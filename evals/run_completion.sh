@@ -1,1 +1,0 @@
-python eval_completion.py "data/Tm.csv" "Tm" --property_name "melting point in degrees Celsius" --limit 100
