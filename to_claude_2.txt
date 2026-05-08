@@ -1,0 +1,4203 @@
+import os
+import re
+import fire
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from tqdm import tqdm
+from dotenv import load_dotenv
+from openai import OpenAI
+from structure_to_iupac.namer import name_smiles
+from sklearn.metrics import mean_absolute_error
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+load_dotenv()
+client = OpenAI()
+
+def ask_gpt(prompt, model="gpt-5.4-mini-2026-03-17"):
+    try:
+        response = client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": "You are a chemistry expert. Provide ONLY the numeric value. No units, no text."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0
+        )
+        content = response.choices[0].message.content.strip()
+        match = re.search(r"[-+]?\d*\.\d+|\d+", content)
+        return float(match.group()) if match else None
+    except:
+        return None
+
+def process_row(row, smiles_col, target_col, property_name, template, few_shot_smi, few_shot_iup):
+    smi = row[smiles_col]
+    actual = row[target_col]
+    
+    try:
+        iupac_name = name_smiles(smi)
+    except:
+        iupac_name = None
+    if not iupac_name: return None
+
+    # Prompt construction
+    smi_context = "\n".join([f"Input: {ex['repr']} -> {property_name}: {ex['val']}" for ex in few_shot_smi])
+    prompt_smi = f"Examples:\n{smi_context}\n\nTask: {template.format(prop=property_name, repr=smi)}"
+
+    iup_context = "\n".join([f"Input: {ex['repr']} -> {property_name}: {ex['val']}" for ex in few_shot_iup])
+    prompt_iup = f"Examples:\n{iup_context}\n\nTask: {template.format(prop=property_name, repr=iupac_name)}"
+
+    pred_smi = ask_gpt(prompt_smi)
+    pred_iup = ask_gpt(prompt_iup)
+
+    if pred_smi is not None and pred_iup is not None:
+        return {"actual": actual, "ae_smi": abs(actual - pred_smi), "ae_iup": abs(actual - pred_iup)}
+    return None
+
+def main(
+    csv_path, 
+    target_col, 
+    property_name="melting point in Kelvin", 
+    smiles_col="SMILES", 
+    limit=55, 
+    workers=15,
+    template="The {prop} of the molecule {repr} is"
+):
+    # Load and clean
+    df = pd.read_csv(csv_path).dropna(subset=[smiles_col, target_col])
+    # BULLETPROOF: Ensure no duplicate molecules leak from context into test
+    df = df.drop_duplicates(subset=[smiles_col])
+    
+    print(f"Loaded {len(df)} unique molecules. Preparing 5-shot context...")
+    
+    few_shot_smi, few_shot_iup = [], []
+    idx = 0
+    while len(few_shot_smi) < 5 and idx < len(df):
+        s, v = df.iloc[idx][smiles_col], df.iloc[idx][target_col]
+        try:
+            name = name_smiles(s)
+            if name:
+                few_shot_smi.append({"repr": s, "val": v})
+                few_shot_iup.append({"repr": name, "val": v})
+        except: pass
+        idx += 1
+
+    eval_df = df.iloc[idx:].head(limit - 5)
+    print(f"🚀 Processing {len(eval_df)} samples in parallel...")
+
+    results = []
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [
+            executor.submit(process_row, row, smiles_col, target_col, property_name, template, few_shot_smi, few_shot_iup) 
+            for _, row in eval_df.iterrows()
+        ]
+        for f in tqdm(as_completed(futures), total=len(futures)):
+            res = f.result()
+            if res: results.append(res)
+
+    res_df = pd.DataFrame(results)
+    m_smi, m_iup = res_df['ae_smi'].mean(), res_df['ae_iup'].mean()
+
+    # Plot
+    plt.figure(figsize=(10, 5))
+    sns.kdeplot(res_df['ae_smi'], fill=True, label=f'SMILES (MAE: {m_smi:.1f})', color='blue')
+    sns.kdeplot(res_df['ae_iup'], fill=True, label=f'IUPAC (MAE: {m_iup:.1f})', color='orange')
+    plt.title(f"MAE Distribution for {property_name} (5-shot)")
+    plt.xlabel("Absolute Error")
+    plt.legend()
+    plt.savefig(f"mae_dist_tm.png", dpi=300)
+    print(f"\nFinal MAE -> SMILES: {m_smi:.2f} | IUPAC: {m_iup:.2f}")
+
+if __name__ == "__main__":
+    fire.Fire(main)import os
+import fire
+import pickle
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+from dotenv import load_dotenv
+from openai import OpenAI
+from sklearn.linear_model import Ridge, LogisticRegression
+from sklearn.model_selection import GroupKFold
+from sklearn.metrics import (mean_absolute_error, r2_score, 
+                             accuracy_score, f1_score, roc_auc_score,
+                             confusion_matrix, ConfusionMatrixDisplay)
+from rdkit import Chem
+from rdkit.Chem.Scaffolds import MurckoScaffold
+from structure_to_iupac.namer import name_smiles
+from collections import defaultdict
+
+load_dotenv()
+client = OpenAI()
+
+def get_cached_embeddings(text_list, dataset_name, suffix, model="text-embedding-3-large"):
+    os.makedirs("embeds", exist_ok=True)
+    cache_path = f"embeds/{dataset_name}_{suffix}.pkl"
+    if os.path.exists(cache_path):
+        with open(cache_path, "rb") as f: return pickle.load(f)
+    
+    print(f"Fetching {suffix} embeddings from OpenAI...")
+    embeddings = []
+    for i in range(0, len(text_list), 500):
+        batch = text_list[i : i + 500]
+        res = client.embeddings.create(input=batch, model=model)
+        embeddings.extend([r.embedding for r in res.data])
+    
+    embeds_array = np.array(embeddings)
+    with open(cache_path, "wb") as f: pickle.dump(embeds_array, f)
+    return embeds_array
+
+def get_scaffolds(smiles_list):
+    groups = []
+    for smi in smiles_list:
+        mol = Chem.MolFromSmiles(smi)
+        groups.append(MurckoScaffold.MurckoScaffoldSmiles(mol=mol) if mol else "")
+    return groups
+
+def run_cv_eval(X, y, groups, label, mode, n_splits=3):
+    """
+    Performs Scaffold-Grouped Cross-Validation.
+    Computes metrics within each fold, then returns the mean and std.
+    """
+    gkf = GroupKFold(n_splits=n_splits)
+    # Store predictions for the final parity/confusion plot
+    all_preds = np.zeros(len(y))
+    all_probs = np.zeros(len(y))
+    
+    # List to store metrics calculated PER FOLD
+    fold_results = defaultdict(list)
+
+    for train_idx, test_idx in gkf.split(X, y, groups=groups):
+        X_train, X_test = X[train_idx], X[test_idx]
+        y_train, y_test = y[train_idx], y[test_idx]
+
+        if mode == 'r':
+            model = Ridge(alpha=1.0).fit(X_train, y_train)
+            p = model.predict(X_test)
+            all_preds[test_idx] = p
+
+            # Metric computation WITHIN this fold
+            fold_results['mae'].append(mean_absolute_error(y_test, p))
+            fold_results['r2'].append(r2_score(y_test, p))
+        else:
+            model = LogisticRegression(max_iter=1000).fit(X_train, y_train)
+            p = model.predict(X_test)
+            prob = model.predict_proba(X_test)[:, 1]
+            all_preds[test_idx] = p
+            all_probs[test_idx] = prob
+            
+            # Metric computation WITHIN this fold
+            fold_results['acc'].append(accuracy_score(y_test, p))
+            fold_results['f1'].append(f1_score(y_test, p))
+            fold_results['auc'].append(roc_auc_score(y_test, prob))
+
+    print(f"\n{label} Results ({n_splits}-fold CV):")
+    for metric, values in fold_results.items():
+        mean_val = np.mean(values)
+        std_val = np.std(values)
+        print(f"  - {metric.upper():3}: {mean_val:.4f} ± {std_val:.4f}")
+    
+    return (all_preds, all_probs) if mode == 'c' else all_preds, fold_results
+
+def plot_results(y_true, smiles_res, iupac_res, mode, output_path="comparison.png"):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+    for ax, (preds_data, metrics), title in zip([ax1, ax2], [smiles_res, iupac_res], ["SMILES", "IUPAC"]):
+        if mode == 'r':
+            ax.scatter(y_true, preds_data, alpha=0.4, edgecolors='white', linewidth=0.5)
+            ax.plot([y_true.min(), y_true.max()], [y_true.min(), y_true.max()], 'r--', alpha=0.8)
+            ax.set_title(f"{title} (Avg R²: {np.mean(metrics['r2']):.3f})")
+            ax.set_xlabel("Experimental")
+            ax.set_ylabel("Predicted")
+        else:
+            preds, _ = preds_data
+            cm = confusion_matrix(y_true, preds)
+            ConfusionMatrixDisplay(cm).plot(ax=ax, cmap='Blues', colorbar=False)
+            ax.set_title(f"{title} (Avg AUC: {np.mean(metrics['auc']):.3f})")
+    
+    plt.tight_layout()
+    plt.savefig(output_path, dpi=300)
+    print(f"\nVisual comparison saved to: {output_path}")
+
+def main(csv_path, target_col, smiles_col="SMILES", mode='r'):
+    dataset_name = os.path.basename(csv_path).split('.')[0]
+    df = pd.read_csv(csv_path)[[smiles_col, target_col]].dropna()
+    
+    print(f"Dataset: {dataset_name} | Generating IUPAC names...")
+    processed = []
+    for smi, val in zip(df[smiles_col], df[target_col]):
+        try:
+            name = name_smiles(smi)
+            if name: processed.append((smi, name, val))
+        except: continue
+    
+    smiles, iupac, y = zip(*processed)
+    y, groups = np.array(y), get_scaffolds(smiles)
+
+    x_smi = get_cached_embeddings(list(smiles), dataset_name, "smiles")
+    x_iup = get_cached_embeddings(list(iupac), dataset_name, "iupac")
+
+    print("\n" + "="*40)
+    s_preds, s_metrics = run_cv_eval(x_smi, y, groups, "SMILES", mode)
+    i_preds, i_metrics = run_cv_eval(x_iup, y, groups, "IUPAC", mode)
+    print("="*40)
+
+    plot_results(y, (s_preds, s_metrics), (i_preds, i_metrics), mode)
+
+if __name__ == "__main__":
+    fire.Fire(main)# structure-to-iupac/assembler.py
+
+import re
+from dataclasses import dataclass, field
+from typing import Optional
+from .rules import bonds, elision, multipliers, stems, suffixes
+
+
+def parse_locant(l):
+    s = str(l)
+    match = re.match(r"^(\d+)([a-zA-Z]*)$", s.split("(")[0])
+    if match:
+        return (1, float(match.group(1)), match.group(2))
+    if any(c.isdigit() for c in s):
+        nums = re.findall(r"\d+", s)
+        return (1, float(nums[0]) if nums else 0.0, s)
+    return (2, 0.0, s)
+
+
+@dataclass
+class SubstituentItem:
+    name: str
+    locants: list[str]
+
+
+@dataclass
+class UnsaturationItem:
+    bond_key: str
+    locants: list[str]
+
+
+@dataclass
+class PrincipalGroupItem:
+    key: str
+    locants: list[str]
+
+
+@dataclass
+class AssemblyParts:
+    parent_length: int
+    is_ring: bool = False
+    is_bicycle: bool = False
+    is_spiro: bool = False
+    is_polycycle: bool = False
+    bicycle_xyz: tuple[int, int, int] = (0, 0, 0)
+    spiro_xy: tuple[int, int] = (0, 0)
+    tricyclo_xyzw: tuple[int, int, int, int] = (0, 0, 0, 0)
+    polycycle_descriptor: str | None = None
+    is_substituent: bool = False
+    is_double_attach: bool = False
+    is_triple_attach: bool = False
+    attachment_locant: int | str = 1
+    retained_name: str | None = None
+    front_modifiers: list[str] = field(default_factory=list)
+    a_prefixes: list[SubstituentItem] = field(default_factory=list)
+    principal_group: Optional[PrincipalGroupItem] = None
+    unsaturations: list[UnsaturationItem] = field(default_factory=list)
+    substituents: list[SubstituentItem] = field(default_factory=list)
+    stereo_features: list[tuple[str, str]] = field(default_factory=list)
+    indicated_hydrogens: list[str] = field(default_factory=list)
+
+
+def needs_hyphen(left: str, right: str) -> bool:
+    if not left or not right:
+        return False
+    if (
+        right[0].isdigit()
+        or right.startswith("N,")
+        or right.startswith("N-")
+        or right.startswith("N',")
+        or right.startswith("N'-")
+    ):
+        return True
+    if left[-1].isdigit():
+        return True
+    return False
+
+
+def is_fully_enclosed(s: str) -> bool:
+    if not s.startswith("(") or not s.endswith(")"):
+        return False
+    depth = 0
+    for i, c in enumerate(s):
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+        if depth == 0 and i < len(s) - 1:
+            return False
+    return depth == 0
+
+
+def _post_process_name(name: str) -> str:
+    name = re.sub(r"(?<![a-zA-Z0-9])1-azacyclopent-2-ene(?![a-zA-Z])", "4,5-dihydro-1H-pyrrole", name)
+    name = re.sub(r"(?<![a-zA-Z0-9])1-azacyclopent-3-ene(?![a-zA-Z])", "2,5-dihydro-1H-pyrrole", name)
+    name = re.sub(
+        r"(?<![a-zA-Z0-9])1-azacyclopent-2-en-(\d+)-(yl|ylidene|ylidyne|ylidynyl)(?![a-zA-Z])",
+        r"4,5-dihydro-1H-pyrrol-\1-\2",
+        name,
+    )
+    name = re.sub(
+        r"(?<![a-zA-Z0-9])1-azacyclopent-3-en-(\d+)-(yl|ylidene|ylidyne|ylidynyl)(?![a-zA-Z])",
+        r"2,5-dihydro-1H-pyrrol-\1-\2",
+        name,
+    )
+    name = re.sub(r"(?<![a-zA-Z0-9])1-azacyclopenta-2,4-diene(?![a-zA-Z])", "1H-pyrrole", name)
+    name = re.sub(
+        r"(?<![a-zA-Z0-9])1-azacyclopenta-2,4-dien-(\d+)-(yl|ylidene|ylidyne|ylidynyl)(?![a-zA-Z])",
+        r"1H-pyrrol-\1-\2",
+        name,
+    )
+
+    name = name.replace("methyloxy", "methoxy")
+    name = name.replace("ethyloxy", "ethoxy")
+    name = name.replace("propyloxy", "propoxy")
+    name = name.replace("butyloxy", "butoxy")
+    name = name.replace("phenyloxy", "phenoxy")
+
+    name = name.replace("aminocarbonylamino", "carbamoylamino")
+    name = name.replace("aminocarbonyl", "carbamoyl")
+    name = name.replace("aminosulfonyl", "sulfamoyl")
+
+    name = name.replace("eth-1-en-1-yl", "ethenyl")
+    name = name.replace("eth-1-enyl", "ethenyl")
+    name = name.replace("(ethenyl)", "ethenyl")
+
+    name = re.sub(r"\b1-(formate|formamide|formic acid|formyl|formaldehyde|formonitrile)\b", r"\1", name)
+    name = re.sub(r"\(1-(formate|formamide|formic acid|formyl|formaldehyde|formonitrile)\)", r"(\1)", name)
+    name = re.sub(r"-1-formate\b", "-formate", name)
+    name = re.sub(r"\bmethyl 1-\(", "methyl (", name)
+    name = re.sub(r"\b(\S+yl) 1-\(", r"\1 (", name)
+    name = re.sub(r"\)1-\(", ")(", name)
+    name = re.sub(r" 1-\(", " (", name)
+
+    name = re.sub(r"\((.*?)\)\((?<!thi)oxo\)methyl\b", r"(\1)carbonyl", name)
+    name = re.sub(r"\((?<!thi)oxo\)\((.*?)\)methyl\b", r"(\1)carbonyl", name)
+    name = name.replace("(oxo)methyl", "formyl")
+    name = re.sub(r"(?<!thi)oxomethyl\b", "formyl", name)
+    name = name.replace("thioxomethyl", "carbonothioyl")
+
+    name = name.replace("1-oxacyclopropan", "oxiran")
+    name = name.replace("1-oxacyclopropane", "oxirane")
+    name = name.replace("1-thiacyclopropan", "thiiran")
+    name = name.replace("1-thiacyclopropane", "thiirane")
+    name = name.replace("1-azacyclopropan", "aziridin")
+    name = name.replace("1-azacyclopropane", "aziridine")
+
+    name = name.replace("1,3-dioxacyclopentan", "1,3-dioxolan")
+    name = name.replace("1,3-dioxacyclopentane", "1,3-dioxolane")
+    name = name.replace("1,3-dioxacyclohexan", "1,3-dioxan")
+    name = name.replace("1,3-dioxacyclohexane", "1,3-dioxane")
+    name = name.replace("1,4-dioxacyclohexan", "1,4-dioxan")
+    name = name.replace("1,4-dioxacyclohexane", "1,4-dioxane")
+    name = name.replace("1,3-oxathiolan", "1,3-oxathiolan")
+    name = name.replace("1,3-oxazolidine", "oxazolidine")
+    name = name.replace("1,3-thiazolidine", "thiazolidine")
+
+    name = name.replace("aminoiminomethyl", "carbamimidoyl")
+    name = name.replace("amino(imino)methyl", "carbamimidoyl")
+    name = name.replace("iminoamino", "diazenyl")
+    name = name.replace("aminoimino", "hydrazono")
+
+    name = re.sub(r"\b1-\((.*?)amino\)methanenitrile\b", r"\1cyanamide", name)
+    name = re.sub(r"\b1-([a-zA-Z0-9\-\[\]\(\)\,]+?)aminomethanenitrile\b", r"\1cyanamide", name)
+    name = name.replace("aminomethanenitrile", "cyanamide")
+
+    replacements =[
+        ("1-hydroxymethanoic acid", "carbonic acid"),
+        ("1-hydroxymethanoate", "carbonate"),
+        ("1-hydroxymethanamide", "carbamic acid"),
+        ("1-hydroxymethanenitrile", "cyanic acid"),
+        ("1-hydroxymethanoyl", "carboxy"),
+        ("1-hydroxymethanoic anhydride", "dicarbonic acid"),
+        ("hydroxymethanoic acid", "carbonic acid"),
+        ("hydroxymethanoate", "carbonate"),
+        ("hydroxymethanamide", "carbamic acid"),
+        ("hydroxymethanenitrile", "cyanic acid"),
+        ("hydroxymethanoyl", "carboxy"),
+        ("hydroxymethanoic anhydride", "dicarbonic acid"),
+        ("benzene-1-carboxylic acid", "benzoic acid"),
+        ("benzene-1-carboxamide", "benzamide"),
+        ("benzene-1-carboxylate", "benzoate"),
+        ("benzene-1-carbonitrile", "benzonitrile"),
+        ("benzene-1-carbaldehyde", "benzaldehyde"),
+        ("benzene-1-carbonyl", "benzoyl"),
+        ("benzenecarboxylic acid", "benzoic acid"),
+        ("benzenecarcarboxamide", "benzamide"),
+        ("benzenecarboxylate", "benzoate"),
+        ("benzenecarcarbonitrile", "benzonitrile"),
+        ("benzenecarbaldehyde", "benzaldehyde"),
+        ("methanoic acid", "formic acid"),
+        ("methanamide", "formamide"),
+        ("methanoate", "formate"),
+        ("methanoyl", "formyl"),
+        ("ethanoic acid", "acetic acid"),
+        ("ethanamide", "acetamide"),
+        ("ethanenitrile", "acetonitrile"),
+        ("ethanoate", "acetate"),
+        ("ethanoyl", "acetyl"),
+        ("propanenitrile", "propionitrile"),
+        ("butanenitrile", "butyronitrile"),
+        ("2-methylpropan-2-yl", "tert-butyl"),
+        ("1,1-dimethylethyl", "tert-butyl"),
+        ("(1,1-dimethylethyl)oxy", "tert-butoxy"),
+        ("(tert-butyl)oxy", "tert-butoxy"),
+        ("tert-butyloxy", "tert-butoxy"),
+        ("methylcarbonyloxy", "acetoxy"),
+        ("methylcarbonyl", "acetyl"),
+        ("ethylcarbonyl", "propionyl"),
+        ("propylcarbonyl", "butyryl"),
+        ("phenylcarbonyl", "benzoyl"),
+        ("(methylcarbonyl)oxy", "acetoxy"),
+        ("(ethylcarbonyl)oxy", "propionyloxy"),
+        ("(phenylcarbonyl)oxy", "benzoyloxy"),
+        ("aminocarbonothioyl", "carbamothioyl"),
+        ("ethan-1-ol", "ethanol"),
+        ("methan-1-ol", "methanol"),
+        ("ethan-1-amine", "ethanamine"),
+        ("methan-1-amine", "methanamine"),
+        ("(phenylsulfonyl)amino", "benzenesulfonamido"),
+        ("phenylsulfonylamino", "benzenesulfonamido"),
+        ("(benzenesulfonyl)amino", "benzenesulfonamido"),
+        ("benzenesulfonylamino", "benzenesulfonamido"),
+        ("(methanesulfonyl)amino", "methanesulfonamido"),
+        ("methanesulfonylamino", "methanesulfonamido"),
+        ("(ethanesulfonyl)amino", "ethanesulfonamido"),
+        ("ethanesulfonylamino", "ethanesulfonamido"),
+        ("(chloromethyl)carbonyl", "chloroacetyl"),
+        ("((chloromethyl)carbonyl)amino", "2-chloroacetamido"),
+        ("(prop-2-enoyl)amino", "acrylamido"),
+        ("prop-2-enoylamino", "acrylamido"),
+        ("prop-2-enoyloxy", "acryloyloxy"),
+        ("1-oxoethan-1-yl", "acetyl"),
+        ("1-oxopropan-1-yl", "propionyl"),
+        ("1-oxobutan-1-yl", "butyryl"),
+        ("1-oxopentan-1-yl", "pentanoyl"),
+        ("1-oxohexan-1-yl", "hexanoyl"),
+        ("1-oxoethyl", "acetyl"),
+        ("1-oxopropyl", "propionyl"),
+        ("1-oxobutyl", "butyryl"),
+        ("1-oxopentyl", "pentanoyl"),
+        ("1-oxohexyl", "hexanoyl"),
+        ("benzene-1-sulfonic acid", "benzenesulfonic acid"),
+        ("benzene-1-sulfonamide", "benzenesulfonamide"),
+        ("benzene-1-thiol", "benzenethiol"),
+        ("ethanedioic acid", "oxalic acid"),
+        ("propanedioic acid", "malonic acid"),
+        ("butanedioic acid", "succinic acid"),
+        ("pentanedioic acid", "glutaric acid"),
+        ("hexanedioic acid", "adipic acid"),
+        ("phenylmethyl", "benzyl"),
+        ("benzylcarbonyl", "phenylacetyl"),
+        ("phenylmethoxy", "benzyloxy"),
+        ("methanehydrazine", "methylhydrazine"),
+        ("ethanehydrazine", "ethylhydrazine"),
+        ("propanehydrazine", "propylhydrazine"),
+        ("benzenehydrazine", "phenylhydrazine"),
+        ("fluoroethanoate", "fluoroacetate"),
+        ("chloroethanoate", "chloroacetate"),
+        ("bromoethanoate", "bromoacetate"),
+        ("iodoethanoate", "iodoacetate"),
+        ("fluoroethanoic acid", "fluoroacetic acid"),
+        ("chloroethanoic acid", "chloroacetic acid"),
+        ("bromoethanoic acid", "bromoacetic acid"),
+        ("iodoethanoic acid", "iodoacetic acid"),
+        ("fluoroethanoyl", "fluoroacetyl"),
+        ("chloroethanoyl", "chloroacetyl"),
+        ("bromoethanoyl", "bromoacetyl"),
+        ("iodoethanoyl", "iodoacetyl"),
+        ("1-azacyclobutane", "azetidine"),
+        ("1-azacyclobutan-", "azetidin-"),
+        ("1-azacyclopentane", "pyrrolidine"),
+        ("1-azacyclopentan-", "pyrrolidin-"),
+        ("1-azacyclohexane", "piperidine"),
+        ("1-azacyclohexan-", "piperidin-"),
+        ("1-oxacyclopentane", "oxolane"),
+        ("1-oxacyclopentan-", "oxolan-"),
+        ("1-oxacyclohexane", "oxane"),
+        ("1-oxacyclohexan-", "oxan-"),
+        ("1-thiacyclopentane", "thiolane"),
+        ("1-thiacyclopentan-", "thiolan-"),
+        ("1-thiacyclohexane", "thiane"),
+        ("1-thiacyclohexan-", "thian-"),
+    ]
+    for old, new in replacements:
+        if old in["2-methylpropan-2-yl", "1,1-dimethylethyl"]:
+            name = re.sub(rf"(?<![a-zA-Z0-9\-,]){re.escape(old)}(?![a-zA-Z])", new, name)
+        else:
+            if old in["1-azacyclobutane", "1-azacyclopentane", "1-azacyclohexane", "1-oxacyclopentane", "1-oxacyclohexane", "1-thiacyclopentane", "1-thiacyclohexane"]:
+                name = re.sub(rf"-{re.escape(old)}(?![a-zA-Z])", new, name)
+            name = re.sub(rf"(?<![a-zA-Z]){re.escape(old)}(?![a-zA-Z])", new, name)
+
+    if name.strip() == "methanenitrile":
+        name = "hydrogen cyanide"
+
+    name = re.sub(r"(?<!m)ethanoic acid\b", "acetic acid", name)
+    name = re.sub(r"(?<!m)ethanamide\b", "acetamide", name)
+    name = re.sub(r"(?<!m)ethanenitrile\b", "acetonitrile", name)
+    name = re.sub(r"(?<!m)ethanoate\b", "acetate", name)
+    name = re.sub(r"(?<!m)ethanoyl\b", "acetyl", name)
+
+    for acyl in ["benzoyl", "acetyl", "propionyl", "formyl"]:
+        name = re.sub(rf"(?<!\))(?<!\])\b\(([^()]*{acyl})\)amino\b", rf"\1amido", name)
+        name = re.sub(rf"(?<!\))(?<!\])\b([^()]*{acyl})amino\b", rf"\1amido", name)
+
+    name = re.sub(r"\b1-methanethiol\b", "methanethiol", name)
+    name = re.sub(r"-1-methanethiol\b", "methanethiol", name)
+
+    name = re.sub(r"\b([a-z]+o)iminomethyl\b", r"\1carbonimidoyl", name)
+    name = re.sub(r"\bimino\(([a-z]+o)\)methyl\b", r"\1carbonimidoyl", name)
+    name = re.sub(r"\bimino([a-z]+o)methyl\b", r"\1carbonimidoyl", name)
+
+    name = re.sub(r"ane-(\d+(?:,\d+)*)-((?:di|tri)?yl(?:idene|idyne)?)\b", r"an-\1-\2", name)
+    name = re.sub(r"ene-(\d+(?:,\d+)*)-((?:di|tri)?yl(?:idene|idyne)?)\b", r"en-\1-\2", name)
+    name = re.sub(r"yne-(\d+(?:,\d+)*)-((?:di|tri)?yl(?:idene|idyne)?)\b", r"yn-\1-\2", name)
+
+    name = re.sub(r"one-(\d+(?:,\d+)*)-((?:di|tri)?yl(?:idene|idyne)?)\b", r"on-\1-\2", name)
+    name = name.replace("one-diyl", "on-diyl")
+    name = name.replace("one-yl", "on-yl")
+
+    name = name.replace("(benzyl)", "benzyl")
+    name = name.replace("(benzyloxy)", "benzyloxy")
+
+    name = name.replace("eth-1-yn-1-yl", "ethynyl")
+    name = name.replace("eth-1-ynyl", "ethynyl")
+
+    name = name.replace("methan-1-one hydrazone", "formaldehyde hydrazone")
+    name = name.replace("methanone hydrazone", "formaldehyde hydrazone")
+    name = name.replace("methanal hydrazone", "formaldehyde hydrazone")
+    name = name.replace("ethanal hydrazone", "acetaldehyde hydrazone")
+
+    name = name.replace("oxo(hydroxy)aminooxy", "nitrooxy")
+    name = name.replace("(oxo(hydroxy)amino)oxy", "nitrooxy")
+    name = name.replace("(oxo)(oxido)aminooxy", "nitrooxy")
+    name = name.replace("((oxo)(oxido)amino)oxy", "nitrooxy")
+
+    name = re.sub(r"\b(amino|imino)([a-z]+oxy)methyl\b", r"\1(\2)methyl", name)
+    name = re.sub(r"\b(amino|imino)([a-z]+oxy)methylidene\b", r"\1(\2)methylidene", name)
+    
+    name = re.sub(r"ane-(\d+(?:,\d+)*)-hydrazine\b", r"an-\1-ylhydrazine", name)
+    name = re.sub(r"ene-(\d+(?:,\d+)*)-hydrazine\b", r"en-\1-ylhydrazine", name)
+    name = re.sub(r"yne-(\d+(?:,\d+)*)-hydrazine\b", r"yn-\1-ylhydrazine", name)
+    
+    name = re.sub(r"\b(amino|imino)\(", r"(\1)(", name)
+    name = name.replace("aminoamino", "hydrazinyl")
+
+    return name
+
+
+def assemble_name(parts: AssemblyParts) -> str:
+    spiro_subs =[]
+    normal_subs =[]
+    for sub in parts.substituents:
+        match = re.match(r"^\[SPIRO\]-(\d+)-(.*)$", sub.name)
+        if match:
+            spiro_subs.append((str(sub.locants[0]), match.group(1), match.group(2)))
+        else:
+            normal_subs.append(sub)
+
+    parts.substituents = normal_subs
+
+    prefix_str = ""
+    if parts.substituents:
+        grouped: dict[str, list[str]] = {}
+        for sub in parts.substituents:
+            grouped.setdefault(sub.name, []).extend(sub.locants)
+
+        prefix_parts =[]
+
+        def sub_sort_key(name):
+            s = name.lower()
+            s = re.sub(r"^[\(\[\{\)]+", "", s)
+            prefix_pattern = r"^((?:(?:[0-9]+[a-z]*|[nospmc]\'*)(?:,(?:[0-9]+[a-z]*|[nospmc]\'*))*|[ezrs]+|sec|tert|t|s|d|l|m|o|p|alpha|beta|gamma))([-)]+)"
+            while True:
+                match = re.match(prefix_pattern, s)
+                if match:
+                    s = s[match.end() :]
+                    s = re.sub(r"^[\(\[\{\)]+", "", s)
+                    continue
+                break
+            return s
+
+        for name in sorted(grouped.keys(), key=sub_sort_key):
+            locs = sorted(grouped[name], key=parse_locant)
+
+            attachments_per_group = 2 if ("diyl" in name and "ylidene" not in name) else 1
+            count_raw = len(locs) if locs else len([s for s in parts.substituents if s.name == name])
+            count = max(1, count_raw // attachments_per_group)
+
+            is_complex = "(" in name or name[0].isdigit() or "-" in name or " " in name
+            mult = (multipliers.complex_(count) if is_complex else multipliers.basic(count)) if count > 1 else ""
+
+            if (
+                parts.parent_length == 1
+                and all(str(l).isdigit() for l in locs)
+                and not parts.principal_group
+                and not parts.a_prefixes
+            ):
+                loc_str = ""
+            else:
+                loc_str = ",".join(map(str, locs))
+
+            simple_one_locant = (
+                len(locs) == 1
+                and str(locs[0]) == "1"
+                and parts.is_ring
+                and not parts.principal_group
+                and not parts.unsaturations
+                and not parts.is_substituent
+                and not parts.a_prefixes
+                and len(grouped) == 1
+                and not parts.is_bicycle
+                and not parts.is_spiro
+                and not parts.is_polycycle
+                and not spiro_subs
+            )
+            if simple_one_locant:
+                loc_str = ""
+
+            name_to_use = name
+            if is_complex and not is_fully_enclosed(name):
+                if count > 1 or loc_str:
+                    name_to_use = f"({name})"
+            elif not loc_str and len(grouped) > 1 and not is_fully_enclosed(name):
+                if name not in["fluoro", "chloro", "bromo", "iodo"]:
+                    name_to_use = f"({name})"
+
+            if loc_str:
+                prefix_parts.append(f"{loc_str}-{mult}{name_to_use}")
+            else:
+                prefix_parts.append(f"{mult}{name_to_use}")
+
+        prefix_str = prefix_parts[0]
+        for p in prefix_parts[1:]:
+            prefix_str += f"-{p}" if needs_hyphen(prefix_str, p) else p
+
+    a_prefix_str = ""
+    if parts.a_prefixes:
+        a_order = {"oxa": 1, "thia": 2, "aza": 3, "phospha": 4, "sila": 5, "bora": 6}
+        grouped_a: dict[str, list[str]] = {}
+        for sub in parts.a_prefixes:
+            grouped_a.setdefault(sub.name,[]).extend(sub.locants)
+
+        a_parts =[]
+        for name in sorted(grouped_a.keys(), key=lambda n: a_order.get(n, 99)):
+            locs = sorted(grouped_a[name], key=parse_locant)
+            loc_str = ",".join(map(str, locs))
+            count = len(locs)
+            mult = multipliers.basic(count) if count > 1 else ""
+            a_parts.append(f"{loc_str}-{mult}{name}")
+
+        a_prefix_str = "-".join(a_parts)
+
+    if parts.is_ring and not parts.is_bicycle and not parts.is_spiro and parts.parent_length == 6:
+        if (
+            len(parts.unsaturations) == 1
+            and parts.unsaturations[0].bond_key == "double"
+            and len(parts.unsaturations[0].locants) == 3
+        ):
+            locs = sorted([parse_locant(l)[1] for l in parts.unsaturations[0].locants])
+            if locs ==[1.0, 3.0, 5.0]:
+                if not parts.a_prefixes:
+                    parts.retained_name = "benzene"
+                    parts.unsaturations =[]
+
+    terminal_e = bonds.PARENT_TERMINAL_VOWEL
+
+    if parts.retained_name:
+        if parts.is_substituent and parts.retained_name == "benzene":
+            stem_str = "phen"
+            terminal_e = ""
+        elif parts.is_substituent and parts.retained_name == "pyridine":
+            stem_str = "pyridin"
+            terminal_e = ""
+        elif parts.is_substituent and parts.retained_name == "naphthalene":
+            stem_str = "naphthalen"
+            terminal_e = ""
+        else:
+            if parts.retained_name.endswith("e"):
+                stem_str = parts.retained_name[:-1]
+                terminal_e = "e"
+            else:
+                stem_str = parts.retained_name
+                terminal_e = ""
+    else:
+        stem_str = stems.stem_for(parts.parent_length)
+        if parts.is_bicycle:
+            x, y, z = parts.bicycle_xyz
+            stem_str = f"bicyclo[{x}.{y}.{z}]" + stem_str
+        elif parts.is_spiro:
+            x, y = parts.spiro_xy
+            stem_str = f"spiro[{x}.{y}]" + stem_str
+        elif parts.is_polycycle:
+            if parts.polycycle_descriptor:
+                stem_str = parts.polycycle_descriptor + stem_str
+            else:
+                v = parts.parent_length
+                if v >= 4:
+                    a = max(1, (v - 2) - 2)
+                    b = 1
+                    c = 1
+                    if a + b + c + 2 != v:
+                        a = v - 2 - b - c
+                    stem_str = f"tricyclo[{a}.{b}.{c}.0^{{1,3}}]" + stem_str
+                else:
+                    stem_str = f"tricyclo[1.1.0.0^{{1,3}}]" + stem_str
+        elif parts.is_ring:
+            stem_str = "cyclo" + stem_str
+
+    if a_prefix_str:
+        if elision.is_vowel_start(stem_str) and a_prefix_str.endswith("a"):
+            a_prefix_str = a_prefix_str[:-1]
+        stem_str = a_prefix_str + stem_str
+
+    unsat_str = ""
+
+    if parts.is_substituent:
+        if parts.is_triple_attach:
+            suffix_yl = "ylidyne"
+        elif parts.is_double_attach:
+            suffix_yl = "ylidene"
+        else:
+            suffix_yl = "yl"
+
+        always_print_locant = False
+        if parts.is_ring and (parts.a_prefixes or (parts.retained_name and parts.retained_name != "benzene")):
+            always_print_locant = True
+
+        if parts.parent_length == 1:
+            always_print_locant = False
+
+        if parts.retained_name == "benzene":
+            terminal_e = "yl"
+        elif (
+            str(parts.attachment_locant) != "1" or parts.unsaturations or always_print_locant
+        ) and parts.parent_length > 1:
+            terminal_e = f"-{parts.attachment_locant}-{suffix_yl}"
+        else:
+            terminal_e = suffix_yl
+
+        suffix_str = ""
+
+        if not parts.retained_name and parts.unsaturations:
+            order = {"double": 1, "triple": 2}
+            sorted_unsats = sorted(parts.unsaturations, key=lambda u: order.get(u.bond_key, 99))
+            unsat_parts =[]
+            base_infixes =[]
+            for u in sorted_unsats:
+                count = len(u.locants) or 1
+                infix = bonds.unsaturation_infix(u.bond_key, count)
+                base_infix = infix[1:] if infix.startswith("a") else infix
+                base_infixes.append((u, base_infix))
+            if base_infixes and not elision.is_vowel_start(base_infixes[0][1]):
+                stem_str += "a"
+            for u, base_infix in base_infixes:
+                if u.locants:
+                    loc_str = ",".join(sorted(u.locants, key=parse_locant))
+                    unsat_parts.append(f"-{loc_str}-{base_infix}")
+                else:
+                    unsat_parts.append(base_infix)
+            unsat_str = "".join(unsat_parts)
+
+        elif not parts.retained_name and not parts.unsaturations:
+            if parts.parent_length > 1 and (
+                str(parts.attachment_locant) != "1"
+                or parts.is_bicycle
+                or parts.is_spiro
+                or parts.is_polycycle
+                or always_print_locant
+            ):
+                unsat_str = "an"
+
+    else:
+        if not parts.retained_name:
+            if not parts.unsaturations:
+                unsat_str = bonds.get("single").saturated_suffix
+            else:
+                order = {"double": 1, "triple": 2}
+                sorted_unsats = sorted(parts.unsaturations, key=lambda u: order.get(u.bond_key, 99))
+                unsat_parts =[]
+                base_infixes =[]
+
+                for u in sorted_unsats:
+                    count = len(u.locants) or 1
+                    infix = bonds.unsaturation_infix(u.bond_key, count)
+                    base_infix = infix[1:] if infix.startswith("a") else infix
+                    base_infixes.append((u, base_infix))
+
+                if base_infixes and not elision.is_vowel_start(base_infixes[0][1]):
+                    stem_str += "a"
+
+                for u, base_infix in base_infixes:
+                    if u.locants:
+                        loc_str = ",".join(sorted(u.locants, key=parse_locant))
+                        unsat_parts.append(f"-{loc_str}-{base_infix}")
+                    else:
+                        unsat_parts.append(base_infix)
+
+                unsat_str = "".join(unsat_parts)
+
+        suffix_str = ""
+        if parts.principal_group:
+            group = suffixes.get(parts.principal_group.key)
+            locs = sorted(parts.principal_group.locants, key=parse_locant)
+
+            omit_locant = False
+            has_spiro_subs = bool(spiro_subs)
+            if parts.parent_length == 1:
+                omit_locant = True
+            elif len(locs) == 1 and str(locs[0]) == "1":
+                if not group.suffix_with_locant:
+                    omit_locant = True
+                elif (
+                    parts.is_ring
+                    and not parts.unsaturations
+                    and not parts.is_bicycle
+                    and not parts.is_spiro
+                    and not parts.is_polycycle
+                    and not has_spiro_subs
+                    and not parts.retained_name
+                ):
+                    omit_locant = True
+
+            if group.key in[
+                "acid_fluoride",
+                "acid_chloride",
+                "acid_bromide",
+                "acid_iodide",
+                "ring_acid_fluoride",
+                "ring_acid_chloride",
+                "ring_acid_bromide",
+                "ring_acid_iodide",
+            ]:
+                if len(locs) > 1:
+                    parts_suffix = group.suffix.split()
+                    suffix_text = (
+                        multipliers.basic(len(locs))
+                        + parts_suffix[0]
+                        + " "
+                        + multipliers.basic(len(locs))
+                        + parts_suffix[1]
+                    )
+                else:
+                    suffix_text = group.suffix
+            else:
+                suffix_text = multipliers.basic(len(locs)) + group.suffix if len(locs) > 1 else group.suffix
+
+            if elision.is_vowel_start(suffix_text):
+                terminal_e = ""
+
+            if group.suffix_with_locant and locs and not omit_locant:
+                suffix_str = f"-{','.join(map(str, locs))}-{suffix_text}"
+            else:
+                suffix_str = suffix_text
+
+    if spiro_subs:
+        core_name = stem_str + unsat_str + "e"
+        for i, (p_loc, s_loc, s_name) in enumerate(spiro_subs):
+            if "-" in s_name or re.search(r"\d", s_name):
+                s_name_str = f"({s_name})"
+            else:
+                s_name_str = s_name
+            core_name = f"spiro[{core_name}-{p_loc},{s_loc}'-{s_name_str}]"
+        
+        if terminal_e and terminal_e != "e":
+            if ("yl" in terminal_e or elision.is_vowel_start(terminal_e.lstrip("-0123456789,"))) and core_name.endswith("e"):
+                core_name = core_name[:-1]
+            core_name += terminal_e
+        terminal_e = ""
+    else:
+        core_name = stem_str + unsat_str + terminal_e
+
+    if parts.indicated_hydrogens:
+        ih_str = ",".join(sorted(parts.indicated_hydrogens, key=parse_locant)) + "H-"
+        core_name = ih_str + core_name
+
+    core_name += suffix_str
+    final_word = (
+        prefix_str + "-" + core_name if prefix_str and needs_hyphen(prefix_str, core_name) else prefix_str + core_name
+    )
+
+    if parts.stereo_features:
+
+        def stereo_sort(f):
+            return parse_locant(f[0])
+
+        unique_stereo =[]
+        seen = set()
+        for f in parts.stereo_features:
+            if f not in seen:
+                seen.add(f)
+                unique_stereo.append(f)
+
+        sorted_stereo = sorted(unique_stereo, key=stereo_sort)
+        stereo_str = "(" + ",".join(f"{loc}{st}" for loc, st in sorted_stereo) + ")-"
+        final_word = stereo_str + final_word
+
+    if parts.front_modifiers:
+        counts = {}
+        for mod in parts.front_modifiers:
+            counts[mod] = counts.get(mod, 0) + 1
+        front_words =[multipliers.basic(c) + m if c > 1 else m for m, c in sorted(counts.items())]
+        final_word = f"{' '.join(front_words)} {final_word}"
+
+    final_word = _post_process_name(final_word)
+
+    return final_word# structure-to-iupac/chains.py
+
+from dataclasses import dataclass, field
+from .molecule import Molecule
+
+@dataclass
+class RingSystem:
+    atoms: set[int]
+    is_bicycle: bool = False
+    is_spiro: bool = False
+    is_polycycle: bool = False
+    x: int = 0
+    y: int = 0
+    z: int = 0
+    paths: list[list[int]] = field(default_factory=list)
+    chord_edges: list[tuple[int, int]] = field(default_factory=list)
+    polycycle_descriptor: str | None = None
+
+def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
+    adj = {n: set() for n in comp_nodes}
+    for u, v in comp_edges:
+        adj[u].add(v)
+        adj[v].add(u)
+        
+    cycles = []
+    def dfs(curr, start, path, visited):
+        for n in adj[curr]:
+            if n == start and len(path) >= 3:
+                cycles.append(path)
+            elif n not in visited:
+                dfs(n, start, path + [n], visited | {n})
+                
+    for n in comp_nodes:
+        dfs(n, n, [n], {n})
+        
+    if not cycles:
+        return None, [list(comp_nodes)]
+        
+    max_len = max(len(c) for c in cycles)
+    largest_cycles =[c for c in cycles if len(c) == max_len]
+    
+    best_main_ring = None
+    best_bridges = None
+    best_main_bridge_len = -1
+    
+    for main_ring in largest_cycles:
+        main_ring_set = set(main_ring)
+        bridges =[]
+        main_ring_edges = set()
+        for i in range(len(main_ring)):
+            u, v = main_ring[i], main_ring[(i+1)%len(main_ring)]
+            main_ring_edges.add(tuple(sorted((u, v))))
+            
+        for u, v in comp_edges:
+            if u in main_ring_set and v in main_ring_set:
+                if tuple(sorted((u, v))) not in main_ring_edges:
+                    bridges.append({
+                        'nodes':[],
+                        'endpoints': (u, v),
+                        'length': 0
+                    })
+                    
+        non_main_nodes = comp_nodes - main_ring_set
+        visited_non_main = set()
+        for n in non_main_nodes:
+            if n not in visited_non_main:
+                comp = []
+                q = [n]
+                visited_non_main.add(n)
+                while q:
+                    curr = q.pop(0)
+                    comp.append(curr)
+                    for neighbor in adj[curr]:
+                        if neighbor in non_main_nodes and neighbor not in visited_non_main:
+                            visited_non_main.add(neighbor)
+                            q.append(neighbor)
+                
+                connections =[]
+                for cn in sorted(comp):
+                    for neighbor in sorted(adj[cn]):
+                        if neighbor in main_ring_set:
+                            connections.append((cn, neighbor))
+                
+                if len(connections) >= 2:
+                    bridges.append({
+                        'nodes': comp,
+                        'endpoints': (connections[0][1], connections[1][1]),
+                        'length': len(comp)
+                    })
+                    for cn, neighbor in connections[2:]:
+                        bridges.append({
+                            'nodes':[],
+                            'endpoints': (cn, neighbor),
+                            'length': 0
+                        })
+                    
+        if not bridges:
+            continue
+            
+        bridges.sort(key=lambda b: b['length'], reverse=True)
+        main_bridge_len = bridges[0]['length']
+        
+        if main_bridge_len > best_main_bridge_len:
+            best_main_bridge_len = main_bridge_len
+            best_main_ring = main_ring
+            best_bridges = bridges
+
+    if not best_bridges:
+        return None, [largest_cycles[0]]
+        
+    main_ring = best_main_ring
+    bridges = best_bridges
+    main_bridge = bridges[0]
+    
+    ep1, ep2 = main_bridge['endpoints']
+    idx1 = main_ring.index(ep1)
+    idx2 = main_ring.index(ep2)
+    
+    if idx1 < idx2:
+        pathA = main_ring[idx1:idx2+1]
+        pathB = main_ring[idx2:] + main_ring[:idx1+1]
+    else:
+        pathA = main_ring[idx2:idx1+1]
+        pathB = main_ring[idx1:] + main_ring[:idx2+1]
+        
+    lenA = len(pathA) - 2
+    lenB = len(pathB) - 2
+    
+    if lenA >= lenB:
+        branch1 = pathA
+        branch2 = pathB[::-1]
+    else:
+        branch1 = pathB
+        branch2 = pathA[::-1]
+        
+    if branch1[0] != ep1:
+        branch1 = branch1[::-1]
+        branch2 = branch2[::-1]
+        
+    bridge_path = []
+    if main_bridge['length'] > 0:
+        q = [(ep1, [])]
+        visited = set()
+        found_path =[]
+        while q:
+            curr, p = q.pop(0)
+            if curr == ep2 and len(p) > 0:
+                found_path = p[:-1]
+                break
+            visited.add(curr)
+            for neighbor in adj[curr]:
+                if neighbor in main_bridge['nodes'] or neighbor == ep2:
+                    if neighbor not in visited:
+                        q.append((neighbor, p + [neighbor]))
+        bridge_path = found_path
+        
+    path1 =[]
+    path1.extend(branch1)
+    path1.extend(branch2[::-1][1:-1])
+    path1.extend(bridge_path)
+    
+    path2 = []
+    path2.extend(branch1[::-1])
+    path2.extend(branch2[1:-1])
+    path2.extend(bridge_path[::-1])
+    
+    def add_extra_nodes(base_path):
+        path = list(base_path)
+        visited = set(path)
+        for br in bridges[1:]:
+            if br['length'] > 0:
+                b_ep1, b_ep2 = br['endpoints']
+                q = [(b_ep1, [])]
+                v2 = set()
+                found =[]
+                while q:
+                    curr, p = q.pop(0)
+                    if curr == b_ep2 and len(p) > 0:
+                        found = p[:-1]
+                        break
+                    v2.add(curr)
+                    for nxt in adj[curr]:
+                        if nxt in br['nodes'] or nxt == b_ep2:
+                            if nxt not in v2:
+                                q.append((nxt, p + [nxt]))
+                for node in found:
+                    if node not in visited:
+                        path.append(node)
+                        visited.add(node)
+        for n in comp_nodes:
+            if n not in visited:
+                path.append(n)
+                visited.add(n)
+        return path
+
+    path1 = add_extra_nodes(path1)
+    path2 = add_extra_nodes(path2)
+    
+    a_len = max(0, len(branch1) - 2)
+    b_len = max(0, len(branch2) - 2)
+    c_len = main_bridge['length']
+    
+    main_lens = sorted([a_len, b_len, c_len], reverse=True)
+    a, b, c = main_lens
+    
+    def build_desc(path):
+        pos = {n: i+1 for i, n in enumerate(path)}
+        extra_chords_data = []
+        for b_idx, br in enumerate(bridges[1:]):
+            b_ep1, b_ep2 = br['endpoints']
+            loc1, loc2 = sorted([pos.get(b_ep1, 1), pos.get(b_ep2, 1)])
+            extra_chords_data.append((br['length'], loc2, loc1))
+        extra_chords_data.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
+        
+        comp_seq = []
+        extra_chords =[]
+        for length, loc2, loc1 in extra_chords_data:
+            comp_seq.extend([loc1, loc2])
+            extra_chords.append(f".{length}^{{{loc1},{loc2}}}")
+            
+        desc_str = f"[{a}.{b}.{c}" + "".join(extra_chords) + "]"
+        return desc_str, tuple(comp_seq)
+
+    desc1_str, comp1 = build_desc(path1)
+    desc2_str, comp2 = build_desc(path2)
+    
+    if comp1 < comp2:
+        best_desc = desc1_str
+        valid_paths = [path1]
+    elif comp2 < comp1:
+        best_desc = desc2_str
+        valid_paths = [path2]
+    else:
+        best_desc = desc1_str
+        valid_paths = [path1, path2]
+        
+    prefixes = {1: "bicyclo", 2: "tricyclo", 3: "tetracyclo", 4: "pentacyclo", 5: "hexacyclo", 6: "heptacyclo", 7: "octacyclo", 8: "nonacyclo", 9: "decacyclo"}
+    prefix = prefixes.get(len(bridges), "polycyclo")
+    
+    return prefix + best_desc, valid_paths
+
+def get_cyclic_atoms(mol: Molecule, exclude_atoms: set[int] = None) -> set[int]:
+    if exclude_atoms is None: exclude_atoms = set()
+    valid_nodes = {a.idx for a in mol if a.idx not in exclude_atoms and (a.is_carbon or mol.degree(a.idx) >= 2)}
+    cyclic = set()
+    
+    for n in valid_nodes:
+        neighbors = [x for x in mol.get_neighbors(n) if x in valid_nodes]
+        in_cycle = False
+        for nxt in neighbors:
+            visited = {n, nxt}
+            q = [nxt]
+            found = False
+            while q:
+                curr = q.pop(0)
+                for nn in mol.get_neighbors(curr):
+                    if nn in valid_nodes:
+                        if nn == n and curr != nxt:
+                            found = True
+                            break
+                        elif nn not in visited:
+                            visited.add(nn)
+                            q.append(nn)
+                if found: break
+            if found:
+                in_cycle = True
+                break
+        if in_cycle:
+            cyclic.add(n)
+            
+    return cyclic
+
+def find_all_carbon_paths(mol: Molecule, exclude_atoms: set[int] = None) -> list[list[int]]:
+    if exclude_atoms is None: exclude_atoms = set()
+    cyclic_atoms = get_cyclic_atoms(mol, exclude_atoms)
+    # Only map continuous carbon sequences as pure chains to allow S and O to act as substituents
+    valid_nodes = {a.idx for a in mol if a.idx not in exclude_atoms and a.idx not in cyclic_atoms and mol.atoms[a.idx].is_carbon}
+    if not valid_nodes: return []
+
+    all_paths = []
+    def dfs(current: int, path: list[int], visited: set[int]):
+        neighbors =[n for n in mol.get_neighbors(current) if n in valid_nodes and n not in visited]
+        if not neighbors:
+            all_paths.append(path)
+            return
+        for n in neighbors:
+            dfs(n, path + [n], visited | {n})
+
+    endpoints =[n for n in valid_nodes if sum(1 for x in mol.get_neighbors(n) if x in valid_nodes) <= 1]
+    start_nodes = endpoints if endpoints else valid_nodes
+
+    for start in start_nodes:
+        dfs(start, [start], {start})
+
+    unique_paths =[]
+    seen = set()
+    for p in all_paths:
+        p_set = frozenset(p)
+        if not any(p_set.issubset(s) for s in seen):
+            if tuple(p) not in unique_paths and tuple(reversed(p)) not in unique_paths:
+                unique_paths.append(p)
+                seen.add(p_set)
+    return unique_paths
+
+def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[RingSystem]:
+    from .rules import retained as retained_rules
+    if exclude_atoms is None: exclude_atoms = set()
+    valid_nodes = {a.idx for a in mol if a.idx not in exclude_atoms and (a.is_carbon or mol.degree(a.idx) >= 2)}
+    cycles =[]
+    def dfs_cycle(curr, start, path, visited):
+        for n in mol.get_neighbors(curr):
+            if n not in valid_nodes: continue
+            if n == start and len(path) >= 3:
+                cycles.append(path)
+            elif n not in visited:
+                dfs_cycle(n, start, path + [n], visited | {n})
+
+    for n in valid_nodes:
+        dfs_cycle(n, n, [n], {n})
+
+    if not cycles: return []
+
+    cycle_edge_sets =[]
+    for c in cycles:
+        c_edges = set()
+        for i in range(len(c)):
+            u, v = c[i], c[(i+1)%len(c)]
+            c_edges.add(tuple(sorted((u, v))))
+        cycle_edge_sets.append(c_edges)
+
+    blocks_edges =[]
+    for c_edges in cycle_edge_sets:
+        merged_edges = c_edges
+        new_blocks =[]
+        for b in blocks_edges:
+            if not b.isdisjoint(merged_edges):
+                merged_edges |= b
+            else:
+                new_blocks.append(b)
+        new_blocks.append(merged_edges)
+        blocks_edges = new_blocks
+
+    blocks =[]
+    for b_edges in blocks_edges:
+        b_nodes = set()
+        for u, v in b_edges:
+            b_nodes.add(u)
+            b_nodes.add(v)
+        is_monocycle = (len(b_edges) == len(b_nodes))
+        blocks.append({
+            'nodes': b_nodes,
+            'edges': b_edges,
+            'is_monocycle': is_monocycle
+        })
+
+    changed = True
+    while changed:
+        changed = False
+        new_blocks =[]
+        while blocks:
+            b1 = blocks.pop(0)
+            merged = False
+            for i, b2 in enumerate(blocks):
+                shared = b1['nodes'].intersection(b2['nodes'])
+                if len(shared) == 1 and b1['is_monocycle'] and b2['is_monocycle']:
+                    blocks[i] = {
+                        'nodes': b1['nodes'] | b2['nodes'],
+                        'edges': b1['edges'] | b2['edges'],
+                        'is_monocycle': False
+                    }
+                    merged = True
+                    changed = True
+                    break
+            if not merged:
+                new_blocks.append(b1)
+        blocks = new_blocks
+
+    systems =[]
+    for block in blocks:
+        comp_nodes = block['nodes']
+        comp_edges = block['edges']
+            
+        comp_adj = {n: set() for n in comp_nodes}
+        for u, v in comp_edges:
+            comp_adj[u].add(v)
+            comp_adj[v].add(u)
+
+        V, E = len(comp_nodes), len(comp_edges)
+
+        if E == V:
+            path = [list(comp_nodes)[0]]
+            curr = path[0]
+            v_set = {curr}
+            while len(path) < V:
+                next_n = next(n for n in comp_adj[curr] if n not in v_set)
+                path.append(next_n)
+                v_set.add(next_n)
+                curr = next_n
+            systems.append(RingSystem(atoms=comp_nodes, paths=[path]))
+
+        elif E == V + 1:
+            degrees = {n: len(comp_adj[n]) for n in comp_nodes}
+            deg4 = [n for n, d in degrees.items() if d == 4]
+            deg3 = [n for n, d in degrees.items() if d >= 3]
+
+            if len(deg4) == 1:
+                spiro_atom = deg4[0]
+                sub_nodes = comp_nodes - {spiro_atom}
+                rings =[]
+                visited_sub = set()
+                for sn in sub_nodes:
+                    if sn not in visited_sub:
+                        comp =[]
+                        q = [sn]
+                        while q:
+                            c = q.pop(0)
+                            if c not in visited_sub:
+                                visited_sub.add(c)
+                                comp.append(c)
+                                q.extend([x for x in comp_adj[c] if x in sub_nodes and x not in visited_sub])
+
+                        endpoints =[n for n in comp if spiro_atom in comp_adj[n]]
+                        if len(endpoints) == 2:
+                            start_node = endpoints[0]
+                            path = [start_node]
+                            curr = start_node
+                            p_set = {start_node}
+                            while len(path) < len(comp):
+                                next_n = next((x for x in comp_adj[curr] if x in comp and x not in p_set), None)
+                                if next_n is None: break
+                                path.append(next_n)
+                                p_set.add(next_n)
+                                curr = next_n
+                            rings.append(path)
+
+                if len(rings) == 2:
+                    r1, r2 = rings
+                    if len(r1) > len(r2): r1, r2 = r2, r1
+                    paths = [
+                        r1 + [spiro_atom] + r2,
+                        r1 +[spiro_atom] + r2[::-1],
+                        r1[::-1] +[spiro_atom] + r2,
+                        r1[::-1] + [spiro_atom] + r2[::-1]
+                    ]
+                    systems.append(RingSystem(
+                        atoms=comp_nodes, is_spiro=True,
+                        x=len(r1), y=len(r2), paths=paths
+                    ))
+
+            elif len(deg3) == 2:
+                b1, b2 = deg3
+                paths_between = []
+                if b2 in comp_adj[b1]:
+                    paths_between.append([])
+
+                sub_nodes = comp_nodes - {b1, b2}
+                sub_visited = set()
+                for sn in sub_nodes:
+                    if sn not in sub_visited:
+                        p_nodes = []
+                        q = [sn]
+                        while q:
+                            c = q.pop(0)
+                            if c not in sub_visited:
+                                sub_visited.add(c)
+                                p_nodes.append(c)
+                                q.extend([x for x in comp_adj[c] if x in sub_nodes and x not in sub_visited])
+
+                        ends =[n for n in p_nodes if b1 in comp_adj[n]]
+                        if not ends: continue
+                        start = ends[0]
+                        ordered_p = [start]
+                        p_set = {start}
+                        curr = start
+                        while len(ordered_p) < len(p_nodes):
+                            next_n = next((x for x in comp_adj[curr] if x in p_nodes and x not in p_set), None)
+                            if next_n is None: break
+                            ordered_p.append(next_n)
+                            p_set.add(next_n)
+                            curr = next_n
+
+                        if b2 not in comp_adj[ordered_p[-1]]:
+                            ordered_p = ordered_p[::-1]
+
+                        paths_between.append(ordered_p)
+
+                paths_between.sort(key=len, reverse=True)
+                if len(paths_between) == 3:
+                    p1, p2, p3 = paths_between
+                    
+                    valid_assignments = [(p1, p2, p3)]
+                    if len(p1) == len(p2) and len(p2) == len(p3):
+                        valid_assignments =[
+                            (p1, p2, p3), (p1, p3, p2),
+                            (p2, p1, p3), (p2, p3, p1),
+                            (p3, p1, p2), (p3, p2, p1)
+                        ]
+                    elif len(p1) == len(p2):
+                        valid_assignments =[
+                            (p1, p2, p3), (p2, p1, p3)
+                        ]
+                    elif len(p2) == len(p3):
+                        valid_assignments =[
+                            (p1, p2, p3), (p1, p3, p2)
+                        ]
+                        
+                    vb_paths =[]
+                    for a, b, c in valid_assignments:
+                        vb_paths.append([b1] + a + [b2] + b[::-1] + c)
+                        vb_paths.append([b2] + a[::-1] + [b1] + b + c[::-1])
+
+                    recognized_via_retained = False
+                    for cand in vb_paths:
+                        if retained_rules.get_retained_ring(mol, cand) is not None:
+                            systems.append(RingSystem(atoms=comp_nodes, is_bicycle=True, x=len(p1), y=len(p2), z=len(p3), paths=[cand]))
+                            recognized_via_retained = True
+                            break
+                    if not recognized_via_retained:
+                        systems.append(RingSystem(
+                            atoms=comp_nodes, is_bicycle=True,
+                            x=len(p1), y=len(p2), z=len(p3), paths=vb_paths
+                        ))
+
+        elif E >= V + 2:
+            descriptor, numbered_paths = get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges)
+            
+            recognized_via_retained = False
+            if retained_rules.get_retained_ring(mol, numbered_paths[0]) is not None:
+                systems.append(RingSystem(atoms=comp_nodes, is_polycycle=True, paths=[numbered_paths[0]], polycycle_descriptor=descriptor))
+                recognized_via_retained = True
+            else:
+                for c in cycles:
+                    if len(c) == V and retained_rules.get_retained_ring(mol, c) is not None:
+                        systems.append(RingSystem(atoms=comp_nodes, is_polycycle=True, paths=[c], polycycle_descriptor=descriptor))
+                        recognized_via_retained = True
+                        break
+                        
+            if not recognized_via_retained:
+                if descriptor:
+                    systems.append(RingSystem(
+                        atoms=comp_nodes, is_polycycle=True,
+                        paths=numbered_paths, polycycle_descriptor=descriptor
+                    ))
+                else:
+                    systems.append(RingSystem(atoms=comp_nodes, paths=[numbered_paths[0]]))
+
+    return systems"""
+structure-to-iupac/molecule.py
+"""
+from dataclasses import dataclass, field
+from typing import Iterator
+from .rules import elements
+
+@dataclass
+class Atom:
+    idx: int
+    symbol: str
+    charge: int = 0
+    isotope: int | None = None
+    stereo: str | None = None  # 'R' or 'S'
+
+    def __post_init__(self):
+        if not elements.is_known(self.symbol):
+            raise ValueError(f"Unknown element symbol: {self.symbol}")
+
+    @property
+    def element(self) -> elements.Element:
+        return elements.get(self.symbol)
+
+    @property
+    def is_carbon(self) -> bool:
+        return self.symbol == "C"
+
+    @property
+    def is_heteroatom(self) -> bool:
+        return self.symbol not in ("C", "H")
+
+@dataclass
+class Bond:
+    idx: int
+    u: int
+    v: int
+    order: int = 1
+    stereo: str | None = None  # 'E' or 'Z'
+    in_small_ring: bool = False  # NEW: Tracks if bond is in a ring of size <= 7
+
+    def get_other_atom(self, atom_idx: int) -> int:
+        if atom_idx == self.u: return self.v
+        if atom_idx == self.v: return self.u
+        raise ValueError(f"Atom {atom_idx} is not part of bond {self.idx}")
+
+class Molecule:
+    def __init__(self):
+        self.atoms: dict[int, Atom] = {}
+        self.bonds: dict[int, Bond] = {}
+        self._adj: dict[int, list[int]] = {}
+        self._bond_lookup: dict[tuple[int, int], int] = {}
+
+    def add_atom(self, symbol: str, idx: int | None = None, charge: int = 0, stereo: str | None = None) -> Atom:
+        if idx is None: idx = max(self.atoms.keys(), default=0) + 1
+        if idx in self.atoms: raise ValueError(f"Atom with idx {idx} already exists.")
+        atom = Atom(idx=idx, symbol=symbol, charge=charge, stereo=stereo)
+        self.atoms[idx] = atom
+        self._adj[idx] =[]
+        return atom
+
+    def add_bond(self, u: int, v: int, order: int = 1, idx: int | None = None, stereo: str | None = None, in_small_ring: bool = False) -> Bond:
+        if u not in self.atoms or v not in self.atoms: raise ValueError("Both atoms must exist")
+        if u == v: raise ValueError("Cannot bond an atom to itself.")
+        bond_key = tuple(sorted((u, v)))
+        if bond_key in self._bond_lookup: raise ValueError(f"Atoms {u} and {v} are already bonded.")
+        if idx is None: idx = max(self.bonds.keys(), default=0) + 1
+        bond = Bond(idx=idx, u=u, v=v, order=order, stereo=stereo, in_small_ring=in_small_ring)
+        self.bonds[idx] = bond
+        self._bond_lookup[bond_key] = idx
+        self._adj[u].append(v)
+        self._adj[v].append(u)
+        return bond
+
+    def get_neighbors(self, atom_idx: int) -> list[int]:
+        return self._adj.get(atom_idx,[])
+
+    def get_bond(self, u: int, v: int) -> Bond | None:
+        bond_key = tuple(sorted((u, v)))
+        bond_idx = self._bond_lookup.get(bond_key)
+        if bond_idx is not None: return self.bonds[bond_idx]
+        return None
+
+    def degree(self, atom_idx: int) -> int:
+        return len(self.get_neighbors(atom_idx))
+
+    def __iter__(self) -> Iterator[Atom]:
+        return iter(self.atoms.values())# structure-to-iupac/api.py
+
+import re
+from rdkit import Chem
+from .molecule import Molecule
+from .perception import perceive_groups, PerceivedGroup
+from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
+from .parent_selection import select_principal_parent
+from .assembler import assemble_name, AssemblyParts, PrincipalGroupItem, SubstituentItem, UnsaturationItem
+from .rules import suffixes, substituents, stems, retained, multipliers
+
+
+def parse_locant(l):
+    s = str(l)
+    match = re.match(r"^(\d+)([a-zA-Z]*)$", s.split("(")[0])
+    if match:
+        return (1, float(match.group(1)), match.group(2))
+    if any(c.isdigit() for c in s):
+        nums = re.findall(r"\d+", s)
+        return (1, float(nums[0]) if nums else 0.0, s)
+    return (2, 0.0, s)
+
+
+def is_fully_enclosed(s: str) -> bool:
+    if not s.startswith("(") or not s.endswith(")"):
+        return False
+    depth = 0
+    for i, c in enumerate(s):
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+        if depth == 0 and i < len(s) - 1:
+            return False
+    return depth == 0
+
+
+def _format_multiplier(name: str, count: int, safe_enclose: bool = False) -> str:
+    is_complex = "(" in name or name[0].isdigit() or "-" in name or " " in name
+    if count == 1:
+        if (safe_enclose or is_complex) and not is_fully_enclosed(name):
+            return f"({name})"
+        return name
+    mult = multipliers.complex_(count) if is_complex else multipliers.basic(count)
+    if is_complex and not is_fully_enclosed(name):
+        return f"{mult}({name})"
+    return f"{mult}{name}"
+
+
+def _get_atom_locants(oriented_path: list[int], target_indices: set[int]) -> list[int]:
+    return sorted([i + 1 for i, atom_idx in enumerate(oriented_path) if atom_idx in target_indices])
+
+
+def _get_bond_locants(
+    mol: Molecule, oriented_path: list[int], is_bicycle: bool, is_spiro: bool, is_polycycle: bool
+) -> tuple[list[int], list[int]]:
+    db_locants =[]
+    tb_locants =[]
+    seen_bonds = set()
+    for u in oriented_path:
+        for v in mol.get_neighbors(u):
+            if v in oriented_path:
+                bond = mol.get_bond(u, v)
+                if bond and bond.order > 1 and bond.idx not in seen_bonds:
+                    seen_bonds.add(bond.idx)
+                    loc_u = oriented_path.index(u) + 1
+                    loc_v = oriented_path.index(v) + 1
+                    min_loc, max_loc = min(loc_u, loc_v), max(loc_u, loc_v)
+
+                    if max_loc == min_loc + 1:
+                        locant_val = min_loc
+                    elif (
+                        min_loc == 1 and max_loc == len(oriented_path) and not (is_bicycle or is_spiro or is_polycycle)
+                    ):
+                        locant_val = max_loc
+                    else:
+                        locant_val = min_loc
+
+                    if bond.order == 2:
+                        db_locants.append(locant_val)
+                    elif bond.order == 3:
+                        tb_locants.append(locant_val)
+
+    return sorted(db_locants), sorted(tb_locants)
+
+
+def number_parent(
+    mol: Molecule,
+    candidate_paths: list[list[int]],
+    principal_carbons: set[int],
+    substituent_mapping: dict[int, list[str]],
+    is_ring: bool,
+    is_bicycle: bool,
+    is_spiro: bool,
+    is_polycycle: bool = False,
+    fixed_start: bool = False,
+    retained_name: str = None,
+) -> list[int]:
+
+    candidates =[]
+    if is_bicycle or is_spiro or is_polycycle or fixed_start:
+        candidates = candidate_paths
+    elif is_ring:
+        path = candidate_paths[0]
+        for i in range(len(path)):
+            rotated = path[i:] + path[:i]
+            candidates.append(rotated)
+            candidates.append(rotated[::-1])
+    else:
+        path = candidate_paths[0]
+        candidates.append(path)
+        candidates.append(path[::-1])
+
+    def compare_paths(p1, p2):
+        def evaluate(oriented_path):
+            pg = _get_atom_locants(oriented_path, principal_carbons)
+
+            het_by_priority = {}
+            for a in mol:
+                if a.idx in oriented_path and not a.is_carbon:
+                    prio = a.element.hw_priority or 99
+                    het_by_priority.setdefault(prio,[]).append(a.idx)
+
+            het_eval = tuple(
+                _get_atom_locants(oriented_path, set(het_by_priority[prio])) for prio in sorted(het_by_priority.keys())
+            )
+
+            if retained_name in {
+                "pyrrole",
+                "imidazole",
+                "pyrazole",
+                "1,2,3-triazole",
+                "1,2,4-triazole",
+                "indole",
+                "isoindole",
+                "indazole",
+                "benzimidazole",
+                "purine",
+                "indene",
+                "fluorene",
+            }:
+                sat_atoms =[]
+                for a_idx in oriented_path:
+                    ring_bonds =[mol.get_bond(a_idx, n) for n in mol.get_neighbors(a_idx) if n in oriented_path]
+                    if sum(b.order for b in ring_bonds) == 2:
+                        sat_atoms.append(a_idx)
+                sat_eval = tuple(_get_atom_locants(oriented_path, set(sat_atoms)))
+            else:
+                sat_eval = ()
+
+            sub_idx = set(substituent_mapping.keys())
+            pref = _get_atom_locants(oriented_path, sub_idx)
+            db, tb = _get_bond_locants(mol, oriented_path, is_bicycle, is_spiro, is_polycycle)
+
+            if retained_name:
+                unsat =[]
+            else:
+                unsat = sorted(db + tb)
+
+            pref_unsat = sorted(pref + unsat)
+
+            def sub_sort_key(name):
+                s = name.lower()
+                s = re.sub(r"^[\(\[\{\)]+", "", s)
+                prefix_pattern = r"^((?:(?:[0-9]+[a-z]*|[nospmc]\'*)(?:,(?:[0-9]+[a-z]*|[nospmc]\'*))*|[ezrs]+|sec|tert|t|s|d|l|m|o|p|alpha|beta|gamma))([-)]+)"
+                while True:
+                    prev = s
+                    match = re.match(prefix_pattern, s)
+                    if match:
+                        s = s[match.end() :]
+                        s = re.sub(r"^[\(\[\{\)]+", "", s)
+                        continue
+                    break
+                return s
+
+            alpha_list =[]
+            for idx in oriented_path:
+                if idx in substituent_mapping:
+                    loc = oriented_path.index(idx) + 1
+                    for name in substituent_mapping[idx]:
+                        alpha_list.append((sub_sort_key(name), loc))
+            alpha_list.sort(key=lambda x: x[0])
+            alpha_eval = tuple(x[1] for x in alpha_list)
+
+            stereo_seq =[]
+            for idx in oriented_path:
+                atom = mol.atoms[idx]
+                if atom.stereo:
+                    stereo_seq.append(0 if atom.stereo == "R" else 1)
+            stereo_eval = tuple(stereo_seq)
+
+            if is_ring:
+                return het_eval + (sat_eval, pg, unsat, pref_unsat, alpha_eval, stereo_eval)
+            else:
+                return (pg,) + het_eval + (sat_eval, unsat, pref_unsat, alpha_eval, stereo_eval)
+
+        ev1 = evaluate(p1)
+        ev2 = evaluate(p2)
+
+        for v1, v2 in zip(ev1, ev2):
+            if not v1 and not v2:
+                continue
+            if not v1:
+                return 1
+            if not v2:
+                return -1
+            for x, y in zip(v1, v2):
+                if x < y:
+                    return -1
+                if x > y:
+                    return 1
+            if len(v1) < len(v2):
+                return -1
+            if len(v1) > len(v2):
+                return 1
+        return 0
+
+    best = candidates[0]
+    for c in candidates[1:]:
+        if compare_paths(c, best) < 0:
+            best = c
+    return best
+
+
+def read_smiles(smiles: str) -> Molecule:
+    rdmol = Chem.MolFromSmiles(smiles)
+    if rdmol is None:
+        rdmol = Chem.MolFromSmiles(smiles, sanitize=False)
+        if rdmol:
+            rdmol.UpdatePropertyCache(strict=False)
+            Chem.FastFindRings(rdmol)
+    else:
+        try:
+            Chem.Kekulize(rdmol, clearAromaticFlags=True)
+        except Exception:
+            pass
+
+    mol = Molecule()
+    if rdmol is None:
+        return mol
+
+    Chem.AssignStereochemistry(rdmol, force=True, cleanIt=True)
+    chiral_centers = dict(Chem.FindMolChiralCenters(rdmol, includeUnassigned=False))
+
+    for atom in rdmol.GetAtoms():
+        stereo = chiral_centers.get(atom.GetIdx())
+        if stereo and atom.GetSymbol() == "S" and atom.GetTotalDegree() == 3:
+            stereo = "R" if stereo == "S" else "S"
+        mol.add_atom(symbol=atom.GetSymbol(), idx=atom.GetIdx(), charge=atom.GetFormalCharge(), stereo=stereo)
+
+    for bond in rdmol.GetBonds():
+        stereo = None
+        st = bond.GetStereo()
+        if st == Chem.rdchem.BondStereo.STEREOE:
+            stereo = "E"
+        elif st == Chem.rdchem.BondStereo.STEREOZ:
+            stereo = "Z"
+
+        in_small_ring = any(bond.IsInRingSize(i) for i in range(3, 8))
+
+        mol.add_bond(
+            u=bond.GetBeginAtomIdx(),
+            v=bond.GetEndAtomIdx(),
+            order=int(bond.GetBondTypeAsDouble()),
+            stereo=stereo,
+            in_small_ring=in_small_ring,
+        )
+    return mol
+
+
+def get_connected_components(mol: Molecule) -> list[set[int]]:
+    visited = set()
+    components =[]
+    for atom in mol:
+        if atom.idx not in visited:
+            comp = set()
+            q = [atom.idx]
+            while q:
+                curr = q.pop(0)
+                if curr not in visited:
+                    visited.add(curr)
+                    comp.add(curr)
+                    q.extend(mol.get_neighbors(curr))
+            components.append(comp)
+    return components
+
+
+def _emit_bond_stereo(mol, parts, numbered_path, get_loc, exclude_atoms=None, upstream_atom=None):
+    if exclude_atoms is None:
+        exclude_atoms = set()
+    path_set = set(numbered_path)
+    cyclic_atoms = get_cyclic_atoms(mol)
+    for u_idx in numbered_path:
+        for v_idx in mol.get_neighbors(u_idx):
+            bond = mol.get_bond(u_idx, v_idx)
+            if not bond or not bond.stereo:
+                continue
+            if bond.in_small_ring:
+                continue
+
+            if v_idx == upstream_atom:
+                upstream_in_ring = v_idx in cyclic_atoms
+                if mol.atoms[v_idx].is_carbon or upstream_in_ring:
+                    continue
+
+            loc_str_u = get_loc(u_idx)
+            if v_idx in path_set:
+                loc_str_v = get_loc(v_idx)
+                min_loc = min(loc_str_u, loc_str_v, key=lambda x: parse_locant(x))
+            else:
+                min_loc = loc_str_u
+
+            if not any(f[0] == min_loc and f[1] in["E", "Z"] for f in parts.stereo_features):
+                parts.stereo_features.append((min_loc, bond.stereo))
+
+
+def name_subgraph(mol: Molecule, start_idx: int, exclude_atoms: set[int], upstream_atom: int = None) -> str:
+    start_atom = mol.atoms[start_idx]
+
+    cyclic_atoms_global = get_cyclic_atoms(mol, exclude_atoms)
+
+    if not start_atom.is_carbon and start_idx not in cyclic_atoms_global:
+        if start_atom.symbol == "O":
+            is_double = False
+            if upstream_atom is not None:
+                bond = mol.get_bond(start_idx, upstream_atom)
+                if bond and bond.order == 2:
+                    is_double = True
+
+            next_atoms =[n for n in mol.get_neighbors(start_idx) if n not in exclude_atoms and n != upstream_atom]
+            if not next_atoms:
+                if is_double:
+                    return "oxo"
+                if start_atom.charge == -1:
+                    return "oxido"
+                return "hydroxy"
+            nxt = next_atoms[0]
+
+            s_oxygens =[
+                o for o in mol.get_neighbors(nxt) if mol.atoms[o].symbol == "O" and mol.get_bond(nxt, o).order == 2
+            ]
+            if mol.atoms[nxt].symbol == "S" and len(s_oxygens) >= 1:
+                r_group = next((n for n in mol.get_neighbors(nxt) if n != start_idx and n not in s_oxygens), None)
+                if r_group is not None:
+                    branch = name_subgraph(
+                        mol, r_group, exclude_atoms | {start_idx, nxt} | set(s_oxygens), upstream_atom=nxt
+                    )
+                    if branch:
+                        if branch.startswith("(") and branch.endswith(")"):
+                            branch = branch[1:-1]
+                        suffix = "sulfonyl" if len(s_oxygens) == 2 else "sulfinyl"
+                        stereo_prefix = f"({mol.atoms[nxt].stereo})-" if mol.atoms[nxt].stereo else ""
+                        return f"({stereo_prefix}{branch}{suffix}oxy)"
+                return "sulfooxy"
+
+            c_oxygens =[
+                o for o in mol.get_neighbors(nxt) if mol.atoms[o].symbol == "O" and mol.get_bond(nxt, o).order == 2
+            ]
+            c_sulfurs =[
+                s for s in mol.get_neighbors(nxt) if mol.atoms[s].symbol == "S" and mol.get_bond(nxt, s).order == 2
+            ]
+            if mol.atoms[nxt].is_carbon and len(c_oxygens) == 1:
+                r_group = next(
+                    (
+                        n
+                        for n in mol.get_neighbors(nxt)
+                        if n != start_idx and n not in c_oxygens and mol.atoms[n].is_carbon
+                    ),
+                    None,
+                )
+                if r_group is not None:
+                    branch = name_subgraph(
+                        mol, r_group, exclude_atoms | {start_idx, nxt} | set(c_oxygens), upstream_atom=nxt
+                    )
+                    if branch:
+                        if branch.startswith("(") and branch.endswith(")"):
+                            branch = branch[1:-1]
+                        return f"({branch}carbonyloxy)"
+                hetero_group = next((n for n in mol.get_neighbors(nxt) if n != start_idx and n not in c_oxygens), None)
+                if hetero_group is not None:
+                    branch = name_subgraph(
+                        mol, hetero_group, exclude_atoms | {start_idx, nxt} | set(c_oxygens), upstream_atom=nxt
+                    )
+                    if branch:
+                        if branch.startswith("(") and branch.endswith(")"):
+                            branch = branch[1:-1]
+                        return f"({branch}carbonyloxy)"
+                return "formyloxy"
+            elif mol.atoms[nxt].is_carbon and len(c_sulfurs) == 1:
+                r_group = next(
+                    (
+                        n
+                        for n in mol.get_neighbors(nxt)
+                        if n != start_idx and n not in c_sulfurs and mol.atoms[n].is_carbon
+                    ),
+                    None,
+                )
+                if r_group is not None:
+                    branch = name_subgraph(
+                        mol, r_group, exclude_atoms | {start_idx, nxt} | set(c_sulfurs), upstream_atom=nxt
+                    )
+                    if branch:
+                        if branch.startswith("(") and branch.endswith(")"):
+                            branch = branch[1:-1]
+                        return f"({branch}carbonothioyloxy)"
+                hetero_group = next((n for n in mol.get_neighbors(nxt) if n != start_idx and n not in c_sulfurs), None)
+                if hetero_group is not None:
+                    branch = name_subgraph(
+                        mol, hetero_group, exclude_atoms | {start_idx, nxt} | set(c_sulfurs), upstream_atom=nxt
+                    )
+                    if branch:
+                        if branch.startswith("(") and branch.endswith(")"):
+                            branch = branch[1:-1]
+                        return f"({branch}carbonothioyloxy)"
+                return "methanethioyloxy"
+            elif mol.atoms[nxt].symbol == "O":
+                r_group = next((n for n in mol.get_neighbors(nxt) if n != start_idx), None)
+                if r_group is not None:
+                    branch = name_subgraph(mol, r_group, exclude_atoms | {start_idx, nxt}, upstream_atom=nxt)
+                    if branch:
+                        if branch.startswith("(") and branch.endswith(")"):
+                            branch = branch[1:-1]
+                        return f"({branch}peroxy)"
+                return "hydroperoxy"
+
+            branch = name_subgraph(mol, nxt, exclude_atoms | {start_idx}, upstream_atom=start_idx)
+            if branch == "methyl":
+                return "methoxy"
+            if branch == "ethyl":
+                return "ethoxy"
+            if branch == "propyl":
+                return "propoxy"
+            if branch == "isopropyl":
+                return "isopropoxy"
+            if branch == "butyl":
+                return "butoxy"
+            if branch == "isobutyl":
+                return "isobutoxy"
+            if branch == "sec-butyl":
+                return "sec-butoxy"
+            if branch == "tert-butyl":
+                return "tert-butoxy"
+            if branch == "phenyl":
+                return "phenoxy"
+            if branch:
+                if branch.startswith("(") and branch.endswith(")"):
+                    branch = branch[1:-1]
+                is_complex = "(" in branch or branch[0].isdigit() or "-" in branch or " " in branch
+                if is_complex:
+                    return f"(({branch})oxy)"
+                return f"({branch}oxy)"
+            return "hydroxy"
+
+        if start_atom.symbol == "N":
+            is_double = False
+            is_triple = False
+            if upstream_atom is not None:
+                bond = mol.get_bond(start_idx, upstream_atom)
+                if bond and bond.order == 2:
+                    is_double = True
+                elif bond and bond.order == 3:
+                    is_triple = True
+
+            next_atoms =[n for n in mol.get_neighbors(start_idx) if n not in exclude_atoms and n != upstream_atom]
+            if not next_atoms:
+                if is_double:
+                    return "imino"
+                if is_triple:
+                    return "nitrilo"
+                return "amino"
+
+            branches =[]
+            for nxt in next_atoms:
+                c_oxygens =[
+                    o for o in mol.get_neighbors(nxt) if mol.atoms[o].symbol == "O" and mol.get_bond(nxt, o).order == 2
+                ]
+                c_sulfurs =[
+                    s for s in mol.get_neighbors(nxt) if mol.atoms[s].symbol == "S" and mol.get_bond(nxt, s).order == 2
+                ]
+                if mol.atoms[nxt].is_carbon and len(c_oxygens) == 1:
+                    r_group = next(
+                        (
+                            n
+                            for n in mol.get_neighbors(nxt)
+                            if n != start_idx and n not in c_oxygens and mol.atoms[n].is_carbon
+                        ),
+                        None,
+                    )
+                    if r_group is not None:
+                        branch = name_subgraph(
+                            mol, r_group, exclude_atoms | {start_idx, nxt} | set(c_oxygens), upstream_atom=nxt
+                        )
+                        if branch:
+                            if branch.startswith("(") and branch.endswith(")"):
+                                branch = branch[1:-1]
+                            branches.append(f"{branch}carbonyl")
+                        else:
+                            branches.append("formyl")
+                    else:
+                        hetero_group = next(
+                            (n for n in mol.get_neighbors(nxt) if n != start_idx and n not in c_oxygens), None
+                        )
+                        if hetero_group is not None:
+                            branch = name_subgraph(
+                                mol, hetero_group, exclude_atoms | {start_idx, nxt} | set(c_oxygens), upstream_atom=nxt
+                            )
+                            if branch:
+                                if branch.startswith("(") and branch.endswith(")"):
+                                    branch = branch[1:-1]
+                                if branch.endswith("amino"):
+                                    branches.append(f"({branch[:-5]}carbamoyl)")
+                                else:
+                                    branches.append(f"{branch}carbonyl")
+                            else:
+                                branches.append("formyl")
+                        else:
+                            branches.append("formyl")
+                elif mol.atoms[nxt].is_carbon and len(c_sulfurs) == 1:
+                    r_group = next(
+                        (
+                            n
+                            for n in mol.get_neighbors(nxt)
+                            if n != start_idx and n not in c_sulfurs and mol.atoms[n].is_carbon
+                        ),
+                        None,
+                    )
+                    if r_group is not None:
+                        branch = name_subgraph(
+                            mol, r_group, exclude_atoms | {start_idx, nxt} | set(c_sulfurs), upstream_atom=nxt
+                        )
+                        if branch:
+                            if branch.startswith("(") and branch.endswith(")"):
+                                branch = branch[1:-1]
+                            branches.append(f"{branch}carbonothioyl")
+                        else:
+                            branches.append("methanethioyl")
+                    else:
+                        hetero_group = next(
+                            (n for n in mol.get_neighbors(nxt) if n != start_idx and n not in c_sulfurs), None
+                        )
+                        if hetero_group is not None:
+                            branch = name_subgraph(
+                                mol, hetero_group, exclude_atoms | {start_idx, nxt} | set(c_sulfurs), upstream_atom=nxt
+                            )
+                            if branch:
+                                if branch.startswith("(") and branch.endswith(")"):
+                                    branch = branch[1:-1]
+                                if branch.endswith("amino"):
+                                    branches.append(f"({branch[:-5]}carbamothioyl)")
+                                else:
+                                    branches.append(f"{branch}carbonothioyl")
+                            else:
+                                branches.append("methanethioyl")
+                        else:
+                            branches.append("methanethioyl")
+                else:
+                    s_oxygens =[
+                        o
+                        for o in mol.get_neighbors(nxt)
+                        if mol.atoms[o].symbol == "O" and mol.get_bond(nxt, o).order == 2
+                    ]
+                    if mol.atoms[nxt].symbol == "S" and len(s_oxygens) >= 1:
+                        r_group = next(
+                            (n for n in mol.get_neighbors(nxt) if n != start_idx and n not in s_oxygens), None
+                        )
+                        if r_group is not None:
+                            branch = name_subgraph(
+                                mol, r_group, exclude_atoms | {start_idx, nxt} | set(s_oxygens), upstream_atom=nxt
+                            )
+                            if branch:
+                                if branch.startswith("(") and branch.endswith(")"):
+                                    branch = branch[1:-1]
+                                suffix = "sulfonyl" if len(s_oxygens) == 2 else "sulfinyl"
+                                stereo_prefix = f"({mol.atoms[nxt].stereo})-" if mol.atoms[nxt].stereo else ""
+                                branches.append(f"{stereo_prefix}{branch}{suffix}")
+                            else:
+                                branches.append("sulfo")
+                        else:
+                            branches.append("sulfo")
+                    else:
+                        br = name_subgraph(mol, nxt, exclude_atoms | {start_idx}, upstream_atom=start_idx)
+                        if br:
+                            branches.append(br)
+
+            if is_double:
+                if len(branches) == 1:
+                    b = branches[0]
+                    if b.startswith("(") and b.endswith(")"):
+                        b = b[1:-1]
+                    is_complex = "(" in b or b[0].isdigit() or "-" in b or " " in b
+                    if is_complex:
+                        return f"(({b})imino)"
+                    return f"({b}imino)"
+                return "imino"
+
+            counts = {}
+            for b in branches:
+                counts[b] = counts.get(b, 0) + 1
+
+            if len(counts) == 1 and list(counts.values())[0] == 1:
+                b = branches[0]
+                if b.startswith("(") and b.endswith(")"):
+                    b = b[1:-1]
+                if b.endswith("carbonyl") or b.endswith("sulfonyl") or b.endswith("sulfinyl") or b.endswith("carbonothioyl"):
+                    return f"{b}amino"
+                is_complex = "(" in b or b[0].isdigit() or "-" in b or " " in b
+                if is_complex:
+                    return f"(({b})amino)"
+                return f"({b}amino)"
+
+            prefix_parts =[]
+            safe = len(counts) > 1 or any("(" in b or b[0].isdigit() or "-" in b or " " in b for b in counts)
+            for b, c in sorted(counts.items()):
+                prefix_parts.append(_format_multiplier(b, c, safe_enclose=safe))
+            prefix = "".join(prefix_parts)
+            return f"({prefix}amino)"
+
+        if start_atom.symbol == "S":
+            is_double = False
+            if upstream_atom is not None:
+                bond = mol.get_bond(start_idx, upstream_atom)
+                if bond and bond.order == 2:
+                    is_double = True
+
+            s_oxygens =[
+                o
+                for o in mol.get_neighbors(start_idx)
+                if mol.atoms[o].symbol == "O" and mol.get_bond(start_idx, o).order == 2
+            ]
+            s_nitrogens =[
+                n
+                for n in mol.get_neighbors(start_idx)
+                if mol.atoms[n].symbol == "N" and mol.get_bond(start_idx, n).order == 2
+            ]
+            next_atoms =[
+                n
+                for n in mol.get_neighbors(start_idx)
+                if n not in exclude_atoms and n != upstream_atom and n not in s_oxygens and n not in s_nitrogens
+            ]
+
+            stereo_prefix = f"({start_atom.stereo})-" if start_atom.stereo else ""
+
+            if len(s_oxygens) == 1 and len(s_nitrogens) == 1:
+                suffix = "sulfonimidoyl"
+                if is_double:
+                    suffix += "idene"
+                if not next_atoms:
+                    return f"{stereo_prefix}{suffix}"
+
+                if len(next_atoms) == 1:
+                    nxt = next_atoms[0]
+                    branch = name_subgraph(
+                        mol,
+                        nxt,
+                        exclude_atoms | {start_idx} | set(s_oxygens) | set(s_nitrogens),
+                        upstream_atom=start_idx,
+                    )
+                    if branch:
+                        if branch.startswith("(") and branch.endswith(")"):
+                            branch = branch[1:-1]
+                        return f"({stereo_prefix}{branch}{suffix})"
+                    return f"{stereo_prefix}{suffix}"
+                else:
+                    branches =[]
+                    for nxt in next_atoms:
+                        br = name_subgraph(
+                            mol,
+                            nxt,
+                            exclude_atoms | {start_idx} | set(s_oxygens) | set(s_nitrogens),
+                            upstream_atom=start_idx,
+                        )
+                        if br:
+                            branches.append(br)
+                    for _ in s_oxygens:
+                        branches.append("oxo")
+                    for _ in s_nitrogens:
+                        branches.append("imino")
+                    val = sum(mol.get_bond(start_idx, n).order for n in mol.get_neighbors(start_idx))
+                    base_suffix = "sulfanylidene" if is_double else "sulfanyl"
+                    counts = {}
+                    for b in branches:
+                        counts[b] = counts.get(b, 0) + 1
+                    prefix_parts =[]
+                    safe = len(counts) > 1 or any("(" in b or b[0].isdigit() or "-" in b or " " in b for b in counts)
+                    for b, c in sorted(counts.items()):
+                        prefix_parts.append(_format_multiplier(b, c, safe_enclose=safe))
+
+                    prefix = "".join(prefix_parts)
+                    return f"({stereo_prefix}{prefix}-lambda^{val}-{base_suffix})"
+
+            if len(s_oxygens) >= 1:
+                suffix = "sulfonyl" if len(s_oxygens) == 2 else "sulfinyl"
+                if is_double:
+                    suffix += "idene"
+                if not next_atoms:
+                    return f"{stereo_prefix}{suffix}"
+
+                if len(next_atoms) == 1:
+                    nxt = next_atoms[0]
+                    branch = name_subgraph(
+                        mol, nxt, exclude_atoms | {start_idx} | set(s_oxygens), upstream_atom=start_idx
+                    )
+                    if branch:
+                        if branch.startswith("(") and branch.endswith(")"):
+                            branch = branch[1:-1]
+                        return f"({stereo_prefix}{branch}{suffix})"
+                    return f"{stereo_prefix}{suffix}"
+                else:
+                    branches =[]
+                    for nxt in next_atoms:
+                        br = name_subgraph(
+                            mol, nxt, exclude_atoms | {start_idx} | set(s_oxygens), upstream_atom=start_idx
+                        )
+                        if br:
+                            branches.append(br)
+                    for _ in s_oxygens:
+                        branches.append("oxo")
+                    val = sum(mol.get_bond(start_idx, n).order for n in mol.get_neighbors(start_idx))
+                    base_suffix = "sulfanylidene" if is_double else "sulfanyl"
+                    counts = {}
+                    for b in branches:
+                        counts[b] = counts.get(b, 0) + 1
+                    prefix_parts =[]
+                    safe = len(counts) > 1 or any("(" in b or b[0].isdigit() or "-" in b or " " in b for b in counts)
+                    for b, c in sorted(counts.items()):
+                        prefix_parts.append(_format_multiplier(b, c, safe_enclose=safe))
+
+                    prefix = "".join(prefix_parts)
+                    return f"({stereo_prefix}{prefix}-lambda^{val}-{base_suffix})"
+
+            if not next_atoms:
+                if is_double:
+                    return "thioxo"
+                return f"{stereo_prefix}sulfanyl"
+
+            if len(next_atoms) == 1:
+                nxt = next_atoms[0]
+                branch = name_subgraph(mol, nxt, exclude_atoms | {start_idx}, upstream_atom=start_idx)
+                if branch == "methyl":
+                    return f"({stereo_prefix}methylsulfanyl)"
+                if branch == "ethyl":
+                    return f"({stereo_prefix}ethylsulfanyl)"
+                if branch == "propyl":
+                    return f"({stereo_prefix}propylsulfanyl)"
+                if branch == "isopropyl":
+                    return f"({stereo_prefix}isopropylsulfanyl)"
+                if branch == "butyl":
+                    return f"({stereo_prefix}butylsulfanyl)"
+                if branch == "isobutyl":
+                    return f"({stereo_prefix}isobutylsulfanyl)"
+                if branch == "sec-butyl":
+                    return f"({stereo_prefix}sec-butylsulfanyl)"
+                if branch == "tert-butyl":
+                    return f"({stereo_prefix}tert-butylsulfanyl)"
+                if branch == "phenyl":
+                    return f"({stereo_prefix}phenylsulfanyl)"
+                if branch:
+                    if branch.startswith("(") and branch.endswith(")"):
+                        branch = branch[1:-1]
+                    is_complex = "(" in branch or branch[0].isdigit() or "-" in branch or " " in branch
+                    if is_double:
+                        if is_complex:
+                            return f"({stereo_prefix}({branch})sulfanylidene)"
+                        return f"({stereo_prefix}{branch}sulfanylidene)"
+                    if is_complex:
+                        return f"({stereo_prefix}({branch})sulfanyl)"
+                    return f"({stereo_prefix}{branch}sulfanyl)"
+                if is_double:
+                    return f"{stereo_prefix}sulfanylidene"
+                return f"{stereo_prefix}sulfanyl"
+            else:
+                branches =[]
+                for nxt in next_atoms:
+                    br = name_subgraph(mol, nxt, exclude_atoms | {start_idx}, upstream_atom=start_idx)
+                    if br:
+                        branches.append(br)
+
+                val = sum(mol.get_bond(start_idx, n).order for n in mol.get_neighbors(start_idx))
+                base_suffix = "sulfanylidene" if is_double else "sulfanyl"
+
+                counts = {}
+                for b in branches:
+                    counts[b] = counts.get(b, 0) + 1
+                prefix_parts =[]
+                safe = len(counts) > 1 or any("(" in b or b[0].isdigit() or "-" in b or " " in b for b in counts)
+                for b, c in sorted(counts.items()):
+                    prefix_parts.append(_format_multiplier(b, c, safe_enclose=safe))
+
+                prefix = "".join(prefix_parts)
+                return f"({stereo_prefix}{prefix}-lambda^{val}-{base_suffix})"
+
+        if start_atom.symbol == "Se":
+            is_double = False
+            if upstream_atom is not None:
+                bond = mol.get_bond(start_idx, upstream_atom)
+                if bond and bond.order == 2:
+                    is_double = True
+
+            next_atoms =[n for n in mol.get_neighbors(start_idx) if n not in exclude_atoms and n != upstream_atom]
+
+            stereo_prefix = f"({start_atom.stereo})-" if start_atom.stereo else ""
+
+            if not next_atoms:
+                if is_double:
+                    return "selenoxo"
+                return f"{stereo_prefix}selanyl"
+
+            if len(next_atoms) == 1:
+                nxt = next_atoms[0]
+                branch = name_subgraph(mol, nxt, exclude_atoms | {start_idx}, upstream_atom=start_idx)
+                if branch == "methyl":
+                    return f"({stereo_prefix}methylselanyl)"
+                if branch == "ethyl":
+                    return f"({stereo_prefix}ethylselanyl)"
+                if branch == "phenyl":
+                    return f"({stereo_prefix}phenylselanyl)"
+                if branch:
+                    if branch.startswith("(") and branch.endswith(")"):
+                        branch = branch[1:-1]
+                    is_complex = "(" in branch or branch[0].isdigit() or "-" in branch or " " in branch
+                    if is_double:
+                        if is_complex:
+                            return f"({stereo_prefix}({branch})selanylidene)"
+                        return f"({stereo_prefix}{branch}selanylidene)"
+                    if is_complex:
+                        return f"({stereo_prefix}({branch})selanyl)"
+                    return f"({stereo_prefix}{branch}selanyl)"
+                if is_double:
+                    return f"{stereo_prefix}selanylidene"
+                return f"{stereo_prefix}selanyl"
+            else:
+                branches =[]
+                for nxt in next_atoms:
+                    br = name_subgraph(mol, nxt, exclude_atoms | {start_idx}, upstream_atom=start_idx)
+                    if br:
+                        branches.append(br)
+
+                val = sum(mol.get_bond(start_idx, n).order for n in mol.get_neighbors(start_idx))
+                base_suffix = "selanylidene" if is_double else "selanyl"
+
+                counts = {}
+                for b in branches:
+                    counts[b] = counts.get(b, 0) + 1
+                prefix_parts =[]
+                safe = len(counts) > 1 or any("(" in b or b[0].isdigit() or "-" in b or " " in b for b in counts)
+                for b, c in sorted(counts.items()):
+                    prefix_parts.append(_format_multiplier(b, c, safe_enclose=safe))
+
+                prefix = "".join(prefix_parts)
+                return f"({stereo_prefix}{prefix}-lambda^{val}-{base_suffix})"
+
+        if start_atom.symbol == "P":
+            is_double = False
+            if upstream_atom is not None:
+                bond = mol.get_bond(start_idx, upstream_atom)
+                if bond and bond.order == 2:
+                    is_double = True
+
+            p_oxygens =[
+                o
+                for o in mol.get_neighbors(start_idx)
+                if mol.atoms[o].symbol == "O" and mol.get_bond(start_idx, o).order == 2
+            ]
+            next_atoms =[
+                n
+                for n in mol.get_neighbors(start_idx)
+                if n not in exclude_atoms and n != upstream_atom and n not in p_oxygens
+            ]
+
+            stereo_prefix = f"({start_atom.stereo})-" if start_atom.stereo else ""
+
+            suffix = "phosphoryl" if len(p_oxygens) >= 1 else "phosphanyl"
+            if is_double:
+                suffix += "idene"
+
+            if not next_atoms:
+                return f"{stereo_prefix}{suffix}"
+
+            branches =[]
+            for nxt in next_atoms:
+                br = name_subgraph(mol, nxt, exclude_atoms | {start_idx} | set(p_oxygens), upstream_atom=start_idx)
+                if br:
+                    branches.append(br)
+
+            counts = {}
+            for b in branches:
+                counts[b] = counts.get(b, 0) + 1
+            prefix_parts =[]
+            safe = len(counts) > 1 or any("(" in b or b[0].isdigit() or "-" in b or " " in b for b in counts)
+            for b, c in sorted(counts.items()):
+                prefix_parts.append(_format_multiplier(b, c, safe_enclose=safe))
+
+            prefix = "".join(prefix_parts)
+            return f"({stereo_prefix}{prefix}{suffix})"
+
+        if start_atom.symbol in ["Si", "B"]:
+            is_double = False
+            if upstream_atom is not None:
+                bond = mol.get_bond(start_idx, upstream_atom)
+                if bond and bond.order == 2:
+                    is_double = True
+
+            suffix = "silyl" if start_atom.symbol == "Si" else "boryl"
+            if is_double:
+                suffix += "idene"
+
+            next_atoms =[n for n in mol.get_neighbors(start_idx) if n not in exclude_atoms and n != upstream_atom]
+            if not next_atoms:
+                return suffix
+            branches =[]
+            for nxt in next_atoms:
+                br = name_subgraph(mol, nxt, exclude_atoms | {start_idx}, upstream_atom=start_idx)
+                if br:
+                    branches.append(br)
+
+            counts = {}
+            for b in branches:
+                counts[b] = counts.get(b, 0) + 1
+            prefix_parts =[]
+            safe = len(counts) > 1 or any("(" in b or b[0].isdigit() or "-" in b or " " in b for b in counts)
+            for b, c in sorted(counts.items()):
+                prefix_parts.append(_format_multiplier(b, c, safe_enclose=safe))
+
+            prefix = "".join(prefix_parts)
+            return f"({prefix}{suffix})"
+
+        if start_atom.symbol in["F", "Cl", "Br", "I"]:
+            next_atoms =[n for n in mol.get_neighbors(start_idx) if n not in exclude_atoms and n != upstream_atom]
+            if not next_atoms:
+                return {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}[start_atom.symbol]
+
+            suffix = {"F": "fluoranyl", "Cl": "chloranyl", "Br": "bromanyl", "I": "iodanyl"}[start_atom.symbol]
+            branches =[]
+            for nxt in next_atoms:
+                br = name_subgraph(mol, nxt, exclude_atoms | {start_idx}, upstream_atom=start_idx)
+                if br:
+                    branches.append(br)
+
+            val = sum(mol.get_bond(start_idx, n).order for n in mol.get_neighbors(start_idx))
+
+            counts = {}
+            for b in branches:
+                counts[b] = counts.get(b, 0) + 1
+            prefix_parts =[]
+            safe = len(counts) > 1 or any("(" in b or b[0].isdigit() or "-" in b or " " in b for b in counts)
+            for b, c in sorted(counts.items()):
+                prefix_parts.append(_format_multiplier(b, c, safe_enclose=safe))
+
+            prefix = "".join(prefix_parts)
+            return f"({prefix}lambda^{val}-{suffix})"
+
+    visited = set(exclude_atoms)
+    comp = set()
+    q = [start_idx]
+    while q:
+        curr = q.pop(0)
+        if curr not in visited:
+            visited.add(curr)
+            comp.add(curr)
+            q.extend([x for x in mol.get_neighbors(curr) if x not in visited])
+
+    sub_exclude = set(mol.atoms.keys()) - comp
+    sub_perceived = perceive_groups(mol)
+
+    for g in sub_perceived:
+        if start_idx in g.atoms_involved and g.atoms_involved.issubset(comp):
+            if g.key == "nitro":
+                return "nitro"
+            if g.key == "nitroso":
+                return "nitroso"
+            if g.key == "azido":
+                return "azido"
+            if g.key == "sulfonic_acid":
+                return "sulfo"
+            if g.key == "isocyano":
+                return "isocyano"
+            if g.key == "nitrile":
+                return "cyano"
+            if g.key == "carboxylic_acid":
+                return "carboxy"
+            if g.key == "amide":
+                return "carbamoyl"
+            if g.key == "acid_fluoride":
+                return "fluorocarbonyl"
+            if g.key == "acid_chloride":
+                return "chlorocarbonyl"
+            if g.key == "acid_bromide":
+                return "bromocarbonyl"
+            if g.key == "acid_iodide":
+                return "iodocarbonyl"
+            if g.key == "isothiocyanato":
+                return "isothiocyanato"
+            if g.key == "isocyanato":
+                return "isocyanato"
+            if g.key == "thiocyanato":
+                return "thiocyanato"
+            if g.key == "cyanato":
+                return "cyanato"
+            if g.key in substituents.SUBSTITUENTS:
+                return substituents.get(g.key).prefix
+
+    cyclic_atoms = get_cyclic_atoms(mol, sub_exclude)
+
+    if start_idx in cyclic_atoms:
+        ring_systems = find_ring_systems(mol, sub_exclude)
+        valid_rings =[rs for rs in ring_systems if start_idx in rs.atoms]
+        if not valid_rings:
+            return ""
+        best_paths, is_ring, is_bicycle, is_spiro, is_polycycle, xyz, polycycle_descriptor = select_principal_parent(
+            mol, [], valid_rings,[start_idx]
+        )
+
+        candidate_paths = best_paths
+        fixed_start_val = is_bicycle or is_spiro or is_polycycle
+    else:
+        valid_nodes = {n for n in comp if n not in cyclic_atoms and mol.atoms[n].is_carbon and n not in sub_exclude}
+        paths =[]
+
+        def dfs_sub(curr, path, visited_nodes):
+            neighbors =[n for n in mol.get_neighbors(curr) if n in valid_nodes and n not in visited_nodes]
+            if not neighbors:
+                if start_idx in path:
+                    paths.append(path)
+                return
+            for n in neighbors:
+                dfs_sub(n, path + [n], visited_nodes | {n})
+
+        endpoints =[n for n in valid_nodes if sum(1 for x in mol.get_neighbors(n) if x in valid_nodes) <= 1]
+        start_nodes = endpoints if endpoints else valid_nodes
+        for start in start_nodes:
+            dfs_sub(start, [start], {start})
+
+        if not paths:
+            return ""
+        best_paths, is_ring, is_bicycle, is_spiro, is_polycycle, xyz, polycycle_descriptor = select_principal_parent(
+            mol, paths, [], [start_idx]
+        )
+        candidate_paths = best_paths
+        fixed_start_val = False
+
+    subst_mapping = {}
+
+    temp_retained = retained.get_retained_ring(mol, candidate_paths[0]) if is_ring else None
+    if temp_retained:
+        retained_name_val, locant_maps = temp_retained
+        if locant_maps is None and (is_bicycle or is_polycycle):
+            retained_name_val, locant_maps = None, None
+        elif any(mol.atoms[idx].symbol not in["C", "N", "O", "S"] for idx in candidate_paths[0]):
+            retained_name_val, locant_maps = None, None
+    else:
+        retained_name_val, locant_maps = None, None
+
+    main_set = set(candidate_paths[0])
+
+    sub_handled_atoms = set()
+    for g in sub_perceived:
+        if g.attachment_carbon in main_set and not g.is_principal_candidate:
+            name = substituents.get(g.key).prefix if g.key in substituents.SUBSTITUENTS else ""
+            if name:
+                subst_mapping.setdefault(g.attachment_carbon,[]).append(name)
+                sub_handled_atoms.update(g.atoms_involved)
+
+    for c_idx in candidate_paths[0]:
+        n_subs =[
+            n_idx
+            for n_idx in mol.get_neighbors(c_idx)
+            if n_idx not in main_set and n_idx not in sub_handled_atoms and n_idx not in sub_exclude
+        ]
+
+        spiro_pairs =[]
+        for i in range(len(n_subs)):
+            for j in range(i + 1, len(n_subs)):
+                n1, n2 = n_subs[i], n_subs[j]
+                visited = {c_idx}
+                q = [n1]
+                in_ring = False
+                while q:
+                    curr = q.pop(0)
+                    if curr == n2:
+                        in_ring = True
+                        break
+                    visited.add(curr)
+                    for nxt in mol.get_neighbors(curr):
+                        if nxt not in visited and nxt not in main_set and nxt not in sub_exclude:
+                            q.append(nxt)
+                if in_ring:
+                    spiro_pairs.append((n1, n2))
+                    break
+            if spiro_pairs:
+                break
+
+        if spiro_pairs:
+            n1, n2 = spiro_pairs[0]
+            sub_comp = set()
+            q_sub = [n1]
+            visited_sub = {c_idx}
+            while q_sub:
+                curr = q_sub.pop(0)
+                if curr not in sub_comp:
+                    sub_comp.add(curr)
+                    visited_sub.add(curr)
+                    for nxt in mol.get_neighbors(curr):
+                        if nxt not in visited_sub and nxt not in main_set and nxt not in sub_exclude:
+                            q_sub.append(nxt)
+            sub_comp.add(c_idx)
+
+            sub_mol = Molecule()
+            for n in sub_comp:
+                atom = mol.atoms[n]
+                sym = "Si" if n == c_idx else atom.symbol
+                sub_mol.add_atom(symbol=sym, idx=n, charge=atom.charge, stereo=atom.stereo)
+            for n in sub_comp:
+                for nxt in mol.get_neighbors(n):
+                    if nxt in sub_comp and n < nxt:
+                        bond = mol.get_bond(n, nxt)
+                        sub_mol.add_bond(
+                            u=n, v=nxt, order=bond.order, stereo=bond.stereo, in_small_ring=bond.in_small_ring
+                        )
+
+            sub_name_raw = name_component(sub_mol, sub_comp, is_substituent=False)
+            match = re.search(r"(?:(^|-)(\d+)-)?sil[a]?", sub_name_raw)
+            if match:
+                loc = match.group(2) if match.group(2) else "1"
+                if match.group(2):
+                    sub_name_clean = re.sub(rf"(^|-){loc}-sil[a]?-?", r"\1", sub_name_raw)
+                else:
+                    sub_name_clean = re.sub(r"sil[a]?-?", "", sub_name_raw)
+
+                sub_name_clean = sub_name_clean.replace("--", "-").strip("-")
+                sub_name_clean = sub_name_clean.replace("-cyclo", "cyclo")
+                if not sub_name_clean:
+                    sub_name_clean = "methane"
+                sub_name = f"[SPIRO]-{loc}-{sub_name_clean}"
+            else:
+                sub_name = f"[SPIRO]-1-{sub_name_raw}"
+
+            subst_mapping.setdefault(c_idx,[]).append(sub_name)
+            sub_handled_atoms.update(sub_comp - {c_idx})
+            n_subs =[n for n in n_subs if n not in sub_comp]
+
+        for n_idx in n_subs:
+            if n_idx not in main_set and n_idx not in sub_handled_atoms and n_idx not in sub_exclude:
+                branch_name = name_subgraph(mol, n_idx, sub_exclude | main_set, upstream_atom=c_idx)
+                if branch_name:
+                    subst_mapping.setdefault(c_idx,[]).append(branch_name)
+
+    if locant_maps:
+
+        def evaluate_map(lmap):
+            def get_val(idx):
+                return parse_locant(lmap[idx])
+
+            pg = sorted([get_val(start_idx)])
+            het_by_priority = {}
+            for a in mol:
+                if a.idx in lmap and not a.is_carbon:
+                    prio = a.element.hw_priority or 99
+                    het_by_priority.setdefault(prio,[]).append(a.idx)
+            het_eval = tuple(
+                sorted([get_val(idx) for idx in het_by_priority[prio]]) for prio in sorted(het_by_priority.keys())
+            )
+            sub_idx = set(subst_mapping.keys())
+            pref = sorted([get_val(idx) for idx in sub_idx if idx in lmap])
+            return het_eval + (pg, pref)
+
+        locant_map = min(locant_maps, key=evaluate_map)
+        numbered_path = list(locant_map.keys())
+    else:
+        locant_map = None
+        numbered_path = (
+            candidate_paths[0]
+            if locant_map
+            else number_parent(
+                mol,
+                candidate_paths,
+                {start_idx},
+                subst_mapping,
+                is_ring,
+                is_bicycle,
+                is_spiro,
+                is_polycycle=is_polycycle,
+                fixed_start=fixed_start_val,
+                retained_name=retained_name_val,
+            )
+        )
+
+    def get_loc(idx):
+        return locant_map[idx] if locant_map else str(numbered_path.index(idx) + 1)
+
+    attach_locant = get_loc(start_idx)
+
+    is_double_attach = False
+    is_triple_attach = False
+    if upstream_atom is not None:
+        bond_to_parent = mol.get_bond(start_idx, upstream_atom)
+        if bond_to_parent:
+            if bond_to_parent.order == 2:
+                is_double_attach = True
+            elif bond_to_parent.order == 3:
+                is_triple_attach = True
+
+    parts = AssemblyParts(
+        parent_length=len(numbered_path),
+        is_ring=is_ring,
+        is_bicycle=is_bicycle,
+        is_spiro=is_spiro,
+        is_polycycle=is_polycycle,
+        bicycle_xyz=xyz if is_bicycle else (0, 0, 0),
+        spiro_xy=(xyz[0], xyz[1]) if is_spiro else (0, 0),
+        polycycle_descriptor=polycycle_descriptor,
+        is_substituent=True,
+        is_double_attach=is_double_attach,
+        is_triple_attach=is_triple_attach,
+        attachment_locant=attach_locant,
+        retained_name=retained_name_val,
+    )
+
+    for i, atom_idx in enumerate(numbered_path):
+        if mol.atoms[atom_idx].stereo:
+            parts.stereo_features.append((get_loc(atom_idx), mol.atoms[atom_idx].stereo))
+
+    _emit_bond_stereo(mol, parts, numbered_path, get_loc, sub_exclude, upstream_atom)
+
+    if retained_name_val in {
+        "pyrrole",
+        "imidazole",
+        "pyrazole",
+        "1,2,3-triazole",
+        "1,2,4-triazole",
+        "indole",
+        "isoindole",
+        "indazole",
+        "benzimidazole",
+        "purine",
+        "indene",
+        "fluorene",
+    }:
+        for idx in numbered_path:
+            atom = mol.atoms[idx]
+            if atom.symbol in ["N", "C"]:
+                ring_bonds =[mol.get_bond(idx, n) for n in mol.get_neighbors(idx) if n in numbered_path]
+                if sum(b.order for b in ring_bonds) == 2:
+                    loc = get_loc(idx)
+                    parts.indicated_hydrogens.append(loc)
+
+    for c_idx, names in subst_mapping.items():
+        locant = get_loc(c_idx)
+        for name in names:
+            existing = next((s for s in parts.substituents if s.name == name), None)
+            if existing:
+                existing.locants.append(locant)
+            else:
+                parts.substituents.append(SubstituentItem(name=name, locants=[locant]))
+
+    if not retained_name_val:
+        for i, atom_idx in enumerate(numbered_path):
+            atom = mol.atoms[atom_idx]
+            if not atom.is_carbon:
+                hw_stem = atom.element.hw_stem
+                if hw_stem:
+                    val = sum(mol.get_bond(atom_idx, n).order for n in mol.get_neighbors(atom_idx))
+                    loc = get_loc(atom_idx)
+                    if atom.charge == 0 and val > atom.element.standard_valence:
+                        loc = f"{loc}lambda^{val}"
+                    parts.a_prefixes.append(SubstituentItem(name=hw_stem, locants=[loc]))
+
+        seen_bonds = set()
+        for u_idx in numbered_path:
+            for v_idx in mol.get_neighbors(u_idx):
+                if v_idx in numbered_path:
+                    bond = mol.get_bond(u_idx, v_idx)
+                    if bond and bond.order > 1 and bond.idx not in seen_bonds:
+                        seen_bonds.add(bond.idx)
+                        b_key = "double" if bond.order == 2 else "triple"
+                        loc_u_idx = numbered_path.index(u_idx)
+                        loc_v_idx = numbered_path.index(v_idx)
+                        min_idx, max_idx = min(loc_u_idx, loc_v_idx), max(loc_u_idx, loc_v_idx)
+
+                        loc_u_str = get_loc(u_idx)
+                        loc_v_str = get_loc(v_idx)
+                        min_loc_str, max_loc_str = (
+                            min(loc_u_str, loc_v_str, key=lambda x: parse_locant(x)),
+                            max(loc_u_str, loc_v_str, key=lambda x: parse_locant(x)),
+                        )
+
+                        if max_idx == min_idx + 1:
+                            locant_str = min_loc_str
+                        elif (
+                            min_idx == 0
+                            and max_idx == len(numbered_path) - 1
+                            and not (is_bicycle or is_spiro or is_polycycle)
+                        ):
+                            locant_str = max_loc_str
+                        else:
+                            locant_str = f"{min_loc_str}({max_loc_str})"
+
+                        existing = next((u for u in parts.unsaturations if u.bond_key == b_key), None)
+                        if existing:
+                            existing.locants.append(locant_str)
+                        else:
+                            parts.unsaturations.append(UnsaturationItem(bond_key=b_key, locants=[locant_str]))
+
+    name = assemble_name(parts)
+
+    if name == "phenyl" and not parts.substituents:
+        return name
+    if (
+        (name.endswith("yl") or name.endswith("ylidene") or name.endswith("ylidyne"))
+        and not parts.substituents
+        and not parts.unsaturations
+        and str(attach_locant) == "1"
+        and not name.startswith("bicyclo")
+        and not name.startswith("spiro")
+        and not name.startswith("tricyclo")
+    ):
+        return name
+
+    return f"({name})"
+
+
+def name_component(mol: Molecule, component_atoms: set[int], is_substituent: bool = False) -> str:
+    if len(component_atoms) == 1:
+        atom = mol.atoms[list(component_atoms)[0]]
+        if atom.symbol in["Na", "K", "Li", "Mg", "Ca"]:
+            return atom.element.name
+        if atom.symbol in ["F", "Cl", "Br", "I"]:
+            halide_map = {"F": "fluoride", "Cl": "chloride", "Br": "bromide", "I": "iodide"}
+            return halide_map[atom.symbol]
+
+    perceived_groups = perceive_groups(mol)
+    perceived_groups =[g for g in perceived_groups if g.attachment_carbon in component_atoms]
+
+    candidates =[g.key for g in perceived_groups if g.is_principal_candidate]
+    if is_substituent:
+        principal_key = None
+    else:
+        principal_key = suffixes.most_senior(candidates).key if candidates else None
+
+    if principal_key == "anhydride":
+        for g in perceived_groups:
+            if g.key == "anhydride":
+                single_o = next(
+                    (o for o in g.atoms_involved if mol.degree(o) == 2 and mol.atoms[o].symbol == "O"), None
+                )
+                if single_o:
+                    c_neighbors =[n for n in mol.get_neighbors(single_o) if mol.atoms[n].is_carbon]
+                    if len(c_neighbors) == 2:
+                        c1, c2 = c_neighbors
+
+                        def get_half_name(start_c):
+                            half_atoms = set()
+                            q = [start_c]
+                            visited = {single_o}
+                            while q:
+                                curr = q.pop(0)
+                                if curr not in half_atoms:
+                                    half_atoms.add(curr)
+                                    visited.add(curr)
+                                    q.extend([x for x in mol.get_neighbors(curr) if x not in visited])
+
+                            sub_mol = Molecule()
+                            for n in half_atoms:
+                                atom = mol.atoms[n]
+                                sub_mol.add_atom(symbol=atom.symbol, idx=n, charge=atom.charge, stereo=atom.stereo)
+                            oh_idx = max(mol.atoms.keys()) + 100
+                            sub_mol.add_atom(symbol="O", idx=oh_idx)
+                            sub_mol.add_bond(u=start_c, v=oh_idx, order=1)
+                            half_atoms.add(oh_idx)
+
+                            for n in half_atoms:
+                                if n == oh_idx:
+                                    continue
+                                for nxt in mol.get_neighbors(n):
+                                    if nxt in half_atoms and n < nxt:
+                                        bond = mol.get_bond(n, nxt)
+                                        sub_mol.add_bond(
+                                            u=n,
+                                            v=nxt,
+                                            order=bond.order,
+                                            stereo=bond.stereo,
+                                            in_small_ring=bond.in_small_ring,
+                                        )
+
+                            name = name_component(sub_mol, half_atoms)
+                            return name.replace(" acid", "")
+
+                        name1 = get_half_name(c1)
+                        name2 = get_half_name(c2)
+
+                        if name1 == name2:
+                            return f"{name1} anhydride"
+                        else:
+                            names = sorted([name1, name2])
+                            return f"{names[0]} {names[1]} anhydride"
+
+    exclude_atoms = set(mol.atoms.keys()) - component_atoms
+
+    cyclic_atoms_all = get_cyclic_atoms(mol, set())
+
+    for g in perceived_groups:
+        if g.key != principal_key:
+            if g.key in[
+                "nitrile",
+                "ring_nitrile",
+                "carboxylic_acid",
+                "ring_carboxylic_acid",
+                "ester",
+                "ring_carboxylate",
+                "amide",
+                "ring_amide",
+                "thioamide",
+                "ring_thioamide",
+                "acid_fluoride",
+                "ring_acid_fluoride",
+                "acid_chloride",
+                "ring_acid_chloride",
+                "acid_bromide",
+                "ring_acid_bromide",
+                "acid_iodide",
+                "ring_acid_iodide",
+            ]:
+                group_c = g.attachment_carbon
+                if group_c in cyclic_atoms_all:
+                    continue
+                adj_c =[n for n in mol.get_neighbors(group_c) if mol.atoms[n].is_carbon and n not in g.atoms_involved]
+                if len(adj_c) == 1:
+                    g.attachment_carbon = adj_c[0]
+                    g.atoms_involved.add(group_c)
+                    exclude_atoms.add(group_c)
+
+    principal_carbons =[]
+    prefix_groups =[]
+    for g in perceived_groups:
+        if g.key == principal_key:
+            principal_carbons.append(g.attachment_carbon)
+        else:
+            prefix_groups.append(g)
+
+    for g in perceived_groups:
+        if g.key == "anhydride":
+            single_o = next((o for o in g.atoms_involved if mol.degree(o) == 2 and mol.atoms[o].symbol == "O"), None)
+            if single_o is not None and single_o not in cyclic_atoms_all:
+                exclude_atoms.add(single_o)
+        elif g.key in["ester", "carboxylate", "ring_carboxylate", "peroxy_ester", "ring_peroxy_ester"]:
+            if g.key in["peroxy_ester", "ring_peroxy_ester"]:
+                single_o = next(
+                    (
+                        o
+                        for o in g.atoms_involved
+                        if mol.atoms[o].symbol == "O"
+                        and mol.get_bond(o, g.attachment_carbon) is None
+                        and mol.degree(o) == 2
+                    ),
+                    None,
+                )
+            else:
+                single_o = next((o for o in g.atoms_involved if mol.degree(o) == 2 or mol.atoms[o].charge == -1), None)
+            if single_o is not None and single_o not in cyclic_atoms_all:
+                exclude_atoms.add(single_o)
+        elif g.key in["sulfonic_acid", "sulfonate"]:
+            single_s = next((s for s in g.atoms_involved if mol.atoms[s].symbol == "S"), None)
+            if single_s is not None and single_s not in cyclic_atoms_all:
+                exclude_atoms.add(single_s)
+        elif g.key in["amide", "ring_amide", "thioamide", "ring_thioamide"]:
+            single_n = next((n for n in g.atoms_involved if mol.atoms[n].symbol == "N"), None)
+            if single_n is not None and single_n not in cyclic_atoms_all:
+                exclude_atoms.add(single_n)
+
+    chains = find_all_carbon_paths(mol, exclude_atoms)
+    ring_systems = find_ring_systems(mol, exclude_atoms)
+
+    if not chains and not ring_systems:
+        return "methane"
+
+    best_paths, is_ring, is_bicycle, is_spiro, is_polycycle, xyz, polycycle_descriptor = select_principal_parent(
+        mol, chains, ring_systems, principal_carbons
+    )
+
+    parent_set = set(best_paths[0])
+
+    valid_groups =[g for g in perceived_groups if g.attachment_carbon in parent_set]
+    perceived_groups = valid_groups
+
+    candidates =[g.key for g in perceived_groups if g.is_principal_candidate]
+    if is_substituent:
+        principal_key = None
+    else:
+        principal_key = suffixes.most_senior(candidates).key if candidates else None
+
+    principal_carbons =[g.attachment_carbon for g in perceived_groups if g.key == principal_key]
+
+    prefix_groups =[]
+    for g in perceived_groups:
+        if g.key != principal_key:
+            prefix_groups.append(g)
+
+    subst_mapping = {}
+    handled_prefix_atoms = set()
+
+    temp_retained = retained.get_retained_ring(mol, best_paths[0]) if is_ring else None
+    if temp_retained:
+        retained_name_val, locant_maps = temp_retained
+        if locant_maps is None and (is_bicycle or is_polycycle):
+            retained_name_val, locant_maps = None, None
+        elif any(mol.atoms[idx].symbol not in["C", "N", "O", "S"] for idx in best_paths[0]):
+            retained_name_val, locant_maps = None, None
+    else:
+        retained_name_val, locant_maps = None, None
+
+    principal_involved_atoms = set()
+    if principal_key:
+        for g in perceived_groups:
+            if g.key == principal_key and g.attachment_carbon in best_paths[0]:
+                principal_involved_atoms.update(g.atoms_involved)
+
+    main_set = set(best_paths[0])
+    base_exclude = set(mol.atoms.keys()) - component_atoms
+    sub_exclude = base_exclude | main_set | principal_involved_atoms
+
+    for g in prefix_groups:
+        if g.key in[
+            "ether", "thioether", "amine", "anhydride", "hydrazine", "hydrazone", "imine",
+            "aldehyde_hydrazone", "ring_aldehyde_hydrazone", "aldehyde_imine", "ring_aldehyde_imine"
+        ]:
+            continue
+
+        if g.attachment_carbon not in main_set:
+            continue
+
+        if g.key in["ester", "carboxylate", "ring_carboxylate", "peroxy_ester", "ring_peroxy_ester"]:
+            if g.key in["peroxy_ester", "ring_peroxy_ester"]:
+                single_o = next(
+                    (
+                        o
+                        for o in g.atoms_involved
+                        if mol.atoms[o].symbol == "O"
+                        and mol.get_bond(o, g.attachment_carbon) is None
+                        and mol.degree(o) == 2
+                    ),
+                    None,
+                )
+            else:
+                single_o = next((o for o in g.atoms_involved if mol.degree(o) == 2 or mol.atoms[o].charge == -1), None)
+
+            if single_o is not None:
+                r_group_c = next((n for n in mol.get_neighbors(single_o) if n not in g.atoms_involved), None)
+                if r_group_c is not None:
+                    branch_name = name_subgraph(mol, r_group_c, sub_exclude | {single_o}, upstream_atom=single_o)
+                    if branch_name:
+                        if branch_name == "methyl":
+                            alkoxy = "methoxy"
+                        elif branch_name == "ethyl":
+                            alkoxy = "ethoxy"
+                        elif branch_name == "propyl":
+                            alkoxy = "propoxy"
+                        elif branch_name == "isopropyl":
+                            alkoxy = "isopropoxy"
+                        elif branch_name == "butyl":
+                            alkoxy = "butoxy"
+                        elif branch_name == "isobutyl":
+                            alkoxy = "isobutoxy"
+                        elif branch_name == "sec-butyl":
+                            alkoxy = "sec-butoxy"
+                        elif branch_name == "tert-butyl":
+                            alkoxy = "tert-butoxy"
+                        elif branch_name == "phenyl":
+                            alkoxy = "phenoxy"
+                        else:
+                            if branch_name.startswith("(") and branch_name.endswith(")"):
+                                branch_name = branch_name[1:-1]
+                            alkoxy = f"({branch_name}oxy)"
+
+                        name = f"({alkoxy}carbonyl)"
+                        subst_mapping.setdefault(g.attachment_carbon,[]).append(name)
+                        handled_prefix_atoms.update(g.atoms_involved)
+            continue
+
+        if g.key in["amide", "ring_amide", "thioamide", "ring_thioamide"]:
+            single_n = next((n for n in g.atoms_involved if mol.atoms[n].symbol == "N"), None)
+            if single_n is not None:
+                n_subs =[
+                    n for n in mol.get_neighbors(single_n) if n not in g.atoms_involved and mol.atoms[n].symbol != "H"
+                ]
+                if not n_subs:
+                    name = "carbamoyl" if g.key in ["amide", "ring_amide"] else "carbamothioyl"
+                else:
+                    sub_names =[
+                        name_subgraph(mol, x, sub_exclude | {single_n}, upstream_atom=single_n) for x in n_subs
+                    ]
+                    counts = {}
+                    for sn in sub_names:
+                        counts[sn] = counts.get(sn, 0) + 1
+                    prefix_parts =[]
+                    safe = len(counts) > 1 or any("(" in sn or sn[0].isdigit() or "-" in sn or " " in sn for sn in counts)
+                    for sn, c in sorted(counts.items()):
+                        prefix_parts.append(_format_multiplier(sn, c, safe_enclose=safe))
+                    prefix = "".join(prefix_parts)
+                    base_name = "carbamoyl" if g.key in ["amide", "ring_amide"] else "carbamothioyl"
+                    name = f"({prefix}{base_name})" if len(n_subs) > 1 else f"({prefix}{base_name})"
+                subst_mapping.setdefault(g.attachment_carbon,[]).append(name)
+                handled_prefix_atoms.update(g.atoms_involved)
+            continue
+
+        if g.key in ["carboxylic_acid", "ring_carboxylic_acid"]:
+            subst_mapping.setdefault(g.attachment_carbon,[]).append("carboxy")
+            handled_prefix_atoms.update(g.atoms_involved)
+            continue
+
+        if g.key in["nitrile", "ring_nitrile"]:
+            subst_mapping.setdefault(g.attachment_carbon,[]).append("cyano")
+            handled_prefix_atoms.update(g.atoms_involved)
+            continue
+
+        if g.key in["acid_fluoride", "ring_acid_fluoride"]:
+            subst_mapping.setdefault(g.attachment_carbon,[]).append("(fluorocarbonyl)")
+            handled_prefix_atoms.update(g.atoms_involved)
+            continue
+        if g.key in["acid_chloride", "ring_acid_chloride"]:
+            subst_mapping.setdefault(g.attachment_carbon,[]).append("(chlorocarbonyl)")
+            handled_prefix_atoms.update(g.atoms_involved)
+            continue
+        if g.key in ["acid_bromide", "ring_acid_bromide"]:
+            subst_mapping.setdefault(g.attachment_carbon,[]).append("(bromocarbonyl)")
+            handled_prefix_atoms.update(g.atoms_involved)
+            continue
+        if g.key in["acid_iodide", "ring_acid_iodide"]:
+            subst_mapping.setdefault(g.attachment_carbon,[]).append("(iodocarbonyl)")
+            handled_prefix_atoms.update(g.atoms_involved)
+            continue
+        if g.key in["peroxy_acid", "ring_peroxy_acid"]:
+            subst_mapping.setdefault(g.attachment_carbon,[]).append("carboperoxy")
+            handled_prefix_atoms.update(g.atoms_involved)
+            continue
+
+        if g.key in["sulfonic_acid", "sulfonate"]:
+            single_o = next((o for o in g.atoms_involved if mol.degree(o) == 2 and mol.atoms[o].symbol == "O"), None)
+            if single_o is not None:
+                r_group_c = next((n for n in mol.get_neighbors(single_o) if n not in g.atoms_involved), None)
+                if r_group_c is not None:
+                    branch_name = name_subgraph(mol, r_group_c, sub_exclude | {single_o}, upstream_atom=single_o)
+                    if branch_name:
+                        if branch_name == "methyl":
+                            alkoxy = "methoxy"
+                        elif branch_name == "ethyl":
+                            alkoxy = "ethoxy"
+                        elif branch_name == "propyl":
+                            alkoxy = "propoxy"
+                        elif branch_name == "isopropyl":
+                            alkoxy = "isopropoxy"
+                        elif branch_name == "butyl":
+                            alkoxy = "butoxy"
+                        elif branch_name == "isobutyl":
+                            alkoxy = "isobutoxy"
+                        elif branch_name == "sec-butyl":
+                            alkoxy = "sec-butoxy"
+                        elif branch_name == "tert-butyl":
+                            alkoxy = "tert-butoxy"
+                        elif branch_name == "phenyl":
+                            alkoxy = "phenoxy"
+                        else:
+                            if branch_name.startswith("(") and branch_name.endswith(")"):
+                                branch_name = branch_name[1:-1]
+                            alkoxy = f"({branch_name}oxy)"
+
+                        name = f"({alkoxy}sulfonyl)"
+                        subst_mapping.setdefault(g.attachment_carbon,[]).append(name)
+                        handled_prefix_atoms.update(g.atoms_involved)
+                        continue
+            subst_mapping.setdefault(g.attachment_carbon,[]).append("sulfo")
+            handled_prefix_atoms.update(g.atoms_involved)
+            continue
+
+        if g.key == "isocyano":
+            subst_mapping.setdefault(g.attachment_carbon,[]).append("isocyano")
+            handled_prefix_atoms.update(g.atoms_involved)
+            continue
+
+        if g.key == "isothiocyanato":
+            subst_mapping.setdefault(g.attachment_carbon,[]).append("isothiocyanato")
+            handled_prefix_atoms.update(g.atoms_involved)
+            continue
+        if g.key == "isocyanato":
+            subst_mapping.setdefault(g.attachment_carbon,[]).append("isocyanato")
+            handled_prefix_atoms.update(g.atoms_involved)
+            continue
+        if g.key == "thiocyanato":
+            subst_mapping.setdefault(g.attachment_carbon,[]).append("thiocyanato")
+            handled_prefix_atoms.update(g.atoms_involved)
+            continue
+        if g.key == "cyanato":
+            subst_mapping.setdefault(g.attachment_carbon,[]).append("cyanato")
+            handled_prefix_atoms.update(g.atoms_involved)
+            continue
+
+        if g.attachment_carbon in best_paths[0]:
+            name = suffixes.get(g.key).prefix if g.is_principal_candidate else substituents.get(g.key).prefix
+            if name:
+                subst_mapping.setdefault(g.attachment_carbon,[]).append(name)
+                handled_prefix_atoms.update(g.atoms_involved)
+
+    for c_idx in best_paths[0]:
+        n_subs =[
+            n_idx
+            for n_idx in mol.get_neighbors(c_idx)
+            if n_idx not in main_set
+            and n_idx not in principal_involved_atoms
+            and n_idx not in handled_prefix_atoms
+            and n_idx not in base_exclude
+        ]
+
+        spiro_pairs =[]
+        for i in range(len(n_subs)):
+            for j in range(i + 1, len(n_subs)):
+                n1, n2 = n_subs[i], n_subs[j]
+                visited = {c_idx}
+                q = [n1]
+                in_ring = False
+                while q:
+                    curr = q.pop(0)
+                    if curr == n2:
+                        in_ring = True
+                        break
+                    visited.add(curr)
+                    for nxt in mol.get_neighbors(curr):
+                        if nxt not in visited and nxt not in main_set and nxt not in base_exclude:
+                            q.append(nxt)
+                if in_ring:
+                    spiro_pairs.append((n1, n2))
+                    break
+            if spiro_pairs:
+                break
+
+        if spiro_pairs:
+            n1, n2 = spiro_pairs[0]
+            sub_comp = set()
+            q_sub =[n1]
+            visited_sub = {c_idx}
+            while q_sub:
+                curr = q_sub.pop(0)
+                if curr not in sub_comp:
+                    sub_comp.add(curr)
+                    visited_sub.add(curr)
+                    for nxt in mol.get_neighbors(curr):
+                        if nxt not in visited_sub and nxt not in main_set and nxt not in base_exclude:
+                            q_sub.append(nxt)
+            sub_comp.add(c_idx)
+
+            sub_mol = Molecule()
+            for n in sub_comp:
+                atom = mol.atoms[n]
+                sym = "Si" if n == c_idx else atom.symbol
+                sub_mol.add_atom(symbol=sym, idx=n, charge=atom.charge, stereo=atom.stereo)
+            for n in sub_comp:
+                for nxt in mol.get_neighbors(n):
+                    if nxt in sub_comp and n < nxt:
+                        bond = mol.get_bond(n, nxt)
+                        sub_mol.add_bond(
+                            u=n, v=nxt, order=bond.order, stereo=bond.stereo, in_small_ring=bond.in_small_ring
+                        )
+
+            sub_name_raw = name_component(sub_mol, sub_comp, is_substituent=False)
+            match = re.search(r"(?:(^|-)(\d+)-)?sil[a]?", sub_name_raw)
+            if match:
+                loc = match.group(2) if match.group(2) else "1"
+                if match.group(2):
+                    sub_name_clean = re.sub(rf"(^|-){loc}-sil[a]?-?", r"\1", sub_name_raw)
+                else:
+                    sub_name_clean = re.sub(r"sil[a]?-?", "", sub_name_raw)
+
+                sub_name_clean = sub_name_clean.replace("--", "-").strip("-")
+                sub_name_clean = sub_name_clean.replace("-cyclo", "cyclo")
+                if not sub_name_clean:
+                    sub_name_clean = "methane"
+                sub_name = f"[SPIRO]-{loc}-{sub_name_clean}"
+            else:
+                sub_name = f"[SPIRO]-1-{sub_name_raw}"
+
+            subst_mapping.setdefault(c_idx,[]).append(sub_name)
+            handled_prefix_atoms.update(sub_comp - {c_idx})
+            n_subs =[n for n in n_subs if n not in sub_comp]
+
+        for n_idx in n_subs:
+            if n_idx not in main_set and n_idx not in principal_involved_atoms and n_idx not in handled_prefix_atoms:
+                branch_name = name_subgraph(mol, n_idx, sub_exclude | main_set, upstream_atom=c_idx)
+                if branch_name:
+                    subst_mapping.setdefault(c_idx,[]).append(branch_name)
+
+    if locant_maps:
+
+        def evaluate_map(lmap):
+            def get_val(idx):
+                return parse_locant(lmap[idx])
+
+            pg = sorted([get_val(c) for c in principal_carbons if c in lmap])
+            het_by_priority = {}
+            for a in mol:
+                if a.idx in lmap and not a.is_carbon:
+                    prio = a.element.hw_priority or 99
+                    het_by_priority.setdefault(prio,[]).append(a.idx)
+            het_eval = tuple(
+                sorted([get_val(idx) for idx in het_by_priority[prio]]) for prio in sorted(het_by_priority.keys())
+            )
+            sub_idx = set(subst_mapping.keys())
+            pref = sorted([get_val(idx) for idx in sub_idx if idx in lmap])
+            return het_eval + (pg, pref)
+
+        locant_map = min(locant_maps, key=evaluate_map)
+        numbered_path = list(locant_map.keys())
+    else:
+        locant_map = None
+        numbered_path = (
+            best_paths[0]
+            if locant_map
+            else number_parent(
+                mol,
+                best_paths,
+                principal_carbons,
+                subst_mapping,
+                is_ring,
+                is_bicycle,
+                is_spiro,
+                is_polycycle=is_polycycle,
+                retained_name=retained_name_val,
+            )
+        )
+
+    def get_loc(idx):
+        return locant_map[idx] if locant_map else str(numbered_path.index(idx) + 1)
+
+    parts = AssemblyParts(
+        parent_length=len(numbered_path),
+        is_ring=is_ring,
+        is_bicycle=is_bicycle,
+        is_spiro=is_spiro,
+        is_polycycle=is_polycycle,
+        bicycle_xyz=xyz if is_bicycle else (0, 0, 0),
+        spiro_xy=(xyz[0], xyz[1]) if is_spiro else (0, 0),
+        polycycle_descriptor=polycycle_descriptor,
+        retained_name=retained_name_val,
+    )
+
+    for i, atom_idx in enumerate(numbered_path):
+        if mol.atoms[atom_idx].stereo:
+            parts.stereo_features.append((get_loc(atom_idx), mol.atoms[atom_idx].stereo))
+
+    _emit_bond_stereo(mol, parts, numbered_path, get_loc, base_exclude)
+
+    if retained_name_val in {
+        "pyrrole",
+        "imidazole",
+        "pyrazole",
+        "1,2,3-triazole",
+        "1,2,4-triazole",
+        "indole",
+        "isoindole",
+        "indazole",
+        "benzimidazole",
+        "purine",
+        "indene",
+        "fluorene",
+    }:
+        for idx in numbered_path:
+            atom = mol.atoms[idx]
+            if atom.symbol in ["N", "C"]:
+                ring_bonds =[mol.get_bond(idx, n) for n in mol.get_neighbors(idx) if n in numbered_path]
+                if sum(b.order for b in ring_bonds) == 2:
+                    loc = get_loc(idx)
+                    parts.indicated_hydrogens.append(loc)
+
+    if principal_key in["ester", "carboxylate", "sulfonate", "ring_carboxylate", "peroxy_ester", "ring_peroxy_ester"]:
+        for g in perceived_groups:
+            if g.key == principal_key:
+                c_idx = g.attachment_carbon
+                if g.key in ["peroxy_ester", "ring_peroxy_ester"]:
+                    single_o = next(
+                        (
+                            o
+                            for o in g.atoms_involved
+                            if mol.atoms[o].symbol == "O" and mol.get_bond(o, c_idx) is None and mol.degree(o) == 2
+                        ),
+                        None,
+                    )
+                else:
+                    single_o = next(
+                        (o for o in g.atoms_involved if mol.degree(o) == 2 or mol.atoms[o].charge == -1), None
+                    )
+
+                if single_o is not None:
+                    r_group_c = next((n for n in mol.get_neighbors(single_o) if n not in g.atoms_involved), None)
+                    if r_group_c is not None:
+                        branch_name = name_subgraph(mol, r_group_c, sub_exclude | {single_o}, upstream_atom=single_o)
+                        if branch_name:
+                            if branch_name.startswith("(") and branch_name.endswith(")"):
+                                branch_name = branch_name[1:-1]
+                            parts.front_modifiers.append(branch_name)
+
+    if principal_key in[
+        "amide",
+        "amine",
+        "ring_amide",
+        "thioamide",
+        "ring_thioamide",
+        "hydrazine",
+        "hydrazone",
+        "imine",
+        "aldehyde_hydrazone",
+        "ring_aldehyde_hydrazone",
+        "aldehyde_imine",
+        "ring_aldehyde_imine"
+    ]:
+        pgs =[g for g in perceived_groups if g.key == principal_key and g.attachment_carbon in numbered_path]
+        pgs.sort(key=lambda g: parse_locant(get_loc(g.attachment_carbon)))
+
+        n_idx_global = 0
+        for g in pgs:
+            c_idx = g.attachment_carbon
+            ns =[n for n in g.atoms_involved if mol.atoms[n].symbol == "N"]
+            ns.sort(key=lambda n: mol.get_bond(n, c_idx) is not None, reverse=True)
+            for single_n in ns:
+                n_substituents =[
+                    n
+                    for n in mol.get_neighbors(single_n)
+                    if n != c_idx and n not in g.atoms_involved and mol.atoms[n].symbol != "H"
+                ]
+
+                if principal_key == "hydrazine":
+                    loc_prefix = "N" if single_n == ns[0] else "N'"
+                elif principal_key in["hydrazone", "aldehyde_hydrazone", "ring_aldehyde_hydrazone"]:
+                    loc_prefix = "N"
+                else:
+                    if len(pgs) == 1 and len(ns) == 1:
+                        loc_prefix = "N"
+                    else:
+                        loc_prefix = "N" + "'" * n_idx_global
+
+                for n_sub in n_substituents:
+                    branch_name = name_subgraph(mol, n_sub, sub_exclude | {single_n}, upstream_atom=single_n)
+                    if branch_name:
+                        existing = next((s for s in parts.substituents if s.name == branch_name), None)
+                        if existing:
+                            existing.locants.append(loc_prefix)
+                        else:
+                            parts.substituents.append(SubstituentItem(name=branch_name, locants=[loc_prefix]))
+                n_idx_global += 1
+
+    if not retained_name_val:
+        for i, atom_idx in enumerate(numbered_path):
+            atom = mol.atoms[atom_idx]
+            if not atom.is_carbon:
+                hw_stem = atom.element.hw_stem
+                if hw_stem:
+                    val = sum(mol.get_bond(atom_idx, n).order for n in mol.get_neighbors(atom_idx))
+                    loc = get_loc(atom_idx)
+                    if atom.charge == 0 and val > atom.element.standard_valence:
+                        loc = f"{loc}lambda^{val}"
+                    parts.a_prefixes.append(SubstituentItem(name=hw_stem, locants=[loc]))
+
+    if principal_key:
+        locants = sorted([get_loc(c) for c in principal_carbons if c in numbered_path], key=parse_locant)
+        parts.principal_group = PrincipalGroupItem(key=principal_key, locants=locants)
+
+    for c_idx, names in subst_mapping.items():
+        if c_idx in numbered_path:
+            locant = get_loc(c_idx)
+            for name in names:
+                existing = next((s for s in parts.substituents if s.name == name), None)
+                if existing:
+                    existing.locants.append(locant)
+                else:
+                    parts.substituents.append(SubstituentItem(name=name, locants=[locant]))
+
+    if not retained_name_val:
+        seen_bonds = set()
+        for u_idx in numbered_path:
+            for v_idx in mol.get_neighbors(u_idx):
+                if v_idx in numbered_path:
+                    bond = mol.get_bond(u_idx, v_idx)
+                    if bond and bond.order > 1 and bond.idx not in seen_bonds:
+                        seen_bonds.add(bond.idx)
+                        b_key = "double" if bond.order == 2 else "triple"
+                        loc_u_idx = numbered_path.index(u_idx)
+                        loc_v_idx = numbered_path.index(v_idx)
+                        min_idx, max_idx = min(loc_u_idx, loc_v_idx), max(loc_u_idx, loc_v_idx)
+
+                        loc_u_str = get_loc(u_idx)
+                        loc_v_str = get_loc(v_idx)
+                        min_loc_str, max_loc_str = (
+                            min(loc_u_str, loc_v_str, key=lambda x: parse_locant(x)),
+                            max(loc_u_str, loc_v_str, key=lambda x: parse_locant(x)),
+                        )
+
+                        if max_idx == min_idx + 1:
+                            locant_str = min_loc_str
+                        elif (
+                            min_idx == 0
+                            and max_idx == len(numbered_path) - 1
+                            and not (is_bicycle or is_spiro or is_polycycle)
+                        ):
+                            locant_str = max_loc_str
+                        else:
+                            locant_str = f"{min_loc_str}({max_loc_str})"
+
+                        existing = next((u for u in parts.unsaturations if u.bond_key == b_key), None)
+                        if existing:
+                            existing.locants.append(locant_str)
+                        else:
+                            parts.unsaturations.append(UnsaturationItem(bond_key=b_key, locants=[locant_str]))
+
+    name = assemble_name(parts)
+
+    if name == "1-phenylbenzene":
+        return "1,1'-biphenyl"
+
+    return name
+
+
+def name_smiles(smiles: str) -> str:
+    mol = read_smiles(smiles)
+    if not mol.atoms:
+        return ""
+    components = get_connected_components(mol)
+
+    names =[]
+    for comp in components:
+        comp_name = name_component(mol, comp)
+        if comp_name:
+            names.append(comp_name)
+
+    metals = {
+        "lithium",
+        "sodium",
+        "potassium",
+        "magnesium",
+        "calcium",
+        "zinc",
+        "copper",
+        "iron",
+        "aluminum",
+        "silver",
+        "gold",
+        "lead",
+        "bismuth",
+        "cesium",
+        "rubidium",
+        "barium",
+        "strontium",
+    }
+
+    def sort_key(name):
+        return (0 if name in metals else 1, name)
+
+    names.sort(key=sort_key)
+
+    return " ".join(names)from .molecule import Molecule
+import re
+
+def _get_atom_locants(oriented_path: list[int], target_indices: set[int]) -> list[int]:
+    return sorted([i + 1 for i, atom_idx in enumerate(oriented_path) if atom_idx in target_indices])
+
+def _get_bond_locants(mol: Molecule, oriented_path: list[int], is_bicycle: bool, is_spiro: bool, is_polycycle: bool) -> tuple[list[int], list[int]]:
+    db_locants =[]
+    tb_locants =[]
+    seen_bonds = set()
+    for u in oriented_path:
+        for v in mol.get_neighbors(u):
+            if v in oriented_path:
+                bond = mol.get_bond(u, v)
+                if bond and bond.order > 1 and bond.idx not in seen_bonds:
+                    seen_bonds.add(bond.idx)
+                    loc_u = oriented_path.index(u) + 1
+                    loc_v = oriented_path.index(v) + 1
+                    min_loc, max_loc = min(loc_u, loc_v), max(loc_u, loc_v)
+                    
+                    if max_loc == min_loc + 1:
+                        locant_val = min_loc
+                    elif min_loc == 1 and max_loc == len(oriented_path) and not (is_bicycle or is_spiro or is_polycycle):
+                        locant_val = max_loc
+                    else:
+                        locant_val = min_loc
+                        
+                    if bond.order == 2: db_locants.append(locant_val)
+                    elif bond.order == 3: tb_locants.append(locant_val)
+                        
+    return sorted(db_locants), sorted(tb_locants)
+
+def number_parent(
+    mol: Molecule, 
+    candidate_paths: list[list[int]], 
+    principal_carbons: set[int], 
+    substituent_mapping: dict[int, list[str]],
+    is_ring: bool,
+    is_bicycle: bool,
+    is_spiro: bool,
+    is_polycycle: bool = False,
+    fixed_start: bool = False,
+    retained_name: str = None
+) -> list[int]:
+    
+    candidates =[]
+    if is_bicycle or is_spiro or is_polycycle or fixed_start:
+        candidates = candidate_paths
+    elif is_ring:
+        path = candidate_paths[0]
+        for i in range(len(path)):
+            rotated = path[i:] + path[:i]
+            candidates.append(rotated)
+            candidates.append(rotated[::-1])
+    else:
+        path = candidate_paths[0]
+        candidates.append(path)
+        candidates.append(path[::-1])
+
+    def compare_paths(p1, p2):
+        def evaluate(oriented_path):
+            pg = _get_atom_locants(oriented_path, principal_carbons)
+            
+            het_by_priority = {}
+            for a in mol:
+                if a.idx in oriented_path and not a.is_carbon:
+                    prio = a.element.hw_priority or 99
+                    het_by_priority.setdefault(prio,[]).append(a.idx)
+            
+            het_eval = tuple(_get_atom_locants(oriented_path, set(het_by_priority[prio])) for prio in sorted(het_by_priority.keys()))
+            
+            sub_idx = set(substituent_mapping.keys())
+            pref = _get_atom_locants(oriented_path, sub_idx)
+            db, tb = _get_bond_locants(mol, oriented_path, is_bicycle, is_spiro, is_polycycle)
+            
+            if retained_name:
+                unsat =[]
+            else:
+                unsat = sorted(db + tb)
+                
+            pref_unsat = sorted(pref + unsat)
+            
+            def sub_sort_key(name):
+                s = name.lower()
+                s = re.sub(r'^[\(\[\{\)]+', '', s)
+                prefix_pattern = r'^((?:(?:[0-9]+[a-z]*|[nospmc]\'*)(?:,(?:[0-9]+[a-z]*|[nospmc]\'*))*|[ezrs]+|sec|tert|t|s|d|l|m|o|p|alpha|beta|gamma))([-)]+)'
+                while True:
+                    prev = s
+                    match = re.match(prefix_pattern, s)
+                    if match:
+                        s = s[match.end():]
+                        s = re.sub(r'^[\(\[\{\)]+', '', s)
+                        continue
+                    break
+                return s
+            
+            alpha_list =[]
+            for idx in oriented_path:
+                if idx in substituent_mapping:
+                    loc = oriented_path.index(idx) + 1
+                    for name in substituent_mapping[idx]:
+                        alpha_list.append((sub_sort_key(name), loc))
+            alpha_list.sort(key=lambda x: x[0])
+            alpha_eval = tuple(x[1] for x in alpha_list)
+            
+            stereo_seq =[]
+            for idx in oriented_path:
+                atom = mol.atoms[idx]
+                if atom.stereo:
+                    stereo_seq.append(0 if atom.stereo == 'R' else 1)
+            stereo_eval = tuple(stereo_seq)
+            
+            if is_ring:
+                return het_eval + (pg, unsat, pref_unsat, alpha_eval, stereo_eval)
+            else:
+                return (pg,) + het_eval + (unsat, pref_unsat, alpha_eval, stereo_eval)
+
+        ev1 = evaluate(p1)
+        ev2 = evaluate(p2)
+        
+        for v1, v2 in zip(ev1, ev2):
+            if not v1 and not v2: continue
+            if not v1: return 1
+            if not v2: return -1
+            for x, y in zip(v1, v2):
+                if x < y: return -1
+                if x > y: return 1
+            if len(v1) < len(v2): return -1
+            if len(v1) > len(v2): return 1
+        return 0
+
+    best = candidates[0]
+    for c in candidates[1:]:
+        if compare_paths(c, best) < 0:
+            best = c
+    return best# structure-to-iupac/parent_selection.py
+from dataclasses import dataclass
+from .molecule import Molecule
+from .chains import RingSystem
+
+@dataclass
+class ParentMetrics:
+    path: list[int]
+    is_ring: bool
+    is_bicycle: bool
+    is_spiro: bool
+    is_polycycle: bool
+    xyz: tuple[int, int, int]
+    principal_groups_count: int
+    length: int
+
+    def sort_key(self) -> tuple:
+        return (
+            self.principal_groups_count,
+            self.is_polycycle,
+            self.is_bicycle,
+            self.is_spiro,
+            self.is_ring,
+            self.length
+        )
+
+def select_principal_parent(mol: Molecule, chains: list[list[int]], ring_systems: list[RingSystem], principal_carbons: list[int]):
+    candidates =[]
+
+    for c in chains:
+        c_set = set(c)
+        pg_count = sum(1 for a in principal_carbons if a in c_set)
+        candidates.append(ParentMetrics(c, False, False, False, False, (0,0,0), pg_count, len(c)))
+
+    for rs in ring_systems:
+        p = rs.paths[0]
+        p_set = set(p)
+        pg_count = sum(1 for a in principal_carbons if a in p_set)
+        xyz = (rs.x, rs.y, rs.z) if rs.is_bicycle else (rs.x, rs.y, 0)
+        candidates.append(ParentMetrics(p, True, rs.is_bicycle, rs.is_spiro, rs.is_polycycle, xyz, pg_count, len(p)))
+
+    if not candidates:
+        return[], False, False, False, False, (0,0,0), None
+
+    candidates.sort(key=lambda m: m.sort_key(), reverse=True)
+    best = candidates[0]
+
+    if best.is_ring:
+        winning_rs = next(rs for rs in ring_systems if rs.paths[0] == best.path)
+        descriptor = winning_rs.polycycle_descriptor if winning_rs.is_polycycle else None
+        return winning_rs.paths, True, best.is_bicycle, best.is_spiro, best.is_polycycle, best.xyz, descriptor
+
+    return [best.path], False, False, False, False, (0,0,0), None# structure-to-iupac/perception.py
+
+from dataclasses import dataclass
+from .molecule import Molecule
+from .chains import get_cyclic_atoms
+
+@dataclass
+class PerceivedGroup:
+    key: str
+    is_principal_candidate: bool
+    attachment_carbon: int
+    atoms_involved: set[int]
+
+def perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
+    groups =[]
+    consumed = set()
+    cyclic_atoms = get_cyclic_atoms(mol)
+
+    for atom in mol:
+        if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
+            oxygens =[n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "O"]
+            adj_atoms =[n for n in mol.get_neighbors(atom.idx) if n not in oxygens]
+            
+            if len(oxygens) == 2 and len(adj_atoms) == 1:
+                has_double_o = any(mol.get_bond(atom.idx, o).order == 2 for o in oxygens)
+                if atom.charge == 1 or has_double_o:
+                    groups.append(PerceivedGroup("nitro", False, adj_atoms[0], {atom.idx} | set(oxygens)))
+                    consumed.update([atom.idx] + oxygens)
+            elif len(oxygens) == 1 and len(adj_atoms) == 1:
+                if mol.get_bond(atom.idx, oxygens[0]).order == 2:
+                    groups.append(PerceivedGroup("nitroso", False, adj_atoms[0], {atom.idx, oxygens[0]}))
+                    consumed.update([atom.idx, oxygens[0]])
+
+    for atom in mol:
+        if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
+            nitrogens =[n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "N"]
+            adj_atoms =[n for n in mol.get_neighbors(atom.idx) if n not in nitrogens]
+            if len(adj_atoms) == 1 and len(nitrogens) == 1:
+                n2 = nitrogens[0]
+                n2_nitrogens =[n for n in mol.get_neighbors(n2) if mol.atoms[n].symbol == "N" and n != atom.idx]
+                if len(n2_nitrogens) == 1:
+                    n3 = n2_nitrogens[0]
+                    if mol.degree(n3) == 1:
+                        groups.append(PerceivedGroup("azido", False, adj_atoms[0], {atom.idx, n2, n3}))
+                        consumed.update([atom.idx, n2, n3])
+
+    for atom in mol:
+        if atom.symbol == "O" and mol.degree(atom.idx) == 2 and atom.idx not in consumed:
+            adj_atoms = mol.get_neighbors(atom.idx)
+            if len(adj_atoms) == 2:
+                c1, c2 = adj_atoms
+                if mol.atoms[c1].is_carbon and mol.atoms[c2].is_carbon:
+                    o1 = next((o for o in mol.get_neighbors(c1) if mol.atoms[o].symbol == "O" and mol.get_bond(c1, o).order == 2), None)
+                    o2 = next((o for o in mol.get_neighbors(c2) if mol.atoms[o].symbol == "O" and mol.get_bond(c2, o).order == 2), None)
+                    if o1 and o2:
+                        visited = {atom.idx, c1}
+                        q =[c1]
+                        is_cyclic = False
+                        while q:
+                            curr = q.pop(0)
+                            for nxt in mol.get_neighbors(curr):
+                                if nxt == c2:
+                                    is_cyclic = True
+                                    break
+                                if nxt not in visited:
+                                    visited.add(nxt)
+                                    q.append(nxt)
+                            if is_cyclic: break
+                            
+                        if not is_cyclic:
+                            groups.append(PerceivedGroup("anhydride", True, c1, {atom.idx, o1, o2}))
+                            consumed.update([atom.idx, o1, o2])
+
+    for atom in mol:
+        if atom.symbol == "S" and atom.idx not in consumed:
+            oxygens =[n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "O"]
+            adj_atoms =[n for n in mol.get_neighbors(atom.idx) if n not in oxygens]
+            if len(oxygens) >= 3 and len(adj_atoms) == 1:
+                double_o_list =[o for o in oxygens if mol.get_bond(atom.idx, o).order == 2]
+                if len(double_o_list) >= 2:
+                    c_idx = adj_atoms[0]
+                    single_o_list =[o for o in oxygens if mol.get_bond(atom.idx, o).order == 1]
+                    ester_o = next((o for o in single_o_list if mol.degree(o) == 2), None)
+                    anion_o = next((o for o in single_o_list if mol.atoms[o].charge == -1), None)
+                    
+                    if ester_o is not None or anion_o is not None:
+                        key = "sulfonate"
+                        groups.append(PerceivedGroup(key, True, c_idx, {atom.idx} | set(oxygens)))
+                        consumed.update([atom.idx] + oxygens)
+                    elif len(single_o_list) > 0:
+                        key = "sulfonic_acid"
+                        groups.append(PerceivedGroup(key, True, c_idx, {atom.idx} | set(oxygens)))
+                        consumed.update([atom.idx] + oxygens)
+
+    for atom in mol:
+        if atom.is_carbon and atom.idx not in consumed:
+            nitrogens =[n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "N" and n not in consumed]
+            oxygens =[o for o in mol.get_neighbors(atom.idx) if mol.atoms[o].symbol == "O" and o not in consumed]
+            sulfurs =[s for s in mol.get_neighbors(atom.idx) if mol.atoms[s].symbol == "S" and s not in consumed]
+            
+            double_n = next((n for n in nitrogens if mol.get_bond(atom.idx, n).order == 2), None)
+            double_o = next((o for o in oxygens if mol.get_bond(atom.idx, o).order == 2 and mol.degree(o) == 1), None)
+            double_s = next((s for s in sulfurs if mol.get_bond(atom.idx, s).order == 2 and mol.degree(s) == 1), None)
+            
+            if double_n is not None:
+                if double_s is not None:
+                    n_neighbors =[x for x in mol.get_neighbors(double_n) if x != atom.idx]
+                    if len(n_neighbors) > 0:
+                        groups.append(PerceivedGroup("isothiocyanato", False, n_neighbors[0], {atom.idx, double_n, double_s}))
+                        consumed.update([atom.idx, double_n, double_s])
+                        continue
+                elif double_o is not None:
+                    n_neighbors =[x for x in mol.get_neighbors(double_n) if x != atom.idx]
+                    if len(n_neighbors) > 0:
+                        groups.append(PerceivedGroup("isocyanato", False, n_neighbors[0], {atom.idx, double_n, double_o}))
+                        consumed.update([atom.idx, double_n, double_o])
+                        continue
+                        
+            triple_n = next((n for n in nitrogens if mol.get_bond(atom.idx, n).order == 3), None)
+            single_o = next((o for o in oxygens if mol.get_bond(atom.idx, o).order == 1), None)
+            single_s = next((s for s in sulfurs if mol.get_bond(atom.idx, s).order == 1), None)
+            
+            if triple_n is not None:
+                if single_s is not None:
+                    s_neighbors =[x for x in mol.get_neighbors(single_s) if x != atom.idx]
+                    if len(s_neighbors) > 0:
+                        groups.append(PerceivedGroup("thiocyanato", False, s_neighbors[0], {atom.idx, triple_n, single_s}))
+                        consumed.update([atom.idx, triple_n, single_s])
+                        continue
+                elif single_o is not None:
+                    o_neighbors =[x for x in mol.get_neighbors(single_o) if x != atom.idx]
+                    if len(o_neighbors) > 0:
+                        groups.append(PerceivedGroup("cyanato", False, o_neighbors[0], {atom.idx, triple_n, single_o}))
+                        consumed.update([atom.idx, triple_n, single_o])
+                        continue
+
+    for atom in mol:
+        if atom.is_carbon and atom.idx not in consumed:
+            nitrogens =[n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "N" and n not in consumed]
+            triple_n = next((n for n in nitrogens if mol.get_bond(atom.idx, n).order == 3), None)
+            if triple_n is not None:
+                n_neighbors =[x for x in mol.get_neighbors(triple_n) if x != atom.idx]
+                if len(n_neighbors) > 0:
+                    groups.append(PerceivedGroup("isocyano", False, n_neighbors[0], {atom.idx, triple_n}))
+                    consumed.update([atom.idx, triple_n])
+                else:
+                    ring_neighbors =[n for n in mol.get_neighbors(atom.idx) if n in cyclic_atoms]
+                    is_exocyclic = False
+                    attached_ring_atom = None
+                    if atom.idx not in cyclic_atoms and len(ring_neighbors) == 1:
+                        attached_ring_atom = ring_neighbors[0]
+                        if mol.get_bond(atom.idx, attached_ring_atom).order == 1:
+                            is_exocyclic = True
+                    target_carbon = attached_ring_atom if is_exocyclic else atom.idx
+                    key = "ring_nitrile" if is_exocyclic else "nitrile"
+                    groups.append(PerceivedGroup(key, True, target_carbon, {atom.idx, triple_n}))
+                    consumed.update([triple_n])
+
+    for atom in mol:
+        if atom.is_carbon:
+            oxygens =[n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "O" and n not in consumed]
+            nitrogens =[n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "N" and n not in consumed]
+            halogens =[n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol in["F", "Cl", "Br", "I"] and n not in consumed]
+            
+            double_o = next((o for o in oxygens if mol.get_bond(atom.idx, o).order == 2 and mol.degree(o) == 1), None)
+            single_o = next((o for o in oxygens if mol.get_bond(atom.idx, o).order == 1), None)
+            single_n = next((n for n in nitrogens if mol.get_bond(atom.idx, n).order == 1), None)
+            single_x = next((x for x in halogens if mol.get_bond(atom.idx, x).order == 1), None)
+            
+            if double_o is not None:
+                ring_neighbors =[n for n in mol.get_neighbors(atom.idx) if n in cyclic_atoms]
+                is_exocyclic = False
+                attached_ring_atom = None
+                
+                if atom.idx not in cyclic_atoms and len(ring_neighbors) == 1:
+                    attached_ring_atom = ring_neighbors[0]
+                    if mol.get_bond(atom.idx, attached_ring_atom).order == 1:
+                        is_exocyclic = True
+                        
+                target_carbon = attached_ring_atom if is_exocyclic else atom.idx
+                
+                if single_o is not None:
+                    o_neighbors =[x for x in mol.get_neighbors(single_o) if x != atom.idx]
+                    is_peroxy = False
+                    peroxy_o = None
+                    if len(o_neighbors) == 1 and mol.atoms[o_neighbors[0]].symbol == "O":
+                        is_peroxy = True
+                        peroxy_o = o_neighbors[0]
+                    elif len(o_neighbors) > 1 and any(mol.atoms[x].symbol == "O" for x in o_neighbors):
+                        is_peroxy = True
+                        peroxy_o = next(x for x in o_neighbors if mol.atoms[x].symbol == "O")
+                        
+                    if is_peroxy:
+                        if mol.degree(peroxy_o) == 1 or mol.atoms[peroxy_o].charge == -1:
+                            key = "ring_peroxy_acid" if is_exocyclic else "peroxy_acid"
+                        else:
+                            key = "ring_peroxy_ester" if is_exocyclic else "peroxy_ester"
+                        groups.append(PerceivedGroup(key, True, target_carbon, {atom.idx, double_o, single_o, peroxy_o}))
+                        consumed.update([double_o, single_o, peroxy_o])
+                    else:
+                        is_lactone = False
+                        if target_carbon == atom.idx and single_o in cyclic_atoms:
+                            visited = {atom.idx, double_o}
+                            q = [single_o]
+                            while q:
+                                curr = q.pop(0)
+                                for nxt in mol.get_neighbors(curr):
+                                    if nxt == atom.idx and curr != single_o:
+                                        is_lactone = True
+                                        break
+                                    if nxt not in visited and nxt in cyclic_atoms:
+                                        visited.add(nxt)
+                                        q.append(nxt)
+                                if is_lactone: break
+
+                        if is_lactone:
+                            groups.append(PerceivedGroup("ketone", True, target_carbon, {atom.idx, double_o}))
+                            consumed.update([double_o]) 
+                        else:
+                            if mol.atoms[single_o].charge == -1:
+                                key = "ring_carboxylate" if is_exocyclic else "carboxylate"
+                            elif mol.degree(single_o) == 1:
+                                key = "ring_carboxylic_acid" if is_exocyclic else "carboxylic_acid"
+                            else:
+                                key = "ring_carboxylate" if is_exocyclic else "ester"
+                            groups.append(PerceivedGroup(key, True, target_carbon, {atom.idx, double_o, single_o}))
+                            consumed.update([double_o, single_o])
+                elif single_n is not None:
+                    is_lactam = False
+                    if target_carbon == atom.idx and single_n in cyclic_atoms:
+                        visited = {atom.idx, double_o}
+                        q = [single_n]
+                        while q:
+                            curr = q.pop(0)
+                            for nxt in mol.get_neighbors(curr):
+                                if nxt == atom.idx and curr != single_n:
+                                    is_lactam = True
+                                    break
+                                if nxt not in visited and nxt in cyclic_atoms:
+                                    visited.add(nxt)
+                                    q.append(nxt)
+                            if is_lactam: break
+
+                    if is_lactam:
+                        groups.append(PerceivedGroup("ketone", True, target_carbon, {atom.idx, double_o}))
+                        consumed.update([double_o])
+                    else:
+                        if single_n in cyclic_atoms:
+                            pass
+                        else:
+                            key = "ring_amide" if is_exocyclic else "amide"
+                            groups.append(PerceivedGroup(key, True, target_carbon, {atom.idx, double_o, single_n}))
+                            consumed.update([double_o, single_n])
+                elif single_x is not None:
+                    sym = mol.atoms[single_x].symbol
+                    if is_exocyclic:
+                        x_map = {"F": "ring_acid_fluoride", "Cl": "ring_acid_chloride", "Br": "ring_acid_bromide", "I": "ring_acid_iodide"}
+                    else:
+                        x_map = {"F": "acid_fluoride", "Cl": "acid_chloride", "Br": "acid_bromide", "I": "acid_iodide"}
+                    groups.append(PerceivedGroup(x_map[sym], True, target_carbon, {atom.idx, double_o, single_x}))
+                    consumed.update([double_o, single_x])
+
+    for atom in mol:
+        if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
+            c_neighbors =[n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].is_carbon]
+            n_neighbors =[n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "N"]
+            
+            double_c = next((c for c in c_neighbors if mol.get_bond(atom.idx, c).order == 2), None)
+            
+            if double_c is not None:
+                if len(n_neighbors) > 0:
+                    n2 = n_neighbors[0]
+                    if mol.get_bond(atom.idx, n2).order == 1:
+                        if n2 not in cyclic_atoms:
+                            ring_neighbors =[n for n in mol.get_neighbors(double_c) if n in cyclic_atoms]
+                            c_of_double_c =[n for n in mol.get_neighbors(double_c) if mol.atoms[n].is_carbon]
+                            if double_c not in cyclic_atoms and len(ring_neighbors) == 1 and len(c_of_double_c) == 1 and mol.get_bond(double_c, ring_neighbors[0]).order == 1:
+                                groups.append(PerceivedGroup("ring_aldehyde_hydrazone", True, ring_neighbors[0], {double_c, atom.idx, n2}))
+                            else:
+                                if len(c_of_double_c) <= 1 and double_c not in cyclic_atoms:
+                                    groups.append(PerceivedGroup("aldehyde_hydrazone", True, double_c, {atom.idx, n2}))
+                                else:
+                                    groups.append(PerceivedGroup("hydrazone", True, double_c, {atom.idx, n2}))
+                            consumed.update([atom.idx, n2])
+                        else:
+                            groups.append(PerceivedGroup("imine", True, double_c, {atom.idx}))
+                            consumed.update([atom.idx])
+                    else:
+                        groups.append(PerceivedGroup("imine", True, double_c, {atom.idx}))
+                        consumed.update([atom.idx])
+                else:
+                    groups.append(PerceivedGroup("imine", True, double_c, {atom.idx}))
+                    consumed.update([atom.idx])
+
+    for atom in mol:
+        if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
+            c_neighbors =[n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].is_carbon]
+            n_neighbors =[n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "N"]
+            
+            if len(n_neighbors) > 0:
+                n2 = n_neighbors[0]
+                c_att = c_neighbors[0] if c_neighbors else None
+                if c_att:
+                    if mol.get_bond(atom.idx, n2).order == 1:
+                        if n2 not in cyclic_atoms:
+                            groups.append(PerceivedGroup("hydrazine", True, c_att, {atom.idx, n2}))
+                            consumed.update([atom.idx, n2])
+                        else:
+                            groups.append(PerceivedGroup("amine", True, c_att, {atom.idx}))
+                            consumed.update([atom.idx])
+
+    for atom in mol:
+        if atom.idx not in consumed:
+            if atom.symbol == "O" and mol.degree(atom.idx) == 1:
+                adj_atoms = mol.get_neighbors(atom.idx)
+                if len(adj_atoms) == 1:
+                    c_idx = adj_atoms[0]
+                    bond = mol.get_bond(atom.idx, c_idx)
+                    if bond.order == 2:
+                        if mol.atoms[c_idx].is_carbon:
+                            if c_idx in cyclic_atoms:
+                                groups.append(PerceivedGroup("ketone", True, c_idx, {atom.idx}))
+                            elif len(mol.get_neighbors(c_idx)) >= 3:
+                                groups.append(PerceivedGroup("ketone", True, c_idx, {atom.idx}))
+                            else:
+                                ring_neighbors =[n for n in mol.get_neighbors(c_idx) if n in cyclic_atoms]
+                                if len(ring_neighbors) == 1 and mol.get_bond(c_idx, ring_neighbors[0]).order == 1:
+                                    groups.append(PerceivedGroup("ring_aldehyde", True, ring_neighbors[0], {c_idx, atom.idx}))
+                                else:
+                                    groups.append(PerceivedGroup("aldehyde", True, c_idx, {c_idx, atom.idx}))
+                    elif bond.order == 1:
+                        if mol.atoms[c_idx].is_carbon:
+                            groups.append(PerceivedGroup("alcohol", True, c_idx, {atom.idx}))
+                    consumed.add(atom.idx)
+            elif atom.symbol == "S" and mol.degree(atom.idx) == 1 and atom.idx not in cyclic_atoms:
+                adj_atoms = mol.get_neighbors(atom.idx)
+                if len(adj_atoms) == 1:
+                    c_idx = adj_atoms[0]
+                    bond = mol.get_bond(atom.idx, c_idx)
+                    if bond.order == 1:
+                        if mol.atoms[c_idx].is_carbon:
+                            groups.append(PerceivedGroup("thiol", True, c_idx, {atom.idx}))
+                            consumed.add(atom.idx)
+
+    for atom in mol:
+        if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
+            adj_atoms = mol.get_neighbors(atom.idx)
+            if len(adj_atoms) > 0:
+                for c in adj_atoms:
+                    groups.append(PerceivedGroup("amine", True, c, {atom.idx}))
+                consumed.add(atom.idx)
+
+    for atom in mol:
+        if atom.symbol == "O" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
+            adj_atoms = mol.get_neighbors(atom.idx)
+            if len(adj_atoms) == 2:
+                for c in adj_atoms:
+                    groups.append(PerceivedGroup("ether", False, c, {atom.idx}))
+                consumed.add(atom.idx)
+
+    for atom in mol:
+        if atom.symbol == "S" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
+            adj_atoms = mol.get_neighbors(atom.idx)
+            if len(adj_atoms) == 2:
+                for c in adj_atoms:
+                    groups.append(PerceivedGroup("thioether", False, c, {atom.idx}))
+                consumed.add(atom.idx)
+
+    halogen_map = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
+    for atom in mol:
+        if atom.symbol in halogen_map and atom.idx not in consumed and atom.idx not in cyclic_atoms:
+            if mol.degree(atom.idx) == 1:
+                adj_atoms = mol.get_neighbors(atom.idx)
+                if len(adj_atoms) == 1:
+                    groups.append(PerceivedGroup(halogen_map[atom.symbol], False, adj_atoms[0], {atom.idx}))
+                    consumed.add(atom.idx)
+
+    return groups

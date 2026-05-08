@@ -1,0 +1,1301 @@
+# structure-to-iupac/rules/bonds.py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class BondType:
+    key: str              
+    order: int            
+    saturated_suffix: str 
+    suffix: str           
+    needs_locant: bool    
+    multi_infix: dict[int, str]  
+
+
+BONDS: dict[str, BondType] = {
+    "single": BondType(
+        key="single",
+        order=1,
+        saturated_suffix="an",   
+        suffix="an",
+        needs_locant=False,      
+        multi_infix={},          
+    ),
+    "double": BondType(
+        key="double",
+        order=2,
+        saturated_suffix="",     
+        suffix="en",             
+        needs_locant=True,
+        multi_infix={
+            2: "adien",          
+            3: "atrien",         
+            4: "atetraen",       
+            5: "apentaen",
+            6: "ahexaen",
+            7: "aheptaen",
+            8: "aoctaen",
+            9: "anonaen",
+            10: "adecaen",
+        },
+    ),
+    "triple": BondType(
+        key="triple",
+        order=3,
+        saturated_suffix="",
+        suffix="yn",             
+        needs_locant=True,
+        multi_infix={
+            2: "adiyn",          
+            3: "atriyn",
+            4: "atetrayn",
+            5: "apentayn",
+            6: "ahexayn",
+            7: "aheptayn",
+            8: "aoctayn",
+            9: "anonayn",
+            10: "adecayn",
+        },
+    ),
+}
+
+PARENT_TERMINAL_VOWEL: str = "e"
+
+def get(key: str) -> BondType:
+    return BONDS[key]
+
+def unsaturation_infix(bond_key: str, count: int) -> str:
+    bt = BONDS[bond_key]
+    if count == 1:
+        return bt.suffix
+    return bt.multi_infix[count]# structure-to-iupac/rules/elements.py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class Element:
+    symbol: str
+    name: str
+    atomic_number: int
+    standard_valence: int
+    hw_stem: str | None
+    hw_priority: int | None
+    substituent_prefix: str | None
+
+ELEMENTS: dict[str, Element] = {
+    "H":  Element("H",  "hydrogen",   1,  1, None,   None, "hydro"),
+    "B":  Element("B",  "boron",      5,  3, "bora", 18,   "boryl"),
+    "C":  Element("C",  "carbon",     6,  4, None,   None, None),
+    "N":  Element("N",  "nitrogen",   7,  3, "aza",  9,    "amino"),
+    "O":  Element("O",  "oxygen",     8,  2, "oxa",  5,    "oxy"),
+    "F":  Element("F",  "fluorine",   9,  1, "fluora",   1,    "fluoro"),
+    "Si": Element("Si", "silicon",   14,  4, "sila", 14,   "silyl"),
+    "P":  Element("P",  "phosphorus",15,  3, "phospha", 10,"phosphanyl"),
+    "S":  Element("S",  "sulfur",    16,  2, "thia", 6,    "sulfanyl"),
+    "Cl": Element("Cl", "chlorine",  17,  1, "chlora",   2,    "chloro"),
+    "Se": Element("Se", "selenium",  34,  2, "selena", 7,  "selanyl"),
+    "Br": Element("Br", "bromine",   35,  1, "broma",   3,    "bromo"),
+    "I":  Element("I",  "iodine",    53,  1, "ioda",   4,    "iodo"),
+    "Li": Element("Li", "lithium",    3,  1, None,   None, None),
+    "Na": Element("Na", "sodium",    11,  1, None,   None, None),
+    "K":  Element("K",  "potassium", 19,  1, None,   None, None),
+    "Mg": Element("Mg", "magnesium", 12,  2, None,   None, None),
+    "Ca": Element("Ca", "calcium",   20,  2, None,   None, None),
+}
+
+def get(symbol: str) -> Element: return ELEMENTS[symbol]
+def is_known(symbol: str) -> bool: return symbol in ELEMENTS"""
+structure-to-iupac/rules/elision.py
+
+Vowel and consonant elision rules for IUPAC name assembly.
+
+When concatenating name fragments (stems, multipliers, suffixes, etc.),
+certain vowels are elided to produce a pronounceable result. These rules
+are applied at the assembler stage when joining pieces.
+
+References:
+- IUPAC 2013 Recommendations, P-16.3.3 (elision of vowels)
+- IUPAC 2013 Recommendations, P-25.3.1.3 (Hantzsch-Widman elision)
+"""
+
+VOWELS: frozenset[str] = frozenset("aeiouy")
+
+
+def elide_terminal_e(stem: str, suffix: str) -> str:
+    """Elide a terminal 'e' from `stem` when `suffix` starts with a vowel.
+
+    This is the most common elision rule, used for parent terminal vowel:
+        "hexane" + "ol"  -> "hexan" + "ol"  -> "hexanol"
+        "hexane" + "oic" -> "hexan" + "oic" -> "hexanoic"
+        "hexane" + "amine" -> "hexan" + "amine" -> "hexanamine"
+    But:
+        "hexane" + "dione" -> "hexanedione"  (suffix starts with 'd', no elision)
+
+    Note: applied to the bare stem+bond combination *before* attaching the
+    parent terminal "e". In practice the assembler decides whether to keep
+    the "e" based on what follows.
+    """
+    if not stem or not suffix:
+        return stem + suffix
+    if stem.endswith("e") and suffix[0] in VOWELS:
+        return stem[:-1] + suffix
+    return stem + suffix
+
+
+def elide_terminal_a(prefix: str, following: str) -> str:
+    """Elide a terminal 'a' from a Hantzsch-Widman heteroatom prefix
+    when followed by a vowel-starting fragment.
+
+    Used in heterocycle naming:
+        "oxa" + "azine"  -> "ox" + "azine"  -> "oxazine"
+        "oxa" + "irane"  -> "ox" + "irane"  -> "oxirane"
+        "thia" + "azole" -> "thi" + "azole" -> "thiazole"
+    But:
+        "oxa" + "thiane" -> "oxathiane"  (consonant follows, no elision)
+
+    Also used in replacement (skeletal) nomenclature:
+        "oxa" + "ane" -> "ox" + "ane" -> ...  (rare; handled per-case)
+    """
+    if not prefix or not following:
+        return prefix + following
+    if prefix.endswith("a") and following[0] in VOWELS:
+        return prefix[:-1] + following
+    return prefix + following
+
+
+def elide_terminal_o(prefix: str, following: str) -> str:
+    """Elide a terminal 'o' from certain prefixes before a vowel.
+
+    Less common than 'a' or 'e' elision, but applies to a few cases like
+    "iodo" combinations and some retained-name prefixes. In practice this
+    is rare in modern PINs; included for completeness.
+
+    Note: most "o"-ending substituent prefixes (chloro, bromo, fluoro, nitro)
+    are NOT elided before vowels — "chloroethane" not "chlorethane".
+    Elision is not the default for substituent prefixes; this helper exists
+    only for specific named cases that opt in.
+    """
+    if not prefix or not following:
+        return prefix + following
+    if prefix.endswith("o") and following[0] in VOWELS:
+        return prefix[:-1] + following
+    return prefix + following
+
+
+def join_with_elision(*fragments: str, rule: str = "e") -> str:
+    """Join name fragments left-to-right, applying the specified elision rule
+    at each junction.
+
+    rule:
+        "e" - elide trailing 'e' before vowel-starting fragment (most common)
+        "a" - elide trailing 'a' before vowel-starting fragment (HW prefixes)
+        "o" - elide trailing 'o' before vowel-starting fragment (rare)
+        "none" - no elision, simple concatenation
+
+    Example:
+        join_with_elision("hexan", "e")              -> "hexane"
+        join_with_elision("hexan", "e", "ol", rule="e") -> wrong; see below
+        join_with_elision("hexan", "ol", rule="e")   -> "hexanol"
+
+    Note: this is intentionally simple. Complex multi-fragment names with
+    locants (e.g. "hexa-1,3-dien-1-ol") are assembled by the dedicated
+    name assembler, not by this helper. Use this only for two- or
+    three-fragment joins where the elision rule is clear.
+    """
+    if not fragments:
+        return ""
+    if rule == "none":
+        return "".join(fragments)
+    elider = {
+        "e": elide_terminal_e,
+        "a": elide_terminal_a,
+        "o": elide_terminal_o,
+    }.get(rule)
+    if elider is None:
+        raise ValueError(f"Unknown elision rule: {rule!r}")
+    result = fragments[0]
+    for frag in fragments[1:]:
+        result = elider(result, frag)
+    return result
+
+
+def is_vowel_start(s: str) -> bool:
+    """Return True if `s` begins with a vowel (a, e, i, o, u, y)."""
+    return bool(s) and s[0].lower() in VOWELS
+
+
+def is_vowel_end(s: str) -> bool:
+    """Return True if `s` ends with a vowel."""
+    return bool(s) and s[-1].lower() in VOWELS"""
+structure-to-iupac/rules/locants.py
+
+Locant comparison and selection logic for IUPAC nomenclature.
+
+The "lowest set of locants" rule is applied throughout nomenclature to break
+ties when multiple numbering schemes are valid. This module provides the
+core comparison primitive used everywhere downstream.
+
+References:
+- IUPAC 2013 Recommendations, P-14.5 (lowest locants)
+- IUPAC 2013 Recommendations, P-31.1.4.3 (locant assignment priority order)
+"""
+
+from __future__ import annotations
+from dataclasses import dataclass
+
+
+# Type alias: a locant set is a list of integers, e.g. [2, 4, 5] for positions
+# 2, 4, and 5. Always treated as a sorted sequence when comparing.
+LocantSet = list[int]
+
+
+def normalize(locants: LocantSet) -> LocantSet:
+    """Return a sorted copy of the locant set (ascending)."""
+    return sorted(locants)
+
+
+def compare(a: LocantSet, b: LocantSet) -> int:
+    """Compare two locant sets per IUPAC "lowest set of locants" rule.
+
+    Returns:
+        -1 if `a` is lower (preferred) than `b`
+         0 if they are equal
+         1 if `a` is higher than `b`
+
+    The rule: compare term-by-term in ascending order. The first point of
+    difference determines the winner; the lower number wins.
+
+    Examples:
+        compare([2, 5],[3, 4])      -> -1   (2 < 3 at first position)
+        compare([2, 4], [2, 5])      -> -1   (tie at first, 4 < 5 at second)
+        compare([1, 3, 5], [1, 3, 5]) -> 0
+        compare([2, 3], [2])          -> 1    (longer set loses if shorter is prefix;
+                                               but in practice equal-length sets compare)
+    """
+    sa = normalize(a)
+    sb = normalize(b)
+    for x, y in zip(sa, sb):
+        if x < y:
+            return -1
+        if x > y:
+            return 1
+    # All compared positions equal; shorter set is "lower" if lengths differ.
+    if len(sa) < len(sb):
+        return -1
+    if len(sa) > len(sb):
+        return 1
+    return 0
+
+
+def lowest(*candidates: LocantSet) -> LocantSet:
+    """Return the lowest locant set among the candidates.
+
+    Example:
+        lowest([2, 5], [3, 4], [2, 4]) -> [2, 4]
+    """
+    if not candidates:
+        raise ValueError("lowest() requires at least one candidate")
+    best = candidates[0]
+    for c in candidates[1:]:
+        if compare(c, best) < 0:
+            best = c
+    return best
+
+
+# ---------------------------------------------------------------------------
+# Multi-criteria locant assignment
+# ---------------------------------------------------------------------------
+# IUPAC P-31.1.4.3 specifies that when numbering a parent chain or ring,
+# locants are assigned to give the lowest set to the following features,
+# applied in this order until a decision is reached:
+#
+#   1. Principal characteristic group(s) (the suffix-cited group)
+#   2. Skeletal heteroatoms (in replacement nomenclature)
+#   3. Indicated/added hydrogen
+#   4. Detachable prefixes, all together (substituents + unsaturation)
+#   5. Double bonds, then triple bonds (separately, double first)
+#   6. Detachable prefixes cited in alphabetical order
+#
+# This is a multi-criteria comparison: each candidate numbering produces a
+# tuple of locant sets, one per criterion. The candidate whose tuple is
+# lexicographically lowest wins.
+
+
+@dataclass(frozen=True)
+class LocantCriteria:
+    """A bundle of locant sets for a candidate numbering, ordered by
+    IUPAC priority. Used to select the correct numbering direction
+    when multiple are valid.
+
+    Fields are ordered by P-31.1.4.3 priority (most important first).
+    None values are skipped during comparison (treated as "not applicable").
+    """
+    principal_group: LocantSet | None = None
+    heteroatoms: LocantSet | None = None
+    indicated_hydrogen: LocantSet | None = None
+    detachable_prefixes_and_unsaturation: LocantSet | None = None
+    double_bonds: LocantSet | None = None
+    triple_bonds: LocantSet | None = None
+    detachable_prefixes_alphabetical: LocantSet | None = None
+
+
+def compare_criteria(a: LocantCriteria, b: LocantCriteria) -> int:
+    """Compare two LocantCriteria tuples lexicographically by IUPAC priority.
+
+    Returns -1 if `a` wins, 1 if `b` wins, 0 if fully tied.
+
+    A criterion is skipped when either side has no value for it (None).
+    For the same molecule under two numbering schemes, both candidates
+    should populate the same fields; treating a one-sided None as a tie
+    on that criterion (rather than an automatic loss) prevents spurious
+    decisions when the caller only fills in some fields.
+    """
+    fields = (
+        "principal_group",
+        "heteroatoms",
+        "indicated_hydrogen",
+        "detachable_prefixes_and_unsaturation",
+        "double_bonds",
+        "triple_bonds",
+        "detachable_prefixes_alphabetical",
+    )
+    for field in fields:
+        va = getattr(a, field)
+        vb = getattr(b, field)
+        # Skip this criterion if either side has no value to compare.
+        # (Previously this branch returned a winner, which contradicted the
+        # documented "Tie-break: skip" behavior and produced wrong winners
+        # whenever one candidate happened to leave a field unfilled.)
+        if va is None or vb is None:
+            continue
+
+        if field == "detachable_prefixes_alphabetical":
+            # Compare sequentially WITHOUT sorting to preserve alphabetical
+            # priority mapping (locant[i] corresponds to the i-th alphabetical
+            # prefix; reordering would destroy that mapping).
+            for x, y in zip(va, vb):
+                if x < y:
+                    return -1
+                if x > y:
+                    return 1
+            if len(va) < len(vb):
+                return -1
+            if len(va) > len(vb):
+                return 1
+        else:
+            result = compare(va, vb)
+            if result != 0:
+                return result
+    return 0
+
+
+def select_best_numbering(candidates: list[LocantCriteria]) -> int:
+    """Given a list of candidate numbering schemes (each represented by its
+    LocantCriteria), return the index of the winner.
+
+    Example:
+        cands =[
+            LocantCriteria(principal_group=[3], double_bonds=[1]),
+            LocantCriteria(principal_group=[1], double_bonds=[3]),
+        ]
+        select_best_numbering(cands) -> 1   # principal group locant 1 < 3
+    """
+    if not candidates:
+        raise ValueError("select_best_numbering() requires at least one candidate")
+    best_idx = 0
+    for i in range(1, len(candidates)):
+        if compare_criteria(candidates[i], candidates[best_idx]) < 0:
+            best_idx = i
+    return best_idx
+"""
+structure-to-iupac/rules/multipliers.py
+
+Multiplicative prefixes for IUPAC nomenclature.
+Used for repeated substituents, multiple bonds, and identical structural features.
+
+References:
+- IUPAC 2013 Recommendations, P-14.2 (multiplicative prefixes)
+"""
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Multiplier:
+    count: int
+    basic: str       # Used for simple substituents: di, tri, tetra...
+    complex: str     # Used for substituted substituents: bis, tris, tetrakis...
+
+
+# "basic" prefixes are used for simple repeated units, e.g. "dimethyl", "trichloro".
+# "complex" prefixes (bis, tris, ...) are used when the substituent itself contains
+# locants, multiplying prefixes, or would cause ambiguity, e.g.
+#   "bis(2-chloroethyl)" not "di(2-chloroethyl)"
+#   "tris(hydroxymethyl)" not "trihydroxymethyl"
+
+MULTIPLIERS: dict[int, Multiplier] = {
+    2:  Multiplier(2,  "di",          "bis"),
+    3:  Multiplier(3,  "tri",         "tris"),
+    4:  Multiplier(4,  "tetra",       "tetrakis"),
+    5:  Multiplier(5,  "penta",       "pentakis"),
+    6:  Multiplier(6,  "hexa",        "hexakis"),
+    7:  Multiplier(7,  "hepta",       "heptakis"),
+    8:  Multiplier(8,  "octa",        "octakis"),
+    9:  Multiplier(9,  "nona",        "nonakis"),
+    10: Multiplier(10, "deca",        "decakis"),
+    11: Multiplier(11, "undeca",      "undecakis"),
+    12: Multiplier(12, "dodeca",      "dodecakis"),
+    13: Multiplier(13, "trideca",     "tridecakis"),
+    14: Multiplier(14, "tetradeca",   "tetradecakis"),
+    15: Multiplier(15, "pentadeca",   "pentadecakis"),
+    16: Multiplier(16, "hexadeca",    "hexadecakis"),
+    17: Multiplier(17, "heptadeca",   "heptadecakis"),
+    18: Multiplier(18, "octadeca",    "octadecakis"),
+    19: Multiplier(19, "nonadeca",    "nonadecakis"),
+    20: Multiplier(20, "icosa",       "icosakis"),
+}
+
+
+def get(count: int) -> Multiplier:
+    """Look up a multiplier by count. Raises KeyError if out of range."""
+    return MULTIPLIERS[count]
+
+
+def basic(count: int) -> str:
+    """Return the basic multiplicative prefix (di, tri, tetra, ...)."""
+    return MULTIPLIERS[count].basic
+
+
+def complex_(count: int) -> str:
+    """Return the complex multiplicative prefix (bis, tris, tetrakis, ...).
+    Trailing underscore avoids shadowing the `complex` builtin.
+    """
+    return MULTIPLIERS[count].complex# structure-to-iupac/rules/retained.py
+from structure_to_iupac.molecule import Molecule
+import itertools
+
+def _find_two_rings(mol: Molecule, path: list[int], fused: list[int], path_set: set[int], small_ring_size: int):
+    """Split a fused bicyclic path into its two component rings.
+    Returns (small_ring, big_ring) as ordered atom lists, or (None, None) if cannot split.
+    """
+    rings =[]
+    for start_n in mol.get_neighbors(fused[0]):
+        if start_n in path_set and start_n != fused[1]:
+            ring_atoms =[fused[0], start_n]
+            visited_local = {fused[0], start_n}
+            cur = start_n
+            while cur != fused[1]:
+                nxt = next((x for x in mol.get_neighbors(cur) if x in path_set and x not in visited_local), None)
+                if nxt is None:
+                    break
+                ring_atoms.append(nxt)
+                visited_local.add(nxt)
+                cur = nxt
+                if len(ring_atoms) > 7:
+                    break
+            if len(ring_atoms) >= 5 and ring_atoms[-1] == fused[1]:
+                rings.append(ring_atoms)
+    if len(rings) != 2:
+        return None, None
+    if len(rings[0]) == small_ring_size:
+        return rings[0], rings[1]
+    elif len(rings[1]) == small_ring_size:
+        return rings[1], rings[0]
+    return None, None
+
+def _count_double_bonds_in_ring(mol: Molecule, ring_atoms: list[int]) -> int:
+    seen = set()
+    cnt = 0
+    n = len(ring_atoms)
+    for i in range(n):
+        a, b = ring_atoms[i], ring_atoms[(i + 1) % n]
+        bd = mol.get_bond(a, b)
+        if bd and bd.idx not in seen:
+            seen.add(bd.idx)
+            if bd.order == 2:
+                cnt += 1
+    return cnt
+
+def _has_no_cumulated_double_bonds(mol: Molecule, path: list[int]) -> bool:
+    path_set = set(path)
+    for a in path:
+        db_count = 0
+        for b in mol.get_neighbors(a):
+            if b in path_set:
+                bd = mol.get_bond(a, b)
+                if bd and bd.order == 2:
+                    db_count += 1
+        if db_count > 1:
+            return False
+    return True
+
+def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[int, str]] | None] | None:
+    size = len(path)
+    path_set = set(path)
+    
+    double_bonds = 0
+    total_bonds = 0
+    seen_bonds = set()
+    
+    internal_degrees = {u: 0 for u in path}
+    symbols = [mol.atoms[idx].symbol for idx in path]
+    n_count = symbols.count("N")
+    o_count = symbols.count("O")
+    s_count = symbols.count("S")
+    
+    for u in path:
+        for v in mol.get_neighbors(u):
+            if v in path_set:
+                internal_degrees[u] += 1
+                bond = mol.get_bond(u, v)
+                if bond and bond.idx not in seen_bonds:
+                    seen_bonds.add(bond.idx)
+                    total_bonds += 1
+                    if bond.order == 2:
+                        double_bonds += 1
+
+    deg_counts = tuple(sorted(internal_degrees.values()))
+    sig = (size, total_bonds, double_bonds, deg_counts)
+    deg3_nodes =[u for u, d in internal_degrees.items() if d == 3]
+    
+    if sig == (10, 11, 5, tuple([2]*8 + [3]*2)):
+        if len(deg3_nodes) == 2 and mol.get_bond(deg3_nodes[0], deg3_nodes[1]) is not None:
+            small_ring, big_ring = _find_two_rings(mol, path, deg3_nodes, path_set, 6)
+            if small_ring and big_ring and len(small_ring) == 6 and len(big_ring) == 6:
+                # Check that one ring is benzene-like (all C, 3 double bonds)
+                small_symbols = [mol.atoms[a].symbol for a in small_ring]
+                big_symbols =[mol.atoms[a].symbol for a in big_ring]
+                small_db = _count_double_bonds_in_ring(mol, small_ring)
+                big_db = _count_double_bonds_in_ring(mol, big_ring)
+                
+                if n_count == 1 and s_count == 0 and o_count == 0:
+                    n_idx = next(idx for idx in path if mol.atoms[idx].symbol == "N")
+                    # N must be in the heterocyclic ring (the one with N), benzene must be all-C
+                    benzene_ring = small_ring if "N" not in small_symbols else (big_ring if "N" not in big_symbols else None)
+                    if benzene_ring is None:
+                        return None
+                    benzene_db = _count_double_bonds_in_ring(mol, benzene_ring)
+                    if benzene_db != 3 or not _has_no_cumulated_double_bonds(mol, benzene_ring):
+                        return None
+                    if any(mol.atoms[a].symbol != "C" for a in benzene_ring):
+                        return None
+                    
+                    idx_n = path.index(n_idx)
+                    n_neighbors_in_path =[v for v in mol.get_neighbors(n_idx) if v in path_set]
+                    is_quinoline = any(internal_degrees[v] == 3 for v in n_neighbors_in_path)
+                    
+                    if is_quinoline:
+                        rot_path = path[idx_n:] + path[:idx_n]
+                        if internal_degrees[rot_path[1]] == 3:
+                            rot_path =[rot_path[0]] + rot_path[1:][::-1]
+                        if internal_degrees[rot_path[4]] == 3 and internal_degrees[rot_path[9]] == 3:
+                            locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                            return "quinoline", [{rot_path[i]: locants[i] for i in range(10)}]
+                    else:
+                        c1 = next(v for v in n_neighbors_in_path if any(internal_degrees[w] == 3 for w in mol.get_neighbors(v) if w in path_set))
+                        idx_c1 = path.index(c1)
+                        rot_path = path[idx_c1:] + path[:idx_c1]
+                        if rot_path[1] != n_idx:
+                            rot_path =[rot_path[0]] + rot_path[1:][::-1]
+                        if internal_degrees[rot_path[4]] == 3 and internal_degrees[rot_path[9]] == 3:
+                            locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                            return "isoquinoline", [{rot_path[i]: locants[i] for i in range(10)}]
+                if n_count == 2 and s_count == 0 and o_count == 0:
+                    n_indices =[idx for idx in path if mol.atoms[idx].symbol == "N"]
+                    # Both N must be in same ring, the other must be benzene
+                    ring_with_n = small_ring if all(n in small_ring for n in n_indices) else (big_ring if all(n in big_ring for n in n_indices) else None)
+                    if ring_with_n is None:
+                        return None
+                    benzene_ring = big_ring if ring_with_n is small_ring else small_ring
+                    if any(mol.atoms[a].symbol != "C" for a in benzene_ring):
+                        return None
+                    if _count_double_bonds_in_ring(mol, benzene_ring) != 3 or not _has_no_cumulated_double_bonds(mol, benzene_ring):
+                        return None
+                    
+                    if all(internal_degrees[n] == 2 for n in n_indices):
+                        n1, n2 = n_indices
+                        rot_path = path[path.index(n1):] + path[:path.index(n1)]
+                        if internal_degrees[rot_path[1]] == 3:
+                            rot_path = [rot_path[0]] + rot_path[1:][::-1]
+                        
+                        if internal_degrees[rot_path[4]] == 3 and internal_degrees[rot_path[9]] == 3:
+                            if rot_path[2] == n2:
+                                locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                                return "quinazoline", [{rot_path[i]: locants[i] for i in range(10)}]
+                            elif rot_path[3] == n2:
+                                locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                                return "quinoxaline",[{rot_path[i]: locants[i] for i in range(10)}]
+                            elif rot_path[1] == n2:
+                                locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                                return "cinnoline", [{rot_path[i]: locants[i] for i in range(10)}]
+                        
+                        rot_path2 = path[path.index(n2):] + path[:path.index(n2)]
+                        if internal_degrees[rot_path2[1]] == 3:
+                            rot_path2 = [rot_path2[0]] + rot_path2[1:][::-1]
+                        if internal_degrees[rot_path2[4]] == 3 and internal_degrees[rot_path2[9]] == 3:
+                            if rot_path2[2] == n1:
+                                locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                                return "quinazoline",[{rot_path2[i]: locants[i] for i in range(10)}]
+                            elif rot_path2[3] == n1:
+                                locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                                return "quinoxaline",[{rot_path2[i]: locants[i] for i in range(10)}]
+                            elif rot_path2[1] == n1:
+                                locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                                return "cinnoline", [{rot_path2[i]: locants[i] for i in range(10)}]
+                if n_count == 0:
+                    if any(mol.atoms[a].symbol != "C" for a in path):
+                        return None
+                    maps =[]
+                    alpha_nodes =[u for u in path if internal_degrees[u] == 2 and any(internal_degrees[v] == 3 for v in mol.get_neighbors(u) if v in path_set)]
+                    for start_idx in alpha_nodes:
+                        rot_path = path[path.index(start_idx):] + path[:path.index(start_idx)]
+                        if internal_degrees[rot_path[1]] == 3:
+                            rot_path = [rot_path[0]] + rot_path[1:][::-1]
+                        if internal_degrees[rot_path[4]] == 3 and internal_degrees[rot_path[9]] == 3:
+                            locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                            maps.append({rot_path[i]: locants[i] for i in range(10)})
+                    if maps:
+                        return "naphthalene", maps
+                    return None
+
+    if sig == (9, 10, 4, tuple([2]*7 + [3]*2)):
+        if len(deg3_nodes) == 2 and mol.get_bond(deg3_nodes[0], deg3_nodes[1]) is not None:
+            small_ring, big_ring = _find_two_rings(mol, path, deg3_nodes, path_set, 5)
+            if small_ring is None or big_ring is None:
+                return None
+            # Big ring (6) must be benzene
+            if any(mol.atoms[a].symbol != "C" for a in big_ring):
+                return None
+            if _count_double_bonds_in_ring(mol, big_ring) != 3 or not _has_no_cumulated_double_bonds(mol, big_ring):
+                return None
+            small_symbols = [mol.atoms[a].symbol for a in small_ring]
+            small_db = _count_double_bonds_in_ring(mol, small_ring)
+            
+            if n_count == 1 and s_count == 0 and o_count == 0:
+                if "N" not in small_symbols:
+                    return None
+                if small_db != 1:  # indole/isoindole have 1 double bond in 5-ring
+                    return None
+                n_idx = next(idx for idx in path if mol.atoms[idx].symbol == "N")
+                if internal_degrees[n_idx] != 2:
+                    return None
+                n_neighbors_in_path =[v for v in mol.get_neighbors(n_idx) if v in path_set]
+                is_indole = any(internal_degrees[v] == 3 for v in n_neighbors_in_path)
+                
+                if is_indole:
+                    rot_path = path[path.index(n_idx):] + path[:path.index(n_idx)]
+                    if internal_degrees[rot_path[1]] == 3:
+                        rot_path = [rot_path[0]] + rot_path[1:][::-1]
+                    if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
+                        locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                        return "indole", [{rot_path[i]: locants[i] for i in range(9)}]
+                else:
+                    c1 = next(v for v in n_neighbors_in_path if any(internal_degrees[w] == 3 for w in mol.get_neighbors(v) if w in path_set))
+                    idx_c1 = path.index(c1)
+                    rot_path = path[idx_c1:] + path[:idx_c1]
+                    if rot_path[1] != n_idx:
+                        rot_path = [rot_path[0]] + rot_path[1:][::-1]
+                    if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
+                        locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                        return "isoindole", [{rot_path[i]: locants[i] for i in range(9)}]
+            if o_count == 1 and n_count == 0 and s_count == 0:
+                if "O" not in small_symbols:
+                    return None
+                if small_db != 1:
+                    return None
+                o_idx = next(idx for idx in path if mol.atoms[idx].symbol == "O")
+                if internal_degrees[o_idx] != 2:
+                    return None
+                rot_path = path[path.index(o_idx):] + path[:path.index(o_idx)]
+                if internal_degrees[rot_path[1]] == 3:
+                    rot_path = [rot_path[0]] + rot_path[1:][::-1]
+                if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
+                    locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                    return "benzofuran",[{rot_path[i]: locants[i] for i in range(9)}]
+            if s_count == 1 and n_count == 0 and o_count == 0:
+                if "S" not in small_symbols:
+                    return None
+                if small_db != 1:
+                    return None
+                s_idx = next(idx for idx in path if mol.atoms[idx].symbol == "S")
+                if internal_degrees[s_idx] != 2:
+                    return None
+                rot_path = path[path.index(s_idx):] + path[:path.index(s_idx)]
+                if internal_degrees[rot_path[1]] == 3:
+                    rot_path =[rot_path[0]] + rot_path[1:][::-1]
+                if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
+                    locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                    return "benzothiophene", [{rot_path[i]: locants[i] for i in range(9)}]
+            if n_count == 1 and s_count == 1 and o_count == 0:
+                if "N" not in small_symbols or "S" not in small_symbols:
+                    return None
+                if small_db != 1:
+                    return None
+                s_idx = next(idx for idx in path if mol.atoms[idx].symbol == "S")
+                n_idx = next(idx for idx in path if mol.atoms[idx].symbol == "N")
+                if internal_degrees[s_idx] == 2 and internal_degrees[n_idx] == 2:
+                    rot_path = path[path.index(s_idx):] + path[:path.index(s_idx)]
+                    if internal_degrees[rot_path[1]] == 3:
+                        rot_path = [rot_path[0]] + rot_path[1:][::-1]
+                    if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
+                        if rot_path[2] == n_idx:
+                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            return "benzothiazole", [{rot_path[i]: locants[i] for i in range(9)}]
+                        elif rot_path[1] == n_idx:
+                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            return "1,2-benzothiazole",[{rot_path[i]: locants[i] for i in range(9)}]
+            if n_count == 1 and o_count == 1 and s_count == 0:
+                if "N" not in small_symbols or "O" not in small_symbols:
+                    return None
+                if small_db != 1:
+                    return None
+                o_idx = next(idx for idx in path if mol.atoms[idx].symbol == "O")
+                n_idx = next(idx for idx in path if mol.atoms[idx].symbol == "N")
+                if internal_degrees[o_idx] == 2 and internal_degrees[n_idx] == 2:
+                    rot_path = path[path.index(o_idx):] + path[:path.index(o_idx)]
+                    if internal_degrees[rot_path[1]] == 3:
+                        rot_path = [rot_path[0]] + rot_path[1:][::-1]
+                    if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
+                        if rot_path[2] == n_idx:
+                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            return "benzoxazole", [{rot_path[i]: locants[i] for i in range(9)}]
+                        elif rot_path[1] == n_idx:
+                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            return "1,2-benzoxazole", [{rot_path[i]: locants[i] for i in range(9)}]
+            if n_count == 2 and o_count == 0 and s_count == 0:
+                if small_symbols.count("N") != 2:
+                    return None
+                if small_db != 1:
+                    return None
+                n_indices =[idx for idx in path if mol.atoms[idx].symbol == "N"]
+                if all(internal_degrees[n] == 2 for n in n_indices):
+                    n1, n2 = n_indices
+                    rot_path = path[path.index(n1):] + path[:path.index(n1)]
+                    if internal_degrees[rot_path[1]] == 3:
+                        rot_path =[rot_path[0]] + rot_path[1:][::-1]
+                    if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
+                        if rot_path[2] == n2:
+                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            return "benzimidazole", [{rot_path[i]: locants[i] for i in range(9)}]
+                        elif rot_path[1] == n2:
+                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            return "indazole", [{rot_path[i]: locants[i] for i in range(9)}]
+                    
+                    rot_path2 = path[path.index(n2):] + path[:path.index(n2)]
+                    if internal_degrees[rot_path2[1]] == 3:
+                        rot_path2 = [rot_path2[0]] + rot_path2[1:][::-1]
+                    if internal_degrees[rot_path2[3]] == 3 and internal_degrees[rot_path2[8]] == 3:
+                        if rot_path2[2] == n1:
+                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            return "benzimidazole", [{rot_path2[i]: locants[i] for i in range(9)}]
+                        elif rot_path2[1] == n1:
+                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            return "indazole",[{rot_path2[i]: locants[i] for i in range(9)}]
+
+    if sig == (9, 10, 3, tuple([2]*7 + [3]*2)):
+        if len(deg3_nodes) == 2 and mol.get_bond(deg3_nodes[0], deg3_nodes[1]) is not None:
+            small_ring, big_ring = _find_two_rings(mol, path, deg3_nodes, path_set, 5)
+            if small_ring is None or big_ring is None:
+                return None
+            # Big ring must be benzene (all-C, 3 double bonds)
+            if any(mol.atoms[a].symbol != "C" for a in big_ring):
+                return None
+            if _count_double_bonds_in_ring(mol, big_ring) != 3 or not _has_no_cumulated_double_bonds(mol, big_ring):
+                return None
+            small_symbols = [mol.atoms[a].symbol for a in small_ring]
+            small_db = _count_double_bonds_in_ring(mol, small_ring)
+            
+            if n_count == 1 and o_count == 0 and s_count == 0:
+                # indoline: 5-ring contains exactly one N, all single bonds in 5-ring (saturated)
+                if small_symbols.count("N") != 1:
+                    return None
+                if small_db != 0:
+                    return None
+                n_idx = next(idx for idx in path if mol.atoms[idx].symbol == "N")
+                if internal_degrees[n_idx] != 2:
+                    return None
+                # Verify N is in small ring
+                if n_idx not in small_ring:
+                    return None
+                rot_path = path[path.index(n_idx):] + path[:path.index(n_idx)]
+                if internal_degrees[rot_path[1]] == 3:
+                    rot_path = [rot_path[0]] + rot_path[1:][::-1]
+                if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
+                    locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                    return "indoline",[{rot_path[i]: locants[i] for i in range(9)}]
+            if n_count == 0 and o_count == 0 and s_count == 0:
+                if any(mol.atoms[a].symbol != "C" for a in path):
+                    return None
+                if small_db != 0:
+                    return None
+                
+                maps =[]
+                fused_atoms = set(deg3_nodes)
+                small_non_fused =[a for a in small_ring if a not in fused_atoms]
+                start_candidates =[a for a in small_non_fused if any(n in fused_atoms for n in mol.get_neighbors(a) if n in path_set)]
+                
+                for start_idx in start_candidates:
+                    rot_path = path[path.index(start_idx):] + path[:path.index(start_idx)]
+                    if internal_degrees[rot_path[1]] == 3:
+                        rot_path = [rot_path[0]] + rot_path[1:][::-1]
+                    if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
+                        locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                        maps.append({rot_path[i]: locants[i] for i in range(9)})
+                if maps:
+                    return "indane", maps
+                return None
+
+    if total_bonds == size:
+        if size == 6 and double_bonds == 0:
+            if n_count == 1 and o_count == 0 and s_count == 0: return "piperidine", None
+            if n_count == 2 and o_count == 0 and s_count == 0:
+                n_indices =[i for i in path if mol.atoms[i].symbol == "N"]
+                dist = min(abs(path.index(n_indices[0]) - path.index(n_indices[1])), 6 - abs(path.index(n_indices[0]) - path.index(n_indices[1])))
+                if dist == 3: return "piperazine", None
+            if n_count == 1 and o_count == 1 and s_count == 0:
+                n_idx = next(i for i in path if mol.atoms[i].symbol == "N")
+                o_idx = next(i for i in path if mol.atoms[i].symbol == "O")
+                dist = min(abs(path.index(n_idx) - path.index(o_idx)), 6 - abs(path.index(n_idx) - path.index(o_idx)))
+                if dist == 3: return "morpholine", None
+            if n_count == 1 and s_count == 1 and o_count == 0:
+                n_idx = next(i for i in path if mol.atoms[i].symbol == "N")
+                s_idx = next(i for i in path if mol.atoms[i].symbol == "S")
+                dist = min(abs(path.index(n_idx) - path.index(s_idx)), 6 - abs(path.index(n_idx) - path.index(s_idx)))
+                if dist == 3: return "thiomorpholine", None
+        if size == 5 and double_bonds == 0:
+            if n_count == 1 and o_count == 0 and s_count == 0: return "pyrrolidine", None
+            if o_count == 1 and n_count == 0 and s_count == 0: return "oxolane", None
+            if s_count == 1 and n_count == 0 and o_count == 0: return "thiolane", None
+            if n_count == 2 and o_count == 0 and s_count == 0:
+                n_indices = [i for i in path if mol.atoms[i].symbol == "N"]
+                dist = min(abs(path.index(n_indices[0]) - path.index(n_indices[1])), 5 - abs(path.index(n_indices[0]) - path.index(n_indices[1])))
+                if dist == 1:
+                    n1, n2 = n_indices
+                    i1, i2 = path.index(n1), path.index(n2)
+                    if (i1 + 1) % 5 == i2:
+                        rot = path[i1:] + path[:i1]
+                    else:
+                        rot = path[i2:] + path[:i2]
+                    locants =['1', '2', '3', '4', '5']
+                    return "pyrazolidine", [{rot[i]: locants[i] for i in range(5)}]
+                if dist == 2:
+                    n1, n2 = n_indices
+                    i1, i2 = path.index(n1), path.index(n2)
+                    forward = (i1 + 2) % 5 == i2
+                    if forward:
+                        rot = path[i1:] + path[:i1]
+                    else:
+                        rot = path[i2:] + path[:i2]
+                    locants =['1', '2', '3', '4', '5']
+                    return "imidazolidine", [{rot[i]: locants[i] for i in range(5)}]
+            if n_count == 1 and o_count == 1 and s_count == 0:
+                n_idx = next(i for i in path if mol.atoms[i].symbol == "N")
+                o_idx = next(i for i in path if mol.atoms[i].symbol == "O")
+                dist = min(abs(path.index(n_idx) - path.index(o_idx)), 5 - abs(path.index(n_idx) - path.index(o_idx)))
+                if dist == 1:
+                    return "isoxazolidine", None
+                if dist == 2:
+                    return "1,3-oxazolidine", None
+            if n_count == 1 and s_count == 1 and o_count == 0:
+                n_idx = next(i for i in path if mol.atoms[i].symbol == "N")
+                s_idx = next(i for i in path if mol.atoms[i].symbol == "S")
+                dist = min(abs(path.index(n_idx) - path.index(s_idx)), 5 - abs(path.index(n_idx) - path.index(s_idx)))
+                if dist == 1:
+                    return "isothiazolidine", None
+                if dist == 2:
+                    return "1,3-thiazolidine", None
+            
+        if size == 6 and double_bonds == 3 and _has_no_cumulated_double_bonds(mol, path):
+            if n_count == 0: return "benzene", None
+            if n_count == 1: return "pyridine", None
+            if n_count == 2:
+                n_indices =[i for i in path if mol.atoms[i].symbol == "N"]
+                dist = min(abs(path.index(n_indices[0]) - path.index(n_indices[1])), 6 - abs(path.index(n_indices[0]) - path.index(n_indices[1])))
+                if dist == 1: return "pyridazine", None
+                if dist == 2: return "pyrimidine", None
+                if dist == 3: return "pyrazine", None
+            if n_count == 3:
+                n_indices =[i for i in path if mol.atoms[i].symbol == "N"]
+                idx_sorted = sorted([path.index(i) for i in n_indices])
+                d1 = idx_sorted[1] - idx_sorted[0]
+                d2 = idx_sorted[2] - idx_sorted[1]
+                d3 = 6 - (idx_sorted[2] - idx_sorted[0])
+                dists = sorted([d1, d2, d3])
+                if dists ==[1, 1, 4]: return "1,2,3-triazine", None
+                if dists ==[1, 2, 3]: return "1,2,4-triazine", None
+                if dists ==[2, 2, 2]: return "1,3,5-triazine", None
+                return None
+        if size == 5 and double_bonds == 2 and _has_no_cumulated_double_bonds(mol, path):
+            if o_count == 1 and n_count == 0 and s_count == 0: return "furan", None
+            if s_count == 1 and n_count == 0 and o_count == 0: return "thiophene", None
+            if n_count == 1 and o_count == 0 and s_count == 0: return "pyrrole", None
+            if n_count == 2 and o_count == 0 and s_count == 0:
+                n_indices =[i for i in path if mol.atoms[i].symbol == "N"]
+                dist = min(abs(path.index(n_indices[0]) - path.index(n_indices[1])), 5 - abs(path.index(n_indices[0]) - path.index(n_indices[1])))
+                if dist == 1: return "pyrazole", None
+                return "imidazole", None
+            if n_count == 3 and o_count == 0 and s_count == 0:
+                n_indices =[i for i in path if mol.atoms[i].symbol == "N"]
+                idx_sorted = sorted([path.index(i) for i in n_indices])
+                d1 = idx_sorted[1] - idx_sorted[0]
+                d2 = idx_sorted[2] - idx_sorted[1]
+                d3 = 5 - (idx_sorted[2] - idx_sorted[0])
+                dists = sorted([d1, d2, d3])
+                if dists ==[1, 1, 3]: return "1,2,3-triazole", None
+                if dists ==[1, 2, 2]: return "1,2,4-triazole", None
+                return None
+            if n_count == 1 and s_count == 1 and o_count == 0:
+                n_idx = next(i for i in path if mol.atoms[i].symbol == "N")
+                s_idx = next(i for i in path if mol.atoms[i].symbol == "S")
+                dist = min(abs(path.index(n_idx) - path.index(s_idx)), 5 - abs(path.index(n_idx) - path.index(s_idx)))
+                if dist == 1: return "isothiazole", None
+                return "thiazole", None
+            if n_count == 1 and o_count == 1 and s_count == 0:
+                n_idx = next(i for i in path if mol.atoms[i].symbol == "N")
+                o_idx = next(i for i in path if mol.atoms[i].symbol == "O")
+                dist = min(abs(path.index(n_idx) - path.index(o_idx)), 5 - abs(path.index(n_idx) - path.index(o_idx)))
+                if dist == 1: return "isoxazole", None
+                return "oxazole", None
+
+    if sig == (10, 11, 4, tuple([2]*8 + [3]*2)):
+        if len(deg3_nodes) == 2 and mol.get_bond(deg3_nodes[0], deg3_nodes[1]) is not None and n_count == 0 and o_count == 0 and s_count == 0:
+            fused = deg3_nodes
+            ring_a = []
+            ring_b =[]
+            for start_n in mol.get_neighbors(fused[0]):
+                if start_n in path_set and start_n != fused[1]:
+                    ring_atoms = [fused[0]]
+                    cur = start_n
+                    visited_local = {fused[0], cur}
+                    ring_atoms.append(cur)
+                    while cur != fused[1]:
+                        nxt = next((x for x in mol.get_neighbors(cur) if x in path_set and x not in visited_local), None)
+                        if nxt is None: break
+                        ring_atoms.append(nxt)
+                        visited_local.add(nxt)
+                        cur = nxt
+                        if len(ring_atoms) > 6: break
+                    if len(ring_atoms) == 6:
+                        if not ring_a: ring_a = ring_atoms
+                        elif not ring_b: ring_b = ring_atoms
+            
+            def count_db(atoms):
+                seen2 = set()
+                cnt = 0
+                for i in range(len(atoms)):
+                    a, b = atoms[i], atoms[(i+1) % len(atoms)]
+                    bd = mol.get_bond(a, b)
+                    if bd and bd.idx not in seen2:
+                        seen2.add(bd.idx)
+                        if bd.order == 2: cnt += 1
+                return cnt
+            
+            if len(ring_a) == 6 and len(ring_b) == 6:
+                db_a = count_db(ring_a)
+                db_b = count_db(ring_b)
+                # True 1,2,3,4-tetrahydronaphthalene: one ring is benzene (3 db), the other is fully saturated (0 db)
+                if (db_a == 3 and db_b == 0 and _has_no_cumulated_double_bonds(mol, ring_a)) or (db_a == 0 and db_b == 3 and _has_no_cumulated_double_bonds(mol, ring_b)):
+                    # Need locant_map so locants 5,6,7,8,8a,1,2,3,4,4a are assigned correctly
+                    # Saturated ring carries locants 1,2,3,4,4a,8a; benzene ring carries 4a,5,6,7,8,8a
+                    sat_ring = ring_a if db_a == 0 else ring_b
+                    aromatic_ring = ring_b if db_a == 0 else ring_a
+                    fused_atoms = set(deg3_nodes)
+                    sat_non_fused =[a for a in sat_ring if a not in fused_atoms]
+                    if len(sat_non_fused) == 4:
+                        # Build locant map: start at a fused atom that's adjacent to a saturated non-fused atom
+                        # to assign locant 4a. Pick the fused atom whose neighbor in sat ring is "first".
+                        for start_fused in fused_atoms:
+                            sat_neighbors_of_start =[n for n in mol.get_neighbors(start_fused) if n in sat_ring and n not in fused_atoms]
+                            if not sat_neighbors_of_start:
+                                continue
+                            other_fused = next(f for f in fused_atoms if f != start_fused)
+                            # Walk through sat_ring: start_fused (=8a) - non_fused1 (=1) - non_fused2 (=2) - non_fused3 (=3) - non_fused4 (=4) - other_fused (=4a)
+                            for first_nf in sat_neighbors_of_start:
+                                walk = [start_fused, first_nf]
+                                visited = {start_fused, first_nf}
+                                cur = first_nf
+                                while cur != other_fused:
+                                    nxt = next((x for x in mol.get_neighbors(cur) if x in sat_ring and x not in visited), None)
+                                    if nxt is None: break
+                                    walk.append(nxt)
+                                    visited.add(nxt)
+                                    cur = nxt
+                                    if len(walk) > 6: break
+                                if len(walk) == 6 and walk[-1] == other_fused:
+                                    # Now walk through aromatic ring
+                                    arom_walk = [other_fused]
+                                    arom_visited = {start_fused, other_fused}
+                                    cur = other_fused
+                                    while True:
+                                        nxt = next((x for x in mol.get_neighbors(cur) if x in aromatic_ring and x not in arom_visited), None)
+                                        if nxt is None: break
+                                        arom_walk.append(nxt)
+                                        arom_visited.add(nxt)
+                                        cur = nxt
+                                        if len(arom_walk) > 5: break
+                                    if len(arom_walk) == 5:
+                                        # Locants: start_fused=8a, walk[1]=1, walk[2]=2, walk[3]=3, walk[4]=4, other_fused=4a, arom_walk[1]=5, arom_walk[2]=6, arom_walk[3]=7, arom_walk[4]=8
+                                        locant_map = {
+                                            walk[0]: '8a', walk[1]: '1', walk[2]: '2', walk[3]: '3', walk[4]: '4', walk[5]: '4a',
+                                            arom_walk[1]: '5', arom_walk[2]: '6', arom_walk[3]: '7', arom_walk[4]: '8'
+                                        }
+                                        return "1,2,3,4-tetrahydronaphthalene",[locant_map]
+                    return "1,2,3,4-tetrahydronaphthalene", None
+
+    if sig == (14, 16, 7, tuple([2]*10 +[3]*4)):
+        deg3_edges = sum(1 for u in deg3_nodes for v in mol.get_neighbors(u) if v in deg3_nodes and u < v)
+        if deg3_edges == 2: return "anthracene", None
+        if deg3_edges == 3: return "phenanthrene", None
+        
+    if sig == (10, 12, 0, tuple([2]*6 + [3]*4)):
+        if n_count == 0 and o_count == 0 and s_count == 0:
+            maps =[]
+            for n1 in deg3_nodes:
+                neighbors_1 =[n for n in mol.get_neighbors(n1) if n in path_set]
+                for n2, n8, n9 in itertools.permutations(neighbors_1):
+                    n3 = next((n for n in mol.get_neighbors(n2) if n in path_set and n != n1), None)
+                    n7 = next((n for n in mol.get_neighbors(n8) if n in path_set and n != n1), None)
+                    n5 = next((n for n in mol.get_neighbors(n9) if n in path_set and n != n1), None)
+                    if not (n3 and n7 and n5): continue
+                    n10 = next((n for n in mol.get_neighbors(n3) if n in path_set and n in mol.get_neighbors(n7)), None)
+                    if not n10: continue
+                    n4 = next((n for n in mol.get_neighbors(n3) if n in path_set and n in mol.get_neighbors(n5) and n != n10), None)
+                    n6 = next((n for n in mol.get_neighbors(n5) if n in path_set and n in mol.get_neighbors(n7) and n != n10), None)
+                    if not (n4 and n6): continue
+                    locant_map = {n1: '1', n2: '2', n3: '3', n4: '4', n5: '5', n6: '6', n7: '7', n8: '8', n9: '9', n10: '10'}
+                    maps.append(locant_map)
+            if maps:
+                return "adamantane", maps
+            return None
+
+    if sig == (8, 12, 0, tuple([3]*8)):
+        if n_count == 0 and o_count == 0 and s_count == 0:
+            maps = []
+            for n1 in path:
+                neighbors_1 =[n for n in mol.get_neighbors(n1) if n in path_set]
+                for n2, n6, n8 in itertools.permutations(neighbors_1):
+                    neighbors_2 =[n for n in mol.get_neighbors(n2) if n in path_set and n != n1]
+                    neighbors_6 =[n for n in mol.get_neighbors(n6) if n in path_set and n != n1]
+                    neighbors_8 =[n for n in mol.get_neighbors(n8) if n in path_set and n != n1]
+                    n5 = next((n for n in neighbors_2 if n in neighbors_6), None)
+                    n3 = next((n for n in neighbors_2 if n in neighbors_8), None)
+                    n7 = next((n for n in neighbors_6 if n in neighbors_8), None)
+                    if not (n5 and n3 and n7): continue
+                    neighbors_3 =[n for n in mol.get_neighbors(n3) if n in path_set and n not in (n2, n8)]
+                    if not neighbors_3: continue
+                    n4 = neighbors_3[0]
+                    locant_map = {n1: '1', n2: '2', n3: '3', n4: '4', n5: '5', n6: '6', n7: '7', n8: '8'}
+                    maps.append(locant_map)
+            if maps:
+                return "cubane", maps
+            return None
+
+    if sig == (17, 20, 0, tuple([2]*11 + [3]*6)): return "gonane", None
+    if sig == (16, 19, 8, tuple([2]*10 + [3]*6)): return "pyrene", None
+        
+    return None"""
+structure-to-iupac/rules/stems.py
+
+Chain-length stems for IUPAC nomenclature.
+Used for alkane parent names, substituent names, and ring stems.
+
+References:
+- IUPAC 2013 Recommendations, P-23.2.1 (chain length names)
+"""
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Stem:
+    length: int          # Number of carbons (or skeletal atoms)
+    stem: str            # Bare stem, e.g. "meth", "eth", "prop"
+    retained: bool       # True for 1-4 (meth/eth/prop/but); False for systematic (pent+)
+
+
+# Stems 1-4 are retained (non-systematic) names.
+# Stems 5+ are derived from Greek/Latin numerical roots.
+# Coverage up to 30; extend as needed (IUPAC defines stems well beyond this).
+STEMS: dict[int, Stem] = {
+    1:  Stem(1,  "meth",        retained=True),
+    2:  Stem(2,  "eth",         retained=True),
+    3:  Stem(3,  "prop",        retained=True),
+    4:  Stem(4,  "but",         retained=True),
+    5:  Stem(5,  "pent",        retained=False),
+    6:  Stem(6,  "hex",         retained=False),
+    7:  Stem(7,  "hept",        retained=False),
+    8:  Stem(8,  "oct",         retained=False),
+    9:  Stem(9,  "non",         retained=False),
+    10: Stem(10, "dec",         retained=False),
+    11: Stem(11, "undec",       retained=False),
+    12: Stem(12, "dodec",       retained=False),
+    13: Stem(13, "tridec",      retained=False),
+    14: Stem(14, "tetradec",    retained=False),
+    15: Stem(15, "pentadec",    retained=False),
+    16: Stem(16, "hexadec",     retained=False),
+    17: Stem(17, "heptadec",    retained=False),
+    18: Stem(18, "octadec",     retained=False),
+    19: Stem(19, "nonadec",     retained=False),
+    20: Stem(20, "icos",        retained=False),  # 2013 PIN; older lit uses "eicos"
+    21: Stem(21, "henicos",     retained=False),
+    22: Stem(22, "docos",       retained=False),
+    23: Stem(23, "tricos",      retained=False),
+    24: Stem(24, "tetracos",    retained=False),
+    25: Stem(25, "pentacos",    retained=False),
+    26: Stem(26, "hexacos",     retained=False),
+    27: Stem(27, "heptacos",    retained=False),
+    28: Stem(28, "octacos",     retained=False),
+    29: Stem(29, "nonacos",     retained=False),
+    30: Stem(30, "triacont",    retained=False),
+}
+
+
+def get(length: int) -> Stem:
+    """Look up a stem by chain length. Raises KeyError if out of range."""
+    return STEMS[length]
+
+
+def stem_for(length: int) -> str:
+    """Return just the stem string for a given chain length."""
+    return STEMS[length].stem"""
+structure-to-iupac/rules/substituents.py
+
+Substituent groups that are ALWAYS cited as prefixes in IUPAC nomenclature.
+These groups are never the principal characteristic group; they always appear
+as prefixes regardless of what else is in the molecule.
+
+For groups that can be either principal (suffix) or substituent (prefix),
+see suffixes.py.
+
+References:
+- IUPAC 2013 Recommendations, P-66.6 (substituent groups always cited as prefixes)
+- IUPAC 2013 Recommendations, P-29 (substituent group nomenclature)
+"""
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Substituent:
+    key: str             # Internal identifier, e.g. "chloro"
+    prefix: str          # Name as cited in the final IUPAC name, e.g. "chloro"
+    needs_locant: bool   # True if locant is required (e.g. on a chain); False for trivial cases
+
+
+# Always-prefix substituents.
+# Halogens use simple "halo-" forms (fluoro, chloro, bromo, iodo).
+# Other prefix-only groups: nitro, nitroso, azido, diazo, isocyano, etc.
+SUBSTITUENTS: dict[str, Substituent] = {
+    # --- Halogens ---
+    "fluoro":    Substituent("fluoro",    "fluoro",    needs_locant=True),
+    "chloro":    Substituent("chloro",    "chloro",    needs_locant=True),
+    "bromo":     Substituent("bromo",     "bromo",     needs_locant=True),
+    "iodo":      Substituent("iodo",      "iodo",      needs_locant=True),
+    "astato":    Substituent("astato",    "astato",    needs_locant=True),
+
+    # --- Nitrogen-based prefix-only groups ---
+    "nitro":     Substituent("nitro",     "nitro",     needs_locant=True),   # -NO2
+    "nitroso":   Substituent("nitroso",   "nitroso",   needs_locant=True),   # -N=O
+    "azido":     Substituent("azido",     "azido",     needs_locant=True),   # -N3
+    "diazo":     Substituent("diazo",     "diazo",     needs_locant=True),   # =N2
+    "diazonio":  Substituent("diazonio",  "diazonio",  needs_locant=True),   # -N2+
+    "isocyano":  Substituent("isocyano",  "isocyano",  needs_locant=True),   # -NC
+    "cyanato":   Substituent("cyanato",   "cyanato",   needs_locant=True),   # -OCN
+    "isocyanato":Substituent("isocyanato","isocyanato",needs_locant=True),   # -NCO
+    "thiocyanato":   Substituent("thiocyanato",   "thiocyanato",   needs_locant=True),  # -SCN
+    "isothiocyanato":Substituent("isothiocyanato","isothiocyanato",needs_locant=True),  # -NCS
+
+    # --- Oxygen / chalcogen prefix-only groups (when not principal) ---
+    # Note: hydroxy, oxo, etc. live in suffixes.py because they CAN be principal.
+    # These ones cannot be principal characteristic groups under PIN rules.
+    "hydroperoxy":   Substituent("hydroperoxy",   "hydroperoxy",   needs_locant=True),  # -OOH
+    "peroxy":        Substituent("peroxy",        "peroxy",        needs_locant=True),  # -OO- (linker form)
+
+    # --- Sulfur-based prefix-only groups ---
+    # Note: -SH (sulfanyl/thiol) and -SO3H (sulfo) CAN be principal in PINs;
+    # they belong in suffixes.py if/when you add them.
+    "sulfanyl":  Substituent("sulfanyl",  "sulfanyl",  needs_locant=True),   # -SH as substituent (also: "mercapto" in older lit)
+
+    # --- Silicon / phosphorus / boron simple substituents ---
+    "silyl":     Substituent("silyl",     "silyl",     needs_locant=True),   # -SiH3
+    "phosphanyl":Substituent("phosphanyl","phosphanyl",needs_locant=True),   # -PH2 (older: "phosphino")
+    "boryl":     Substituent("boryl",     "boryl",     needs_locant=True),   # -BH2
+}
+
+
+def get(key: str) -> Substituent:
+    """Look up a substituent by key."""
+    return SUBSTITUENTS[key]
+
+
+def is_known(key: str) -> bool:
+    return key in SUBSTITUENTS# structure-to-iupac/rules/suffixes.py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class CharacteristicGroup:
+    key: str
+    seniority: int
+    suffix: str
+    suffix_with_locant: bool
+    prefix: str | None
+    multi_suffix: str | None
+
+GROUPS: dict[str, CharacteristicGroup] = {
+    "olate": CharacteristicGroup("olate", 15, "olate", True, "oxido", "diolate"),
+    "thiolate": CharacteristicGroup("thiolate", 16, "thiolate", True, "sulfido", "dithiolate"),
+    
+    "carboxylic_acid": CharacteristicGroup("carboxylic_acid", 20, "oic acid", False, "carboxy", "dioic acid"),
+    "carboxylate": CharacteristicGroup("carboxylate", 21, "oate", False, "carboxylato", "dioate"),
+    
+    "ring_carboxylic_acid": CharacteristicGroup("ring_carboxylic_acid", 20, "carboxylic acid", True, "carboxy", "dicarboxylic acid"),
+    "ring_carboxylate": CharacteristicGroup("ring_carboxylate", 21, "carboxylate", True, "carboxylato", "dicarboxylate"),
+    
+    "peroxy_acid": CharacteristicGroup("peroxy_acid", 22, "peroxoic acid", False, "carboperoxy", "diperoxoic acid"),
+    "ring_peroxy_acid": CharacteristicGroup("ring_peroxy_acid", 22, "carboperoxoic acid", True, "carboperoxy", "dicarboperoxoic acid"),
+    "peroxy_ester": CharacteristicGroup("peroxy_ester", 45, "peroxoate", False, "oxycarbonyl", None),
+    "ring_peroxy_ester": CharacteristicGroup("ring_peroxy_ester", 45, "carboperoxoate", True, "oxycarbonyl", None),
+    
+    "sulfonic_acid": CharacteristicGroup("sulfonic_acid", 25, "sulfonic acid", True, "sulfo", "disulfonic acid"),
+    "sulfonate": CharacteristicGroup("sulfonate", 26, "sulfonate", True, "sulfonato", "disulfonate"),
+    "anhydride": CharacteristicGroup("anhydride", 30, "oic anhydride", False, None, None),
+    
+    "ester": CharacteristicGroup("ester", 40, "oate", False, "oxycarbonyl", None),
+    
+    "acid_fluoride": CharacteristicGroup("acid_fluoride", 50, "oyl fluoride", False, "fluorocarbonyl", "dioyl difluoride"),
+    "acid_chloride": CharacteristicGroup("acid_chloride", 51, "oyl chloride", False, "chlorocarbonyl", "dioyl dichloride"),
+    "acid_bromide": CharacteristicGroup("acid_bromide", 52, "oyl bromide", False, "bromocarbonyl", "dioyl dibromide"),
+    "acid_iodide": CharacteristicGroup("acid_iodide", 53, "oyl iodide", False, "iodocarbonyl", "dioyl diiodide"),
+    
+    "ring_acid_fluoride": CharacteristicGroup("ring_acid_fluoride", 50, "carbonyl fluoride", True, "fluorocarbonyl", "dicarbonyl difluoride"),
+    "ring_acid_chloride": CharacteristicGroup("ring_acid_chloride", 51, "carbonyl chloride", True, "chlorocarbonyl", "dicarbonyl dichloride"),
+    "ring_acid_bromide": CharacteristicGroup("ring_acid_bromide", 52, "carbonyl bromide", True, "bromocarbonyl", "dicarbonyl dibromide"),
+    "ring_acid_iodide": CharacteristicGroup("ring_acid_iodide", 53, "carbonyl iodide", True, "iodocarbonyl", "dicarbonyl diiodide"),
+    
+    "amide": CharacteristicGroup("amide", 60, "amide", False, "carbamoyl", "diamide"),
+    "ring_amide": CharacteristicGroup("ring_amide", 60, "carboxamide", True, "carbamoyl", "dicarboxamide"),
+    
+    "thioamide": CharacteristicGroup("thioamide", 65, "thioamide", False, "carbamothioyl", "dithioamide"),
+    "ring_thioamide": CharacteristicGroup("ring_thioamide", 65, "carbothioamide", True, "carbamothioyl", "dicarbothioamide"),
+    
+    "nitrile": CharacteristicGroup("nitrile", 70, "nitrile", False, "cyano", "dinitrile"),
+    "ring_nitrile": CharacteristicGroup("ring_nitrile", 70, "carbonitrile", True, "cyano", "dicarbonitrile"),
+    
+    "aldehyde": CharacteristicGroup("aldehyde", 80, "al", False, "oxo", "dial"),
+    "ring_aldehyde": CharacteristicGroup("ring_aldehyde", 80, "carbaldehyde", True, "formyl", "dicarbaldehyde"),
+    
+    "ketone": CharacteristicGroup("ketone", 90, "one", True, "oxo", "dione"),
+    "hydrazone": CharacteristicGroup("hydrazone", 95, "one hydrazone", True, "hydrazono", "dione dihydrazone"),
+    "aldehyde_hydrazone": CharacteristicGroup("aldehyde_hydrazone", 95, "al hydrazone", False, "hydrazono", "dial dihydrazone"),
+    "ring_aldehyde_hydrazone": CharacteristicGroup("ring_aldehyde_hydrazone", 95, "carbaldehyde hydrazone", True, "hydrazonomethyl", "dicarbaldehyde dihydrazone"),
+    
+    "alcohol": CharacteristicGroup("alcohol", 100, "ol", True, "hydroxy", "diol"),
+    "thiol": CharacteristicGroup("thiol", 105, "thiol", True, "sulfanyl", "dithiol"),
+    
+    "amine": CharacteristicGroup("amine", 110, "amine", True, "amino", "diamine"),
+    "imine": CharacteristicGroup("imine", 112, "imine", True, "imino", "diimine"),
+    "hydrazine": CharacteristicGroup("hydrazine", 115, "hydrazine", True, "hydrazinyl", "dihydrazine"),
+
+    "ether": CharacteristicGroup("ether", 200, "ether", False, "oxy", None),
+}
+
+def get(key: str) -> CharacteristicGroup: return GROUPS[key]
+def most_senior(keys: list[str]) -> CharacteristicGroup: return min((GROUPS[k] for k in keys), key=lambda g: g.seniority)

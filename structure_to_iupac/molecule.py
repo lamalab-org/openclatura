@@ -1,0 +1,87 @@
+"""
+structure-to-iupac/molecule.py
+"""
+from dataclasses import dataclass, field
+from typing import Iterator
+from .rules import elements
+
+@dataclass
+class Atom:
+    idx: int
+    symbol: str
+    charge: int = 0
+    isotope: int | None = None
+    stereo: str | None = None  # 'R' or 'S'
+
+    def __post_init__(self):
+        if not elements.is_known(self.symbol):
+            raise ValueError(f"Unknown element symbol: {self.symbol}")
+
+    @property
+    def element(self) -> elements.Element:
+        return elements.get(self.symbol)
+
+    @property
+    def is_carbon(self) -> bool:
+        return self.symbol == "C"
+
+    @property
+    def is_heteroatom(self) -> bool:
+        return self.symbol not in ("C", "H")
+
+@dataclass
+class Bond:
+    idx: int
+    u: int
+    v: int
+    order: int = 1
+    stereo: str | None = None  # 'E' or 'Z'
+    in_small_ring: bool = False  # NEW: Tracks if bond is in a ring of size <= 7
+
+    def get_other_atom(self, atom_idx: int) -> int:
+        if atom_idx == self.u: return self.v
+        if atom_idx == self.v: return self.u
+        raise ValueError(f"Atom {atom_idx} is not part of bond {self.idx}")
+
+class Molecule:
+    def __init__(self):
+        self.atoms: dict[int, Atom] = {}
+        self.bonds: dict[int, Bond] = {}
+        self._adj: dict[int, list[int]] = {}
+        self._bond_lookup: dict[tuple[int, int], int] = {}
+
+    def add_atom(self, symbol: str, idx: int | None = None, charge: int = 0, stereo: str | None = None) -> Atom:
+        if idx is None: idx = max(self.atoms.keys(), default=0) + 1
+        if idx in self.atoms: raise ValueError(f"Atom with idx {idx} already exists.")
+        atom = Atom(idx=idx, symbol=symbol, charge=charge, stereo=stereo)
+        self.atoms[idx] = atom
+        self._adj[idx] =[]
+        return atom
+
+    def add_bond(self, u: int, v: int, order: int = 1, idx: int | None = None, stereo: str | None = None, in_small_ring: bool = False) -> Bond:
+        if u not in self.atoms or v not in self.atoms: raise ValueError("Both atoms must exist")
+        if u == v: raise ValueError("Cannot bond an atom to itself.")
+        bond_key = tuple(sorted((u, v)))
+        if bond_key in self._bond_lookup: raise ValueError(f"Atoms {u} and {v} are already bonded.")
+        if idx is None: idx = max(self.bonds.keys(), default=0) + 1
+        bond = Bond(idx=idx, u=u, v=v, order=order, stereo=stereo, in_small_ring=in_small_ring)
+        self.bonds[idx] = bond
+        self._bond_lookup[bond_key] = idx
+        self._adj[u].append(v)
+        self._adj[v].append(u)
+        return bond
+
+    def get_neighbors(self, atom_idx: int) -> list[int]:
+        return self._adj.get(atom_idx,[])
+
+    def get_bond(self, u: int, v: int) -> Bond | None:
+        bond_key = tuple(sorted((u, v)))
+        bond_idx = self._bond_lookup.get(bond_key)
+        if bond_idx is not None: return self.bonds[bond_idx]
+        return None
+
+    def degree(self, atom_idx: int) -> int:
+        return len(self.get_neighbors(atom_idx))
+
+    def __iter__(self) -> Iterator[Atom]:
+        return iter(self.atoms.values())

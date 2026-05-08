@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "structure_to_iupac"
+version = "0.1.0"
+description = "Deterministic Structure to Iupac translator"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = "MIT"
+authors = [
+    { name = "Adrian Mirza" },
+]
+
+dependencies = [
+    "rdkit==2026.3.1"
+]
+
+# 1. Add Ruff as a development dependency
+[project.optional-dependencies]
+dev = [
+    "dotenv==0.9.9",
+    "rdkit==2026.3.1"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["structure_to_iupac/"]
+
+# 2. Configure Ruff
+[tool.ruff]
+# Match your requires-python version
+target-version = "py312" 
+line-length = 120
+
+[tool.ruff.format]
+# You can leave this as just line-length, or explicitly declare your style preferences:
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+
+[tool.hatch.envs.default.scripts]
+fmt = "ruff format"
+lint = "ruff check --fix"
+all = ["fmt", "lint"]
