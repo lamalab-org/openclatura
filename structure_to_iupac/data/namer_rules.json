@@ -1,0 +1,249 @@
+{
+  "indicated_hydrogen_retained_names": {
+    "bluebook_rule": "P-14.7, P-22.2, P-25; retained heterocycle names and indicated hydrogen locants",
+    "values": [
+      "pyrrole",
+      "imidazole",
+      "pyrazole",
+      "1,2,3-triazole",
+      "1,2,4-triazole",
+      "indole",
+      "isoindole",
+      "indazole",
+      "benzimidazole",
+      "purine",
+      "indene",
+      "fluorene"
+    ]
+  },
+  "single_atom_cations": {
+    "bluebook_rule": "P-72; cation and salt component names",
+    "values": ["Na", "K", "Li", "Mg", "Ca"]
+  },
+  "single_atom_anions": {
+    "bluebook_rule": "P-72; anion names for halide components",
+    "values": {
+      "F": "fluoride",
+      "Cl": "chloride",
+      "Br": "bromide",
+      "I": "iodide"
+    }
+  },
+  "salt_metal_names": {
+    "bluebook_rule": "P-72; ordering of ionic components in additive names",
+    "values": [
+      "lithium",
+      "sodium",
+      "potassium",
+      "magnesium",
+      "calcium",
+      "zinc",
+      "copper",
+      "iron",
+      "aluminum",
+      "silver",
+      "gold",
+      "lead",
+      "bismuth",
+      "cesium",
+      "rubidium",
+      "barium",
+      "strontium"
+    ]
+  },
+  "alkyl_oxy_prefixes": {
+    "bluebook_rule": "P-61.2.2.1; alkoxy and aryloxy prefixes",
+    "values": {
+      "methyl": "methoxy",
+      "ethyl": "ethoxy",
+      "propyl": "propoxy",
+      "isopropyl": "isopropoxy",
+      "butyl": "butoxy",
+      "isobutyl": "isobutoxy",
+      "sec-butyl": "sec-butoxy",
+      "tert-butyl": "tert-butoxy",
+      "phenyl": "phenoxy"
+    }
+  },
+  "simple_sulfanyl_prefixes": {
+    "bluebook_rule": "P-61.2.2.2; sulfanyl substituent prefixes",
+    "values": ["methyl", "ethyl", "propyl", "isopropyl", "butyl", "isobutyl", "sec-butyl", "tert-butyl", "phenyl"]
+  },
+  "simple_selanyl_prefixes": {
+    "bluebook_rule": "P-61.2.2.2; selanyl substituent prefixes by chalcogen analogue",
+    "values": ["methyl", "ethyl", "phenyl"]
+  },
+  "halogen_prefixes": {
+    "bluebook_rule": "P-61.3; halogen detachable prefixes",
+    "values": {
+      "F": "fluoro",
+      "Cl": "chloro",
+      "Br": "bromo",
+      "I": "iodo"
+    }
+  },
+  "halogen_lambda_suffixes": {
+    "bluebook_rule": "P-14.1, P-14.5; lambda convention and heteroatom substituent names",
+    "values": {
+      "F": "fluoranyl",
+      "Cl": "chloranyl",
+      "Br": "bromanyl",
+      "I": "iodanyl"
+    }
+  },
+  "retained_ring_elements": {
+    "bluebook_rule": "P-22 and P-25; retained heterocycle names supported by this implementation",
+    "values": ["C", "N", "O", "S"]
+  },
+  "direct_group_prefixes": {
+    "bluebook_rule": "P-63, P-64, P-65; characteristic groups named only by prefixes in substituent context",
+    "values": {
+      "nitro": "nitro",
+      "nitroso": "nitroso",
+      "azido": "azido",
+      "sulfonic_acid": "sulfo",
+      "isocyano": "isocyano",
+      "nitrile": "cyano",
+      "carboxylic_acid": "carboxy",
+      "amide": "carbamoyl",
+      "acid_fluoride": "fluorocarbonyl",
+      "acid_chloride": "chlorocarbonyl",
+      "acid_bromide": "bromocarbonyl",
+      "acid_iodide": "iodocarbonyl",
+      "isothiocyanato": "isothiocyanato",
+      "isocyanato": "isocyanato",
+      "thiocyanato": "thiocyanato",
+      "cyanato": "cyanato"
+    }
+  },
+  "chain_external_carbonyl_groups": {
+    "bluebook_rule": "P-44.3, P-65.1; carbonyl-containing suffix groups attached to a carbon chain",
+    "values": [
+      "nitrile",
+      "ring_nitrile",
+      "carboxylic_acid",
+      "ring_carboxylic_acid",
+      "ester",
+      "ring_carboxylate",
+      "amide",
+      "ring_amide",
+      "thioamide",
+      "ring_thioamide",
+      "acid_fluoride",
+      "ring_acid_fluoride",
+      "acid_chloride",
+      "ring_acid_chloride",
+      "acid_bromide",
+      "ring_acid_bromide",
+      "acid_iodide",
+      "ring_acid_iodide"
+    ]
+  },
+  "prefix_groups_to_skip": {
+    "bluebook_rule": "P-41, P-44, P-63; groups handled by dedicated parent/suffix logic before prefix fallback",
+    "values": [
+      "ether",
+      "thioether",
+      "amine",
+      "anhydride",
+      "hydrazine",
+      "hydrazone",
+      "imine",
+      "aldehyde_hydrazone",
+      "ring_aldehyde_hydrazone",
+      "aldehyde_imine",
+      "ring_aldehyde_imine"
+    ]
+  },
+  "ester_like_prefix_groups": {
+    "bluebook_rule": "P-65.6; esters and peroxy esters named with alkoxycarbonyl or related prefixes",
+    "values": ["ester", "carboxylate", "ring_carboxylate", "peroxy_ester", "ring_peroxy_ester"]
+  },
+  "peroxy_ester_groups": {
+    "bluebook_rule": "P-65.6; peroxy ester single-oxygen selection",
+    "values": ["peroxy_ester", "ring_peroxy_ester"]
+  },
+  "amide_like_prefix_groups": {
+    "bluebook_rule": "P-66.1; amides and thioamides as substituent prefixes",
+    "values": ["amide", "ring_amide", "thioamide", "ring_thioamide"]
+  },
+  "amide_prefix_bases": {
+    "bluebook_rule": "P-66.1; amide and thioamide prefix names",
+    "values": {
+      "amide": "carbamoyl",
+      "ring_amide": "carbamoyl",
+      "thioamide": "carbamothioyl",
+      "ring_thioamide": "carbamothioyl"
+    }
+  },
+  "carboxy_prefix_groups": {
+    "bluebook_rule": "P-65.1; carboxy prefix for acids when not principal",
+    "values": ["carboxylic_acid", "ring_carboxylic_acid"]
+  },
+  "cyano_prefix_groups": {
+    "bluebook_rule": "P-66.4; cyano prefix for nitriles when not principal",
+    "values": ["nitrile", "ring_nitrile"]
+  },
+  "acid_halide_prefixes": {
+    "bluebook_rule": "P-65.5; carbonyl halide prefixes",
+    "values": {
+      "acid_fluoride": "(fluorocarbonyl)",
+      "ring_acid_fluoride": "(fluorocarbonyl)",
+      "acid_chloride": "(chlorocarbonyl)",
+      "ring_acid_chloride": "(chlorocarbonyl)",
+      "acid_bromide": "(bromocarbonyl)",
+      "ring_acid_bromide": "(bromocarbonyl)",
+      "acid_iodide": "(iodocarbonyl)",
+      "ring_acid_iodide": "(iodocarbonyl)"
+    }
+  },
+  "peroxy_acid_prefix_groups": {
+    "bluebook_rule": "P-65.6; peroxy acid prefix forms",
+    "values": ["peroxy_acid", "ring_peroxy_acid"]
+  },
+  "sulfonyl_prefix_groups": {
+    "bluebook_rule": "P-67.1; sulfonic acids and sulfonates as prefixes",
+    "values": ["sulfonic_acid", "sulfonate"]
+  },
+  "direct_prefix_groups": {
+    "bluebook_rule": "P-63, P-64; direct detachable prefixes",
+    "values": {
+      "isocyano": "isocyano",
+      "isothiocyanato": "isothiocyanato",
+      "isocyanato": "isocyanato",
+      "thiocyanato": "thiocyanato",
+      "cyanato": "cyanato"
+    }
+  },
+  "front_modifier_principal_groups": {
+    "bluebook_rule": "P-65.6, P-67.1; ester and sulfonate front modifiers",
+    "values": ["ester", "carboxylate", "sulfonate", "ring_carboxylate", "peroxy_ester", "ring_peroxy_ester"]
+  },
+  "n_substituent_principal_groups": {
+    "bluebook_rule": "P-62, P-66; N-substitution locants for amines, amides, imines, hydrazones, and hydrazines",
+    "values": [
+      "amide",
+      "amine",
+      "ring_amide",
+      "thioamide",
+      "ring_thioamide",
+      "hydrazine",
+      "hydrazone",
+      "imine",
+      "aldehyde_hydrazone",
+      "ring_aldehyde_hydrazone",
+      "aldehyde_imine",
+      "ring_aldehyde_imine"
+    ]
+  },
+  "hydrazone_principal_groups": {
+    "bluebook_rule": "P-66.3; hydrazone N-substitution locants",
+    "values": ["hydrazone", "aldehyde_hydrazone", "ring_aldehyde_hydrazone"]
+  },
+  "special_component_names": {
+    "bluebook_rule": "P-13.5, P-52, P-53; retained and contracted component names",
+    "values": {
+      "1-phenylbenzene": "1,1'-biphenyl"
+    }
+  }
+}
