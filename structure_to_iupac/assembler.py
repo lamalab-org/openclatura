@@ -21,18 +21,25 @@ def parse_locant(l):
 class SubstituentItem:
     name: str
     locants: list[str]
+    atom_ids: set[int] = field(default_factory=set)
+    bond_ids: set[int] = field(default_factory=set)
+    trace_segments: list[dict] = field(default_factory=list)
 
 
 @dataclass
 class UnsaturationItem:
     bond_key: str
     locants: list[str]
+    atom_ids: set[int] = field(default_factory=set)
+    bond_ids: set[int] = field(default_factory=set)
 
 
 @dataclass
 class PrincipalGroupItem:
     key: str
     locants: list[str]
+    atom_ids: set[int] = field(default_factory=set)
+    bond_ids: set[int] = field(default_factory=set)
 
 
 @dataclass
@@ -58,6 +65,8 @@ class AssemblyParts:
     substituents: list[SubstituentItem] = field(default_factory=list)
     stereo_features: list[tuple[str, str]] = field(default_factory=list)
     indicated_hydrogens: list[str] = field(default_factory=list)
+    parent_atom_ids: set[int] = field(default_factory=set)
+    parent_bond_ids: set[int] = field(default_factory=set)
 
 
 def needs_hyphen(left: str, right: str) -> bool:

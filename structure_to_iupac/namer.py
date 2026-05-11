@@ -7,7 +7,7 @@ from .perception import perceive_groups, PerceivedGroup
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
 from .parent_selection import select_principal_parent
 from .assembler import assemble_name, AssemblyParts, PrincipalGroupItem, SubstituentItem, UnsaturationItem
-from .rules import suffixes, substituents, stems, retained, multipliers
+from .rules import bonds, suffixes, substituents, stems, retained, multipliers
 from .naming_data import mapping, values
 
 
@@ -74,6 +74,215 @@ def is_fully_enclosed(s: str) -> bool:
         if depth == 0 and i < len(s) - 1:
             return False
     return depth == 0
+
+
+def _bond_ids_within(mol: Molecule, atom_ids: set[int]) -> set[int]:
+    """Return bond IDs whose endpoints are both in ``atom_ids``.
+
+    Blue Book references: P-14.3 and P-44; this trace helper links assembled
+    parent and substituent name fragments back to the structural atoms used for
+    numbering and parent selection.
+    """
+
+    bond_ids = set()
+    for atom_idx in atom_ids:
+        for neighbor_idx in mol.get_neighbors(atom_idx):
+            if neighbor_idx in atom_ids and atom_idx < neighbor_idx:
+                bond = mol.get_bond(atom_idx, neighbor_idx)
+                if bond:
+                    bond_ids.add(bond.idx)
+    return bond_ids
+
+
+def _add_substituent_trace(parts: AssemblyParts, name: str, locant: str, atom_ids=None, bond_ids=None, trace_segments=None) -> None:
+    """Append or merge a substituent while preserving trace atom/bond IDs.
+
+    Blue Book references: P-14.2, P-16.5, and P-61; repeated detachable
+    prefixes are grouped by name but retain all source atoms.
+    """
+
+    atom_ids = set(atom_ids or ())
+    bond_ids = set(bond_ids or ())
+    trace_segments = list(trace_segments or ())
+    existing = next((s for s in parts.substituents if s.name == name), None)
+    if existing:
+        existing.locants.append(locant)
+        existing.atom_ids.update(atom_ids)
+        existing.bond_ids.update(bond_ids)
+        existing.trace_segments.extend(trace_segments)
+    else:
+        parts.substituents.append(
+            SubstituentItem(
+                name=name,
+                locants=[locant],
+                atom_ids=atom_ids,
+                bond_ids=bond_ids,
+                trace_segments=trace_segments,
+            )
+        )
+
+
+def _multiplied_name_terms(name: str, count: int) -> list[str]:
+    """Return possible assembled text terms for repeated name fragments.
+
+    Blue Book references: P-13.4 and P-14.2 for multiplicative prefixes in
+    assembled names.
+    """
+
+    clean = _strip_outer_parentheses(name)
+    terms = [clean]
+    if count > 1:
+        is_complex = "(" in clean or clean[:1].isdigit() or "-" in clean or " " in clean
+        mult = multipliers.complex_(count) if is_complex else multipliers.basic(count)
+        terms.insert(0, mult + clean)
+    return terms
+
+
+def _assembly_parent_terms(parts: AssemblyParts) -> list[str]:
+    """Return parent-name terms from the actual assembly configuration."""
+
+    if parts.retained_name:
+        return [parts.retained_name, parts.retained_name[:-1] if parts.retained_name.endswith("e") else parts.retained_name]
+
+    stem = stems.stem_for(parts.parent_length)
+    terms = [stem]
+    if parts.is_bicycle:
+        terms.insert(0, f"bicyclo[{parts.bicycle_xyz[0]}.{parts.bicycle_xyz[1]}.{parts.bicycle_xyz[2]}]{stem}")
+        terms.append("bicyclo")
+    elif parts.is_spiro:
+        terms.insert(0, f"spiro[{parts.spiro_xy[0]}.{parts.spiro_xy[1]}]{stem}")
+        terms.append("spiro")
+    elif parts.is_polycycle and parts.polycycle_descriptor:
+        terms.insert(0, parts.polycycle_descriptor + stem)
+    elif parts.is_ring:
+        terms.insert(0, "cyclo" + stem)
+    return terms
+
+
+def _assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
+    """Convert populated AssemblyParts metadata into visualizer annotations.
+
+    Blue Book references: P-14 for locants, P-31 for unsaturation, P-44/P-45
+    for parent structures, P-51/P-52 for replacement prefixes, and P-61-P-67
+    for detachable prefixes and characteristic-group suffixes.
+    """
+
+    segments = []
+    if parts.substituents:
+        grouped: dict[str, SubstituentItem] = {}
+        for item in parts.substituents:
+            target = grouped.setdefault(
+                item.name,
+                SubstituentItem(name=item.name, locants=[], atom_ids=set(), bond_ids=set()),
+            )
+            target.locants.extend(item.locants)
+            target.atom_ids.update(item.atom_ids)
+            target.bond_ids.update(item.bond_ids)
+            target.trace_segments.extend(item.trace_segments)
+        for item in grouped.values():
+            if item.trace_segments and _strip_outer_parentheses(item.name) != "methyl":
+                segments.extend(item.trace_segments)
+                continue
+            segments.append(
+                {
+                    "key": f"substituent:{item.name}",
+                    "label": f"{_strip_outer_parentheses(item.name)} substituent",
+                    "atoms": sorted(item.atom_ids),
+                    "bonds": sorted(item.bond_ids),
+                    "name_terms": _multiplied_name_terms(item.name, max(1, len(item.locants))),
+                    "rule_hint": "Detachable prefixes: Blue Book P-14.2, P-16.5, and P-61.",
+                }
+            )
+
+    if parts.a_prefixes:
+        grouped_a: dict[str, SubstituentItem] = {}
+        for item in parts.a_prefixes:
+            target = grouped_a.setdefault(
+                item.name,
+                SubstituentItem(name=item.name, locants=[], atom_ids=set(), bond_ids=set()),
+            )
+            target.locants.extend(item.locants)
+            target.atom_ids.update(item.atom_ids)
+            target.bond_ids.update(item.bond_ids)
+        for item in grouped_a.values():
+            segments.append(
+                {
+                    "key": f"replacement:{item.name}",
+                    "label": f"{item.name} replacement",
+                    "atoms": sorted(item.atom_ids),
+                    "bonds": sorted(item.bond_ids),
+                    "name_terms": _multiplied_name_terms(item.name, max(1, len(item.locants))),
+                    "rule_hint": "Replacement prefixes in parent structures: Blue Book P-51 and P-52.",
+                }
+            )
+
+    for item in parts.unsaturations:
+        count = max(1, len(item.locants))
+        try:
+            infix = bonds.unsaturation_infix(item.bond_key, count)
+        except KeyError:
+            infix = bonds.get(item.bond_key).suffix
+        base_infix = infix[1:] if infix.startswith("a") else infix
+        segments.append(
+            {
+                "key": f"unsaturation:{item.bond_key}",
+                "label": f"{item.bond_key} bonds",
+                "atoms": sorted(item.atom_ids),
+                "bonds": sorted(item.bond_ids),
+                "name_terms": [base_infix, bonds.get(item.bond_key).suffix],
+                "rule_hint": "Unsaturation infixes: Blue Book P-31.1 and P-44.",
+            }
+        )
+
+    simple_methyl_substituent = (
+        parts.is_substituent
+        and parts.parent_length == 1
+        and not parts.substituents
+        and not parts.a_prefixes
+        and not parts.unsaturations
+        and not parts.principal_group
+    )
+    if parts.parent_atom_ids and simple_methyl_substituent:
+        segments.append(
+            {
+                "key": "substituent:methyl",
+                "label": "methyl substituent",
+                "atoms": sorted(parts.parent_atom_ids),
+                "bonds": sorted(parts.parent_bond_ids),
+                "name_terms": ["methyl"],
+                "rule_hint": "Detachable hydrocarbon prefixes: Blue Book P-29 and P-61.",
+            }
+        )
+    elif parts.parent_atom_ids:
+        segments.append(
+            {
+                "key": "parent",
+                "label": "parent skeleton",
+                "atoms": sorted(parts.parent_atom_ids),
+                "bonds": sorted(parts.parent_bond_ids),
+                "name_terms": _assembly_parent_terms(parts),
+                "rule_hint": "Parent hydride / parent structure: Blue Book P-44 and P-45.",
+            }
+        )
+
+    if parts.principal_group:
+        group = suffixes.get(parts.principal_group.key)
+        terms = [group.suffix]
+        if group.multi_suffix:
+            terms.insert(0, group.multi_suffix)
+        if group.prefix:
+            terms.append(group.prefix)
+        segments.append(
+            {
+                "key": f"principal:{parts.principal_group.key}",
+                "label": parts.principal_group.key.replace("_", " "),
+                "atoms": sorted(parts.principal_group.atom_ids),
+                "bonds": sorted(parts.principal_group.bond_ids),
+                "name_terms": terms,
+                "rule_hint": "Principal characteristic groups: Blue Book P-41, P-44, and P-61-P-67.",
+            }
+        )
+    return segments
 
 
 def _format_multiplier(name: str, count: int, safe_enclose: bool = False) -> str:
@@ -303,7 +512,8 @@ def number_parent(
             for idx in oriented_path:
                 if idx in substituent_mapping:
                     loc = oriented_path.index(idx) + 1
-                    for name in substituent_mapping[idx]:
+                    for item in substituent_mapping[idx]:
+                        name = item.name if hasattr(item, "name") else item
                         alpha_list.append((sub_sort_key(name), loc))
             alpha_list.sort(key=lambda x: x[0])
             alpha_eval = tuple(x[1] for x in alpha_list)
@@ -1097,7 +1307,7 @@ def _collect_subgraph_substituents(
     candidate_path: list[int],
     sub_perceived: list[PerceivedGroup],
     sub_exclude: set[int],
-) -> dict[int, list[str]]:
+) -> dict[int, list[SubstituentItem]]:
     """Collect prefixes attached to a recursive subgraph parent.
 
     Blue Book references: P-14.2, P-16.5, P-44, P-61 through P-67, and P-24
@@ -1106,14 +1316,21 @@ def _collect_subgraph_substituents(
     """
 
     main_set = set(candidate_path)
-    subst_mapping: dict[int, list[str]] = {}
+    subst_mapping: dict[int, list[SubstituentItem]] = {}
     sub_handled_atoms = set()
 
     for group in sub_perceived:
         if group.attachment_carbon in main_set and not group.is_principal_candidate:
             name = substituents.get(group.key).prefix if group.key in substituents.SUBSTITUENTS else ""
             if name:
-                subst_mapping.setdefault(group.attachment_carbon, []).append(name)
+                subst_mapping.setdefault(group.attachment_carbon, []).append(
+                    SubstituentItem(
+                        name=name,
+                        locants=[],
+                        atom_ids=set(group.atoms_involved),
+                        bond_ids=_bond_ids_within(mol, set(group.atoms_involved) | {group.attachment_carbon}),
+                    )
+                )
                 sub_handled_atoms.update(group.atoms_involved)
 
     for c_idx in candidate_path:
@@ -1126,15 +1343,34 @@ def _collect_subgraph_substituents(
         spiro_pair = _find_spiro_side_pair(mol, c_idx, n_subs, main_set, sub_exclude)
         if spiro_pair:
             sub_comp = _spiro_side_component(mol, c_idx, spiro_pair[0], main_set, sub_exclude)
-            subst_mapping.setdefault(c_idx, []).append(_spiro_subgraph_name(mol, c_idx, sub_comp))
+            subst_mapping.setdefault(c_idx, []).append(
+                SubstituentItem(
+                    name=_spiro_subgraph_name(mol, c_idx, sub_comp),
+                    locants=[],
+                    atom_ids=sub_comp - {c_idx},
+                    bond_ids=_bond_ids_within(mol, sub_comp),
+                )
+            )
             sub_handled_atoms.update(sub_comp - {c_idx})
             n_subs = [n for n in n_subs if n not in sub_comp]
 
         for n_idx in n_subs:
             if n_idx not in main_set and n_idx not in sub_handled_atoms and n_idx not in sub_exclude:
-                branch_name = name_subgraph(mol, n_idx, sub_exclude | main_set, upstream_atom=c_idx)
+                branch_name, branch_trace = name_subgraph(
+                    mol, n_idx, sub_exclude | main_set, upstream_atom=c_idx, return_trace=True
+                )
                 if branch_name:
-                    subst_mapping.setdefault(c_idx, []).append(branch_name)
+                    branch_atoms = _subgraph_component(mol, n_idx, sub_exclude | main_set)
+                    branch_with_attachment = branch_atoms | {c_idx}
+                    subst_mapping.setdefault(c_idx, []).append(
+                        SubstituentItem(
+                            name=branch_name,
+                            locants=[],
+                            atom_ids=branch_atoms,
+                            bond_ids=_bond_ids_within(mol, branch_with_attachment),
+                            trace_segments=branch_trace,
+                        )
+                    )
 
     return subst_mapping
 
@@ -1226,21 +1462,17 @@ def _add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path:
                 parts.indicated_hydrogens.append(get_loc(idx))
 
 
-def _add_subgraph_substituents(parts: AssemblyParts, subst_mapping: dict[int, list[str]], get_loc) -> None:
+def _add_subgraph_substituents(parts: AssemblyParts, subst_mapping: dict[int, list[SubstituentItem]], get_loc) -> None:
     """Add collected substituent prefixes to assembly parts.
 
     Blue Book references: P-14.2 and P-16.5 for locants, multiplicative
     prefixes, and complex substituent citation.
     """
 
-    for c_idx, names in subst_mapping.items():
+    for c_idx, items in subst_mapping.items():
         locant = get_loc(c_idx)
-        for name in names:
-            existing = next((s for s in parts.substituents if s.name == name), None)
-            if existing:
-                existing.locants.append(locant)
-            else:
-                parts.substituents.append(SubstituentItem(name=name, locants=[locant]))
+        for item in items:
+            _add_substituent_trace(parts, item.name, locant, item.atom_ids, item.bond_ids, item.trace_segments)
 
 
 def _add_subgraph_parent_features(
@@ -1270,7 +1502,7 @@ def _add_subgraph_parent_features(
                 loc = get_loc(atom_idx)
                 if atom.charge == 0 and valence > atom.element.standard_valence:
                     loc = f"{loc}lambda^{valence}"
-                parts.a_prefixes.append(SubstituentItem(name=hw_stem, locants=[loc]))
+                parts.a_prefixes.append(SubstituentItem(name=hw_stem, locants=[loc], atom_ids={atom_idx}))
 
     seen_bonds = set()
     for u_idx in numbered_path:
@@ -1303,8 +1535,17 @@ def _add_subgraph_parent_features(
                     existing = next((u for u in parts.unsaturations if u.bond_key == bond_key), None)
                     if existing:
                         existing.locants.append(locant_str)
+                        existing.atom_ids.update({u_idx, v_idx})
+                        existing.bond_ids.add(bond.idx)
                     else:
-                        parts.unsaturations.append(UnsaturationItem(bond_key=bond_key, locants=[locant_str]))
+                        parts.unsaturations.append(
+                            UnsaturationItem(
+                                bond_key=bond_key,
+                                locants=[locant_str],
+                                atom_ids={u_idx, v_idx},
+                                bond_ids={bond.idx},
+                            )
+                        )
 
 
 def _build_subgraph_parts(
@@ -1343,6 +1584,8 @@ def _build_subgraph_parts(
         is_triple_attach=upstream_order == 3,
         attachment_locant=attach_locant,
         retained_name=retained_name_val,
+        parent_atom_ids=set(numbered_path),
+        parent_bond_ids=_bond_ids_within(mol, set(numbered_path)),
     )
 
     for atom_idx in numbered_path:
@@ -1373,7 +1616,13 @@ def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
     return f"({name})"
 
 
-def name_subgraph(mol: Molecule, start_idx: int, exclude_atoms: set[int], upstream_atom: int = None) -> str:
+def name_subgraph(
+    mol: Molecule,
+    start_idx: int,
+    exclude_atoms: set[int],
+    upstream_atom: int = None,
+    return_trace: bool = False,
+):
     """Name a recursive substituent subgraph attached to the current parent.
 
     Blue Book references: P-13.6, P-14.2, P-16.5, P-61, P-62, P-63, P-65,
@@ -1394,23 +1643,26 @@ def name_subgraph(mol: Molecule, start_idx: int, exclude_atoms: set[int], upstre
             "B": _name_group_13_14_subgraph,
         }
         if start_atom.symbol == "Se":
-            return _name_chalcogen_subgraph(
+            name = _name_chalcogen_subgraph(
                 mol, start_idx, exclude_atoms, upstream_atom, SIMPLE_SELANYL_PREFIXES, "selanyl", "selenoxo"
             )
+            return (name, []) if return_trace else name
         if start_atom.symbol in HALOGEN_PREFIXES:
-            return _name_halogen_subgraph(mol, start_idx, exclude_atoms, upstream_atom)
+            name = _name_halogen_subgraph(mol, start_idx, exclude_atoms, upstream_atom)
+            return (name, []) if return_trace else name
         if start_atom.symbol in heteroatom_handlers:
-            return heteroatom_handlers[start_atom.symbol](mol, start_idx, exclude_atoms, upstream_atom)
+            name = heteroatom_handlers[start_atom.symbol](mol, start_idx, exclude_atoms, upstream_atom)
+            return (name, []) if return_trace else name
 
     component = _subgraph_component(mol, start_idx, exclude_atoms)
     direct_prefix = _direct_subgraph_prefix(mol, start_idx, component)
     if direct_prefix:
-        return direct_prefix
+        return (direct_prefix, []) if return_trace else direct_prefix
 
     sub_exclude = set(mol.atoms.keys()) - component
     parent_selection = _select_subgraph_parent(mol, start_idx, component, sub_exclude)
     if parent_selection is None:
-        return ""
+        return ("", []) if return_trace else ""
 
     (
         candidate_paths,
@@ -1462,7 +1714,10 @@ def name_subgraph(mol: Molecule, start_idx: int, exclude_atoms: set[int], upstre
     _add_subgraph_substituents(parts, subst_mapping, get_loc)
     _add_subgraph_parent_features(mol, parts, numbered_path, get_loc, is_bicycle, is_spiro, is_polycycle)
 
-    return _finalize_subgraph_name(assemble_name(parts), parts)
+    name = _finalize_subgraph_name(assemble_name(parts), parts)
+    if return_trace:
+        return name, _assembly_trace_segments(parts)
+    return name
 
 
 def _single_atom_component_name(mol: Molecule, component_atoms: set[int]) -> str:
@@ -1749,7 +2004,7 @@ def _collect_component_prefix_substituents(
     prefix_groups: list[PerceivedGroup],
     parent_path: list[int],
     sub_exclude: set[int],
-) -> tuple[dict[int, list[str]], set[int]]:
+) -> tuple[dict[int, list[SubstituentItem]], set[int]]:
     """Collect characteristic groups cited as prefixes on the component parent.
 
     Blue Book references: P-61 through P-67 for detachable prefixes and suffix
@@ -1757,7 +2012,7 @@ def _collect_component_prefix_substituents(
     """
 
     main_set = set(parent_path)
-    subst_mapping: dict[int, list[str]] = {}
+    subst_mapping: dict[int, list[SubstituentItem]] = {}
     handled_prefix_atoms = set()
 
     for group in prefix_groups:
@@ -1785,7 +2040,11 @@ def _collect_component_prefix_substituents(
             name = suffixes.get(group.key).prefix if group.is_principal_candidate else substituents.get(group.key).prefix
 
         if name:
-            subst_mapping.setdefault(group.attachment_carbon, []).append(name)
+            trace_atoms = set(group.atoms_involved)
+            trace_bonds = _bond_ids_within(mol, trace_atoms | {group.attachment_carbon})
+            subst_mapping.setdefault(group.attachment_carbon, []).append(
+                SubstituentItem(name=name, locants=[], atom_ids=trace_atoms, bond_ids=trace_bonds)
+            )
             handled_prefix_atoms.update(group.atoms_involved)
 
     return subst_mapping, handled_prefix_atoms
@@ -1794,7 +2053,7 @@ def _collect_component_prefix_substituents(
 def _collect_component_branch_substituents(
     mol: Molecule,
     parent_path: list[int],
-    subst_mapping: dict[int, list[str]],
+    subst_mapping: dict[int, list[SubstituentItem]],
     handled_prefix_atoms: set[int],
     principal_involved_atoms: set[int],
     base_exclude: set[int],
@@ -1819,15 +2078,33 @@ def _collect_component_branch_substituents(
         spiro_pair = _find_spiro_side_pair(mol, c_idx, n_subs, main_set, base_exclude)
         if spiro_pair:
             sub_comp = _spiro_side_component(mol, c_idx, spiro_pair[0], main_set, base_exclude)
-            subst_mapping.setdefault(c_idx, []).append(_spiro_subgraph_name(mol, c_idx, sub_comp))
+            subst_mapping.setdefault(c_idx, []).append(
+                SubstituentItem(
+                    name=_spiro_subgraph_name(mol, c_idx, sub_comp),
+                    locants=[],
+                    atom_ids=sub_comp - {c_idx},
+                    bond_ids=_bond_ids_within(mol, sub_comp),
+                )
+            )
             handled_prefix_atoms.update(sub_comp - {c_idx})
             n_subs = [n for n in n_subs if n not in sub_comp]
 
         for n_idx in n_subs:
             if n_idx not in main_set and n_idx not in principal_involved_atoms and n_idx not in handled_prefix_atoms:
-                branch_name = name_subgraph(mol, n_idx, sub_exclude | main_set, upstream_atom=c_idx)
+                branch_name, branch_trace = name_subgraph(
+                    mol, n_idx, sub_exclude | main_set, upstream_atom=c_idx, return_trace=True
+                )
                 if branch_name:
-                    subst_mapping.setdefault(c_idx, []).append(branch_name)
+                    branch_atoms = _subgraph_component(mol, n_idx, sub_exclude | main_set)
+                    subst_mapping.setdefault(c_idx, []).append(
+                        SubstituentItem(
+                            name=branch_name,
+                            locants=[],
+                            atom_ids=branch_atoms,
+                            bond_ids=_bond_ids_within(mol, branch_atoms | {c_idx}),
+                            trace_segments=branch_trace,
+                        )
+                    )
 
 
 def _choose_component_numbering(
@@ -1913,6 +2190,8 @@ def _build_component_parts(
         spiro_xy=(xyz[0], xyz[1]) if is_spiro else (0, 0),
         polycycle_descriptor=polycycle_descriptor,
         retained_name=retained_name_val,
+        parent_atom_ids=set(numbered_path),
+        parent_bond_ids=_bond_ids_within(mol, set(numbered_path)),
     )
     for atom_idx in numbered_path:
         if mol.atoms[atom_idx].stereo:
@@ -2002,18 +2281,30 @@ def _add_component_n_substituents(
                 loc_prefix = "N" + "'" * n_idx_global
 
             for n_sub in n_substituents:
-                branch_name = name_subgraph(mol, n_sub, sub_exclude | {single_n}, upstream_atom=single_n)
+                branch_name, branch_trace = name_subgraph(
+                    mol, n_sub, sub_exclude | {single_n}, upstream_atom=single_n, return_trace=True
+                )
                 if branch_name:
-                    existing = next((s for s in parts.substituents if s.name == branch_name), None)
-                    if existing:
-                        existing.locants.append(loc_prefix)
-                    else:
-                        parts.substituents.append(SubstituentItem(name=branch_name, locants=[loc_prefix]))
+                    branch_atoms = _subgraph_component(mol, n_sub, sub_exclude | {single_n})
+                    _add_substituent_trace(
+                        parts,
+                        branch_name,
+                        loc_prefix,
+                        branch_atoms,
+                        _bond_ids_within(mol, branch_atoms | {single_n}),
+                        branch_trace,
+                    )
             n_idx_global += 1
 
 
 def _add_component_principal_group(
-    parts: AssemblyParts, principal_key: str | None, principal_carbons: list[int], numbered_path: list[int], get_loc
+    mol: Molecule,
+    parts: AssemblyParts,
+    perceived_groups: list[PerceivedGroup],
+    principal_key: str | None,
+    principal_carbons: list[int],
+    numbered_path: list[int],
+    get_loc,
 ) -> None:
     """Add the principal characteristic group suffix locants to assembly parts.
 
@@ -2022,11 +2313,21 @@ def _add_component_principal_group(
 
     if principal_key:
         locants = sorted([get_loc(c) for c in principal_carbons if c in numbered_path], key=parse_locant)
-        parts.principal_group = PrincipalGroupItem(key=principal_key, locants=locants)
+        atom_ids = set()
+        for group in perceived_groups:
+            if group.key == principal_key and group.attachment_carbon in numbered_path:
+                atom_ids.add(group.attachment_carbon)
+                atom_ids.update(group.atoms_involved)
+        parts.principal_group = PrincipalGroupItem(
+            key=principal_key,
+            locants=locants,
+            atom_ids=atom_ids,
+            bond_ids=_bond_ids_within(mol, atom_ids),
+        )
 
 
 def _add_component_substituents(
-    parts: AssemblyParts, subst_mapping: dict[int, list[str]], numbered_path: list[int], get_loc
+    parts: AssemblyParts, subst_mapping: dict[int, list[SubstituentItem]], numbered_path: list[int], get_loc
 ) -> None:
     """Add collected component substituents to assembly parts.
 
@@ -2034,18 +2335,14 @@ def _add_component_substituents(
     prefix citation.
     """
 
-    for c_idx, names in subst_mapping.items():
+    for c_idx, items in subst_mapping.items():
         if c_idx in numbered_path:
             locant = get_loc(c_idx)
-            for name in names:
-                existing = next((s for s in parts.substituents if s.name == name), None)
-                if existing:
-                    existing.locants.append(locant)
-                else:
-                    parts.substituents.append(SubstituentItem(name=name, locants=[locant]))
+            for item in items:
+                _add_substituent_trace(parts, item.name, locant, item.atom_ids, item.bond_ids, item.trace_segments)
 
 
-def name_component(mol: Molecule, component_atoms: set[int], is_substituent: bool = False) -> str:
+def name_component(mol: Molecule, component_atoms: set[int], is_substituent: bool = False, return_trace: bool = False):
     """Name one connected component or recursive component of a molecule.
 
     Blue Book references: P-44 and P-45 for parent selection, P-52/P-53 for
@@ -2055,6 +2352,8 @@ def name_component(mol: Molecule, component_atoms: set[int], is_substituent: boo
 
     single_atom_name = _single_atom_component_name(mol, component_atoms)
     if single_atom_name:
+        if return_trace:
+            return single_atom_name, []
         return single_atom_name
 
     perceived_groups = _component_groups(mol, component_atoms)
@@ -2062,6 +2361,8 @@ def name_component(mol: Molecule, component_atoms: set[int], is_substituent: boo
 
     anhydride_name = _try_name_anhydride_component(mol, perceived_groups, principal_key)
     if anhydride_name:
+        if return_trace:
+            return anhydride_name, []
         return anhydride_name
 
     exclude_atoms = set(mol.atoms.keys()) - component_atoms
@@ -2072,6 +2373,8 @@ def name_component(mol: Molecule, component_atoms: set[int], is_substituent: boo
 
     parent_selection = _select_component_parent(mol, exclude_atoms, principal_carbons)
     if parent_selection is None:
+        if return_trace:
+            return "methane", []
         return "methane"
 
     best_paths, is_ring, is_bicycle, is_spiro, is_polycycle, xyz, polycycle_descriptor = parent_selection
@@ -2131,11 +2434,45 @@ def name_component(mol: Molecule, component_atoms: set[int], is_substituent: boo
     _add_component_front_modifiers(mol, parts, perceived_groups, principal_key, sub_exclude)
     _add_component_n_substituents(mol, parts, perceived_groups, principal_key, numbered_path, get_loc, sub_exclude)
     _add_subgraph_parent_features(mol, parts, numbered_path, get_loc, is_bicycle, is_spiro, is_polycycle)
-    _add_component_principal_group(parts, principal_key, principal_carbons, numbered_path, get_loc)
+    _add_component_principal_group(mol, parts, perceived_groups, principal_key, principal_carbons, numbered_path, get_loc)
     _add_component_substituents(parts, subst_mapping, numbered_path, get_loc)
 
     name = assemble_name(parts)
-    return SPECIAL_COMPONENT_NAMES.get(name, name)
+    name = SPECIAL_COMPONENT_NAMES.get(name, name)
+    if return_trace:
+        return name, _assembly_trace_segments(parts)
+    return name
+
+
+def name_smiles_with_trace(smiles: str) -> tuple[str, list[dict]]:
+    """Return a generated name and AssemblyParts-derived trace annotations.
+
+    Blue Book references are carried by each trace segment. This API keeps the
+    original ``name_smiles`` function unchanged while exposing atom and bond IDs
+    selected during parent, prefix, unsaturation, and suffix assembly.
+    """
+
+    mol = read_smiles(smiles)
+    if not mol.atoms:
+        return "", []
+    components = get_connected_components(mol)
+
+    named_components = []
+    for comp in components:
+        comp_name, trace = name_component(mol, comp, return_trace=True)
+        if comp_name:
+            named_components.append((comp_name, trace))
+
+    def sort_key(item):
+        name, _ = item
+        return (0 if name in SALT_METAL_NAMES else 1, name)
+
+    named_components.sort(key=sort_key)
+    final_name = " ".join(name for name, _ in named_components)
+    traces = []
+    for _, trace in named_components:
+        traces.extend(trace)
+    return final_name, traces
 
 def name_smiles(smiles: str) -> str:
     """Return an IUPAC-style name for a SMILES string.
