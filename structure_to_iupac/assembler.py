@@ -3,6 +3,7 @@
 import re
 from dataclasses import dataclass, field
 from typing import Optional
+from .nomenclature import RULES
 from .rules import bonds, elision, multipliers, stems, suffixes
 
 
@@ -356,110 +357,109 @@ def _post_process_name(name: str) -> str:
     return name
 
 
-def assemble_name(parts: AssemblyParts) -> str:
+SPIRO_SUBSTITUENT_RE = re.compile(r"^\[SPIRO\]-(\d+)-(.*)$")
+SUBSTITUENT_SORT_PREFIX_RE = re.compile(RULES.assembly.substituent_sort_prefix_pattern)
+A_PREFIX_ORDER = RULES.assembly.replacement_prefix_order
+UNSATURATION_ORDER = RULES.assembly.unsaturation_order
+RETAINED_SUBSTITUENT_STEMS = RULES.retained.substituent_stems
+ACID_HALIDE_SUFFIX_KEYS = RULES.assembly.acid_halide_suffix_keys
+
+
+def _split_spiro_substituents(parts: AssemblyParts) -> list[tuple[str, str, str]]:
     spiro_subs =[]
     normal_subs =[]
     for sub in parts.substituents:
-        match = re.match(r"^\[SPIRO\]-(\d+)-(.*)$", sub.name)
+        match = SPIRO_SUBSTITUENT_RE.match(sub.name)
         if match:
             spiro_subs.append((str(sub.locants[0]), match.group(1), match.group(2)))
         else:
             normal_subs.append(sub)
-
     parts.substituents = normal_subs
+    return spiro_subs
 
-    prefix_str = ""
-    if parts.substituents:
-        grouped: dict[str, list[str]] = {}
-        for sub in parts.substituents:
-            grouped.setdefault(sub.name, []).extend(sub.locants)
 
-        prefix_parts =[]
-
-        def sub_sort_key(name):
-            s = name.lower()
-            s = re.sub(r"^[\(\[\{\)]+", "", s)
-            prefix_pattern = r"^((?:(?:[0-9]+[a-z]*|[nospmc]\'*)(?:,(?:[0-9]+[a-z]*|[nospmc]\'*))*|[ezrs]+|sec|tert|t|s|d|l|m|o|p|alpha|beta|gamma))([-)]+)"
-            while True:
-                match = re.match(prefix_pattern, s)
-                if match:
-                    s = s[match.end() :]
-                    s = re.sub(r"^[\(\[\{\)]+", "", s)
-                    continue
-                break
+def _substituent_sort_key(name: str) -> str:
+    s = name.lower()
+    s = re.sub(r"^[\(\[\{\)]+", "", s)
+    while True:
+        match = SUBSTITUENT_SORT_PREFIX_RE.match(s)
+        if not match:
             return s
+        s = s[match.end() :]
+        s = re.sub(r"^[\(\[\{\)]+", "", s)
 
-        for name in sorted(grouped.keys(), key=sub_sort_key):
-            locs = sorted(grouped[name], key=parse_locant)
 
-            attachments_per_group = 2 if ("diyl" in name and "ylidene" not in name) else 1
-            count_raw = len(locs) if locs else len([s for s in parts.substituents if s.name == name])
-            count = max(1, count_raw // attachments_per_group)
+def _group_substituents(substituents: list[SubstituentItem]) -> dict[str, list[str]]:
+    grouped: dict[str, list[str]] = {}
+    for sub in substituents:
+        grouped.setdefault(sub.name, []).extend(sub.locants)
+    return grouped
 
-            is_complex = "(" in name or name[0].isdigit() or "-" in name or " " in name
-            mult = (multipliers.complex_(count) if is_complex else multipliers.basic(count)) if count > 1 else ""
 
-            if (
-                parts.parent_length == 1
-                and all(str(l).isdigit() for l in locs)
-                and not parts.principal_group
-                and not parts.a_prefixes
-            ):
-                loc_str = ""
-            else:
-                loc_str = ",".join(map(str, locs))
+def _substituent_locant_string(parts: AssemblyParts, locs: list[str], grouped_count: int, spiro_subs) -> str:
+    if parts.parent_length == 1 and all(str(l).isdigit() for l in locs) and not parts.principal_group and not parts.a_prefixes:
+        return ""
+    simple_one_locant = (
+        len(locs) == 1
+        and str(locs[0]) == "1"
+        and parts.is_ring
+        and not parts.principal_group
+        and not parts.unsaturations
+        and not parts.is_substituent
+        and not parts.a_prefixes
+        and grouped_count == 1
+        and not parts.is_bicycle
+        and not parts.is_spiro
+        and not parts.is_polycycle
+        and not spiro_subs
+    )
+    return "" if simple_one_locant else ",".join(map(str, locs))
 
-            simple_one_locant = (
-                len(locs) == 1
-                and str(locs[0]) == "1"
-                and parts.is_ring
-                and not parts.principal_group
-                and not parts.unsaturations
-                and not parts.is_substituent
-                and not parts.a_prefixes
-                and len(grouped) == 1
-                and not parts.is_bicycle
-                and not parts.is_spiro
-                and not parts.is_polycycle
-                and not spiro_subs
-            )
-            if simple_one_locant:
-                loc_str = ""
 
-            name_to_use = name
-            if is_complex and not is_fully_enclosed(name):
-                if count > 1 or loc_str:
-                    name_to_use = f"({name})"
-            elif not loc_str and len(grouped) > 1 and not is_fully_enclosed(name):
-                if name not in["fluoro", "chloro", "bromo", "iodo"]:
-                    name_to_use = f"({name})"
+def _format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:
+    if not parts.substituents:
+        return ""
+    grouped = _group_substituents(parts.substituents)
+    prefix_parts =[]
+    for name in sorted(grouped.keys(), key=_substituent_sort_key):
+        locs = sorted(grouped[name], key=parse_locant)
+        attachments_per_group = 2 if ("diyl" in name and "ylidene" not in name) else 1
+        count_raw = len(locs) if locs else len([s for s in parts.substituents if s.name == name])
+        count = max(1, count_raw // attachments_per_group)
+        is_complex = "(" in name or name[0].isdigit() or "-" in name or " " in name
+        mult = (multipliers.complex_(count) if is_complex else multipliers.basic(count)) if count > 1 else ""
+        loc_str = _substituent_locant_string(parts, locs, len(grouped), spiro_subs)
 
-            if loc_str:
-                prefix_parts.append(f"{loc_str}-{mult}{name_to_use}")
-            else:
-                prefix_parts.append(f"{mult}{name_to_use}")
+        name_to_use = name
+        if is_complex and not is_fully_enclosed(name):
+            if count > 1 or loc_str:
+                name_to_use = f"({name})"
+        elif not loc_str and len(grouped) > 1 and not is_fully_enclosed(name):
+            if name not in["fluoro", "chloro", "bromo", "iodo"]:
+                name_to_use = f"({name})"
+        prefix_parts.append(f"{loc_str}-{mult}{name_to_use}" if loc_str else f"{mult}{name_to_use}")
 
-        prefix_str = prefix_parts[0]
-        for p in prefix_parts[1:]:
-            prefix_str += f"-{p}" if needs_hyphen(prefix_str, p) else p
+    prefix_str = prefix_parts[0]
+    for p in prefix_parts[1:]:
+        prefix_str += f"-{p}" if needs_hyphen(prefix_str, p) else p
+    return prefix_str
 
-    a_prefix_str = ""
-    if parts.a_prefixes:
-        a_order = {"oxa": 1, "thia": 2, "aza": 3, "phospha": 4, "sila": 5, "bora": 6}
-        grouped_a: dict[str, list[str]] = {}
-        for sub in parts.a_prefixes:
-            grouped_a.setdefault(sub.name,[]).extend(sub.locants)
 
-        a_parts =[]
-        for name in sorted(grouped_a.keys(), key=lambda n: a_order.get(n, 99)):
-            locs = sorted(grouped_a[name], key=parse_locant)
-            loc_str = ",".join(map(str, locs))
-            count = len(locs)
-            mult = multipliers.basic(count) if count > 1 else ""
-            a_parts.append(f"{loc_str}-{mult}{name}")
+def _format_replacement_prefixes(parts: AssemblyParts) -> str:
+    if not parts.a_prefixes:
+        return ""
+    grouped_a = _group_substituents(parts.a_prefixes)
+    a_parts =[]
+    for name in sorted(grouped_a.keys(), key=lambda n: A_PREFIX_ORDER.get(n, 99)):
+        locs = sorted(grouped_a[name], key=parse_locant)
+        loc_str = ",".join(map(str, locs))
+        count = len(locs)
+        mult = multipliers.basic(count) if count > 1 else ""
+        a_parts.append(f"{loc_str}-{mult}{name}")
+    return "-".join(a_parts)
 
-        a_prefix_str = "-".join(a_parts)
 
+def _promote_benzene_retained_name(parts: AssemblyParts) -> None:
     if parts.is_ring and not parts.is_bicycle and not parts.is_spiro and parts.parent_length == 6:
         if (
             len(parts.unsaturations) == 1
@@ -472,18 +472,13 @@ def assemble_name(parts: AssemblyParts) -> str:
                     parts.retained_name = "benzene"
                     parts.unsaturations =[]
 
+
+def _parent_stem_and_terminal(parts: AssemblyParts) -> tuple[str, str]:
     terminal_e = bonds.PARENT_TERMINAL_VOWEL
 
     if parts.retained_name:
-        if parts.is_substituent and parts.retained_name == "benzene":
-            stem_str = "phen"
-            terminal_e = ""
-        elif parts.is_substituent and parts.retained_name == "pyridine":
-            stem_str = "pyridin"
-            terminal_e = ""
-        elif parts.is_substituent and parts.retained_name == "naphthalene":
-            stem_str = "naphthalen"
-            terminal_e = ""
+        if parts.is_substituent and parts.retained_name in RETAINED_SUBSTITUENT_STEMS:
+            stem_str, terminal_e = RETAINED_SUBSTITUENT_STEMS[parts.retained_name]
         else:
             if parts.retained_name.endswith("e"):
                 stem_str = parts.retained_name[:-1]
@@ -515,202 +510,197 @@ def assemble_name(parts: AssemblyParts) -> str:
                     stem_str = f"tricyclo[1.1.0.0^{{1,3}}]" + stem_str
         elif parts.is_ring:
             stem_str = "cyclo" + stem_str
+    return stem_str, terminal_e
 
+
+def _apply_replacement_prefix(stem_str: str, a_prefix_str: str) -> str:
     if a_prefix_str:
         if elision.is_vowel_start(stem_str) and a_prefix_str.endswith("a"):
             a_prefix_str = a_prefix_str[:-1]
         stem_str = a_prefix_str + stem_str
+    return stem_str
+
+
+def _format_unsaturations(parts: AssemblyParts, stem_str: str) -> tuple[str, str]:
+    sorted_unsats = sorted(parts.unsaturations, key=lambda u: UNSATURATION_ORDER.get(u.bond_key, 99))
+    unsat_parts =[]
+    base_infixes =[]
+    for u in sorted_unsats:
+        count = len(u.locants) or 1
+        infix = bonds.unsaturation_infix(u.bond_key, count)
+        base_infix = infix[1:] if infix.startswith("a") else infix
+        base_infixes.append((u, base_infix))
+    if base_infixes and not elision.is_vowel_start(base_infixes[0][1]):
+        stem_str += "a"
+    for u, base_infix in base_infixes:
+        if u.locants:
+            loc_str = ",".join(sorted(u.locants, key=parse_locant))
+            unsat_parts.append(f"-{loc_str}-{base_infix}")
+        else:
+            unsat_parts.append(base_infix)
+    return stem_str, "".join(unsat_parts)
+
+
+def _substituent_suffix_word(parts: AssemblyParts) -> str:
+    if parts.is_triple_attach:
+        return "ylidyne"
+    if parts.is_double_attach:
+        return "ylidene"
+    return "yl"
+
+
+def _always_print_substituent_locant(parts: AssemblyParts) -> bool:
+    if parts.parent_length == 1:
+        return False
+    return bool(parts.is_ring and (parts.a_prefixes or (parts.retained_name and parts.retained_name != "benzene")))
+
+
+def _format_substituent_tail(parts: AssemblyParts, stem_str: str, terminal_e: str) -> tuple[str, str, str, str]:
+    suffix_yl = _substituent_suffix_word(parts)
+    always_print_locant = _always_print_substituent_locant(parts)
+    if parts.retained_name == "benzene":
+        terminal_e = "yl"
+    elif (str(parts.attachment_locant) != "1" or parts.unsaturations or always_print_locant) and parts.parent_length > 1:
+        terminal_e = f"-{parts.attachment_locant}-{suffix_yl}"
+    else:
+        terminal_e = suffix_yl
 
     unsat_str = ""
+    if not parts.retained_name and parts.unsaturations:
+        stem_str, unsat_str = _format_unsaturations(parts, stem_str)
+    elif not parts.retained_name and not parts.unsaturations:
+        if parts.parent_length > 1 and (
+            str(parts.attachment_locant) != "1"
+            or parts.is_bicycle
+            or parts.is_spiro
+            or parts.is_polycycle
+            or always_print_locant
+        ):
+            unsat_str = "an"
+    return stem_str, unsat_str, terminal_e, ""
 
-    if parts.is_substituent:
-        if parts.is_triple_attach:
-            suffix_yl = "ylidyne"
-        elif parts.is_double_attach:
-            suffix_yl = "ylidene"
-        else:
-            suffix_yl = "yl"
 
-        always_print_locant = False
-        if parts.is_ring and (parts.a_prefixes or (parts.retained_name and parts.retained_name != "benzene")):
-            always_print_locant = True
-
-        if parts.parent_length == 1:
-            always_print_locant = False
-
-        if parts.retained_name == "benzene":
-            terminal_e = "yl"
+def _format_principal_suffix(parts: AssemblyParts, terminal_e: str, spiro_subs) -> tuple[str, str]:
+    if not parts.principal_group:
+        return terminal_e, ""
+    group = suffixes.get(parts.principal_group.key)
+    locs = sorted(parts.principal_group.locants, key=parse_locant)
+    has_spiro_subs = bool(spiro_subs)
+    omit_locant = parts.parent_length == 1
+    if not omit_locant and len(locs) == 1 and str(locs[0]) == "1":
+        if not group.suffix_with_locant:
+            omit_locant = True
         elif (
-            str(parts.attachment_locant) != "1" or parts.unsaturations or always_print_locant
-        ) and parts.parent_length > 1:
-            terminal_e = f"-{parts.attachment_locant}-{suffix_yl}"
+            parts.is_ring
+            and not parts.unsaturations
+            and not parts.is_bicycle
+            and not parts.is_spiro
+            and not parts.is_polycycle
+            and not has_spiro_subs
+            and not parts.retained_name
+        ):
+            omit_locant = True
+
+    if group.key in ACID_HALIDE_SUFFIX_KEYS:
+        if len(locs) > 1:
+            parts_suffix = group.suffix.split()
+            suffix_text = (
+                multipliers.basic(len(locs))
+                + parts_suffix[0]
+                + " "
+                + multipliers.basic(len(locs))
+                + parts_suffix[1]
+            )
         else:
-            terminal_e = suffix_yl
-
-        suffix_str = ""
-
-        if not parts.retained_name and parts.unsaturations:
-            order = {"double": 1, "triple": 2}
-            sorted_unsats = sorted(parts.unsaturations, key=lambda u: order.get(u.bond_key, 99))
-            unsat_parts =[]
-            base_infixes =[]
-            for u in sorted_unsats:
-                count = len(u.locants) or 1
-                infix = bonds.unsaturation_infix(u.bond_key, count)
-                base_infix = infix[1:] if infix.startswith("a") else infix
-                base_infixes.append((u, base_infix))
-            if base_infixes and not elision.is_vowel_start(base_infixes[0][1]):
-                stem_str += "a"
-            for u, base_infix in base_infixes:
-                if u.locants:
-                    loc_str = ",".join(sorted(u.locants, key=parse_locant))
-                    unsat_parts.append(f"-{loc_str}-{base_infix}")
-                else:
-                    unsat_parts.append(base_infix)
-            unsat_str = "".join(unsat_parts)
-
-        elif not parts.retained_name and not parts.unsaturations:
-            if parts.parent_length > 1 and (
-                str(parts.attachment_locant) != "1"
-                or parts.is_bicycle
-                or parts.is_spiro
-                or parts.is_polycycle
-                or always_print_locant
-            ):
-                unsat_str = "an"
-
+            suffix_text = group.suffix
     else:
-        if not parts.retained_name:
-            if not parts.unsaturations:
-                unsat_str = bonds.get("single").saturated_suffix
-            else:
-                order = {"double": 1, "triple": 2}
-                sorted_unsats = sorted(parts.unsaturations, key=lambda u: order.get(u.bond_key, 99))
-                unsat_parts =[]
-                base_infixes =[]
+        suffix_text = multipliers.basic(len(locs)) + group.suffix if len(locs) > 1 else group.suffix
 
-                for u in sorted_unsats:
-                    count = len(u.locants) or 1
-                    infix = bonds.unsaturation_infix(u.bond_key, count)
-                    base_infix = infix[1:] if infix.startswith("a") else infix
-                    base_infixes.append((u, base_infix))
-
-                if base_infixes and not elision.is_vowel_start(base_infixes[0][1]):
-                    stem_str += "a"
-
-                for u, base_infix in base_infixes:
-                    if u.locants:
-                        loc_str = ",".join(sorted(u.locants, key=parse_locant))
-                        unsat_parts.append(f"-{loc_str}-{base_infix}")
-                    else:
-                        unsat_parts.append(base_infix)
-
-                unsat_str = "".join(unsat_parts)
-
-        suffix_str = ""
-        if parts.principal_group:
-            group = suffixes.get(parts.principal_group.key)
-            locs = sorted(parts.principal_group.locants, key=parse_locant)
-
-            omit_locant = False
-            has_spiro_subs = bool(spiro_subs)
-            if parts.parent_length == 1:
-                omit_locant = True
-            elif len(locs) == 1 and str(locs[0]) == "1":
-                if not group.suffix_with_locant:
-                    omit_locant = True
-                elif (
-                    parts.is_ring
-                    and not parts.unsaturations
-                    and not parts.is_bicycle
-                    and not parts.is_spiro
-                    and not parts.is_polycycle
-                    and not has_spiro_subs
-                    and not parts.retained_name
-                ):
-                    omit_locant = True
-
-            if group.key in[
-                "acid_fluoride",
-                "acid_chloride",
-                "acid_bromide",
-                "acid_iodide",
-                "ring_acid_fluoride",
-                "ring_acid_chloride",
-                "ring_acid_bromide",
-                "ring_acid_iodide",
-            ]:
-                if len(locs) > 1:
-                    parts_suffix = group.suffix.split()
-                    suffix_text = (
-                        multipliers.basic(len(locs))
-                        + parts_suffix[0]
-                        + " "
-                        + multipliers.basic(len(locs))
-                        + parts_suffix[1]
-                    )
-                else:
-                    suffix_text = group.suffix
-            else:
-                suffix_text = multipliers.basic(len(locs)) + group.suffix if len(locs) > 1 else group.suffix
-
-            if elision.is_vowel_start(suffix_text):
-                terminal_e = ""
-
-            if group.suffix_with_locant and locs and not omit_locant:
-                suffix_str = f"-{','.join(map(str, locs))}-{suffix_text}"
-            else:
-                suffix_str = suffix_text
-
-    if spiro_subs:
-        core_name = stem_str + unsat_str + "e"
-        for i, (p_loc, s_loc, s_name) in enumerate(spiro_subs):
-            if "-" in s_name or re.search(r"\d", s_name):
-                s_name_str = f"({s_name})"
-            else:
-                s_name_str = s_name
-            core_name = f"spiro[{core_name}-{p_loc},{s_loc}'-{s_name_str}]"
-        
-        if terminal_e and terminal_e != "e":
-            if ("yl" in terminal_e or elision.is_vowel_start(terminal_e.lstrip("-0123456789,"))) and core_name.endswith("e"):
-                core_name = core_name[:-1]
-            core_name += terminal_e
+    if elision.is_vowel_start(suffix_text):
         terminal_e = ""
+    if group.suffix_with_locant and locs and not omit_locant:
+        return terminal_e, f"-{','.join(map(str, locs))}-{suffix_text}"
+    return terminal_e, suffix_text
+
+
+def _format_parent_tail(parts: AssemblyParts, stem_str: str, terminal_e: str, spiro_subs) -> tuple[str, str, str, str]:
+    unsat_str = ""
+    if not parts.retained_name:
+        if not parts.unsaturations:
+            unsat_str = bonds.get("single").saturated_suffix
+        else:
+            stem_str, unsat_str = _format_unsaturations(parts, stem_str)
+    terminal_e, suffix_str = _format_principal_suffix(parts, terminal_e, spiro_subs)
+    return stem_str, unsat_str, terminal_e, suffix_str
+
+
+def _format_spiro_core(stem_str: str, unsat_str: str, terminal_e: str, spiro_subs) -> tuple[str, str]:
+    if not spiro_subs:
+        return stem_str + unsat_str + terminal_e, terminal_e
+    core_name = stem_str + unsat_str + "e"
+    for p_loc, s_loc, s_name in spiro_subs:
+        if "-" in s_name or re.search(r"\d", s_name):
+            s_name_str = f"({s_name})"
+        else:
+            s_name_str = s_name
+        core_name = f"spiro[{core_name}-{p_loc},{s_loc}'-{s_name_str}]"
+
+    if terminal_e and terminal_e != "e":
+        if ("yl" in terminal_e or elision.is_vowel_start(terminal_e.lstrip("-0123456789,"))) and core_name.endswith("e"):
+            core_name = core_name[:-1]
+        core_name += terminal_e
+    return core_name, ""
+
+
+def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
+    if not parts.indicated_hydrogens:
+        return core_name
+    ih_str = ",".join(sorted(parts.indicated_hydrogens, key=parse_locant)) + "H-"
+    return ih_str + core_name
+
+
+def _add_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:
+    if not parts.stereo_features:
+        return final_word
+    unique_stereo =[]
+    seen = set()
+    for feature in parts.stereo_features:
+        if feature not in seen:
+            seen.add(feature)
+            unique_stereo.append(feature)
+    sorted_stereo = sorted(unique_stereo, key=lambda f: parse_locant(f[0]))
+    stereo_str = "(" + ",".join(f"{loc}{st}" for loc, st in sorted_stereo) + ")-"
+    return stereo_str + final_word
+
+
+def _add_front_modifiers(parts: AssemblyParts, final_word: str) -> str:
+    if not parts.front_modifiers:
+        return final_word
+    counts = {}
+    for mod in parts.front_modifiers:
+        counts[mod] = counts.get(mod, 0) + 1
+    front_words =[multipliers.basic(c) + m if c > 1 else m for m, c in sorted(counts.items())]
+    return f"{' '.join(front_words)} {final_word}"
+
+
+def assemble_name(parts: AssemblyParts) -> str:
+    spiro_subs = _split_spiro_substituents(parts)
+    prefix_str = _format_substituent_prefixes(parts, spiro_subs)
+    a_prefix_str = _format_replacement_prefixes(parts)
+    _promote_benzene_retained_name(parts)
+    stem_str, terminal_e = _parent_stem_and_terminal(parts)
+    stem_str = _apply_replacement_prefix(stem_str, a_prefix_str)
+    if parts.is_substituent:
+        stem_str, unsat_str, terminal_e, suffix_str = _format_substituent_tail(parts, stem_str, terminal_e)
     else:
-        core_name = stem_str + unsat_str + terminal_e
+        stem_str, unsat_str, terminal_e, suffix_str = _format_parent_tail(parts, stem_str, terminal_e, spiro_subs)
 
-    if parts.indicated_hydrogens:
-        ih_str = ",".join(sorted(parts.indicated_hydrogens, key=parse_locant)) + "H-"
-        core_name = ih_str + core_name
-
+    core_name, terminal_e = _format_spiro_core(stem_str, unsat_str, terminal_e, spiro_subs)
+    core_name = _add_indicated_hydrogen_prefix(parts, core_name)
     core_name += suffix_str
     final_word = (
         prefix_str + "-" + core_name if prefix_str and needs_hyphen(prefix_str, core_name) else prefix_str + core_name
     )
-
-    if parts.stereo_features:
-
-        def stereo_sort(f):
-            return parse_locant(f[0])
-
-        unique_stereo =[]
-        seen = set()
-        for f in parts.stereo_features:
-            if f not in seen:
-                seen.add(f)
-                unique_stereo.append(f)
-
-        sorted_stereo = sorted(unique_stereo, key=stereo_sort)
-        stereo_str = "(" + ",".join(f"{loc}{st}" for loc, st in sorted_stereo) + ")-"
-        final_word = stereo_str + final_word
-
-    if parts.front_modifiers:
-        counts = {}
-        for mod in parts.front_modifiers:
-            counts[mod] = counts.get(mod, 0) + 1
-        front_words =[multipliers.basic(c) + m if c > 1 else m for m, c in sorted(counts.items())]
-        final_word = f"{' '.join(front_words)} {final_word}"
-
-    final_word = _post_process_name(final_word)
-
-    return final_word
+    final_word = _add_stereo_prefix(parts, final_word)
+    final_word = _add_front_modifiers(parts, final_word)
+    return _post_process_name(final_word)

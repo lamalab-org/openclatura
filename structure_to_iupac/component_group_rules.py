@@ -10,17 +10,19 @@ from .group_atom_roles import (
     peroxy_ester_single_oxygen,
     sulfonyl_sulfur,
 )
-from .namer_config import AMIDE_LIKE_PREFIX_GROUPS, CHAIN_EXTERNAL_CARBONYL_GROUPS, ESTER_LIKE_PREFIX_GROUPS, PEROXY_ESTER_GROUPS, SULFONYL_PREFIX_GROUPS
+from .nomenclature import RULES
 from .perception import PerceivedGroup
 
 AtomSelector = Callable[[Molecule, PerceivedGroup], int | None]
 
 
 NONPARENT_ATOM_SELECTORS: dict[str, AtomSelector] = {"anhydride": bridge_oxygen}
-NONPARENT_ATOM_SELECTORS.update({key: ester_single_oxygen for key in ESTER_LIKE_PREFIX_GROUPS - PEROXY_ESTER_GROUPS})
-NONPARENT_ATOM_SELECTORS.update({key: peroxy_ester_single_oxygen for key in PEROXY_ESTER_GROUPS})
-NONPARENT_ATOM_SELECTORS.update({key: sulfonyl_sulfur for key in SULFONYL_PREFIX_GROUPS})
-NONPARENT_ATOM_SELECTORS.update({key: amide_nitrogen for key in AMIDE_LIKE_PREFIX_GROUPS})
+NONPARENT_ATOM_SELECTORS.update(
+    {key: ester_single_oxygen for key in RULES.prefixes.ester_like_groups - RULES.prefixes.peroxy_ester_groups}
+)
+NONPARENT_ATOM_SELECTORS.update({key: peroxy_ester_single_oxygen for key in RULES.prefixes.peroxy_ester_groups})
+NONPARENT_ATOM_SELECTORS.update({key: sulfonyl_sulfur for key in RULES.prefixes.sulfonyl_groups})
+NONPARENT_ATOM_SELECTORS.update({key: amide_nitrogen for key in RULES.prefixes.amide_like_groups})
 
 
 def retarget_external_carbonyl_groups(
@@ -33,7 +35,7 @@ def retarget_external_carbonyl_groups(
     """Move exocyclic carbonyl group attachment onto the parent chain atom."""
 
     for group in perceived_groups:
-        if group.key == principal_key or group.key not in CHAIN_EXTERNAL_CARBONYL_GROUPS:
+        if group.key == principal_key or group.key not in RULES.components.chain_external_carbonyl_groups:
             continue
         group_c = group.attachment_carbon
         if group_c in cyclic_atoms_all:

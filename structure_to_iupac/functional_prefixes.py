@@ -7,18 +7,7 @@ from .assembler import SubstituentItem
 from .formatting import format_counted_prefixes, oxy_prefix_from_branch
 from .group_atom_roles import amide_nitrogen, ester_or_peroxy_single_oxygen
 from .molecule import Molecule
-from .namer_config import (
-    ACID_HALIDE_PREFIXES,
-    AMIDE_LIKE_PREFIX_GROUPS,
-    AMIDE_PREFIX_BASES,
-    CARBOXY_PREFIX_GROUPS,
-    CYANO_PREFIX_GROUPS,
-    DIRECT_PREFIX_GROUPS,
-    ESTER_LIKE_PREFIX_GROUPS,
-    PEROXY_ACID_PREFIX_GROUPS,
-    PREFIX_GROUPS_TO_SKIP,
-    SULFONYL_PREFIX_GROUPS,
-)
+from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .rules import suffixes, substituents
 from .trace_helpers import bond_ids_within
@@ -62,9 +51,9 @@ def amide_prefix_from_group(
         return ""
     n_subs = [n for n in mol.get_neighbors(single_n) if n not in group.atoms_involved and mol.atoms[n].symbol != "H"]
     if not n_subs:
-        return AMIDE_PREFIX_BASES[group.key]
+        return RULES.prefixes.amide_bases[group.key]
     sub_names = [branch_namer(mol, x, sub_exclude | {single_n}, upstream_atom=single_n) for x in n_subs]
-    return f"({format_counted_prefixes(sub_names)}{AMIDE_PREFIX_BASES[group.key]})"
+    return f"({format_counted_prefixes(sub_names)}{RULES.prefixes.amide_bases[group.key]})"
 
 
 def ester_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
@@ -84,11 +73,11 @@ def static_prefix_handler(name: str) -> PrefixHandler:
 
 
 def acid_halide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
-    return ACID_HALIDE_PREFIXES[group.key]
+    return RULES.prefixes.acid_halide_prefixes[group.key]
 
 
 def direct_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
-    return DIRECT_PREFIX_GROUPS[group.key]
+    return RULES.prefixes.direct_prefixes[group.key]
 
 
 def fallback_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
@@ -98,14 +87,14 @@ def fallback_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> st
 
 
 PREFIX_HANDLERS: dict[str, PrefixHandler] = {}
-PREFIX_HANDLERS.update({key: ester_prefix_handler for key in ESTER_LIKE_PREFIX_GROUPS})
-PREFIX_HANDLERS.update({key: amide_prefix_handler for key in AMIDE_LIKE_PREFIX_GROUPS})
-PREFIX_HANDLERS.update({key: static_prefix_handler("carboxy") for key in CARBOXY_PREFIX_GROUPS})
-PREFIX_HANDLERS.update({key: static_prefix_handler("cyano") for key in CYANO_PREFIX_GROUPS})
-PREFIX_HANDLERS.update({key: acid_halide_prefix_handler for key in ACID_HALIDE_PREFIXES})
-PREFIX_HANDLERS.update({key: static_prefix_handler("carboperoxy") for key in PEROXY_ACID_PREFIX_GROUPS})
-PREFIX_HANDLERS.update({key: sulfonyl_prefix_handler for key in SULFONYL_PREFIX_GROUPS})
-PREFIX_HANDLERS.update({key: direct_prefix_handler for key in DIRECT_PREFIX_GROUPS})
+PREFIX_HANDLERS.update({key: ester_prefix_handler for key in RULES.prefixes.ester_like_groups})
+PREFIX_HANDLERS.update({key: amide_prefix_handler for key in RULES.prefixes.amide_like_groups})
+PREFIX_HANDLERS.update({key: static_prefix_handler("carboxy") for key in RULES.prefixes.carboxy_groups})
+PREFIX_HANDLERS.update({key: static_prefix_handler("cyano") for key in RULES.prefixes.cyano_groups})
+PREFIX_HANDLERS.update({key: acid_halide_prefix_handler for key in RULES.prefixes.acid_halide_prefixes})
+PREFIX_HANDLERS.update({key: static_prefix_handler("carboperoxy") for key in RULES.prefixes.peroxy_acid_groups})
+PREFIX_HANDLERS.update({key: sulfonyl_prefix_handler for key in RULES.prefixes.sulfonyl_groups})
+PREFIX_HANDLERS.update({key: direct_prefix_handler for key in RULES.prefixes.direct_prefixes})
 
 
 def prefix_from_group(context: PrefixContext, group: PerceivedGroup) -> str:
@@ -128,7 +117,7 @@ def collect_component_prefix_substituents(
     context = PrefixContext(mol=mol, parent_path=parent_path, sub_exclude=sub_exclude, branch_namer=branch_namer)
 
     for group in prefix_groups:
-        if group.key in PREFIX_GROUPS_TO_SKIP or group.attachment_carbon not in main_set:
+        if group.key in RULES.prefixes.skip_groups or group.attachment_carbon not in main_set:
             continue
 
         name = prefix_from_group(context, group)

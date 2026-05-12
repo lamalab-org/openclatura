@@ -1,7 +1,7 @@
 """Reusable atom-role selectors for perceived functional groups."""
 
 from .molecule import Molecule
-from .namer_config import PEROXY_ESTER_GROUPS
+from .nomenclature import RULES
 from .perception import PerceivedGroup
 
 
@@ -25,7 +25,7 @@ def peroxy_ester_single_oxygen(mol: Molecule, group: PerceivedGroup) -> int | No
 
 
 def ester_or_peroxy_single_oxygen(mol: Molecule, group: PerceivedGroup) -> int | None:
-    if group.key in PEROXY_ESTER_GROUPS:
+    if group.key in RULES.prefixes.peroxy_ester_groups:
         return peroxy_ester_single_oxygen(mol, group)
     return ester_single_oxygen(mol, group)
 

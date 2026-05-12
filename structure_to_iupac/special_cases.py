@@ -3,7 +3,7 @@
 from collections.abc import Callable
 
 from .molecule import Molecule
-from .namer_config import SINGLE_ATOM_ANIONS, SINGLE_ATOM_CATIONS
+from .nomenclature import RULES
 from .perception import PerceivedGroup
 
 ComponentNamer = Callable[..., str]
@@ -15,10 +15,10 @@ def single_atom_component_name(mol: Molecule, component_atoms: set[int]) -> str:
     if len(component_atoms) != 1:
         return ""
     atom = mol.atoms[list(component_atoms)[0]]
-    if atom.symbol in SINGLE_ATOM_CATIONS:
+    if atom.symbol in RULES.ions.single_atom_cations:
         return atom.element.name
-    if atom.symbol in SINGLE_ATOM_ANIONS:
-        return SINGLE_ATOM_ANIONS[atom.symbol]
+    if atom.symbol in RULES.ions.single_atom_anions:
+        return RULES.ions.single_atom_anions[atom.symbol]
     return ""
 
 
