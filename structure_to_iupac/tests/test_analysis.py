@@ -1,8 +1,9 @@
 from structure_to_iupac import TracePhase, analyze_smiles, name_smiles
 from structure_to_iupac.chains import find_all_carbon_paths, find_ring_systems
+from structure_to_iupac.functional_groups import PERCEPTION_DETECTORS, register_group_detector
 from structure_to_iupac.namer import read_smiles
 from structure_to_iupac.parent_selection import ParentSelection, select_principal_parent
-from structure_to_iupac.perception import perceive_groups
+from structure_to_iupac.perception import PerceivedGroup, perceive_groups
 
 
 def test_name_smiles_stays_plain_fast_api():
@@ -24,6 +25,23 @@ def test_functional_groups_carry_metadata_and_graph_bindings():
         "characteristic_group",
         "full_group",
     }
+
+
+def test_custom_perception_detector_extension_point():
+    def detector(mol):
+        if not mol.atoms:
+            return []
+        return [PerceivedGroup("fluoro", False, next(iter(mol.atoms)), set())]
+
+    register_group_detector(detector, prepend=True)
+    try:
+        groups = perceive_groups(read_smiles("C"))
+    finally:
+        PERCEPTION_DETECTORS.remove(detector)
+
+    custom = next(group for group in groups if group.key == "fluoro")
+    assert custom.prefix == "fluoro"
+    assert custom.metadata.source == "nomenclature.functional_groups"
 
 
 def test_analyze_smiles_exposes_decision_trace():

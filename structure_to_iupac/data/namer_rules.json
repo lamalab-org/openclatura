@@ -246,6 +246,10 @@
       "1-phenylbenzene": "1,1'-biphenyl"
     }
   },
+  "functional_groups": {
+    "bluebook_rule": "Unified functional-group metadata overrides and custom extension point. Built-ins are loaded from compatibility rule modules unless overridden here.",
+    "values": {}
+  },
   "retained_substituent_stems": {
     "bluebook_rule": "P-13.6 and retained parent substituent forms",
     "values": {
@@ -290,5 +294,49 @@
     "values": {
       "prefix_pattern": "^((?:(?:[0-9]+[a-z]*|[nospmc]'*)(?:,(?:[0-9]+[a-z]*|[nospmc]'*))*|[ezrs]+|sec|tert|t|s|d|l|m|o|p|alpha|beta|gamma))([-)]+)"
     }
+  },
+  "postprocess_literal_replacements": {
+    "bluebook_rule": "Ordered retained-name and contracted-prefix post-processing replacements",
+    "values": [
+      ["methyloxy", "methoxy"],
+      ["ethyloxy", "ethoxy"],
+      ["propyloxy", "propoxy"],
+      ["butyloxy", "butoxy"],
+      ["phenyloxy", "phenoxy"],
+      ["aminocarbonylamino", "carbamoylamino"],
+      ["aminocarbonyl", "carbamoyl"],
+      ["aminosulfonyl", "sulfamoyl"],
+      ["eth-1-en-1-yl", "ethenyl"],
+      ["eth-1-enyl", "ethenyl"],
+      ["(ethenyl)", "ethenyl"],
+      ["(benzyl)", "benzyl"],
+      ["(benzyloxy)", "benzyloxy"],
+      ["eth-1-yn-1-yl", "ethynyl"],
+      ["eth-1-ynyl", "ethynyl"],
+      ["aminoamino", "hydrazinyl"]
+    ]
+  },
+  "postprocess_regex_replacements": {
+    "bluebook_rule": "Ordered regex post-processing replacements that are safe to apply before legacy post-processing",
+    "values": [
+      {
+        "pattern": "\\b1-(formate|formamide|formic acid|formyl|formaldehyde|formonitrile)\\b",
+        "replacement": "\\1"
+      },
+      {
+        "pattern": "\\(1-(formate|formamide|formic acid|formyl|formaldehyde|formonitrile)\\)",
+        "replacement": "(\\1)"
+      }
+    ]
+  },
+  "postprocess_exact_replacements": {
+    "bluebook_rule": "Whole-name post-processing replacements",
+    "values": {
+      "methanenitrile": "hydrogen cyanide"
+    }
+  },
+  "postprocess_acyl_amido_terms": {
+    "bluebook_rule": "Acyl terms converted from amino to amido forms",
+    "values": ["benzoyl", "acetyl", "propionyl", "formyl"]
   }
 }

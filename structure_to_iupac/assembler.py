@@ -3,6 +3,7 @@
 import re
 from dataclasses import dataclass, field
 from typing import Optional
+from .name_postprocessing import apply_acyl_amido_postprocessing, apply_data_postprocessing
 from .nomenclature import RULES
 from .rules import bonds, elision, multipliers, stems, suffixes
 
@@ -101,6 +102,7 @@ def is_fully_enclosed(s: str) -> bool:
 
 
 def _post_process_name(name: str) -> str:
+    name = apply_data_postprocessing(name)
     name = re.sub(r"(?<![a-zA-Z0-9])1-azacyclopent-2-ene(?![a-zA-Z])", "4,5-dihydro-1H-pyrrole", name)
     name = re.sub(r"(?<![a-zA-Z0-9])1-azacyclopent-3-ene(?![a-zA-Z])", "2,5-dihydro-1H-pyrrole", name)
     name = re.sub(
@@ -120,22 +122,6 @@ def _post_process_name(name: str) -> str:
         name,
     )
 
-    name = name.replace("methyloxy", "methoxy")
-    name = name.replace("ethyloxy", "ethoxy")
-    name = name.replace("propyloxy", "propoxy")
-    name = name.replace("butyloxy", "butoxy")
-    name = name.replace("phenyloxy", "phenoxy")
-
-    name = name.replace("aminocarbonylamino", "carbamoylamino")
-    name = name.replace("aminocarbonyl", "carbamoyl")
-    name = name.replace("aminosulfonyl", "sulfamoyl")
-
-    name = name.replace("eth-1-en-1-yl", "ethenyl")
-    name = name.replace("eth-1-enyl", "ethenyl")
-    name = name.replace("(ethenyl)", "ethenyl")
-
-    name = re.sub(r"\b1-(formate|formamide|formic acid|formyl|formaldehyde|formonitrile)\b", r"\1", name)
-    name = re.sub(r"\(1-(formate|formamide|formic acid|formyl|formaldehyde|formonitrile)\)", r"(\1)", name)
     name = re.sub(r"-1-formate\b", "-formate", name)
     name = re.sub(r"\bmethyl 1-\(", "methyl (", name)
     name = re.sub(r"\b(\S+yl) 1-\(", r"\1 (", name)
@@ -300,8 +286,7 @@ def _post_process_name(name: str) -> str:
                 name = re.sub(rf"-{re.escape(old)}(?![a-zA-Z])", new, name)
             name = re.sub(rf"(?<![a-zA-Z]){re.escape(old)}(?![a-zA-Z])", new, name)
 
-    if name.strip() == "methanenitrile":
-        name = "hydrogen cyanide"
+    name = apply_data_postprocessing(name)
 
     name = re.sub(r"(?<!m)ethanoic acid\b", "acetic acid", name)
     name = re.sub(r"(?<!m)ethanamide\b", "acetamide", name)
@@ -309,9 +294,7 @@ def _post_process_name(name: str) -> str:
     name = re.sub(r"(?<!m)ethanoate\b", "acetate", name)
     name = re.sub(r"(?<!m)ethanoyl\b", "acetyl", name)
 
-    for acyl in ["benzoyl", "acetyl", "propionyl", "formyl"]:
-        name = re.sub(rf"(?<!\))(?<!\])\b\(([^()]*{acyl})\)amino\b", rf"\1amido", name)
-        name = re.sub(rf"(?<!\))(?<!\])\b([^()]*{acyl})amino\b", rf"\1amido", name)
+    name = apply_acyl_amido_postprocessing(name)
 
     name = re.sub(r"\b1-methanethiol\b", "methanethiol", name)
     name = re.sub(r"-1-methanethiol\b", "methanethiol", name)
@@ -328,11 +311,7 @@ def _post_process_name(name: str) -> str:
     name = name.replace("one-diyl", "on-diyl")
     name = name.replace("one-yl", "on-yl")
 
-    name = name.replace("(benzyl)", "benzyl")
-    name = name.replace("(benzyloxy)", "benzyloxy")
-
-    name = name.replace("eth-1-yn-1-yl", "ethynyl")
-    name = name.replace("eth-1-ynyl", "ethynyl")
+    name = apply_data_postprocessing(name)
 
     name = name.replace("methan-1-one hydrazone", "formaldehyde hydrazone")
     name = name.replace("methanone hydrazone", "formaldehyde hydrazone")
@@ -352,7 +331,7 @@ def _post_process_name(name: str) -> str:
     name = re.sub(r"yne-(\d+(?:,\d+)*)-hydrazine\b", r"yn-\1-ylhydrazine", name)
     
     name = re.sub(r"\b(amino|imino)\(", r"(\1)(", name)
-    name = name.replace("aminoamino", "hydrazinyl")
+    name = apply_data_postprocessing(name)
 
     return name
 

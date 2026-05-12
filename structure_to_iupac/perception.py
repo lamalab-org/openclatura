@@ -3,8 +3,8 @@
 from dataclasses import dataclass, field
 
 from .chains import get_cyclic_atoms
+from .functional_groups import PERCEPTION_DETECTORS, metadata_for_group, register_group_detector
 from .molecule import AtomBinding, BondBinding, FunctionalGroupMetadata, Molecule
-from .rules import substituents, suffixes
 
 @dataclass
 class PerceivedGroup:
@@ -51,6 +51,14 @@ class PerceivedGroup:
 
 
 def perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
+    groups = []
+    for detector in PERCEPTION_DETECTORS:
+        groups.extend(detector(mol))
+    groups.extend(_builtin_perceive_groups(mol))
+    return _enrich_groups(mol, groups)
+
+
+def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
     groups =[]
     consumed = set()
     cyclic_atoms = get_cyclic_atoms(mol)
@@ -414,7 +422,7 @@ def perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                     groups.append(PerceivedGroup(halogen_map[atom.symbol], False, adj_atoms[0], {atom.idx}))
                     consumed.add(atom.idx)
 
-    return _enrich_groups(mol, groups)
+    return groups
 
 
 def _enrich_groups(mol: Molecule, groups: list[PerceivedGroup]) -> list[PerceivedGroup]:
@@ -433,27 +441,7 @@ def _enrich_groups(mol: Molecule, groups: list[PerceivedGroup]) -> list[Perceive
 def _metadata_for_group(key: str) -> FunctionalGroupMetadata:
     """Return naming metadata for a perceived group from rule tables."""
 
-    if key in suffixes.GROUPS:
-        rule = suffixes.get(key)
-        return FunctionalGroupMetadata(
-            prefix=rule.prefix,
-            suffix=rule.suffix,
-            multi_suffix=rule.multi_suffix,
-            seniority=rule.seniority,
-            suffix_with_locant=rule.suffix_with_locant,
-            source="rules.suffixes",
-        )
-    if key in substituents.SUBSTITUENTS:
-        rule = substituents.get(key)
-        return FunctionalGroupMetadata(
-            prefix=rule.prefix,
-            suffix=None,
-            multi_suffix=None,
-            seniority=None,
-            suffix_with_locant=False,
-            source="rules.substituents",
-        )
-    return FunctionalGroupMetadata(source="perception")
+    return metadata_for_group(key)
 
 
 def _atom_bindings_for_group(group: PerceivedGroup) -> tuple[AtomBinding, ...]:

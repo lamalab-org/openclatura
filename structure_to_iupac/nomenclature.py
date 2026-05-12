@@ -68,6 +68,41 @@ class AssemblyRules:
 
 
 @dataclass(frozen=True)
+class RegexReplacement:
+    pattern: str
+    replacement: str
+
+
+@dataclass(frozen=True)
+class PostprocessRules:
+    literal_replacements: tuple[tuple[str, str], ...]
+    regex_replacements: tuple[RegexReplacement, ...]
+    exact_replacements: dict[str, str]
+    acyl_amido_terms: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class FunctionalGroupRule:
+    key: str
+    role: str
+    prefix: str | None = None
+    suffix: str | None = None
+    multi_suffix: str | None = None
+    seniority: int | None = None
+    suffix_with_locant: bool = False
+    needs_locant: bool = True
+    perception_handler: str | None = None
+    prefix_handler: str | None = None
+    component_flags: tuple[str, ...] = ()
+    postprocess_tags: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class FunctionalGroupRules:
+    by_key: dict[str, FunctionalGroupRule]
+
+
+@dataclass(frozen=True)
 class NomenclatureRegistry:
     retained: RetainedNameRules
     heteroatoms: HeteroatomRules
@@ -75,10 +110,64 @@ class NomenclatureRegistry:
     components: ComponentRules
     ions: IonRules
     assembly: AssemblyRules
+    functional_groups: FunctionalGroupRules
+    postprocess: PostprocessRules
 
 
 def _tuple_mapping(section: str) -> dict[str, tuple[str, str]]:
     return {key: tuple(value) for key, value in mapping(section).items()}
+
+
+def _functional_group_rules() -> FunctionalGroupRules:
+    groups = {}
+    from .rules import substituents, suffixes
+
+    for key, rule in suffixes.GROUPS.items():
+        groups[key] = FunctionalGroupRule(
+            key=key,
+            role="principal",
+            prefix=rule.prefix,
+            suffix=rule.suffix,
+            multi_suffix=rule.multi_suffix,
+            seniority=rule.seniority,
+            suffix_with_locant=rule.suffix_with_locant,
+            needs_locant=True,
+        )
+    for key, rule in substituents.SUBSTITUENTS.items():
+        groups[key] = FunctionalGroupRule(
+            key=key,
+            role="prefix",
+            prefix=rule.prefix,
+            needs_locant=rule.needs_locant,
+        )
+    for key, item in mapping("functional_groups").items():
+        groups[key] = FunctionalGroupRule(
+            key=key,
+            role=item["role"],
+            prefix=item.get("prefix"),
+            suffix=item.get("suffix"),
+            multi_suffix=item.get("multi_suffix"),
+            seniority=item.get("seniority"),
+            suffix_with_locant=bool(item.get("suffix_with_locant", False)),
+            needs_locant=bool(item.get("needs_locant", True)),
+            perception_handler=item.get("perception_handler"),
+            prefix_handler=item.get("prefix_handler"),
+            component_flags=tuple(item.get("component_flags", [])),
+            postprocess_tags=tuple(item.get("postprocess_tags", [])),
+        )
+    return FunctionalGroupRules(by_key=groups)
+
+
+def _postprocess_rules() -> PostprocessRules:
+    return PostprocessRules(
+        literal_replacements=tuple(tuple(item) for item in values("postprocess_literal_replacements")),
+        regex_replacements=tuple(
+            RegexReplacement(pattern=item["pattern"], replacement=item["replacement"])
+            for item in values("postprocess_regex_replacements")
+        ),
+        exact_replacements=mapping("postprocess_exact_replacements"),
+        acyl_amido_terms=tuple(values("postprocess_acyl_amido_terms")),
+    )
 
 
 @lru_cache(maxsize=1)
@@ -130,6 +219,8 @@ def registry() -> NomenclatureRegistry:
             acid_halide_suffix_keys=set(values("acid_halide_suffix_keys")),
             substituent_sort_prefix_pattern=mapping("substituent_sort")["prefix_pattern"],
         ),
+        functional_groups=_functional_group_rules(),
+        postprocess=_postprocess_rules(),
     )
 
 
