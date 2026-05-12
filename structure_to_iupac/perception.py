@@ -1,15 +1,54 @@
 # structure-to-iupac/perception.py
 
-from dataclasses import dataclass
-from .molecule import Molecule
+from dataclasses import dataclass, field
+
 from .chains import get_cyclic_atoms
+from .molecule import AtomBinding, BondBinding, FunctionalGroupMetadata, Molecule
+from .rules import substituents, suffixes
 
 @dataclass
 class PerceivedGroup:
+    """Functional-group perception result bound to graph atoms and metadata.
+
+    The first four fields are the legacy contract used throughout namer.py.
+    The remaining fields make the object self-describing: rule metadata,
+    atom-role bindings, bond-role bindings, and short reasons explaining why
+    the detector emitted the group.
+    """
+
     key: str
     is_principal_candidate: bool
     attachment_carbon: int
     atoms_involved: set[int]
+    metadata: FunctionalGroupMetadata = field(default_factory=FunctionalGroupMetadata)
+    atom_bindings: tuple[AtomBinding, ...] = ()
+    bond_bindings: tuple[BondBinding, ...] = ()
+    decision_reasons: tuple[str, ...] = ()
+
+    @property
+    def atom_ids(self) -> set[int]:
+        """Return all atoms represented by this group, including attachment."""
+
+        return set(self.atoms_involved) | {self.attachment_carbon}
+
+    @property
+    def bond_ids(self) -> set[int]:
+        """Return all graph bonds bound to this group."""
+
+        return {bond_id for binding in self.bond_bindings for bond_id in binding.bond_ids}
+
+    @property
+    def prefix(self) -> str | None:
+        return self.metadata.prefix
+
+    @property
+    def suffix(self) -> str | None:
+        return self.metadata.suffix
+
+    @property
+    def seniority(self) -> int | None:
+        return self.metadata.seniority
+
 
 def perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
     groups =[]
@@ -375,4 +414,83 @@ def perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                     groups.append(PerceivedGroup(halogen_map[atom.symbol], False, adj_atoms[0], {atom.idx}))
                     consumed.add(atom.idx)
 
+    return _enrich_groups(mol, groups)
+
+
+def _enrich_groups(mol: Molecule, groups: list[PerceivedGroup]) -> list[PerceivedGroup]:
+    """Attach metadata and graph bindings to perceived groups."""
+
+    for group in groups:
+        group.metadata = _metadata_for_group(group.key)
+        group.atom_bindings = _atom_bindings_for_group(group)
+        group.bond_bindings = _bond_bindings_for_group(mol, group)
+        group.decision_reasons = (
+            f"Matched {group.key.replace('_', ' ')} pattern near atom {group.attachment_carbon}.",
+        )
     return groups
+
+
+def _metadata_for_group(key: str) -> FunctionalGroupMetadata:
+    """Return naming metadata for a perceived group from rule tables."""
+
+    if key in suffixes.GROUPS:
+        rule = suffixes.get(key)
+        return FunctionalGroupMetadata(
+            prefix=rule.prefix,
+            suffix=rule.suffix,
+            multi_suffix=rule.multi_suffix,
+            seniority=rule.seniority,
+            suffix_with_locant=rule.suffix_with_locant,
+            source="rules.suffixes",
+        )
+    if key in substituents.SUBSTITUENTS:
+        rule = substituents.get(key)
+        return FunctionalGroupMetadata(
+            prefix=rule.prefix,
+            suffix=None,
+            multi_suffix=None,
+            seniority=None,
+            suffix_with_locant=False,
+            source="rules.substituents",
+        )
+    return FunctionalGroupMetadata(source="perception")
+
+
+def _atom_bindings_for_group(group: PerceivedGroup) -> tuple[AtomBinding, ...]:
+    """Return role-labelled atom bindings for a group."""
+
+    characteristic_atoms = tuple(sorted(group.atoms_involved))
+    attachment_atoms = (group.attachment_carbon,)
+    return (
+        AtomBinding("attachment", attachment_atoms),
+        AtomBinding("characteristic_group", characteristic_atoms),
+        AtomBinding("full_group", tuple(sorted(group.atom_ids))),
+    )
+
+
+def _bond_bindings_for_group(mol: Molecule, group: PerceivedGroup) -> tuple[BondBinding, ...]:
+    """Return role-labelled bond bindings for a group."""
+
+    characteristic_atoms = set(group.atoms_involved)
+    full_atoms = group.atom_ids
+    characteristic_bonds = _bond_ids_within(mol, characteristic_atoms)
+    full_bonds = _bond_ids_within(mol, full_atoms)
+    attachment_bonds = full_bonds - characteristic_bonds
+    return (
+        BondBinding("characteristic_group", tuple(sorted(characteristic_bonds))),
+        BondBinding("attachment", tuple(sorted(attachment_bonds))),
+        BondBinding("full_group", tuple(sorted(full_bonds))),
+    )
+
+
+def _bond_ids_within(mol: Molecule, atom_ids: set[int]) -> set[int]:
+    """Return IDs for bonds whose endpoints are both in atom_ids."""
+
+    bond_ids = set()
+    for atom_idx in atom_ids:
+        for neighbor_idx in mol.get_neighbors(atom_idx):
+            if neighbor_idx in atom_ids and atom_idx < neighbor_idx:
+                bond = mol.get_bond(atom_idx, neighbor_idx)
+                if bond is not None:
+                    bond_ids.add(bond.idx)
+    return bond_ids

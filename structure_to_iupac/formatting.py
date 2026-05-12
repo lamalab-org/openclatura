@@ -1,0 +1,85 @@
+"""Name-fragment formatting helpers used by the naming pipeline."""
+
+from .namer_config import ALKYL_OXY_PREFIXES
+from .rules import multipliers
+
+
+def is_fully_enclosed(s: str) -> bool:
+    """Return true when a name fragment is already fully parenthesized."""
+
+    if not s.startswith("(") or not s.endswith(")"):
+        return False
+    depth = 0
+    for i, c in enumerate(s):
+        if c == "(":
+            depth += 1
+        elif c == ")":
+            depth -= 1
+        if depth == 0 and i < len(s) - 1:
+            return False
+    return depth == 0
+
+
+def strip_outer_parentheses(name: str) -> str:
+    """Remove one balanced outer parenthesis pair from a fragment."""
+
+    if name.startswith("(") and name.endswith(")"):
+        return name[1:-1]
+    return name
+
+
+def is_complex_prefix(name: str) -> bool:
+    """Return true when a substituent prefix needs protective parentheses."""
+
+    return "(" in name or name[0].isdigit() or "-" in name or " " in name
+
+
+def format_multiplier(name: str, count: int, safe_enclose: bool = False) -> str:
+    """Apply simple or complex multiplicative prefixes to a substituent name."""
+
+    is_complex = is_complex_prefix(name)
+    if count == 1:
+        if (safe_enclose or is_complex) and not is_fully_enclosed(name):
+            return f"({name})"
+        return name
+    mult = multipliers.complex_(count) if is_complex else multipliers.basic(count)
+    if is_complex and not is_fully_enclosed(name):
+        return f"{mult}({name})"
+    return f"{mult}{name}"
+
+
+def count_names(names: list[str]) -> dict[str, int]:
+    """Count repeated substituent fragments before multiplier formatting."""
+
+    counts = {}
+    for name in names:
+        counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
+def format_counted_prefixes(names: list[str]) -> str:
+    """Format repeated substituent fragments with correct multipliers."""
+
+    counts = count_names(names)
+    safe = len(counts) > 1 or any(is_complex_prefix(name) for name in counts)
+    return "".join(format_multiplier(name, count, safe_enclose=safe) for name, count in sorted(counts.items()))
+
+
+def oxy_prefix_from_branch(branch: str) -> str:
+    """Return an oxy prefix for a named branch."""
+
+    retained = ALKYL_OXY_PREFIXES.get(branch)
+    if retained:
+        return retained
+    branch = strip_outer_parentheses(branch)
+    return f"({branch}oxy)"
+
+
+def format_element_substituent(stereo_prefix: str, branch: str, suffix: str, is_double: bool = False) -> str:
+    """Attach a named branch to an element substituent suffix."""
+
+    branch = strip_outer_parentheses(branch)
+    suffix_text = suffix + ("idene" if is_double else "")
+    if is_complex_prefix(branch):
+        return f"({stereo_prefix}({branch}){suffix_text})"
+    return f"({stereo_prefix}{branch}{suffix_text})"

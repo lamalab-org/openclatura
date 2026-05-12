@@ -1,1129 +1,61 @@
 # structure-to-iupac/api.py
 
 import re
-from rdkit import Chem
-from .molecule import Molecule
+
+from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
+from .naming_context import ComponentNamingState
 from .perception import perceive_groups, PerceivedGroup
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
 from .parent_selection import select_principal_parent
-from .assembler import assemble_name, AssemblyParts, PrincipalGroupItem, SubstituentItem, UnsaturationItem
-from .rules import bonds, suffixes, substituents, stems, retained, multipliers
-from .naming_data import mapping, values
-
-
-INDICATED_H_RETAINED_NAMES = set(values("indicated_hydrogen_retained_names"))
-ALKYL_OXY_PREFIXES = mapping("alkyl_oxy_prefixes")
-SIMPLE_SULFANYL_PREFIXES = set(values("simple_sulfanyl_prefixes"))
-SIMPLE_SELANYL_PREFIXES = set(values("simple_selanyl_prefixes"))
-HALOGEN_PREFIXES = mapping("halogen_prefixes")
-HALOGEN_LAMBDA_SUFFIXES = mapping("halogen_lambda_suffixes")
-RETAINED_RING_ELEMENTS = set(values("retained_ring_elements"))
-DIRECT_GROUP_PREFIXES = mapping("direct_group_prefixes")
-CHAIN_EXTERNAL_CARBONYL_GROUPS = set(values("chain_external_carbonyl_groups"))
-PREFIX_GROUPS_TO_SKIP = set(values("prefix_groups_to_skip"))
-ESTER_LIKE_PREFIX_GROUPS = set(values("ester_like_prefix_groups"))
-PEROXY_ESTER_GROUPS = set(values("peroxy_ester_groups"))
-AMIDE_LIKE_PREFIX_GROUPS = set(values("amide_like_prefix_groups"))
-AMIDE_PREFIX_BASES = mapping("amide_prefix_bases")
-CARBOXY_PREFIX_GROUPS = set(values("carboxy_prefix_groups"))
-CYANO_PREFIX_GROUPS = set(values("cyano_prefix_groups"))
-ACID_HALIDE_PREFIXES = mapping("acid_halide_prefixes")
-PEROXY_ACID_PREFIX_GROUPS = set(values("peroxy_acid_prefix_groups"))
-SULFONYL_PREFIX_GROUPS = set(values("sulfonyl_prefix_groups"))
-DIRECT_PREFIX_GROUPS = mapping("direct_prefix_groups")
-FRONT_MODIFIER_PRINCIPAL_GROUPS = set(values("front_modifier_principal_groups"))
-N_SUBSTITUENT_PRINCIPAL_GROUPS = set(values("n_substituent_principal_groups"))
-HYDRAZONE_PRINCIPAL_GROUPS = set(values("hydrazone_principal_groups"))
-SPECIAL_COMPONENT_NAMES = mapping("special_component_names")
-SINGLE_ATOM_CATIONS = set(values("single_atom_cations"))
-SINGLE_ATOM_ANIONS = mapping("single_atom_anions")
-SALT_METAL_NAMES = set(values("salt_metal_names"))
-
-
-def parse_locant(l):
-    """Return a sortable representation of a locant string.
-
-    Blue Book references: P-14.3 and P-14.4 for locants and ordering of
-    locant sets.
-    """
-
-    s = str(l)
-    match = re.match(r"^(\d+)([a-zA-Z]*)$", s.split("(")[0])
-    if match:
-        return (1, float(match.group(1)), match.group(2))
-    if any(c.isdigit() for c in s):
-        nums = re.findall(r"\d+", s)
-        return (1, float(nums[0]) if nums else 0.0, s)
-    return (2, 0.0, s)
-
-
-def is_fully_enclosed(s: str) -> bool:
-    """Return true when a name fragment is already fully parenthesized.
-
-    Blue Book references: P-16.5 for enclosing complex prefixes in parentheses.
-    """
-
-    if not s.startswith("(") or not s.endswith(")"):
-        return False
-    depth = 0
-    for i, c in enumerate(s):
-        if c == "(":
-            depth += 1
-        elif c == ")":
-            depth -= 1
-        if depth == 0 and i < len(s) - 1:
-            return False
-    return depth == 0
-
-
-def _bond_ids_within(mol: Molecule, atom_ids: set[int]) -> set[int]:
-    """Return bond IDs whose endpoints are both in ``atom_ids``.
-
-    Blue Book references: P-14.3 and P-44; this trace helper links assembled
-    parent and substituent name fragments back to the structural atoms used for
-    numbering and parent selection.
-    """
-
-    bond_ids = set()
-    for atom_idx in atom_ids:
-        for neighbor_idx in mol.get_neighbors(atom_idx):
-            if neighbor_idx in atom_ids and atom_idx < neighbor_idx:
-                bond = mol.get_bond(atom_idx, neighbor_idx)
-                if bond:
-                    bond_ids.add(bond.idx)
-    return bond_ids
-
-
-def _add_substituent_trace(parts: AssemblyParts, name: str, locant: str, atom_ids=None, bond_ids=None, trace_segments=None) -> None:
-    """Append or merge a substituent while preserving trace atom/bond IDs.
-
-    Blue Book references: P-14.2, P-16.5, and P-61; repeated detachable
-    prefixes are grouped by name but retain all source atoms.
-    """
-
-    atom_ids = set(atom_ids or ())
-    bond_ids = set(bond_ids or ())
-    trace_segments = list(trace_segments or ())
-    existing = next((s for s in parts.substituents if s.name == name), None)
-    if existing:
-        existing.locants.append(locant)
-        existing.atom_ids.update(atom_ids)
-        existing.bond_ids.update(bond_ids)
-        existing.trace_segments.extend(trace_segments)
-    else:
-        parts.substituents.append(
-            SubstituentItem(
-                name=name,
-                locants=[locant],
-                atom_ids=atom_ids,
-                bond_ids=bond_ids,
-                trace_segments=trace_segments,
-            )
-        )
-
-
-def _multiplied_name_terms(name: str, count: int) -> list[str]:
-    """Return possible assembled text terms for repeated name fragments.
-
-    Blue Book references: P-13.4 and P-14.2 for multiplicative prefixes in
-    assembled names.
-    """
-
-    clean = _strip_outer_parentheses(name)
-    terms = [clean]
-    if count > 1:
-        is_complex = "(" in clean or clean[:1].isdigit() or "-" in clean or " " in clean
-        mult = multipliers.complex_(count) if is_complex else multipliers.basic(count)
-        terms.insert(0, mult + clean)
-    return terms
-
-
-def _assembly_parent_terms(parts: AssemblyParts) -> list[str]:
-    """Return parent-name terms from the actual assembly configuration."""
-
-    if parts.retained_name:
-        return [parts.retained_name, parts.retained_name[:-1] if parts.retained_name.endswith("e") else parts.retained_name]
-
-    stem = stems.stem_for(parts.parent_length)
-    terms = [stem]
-    if parts.is_bicycle:
-        terms.insert(0, f"bicyclo[{parts.bicycle_xyz[0]}.{parts.bicycle_xyz[1]}.{parts.bicycle_xyz[2]}]{stem}")
-        terms.append("bicyclo")
-    elif parts.is_spiro:
-        terms.insert(0, f"spiro[{parts.spiro_xy[0]}.{parts.spiro_xy[1]}]{stem}")
-        terms.append("spiro")
-    elif parts.is_polycycle and parts.polycycle_descriptor:
-        terms.insert(0, parts.polycycle_descriptor + stem)
-    elif parts.is_ring:
-        terms.insert(0, "cyclo" + stem)
-    return terms
-
-
-def _assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
-    """Convert populated AssemblyParts metadata into visualizer annotations.
-
-    Blue Book references: P-14 for locants, P-31 for unsaturation, P-44/P-45
-    for parent structures, P-51/P-52 for replacement prefixes, and P-61-P-67
-    for detachable prefixes and characteristic-group suffixes.
-    """
-
-    segments = []
-    if parts.substituents:
-        grouped: dict[str, SubstituentItem] = {}
-        for item in parts.substituents:
-            target = grouped.setdefault(
-                item.name,
-                SubstituentItem(name=item.name, locants=[], atom_ids=set(), bond_ids=set()),
-            )
-            target.locants.extend(item.locants)
-            target.atom_ids.update(item.atom_ids)
-            target.bond_ids.update(item.bond_ids)
-            target.trace_segments.extend(item.trace_segments)
-        for item in grouped.values():
-            if item.trace_segments and _strip_outer_parentheses(item.name) != "methyl":
-                segments.extend(item.trace_segments)
-                continue
-            segments.append(
-                {
-                    "key": f"substituent:{item.name}",
-                    "label": f"{_strip_outer_parentheses(item.name)} substituent",
-                    "atoms": sorted(item.atom_ids),
-                    "bonds": sorted(item.bond_ids),
-                    "name_terms": _multiplied_name_terms(item.name, max(1, len(item.locants))),
-                    "rule_hint": "Detachable prefixes: Blue Book P-14.2, P-16.5, and P-61.",
-                }
-            )
-
-    if parts.a_prefixes:
-        grouped_a: dict[str, SubstituentItem] = {}
-        for item in parts.a_prefixes:
-            target = grouped_a.setdefault(
-                item.name,
-                SubstituentItem(name=item.name, locants=[], atom_ids=set(), bond_ids=set()),
-            )
-            target.locants.extend(item.locants)
-            target.atom_ids.update(item.atom_ids)
-            target.bond_ids.update(item.bond_ids)
-        for item in grouped_a.values():
-            segments.append(
-                {
-                    "key": f"replacement:{item.name}",
-                    "label": f"{item.name} replacement",
-                    "atoms": sorted(item.atom_ids),
-                    "bonds": sorted(item.bond_ids),
-                    "name_terms": _multiplied_name_terms(item.name, max(1, len(item.locants))),
-                    "rule_hint": "Replacement prefixes in parent structures: Blue Book P-51 and P-52.",
-                }
-            )
-
-    for item in parts.unsaturations:
-        count = max(1, len(item.locants))
-        try:
-            infix = bonds.unsaturation_infix(item.bond_key, count)
-        except KeyError:
-            infix = bonds.get(item.bond_key).suffix
-        base_infix = infix[1:] if infix.startswith("a") else infix
-        segments.append(
-            {
-                "key": f"unsaturation:{item.bond_key}",
-                "label": f"{item.bond_key} bonds",
-                "atoms": sorted(item.atom_ids),
-                "bonds": sorted(item.bond_ids),
-                "name_terms": [base_infix, bonds.get(item.bond_key).suffix],
-                "rule_hint": "Unsaturation infixes: Blue Book P-31.1 and P-44.",
-            }
-        )
-
-    simple_methyl_substituent = (
-        parts.is_substituent
-        and parts.parent_length == 1
-        and not parts.substituents
-        and not parts.a_prefixes
-        and not parts.unsaturations
-        and not parts.principal_group
-    )
-    if parts.parent_atom_ids and simple_methyl_substituent:
-        segments.append(
-            {
-                "key": "substituent:methyl",
-                "label": "methyl substituent",
-                "atoms": sorted(parts.parent_atom_ids),
-                "bonds": sorted(parts.parent_bond_ids),
-                "name_terms": ["methyl"],
-                "rule_hint": "Detachable hydrocarbon prefixes: Blue Book P-29 and P-61.",
-            }
-        )
-    elif parts.parent_atom_ids:
-        segments.append(
-            {
-                "key": "parent",
-                "label": "parent skeleton",
-                "atoms": sorted(parts.parent_atom_ids),
-                "bonds": sorted(parts.parent_bond_ids),
-                "name_terms": _assembly_parent_terms(parts),
-                "rule_hint": "Parent hydride / parent structure: Blue Book P-44 and P-45.",
-            }
-        )
-
-    if parts.principal_group:
-        group = suffixes.get(parts.principal_group.key)
-        terms = [group.suffix]
-        if group.multi_suffix:
-            terms.insert(0, group.multi_suffix)
-        if group.prefix:
-            terms.append(group.prefix)
-        segments.append(
-            {
-                "key": f"principal:{parts.principal_group.key}",
-                "label": parts.principal_group.key.replace("_", " "),
-                "atoms": sorted(parts.principal_group.atom_ids),
-                "bonds": sorted(parts.principal_group.bond_ids),
-                "name_terms": terms,
-                "rule_hint": "Principal characteristic groups: Blue Book P-41, P-44, and P-61-P-67.",
-            }
-        )
-    return segments
-
-
-def _format_multiplier(name: str, count: int, safe_enclose: bool = False) -> str:
-    """Apply simple or complex multiplicative prefixes to a substituent name.
-
-    Blue Book references: P-14.2 and P-16.5 for multiplicative prefixes and
-    parenthesized complex substituent prefixes.
-    """
-
-    is_complex = "(" in name or name[0].isdigit() or "-" in name or " " in name
-    if count == 1:
-        if (safe_enclose or is_complex) and not is_fully_enclosed(name):
-            return f"({name})"
-        return name
-    mult = multipliers.complex_(count) if is_complex else multipliers.basic(count)
-    if is_complex and not is_fully_enclosed(name):
-        return f"{mult}({name})"
-    return f"{mult}{name}"
-
-
-def _strip_outer_parentheses(name: str) -> str:
-    """Remove one balanced outer parenthesis pair from a fragment.
-
-    Blue Book references: P-16.5; this keeps complex prefixes enclosed only
-    when the final assembly context requires it.
-    """
-
-    if name.startswith("(") and name.endswith(")"):
-        return name[1:-1]
-    return name
-
-
-def _is_complex_prefix(name: str) -> bool:
-    """Return true when a substituent prefix needs protective parentheses.
-
-    Blue Book references: P-16.5 for complex substituent prefix enclosure.
-    """
-
-    return "(" in name or name[0].isdigit() or "-" in name or " " in name
-
-
-def _count_names(names: list[str]) -> dict[str, int]:
-    """Count repeated substituent fragments before multiplier formatting.
-
-    Blue Book references: P-14.2 for multiplicative prefixes.
-    """
-
-    counts = {}
-    for name in names:
-        counts[name] = counts.get(name, 0) + 1
-    return counts
-
-
-def _format_counted_prefixes(names: list[str]) -> str:
-    """Format repeated substituent fragments with correct multipliers.
-
-    Blue Book references: P-14.2 and P-16.5 for simple versus complex
-    multiplicative prefixes.
-    """
-
-    counts = _count_names(names)
-    safe = len(counts) > 1 or any(_is_complex_prefix(name) for name in counts)
-    return "".join(_format_multiplier(name, count, safe_enclose=safe) for name, count in sorted(counts.items()))
-
-
-def _oxy_prefix_from_branch(branch: str) -> str:
-    """Return an oxy prefix for a named branch.
-
-    Blue Book references: P-61.2.2.1; extend simple retained forms in
-    ``alkyl_oxy_prefixes`` in ``data/namer_rules.json``.
-    """
-
-    retained = ALKYL_OXY_PREFIXES.get(branch)
-    if retained:
-        return retained
-    branch = _strip_outer_parentheses(branch)
-    return f"({branch}oxy)"
-
-
-def _format_element_substituent(stereo_prefix: str, branch: str, suffix: str, is_double: bool = False) -> str:
-    """Attach a named branch to an element substituent suffix.
-
-    Blue Book references: P-61.2 and P-14.5 for chalcogen and heteroatom
-    substituent prefixes with lambda/hydride-derived suffixes.
-    """
-
-    branch = _strip_outer_parentheses(branch)
-    suffix_text = suffix + ("idene" if is_double else "")
-    if _is_complex_prefix(branch):
-        return f"({stereo_prefix}({branch}){suffix_text})"
-    return f"({stereo_prefix}{branch}{suffix_text})"
-
-
-def _get_atom_locants(oriented_path: list[int], target_indices: set[int]) -> list[int]:
-    """Return numeric locants for target atoms in an oriented parent path.
-
-    Blue Book references: P-14.3 and P-44.1 for assigning locants to parent
-    atoms and characteristic groups.
-    """
-
-    return sorted([i + 1 for i, atom_idx in enumerate(oriented_path) if atom_idx in target_indices])
-
-
-def _get_bond_locants(
-    mol: Molecule, oriented_path: list[int], is_bicycle: bool, is_spiro: bool, is_polycycle: bool
-) -> tuple[list[int], list[int]]:
-    """Return double- and triple-bond locants for an oriented parent path.
-
-    Blue Book references: P-31.1 and P-44.1 for unsaturation locants in parent
-    hydrides.
-    """
-
-    db_locants =[]
-    tb_locants =[]
-    seen_bonds = set()
-    for u in oriented_path:
-        for v in mol.get_neighbors(u):
-            if v in oriented_path:
-                bond = mol.get_bond(u, v)
-                if bond and bond.order > 1 and bond.idx not in seen_bonds:
-                    seen_bonds.add(bond.idx)
-                    loc_u = oriented_path.index(u) + 1
-                    loc_v = oriented_path.index(v) + 1
-                    min_loc, max_loc = min(loc_u, loc_v), max(loc_u, loc_v)
-
-                    if max_loc == min_loc + 1:
-                        locant_val = min_loc
-                    elif (
-                        min_loc == 1 and max_loc == len(oriented_path) and not (is_bicycle or is_spiro or is_polycycle)
-                    ):
-                        locant_val = max_loc
-                    else:
-                        locant_val = min_loc
-
-                    if bond.order == 2:
-                        db_locants.append(locant_val)
-                    elif bond.order == 3:
-                        tb_locants.append(locant_val)
-
-    return sorted(db_locants), sorted(tb_locants)
-
-
-def number_parent(
-    mol: Molecule,
-    candidate_paths: list[list[int]],
-    principal_carbons: set[int],
-    substituent_mapping: dict[int, list[str]],
-    is_ring: bool,
-    is_bicycle: bool,
-    is_spiro: bool,
-    is_polycycle: bool = False,
-    fixed_start: bool = False,
-    retained_name: str = None,
-) -> list[int]:
-    """Choose the preferred numbering for a selected parent skeleton.
-
-    Blue Book references: P-14.4, P-44, and P-45; numbering minimizes senior
-    characteristic group locants, heteroatom locants, unsaturation locants,
-    substituent locants, and finally stereochemical locants.
-    """
-
-
-    candidates =[]
-    if is_bicycle or is_spiro or is_polycycle or fixed_start:
-        candidates = candidate_paths
-    elif is_ring:
-        path = candidate_paths[0]
-        for i in range(len(path)):
-            rotated = path[i:] + path[:i]
-            candidates.append(rotated)
-            candidates.append(rotated[::-1])
-    else:
-        path = candidate_paths[0]
-        candidates.append(path)
-        candidates.append(path[::-1])
-
-    def compare_paths(p1, p2):
-        def evaluate(oriented_path):
-            pg = _get_atom_locants(oriented_path, principal_carbons)
-
-            het_by_priority = {}
-            for a in mol:
-                if a.idx in oriented_path and not a.is_carbon:
-                    prio = a.element.hw_priority or 99
-                    het_by_priority.setdefault(prio,[]).append(a.idx)
-
-            het_eval = tuple(
-                _get_atom_locants(oriented_path, set(het_by_priority[prio])) for prio in sorted(het_by_priority.keys())
-            )
-
-            if retained_name in INDICATED_H_RETAINED_NAMES:
-                sat_atoms =[]
-                for a_idx in oriented_path:
-                    ring_bonds =[mol.get_bond(a_idx, n) for n in mol.get_neighbors(a_idx) if n in oriented_path]
-                    if sum(b.order for b in ring_bonds) == 2:
-                        sat_atoms.append(a_idx)
-                sat_eval = tuple(_get_atom_locants(oriented_path, set(sat_atoms)))
-            else:
-                sat_eval = ()
-
-            sub_idx = set(substituent_mapping.keys())
-            pref = _get_atom_locants(oriented_path, sub_idx)
-            db, tb = _get_bond_locants(mol, oriented_path, is_bicycle, is_spiro, is_polycycle)
-
-            if retained_name:
-                unsat =[]
-            else:
-                unsat = sorted(db + tb)
-
-            pref_unsat = sorted(pref + unsat)
-
-            def sub_sort_key(name):
-                s = name.lower()
-                s = re.sub(r"^[\(\[\{\)]+", "", s)
-                prefix_pattern = r"^((?:(?:[0-9]+[a-z]*|[nospmc]\'*)(?:,(?:[0-9]+[a-z]*|[nospmc]\'*))*|[ezrs]+|sec|tert|t|s|d|l|m|o|p|alpha|beta|gamma))([-)]+)"
-                while True:
-                    prev = s
-                    match = re.match(prefix_pattern, s)
-                    if match:
-                        s = s[match.end() :]
-                        s = re.sub(r"^[\(\[\{\)]+", "", s)
-                        continue
-                    break
-                return s
-
-            alpha_list =[]
-            for idx in oriented_path:
-                if idx in substituent_mapping:
-                    loc = oriented_path.index(idx) + 1
-                    for item in substituent_mapping[idx]:
-                        name = item.name if hasattr(item, "name") else item
-                        alpha_list.append((sub_sort_key(name), loc))
-            alpha_list.sort(key=lambda x: x[0])
-            alpha_eval = tuple(x[1] for x in alpha_list)
-
-            stereo_seq =[]
-            for idx in oriented_path:
-                atom = mol.atoms[idx]
-                if atom.stereo:
-                    stereo_seq.append(0 if atom.stereo == "R" else 1)
-            stereo_eval = tuple(stereo_seq)
-
-            if is_ring:
-                return het_eval + (sat_eval, pg, unsat, pref_unsat, alpha_eval, stereo_eval)
-            else:
-                return (pg,) + het_eval + (sat_eval, unsat, pref_unsat, alpha_eval, stereo_eval)
-
-        ev1 = evaluate(p1)
-        ev2 = evaluate(p2)
-
-        for v1, v2 in zip(ev1, ev2):
-            if not v1 and not v2:
-                continue
-            if not v1:
-                return 1
-            if not v2:
-                return -1
-            for x, y in zip(v1, v2):
-                if x < y:
-                    return -1
-                if x > y:
-                    return 1
-            if len(v1) < len(v2):
-                return -1
-            if len(v1) > len(v2):
-                return 1
-        return 0
-
-    best = candidates[0]
-    for c in candidates[1:]:
-        if compare_paths(c, best) < 0:
-            best = c
-    return best
-
-
-def read_smiles(smiles: str) -> Molecule:
-    """Parse a SMILES string into the internal graph model.
-
-    Blue Book references: P-13 and P-14 govern name construction downstream;
-    this function only preserves graph, bond order, charge, and stereochemical
-    features needed by those rules.
-    """
-
-    rdmol = Chem.MolFromSmiles(smiles)
-    if rdmol is None:
-        rdmol = Chem.MolFromSmiles(smiles, sanitize=False)
-        if rdmol:
-            rdmol.UpdatePropertyCache(strict=False)
-            Chem.FastFindRings(rdmol)
-    else:
-        try:
-            Chem.Kekulize(rdmol, clearAromaticFlags=True)
-        except Exception:
-            pass
-
-    mol = Molecule()
-    if rdmol is None:
-        return mol
-
-    Chem.AssignStereochemistry(rdmol, force=True, cleanIt=True)
-    chiral_centers = dict(Chem.FindMolChiralCenters(rdmol, includeUnassigned=False))
-
-    for atom in rdmol.GetAtoms():
-        stereo = chiral_centers.get(atom.GetIdx())
-        if stereo and atom.GetSymbol() == "S" and atom.GetTotalDegree() == 3:
-            stereo = "R" if stereo == "S" else "S"
-        mol.add_atom(symbol=atom.GetSymbol(), idx=atom.GetIdx(), charge=atom.GetFormalCharge(), stereo=stereo)
-
-    for bond in rdmol.GetBonds():
-        stereo = None
-        st = bond.GetStereo()
-        if st == Chem.rdchem.BondStereo.STEREOE:
-            stereo = "E"
-        elif st == Chem.rdchem.BondStereo.STEREOZ:
-            stereo = "Z"
-
-        in_small_ring = any(bond.IsInRingSize(i) for i in range(3, 8))
-
-        mol.add_bond(
-            u=bond.GetBeginAtomIdx(),
-            v=bond.GetEndAtomIdx(),
-            order=int(bond.GetBondTypeAsDouble()),
-            stereo=stereo,
-            in_small_ring=in_small_ring,
-        )
-    return mol
-
-
-def get_connected_components(mol: Molecule) -> list[set[int]]:
-    """Split a molecule graph into disconnected naming components.
-
-    Blue Book references: P-72 for ionic/disconnected component names.
-    """
-
-    visited = set()
-    components =[]
-    for atom in mol:
-        if atom.idx not in visited:
-            comp = set()
-            q = [atom.idx]
-            while q:
-                curr = q.pop(0)
-                if curr not in visited:
-                    visited.add(curr)
-                    comp.add(curr)
-                    q.extend(mol.get_neighbors(curr))
-            components.append(comp)
-    return components
-
-
-def _emit_bond_stereo(mol, parts, numbered_path, get_loc, exclude_atoms=None, upstream_atom=None):
-    """Collect E/Z bond stereochemical descriptors for assembly.
-
-    Blue Book references: P-91 and P-93 for stereochemical descriptor citation.
-    """
-
-    if exclude_atoms is None:
-        exclude_atoms = set()
-    path_set = set(numbered_path)
-    cyclic_atoms = get_cyclic_atoms(mol)
-    for u_idx in numbered_path:
-        for v_idx in mol.get_neighbors(u_idx):
-            bond = mol.get_bond(u_idx, v_idx)
-            if not bond or not bond.stereo:
-                continue
-            if bond.in_small_ring:
-                continue
-
-            if v_idx == upstream_atom:
-                upstream_in_ring = v_idx in cyclic_atoms
-                if mol.atoms[v_idx].is_carbon or upstream_in_ring:
-                    continue
-
-            loc_str_u = get_loc(u_idx)
-            if v_idx in path_set:
-                loc_str_v = get_loc(v_idx)
-                min_loc = min(loc_str_u, loc_str_v, key=lambda x: parse_locant(x))
-            else:
-                min_loc = loc_str_u
-
-            if not any(f[0] == min_loc and f[1] in["E", "Z"] for f in parts.stereo_features):
-                parts.stereo_features.append((min_loc, bond.stereo))
-
-
-def _upstream_bond_order(mol: Molecule, start_idx: int, upstream_atom: int | None) -> int:
-    """Return the bond order to the parent atom, or zero for root fragments.
-
-    Blue Book references: P-13.6 and P-61; the bond order determines whether a
-    heteroatom fragment is named with prefix forms such as oxo, imino, nitrilo,
-    or ylidene-style suffixes.
-    """
-
-    if upstream_atom is None:
-        return 0
-    bond = mol.get_bond(start_idx, upstream_atom)
-    return bond.order if bond else 0
-
-
-def _subgraph_neighbors(
-    mol: Molecule, start_idx: int, exclude_atoms: set[int], upstream_atom: int | None, extra_exclude=None
-) -> list[int]:
-    """Return substituent-side neighbors that remain available for recursion.
-
-    Blue Book references: P-13.6 and P-16.5; recursive substituent prefixes are
-    constructed only from atoms outside the current parent/excluded fragment.
-    """
-
-    blocked = set(extra_exclude or [])
-    return [
-        n
-        for n in mol.get_neighbors(start_idx)
-        if n not in exclude_atoms and n != upstream_atom and n not in blocked
-    ]
-
-
-def _double_bonded_neighbors(mol: Molecule, center_idx: int, symbol: str) -> list[int]:
-    """Return neighbors of a given element double-bonded to ``center_idx``.
-
-    Blue Book references: P-63, P-65, P-66, and P-67 for oxo, thioxo,
-    sulfinyl, sulfonyl, carbonyl, and related prefix forms.
-    """
-
-    return [
-        n
-        for n in mol.get_neighbors(center_idx)
-        if mol.atoms[n].symbol == symbol and mol.get_bond(center_idx, n).order == 2
-    ]
-
-
-def _first_substituent_neighbor(mol: Molecule, center_idx: int, excluded: set[int], require_carbon=False) -> int | None:
-    """Return the first neighbor outside a local functional group.
-
-    Blue Book references: P-13.6; this identifies the R group used to build a
-    recursive substituent prefix.
-    """
-
-    for n in mol.get_neighbors(center_idx):
-        if n in excluded:
-            continue
-        if require_carbon and not mol.atoms[n].is_carbon:
-            continue
-        return n
-    return None
-
-
-def _stereo_prefix(atom) -> str:
-    """Format an atom-centered stereochemical prefix for a substituent fragment.
-
-    Blue Book references: P-91 and P-93 for stereochemical descriptor citation.
-    """
-
-    return f"({atom.stereo})-" if atom.stereo else ""
-
-
-def _sulfur_oxo_suffix(oxo_count: int) -> str:
-    """Choose sulfinyl or sulfonyl from the number of S=O bonds.
-
-    Blue Book references: P-67.1 for sulfur oxo acid and sulfur oxo substituent
-    prefix forms.
-    """
-
-    return "sulfonyl" if oxo_count == 2 else "sulfinyl"
-
-
-def _name_branch_or_none(mol: Molecule, branch_idx: int | None, exclude_atoms: set[int], upstream_atom: int) -> str:
-    """Name a recursive branch and normalize one redundant parenthesis layer.
-
-    Blue Book references: P-16.5; complex prefixes are parenthesized by the
-    final formatting context.
-    """
-
-    if branch_idx is None:
-        return ""
-    return _strip_outer_parentheses(name_subgraph(mol, branch_idx, exclude_atoms, upstream_atom=upstream_atom))
-
-
-def _name_carbonyl_like_fragment(
-    mol: Molecule,
-    center_idx: int,
-    attach_idx: int,
-    double_atoms: list[int],
-    exclude_atoms: set[int],
-    branch_suffix: str,
-    fallback: str,
-    amino_base: str | None = None,
-    wrap_result: bool = False,
-) -> str:
-    """Name carbonyl or thiocarbonyl fragments attached through O or N.
-
-    Blue Book references: P-65 and P-66; carbonyl fragments become retained
-    prefix forms such as formyl, carbamoyl, carbonyloxy, and carbonothioyl.
-    """
-
-    local_exclude = exclude_atoms | {attach_idx, center_idx} | set(double_atoms)
-    branch_idx = _first_substituent_neighbor(mol, center_idx, {attach_idx, *double_atoms}, require_carbon=True)
-    if branch_idx is None:
-        branch_idx = _first_substituent_neighbor(mol, center_idx, {attach_idx, *double_atoms})
-
-    branch = _name_branch_or_none(mol, branch_idx, local_exclude, upstream_atom=center_idx)
-    if not branch:
-        return fallback
-    if amino_base and branch.endswith("amino"):
-        return f"({branch[:-5]}{amino_base})"
-    result = f"{branch}{branch_suffix}"
-    return f"({result})" if wrap_result else result
-
-
-def _format_amino_from_branches(branches: list[str], is_double: bool) -> str:
-    """Format amino or imino substituent names from N-attached branches.
-
-    Blue Book references: P-62 and P-66 for amino, imino, N-substituted, and
-    acylamino-style prefixes.
-    """
-
-    if is_double:
-        if len(branches) == 1:
-            branch = _strip_outer_parentheses(branches[0])
-            if _is_complex_prefix(branch):
-                return f"(({branch})imino)"
-            return f"({branch}imino)"
-        return "imino"
-
-    counts = _count_names(branches)
-    if len(counts) == 1 and list(counts.values())[0] == 1:
-        branch = _strip_outer_parentheses(branches[0])
-        if branch.endswith(("carbonyl", "sulfonyl", "sulfinyl", "carbonothioyl")):
-            return f"{branch}amino"
-        if _is_complex_prefix(branch):
-            return f"(({branch})amino)"
-        return f"({branch}amino)"
-
-    return f"({_format_counted_prefixes(branches)}amino)"
-
-
-def _format_lambda_substituent(
-    mol: Molecule,
-    start_idx: int,
-    branches: list[str],
-    stereo_prefix: str,
-    base_suffix: str,
-) -> str:
-    """Format hypervalent lambda substituent fragments.
-
-    Blue Book references: P-14.1 and P-14.5 for the lambda convention in
-    heteroatom substituent names.
-    """
-
-    valence = sum(mol.get_bond(start_idx, n).order for n in mol.get_neighbors(start_idx))
-    return f"({stereo_prefix}{_format_counted_prefixes(branches)}-lambda^{valence}-{base_suffix})"
-
-
-def _name_oxygen_subgraph(mol: Molecule, start_idx: int, exclude_atoms: set[int], upstream_atom: int | None) -> str:
-    """Name an oxygen-starting substituent fragment.
-
-    Blue Book references: P-61.2.2.1 for alkoxy/aryloxy prefixes, P-63 for oxo
-    and hydroxy prefixes, P-65 for acyloxy/carbonyl prefixes, and P-67 for
-    sulfonyloxy/sulfinyloxy prefixes.
-    """
-
-    is_double = _upstream_bond_order(mol, start_idx, upstream_atom) == 2
-    next_atoms = _subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
-    start_atom = mol.atoms[start_idx]
-    if not next_atoms:
-        if is_double:
-            return "oxo"
-        if start_atom.charge == -1:
-            return "oxido"
-        return "hydroxy"
-
-    nxt = next_atoms[0]
-    s_oxygens = _double_bonded_neighbors(mol, nxt, "O")
-    if mol.atoms[nxt].symbol == "S" and s_oxygens:
-        branch_idx = _first_substituent_neighbor(mol, nxt, {start_idx, *s_oxygens})
-        branch = _name_branch_or_none(mol, branch_idx, exclude_atoms | {start_idx, nxt} | set(s_oxygens), nxt)
-        if branch:
-            return f"({_stereo_prefix(mol.atoms[nxt])}{branch}{_sulfur_oxo_suffix(len(s_oxygens))}oxy)"
-        return "sulfooxy"
-
-    c_oxygens = _double_bonded_neighbors(mol, nxt, "O")
-    c_sulfurs = _double_bonded_neighbors(mol, nxt, "S")
-    if mol.atoms[nxt].is_carbon and len(c_oxygens) == 1:
-        return _name_carbonyl_like_fragment(
-            mol, nxt, start_idx, c_oxygens, exclude_atoms, "carbonyloxy", "formyloxy", wrap_result=True
-        )
-    if mol.atoms[nxt].is_carbon and len(c_sulfurs) == 1:
-        return _name_carbonyl_like_fragment(
-            mol,
-            nxt,
-            start_idx,
-            c_sulfurs,
-            exclude_atoms,
-            "carbonothioyloxy",
-            "methanethioyloxy",
-            wrap_result=True,
-        )
-    if mol.atoms[nxt].symbol == "O":
-        branch_idx = _first_substituent_neighbor(mol, nxt, {start_idx})
-        branch = _name_branch_or_none(mol, branch_idx, exclude_atoms | {start_idx, nxt}, nxt)
-        return f"({branch}peroxy)" if branch else "hydroperoxy"
-
-    branch = name_subgraph(mol, nxt, exclude_atoms | {start_idx}, upstream_atom=start_idx)
-    if branch:
-        if branch in ALKYL_OXY_PREFIXES:
-            return ALKYL_OXY_PREFIXES[branch]
-        branch = _strip_outer_parentheses(branch)
-        if _is_complex_prefix(branch):
-            return f"(({branch})oxy)"
-        return f"({branch}oxy)"
-    return "hydroxy"
-
-
-def _name_nitrogen_subgraph(mol: Molecule, start_idx: int, exclude_atoms: set[int], upstream_atom: int | None) -> str:
-    """Name a nitrogen-starting substituent fragment.
-
-    Blue Book references: P-62 for amines/imines, P-63 for amino/imino/nitrilo
-    prefixes, P-66 for amide-derived prefixes, and P-67 for sulfonamide-like
-    prefixes.
-    """
-
-    upstream_order = _upstream_bond_order(mol, start_idx, upstream_atom)
-    is_double = upstream_order == 2
-    is_triple = upstream_order == 3
-    next_atoms = _subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
-    if not next_atoms:
-        if is_double:
-            return "imino"
-        if is_triple:
-            return "nitrilo"
-        return "amino"
-
-    branches = []
-    for nxt in next_atoms:
-        c_oxygens = _double_bonded_neighbors(mol, nxt, "O")
-        c_sulfurs = _double_bonded_neighbors(mol, nxt, "S")
-        if mol.atoms[nxt].is_carbon and len(c_oxygens) == 1:
-            branches.append(
-                _name_carbonyl_like_fragment(
-                    mol, nxt, start_idx, c_oxygens, exclude_atoms, "carbonyl", "formyl", amino_base="carbamoyl"
-                )
-            )
-        elif mol.atoms[nxt].is_carbon and len(c_sulfurs) == 1:
-            branches.append(
-                _name_carbonyl_like_fragment(
-                    mol,
-                    nxt,
-                    start_idx,
-                    c_sulfurs,
-                    exclude_atoms,
-                    "carbonothioyl",
-                    "methanethioyl",
-                    amino_base="carbamothioyl",
-                )
-            )
-        else:
-            s_oxygens = _double_bonded_neighbors(mol, nxt, "O")
-            if mol.atoms[nxt].symbol == "S" and s_oxygens:
-                branch_idx = _first_substituent_neighbor(mol, nxt, {start_idx, *s_oxygens})
-                branch = _name_branch_or_none(mol, branch_idx, exclude_atoms | {start_idx, nxt} | set(s_oxygens), nxt)
-                if branch:
-                    branches.append(f"{_stereo_prefix(mol.atoms[nxt])}{branch}{_sulfur_oxo_suffix(len(s_oxygens))}")
-                else:
-                    branches.append("sulfo")
-            else:
-                branch = name_subgraph(mol, nxt, exclude_atoms | {start_idx}, upstream_atom=start_idx)
-                if branch:
-                    branches.append(branch)
-
-    return _format_amino_from_branches(branches, is_double)
-
-
-def _name_sulfur_subgraph(mol: Molecule, start_idx: int, exclude_atoms: set[int], upstream_atom: int | None) -> str:
-    """Name a sulfur-starting substituent fragment.
-
-    Blue Book references: P-67 for sulfur prefixes, P-14.5 for lambda
-    descriptors, and P-61.2.2.2 for sulfanyl/sulfanylidene prefixes.
-    """
-
-    is_double = _upstream_bond_order(mol, start_idx, upstream_atom) == 2
-    s_oxygens = _double_bonded_neighbors(mol, start_idx, "O")
-    s_nitrogens = _double_bonded_neighbors(mol, start_idx, "N")
-    next_atoms = _subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom, s_oxygens + s_nitrogens)
-    stereo_prefix = _stereo_prefix(mol.atoms[start_idx])
-
-    if len(s_oxygens) == 1 and len(s_nitrogens) == 1:
-        suffix = "sulfonimidoyl" + ("idene" if is_double else "")
-        if not next_atoms:
-            return f"{stereo_prefix}{suffix}"
-        if len(next_atoms) == 1:
-            branch = _name_branch_or_none(
-                mol, next_atoms[0], exclude_atoms | {start_idx} | set(s_oxygens) | set(s_nitrogens), start_idx
-            )
-            return f"({stereo_prefix}{branch}{suffix})" if branch else f"{stereo_prefix}{suffix}"
-        branches = [
-            br
-            for nxt in next_atoms
-            if (br := name_subgraph(mol, nxt, exclude_atoms | {start_idx} | set(s_oxygens) | set(s_nitrogens), start_idx))
-        ]
-        branches.extend(["oxo"] * len(s_oxygens))
-        branches.extend(["imino"] * len(s_nitrogens))
-        return _format_lambda_substituent(mol, start_idx, branches, stereo_prefix, "sulfanylidene" if is_double else "sulfanyl")
-
-    if s_oxygens:
-        suffix = _sulfur_oxo_suffix(len(s_oxygens)) + ("idene" if is_double else "")
-        if not next_atoms:
-            return f"{stereo_prefix}{suffix}"
-        if len(next_atoms) == 1:
-            branch = _name_branch_or_none(mol, next_atoms[0], exclude_atoms | {start_idx} | set(s_oxygens), start_idx)
-            return f"({stereo_prefix}{branch}{suffix})" if branch else f"{stereo_prefix}{suffix}"
-        branches = [
-            br
-            for nxt in next_atoms
-            if (br := name_subgraph(mol, nxt, exclude_atoms | {start_idx} | set(s_oxygens), start_idx))
-        ]
-        branches.extend(["oxo"] * len(s_oxygens))
-        return _format_lambda_substituent(mol, start_idx, branches, stereo_prefix, "sulfanylidene" if is_double else "sulfanyl")
-
-    if not next_atoms:
-        return "thioxo" if is_double else f"{stereo_prefix}sulfanyl"
-
-    if len(next_atoms) == 1:
-        branch = name_subgraph(mol, next_atoms[0], exclude_atoms | {start_idx}, upstream_atom=start_idx)
-        if branch in SIMPLE_SULFANYL_PREFIXES:
-            return f"({stereo_prefix}{branch}sulfanyl)"
-        if branch:
-            return _format_element_substituent(stereo_prefix, branch, "sulfanyl", is_double=is_double)
-        return f"{stereo_prefix}{'sulfanylidene' if is_double else 'sulfanyl'}"
-
-    branches = [
-        br for nxt in next_atoms if (br := name_subgraph(mol, nxt, exclude_atoms | {start_idx}, upstream_atom=start_idx))
-    ]
-    return _format_lambda_substituent(mol, start_idx, branches, stereo_prefix, "sulfanylidene" if is_double else "sulfanyl")
-
-
-def _name_chalcogen_subgraph(
-    mol: Molecule,
-    start_idx: int,
-    exclude_atoms: set[int],
-    upstream_atom: int | None,
-    simple_prefixes: set[str],
-    element_suffix: str,
-    oxo_prefix: str,
-) -> str:
-    """Name selenium-like chalcogen substituent fragments.
-
-    Blue Book references: P-61.2.2.2 and P-14.5 for chalcogen substituent and
-    lambda naming patterns.
-    """
-
-    is_double = _upstream_bond_order(mol, start_idx, upstream_atom) == 2
-    next_atoms = _subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
-    stereo_prefix = _stereo_prefix(mol.atoms[start_idx])
-    if not next_atoms:
-        return oxo_prefix if is_double else f"{stereo_prefix}{element_suffix}"
-    if len(next_atoms) == 1:
-        branch = name_subgraph(mol, next_atoms[0], exclude_atoms | {start_idx}, upstream_atom=start_idx)
-        if branch in simple_prefixes:
-            return f"({stereo_prefix}{branch}{element_suffix})"
-        if branch:
-            return _format_element_substituent(stereo_prefix, branch, element_suffix, is_double=is_double)
-        return f"{stereo_prefix}{element_suffix + ('idene' if is_double else '')}"
-    branches = [
-        br for nxt in next_atoms if (br := name_subgraph(mol, nxt, exclude_atoms | {start_idx}, upstream_atom=start_idx))
-    ]
-    return _format_lambda_substituent(
-        mol, start_idx, branches, stereo_prefix, element_suffix + ("idene" if is_double else "")
-    )
-
-
-def _name_phosphorus_subgraph(mol: Molecule, start_idx: int, exclude_atoms: set[int], upstream_atom: int | None) -> str:
-    """Name a phosphorus-starting substituent fragment.
-
-    Blue Book references: P-68 by analogy with heteroatom hydride prefixes and
-    P-14.5 for valence-sensitive substituent forms.
-    """
-
-    is_double = _upstream_bond_order(mol, start_idx, upstream_atom) == 2
-    p_oxygens = _double_bonded_neighbors(mol, start_idx, "O")
-    next_atoms = _subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom, p_oxygens)
-    stereo_prefix = _stereo_prefix(mol.atoms[start_idx])
-    suffix = ("phosphoryl" if p_oxygens else "phosphanyl") + ("idene" if is_double else "")
-    if not next_atoms:
-        return f"{stereo_prefix}{suffix}"
-    branches = [
-        br for nxt in next_atoms if (br := name_subgraph(mol, nxt, exclude_atoms | {start_idx} | set(p_oxygens), start_idx))
-    ]
-    return f"({stereo_prefix}{_format_counted_prefixes(branches)}{suffix})"
-
-
-def _name_group_13_14_subgraph(mol: Molecule, start_idx: int, exclude_atoms: set[int], upstream_atom: int | None) -> str:
-    """Name simple silicon and boron substituent fragments.
-
-    Blue Book references: P-61.2 and P-14.5 for hydride-derived substituent
-    names such as silyl, boryl, and their ylidene analogues.
-    """
-
-    is_double = _upstream_bond_order(mol, start_idx, upstream_atom) == 2
-    suffix = ("silyl" if mol.atoms[start_idx].symbol == "Si" else "boryl") + ("idene" if is_double else "")
-    next_atoms = _subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
-    if not next_atoms:
-        return suffix
-    branches = [
-        br for nxt in next_atoms if (br := name_subgraph(mol, nxt, exclude_atoms | {start_idx}, upstream_atom=start_idx))
-    ]
-    return f"({_format_counted_prefixes(branches)}{suffix})"
-
-
-def _name_halogen_subgraph(mol: Molecule, start_idx: int, exclude_atoms: set[int], upstream_atom: int | None) -> str:
-    """Name a halogen-starting substituent fragment.
-
-    Blue Book references: P-61.3 for fluoro/chloro/bromo/iodo prefixes and
-    P-14.5 for lambda descriptors on substituted halogen centers.
-    """
-
-    next_atoms = _subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
-    symbol = mol.atoms[start_idx].symbol
-    if not next_atoms:
-        return HALOGEN_PREFIXES[symbol]
-    branches = [
-        br for nxt in next_atoms if (br := name_subgraph(mol, nxt, exclude_atoms | {start_idx}, upstream_atom=start_idx))
-    ]
-    valence = sum(mol.get_bond(start_idx, n).order for n in mol.get_neighbors(start_idx))
-    return f"({_format_counted_prefixes(branches)}lambda^{valence}-{HALOGEN_LAMBDA_SUFFIXES[symbol]})"
-
-
-def _subgraph_component(mol: Molecule, start_idx: int, exclude_atoms: set[int]) -> set[int]:
-    """Return the connected recursive substituent component from ``start_idx``.
-
-    Blue Book references: P-13.6; substituent prefixes are named as separate
-    substituent components before being attached to the parent name.
-    """
-
-    visited = set(exclude_atoms)
-    component = set()
-    queue = [start_idx]
-    while queue:
-        curr = queue.pop(0)
-        if curr not in visited:
-            visited.add(curr)
-            component.add(curr)
-            queue.extend([n for n in mol.get_neighbors(curr) if n not in visited])
-    return component
+from .assembler import assemble_name, AssemblyParts, SubstituentItem
+from .component_group_rules import (
+    exclude_nonparent_group_atoms as _exclude_nonparent_group_atoms,
+    principal_involved_atoms as _principal_involved_atoms,
+    retarget_external_carbonyl_groups as _retarget_external_carbonyl_groups,
+)
+from .component_modifiers import (
+    add_component_front_modifiers as _add_component_front_modifiers,
+    add_component_n_substituents as _add_component_n_substituents,
+)
+from .functional_prefixes import collect_component_prefix_substituents as _collect_component_prefix_substituents
+from .graph_io import get_connected_components, read_smiles
+from .heteroatom_subgraphs import name_heteroatom_subgraph, upstream_bond_order
+from .locants import parse_locant
+from .namer_config import (
+    DIRECT_GROUP_PREFIXES,
+    RETAINED_RING_ELEMENTS,
+    SALT_METAL_NAMES,
+    SPECIAL_COMPONENT_NAMES,
+)
+from .numbering import number_parent
+from .principal_groups import (
+    add_component_principal_group as _add_component_principal_group,
+    component_groups as _component_groups,
+    component_principal_key as _component_principal_key,
+    filter_component_groups_to_parent as _filter_component_groups_to_parent,
+    partition_principal_and_prefix_groups as _partition_principal_and_prefix_groups,
+)
+from .rules import substituents, retained
+from .special_cases import (
+    single_atom_component_name as _single_atom_component_name,
+    try_name_anhydride_component as _try_name_anhydride_component,
+)
+from .subgraph_tools import (
+    add_indicated_hydrogens as _add_indicated_hydrogens,
+    add_parent_features as _add_subgraph_parent_features,
+    emit_bond_stereo as _emit_bond_stereo,
+    find_spiro_side_pair as _find_spiro_side_pair,
+    spiro_side_component as _spiro_side_component,
+    subgraph_component as _subgraph_component,
+    subgraph_locant_getter as _subgraph_locant_getter,
+)
+from .trace_helpers import (
+    add_substituent_trace as _add_substituent_trace,
+    assembly_trace_segments as _assembly_trace_segments,
+    bond_ids_within as _bond_ids_within,
+    functional_group_trace_data as _functional_group_trace_data,
+    trace_decision as _trace_decision,
+)
 
 
 def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) -> str:
@@ -1183,20 +115,18 @@ def _select_subgraph_parent(mol: Molecule, start_idx: int, component: set[int], 
         valid_rings = [rs for rs in ring_systems if start_idx in rs.atoms]
         if not valid_rings:
             return None
-        best_paths, is_ring, is_bicycle, is_spiro, is_polycycle, xyz, polycycle_descriptor = select_principal_parent(
-            mol, [], valid_rings, [start_idx]
-        )
-        return best_paths, is_ring, is_bicycle, is_spiro, is_polycycle, xyz, polycycle_descriptor, (
-            is_bicycle or is_spiro or is_polycycle
-        )
+        selection = select_principal_parent(mol, [], valid_rings, [start_idx])
+        if selection is None:
+            return None
+        return selection.with_fixed_start(selection.requires_fixed_substituent_start)
 
     paths = _find_acyclic_subgraph_paths(mol, start_idx, component, cyclic_atoms, sub_exclude)
     if not paths:
         return None
-    best_paths, is_ring, is_bicycle, is_spiro, is_polycycle, xyz, polycycle_descriptor = select_principal_parent(
-        mol, paths, [], [start_idx]
-    )
-    return best_paths, is_ring, is_bicycle, is_spiro, is_polycycle, xyz, polycycle_descriptor, False
+    selection = select_principal_parent(mol, paths, [], [start_idx])
+    if selection is None:
+        return None
+    return selection.with_fixed_start(False)
 
 
 def _retained_subgraph_ring(mol: Molecule, path: list[int], is_ring: bool, is_bicycle: bool, is_polycycle: bool):
@@ -1215,54 +145,6 @@ def _retained_subgraph_ring(mol: Molecule, path: list[int], is_ring: bool, is_bi
     if any(mol.atoms[idx].symbol not in RETAINED_RING_ELEMENTS for idx in path):
         return None, None
     return retained_name_val, locant_maps
-
-
-def _find_spiro_side_pair(
-    mol: Molecule, c_idx: int, n_subs: list[int], main_set: set[int], sub_exclude: set[int]
-) -> tuple[int, int] | None:
-    """Find a side-ring pair that forms a spiro substituent at ``c_idx``.
-
-    Blue Book references: P-24 and P-52.3 for spiro systems and spiro
-    substituent citation.
-    """
-
-    for i in range(len(n_subs)):
-        for j in range(i + 1, len(n_subs)):
-            n1, n2 = n_subs[i], n_subs[j]
-            visited = {c_idx}
-            queue = [n1]
-            while queue:
-                curr = queue.pop(0)
-                if curr == n2:
-                    return n1, n2
-                visited.add(curr)
-                for nxt in mol.get_neighbors(curr):
-                    if nxt not in visited and nxt not in main_set and nxt not in sub_exclude:
-                        queue.append(nxt)
-    return None
-
-
-def _spiro_side_component(
-    mol: Molecule, c_idx: int, side_start: int, main_set: set[int], sub_exclude: set[int]
-) -> set[int]:
-    """Return the atoms in a side ring used as a spiro substituent.
-
-    Blue Book references: P-24 and P-52.3 for spiro ring construction.
-    """
-
-    sub_comp = set()
-    queue = [side_start]
-    visited = {c_idx}
-    while queue:
-        curr = queue.pop(0)
-        if curr not in sub_comp:
-            sub_comp.add(curr)
-            visited.add(curr)
-            for nxt in mol.get_neighbors(curr):
-                if nxt not in visited and nxt not in main_set and nxt not in sub_exclude:
-                    queue.append(nxt)
-    sub_comp.add(c_idx)
-    return sub_comp
 
 
 def _spiro_subgraph_name(mol: Molecule, c_idx: int, sub_comp: set[int]) -> str:
@@ -1433,35 +315,6 @@ def _choose_subgraph_numbering(
     )
 
 
-def _subgraph_locant_getter(numbered_path: list[int], locant_map):
-    """Create a locant accessor for numbered recursive substituent atoms.
-
-    Blue Book references: P-14.3 for locants.
-    """
-
-    def get_loc(idx):
-        return locant_map[idx] if locant_map else str(numbered_path.index(idx) + 1)
-
-    return get_loc
-
-
-def _add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
-    """Add indicated hydrogen locants for retained ring substituent names.
-
-    Blue Book references: P-14.7, P-22.2, and P-25 for indicated hydrogen in
-    retained heterocycle and hydrocarbon names.
-    """
-
-    if parts.retained_name not in INDICATED_H_RETAINED_NAMES:
-        return
-    for idx in numbered_path:
-        atom = mol.atoms[idx]
-        if atom.symbol in ["N", "C"]:
-            ring_bonds = [mol.get_bond(idx, n) for n in mol.get_neighbors(idx) if n in numbered_path]
-            if sum(b.order for b in ring_bonds) == 2:
-                parts.indicated_hydrogens.append(get_loc(idx))
-
-
 def _add_subgraph_substituents(parts: AssemblyParts, subst_mapping: dict[int, list[SubstituentItem]], get_loc) -> None:
     """Add collected substituent prefixes to assembly parts.
 
@@ -1473,79 +326,6 @@ def _add_subgraph_substituents(parts: AssemblyParts, subst_mapping: dict[int, li
         locant = get_loc(c_idx)
         for item in items:
             _add_substituent_trace(parts, item.name, locant, item.atom_ids, item.bond_ids, item.trace_segments)
-
-
-def _add_subgraph_parent_features(
-    mol: Molecule,
-    parts: AssemblyParts,
-    numbered_path: list[int],
-    get_loc,
-    is_bicycle: bool,
-    is_spiro: bool,
-    is_polycycle: bool,
-) -> None:
-    """Add replacement prefixes and unsaturation locants to assembly parts.
-
-    Blue Book references: P-31 for unsaturation, P-44 for parent hydrides, and
-    P-51 for skeletal replacement prefixes.
-    """
-
-    if parts.retained_name:
-        return
-
-    for atom_idx in numbered_path:
-        atom = mol.atoms[atom_idx]
-        if not atom.is_carbon:
-            hw_stem = atom.element.hw_stem
-            if hw_stem:
-                valence = sum(mol.get_bond(atom_idx, n).order for n in mol.get_neighbors(atom_idx))
-                loc = get_loc(atom_idx)
-                if atom.charge == 0 and valence > atom.element.standard_valence:
-                    loc = f"{loc}lambda^{valence}"
-                parts.a_prefixes.append(SubstituentItem(name=hw_stem, locants=[loc], atom_ids={atom_idx}))
-
-    seen_bonds = set()
-    for u_idx in numbered_path:
-        for v_idx in mol.get_neighbors(u_idx):
-            if v_idx in numbered_path:
-                bond = mol.get_bond(u_idx, v_idx)
-                if bond and bond.order > 1 and bond.idx not in seen_bonds:
-                    seen_bonds.add(bond.idx)
-                    bond_key = "double" if bond.order == 2 else "triple"
-                    loc_u_idx = numbered_path.index(u_idx)
-                    loc_v_idx = numbered_path.index(v_idx)
-                    min_idx, max_idx = min(loc_u_idx, loc_v_idx), max(loc_u_idx, loc_v_idx)
-
-                    loc_u_str = get_loc(u_idx)
-                    loc_v_str = get_loc(v_idx)
-                    min_loc_str, max_loc_str = (
-                        min(loc_u_str, loc_v_str, key=lambda x: parse_locant(x)),
-                        max(loc_u_str, loc_v_str, key=lambda x: parse_locant(x)),
-                    )
-
-                    if max_idx == min_idx + 1:
-                        locant_str = min_loc_str
-                    elif min_idx == 0 and max_idx == len(numbered_path) - 1 and not (
-                        is_bicycle or is_spiro or is_polycycle
-                    ):
-                        locant_str = max_loc_str
-                    else:
-                        locant_str = f"{min_loc_str}({max_loc_str})"
-
-                    existing = next((u for u in parts.unsaturations if u.bond_key == bond_key), None)
-                    if existing:
-                        existing.locants.append(locant_str)
-                        existing.atom_ids.update({u_idx, v_idx})
-                        existing.bond_ids.add(bond.idx)
-                    else:
-                        parts.unsaturations.append(
-                            UnsaturationItem(
-                                bond_key=bond_key,
-                                locants=[locant_str],
-                                atom_ids={u_idx, v_idx},
-                                bond_ids={bond.idx},
-                            )
-                        )
 
 
 def _build_subgraph_parts(
@@ -1569,7 +349,7 @@ def _build_subgraph_parts(
     """
 
     attach_locant = get_loc(start_idx)
-    upstream_order = _upstream_bond_order(mol, start_idx, upstream_atom)
+    upstream_order = upstream_bond_order(mol, start_idx, upstream_atom)
     parts = AssemblyParts(
         parent_length=len(numbered_path),
         is_ring=is_ring,
@@ -1634,24 +414,8 @@ def name_subgraph(
     cyclic_atoms_global = get_cyclic_atoms(mol, exclude_atoms)
 
     if not start_atom.is_carbon and start_idx not in cyclic_atoms_global:
-        heteroatom_handlers = {
-            "O": _name_oxygen_subgraph,
-            "N": _name_nitrogen_subgraph,
-            "S": _name_sulfur_subgraph,
-            "P": _name_phosphorus_subgraph,
-            "Si": _name_group_13_14_subgraph,
-            "B": _name_group_13_14_subgraph,
-        }
-        if start_atom.symbol == "Se":
-            name = _name_chalcogen_subgraph(
-                mol, start_idx, exclude_atoms, upstream_atom, SIMPLE_SELANYL_PREFIXES, "selanyl", "selenoxo"
-            )
-            return (name, []) if return_trace else name
-        if start_atom.symbol in HALOGEN_PREFIXES:
-            name = _name_halogen_subgraph(mol, start_idx, exclude_atoms, upstream_atom)
-            return (name, []) if return_trace else name
-        if start_atom.symbol in heteroatom_handlers:
-            name = heteroatom_handlers[start_atom.symbol](mol, start_idx, exclude_atoms, upstream_atom)
+        name = name_heteroatom_subgraph(mol, start_idx, exclude_atoms, upstream_atom, name_subgraph)
+        if name is not None:
             return (name, []) if return_trace else name
 
     component = _subgraph_component(mol, start_idx, exclude_atoms)
@@ -1664,33 +428,26 @@ def name_subgraph(
     if parent_selection is None:
         return ("", []) if return_trace else ""
 
-    (
-        candidate_paths,
-        is_ring,
-        is_bicycle,
-        is_spiro,
-        is_polycycle,
-        xyz,
-        polycycle_descriptor,
-        fixed_start_val,
-    ) = parent_selection
-
     retained_name_val, locant_maps = _retained_subgraph_ring(
-        mol, candidate_paths[0], is_ring, is_bicycle, is_polycycle
+        mol,
+        parent_selection.primary_path,
+        parent_selection.is_ring,
+        parent_selection.is_bicycle,
+        parent_selection.is_polycycle,
     )
     sub_perceived = perceive_groups(mol)
-    subst_mapping = _collect_subgraph_substituents(mol, candidate_paths[0], sub_perceived, sub_exclude)
+    subst_mapping = _collect_subgraph_substituents(mol, parent_selection.primary_path, sub_perceived, sub_exclude)
     numbered_path, locant_map = _choose_subgraph_numbering(
         mol,
-        candidate_paths,
+        parent_selection.paths,
         start_idx,
         subst_mapping,
         locant_maps,
-        is_ring,
-        is_bicycle,
-        is_spiro,
-        is_polycycle,
-        fixed_start_val,
+        parent_selection.is_ring,
+        parent_selection.is_bicycle,
+        parent_selection.is_spiro,
+        parent_selection.is_polycycle,
+        parent_selection.fixed_start_required,
         retained_name_val,
     )
     get_loc = _subgraph_locant_getter(numbered_path, locant_map)
@@ -1702,207 +459,30 @@ def name_subgraph(
         numbered_path,
         get_loc,
         retained_name_val,
-        is_ring,
-        is_bicycle,
-        is_spiro,
-        is_polycycle,
-        xyz,
-        polycycle_descriptor,
+        parent_selection.is_ring,
+        parent_selection.is_bicycle,
+        parent_selection.is_spiro,
+        parent_selection.is_polycycle,
+        parent_selection.xyz,
+        parent_selection.polycycle_descriptor,
     )
     _emit_bond_stereo(mol, parts, numbered_path, get_loc, sub_exclude, upstream_atom)
     _add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
     _add_subgraph_substituents(parts, subst_mapping, get_loc)
-    _add_subgraph_parent_features(mol, parts, numbered_path, get_loc, is_bicycle, is_spiro, is_polycycle)
+    _add_subgraph_parent_features(
+        mol,
+        parts,
+        numbered_path,
+        get_loc,
+        parent_selection.is_bicycle,
+        parent_selection.is_spiro,
+        parent_selection.is_polycycle,
+    )
 
     name = _finalize_subgraph_name(assemble_name(parts), parts)
     if return_trace:
         return name, _assembly_trace_segments(parts)
     return name
-
-
-def _single_atom_component_name(mol: Molecule, component_atoms: set[int]) -> str:
-    """Return the name for a one-atom ionic component, when supported.
-
-    Blue Book references: P-72 for names of ionic components in salts.
-    """
-
-    if len(component_atoms) != 1:
-        return ""
-    atom = mol.atoms[list(component_atoms)[0]]
-    if atom.symbol in SINGLE_ATOM_CATIONS:
-        return atom.element.name
-    if atom.symbol in SINGLE_ATOM_ANIONS:
-        return SINGLE_ATOM_ANIONS[atom.symbol]
-    return ""
-
-
-def _component_groups(mol: Molecule, component_atoms: set[int]) -> list[PerceivedGroup]:
-    """Return perceived groups whose attachment atom is inside a component.
-
-    Blue Book references: P-41, P-44, and P-63 through P-67 for characteristic
-    group and detachable-prefix recognition.
-    """
-
-    return [group for group in perceive_groups(mol) if group.attachment_carbon in component_atoms]
-
-
-def _component_principal_key(perceived_groups: list[PerceivedGroup], is_substituent: bool) -> str | None:
-    """Select the senior principal characteristic group for a component.
-
-    Blue Book references: P-41 and P-44 for characteristic group seniority and
-    suffix selection.
-    """
-
-    if is_substituent:
-        return None
-    candidates = [group.key for group in perceived_groups if group.is_principal_candidate]
-    return suffixes.most_senior(candidates).key if candidates else None
-
-
-def _anhydride_half_name(mol: Molecule, start_c: int, bridge_o: int) -> str:
-    """Name one acid half of an anhydride component.
-
-    Blue Book references: P-65.7 for acid anhydride names.
-    """
-
-    half_atoms = set()
-    queue = [start_c]
-    visited = {bridge_o}
-    while queue:
-        curr = queue.pop(0)
-        if curr not in half_atoms:
-            half_atoms.add(curr)
-            visited.add(curr)
-            queue.extend([x for x in mol.get_neighbors(curr) if x not in visited])
-
-    sub_mol = Molecule()
-    for n in half_atoms:
-        atom = mol.atoms[n]
-        sub_mol.add_atom(symbol=atom.symbol, idx=n, charge=atom.charge, stereo=atom.stereo)
-    oh_idx = max(mol.atoms.keys()) + 100
-    sub_mol.add_atom(symbol="O", idx=oh_idx)
-    sub_mol.add_bond(u=start_c, v=oh_idx, order=1)
-    half_atoms.add(oh_idx)
-
-    for n in half_atoms:
-        if n == oh_idx:
-            continue
-        for nxt in mol.get_neighbors(n):
-            if nxt in half_atoms and n < nxt:
-                bond = mol.get_bond(n, nxt)
-                sub_mol.add_bond(
-                    u=n, v=nxt, order=bond.order, stereo=bond.stereo, in_small_ring=bond.in_small_ring
-                )
-
-    return name_component(sub_mol, half_atoms).replace(" acid", "")
-
-
-def _try_name_anhydride_component(mol: Molecule, perceived_groups: list[PerceivedGroup], principal_key: str | None) -> str:
-    """Return an anhydride component name when the component is an anhydride.
-
-    Blue Book references: P-65.7 for symmetrical and unsymmetrical acid
-    anhydride names.
-    """
-
-    if principal_key != "anhydride":
-        return ""
-    for group in perceived_groups:
-        if group.key != "anhydride":
-            continue
-        bridge_o = next((o for o in group.atoms_involved if mol.degree(o) == 2 and mol.atoms[o].symbol == "O"), None)
-        if bridge_o is None:
-            continue
-        c_neighbors = [n for n in mol.get_neighbors(bridge_o) if mol.atoms[n].is_carbon]
-        if len(c_neighbors) != 2:
-            continue
-        name1 = _anhydride_half_name(mol, c_neighbors[0], bridge_o)
-        name2 = _anhydride_half_name(mol, c_neighbors[1], bridge_o)
-        if name1 == name2:
-            return f"{name1} anhydride"
-        names = sorted([name1, name2])
-        return f"{names[0]} {names[1]} anhydride"
-    return ""
-
-
-def _retarget_external_carbonyl_groups(
-    mol: Molecule,
-    perceived_groups: list[PerceivedGroup],
-    principal_key: str | None,
-    exclude_atoms: set[int],
-    cyclic_atoms_all: set[int],
-) -> None:
-    """Move exocyclic carbonyl group attachment onto the parent chain atom.
-
-    Blue Book references: P-44.3 and P-65/P-66 for carbonyl-containing suffix
-    groups attached to chains and rings.
-    """
-
-    for group in perceived_groups:
-        if group.key == principal_key or group.key not in CHAIN_EXTERNAL_CARBONYL_GROUPS:
-            continue
-        group_c = group.attachment_carbon
-        if group_c in cyclic_atoms_all:
-            continue
-        adj_c = [n for n in mol.get_neighbors(group_c) if mol.atoms[n].is_carbon and n not in group.atoms_involved]
-        if len(adj_c) == 1:
-            group.attachment_carbon = adj_c[0]
-            group.atoms_involved.add(group_c)
-            exclude_atoms.add(group_c)
-
-
-def _exclude_nonparent_group_atoms(
-    mol: Molecule, perceived_groups: list[PerceivedGroup], exclude_atoms: set[int], cyclic_atoms_all: set[int]
-) -> None:
-    """Exclude linker atoms that should not become part of the parent skeleton.
-
-    Blue Book references: P-44.3 and P-65 through P-67 for suffix group atoms
-    cited outside the parent hydride.
-    """
-
-    for group in perceived_groups:
-        if group.key == "anhydride":
-            atom_idx = next((o for o in group.atoms_involved if mol.degree(o) == 2 and mol.atoms[o].symbol == "O"), None)
-        elif group.key in ESTER_LIKE_PREFIX_GROUPS:
-            if group.key in PEROXY_ESTER_GROUPS:
-                atom_idx = next(
-                    (
-                        o
-                        for o in group.atoms_involved
-                        if mol.atoms[o].symbol == "O"
-                        and mol.get_bond(o, group.attachment_carbon) is None
-                        and mol.degree(o) == 2
-                    ),
-                    None,
-                )
-            else:
-                atom_idx = next((o for o in group.atoms_involved if mol.degree(o) == 2 or mol.atoms[o].charge == -1), None)
-        elif group.key in SULFONYL_PREFIX_GROUPS:
-            atom_idx = next((s for s in group.atoms_involved if mol.atoms[s].symbol == "S"), None)
-        elif group.key in AMIDE_LIKE_PREFIX_GROUPS:
-            atom_idx = next((n for n in group.atoms_involved if mol.atoms[n].symbol == "N"), None)
-        else:
-            atom_idx = None
-
-        if atom_idx is not None and atom_idx not in cyclic_atoms_all:
-            exclude_atoms.add(atom_idx)
-
-
-def _partition_principal_and_prefix_groups(
-    perceived_groups: list[PerceivedGroup], principal_key: str | None
-) -> tuple[list[int], list[PerceivedGroup]]:
-    """Split perceived groups into principal attachment atoms and prefixes.
-
-    Blue Book references: P-41 and P-44 for principal groups and prefixes.
-    """
-
-    principal_carbons = []
-    prefix_groups = []
-    for group in perceived_groups:
-        if group.key == principal_key:
-            principal_carbons.append(group.attachment_carbon)
-        else:
-            prefix_groups.append(group)
-    return principal_carbons, prefix_groups
 
 
 def _select_component_parent(mol: Molecule, exclude_atoms: set[int], principal_carbons: list[int]):
@@ -1916,138 +496,6 @@ def _select_component_parent(mol: Molecule, exclude_atoms: set[int], principal_c
     if not chains and not ring_systems:
         return None
     return select_principal_parent(mol, chains, ring_systems, principal_carbons)
-
-
-def _filter_component_groups_to_parent(
-    perceived_groups: list[PerceivedGroup], parent_set: set[int], is_substituent: bool
-) -> tuple[list[PerceivedGroup], str | None, list[int], list[PerceivedGroup]]:
-    """Keep only groups attached to the selected parent and recompute seniority.
-
-    Blue Book references: P-44 for choosing the parent before assigning suffix
-    and prefix roles.
-    """
-
-    valid_groups = [group for group in perceived_groups if group.attachment_carbon in parent_set]
-    principal_key = _component_principal_key(valid_groups, is_substituent)
-    principal_carbons, prefix_groups = _partition_principal_and_prefix_groups(valid_groups, principal_key)
-    return valid_groups, principal_key, principal_carbons, prefix_groups
-
-
-def _principal_involved_atoms(
-    perceived_groups: list[PerceivedGroup], principal_key: str | None, parent_path: list[int]
-) -> set[int]:
-    """Return atoms already consumed by the principal group on the parent.
-
-    Blue Book references: P-44 and P-65 through P-67; principal group atoms are
-    not re-named as substituent branches.
-    """
-
-    atoms = set()
-    if principal_key:
-        for group in perceived_groups:
-            if group.key == principal_key and group.attachment_carbon in parent_path:
-                atoms.update(group.atoms_involved)
-    return atoms
-
-
-def _ester_prefix_from_group(mol: Molecule, group: PerceivedGroup, sub_exclude: set[int], suffix_text: str) -> str:
-    """Return an alkoxycarbonyl or alkoxysulfonyl-style prefix.
-
-    Blue Book references: P-65.6 and P-67.1 for ester and sulfonate prefixes
-    when these groups are not principal.
-    """
-
-    if group.key in PEROXY_ESTER_GROUPS:
-        single_o = next(
-            (
-                o
-                for o in group.atoms_involved
-                if mol.atoms[o].symbol == "O"
-                and mol.get_bond(o, group.attachment_carbon) is None
-                and mol.degree(o) == 2
-            ),
-            None,
-        )
-    else:
-        single_o = next((o for o in group.atoms_involved if mol.degree(o) == 2 or mol.atoms[o].charge == -1), None)
-
-    if single_o is None:
-        return ""
-    r_group_c = next((n for n in mol.get_neighbors(single_o) if n not in group.atoms_involved), None)
-    if r_group_c is None:
-        return ""
-    branch_name = name_subgraph(mol, r_group_c, sub_exclude | {single_o}, upstream_atom=single_o)
-    if not branch_name:
-        return ""
-    return f"({_oxy_prefix_from_branch(branch_name)}{suffix_text})"
-
-
-def _amide_prefix_from_group(mol: Molecule, group: PerceivedGroup, sub_exclude: set[int]) -> str:
-    """Return carbamoyl or carbamothioyl prefix text for an amide-like group.
-
-    Blue Book references: P-66.1 for amide and thioamide prefixes, including
-    N-substituted prefix forms.
-    """
-
-    single_n = next((n for n in group.atoms_involved if mol.atoms[n].symbol == "N"), None)
-    if single_n is None:
-        return ""
-    n_subs = [n for n in mol.get_neighbors(single_n) if n not in group.atoms_involved and mol.atoms[n].symbol != "H"]
-    if not n_subs:
-        return AMIDE_PREFIX_BASES[group.key]
-    sub_names = [name_subgraph(mol, x, sub_exclude | {single_n}, upstream_atom=single_n) for x in n_subs]
-    return f"({_format_counted_prefixes(sub_names)}{AMIDE_PREFIX_BASES[group.key]})"
-
-
-def _collect_component_prefix_substituents(
-    mol: Molecule,
-    prefix_groups: list[PerceivedGroup],
-    parent_path: list[int],
-    sub_exclude: set[int],
-) -> tuple[dict[int, list[SubstituentItem]], set[int]]:
-    """Collect characteristic groups cited as prefixes on the component parent.
-
-    Blue Book references: P-61 through P-67 for detachable prefixes and suffix
-    groups cited as prefixes when they are not principal.
-    """
-
-    main_set = set(parent_path)
-    subst_mapping: dict[int, list[SubstituentItem]] = {}
-    handled_prefix_atoms = set()
-
-    for group in prefix_groups:
-        if group.key in PREFIX_GROUPS_TO_SKIP or group.attachment_carbon not in main_set:
-            continue
-
-        name = ""
-        if group.key in ESTER_LIKE_PREFIX_GROUPS:
-            name = _ester_prefix_from_group(mol, group, sub_exclude, "carbonyl")
-        elif group.key in AMIDE_LIKE_PREFIX_GROUPS:
-            name = _amide_prefix_from_group(mol, group, sub_exclude)
-        elif group.key in CARBOXY_PREFIX_GROUPS:
-            name = "carboxy"
-        elif group.key in CYANO_PREFIX_GROUPS:
-            name = "cyano"
-        elif group.key in ACID_HALIDE_PREFIXES:
-            name = ACID_HALIDE_PREFIXES[group.key]
-        elif group.key in PEROXY_ACID_PREFIX_GROUPS:
-            name = "carboperoxy"
-        elif group.key in SULFONYL_PREFIX_GROUPS:
-            name = _ester_prefix_from_group(mol, group, sub_exclude, "sulfonyl") or "sulfo"
-        elif group.key in DIRECT_PREFIX_GROUPS:
-            name = DIRECT_PREFIX_GROUPS[group.key]
-        elif group.attachment_carbon in parent_path:
-            name = suffixes.get(group.key).prefix if group.is_principal_candidate else substituents.get(group.key).prefix
-
-        if name:
-            trace_atoms = set(group.atoms_involved)
-            trace_bonds = _bond_ids_within(mol, trace_atoms | {group.attachment_carbon})
-            subst_mapping.setdefault(group.attachment_carbon, []).append(
-                SubstituentItem(name=name, locants=[], atom_ids=trace_atoms, bond_ids=trace_bonds)
-            )
-            handled_prefix_atoms.update(group.atoms_involved)
-
-    return subst_mapping, handled_prefix_atoms
 
 
 def _collect_component_branch_substituents(
@@ -2199,133 +647,6 @@ def _build_component_parts(
     return parts
 
 
-def _add_component_front_modifiers(
-    mol: Molecule,
-    parts: AssemblyParts,
-    perceived_groups: list[PerceivedGroup],
-    principal_key: str | None,
-    sub_exclude: set[int],
-) -> None:
-    """Add ester/sulfonate front modifiers such as the alcohol component name.
-
-    Blue Book references: P-65.6 and P-67.1 for ester and sulfonate component
-    names with front modifiers.
-    """
-
-    if principal_key not in FRONT_MODIFIER_PRINCIPAL_GROUPS:
-        return
-    for group in perceived_groups:
-        if group.key != principal_key:
-            continue
-        c_idx = group.attachment_carbon
-        if group.key in PEROXY_ESTER_GROUPS:
-            single_o = next(
-                (
-                    o
-                    for o in group.atoms_involved
-                    if mol.atoms[o].symbol == "O" and mol.get_bond(o, c_idx) is None and mol.degree(o) == 2
-                ),
-                None,
-            )
-        else:
-            single_o = next((o for o in group.atoms_involved if mol.degree(o) == 2 or mol.atoms[o].charge == -1), None)
-        if single_o is None:
-            continue
-        r_group_c = next((n for n in mol.get_neighbors(single_o) if n not in group.atoms_involved), None)
-        if r_group_c is None:
-            continue
-        branch_name = name_subgraph(mol, r_group_c, sub_exclude | {single_o}, upstream_atom=single_o)
-        if branch_name:
-            parts.front_modifiers.append(_strip_outer_parentheses(branch_name))
-
-
-def _add_component_n_substituents(
-    mol: Molecule,
-    parts: AssemblyParts,
-    perceived_groups: list[PerceivedGroup],
-    principal_key: str | None,
-    numbered_path: list[int],
-    get_loc,
-    sub_exclude: set[int],
-) -> None:
-    """Add N-substituent prefixes and N/N' locants for principal groups.
-
-    Blue Book references: P-62 and P-66 for amines, amides, imines,
-    hydrazones, and hydrazines with N-substitution.
-    """
-
-    if principal_key not in N_SUBSTITUENT_PRINCIPAL_GROUPS:
-        return
-    principal_groups = [g for g in perceived_groups if g.key == principal_key and g.attachment_carbon in numbered_path]
-    principal_groups.sort(key=lambda g: parse_locant(get_loc(g.attachment_carbon)))
-
-    n_idx_global = 0
-    for group in principal_groups:
-        c_idx = group.attachment_carbon
-        nitrogens = [n for n in group.atoms_involved if mol.atoms[n].symbol == "N"]
-        nitrogens.sort(key=lambda n: mol.get_bond(n, c_idx) is not None, reverse=True)
-        for single_n in nitrogens:
-            n_substituents = [
-                n
-                for n in mol.get_neighbors(single_n)
-                if n != c_idx and n not in group.atoms_involved and mol.atoms[n].symbol != "H"
-            ]
-
-            if principal_key == "hydrazine":
-                loc_prefix = "N" if single_n == nitrogens[0] else "N'"
-            elif principal_key in HYDRAZONE_PRINCIPAL_GROUPS:
-                loc_prefix = "N"
-            elif len(principal_groups) == 1 and len(nitrogens) == 1:
-                loc_prefix = "N"
-            else:
-                loc_prefix = "N" + "'" * n_idx_global
-
-            for n_sub in n_substituents:
-                branch_name, branch_trace = name_subgraph(
-                    mol, n_sub, sub_exclude | {single_n}, upstream_atom=single_n, return_trace=True
-                )
-                if branch_name:
-                    branch_atoms = _subgraph_component(mol, n_sub, sub_exclude | {single_n})
-                    _add_substituent_trace(
-                        parts,
-                        branch_name,
-                        loc_prefix,
-                        branch_atoms,
-                        _bond_ids_within(mol, branch_atoms | {single_n}),
-                        branch_trace,
-                    )
-            n_idx_global += 1
-
-
-def _add_component_principal_group(
-    mol: Molecule,
-    parts: AssemblyParts,
-    perceived_groups: list[PerceivedGroup],
-    principal_key: str | None,
-    principal_carbons: list[int],
-    numbered_path: list[int],
-    get_loc,
-) -> None:
-    """Add the principal characteristic group suffix locants to assembly parts.
-
-    Blue Book references: P-41 and P-44 for senior characteristic group suffixes.
-    """
-
-    if principal_key:
-        locants = sorted([get_loc(c) for c in principal_carbons if c in numbered_path], key=parse_locant)
-        atom_ids = set()
-        for group in perceived_groups:
-            if group.key == principal_key and group.attachment_carbon in numbered_path:
-                atom_ids.add(group.attachment_carbon)
-                atom_ids.update(group.atoms_involved)
-        parts.principal_group = PrincipalGroupItem(
-            key=principal_key,
-            locants=locants,
-            atom_ids=atom_ids,
-            bond_ids=_bond_ids_within(mol, atom_ids),
-        )
-
-
 def _add_component_substituents(
     parts: AssemblyParts, subst_mapping: dict[int, list[SubstituentItem]], numbered_path: list[int], get_loc
 ) -> None:
@@ -2342,7 +663,13 @@ def _add_component_substituents(
                 _add_substituent_trace(parts, item.name, locant, item.atom_ids, item.bond_ids, item.trace_segments)
 
 
-def name_component(mol: Molecule, component_atoms: set[int], is_substituent: bool = False, return_trace: bool = False):
+def name_component(
+    mol: Molecule,
+    component_atoms: set[int],
+    is_substituent: bool = False,
+    return_trace: bool = False,
+    decision_trace: DecisionTrace | None = None,
+):
     """Name one connected component or recursive component of a molecule.
 
     Blue Book references: P-44 and P-45 for parent selection, P-52/P-53 for
@@ -2352,68 +679,159 @@ def name_component(mol: Molecule, component_atoms: set[int], is_substituent: boo
 
     single_atom_name = _single_atom_component_name(mol, component_atoms)
     if single_atom_name:
+        _trace_decision(
+            decision_trace,
+            TracePhase.COMPONENT,
+            "named single-atom component",
+            "A one-atom ionic component is named directly before parent selection.",
+            atoms=component_atoms,
+            data={"name": single_atom_name},
+        )
         if return_trace:
             return single_atom_name, []
         return single_atom_name
 
-    perceived_groups = _component_groups(mol, component_atoms)
-    principal_key = _component_principal_key(perceived_groups, is_substituent)
+    state = ComponentNamingState(component_atoms=set(component_atoms), is_substituent=is_substituent)
+    state.perceived_groups = _component_groups(mol, state.component_atoms)
+    _trace_decision(
+        decision_trace,
+        TracePhase.PERCEPTION,
+        "identified functional groups",
+        "Functional-group perception binds matched subgroups to graph atoms before priority selection.",
+        atoms=state.component_atoms,
+        data={"groups": _functional_group_trace_data(state.perceived_groups)},
+    )
+    state.principal_key = _component_principal_key(state.perceived_groups, state.is_substituent)
+    _trace_decision(
+        decision_trace,
+        TracePhase.PRIORITY,
+        "selected principal group",
+        "Principal candidates are ranked with the seniority order from rules.suffixes.",
+        atoms={group.attachment_carbon for group in state.perceived_groups if group.key == state.principal_key},
+        data={"principal_key": state.principal_key, "is_substituent": state.is_substituent},
+    )
 
-    anhydride_name = _try_name_anhydride_component(mol, perceived_groups, principal_key)
+    anhydride_name = _try_name_anhydride_component(mol, state.perceived_groups, state.principal_key, name_component)
     if anhydride_name:
+        _trace_decision(
+            decision_trace,
+            TracePhase.ASSEMBLY,
+            "used anhydride component shortcut",
+            "Anhydrides are split into acid halves and assembled before normal parent selection.",
+            atoms=state.component_atoms,
+            data={"name": anhydride_name},
+        )
         if return_trace:
             return anhydride_name, []
         return anhydride_name
 
-    exclude_atoms = set(mol.atoms.keys()) - component_atoms
-    cyclic_atoms_all = get_cyclic_atoms(mol, set())
-    _retarget_external_carbonyl_groups(mol, perceived_groups, principal_key, exclude_atoms, cyclic_atoms_all)
-    principal_carbons, _ = _partition_principal_and_prefix_groups(perceived_groups, principal_key)
-    _exclude_nonparent_group_atoms(mol, perceived_groups, exclude_atoms, cyclic_atoms_all)
+    state.exclude_atoms = set(mol.atoms.keys()) - state.component_atoms
+    state.cyclic_atoms_all = get_cyclic_atoms(mol, set())
+    _retarget_external_carbonyl_groups(
+        mol,
+        state.perceived_groups,
+        state.principal_key,
+        state.exclude_atoms,
+        state.cyclic_atoms_all,
+    )
+    state.principal_carbons, _ = _partition_principal_and_prefix_groups(state.perceived_groups, state.principal_key)
+    _exclude_nonparent_group_atoms(mol, state.perceived_groups, state.exclude_atoms, state.cyclic_atoms_all)
 
-    parent_selection = _select_component_parent(mol, exclude_atoms, principal_carbons)
-    if parent_selection is None:
+    state.parent_selection = _select_component_parent(mol, state.exclude_atoms, state.principal_carbons)
+    if state.parent_selection is None:
+        _trace_decision(
+            decision_trace,
+            TracePhase.PARENT_SELECTION,
+            "used methane fallback",
+            "No supported chain or ring parent was found after exclusions.",
+            atoms=state.component_atoms,
+            data={"excluded_atoms": sorted(state.exclude_atoms)},
+        )
         if return_trace:
             return "methane", []
         return "methane"
 
-    best_paths, is_ring, is_bicycle, is_spiro, is_polycycle, xyz, polycycle_descriptor = parent_selection
-    parent_path = best_paths[0]
-    parent_set = set(parent_path)
-
-    perceived_groups, principal_key, principal_carbons, prefix_groups = _filter_component_groups_to_parent(
-        perceived_groups, parent_set, is_substituent
+    _trace_decision(
+        decision_trace,
+        TracePhase.PARENT_SELECTION,
+        "selected parent skeleton",
+        "The parent is chosen after splitting ring systems/chains and scoring principal-group coverage and parent size.",
+        atoms=state.parent_set,
+        bonds=_bond_ids_within(mol, state.parent_set),
+        data={
+            "parent_atoms": state.parent_path,
+            "is_ring": state.parent_selection.is_ring,
+            "is_bicycle": state.parent_selection.is_bicycle,
+            "is_spiro": state.parent_selection.is_spiro,
+            "is_polycycle": state.parent_selection.is_polycycle,
+            "polycycle_descriptor": state.parent_selection.polycycle_descriptor,
+        },
     )
-    retained_name_val, locant_maps = _retained_subgraph_ring(mol, parent_path, is_ring, is_bicycle, is_polycycle)
 
-    principal_involved_atoms = _principal_involved_atoms(perceived_groups, principal_key, parent_path)
-    base_exclude = set(mol.atoms.keys()) - component_atoms
-    sub_exclude = base_exclude | parent_set | principal_involved_atoms
+    state.perceived_groups, state.principal_key, state.principal_carbons, state.prefix_groups = (
+        _filter_component_groups_to_parent(state.perceived_groups, state.parent_set, state.is_substituent)
+    )
+    state.retained_name, state.locant_maps = _retained_subgraph_ring(
+        mol,
+        state.parent_path,
+        state.parent_selection.is_ring,
+        state.parent_selection.is_bicycle,
+        state.parent_selection.is_polycycle,
+    )
+    if state.retained_name:
+        _trace_decision(
+            decision_trace,
+            TracePhase.PARENT_SELECTION,
+            "used retained parent name",
+            "The selected ring parent matched a retained ring table with locant maps.",
+            atoms=state.parent_set,
+            data={"retained_name": state.retained_name, "locant_map_count": len(state.locant_maps or [])},
+        )
+
+    state.principal_involved_atoms = _principal_involved_atoms(
+        state.perceived_groups,
+        state.principal_key,
+        state.parent_path,
+    )
+    state.base_exclude = set(mol.atoms.keys()) - state.component_atoms
+    state.sub_exclude = state.base_exclude | state.parent_set | state.principal_involved_atoms
 
     subst_mapping, handled_prefix_atoms = _collect_component_prefix_substituents(
-        mol, prefix_groups, parent_path, sub_exclude
+        mol,
+        state.prefix_groups,
+        state.parent_path,
+        state.sub_exclude,
+        name_subgraph,
     )
     _collect_component_branch_substituents(
         mol,
-        parent_path,
+        state.parent_path,
         subst_mapping,
         handled_prefix_atoms,
-        principal_involved_atoms,
-        base_exclude,
-        sub_exclude,
+        state.principal_involved_atoms,
+        state.base_exclude,
+        state.sub_exclude,
     )
 
     numbered_path, locant_map = _choose_component_numbering(
         mol,
-        best_paths,
-        principal_carbons,
+        state.parent_selection.paths,
+        state.principal_carbons,
         subst_mapping,
-        locant_maps,
-        is_ring,
-        is_bicycle,
-        is_spiro,
-        is_polycycle,
-        retained_name_val,
+        state.locant_maps,
+        state.parent_selection.is_ring,
+        state.parent_selection.is_bicycle,
+        state.parent_selection.is_spiro,
+        state.parent_selection.is_polycycle,
+        state.retained_name,
+    )
+    _trace_decision(
+        decision_trace,
+        TracePhase.NUMBERING,
+        "selected numbering",
+        "Numbering minimizes principal-group, heteroatom, substituent, and unsaturation locants.",
+        atoms=set(numbered_path),
+        data={"numbered_path": numbered_path, "locants": locant_map or {atom: i + 1 for i, atom in enumerate(numbered_path)}},
     )
     get_loc = _subgraph_locant_getter(numbered_path, locant_map)
 
@@ -2421,24 +839,62 @@ def name_component(mol: Molecule, component_atoms: set[int], is_substituent: boo
         mol,
         numbered_path,
         get_loc,
-        retained_name_val,
-        is_ring,
-        is_bicycle,
-        is_spiro,
-        is_polycycle,
-        xyz,
-        polycycle_descriptor,
+        state.retained_name,
+        state.parent_selection.is_ring,
+        state.parent_selection.is_bicycle,
+        state.parent_selection.is_spiro,
+        state.parent_selection.is_polycycle,
+        state.parent_selection.xyz,
+        state.parent_selection.polycycle_descriptor,
     )
-    _emit_bond_stereo(mol, parts, numbered_path, get_loc, base_exclude)
+    _emit_bond_stereo(mol, parts, numbered_path, get_loc, state.base_exclude)
     _add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
-    _add_component_front_modifiers(mol, parts, perceived_groups, principal_key, sub_exclude)
-    _add_component_n_substituents(mol, parts, perceived_groups, principal_key, numbered_path, get_loc, sub_exclude)
-    _add_subgraph_parent_features(mol, parts, numbered_path, get_loc, is_bicycle, is_spiro, is_polycycle)
-    _add_component_principal_group(mol, parts, perceived_groups, principal_key, principal_carbons, numbered_path, get_loc)
+    _add_component_front_modifiers(mol, parts, state.perceived_groups, state.principal_key, state.sub_exclude, name_subgraph)
+    _add_component_n_substituents(
+        mol,
+        parts,
+        state.perceived_groups,
+        state.principal_key,
+        numbered_path,
+        get_loc,
+        state.sub_exclude,
+        name_subgraph,
+    )
+    _add_subgraph_parent_features(
+        mol,
+        parts,
+        numbered_path,
+        get_loc,
+        state.parent_selection.is_bicycle,
+        state.parent_selection.is_spiro,
+        state.parent_selection.is_polycycle,
+    )
+    _add_component_principal_group(
+        mol,
+        parts,
+        state.perceived_groups,
+        state.principal_key,
+        state.principal_carbons,
+        numbered_path,
+        get_loc,
+    )
     _add_component_substituents(parts, subst_mapping, numbered_path, get_loc)
 
     name = assemble_name(parts)
     name = SPECIAL_COMPONENT_NAMES.get(name, name)
+    _trace_decision(
+        decision_trace,
+        TracePhase.ASSEMBLY,
+        "assembled component name",
+        "AssemblyParts combines parent, suffix group, prefixes, unsaturation, stereochemistry, and retained-name replacements.",
+        atoms=set(numbered_path),
+        data={
+            "name": name,
+            "principal_key": state.principal_key,
+            "substituent_count": len(parts.substituents),
+            "unsaturation_count": len(parts.unsaturations),
+        },
+    )
     if return_trace:
         return name, _assembly_trace_segments(parts)
     return name
@@ -2452,14 +908,46 @@ def name_smiles_with_trace(smiles: str) -> tuple[str, list[dict]]:
     selected during parent, prefix, unsaturation, and suffix assembly.
     """
 
+    analysis = analyze_smiles(smiles)
+    return analysis.name, analysis.trace_segments
+
+
+def analyze_smiles(smiles: str) -> NameAnalysis:
+    """Return a generated name with structure annotations and decision traces.
+
+    The default ``name_smiles`` path stays minimal. This analysis API turns on
+    explainability and records the major choices in the pipeline: parsing,
+    component splitting, functional-group perception, priority, parent
+    selection, numbering, and final assembly.
+    """
+
+    decisions = DecisionTrace()
     mol = read_smiles(smiles)
+    _trace_decision(
+        decisions,
+        TracePhase.PARSE,
+        "parsed SMILES",
+        "RDKit parsing populated the internal Molecule graph used by the namer.",
+        atoms=set(mol.atoms.keys()),
+        bonds=set(mol.bonds.keys()),
+        data={"smiles": smiles, "atom_count": len(mol.atoms), "bond_count": len(mol.bonds)},
+    )
     if not mol.atoms:
-        return "", []
+        return NameAnalysis(name="", trace_segments=[], decisions=decisions.steps)
+
     components = get_connected_components(mol)
+    _trace_decision(
+        decisions,
+        TracePhase.COMPONENT,
+        "split molecule into components",
+        "Each connected graph component is named independently before final component ordering.",
+        atoms=set(mol.atoms.keys()),
+        data={"components": [sorted(component) for component in components]},
+    )
 
     named_components = []
     for comp in components:
-        comp_name, trace = name_component(mol, comp, return_trace=True)
+        comp_name, trace = name_component(mol, comp, return_trace=True, decision_trace=decisions)
         if comp_name:
             named_components.append((comp_name, trace))
 
@@ -2472,7 +960,15 @@ def name_smiles_with_trace(smiles: str) -> tuple[str, list[dict]]:
     traces = []
     for _, trace in named_components:
         traces.extend(trace)
-    return final_name, traces
+    _trace_decision(
+        decisions,
+        TracePhase.ASSEMBLY,
+        "assembled final molecule name",
+        "Named components are sorted with supported salt metals first, then joined.",
+        atoms=set(mol.atoms.keys()),
+        data={"name": final_name, "components": [name for name, _ in named_components]},
+    )
+    return NameAnalysis(name=final_name, trace_segments=traces, decisions=decisions.steps)
 
 def name_smiles(smiles: str) -> str:
     """Return an IUPAC-style name for a SMILES string.

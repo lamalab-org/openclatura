@@ -1,0 +1,32 @@
+"""Shared data-backed configuration for the naming pipeline."""
+
+from .naming_data import mapping, values
+
+
+INDICATED_H_RETAINED_NAMES = set(values("indicated_hydrogen_retained_names"))
+ALKYL_OXY_PREFIXES = mapping("alkyl_oxy_prefixes")
+SIMPLE_SULFANYL_PREFIXES = set(values("simple_sulfanyl_prefixes"))
+SIMPLE_SELANYL_PREFIXES = set(values("simple_selanyl_prefixes"))
+HALOGEN_PREFIXES = mapping("halogen_prefixes")
+HALOGEN_LAMBDA_SUFFIXES = mapping("halogen_lambda_suffixes")
+RETAINED_RING_ELEMENTS = set(values("retained_ring_elements"))
+DIRECT_GROUP_PREFIXES = mapping("direct_group_prefixes")
+CHAIN_EXTERNAL_CARBONYL_GROUPS = set(values("chain_external_carbonyl_groups"))
+PREFIX_GROUPS_TO_SKIP = set(values("prefix_groups_to_skip"))
+ESTER_LIKE_PREFIX_GROUPS = set(values("ester_like_prefix_groups"))
+PEROXY_ESTER_GROUPS = set(values("peroxy_ester_groups"))
+AMIDE_LIKE_PREFIX_GROUPS = set(values("amide_like_prefix_groups"))
+AMIDE_PREFIX_BASES = mapping("amide_prefix_bases")
+CARBOXY_PREFIX_GROUPS = set(values("carboxy_prefix_groups"))
+CYANO_PREFIX_GROUPS = set(values("cyano_prefix_groups"))
+ACID_HALIDE_PREFIXES = mapping("acid_halide_prefixes")
+PEROXY_ACID_PREFIX_GROUPS = set(values("peroxy_acid_prefix_groups"))
+SULFONYL_PREFIX_GROUPS = set(values("sulfonyl_prefix_groups"))
+DIRECT_PREFIX_GROUPS = mapping("direct_prefix_groups")
+FRONT_MODIFIER_PRINCIPAL_GROUPS = set(values("front_modifier_principal_groups"))
+N_SUBSTITUENT_PRINCIPAL_GROUPS = set(values("n_substituent_principal_groups"))
+HYDRAZONE_PRINCIPAL_GROUPS = set(values("hydrazone_principal_groups"))
+SPECIAL_COMPONENT_NAMES = mapping("special_component_names")
+SINGLE_ATOM_CATIONS = set(values("single_atom_cations"))
+SINGLE_ATOM_ANIONS = mapping("single_atom_anions")
+SALT_METAL_NAMES = set(values("salt_metal_names"))

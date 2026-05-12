@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 
 # --- Configuration ---
-N_TEST = 1_000
+N_TEST = 50_000
 SEED = 42
 
 
