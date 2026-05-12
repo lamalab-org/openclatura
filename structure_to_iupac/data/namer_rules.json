@@ -245,5 +245,50 @@
     "values": {
       "1-phenylbenzene": "1,1'-biphenyl"
     }
+  },
+  "retained_substituent_stems": {
+    "bluebook_rule": "P-13.6 and retained parent substituent forms",
+    "values": {
+      "benzene": ["phen", ""],
+      "pyridine": ["pyridin", ""],
+      "naphthalene": ["naphthalen", ""]
+    }
+  },
+  "replacement_prefix_order": {
+    "bluebook_rule": "P-51; skeletal replacement prefix citation order",
+    "values": {
+      "oxa": 1,
+      "thia": 2,
+      "aza": 3,
+      "phospha": 4,
+      "sila": 5,
+      "bora": 6
+    }
+  },
+  "unsaturation_order": {
+    "bluebook_rule": "P-31; double-bond infixes precede triple-bond infixes",
+    "values": {
+      "double": 1,
+      "triple": 2
+    }
+  },
+  "acid_halide_suffix_keys": {
+    "bluebook_rule": "P-65.5; acid halide suffix multiplication",
+    "values": [
+      "acid_fluoride",
+      "acid_chloride",
+      "acid_bromide",
+      "acid_iodide",
+      "ring_acid_fluoride",
+      "ring_acid_chloride",
+      "ring_acid_bromide",
+      "ring_acid_iodide"
+    ]
+  },
+  "substituent_sort": {
+    "bluebook_rule": "P-14.5; detachable prefix alphabetization after ignored descriptors",
+    "values": {
+      "prefix_pattern": "^((?:(?:[0-9]+[a-z]*|[nospmc]'*)(?:,(?:[0-9]+[a-z]*|[nospmc]'*))*|[ezrs]+|sec|tert|t|s|d|l|m|o|p|alpha|beta|gamma))([-)]+)"
+    }
   }
 }
