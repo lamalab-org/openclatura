@@ -87,6 +87,27 @@ class TracePhase(str, Enum):
     ASSEMBLY = "assembly"
 
 
+class OperationClass(str, Enum):
+    """High-level IUPAC operation classes represented by the naming pipeline."""
+
+    SUBSTITUTIVE = "substitutive"
+    REPLACEMENT = "replacement"
+    ADDITIVE = "additive"
+    SUBTRACTIVE = "subtractive"
+    CONJUNCTIVE = "conjunctive"
+    MULTIPLICATIVE = "multiplicative"
+    FUSION = "fusion"
+
+
+@dataclass(frozen=True)
+class NomenclatureOperation:
+    """Structured operation record derived from naming decisions."""
+
+    operation_class: OperationClass
+    detail: str
+    locants: tuple[str, ...] = ()
+
+
 @dataclass(frozen=True)
 class TraceStep:
     """One explainable naming decision."""
@@ -134,6 +155,7 @@ class NameAnalysis:
     name: str
     trace_segments: list[dict]
     decisions: list[TraceStep]
+    operations: list[NomenclatureOperation] = field(default_factory=list)
 
 
 class Molecule:

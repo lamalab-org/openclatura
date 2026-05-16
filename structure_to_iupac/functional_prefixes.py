@@ -64,6 +64,25 @@ def amide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     return amide_prefix_from_group(context.mol, group, context.sub_exclude, context.branch_namer)
 
 
+def iminium_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    nitrogens = [n for n in group.atoms_involved if context.mol.atoms[n].symbol == "N"]
+    if not nitrogens:
+        return "iminio"
+    iminium_n = nitrogens[0]
+    n_subs = [
+        n
+        for n in context.mol.get_neighbors(iminium_n)
+        if n != group.attachment_carbon and n not in group.atoms_involved and context.mol.atoms[n].symbol != "H"
+    ]
+    if not n_subs:
+        return "iminio"
+    sub_names = [
+        context.branch_namer(context.mol, n_sub, context.sub_exclude | {iminium_n}, upstream_atom=iminium_n)
+        for n_sub in n_subs
+    ]
+    return f"({format_counted_prefixes(sub_names)}iminio)"
+
+
 def sulfonyl_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     return ester_prefix_from_group(context.mol, group, context.sub_exclude, "sulfonyl", context.branch_namer) or "sulfo"
 
@@ -95,6 +114,7 @@ PREFIX_HANDLERS.update({key: acid_halide_prefix_handler for key in RULES.prefixe
 PREFIX_HANDLERS.update({key: static_prefix_handler("carboperoxy") for key in RULES.prefixes.peroxy_acid_groups})
 PREFIX_HANDLERS.update({key: sulfonyl_prefix_handler for key in RULES.prefixes.sulfonyl_groups})
 PREFIX_HANDLERS.update({key: direct_prefix_handler for key in RULES.prefixes.direct_prefixes})
+PREFIX_HANDLERS["iminium"] = iminium_prefix_handler
 
 
 def prefix_from_group(context: PrefixContext, group: PerceivedGroup) -> str:

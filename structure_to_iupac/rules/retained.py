@@ -472,6 +472,8 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                 if dists ==[1, 1, 3]: return "1,2,3-triazole", None
                 if dists ==[1, 2, 2]: return "1,2,4-triazole", None
                 return None
+            if n_count == 4 and o_count == 0 and s_count == 0:
+                return "tetrazole", None
             if n_count == 1 and s_count == 1 and o_count == 0:
                 n_idx = next(i for i in path if mol.atoms[i].symbol == "N")
                 s_idx = next(i for i in path if mol.atoms[i].symbol == "S")

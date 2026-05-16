@@ -2,12 +2,14 @@
 
 import re
 
+from .formatting import format_counted_prefixes, strip_outer_parentheses
+from .group_atom_roles import amide_nitrogen
 from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
 from .naming_context import ComponentNamingState
 from .perception import perceive_groups, PerceivedGroup
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
 from .parent_selection import select_principal_parent
-from .assembler import assemble_name, AssemblyParts, SubstituentItem
+from .assembler import assemble_name, AssemblyParts, ParentChargeItem, SubstituentItem
 from .component_group_rules import (
     exclude_nonparent_group_atoms as _exclude_nonparent_group_atoms,
     principal_involved_atoms as _principal_involved_atoms,
@@ -20,6 +22,7 @@ from .component_modifiers import (
 from .functional_prefixes import collect_component_prefix_substituents as _collect_component_prefix_substituents
 from .graph_io import get_connected_components, read_smiles
 from .heteroatom_subgraphs import name_heteroatom_subgraph, upstream_bond_order
+from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names
 from .locants import parse_locant
 from .namer_config import (
     DIRECT_GROUP_PREFIXES,
@@ -27,7 +30,9 @@ from .namer_config import (
     SALT_METAL_NAMES,
     SPECIAL_COMPONENT_NAMES,
 )
+from .nomenclature import RULES
 from .numbering import number_parent
+from .operations import infer_operations
 from .principal_groups import (
     add_component_principal_group as _add_component_principal_group,
     component_groups as _component_groups,
@@ -67,11 +72,46 @@ def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) 
 
     for group in perceive_groups(mol):
         if start_idx in group.atoms_involved and group.atoms_involved.issubset(component):
+            if group.key in RULES.prefixes.amide_like_groups:
+                substituted = _direct_amide_subgraph_prefix(mol, group, component)
+                if substituted:
+                    return substituted
             if group.key in DIRECT_GROUP_PREFIXES:
                 return DIRECT_GROUP_PREFIXES[group.key]
             if group.key in substituents.SUBSTITUENTS:
                 return substituents.get(group.key).prefix
     return ""
+
+
+def _direct_amide_subgraph_prefix(mol: Molecule, group: PerceivedGroup, component: set[int]) -> str:
+    """Return substituted carbamoyl/carbamothioyl for direct amide subgraphs."""
+
+    amide_n = amide_nitrogen(mol, group)
+    if amide_n is None:
+        return ""
+    n_substituents = [
+        n
+        for n in mol.get_neighbors(amide_n)
+        if n in component and n not in group.atoms_involved and mol.atoms[n].symbol != "H"
+    ]
+    base = RULES.prefixes.amide_bases[group.key]
+    if not n_substituents:
+        return base
+    outside_component = set(mol.atoms.keys()) - component
+    branch_names = []
+    for n_sub in n_substituents:
+        branch = name_subgraph(
+            mol,
+            n_sub,
+            outside_component | set(group.atoms_involved) | {amide_n},
+            upstream_atom=amide_n,
+        )
+        branch = strip_outer_parentheses(branch)
+        if branch:
+            branch_names.append(branch)
+    if not branch_names:
+        return base
+    return f"({format_counted_prefixes(branch_names)}{base})"
 
 
 def _find_acyclic_subgraph_paths(
@@ -371,6 +411,15 @@ def _build_subgraph_parts(
     for atom_idx in numbered_path:
         if mol.atoms[atom_idx].stereo:
             parts.stereo_features.append((get_loc(atom_idx), mol.atoms[atom_idx].stereo))
+        if mol.atoms[atom_idx].charge:
+            parts.parent_charges.append(
+                ParentChargeItem(
+                    locant=str(get_loc(atom_idx)),
+                    symbol=mol.atoms[atom_idx].symbol,
+                    charge=mol.atoms[atom_idx].charge,
+                    atom_id=atom_idx,
+                )
+            )
     return parts
 
 
@@ -480,6 +529,8 @@ def name_subgraph(
     )
 
     name = _finalize_subgraph_name(assemble_name(parts), parts)
+    name = apply_anionic_parent_names(name, mol, numbered_path, get_loc, parts.retained_name)
+    name = apply_cationic_imino_names(name, mol)
     if return_trace:
         return name, _assembly_trace_segments(parts)
     return name
@@ -644,6 +695,15 @@ def _build_component_parts(
     for atom_idx in numbered_path:
         if mol.atoms[atom_idx].stereo:
             parts.stereo_features.append((get_loc(atom_idx), mol.atoms[atom_idx].stereo))
+        if mol.atoms[atom_idx].charge:
+            parts.parent_charges.append(
+                ParentChargeItem(
+                    locant=str(get_loc(atom_idx)),
+                    symbol=mol.atoms[atom_idx].symbol,
+                    charge=mol.atoms[atom_idx].charge,
+                    atom_id=atom_idx,
+                )
+            )
     return parts
 
 
@@ -881,6 +941,8 @@ def name_component(
     _add_component_substituents(parts, subst_mapping, numbered_path, get_loc)
 
     name = assemble_name(parts)
+    name = apply_anionic_parent_names(name, mol, numbered_path, get_loc, parts.retained_name)
+    name = apply_cationic_imino_names(name, mol)
     name = SPECIAL_COMPONENT_NAMES.get(name, name)
     _trace_decision(
         decision_trace,
@@ -968,7 +1030,12 @@ def analyze_smiles(smiles: str) -> NameAnalysis:
         atoms=set(mol.atoms.keys()),
         data={"name": final_name, "components": [name for name, _ in named_components]},
     )
-    return NameAnalysis(name=final_name, trace_segments=traces, decisions=decisions.steps)
+    return NameAnalysis(
+        name=final_name,
+        trace_segments=traces,
+        decisions=decisions.steps,
+        operations=infer_operations(decisions.steps, traces),
+    )
 
 def name_smiles(smiles: str) -> str:
     """Return an IUPAC-style name for a SMILES string.

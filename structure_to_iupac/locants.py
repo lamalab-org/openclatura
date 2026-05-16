@@ -1,14 +1,61 @@
 """Locant parsing and atom/bond locant helpers."""
 
 import re
+from collections.abc import Iterable, Mapping
 
 from .molecule import Molecule
+
+
+class DisplayLocant(int):
+    """Integer locant with a separate display representation."""
+
+    def __new__(cls, value: int, display: str | None = None):
+        obj = int.__new__(cls, value)
+        obj.display = str(value) if display is None else str(display)
+        return obj
+
+
+def as_display_locant(locant: int, display: str | None = None) -> DisplayLocant:
+    """Return a display-aware locant while preserving existing display text."""
+
+    if isinstance(locant, DisplayLocant) and display is None:
+        return locant
+    inherited_display = getattr(locant, "display", None)
+    return DisplayLocant(int(locant), display if display is not None else inherited_display)
+
+
+def locant_text(locant: int, display: str | None = None) -> str:
+    """Return the rendered text for a locant."""
+
+    if display is not None:
+        return str(display)
+    inherited_display = getattr(locant, "display", None)
+    return str(locant) if inherited_display is None else str(inherited_display)
+
+
+def locant_texts(locants: Iterable[int], display_locants: Iterable[str] | None = None) -> tuple[str, ...]:
+    """Return rendered text for multiple locants."""
+
+    if display_locants is not None:
+        return tuple(str(locant) for locant in display_locants)
+    return tuple(locant_text(locant) for locant in locants)
+
+
+def coerce_display_numbering(
+    numbering: Mapping[int, int], display_numbering: Mapping[int, str] | None = None
+) -> dict[int, DisplayLocant]:
+    """Attach display locants to a numeric atom-numbering map."""
+
+    return {
+        atom: as_display_locant(locant, display_numbering.get(atom) if display_numbering is not None else None)
+        for atom, locant in numbering.items()
+    }
 
 
 def parse_locant(l):
     """Return a sortable representation of a locant string."""
 
-    s = str(l)
+    s = locant_text(l)
     match = re.match(r"^(\d+)([a-zA-Z]*)$", s.split("(")[0])
     if match:
         return (1, float(match.group(1)), match.group(2))

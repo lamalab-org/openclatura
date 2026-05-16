@@ -9,6 +9,8 @@ from .formatting import (
     is_complex_prefix,
     strip_outer_parentheses,
 )
+from .heteroatom_substituent_specs import unsubstituted_prefix
+from .ionic_naming import ammonio_prefix
 from .molecule import Molecule
 from .namer_config import (
     ALKYL_OXY_PREFIXES,
@@ -103,14 +105,31 @@ def name_carbonyl_like_fragment(
     return f"({result})" if wrap_result else result
 
 
-def format_amino_from_branches(branches: list[str], is_double: bool) -> str:
+def format_amino_from_branches(
+    branches: list[str], is_double: bool, is_cation: bool = False, is_anion: bool = False
+) -> str:
     if is_double:
+        if is_cation:
+            if len(branches) == 1:
+                branch = strip_outer_parentheses(branches[0])
+                if is_complex_prefix(branch):
+                    return f"(({branch})iminio)"
+                return f"({branch}iminio)"
+            return "iminio"
         if len(branches) == 1:
             branch = strip_outer_parentheses(branches[0])
             if is_complex_prefix(branch):
                 return f"(({branch})imino)"
             return f"({branch}imino)"
         return "imino"
+
+    if is_cation:
+        return ammonio_prefix([strip_outer_parentheses(branch) for branch in branches])
+    if is_anion:
+        if not branches:
+            return "azanidyl"
+        branch_names = [strip_outer_parentheses(branch) for branch in branches]
+        return f"({format_counted_prefixes(branch_names)}azanidyl)"
 
     counts = count_names(branches)
     if len(counts) == 1 and list(counts.values())[0] == 1:
@@ -150,7 +169,7 @@ def name_oxygen_subgraph(
             return "oxo"
         if start_atom.charge == -1:
             return "oxido"
-        return "hydroxy"
+        return unsubstituted_prefix("O") or "hydroxy"
 
     nxt = next_atoms[0]
     s_oxygens = double_bonded_neighbors(mol, nxt, "O")
@@ -212,12 +231,18 @@ def name_nitrogen_subgraph(
     is_double = upstream_order == 2
     is_triple = upstream_order == 3
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
+    is_cation = mol.atoms[start_idx].charge > 0
+    is_anion = mol.atoms[start_idx].charge < 0
     if not next_atoms:
         if is_double:
             return "imino"
         if is_triple:
             return "nitrilo"
-        return "amino"
+        if is_cation:
+            return "ammonio"
+        if is_anion:
+            return "azanidyl"
+        return unsubstituted_prefix("N") or "amino"
 
     branches = []
     for nxt in next_atoms:
@@ -259,7 +284,7 @@ def name_nitrogen_subgraph(
                 if branch:
                     branches.append(branch)
 
-    return format_amino_from_branches(branches, is_double)
+    return format_amino_from_branches(branches, is_double, is_cation, is_anion)
 
 
 def name_sulfur_subgraph(
@@ -311,7 +336,7 @@ def name_sulfur_subgraph(
         )
 
     if not next_atoms:
-        return "thioxo" if is_double else f"{stereo_prefix_text}sulfanyl"
+        return "thioxo" if is_double else f"{stereo_prefix_text}{unsubstituted_prefix('S') or 'sulfanyl'}"
 
     if len(next_atoms) == 1:
         branch = branch_namer(mol, next_atoms[0], exclude_atoms | {start_idx}, start_idx)
@@ -341,7 +366,7 @@ def name_chalcogen_subgraph(
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
     stereo_prefix_text = stereo_prefix(mol.atoms[start_idx])
     if not next_atoms:
-        return oxo_prefix if is_double else f"{stereo_prefix_text}{element_suffix}"
+        return oxo_prefix if is_double else f"{stereo_prefix_text}{unsubstituted_prefix(mol.atoms[start_idx].symbol) or element_suffix}"
     if len(next_atoms) == 1:
         branch = branch_namer(mol, next_atoms[0], exclude_atoms | {start_idx}, start_idx)
         if branch in simple_prefixes:
@@ -366,7 +391,9 @@ def name_phosphorus_subgraph(
     p_oxygens = double_bonded_neighbors(mol, start_idx, "O")
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom, p_oxygens)
     stereo_prefix_text = stereo_prefix(mol.atoms[start_idx])
-    suffix = ("phosphoryl" if p_oxygens else "phosphanyl") + ("idene" if is_double else "")
+    suffix = (unsubstituted_prefix("P", len(p_oxygens)) or ("phosphoryl" if p_oxygens else "phosphanyl")) + (
+        "idene" if is_double else ""
+    )
     if not next_atoms:
         return f"{stereo_prefix_text}{suffix}"
     branches = [br for nxt in next_atoms if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx} | set(p_oxygens), start_idx))]
@@ -381,7 +408,10 @@ def name_group_13_14_subgraph(
     branch_namer: BranchNamer,
 ) -> str:
     is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
-    suffix = ("silyl" if mol.atoms[start_idx].symbol == "Si" else "boryl") + ("idene" if is_double else "")
+    base_suffix = unsubstituted_prefix(mol.atoms[start_idx].symbol) or (
+        "silyl" if mol.atoms[start_idx].symbol == "Si" else "boryl"
+    )
+    suffix = base_suffix + ("idene" if is_double else "")
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
     if not next_atoms:
         return suffix

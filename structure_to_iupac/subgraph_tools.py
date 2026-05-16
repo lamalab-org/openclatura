@@ -1,10 +1,12 @@
 """Shared graph-fragment helpers for parent and substituent assembly."""
 
-from .assembler import AssemblyParts, SubstituentItem, UnsaturationItem
+from .additive import add_indicated_hydrogens as _add_indicated_hydrogens
+from .additive import add_replacement_prefixes
+from .assembler import AssemblyParts
 from .chains import get_cyclic_atoms
 from .locants import parse_locant
 from .molecule import Molecule
-from .namer_config import INDICATED_H_RETAINED_NAMES
+from .subtractive import add_unsaturations
 
 
 def emit_bond_stereo(mol, parts, numbered_path, get_loc, exclude_atoms=None, upstream_atom=None):
@@ -106,14 +108,7 @@ def subgraph_locant_getter(numbered_path: list[int], locant_map):
 def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     """Add indicated hydrogen locants for retained ring names."""
 
-    if parts.retained_name not in INDICATED_H_RETAINED_NAMES:
-        return
-    for idx in numbered_path:
-        atom = mol.atoms[idx]
-        if atom.symbol in ["N", "C"]:
-            ring_bonds = [mol.get_bond(idx, n) for n in mol.get_neighbors(idx) if n in numbered_path]
-            if sum(b.order for b in ring_bonds) == 2:
-                parts.indicated_hydrogens.append(get_loc(idx))
+    _add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
 
 
 def add_parent_features(
@@ -127,59 +122,5 @@ def add_parent_features(
 ) -> None:
     """Add replacement prefixes and unsaturation locants to assembly parts."""
 
-    if parts.retained_name:
-        return
-
-    for atom_idx in numbered_path:
-        atom = mol.atoms[atom_idx]
-        if not atom.is_carbon:
-            hw_stem = atom.element.hw_stem
-            if hw_stem:
-                valence = sum(mol.get_bond(atom_idx, n).order for n in mol.get_neighbors(atom_idx))
-                loc = get_loc(atom_idx)
-                if atom.charge == 0 and valence > atom.element.standard_valence:
-                    loc = f"{loc}lambda^{valence}"
-                parts.a_prefixes.append(SubstituentItem(name=hw_stem, locants=[loc], atom_ids={atom_idx}))
-
-    seen_bonds = set()
-    for u_idx in numbered_path:
-        for v_idx in mol.get_neighbors(u_idx):
-            if v_idx in numbered_path:
-                bond = mol.get_bond(u_idx, v_idx)
-                if bond and bond.order > 1 and bond.idx not in seen_bonds:
-                    seen_bonds.add(bond.idx)
-                    bond_key = "double" if bond.order == 2 else "triple"
-                    loc_u_idx = numbered_path.index(u_idx)
-                    loc_v_idx = numbered_path.index(v_idx)
-                    min_idx, max_idx = min(loc_u_idx, loc_v_idx), max(loc_u_idx, loc_v_idx)
-
-                    loc_u_str = get_loc(u_idx)
-                    loc_v_str = get_loc(v_idx)
-                    min_loc_str, max_loc_str = (
-                        min(loc_u_str, loc_v_str, key=lambda x: parse_locant(x)),
-                        max(loc_u_str, loc_v_str, key=lambda x: parse_locant(x)),
-                    )
-
-                    if max_idx == min_idx + 1:
-                        locant_str = min_loc_str
-                    elif min_idx == 0 and max_idx == len(numbered_path) - 1 and not (
-                        is_bicycle or is_spiro or is_polycycle
-                    ):
-                        locant_str = max_loc_str
-                    else:
-                        locant_str = f"{min_loc_str}({max_loc_str})"
-
-                    existing = next((u for u in parts.unsaturations if u.bond_key == bond_key), None)
-                    if existing:
-                        existing.locants.append(locant_str)
-                        existing.atom_ids.update({u_idx, v_idx})
-                        existing.bond_ids.add(bond.idx)
-                    else:
-                        parts.unsaturations.append(
-                            UnsaturationItem(
-                                bond_key=bond_key,
-                                locants=[locant_str],
-                                atom_ids={u_idx, v_idx},
-                                bond_ids={bond.idx},
-                            )
-                        )
+    add_replacement_prefixes(mol, parts, numbered_path, get_loc)
+    add_unsaturations(mol, parts, numbered_path, get_loc, is_bicycle, is_spiro, is_polycycle)

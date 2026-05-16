@@ -6,7 +6,9 @@ from .molecule import Molecule
 
 
 @dataclass
-class ParentMetrics:
+class ParentCandidate:
+    """One parent skeleton candidate with explicit scoring metadata."""
+
     path: list[int]
     is_ring: bool
     is_bicycle: bool
@@ -15,8 +17,46 @@ class ParentMetrics:
     xyz: tuple[int, int, int]
     principal_groups_count: int
     length: int
+    score_tuple: tuple
 
-    def sort_key(self) -> tuple:
+    @classmethod
+    def build(
+        cls,
+        path: list[int],
+        *,
+        is_ring: bool,
+        is_bicycle: bool,
+        is_spiro: bool,
+        is_polycycle: bool,
+        xyz: tuple[int, int, int],
+        principal_groups_count: int,
+    ) -> "ParentCandidate":
+        """Build a candidate using the current parent-selection preference order."""
+
+        score_tuple = (
+            -principal_groups_count,
+            -int(is_polycycle),
+            -int(is_bicycle),
+            -int(is_spiro),
+            -int(is_ring),
+            -len(path),
+            tuple(path),
+        )
+        return cls(
+            path=path,
+            is_ring=is_ring,
+            is_bicycle=is_bicycle,
+            is_spiro=is_spiro,
+            is_polycycle=is_polycycle,
+            xyz=xyz,
+            principal_groups_count=principal_groups_count,
+            length=len(path),
+            score_tuple=score_tuple,
+        )
+
+    def legacy_sort_key(self) -> tuple:
+        """Return the previous max-sort key, kept for traceability."""
+
         return (
             self.principal_groups_count,
             self.is_polycycle,
@@ -39,6 +79,7 @@ class ParentSelection:
     xyz: tuple[int, int, int]
     polycycle_descriptor: str | None = None
     fixed_start_required: bool = False
+    score_tuple: tuple = ()
 
     @property
     def primary_path(self) -> list[int]:
@@ -70,6 +111,7 @@ class ParentSelection:
             xyz=self.xyz,
             polycycle_descriptor=self.polycycle_descriptor,
             fixed_start_required=fixed_start_required,
+            score_tuple=self.score_tuple,
         )
 
 
@@ -81,24 +123,44 @@ def select_principal_parent(
 ) -> ParentSelection | None:
     """Select the best parent skeleton from chain and ring candidates."""
 
-    candidates = []
+    candidates: list[ParentCandidate] = []
 
     for c in chains:
         c_set = set(c)
         pg_count = sum(1 for a in principal_carbons if a in c_set)
-        candidates.append(ParentMetrics(c, False, False, False, False, (0, 0, 0), pg_count, len(c)))
+        candidates.append(
+            ParentCandidate.build(
+                c,
+                is_ring=False,
+                is_bicycle=False,
+                is_spiro=False,
+                is_polycycle=False,
+                xyz=(0, 0, 0),
+                principal_groups_count=pg_count,
+            )
+        )
 
     for rs in ring_systems:
         p = rs.paths[0]
         p_set = set(p)
         pg_count = sum(1 for a in principal_carbons if a in p_set)
         xyz = (rs.x, rs.y, rs.z) if rs.is_bicycle else (rs.x, rs.y, 0)
-        candidates.append(ParentMetrics(p, True, rs.is_bicycle, rs.is_spiro, rs.is_polycycle, xyz, pg_count, len(p)))
+        candidates.append(
+            ParentCandidate.build(
+                p,
+                is_ring=True,
+                is_bicycle=rs.is_bicycle,
+                is_spiro=rs.is_spiro,
+                is_polycycle=rs.is_polycycle,
+                xyz=xyz,
+                principal_groups_count=pg_count,
+            )
+        )
 
     if not candidates:
         return None
 
-    candidates.sort(key=lambda m: m.sort_key(), reverse=True)
+    candidates.sort(key=lambda m: m.score_tuple)
     best = candidates[0]
 
     if best.is_ring:
@@ -112,6 +174,7 @@ def select_principal_parent(
             is_polycycle=best.is_polycycle,
             xyz=best.xyz,
             polycycle_descriptor=descriptor,
+            score_tuple=best.score_tuple,
         )
 
     return ParentSelection(
@@ -121,4 +184,5 @@ def select_principal_parent(
         is_spiro=False,
         is_polycycle=False,
         xyz=(0, 0, 0),
+        score_tuple=best.score_tuple,
     )

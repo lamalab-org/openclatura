@@ -19,6 +19,10 @@ def single_atom_component_name(mol: Molecule, component_atoms: set[int]) -> str:
         return atom.element.name
     if atom.symbol in RULES.ions.single_atom_anions:
         return RULES.ions.single_atom_anions[atom.symbol]
+    if atom.symbol == "N":
+        return "azane"
+    if atom.symbol == "O":
+        return "oxidane"
     return ""
 
 

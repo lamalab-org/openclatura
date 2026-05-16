@@ -145,6 +145,7 @@
       "ether",
       "thioether",
       "amine",
+      "aminium",
       "anhydride",
       "hydrazine",
       "hydrazone",
@@ -230,6 +231,7 @@
       "hydrazine",
       "hydrazone",
       "imine",
+      "iminium",
       "aldehyde_hydrazone",
       "ring_aldehyde_hydrazone",
       "aldehyde_imine",
@@ -257,6 +259,53 @@
       "pyridine": ["pyridin", ""],
       "naphthalene": ["naphthalen", ""]
     }
+  },
+  "ambiguous_connection_substituent_stems": {
+    "bluebook_rule": "P-13.6; explicit attachment locants avoid ambiguous retained-ring radical placement",
+    "values": [
+      "aziridin",
+      "azetidin",
+      "pyrrolidin",
+      "piperidin",
+      "piperazin",
+      "pyrazol",
+      "imidazol",
+      "triazol",
+      "tetrazol",
+      "oxazol",
+      "isoxazol",
+      "thiazol",
+      "isothiazol"
+    ]
+  },
+  "connection_boundary_parent_stems": {
+    "bluebook_rule": "P-13.6; parent stems that retain optional 1-locants at prefix boundaries to avoid ambiguous OPSIN attachment",
+    "values": [
+      "aziridin",
+      "azetidin",
+      "pyrrolidin",
+      "piperidin",
+      "piperazin",
+      "pyrazol",
+      "imidazol",
+      "triazol",
+      "tetrazol",
+      "oxazol",
+      "isoxazol",
+      "thiazol",
+      "isothiazol",
+      "cycloprop",
+      "cyclobut",
+      "cyclopent",
+      "cyclohex",
+      "benzen",
+      "methan",
+      "ethan",
+      "propan",
+      "butan",
+      "pentan",
+      "hexan"
+    ]
   },
   "replacement_prefix_order": {
     "bluebook_rule": "P-51; skeletal replacement prefix citation order",
@@ -306,6 +355,7 @@
       ["aminocarbonylamino", "carbamoylamino"],
       ["aminocarbonyl", "carbamoyl"],
       ["aminosulfonyl", "sulfamoyl"],
+      ["formylamido", "formamido"],
       ["eth-1-en-1-yl", "ethenyl"],
       ["eth-1-enyl", "ethenyl"],
       ["(ethenyl)", "ethenyl"],
@@ -338,5 +388,9 @@
   "postprocess_acyl_amido_terms": {
     "bluebook_rule": "Acyl terms converted from amino to amido forms",
     "values": ["benzoyl", "acetyl", "propionyl", "formyl"]
+  },
+  "postprocess_n_substituted_functional_suffixes": {
+    "bluebook_rule": "P-62, P-66, P-67; functional prefix suffixes whose leading parenthesized substituent is an N-substituent, not a carbon substituent on the acid parent",
+    "values": ["sulfonamido", "sulfinamido", "sulfamoylamino", "carbamoylamino", "carbamothioylamino"]
   }
 }

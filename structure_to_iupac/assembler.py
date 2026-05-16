@@ -3,7 +3,12 @@
 import re
 from dataclasses import dataclass, field
 from typing import Optional
-from .name_postprocessing import apply_acyl_amido_postprocessing, apply_data_postprocessing
+from .charge_specs import IONIC_RETAINED_N_PARENTS, IONIC_SATURATED_N_RING_PARENTS
+from .name_postprocessing import (
+    apply_acyl_amido_postprocessing,
+    apply_connection_boundary_postprocessing,
+    apply_data_postprocessing,
+)
 from .nomenclature import RULES
 from .rules import bonds, elision, multipliers, stems, suffixes
 
@@ -44,6 +49,14 @@ class PrincipalGroupItem:
     bond_ids: set[int] = field(default_factory=set)
 
 
+@dataclass(frozen=True)
+class ParentChargeItem:
+    locant: str
+    symbol: str
+    charge: int
+    atom_id: int | None = None
+
+
 @dataclass
 class AssemblyParts:
     parent_length: int
@@ -67,6 +80,7 @@ class AssemblyParts:
     substituents: list[SubstituentItem] = field(default_factory=list)
     stereo_features: list[tuple[str, str]] = field(default_factory=list)
     indicated_hydrogens: list[str] = field(default_factory=list)
+    parent_charges: list[ParentChargeItem] = field(default_factory=list)
     parent_atom_ids: set[int] = field(default_factory=set)
     parent_bond_ids: set[int] = field(default_factory=set)
 
@@ -123,10 +137,7 @@ def _post_process_name(name: str) -> str:
     )
 
     name = re.sub(r"-1-formate\b", "-formate", name)
-    name = re.sub(r"\bmethyl 1-\(", "methyl (", name)
-    name = re.sub(r"\b(\S+yl) 1-\(", r"\1 (", name)
-    name = re.sub(r"\)1-\(", ")(", name)
-    name = re.sub(r" 1-\(", " (", name)
+    name = apply_connection_boundary_postprocessing(name)
 
     name = re.sub(r"\((.*?)\)\((?<!thi)oxo\)methyl\b", r"(\1)carbonyl", name)
     name = re.sub(r"\((?<!thi)oxo\)\((.*?)\)methyl\b", r"(\1)carbonyl", name)
@@ -332,6 +343,7 @@ def _post_process_name(name: str) -> str:
     
     name = re.sub(r"\b(amino|imino)\(", r"(\1)(", name)
     name = apply_data_postprocessing(name)
+    name = apply_connection_boundary_postprocessing(name)
 
     return name
 
@@ -342,6 +354,7 @@ A_PREFIX_ORDER = RULES.assembly.replacement_prefix_order
 UNSATURATION_ORDER = RULES.assembly.unsaturation_order
 RETAINED_SUBSTITUENT_STEMS = RULES.retained.substituent_stems
 ACID_HALIDE_SUFFIX_KEYS = RULES.assembly.acid_halide_suffix_keys
+AMBIGUOUS_CONNECTION_SUBSTITUENT_STEMS = RULES.assembly.ambiguous_connection_substituent_stems
 
 
 def _split_spiro_substituents(parts: AssemblyParts) -> list[tuple[str, str, str]]:
@@ -427,7 +440,15 @@ def _format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:
 def _format_replacement_prefixes(parts: AssemblyParts) -> str:
     if not parts.a_prefixes:
         return ""
-    grouped_a = _group_substituents(parts.a_prefixes)
+    if _inferred_ionic_retained_parent(parts):
+        return ""
+    single_charged_replacement_locants = _single_charged_replacement_locants(parts)
+    grouped_a: dict[str, list[str]] = {}
+    for item in parts.a_prefixes:
+        name = item.name
+        if name == "aza" and item.locants and str(item.locants[0]) in single_charged_replacement_locants:
+            name = "azonia"
+        grouped_a.setdefault(name, []).extend(item.locants)
     a_parts =[]
     for name in sorted(grouped_a.keys(), key=lambda n: A_PREFIX_ORDER.get(n, 99)):
         locs = sorted(grouped_a[name], key=parse_locant)
@@ -452,10 +473,73 @@ def _promote_benzene_retained_name(parts: AssemblyParts) -> None:
                     parts.unsaturations =[]
 
 
+def _positive_parent_n_charges(parts: AssemblyParts) -> list[ParentChargeItem]:
+    return [charge for charge in parts.parent_charges if charge.symbol == "N" and charge.charge > 0]
+
+
+def _has_ionic_retained_parent(parts: AssemblyParts) -> bool:
+    return bool(parts.retained_name in IONIC_RETAINED_N_PARENTS and _positive_parent_n_charges(parts))
+
+
+def _has_retained_like_parent(parts: AssemblyParts) -> bool:
+    return bool(parts.retained_name or _inferred_ionic_retained_parent(parts))
+
+
+def _inferred_ionic_retained_parent(parts: AssemblyParts) -> str | None:
+    if parts.retained_name or not parts.is_ring or parts.is_bicycle or parts.is_spiro or parts.is_polycycle:
+        return None
+    if parts.unsaturations or len(_positive_parent_n_charges(parts)) != 1:
+        return None
+    aza_locs = [str(loc) for item in parts.a_prefixes if item.name == "aza" for loc in item.locants]
+    if len(aza_locs) != 1:
+        return None
+    return IONIC_SATURATED_N_RING_PARENTS.get(parts.parent_length)
+
+
+def _single_charged_replacement_locants(parts: AssemblyParts) -> set[str]:
+    if parts.retained_name or _inferred_ionic_retained_parent(parts):
+        return set()
+    positive_n_locs = {charge.locant for charge in _positive_parent_n_charges(parts)}
+    if not positive_n_locs:
+        return set()
+    aza_locs = [str(loc) for item in parts.a_prefixes if item.name == "aza" for loc in item.locants]
+    if len(aza_locs) == 1 and aza_locs[0] in positive_n_locs:
+        return {aza_locs[0]}
+    return set()
+
+
+def _parent_charge_suffix_locs(parts: AssemblyParts) -> list[str]:
+    if _has_ionic_retained_parent(parts) or _inferred_ionic_retained_parent(parts):
+        return []
+    represented_as_azonia = _single_charged_replacement_locants(parts)
+    return sorted(
+        [
+            charge.locant
+            for charge in _positive_parent_n_charges(parts)
+            if charge.locant not in represented_as_azonia
+        ],
+        key=parse_locant,
+    )
+
+
+def _append_charge_suffixes_to_terminal(parts: AssemblyParts, terminal_e: str) -> str:
+    suffix_locs = _parent_charge_suffix_locs(parts)
+    if not suffix_locs:
+        return terminal_e
+    return "-" + ",".join(suffix_locs) + "-ium" + terminal_e
+
+
 def _parent_stem_and_terminal(parts: AssemblyParts) -> tuple[str, str]:
     terminal_e = bonds.PARENT_TERMINAL_VOWEL
 
-    if parts.retained_name:
+    inferred_ionic_parent = _inferred_ionic_retained_parent(parts)
+    if _has_ionic_retained_parent(parts):
+        stem_str = IONIC_RETAINED_N_PARENTS[parts.retained_name]
+        terminal_e = ""
+    elif inferred_ionic_parent:
+        stem_str = inferred_ionic_parent
+        terminal_e = ""
+    elif parts.retained_name:
         if parts.is_substituent and parts.retained_name in RETAINED_SUBSTITUENT_STEMS:
             stem_str, terminal_e = RETAINED_SUBSTITUENT_STEMS[parts.retained_name]
         else:
@@ -531,12 +615,19 @@ def _substituent_suffix_word(parts: AssemblyParts) -> str:
 def _always_print_substituent_locant(parts: AssemblyParts) -> bool:
     if parts.parent_length == 1:
         return False
-    return bool(parts.is_ring and (parts.a_prefixes or (parts.retained_name and parts.retained_name != "benzene")))
+    if parts.is_bicycle or parts.is_spiro or parts.is_polycycle:
+        return True
+    if parts.is_ring and (parts.a_prefixes or (parts.retained_name and parts.retained_name != "benzene")):
+        return True
+    stem_str, _ = _parent_stem_and_terminal(parts)
+    return any(stem_str.endswith(stem) for stem in AMBIGUOUS_CONNECTION_SUBSTITUENT_STEMS)
 
 
-def _format_substituent_tail(parts: AssemblyParts, stem_str: str, terminal_e: str) -> tuple[str, str, str, str]:
+def _format_substituent_tail(
+    parts: AssemblyParts, stem_str: str, terminal_e: str, spiro_subs
+) -> tuple[str, str, str, str]:
     suffix_yl = _substituent_suffix_word(parts)
-    always_print_locant = _always_print_substituent_locant(parts)
+    always_print_locant = bool(spiro_subs) or _always_print_substituent_locant(parts)
     if parts.retained_name == "benzene":
         terminal_e = "yl"
     elif (str(parts.attachment_locant) != "1" or parts.unsaturations or always_print_locant) and parts.parent_length > 1:
@@ -545,9 +636,9 @@ def _format_substituent_tail(parts: AssemblyParts, stem_str: str, terminal_e: st
         terminal_e = suffix_yl
 
     unsat_str = ""
-    if not parts.retained_name and parts.unsaturations:
+    if not _has_retained_like_parent(parts) and parts.unsaturations:
         stem_str, unsat_str = _format_unsaturations(parts, stem_str)
-    elif not parts.retained_name and not parts.unsaturations:
+    elif not _has_retained_like_parent(parts) and not parts.unsaturations:
         if parts.parent_length > 1 and (
             str(parts.attachment_locant) != "1"
             or parts.is_bicycle
@@ -556,6 +647,7 @@ def _format_substituent_tail(parts: AssemblyParts, stem_str: str, terminal_e: st
             or always_print_locant
         ):
             unsat_str = "an"
+    terminal_e = _append_charge_suffixes_to_terminal(parts, terminal_e)
     return stem_str, unsat_str, terminal_e, ""
 
 
@@ -604,12 +696,16 @@ def _format_principal_suffix(parts: AssemblyParts, terminal_e: str, spiro_subs) 
 
 def _format_parent_tail(parts: AssemblyParts, stem_str: str, terminal_e: str, spiro_subs) -> tuple[str, str, str, str]:
     unsat_str = ""
-    if not parts.retained_name:
+    if not _has_retained_like_parent(parts):
         if not parts.unsaturations:
             unsat_str = bonds.get("single").saturated_suffix
         else:
             stem_str, unsat_str = _format_unsaturations(parts, stem_str)
     terminal_e, suffix_str = _format_principal_suffix(parts, terminal_e, spiro_subs)
+    charge_suffix_locs = _parent_charge_suffix_locs(parts)
+    if charge_suffix_locs:
+        terminal_e = ""
+        suffix_str = "-" + ",".join(charge_suffix_locs) + "-ium" + suffix_str
     return stem_str, unsat_str, terminal_e, suffix_str
 
 
@@ -617,7 +713,10 @@ def _format_spiro_core(stem_str: str, unsat_str: str, terminal_e: str, spiro_sub
     if not spiro_subs:
         return stem_str + unsat_str + terminal_e, terminal_e
     core_name = stem_str + unsat_str + "e"
+    side_prefixes = []
     for p_loc, s_loc, s_name in spiro_subs:
+        extracted_prefixes, s_name = _extract_spiro_side_prefixes(s_name)
+        side_prefixes.extend(extracted_prefixes)
         if "-" in s_name or re.search(r"\d", s_name):
             s_name_str = f"({s_name})"
         else:
@@ -628,11 +727,58 @@ def _format_spiro_core(stem_str: str, unsat_str: str, terminal_e: str, spiro_sub
         if ("yl" in terminal_e or elision.is_vowel_start(terminal_e.lstrip("-0123456789,"))) and core_name.endswith("e"):
             core_name = core_name[:-1]
         core_name += terminal_e
+    if side_prefixes:
+        core_name = "-".join(side_prefixes) + core_name
     return core_name, ""
+
+
+def _extract_spiro_side_prefixes(side_name: str) -> tuple[list[str], str]:
+    """Move simple side-ring substituents to primed spiro prefixes.
+
+    OPSIN does not parse embedded side names such as
+    ``spiro[...,1'-(2-methylcyclopropane)]`` reliably.  The equivalent
+    parseable form is ``2'-methylspiro[...,1'-cyclopropane]``.
+    """
+
+    parent_aliases = (
+        ("1-azacyclopropane", "aziridine"),
+        ("1-oxacyclopropane", "oxirane"),
+        ("1-thiacyclopropane", "thiirane"),
+    )
+    parent_names = (
+        "1-oxacyclobutane",
+        "1-azacyclobutane",
+        "1-thiacyclobutane",
+        "aziridine",
+        "oxirane",
+        "thiirane",
+        "cyclopropane",
+    )
+    normalized = side_name.replace("-aziridine", "aziridine")
+    parent = None
+    prefix_text = ""
+    for alias, retained_parent in parent_aliases:
+        if normalized.endswith(alias):
+            parent = retained_parent
+            prefix_text = normalized[: -len(alias)].rstrip("-")
+            break
+    if parent is None:
+        parent = next((candidate for candidate in parent_names if normalized.endswith(candidate)), None)
+        if parent is None:
+            return [], normalized
+        prefix_text = normalized[: -len(parent)].rstrip("-")
+    match = re.match(r"^([0-9,]+)-(.+)$", prefix_text)
+    if not match:
+        return [], parent
+    locants, substituent = match.groups()
+    primed_locants = ",".join(f"{loc}'" for loc in locants.split(","))
+    return [f"{primed_locants}-{substituent}"], parent
 
 
 def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
     if not parts.indicated_hydrogens:
+        return core_name
+    if _positive_parent_n_charges(parts):
         return core_name
     ih_str = ",".join(sorted(parts.indicated_hydrogens, key=parse_locant)) + "H-"
     return ih_str + core_name
@@ -670,15 +816,22 @@ def assemble_name(parts: AssemblyParts) -> str:
     stem_str, terminal_e = _parent_stem_and_terminal(parts)
     stem_str = _apply_replacement_prefix(stem_str, a_prefix_str)
     if parts.is_substituent:
-        stem_str, unsat_str, terminal_e, suffix_str = _format_substituent_tail(parts, stem_str, terminal_e)
+        stem_str, unsat_str, terminal_e, suffix_str = _format_substituent_tail(
+            parts, stem_str, terminal_e, spiro_subs
+        )
     else:
         stem_str, unsat_str, terminal_e, suffix_str = _format_parent_tail(parts, stem_str, terminal_e, spiro_subs)
 
     core_name, terminal_e = _format_spiro_core(stem_str, unsat_str, terminal_e, spiro_subs)
     core_name = _add_indicated_hydrogen_prefix(parts, core_name)
     core_name += suffix_str
+    parent_needs_prefix_hyphen = bool(
+        prefix_str and _positive_parent_n_charges(parts) and parts.retained_name and parts.indicated_hydrogens
+    )
     final_word = (
-        prefix_str + "-" + core_name if prefix_str and needs_hyphen(prefix_str, core_name) else prefix_str + core_name
+        prefix_str + "-" + core_name
+        if prefix_str and (needs_hyphen(prefix_str, core_name) or parent_needs_prefix_hyphen)
+        else prefix_str + core_name
     )
     final_word = _add_stereo_prefix(parts, final_word)
     final_word = _add_front_modifiers(parts, final_word)

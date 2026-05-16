@@ -1,5 +1,15 @@
 from .functional_groups import register_group_detector
-from .molecule import AtomBinding, BondBinding, DecisionTrace, FunctionalGroupMetadata, NameAnalysis, TracePhase, TraceStep
+from .molecule import (
+    AtomBinding,
+    BondBinding,
+    DecisionTrace,
+    FunctionalGroupMetadata,
+    NameAnalysis,
+    NomenclatureOperation,
+    OperationClass,
+    TracePhase,
+    TraceStep,
+)
 from .namer import analyze_smiles, name_smiles, name_smiles_with_trace
 from .nomenclature import RULES, registry
 
@@ -9,6 +19,8 @@ __all__ = [
     "DecisionTrace",
     "FunctionalGroupMetadata",
     "NameAnalysis",
+    "NomenclatureOperation",
+    "OperationClass",
     "TracePhase",
     "TraceStep",
     "analyze_smiles",

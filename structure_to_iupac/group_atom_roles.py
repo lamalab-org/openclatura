@@ -10,7 +10,14 @@ def bridge_oxygen(mol: Molecule, group: PerceivedGroup) -> int | None:
 
 
 def ester_single_oxygen(mol: Molecule, group: PerceivedGroup) -> int | None:
-    return next((o for o in group.atoms_involved if mol.degree(o) == 2 or mol.atoms[o].charge == -1), None)
+    return next(
+        (
+            o
+            for o in group.atoms_involved
+            if mol.atoms[o].symbol == "O" and (mol.degree(o) == 2 or mol.atoms[o].charge == -1)
+        ),
+        None,
+    )
 
 
 def peroxy_ester_single_oxygen(mol: Molecule, group: PerceivedGroup) -> int | None:

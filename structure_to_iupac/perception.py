@@ -330,13 +330,16 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                                     groups.append(PerceivedGroup("hydrazone", True, double_c, {atom.idx, n2}))
                             consumed.update([atom.idx, n2])
                         else:
-                            groups.append(PerceivedGroup("imine", True, double_c, {atom.idx}))
+                            key = "iminium" if atom.charge > 0 else "imine"
+                            groups.append(PerceivedGroup(key, True, double_c, {atom.idx}))
                             consumed.update([atom.idx])
                     else:
-                        groups.append(PerceivedGroup("imine", True, double_c, {atom.idx}))
+                        key = "iminium" if atom.charge > 0 else "imine"
+                        groups.append(PerceivedGroup(key, True, double_c, {atom.idx}))
                         consumed.update([atom.idx])
                 else:
-                    groups.append(PerceivedGroup("imine", True, double_c, {atom.idx}))
+                    key = "iminium" if atom.charge > 0 else "imine"
+                    groups.append(PerceivedGroup(key, True, double_c, {atom.idx}))
                     consumed.update([atom.idx])
 
     for atom in mol:
@@ -377,7 +380,8 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                                     groups.append(PerceivedGroup("aldehyde", True, c_idx, {c_idx, atom.idx}))
                     elif bond.order == 1:
                         if mol.atoms[c_idx].is_carbon:
-                            groups.append(PerceivedGroup("alcohol", True, c_idx, {atom.idx}))
+                            key = "olate" if atom.charge < 0 else "alcohol"
+                            groups.append(PerceivedGroup(key, True, c_idx, {atom.idx}))
                     consumed.add(atom.idx)
             elif atom.symbol == "S" and mol.degree(atom.idx) == 1 and atom.idx not in cyclic_atoms:
                 adj_atoms = mol.get_neighbors(atom.idx)
@@ -393,8 +397,9 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
         if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
             adj_atoms = mol.get_neighbors(atom.idx)
             if len(adj_atoms) > 0:
+                key = "aminium" if atom.charge > 0 else "amine"
                 for c in adj_atoms:
-                    groups.append(PerceivedGroup("amine", True, c, {atom.idx}))
+                    groups.append(PerceivedGroup(key, True, c, {atom.idx}))
                 consumed.add(atom.idx)
 
     for atom in mol:

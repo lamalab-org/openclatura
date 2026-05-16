@@ -65,6 +65,8 @@ class AssemblyRules:
     unsaturation_order: dict[str, int]
     acid_halide_suffix_keys: set[str]
     substituent_sort_prefix_pattern: str
+    ambiguous_connection_substituent_stems: set[str]
+    connection_boundary_parent_stems: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -79,6 +81,7 @@ class PostprocessRules:
     regex_replacements: tuple[RegexReplacement, ...]
     exact_replacements: dict[str, str]
     acyl_amido_terms: tuple[str, ...]
+    n_substituted_functional_suffixes: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -167,6 +170,7 @@ def _postprocess_rules() -> PostprocessRules:
         ),
         exact_replacements=mapping("postprocess_exact_replacements"),
         acyl_amido_terms=tuple(values("postprocess_acyl_amido_terms")),
+        n_substituted_functional_suffixes=tuple(values("postprocess_n_substituted_functional_suffixes")),
     )
 
 
@@ -218,6 +222,8 @@ def registry() -> NomenclatureRegistry:
             unsaturation_order={key: int(value) for key, value in mapping("unsaturation_order").items()},
             acid_halide_suffix_keys=set(values("acid_halide_suffix_keys")),
             substituent_sort_prefix_pattern=mapping("substituent_sort")["prefix_pattern"],
+            ambiguous_connection_substituent_stems=set(values("ambiguous_connection_substituent_stems")),
+            connection_boundary_parent_stems=tuple(values("connection_boundary_parent_stems")),
         ),
         functional_groups=_functional_group_rules(),
         postprocess=_postprocess_rules(),

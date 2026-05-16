@@ -62,7 +62,9 @@ GROUPS: dict[str, CharacteristicGroup] = {
     "thiol": CharacteristicGroup("thiol", 105, "thiol", True, "sulfanyl", "dithiol"),
     
     "amine": CharacteristicGroup("amine", 110, "amine", True, "amino", "diamine"),
+    "aminium": CharacteristicGroup("aminium", 109, "aminium", True, "ammonio", "diaminium"),
     "imine": CharacteristicGroup("imine", 112, "imine", True, "imino", "diimine"),
+    "iminium": CharacteristicGroup("iminium", 111, "iminium", True, "iminio", "diiminium"),
     "hydrazine": CharacteristicGroup("hydrazine", 115, "hydrazine", True, "hydrazinyl", "dihydrazine"),
 
     "ether": CharacteristicGroup("ether", 200, "ether", False, "oxy", None),
