@@ -2,6 +2,13 @@
 
 from dataclasses import dataclass, field
 from .molecule import Molecule
+from .polycycle_topology import (
+    bicyclo_proof,
+    build_ring_numbering,
+    linear_dispiro_proof,
+    monospiro_proof,
+    ring_system_topology,
+)
 
 @dataclass
 class RingSystem:
@@ -251,16 +258,17 @@ def get_linear_dispiro_descriptor_and_paths(mol: Molecule, comp_nodes, comp_edge
     length middle path in descriptors such as ``dispiro[2.0.2.2]octane``.
     """
 
+    topology = ring_system_topology(mol, set(comp_nodes), set(comp_edges))
+    proof = linear_dispiro_proof(topology.atoms, topology.edges, degrees=topology.internal_degrees, spiro_atoms=topology.spiro_atoms)
+    if proof is None or topology.classification != "linear_dispiro":
+        return None
+
     adj = {n: set() for n in comp_nodes}
     for u, v in comp_edges:
         adj[u].add(v)
         adj[v].add(u)
 
-    spiro_atoms = [n for n in comp_nodes if len(adj[n]) >= 4]
-    if len(spiro_atoms) != 2:
-        return None
-
-    s1, s2 = sorted(spiro_atoms)
+    s1, s2 = proof.spiro_atoms
     non_spiro = set(comp_nodes) - {s1, s2}
     components = []
     seen = set()
@@ -306,17 +314,32 @@ def get_linear_dispiro_descriptor_and_paths(mol: Molecule, comp_nodes, comp_edge
     middle_path = _component_path_between_centers(middle_nonzero, first_spiro, second_spiro, adj)
     second_path = _component_path_between_spiro_neighbors(second_terminal, second_spiro, adj)
     extra_middle_path = _component_path_between_centers(extra_middle, first_spiro, second_spiro, adj)
-    path = first_path + [first_spiro] + middle_path + [second_spiro] + second_path + extra_middle_path
-    if set(path) != set(comp_nodes) or len(path) != len(comp_nodes):
-        path = (
-            list(first_terminal)
-            + [first_spiro]
-            + list(middle_nonzero)
-            + [second_spiro]
-            + list(second_terminal)
-            + list(extra_middle)
-        )
-    return descriptor, [path]
+    paths = []
+    for oriented_first in (first_path, list(reversed(first_path))):
+        for oriented_second in (second_path, list(reversed(second_path))):
+            if has_direct_middle:
+                path = (
+                    list(oriented_first)
+                    + [first_spiro, second_spiro]
+                    + list(oriented_second)
+                    + list(reversed(middle_path))
+                )
+            else:
+                path = (
+                    list(oriented_first)
+                    + [first_spiro]
+                    + list(middle_path)
+                    + [second_spiro]
+                    + list(oriented_second)
+                    + list(reversed(extra_middle_path))
+                )
+            numbering = build_ring_numbering("dispiro", tuple(descriptor_numbers), tuple(path), set(comp_edges), mol)
+            if numbering.audit_ok:
+                paths.append(path)
+    paths = _dedupe_numbering_paths(paths)
+    if not paths:
+        return None
+    return descriptor, paths
 
 
 def _terminal_dispiro_sort_key(mol: Molecule, component: set[int]) -> tuple:
@@ -526,127 +549,13 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
             systems.append(RingSystem(atoms=comp_nodes, paths=[path]))
 
         elif E == V + 1:
-            degrees = {n: len(comp_adj[n]) for n in comp_nodes}
-            deg4 = [n for n, d in degrees.items() if d == 4]
-            deg3 = [n for n, d in degrees.items() if d >= 3]
-
-            if len(deg4) == 1:
-                spiro_atom = deg4[0]
-                sub_nodes = comp_nodes - {spiro_atom}
-                rings =[]
-                visited_sub = set()
-                for sn in sub_nodes:
-                    if sn not in visited_sub:
-                        comp =[]
-                        q = [sn]
-                        while q:
-                            c = q.pop(0)
-                            if c not in visited_sub:
-                                visited_sub.add(c)
-                                comp.append(c)
-                                q.extend([x for x in comp_adj[c] if x in sub_nodes and x not in visited_sub])
-
-                        endpoints =[n for n in comp if spiro_atom in comp_adj[n]]
-                        if len(endpoints) == 2:
-                            start_node = endpoints[0]
-                            path = [start_node]
-                            curr = start_node
-                            p_set = {start_node}
-                            while len(path) < len(comp):
-                                next_n = next((x for x in comp_adj[curr] if x in comp and x not in p_set), None)
-                                if next_n is None: break
-                                path.append(next_n)
-                                p_set.add(next_n)
-                                curr = next_n
-                            rings.append(path)
-
-                if len(rings) == 2:
-                    r1, r2 = rings
-                    if len(r1) > len(r2): r1, r2 = r2, r1
-                    paths = [
-                        r1 + [spiro_atom] + r2,
-                        r1 +[spiro_atom] + r2[::-1],
-                        r1[::-1] +[spiro_atom] + r2,
-                        r1[::-1] + [spiro_atom] + r2[::-1]
-                    ]
-                    systems.append(RingSystem(
-                        atoms=comp_nodes, is_spiro=True,
-                        x=len(r1), y=len(r2), paths=paths
-                    ))
-
-            elif len(deg3) == 2:
-                b1, b2 = deg3
-                paths_between = []
-                if b2 in comp_adj[b1]:
-                    paths_between.append([])
-
-                sub_nodes = comp_nodes - {b1, b2}
-                sub_visited = set()
-                for sn in sub_nodes:
-                    if sn not in sub_visited:
-                        p_nodes = []
-                        q = [sn]
-                        while q:
-                            c = q.pop(0)
-                            if c not in sub_visited:
-                                sub_visited.add(c)
-                                p_nodes.append(c)
-                                q.extend([x for x in comp_adj[c] if x in sub_nodes and x not in sub_visited])
-
-                        ends =[n for n in p_nodes if b1 in comp_adj[n]]
-                        if not ends: continue
-                        start = ends[0]
-                        ordered_p = [start]
-                        p_set = {start}
-                        curr = start
-                        while len(ordered_p) < len(p_nodes):
-                            next_n = next((x for x in comp_adj[curr] if x in p_nodes and x not in p_set), None)
-                            if next_n is None: break
-                            ordered_p.append(next_n)
-                            p_set.add(next_n)
-                            curr = next_n
-
-                        if b2 not in comp_adj[ordered_p[-1]]:
-                            ordered_p = ordered_p[::-1]
-
-                        paths_between.append(ordered_p)
-
-                paths_between.sort(key=len, reverse=True)
-                if len(paths_between) == 3:
-                    p1, p2, p3 = paths_between
-                    
-                    valid_assignments = [(p1, p2, p3)]
-                    if len(p1) == len(p2) and len(p2) == len(p3):
-                        valid_assignments =[
-                            (p1, p2, p3), (p1, p3, p2),
-                            (p2, p1, p3), (p2, p3, p1),
-                            (p3, p1, p2), (p3, p2, p1)
-                        ]
-                    elif len(p1) == len(p2):
-                        valid_assignments =[
-                            (p1, p2, p3), (p2, p1, p3)
-                        ]
-                    elif len(p2) == len(p3):
-                        valid_assignments =[
-                            (p1, p2, p3), (p1, p3, p2)
-                        ]
-                        
-                    vb_paths =[]
-                    for a, b, c in valid_assignments:
-                        vb_paths.append([b1] + a + [b2] + b[::-1] + c)
-                        vb_paths.append([b2] + a[::-1] + [b1] + b + c[::-1])
-
-                    recognized_via_retained = False
-                    for cand in vb_paths:
-                        if retained_rules.recognizes_retained_ring(mol, cand):
-                            systems.append(RingSystem(atoms=comp_nodes, is_bicycle=True, x=len(p1), y=len(p2), z=len(p3), paths=[cand]))
-                            recognized_via_retained = True
-                            break
-                    if not recognized_via_retained:
-                        systems.append(RingSystem(
-                            atoms=comp_nodes, is_bicycle=True,
-                            x=len(p1), y=len(p2), z=len(p3), paths=vb_paths
-                        ))
+            proof_system = _proven_monospiro_or_bicyclo_system(mol, comp_nodes, comp_edges)
+            if proof_system is not None:
+                systems.append(proof_system)
+            else:
+                legacy_system = _legacy_monospiro_or_bicyclo_system(mol, comp_nodes, comp_adj)
+                if legacy_system is not None:
+                    systems.append(legacy_system)
 
         elif E >= V + 2:
             descriptor, numbered_paths = _polyspiro_descriptor_or_von_baeyer(mol, comp_nodes, comp_edges)
@@ -708,7 +617,11 @@ def merge_polyspiro_ring_systems(mol: Molecule, systems: list[RingSystem]) -> li
         if not _has_multiple_spiro_centers(union_atoms, union_edges):
             result.extend(systems[group_idx] for group_idx in sorted(group_indexes))
             continue
-        descriptor, paths = _polyspiro_descriptor_or_von_baeyer(mol, union_atoms, union_edges)
+        dispiro = get_linear_dispiro_descriptor_and_paths(mol, union_atoms, union_edges)
+        if dispiro is None:
+            result.extend(systems[group_idx] for group_idx in sorted(group_indexes))
+            continue
+        descriptor, paths = dispiro
         result.append(
             RingSystem(
                 atoms=union_atoms,
@@ -718,6 +631,238 @@ def merge_polyspiro_ring_systems(mol: Molecule, systems: list[RingSystem]) -> li
             )
         )
     return result
+
+
+def _proven_monospiro_or_bicyclo_system(mol: Molecule, comp_nodes: set[int], comp_edges: set[tuple[int, int]]) -> RingSystem | None:
+    from .rules import retained as retained_rules
+
+    topology = ring_system_topology(mol, comp_nodes, comp_edges)
+    spiro = monospiro_proof(topology.atoms, topology.edges, degrees=topology.internal_degrees, spiro_atoms=topology.spiro_atoms)
+    if spiro is not None and topology.classification == "monospiro":
+        paths = _audited_ring_paths(mol, "spiro", spiro.descriptor_numbers, spiro.numbering_paths, topology.edges)
+        if not paths:
+            return None
+        retained = _first_retained_path(mol, paths, retained_rules)
+        return RingSystem(
+            atoms=set(comp_nodes),
+            is_spiro=True,
+            x=spiro.descriptor_numbers[0],
+            y=spiro.descriptor_numbers[1],
+            paths=[retained] if retained is not None else paths,
+        )
+
+    bicyclo = bicyclo_proof(
+        topology.atoms,
+        topology.edges,
+        degrees=topology.internal_degrees,
+        bridgeheads=topology.bridgeheads,
+    )
+    if bicyclo is not None and topology.classification == "bicyclic":
+        paths = _audited_ring_paths(mol, "bicyclo", bicyclo.descriptor_numbers, bicyclo.numbering_paths, topology.edges)
+        if not paths:
+            return None
+        legacy = _legacy_monospiro_or_bicyclo_system(
+            mol,
+            comp_nodes,
+            _adjacency_from_edges(comp_nodes, comp_edges),
+        )
+        legacy_paths = []
+        if legacy is not None:
+            legacy_paths = _audited_ring_paths(
+                mol,
+                "bicyclo",
+                bicyclo.descriptor_numbers,
+                [tuple(path) for path in legacy.paths],
+                topology.edges,
+            )
+        if legacy is not None and not _is_plain_hydrocarbon_ring_system(mol, comp_nodes, comp_edges):
+            paths = legacy_paths or paths
+        elif legacy is not None:
+            paths = _dedupe_numbering_paths(paths + legacy_paths)
+        retained = _first_retained_path(mol, paths, retained_rules)
+        return RingSystem(
+            atoms=set(comp_nodes),
+            is_bicycle=True,
+            x=bicyclo.descriptor_numbers[0],
+            y=bicyclo.descriptor_numbers[1],
+            z=bicyclo.descriptor_numbers[2],
+            paths=[retained] if retained is not None else paths,
+        )
+    return None
+
+
+def _audited_ring_paths(
+    mol: Molecule,
+    kind: str,
+    descriptor_numbers: tuple[int, ...],
+    paths: tuple[tuple[int, ...], ...] | list[tuple[int, ...]],
+    edges: frozenset[tuple[int, int]],
+) -> list[list[int]]:
+    audited = []
+    for path in paths:
+        numbering = build_ring_numbering(kind, descriptor_numbers, path, edges, mol)
+        if numbering.audit_ok:
+            audited.append(list(numbering.path))
+    return _dedupe_numbering_paths(audited)
+
+
+def _is_plain_hydrocarbon_ring_system(mol: Molecule, comp_nodes: set[int], comp_edges: set[tuple[int, int]] | frozenset[tuple[int, int]]) -> bool:
+    if any(mol.atoms[atom_idx].symbol != "C" or mol.atoms[atom_idx].charge for atom_idx in comp_nodes):
+        return False
+    for first, second in comp_edges:
+        bond = mol.get_bond(first, second)
+        if bond is not None and bond.order != 1:
+            return False
+    return True
+
+
+def _adjacency_from_edges(nodes: set[int], edges: set[tuple[int, int]] | frozenset[tuple[int, int]]) -> dict[int, set[int]]:
+    adjacency = {node: set() for node in nodes}
+    for first, second in edges:
+        adjacency[first].add(second)
+        adjacency[second].add(first)
+    return adjacency
+
+
+def _dedupe_numbering_paths(paths: list[list[int]]) -> list[list[int]]:
+    unique = []
+    seen = set()
+    for path in paths:
+        key = tuple(path)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(path)
+    return unique
+
+
+def _first_retained_path(mol: Molecule, paths: list[list[int]], retained_rules) -> list[int] | None:
+    for path in paths:
+        if retained_rules.recognizes_retained_ring(mol, path):
+            return path
+    return None
+
+
+def _legacy_monospiro_or_bicyclo_system(
+    mol: Molecule,
+    comp_nodes: set[int],
+    comp_adj: dict[int, set[int]],
+) -> RingSystem | None:
+    from .rules import retained as retained_rules
+
+    degrees = {n: len(comp_adj[n]) for n in comp_nodes}
+    deg4 = [n for n, d in degrees.items() if d == 4]
+    deg3 = [n for n, d in degrees.items() if d >= 3]
+
+    if len(deg4) == 1:
+        spiro_atom = deg4[0]
+        sub_nodes = comp_nodes - {spiro_atom}
+        rings = []
+        visited_sub = set()
+        for sn in sub_nodes:
+            if sn in visited_sub:
+                continue
+            comp = []
+            q = [sn]
+            while q:
+                c = q.pop(0)
+                if c not in visited_sub:
+                    visited_sub.add(c)
+                    comp.append(c)
+                    q.extend([x for x in comp_adj[c] if x in sub_nodes and x not in visited_sub])
+
+            endpoints = [n for n in comp if spiro_atom in comp_adj[n]]
+            if len(endpoints) == 2:
+                path = [endpoints[0]]
+                curr = path[0]
+                p_set = {curr}
+                while len(path) < len(comp):
+                    next_n = next((x for x in comp_adj[curr] if x in comp and x not in p_set), None)
+                    if next_n is None:
+                        break
+                    path.append(next_n)
+                    p_set.add(next_n)
+                    curr = next_n
+                rings.append(path)
+
+        if len(rings) != 2:
+            return None
+        r1, r2 = rings
+        if len(r1) > len(r2):
+            r1, r2 = r2, r1
+        return RingSystem(
+            atoms=comp_nodes,
+            is_spiro=True,
+            x=len(r1),
+            y=len(r2),
+            paths=[
+                r1 + [spiro_atom] + r2,
+                r1 + [spiro_atom] + r2[::-1],
+                r1[::-1] + [spiro_atom] + r2,
+                r1[::-1] + [spiro_atom] + r2[::-1],
+            ],
+        )
+
+    if len(deg3) != 2:
+        return None
+    b1, b2 = deg3
+    paths_between = []
+    if b2 in comp_adj[b1]:
+        paths_between.append([])
+
+    sub_nodes = comp_nodes - {b1, b2}
+    sub_visited = set()
+    for sn in sub_nodes:
+        if sn in sub_visited:
+            continue
+        p_nodes = []
+        q = [sn]
+        while q:
+            c = q.pop(0)
+            if c not in sub_visited:
+                sub_visited.add(c)
+                p_nodes.append(c)
+                q.extend([x for x in comp_adj[c] if x in sub_nodes and x not in sub_visited])
+
+        ends = [n for n in p_nodes if b1 in comp_adj[n]]
+        if not ends:
+            continue
+        ordered_p = [ends[0]]
+        p_set = {ordered_p[0]}
+        curr = ordered_p[0]
+        while len(ordered_p) < len(p_nodes):
+            next_n = next((x for x in comp_adj[curr] if x in p_nodes and x not in p_set), None)
+            if next_n is None:
+                break
+            ordered_p.append(next_n)
+            p_set.add(next_n)
+            curr = next_n
+
+        if b2 not in comp_adj[ordered_p[-1]]:
+            ordered_p = ordered_p[::-1]
+        paths_between.append(ordered_p)
+
+    paths_between.sort(key=len, reverse=True)
+    if len(paths_between) != 3:
+        return None
+    p1, p2, p3 = paths_between
+    valid_assignments = [(p1, p2, p3)]
+    if len(p1) == len(p2) and len(p2) == len(p3):
+        valid_assignments = [(p1, p2, p3), (p1, p3, p2), (p2, p1, p3), (p2, p3, p1), (p3, p1, p2), (p3, p2, p1)]
+    elif len(p1) == len(p2):
+        valid_assignments = [(p1, p2, p3), (p2, p1, p3)]
+    elif len(p2) == len(p3):
+        valid_assignments = [(p1, p2, p3), (p1, p3, p2)]
+
+    vb_paths = []
+    for a, b, c in valid_assignments:
+        vb_paths.append([b1] + a + [b2] + b[::-1] + c)
+        vb_paths.append([b2] + a[::-1] + [b1] + b + c[::-1])
+
+    for cand in vb_paths:
+        if retained_rules.recognizes_retained_ring(mol, cand):
+            return RingSystem(atoms=comp_nodes, is_bicycle=True, x=len(p1), y=len(p2), z=len(p3), paths=[cand])
+    return RingSystem(atoms=comp_nodes, is_bicycle=True, x=len(p1), y=len(p2), z=len(p3), paths=vb_paths)
 
 
 def _edges_within_atoms(mol: Molecule, atoms: set[int]) -> set[tuple[int, int]]:

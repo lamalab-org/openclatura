@@ -42,7 +42,15 @@ def anhydride_half_name(mol: Molecule, start_c: int, bridge_o: int, component_na
     sub_mol = Molecule()
     for n in half_atoms:
         atom = mol.atoms[n]
-        sub_mol.add_atom(symbol=atom.symbol, idx=n, charge=atom.charge, stereo=atom.stereo)
+        sub_mol.add_atom(
+            symbol=atom.symbol,
+            idx=n,
+            charge=atom.charge,
+            stereo=atom.stereo,
+            is_aromatic=atom.is_aromatic,
+            explicit_h_count=atom.explicit_h_count,
+            total_h_count=atom.total_h_count,
+        )
     oh_idx = max(mol.atoms.keys()) + 100
     sub_mol.add_atom(symbol="O", idx=oh_idx)
     sub_mol.add_bond(u=start_c, v=oh_idx, order=1)

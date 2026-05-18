@@ -161,7 +161,15 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
     for n in sub_comp:
         atom = mol.atoms[n]
         symbol = "Si" if n == c_idx else atom.symbol
-        sub_mol.add_atom(symbol=symbol, idx=n, charge=atom.charge, stereo=atom.stereo)
+        sub_mol.add_atom(
+            symbol=symbol,
+            idx=n,
+            charge=atom.charge,
+            stereo=atom.stereo,
+            is_aromatic=atom.is_aromatic,
+            explicit_h_count=atom.explicit_h_count,
+            total_h_count=atom.total_h_count,
+        )
     for n in sub_comp:
         for nxt in mol.get_neighbors(n):
             if nxt in sub_comp and n < nxt:

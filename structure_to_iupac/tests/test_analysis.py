@@ -8,9 +8,17 @@ from structure_to_iupac.ionic_naming import apply_parent_charge_names, apply_ret
 from structure_to_iupac.locants import as_display_locant, coerce_display_numbering, locant_text, parse_locant
 from structure_to_iupac.name_postprocessing import apply_connection_boundary_postprocessing, postprocessing_rule_inventory
 from structure_to_iupac.namer import read_smiles
+from structure_to_iupac.numbering import polycycle_numbering_key
 from structure_to_iupac.parent_selection import ParentCandidate, ParentSelection, select_principal_parent
 from structure_to_iupac.parent_pipeline import build_parent_assembly_plan
 from structure_to_iupac.perception import PerceivedGroup, perceive_groups
+from structure_to_iupac.polycycle_topology import (
+    bicyclo_proof,
+    build_ring_numbering,
+    linear_dispiro_proof,
+    monospiro_proof,
+    ring_system_topology,
+)
 from structure_to_iupac.retained_specs import retained_parent_spec
 from structure_to_iupac.ring_systems import ring_system_fragment
 from structure_to_iupac.spiro_assembly import SpiroAssembly
@@ -28,6 +36,20 @@ def test_naming_engine_matches_plain_public_api():
     assert engine.name_smiles("") == ""
     assert engine.name_smiles_with_trace("CCO")[0] == "ethanol"
     assert engine.analyze_smiles("CCO").name == analyze_smiles("CCO").name
+
+
+def test_graph_parser_preserves_aromatic_and_hydrogen_metadata_after_kekulization():
+    mol = read_smiles("Cn1cc[nH]n1")
+    aromatic_n_with_h = [atom.idx for atom in mol if atom.symbol == "N" and atom.is_aromatic and atom.total_h_count > 0]
+
+    assert aromatic_n_with_h
+
+
+def test_polycycle_numbering_key_uses_explicit_h_metadata_when_enabled():
+    mol = read_smiles("c1[nH]ccn1")
+    path = [0, 1, 2, 3, 4]
+
+    assert polycycle_numbering_key(mol, path, include_saturated_ring_proxy=True)[1] == (2,)
 
 
 def test_display_locants_keep_numeric_order_and_rendered_text():
@@ -422,14 +444,105 @@ def test_spiro_side_parents_are_normalized_without_nested_or_parenthesized_polyc
     assert "(bicyclo" not in core
 
 
+def test_polycycle_topology_classifies_linear_dispiro_and_rejects_mixed_spiro():
+    linear = read_smiles("C1CC11CC2(CC2)C1")
+    linear_system = next(system for system in find_ring_systems(linear) if system.is_polycycle)
+    linear_topology = ring_system_topology(linear, linear_system.atoms)
+    proof = linear_dispiro_proof(linear_topology.atoms, linear_topology.edges)
+
+    assert linear_topology.classification == "linear_dispiro"
+    assert proof is not None
+    assert proof.descriptor == "dispiro[2.1.2.1]"
+    assert proof.atom_count == len(linear_system.atoms)
+
+    mixed = read_smiles("C1C2C1C1(CC1)C21CC1")
+    mixed_topology = ring_system_topology(mixed, set(mixed.atoms))
+
+    assert mixed_topology.classification != "linear_dispiro"
+    assert linear_dispiro_proof(mixed_topology.atoms, mixed_topology.edges) is None
+
+
+def test_polycycle_topology_proves_monospiro_and_bicyclo_descriptors():
+    spiro_mol = read_smiles("C1CC11CC1")
+    spiro_system = next(system for system in find_ring_systems(spiro_mol) if system.is_spiro)
+    spiro_topology = ring_system_topology(spiro_mol, spiro_system.atoms)
+    spiro = monospiro_proof(spiro_topology.atoms, spiro_topology.edges)
+
+    assert spiro_topology.classification == "monospiro"
+    assert spiro is not None
+    assert spiro.descriptor == "spiro[2.2]"
+    assert spiro.atom_count == len(spiro_system.atoms)
+
+    bicyclo_mol = read_smiles("C1CC2CC1C2")
+    bicyclo_system = next(system for system in find_ring_systems(bicyclo_mol) if system.is_bicycle)
+    bicyclo_topology = ring_system_topology(bicyclo_mol, bicyclo_system.atoms)
+    bicyclo = bicyclo_proof(bicyclo_topology.atoms, bicyclo_topology.edges)
+
+    assert bicyclo_topology.classification == "bicyclic"
+    assert bicyclo is not None
+    assert bicyclo.descriptor == "bicyclo[2.1.1]"
+    assert bicyclo.atom_count == len(bicyclo_system.atoms)
+
+
+def test_simple_spiro_numbering_map_keeps_smaller_ring_first_and_audits_edges():
+    mol = read_smiles("C1CC11CCO1")
+    system = next(system for system in find_ring_systems(mol) if system.is_spiro)
+    topology = ring_system_topology(mol, system.atoms)
+    proof = monospiro_proof(topology.atoms, topology.edges)
+
+    assert proof is not None
+    assert proof.descriptor_numbers == (2, 3)
+    assert system.paths == [list(path) for path in proof.numbering_paths]
+    assert all(path[2] == proof.spiro_atom for path in proof.numbering_paths)
+
+    numberings = [
+        build_ring_numbering("spiro", proof.descriptor_numbers, path, topology.edges, mol)
+        for path in proof.numbering_paths
+    ]
+    assert all(numbering.audit_ok for numbering in numberings)
+    assert all(numbering.spiro_locants == (3,) for numbering in numberings)
+    assert all(numbering.atom_to_locant[5] in {4, 6} for numbering in numberings)
+    assert {numbering.atom_to_locant[5] for numbering in numberings} == {4, 6}
+    assert all(numbering.atom_symbols_by_locant[numbering.atom_to_locant[5]] == "O" for numbering in numberings)
+    assert all(set(numbering.bond_orders_by_locants.values()) == {1} for numbering in numberings)
+    assert name_smiles("C1CC11CCO1") == "4-oxaspiro[2.3]hexane"
+    assert name_smiles("CC1CC2(CC2)O1") == "5-methyl-4-oxaspiro[2.3]hexane"
+    assert name_smiles("OC1CC11CC1") == "spiro[2.2]pentan-1-ol"
+    assert name_smiles("O=C1CC11CC1") == "spiro[2.2]pentan-1-one"
+
+
+def test_simple_bicyclo_numbering_map_matches_bridge_descriptor_and_attachment_locant():
+    mol = read_smiles("CC1C2CCC12")
+    system = next(system for system in find_ring_systems(mol) if system.is_bicycle)
+    topology = ring_system_topology(mol, system.atoms)
+    proof = bicyclo_proof(topology.atoms, topology.edges)
+
+    assert proof is not None
+    assert proof.descriptor_numbers == (2, 1, 0)
+    assert system.paths == [list(path) for path in proof.numbering_paths]
+
+    numberings = [
+        build_ring_numbering("bicyclo", proof.descriptor_numbers, path, topology.edges, mol, substituent_attachment_atoms={1})
+        for path in proof.numbering_paths
+    ]
+    assert all(numbering.audit_ok for numbering in numberings)
+    assert all(numbering.bridgehead_locants == (1, 4) for numbering in numberings)
+    assert all(numbering.atom_to_locant[1] == 5 for numbering in numberings)
+    assert all(numbering.substituent_attachment_locants == (5,) for numbering in numberings)
+    assert all(set(numbering.bond_orders_by_locants.values()) == {1} for numbering in numberings)
+    assert name_smiles("CC1C2CCC12") == "5-methylbicyclo[2.1.0]pentane"
+    assert name_smiles("OC1CC2CC1C2") == "bicyclo[2.1.1]hexan-2-ol"
+    assert name_smiles("O=C1CC2CC1C2") == "bicyclo[2.1.1]hexan-2-one"
+
+
 def test_linear_polyspiro_ring_systems_use_dispiro_parent_not_partial_spiro():
     cases = {
         "C1CC11CCC11CC1": "dispiro[2.0.2.2]octane",
-        "C1CC11CCC11CO1": "2-oxadispiro[2.0.2.2]octane",
-        "C1C2(CCC2)C11COC1": "2-oxadispiro[3.0.3.1]nonane",
-        "C1OC11CC2(CCC2)C1": "2-oxadispiro[2.1.3.1]nonane",
+        "C1CC11COC11CC1": "7-oxadispiro[2.0.2.2]octane",
+        "C1CC2(C1)OC21CCC1": "9-oxadispiro[3.0.3.1]nonane",
+        "C1OC11CC2(CCC2)C1": "1-oxadispiro[2.1.3.1]nonane",
         "C1CC11CC2(CC2)C1": "dispiro[2.1.2.1]octane",
-        "C1=CC2(CN2)CC12CN2": "2,8-diazadispiro[2.2.2.1]non-4-ene",
+        "C1=CC2(CN2)CC12CN2": "1,7-diazadispiro[2.2.2.1]non-4-ene",
     }
 
     for smiles, expected in cases.items():
@@ -440,11 +553,45 @@ def test_linear_polyspiro_ring_systems_use_dispiro_parent_not_partial_spiro():
         assert "ethenyl" not in generated
 
 
+def test_dispiro_numbering_map_audits_direct_and_non_direct_middle_segments():
+    direct = read_smiles("C1CC11COC11CC1")
+    direct_system = next(system for system in find_ring_systems(direct) if system.is_polycycle)
+    direct_topology = ring_system_topology(direct, direct_system.atoms)
+    direct_numberings = [
+        build_ring_numbering("dispiro", (2, 0, 2, 2), path, direct_topology.edges, direct)
+        for path in direct_system.paths
+    ]
+
+    assert direct_system.polycycle_descriptor == "dispiro[2.0.2.2]"
+    assert all(numbering.audit_ok for numbering in direct_numberings)
+    assert {numbering.atom_to_locant[4] for numbering in direct_numberings} == {7}
+    assert all(numbering.atom_symbols_by_locant[numbering.atom_to_locant[4]] == "O" for numbering in direct_numberings)
+
+    non_direct = read_smiles("C1OC11CC2(CCC2)C1")
+    non_direct_system = next(system for system in find_ring_systems(non_direct) if system.is_polycycle)
+    non_direct_topology = ring_system_topology(non_direct, non_direct_system.atoms)
+    non_direct_numberings = [
+        build_ring_numbering("dispiro", (2, 1, 3, 1), path, non_direct_topology.edges, non_direct)
+        for path in non_direct_system.paths
+    ]
+
+    assert non_direct_system.polycycle_descriptor == "dispiro[2.1.3.1]"
+    assert all(numbering.audit_ok for numbering in non_direct_numberings)
+    assert {numbering.atom_to_locant[1] for numbering in non_direct_numberings} == {1, 2}
+    assert all(set(numbering.bond_orders_by_locants.values()) == {1} for numbering in non_direct_numberings)
+
+
 def test_split_polyspiro_oxirane_case_keeps_both_spiro_side_rings():
     generated = name_smiles("O1CC11C2CC2C11OC1")
 
-    assert generated == "1,9-dioxadispiro[2.0.2.3]nonane"
-    assert generated != "spiro[bicyclo[2.1.0]pentane-2,2'-oxirane]"
+    assert generated == "dispiro[oxirane-2,2'-bicyclo[2.1.0]pentane-3',2''-oxirane]"
+
+
+def test_complex_spiro_fused_systems_do_not_use_linear_dispiro_renderer():
+    generated = name_smiles("C1C2C1C1(CC1)C21CC1")
+
+    assert generated == "dispiro[cyclopropane-1,2'-bicyclo[2.1.0]pentane-3',1''-cyclopropane]"
+    assert generated != "dispiro[2.0.2.3]nonane"
 
 
 def test_pyopsin_regression_names_preserve_terminal_olate_charge():

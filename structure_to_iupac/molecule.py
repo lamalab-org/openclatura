@@ -12,6 +12,9 @@ class Atom:
     charge: int = 0
     isotope: int | None = None
     stereo: str | None = None  # 'R' or 'S'
+    is_aromatic: bool = False
+    explicit_h_count: int = 0
+    total_h_count: int = 0
 
     def __post_init__(self):
         if not elements.is_known(self.symbol):
@@ -165,12 +168,30 @@ class Molecule:
         self._adj: dict[int, list[int]] = {}
         self._bond_lookup: dict[tuple[int, int], int] = {}
 
-    def add_atom(self, symbol: str, idx: int | None = None, charge: int = 0, stereo: str | None = None) -> Atom:
+    def add_atom(
+        self,
+        symbol: str,
+        idx: int | None = None,
+        charge: int = 0,
+        stereo: str | None = None,
+        *,
+        is_aromatic: bool = False,
+        explicit_h_count: int = 0,
+        total_h_count: int = 0,
+    ) -> Atom:
         if idx is None:
             idx = max(self.atoms.keys(), default=0) + 1
         if idx in self.atoms:
             raise ValueError(f"Atom with idx {idx} already exists.")
-        atom = Atom(idx=idx, symbol=symbol, charge=charge, stereo=stereo)
+        atom = Atom(
+            idx=idx,
+            symbol=symbol,
+            charge=charge,
+            stereo=stereo,
+            is_aromatic=is_aromatic,
+            explicit_h_count=explicit_h_count,
+            total_h_count=total_h_count,
+        )
         self.atoms[idx] = atom
         self._adj[idx] = []
         return atom

@@ -49,7 +49,15 @@ def ring_system_fragment(mol: Molecule, atom_indices: set[int] | list[int] | tup
 
     for new_idx, old_idx in enumerate(ordered):
         atom = mol.atoms[old_idx]
-        fragment.add_atom(symbol=atom.symbol, idx=new_idx, charge=atom.charge, stereo=atom.stereo)
+        fragment.add_atom(
+            symbol=atom.symbol,
+            idx=new_idx,
+            charge=atom.charge,
+            stereo=atom.stereo,
+            is_aromatic=atom.is_aromatic,
+            explicit_h_count=atom.explicit_h_count,
+            total_h_count=atom.total_h_count,
+        )
         old_to_new[old_idx] = new_idx
         new_to_old[new_idx] = old_idx
 

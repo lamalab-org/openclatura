@@ -40,6 +40,8 @@ def format_spiro_core(stem_str: str, unsat_str: str, terminal_e: str, spiro_subs
     if not spiro_subs:
         return stem_str + unsat_str + terminal_e, terminal_e
     core_name = stem_str + unsat_str + "e"
+    if len(spiro_subs) == 2 and not core_name.startswith("spiro["):
+        return _format_dispiro_core(core_name, terminal_e, spiro_subs), ""
     side_prefixes = []
     for spiro in spiro_subs:
         s_name = spiro.side_parent_name
@@ -63,6 +65,38 @@ def format_spiro_core(stem_str: str, unsat_str: str, terminal_e: str, spiro_subs
     if side_prefixes:
         core_name = "-".join(side_prefixes) + core_name
     return core_name, ""
+
+
+def _format_dispiro_core(core_name: str, terminal_e: str, spiro_subs: list[SpiroAssembly]) -> str:
+    first, second = sorted(spiro_subs, key=lambda spiro: (int(spiro.parent_locant), spiro.side_parent_name))
+    first_side = _spiro_side_name(first.side_parent_name)
+    second_side = _spiro_side_name(second.side_parent_name)
+    core = (
+        f"dispiro[{first_side}-{first.side_locant},{first.parent_locant}'-"
+        f"{core_name}-{second.parent_locant}',{second.side_locant}''-{second_side}]"
+    )
+    side_prefixes = []
+    side_prefixes.extend(_reprime_side_prefixes(first.side_prefixes, "'"))
+    side_prefixes.extend(_reprime_side_prefixes(second.side_prefixes, "''"))
+    if terminal_e and terminal_e != "e":
+        if ("yl" in terminal_e or elision.is_vowel_start(terminal_e.lstrip("-0123456789,"))) and core.endswith("e"):
+            core = core[:-1]
+        core += terminal_e
+    if side_prefixes:
+        core = "-".join(side_prefixes) + core
+    return core
+
+
+def _spiro_side_name(side_parent_name: str) -> str:
+    if _spiro_side_parent_needs_parentheses(side_parent_name):
+        return f"({side_parent_name})"
+    return side_parent_name
+
+
+def _reprime_side_prefixes(prefixes: tuple[str, ...], prime: str) -> list[str]:
+    if prime == "'":
+        return list(prefixes)
+    return [prefix.replace("'", prime) for prefix in prefixes]
 
 
 def extract_spiro_side_prefixes(side_name: str) -> tuple[list[str], str]:
