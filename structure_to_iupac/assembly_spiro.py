@@ -21,13 +21,14 @@ def split_spiro_substituents(parts: AssemblyParts) -> list[SpiroAssembly]:
             continue
         match = SPIRO_SUBSTITUENT_RE.match(sub.name)
         if match:
-            side_prefixes, side_parent_name = extract_spiro_side_prefixes(match.group(2))
+            side_prefixes, side_parent_name, side_suffixes = extract_spiro_side_prefixes(match.group(2))
             spiro_subs.append(
                 SpiroAssembly(
                     parent_locant=str(sub.locants[0]),
                     side_locant=match.group(1),
                     side_parent_name=side_parent_name,
                     side_prefixes=tuple(side_prefixes),
+                    side_suffixes=tuple(side_suffixes),
                 )
             )
         else:
@@ -43,9 +44,11 @@ def format_spiro_core(stem_str: str, unsat_str: str, terminal_e: str, spiro_subs
     if len(spiro_subs) == 2 and not core_name.startswith("spiro["):
         return _format_dispiro_core(core_name, terminal_e, spiro_subs), ""
     side_prefixes = []
+    side_suffixes = []
     for spiro in spiro_subs:
         s_name = spiro.side_parent_name
         side_prefixes.extend(spiro.side_prefixes)
+        side_suffixes.extend(_prime_side_suffixes(spiro.side_suffixes, "'"))
         if core_name.startswith("spiro["):
             # A second spiro operation needs full dispiro numbering.  Do not
             # compose invalid nested ``spiro[spiro[...]]`` strings; keep the
@@ -61,9 +64,13 @@ def format_spiro_core(stem_str: str, unsat_str: str, terminal_e: str, spiro_subs
     if terminal_e and terminal_e != "e":
         if ("yl" in terminal_e or elision.is_vowel_start(terminal_e.lstrip("-0123456789,"))) and core_name.endswith("e"):
             core_name = core_name[:-1]
-        core_name += terminal_e
+        core_name += _merge_terminal_and_side_suffixes(terminal_e, side_suffixes)
+    elif side_suffixes:
+        core_name += _format_side_suffixes(side_suffixes)
     if side_prefixes:
+        side_prefixes = _prime_replacement_prefixes_for_primed_component(core_name, side_prefixes)
         core_name = "-".join(side_prefixes) + core_name
+    core_name = _prime_inline_replacement_prefixes_for_primed_component(core_name)
     return core_name, ""
 
 
@@ -76,13 +83,19 @@ def _format_dispiro_core(core_name: str, terminal_e: str, spiro_subs: list[Spiro
         f"{core_name}-{second.parent_locant}',{second.side_locant}''-{second_side}]"
     )
     side_prefixes = []
+    side_suffixes = []
     side_prefixes.extend(_reprime_side_prefixes(first.side_prefixes, "'"))
     side_prefixes.extend(_reprime_side_prefixes(second.side_prefixes, "''"))
+    side_suffixes.extend(_prime_side_suffixes(first.side_suffixes, "'"))
+    side_suffixes.extend(_prime_side_suffixes(second.side_suffixes, "''"))
     if terminal_e and terminal_e != "e":
         if ("yl" in terminal_e or elision.is_vowel_start(terminal_e.lstrip("-0123456789,"))) and core.endswith("e"):
             core = core[:-1]
-        core += terminal_e
+        core += _merge_terminal_and_side_suffixes(terminal_e, side_suffixes)
+    elif side_suffixes:
+        core += _format_side_suffixes(side_suffixes)
     if side_prefixes:
+        side_prefixes = _prime_replacement_prefixes_for_primed_component(core, side_prefixes)
         core = "-".join(side_prefixes) + core
     return core
 
@@ -99,7 +112,48 @@ def _reprime_side_prefixes(prefixes: tuple[str, ...], prime: str) -> list[str]:
     return [prefix.replace("'", prime) for prefix in prefixes]
 
 
-def extract_spiro_side_prefixes(side_name: str) -> tuple[list[str], str]:
+def _prime_replacement_prefixes_for_primed_component(core_name: str, prefixes: list[str]) -> list[str]:
+    if "spiro[cyclopropane-" not in core_name:
+        return prefixes
+    return [
+        re.sub(r"^([0-9,]+)-(oxa|aza|thia)$", lambda match: f"{match.group(1)}'-{match.group(2)}", prefix)
+        for prefix in prefixes
+    ]
+
+
+def _prime_inline_replacement_prefixes_for_primed_component(core_name: str) -> str:
+    if "spiro[cyclopropane-" not in core_name:
+        return core_name
+    return re.sub(r"(^|-)([0-9,]+)-(oxa|aza|thia)spiro\[", r"\1\2'-\3spiro[", core_name)
+
+
+def _prime_side_suffixes(suffixes: tuple[tuple[str, str], ...], prime: str) -> list[tuple[str, str]]:
+    return [(f"{locant}{prime}", suffix) for locant, suffix in suffixes]
+
+
+def _merge_terminal_and_side_suffixes(terminal_e: str, side_suffixes: list[tuple[str, str]]) -> str:
+    if not side_suffixes:
+        return terminal_e
+    match = re.fullmatch(r"-([0-9,']+)-(ol|one)", terminal_e)
+    if not match:
+        return terminal_e + _format_side_suffixes(side_suffixes)
+    main_locants = match.group(1).split(",")
+    main_suffix = match.group(2)
+    same_suffix = [(locant, suffix) for locant, suffix in side_suffixes if suffix == main_suffix]
+    other_suffix = [(locant, suffix) for locant, suffix in side_suffixes if suffix != main_suffix]
+    if not same_suffix:
+        return terminal_e + _format_side_suffixes(side_suffixes)
+    locants = main_locants + [locant for locant, _ in same_suffix]
+    multiplier = {2: "di", 3: "tri", 4: "tetra"}.get(len(locants), "")
+    merged_suffix = f"{multiplier}{main_suffix}" if multiplier else main_suffix
+    return f"-{','.join(locants)}-{merged_suffix}" + _format_side_suffixes(other_suffix)
+
+
+def _format_side_suffixes(side_suffixes: list[tuple[str, str]]) -> str:
+    return "".join(f"-{locant}-{suffix}" for locant, suffix in side_suffixes)
+
+
+def extract_spiro_side_prefixes(side_name: str) -> tuple[list[str], str, tuple[tuple[str, str], ...]]:
     """Move simple side-ring substituents to primed spiro prefixes."""
 
     parent_aliases = (
@@ -117,9 +171,11 @@ def extract_spiro_side_prefixes(side_name: str) -> tuple[list[str], str]:
         "aziridine",
         "oxirane",
         "thiirane",
+        "cyclobutane",
         "cyclopropane",
     )
     normalized = side_name.replace("-aziridine", "aziridine")
+    normalized, side_suffixes = _extract_side_suffixes(normalized)
     parent = None
     prefix_text = ""
     for alias, retained_parent in parent_aliases:
@@ -129,25 +185,37 @@ def extract_spiro_side_prefixes(side_name: str) -> tuple[list[str], str]:
             break
     if parent is None:
         parent = _extract_polycyclic_parent(normalized)
+        if parent is not None and normalized.endswith(parent):
+            prefix_text = normalized[: -len(parent)].rstrip("-")
     if parent is None:
         parent = next((candidate for candidate in parent_names if normalized.endswith(candidate)), None)
         if parent is None:
-            return [], normalized
+            return [], normalized, tuple(side_suffixes)
         prefix_text = normalized[: -len(parent)].rstrip("-")
     elif normalized != parent and normalized.endswith(parent):
         prefix_text = normalized[: -len(parent)].rstrip("-")
     match = re.match(r"^([0-9,]+)-(.+)$", prefix_text)
     if not match:
-        return [], parent
+        return [], parent, tuple(side_suffixes)
     locants, substituent = match.groups()
     primed_locants = ",".join(f"{loc}'" for loc in locants.split(","))
-    return [f"{primed_locants}-{substituent}"], parent
+    return [f"{primed_locants}-{substituent}"], parent, tuple(side_suffixes)
+
+
+def _extract_side_suffixes(side_name: str) -> tuple[str, list[tuple[str, str]]]:
+    match = re.fullmatch(r"(.+?)an-([0-9,]+)-(ol|one)", side_name)
+    if not match:
+        return side_name, []
+    stem, locants, suffix = match.groups()
+    return stem + "ane", [(locant, suffix) for locant in locants.split(",")]
 
 
 def _extract_polycyclic_parent(name: str) -> str | None:
     for marker in ("tetracyclo[", "tricyclo[", "bicyclo["):
         idx = name.rfind(marker)
         if idx > 0 and name[idx - 1] == "-":
+            return name[idx:]
+        if idx > 0 and re.fullmatch(r"(?:[0-9,]+-)?(?:oxa|aza|thia)", name[:idx]):
             return name[idx:]
     return None
 

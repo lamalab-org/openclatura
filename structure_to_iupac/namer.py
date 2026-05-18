@@ -191,12 +191,13 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
     sub_name_clean = sub_name_clean.replace("-cyclo", "cyclo")
     if not sub_name_clean:
         sub_name_clean = "methane"
-    side_prefixes, side_parent_name = extract_spiro_side_prefixes(sub_name_clean)
+    side_prefixes, side_parent_name, side_suffixes = extract_spiro_side_prefixes(sub_name_clean)
     return SpiroAssembly(
         parent_locant="",
         side_locant=loc,
         side_parent_name=side_parent_name,
         side_prefixes=tuple(side_prefixes),
+        side_suffixes=tuple(side_suffixes),
     )
 
 

@@ -427,9 +427,10 @@ def test_spiro_substituent_radicals_keep_attachment_locants():
 
 
 def test_spiro_side_parents_are_normalized_without_nested_or_parenthesized_polycycles():
-    prefixes, parent = extract_spiro_side_prefixes("1-methyl-bicyclo[1.1.1]pentane")
+    prefixes, parent, suffixes = extract_spiro_side_prefixes("1-methyl-bicyclo[1.1.1]pentane")
     assert prefixes == ["1'-methyl"]
     assert parent == "bicyclo[1.1.1]pentane"
+    assert suffixes == ()
 
     core, _ = format_spiro_core(
         "cyclopropan",
@@ -442,6 +443,18 @@ def test_spiro_side_parents_are_normalized_without_nested_or_parenthesized_polyc
     )
     assert "spiro[spiro[" not in core
     assert "(bicyclo" not in core
+
+
+def test_mixed_spiro_bicyclo_side_suffixes_and_replacement_locants_are_component_scoped():
+    cases = {
+        "OC1CC11C2CC1(O)C2": "spiro[bicyclo[1.1.1]pentane-2,1'-cyclopropane]-2'-ol-1-ol",
+        "OC1CC11C2CC1C2=O": "spiro[bicyclo[1.1.1]pentane-4,1'-cyclopropane]-2'-ol-2-one",
+        "CC12CC(O1)C21CC1O": "1'-methyl-2'-oxaspiro[cyclopropane-2,4'-bicyclo[1.1.1]pentane]-1-ol",
+        "CC12CN(C1)C21CC1O": "3'-methyl-1'-azaspiro[cyclopropane-2,2'-bicyclo[1.1.1]pentane]-1-ol",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
 
 
 def test_polycycle_topology_classifies_linear_dispiro_and_rejects_mixed_spiro():
