@@ -357,6 +357,34 @@ def apply_aldehyde_suffix_ide(name: str, negative_locants: dict[str, set[str]]) 
     return updated
 
 
+def apply_carbaldehyde_suffix_ide(name: str, negative_locants: dict[str, set[str]]) -> str:
+    """Insert an anion suffix before ring carbaldehyde suffixes.
+
+    OPSIN treats ``...-carbaldehyde`` parents as neutral unless the anionic
+    ring atom is represented on the parent stem before the characteristic-group
+    suffix.
+    """
+
+    carbon_locants = [
+        operation.locant for operation in anionic_suffix_operations(negative_locants) if operation.atom_symbol == "C"
+    ]
+    updated = name
+    for anion_locant in sorted(carbon_locants, key=lambda value: (not value.isdigit(), value)):
+        if f"-{anion_locant}-ide" in updated:
+            continue
+        pattern = re.compile(
+            r"(?P<stem>[A-Za-z0-9,\-\[\]\^\{\}\.'](?:[A-Za-z0-9,\-\[\]\^\{\}\.']|\(\d+\))*?)"
+            r"-(?P<suffix_locant>\d+)-carbaldehyde\b"
+        )
+
+        def repl(match: re.Match) -> str:
+            stem = explicit_implicit_cation_locant(match.group("stem"))
+            return f"{stem}-{anion_locant}-ide-{match.group('suffix_locant')}-carbaldehyde"
+
+        updated = pattern.sub(repl, updated, count=1)
+    return updated
+
+
 def apply_nitrile_suffix_ide(name: str, negative_locants: dict[str, set[str]]) -> str:
     """Insert carbanion ``-ide`` operations before nitrile suffixes.
 
@@ -404,10 +432,50 @@ def apply_parent_anion_rule(name: str, site: ParentChargeSite, context: ParentCh
 
     updated = apply_one_suffix_ide(name, negative_locants)
     updated = apply_aldehyde_suffix_ide(updated, negative_locants)
+    updated = apply_carbaldehyde_suffix_ide(updated, negative_locants)
     updated = apply_nitrile_suffix_ide(updated, negative_locants)
+    updated = apply_terminal_characteristic_suffix_ide(updated, negative_locants)
     if updated != name:
         return updated
     updated = apply_retained_parent_ide(name, context.retained_name, negative_locants)
+    if updated != name:
+        return updated
+    updated = apply_terminal_parent_ide(name, negative_locants)
+    return updated
+
+
+def apply_terminal_parent_ide(name: str, negative_locants: dict[str, set[str]]) -> str:
+    """Append parent anion suffixes when no principal suffix needs reordering."""
+
+    updated = name
+    for operation in anionic_suffix_operations(negative_locants):
+        if f"-{operation.locant}-ide" in updated:
+            continue
+        updated = f"{updated}-{operation.locant}-ide"
+    return updated
+
+
+def apply_terminal_characteristic_suffix_ide(name: str, negative_locants: dict[str, set[str]]) -> str:
+    """Place parent ``-ide`` before terminal suffixes that cannot follow it.
+
+    OPSIN accepts suffix stacks such as ``...ene-5-ide-2,6-dione`` and
+    ``...-6-ide-6-aminium``.  Appending ``-ide`` after those suffixes describes
+    an unparsable suffix-on-suffix stack, so this rule inserts the anion
+    operation at the parent/suffix boundary using the graph-backed anion
+    locant.
+    """
+
+    updated = name
+    suffix_pattern = re.compile(
+        r"(?P<stem>.+?)"
+        r"(?P<suffix>-(?:\d+(?:,\d+)*)-(?:dione|diamine|aminium))$"
+    )
+    for operation in anionic_suffix_operations(negative_locants):
+        if f"-{operation.locant}-ide" in updated:
+            continue
+        match = suffix_pattern.match(updated)
+        if match:
+            updated = f"{match.group('stem')}-{operation.locant}-ide{match.group('suffix')}"
     return updated
 
 
@@ -443,6 +511,7 @@ def apply_cationic_imino_names(name: str, mol: Molecule) -> str:
     """Make cationic C=N fragments explicit when they appear in nested names."""
 
     has_cationic_imine = False
+    has_cationic_imidamide = False
     for atom_idx, atom in mol.atoms.items():
         if atom.symbol != "N" or atom.charge <= 0:
             continue
@@ -450,11 +519,43 @@ def apply_cationic_imino_names(name: str, mol: Molecule) -> str:
             bond = mol.get_bond(atom_idx, neighbor)
             if bond and bond.order == 2 and mol.atoms[neighbor].is_carbon:
                 has_cationic_imine = True
+                has_cationic_imidamide = carbon_has_two_hetero_substituents(mol, neighbor, atom_idx)
                 break
         if has_cationic_imine:
             break
     if not has_cationic_imine:
         return name
+    if has_cationic_imidamide:
+        name = normalize_cationic_methylideneammonio_substituents(name)
     name = name.replace("(imino)methyl", "(iminio)methyl")
     name = name.replace("iminomethyl", "iminiomethyl")
     return name
+
+
+def carbon_has_two_hetero_substituents(mol: Molecule, carbon_idx: int, imino_n_idx: int) -> bool:
+    hetero_neighbors = [
+        neighbor
+        for neighbor in mol.get_neighbors(carbon_idx)
+        if neighbor != imino_n_idx and mol.atoms[neighbor].symbol in {"N", "O", "S"}
+    ]
+    return len(hetero_neighbors) >= 2
+
+
+def normalize_cationic_methylideneammonio_substituents(name: str) -> str:
+    """Bind imidamide/imino-ether cation charge to the exocyclic N atom.
+
+    ``((amino)(alkoxy)methylideneammonio)`` is parsed by OPSIN with the
+    positive charge on the substituent heteroatom.  The ``N-(...)ammonio`` form
+    preserves a graph pattern where the cationic nitrogen is double-bonded to
+    the central carbon.
+    """
+
+    pattern = re.compile(
+        r"\(\((?P<left>[A-Za-z0-9,\-\[\]\^\{\}']+)\)"
+        r"\((?P<right>[A-Za-z0-9,\-\[\]\^\{\}']+)\)"
+        r"methylideneammonio\)"
+    )
+    return pattern.sub(
+        lambda match: f"(N-(({match.group('left')})({match.group('right')})methylidene)ammonio)",
+        name,
+    )

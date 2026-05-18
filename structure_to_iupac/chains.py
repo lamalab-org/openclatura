@@ -239,7 +239,11 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
         valid_paths = [path2]
     else:
         best_desc = desc1_str
-        valid_paths = [path1, path2]
+        # The descriptor and its superscript bridge locants are built from
+        # this source orientation.  The mirrored path can have lower
+        # heteroatom or unsaturation locants, but those locants no longer
+        # describe the emitted von Baeyer descriptor graph.
+        valid_paths = [path1]
         
     prefixes = {1: "bicyclo", 2: "tricyclo", 3: "tetracyclo", 4: "pentacyclo", 5: "hexacyclo", 6: "heptacyclo", 7: "octacyclo", 8: "nonacyclo", 9: "decacyclo"}
     prefix = prefixes.get(len(bridges), "polycyclo")

@@ -687,6 +687,27 @@ def test_pyopsin_regression_names_preserve_carbanion_suffix_locants():
         assert name_smiles(smiles) == expected
 
 
+def test_pyopsin_regression_names_preserve_zwitterionic_parent_suffix_order():
+    cases = {
+        "[NH3+]C1=CC(=O)NC(=O)[CH-]1": "4-ammonio-1-azacyclohex-3-ene-5-ide-2,6-dione",
+        "NC1=NC(N)=[NH+][N-]C1=N": "6-imino-1,2,4-triazacyclohexa-2,4-dien-2-ium-1-ide-3,5-diamine",
+        "[NH3+][C-]1C=CC2=C1N=NO2": "2-oxa-3,4-diazabicyclo[3.3.0]octa-1(5),3,7-trien-6-ide-6-aminium",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_pyopsin_regression_names_preserve_cationic_imidamide_connectivity():
+    cases = {
+        "CNC(N)=[NH+]CC([O-])=O": "2-(N-((amino)(methylamino)methylidene)ammonio)acetate",
+        "COC(N)=[NH+]CC([O-])=O": "2-(N-((amino)(methoxy)methylidene)ammonio)acetate",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
 def test_invalid_ide_morphology_is_normalized():
     assert (
         apply_retained_parent_ide("5-(ammoniomethyl)imidazolidine-2,4-dione", "imidazolidine", {"1": {"C"}})
@@ -762,6 +783,21 @@ def test_anionic_ketone_parent_names_keep_parent_descriptor_intact():
 
     for smiles, expected in cases.items():
         assert name_smiles(smiles) == expected
+
+
+def test_von_baeyer_polycycle_keeps_descriptor_source_numbering():
+    cases = {
+        "C1C2C1C13COC21CO3": "7,9-dioxatetracyclo[3.2.2.0^{1,5}.0^{2,4}]nonane",
+        "C1NC23COC12C=CC3": "9-oxa-7-azatricyclo[3.2.2.0^{1,5}]non-3-ene",
+        "C1NC23COC12COC3": "3,9-dioxa-7-azatricyclo[3.2.2.0^{1,5}]nonane",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_substituted_alkoxy_prefixes_preserve_imino_ether_connectivity():
+    assert name_smiles("OCCOC(=N)NC=O") == "N-((2-hydroxyethoxy)(imino)methyl)formamide"
 
 
 def test_trace_segment_schema_for_functionalized_molecules():

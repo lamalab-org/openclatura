@@ -72,7 +72,35 @@ def oxy_prefix_from_branch(branch: str) -> str:
     if retained:
         return retained
     branch = strip_outer_parentheses(branch)
+    retained = ALKYL_OXY_PREFIXES.get(branch)
+    if retained:
+        return retained
+    substituted_alkoxy = substituted_alkoxy_prefix(branch)
+    if substituted_alkoxy:
+        return substituted_alkoxy
+    if is_complex_prefix(branch):
+        return f"(({branch})oxy)"
     return f"({branch}oxy)"
+
+
+def substituted_alkoxy_prefix(branch: str) -> str | None:
+    """Contract substituted acyclic alkyl branches to alkoxy prefixes."""
+
+    if "hydroxy" not in branch:
+        return None
+    terminal_replacements = {
+        "methyl": "methoxy",
+        "ethyl": "ethoxy",
+        "propyl": "propoxy",
+        "butyl": "butoxy",
+        "pentyl": "pentoxy",
+        "hexyl": "hexoxy",
+    }
+    for terminal, replacement in terminal_replacements.items():
+        if branch.endswith(terminal):
+            prefix = branch[: -len(terminal)]
+            return f"({prefix}{replacement})" if prefix else replacement
+    return None
 
 
 def format_element_substituent(stereo_prefix: str, branch: str, suffix: str, is_double: bool = False) -> str:

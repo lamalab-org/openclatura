@@ -7,13 +7,13 @@ from .formatting import (
     format_counted_prefixes,
     format_element_substituent,
     is_complex_prefix,
+    oxy_prefix_from_branch,
     strip_outer_parentheses,
 )
 from .heteroatom_substituent_specs import unsubstituted_prefix
 from .ionic_naming import ammonio_prefix
 from .molecule import Molecule
 from .namer_config import (
-    ALKYL_OXY_PREFIXES,
     HALOGEN_LAMBDA_SUFFIXES,
     HALOGEN_PREFIXES,
     SIMPLE_SELANYL_PREFIXES,
@@ -221,12 +221,7 @@ def name_oxygen_subgraph(
 
     branch = branch_namer(mol, nxt, exclude_atoms | {start_idx}, start_idx)
     if branch:
-        if branch in ALKYL_OXY_PREFIXES:
-            return ALKYL_OXY_PREFIXES[branch]
-        branch = strip_outer_parentheses(branch)
-        if is_complex_prefix(branch):
-            return f"(({branch})oxy)"
-        return f"({branch}oxy)"
+        return oxy_prefix_from_branch(branch)
     return "hydroxy"
 
 
