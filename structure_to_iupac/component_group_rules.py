@@ -18,11 +18,17 @@ AtomSelector = Callable[[Molecule, PerceivedGroup], int | None]
 
 NONPARENT_ATOM_SELECTORS: dict[str, AtomSelector] = {"anhydride": bridge_oxygen}
 NONPARENT_ATOM_SELECTORS.update(
-    {key: ester_single_oxygen for key in RULES.prefixes.ester_like_groups - RULES.prefixes.peroxy_ester_groups}
+    {
+        key: ester_single_oxygen
+        for key in RULES.functional_groups.keys_with_family("ester_like")
+        - RULES.functional_groups.keys_with_family("peroxy_ester")
+    }
 )
-NONPARENT_ATOM_SELECTORS.update({key: peroxy_ester_single_oxygen for key in RULES.prefixes.peroxy_ester_groups})
-NONPARENT_ATOM_SELECTORS.update({key: sulfonyl_sulfur for key in RULES.prefixes.sulfonyl_groups})
-NONPARENT_ATOM_SELECTORS.update({key: amide_nitrogen for key in RULES.prefixes.amide_like_groups})
+NONPARENT_ATOM_SELECTORS.update(
+    {key: peroxy_ester_single_oxygen for key in RULES.functional_groups.keys_with_family("peroxy_ester")}
+)
+NONPARENT_ATOM_SELECTORS.update({key: sulfonyl_sulfur for key in RULES.functional_groups.keys_with_family("sulfonyl")})
+NONPARENT_ATOM_SELECTORS.update({key: amide_nitrogen for key in RULES.functional_groups.keys_with_family("amide_like")})
 
 
 def retarget_external_carbonyl_groups(
@@ -35,7 +41,9 @@ def retarget_external_carbonyl_groups(
     """Move exocyclic carbonyl group attachment onto the parent chain atom."""
 
     for group in perceived_groups:
-        if group.key == principal_key or group.key not in RULES.components.chain_external_carbonyl_groups:
+        if group.key == principal_key or group.key not in RULES.functional_groups.keys_with_family(
+            "chain_external_carbonyl"
+        ):
             continue
         group_c = group.attachment_carbon
         if group_c in cyclic_atoms_all:

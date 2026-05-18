@@ -52,6 +52,14 @@ class ParentChargeRule:
     apply: Callable[[str, ParentChargeSite, ParentChargeContext], str]
 
 
+@dataclass(frozen=True)
+class AnionicSuffixOperation:
+    locant: str
+    atom_symbol: str
+    operation: str
+    reason: str
+
+
 def ammonio_prefix(branches: list[str]) -> str:
     """Return an ammonio-style prefix for a protonated nitrogen substituent."""
 
@@ -267,9 +275,25 @@ def charged_locants(mol: Molecule, numbered_path: list[int], get_loc, charge: in
     return charge_locants(parent_charge_sites(mol, numbered_path, get_loc), charge)
 
 
+def anionic_suffix_operations(negative_locants: dict[str, set[str]]) -> list[AnionicSuffixOperation]:
+    operations = []
+    for locant in sorted(negative_locants, key=lambda value: (not value.isdigit(), value)):
+        for symbol in sorted(negative_locants[locant]):
+            operations.append(
+                AnionicSuffixOperation(
+                    locant=locant,
+                    atom_symbol=symbol,
+                    operation="ide",
+                    reason="Negative parent atoms are rendered as parent anion suffix operations.",
+                )
+            )
+    return operations
+
+
 def _replace_stem_with_ide(name: str, neutral_stem: str, charged_stem: str, anion_locant: str) -> str:
     escaped = re.escape(neutral_stem)
-    pattern = re.compile(rf"(?<![A-Za-z0-9])(?:\d+H-)?{escaped}(?!-\d+-ide)")
+    charged_stem = charged_stem[:-1] if charged_stem.endswith("e") else charged_stem
+    pattern = re.compile(rf"(?<![A-Za-z0-9])(?:\d+H-)?{escaped}e?(?!-\d+-ide)")
     return pattern.sub(f"{charged_stem}-{anion_locant}-ide", name)
 
 
@@ -293,7 +317,8 @@ def apply_one_suffix_ide(name: str, negative_locants: dict[str, set[str]]) -> st
     """Convert generated ketone suffix parents to oxo/ide form by grammar."""
 
     updated = name
-    for anion_locant in sorted(negative_locants, key=lambda value: (not value.isdigit(), value)):
+    for operation in anionic_suffix_operations(negative_locants):
+        anion_locant = operation.locant
         pattern = re.compile(
             r"(?<![A-Za-z0-9])(?:\d+H-)?"
             r"(?P<stem>[A-Za-z0-9,\[\]\^\{\}](?:[A-Za-z0-9,\-\[\]\^\{\}\.']|\(\d+\))*?)"
@@ -322,11 +347,53 @@ def explicit_implicit_cation_locant(stem: str) -> str:
 def apply_aldehyde_suffix_ide(name: str, negative_locants: dict[str, set[str]]) -> str:
     """Convert acyclic aldehyde suffix names to locanted carbanion aldehydes."""
 
-    carbon_locants = [locant for locant, symbols in negative_locants.items() if "C" in symbols]
+    carbon_locants = [
+        operation.locant for operation in anionic_suffix_operations(negative_locants) if operation.atom_symbol == "C"
+    ]
     updated = name
     for anion_locant in sorted(carbon_locants, key=lambda value: (not value.isdigit(), value)):
         pattern = re.compile(r"(?P<stem>[A-Za-z0-9,\-\[\]\^\{\}]+?an)al\b")
         updated = pattern.sub(lambda match: f"{match.group('stem')}-{anion_locant}-ide-1-al", updated, count=1)
+    return updated
+
+
+def apply_nitrile_suffix_ide(name: str, negative_locants: dict[str, set[str]]) -> str:
+    """Insert carbanion ``-ide`` operations before nitrile suffixes.
+
+    OPSIN treats names such as ``propanedinitrile`` and ``cyclo...carbonitrile``
+    as neutral unless the carbanion site is represented in the parent suffix
+    stack.  This rule is graph-backed by the charged parent locant and only
+    applies to carbon anions.
+    """
+
+    carbon_locants = [
+        operation.locant for operation in anionic_suffix_operations(negative_locants) if operation.atom_symbol == "C"
+    ]
+    updated = name
+    for anion_locant in sorted(carbon_locants, key=lambda value: (not value.isdigit(), value)):
+        if f"-{anion_locant}-ide" in updated:
+            continue
+        updated = re.sub(
+            r"(?P<stem>[A-Za-z0-9,\-\[\]\^\{\}]+?ane)dinitrile\b",
+            lambda match: f"{match.group('stem')}-{anion_locant}-ide-1,3-dinitrile",
+            updated,
+            count=1,
+        )
+        before_carbonitrile = updated
+        updated = re.sub(
+            r"(?P<stem>[A-Za-z0-9,\-\[\]\^\{\}]+?)-(?P<suffix_locant>\d+)-carbonitrile\b",
+            lambda match: f"{match.group('stem')}-{anion_locant}-ide-{match.group('suffix_locant')}-carbonitrile",
+            updated,
+            count=1,
+        )
+        if updated != before_carbonitrile:
+            continue
+        updated = re.sub(
+            r"(?P<stem>[A-Za-z0-9,\-\[\]\^\{\}]+?)carbonitrile\b",
+            lambda match: f"{match.group('stem')}-{anion_locant}-ide-carbonitrile",
+            updated,
+            count=1,
+        )
     return updated
 
 
@@ -337,6 +404,7 @@ def apply_parent_anion_rule(name: str, site: ParentChargeSite, context: ParentCh
 
     updated = apply_one_suffix_ide(name, negative_locants)
     updated = apply_aldehyde_suffix_ide(updated, negative_locants)
+    updated = apply_nitrile_suffix_ide(updated, negative_locants)
     if updated != name:
         return updated
     updated = apply_retained_parent_ide(name, context.retained_name, negative_locants)

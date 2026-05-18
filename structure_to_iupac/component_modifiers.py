@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 
-from .assembler import AssemblyParts
+from .assembly_parts import AssemblyParts
 from .formatting import strip_outer_parentheses
 from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
@@ -25,7 +25,7 @@ def add_component_front_modifiers(
 ) -> None:
     """Add ester/sulfonate front modifiers such as the alcohol component name."""
 
-    if principal_key not in RULES.components.front_modifier_principal_groups:
+    if principal_key not in RULES.functional_groups.keys_with_family("front_modifier"):
         return
     for group in perceived_groups:
         if group.key != principal_key:
@@ -48,7 +48,7 @@ def n_substituent_locant(
 
     if principal_key == "hydrazine":
         return "N" if nitrogen_index == 0 else "N'"
-    if principal_key in RULES.components.hydrazone_principal_groups:
+    if principal_key in RULES.functional_groups.keys_with_family("hydrazone"):
         return "N"
     if principal_group_count == 1 and nitrogen_count == 1:
         return "N"

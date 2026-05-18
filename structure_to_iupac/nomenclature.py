@@ -96,6 +96,7 @@ class FunctionalGroupRule:
     needs_locant: bool = True
     perception_handler: str | None = None
     prefix_handler: str | None = None
+    families: tuple[str, ...] = ()
     component_flags: tuple[str, ...] = ()
     postprocess_tags: tuple[str, ...] = ()
 
@@ -103,6 +104,120 @@ class FunctionalGroupRule:
 @dataclass(frozen=True)
 class FunctionalGroupRules:
     by_key: dict[str, FunctionalGroupRule]
+
+    def has(self, key: str) -> bool:
+        return key in self.by_key
+
+    def get(self, key: str) -> FunctionalGroupRule:
+        return self.by_key[key]
+
+    def prefix_for(self, key: str) -> str | None:
+        rule = self.by_key.get(key)
+        return rule.prefix if rule else None
+
+    def cited_prefix_for(self, key: str) -> str | None:
+        prefix = self.prefix_for(key)
+        if prefix is None:
+            return None
+        rule = self.by_key[key]
+        if "acid_halide" in rule.families:
+            return f"({prefix})"
+        return prefix
+
+    def direct_subgraph_prefix_for(self, key: str) -> str | None:
+        rule = self.by_key.get(key)
+        if rule is None:
+            return None
+        if rule.role == "prefix" or "direct_group" in rule.families:
+            return rule.prefix
+        return None
+
+    def principal_keys(self) -> set[str]:
+        return {key for key, rule in self.by_key.items() if rule.role == "principal"}
+
+    def prefix_keys(self) -> set[str]:
+        return {key for key, rule in self.by_key.items() if rule.prefix}
+
+    def most_senior(self, keys: list[str]) -> FunctionalGroupRule:
+        principal_rules = [self.by_key[key] for key in keys if key in self.by_key and self.by_key[key].seniority is not None]
+        if not principal_rules:
+            raise KeyError(f"No seniority metadata for functional-group keys: {keys!r}")
+        return min(principal_rules, key=lambda rule: rule.seniority)
+
+    def keys_with_family(self, family: str) -> set[str]:
+        return {key for key, rule in self.by_key.items() if family in rule.families}
+
+
+PRINCIPAL_FUNCTIONAL_GROUP_ROWS: tuple[dict, ...] = (
+    {"key": "olate", "seniority": 15, "suffix": "olate", "suffix_with_locant": True, "prefix": "oxido", "multi_suffix": "diolate"},
+    {"key": "thiolate", "seniority": 16, "suffix": "thiolate", "suffix_with_locant": True, "prefix": "sulfido", "multi_suffix": "dithiolate"},
+    {"key": "carboxylic_acid", "seniority": 20, "suffix": "oic acid", "suffix_with_locant": False, "prefix": "carboxy", "multi_suffix": "dioic acid"},
+    {"key": "carboxylate", "seniority": 21, "suffix": "oate", "suffix_with_locant": False, "prefix": "carboxylato", "multi_suffix": "dioate"},
+    {"key": "ring_carboxylic_acid", "seniority": 20, "suffix": "carboxylic acid", "suffix_with_locant": True, "prefix": "carboxy", "multi_suffix": "dicarboxylic acid"},
+    {"key": "ring_carboxylate", "seniority": 21, "suffix": "carboxylate", "suffix_with_locant": True, "prefix": "carboxylato", "multi_suffix": "dicarboxylate"},
+    {"key": "peroxy_acid", "seniority": 22, "suffix": "peroxoic acid", "suffix_with_locant": False, "prefix": "carboperoxy", "multi_suffix": "diperoxoic acid"},
+    {"key": "ring_peroxy_acid", "seniority": 22, "suffix": "carboperoxoic acid", "suffix_with_locant": True, "prefix": "carboperoxy", "multi_suffix": "dicarboperoxoic acid"},
+    {"key": "peroxy_ester", "seniority": 45, "suffix": "peroxoate", "suffix_with_locant": False, "prefix": "oxycarbonyl", "multi_suffix": None},
+    {"key": "ring_peroxy_ester", "seniority": 45, "suffix": "carboperoxoate", "suffix_with_locant": True, "prefix": "oxycarbonyl", "multi_suffix": None},
+    {"key": "sulfonic_acid", "seniority": 25, "suffix": "sulfonic acid", "suffix_with_locant": True, "prefix": "sulfo", "multi_suffix": "disulfonic acid"},
+    {"key": "sulfonate", "seniority": 26, "suffix": "sulfonate", "suffix_with_locant": True, "prefix": "sulfonato", "multi_suffix": "disulfonate"},
+    {"key": "anhydride", "seniority": 30, "suffix": "oic anhydride", "suffix_with_locant": False, "prefix": None, "multi_suffix": None},
+    {"key": "ester", "seniority": 40, "suffix": "oate", "suffix_with_locant": False, "prefix": "oxycarbonyl", "multi_suffix": None},
+    {"key": "acid_fluoride", "seniority": 50, "suffix": "oyl fluoride", "suffix_with_locant": False, "prefix": "fluorocarbonyl", "multi_suffix": "dioyl difluoride"},
+    {"key": "acid_chloride", "seniority": 51, "suffix": "oyl chloride", "suffix_with_locant": False, "prefix": "chlorocarbonyl", "multi_suffix": "dioyl dichloride"},
+    {"key": "acid_bromide", "seniority": 52, "suffix": "oyl bromide", "suffix_with_locant": False, "prefix": "bromocarbonyl", "multi_suffix": "dioyl dibromide"},
+    {"key": "acid_iodide", "seniority": 53, "suffix": "oyl iodide", "suffix_with_locant": False, "prefix": "iodocarbonyl", "multi_suffix": "dioyl diiodide"},
+    {"key": "ring_acid_fluoride", "seniority": 50, "suffix": "carbonyl fluoride", "suffix_with_locant": True, "prefix": "fluorocarbonyl", "multi_suffix": "dicarbonyl difluoride"},
+    {"key": "ring_acid_chloride", "seniority": 51, "suffix": "carbonyl chloride", "suffix_with_locant": True, "prefix": "chlorocarbonyl", "multi_suffix": "dicarbonyl dichloride"},
+    {"key": "ring_acid_bromide", "seniority": 52, "suffix": "carbonyl bromide", "suffix_with_locant": True, "prefix": "bromocarbonyl", "multi_suffix": "dicarbonyl dibromide"},
+    {"key": "ring_acid_iodide", "seniority": 53, "suffix": "carbonyl iodide", "suffix_with_locant": True, "prefix": "iodocarbonyl", "multi_suffix": "dicarbonyl diiodide"},
+    {"key": "amide", "seniority": 60, "suffix": "amide", "suffix_with_locant": False, "prefix": "carbamoyl", "multi_suffix": "diamide"},
+    {"key": "ring_amide", "seniority": 60, "suffix": "carboxamide", "suffix_with_locant": True, "prefix": "carbamoyl", "multi_suffix": "dicarboxamide"},
+    {"key": "thioamide", "seniority": 65, "suffix": "thioamide", "suffix_with_locant": False, "prefix": "carbamothioyl", "multi_suffix": "dithioamide"},
+    {"key": "ring_thioamide", "seniority": 65, "suffix": "carbothioamide", "suffix_with_locant": True, "prefix": "carbamothioyl", "multi_suffix": "dicarbothioamide"},
+    {"key": "nitrile", "seniority": 70, "suffix": "nitrile", "suffix_with_locant": False, "prefix": "cyano", "multi_suffix": "dinitrile"},
+    {"key": "ring_nitrile", "seniority": 70, "suffix": "carbonitrile", "suffix_with_locant": True, "prefix": "cyano", "multi_suffix": "dicarbonitrile"},
+    {"key": "aldehyde", "seniority": 80, "suffix": "al", "suffix_with_locant": False, "prefix": "oxo", "multi_suffix": "dial"},
+    {"key": "ring_aldehyde", "seniority": 80, "suffix": "carbaldehyde", "suffix_with_locant": True, "prefix": "formyl", "multi_suffix": "dicarbaldehyde"},
+    {"key": "ketone", "seniority": 90, "suffix": "one", "suffix_with_locant": True, "prefix": "oxo", "multi_suffix": "dione"},
+    {"key": "hydrazone", "seniority": 95, "suffix": "one hydrazone", "suffix_with_locant": True, "prefix": "hydrazono", "multi_suffix": "dione dihydrazone"},
+    {"key": "aldehyde_hydrazone", "seniority": 95, "suffix": "al hydrazone", "suffix_with_locant": False, "prefix": "hydrazono", "multi_suffix": "dial dihydrazone"},
+    {"key": "ring_aldehyde_hydrazone", "seniority": 95, "suffix": "carbaldehyde hydrazone", "suffix_with_locant": True, "prefix": "hydrazonomethyl", "multi_suffix": "dicarbaldehyde dihydrazone"},
+    {"key": "alcohol", "seniority": 100, "suffix": "ol", "suffix_with_locant": True, "prefix": "hydroxy", "multi_suffix": "diol"},
+    {"key": "thiol", "seniority": 105, "suffix": "thiol", "suffix_with_locant": True, "prefix": "sulfanyl", "multi_suffix": "dithiol"},
+    {"key": "amine", "seniority": 110, "suffix": "amine", "suffix_with_locant": True, "prefix": "amino", "multi_suffix": "diamine"},
+    {"key": "aminium", "seniority": 109, "suffix": "aminium", "suffix_with_locant": True, "prefix": "ammonio", "multi_suffix": "diaminium"},
+    {"key": "imine", "seniority": 112, "suffix": "imine", "suffix_with_locant": True, "prefix": "imino", "multi_suffix": "diimine"},
+    {"key": "iminium", "seniority": 111, "suffix": "iminium", "suffix_with_locant": True, "prefix": "iminio", "multi_suffix": "diiminium"},
+    {"key": "hydrazine", "seniority": 115, "suffix": "hydrazine", "suffix_with_locant": True, "prefix": "hydrazinyl", "multi_suffix": "dihydrazine"},
+    {"key": "ether", "seniority": 200, "suffix": "ether", "suffix_with_locant": False, "prefix": "oxy", "multi_suffix": None},
+)
+
+
+PREFIX_FUNCTIONAL_GROUP_ROWS: tuple[dict, ...] = (
+    {"key": "fluoro", "prefix": "fluoro", "needs_locant": True},
+    {"key": "chloro", "prefix": "chloro", "needs_locant": True},
+    {"key": "bromo", "prefix": "bromo", "needs_locant": True},
+    {"key": "iodo", "prefix": "iodo", "needs_locant": True},
+    {"key": "astato", "prefix": "astato", "needs_locant": True},
+    {"key": "nitro", "prefix": "nitro", "needs_locant": True},
+    {"key": "nitroso", "prefix": "nitroso", "needs_locant": True},
+    {"key": "azido", "prefix": "azido", "needs_locant": True},
+    {"key": "diazo", "prefix": "diazo", "needs_locant": True},
+    {"key": "diazonio", "prefix": "diazonio", "needs_locant": True},
+    {"key": "isocyano", "prefix": "isocyano", "needs_locant": True},
+    {"key": "cyanato", "prefix": "cyanato", "needs_locant": True},
+    {"key": "isocyanato", "prefix": "isocyanato", "needs_locant": True},
+    {"key": "thiocyanato", "prefix": "thiocyanato", "needs_locant": True},
+    {"key": "isothiocyanato", "prefix": "isothiocyanato", "needs_locant": True},
+    {"key": "hydroperoxy", "prefix": "hydroperoxy", "needs_locant": True},
+    {"key": "peroxy", "prefix": "peroxy", "needs_locant": True},
+    {"key": "sulfanyl", "prefix": "sulfanyl", "needs_locant": True},
+    {"key": "silyl", "prefix": "silyl", "needs_locant": True},
+    {"key": "phosphanyl", "prefix": "phosphanyl", "needs_locant": True},
+    {"key": "phosphoryl", "prefix": "phosphoryl", "needs_locant": True},
+    {"key": "boryl", "prefix": "boryl", "needs_locant": True},
+)
 
 
 @dataclass(frozen=True)
@@ -123,27 +238,31 @@ def _tuple_mapping(section: str) -> dict[str, tuple[str, str]]:
 
 def _functional_group_rules() -> FunctionalGroupRules:
     groups = {}
-    from .rules import substituents, suffixes
 
-    for key, rule in suffixes.GROUPS.items():
+    for item in PRINCIPAL_FUNCTIONAL_GROUP_ROWS:
+        key = item["key"]
         groups[key] = FunctionalGroupRule(
             key=key,
             role="principal",
-            prefix=rule.prefix,
-            suffix=rule.suffix,
-            multi_suffix=rule.multi_suffix,
-            seniority=rule.seniority,
-            suffix_with_locant=rule.suffix_with_locant,
+            prefix=item["prefix"],
+            suffix=item["suffix"],
+            multi_suffix=item["multi_suffix"],
+            seniority=item["seniority"],
+            suffix_with_locant=item["suffix_with_locant"],
             needs_locant=True,
+            families=_derived_functional_group_families(key),
         )
-    for key, rule in substituents.SUBSTITUENTS.items():
+    for item in PREFIX_FUNCTIONAL_GROUP_ROWS:
+        key = item["key"]
         groups[key] = FunctionalGroupRule(
             key=key,
             role="prefix",
-            prefix=rule.prefix,
-            needs_locant=rule.needs_locant,
+            prefix=item["prefix"],
+            needs_locant=item["needs_locant"],
+            families=_derived_functional_group_families(key),
         )
     for key, item in mapping("functional_groups").items():
+        families = tuple(item.get("families", _derived_functional_group_families(key)))
         groups[key] = FunctionalGroupRule(
             key=key,
             role=item["role"],
@@ -155,10 +274,39 @@ def _functional_group_rules() -> FunctionalGroupRules:
             needs_locant=bool(item.get("needs_locant", True)),
             perception_handler=item.get("perception_handler"),
             prefix_handler=item.get("prefix_handler"),
+            families=families,
             component_flags=tuple(item.get("component_flags", [])),
             postprocess_tags=tuple(item.get("postprocess_tags", [])),
         )
     return FunctionalGroupRules(by_key=groups)
+
+
+def _derived_functional_group_families(key: str) -> tuple[str, ...]:
+    families = set()
+    family_sections = {
+        "chain_external_carbonyl": "chain_external_carbonyl_groups",
+        "prefix_skip": "prefix_groups_to_skip",
+        "ester_like": "ester_like_prefix_groups",
+        "peroxy_ester": "peroxy_ester_groups",
+        "amide_like": "amide_like_prefix_groups",
+        "carboxy_prefix": "carboxy_prefix_groups",
+        "cyano_prefix": "cyano_prefix_groups",
+        "peroxy_acid": "peroxy_acid_prefix_groups",
+        "sulfonyl": "sulfonyl_prefix_groups",
+        "front_modifier": "front_modifier_principal_groups",
+        "n_substitutable": "n_substituent_principal_groups",
+        "hydrazone": "hydrazone_principal_groups",
+    }
+    for family, section in family_sections.items():
+        if key in values(section):
+            families.add(family)
+    if key in mapping("acid_halide_prefixes"):
+        families.add("acid_halide")
+    if key in mapping("direct_prefix_groups"):
+        families.add("direct_prefix")
+    if key in mapping("direct_group_prefixes"):
+        families.add("direct_group")
+    return tuple(sorted(families))
 
 
 def _postprocess_rules() -> PostprocessRules:

@@ -1,6 +1,6 @@
 """Explicit subtractive feature collection for selected parents."""
 
-from .assembler import AssemblyParts, UnsaturationItem
+from .assembly_parts import AssemblyParts, UnsaturationItem
 from .locants import parse_locant
 from .molecule import Molecule
 

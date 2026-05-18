@@ -1,10 +1,13 @@
 """Trace and explainability helpers for generated names."""
 
-from .assembler import AssemblyParts, SubstituentItem
+from dataclasses import replace
+
+from .assembly_parts import AssemblyParts, SubstituentItem
 from .formatting import strip_outer_parentheses
 from .molecule import DecisionTrace, Molecule, TracePhase
+from .nomenclature import RULES
 from .perception import PerceivedGroup
-from .rules import bonds, multipliers, stems, suffixes
+from .rules import bonds, multipliers, stems
 
 
 def trace_decision(
@@ -63,13 +66,16 @@ def add_substituent_trace(
     atom_ids=None,
     bond_ids=None,
     trace_segments=None,
+    spiro=None,
 ) -> None:
     """Append or merge a substituent while preserving trace atom/bond IDs."""
 
     atom_ids = set(atom_ids or ())
     bond_ids = set(bond_ids or ())
     trace_segments = list(trace_segments or ())
-    existing = next((s for s in parts.substituents if s.name == name), None)
+    if spiro is not None:
+        spiro = replace(spiro, parent_locant=str(locant))
+    existing = next((s for s in parts.substituents if s.name == name and s.spiro == spiro), None)
     if existing:
         existing.locants.append(locant)
         existing.atom_ids.update(atom_ids)
@@ -83,6 +89,7 @@ def add_substituent_trace(
                 atom_ids=atom_ids,
                 bond_ids=bond_ids,
                 trace_segments=trace_segments,
+                spiro=spiro,
             )
         )
 
@@ -222,7 +229,7 @@ def assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
         )
 
     if parts.principal_group:
-        group = suffixes.get(parts.principal_group.key)
+        group = RULES.functional_groups.get(parts.principal_group.key)
         terms = [group.suffix]
         if group.multi_suffix:
             terms.insert(0, group.multi_suffix)

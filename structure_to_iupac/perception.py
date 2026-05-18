@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 
 from .chains import get_cyclic_atoms
-from .functional_groups import PERCEPTION_DETECTORS, metadata_for_group, register_group_detector
+from .functional_groups import PERCEPTION_DETECTORS, PERCEPTION_SPECS, PerceptionDetectorSpec, metadata_for_group
 from .molecule import AtomBinding, BondBinding, FunctionalGroupMetadata, Molecule
 
 @dataclass
@@ -24,6 +24,8 @@ class PerceivedGroup:
     atom_bindings: tuple[AtomBinding, ...] = ()
     bond_bindings: tuple[BondBinding, ...] = ()
     decision_reasons: tuple[str, ...] = ()
+    variant: str | None = None
+    role: str | None = None
 
     @property
     def atom_ids(self) -> set[int]:
@@ -54,8 +56,24 @@ def perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
     groups = []
     for detector in PERCEPTION_DETECTORS:
         groups.extend(detector(mol))
-    groups.extend(_builtin_perceive_groups(mol))
+    if PERCEPTION_SPECS:
+        specs = tuple(sorted(BUILTIN_PERCEPTION_SPECS + tuple(PERCEPTION_SPECS), key=lambda item: item.priority))
+    else:
+        specs = BUILTIN_PERCEPTION_SPECS
+    for spec in specs:
+        groups.extend(spec.detector(mol))
     return _enrich_groups(mol, groups)
+
+
+BUILTIN_PERCEPTION_SPECS = (
+    PerceptionDetectorSpec(
+        key="builtin.functional_groups",
+        detector=lambda mol: _builtin_perceive_groups(mol),
+        priority=100,
+        families=("functional_group",),
+        description="Built-in structural functional-group detectors.",
+    ),
+)
 
 
 def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:

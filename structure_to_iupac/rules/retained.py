@@ -57,6 +57,12 @@ def _has_no_cumulated_double_bonds(mol: Molecule, path: list[int]) -> bool:
             return False
     return True
 
+def recognizes_retained_ring(mol: Molecule, path: list[int]) -> bool:
+    """Return whether a path matches any retained-ring recognizer."""
+
+    return get_retained_ring(mol, path) is not None
+
+
 def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[int, str]] | None] | None:
     size = len(path)
     path_set = set(path)

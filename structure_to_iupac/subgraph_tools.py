@@ -2,7 +2,7 @@
 
 from .additive import add_indicated_hydrogens as _add_indicated_hydrogens
 from .additive import add_replacement_prefixes
-from .assembler import AssemblyParts
+from .assembly_parts import AssemblyParts
 from .chains import get_cyclic_atoms
 from .locants import parse_locant
 from .molecule import Molecule

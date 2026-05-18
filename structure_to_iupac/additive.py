@@ -1,6 +1,6 @@
 """Explicit additive/replacement feature collection for selected parents."""
 
-from .assembler import AssemblyParts, SubstituentItem
+from .assembly_parts import AssemblyParts, SubstituentItem
 from .molecule import Molecule
 from .namer_config import INDICATED_H_RETAINED_NAMES
 
@@ -9,6 +9,8 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     """Add indicated hydrogen locants for retained ring names."""
 
     if parts.retained_name not in INDICATED_H_RETAINED_NAMES:
+        return
+    if parts.retained_name == "tetrazole" and any(mol.atoms[idx].charge for idx in numbered_path):
         return
     for idx in numbered_path:
         atom = mol.atoms[idx]

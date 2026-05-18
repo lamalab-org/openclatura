@@ -1,10 +1,36 @@
 """Data-driven final name post-processing."""
 
 import re
+from dataclasses import dataclass
 
 from .nomenclature import RULES
 
 OPTIONAL_ONE_LOCANT_PREFIX_RE = re.compile(r"(?P<prefix>\bmethyl |\b\S+yl | |\))1-\(")
+
+
+@dataclass(frozen=True)
+class PostprocessingRuleInventoryItem:
+    owner: str
+    kind: str
+    pattern: str
+    replacement: str
+
+
+def postprocessing_rule_inventory() -> tuple[PostprocessingRuleInventoryItem, ...]:
+    """Return classified compatibility post-processing rules for migration."""
+
+    items = []
+    for old, new in RULES.postprocess.literal_replacements:
+        items.append(PostprocessingRuleInventoryItem("compatibility.literal", "literal", old, new))
+    for rule in RULES.postprocess.regex_replacements:
+        items.append(PostprocessingRuleInventoryItem("compatibility.regex", "regex", rule.pattern, rule.replacement))
+    for old, new in RULES.postprocess.exact_replacements.items():
+        items.append(PostprocessingRuleInventoryItem("compatibility.exact", "exact", old, new))
+    for term in RULES.postprocess.acyl_amido_terms:
+        items.append(PostprocessingRuleInventoryItem("functional_group.acyl_amido", "term", term, "amido"))
+    for suffix in RULES.postprocess.n_substituted_functional_suffixes:
+        items.append(PostprocessingRuleInventoryItem("attachment.n_substituted", "suffix", suffix, "N-qualified"))
+    return tuple(items)
 
 
 def apply_data_postprocessing(name: str) -> str:
@@ -21,9 +47,23 @@ def apply_acyl_amido_postprocessing(name: str) -> str:
     """Apply acyl-amino to amido contractions from data."""
 
     for acyl in RULES.postprocess.acyl_amido_terms:
-        name = re.sub(rf"(?<!\))(?<!\])\b\(([^()]*{acyl})\)amino\b", rf"\1amido", name)
-        name = re.sub(rf"(?<!\))(?<!\])\b([^()]*{acyl})amino\b", rf"\1amido", name)
+        name = re.sub(
+            rf"(?<!\))(?<!\])\b\(([^()]*{acyl})\)amino\b",
+            lambda match: _acyl_amido_replacement(match.group(1)),
+            name,
+        )
+        name = re.sub(
+            rf"(?<!\))(?<!\])\b([^()]*{acyl})amino\b",
+            lambda match: _acyl_amido_replacement(match.group(1)),
+            name,
+        )
     return name
+
+
+def _acyl_amido_replacement(acyl_prefix: str) -> str:
+    if acyl_prefix.startswith("N,") or acyl_prefix.startswith("N-"):
+        return f"{acyl_prefix}amino"
+    return f"{acyl_prefix}amido"
 
 
 def apply_connection_boundary_postprocessing(name: str) -> str:

@@ -140,7 +140,17 @@ def format_amino_from_branches(
             return f"(({branch})amino)"
         return f"({branch}amino)"
 
-    return f"({format_counted_prefixes(branches)}amino)"
+    return f"({format_n_substituted_amino_prefix(branches)}amino)"
+
+
+def format_n_substituted_amino_prefix(branches: list[str]) -> str:
+    """Format multiple substituents attached directly to one amino nitrogen."""
+
+    branch_names = [strip_outer_parentheses(branch) for branch in branches]
+    if len(branch_names) > 1 and len(set(branch_names)) == 1 and branch_names[0] == "formyl":
+        locants = ",".join("N" for _ in branch_names)
+        return f"{locants}-{format_counted_prefixes(branch_names)}"
+    return format_counted_prefixes(branches)
 
 
 def format_lambda_substituent(

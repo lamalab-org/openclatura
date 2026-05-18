@@ -3,13 +3,12 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from .assembler import SubstituentItem
+from .assembly_parts import SubstituentItem
 from .formatting import format_counted_prefixes, oxy_prefix_from_branch
 from .group_atom_roles import amide_nitrogen, ester_or_peroxy_single_oxygen
 from .molecule import Molecule
 from .nomenclature import RULES
 from .perception import PerceivedGroup
-from .rules import suffixes, substituents
 from .trace_helpers import bond_ids_within
 
 BranchNamer = Callable[..., str]
@@ -50,10 +49,13 @@ def amide_prefix_from_group(
     if single_n is None:
         return ""
     n_subs = [n for n in mol.get_neighbors(single_n) if n not in group.atoms_involved and mol.atoms[n].symbol != "H"]
+    base = RULES.functional_groups.prefix_for(group.key) or ""
+    if not base:
+        return ""
     if not n_subs:
-        return RULES.prefixes.amide_bases[group.key]
+        return base
     sub_names = [branch_namer(mol, x, sub_exclude | {single_n}, upstream_atom=single_n) for x in n_subs]
-    return f"({format_counted_prefixes(sub_names)}{RULES.prefixes.amide_bases[group.key]})"
+    return f"({format_counted_prefixes(sub_names)}{base})"
 
 
 def ester_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
@@ -92,28 +94,28 @@ def static_prefix_handler(name: str) -> PrefixHandler:
 
 
 def acid_halide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
-    return RULES.prefixes.acid_halide_prefixes[group.key]
+    return RULES.functional_groups.cited_prefix_for(group.key) or ""
 
 
 def direct_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
-    return RULES.prefixes.direct_prefixes[group.key]
+    return RULES.functional_groups.cited_prefix_for(group.key) or ""
 
 
 def fallback_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     if group.attachment_carbon not in context.parent_path:
         return ""
-    return suffixes.get(group.key).prefix if group.is_principal_candidate else substituents.get(group.key).prefix
+    return RULES.functional_groups.prefix_for(group.key) or ""
 
 
 PREFIX_HANDLERS: dict[str, PrefixHandler] = {}
-PREFIX_HANDLERS.update({key: ester_prefix_handler for key in RULES.prefixes.ester_like_groups})
-PREFIX_HANDLERS.update({key: amide_prefix_handler for key in RULES.prefixes.amide_like_groups})
-PREFIX_HANDLERS.update({key: static_prefix_handler("carboxy") for key in RULES.prefixes.carboxy_groups})
-PREFIX_HANDLERS.update({key: static_prefix_handler("cyano") for key in RULES.prefixes.cyano_groups})
-PREFIX_HANDLERS.update({key: acid_halide_prefix_handler for key in RULES.prefixes.acid_halide_prefixes})
-PREFIX_HANDLERS.update({key: static_prefix_handler("carboperoxy") for key in RULES.prefixes.peroxy_acid_groups})
-PREFIX_HANDLERS.update({key: sulfonyl_prefix_handler for key in RULES.prefixes.sulfonyl_groups})
-PREFIX_HANDLERS.update({key: direct_prefix_handler for key in RULES.prefixes.direct_prefixes})
+PREFIX_HANDLERS.update({key: ester_prefix_handler for key in RULES.functional_groups.keys_with_family("ester_like")})
+PREFIX_HANDLERS.update({key: amide_prefix_handler for key in RULES.functional_groups.keys_with_family("amide_like")})
+PREFIX_HANDLERS.update({key: static_prefix_handler("carboxy") for key in RULES.functional_groups.keys_with_family("carboxy_prefix")})
+PREFIX_HANDLERS.update({key: static_prefix_handler("cyano") for key in RULES.functional_groups.keys_with_family("cyano_prefix")})
+PREFIX_HANDLERS.update({key: acid_halide_prefix_handler for key in RULES.functional_groups.keys_with_family("acid_halide")})
+PREFIX_HANDLERS.update({key: static_prefix_handler("carboperoxy") for key in RULES.functional_groups.keys_with_family("peroxy_acid")})
+PREFIX_HANDLERS.update({key: sulfonyl_prefix_handler for key in RULES.functional_groups.keys_with_family("sulfonyl")})
+PREFIX_HANDLERS.update({key: direct_prefix_handler for key in RULES.functional_groups.keys_with_family("direct_prefix")})
 PREFIX_HANDLERS["iminium"] = iminium_prefix_handler
 
 
@@ -137,7 +139,7 @@ def collect_component_prefix_substituents(
     context = PrefixContext(mol=mol, parent_path=parent_path, sub_exclude=sub_exclude, branch_namer=branch_namer)
 
     for group in prefix_groups:
-        if group.key in RULES.prefixes.skip_groups or group.attachment_carbon not in main_set:
+        if group.key in RULES.functional_groups.keys_with_family("prefix_skip") or group.attachment_carbon not in main_set:
             continue
 
         name = prefix_from_group(context, group)

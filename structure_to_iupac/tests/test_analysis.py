@@ -1,19 +1,33 @@
-from structure_to_iupac import OperationClass, TracePhase, analyze_smiles, name_smiles
+from structure_to_iupac import NamingEngine, NamingIntent, OperationClass, RULES, TracePhase, analyze_smiles, name_smiles
 from structure_to_iupac.assembler import AssemblyParts, ParentChargeItem, SubstituentItem, UnsaturationItem, assemble_name
+from structure_to_iupac.assembly_charge import parent_charge_operations
+from structure_to_iupac.assembly_spiro import extract_spiro_side_prefixes, format_spiro_core, split_spiro_substituents
 from structure_to_iupac.chains import find_all_carbon_paths, find_ring_systems
-from structure_to_iupac.functional_groups import PERCEPTION_DETECTORS, register_group_detector
-from structure_to_iupac.ionic_naming import apply_parent_charge_names, parent_charge_sites
+from structure_to_iupac.functional_groups import PERCEPTION_DETECTORS, PERCEPTION_SPECS, PerceptionDetectorSpec, register_group_detector, register_perception_spec
+from structure_to_iupac.ionic_naming import apply_parent_charge_names, apply_retained_parent_ide, parent_charge_sites
 from structure_to_iupac.locants import as_display_locant, coerce_display_numbering, locant_text, parse_locant
-from structure_to_iupac.name_postprocessing import apply_connection_boundary_postprocessing
+from structure_to_iupac.name_postprocessing import apply_connection_boundary_postprocessing, postprocessing_rule_inventory
 from structure_to_iupac.namer import read_smiles
 from structure_to_iupac.parent_selection import ParentCandidate, ParentSelection, select_principal_parent
+from structure_to_iupac.parent_pipeline import build_parent_assembly_plan
 from structure_to_iupac.perception import PerceivedGroup, perceive_groups
+from structure_to_iupac.retained_specs import retained_parent_spec
 from structure_to_iupac.ring_systems import ring_system_fragment
+from structure_to_iupac.spiro_assembly import SpiroAssembly
 from structure_to_iupac.heteroatom_substituent_specs import ligand_prefix, unsubstituted_prefix
 
 
 def test_name_smiles_stays_plain_fast_api():
     assert name_smiles("CCO") == "ethanol"
+
+
+def test_naming_engine_matches_plain_public_api():
+    engine = NamingEngine()
+
+    assert engine.name_smiles("CCO") == name_smiles("CCO")
+    assert engine.name_smiles("") == ""
+    assert engine.name_smiles_with_trace("CCO")[0] == "ethanol"
+    assert engine.analyze_smiles("CCO").name == analyze_smiles("CCO").name
 
 
 def test_display_locants_keep_numeric_order_and_rendered_text():
@@ -60,6 +74,97 @@ def test_custom_perception_detector_extension_point():
     custom = next(group for group in groups if group.key == "fluoro")
     assert custom.prefix == "fluoro"
     assert custom.metadata.source == "nomenclature.functional_groups"
+
+
+def test_functional_group_registry_exposes_derived_families():
+    assert "ester" in RULES.functional_groups.keys_with_family("ester_like")
+    assert "amide" in RULES.functional_groups.keys_with_family("amide_like")
+    assert "ring_nitrile" in RULES.functional_groups.keys_with_family("chain_external_carbonyl")
+    assert "hydrazone" in RULES.functional_groups.keys_with_family("hydrazone")
+    assert RULES.functional_groups.most_senior(["alcohol", "carboxylic_acid"]).key == "carboxylic_acid"
+    assert RULES.functional_groups.direct_subgraph_prefix_for("nitro") == "nitro"
+    assert RULES.functional_groups.direct_subgraph_prefix_for("alcohol") is None
+
+
+def test_legacy_suffix_and_substituent_modules_are_registry_views():
+    from structure_to_iupac.rules import substituents, suffixes
+
+    assert suffixes.get("carboxylic_acid").suffix == RULES.functional_groups.get("carboxylic_acid").suffix
+    assert substituents.get("nitro").prefix == RULES.functional_groups.get("nitro").prefix
+
+
+def test_perception_specs_can_extend_group_detection():
+    def detector(mol):
+        if not mol.atoms:
+            return []
+        return [PerceivedGroup("chloro", False, next(iter(mol.atoms)), set(), variant="custom", role="prefix")]
+
+    spec = PerceptionDetectorSpec("test.chloro", detector, priority=1, families=("test",))
+    register_perception_spec(spec)
+    try:
+        groups = perceive_groups(read_smiles("C"))
+    finally:
+        PERCEPTION_SPECS.remove(spec)
+
+    custom = next(group for group in groups if group.variant == "custom")
+    assert custom.prefix == "chloro"
+    assert custom.role == "prefix"
+
+
+def test_spiro_marker_is_converted_to_structural_assembly_item():
+    parts = AssemblyParts(
+        parent_length=3,
+        substituents=[SubstituentItem(name="[SPIRO]-2-3-methylaziridine", locants=["1"])],
+    )
+
+    spiro_subs = split_spiro_substituents(parts)
+
+    assert spiro_subs == [SpiroAssembly("1", "2", "aziridine", ("3'-methyl",))]
+    assert parts.substituents == []
+
+
+def test_structural_spiro_substituent_bypasses_marker_text():
+    parts = AssemblyParts(
+        parent_length=3,
+        substituents=[
+            SubstituentItem(
+                name="",
+                locants=["1"],
+                spiro=SpiroAssembly("1", "2", "aziridine", ("3'-methyl",)),
+            )
+        ],
+    )
+
+    spiro_subs = split_spiro_substituents(parts)
+
+    assert spiro_subs == [SpiroAssembly("1", "2", "aziridine", ("3'-methyl",))]
+    assert parts.substituents == []
+
+
+def test_charge_and_postprocessing_rules_are_inventory_backed():
+    parts = AssemblyParts(
+        parent_length=3,
+        parent_charges=[ParentChargeItem(atom_id=1, locant="1", symbol="N", charge=1)],
+    )
+    assert parent_charge_operations(parts)[0].suffix == "ium"
+    assert any(item.owner.startswith("compatibility") for item in postprocessing_rule_inventory())
+
+
+def test_retained_specs_expose_attachment_policy():
+    spec = retained_parent_spec("aziridine")
+    assert spec is not None
+    assert spec.attachment_policy.print_substituent_locant
+
+
+def test_tetrazole_substitution_keeps_retained_parent_attachment_explicit():
+    assert name_smiles("CC1=NN=NN1") == "5-methyl-1H-tetrazole"
+    assert name_smiles("CN1C=NN=N1") == "1-methyl-1H-tetrazole"
+
+
+def test_retained_heteroaromatic_parent_locants_follow_attachment_equivalence():
+    assert name_smiles("Cc1ccccc1") == "methylbenzene"
+    assert name_smiles("CN1C=CN=C1") == "1-methyl-1H-imidazole"
+    assert name_smiles("CN1C=CC=C1") == "1-methyl-1H-pyrrole"
 
 
 def test_analyze_smiles_exposes_decision_trace():
@@ -114,6 +219,30 @@ def test_parent_candidate_score_prefers_principal_coverage_then_length():
     )
 
     assert min([short, long], key=lambda candidate: candidate.score_tuple) is long
+
+
+def test_parent_pipeline_uses_intent_to_build_component_parts():
+    mol = read_smiles("CCO")
+    selection = select_principal_parent(
+        mol,
+        find_all_carbon_paths(mol, exclude_atoms={2}),
+        find_ring_systems(mol, exclude_atoms={2}),
+        principal_carbons=[1],
+    )
+
+    plan = build_parent_assembly_plan(
+        mol,
+        selection,
+        NamingIntent.component([1]),
+        {},
+        None,
+        None,
+    )
+
+    assert plan.numbered_path == [1, 0]
+    assert plan.get_loc(1) == "1"
+    assert plan.parts.parent_atom_ids == {0, 1}
+    assert plan.parts.is_substituent is False
 
 
 def test_heteroatom_substituent_specs_are_data_shaped():
@@ -268,11 +397,54 @@ def test_spiro_substituent_radicals_keep_attachment_locants():
     cases = {
         "OCC12CC(C1)C21CN1": "1-(spiro[bicyclo[1.1.1]pentane-2,2'-aziridine]-1-yl)methanol",
         "OCC12CC1C1(CN1)C2": "1-(spiro[bicyclo[2.1.0]pentane-3,2'-aziridine]-1-yl)methanol",
-        "OCC1CC11C2CC1C2": "1-(spiro[cyclopropane-2,2'-(bicyclo[1.1.1]pentane)]-1-yl)methanol",
+        "OCC1CC11C2CC1C2": "1-(spiro[cyclopropane-2,2'-bicyclo[1.1.1]pentane]-1-yl)methanol",
     }
 
     for smiles, expected in cases.items():
         assert name_smiles(smiles) == expected
+
+
+def test_spiro_side_parents_are_normalized_without_nested_or_parenthesized_polycycles():
+    prefixes, parent = extract_spiro_side_prefixes("1-methyl-bicyclo[1.1.1]pentane")
+    assert prefixes == ["1'-methyl"]
+    assert parent == "bicyclo[1.1.1]pentane"
+
+    core, _ = format_spiro_core(
+        "cyclopropan",
+        "",
+        "e",
+        [
+            SpiroAssembly("2", "2", "bicyclo[1.1.1]pentane", ()),
+            SpiroAssembly("3", "1", "cyclopropane", ()),
+        ],
+    )
+    assert "spiro[spiro[" not in core
+    assert "(bicyclo" not in core
+
+
+def test_linear_polyspiro_ring_systems_use_dispiro_parent_not_partial_spiro():
+    cases = {
+        "C1CC11CCC11CC1": "dispiro[2.0.2.2]octane",
+        "C1CC11CCC11CO1": "2-oxadispiro[2.0.2.2]octane",
+        "C1C2(CCC2)C11COC1": "2-oxadispiro[3.0.3.1]nonane",
+        "C1OC11CC2(CCC2)C1": "2-oxadispiro[2.1.3.1]nonane",
+        "C1CC11CC2(CC2)C1": "dispiro[2.1.2.1]octane",
+        "C1=CC2(CN2)CC12CN2": "2,8-diazadispiro[2.2.2.1]non-4-ene",
+    }
+
+    for smiles, expected in cases.items():
+        generated = name_smiles(smiles)
+        assert generated == expected
+        assert generated != "spiro[2.3]hexane"
+        assert "methyl" not in generated
+        assert "ethenyl" not in generated
+
+
+def test_split_polyspiro_oxirane_case_keeps_both_spiro_side_rings():
+    generated = name_smiles("O1CC11C2CC2C11OC1")
+
+    assert generated == "1,9-dioxadispiro[2.0.2.3]nonane"
+    assert generated != "spiro[bicyclo[2.1.0]pentane-2,2'-oxirane]"
 
 
 def test_pyopsin_regression_names_preserve_terminal_olate_charge():
@@ -347,10 +519,38 @@ def test_pyopsin_regression_names_keep_formate_esters_principal():
 def test_pyopsin_regression_names_preserve_carbanion_suffix_locants():
     cases = {
         "C[NH2+]CC(=O)[CH-]C=O": "4-(methylammonio)-3-oxobutan-2-ide-1-al",
+        "NC=[NH+][C-](C#N)C#N": "2-(aminomethylideneammonio)propane-2-ide-1,3-dinitrile",
+        "[NH2+]=C1O[C-](C=C1)C#N": "5-iminio-1-oxacyclopent-3-ene-2-ide-2-carbonitrile",
     }
 
     for smiles, expected in cases.items():
         assert name_smiles(smiles) == expected
+
+
+def test_invalid_ide_morphology_is_normalized():
+    assert (
+        apply_retained_parent_ide("5-(ammoniomethyl)imidazolidine-2,4-dione", "imidazolidine", {"1": {"C"}})
+        == "5-(ammoniomethyl)imidazolidin-1-ide-2,4-dione"
+    )
+    assert (
+        apply_retained_parent_ide(
+            "5-(ammoniomethyl)-1,2,3-triazole-4-carbonitrile", "1,2,3-triazole", {"1": {"C"}}
+        )
+        == "5-(ammoniomethyl)-1,2,3-triazol-1-ide-4-carbonitrile"
+    )
+
+
+def test_multiplied_formylamino_names_use_n_locants_not_diformamido():
+    cases = {
+        "O=CN(C=O)CC(N)=O": "2-(N,N-diformylamino)acetamide",
+        "COC(=O)N(C=O)C=O": "methyl (N,N-diformylamino)formate",
+        "O=CN(C=O)C(=O)OC": "methyl (N,N-diformylamino)formate",
+    }
+
+    for smiles, expected in cases.items():
+        generated = name_smiles(smiles)
+        assert generated == expected
+        assert "diformamido" not in generated
 
 
 def test_pyopsin_regression_names_preserve_cationic_imino_charge():

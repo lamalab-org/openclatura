@@ -1,10 +1,10 @@
 """Principal characteristic-group selection and suffix assembly."""
 
-from .assembler import AssemblyParts, PrincipalGroupItem
+from .assembly_parts import AssemblyParts, PrincipalGroupItem
 from .locants import parse_locant
 from .molecule import Molecule
+from .nomenclature import RULES
 from .perception import perceive_groups, PerceivedGroup
-from .rules import suffixes
 from .trace_helpers import bond_ids_within
 
 
@@ -20,7 +20,7 @@ def component_principal_key(perceived_groups: list[PerceivedGroup], is_substitue
     if is_substituent:
         return None
     candidates = [group.key for group in perceived_groups if group.is_principal_candidate]
-    return suffixes.most_senior(candidates).key if candidates else None
+    return RULES.functional_groups.most_senior(candidates).key if candidates else None
 
 
 def partition_principal_and_prefix_groups(

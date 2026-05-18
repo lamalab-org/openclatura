@@ -2,7 +2,7 @@
 
 import re
 
-from .locants import get_atom_locants, get_bond_locants
+from .locants import get_atom_locants, get_bond_locants, parse_locant
 from .molecule import Molecule
 from .namer_config import INDICATED_H_RETAINED_NAMES
 
@@ -50,7 +50,10 @@ def number_parent(
                 for prio in sorted(het_by_priority.keys())
             )
 
-            if retained_name in INDICATED_H_RETAINED_NAMES:
+            charged_tetrazole = retained_name == "tetrazole" and any(
+                mol.atoms[a_idx].charge for a_idx in oriented_path
+            )
+            if retained_name in INDICATED_H_RETAINED_NAMES and not charged_tetrazole:
                 sat_atoms = []
                 for a_idx in oriented_path:
                     ring_bonds = [mol.get_bond(a_idx, n) for n in mol.get_neighbors(a_idx) if n in oriented_path]
@@ -132,3 +135,59 @@ def number_parent(
         if compare_paths(c, best) < 0:
             best = c
     return best
+
+
+def choose_parent_numbering(
+    mol: Molecule,
+    candidate_paths: list[list[int]],
+    principal_atoms,
+    substituent_mapping: dict[int, list],
+    locant_maps,
+    is_ring: bool,
+    is_bicycle: bool,
+    is_spiro: bool,
+    is_polycycle: bool,
+    retained_name: str | None,
+    *,
+    fixed_start: bool = False,
+) -> tuple[list[int], dict[int, str] | None]:
+    """Choose parent numbering from retained locant maps or normal rules."""
+
+    principal_atom_set = set(principal_atoms)
+    if locant_maps:
+
+        def evaluate_map(lmap):
+            def get_val(idx):
+                return parse_locant(lmap[idx])
+
+            principal_eval = sorted([get_val(idx) for idx in principal_atom_set if idx in lmap])
+            het_by_priority = {}
+            for atom in mol:
+                if atom.idx in lmap and not atom.is_carbon:
+                    priority = atom.element.hw_priority or 99
+                    het_by_priority.setdefault(priority, []).append(atom.idx)
+            heteroatom_eval = tuple(
+                sorted([get_val(idx) for idx in het_by_priority[priority]])
+                for priority in sorted(het_by_priority.keys())
+            )
+            substituent_eval = sorted([get_val(idx) for idx in set(substituent_mapping.keys()) if idx in lmap])
+            return heteroatom_eval + (principal_eval, substituent_eval)
+
+        locant_map = min(locant_maps, key=evaluate_map)
+        return list(locant_map.keys()), locant_map
+
+    return (
+        number_parent(
+            mol,
+            candidate_paths,
+            principal_atom_set,
+            substituent_mapping,
+            is_ring,
+            is_bicycle,
+            is_spiro,
+            is_polycycle=is_polycycle,
+            fixed_start=fixed_start,
+            retained_name=retained_name,
+        ),
+        None,
+    )

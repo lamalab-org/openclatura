@@ -239,6 +239,128 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
     
     return prefix + best_desc, valid_paths
 
+
+def get_linear_dispiro_descriptor_and_paths(mol: Molecule, comp_nodes, comp_edges):
+    """Return a dispiro descriptor for linear two-spiro-center ring systems.
+
+    The general von Baeyer fallback treats these graphs as bridged polycycles
+    and may duplicate a spiro atom in the numbering path.  Linear dispiro
+    systems have two tetra-valent spiro atoms; removing them leaves two
+    terminal components attached to one spiro atom and one or two middle paths
+    between both spiro atoms.  A direct spiro-spiro bond contributes the zero
+    length middle path in descriptors such as ``dispiro[2.0.2.2]octane``.
+    """
+
+    adj = {n: set() for n in comp_nodes}
+    for u, v in comp_edges:
+        adj[u].add(v)
+        adj[v].add(u)
+
+    spiro_atoms = [n for n in comp_nodes if len(adj[n]) >= 4]
+    if len(spiro_atoms) != 2:
+        return None
+
+    s1, s2 = sorted(spiro_atoms)
+    non_spiro = set(comp_nodes) - {s1, s2}
+    components = []
+    seen = set()
+    for node in sorted(non_spiro):
+        if node in seen:
+            continue
+        queue = [node]
+        seen.add(node)
+        comp = set()
+        while queue:
+            current = queue.pop(0)
+            comp.add(current)
+            for neighbor in adj[current]:
+                if neighbor in non_spiro and neighbor not in seen:
+                    seen.add(neighbor)
+                    queue.append(neighbor)
+        attachments = {neighbor for atom in comp for neighbor in adj[atom] if neighbor in {s1, s2}}
+        components.append((comp, attachments))
+
+    terminal = [(comp, next(iter(attachments))) for comp, attachments in components if len(attachments) == 1]
+    middle = [comp for comp, attachments in components if attachments == {s1, s2}]
+    has_direct_middle = s2 in adj[s1]
+    if len(terminal) != 2 or len(middle) + int(has_direct_middle) != 2:
+        return None
+
+    terminal.sort(key=lambda item: _terminal_dispiro_sort_key(mol, item[0]))
+    first_terminal, first_spiro = terminal[0]
+    second_terminal, second_spiro = terminal[1]
+    if first_spiro == second_spiro:
+        return None
+    middle_nonzero = middle[0] if middle else set()
+    extra_middle = middle[1] if len(middle) > 1 else set()
+
+    descriptor_numbers = [
+        len(first_terminal),
+        0 if has_direct_middle else len(middle[0]),
+        len(second_terminal),
+        len(middle_nonzero) if has_direct_middle else len(middle[1]),
+    ]
+    descriptor = "dispiro[" + ".".join(str(number) for number in descriptor_numbers) + "]"
+
+    first_path = _component_path_between_spiro_neighbors(first_terminal, first_spiro, adj)
+    middle_path = _component_path_between_centers(middle_nonzero, first_spiro, second_spiro, adj)
+    second_path = _component_path_between_spiro_neighbors(second_terminal, second_spiro, adj)
+    extra_middle_path = _component_path_between_centers(extra_middle, first_spiro, second_spiro, adj)
+    path = first_path + [first_spiro] + middle_path + [second_spiro] + second_path + extra_middle_path
+    if set(path) != set(comp_nodes) or len(path) != len(comp_nodes):
+        path = (
+            list(first_terminal)
+            + [first_spiro]
+            + list(middle_nonzero)
+            + [second_spiro]
+            + list(second_terminal)
+            + list(extra_middle)
+        )
+    return descriptor, [path]
+
+
+def _terminal_dispiro_sort_key(mol: Molecule, component: set[int]) -> tuple:
+    hetero_positions = [idx for idx in component if mol.atoms[idx].symbol != "C"]
+    return (0 if hetero_positions else 1, -len(component), sorted(component))
+
+
+def _component_path_between_spiro_neighbors(component: set[int], spiro_atom: int, adj: dict[int, set[int]]) -> list[int]:
+    endpoints = sorted(atom for atom in component if spiro_atom in adj[atom])
+    if len(endpoints) < 2:
+        return sorted(component)
+    return _shortest_component_path(endpoints[0], endpoints[1], component, adj)
+
+
+def _component_path_between_centers(
+    component: set[int], first_spiro: int, second_spiro: int, adj: dict[int, set[int]]
+) -> list[int]:
+    if not component:
+        return []
+    starts = sorted(atom for atom in component if first_spiro in adj[atom])
+    ends = {atom for atom in component if second_spiro in adj[atom]}
+    if not starts or not ends:
+        return sorted(component)
+    for start in starts:
+        for end in sorted(ends):
+            path = _shortest_component_path(start, end, component, adj)
+            if path:
+                return path
+    return sorted(component)
+
+
+def _shortest_component_path(start: int, end: int, component: set[int], adj: dict[int, set[int]]) -> list[int]:
+    queue = [(start, [start])]
+    seen = {start}
+    while queue:
+        current, path = queue.pop(0)
+        if current == end:
+            return path
+        for neighbor in sorted(adj[current]):
+            if neighbor in component and neighbor not in seen:
+                seen.add(neighbor)
+                queue.append((neighbor, path + [neighbor]))
+    return [start]
+
 def get_cyclic_atoms(mol: Molecule, exclude_atoms: set[int] = None) -> set[int]:
     if exclude_atoms is None: exclude_atoms = set()
     valid_nodes = {a.idx for a in mol if a.idx not in exclude_atoms and (a.is_carbon or mol.degree(a.idx) >= 2)}
@@ -362,10 +484,15 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
             merged = False
             for i, b2 in enumerate(blocks):
                 shared = b1['nodes'].intersection(b2['nodes'])
-                if len(shared) == 1 and b1['is_monocycle'] and b2['is_monocycle']:
+                merged_nodes = b1['nodes'] | b2['nodes']
+                merged_edges = b1['edges'] | b2['edges']
+                should_merge = (
+                    len(shared) == 1 and b1['is_monocycle'] and b2['is_monocycle']
+                ) or (shared and _has_multiple_spiro_centers(merged_nodes, merged_edges))
+                if should_merge:
                     blocks[i] = {
-                        'nodes': b1['nodes'] | b2['nodes'],
-                        'edges': b1['edges'] | b2['edges'],
+                        'nodes': merged_nodes,
+                        'edges': merged_edges,
                         'is_monocycle': False
                     }
                     merged = True
@@ -511,7 +638,7 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
 
                     recognized_via_retained = False
                     for cand in vb_paths:
-                        if retained_rules.get_retained_ring(mol, cand) is not None:
+                        if retained_rules.recognizes_retained_ring(mol, cand):
                             systems.append(RingSystem(atoms=comp_nodes, is_bicycle=True, x=len(p1), y=len(p2), z=len(p3), paths=[cand]))
                             recognized_via_retained = True
                             break
@@ -522,15 +649,15 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                         ))
 
         elif E >= V + 2:
-            descriptor, numbered_paths = get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges)
+            descriptor, numbered_paths = _polyspiro_descriptor_or_von_baeyer(mol, comp_nodes, comp_edges)
             
             recognized_via_retained = False
-            if retained_rules.get_retained_ring(mol, numbered_paths[0]) is not None:
+            if retained_rules.recognizes_retained_ring(mol, numbered_paths[0]):
                 systems.append(RingSystem(atoms=comp_nodes, is_polycycle=True, paths=[numbered_paths[0]], polycycle_descriptor=descriptor))
                 recognized_via_retained = True
             else:
                 for c in cycles:
-                    if len(c) == V and retained_rules.get_retained_ring(mol, c) is not None:
+                    if len(c) == V and retained_rules.recognizes_retained_ring(mol, c):
                         systems.append(RingSystem(atoms=comp_nodes, is_polycycle=True, paths=[c], polycycle_descriptor=descriptor))
                         recognized_via_retained = True
                         break
@@ -544,4 +671,74 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                 else:
                     systems.append(RingSystem(atoms=comp_nodes, paths=[numbered_paths[0]]))
 
-    return systems
+    return merge_polyspiro_ring_systems(mol, systems)
+
+
+def merge_polyspiro_ring_systems(mol: Molecule, systems: list[RingSystem]) -> list[RingSystem]:
+    """Merge ring systems that were split around a multi-spiro parent."""
+
+    if len(systems) < 2:
+        return systems
+    result = []
+    seen = set()
+    for idx, system in enumerate(systems):
+        if idx in seen:
+            continue
+        group_indexes = {idx}
+        queue = [idx]
+        seen.add(idx)
+        while queue:
+            current_idx = queue.pop(0)
+            current = systems[current_idx]
+            for other_idx, other in enumerate(systems):
+                if other_idx in seen:
+                    continue
+                if current.atoms.isdisjoint(other.atoms):
+                    continue
+                seen.add(other_idx)
+                group_indexes.add(other_idx)
+                queue.append(other_idx)
+        if len(group_indexes) == 1:
+            result.append(system)
+            continue
+        union_atoms = set()
+        for group_idx in group_indexes:
+            union_atoms |= systems[group_idx].atoms
+        union_edges = _edges_within_atoms(mol, union_atoms)
+        if not _has_multiple_spiro_centers(union_atoms, union_edges):
+            result.extend(systems[group_idx] for group_idx in sorted(group_indexes))
+            continue
+        descriptor, paths = _polyspiro_descriptor_or_von_baeyer(mol, union_atoms, union_edges)
+        result.append(
+            RingSystem(
+                atoms=union_atoms,
+                is_polycycle=True,
+                paths=paths,
+                polycycle_descriptor=descriptor,
+            )
+        )
+    return result
+
+
+def _edges_within_atoms(mol: Molecule, atoms: set[int]) -> set[tuple[int, int]]:
+    edges = set()
+    for atom_idx in atoms:
+        for neighbor_idx in mol.get_neighbors(atom_idx):
+            if neighbor_idx in atoms and atom_idx < neighbor_idx:
+                edges.add((atom_idx, neighbor_idx))
+    return edges
+
+
+def _polyspiro_descriptor_or_von_baeyer(mol: Molecule, atoms: set[int], edges: set[tuple[int, int]]):
+    dispiro = get_linear_dispiro_descriptor_and_paths(mol, atoms, edges)
+    if dispiro is not None:
+        return dispiro
+    return get_von_baeyer_descriptor_and_path(atoms, edges)
+
+
+def _has_multiple_spiro_centers(nodes: set[int], edges: set[tuple[int, int]]) -> bool:
+    degrees = {node: 0 for node in nodes}
+    for u, v in edges:
+        degrees[u] += 1
+        degrees[v] += 1
+    return sum(1 for degree in degrees.values() if degree >= 4) >= 2

@@ -1,12 +1,25 @@
 """Functional-group metadata and perception extension points."""
 
 from collections.abc import Callable
+from dataclasses import dataclass
 
 from .molecule import FunctionalGroupMetadata, Molecule
 from .nomenclature import RULES
 
 
 PERCEPTION_DETECTORS: list[Callable[[Molecule], list]] = []
+
+
+@dataclass(frozen=True)
+class PerceptionDetectorSpec:
+    key: str
+    detector: Callable[[Molecule], list]
+    priority: int = 100
+    families: tuple[str, ...] = ()
+    description: str = ""
+
+
+PERCEPTION_SPECS: list[PerceptionDetectorSpec] = []
 
 
 def register_group_detector(detector: Callable[[Molecule], list], *, prepend: bool = False) -> Callable[[Molecule], list]:
@@ -17,6 +30,17 @@ def register_group_detector(detector: Callable[[Molecule], list], *, prepend: bo
     else:
         PERCEPTION_DETECTORS.append(detector)
     return detector
+
+
+def register_perception_spec(spec: PerceptionDetectorSpec, *, prepend: bool = False) -> PerceptionDetectorSpec:
+    """Register an ordered detector spec for custom functional-group perception."""
+
+    if prepend:
+        PERCEPTION_SPECS.insert(0, spec)
+    else:
+        PERCEPTION_SPECS.append(spec)
+    PERCEPTION_SPECS.sort(key=lambda item: item.priority)
+    return spec
 
 
 def metadata_for_group(key: str) -> FunctionalGroupMetadata:

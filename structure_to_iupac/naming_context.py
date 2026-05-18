@@ -16,6 +16,33 @@ class NamingMode(str, Enum):
     SUBGRAPH = "subgraph"
 
 
+@dataclass(frozen=True)
+class NamingIntent:
+    """Mode-specific intent for parent numbering and assembly."""
+
+    mode: NamingMode
+    principal_atoms: tuple[int, ...] = ()
+    root_atom: int | None = None
+    upstream_atom: int | None = None
+    fixed_start: bool = False
+    is_substituent: bool = False
+
+    @classmethod
+    def component(cls, principal_atoms) -> "NamingIntent":
+        return cls(mode=NamingMode.COMPONENT, principal_atoms=tuple(principal_atoms))
+
+    @classmethod
+    def subgraph(cls, root_atom: int, upstream_atom: int | None, *, fixed_start: bool) -> "NamingIntent":
+        return cls(
+            mode=NamingMode.SUBGRAPH,
+            principal_atoms=(root_atom,),
+            root_atom=root_atom,
+            upstream_atom=upstream_atom,
+            fixed_start=fixed_start,
+            is_substituent=True,
+        )
+
+
 @dataclass
 class NamingContext:
     """Shared context for a naming run or recursive naming branch."""
@@ -85,6 +112,16 @@ class NumberedParent:
         if self.locant_map:
             return self.locant_map[atom_idx]
         return self.path.index(atom_idx) + 1
+
+
+@dataclass
+class ParentAssemblyPlan:
+    """Numbered parent plus assembly parts for the selected naming intent."""
+
+    numbered_path: list[int]
+    locant_map: dict[int, str] | None
+    get_loc: Callable
+    parts: object
 
 
 @dataclass
