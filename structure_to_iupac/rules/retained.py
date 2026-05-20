@@ -1,5 +1,6 @@
 # structure-to-iupac/rules/retained.py
 from structure_to_iupac.molecule import Molecule
+from structure_to_iupac.nomenclature import RULES
 import itertools
 
 def _find_two_rings(mol: Molecule, path: list[int], fused: list[int], path_set: set[int], small_ring_size: int):
@@ -91,8 +92,25 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
     deg_counts = tuple(sorted(internal_degrees.values()))
     sig = (size, total_bonds, double_bonds, deg_counts)
     deg3_nodes =[u for u, d in internal_degrees.items() if d == 3]
+
+    data_monocycle = _match_data_monocycle_retained(
+        mol,
+        path,
+        size,
+        total_bonds,
+        double_bonds,
+        symbols,
+    )
+    if data_monocycle is not None:
+        return data_monocycle, None
     
-    if sig == (10, 11, 5, tuple([2]*8 + [3]*2)):
+    if _matches_any_retained_signature(
+        ("naphthalene", "quinoline", "isoquinoline", "quinazoline", "quinoxaline", "cinnoline"),
+        sig,
+        symbols,
+        deg3_nodes,
+        mol,
+    ):
         if len(deg3_nodes) == 2 and mol.get_bond(deg3_nodes[0], deg3_nodes[1]) is not None:
             small_ring, big_ring = _find_two_rings(mol, path, deg3_nodes, path_set, 6)
             if small_ring and big_ring and len(small_ring) == 6 and len(big_ring) == 6:
@@ -123,7 +141,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                         if internal_degrees[rot_path[1]] == 3:
                             rot_path =[rot_path[0]] + rot_path[1:][::-1]
                         if internal_degrees[rot_path[4]] == 3 and internal_degrees[rot_path[9]] == 3:
-                            locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                            locants = _retained_locants("quinoline")
                             return "quinoline", [{rot_path[i]: locants[i] for i in range(10)}]
                     else:
                         c1 = next(v for v in n_neighbors_in_path if any(internal_degrees[w] == 3 for w in mol.get_neighbors(v) if w in path_set))
@@ -132,7 +150,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                         if rot_path[1] != n_idx:
                             rot_path =[rot_path[0]] + rot_path[1:][::-1]
                         if internal_degrees[rot_path[4]] == 3 and internal_degrees[rot_path[9]] == 3:
-                            locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                            locants = _retained_locants("isoquinoline")
                             return "isoquinoline", [{rot_path[i]: locants[i] for i in range(10)}]
                 if n_count == 2 and s_count == 0 and o_count == 0:
                     n_indices =[idx for idx in path if mol.atoms[idx].symbol == "N"]
@@ -154,13 +172,13 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                         
                         if internal_degrees[rot_path[4]] == 3 and internal_degrees[rot_path[9]] == 3:
                             if rot_path[2] == n2:
-                                locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                                locants = _retained_locants("quinazoline")
                                 return "quinazoline", [{rot_path[i]: locants[i] for i in range(10)}]
                             elif rot_path[3] == n2:
-                                locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                                locants = _retained_locants("quinoxaline")
                                 return "quinoxaline",[{rot_path[i]: locants[i] for i in range(10)}]
                             elif rot_path[1] == n2:
-                                locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                                locants = _retained_locants("cinnoline")
                                 return "cinnoline", [{rot_path[i]: locants[i] for i in range(10)}]
                         
                         rot_path2 = path[path.index(n2):] + path[:path.index(n2)]
@@ -168,13 +186,13 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                             rot_path2 = [rot_path2[0]] + rot_path2[1:][::-1]
                         if internal_degrees[rot_path2[4]] == 3 and internal_degrees[rot_path2[9]] == 3:
                             if rot_path2[2] == n1:
-                                locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                                locants = _retained_locants("quinazoline")
                                 return "quinazoline",[{rot_path2[i]: locants[i] for i in range(10)}]
                             elif rot_path2[3] == n1:
-                                locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                                locants = _retained_locants("quinoxaline")
                                 return "quinoxaline",[{rot_path2[i]: locants[i] for i in range(10)}]
                             elif rot_path2[1] == n1:
-                                locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                                locants = _retained_locants("cinnoline")
                                 return "cinnoline", [{rot_path2[i]: locants[i] for i in range(10)}]
                 if n_count == 0:
                     if any(mol.atoms[a].symbol != "C" for a in path):
@@ -186,13 +204,23 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                         if internal_degrees[rot_path[1]] == 3:
                             rot_path = [rot_path[0]] + rot_path[1:][::-1]
                         if internal_degrees[rot_path[4]] == 3 and internal_degrees[rot_path[9]] == 3:
-                            locants =['1', '2', '3', '4', '4a', '5', '6', '7', '8', '8a']
+                            locants = _retained_locants("naphthalene")
                             maps.append({rot_path[i]: locants[i] for i in range(10)})
                     if maps:
                         return "naphthalene", maps
                     return None
 
-    if sig == (9, 10, 4, tuple([2]*7 + [3]*2)):
+    if _matches_any_retained_signature(
+        (
+            "indole", "isoindole", "benzofuran", "benzothiophene",
+            "benzothiazole", "1,2-benzothiazole", "benzoxazole",
+            "1,2-benzoxazole", "benzimidazole", "indazole",
+        ),
+        sig,
+        symbols,
+        deg3_nodes,
+        mol,
+    ):
         if len(deg3_nodes) == 2 and mol.get_bond(deg3_nodes[0], deg3_nodes[1]) is not None:
             small_ring, big_ring = _find_two_rings(mol, path, deg3_nodes, path_set, 5)
             if small_ring is None or big_ring is None:
@@ -221,7 +249,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                     if internal_degrees[rot_path[1]] == 3:
                         rot_path = [rot_path[0]] + rot_path[1:][::-1]
                     if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
-                        locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                        locants = _retained_locants("indole")
                         return "indole", [{rot_path[i]: locants[i] for i in range(9)}]
                 else:
                     c1 = next(v for v in n_neighbors_in_path if any(internal_degrees[w] == 3 for w in mol.get_neighbors(v) if w in path_set))
@@ -230,7 +258,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                     if rot_path[1] != n_idx:
                         rot_path = [rot_path[0]] + rot_path[1:][::-1]
                     if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
-                        locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                        locants = _retained_locants("isoindole")
                         return "isoindole", [{rot_path[i]: locants[i] for i in range(9)}]
             if o_count == 1 and n_count == 0 and s_count == 0:
                 if "O" not in small_symbols:
@@ -244,7 +272,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                 if internal_degrees[rot_path[1]] == 3:
                     rot_path = [rot_path[0]] + rot_path[1:][::-1]
                 if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
-                    locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                    locants = _retained_locants("benzofuran")
                     return "benzofuran",[{rot_path[i]: locants[i] for i in range(9)}]
             if s_count == 1 and n_count == 0 and o_count == 0:
                 if "S" not in small_symbols:
@@ -258,7 +286,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                 if internal_degrees[rot_path[1]] == 3:
                     rot_path =[rot_path[0]] + rot_path[1:][::-1]
                 if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
-                    locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                    locants = _retained_locants("benzothiophene")
                     return "benzothiophene", [{rot_path[i]: locants[i] for i in range(9)}]
             if n_count == 1 and s_count == 1 and o_count == 0:
                 if "N" not in small_symbols or "S" not in small_symbols:
@@ -273,10 +301,10 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                         rot_path = [rot_path[0]] + rot_path[1:][::-1]
                     if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
                         if rot_path[2] == n_idx:
-                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            locants = _retained_locants("benzothiazole")
                             return "benzothiazole", [{rot_path[i]: locants[i] for i in range(9)}]
                         elif rot_path[1] == n_idx:
-                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            locants = _retained_locants("1,2-benzothiazole")
                             return "1,2-benzothiazole",[{rot_path[i]: locants[i] for i in range(9)}]
             if n_count == 1 and o_count == 1 and s_count == 0:
                 if "N" not in small_symbols or "O" not in small_symbols:
@@ -291,10 +319,10 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                         rot_path = [rot_path[0]] + rot_path[1:][::-1]
                     if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
                         if rot_path[2] == n_idx:
-                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            locants = _retained_locants("benzoxazole")
                             return "benzoxazole", [{rot_path[i]: locants[i] for i in range(9)}]
                         elif rot_path[1] == n_idx:
-                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            locants = _retained_locants("1,2-benzoxazole")
                             return "1,2-benzoxazole", [{rot_path[i]: locants[i] for i in range(9)}]
             if n_count == 2 and o_count == 0 and s_count == 0:
                 if small_symbols.count("N") != 2:
@@ -309,10 +337,10 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                         rot_path =[rot_path[0]] + rot_path[1:][::-1]
                     if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
                         if rot_path[2] == n2:
-                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            locants = _retained_locants("benzimidazole")
                             return "benzimidazole", [{rot_path[i]: locants[i] for i in range(9)}]
                         elif rot_path[1] == n2:
-                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            locants = _retained_locants("indazole")
                             return "indazole", [{rot_path[i]: locants[i] for i in range(9)}]
                     
                     rot_path2 = path[path.index(n2):] + path[:path.index(n2)]
@@ -320,13 +348,13 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                         rot_path2 = [rot_path2[0]] + rot_path2[1:][::-1]
                     if internal_degrees[rot_path2[3]] == 3 and internal_degrees[rot_path2[8]] == 3:
                         if rot_path2[2] == n1:
-                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            locants = _retained_locants("benzimidazole")
                             return "benzimidazole", [{rot_path2[i]: locants[i] for i in range(9)}]
                         elif rot_path2[1] == n1:
-                            locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                            locants = _retained_locants("indazole")
                             return "indazole",[{rot_path2[i]: locants[i] for i in range(9)}]
 
-    if sig == (9, 10, 3, tuple([2]*7 + [3]*2)):
+    if _matches_any_retained_signature(("indoline", "indane"), sig, symbols, deg3_nodes, mol):
         if len(deg3_nodes) == 2 and mol.get_bond(deg3_nodes[0], deg3_nodes[1]) is not None:
             small_ring, big_ring = _find_two_rings(mol, path, deg3_nodes, path_set, 5)
             if small_ring is None or big_ring is None:
@@ -355,7 +383,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                 if internal_degrees[rot_path[1]] == 3:
                     rot_path = [rot_path[0]] + rot_path[1:][::-1]
                 if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
-                    locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                    locants = _retained_locants("indoline")
                     return "indoline",[{rot_path[i]: locants[i] for i in range(9)}]
             if n_count == 0 and o_count == 0 and s_count == 0:
                 if any(mol.atoms[a].symbol != "C" for a in path):
@@ -373,7 +401,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                     if internal_degrees[rot_path[1]] == 3:
                         rot_path = [rot_path[0]] + rot_path[1:][::-1]
                     if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
-                        locants =['1', '2', '3', '3a', '4', '5', '6', '7', '7a']
+                        locants = _retained_locants("indane")
                         maps.append({rot_path[i]: locants[i] for i in range(9)})
                 if maps:
                     return "indane", maps
@@ -493,7 +521,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                 if dist == 1: return "isoxazole", None
                 return "oxazole", None
 
-    if sig == (10, 11, 4, tuple([2]*8 + [3]*2)):
+    if _matches_any_retained_signature(("1,2,3,4-tetrahydronaphthalene",), sig, symbols, deg3_nodes, mol):
         if len(deg3_nodes) == 2 and mol.get_bond(deg3_nodes[0], deg3_nodes[1]) is not None and n_count == 0 and o_count == 0 and s_count == 0:
             fused = deg3_nodes
             ring_a = []
@@ -578,12 +606,14 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                                         return "1,2,3,4-tetrahydronaphthalene",[locant_map]
                     return "1,2,3,4-tetrahydronaphthalene", None
 
-    if sig == (14, 16, 7, tuple([2]*10 +[3]*4)):
+    if _matches_any_retained_signature(("anthracene", "phenanthrene"), sig, symbols, deg3_nodes, mol):
         deg3_edges = sum(1 for u in deg3_nodes for v in mol.get_neighbors(u) if v in deg3_nodes and u < v)
-        if deg3_edges == 2: return "anthracene", None
-        if deg3_edges == 3: return "phenanthrene", None
+        if _matches_retained_signature("anthracene", sig, symbols, deg3_nodes, mol, deg3_edges=deg3_edges):
+            return "anthracene", None
+        if _matches_retained_signature("phenanthrene", sig, symbols, deg3_nodes, mol, deg3_edges=deg3_edges):
+            return "phenanthrene", None
         
-    if sig == (10, 12, 0, tuple([2]*6 + [3]*4)):
+    if _matches_any_retained_signature(("adamantane",), sig, symbols, deg3_nodes, mol):
         if n_count == 0 and o_count == 0 and s_count == 0:
             maps =[]
             for n1 in deg3_nodes:
@@ -604,7 +634,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                 return "adamantane", maps
             return None
 
-    if sig == (8, 12, 0, tuple([3]*8)):
+    if _matches_any_retained_signature(("cubane",), sig, symbols, deg3_nodes, mol):
         if n_count == 0 and o_count == 0 and s_count == 0:
             maps = []
             for n1 in path:
@@ -626,7 +656,142 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                 return "cubane", maps
             return None
 
-    if sig == (17, 20, 0, tuple([2]*11 + [3]*6)): return "gonane", None
-    if sig == (16, 19, 8, tuple([2]*10 + [3]*6)): return "pyrene", None
+    if _matches_retained_signature("gonane", sig, symbols, deg3_nodes, mol):
+        return "gonane", None
+    if _matches_retained_signature("pyrene", sig, symbols, deg3_nodes, mol):
+        return "pyrene", None
+    for spec in RULES.retained.fused_polycycle_specs:
+        if not spec.get("match_by_signature"):
+            continue
+        name = spec["name"]
+        if _matches_retained_signature(name, sig, symbols, deg3_nodes, mol):
+            return name, None
         
     return None
+
+
+def _match_data_monocycle_retained(
+    mol: Molecule,
+    path: list[int],
+    size: int,
+    total_bonds: int,
+    double_bonds: int,
+    symbols: list[str],
+) -> str | None:
+    if total_bonds != size:
+        return None
+    for spec in RULES.retained.monocycle_specs:
+        if size != spec["size"] or double_bonds != spec["double_bonds"]:
+            continue
+        if spec.get("no_cumulated_double_bonds") and not _has_no_cumulated_double_bonds(mol, path):
+            continue
+        if not _symbol_counts_match(symbols, spec.get("symbols", {})):
+            continue
+        expected_distances = spec.get("hetero_distance_multiset")
+        if expected_distances is not None and _hetero_distance_multiset(mol, path) != sorted(expected_distances):
+            continue
+        expected_gaps = spec.get("hetero_gap_multiset")
+        if expected_gaps is not None and _hetero_gap_multiset(mol, path) != sorted(expected_gaps):
+            continue
+        return spec["name"]
+    return None
+
+
+def _retained_fused_spec(name: str) -> dict | None:
+    return next((spec for spec in RULES.retained.fused_polycycle_specs if spec["name"] == name), None)
+
+
+def _retained_locants(name: str) -> list[str]:
+    spec = _retained_fused_spec(name)
+    if spec is None:
+        return []
+    return list(spec.get("locants", []))
+
+
+def _matches_any_retained_signature(
+    names: tuple[str, ...],
+    sig: tuple[int, int, int, tuple[int, ...]],
+    symbols: list[str],
+    deg3_nodes: list[int],
+    mol: Molecule,
+) -> bool:
+    return any(_matches_retained_signature(name, sig, symbols, deg3_nodes, mol) for name in names)
+
+
+def _matches_retained_signature(
+    name: str,
+    sig: tuple[int, int, int, tuple[int, ...]],
+    symbols: list[str],
+    deg3_nodes: list[int],
+    mol: Molecule,
+    *,
+    deg3_edges: int | None = None,
+) -> bool:
+    spec = _retained_fused_spec(name)
+    if spec is None:
+        return False
+    signature = spec["signature"]
+    expected_sig = (
+        int(signature["size"]),
+        int(signature["total_bonds"]),
+        int(signature["double_bonds"]),
+        _degree_counts_tuple(signature["degree_counts"]),
+    )
+    if sig != expected_sig:
+        return False
+    if not _symbol_counts_match(symbols, spec.get("symbols", {})):
+        return False
+    expected_fused_edges = spec.get("fused_degree3_edges")
+    if expected_fused_edges is not None:
+        actual = sum(1 for u in deg3_nodes for v in mol.get_neighbors(u) if v in deg3_nodes and u < v)
+        if actual != int(expected_fused_edges):
+            return False
+    expected_deg3_edges = spec.get("deg3_edges")
+    if expected_deg3_edges is not None:
+        actual = deg3_edges
+        if actual is None:
+            actual = sum(1 for u in deg3_nodes for v in mol.get_neighbors(u) if v in deg3_nodes and u < v)
+        if actual != int(expected_deg3_edges):
+            return False
+    return True
+
+
+def _degree_counts_tuple(counts: dict[str, int]) -> tuple[int, ...]:
+    values = []
+    for degree, count in counts.items():
+        values.extend([int(degree)] * int(count))
+    return tuple(sorted(values))
+
+
+def _symbol_counts_match(symbols: list[str], expected: dict[str, int]) -> bool:
+    for symbol in ("N", "O", "S"):
+        if symbols.count(symbol) != int(expected.get(symbol, 0)):
+            return False
+    hetero_count = sum(int(value) for value in expected.values())
+    return symbols.count("C") == len(symbols) - hetero_count
+
+
+def _hetero_distance_multiset(mol: Molecule, path: list[int]) -> list[int]:
+    hetero_indices = [idx for idx, atom_idx in enumerate(path) if mol.atoms[atom_idx].symbol in {"N", "O", "S"}]
+    if len(hetero_indices) < 2:
+        return []
+    size = len(path)
+    distances = []
+    for left, right in itertools.combinations(hetero_indices, 2):
+        distance = abs(left - right)
+        distances.append(min(distance, size - distance))
+    return sorted(distances)
+
+
+def _hetero_gap_multiset(mol: Molecule, path: list[int]) -> list[int]:
+    hetero_indices = sorted(idx for idx, atom_idx in enumerate(path) if mol.atoms[atom_idx].symbol in {"N", "O", "S"})
+    if len(hetero_indices) < 3:
+        return []
+    size = len(path)
+    gaps = [
+        hetero_indices[(idx + 1) % len(hetero_indices)] - hetero_indices[idx]
+        if idx + 1 < len(hetero_indices)
+        else size - hetero_indices[idx] + hetero_indices[0]
+        for idx in range(len(hetero_indices))
+    ]
+    return sorted(gaps)

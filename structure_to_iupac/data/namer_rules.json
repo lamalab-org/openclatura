@@ -19,7 +19,13 @@
   },
   "single_atom_cations": {
     "bluebook_rule": "P-72; cation and salt component names",
-    "values": ["Na", "K", "Li", "Mg", "Ca"]
+    "values": [
+      "Na",
+      "K",
+      "Li",
+      "Mg",
+      "Ca"
+    ]
   },
   "single_atom_anions": {
     "bluebook_rule": "P-72; anion names for halide components",
@@ -29,6 +35,139 @@
       "Br": "bromide",
       "I": "iodide"
     }
+  },
+  "mononuclear_parent_hydrides": {
+    "bluebook_rule": "P-13 replacement nomenclature; mononuclear non-carbon parent hydrides",
+    "values": {
+      "B": "borane",
+      "N": "azane",
+      "O": "oxidane",
+      "Si": "silane",
+      "P": "phosphane",
+      "S": "sulfane",
+      "As": "arsane",
+      "Se": "selane",
+      "Sb": "stibane",
+      "Te": "tellane",
+      "Bi": "bismuthane"
+    }
+  },
+  "replacement_parent_oxoacid_specs": {
+    "bluebook_rule": "P-13 replacement nomenclature; functional parent hydrides described by central atom and ligand counts",
+    "values": [
+      {"name": "phosphoric acid", "central": "P", "single_o": 3, "double_o": 1},
+      {"name": "sulfuric acid", "central": "S", "single_o": 2, "double_o": 2},
+      {"name": "nitric acid", "central": "N", "single_o": 2, "double_o": 1, "charge": 1},
+      {"name": "hypobromous acid", "central": "Br", "single_o": 1, "double_o": 0}
+    ]
+  },
+  "retained_ionic_n_parents": {
+    "bluebook_rule": "P-14.4 and P-22; retained saturated N-heterocycle cation parent names",
+    "values": {
+      "azetidine": "azetidinium",
+      "aziridine": "aziridinium",
+      "pyrrolidine": "pyrrolidinium",
+      "piperidine": "piperidinium"
+    }
+  },
+  "saturated_n_ring_ionic_parents": {
+    "bluebook_rule": "P-22 replacement nomenclature; inferred saturated N-heterocycle cation parent names by ring size",
+    "values": {
+      "3": "aziridinium",
+      "4": "azetidinium",
+      "5": "pyrrolidinium",
+      "6": "piperidinium"
+    }
+  },
+  "parent_charge_suffixes": {
+    "bluebook_rule": "P-14.4; parent charge suffix operations",
+    "values": {
+      "N:+": {
+        "suffix": "ium",
+        "reason": "Positive parent nitrogen charges are rendered as parent suffix operations."
+      },
+      "*:-": {
+        "suffix": "ide",
+        "reason": "Negative parent atoms are rendered as parent anion suffix operations."
+      }
+    }
+  },
+  "replacement_charge_prefixes": {
+    "bluebook_rule": "P-14.4; charged replacement-prefix variants",
+    "values": {
+      "aza:+": "azonia"
+    }
+  },
+  "heteroatom_charge_prefixes": {
+    "bluebook_rule": "P-61 and P-72; charged heteroatom substituent prefixes",
+    "values": {
+      "O:-:single": "oxido",
+      "N:+:single": "ammonio",
+      "N:+:double": "iminio",
+      "N:-:single": "azanidyl"
+    }
+  },
+  "anion_suffix_placements": {
+    "bluebook_rule": "P-14.4; parent anion suffix placement before terminal characteristic suffix stacks",
+    "values": [
+      {
+        "key": "ketone_to_oxo_ide",
+        "atom_symbols": [
+          "*"
+        ],
+        "placement": "transform",
+        "reason": "Ketone suffix parents with an anionic parent atom are rendered as oxo prefixes plus parent ide suffix."
+      },
+      {
+        "key": "aldehyde_to_ide_al",
+        "atom_symbols": [
+          "C"
+        ],
+        "placement": "transform",
+        "reason": "Acyclic aldehyde suffix names need the carbanion ide operation before the aldehyde suffix."
+      },
+      {
+        "key": "carbaldehyde_suffix_ide",
+        "atom_symbols": [
+          "C"
+        ],
+        "placement": "before_suffix",
+        "reason": "Ring carbaldehyde suffixes need the carbanion ide operation before the characteristic-group suffix."
+      },
+      {
+        "key": "dinitrile_suffix_ide",
+        "atom_symbols": [
+          "C"
+        ],
+        "placement": "before_suffix",
+        "reason": "Dinitrile suffixes need the carbanion ide operation before the characteristic-group suffix."
+      },
+      {
+        "key": "locanted_carbonitrile_suffix_ide",
+        "atom_symbols": [
+          "C"
+        ],
+        "placement": "before_suffix",
+        "reason": "Locanted carbonitrile suffixes need the carbanion ide operation before the characteristic-group suffix."
+      },
+      {
+        "key": "terminal_carbonitrile_suffix_ide",
+        "atom_symbols": [
+          "C"
+        ],
+        "placement": "before_suffix",
+        "reason": "Unlocanted carbonitrile suffixes need the carbanion ide operation before the characteristic-group suffix."
+      },
+      {
+        "key": "terminal_characteristic_suffix_ide",
+        "atom_symbols": [
+          "*"
+        ],
+        "suffix_pattern": "-(?:\\d+(?:,\\d+)*)-(?:dione|diamine|aminium)$",
+        "placement": "before_suffix",
+        "reason": "Parent anion suffixes must precede terminal characteristic suffix stacks."
+      }
+    ]
   },
   "salt_metal_names": {
     "bluebook_rule": "P-72; ordering of ionic components in additive names",
@@ -58,8 +197,12 @@
       "methyl": "methoxy",
       "ethyl": "ethoxy",
       "propyl": "propoxy",
+      "propan-2-yl": "isopropoxy",
       "isopropyl": "isopropoxy",
       "butyl": "butoxy",
+      "butan-2-yl": "sec-butoxy",
+      "2-methylpropyl": "isobutoxy",
+      "2-methylpropan-2-yl": "tert-butoxy",
       "isobutyl": "isobutoxy",
       "sec-butyl": "sec-butoxy",
       "tert-butyl": "tert-butoxy",
@@ -68,11 +211,25 @@
   },
   "simple_sulfanyl_prefixes": {
     "bluebook_rule": "P-61.2.2.2; sulfanyl substituent prefixes",
-    "values": ["methyl", "ethyl", "propyl", "isopropyl", "butyl", "isobutyl", "sec-butyl", "tert-butyl", "phenyl"]
+    "values": [
+      "methyl",
+      "ethyl",
+      "propyl",
+      "isopropyl",
+      "butyl",
+      "isobutyl",
+      "sec-butyl",
+      "tert-butyl",
+      "phenyl"
+    ]
   },
   "simple_selanyl_prefixes": {
     "bluebook_rule": "P-61.2.2.2; selanyl substituent prefixes by chalcogen analogue",
-    "values": ["methyl", "ethyl", "phenyl"]
+    "values": [
+      "methyl",
+      "ethyl",
+      "phenyl"
+    ]
   },
   "halogen_prefixes": {
     "bluebook_rule": "P-61.3; halogen detachable prefixes",
@@ -94,7 +251,34 @@
   },
   "retained_ring_elements": {
     "bluebook_rule": "P-22 and P-25; retained heterocycle names supported by this implementation",
-    "values": ["C", "N", "O", "S"]
+    "values": [
+      "C",
+      "N",
+      "O",
+      "S"
+    ]
+  },
+  "ring_descriptor_templates": {
+    "bluebook_rule": "P-23 and P-24; ring descriptor rendering templates",
+    "values": {
+      "spiro": "spiro[{numbers}]",
+      "dispiro": "dispiro[{numbers}]",
+      "bicyclo": "bicyclo[{numbers}]"
+    }
+  },
+  "polycycle_prefixes": {
+    "bluebook_rule": "P-23.1; von Baeyer polycycle prefixes by bridge count",
+    "values": {
+      "1": "bicyclo",
+      "2": "tricyclo",
+      "3": "tetracyclo",
+      "4": "pentacyclo",
+      "5": "hexacyclo",
+      "6": "heptacyclo",
+      "7": "octacyclo",
+      "8": "nonacyclo",
+      "9": "decacyclo"
+    }
   },
   "direct_group_prefixes": {
     "bluebook_rule": "P-63, P-64, P-65; characteristic groups named only by prefixes in substituent context",
@@ -159,15 +343,29 @@
   },
   "ester_like_prefix_groups": {
     "bluebook_rule": "P-65.6; esters and peroxy esters named with alkoxycarbonyl or related prefixes",
-    "values": ["ester", "carboxylate", "ring_carboxylate", "peroxy_ester", "ring_peroxy_ester"]
+    "values": [
+      "ester",
+      "carboxylate",
+      "ring_carboxylate",
+      "peroxy_ester",
+      "ring_peroxy_ester"
+    ]
   },
   "peroxy_ester_groups": {
     "bluebook_rule": "P-65.6; peroxy ester single-oxygen selection",
-    "values": ["peroxy_ester", "ring_peroxy_ester"]
+    "values": [
+      "peroxy_ester",
+      "ring_peroxy_ester"
+    ]
   },
   "amide_like_prefix_groups": {
     "bluebook_rule": "P-66.1; amides and thioamides as substituent prefixes",
-    "values": ["amide", "ring_amide", "thioamide", "ring_thioamide"]
+    "values": [
+      "amide",
+      "ring_amide",
+      "thioamide",
+      "ring_thioamide"
+    ]
   },
   "amide_prefix_bases": {
     "bluebook_rule": "P-66.1; amide and thioamide prefix names",
@@ -180,11 +378,17 @@
   },
   "carboxy_prefix_groups": {
     "bluebook_rule": "P-65.1; carboxy prefix for acids when not principal",
-    "values": ["carboxylic_acid", "ring_carboxylic_acid"]
+    "values": [
+      "carboxylic_acid",
+      "ring_carboxylic_acid"
+    ]
   },
   "cyano_prefix_groups": {
     "bluebook_rule": "P-66.4; cyano prefix for nitriles when not principal",
-    "values": ["nitrile", "ring_nitrile"]
+    "values": [
+      "nitrile",
+      "ring_nitrile"
+    ]
   },
   "acid_halide_prefixes": {
     "bluebook_rule": "P-65.5; carbonyl halide prefixes",
@@ -201,11 +405,17 @@
   },
   "peroxy_acid_prefix_groups": {
     "bluebook_rule": "P-65.6; peroxy acid prefix forms",
-    "values": ["peroxy_acid", "ring_peroxy_acid"]
+    "values": [
+      "peroxy_acid",
+      "ring_peroxy_acid"
+    ]
   },
   "sulfonyl_prefix_groups": {
     "bluebook_rule": "P-67.1; sulfonic acids and sulfonates as prefixes",
-    "values": ["sulfonic_acid", "sulfonate"]
+    "values": [
+      "sulfonic_acid",
+      "sulfonate"
+    ]
   },
   "direct_prefix_groups": {
     "bluebook_rule": "P-63, P-64; direct detachable prefixes",
@@ -219,7 +429,14 @@
   },
   "front_modifier_principal_groups": {
     "bluebook_rule": "P-65.6, P-67.1; ester and sulfonate front modifiers",
-    "values": ["ester", "carboxylate", "sulfonate", "ring_carboxylate", "peroxy_ester", "ring_peroxy_ester"]
+    "values": [
+      "ester",
+      "carboxylate",
+      "sulfonate",
+      "ring_carboxylate",
+      "peroxy_ester",
+      "ring_peroxy_ester"
+    ]
   },
   "n_substituent_principal_groups": {
     "bluebook_rule": "P-62, P-66; N-substitution locants for amines, amides, imines, hydrazones, and hydrazines",
@@ -241,7 +458,11 @@
   },
   "hydrazone_principal_groups": {
     "bluebook_rule": "P-66.3; hydrazone N-substitution locants",
-    "values": ["hydrazone", "aldehyde_hydrazone", "ring_aldehyde_hydrazone"]
+    "values": [
+      "hydrazone",
+      "aldehyde_hydrazone",
+      "ring_aldehyde_hydrazone"
+    ]
   },
   "special_component_names": {
     "bluebook_rule": "P-13.5, P-52, P-53; retained and contracted component names",
@@ -250,15 +471,513 @@
     }
   },
   "functional_groups": {
-    "bluebook_rule": "Unified functional-group metadata overrides and custom extension point. Built-ins are loaded from compatibility rule modules unless overridden here.",
-    "values": {}
+    "bluebook_rule": "Unified functional-group metadata. Add or override functional groups here with role, suffix templates, locant policy, multiplication strategy, handlers, and optional family tags.",
+    "values": {
+      "olate": {
+        "role": "principal",
+        "prefix": "oxido",
+        "suffix": "olate",
+        "multi_suffix": "diolate",
+        "seniority": 15,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "thiolate": {
+        "role": "principal",
+        "prefix": "sulfido",
+        "suffix": "thiolate",
+        "multi_suffix": "dithiolate",
+        "seniority": 16,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "carboxylic_acid": {
+        "role": "principal",
+        "prefix": "carboxy",
+        "suffix": "oic acid",
+        "multi_suffix": "dioic acid",
+        "seniority": 20,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "carboxylate": {
+        "role": "principal",
+        "prefix": "carboxylato",
+        "suffix": "oate",
+        "multi_suffix": "dioate",
+        "seniority": 21,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_carboxylic_acid": {
+        "role": "principal",
+        "prefix": "carboxy",
+        "suffix": "carboxylic acid",
+        "multi_suffix": "dicarboxylic acid",
+        "seniority": 20,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "ring_carboxylate": {
+        "role": "principal",
+        "prefix": "carboxylato",
+        "suffix": "carboxylate",
+        "multi_suffix": "dicarboxylate",
+        "seniority": 21,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "peroxy_acid": {
+        "role": "principal",
+        "prefix": "carboperoxy",
+        "suffix": "peroxoic acid",
+        "multi_suffix": "diperoxoic acid",
+        "seniority": 22,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_peroxy_acid": {
+        "role": "principal",
+        "prefix": "carboperoxy",
+        "suffix": "carboperoxoic acid",
+        "multi_suffix": "dicarboperoxoic acid",
+        "seniority": 22,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "peroxy_ester": {
+        "role": "principal",
+        "prefix": "oxycarbonyl",
+        "suffix": "peroxoate",
+        "multi_suffix": null,
+        "seniority": 45,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_peroxy_ester": {
+        "role": "principal",
+        "prefix": "oxycarbonyl",
+        "suffix": "carboperoxoate",
+        "multi_suffix": null,
+        "seniority": 45,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "sulfonic_acid": {
+        "role": "principal",
+        "prefix": "sulfo",
+        "suffix": "sulfonic acid",
+        "multi_suffix": "disulfonic acid",
+        "seniority": 25,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "sulfonate": {
+        "role": "principal",
+        "prefix": "sulfonato",
+        "suffix": "sulfonate",
+        "multi_suffix": "disulfonate",
+        "seniority": 26,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "anhydride": {
+        "role": "principal",
+        "prefix": null,
+        "suffix": "oic anhydride",
+        "multi_suffix": null,
+        "seniority": 30,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ester": {
+        "role": "principal",
+        "prefix": "oxycarbonyl",
+        "suffix": "oate",
+        "multi_suffix": null,
+        "seniority": 40,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "acid_fluoride": {
+        "role": "principal",
+        "prefix": "fluorocarbonyl",
+        "suffix": "oyl fluoride",
+        "multi_suffix": "dioyl difluoride",
+        "seniority": 50,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "acid_chloride": {
+        "role": "principal",
+        "prefix": "chlorocarbonyl",
+        "suffix": "oyl chloride",
+        "multi_suffix": "dioyl dichloride",
+        "seniority": 51,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "acid_bromide": {
+        "role": "principal",
+        "prefix": "bromocarbonyl",
+        "suffix": "oyl bromide",
+        "multi_suffix": "dioyl dibromide",
+        "seniority": 52,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "acid_iodide": {
+        "role": "principal",
+        "prefix": "iodocarbonyl",
+        "suffix": "oyl iodide",
+        "multi_suffix": "dioyl diiodide",
+        "seniority": 53,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_acid_fluoride": {
+        "role": "principal",
+        "prefix": "fluorocarbonyl",
+        "suffix": "carbonyl fluoride",
+        "multi_suffix": "dicarbonyl difluoride",
+        "seniority": 50,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "ring_acid_chloride": {
+        "role": "principal",
+        "prefix": "chlorocarbonyl",
+        "suffix": "carbonyl chloride",
+        "multi_suffix": "dicarbonyl dichloride",
+        "seniority": 51,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "ring_acid_bromide": {
+        "role": "principal",
+        "prefix": "bromocarbonyl",
+        "suffix": "carbonyl bromide",
+        "multi_suffix": "dicarbonyl dibromide",
+        "seniority": 52,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "ring_acid_iodide": {
+        "role": "principal",
+        "prefix": "iodocarbonyl",
+        "suffix": "carbonyl iodide",
+        "multi_suffix": "dicarbonyl diiodide",
+        "seniority": 53,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "amide": {
+        "role": "principal",
+        "prefix": "carbamoyl",
+        "suffix": "amide",
+        "multi_suffix": "diamide",
+        "seniority": 60,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_amide": {
+        "role": "principal",
+        "prefix": "carbamoyl",
+        "suffix": "carboxamide",
+        "multi_suffix": "dicarboxamide",
+        "seniority": 60,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "thioamide": {
+        "role": "principal",
+        "prefix": "carbamothioyl",
+        "suffix": "thioamide",
+        "multi_suffix": "dithioamide",
+        "seniority": 65,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_thioamide": {
+        "role": "principal",
+        "prefix": "carbamothioyl",
+        "suffix": "carbothioamide",
+        "multi_suffix": "dicarbothioamide",
+        "seniority": 65,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "nitrile": {
+        "role": "principal",
+        "prefix": "cyano",
+        "suffix": "nitrile",
+        "multi_suffix": "dinitrile",
+        "seniority": 70,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_nitrile": {
+        "role": "principal",
+        "prefix": "cyano",
+        "suffix": "carbonitrile",
+        "multi_suffix": "dicarbonitrile",
+        "seniority": 70,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "aldehyde": {
+        "role": "principal",
+        "prefix": "oxo",
+        "suffix": "al",
+        "multi_suffix": "dial",
+        "seniority": 80,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_aldehyde": {
+        "role": "principal",
+        "prefix": "formyl",
+        "suffix": "carbaldehyde",
+        "multi_suffix": "dicarbaldehyde",
+        "seniority": 80,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "ketone": {
+        "role": "principal",
+        "prefix": "oxo",
+        "suffix": "one",
+        "multi_suffix": "dione",
+        "seniority": 90,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "hydrazone": {
+        "role": "principal",
+        "prefix": "hydrazono",
+        "suffix": "one hydrazone",
+        "multi_suffix": "dione dihydrazone",
+        "seniority": 95,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "aldehyde_hydrazone": {
+        "role": "principal",
+        "prefix": "hydrazono",
+        "suffix": "al hydrazone",
+        "multi_suffix": "dial dihydrazone",
+        "seniority": 95,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_aldehyde_hydrazone": {
+        "role": "principal",
+        "prefix": "hydrazonomethyl",
+        "suffix": "carbaldehyde hydrazone",
+        "multi_suffix": "dicarbaldehyde dihydrazone",
+        "seniority": 95,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "alcohol": {
+        "role": "principal",
+        "prefix": "hydroxy",
+        "suffix": "ol",
+        "multi_suffix": "diol",
+        "seniority": 100,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "thiol": {
+        "role": "principal",
+        "prefix": "sulfanyl",
+        "suffix": "thiol",
+        "multi_suffix": "dithiol",
+        "seniority": 105,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "amine": {
+        "role": "principal",
+        "prefix": "amino",
+        "suffix": "amine",
+        "multi_suffix": "diamine",
+        "seniority": 110,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "aminium": {
+        "role": "principal",
+        "prefix": "ammonio",
+        "suffix": "aminium",
+        "multi_suffix": "diaminium",
+        "seniority": 109,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "imine": {
+        "role": "principal",
+        "prefix": "imino",
+        "suffix": "imine",
+        "multi_suffix": "diimine",
+        "seniority": 112,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "iminium": {
+        "role": "principal",
+        "prefix": "iminio",
+        "suffix": "iminium",
+        "multi_suffix": "diiminium",
+        "seniority": 111,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "hydrazine": {
+        "role": "principal",
+        "prefix": "hydrazinyl",
+        "suffix": "hydrazine",
+        "multi_suffix": "dihydrazine",
+        "seniority": 115,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "ether": {
+        "role": "principal",
+        "prefix": "oxy",
+        "suffix": "ether",
+        "multi_suffix": null,
+        "seniority": 200,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "fluoro": {
+        "role": "prefix",
+        "prefix": "fluoro",
+        "needs_locant": true
+      },
+      "chloro": {
+        "role": "prefix",
+        "prefix": "chloro",
+        "needs_locant": true
+      },
+      "bromo": {
+        "role": "prefix",
+        "prefix": "bromo",
+        "needs_locant": true
+      },
+      "iodo": {
+        "role": "prefix",
+        "prefix": "iodo",
+        "needs_locant": true
+      },
+      "astato": {
+        "role": "prefix",
+        "prefix": "astato",
+        "needs_locant": true
+      },
+      "nitro": {
+        "role": "prefix",
+        "prefix": "nitro",
+        "needs_locant": true
+      },
+      "nitroso": {
+        "role": "prefix",
+        "prefix": "nitroso",
+        "needs_locant": true
+      },
+      "azido": {
+        "role": "prefix",
+        "prefix": "azido",
+        "needs_locant": true
+      },
+      "diazo": {
+        "role": "prefix",
+        "prefix": "diazo",
+        "needs_locant": true
+      },
+      "diazonio": {
+        "role": "prefix",
+        "prefix": "diazonio",
+        "needs_locant": true
+      },
+      "isocyano": {
+        "role": "prefix",
+        "prefix": "isocyano",
+        "needs_locant": true
+      },
+      "cyanato": {
+        "role": "prefix",
+        "prefix": "cyanato",
+        "needs_locant": true
+      },
+      "isocyanato": {
+        "role": "prefix",
+        "prefix": "isocyanato",
+        "needs_locant": true
+      },
+      "thiocyanato": {
+        "role": "prefix",
+        "prefix": "thiocyanato",
+        "needs_locant": true
+      },
+      "isothiocyanato": {
+        "role": "prefix",
+        "prefix": "isothiocyanato",
+        "needs_locant": true
+      },
+      "hydroperoxy": {
+        "role": "prefix",
+        "prefix": "hydroperoxy",
+        "needs_locant": true
+      },
+      "peroxy": {
+        "role": "prefix",
+        "prefix": "peroxy",
+        "needs_locant": true
+      },
+      "sulfanyl": {
+        "role": "prefix",
+        "prefix": "sulfanyl",
+        "needs_locant": true
+      },
+      "silyl": {
+        "role": "prefix",
+        "prefix": "silyl",
+        "needs_locant": true
+      },
+      "phosphanyl": {
+        "role": "prefix",
+        "prefix": "phosphanyl",
+        "needs_locant": true
+      },
+      "phosphoryl": {
+        "role": "prefix",
+        "prefix": "phosphoryl",
+        "needs_locant": true
+      },
+      "boryl": {
+        "role": "prefix",
+        "prefix": "boryl",
+        "needs_locant": true
+      }
+    }
   },
   "retained_substituent_stems": {
     "bluebook_rule": "P-13.6 and retained parent substituent forms",
     "values": {
-      "benzene": ["phen", ""],
-      "pyridine": ["pyridin", ""],
-      "naphthalene": ["naphthalen", ""]
+      "benzene": [
+        "phen",
+        ""
+      ],
+      "pyridine": [
+        "pyridin",
+        ""
+      ],
+      "naphthalene": [
+        "naphthalen",
+        ""
+      ]
     }
   },
   "ambiguous_connection_substituent_stems": {
@@ -348,23 +1067,108 @@
   "postprocess_literal_replacements": {
     "bluebook_rule": "Ordered retained-name and contracted-prefix post-processing replacements",
     "values": [
-      ["methyloxy", "methoxy"],
-      ["ethyloxy", "ethoxy"],
-      ["propyloxy", "propoxy"],
-      ["butyloxy", "butoxy"],
-      ["phenyloxy", "phenoxy"],
-      ["aminocarbonylamino", "carbamoylamino"],
-      ["aminocarbonyl", "carbamoyl"],
-      ["aminosulfonyl", "sulfamoyl"],
-      ["formylamido", "formamido"],
-      ["eth-1-en-1-yl", "ethenyl"],
-      ["eth-1-enyl", "ethenyl"],
-      ["(ethenyl)", "ethenyl"],
-      ["(benzyl)", "benzyl"],
-      ["(benzyloxy)", "benzyloxy"],
-      ["eth-1-yn-1-yl", "ethynyl"],
-      ["eth-1-ynyl", "ethynyl"],
-      ["aminoamino", "hydrazinyl"]
+      {
+        "pattern": "methyloxy",
+        "replacement": "methoxy",
+        "category": "retained_alias",
+        "reason": "Contract systematic alkyloxy spelling to retained methoxy."
+      },
+      {
+        "pattern": "ethyloxy",
+        "replacement": "ethoxy",
+        "category": "retained_alias",
+        "reason": "Contract systematic alkyloxy spelling to retained ethoxy."
+      },
+      {
+        "pattern": "propyloxy",
+        "replacement": "propoxy",
+        "category": "retained_alias",
+        "reason": "Contract systematic alkyloxy spelling to retained propoxy."
+      },
+      {
+        "pattern": "butyloxy",
+        "replacement": "butoxy",
+        "category": "retained_alias",
+        "reason": "Contract systematic alkyloxy spelling to retained butoxy."
+      },
+      {
+        "pattern": "phenyloxy",
+        "replacement": "phenoxy",
+        "category": "retained_alias",
+        "reason": "Contract systematic aryl oxy spelling to retained phenoxy."
+      },
+      {
+        "pattern": "aminocarbonylamino",
+        "replacement": "carbamoylamino",
+        "category": "retained_alias",
+        "reason": "Use retained carbamoylamino prefix spelling."
+      },
+      {
+        "pattern": "aminocarbonyl",
+        "replacement": "carbamoyl",
+        "category": "retained_alias",
+        "reason": "Use retained carbamoyl prefix spelling."
+      },
+      {
+        "pattern": "aminosulfonyl",
+        "replacement": "sulfamoyl",
+        "category": "retained_alias",
+        "reason": "Use retained sulfamoyl prefix spelling."
+      },
+      {
+        "pattern": "formylamido",
+        "replacement": "formamido",
+        "category": "morphology",
+        "reason": "Use valid formamido morphology for formyl-amido contraction."
+      },
+      {
+        "pattern": "eth-1-en-1-yl",
+        "replacement": "ethenyl",
+        "category": "retained_alias",
+        "reason": "Contract explicit locanted vinyl substituent to ethenyl."
+      },
+      {
+        "pattern": "eth-1-enyl",
+        "replacement": "ethenyl",
+        "category": "retained_alias",
+        "reason": "Contract explicit locanted vinyl substituent to ethenyl."
+      },
+      {
+        "pattern": "(ethenyl)",
+        "replacement": "ethenyl",
+        "category": "grammar",
+        "reason": "Remove unnecessary parentheses around simple ethenyl prefix."
+      },
+      {
+        "pattern": "(benzyl)",
+        "replacement": "benzyl",
+        "category": "grammar",
+        "reason": "Remove unnecessary parentheses around simple benzyl prefix."
+      },
+      {
+        "pattern": "(benzyloxy)",
+        "replacement": "benzyloxy",
+        "category": "grammar",
+        "reason": "Remove unnecessary parentheses around simple benzyloxy prefix."
+      },
+      {
+        "pattern": "eth-1-yn-1-yl",
+        "replacement": "ethynyl",
+        "category": "retained_alias",
+        "reason": "Contract explicit locanted ethynyl substituent to ethynyl."
+      },
+      {
+        "pattern": "eth-1-ynyl",
+        "replacement": "ethynyl",
+        "category": "retained_alias",
+        "reason": "Contract explicit locanted ethynyl substituent to ethynyl."
+      },
+      {
+        "pattern": "aminoamino",
+        "replacement": "hydrazinyl",
+        "category": "retained_alias",
+        "reason": "Use retained hydrazinyl prefix for aminoamino."
+      }
     ]
   },
   "postprocess_regex_replacements": {
@@ -372,26 +1176,1042 @@
     "values": [
       {
         "pattern": "\\b1-(formate|formamide|formic acid|formyl|formaldehyde|formonitrile)\\b",
-        "replacement": "\\1"
+        "replacement": "\\1",
+        "category": "grammar",
+        "reason": "Remove invalid locant on one-carbon retained functional names."
       },
       {
         "pattern": "\\(1-(formate|formamide|formic acid|formyl|formaldehyde|formonitrile)\\)",
-        "replacement": "(\\1)"
+        "replacement": "(\\1)",
+        "category": "grammar",
+        "reason": "Remove invalid locant on one-carbon retained functional names."
       }
     ]
   },
   "postprocess_exact_replacements": {
     "bluebook_rule": "Whole-name post-processing replacements",
-    "values": {
-      "methanenitrile": "hydrogen cyanide"
-    }
+    "values": [
+      {
+        "pattern": "methanenitrile",
+        "replacement": "hydrogen cyanide",
+        "category": "retained_alias",
+        "reason": "Use retained common name for whole-component spelling."
+      }
+    ]
   },
   "postprocess_acyl_amido_terms": {
     "bluebook_rule": "Acyl terms converted from amino to amido forms",
-    "values": ["benzoyl", "acetyl", "propionyl", "formyl"]
+    "values": [
+      "benzoyl",
+      "acetyl",
+      "propionyl",
+      "formyl"
+    ]
   },
   "postprocess_n_substituted_functional_suffixes": {
     "bluebook_rule": "P-62, P-66, P-67; functional prefix suffixes whose leading parenthesized substituent is an N-substituent, not a carbon substituent on the acid parent",
-    "values": ["sulfonamido", "sulfinamido", "sulfamoylamino", "carbamoylamino", "carbamothioylamino"]
+    "values": [
+      "sulfonamido",
+      "sulfinamido",
+      "sulfamoylamino",
+      "carbamoylamino",
+      "carbamothioylamino"
+    ]
+  },
+  "retained_monocycle_specs": {
+    "bluebook_rule": "P-22 and P-25; table-driven retained monocyclic parent recognition. Carbon count is inferred from ring size minus listed heteroatoms.",
+    "values": [
+      {
+        "name": "piperidine",
+        "size": 6,
+        "double_bonds": 0,
+        "symbols": {
+          "N": 1
+        }
+      },
+      {
+        "name": "piperazine",
+        "size": 6,
+        "double_bonds": 0,
+        "symbols": {
+          "N": 2
+        },
+        "hetero_distance_multiset": [
+          3
+        ]
+      },
+      {
+        "name": "morpholine",
+        "size": 6,
+        "double_bonds": 0,
+        "symbols": {
+          "N": 1,
+          "O": 1
+        },
+        "hetero_distance_multiset": [
+          3
+        ]
+      },
+      {
+        "name": "thiomorpholine",
+        "size": 6,
+        "double_bonds": 0,
+        "symbols": {
+          "N": 1,
+          "S": 1
+        },
+        "hetero_distance_multiset": [
+          3
+        ]
+      },
+      {
+        "name": "pyrrolidine",
+        "size": 5,
+        "double_bonds": 0,
+        "symbols": {
+          "N": 1
+        }
+      },
+      {
+        "name": "oxolane",
+        "size": 5,
+        "double_bonds": 0,
+        "symbols": {
+          "O": 1
+        }
+      },
+      {
+        "name": "thiolane",
+        "size": 5,
+        "double_bonds": 0,
+        "symbols": {
+          "S": 1
+        }
+      },
+      {
+        "name": "isoxazolidine",
+        "size": 5,
+        "double_bonds": 0,
+        "symbols": {
+          "N": 1,
+          "O": 1
+        },
+        "hetero_distance_multiset": [
+          1
+        ]
+      },
+      {
+        "name": "1,3-oxazolidine",
+        "size": 5,
+        "double_bonds": 0,
+        "symbols": {
+          "N": 1,
+          "O": 1
+        },
+        "hetero_distance_multiset": [
+          2
+        ]
+      },
+      {
+        "name": "isothiazolidine",
+        "size": 5,
+        "double_bonds": 0,
+        "symbols": {
+          "N": 1,
+          "S": 1
+        },
+        "hetero_distance_multiset": [
+          1
+        ]
+      },
+      {
+        "name": "1,3-thiazolidine",
+        "size": 5,
+        "double_bonds": 0,
+        "symbols": {
+          "N": 1,
+          "S": 1
+        },
+        "hetero_distance_multiset": [
+          2
+        ]
+      },
+      {
+        "name": "benzene",
+        "size": 6,
+        "double_bonds": 3,
+        "symbols": {},
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "pyridine",
+        "size": 6,
+        "double_bonds": 3,
+        "symbols": {
+          "N": 1
+        },
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "pyridazine",
+        "size": 6,
+        "double_bonds": 3,
+        "symbols": {
+          "N": 2
+        },
+        "hetero_distance_multiset": [
+          1
+        ],
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "pyrimidine",
+        "size": 6,
+        "double_bonds": 3,
+        "symbols": {
+          "N": 2
+        },
+        "hetero_distance_multiset": [
+          2
+        ],
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "pyrazine",
+        "size": 6,
+        "double_bonds": 3,
+        "symbols": {
+          "N": 2
+        },
+        "hetero_distance_multiset": [
+          3
+        ],
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "1,2,3-triazine",
+        "size": 6,
+        "double_bonds": 3,
+        "symbols": {
+          "N": 3
+        },
+        "hetero_gap_multiset": [
+          1,
+          1,
+          4
+        ],
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "1,2,4-triazine",
+        "size": 6,
+        "double_bonds": 3,
+        "symbols": {
+          "N": 3
+        },
+        "hetero_gap_multiset": [
+          1,
+          2,
+          3
+        ],
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "1,3,5-triazine",
+        "size": 6,
+        "double_bonds": 3,
+        "symbols": {
+          "N": 3
+        },
+        "hetero_gap_multiset": [
+          2,
+          2,
+          2
+        ],
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "furan",
+        "size": 5,
+        "double_bonds": 2,
+        "symbols": {
+          "O": 1
+        },
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "thiophene",
+        "size": 5,
+        "double_bonds": 2,
+        "symbols": {
+          "S": 1
+        },
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "pyrrole",
+        "size": 5,
+        "double_bonds": 2,
+        "symbols": {
+          "N": 1
+        },
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "pyrazole",
+        "size": 5,
+        "double_bonds": 2,
+        "symbols": {
+          "N": 2
+        },
+        "hetero_distance_multiset": [
+          1
+        ],
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "imidazole",
+        "size": 5,
+        "double_bonds": 2,
+        "symbols": {
+          "N": 2
+        },
+        "hetero_distance_multiset": [
+          2
+        ],
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "1,2,3-triazole",
+        "size": 5,
+        "double_bonds": 2,
+        "symbols": {
+          "N": 3
+        },
+        "hetero_gap_multiset": [
+          1,
+          1,
+          3
+        ],
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "1,2,4-triazole",
+        "size": 5,
+        "double_bonds": 2,
+        "symbols": {
+          "N": 3
+        },
+        "hetero_gap_multiset": [
+          1,
+          2,
+          2
+        ],
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "tetrazole",
+        "size": 5,
+        "double_bonds": 2,
+        "symbols": {
+          "N": 4
+        },
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "isothiazole",
+        "size": 5,
+        "double_bonds": 2,
+        "symbols": {
+          "N": 1,
+          "S": 1
+        },
+        "hetero_distance_multiset": [
+          1
+        ],
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "thiazole",
+        "size": 5,
+        "double_bonds": 2,
+        "symbols": {
+          "N": 1,
+          "S": 1
+        },
+        "hetero_distance_multiset": [
+          2
+        ],
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "isoxazole",
+        "size": 5,
+        "double_bonds": 2,
+        "symbols": {
+          "N": 1,
+          "O": 1
+        },
+        "hetero_distance_multiset": [
+          1
+        ],
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "oxazole",
+        "size": 5,
+        "double_bonds": 2,
+        "symbols": {
+          "N": 1,
+          "O": 1
+        },
+        "hetero_distance_multiset": [
+          2
+        ],
+        "no_cumulated_double_bonds": true
+      }
+    ]
+  },
+  "retained_fused_polycycle_specs": {
+    "bluebook_rule": "P-25 and retained fused/polycyclic parent names; graph signatures select retained families while locant maps remain graph-derived.",
+    "values": [
+      {
+        "name": "naphthalene",
+        "signature": {
+          "size": 10,
+          "total_bonds": 11,
+          "double_bonds": 5,
+          "degree_counts": {
+            "2": 8,
+            "3": 2
+          }
+        },
+        "symbols": {},
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
+      },
+      {
+        "name": "quinoline",
+        "signature": {
+          "size": 10,
+          "total_bonds": 11,
+          "double_bonds": 5,
+          "degree_counts": {
+            "2": 8,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "N": 1
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
+      },
+      {
+        "name": "isoquinoline",
+        "signature": {
+          "size": 10,
+          "total_bonds": 11,
+          "double_bonds": 5,
+          "degree_counts": {
+            "2": 8,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "N": 1
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
+      },
+      {
+        "name": "quinazoline",
+        "signature": {
+          "size": 10,
+          "total_bonds": 11,
+          "double_bonds": 5,
+          "degree_counts": {
+            "2": 8,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "N": 2
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
+      },
+      {
+        "name": "quinoxaline",
+        "signature": {
+          "size": 10,
+          "total_bonds": 11,
+          "double_bonds": 5,
+          "degree_counts": {
+            "2": 8,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "N": 2
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
+      },
+      {
+        "name": "cinnoline",
+        "signature": {
+          "size": 10,
+          "total_bonds": 11,
+          "double_bonds": 5,
+          "degree_counts": {
+            "2": 8,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "N": 2
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
+      },
+      {
+        "name": "indole",
+        "signature": {
+          "size": 9,
+          "total_bonds": 10,
+          "double_bonds": 4,
+          "degree_counts": {
+            "2": 7,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "N": 1
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      },
+      {
+        "name": "isoindole",
+        "signature": {
+          "size": 9,
+          "total_bonds": 10,
+          "double_bonds": 4,
+          "degree_counts": {
+            "2": 7,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "N": 1
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      },
+      {
+        "name": "benzofuran",
+        "signature": {
+          "size": 9,
+          "total_bonds": 10,
+          "double_bonds": 4,
+          "degree_counts": {
+            "2": 7,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "O": 1
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      },
+      {
+        "name": "benzothiophene",
+        "signature": {
+          "size": 9,
+          "total_bonds": 10,
+          "double_bonds": 4,
+          "degree_counts": {
+            "2": 7,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "S": 1
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      },
+      {
+        "name": "benzothiazole",
+        "signature": {
+          "size": 9,
+          "total_bonds": 10,
+          "double_bonds": 4,
+          "degree_counts": {
+            "2": 7,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "N": 1,
+          "S": 1
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      },
+      {
+        "name": "1,2-benzothiazole",
+        "signature": {
+          "size": 9,
+          "total_bonds": 10,
+          "double_bonds": 4,
+          "degree_counts": {
+            "2": 7,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "N": 1,
+          "S": 1
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      },
+      {
+        "name": "benzoxazole",
+        "signature": {
+          "size": 9,
+          "total_bonds": 10,
+          "double_bonds": 4,
+          "degree_counts": {
+            "2": 7,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "N": 1,
+          "O": 1
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      },
+      {
+        "name": "1,2-benzoxazole",
+        "signature": {
+          "size": 9,
+          "total_bonds": 10,
+          "double_bonds": 4,
+          "degree_counts": {
+            "2": 7,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "N": 1,
+          "O": 1
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      },
+      {
+        "name": "benzimidazole",
+        "signature": {
+          "size": 9,
+          "total_bonds": 10,
+          "double_bonds": 4,
+          "degree_counts": {
+            "2": 7,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "N": 2
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      },
+      {
+        "name": "indazole",
+        "signature": {
+          "size": 9,
+          "total_bonds": 10,
+          "double_bonds": 4,
+          "degree_counts": {
+            "2": 7,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "N": 2
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      },
+      {
+        "name": "indoline",
+        "signature": {
+          "size": 9,
+          "total_bonds": 10,
+          "double_bonds": 3,
+          "degree_counts": {
+            "2": 7,
+            "3": 2
+          }
+        },
+        "symbols": {
+          "N": 1
+        },
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      },
+      {
+        "name": "indane",
+        "signature": {
+          "size": 9,
+          "total_bonds": 10,
+          "double_bonds": 3,
+          "degree_counts": {
+            "2": 7,
+            "3": 2
+          }
+        },
+        "symbols": {},
+        "fused_degree3_edges": 1,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      },
+      {
+        "name": "1,2,3,4-tetrahydronaphthalene",
+        "signature": {
+          "size": 10,
+          "total_bonds": 11,
+          "double_bonds": 4,
+          "degree_counts": {
+            "2": 8,
+            "3": 2
+          }
+        },
+        "symbols": {},
+        "fused_degree3_edges": 1
+      },
+      {
+        "name": "anthracene",
+        "signature": {
+          "size": 14,
+          "total_bonds": 16,
+          "double_bonds": 7,
+          "degree_counts": {
+            "2": 10,
+            "3": 4
+          }
+        },
+        "symbols": {},
+        "deg3_edges": 2
+      },
+      {
+        "name": "phenanthrene",
+        "signature": {
+          "size": 14,
+          "total_bonds": 16,
+          "double_bonds": 7,
+          "degree_counts": {
+            "2": 10,
+            "3": 4
+          }
+        },
+        "symbols": {},
+        "deg3_edges": 3
+      },
+      {
+        "name": "adamantane",
+        "signature": {
+          "size": 10,
+          "total_bonds": 12,
+          "double_bonds": 0,
+          "degree_counts": {
+            "2": 6,
+            "3": 4
+          }
+        },
+        "symbols": {},
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10"
+        ]
+      },
+      {
+        "name": "cubane",
+        "signature": {
+          "size": 8,
+          "total_bonds": 12,
+          "double_bonds": 0,
+          "degree_counts": {
+            "3": 8
+          }
+        },
+        "symbols": {},
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ]
+      },
+      {
+        "name": "gonane",
+        "signature": {
+          "size": 17,
+          "total_bonds": 20,
+          "double_bonds": 0,
+          "degree_counts": {
+            "2": 11,
+            "3": 6
+          }
+        },
+        "symbols": {}
+      },
+      {
+        "name": "pyrene",
+        "signature": {
+          "size": 16,
+          "total_bonds": 19,
+          "double_bonds": 8,
+          "degree_counts": {
+            "2": 10,
+            "3": 6
+          }
+        },
+        "symbols": {}
+      },
+      {
+        "name": "pentacene",
+        "match_by_signature": true,
+        "signature": {
+          "size": 22,
+          "total_bonds": 26,
+          "double_bonds": 11,
+          "degree_counts": {
+            "2": 14,
+            "3": 8
+          }
+        },
+        "deg3_edges": 4,
+        "symbols": {}
+      },
+      {
+        "name": "dibenzo[a,h]anthracene",
+        "match_by_signature": true,
+        "signature": {
+          "size": 22,
+          "total_bonds": 26,
+          "double_bonds": 11,
+          "degree_counts": {
+            "2": 14,
+            "3": 8
+          }
+        },
+        "deg3_edges": 6,
+        "symbols": {}
+      }
+    ]
   }
 }

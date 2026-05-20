@@ -7,6 +7,7 @@ except for descriptor/audit data that can be proven from the graph.
 from dataclasses import dataclass
 
 from .molecule import Molecule
+from .ring_renderer import render_ring_descriptor
 
 
 @dataclass(frozen=True)
@@ -31,7 +32,7 @@ class LinearDispiroProof:
 
     @property
     def descriptor(self) -> str:
-        return "dispiro[" + ".".join(str(number) for number in self.descriptor_numbers) + "]"
+        return render_ring_descriptor("dispiro", self.descriptor_numbers)
 
     @property
     def atom_count(self) -> int:
@@ -47,7 +48,7 @@ class MonospiroProof:
 
     @property
     def descriptor(self) -> str:
-        return f"spiro[{self.descriptor_numbers[0]}.{self.descriptor_numbers[1]}]"
+        return render_ring_descriptor("spiro", self.descriptor_numbers)
 
     @property
     def atom_count(self) -> int:
@@ -63,7 +64,7 @@ class BicycloProof:
 
     @property
     def descriptor(self) -> str:
-        return f"bicyclo[{self.descriptor_numbers[0]}.{self.descriptor_numbers[1]}.{self.descriptor_numbers[2]}]"
+        return render_ring_descriptor("bicyclo", self.descriptor_numbers)
 
     @property
     def atom_count(self) -> int:

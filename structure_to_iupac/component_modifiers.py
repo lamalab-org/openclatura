@@ -39,6 +39,7 @@ def add_component_front_modifiers(
         branch_name = branch_namer(mol, r_group_c, sub_exclude | {single_o}, upstream_atom=single_o)
         if branch_name:
             parts.front_modifiers.append(strip_outer_parentheses(branch_name))
+            parts.front_modifier_atom_ids.update(subgraph_component(mol, r_group_c, sub_exclude | {single_o}))
 
 
 def n_substituent_locant(

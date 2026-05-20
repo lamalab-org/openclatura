@@ -16,6 +16,8 @@ class RetainedNameRules:
     indicated_hydrogen_names: set[str]
     ring_elements: set[str]
     substituent_stems: dict[str, tuple[str, str]]
+    monocycle_specs: tuple[dict, ...]
+    fused_polycycle_specs: tuple[dict, ...]
 
 
 @dataclass(frozen=True)
@@ -25,6 +27,12 @@ class HeteroatomRules:
     simple_selanyl_prefixes: set[str]
     halogen_prefixes: dict[str, str]
     halogen_lambda_suffixes: dict[str, str]
+
+
+@dataclass(frozen=True)
+class RingRules:
+    descriptor_templates: dict[str, str]
+    polycycle_prefixes: dict[int, str]
 
 
 @dataclass(frozen=True)
@@ -51,12 +59,39 @@ class ComponentRules:
     hydrazone_principal_groups: set[str]
     special_names: dict[str, str]
     salt_metal_names: set[str]
+    mononuclear_parent_hydrides: dict[str, str]
+    replacement_parent_oxoacid_specs: tuple[dict, ...]
 
 
 @dataclass(frozen=True)
 class IonRules:
     single_atom_cations: set[str]
     single_atom_anions: dict[str, str]
+
+
+@dataclass(frozen=True)
+class ParentChargeSuffixRule:
+    suffix: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class AnionSuffixPlacementRule:
+    key: str
+    suffix_pattern: str
+    placement: str
+    reason: str
+    atom_symbols: tuple[str, ...] = ("*",)
+
+
+@dataclass(frozen=True)
+class ChargeRules:
+    retained_ionic_n_parents: dict[str, str]
+    saturated_n_ring_ionic_parents: dict[int, str]
+    parent_charge_suffixes: dict[str, ParentChargeSuffixRule]
+    replacement_charge_prefixes: dict[str, str]
+    heteroatom_charge_prefixes: dict[str, str]
+    anion_suffix_placements: tuple[AnionSuffixPlacementRule, ...]
 
 
 @dataclass(frozen=True)
@@ -73,13 +108,23 @@ class AssemblyRules:
 class RegexReplacement:
     pattern: str
     replacement: str
+    category: str = "migration"
+    reason: str = ""
+
+
+@dataclass(frozen=True)
+class LiteralReplacement:
+    pattern: str
+    replacement: str
+    category: str = "migration"
+    reason: str = ""
 
 
 @dataclass(frozen=True)
 class PostprocessRules:
-    literal_replacements: tuple[tuple[str, str], ...]
+    literal_replacements: tuple[LiteralReplacement, ...]
     regex_replacements: tuple[RegexReplacement, ...]
-    exact_replacements: dict[str, str]
+    exact_replacements: tuple[LiteralReplacement, ...]
     acyl_amido_terms: tuple[str, ...]
     n_substituted_functional_suffixes: tuple[str, ...]
 
@@ -148,85 +193,15 @@ class FunctionalGroupRules:
         return {key for key, rule in self.by_key.items() if family in rule.families}
 
 
-PRINCIPAL_FUNCTIONAL_GROUP_ROWS: tuple[dict, ...] = (
-    {"key": "olate", "seniority": 15, "suffix": "olate", "suffix_with_locant": True, "prefix": "oxido", "multi_suffix": "diolate"},
-    {"key": "thiolate", "seniority": 16, "suffix": "thiolate", "suffix_with_locant": True, "prefix": "sulfido", "multi_suffix": "dithiolate"},
-    {"key": "carboxylic_acid", "seniority": 20, "suffix": "oic acid", "suffix_with_locant": False, "prefix": "carboxy", "multi_suffix": "dioic acid"},
-    {"key": "carboxylate", "seniority": 21, "suffix": "oate", "suffix_with_locant": False, "prefix": "carboxylato", "multi_suffix": "dioate"},
-    {"key": "ring_carboxylic_acid", "seniority": 20, "suffix": "carboxylic acid", "suffix_with_locant": True, "prefix": "carboxy", "multi_suffix": "dicarboxylic acid"},
-    {"key": "ring_carboxylate", "seniority": 21, "suffix": "carboxylate", "suffix_with_locant": True, "prefix": "carboxylato", "multi_suffix": "dicarboxylate"},
-    {"key": "peroxy_acid", "seniority": 22, "suffix": "peroxoic acid", "suffix_with_locant": False, "prefix": "carboperoxy", "multi_suffix": "diperoxoic acid"},
-    {"key": "ring_peroxy_acid", "seniority": 22, "suffix": "carboperoxoic acid", "suffix_with_locant": True, "prefix": "carboperoxy", "multi_suffix": "dicarboperoxoic acid"},
-    {"key": "peroxy_ester", "seniority": 45, "suffix": "peroxoate", "suffix_with_locant": False, "prefix": "oxycarbonyl", "multi_suffix": None},
-    {"key": "ring_peroxy_ester", "seniority": 45, "suffix": "carboperoxoate", "suffix_with_locant": True, "prefix": "oxycarbonyl", "multi_suffix": None},
-    {"key": "sulfonic_acid", "seniority": 25, "suffix": "sulfonic acid", "suffix_with_locant": True, "prefix": "sulfo", "multi_suffix": "disulfonic acid"},
-    {"key": "sulfonate", "seniority": 26, "suffix": "sulfonate", "suffix_with_locant": True, "prefix": "sulfonato", "multi_suffix": "disulfonate"},
-    {"key": "anhydride", "seniority": 30, "suffix": "oic anhydride", "suffix_with_locant": False, "prefix": None, "multi_suffix": None},
-    {"key": "ester", "seniority": 40, "suffix": "oate", "suffix_with_locant": False, "prefix": "oxycarbonyl", "multi_suffix": None},
-    {"key": "acid_fluoride", "seniority": 50, "suffix": "oyl fluoride", "suffix_with_locant": False, "prefix": "fluorocarbonyl", "multi_suffix": "dioyl difluoride"},
-    {"key": "acid_chloride", "seniority": 51, "suffix": "oyl chloride", "suffix_with_locant": False, "prefix": "chlorocarbonyl", "multi_suffix": "dioyl dichloride"},
-    {"key": "acid_bromide", "seniority": 52, "suffix": "oyl bromide", "suffix_with_locant": False, "prefix": "bromocarbonyl", "multi_suffix": "dioyl dibromide"},
-    {"key": "acid_iodide", "seniority": 53, "suffix": "oyl iodide", "suffix_with_locant": False, "prefix": "iodocarbonyl", "multi_suffix": "dioyl diiodide"},
-    {"key": "ring_acid_fluoride", "seniority": 50, "suffix": "carbonyl fluoride", "suffix_with_locant": True, "prefix": "fluorocarbonyl", "multi_suffix": "dicarbonyl difluoride"},
-    {"key": "ring_acid_chloride", "seniority": 51, "suffix": "carbonyl chloride", "suffix_with_locant": True, "prefix": "chlorocarbonyl", "multi_suffix": "dicarbonyl dichloride"},
-    {"key": "ring_acid_bromide", "seniority": 52, "suffix": "carbonyl bromide", "suffix_with_locant": True, "prefix": "bromocarbonyl", "multi_suffix": "dicarbonyl dibromide"},
-    {"key": "ring_acid_iodide", "seniority": 53, "suffix": "carbonyl iodide", "suffix_with_locant": True, "prefix": "iodocarbonyl", "multi_suffix": "dicarbonyl diiodide"},
-    {"key": "amide", "seniority": 60, "suffix": "amide", "suffix_with_locant": False, "prefix": "carbamoyl", "multi_suffix": "diamide"},
-    {"key": "ring_amide", "seniority": 60, "suffix": "carboxamide", "suffix_with_locant": True, "prefix": "carbamoyl", "multi_suffix": "dicarboxamide"},
-    {"key": "thioamide", "seniority": 65, "suffix": "thioamide", "suffix_with_locant": False, "prefix": "carbamothioyl", "multi_suffix": "dithioamide"},
-    {"key": "ring_thioamide", "seniority": 65, "suffix": "carbothioamide", "suffix_with_locant": True, "prefix": "carbamothioyl", "multi_suffix": "dicarbothioamide"},
-    {"key": "nitrile", "seniority": 70, "suffix": "nitrile", "suffix_with_locant": False, "prefix": "cyano", "multi_suffix": "dinitrile"},
-    {"key": "ring_nitrile", "seniority": 70, "suffix": "carbonitrile", "suffix_with_locant": True, "prefix": "cyano", "multi_suffix": "dicarbonitrile"},
-    {"key": "aldehyde", "seniority": 80, "suffix": "al", "suffix_with_locant": False, "prefix": "oxo", "multi_suffix": "dial"},
-    {"key": "ring_aldehyde", "seniority": 80, "suffix": "carbaldehyde", "suffix_with_locant": True, "prefix": "formyl", "multi_suffix": "dicarbaldehyde"},
-    {"key": "ketone", "seniority": 90, "suffix": "one", "suffix_with_locant": True, "prefix": "oxo", "multi_suffix": "dione"},
-    {"key": "hydrazone", "seniority": 95, "suffix": "one hydrazone", "suffix_with_locant": True, "prefix": "hydrazono", "multi_suffix": "dione dihydrazone"},
-    {"key": "aldehyde_hydrazone", "seniority": 95, "suffix": "al hydrazone", "suffix_with_locant": False, "prefix": "hydrazono", "multi_suffix": "dial dihydrazone"},
-    {"key": "ring_aldehyde_hydrazone", "seniority": 95, "suffix": "carbaldehyde hydrazone", "suffix_with_locant": True, "prefix": "hydrazonomethyl", "multi_suffix": "dicarbaldehyde dihydrazone"},
-    {"key": "alcohol", "seniority": 100, "suffix": "ol", "suffix_with_locant": True, "prefix": "hydroxy", "multi_suffix": "diol"},
-    {"key": "thiol", "seniority": 105, "suffix": "thiol", "suffix_with_locant": True, "prefix": "sulfanyl", "multi_suffix": "dithiol"},
-    {"key": "amine", "seniority": 110, "suffix": "amine", "suffix_with_locant": True, "prefix": "amino", "multi_suffix": "diamine"},
-    {"key": "aminium", "seniority": 109, "suffix": "aminium", "suffix_with_locant": True, "prefix": "ammonio", "multi_suffix": "diaminium"},
-    {"key": "imine", "seniority": 112, "suffix": "imine", "suffix_with_locant": True, "prefix": "imino", "multi_suffix": "diimine"},
-    {"key": "iminium", "seniority": 111, "suffix": "iminium", "suffix_with_locant": True, "prefix": "iminio", "multi_suffix": "diiminium"},
-    {"key": "hydrazine", "seniority": 115, "suffix": "hydrazine", "suffix_with_locant": True, "prefix": "hydrazinyl", "multi_suffix": "dihydrazine"},
-    {"key": "ether", "seniority": 200, "suffix": "ether", "suffix_with_locant": False, "prefix": "oxy", "multi_suffix": None},
-)
-
-
-PREFIX_FUNCTIONAL_GROUP_ROWS: tuple[dict, ...] = (
-    {"key": "fluoro", "prefix": "fluoro", "needs_locant": True},
-    {"key": "chloro", "prefix": "chloro", "needs_locant": True},
-    {"key": "bromo", "prefix": "bromo", "needs_locant": True},
-    {"key": "iodo", "prefix": "iodo", "needs_locant": True},
-    {"key": "astato", "prefix": "astato", "needs_locant": True},
-    {"key": "nitro", "prefix": "nitro", "needs_locant": True},
-    {"key": "nitroso", "prefix": "nitroso", "needs_locant": True},
-    {"key": "azido", "prefix": "azido", "needs_locant": True},
-    {"key": "diazo", "prefix": "diazo", "needs_locant": True},
-    {"key": "diazonio", "prefix": "diazonio", "needs_locant": True},
-    {"key": "isocyano", "prefix": "isocyano", "needs_locant": True},
-    {"key": "cyanato", "prefix": "cyanato", "needs_locant": True},
-    {"key": "isocyanato", "prefix": "isocyanato", "needs_locant": True},
-    {"key": "thiocyanato", "prefix": "thiocyanato", "needs_locant": True},
-    {"key": "isothiocyanato", "prefix": "isothiocyanato", "needs_locant": True},
-    {"key": "hydroperoxy", "prefix": "hydroperoxy", "needs_locant": True},
-    {"key": "peroxy", "prefix": "peroxy", "needs_locant": True},
-    {"key": "sulfanyl", "prefix": "sulfanyl", "needs_locant": True},
-    {"key": "silyl", "prefix": "silyl", "needs_locant": True},
-    {"key": "phosphanyl", "prefix": "phosphanyl", "needs_locant": True},
-    {"key": "phosphoryl", "prefix": "phosphoryl", "needs_locant": True},
-    {"key": "boryl", "prefix": "boryl", "needs_locant": True},
-)
-
-
 @dataclass(frozen=True)
 class NomenclatureRegistry:
     retained: RetainedNameRules
     heteroatoms: HeteroatomRules
+    rings: RingRules
     prefixes: PrefixRules
     components: ComponentRules
     ions: IonRules
+    charges: ChargeRules
     assembly: AssemblyRules
     functional_groups: FunctionalGroupRules
     postprocess: PostprocessRules
@@ -239,28 +214,6 @@ def _tuple_mapping(section: str) -> dict[str, tuple[str, str]]:
 def _functional_group_rules() -> FunctionalGroupRules:
     groups = {}
 
-    for item in PRINCIPAL_FUNCTIONAL_GROUP_ROWS:
-        key = item["key"]
-        groups[key] = FunctionalGroupRule(
-            key=key,
-            role="principal",
-            prefix=item["prefix"],
-            suffix=item["suffix"],
-            multi_suffix=item["multi_suffix"],
-            seniority=item["seniority"],
-            suffix_with_locant=item["suffix_with_locant"],
-            needs_locant=True,
-            families=_derived_functional_group_families(key),
-        )
-    for item in PREFIX_FUNCTIONAL_GROUP_ROWS:
-        key = item["key"]
-        groups[key] = FunctionalGroupRule(
-            key=key,
-            role="prefix",
-            prefix=item["prefix"],
-            needs_locant=item["needs_locant"],
-            families=_derived_functional_group_families(key),
-        )
     for key, item in mapping("functional_groups").items():
         families = tuple(item.get("families", _derived_functional_group_families(key)))
         groups[key] = FunctionalGroupRule(
@@ -311,14 +264,63 @@ def _derived_functional_group_families(key: str) -> tuple[str, ...]:
 
 def _postprocess_rules() -> PostprocessRules:
     return PostprocessRules(
-        literal_replacements=tuple(tuple(item) for item in values("postprocess_literal_replacements")),
+        literal_replacements=tuple(
+            LiteralReplacement(
+                pattern=item["pattern"],
+                replacement=item["replacement"],
+                category=item["category"],
+                reason=item["reason"],
+            )
+            for item in values("postprocess_literal_replacements")
+        ),
         regex_replacements=tuple(
-            RegexReplacement(pattern=item["pattern"], replacement=item["replacement"])
+            RegexReplacement(
+                pattern=item["pattern"],
+                replacement=item["replacement"],
+                category=item["category"],
+                reason=item["reason"],
+            )
             for item in values("postprocess_regex_replacements")
         ),
-        exact_replacements=mapping("postprocess_exact_replacements"),
+        exact_replacements=tuple(
+            LiteralReplacement(
+                pattern=item["pattern"],
+                replacement=item["replacement"],
+                category=item["category"],
+                reason=item["reason"],
+            )
+            for item in values("postprocess_exact_replacements")
+        ),
         acyl_amido_terms=tuple(values("postprocess_acyl_amido_terms")),
         n_substituted_functional_suffixes=tuple(values("postprocess_n_substituted_functional_suffixes")),
+    )
+
+
+def _charge_rules() -> ChargeRules:
+    return ChargeRules(
+        retained_ionic_n_parents=mapping("retained_ionic_n_parents"),
+        saturated_n_ring_ionic_parents={
+            int(key): value for key, value in mapping("saturated_n_ring_ionic_parents").items()
+        },
+        parent_charge_suffixes={
+            key: ParentChargeSuffixRule(
+                suffix=value["suffix"],
+                reason=value["reason"],
+            )
+            for key, value in mapping("parent_charge_suffixes").items()
+        },
+        replacement_charge_prefixes=mapping("replacement_charge_prefixes"),
+        heteroatom_charge_prefixes=mapping("heteroatom_charge_prefixes"),
+        anion_suffix_placements=tuple(
+            AnionSuffixPlacementRule(
+                key=item["key"],
+                suffix_pattern=item.get("suffix_pattern", ""),
+                placement=item["placement"],
+                reason=item["reason"],
+                atom_symbols=tuple(item.get("atom_symbols", ["*"])),
+            )
+            for item in values("anion_suffix_placements")
+        ),
     )
 
 
@@ -331,6 +333,8 @@ def registry() -> NomenclatureRegistry:
             indicated_hydrogen_names=set(values("indicated_hydrogen_retained_names")),
             ring_elements=set(values("retained_ring_elements")),
             substituent_stems=_tuple_mapping("retained_substituent_stems"),
+            monocycle_specs=tuple(values("retained_monocycle_specs")),
+            fused_polycycle_specs=tuple(values("retained_fused_polycycle_specs")),
         ),
         heteroatoms=HeteroatomRules(
             alkyl_oxy_prefixes=mapping("alkyl_oxy_prefixes"),
@@ -338,6 +342,10 @@ def registry() -> NomenclatureRegistry:
             simple_selanyl_prefixes=set(values("simple_selanyl_prefixes")),
             halogen_prefixes=mapping("halogen_prefixes"),
             halogen_lambda_suffixes=mapping("halogen_lambda_suffixes"),
+        ),
+        rings=RingRules(
+            descriptor_templates=mapping("ring_descriptor_templates"),
+            polycycle_prefixes={int(key): value for key, value in mapping("polycycle_prefixes").items()},
         ),
         prefixes=PrefixRules(
             direct_group_prefixes=mapping("direct_group_prefixes"),
@@ -360,11 +368,14 @@ def registry() -> NomenclatureRegistry:
             hydrazone_principal_groups=set(values("hydrazone_principal_groups")),
             special_names=mapping("special_component_names"),
             salt_metal_names=set(values("salt_metal_names")),
+            mononuclear_parent_hydrides=mapping("mononuclear_parent_hydrides"),
+            replacement_parent_oxoacid_specs=tuple(values("replacement_parent_oxoacid_specs")),
         ),
         ions=IonRules(
             single_atom_cations=set(values("single_atom_cations")),
             single_atom_anions=mapping("single_atom_anions"),
         ),
+        charges=_charge_rules(),
         assembly=AssemblyRules(
             replacement_prefix_order={key: int(value) for key, value in mapping("replacement_prefix_order").items()},
             unsaturation_order={key: int(value) for key, value in mapping("unsaturation_order").items()},

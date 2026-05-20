@@ -9,6 +9,8 @@ from .polycycle_topology import (
     monospiro_proof,
     ring_system_topology,
 )
+from .ring_renderer import render_ring_descriptor, render_von_baeyer_descriptor
+from .ring_parent import RingParent
 
 @dataclass
 class RingSystem:
@@ -22,6 +24,7 @@ class RingSystem:
     paths: list[list[int]] = field(default_factory=list)
     chord_edges: list[tuple[int, int]] = field(default_factory=list)
     polycycle_descriptor: str | None = None
+    ring_parent: RingParent | None = None
 
 def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
     adj = {n: set() for n in comp_nodes}
@@ -245,10 +248,7 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
         # describe the emitted von Baeyer descriptor graph.
         valid_paths = [path1]
         
-    prefixes = {1: "bicyclo", 2: "tricyclo", 3: "tetracyclo", 4: "pentacyclo", 5: "hexacyclo", 6: "heptacyclo", 7: "octacyclo", 8: "nonacyclo", 9: "decacyclo"}
-    prefix = prefixes.get(len(bridges), "polycyclo")
-    
-    return prefix + best_desc, valid_paths
+    return render_von_baeyer_descriptor(len(bridges), best_desc), valid_paths
 
 
 def get_linear_dispiro_descriptor_and_paths(mol: Molecule, comp_nodes, comp_edges):
@@ -312,7 +312,7 @@ def get_linear_dispiro_descriptor_and_paths(mol: Molecule, comp_nodes, comp_edge
         len(second_terminal),
         len(middle_nonzero) if has_direct_middle else len(middle[1]),
     ]
-    descriptor = "dispiro[" + ".".join(str(number) for number in descriptor_numbers) + "]"
+    descriptor = render_ring_descriptor("dispiro", tuple(descriptor_numbers))
 
     first_path = _component_path_between_spiro_neighbors(first_terminal, first_spiro, adj)
     middle_path = _component_path_between_centers(middle_nonzero, first_spiro, second_spiro, adj)
@@ -550,7 +550,18 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                 path.append(next_n)
                 v_set.add(next_n)
                 curr = next_n
-            systems.append(RingSystem(atoms=comp_nodes, paths=[path]))
+            systems.append(
+                RingSystem(
+                    atoms=comp_nodes,
+                    paths=[path],
+                    ring_parent=RingParent.from_paths(
+                        kind="monocycle",
+                        atoms=comp_nodes,
+                        descriptor=None,
+                        paths=[path],
+                    ),
+                )
+            )
 
         elif E == V + 1:
             proof_system = _proven_monospiro_or_bicyclo_system(mol, comp_nodes, comp_edges)
@@ -566,12 +577,38 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
             
             recognized_via_retained = False
             if retained_rules.recognizes_retained_ring(mol, numbered_paths[0]):
-                systems.append(RingSystem(atoms=comp_nodes, is_polycycle=True, paths=[numbered_paths[0]], polycycle_descriptor=descriptor))
+                systems.append(
+                    RingSystem(
+                        atoms=comp_nodes,
+                        is_polycycle=True,
+                        paths=[numbered_paths[0]],
+                        polycycle_descriptor=descriptor,
+                        ring_parent=RingParent.from_paths(
+                            kind="polycycle",
+                            atoms=comp_nodes,
+                            descriptor=descriptor,
+                            paths=[numbered_paths[0]],
+                        ),
+                    )
+                )
                 recognized_via_retained = True
             else:
                 for c in cycles:
                     if len(c) == V and retained_rules.recognizes_retained_ring(mol, c):
-                        systems.append(RingSystem(atoms=comp_nodes, is_polycycle=True, paths=[c], polycycle_descriptor=descriptor))
+                        systems.append(
+                            RingSystem(
+                                atoms=comp_nodes,
+                                is_polycycle=True,
+                                paths=[c],
+                                polycycle_descriptor=descriptor,
+                                ring_parent=RingParent.from_paths(
+                                    kind="polycycle",
+                                    atoms=comp_nodes,
+                                    descriptor=descriptor,
+                                    paths=[c],
+                                ),
+                            )
+                        )
                         recognized_via_retained = True
                         break
                         
@@ -579,10 +616,28 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                 if descriptor:
                     systems.append(RingSystem(
                         atoms=comp_nodes, is_polycycle=True,
-                        paths=numbered_paths, polycycle_descriptor=descriptor
+                        paths=numbered_paths,
+                        polycycle_descriptor=descriptor,
+                        ring_parent=RingParent.from_paths(
+                            kind="polycycle",
+                            atoms=comp_nodes,
+                            descriptor=descriptor,
+                            paths=numbered_paths,
+                        ),
                     ))
                 else:
-                    systems.append(RingSystem(atoms=comp_nodes, paths=[numbered_paths[0]]))
+                    systems.append(
+                        RingSystem(
+                            atoms=comp_nodes,
+                            paths=[numbered_paths[0]],
+                            ring_parent=RingParent.from_paths(
+                                kind="complex_ring",
+                                atoms=comp_nodes,
+                                descriptor=None,
+                                paths=[numbered_paths[0]],
+                            ),
+                        )
+                    )
 
     return merge_polyspiro_ring_systems(mol, systems)
 
@@ -632,6 +687,12 @@ def merge_polyspiro_ring_systems(mol: Molecule, systems: list[RingSystem]) -> li
                 is_polycycle=True,
                 paths=paths,
                 polycycle_descriptor=descriptor,
+                ring_parent=RingParent.from_paths(
+                    kind="dispiro",
+                    atoms=union_atoms,
+                    descriptor=descriptor,
+                    paths=paths,
+                ),
             )
         )
     return result
@@ -643,16 +704,26 @@ def _proven_monospiro_or_bicyclo_system(mol: Molecule, comp_nodes: set[int], com
     topology = ring_system_topology(mol, comp_nodes, comp_edges)
     spiro = monospiro_proof(topology.atoms, topology.edges, degrees=topology.internal_degrees, spiro_atoms=topology.spiro_atoms)
     if spiro is not None and topology.classification == "monospiro":
-        paths = _audited_ring_paths(mol, "spiro", spiro.descriptor_numbers, spiro.numbering_paths, topology.edges)
-        if not paths:
+        numberings = _audited_ring_numberings(mol, "spiro", spiro.descriptor_numbers, spiro.numbering_paths, topology.edges)
+        if not numberings:
             return None
+        paths = _dedupe_numbering_paths([list(numbering.path) for numbering in numberings])
         retained = _first_retained_path(mol, paths, retained_rules)
+        selected_paths = [retained] if retained is not None else paths
         return RingSystem(
             atoms=set(comp_nodes),
             is_spiro=True,
             x=spiro.descriptor_numbers[0],
             y=spiro.descriptor_numbers[1],
-            paths=[retained] if retained is not None else paths,
+            paths=selected_paths,
+            ring_parent=RingParent.from_numberings(
+                kind="spiro",
+                atoms=comp_nodes,
+                descriptor=spiro.descriptor,
+                descriptor_numbers=spiro.descriptor_numbers,
+                numberings=numberings,
+                selected_path=selected_paths[0],
+            ),
         )
 
     bicyclo = bicyclo_proof(
@@ -662,37 +733,66 @@ def _proven_monospiro_or_bicyclo_system(mol: Molecule, comp_nodes: set[int], com
         bridgeheads=topology.bridgeheads,
     )
     if bicyclo is not None and topology.classification == "bicyclic":
-        paths = _audited_ring_paths(mol, "bicyclo", bicyclo.descriptor_numbers, bicyclo.numbering_paths, topology.edges)
-        if not paths:
+        numberings = _audited_ring_numberings(mol, "bicyclo", bicyclo.descriptor_numbers, bicyclo.numbering_paths, topology.edges)
+        if not numberings:
             return None
+        paths = _dedupe_numbering_paths([list(numbering.path) for numbering in numberings])
         legacy = _legacy_monospiro_or_bicyclo_system(
             mol,
             comp_nodes,
             _adjacency_from_edges(comp_nodes, comp_edges),
         )
         legacy_paths = []
+        legacy_numberings = []
         if legacy is not None:
-            legacy_paths = _audited_ring_paths(
+            legacy_numberings = _audited_ring_numberings(
                 mol,
                 "bicyclo",
                 bicyclo.descriptor_numbers,
                 [tuple(path) for path in legacy.paths],
                 topology.edges,
             )
+            legacy_paths = _dedupe_numbering_paths([list(numbering.path) for numbering in legacy_numberings])
         if legacy is not None and not _is_plain_hydrocarbon_ring_system(mol, comp_nodes, comp_edges):
             paths = legacy_paths or paths
+            numberings = legacy_numberings or numberings
         elif legacy is not None:
             paths = _dedupe_numbering_paths(paths + legacy_paths)
+            numberings = _dedupe_ring_numberings(numberings + legacy_numberings)
         retained = _first_retained_path(mol, paths, retained_rules)
+        selected_paths = [retained] if retained is not None else paths
         return RingSystem(
             atoms=set(comp_nodes),
             is_bicycle=True,
             x=bicyclo.descriptor_numbers[0],
             y=bicyclo.descriptor_numbers[1],
             z=bicyclo.descriptor_numbers[2],
-            paths=[retained] if retained is not None else paths,
+            paths=selected_paths,
+            ring_parent=RingParent.from_numberings(
+                kind="bicyclo",
+                atoms=comp_nodes,
+                descriptor=bicyclo.descriptor,
+                descriptor_numbers=bicyclo.descriptor_numbers,
+                numberings=numberings,
+                selected_path=selected_paths[0],
+            ),
         )
     return None
+
+
+def _audited_ring_numberings(
+    mol: Molecule,
+    kind: str,
+    descriptor_numbers: tuple[int, ...],
+    paths: tuple[tuple[int, ...], ...] | list[tuple[int, ...]],
+    edges: frozenset[tuple[int, int]],
+):
+    audited = []
+    for path in paths:
+        numbering = build_ring_numbering(kind, descriptor_numbers, path, edges, mol)
+        if numbering.audit_ok:
+            audited.append(numbering)
+    return _dedupe_ring_numberings(audited)
 
 
 def _audited_ring_paths(
@@ -702,12 +802,20 @@ def _audited_ring_paths(
     paths: tuple[tuple[int, ...], ...] | list[tuple[int, ...]],
     edges: frozenset[tuple[int, int]],
 ) -> list[list[int]]:
-    audited = []
-    for path in paths:
-        numbering = build_ring_numbering(kind, descriptor_numbers, path, edges, mol)
-        if numbering.audit_ok:
-            audited.append(list(numbering.path))
-    return _dedupe_numbering_paths(audited)
+    return _dedupe_numbering_paths(
+        [list(numbering.path) for numbering in _audited_ring_numberings(mol, kind, descriptor_numbers, paths, edges)]
+    )
+
+
+def _dedupe_ring_numberings(numberings):
+    unique = []
+    seen = set()
+    for numbering in numberings:
+        if numbering.path in seen:
+            continue
+        seen.add(numbering.path)
+        unique.append(numbering)
+    return unique
 
 
 def _is_plain_hydrocarbon_ring_system(mol: Molecule, comp_nodes: set[int], comp_edges: set[tuple[int, int]] | frozenset[tuple[int, int]]) -> bool:

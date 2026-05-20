@@ -9,6 +9,7 @@ from .group_atom_roles import amide_nitrogen, ester_or_peroxy_single_oxygen
 from .molecule import Molecule
 from .nomenclature import RULES
 from .perception import PerceivedGroup
+from .subgraph_tools import subgraph_component
 from .trace_helpers import bond_ids_within
 
 BranchNamer = Callable[..., str]
@@ -145,6 +146,15 @@ def collect_component_prefix_substituents(
         name = prefix_from_group(context, group)
         if name:
             trace_atoms = set(group.atoms_involved)
+            for atom_idx in group.atoms_involved:
+                for neighbor in mol.get_neighbors(atom_idx):
+                    if (
+                        neighbor not in group.atom_ids
+                        and neighbor not in main_set
+                        and neighbor not in context.sub_exclude
+                        and mol.atoms[neighbor].symbol != "H"
+                    ):
+                        trace_atoms.update(subgraph_component(mol, neighbor, context.sub_exclude | {atom_idx}))
             trace_bonds = bond_ids_within(mol, trace_atoms | {group.attachment_carbon})
             subst_mapping.setdefault(group.attachment_carbon, []).append(
                 SubstituentItem(name=name, locants=[], atom_ids=trace_atoms, bond_ids=trace_bonds)

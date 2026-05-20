@@ -39,6 +39,18 @@ class ParentChargeItem:
     atom_id: int | None = None
 
 
+@dataclass(frozen=True)
+class NameAtomBinding:
+    """Mapping from one emitted name term/operation to graph atoms and bonds."""
+
+    stage: str
+    role: str
+    term: str
+    atom_ids: set[int] = field(default_factory=set)
+    bond_ids: set[int] = field(default_factory=set)
+    locants: tuple[str, ...] = ()
+
+
 @dataclass
 class AssemblyParts:
     parent_length: int
@@ -56,6 +68,7 @@ class AssemblyParts:
     attachment_locant: int | str = 1
     retained_name: str | None = None
     front_modifiers: list[str] = field(default_factory=list)
+    front_modifier_atom_ids: set[int] = field(default_factory=set)
     a_prefixes: list[SubstituentItem] = field(default_factory=list)
     principal_group: PrincipalGroupItem | None = None
     unsaturations: list[UnsaturationItem] = field(default_factory=list)
@@ -68,3 +81,4 @@ class AssemblyParts:
     parent_atom_symbols_by_locant: dict[str, str] = field(default_factory=dict)
     parent_atom_charges_by_locant: dict[str, int] = field(default_factory=dict)
     parent_bond_orders_by_locants: dict[tuple[str, str], int] = field(default_factory=dict)
+    name_atom_bindings: list[NameAtomBinding] = field(default_factory=list)

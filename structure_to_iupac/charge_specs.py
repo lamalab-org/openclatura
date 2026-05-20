@@ -1,15 +1,7 @@
-"""Data tables for charge-aware parent assembly."""
+"""Compatibility views for charge-aware parent assembly data."""
 
-IONIC_RETAINED_N_PARENTS = {
-    "azetidine": "azetidinium",
-    "aziridine": "aziridinium",
-    "pyrrolidine": "pyrrolidinium",
-    "piperidine": "piperidinium",
-}
+from .nomenclature import RULES
 
-IONIC_SATURATED_N_RING_PARENTS = {
-    3: "aziridinium",
-    4: "azetidinium",
-    5: "pyrrolidinium",
-    6: "piperidinium",
-}
+
+IONIC_RETAINED_N_PARENTS = RULES.charges.retained_ionic_n_parents
+IONIC_SATURATED_N_RING_PARENTS = RULES.charges.saturated_n_ring_ionic_parents

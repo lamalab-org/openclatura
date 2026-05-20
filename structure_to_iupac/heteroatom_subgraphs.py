@@ -19,6 +19,7 @@ from .namer_config import (
     SIMPLE_SELANYL_PREFIXES,
     SIMPLE_SULFANYL_PREFIXES,
 )
+from .nomenclature import RULES
 
 BranchNamer = Callable[[Molecule, int, set[int], int | None], str]
 
@@ -112,10 +113,11 @@ def format_amino_from_branches(
         if is_cation:
             if len(branches) == 1:
                 branch = strip_outer_parentheses(branches[0])
+                iminio = charged_heteroatom_prefix("N", 1, "double") or "iminio"
                 if is_complex_prefix(branch):
-                    return f"(({branch})iminio)"
-                return f"({branch}iminio)"
-            return "iminio"
+                    return f"(({branch}){iminio})"
+                return f"({branch}{iminio})"
+            return charged_heteroatom_prefix("N", 1, "double") or "iminio"
         if len(branches) == 1:
             branch = strip_outer_parentheses(branches[0])
             if is_complex_prefix(branch):
@@ -124,12 +126,16 @@ def format_amino_from_branches(
         return "imino"
 
     if is_cation:
-        return ammonio_prefix([strip_outer_parentheses(branch) for branch in branches])
+        prefix = charged_heteroatom_prefix("N", 1, "single") or "ammonio"
+        if prefix == "ammonio":
+            return ammonio_prefix([strip_outer_parentheses(branch) for branch in branches])
+        return prefix
     if is_anion:
         if not branches:
-            return "azanidyl"
+            return charged_heteroatom_prefix("N", -1, "single") or "azanidyl"
         branch_names = [strip_outer_parentheses(branch) for branch in branches]
-        return f"({format_counted_prefixes(branch_names)}azanidyl)"
+        prefix = charged_heteroatom_prefix("N", -1, "single") or "azanidyl"
+        return f"({format_counted_prefixes(branch_names)}{prefix})"
 
     counts = count_names(branches)
     if len(counts) == 1 and list(counts.values())[0] == 1:
@@ -160,8 +166,16 @@ def format_lambda_substituent(
     stereo_prefix_text: str,
     base_suffix: str,
 ) -> str:
-    valence = sum(mol.get_bond(start_idx, n).order for n in mol.get_neighbors(start_idx))
+    valence = substituent_bonding_number(mol, start_idx)
     return f"({stereo_prefix_text}{format_counted_prefixes(branches)}-lambda^{valence}-{base_suffix})"
+
+
+def substituent_bonding_number(mol: Molecule, atom_idx: int) -> int:
+    """Return sigma/bond-order valence including explicit hydrogens."""
+
+    bond_order_sum = sum(mol.get_bond(atom_idx, n).order for n in mol.get_neighbors(atom_idx))
+    hydrogens = mol.atoms[atom_idx].total_h_count or mol.atoms[atom_idx].explicit_h_count
+    return bond_order_sum + hydrogens
 
 
 def name_oxygen_subgraph(
@@ -178,7 +192,7 @@ def name_oxygen_subgraph(
         if is_double:
             return "oxo"
         if start_atom.charge == -1:
-            return "oxido"
+            return charged_heteroatom_prefix("O", -1, "single") or "oxido"
         return unsubstituted_prefix("O") or "hydroxy"
 
     nxt = next_atoms[0]
@@ -244,9 +258,9 @@ def name_nitrogen_subgraph(
         if is_triple:
             return "nitrilo"
         if is_cation:
-            return "ammonio"
+            return charged_heteroatom_prefix("N", 1, "single") or "ammonio"
         if is_anion:
-            return "azanidyl"
+            return charged_heteroatom_prefix("N", -1, "single") or "azanidyl"
         return unsubstituted_prefix("N") or "amino"
 
     branches = []
@@ -290,6 +304,11 @@ def name_nitrogen_subgraph(
                     branches.append(branch)
 
     return format_amino_from_branches(branches, is_double, is_cation, is_anion)
+
+
+def charged_heteroatom_prefix(symbol: str, charge: int, bond_kind: str) -> str | None:
+    sign = "+" if charge > 0 else "-"
+    return RULES.charges.heteroatom_charge_prefixes.get(f"{symbol}:{sign}:{bond_kind}")
 
 
 def name_sulfur_subgraph(
@@ -374,6 +393,10 @@ def name_chalcogen_subgraph(
         return oxo_prefix if is_double else f"{stereo_prefix_text}{unsubstituted_prefix(mol.atoms[start_idx].symbol) or element_suffix}"
     if len(next_atoms) == 1:
         branch = branch_namer(mol, next_atoms[0], exclude_atoms | {start_idx}, start_idx)
+        if branch and substituent_bonding_number(mol, start_idx) != mol.atoms[start_idx].element.standard_valence:
+            return format_lambda_substituent(
+                mol, start_idx, [branch], stereo_prefix_text, element_suffix + ("idene" if is_double else "")
+            )
         if branch in simple_prefixes:
             return f"({stereo_prefix_text}{branch}{element_suffix})"
         if branch:

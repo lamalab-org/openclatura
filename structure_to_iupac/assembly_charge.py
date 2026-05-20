@@ -4,7 +4,8 @@ from dataclasses import dataclass
 
 from .assembly_parts import AssemblyParts, ParentChargeItem
 from .assembly_utils import parse_locant
-from .charge_specs import IONIC_RETAINED_N_PARENTS, IONIC_SATURATED_N_RING_PARENTS
+from .name_operations import ParentSuffixOperation
+from .nomenclature import RULES
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,7 @@ def positive_parent_n_charges(parts: AssemblyParts) -> list[ParentChargeItem]:
 
 
 def has_ionic_retained_parent(parts: AssemblyParts) -> bool:
-    return bool(parts.retained_name in IONIC_RETAINED_N_PARENTS and positive_parent_n_charges(parts))
+    return bool(parts.retained_name in RULES.charges.retained_ionic_n_parents and positive_parent_n_charges(parts))
 
 
 def has_retained_like_parent(parts: AssemblyParts) -> bool:
@@ -34,7 +35,7 @@ def inferred_ionic_retained_parent(parts: AssemblyParts) -> str | None:
     aza_locs = [str(loc) for item in parts.a_prefixes if item.name == "aza" for loc in item.locants]
     if len(aza_locs) != 1:
         return None
-    return IONIC_SATURATED_N_RING_PARENTS.get(parts.parent_length)
+    return RULES.charges.saturated_n_ring_ionic_parents.get(parts.parent_length)
 
 
 def single_charged_replacement_locants(parts: AssemblyParts) -> set[str]:
@@ -64,14 +65,29 @@ def parent_charge_suffix_locs(parts: AssemblyParts) -> list[str]:
 
 
 def parent_charge_operations(parts: AssemblyParts) -> list[ParentChargeOperation]:
+    return [
+        ParentChargeOperation(
+            locants=operation.locants,
+            suffix=operation.suffix,
+            reason=operation.reason,
+        )
+        for operation in parent_charge_name_operations(parts)
+    ]
+
+
+def parent_charge_name_operations(parts: AssemblyParts) -> list[ParentSuffixOperation]:
     suffix_locs = tuple(parent_charge_suffix_locs(parts))
     if not suffix_locs:
         return []
+    rule = RULES.charges.parent_charge_suffixes["N:+"]
     return [
-        ParentChargeOperation(
+        ParentSuffixOperation(
+            key="parent-n-cation-suffix",
             locants=suffix_locs,
-            suffix="ium",
-            reason="Positive parent nitrogen charges are rendered as parent suffix operations.",
+            suffix=rule.suffix,
+            reason=rule.reason,
+            charge=1,
+            atom_symbols=("N",),
         )
     ]
 

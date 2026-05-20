@@ -14,33 +14,84 @@ class PostprocessingRuleInventoryItem:
     kind: str
     pattern: str
     replacement: str
+    category: str = "migration"
+    reason: str = ""
 
 
 def postprocessing_rule_inventory() -> tuple[PostprocessingRuleInventoryItem, ...]:
     """Return classified compatibility post-processing rules for migration."""
 
     items = []
-    for old, new in RULES.postprocess.literal_replacements:
-        items.append(PostprocessingRuleInventoryItem("compatibility.literal", "literal", old, new))
+    for rule in RULES.postprocess.literal_replacements:
+        items.append(
+            PostprocessingRuleInventoryItem(
+                "compatibility.literal",
+                "literal",
+                rule.pattern,
+                rule.replacement,
+                rule.category,
+                rule.reason,
+            )
+        )
     for rule in RULES.postprocess.regex_replacements:
-        items.append(PostprocessingRuleInventoryItem("compatibility.regex", "regex", rule.pattern, rule.replacement))
-    for old, new in RULES.postprocess.exact_replacements.items():
-        items.append(PostprocessingRuleInventoryItem("compatibility.exact", "exact", old, new))
+        items.append(
+            PostprocessingRuleInventoryItem(
+                "compatibility.regex",
+                "regex",
+                rule.pattern,
+                rule.replacement,
+                rule.category,
+                rule.reason,
+            )
+        )
+    for rule in RULES.postprocess.exact_replacements:
+        items.append(
+            PostprocessingRuleInventoryItem(
+                "compatibility.exact",
+                "exact",
+                rule.pattern,
+                rule.replacement,
+                rule.category,
+                rule.reason,
+            )
+        )
     for term in RULES.postprocess.acyl_amido_terms:
-        items.append(PostprocessingRuleInventoryItem("functional_group.acyl_amido", "term", term, "amido"))
+        items.append(
+            PostprocessingRuleInventoryItem(
+                "functional_group.acyl_amido",
+                "term",
+                term,
+                "amido",
+                "grammar",
+                "Convert acyl-amino constructions to valid amido prefix grammar.",
+            )
+        )
     for suffix in RULES.postprocess.n_substituted_functional_suffixes:
-        items.append(PostprocessingRuleInventoryItem("attachment.n_substituted", "suffix", suffix, "N-qualified"))
+        items.append(
+            PostprocessingRuleInventoryItem(
+                "attachment.n_substituted",
+                "suffix",
+                suffix,
+                "N-qualified",
+                "grammar",
+                "Mark nested substituent attachment as N-substitution for functional prefixes.",
+            )
+        )
     return tuple(items)
 
 
 def apply_data_postprocessing(name: str) -> str:
     """Apply ordered post-processing rules from the nomenclature registry."""
 
-    for old, new in RULES.postprocess.literal_replacements:
-        name = name.replace(old, new)
+    for rule in RULES.postprocess.literal_replacements:
+        name = name.replace(rule.pattern, rule.replacement)
     for rule in RULES.postprocess.regex_replacements:
         name = re.sub(rule.pattern, rule.replacement, name)
-    return RULES.postprocess.exact_replacements.get(name.strip(), name)
+    stripped = name.strip()
+    for rule in RULES.postprocess.exact_replacements:
+        if stripped == rule.pattern:
+            return rule.replacement
+    return name
 
 
 def apply_acyl_amido_postprocessing(name: str) -> str:

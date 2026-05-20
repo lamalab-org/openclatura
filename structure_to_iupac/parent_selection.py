@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from .chains import RingSystem
 from .molecule import Molecule
+from .ring_parent import RingParent
 
 
 @dataclass
@@ -78,6 +79,7 @@ class ParentSelection:
     is_polycycle: bool
     xyz: tuple[int, int, int]
     polycycle_descriptor: str | None = None
+    ring_parent: RingParent | None = None
     fixed_start_required: bool = False
     score_tuple: tuple = ()
 
@@ -110,6 +112,7 @@ class ParentSelection:
             is_polycycle=self.is_polycycle,
             xyz=self.xyz,
             polycycle_descriptor=self.polycycle_descriptor,
+            ring_parent=self.ring_parent,
             fixed_start_required=fixed_start_required,
             score_tuple=self.score_tuple,
         )
@@ -174,6 +177,7 @@ def select_principal_parent(
             is_polycycle=best.is_polycycle,
             xyz=best.xyz,
             polycycle_descriptor=descriptor,
+            ring_parent=winning_rs.ring_parent,
             score_tuple=best.score_tuple,
         )
 

@@ -12,6 +12,8 @@ from .component_group_rules import (
 from .component_modifiers import add_component_front_modifiers, add_component_n_substituents
 from .functional_prefixes import collect_component_prefix_substituents
 from .molecule import DecisionTrace, Molecule, TracePhase
+from .name_bindings import binding_trace_data, refresh_name_atom_bindings
+from .naming_audit import UnnamedAtomError, assert_component_fully_named
 from .naming_context import ComponentNamingState, NamingIntent
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
 from .parent_selection import select_principal_parent
@@ -22,7 +24,7 @@ from .principal_groups import (
     filter_component_groups_to_parent,
     partition_principal_and_prefix_groups,
 )
-from .special_cases import single_atom_component_name, try_name_anhydride_component
+from .special_cases import structural_replacement_parent_name, single_atom_component_name, try_name_anhydride_component
 from .subgraph_tools import (
     add_indicated_hydrogens,
     add_parent_features,
@@ -160,6 +162,20 @@ def name_component(
             return single_atom_name, []
         return single_atom_name
 
+    structural_parent_name = structural_replacement_parent_name(mol, component_atoms)
+    if structural_parent_name:
+        trace_decision(
+            decision_trace,
+            TracePhase.COMPONENT,
+            "named structural replacement parent",
+            "A graph-derived replacement-parent hydride class matched the full component graph.",
+            atoms=component_atoms,
+            data={"name": structural_parent_name},
+        )
+        if return_trace:
+            return structural_parent_name, []
+        return structural_parent_name
+
     def name_component_again(next_mol: Molecule, next_atoms: set[int], is_substituent: bool = False):
         return name_component(
             next_mol,
@@ -221,14 +237,13 @@ def name_component(
         trace_decision(
             decision_trace,
             TracePhase.PARENT_SELECTION,
-            "used methane fallback",
+            "failed parent selection",
             "No supported chain or ring parent was found after exclusions.",
             atoms=state.component_atoms,
             data={"excluded_atoms": sorted(state.exclude_atoms)},
         )
-        if return_trace:
-            return "methane", []
-        return "methane"
+        details = ", ".join(f"{idx}:{mol.atoms[idx].symbol}" for idx in sorted(state.component_atoms))
+        raise UnnamedAtomError(f"No supported parent skeleton for component atoms: {details}")
 
     trace_decision(
         decision_trace,
@@ -293,6 +308,13 @@ def name_component(
         name_subgraph=name_subgraph,
         name_spiro_subgraph=name_spiro_subgraph,
     )
+    if (
+        state.retained_name
+        and state.locant_maps is None
+        and state.parent_selection.is_polycycle
+        and (subst_mapping or state.perceived_groups)
+    ):
+        state.retained_name = None
 
     parent_plan = build_parent_assembly_plan(
         mol,
@@ -347,6 +369,8 @@ def name_component(
     )
     add_component_substituents(parts, subst_mapping, numbered_path, get_loc)
 
+    refresh_name_atom_bindings(parts)
+    assert_component_fully_named(mol, state.component_atoms, parts, "<component>")
     name = assemble_parent_name(mol, parts, numbered_path, get_loc, apply_special_component_names=True)
     trace_decision(
         decision_trace,
@@ -359,6 +383,7 @@ def name_component(
             "principal_key": state.principal_key,
             "substituent_count": len(parts.substituents),
             "unsaturation_count": len(parts.unsaturations),
+            "name_atom_bindings": binding_trace_data(parts.name_atom_bindings),
         },
     )
     if return_trace:

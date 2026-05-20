@@ -173,7 +173,7 @@ def format_replacement_prefixes(parts: AssemblyParts) -> str:
     for item in parts.a_prefixes:
         name = item.name
         if name == "aza" and item.locants and str(item.locants[0]) in charged_replacement_locants:
-            name = "azonia"
+            name = RULES.charges.replacement_charge_prefixes.get("aza:+", name)
         grouped_a.setdefault(name, []).extend(item.locants)
     a_parts = []
     for name in sorted(grouped_a.keys(), key=lambda n: A_PREFIX_ORDER.get(n, 99)):

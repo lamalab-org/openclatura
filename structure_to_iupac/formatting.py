@@ -1,7 +1,7 @@
 """Name-fragment formatting helpers used by the naming pipeline."""
 
 from .namer_config import ALKYL_OXY_PREFIXES
-from .rules import multipliers
+from .rules import multipliers, stems
 
 
 def is_fully_enclosed(s: str) -> bool:
@@ -88,15 +88,9 @@ def substituted_alkoxy_prefix(branch: str) -> str | None:
 
     if "hydroxy" not in branch:
         return None
-    terminal_replacements = {
-        "methyl": "methoxy",
-        "ethyl": "ethoxy",
-        "propyl": "propoxy",
-        "butyl": "butoxy",
-        "pentyl": "pentoxy",
-        "hexyl": "hexoxy",
-    }
-    for terminal, replacement in terminal_replacements.items():
+    for stem in stems.STEMS.values():
+        terminal = f"{stem.stem}yl"
+        replacement = f"{stem.stem}oxy"
         if branch.endswith(terminal):
             prefix = branch[: -len(terminal)]
             return f"({prefix}{replacement})" if prefix else replacement

@@ -10,7 +10,8 @@ from .assembly_charge import (
     positive_parent_n_charges,
 )
 from .assembly_utils import parse_locant
-from .charge_specs import IONIC_RETAINED_N_PARENTS
+from .nomenclature import RULES
+from .ring_renderer import render_ring_descriptor
 from .nomenclature import RULES
 from .retained_specs import retained_parent_spec
 from .rules import bonds, elision, multipliers, stems
@@ -40,7 +41,7 @@ def parent_stem_and_terminal(parts: AssemblyParts) -> tuple[str, str]:
 
     inferred_ionic_parent = inferred_ionic_retained_parent(parts)
     if has_ionic_retained_parent(parts):
-        stem_str = IONIC_RETAINED_N_PARENTS[parts.retained_name]
+        stem_str = RULES.charges.retained_ionic_n_parents[parts.retained_name]
         terminal_e = ""
     elif inferred_ionic_parent:
         stem_str = inferred_ionic_parent
@@ -61,10 +62,10 @@ def parent_stem_and_terminal(parts: AssemblyParts) -> tuple[str, str]:
         stem_str = stems.stem_for(parts.parent_length)
         if parts.is_bicycle:
             x, y, z = parts.bicycle_xyz
-            stem_str = f"bicyclo[{x}.{y}.{z}]" + stem_str
+            stem_str = render_ring_descriptor("bicyclo", (x, y, z)) + stem_str
         elif parts.is_spiro:
             x, y = parts.spiro_xy
-            stem_str = f"spiro[{x}.{y}]" + stem_str
+            stem_str = render_ring_descriptor("spiro", (x, y)) + stem_str
         elif parts.is_polycycle:
             if parts.polycycle_descriptor:
                 stem_str = parts.polycycle_descriptor + stem_str

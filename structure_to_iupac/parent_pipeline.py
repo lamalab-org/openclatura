@@ -20,9 +20,11 @@ def resolve_retained_parent(
     if not temp_retained:
         return None, None
     retained_name, locant_maps = temp_retained
-    if locant_maps is None and (is_bicycle or is_polycycle):
-        return None, None
     if any(mol.atoms[idx].symbol not in RETAINED_RING_ELEMENTS for idx in path):
+        return None, None
+    if locant_maps is None and (is_bicycle or is_polycycle):
+        if all(mol.atoms[idx].symbol == "C" and mol.atoms[idx].charge == 0 for idx in path):
+            return retained_name, None
         return None, None
     return retained_name, locant_maps
 
