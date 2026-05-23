@@ -3,6 +3,7 @@
 from .assembly_parts import AssemblyParts, SubstituentItem
 from .molecule import Molecule
 from .namer_config import INDICATED_H_RETAINED_NAMES
+from .name_operations import HydroOperation
 
 
 def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
@@ -17,7 +18,17 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         if atom.symbol in ["N", "C"]:
             ring_bonds = [mol.get_bond(idx, n) for n in mol.get_neighbors(idx) if n in numbered_path]
             if sum(b.order for b in ring_bonds) == 2:
-                parts.indicated_hydrogens.append(get_loc(idx))
+                locant = str(get_loc(idx))
+                parts.indicated_hydrogens.append(locant)
+                parts.hydro_operations.append(
+                    HydroOperation(
+                        key="indicated_hydrogen",
+                        reason="Retained unsaturated parent requires indicated-hydrogen locant.",
+                        locants=(locant,),
+                        atom_ids=(idx,),
+                        operation_kind="indicated_hydrogen",
+                    )
+                )
 
 
 def add_replacement_prefixes(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:

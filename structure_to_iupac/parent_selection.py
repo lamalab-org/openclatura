@@ -3,7 +3,71 @@ from dataclasses import dataclass
 
 from .chains import RingSystem
 from .molecule import Molecule
+from .naming_data import values
 from .ring_parent import RingParent
+
+
+PARENT_SELECTION_CRITERIA = tuple(values("parent_selection_criteria"))
+ELEMENT_SENIORITY = {"N": 1, "P": 2, "Si": 3, "B": 4, "O": 5, "S": 6, "C": 7}
+HETEROATOM_SENIORITY = {"N": 1, "O": 2, "S": 3, "P": 4, "Si": 5, "B": 6}
+
+
+@dataclass(frozen=True)
+class ParentSeniorityProfile:
+    """Named parent-selection criteria for one candidate skeleton."""
+
+    principal_group_count: int
+    contains_principal_group: bool
+    senior_element_vector: tuple[int, ...]
+    polycycle_parent: bool
+    bicycle_parent: bool
+    spiro_parent: bool
+    ring_parent: bool
+    ring_count: int
+    parent_atom_count: int
+    heteroatom_count: int
+    senior_heteroatom_vector: tuple[int, ...]
+    multiple_bond_count: int
+    double_bond_count: int
+    path_tiebreak: tuple[int, ...]
+
+    def criterion_value(self, criterion: str):
+        """Return the sortable value for one configured criterion."""
+
+        if criterion == "principal_group_count":
+            return -self.principal_group_count
+        if criterion == "contains_principal_group":
+            return -int(self.contains_principal_group)
+        if criterion == "senior_element_vector":
+            return self.senior_element_vector
+        if criterion == "polycycle_parent":
+            return -int(self.polycycle_parent)
+        if criterion == "bicycle_parent":
+            return -int(self.bicycle_parent)
+        if criterion == "spiro_parent":
+            return -int(self.spiro_parent)
+        if criterion == "ring_parent":
+            return -int(self.ring_parent)
+        if criterion == "ring_count":
+            return -self.ring_count
+        if criterion == "parent_atom_count":
+            return -self.parent_atom_count
+        if criterion == "heteroatom_count":
+            return -self.heteroatom_count
+        if criterion == "senior_heteroatom_vector":
+            return self.senior_heteroatom_vector
+        if criterion == "multiple_bond_count":
+            return -self.multiple_bond_count
+        if criterion == "double_bond_count":
+            return -self.double_bond_count
+        if criterion == "path_tiebreak":
+            return self.path_tiebreak
+        raise KeyError(f"Unknown parent selection criterion: {criterion}")
+
+    def score_tuple(self, criteria: tuple[str, ...] = PARENT_SELECTION_CRITERIA) -> tuple:
+        """Return the current sortable score tuple from configured criteria."""
+
+        return tuple(self.criterion_value(criterion) for criterion in criteria)
 
 
 @dataclass
@@ -18,6 +82,7 @@ class ParentCandidate:
     xyz: tuple[int, int, int]
     principal_groups_count: int
     length: int
+    seniority_profile: ParentSeniorityProfile
     score_tuple: tuple
 
     @classmethod
@@ -31,18 +96,28 @@ class ParentCandidate:
         is_polycycle: bool,
         xyz: tuple[int, int, int],
         principal_groups_count: int,
+        mol: Molecule | None = None,
+        ring_count: int = 0,
     ) -> "ParentCandidate":
         """Build a candidate using the current parent-selection preference order."""
 
-        score_tuple = (
-            -principal_groups_count,
-            -int(is_polycycle),
-            -int(is_bicycle),
-            -int(is_spiro),
-            -int(is_ring),
-            -len(path),
-            tuple(path),
+        profile = ParentSeniorityProfile(
+            principal_group_count=principal_groups_count,
+            contains_principal_group=principal_groups_count > 0,
+            senior_element_vector=_senior_element_vector(mol, path, include_carbon=True),
+            polycycle_parent=is_polycycle,
+            bicycle_parent=is_bicycle,
+            spiro_parent=is_spiro,
+            ring_parent=is_ring,
+            ring_count=ring_count,
+            parent_atom_count=len(path),
+            heteroatom_count=_heteroatom_count(mol, path),
+            senior_heteroatom_vector=_senior_element_vector(mol, path, include_carbon=False),
+            multiple_bond_count=_multiple_bond_count(mol, path, include_double=True),
+            double_bond_count=_multiple_bond_count(mol, path, include_double=False),
+            path_tiebreak=tuple(path),
         )
+        score_tuple = profile.score_tuple()
         return cls(
             path=path,
             is_ring=is_ring,
@@ -52,6 +127,7 @@ class ParentCandidate:
             xyz=xyz,
             principal_groups_count=principal_groups_count,
             length=len(path),
+            seniority_profile=profile,
             score_tuple=score_tuple,
         )
 
@@ -81,6 +157,7 @@ class ParentSelection:
     polycycle_descriptor: str | None = None
     ring_parent: RingParent | None = None
     fixed_start_required: bool = False
+    seniority_profile: ParentSeniorityProfile | None = None
     score_tuple: tuple = ()
 
     @property
@@ -114,6 +191,7 @@ class ParentSelection:
             polycycle_descriptor=self.polycycle_descriptor,
             ring_parent=self.ring_parent,
             fixed_start_required=fixed_start_required,
+            seniority_profile=self.seniority_profile,
             score_tuple=self.score_tuple,
         )
 
@@ -140,6 +218,8 @@ def select_principal_parent(
                 is_polycycle=False,
                 xyz=(0, 0, 0),
                 principal_groups_count=pg_count,
+                mol=mol,
+                ring_count=0,
             )
         )
 
@@ -157,6 +237,8 @@ def select_principal_parent(
                 is_polycycle=rs.is_polycycle,
                 xyz=xyz,
                 principal_groups_count=pg_count,
+                mol=mol,
+                ring_count=_ring_count_for_system(rs),
             )
         )
 
@@ -178,6 +260,7 @@ def select_principal_parent(
             xyz=best.xyz,
             polycycle_descriptor=descriptor,
             ring_parent=winning_rs.ring_parent,
+            seniority_profile=best.seniority_profile,
             score_tuple=best.score_tuple,
         )
 
@@ -188,5 +271,54 @@ def select_principal_parent(
         is_spiro=False,
         is_polycycle=False,
         xyz=(0, 0, 0),
+        seniority_profile=best.seniority_profile,
         score_tuple=best.score_tuple,
     )
+
+
+def _senior_element_vector(mol: Molecule | None, path: list[int], *, include_carbon: bool) -> tuple[int, ...]:
+    if mol is None:
+        return ()
+    ranks = []
+    for atom_idx in path:
+        symbol = mol.atoms[atom_idx].symbol
+        if include_carbon:
+            rank = ELEMENT_SENIORITY.get(symbol)
+        else:
+            rank = HETEROATOM_SENIORITY.get(symbol)
+        if rank is not None:
+            ranks.append(rank)
+    return tuple(sorted(ranks))
+
+
+def _heteroatom_count(mol: Molecule | None, path: list[int]) -> int:
+    if mol is None:
+        return 0
+    return sum(1 for atom_idx in path if mol.atoms[atom_idx].symbol != "C")
+
+
+def _multiple_bond_count(mol: Molecule | None, path: list[int], *, include_double: bool) -> int:
+    if mol is None:
+        return 0
+    path_set = set(path)
+    count = 0
+    for atom_idx in path:
+        for neighbor in mol.get_neighbors(atom_idx):
+            if neighbor not in path_set or atom_idx >= neighbor:
+                continue
+            bond = mol.get_bond(atom_idx, neighbor)
+            if bond is None:
+                continue
+            if include_double and bond.order > 1:
+                count += 1
+            elif not include_double and bond.order == 2:
+                count += 1
+    return count
+
+
+def _ring_count_for_system(ring_system: RingSystem) -> int:
+    if ring_system.is_polycycle:
+        return max(3, len(ring_system.chord_edges) + 1)
+    if ring_system.is_bicycle or ring_system.is_spiro:
+        return 2
+    return 1

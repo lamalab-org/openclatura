@@ -1,5 +1,7 @@
 """Name-fragment formatting helpers used by the naming pipeline."""
 
+import re
+
 from .namer_config import ALKYL_OXY_PREFIXES
 from .rules import multipliers, stems
 
@@ -105,3 +107,10 @@ def format_element_substituent(stereo_prefix: str, branch: str, suffix: str, is_
     if is_complex_prefix(branch):
         return f"({stereo_prefix}({branch}){suffix_text})"
     return f"({stereo_prefix}{branch}{suffix_text})"
+
+
+def ensure_stereo_descriptor_boundary(name: str) -> str:
+    """Ensure stereodescriptor groups are separated from following name stems."""
+
+    descriptor = r"\((?:\d+[A-Za-z]*[RS]|[EZ])(?:,(?:\d+[A-Za-z]*[RS]|[EZ]))*\)"
+    return re.sub(rf"({descriptor})(?=[A-Za-z])", r"\1-", name)

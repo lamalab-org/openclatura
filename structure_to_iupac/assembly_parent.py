@@ -6,19 +6,19 @@ from .assembly_charge import (
     has_ionic_retained_parent,
     has_retained_like_parent,
     inferred_ionic_retained_parent,
-    parent_charge_operations,
+    parent_charge_name_operations,
     positive_parent_n_charges,
 )
 from .assembly_utils import parse_locant
 from .nomenclature import RULES
+from .principal_suffixes import render_principal_suffix
 from .ring_renderer import render_ring_descriptor
-from .nomenclature import RULES
 from .retained_specs import retained_parent_spec
-from .rules import bonds, elision, multipliers, stems
+from .rules import bonds, elision, stems
+from .suffix_stack import suffix_operation_spelling
 
 
 UNSATURATION_ORDER = RULES.assembly.unsaturation_order
-ACID_HALIDE_SUFFIX_KEYS = RULES.assembly.acid_halide_suffix_keys
 AMBIGUOUS_CONNECTION_SUBSTITUENT_STEMS = RULES.assembly.ambiguous_connection_substituent_stems
 
 
@@ -184,20 +184,7 @@ def format_principal_suffix(parts: AssemblyParts, terminal_e: str, spiro_subs) -
         ):
             omit_locant = True
 
-    if group.key in ACID_HALIDE_SUFFIX_KEYS:
-        if len(locs) > 1:
-            parts_suffix = group.suffix.split()
-            suffix_text = (
-                multipliers.basic(len(locs))
-                + parts_suffix[0]
-                + " "
-                + multipliers.basic(len(locs))
-                + parts_suffix[1]
-            )
-        else:
-            suffix_text = group.suffix
-    else:
-        suffix_text = multipliers.basic(len(locs)) + group.suffix if len(locs) > 1 else group.suffix
+    suffix_text = render_principal_suffix(group, len(locs))
 
     if elision.is_vowel_start(suffix_text):
         terminal_e = ""
@@ -214,10 +201,10 @@ def format_parent_tail(parts: AssemblyParts, stem_str: str, terminal_e: str, spi
         else:
             stem_str, unsat_str = format_unsaturations(parts, stem_str)
     terminal_e, suffix_str = format_principal_suffix(parts, terminal_e, spiro_subs)
-    charge_operations = parent_charge_operations(parts)
+    charge_operations = parent_charge_name_operations(parts)
     if charge_operations:
         terminal_e = ""
         suffix_str = "".join(
-            f"-{','.join(operation.locants)}-{operation.suffix}" for operation in charge_operations
+            f"-{','.join(operation.locants)}-{suffix_operation_spelling(operation)}" for operation in charge_operations
         ) + suffix_str
     return stem_str, unsat_str, terminal_e, suffix_str

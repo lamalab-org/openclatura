@@ -15,6 +15,7 @@ from .assembly_parent import (
     parent_stem_and_terminal,
     promote_benzene_retained_name,
 )
+from .formatting import ensure_stereo_descriptor_boundary
 from .name_postprocessing import (
     apply_acyl_amido_postprocessing,
     apply_connection_boundary_postprocessing,
@@ -26,6 +27,7 @@ from .rules import multipliers
 
 def _post_process_name(name: str) -> str:
     name = apply_data_postprocessing(name)
+    name = ensure_stereo_descriptor_boundary(name)
     name = re.sub(r"(?<![a-zA-Z0-9])1-azacyclopent-2-ene(?![a-zA-Z])", "4,5-dihydro-1H-pyrrole", name)
     name = re.sub(r"(?<![a-zA-Z0-9])1-azacyclopent-3-ene(?![a-zA-Z])", "2,5-dihydro-1H-pyrrole", name)
     name = re.sub(
@@ -257,11 +259,17 @@ def _post_process_name(name: str) -> str:
 
 
 def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
-    if not parts.indicated_hydrogens:
+    indicated_hydrogens = [
+        locant
+        for operation in parts.hydro_operations
+        if operation.operation_kind == "indicated_hydrogen"
+        for locant in operation.locants
+    ] or parts.indicated_hydrogens
+    if not indicated_hydrogens:
         return core_name
     if positive_parent_n_charges(parts):
         return core_name
-    ih_str = ",".join(sorted(parts.indicated_hydrogens, key=parse_locant)) + "H-"
+    ih_str = ",".join(sorted(indicated_hydrogens, key=parse_locant)) + "H-"
     return ih_str + core_name
 
 

@@ -5,6 +5,7 @@ import re
 
 from .name_operations import ParentSuffixOperation
 from .nomenclature import RULES
+from .rules import multipliers
 
 
 @dataclass
@@ -164,7 +165,16 @@ def explicit_implicit_cation_locant(stem: str) -> str:
 def _operation_text(operation: ParentSuffixOperation) -> str:
     if not operation.locants or not operation.suffix:
         return ""
-    return f"-{','.join(operation.locants)}-{operation.suffix}"
+    return f"-{','.join(operation.locants)}-{suffix_operation_spelling(operation)}"
+
+
+def suffix_operation_spelling(operation: ParentSuffixOperation) -> str:
+    """Return the suffix spelling, including multiplicative prefixes."""
+
+    count = len(operation.locants)
+    if count <= 1:
+        return operation.suffix
+    return f"{multipliers.basic(count)}{operation.suffix}"
 
 
 IMPLICIT_RETAINED_CATION_STEMS = {

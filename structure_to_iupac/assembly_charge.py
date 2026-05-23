@@ -6,6 +6,7 @@ from .assembly_parts import AssemblyParts, ParentChargeItem
 from .assembly_utils import parse_locant
 from .name_operations import ParentSuffixOperation
 from .nomenclature import RULES
+from .suffix_stack import suffix_operation_spelling
 
 
 @dataclass(frozen=True)
@@ -93,7 +94,9 @@ def parent_charge_name_operations(parts: AssemblyParts) -> list[ParentSuffixOper
 
 
 def append_charge_suffixes_to_terminal(parts: AssemblyParts, terminal_e: str) -> str:
-    operations = parent_charge_operations(parts)
+    operations = parent_charge_name_operations(parts)
     if not operations:
         return terminal_e
-    return "".join(f"-{','.join(operation.locants)}-{operation.suffix}" for operation in operations) + terminal_e
+    return "".join(
+        f"-{','.join(operation.locants)}-{suffix_operation_spelling(operation)}" for operation in operations
+    ) + terminal_e

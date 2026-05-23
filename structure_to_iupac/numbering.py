@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from .locants import get_atom_locants, get_bond_locants, parse_locant
 from .molecule import Molecule
 from .namer_config import INDICATED_H_RETAINED_NAMES
+from .naming_data import mapping
+
+
+NUMBERING_CRITERIA = mapping("numbering_criteria")
 
 
 @dataclass(frozen=True)
@@ -27,27 +31,31 @@ class NumberingPreference:
     substituent_citation: tuple[int, ...]
     stereochemistry: tuple[int, ...]
 
+    def criterion_value(self, criterion: str) -> tuple:
+        if criterion == "principal":
+            return self.principal
+        if criterion == "hetero_by_priority":
+            return self.hetero_by_priority
+        if criterion == "indicated_hydrogen":
+            return self.indicated_hydrogen
+        if criterion == "unsaturation":
+            return self.unsaturation
+        if criterion == "substituent_and_unsaturation":
+            return self.substituent_and_unsaturation
+        if criterion == "substituent_citation":
+            return self.substituent_citation
+        if criterion == "stereochemistry":
+            return self.stereochemistry
+        raise KeyError(f"Unknown numbering criterion: {criterion}")
+
+    def ordered_key(self, criteria: list[str]) -> tuple:
+        return tuple(self.criterion_value(criterion) for criterion in criteria)
+
     def chain_key(self) -> tuple:
-        return (
-            self.principal,
-            *self.hetero_by_priority,
-            self.indicated_hydrogen,
-            self.unsaturation,
-            self.substituent_and_unsaturation,
-            self.substituent_citation,
-            self.stereochemistry,
-        )
+        return self.ordered_key(NUMBERING_CRITERIA["chain"])
 
     def ring_key(self) -> tuple:
-        return (
-            *self.hetero_by_priority,
-            self.indicated_hydrogen,
-            self.principal,
-            self.unsaturation,
-            self.substituent_and_unsaturation,
-            self.substituent_citation,
-            self.stereochemistry,
-        )
+        return self.ordered_key(NUMBERING_CRITERIA["ring"])
 
 
 def polycycle_numbering_key(

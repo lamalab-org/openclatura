@@ -6,6 +6,7 @@ from .assembly_parts import AssemblyParts, SubstituentItem
 from .formatting import strip_outer_parentheses
 from .molecule import DecisionTrace, Molecule, TracePhase
 from .nomenclature import RULES
+from .principal_suffixes import principal_suffix_terms
 from .perception import PerceivedGroup
 from .rules import bonds, multipliers, stems
 
@@ -230,9 +231,7 @@ def assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
 
     if parts.principal_group:
         group = RULES.functional_groups.get(parts.principal_group.key)
-        terms = [group.suffix]
-        if group.multi_suffix:
-            terms.insert(0, group.multi_suffix)
+        terms = list(principal_suffix_terms(group, (1, 2, 3)))
         if group.prefix:
             terms.append(group.prefix)
         segments.append(

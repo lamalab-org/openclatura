@@ -9,6 +9,7 @@ import re
 from dataclasses import dataclass
 from typing import Callable
 
+from .formatting import format_counted_prefixes
 from .molecule import Molecule
 from .name_operations import ParentSuffixOperation
 from .nomenclature import RULES
@@ -61,24 +62,9 @@ def ammonio_prefix(branches: list[str]) -> str:
 
     if not branches:
         return "ammonio"
-    counts: dict[str, int] = {}
-    order: list[str] = []
-    for branch in branches:
-        if branch not in counts:
-            order.append(branch)
-        counts[branch] = counts.get(branch, 0) + 1
-    parts = []
-    for branch in order:
-        count = counts[branch]
-        if count == 1:
-            parts.append(branch)
-        elif count == 2:
-            parts.append(f"di{branch}")
-        elif count == 3:
-            parts.append(f"tri{branch}")
-        else:
-            parts.append(f"{count}{branch}")
-    return f"({''.join(parts)}ammonio)"
+    if any(re.match(r"^[A-Z][a-z]?-", branch) for branch in branches):
+        return f"({''.join(branches)}ammonio)"
+    return f"({format_counted_prefixes(branches)}ammonio)"
 
 
 def apply_parent_charge_names(
@@ -609,9 +595,9 @@ def normalize_cationic_methylideneammonio_substituents(name: str) -> str:
     """
 
     pattern = re.compile(
-        r"\(\((?P<left>[A-Za-z0-9,\-\[\]\^\{\}']+)\)"
+        r"\(\(\((?P<left>[A-Za-z0-9,\-\[\]\^\{\}']+)\)"
         r"\((?P<right>[A-Za-z0-9,\-\[\]\^\{\}']+)\)"
-        r"methylideneammonio\)"
+        r"methylidene\)ammonio\)"
     )
     return pattern.sub(
         lambda match: f"(N-(({match.group('left')})({match.group('right')})methylidene)ammonio)",

@@ -1,4 +1,58 @@
 {
+  "parent_selection_criteria": {
+    "bluebook_rule": "Brief Guide sections 3 and 6; active criteria preserve the current generator behavior while exposing named extension points for the full parent-seniority hierarchy.",
+    "values": [
+      "principal_group_count",
+      "polycycle_parent",
+      "bicycle_parent",
+      "spiro_parent",
+      "ring_parent",
+      "parent_atom_count",
+      "path_tiebreak"
+    ]
+  },
+  "parent_seniority_criteria_available": {
+    "bluebook_rule": "Brief Guide section 6; supported parent-seniority profile fields. The active subset is selected by parent_selection_criteria.",
+    "values": [
+      "contains_principal_group",
+      "principal_group_count",
+      "senior_element_vector",
+      "ring_parent",
+      "ring_count",
+      "parent_atom_count",
+      "heteroatom_count",
+      "senior_heteroatom_vector",
+      "multiple_bond_count",
+      "double_bond_count",
+      "polycycle_parent",
+      "bicycle_parent",
+      "spiro_parent",
+      "path_tiebreak"
+    ]
+  },
+  "numbering_criteria": {
+    "bluebook_rule": "Brief Guide section 7; active parent-numbering criteria by parent class.",
+    "values": {
+      "chain": [
+        "principal",
+        "hetero_by_priority",
+        "indicated_hydrogen",
+        "unsaturation",
+        "substituent_and_unsaturation",
+        "substituent_citation",
+        "stereochemistry"
+      ],
+      "ring": [
+        "hetero_by_priority",
+        "indicated_hydrogen",
+        "principal",
+        "unsaturation",
+        "substituent_and_unsaturation",
+        "substituent_citation",
+        "stereochemistry"
+      ]
+    }
+  },
   "indicated_hydrogen_retained_names": {
     "bluebook_rule": "P-14.7, P-22.2, P-25; retained heterocycle names and indicated hydrogen locants",
     "values": [
@@ -55,10 +109,119 @@
   "replacement_parent_oxoacid_specs": {
     "bluebook_rule": "P-13 replacement nomenclature; functional parent hydrides described by central atom and ligand counts",
     "values": [
-      {"name": "phosphoric acid", "central": "P", "single_o": 3, "double_o": 1},
-      {"name": "sulfuric acid", "central": "S", "single_o": 2, "double_o": 2},
-      {"name": "nitric acid", "central": "N", "single_o": 2, "double_o": 1, "charge": 1},
-      {"name": "hypobromous acid", "central": "Br", "single_o": 1, "double_o": 0}
+      {
+        "name": "phosphoric acid",
+        "ester_suffix": "phosphate",
+        "central": "P",
+        "single_o": 3,
+        "double_o": 1
+      },
+      {
+        "name": "sulfuric acid",
+        "ester_suffix": "sulfate",
+        "central": "S",
+        "single_o": 2,
+        "double_o": 2
+      },
+      {
+        "name": "nitric acid",
+        "ester_suffix": "nitrate",
+        "central": "N",
+        "single_o": 2,
+        "double_o": 1,
+        "charge": 1
+      },
+      {
+        "name": "hypofluorous acid",
+        "ester_suffix": "hypofluorite",
+        "central": "F",
+        "single_o": 1,
+        "double_o": 0
+      },
+      {
+        "name": "hypochlorous acid",
+        "ester_suffix": "hypochlorite",
+        "central": "Cl",
+        "single_o": 1,
+        "double_o": 0
+      },
+      {
+        "name": "chlorous acid",
+        "ester_suffix": "chlorite",
+        "central": "Cl",
+        "single_o": 1,
+        "double_o": 1
+      },
+      {
+        "name": "chloric acid",
+        "ester_suffix": "chlorate",
+        "central": "Cl",
+        "single_o": 1,
+        "double_o": 2
+      },
+      {
+        "name": "perchloric acid",
+        "ester_suffix": "perchlorate",
+        "central": "Cl",
+        "single_o": 1,
+        "double_o": 3
+      },
+      {
+        "name": "hypobromous acid",
+        "ester_suffix": "hypobromite",
+        "central": "Br",
+        "single_o": 1,
+        "double_o": 0
+      },
+      {
+        "name": "bromous acid",
+        "ester_suffix": "bromite",
+        "central": "Br",
+        "single_o": 1,
+        "double_o": 1
+      },
+      {
+        "name": "bromic acid",
+        "ester_suffix": "bromate",
+        "central": "Br",
+        "single_o": 1,
+        "double_o": 2
+      },
+      {
+        "name": "perbromic acid",
+        "ester_suffix": "perbromate",
+        "central": "Br",
+        "single_o": 1,
+        "double_o": 3
+      },
+      {
+        "name": "hypoiodous acid",
+        "ester_suffix": "hypoiodite",
+        "central": "I",
+        "single_o": 1,
+        "double_o": 0
+      },
+      {
+        "name": "iodous acid",
+        "ester_suffix": "iodite",
+        "central": "I",
+        "single_o": 1,
+        "double_o": 1
+      },
+      {
+        "name": "iodic acid",
+        "ester_suffix": "iodate",
+        "central": "I",
+        "single_o": 1,
+        "double_o": 2
+      },
+      {
+        "name": "periodic acid",
+        "ester_suffix": "periodate",
+        "central": "I",
+        "single_o": 1,
+        "double_o": 3
+      }
     ]
   },
   "retained_ionic_n_parents": {
@@ -477,7 +640,11 @@
         "role": "principal",
         "prefix": "oxido",
         "suffix": "olate",
-        "multi_suffix": "diolate",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 15,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -486,7 +653,11 @@
         "role": "principal",
         "prefix": "sulfido",
         "suffix": "thiolate",
-        "multi_suffix": "dithiolate",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 16,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -495,7 +666,11 @@
         "role": "principal",
         "prefix": "carboxy",
         "suffix": "oic acid",
-        "multi_suffix": "dioic acid",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 20,
         "suffix_with_locant": false,
         "needs_locant": true
@@ -504,7 +679,11 @@
         "role": "principal",
         "prefix": "carboxylato",
         "suffix": "oate",
-        "multi_suffix": "dioate",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 21,
         "suffix_with_locant": false,
         "needs_locant": true
@@ -513,7 +692,11 @@
         "role": "principal",
         "prefix": "carboxy",
         "suffix": "carboxylic acid",
-        "multi_suffix": "dicarboxylic acid",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 20,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -522,7 +705,11 @@
         "role": "principal",
         "prefix": "carboxylato",
         "suffix": "carboxylate",
-        "multi_suffix": "dicarboxylate",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 21,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -531,7 +718,11 @@
         "role": "principal",
         "prefix": "carboperoxy",
         "suffix": "peroxoic acid",
-        "multi_suffix": "diperoxoic acid",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 22,
         "suffix_with_locant": false,
         "needs_locant": true
@@ -540,7 +731,11 @@
         "role": "principal",
         "prefix": "carboperoxy",
         "suffix": "carboperoxoic acid",
-        "multi_suffix": "dicarboperoxoic acid",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 22,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -567,7 +762,11 @@
         "role": "principal",
         "prefix": "sulfo",
         "suffix": "sulfonic acid",
-        "multi_suffix": "disulfonic acid",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 25,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -576,7 +775,11 @@
         "role": "principal",
         "prefix": "sulfonato",
         "suffix": "sulfonate",
-        "multi_suffix": "disulfonate",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 26,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -603,7 +806,12 @@
         "role": "principal",
         "prefix": "fluorocarbonyl",
         "suffix": "oyl fluoride",
-        "multi_suffix": "dioyl difluoride",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0,
+            1
+          ]
+        },
         "seniority": 50,
         "suffix_with_locant": false,
         "needs_locant": true
@@ -612,7 +820,12 @@
         "role": "principal",
         "prefix": "chlorocarbonyl",
         "suffix": "oyl chloride",
-        "multi_suffix": "dioyl dichloride",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0,
+            1
+          ]
+        },
         "seniority": 51,
         "suffix_with_locant": false,
         "needs_locant": true
@@ -621,7 +834,12 @@
         "role": "principal",
         "prefix": "bromocarbonyl",
         "suffix": "oyl bromide",
-        "multi_suffix": "dioyl dibromide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0,
+            1
+          ]
+        },
         "seniority": 52,
         "suffix_with_locant": false,
         "needs_locant": true
@@ -630,7 +848,12 @@
         "role": "principal",
         "prefix": "iodocarbonyl",
         "suffix": "oyl iodide",
-        "multi_suffix": "dioyl diiodide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0,
+            1
+          ]
+        },
         "seniority": 53,
         "suffix_with_locant": false,
         "needs_locant": true
@@ -639,7 +862,12 @@
         "role": "principal",
         "prefix": "fluorocarbonyl",
         "suffix": "carbonyl fluoride",
-        "multi_suffix": "dicarbonyl difluoride",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0,
+            1
+          ]
+        },
         "seniority": 50,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -648,7 +876,12 @@
         "role": "principal",
         "prefix": "chlorocarbonyl",
         "suffix": "carbonyl chloride",
-        "multi_suffix": "dicarbonyl dichloride",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0,
+            1
+          ]
+        },
         "seniority": 51,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -657,7 +890,12 @@
         "role": "principal",
         "prefix": "bromocarbonyl",
         "suffix": "carbonyl bromide",
-        "multi_suffix": "dicarbonyl dibromide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0,
+            1
+          ]
+        },
         "seniority": 52,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -666,7 +904,12 @@
         "role": "principal",
         "prefix": "iodocarbonyl",
         "suffix": "carbonyl iodide",
-        "multi_suffix": "dicarbonyl diiodide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0,
+            1
+          ]
+        },
         "seniority": 53,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -675,7 +918,11 @@
         "role": "principal",
         "prefix": "carbamoyl",
         "suffix": "amide",
-        "multi_suffix": "diamide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 60,
         "suffix_with_locant": false,
         "needs_locant": true
@@ -684,7 +931,11 @@
         "role": "principal",
         "prefix": "carbamoyl",
         "suffix": "carboxamide",
-        "multi_suffix": "dicarboxamide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 60,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -693,7 +944,11 @@
         "role": "principal",
         "prefix": "carbamothioyl",
         "suffix": "thioamide",
-        "multi_suffix": "dithioamide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 65,
         "suffix_with_locant": false,
         "needs_locant": true
@@ -702,7 +957,11 @@
         "role": "principal",
         "prefix": "carbamothioyl",
         "suffix": "carbothioamide",
-        "multi_suffix": "dicarbothioamide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 65,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -711,7 +970,11 @@
         "role": "principal",
         "prefix": "cyano",
         "suffix": "nitrile",
-        "multi_suffix": "dinitrile",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 70,
         "suffix_with_locant": false,
         "needs_locant": true
@@ -720,7 +983,11 @@
         "role": "principal",
         "prefix": "cyano",
         "suffix": "carbonitrile",
-        "multi_suffix": "dicarbonitrile",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 70,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -729,7 +996,11 @@
         "role": "principal",
         "prefix": "oxo",
         "suffix": "al",
-        "multi_suffix": "dial",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 80,
         "suffix_with_locant": false,
         "needs_locant": true
@@ -738,7 +1009,11 @@
         "role": "principal",
         "prefix": "formyl",
         "suffix": "carbaldehyde",
-        "multi_suffix": "dicarbaldehyde",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 80,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -747,7 +1022,11 @@
         "role": "principal",
         "prefix": "oxo",
         "suffix": "one",
-        "multi_suffix": "dione",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 90,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -756,7 +1035,12 @@
         "role": "principal",
         "prefix": "hydrazono",
         "suffix": "one hydrazone",
-        "multi_suffix": "dione dihydrazone",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0,
+            1
+          ]
+        },
         "seniority": 95,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -765,7 +1049,12 @@
         "role": "principal",
         "prefix": "hydrazono",
         "suffix": "al hydrazone",
-        "multi_suffix": "dial dihydrazone",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0,
+            1
+          ]
+        },
         "seniority": 95,
         "suffix_with_locant": false,
         "needs_locant": true
@@ -774,7 +1063,12 @@
         "role": "principal",
         "prefix": "hydrazonomethyl",
         "suffix": "carbaldehyde hydrazone",
-        "multi_suffix": "dicarbaldehyde dihydrazone",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0,
+            1
+          ]
+        },
         "seniority": 95,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -783,7 +1077,11 @@
         "role": "principal",
         "prefix": "hydroxy",
         "suffix": "ol",
-        "multi_suffix": "diol",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 100,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -792,7 +1090,11 @@
         "role": "principal",
         "prefix": "sulfanyl",
         "suffix": "thiol",
-        "multi_suffix": "dithiol",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 105,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -801,7 +1103,11 @@
         "role": "principal",
         "prefix": "amino",
         "suffix": "amine",
-        "multi_suffix": "diamine",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 110,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -810,7 +1116,11 @@
         "role": "principal",
         "prefix": "ammonio",
         "suffix": "aminium",
-        "multi_suffix": "diaminium",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 109,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -819,7 +1129,11 @@
         "role": "principal",
         "prefix": "imino",
         "suffix": "imine",
-        "multi_suffix": "diimine",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 112,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -828,7 +1142,11 @@
         "role": "principal",
         "prefix": "iminio",
         "suffix": "iminium",
-        "multi_suffix": "diiminium",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 111,
         "suffix_with_locant": true,
         "needs_locant": true
@@ -837,7 +1155,11 @@
         "role": "principal",
         "prefix": "hydrazinyl",
         "suffix": "hydrazine",
-        "multi_suffix": "dihydrazine",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
         "seniority": 115,
         "suffix_with_locant": true,
         "needs_locant": true

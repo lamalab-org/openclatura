@@ -104,6 +104,7 @@ def build_parent_parts(
     )
     for atom_idx in numbered_path:
         locant = str(get_loc(atom_idx))
+        parts.parent_atom_ids_by_locant[locant] = atom_idx
         parts.parent_atom_symbols_by_locant[locant] = mol.atoms[atom_idx].symbol
         parts.parent_atom_charges_by_locant[locant] = mol.atoms[atom_idx].charge
         if mol.atoms[atom_idx].stereo:

@@ -12,6 +12,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from .rule_layout import RuleGroupView, rule_groups
+
 
 DATA_DIR = Path(__file__).with_name("data")
 
@@ -36,6 +38,13 @@ def namer_rules() -> dict[str, Any]:
     """
 
     return load_json_table("namer_rules.json")
+
+
+@lru_cache(maxsize=1)
+def grouped_namer_rules() -> dict[str, RuleGroupView]:
+    """Return ``namer_rules.json`` as named domain groups."""
+
+    return rule_groups(namer_rules())
 
 
 def values(section: str) -> list[Any]:

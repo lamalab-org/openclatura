@@ -53,6 +53,7 @@ def metadata_for_group(key: str) -> FunctionalGroupMetadata:
         prefix=rule.prefix,
         suffix=rule.suffix,
         multi_suffix=rule.multi_suffix,
+        suffix_multiplier_positions=rule.suffix_multiplier_positions,
         seniority=rule.seniority,
         suffix_with_locant=rule.suffix_with_locant,
         source="nomenclature.functional_groups",

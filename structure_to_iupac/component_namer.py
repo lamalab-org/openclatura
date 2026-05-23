@@ -24,6 +24,7 @@ from .principal_groups import (
     filter_component_groups_to_parent,
     partition_principal_and_prefix_groups,
 )
+from .stereo_audit import audit_stereochemistry
 from .special_cases import structural_replacement_parent_name, single_atom_component_name, try_name_anhydride_component
 from .subgraph_tools import (
     add_indicated_hydrogens,
@@ -162,7 +163,17 @@ def name_component(
             return single_atom_name, []
         return single_atom_name
 
-    structural_parent_name = structural_replacement_parent_name(mol, component_atoms)
+    def name_component_again(next_mol: Molecule, next_atoms: set[int], is_substituent: bool = False):
+        return name_component(
+            next_mol,
+            next_atoms,
+            is_substituent=is_substituent,
+            name_subgraph=name_subgraph,
+            name_spiro_subgraph=name_spiro_subgraph,
+            assemble_parent_name=assemble_parent_name,
+        )
+
+    structural_parent_name = structural_replacement_parent_name(mol, component_atoms, name_subgraph)
     if structural_parent_name:
         trace_decision(
             decision_trace,
@@ -175,16 +186,6 @@ def name_component(
         if return_trace:
             return structural_parent_name, []
         return structural_parent_name
-
-    def name_component_again(next_mol: Molecule, next_atoms: set[int], is_substituent: bool = False):
-        return name_component(
-            next_mol,
-            next_atoms,
-            is_substituent=is_substituent,
-            name_subgraph=name_subgraph,
-            name_spiro_subgraph=name_spiro_subgraph,
-            assemble_parent_name=assemble_parent_name,
-        )
 
     state = ComponentNamingState(component_atoms=set(component_atoms), is_substituent=is_substituent)
     state.perceived_groups = component_groups(mol, state.component_atoms)
@@ -370,6 +371,7 @@ def name_component(
     add_component_substituents(parts, subst_mapping, numbered_path, get_loc)
 
     refresh_name_atom_bindings(parts)
+    parts.stereo_audit_issues = list(audit_stereochemistry(mol, parts).issues)
     assert_component_fully_named(mol, state.component_atoms, parts, "<component>")
     name = assemble_parent_name(mol, parts, numbered_path, get_loc, apply_special_component_names=True)
     trace_decision(
@@ -383,6 +385,7 @@ def name_component(
             "principal_key": state.principal_key,
             "substituent_count": len(parts.substituents),
             "unsaturation_count": len(parts.unsaturations),
+            "stereo_audit_issues": parts.stereo_audit_issues,
             "name_atom_bindings": binding_trace_data(parts.name_atom_bindings),
         },
     )

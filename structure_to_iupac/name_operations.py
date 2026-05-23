@@ -56,3 +56,12 @@ class IndicatedHydrogenOperation(NameOperation):
     """An indicated-hydrogen operation tied to parent locants."""
 
     locants: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class HydroOperation(NameOperation):
+    """An additive hydrogen operation tied to parent locants."""
+
+    locants: tuple[str, ...] = ()
+    atom_ids: tuple[int, ...] = ()
+    operation_kind: str = "indicated_hydrogen"

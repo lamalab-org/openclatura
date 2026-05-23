@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 
+from .name_operations import HydroOperation
 from .spiro_assembly import SpiroAssembly
 
 
@@ -75,10 +76,13 @@ class AssemblyParts:
     substituents: list[SubstituentItem] = field(default_factory=list)
     stereo_features: list[tuple[str, str]] = field(default_factory=list)
     indicated_hydrogens: list[str] = field(default_factory=list)
+    hydro_operations: list[HydroOperation] = field(default_factory=list)
     parent_charges: list[ParentChargeItem] = field(default_factory=list)
     parent_atom_ids: set[int] = field(default_factory=set)
     parent_bond_ids: set[int] = field(default_factory=set)
+    parent_atom_ids_by_locant: dict[str, int] = field(default_factory=dict)
     parent_atom_symbols_by_locant: dict[str, str] = field(default_factory=dict)
     parent_atom_charges_by_locant: dict[str, int] = field(default_factory=dict)
     parent_bond_orders_by_locants: dict[tuple[str, str], int] = field(default_factory=dict)
     name_atom_bindings: list[NameAtomBinding] = field(default_factory=list)
+    stereo_audit_issues: list[str] = field(default_factory=list)

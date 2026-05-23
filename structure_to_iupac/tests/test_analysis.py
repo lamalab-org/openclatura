@@ -3,9 +3,10 @@ import pytest
 from structure_to_iupac import NamingEngine, NamingIntent, OperationClass, RULES, TracePhase, analyze_smiles, name_smiles
 from structure_to_iupac.assembler import AssemblyParts, ParentChargeItem, SubstituentItem, UnsaturationItem, assemble_name, post_process_name
 from structure_to_iupac.assembly_charge import parent_charge_operations
-from structure_to_iupac.assembly_spiro import extract_spiro_side_prefixes, format_spiro_core, split_spiro_substituents
+from structure_to_iupac.assembly_spiro import _spiro_side_locant, extract_spiro_side_prefixes, format_spiro_core, split_spiro_substituents
 from structure_to_iupac.chains import find_all_carbon_paths, find_ring_systems
 from structure_to_iupac.functional_groups import PERCEPTION_DETECTORS, PERCEPTION_SPECS, PerceptionDetectorSpec, register_group_detector, register_perception_spec
+from structure_to_iupac.formatting import ensure_stereo_descriptor_boundary
 from structure_to_iupac.ionic_naming import (
     apply_ring_parent_nitrogen_zwitterion_stack,
     apply_parent_charge_names,
@@ -16,9 +17,15 @@ from structure_to_iupac.ionic_naming import (
 )
 from structure_to_iupac.locants import as_display_locant, coerce_display_numbering, locant_text, parse_locant
 from structure_to_iupac.name_postprocessing import apply_connection_boundary_postprocessing, postprocessing_rule_inventory
-from structure_to_iupac.namer import name_component, read_smiles
-from structure_to_iupac.numbering import polycycle_numbering_key
-from structure_to_iupac.parent_selection import ParentCandidate, ParentSelection, select_principal_parent
+from structure_to_iupac.namer import _spiro_subgraph_assembly, name_component, read_smiles
+from structure_to_iupac.numbering import NUMBERING_CRITERIA, NumberingPreference, polycycle_numbering_key
+from structure_to_iupac.parent_selection import (
+    PARENT_SELECTION_CRITERIA,
+    ParentCandidate,
+    ParentSelection,
+    ParentSeniorityProfile,
+    select_principal_parent,
+)
 from structure_to_iupac.parent_pipeline import build_parent_assembly_plan
 from structure_to_iupac.perception import PerceivedGroup, perceive_groups
 from structure_to_iupac.polycycle_topology import (
@@ -28,6 +35,7 @@ from structure_to_iupac.polycycle_topology import (
     monospiro_proof,
     ring_system_topology,
 )
+from structure_to_iupac.principal_suffixes import render_principal_suffix
 from structure_to_iupac.retained_specs import retained_parent_spec
 from structure_to_iupac.rules.retained import get_retained_ring
 from structure_to_iupac.ring_systems import ring_system_fragment
@@ -35,13 +43,16 @@ from structure_to_iupac.ring_renderer import render_ring_descriptor, render_von_
 from structure_to_iupac.spiro_assembly import SpiroAssembly
 from structure_to_iupac.special_cases import _alkyl_ligand_name, structural_replacement_parent_name
 from structure_to_iupac.heteroatom_substituent_specs import ligand_prefix, unsubstituted_prefix
-from structure_to_iupac.name_operations import ParentSuffixOperation
+from structure_to_iupac.name_operations import HydroOperation, ParentSuffixOperation
 from structure_to_iupac.name_bindings import postprocess_name_atom_bindings
 from structure_to_iupac.naming_audit import UnnamedAtomError, assert_component_fully_named
 from structure_to_iupac.naming_data import namer_rules
+from structure_to_iupac.rule_layout import rule_group_specs, rule_groups, section_group_map, unassigned_sections
 from structure_to_iupac.suffix_stack import SuffixStack
 from structure_to_iupac.molecule import Molecule
 from structure_to_iupac.assembly_parts import NameAtomBinding
+from structure_to_iupac.stereo_audit import audit_stereochemistry
+from structure_to_iupac.additive import add_indicated_hydrogens
 
 
 def test_name_smiles_stays_plain_fast_api():
@@ -89,12 +100,30 @@ def test_postprocessing_updates_binding_terms():
     assert processed[0].atom_ids == {0, 1, 2}
 
 
+def test_stereo_descriptor_boundary_is_inserted_before_substituent_stems():
+    assert ensure_stereo_descriptor_boundary("((1R,2R)cyclopropan-2-yl)") == "((1R,2R)-cyclopropan-2-yl)"
+    assert ensure_stereo_descriptor_boundary("(1R)-cyclohexyl") == "(1R)-cyclohexyl"
+
+
 def test_charge_vocabulary_is_registry_backed():
     assert RULES.charges.retained_ionic_n_parents["pyrrolidine"] == "pyrrolidinium"
     assert RULES.charges.saturated_n_ring_ionic_parents[5] == "pyrrolidinium"
     assert RULES.charges.parent_charge_suffixes["N:+"].suffix == "ium"
     assert RULES.charges.replacement_charge_prefixes["aza:+"] == "azonia"
     assert RULES.charges.heteroatom_charge_prefixes["N:+:double"] == "iminio"
+
+
+def test_namer_rule_sections_are_grouped_by_domain():
+    rules = namer_rules()
+    groups = rule_groups(rules)
+    section_to_group = section_group_map()
+
+    assert not unassigned_sections(rules)
+    assert set(section_to_group) == set(rules)
+    assert len(section_to_group) == sum(len(spec.sections) for spec in rule_group_specs())
+    assert groups["charges"].mapping("parent_charge_suffixes")["N:+"]["suffix"] == "ium"
+    assert "functional_groups" in groups["functional_groups"].spec.sections
+    assert "postprocess_literal_replacements" in groups["postprocessing"].spec.sections
 
 
 def test_replacement_parents_are_graph_class_backed():
@@ -105,6 +134,155 @@ def test_replacement_parents_are_graph_class_backed():
 
     oxoacid = read_smiles("OP(=O)(O)O")
     assert structural_replacement_parent_name(oxoacid, set(oxoacid.atoms)) == "phosphoric acid"
+
+
+def test_halogen_oxoacid_replacement_parents_are_data_backed():
+    cases = {
+        ("F", 1, 0): "hypofluorous acid",
+        ("Cl", 1, 0): "hypochlorous acid",
+        ("Cl", 1, 1): "chlorous acid",
+        ("Cl", 1, 2): "chloric acid",
+        ("Cl", 1, 3): "perchloric acid",
+        ("Br", 1, 0): "hypobromous acid",
+        ("Br", 1, 1): "bromous acid",
+        ("Br", 1, 2): "bromic acid",
+        ("Br", 1, 3): "perbromic acid",
+        ("I", 1, 0): "hypoiodous acid",
+        ("I", 1, 1): "iodous acid",
+        ("I", 1, 2): "iodic acid",
+        ("I", 1, 3): "periodic acid",
+    }
+
+    for (central_symbol, single_o, double_o), expected in cases.items():
+        mol = _oxoacid_graph(central_symbol, single_o, double_o)
+        assert structural_replacement_parent_name(mol, set(mol.atoms)) == expected
+
+
+def test_oxoacid_alkyl_esters_are_data_backed():
+    cases = {
+        ("Cl", 1, 0, 1, 0): "methyl hypochlorite",
+        ("Cl", 1, 1, 1, 0): "methyl chlorite",
+        ("Cl", 1, 2, 1, 0): "methyl chlorate",
+        ("Cl", 1, 3, 1, 0): "methyl perchlorate",
+        ("Br", 1, 2, 1, 0): "methyl bromate",
+        ("Br", 1, 2, 2, 0): "ethyl bromate",
+        ("Br", 1, 2, 3, 0): "propyl bromate",
+        ("I", 1, 2, 1, 0): "methyl iodate",
+        ("P", 3, 1, 1, 0): "methyl phosphate",
+        ("S", 2, 2, 2, 0): "ethyl sulfate",
+        ("N", 2, 1, 1, 1): "methyl nitrate",
+    }
+
+    for (central_symbol, single_o, double_o, carbon_count, central_charge), expected in cases.items():
+        mol = _oxoacid_ester_graph(central_symbol, single_o, double_o, carbon_count, central_charge)
+        assert structural_replacement_parent_name(mol, set(mol.atoms)) == expected
+
+
+def test_charge_normalized_halogen_oxoacid_esters_match_acid_ester_specs():
+    acid = _halogen_oxoacid_graph("Br", single_o=1, charged_oxo_o=2, central_charge=2)
+    ester = _halogen_oxoacid_ester_graph("Br", charged_oxo_o=2, carbon_count=1, central_charge=2)
+
+    assert structural_replacement_parent_name(acid, set(acid.atoms)) == "bromic acid"
+    assert structural_replacement_parent_name(ester, set(ester.atoms)) == "methyl bromate"
+
+
+def test_oxoacid_esters_use_recursive_front_modifier_namer():
+    ester = _halogen_oxoacid_ester_graph("Br", charged_oxo_o=2, carbon_count=1, central_charge=2)
+    calls = []
+
+    def branch_namer(mol: Molecule, start_idx: int, exclude_atoms: set[int], upstream_atom: int | None = None):
+        calls.append((start_idx, exclude_atoms, upstream_atom))
+        return "(custom modifier)"
+
+    assert structural_replacement_parent_name(ester, set(ester.atoms), branch_namer) == "custom modifier bromate"
+    assert calls == [(2, {0, 1, 3, 4}, 1)]
+
+
+def _oxoacid_graph(central_symbol: str, single_o: int, double_o: int) -> Molecule:
+    mol = Molecule()
+    mol.add_atom(symbol=central_symbol, idx=0)
+    next_idx = 1
+    for _ in range(single_o):
+        mol.add_atom(symbol="O", idx=next_idx)
+        mol.add_bond(0, next_idx, order=1)
+        next_idx += 1
+    for _ in range(double_o):
+        mol.add_atom(symbol="O", idx=next_idx)
+        mol.add_bond(0, next_idx, order=2)
+        next_idx += 1
+    return mol
+
+
+def _halogen_oxoacid_graph(central_symbol: str, single_o: int, charged_oxo_o: int, central_charge: int) -> Molecule:
+    mol = Molecule()
+    mol.add_atom(symbol=central_symbol, idx=0, charge=central_charge)
+    next_idx = 1
+    for _ in range(single_o):
+        mol.add_atom(symbol="O", idx=next_idx)
+        mol.add_bond(0, next_idx, order=1)
+        next_idx += 1
+    for _ in range(charged_oxo_o):
+        mol.add_atom(symbol="O", idx=next_idx, charge=-1)
+        mol.add_bond(0, next_idx, order=1)
+        next_idx += 1
+    return mol
+
+
+def _oxoacid_ester_graph(
+    central_symbol: str,
+    single_o: int,
+    double_o: int,
+    carbon_count: int,
+    central_charge: int = 0,
+) -> Molecule:
+    mol = Molecule()
+    mol.add_atom(symbol=central_symbol, idx=0, charge=central_charge)
+    mol.add_atom(symbol="O", idx=1)
+    mol.add_bond(0, 1, order=1)
+    mol.add_atom(symbol="C", idx=2)
+    mol.add_bond(1, 2, order=1)
+    next_idx = 3
+    previous_carbon = 2
+    for _ in range(carbon_count - 1):
+        mol.add_atom(symbol="C", idx=next_idx)
+        mol.add_bond(previous_carbon, next_idx, order=1)
+        previous_carbon = next_idx
+        next_idx += 1
+    for _ in range(single_o - 1):
+        mol.add_atom(symbol="O", idx=next_idx)
+        mol.add_bond(0, next_idx, order=1)
+        next_idx += 1
+    for _ in range(double_o):
+        mol.add_atom(symbol="O", idx=next_idx)
+        mol.add_bond(0, next_idx, order=2)
+        next_idx += 1
+    return mol
+
+
+def _halogen_oxoacid_ester_graph(
+    central_symbol: str,
+    charged_oxo_o: int,
+    carbon_count: int,
+    central_charge: int,
+) -> Molecule:
+    mol = Molecule()
+    mol.add_atom(symbol=central_symbol, idx=0, charge=central_charge)
+    mol.add_atom(symbol="O", idx=1)
+    mol.add_bond(0, 1, order=1)
+    mol.add_atom(symbol="C", idx=2)
+    mol.add_bond(1, 2, order=1)
+    next_idx = 3
+    previous_carbon = 2
+    for _ in range(carbon_count - 1):
+        mol.add_atom(symbol="C", idx=next_idx)
+        mol.add_bond(previous_carbon, next_idx, order=1)
+        previous_carbon = next_idx
+        next_idx += 1
+    for _ in range(charged_oxo_o):
+        mol.add_atom(symbol="O", idx=next_idx, charge=-1)
+        mol.add_bond(0, next_idx, order=1)
+        next_idx += 1
+    return mol
 
 
 def test_ring_descriptor_rendering_is_registry_backed():
@@ -226,6 +404,40 @@ def test_legacy_suffix_and_substituent_modules_are_registry_views():
 
     assert suffixes.get("carboxylic_acid").suffix == RULES.functional_groups.get("carboxylic_acid").suffix
     assert substituents.get("nitro").prefix == RULES.functional_groups.get("nitro").prefix
+    assert suffixes.get("acid_chloride").render_suffix(3) == "trioyl trichloride"
+
+
+def test_principal_suffixes_render_programmatically_from_template_positions():
+    acid = RULES.functional_groups.get("carboxylic_acid")
+    acid_chloride = RULES.functional_groups.get("acid_chloride")
+    hydrazone = RULES.functional_groups.get("hydrazone")
+
+    assert acid.multi_suffix is not None
+    assert acid.multi_suffix.multiplier_positions == (0,)
+    assert acid.suffix_multiplier_positions == (0,)
+    assert render_principal_suffix(acid, 1) == "oic acid"
+    assert render_principal_suffix(acid, 2) == "dioic acid"
+    assert render_principal_suffix(acid, 3) == "trioic acid"
+
+    assert acid_chloride.multi_suffix is not None
+    assert acid_chloride.multi_suffix.multiplier_positions == (0, 1)
+    assert acid_chloride.suffix_multiplier_positions == (0, 1)
+    assert render_principal_suffix(acid_chloride, 2) == "dioyl dichloride"
+    assert render_principal_suffix(acid_chloride, 3) == "trioyl trichloride"
+
+    assert hydrazone.suffix_multiplier_positions == (0, 1)
+    assert render_principal_suffix(hydrazone, 2) == "dione dihydrazone"
+    assert render_principal_suffix(hydrazone, 3) == "trione trihydrazone"
+
+
+def test_builtin_multi_suffix_rows_are_templates_not_fixed_names():
+    groups = namer_rules()["functional_groups"]["values"]
+    multi_suffix_rows = [item["multi_suffix"] for item in groups.values() if item.get("multi_suffix") is not None]
+
+    assert multi_suffix_rows
+    assert all(isinstance(row, dict) for row in multi_suffix_rows)
+    assert all("multiplier_positions" in row for row in multi_suffix_rows)
+    assert not any(isinstance(row, str) and row.startswith("di") for row in multi_suffix_rows)
 
 
 def test_perception_specs_can_extend_group_detection():
@@ -274,6 +486,17 @@ def test_structural_spiro_substituent_bypasses_marker_text():
 
     assert spiro_subs == [SpiroAssembly("1", "2", "aziridine", ("3'-methyl",))]
     assert parts.substituents == []
+
+
+def test_spiro_side_retained_ionic_ring_locants_are_registry_derived():
+    assert extract_spiro_side_prefixes("1-((4-chlorophenyl)methyl)piperidinium") == (
+        ["1'-((4-chlorophenyl)methyl)"],
+        "piperidin-1-ium",
+        (),
+    )
+    assert _spiro_side_locant(SpiroAssembly("3", "1", "piperidin-1-ium")) == "4"
+    assert _spiro_side_locant(SpiroAssembly("3", "1", "pyrrolidin-1-ium")) == "3"
+    assert _spiro_side_locant(SpiroAssembly("3", "1", "azetidin-1-ium")) == "3"
 
 
 def test_charge_and_postprocessing_rules_are_inventory_backed():
@@ -371,7 +594,133 @@ def test_parent_selection_has_named_shape():
     assert selection.atom_set == {0, 1}
     assert selection.is_ring is False
     assert selection.polycycle_descriptor is None
+    assert isinstance(selection.seniority_profile, ParentSeniorityProfile)
+    assert selection.seniority_profile.principal_group_count == 1
+    assert selection.seniority_profile.parent_atom_count == 2
     assert selection.score_tuple
+
+
+def test_parent_selection_criteria_are_data_ordered_and_behavior_preserving():
+    profile = ParentSeniorityProfile(
+        principal_group_count=1,
+        contains_principal_group=True,
+        senior_element_vector=(7, 7),
+        polycycle_parent=False,
+        bicycle_parent=False,
+        spiro_parent=False,
+        ring_parent=False,
+        ring_count=0,
+        parent_atom_count=2,
+        heteroatom_count=0,
+        senior_heteroatom_vector=(),
+        multiple_bond_count=0,
+        double_bond_count=0,
+        path_tiebreak=(0, 1),
+    )
+
+    assert PARENT_SELECTION_CRITERIA == (
+        "principal_group_count",
+        "polycycle_parent",
+        "bicycle_parent",
+        "spiro_parent",
+        "ring_parent",
+        "parent_atom_count",
+        "path_tiebreak",
+    )
+    assert profile.score_tuple() == (-1, 0, 0, 0, 0, -2, (0, 1))
+
+
+def test_parent_seniority_profile_exposes_brief_guide_extension_fields():
+    mol = read_smiles("NCCO")
+    candidate = ParentCandidate.build(
+        [0, 1, 2, 3],
+        is_ring=False,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+    )
+
+    profile = candidate.seniority_profile
+    assert profile.senior_element_vector == (1, 5, 7, 7)
+    assert profile.heteroatom_count == 2
+    assert profile.senior_heteroatom_vector == (1, 2)
+
+
+def test_numbering_preference_uses_data_ordered_criteria():
+    preference = NumberingPreference(
+        principal=(2,),
+        hetero_by_priority=((1,),),
+        indicated_hydrogen=(),
+        unsaturation=(3,),
+        substituent_and_unsaturation=(3, 4),
+        substituent_citation=(4,),
+        stereochemistry=(),
+    )
+
+    assert NUMBERING_CRITERIA["ring"][0] == "hetero_by_priority"
+    assert preference.ring_key()[0] == ((1,),)
+    assert NUMBERING_CRITERIA["chain"][0] == "principal"
+    assert preference.chain_key()[0] == (2,)
+
+
+def test_indicated_hydrogen_is_carried_as_hydro_operation():
+    mol = read_smiles("C1=NN=NN1")
+    parts = AssemblyParts(parent_length=5, is_ring=True, retained_name="tetrazole")
+    numbered_path = [0, 1, 2, 3, 4]
+
+    add_indicated_hydrogens(mol, parts, numbered_path, lambda atom_idx: str(numbered_path.index(atom_idx) + 1))
+
+    assert parts.indicated_hydrogens == ["5"]
+    assert parts.hydro_operations == [
+        HydroOperation(
+            key="indicated_hydrogen",
+            reason="Retained unsaturated parent requires indicated-hydrogen locant.",
+            locants=("5",),
+            atom_ids=(4,),
+            operation_kind="indicated_hydrogen",
+        )
+    ]
+
+
+def test_stereochemistry_audit_checks_emitted_locants_against_graph_metadata():
+    mol = read_smiles("F[C@](Cl)(Br)I")
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={1}, stereo_features=[("1", "S")])
+    parts.parent_atom_ids_by_locant["1"] = 1
+
+    audit = audit_stereochemistry(mol, parts)
+
+    assert audit.ok
+    assert audit.checked_features == 1
+
+
+def test_stereochemistry_audit_checks_bound_substituent_terms():
+    mol = read_smiles("F[C@](Cl)(Br)I")
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0})
+    parts.name_atom_bindings.append(
+        NameAtomBinding(stage="prefix", role="substituent", term="chlorobromoiodomethyl", atom_ids={1, 2, 3, 4})
+    )
+
+    audit = audit_stereochemistry(mol, parts)
+
+    assert not audit.ok
+    assert "0 R/S descriptors for 1 stereo atoms" in audit.issues[0]
+
+
+def test_charged_ammonio_substituent_keeps_all_n_ligands_explicit():
+    assert (
+        name_smiles("CCCC1CCC(CC1)[NH+](C)Cc2ccc3c(c2)oc(=O)o3")
+        == "3-(((4-propylcyclohexyl)(methyl)ammonio)methyl)-7,9-dioxabicyclo[4.3.0]nona-1(6),2,4-trien-8-one"
+    )
+
+
+def test_zinc_multi_locant_cation_suffixes_render_with_multiplier():
+    assert (
+        name_smiles("CC(C)(C[NH+]1CCC[C@@]2(C1)CC[NH2+]C2)COC")
+        == "(5R)-7-(2-(methoxymethyl)-2-methylpropyl)-2,7-diazaspiro[4.5]decan-2,7-diium"
+    )
 
 
 def test_parent_candidate_score_prefers_principal_coverage_then_length():
@@ -395,6 +744,7 @@ def test_parent_candidate_score_prefers_principal_coverage_then_length():
     )
 
     assert min([short, long], key=lambda candidate: candidate.score_tuple) is long
+    assert long.seniority_profile.parent_atom_count == 2
 
 
 def test_parent_pipeline_uses_intent_to_build_component_parts():
@@ -548,6 +898,40 @@ def test_cationic_parent_suffixes_are_created_by_assembly_parts():
     assert assemble_name(fused_parts) == "1,7-diazabicyclo[4.3.0]nona-2,4,6,8-tetraen-7-ium"
 
 
+def test_multiple_cationic_parent_suffixes_use_multiplicative_suffixes():
+    parent_parts = AssemblyParts(
+        parent_length=9,
+        is_bicycle=True,
+        bicycle_xyz=(3, 3, 0),
+        a_prefixes=[
+            SubstituentItem(name="aza", locants=["3"]),
+            SubstituentItem(name="aza", locants=["7"]),
+        ],
+        parent_charges=[
+            ParentChargeItem(locant="3", symbol="N", charge=1),
+            ParentChargeItem(locant="7", symbol="N", charge=1),
+        ],
+    )
+    substituent_parts = AssemblyParts(
+        parent_length=9,
+        is_bicycle=True,
+        is_substituent=True,
+        attachment_locant=3,
+        bicycle_xyz=(3, 3, 0),
+        a_prefixes=[
+            SubstituentItem(name="aza", locants=["3"]),
+            SubstituentItem(name="aza", locants=["7"]),
+        ],
+        parent_charges=[
+            ParentChargeItem(locant="3", symbol="N", charge=1),
+            ParentChargeItem(locant="7", symbol="N", charge=1),
+        ],
+    )
+
+    assert assemble_name(parent_parts) == "3,7-diazabicyclo[3.3.0]nonan-3,7-diium"
+    assert assemble_name(substituent_parts) == "3,7-diazabicyclo[3.3.0]nonan-3,7-diium-3-yl"
+
+
 def test_ambiguous_ring_connection_stems_keep_attachment_locants():
     cases = {
         "pyrazole": "pyrazol-1-yl",
@@ -597,6 +981,75 @@ def test_spiro_side_parents_are_normalized_without_nested_or_parenthesized_polyc
     )
     assert "spiro[spiro[" not in core
     assert "(bicyclo" not in core
+
+
+def test_spiro_side_heteroaromatic_branch_uses_graph_numbered_side_ring():
+    mol = Molecule()
+    for idx, symbol in {
+        0: "C",
+        1: "C",
+        2: "C",
+        3: "C",
+        4: "N",
+        5: "C",
+        6: "O",
+        7: "N",
+        8: "C",
+    }.items():
+        mol.add_atom(symbol=symbol, idx=idx, is_aromatic=idx in {3, 4, 5, 6, 7})
+    for u, v, order in (
+        (0, 1, 1),
+        (1, 2, 1),
+        (2, 0, 1),
+        (1, 5, 1),
+        (3, 4, 1),
+        (4, 5, 2),
+        (5, 6, 1),
+        (6, 7, 1),
+        (7, 3, 2),
+        (3, 8, 1),
+    ):
+        mol.add_bond(u, v, order=order)
+
+    spiro = _spiro_subgraph_assembly(mol, 0, set(mol.atoms))
+
+    assert spiro.side_locant == "1"
+    assert spiro.side_parent_name == "cyclopropane"
+    assert spiro.side_prefixes == ("2'-(3-methyl-1,2,4-oxadiazol-5-yl)",)
+
+
+def test_spiro_side_hantzsch_widman_branch_requires_aromatic_ring_metadata():
+    mol = Molecule()
+    for idx, symbol in {
+        0: "C",
+        1: "C",
+        2: "C",
+        3: "C",
+        4: "N",
+        5: "C",
+        6: "O",
+        7: "N",
+        8: "C",
+    }.items():
+        mol.add_atom(symbol=symbol, idx=idx, is_aromatic=False)
+    for u, v, order in (
+        (0, 1, 1),
+        (1, 2, 1),
+        (2, 0, 1),
+        (1, 5, 1),
+        (3, 4, 1),
+        (4, 5, 2),
+        (5, 6, 1),
+        (6, 7, 1),
+        (7, 3, 2),
+        (3, 8, 1),
+    ):
+        mol.add_bond(u, v, order=order)
+
+    spiro = _spiro_subgraph_assembly(mol, 0, set(mol.atoms))
+
+    assert spiro.side_parent_name != "cyclopropane"
+    assert not any("oxadiazol" in prefix for prefix in spiro.side_prefixes)
 
 
 def test_mixed_spiro_bicyclo_side_suffixes_and_replacement_locants_are_component_scoped():

@@ -2,13 +2,14 @@
 
 from collections.abc import Callable
 
-from .formatting import format_multiplier, oxy_prefix_from_branch
+from .formatting import format_multiplier, oxy_prefix_from_branch, strip_outer_parentheses
 from .molecule import Molecule
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .rules import multipliers, stems
 
 ComponentNamer = Callable[..., str]
+BranchNamer = Callable[..., str]
 
 
 def single_atom_component_name(mol: Molecule, component_atoms: set[int]) -> str:
@@ -27,11 +28,16 @@ def single_atom_component_name(mol: Molecule, component_atoms: set[int]) -> str:
     return ""
 
 
-def structural_replacement_parent_name(mol: Molecule, component_atoms: set[int]) -> str:
+def structural_replacement_parent_name(
+    mol: Molecule,
+    component_atoms: set[int],
+    branch_namer: BranchNamer | None = None,
+) -> str:
     """Return a replacement-parent hydride name from graph-derived specs."""
 
     return (
-        oxoacid_parent_name(mol, component_atoms)
+        oxoacid_ester_name(mol, component_atoms, branch_namer)
+        or oxoacid_parent_name(mol, component_atoms)
         or organophosphinic_acid_name(mol, component_atoms)
         or sulfoxide_parent_name(mol, component_atoms)
         or homonuclear_chain_parent_name(mol, component_atoms)
@@ -47,25 +53,153 @@ def oxoacid_parent_name(mol: Molecule, component_atoms: set[int]) -> str:
         return ""
     central = non_oxygen[0]
     central_atom = mol.atoms[central]
-    single_o = 0
-    double_o = 0
     for neighbor in mol.get_neighbors(central):
         if neighbor not in component_atoms or mol.atoms[neighbor].symbol != "O":
             return ""
-        bond = mol.get_bond(central, neighbor)
-        if bond and bond.order == 2:
+    oxygen_neighbors = [neighbor for neighbor in mol.get_neighbors(central) if neighbor in component_atoms]
+    single_o, double_o = _oxoacid_oxygen_counts(mol, central, oxygen_neighbors)
+    spec = _matching_oxoacid_spec(central_atom.symbol, single_o, double_o, central_atom.charge)
+    return spec["name"] if spec is not None else ""
+
+
+def oxoacid_ester_name(
+    mol: Molecule,
+    component_atoms: set[int],
+    branch_namer: BranchNamer | None = None,
+) -> str:
+    """Name organic esters of data-backed oxoacid parent hydrides."""
+
+    matches = []
+    for central in component_atoms:
+        central_atom = mol.atoms[central]
+        oxygen_neighbors = []
+        non_oxygen_neighbors = []
+        for neighbor in mol.get_neighbors(central):
+            if neighbor not in component_atoms:
+                return ""
+            if mol.atoms[neighbor].symbol == "O":
+                oxygen_neighbors.append(neighbor)
+            else:
+                non_oxygen_neighbors.append(neighbor)
+        if non_oxygen_neighbors or not oxygen_neighbors:
+            continue
+        ester_oxygen = None
+        ester_root = None
+        for oxygen in oxygen_neighbors:
+            bond = mol.get_bond(central, oxygen)
+            if bond is None:
+                return ""
+            organic_neighbors = [
+                n
+                for n in mol.get_neighbors(oxygen)
+                if n in component_atoms and n != central and mol.atoms[n].symbol == "C"
+            ]
+            if organic_neighbors:
+                if ester_oxygen is not None or len(organic_neighbors) != 1:
+                    return ""
+                ester_oxygen = oxygen
+                ester_root = organic_neighbors[0]
+        if ester_oxygen is None or ester_root is None:
+            continue
+        single_o, double_o = _oxoacid_oxygen_counts(mol, central, oxygen_neighbors)
+        spec = _matching_oxoacid_spec(central_atom.symbol, single_o, double_o, central_atom.charge)
+        if spec is None or not spec.get("ester_suffix"):
+            continue
+        oxoacid_atoms = {central, *oxygen_neighbors}
+        ester_component_atoms = _ester_modifier_atoms(mol, component_atoms, ester_root, oxoacid_atoms)
+        if not ester_component_atoms or ester_component_atoms | oxoacid_atoms != component_atoms:
+            continue
+        ester_name = _ester_modifier_name(mol, component_atoms, ester_root, ester_oxygen, oxoacid_atoms, branch_namer)
+        if not ester_name:
+            continue
+        matches.append(f"{ester_name} {spec['ester_suffix']}")
+    return matches[0] if len(matches) == 1 else ""
+
+
+def _ester_modifier_atoms(
+    mol: Molecule,
+    component_atoms: set[int],
+    root: int,
+    acid_atoms: set[int],
+) -> set[int]:
+    atoms = set()
+    queue = [root]
+    while queue:
+        atom_idx = queue.pop(0)
+        if atom_idx in atoms:
+            continue
+        if atom_idx not in component_atoms or atom_idx in acid_atoms:
+            return set()
+        atoms.add(atom_idx)
+        for neighbor in mol.get_neighbors(atom_idx):
+            if neighbor in acid_atoms:
+                continue
+            if neighbor in component_atoms:
+                queue.append(neighbor)
+    return atoms
+
+
+def _ester_modifier_name(
+    mol: Molecule,
+    component_atoms: set[int],
+    root: int,
+    ester_oxygen: int,
+    acid_atoms: set[int],
+    branch_namer: BranchNamer | None,
+) -> str:
+    if branch_namer is not None:
+        name = branch_namer(mol, root, set(mol.atoms) - component_atoms | acid_atoms, upstream_atom=ester_oxygen)
+        if isinstance(name, tuple):
+            name = name[0]
+        if name:
+            return strip_outer_parentheses(name)
+    return _alkyl_ligand_name(mol, component_atoms, root, ester_oxygen)
+
+
+def _oxoacid_oxygen_counts(mol: Molecule, central: int, oxygen_neighbors: list[int]) -> tuple[int, int]:
+    single_o = 0
+    double_o = 0
+    central_symbol = mol.atoms[central].symbol
+    for oxygen in oxygen_neighbors:
+        bond = mol.get_bond(central, oxygen)
+        if bond is None:
+            continue
+        if bond.order == 2 or _is_charge_normalized_halogen_oxo_ligand(mol, central_symbol, central, oxygen):
             double_o += 1
         else:
             single_o += 1
+    return single_o, double_o
+
+
+def _is_charge_normalized_halogen_oxo_ligand(
+    mol: Molecule,
+    central_symbol: str,
+    central: int,
+    oxygen: int,
+) -> bool:
+    """Return true for RDKit-normalized X(+)-O(-) oxo ligands on halogen oxoacids."""
+
+    if central_symbol not in {"Cl", "Br", "I"}:
+        return False
+    bond = mol.get_bond(central, oxygen)
+    return (
+        bond is not None
+        and bond.order == 1
+        and mol.atoms[oxygen].charge < 0
+        and sum(1 for _ in mol.get_neighbors(oxygen)) == 1
+    )
+
+
+def _matching_oxoacid_spec(central_symbol: str, single_o: int, double_o: int, charge: int) -> dict | None:
     for spec in RULES.components.replacement_parent_oxoacid_specs:
-        if spec["central"] != central_atom.symbol:
+        if spec["central"] != central_symbol:
             continue
         if int(spec["single_o"]) != single_o or int(spec["double_o"]) != double_o:
             continue
-        if "charge" in spec and int(spec["charge"]) != central_atom.charge:
+        if "charge" in spec and int(spec["charge"]) != charge:
             continue
-        return spec["name"]
-    return ""
+        return spec
+    return None
 
 
 def organophosphinic_acid_name(mol: Molecule, component_atoms: set[int]) -> str:
