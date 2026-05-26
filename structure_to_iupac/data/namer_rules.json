@@ -1,13 +1,15 @@
 {
   "parent_selection_criteria": {
-    "bluebook_rule": "Brief Guide sections 3 and 6; active criteria preserve the current generator behavior while exposing named extension points for the full parent-seniority hierarchy.",
+    "bluebook_rule": "Brief Guide section 6; active criteria for selecting the senior parent compound.",
     "values": [
+      "contains_principal_group",
       "principal_group_count",
-      "polycycle_parent",
-      "bicycle_parent",
-      "spiro_parent",
+      "senior_element_vector",
       "ring_parent",
-      "parent_atom_count",
+      "ring_seniority",
+      "chain_seniority",
+      "multiple_bond_count",
+      "double_bond_count",
       "path_tiebreak"
     ]
   },
@@ -24,6 +26,9 @@
       "senior_heteroatom_vector",
       "multiple_bond_count",
       "double_bond_count",
+      "senior_heteroatom_count_vector",
+      "ring_seniority",
+      "chain_seniority",
       "polycycle_parent",
       "bicycle_parent",
       "spiro_parent",

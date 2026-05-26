@@ -10,6 +10,7 @@ from .ring_parent import RingParent
 PARENT_SELECTION_CRITERIA = tuple(values("parent_selection_criteria"))
 ELEMENT_SENIORITY = {"N": 1, "P": 2, "Si": 3, "B": 4, "O": 5, "S": 6, "C": 7}
 HETEROATOM_SENIORITY = {"N": 1, "O": 2, "S": 3, "P": 4, "Si": 5, "B": 6}
+HETEROATOM_COUNT_SENIORITY = ("O", "S", "N", "P", "Si", "B")
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,7 @@ class ParentSeniorityProfile:
     parent_atom_count: int
     heteroatom_count: int
     senior_heteroatom_vector: tuple[int, ...]
+    senior_heteroatom_count_vector: tuple[int, ...]
     multiple_bond_count: int
     double_bond_count: int
     path_tiebreak: tuple[int, ...]
@@ -39,6 +41,8 @@ class ParentSeniorityProfile:
         if criterion == "contains_principal_group":
             return -int(self.contains_principal_group)
         if criterion == "senior_element_vector":
+            if self.ring_parent:
+                return ()
             return self.senior_element_vector
         if criterion == "polycycle_parent":
             return -int(self.polycycle_parent)
@@ -56,6 +60,12 @@ class ParentSeniorityProfile:
             return -self.heteroatom_count
         if criterion == "senior_heteroatom_vector":
             return self.senior_heteroatom_vector
+        if criterion == "senior_heteroatom_count_vector":
+            return self.senior_heteroatom_count_vector
+        if criterion == "ring_seniority":
+            return self.ring_seniority_key()
+        if criterion == "chain_seniority":
+            return self.chain_seniority_key()
         if criterion == "multiple_bond_count":
             return -self.multiple_bond_count
         if criterion == "double_bond_count":
@@ -68,6 +78,31 @@ class ParentSeniorityProfile:
         """Return the current sortable score tuple from configured criteria."""
 
         return tuple(self.criterion_value(criterion) for criterion in criteria)
+
+    def ring_seniority_key(self) -> tuple:
+        """Return ring-system seniority criteria with a polycycle topology guard."""
+
+        if not self.ring_parent:
+            return ()
+        return (
+            -self.ring_count if self.ring_count > 1 else 0,
+            self.senior_heteroatom_vector,
+            -self.ring_count,
+            -self.parent_atom_count,
+            -self.heteroatom_count,
+            self.senior_heteroatom_count_vector,
+        )
+
+    def chain_seniority_key(self) -> tuple:
+        """Return Brief Guide section 6 chain criteria f.1 and related ties."""
+
+        if self.ring_parent:
+            return ()
+        return (
+            -self.parent_atom_count,
+            -self.heteroatom_count,
+            self.senior_heteroatom_count_vector,
+        )
 
 
 @dataclass
@@ -113,6 +148,7 @@ class ParentCandidate:
             parent_atom_count=len(path),
             heteroatom_count=_heteroatom_count(mol, path),
             senior_heteroatom_vector=_senior_element_vector(mol, path, include_carbon=False),
+            senior_heteroatom_count_vector=_senior_heteroatom_count_vector(mol, path),
             multiple_bond_count=_multiple_bond_count(mol, path, include_double=True),
             double_bond_count=_multiple_bond_count(mol, path, include_double=False),
             path_tiebreak=tuple(path),
@@ -279,7 +315,7 @@ def select_principal_parent(
 def _senior_element_vector(mol: Molecule | None, path: list[int], *, include_carbon: bool) -> tuple[int, ...]:
     if mol is None:
         return ()
-    ranks = []
+    ranks = set()
     for atom_idx in path:
         symbol = mol.atoms[atom_idx].symbol
         if include_carbon:
@@ -287,8 +323,19 @@ def _senior_element_vector(mol: Molecule | None, path: list[int], *, include_car
         else:
             rank = HETEROATOM_SENIORITY.get(symbol)
         if rank is not None:
-            ranks.append(rank)
+            ranks.add(rank)
+    if not include_carbon and ranks:
+        return (min(ranks),)
     return tuple(sorted(ranks))
+
+
+def _senior_heteroatom_count_vector(mol: Molecule | None, path: list[int]) -> tuple[int, ...]:
+    """Return descending counts in the section 6 e.5/f order O, S, N, P, Si, B."""
+
+    if mol is None:
+        return ()
+    path_symbols = [mol.atoms[atom_idx].symbol for atom_idx in path]
+    return tuple(-path_symbols.count(symbol) for symbol in HETEROATOM_COUNT_SENIORITY)
 
 
 def _heteroatom_count(mol: Molecule | None, path: list[int]) -> int:

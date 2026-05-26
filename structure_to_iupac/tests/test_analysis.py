@@ -604,7 +604,7 @@ def test_parent_selection_criteria_are_data_ordered_and_behavior_preserving():
     profile = ParentSeniorityProfile(
         principal_group_count=1,
         contains_principal_group=True,
-        senior_element_vector=(7, 7),
+        senior_element_vector=(7,),
         polycycle_parent=False,
         bicycle_parent=False,
         spiro_parent=False,
@@ -613,21 +613,24 @@ def test_parent_selection_criteria_are_data_ordered_and_behavior_preserving():
         parent_atom_count=2,
         heteroatom_count=0,
         senior_heteroatom_vector=(),
+        senior_heteroatom_count_vector=(0, 0, 0, 0, 0, 0),
         multiple_bond_count=0,
         double_bond_count=0,
         path_tiebreak=(0, 1),
     )
 
     assert PARENT_SELECTION_CRITERIA == (
+        "contains_principal_group",
         "principal_group_count",
-        "polycycle_parent",
-        "bicycle_parent",
-        "spiro_parent",
+        "senior_element_vector",
         "ring_parent",
-        "parent_atom_count",
+        "ring_seniority",
+        "chain_seniority",
+        "multiple_bond_count",
+        "double_bond_count",
         "path_tiebreak",
     )
-    assert profile.score_tuple() == (-1, 0, 0, 0, 0, -2, (0, 1))
+    assert profile.score_tuple() == (-1, -1, (7,), 0, (), (-2, 0, (0, 0, 0, 0, 0, 0)), 0, 0, (0, 1))
 
 
 def test_parent_seniority_profile_exposes_brief_guide_extension_fields():
@@ -644,9 +647,69 @@ def test_parent_seniority_profile_exposes_brief_guide_extension_fields():
     )
 
     profile = candidate.seniority_profile
-    assert profile.senior_element_vector == (1, 5, 7, 7)
+    assert profile.senior_element_vector == (1, 5, 7)
     assert profile.heteroatom_count == 2
-    assert profile.senior_heteroatom_vector == (1, 2)
+    assert profile.senior_heteroatom_vector == (1,)
+    assert profile.senior_heteroatom_count_vector == (-1, 0, -1, 0, 0, 0)
+
+
+def test_parent_seniority_criteria_follow_brief_guide_section_6_order():
+    assert name_smiles("OCCOCC(=O)O") == "2-(2-hydroxyethoxy)acetic acid"
+
+    mol = Molecule()
+    for idx, symbol in {
+        0: "C",
+        1: "C",
+        2: "C",
+        3: "N",
+        4: "Si",
+        5: "O",
+        6: "P",
+        7: "N",
+        8: "N",
+        9: "O",
+        10: "C",
+        11: "C",
+        12: "C",
+        13: "C",
+    }.items():
+        mol.add_atom(symbol=symbol, idx=idx)
+    for u, v, order in (
+        (0, 1, 1),
+        (1, 2, 2),
+        (10, 11, 1),
+        (11, 12, 1),
+        (12, 13, 1),
+    ):
+        mol.add_bond(u, v, order=order)
+
+    no_group = ParentCandidate.build([0, 1], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
+    one_group = ParentCandidate.build([0, 1], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=1, mol=mol)
+    two_groups = ParentCandidate.build([0, 1, 2], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=2, mol=mol)
+    n_parent = ParentCandidate.build([3], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
+    si_parent = ParentCandidate.build([4], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
+    carbon_ring = ParentCandidate.build([10, 11, 12, 13], is_ring=True, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol, ring_count=1)
+    carbon_chain = ParentCandidate.build([10, 11, 12, 13], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
+    o_ring = ParentCandidate.build([5, 10, 11], is_ring=True, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol, ring_count=1)
+    p_ring = ParentCandidate.build([6, 10, 11], is_ring=True, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol, ring_count=1)
+    bicycle = ParentCandidate.build([10, 11, 12, 13], is_ring=True, is_bicycle=True, is_spiro=False, is_polycycle=False, xyz=(1, 1, 0), principal_groups_count=0, mol=mol, ring_count=2)
+    monocycle = ParentCandidate.build([10, 11, 12, 13], is_ring=True, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol, ring_count=1)
+    piperazine_like = ParentCandidate.build([7, 8, 10, 11, 12, 13], is_ring=True, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol, ring_count=1)
+    oxazinane_like = ParentCandidate.build([7, 9, 10, 11, 12, 13], is_ring=True, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol, ring_count=1)
+    shorter_chain = ParentCandidate.build([10, 11, 12], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
+    longer_chain = ParentCandidate.build([10, 11, 12, 13], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
+    saturated_chain = ParentCandidate.build([10, 11, 12], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
+    unsaturated_chain = ParentCandidate.build([0, 1, 2], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
+
+    assert min([no_group, one_group], key=lambda candidate: candidate.score_tuple) is one_group
+    assert min([one_group, two_groups], key=lambda candidate: candidate.score_tuple) is two_groups
+    assert min([si_parent, n_parent], key=lambda candidate: candidate.score_tuple) is n_parent
+    assert min([carbon_chain, carbon_ring], key=lambda candidate: candidate.score_tuple) is carbon_ring
+    assert min([p_ring, o_ring], key=lambda candidate: candidate.score_tuple) is o_ring
+    assert min([monocycle, bicycle], key=lambda candidate: candidate.score_tuple) is bicycle
+    assert min([piperazine_like, oxazinane_like], key=lambda candidate: candidate.score_tuple) is oxazinane_like
+    assert min([shorter_chain, longer_chain], key=lambda candidate: candidate.score_tuple) is longer_chain
+    assert min([saturated_chain, unsaturated_chain], key=lambda candidate: candidate.score_tuple) is unsaturated_chain
 
 
 def test_numbering_preference_uses_data_ordered_criteria():
