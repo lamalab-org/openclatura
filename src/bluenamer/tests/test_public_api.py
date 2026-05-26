@@ -36,6 +36,27 @@ def test_name_returns_naming_result_with_smiles_field():
     assert result.rules_hit == ()
 
 
+def test_naming_result_is_easy_to_use():
+    """Ergonomics: str, bool, repr, to_dict all do the obvious thing."""
+
+    good = name("CCO")
+    assert str(good) == "ethanol"
+    assert bool(good) is True
+    assert "ethanol" in repr(good)
+    payload = good.to_dict()
+    assert payload["name"] == "ethanol"
+    assert payload["smiles"] == "CCO"
+    assert payload["ok"] is True
+    # Round-trips through json without extra args.
+    import json
+
+    json.dumps(payload)
+
+    bad = name("")
+    assert str(bad) == ""
+    assert bool(bad) is False
+
+
 def test_name_with_trace_populates_rules_hit_and_hints():
     result = name("CC(=O)Nc1ccccc1", include_trace=True)
     assert result.name == "N-phenylacetamide"

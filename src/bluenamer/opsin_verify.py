@@ -42,6 +42,22 @@ class OpsinCheck:
 
         return self.status == "matched"
 
+    def __bool__(self) -> bool:
+        return self.ok
+
+    def __str__(self) -> str:
+        return self.status
+
+    def to_dict(self) -> dict:
+        return {
+            "status": self.status,
+            "name": self.name,
+            "canonical_original": self.canonical_original,
+            "opsin_smiles": self.opsin_smiles,
+            "canonical_roundtrip": self.canonical_roundtrip,
+            "error_message": self.error_message,
+        }
+
 
 def _try_import_py2opsin():
     try:

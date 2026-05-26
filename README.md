@@ -85,6 +85,24 @@ for step in analysis.decisions:
     print(step.phase, step.decision, step.reason)
 ```
 
+### Natural-language description (`describe`)
+
+`bluenamer.describe(smiles)` walks the same trace and renders a
+deterministic, multi-paragraph explanation of how the name is built.
+Useful for explainability views and for generating (SMILES, name,
+description) training tuples:
+
+```python
+from bluenamer import describe
+
+d = describe("CC(=O)Nc1ccccc1")
+print(d)            # multi-paragraph prose
+d.rules_hit         # ('P-44', 'P-45', 'P-41', 'P-61', 'P-67')
+d.components[0]     # DescribedComponent(phase='parse', text='RDKit parsed ...')
+```
+
+Same input → same output. No LLM in the loop.
+
 ### CLI
 
 ```bash
