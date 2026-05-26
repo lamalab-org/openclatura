@@ -42,8 +42,9 @@ def test_pubchem_naming_rate(pubchem_sample, capsys):
     total = len(results)
     with capsys.disabled():
         print(f"\n[pubchem] sampled={total} named={named} rate={named / total:.2%}")
-    # Defensive minimum — PubChem rates are higher in practice.
-    assert named / total > 0.10, f"PubChem naming rate dropped below 10%: {named}/{total}"
+    # PubChem is the headline coverage target; anything below 90% is a
+    # regression that needs investigation, not just a "rate drift".
+    assert named / total > 0.90, f"PubChem naming rate {named}/{total} = {named / total:.2%} below 90%"
 
 
 def test_pubchem_opsin_match_rate(pubchem_sample, capsys):
