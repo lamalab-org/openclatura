@@ -1,7 +1,7 @@
 import numpy as np
 import py2opsin
 from datasets import load_dataset
-from structure_to_iupac.namer import name_smiles
+from bluenamer.namer import name_smiles
 from rdkit.Chem import CanonSmiles
 from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm

@@ -1,0 +1,952 @@
+# bluenamer/api.py
+
+import re
+
+from .assembler import assemble_name_raw, post_process_name
+from .assembly_parts import AssemblyParts, SubstituentItem
+from .assembly_spiro import extract_spiro_side_prefixes
+from .chains import find_ring_systems, get_cyclic_atoms
+from .component_namer import name_component as _name_component_impl
+from .engine import DEFAULT_NAMING_ENGINE
+from .formatting import format_counted_prefixes, format_multiplier, strip_outer_parentheses
+from .group_atom_roles import amide_nitrogen
+from .heteroatom_subgraphs import name_heteroatom_subgraph
+from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names
+from .molecule import DecisionTrace, Molecule, NameAnalysis
+from .name_bindings import postprocess_name_atom_bindings
+from .namer_config import (
+    SPECIAL_COMPONENT_NAMES,
+)
+from .naming_context import NamingIntent
+from .nomenclature import RULES
+from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
+from .parent_selection import select_principal_parent
+from .perception import PerceivedGroup, perceive_groups
+from .rules import elision, multipliers, stems
+from .spiro_assembly import SpiroAssembly
+from .subgraph_tools import (
+    add_indicated_hydrogens as _add_indicated_hydrogens,
+)
+from .subgraph_tools import (
+    add_parent_features as _add_subgraph_parent_features,
+)
+from .subgraph_tools import (
+    emit_bond_stereo as _emit_bond_stereo,
+)
+from .subgraph_tools import (
+    find_spiro_side_pair as _find_spiro_side_pair,
+)
+from .subgraph_tools import (
+    spiro_side_component as _spiro_side_component,
+)
+from .subgraph_tools import (
+    subgraph_component as _subgraph_component,
+)
+from .trace_helpers import (
+    add_substituent_trace as _add_substituent_trace,
+)
+from .trace_helpers import (
+    assembly_trace_segments as _assembly_trace_segments,
+)
+from .trace_helpers import (
+    bond_ids_within as _bond_ids_within,
+)
+
+
+def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) -> str:
+    """Return a direct functional-group prefix when the subgraph is one group.
+
+    Blue Book references: P-63 through P-67 for direct detachable prefixes such
+    as nitro, cyano, carboxy, carbamoyl, and halo-carbonyl prefixes.
+    """
+
+    for group in perceive_groups(mol):
+        if start_idx in group.atoms_involved and group.atoms_involved.issubset(component):
+            if group.key in RULES.prefixes.amide_like_groups:
+                substituted = _direct_amide_subgraph_prefix(mol, group, component)
+                if substituted:
+                    return substituted
+            prefix = RULES.functional_groups.direct_subgraph_prefix_for(group.key)
+            if prefix:
+                return prefix
+    return ""
+
+
+def _direct_amide_subgraph_prefix(mol: Molecule, group: PerceivedGroup, component: set[int]) -> str:
+    """Return substituted carbamoyl/carbamothioyl for direct amide subgraphs."""
+
+    amide_n = amide_nitrogen(mol, group)
+    if amide_n is None:
+        return ""
+    n_substituents = [
+        n
+        for n in mol.get_neighbors(amide_n)
+        if n in component and n not in group.atoms_involved and mol.atoms[n].symbol != "H"
+    ]
+    base = RULES.functional_groups.prefix_for(group.key) or ""
+    if not base:
+        return ""
+    if not n_substituents:
+        return base
+    outside_component = set(mol.atoms.keys()) - component
+    branch_names = []
+    for n_sub in n_substituents:
+        branch = name_subgraph(
+            mol,
+            n_sub,
+            outside_component | set(group.atoms_involved) | {amide_n},
+            upstream_atom=amide_n,
+        )
+        branch = strip_outer_parentheses(branch)
+        if branch:
+            branch_names.append(branch)
+    if not branch_names:
+        return base
+    return f"({format_counted_prefixes(branch_names)}{base})"
+
+
+def _find_acyclic_subgraph_paths(
+    mol: Molecule, start_idx: int, component: set[int], cyclic_atoms: set[int], sub_exclude: set[int]
+) -> list[list[int]]:
+    """Find carbon paths available for recursive acyclic substituent naming.
+
+    Blue Book references: P-44 and P-45 for parent hydride selection in
+    substituent names.
+    """
+
+    valid_nodes = {n for n in component if n not in cyclic_atoms and mol.atoms[n].is_carbon and n not in sub_exclude}
+    paths = []
+
+    def dfs_sub(curr, path, visited_nodes):
+        neighbors = [n for n in mol.get_neighbors(curr) if n in valid_nodes and n not in visited_nodes]
+        if not neighbors:
+            if start_idx in path:
+                paths.append(path)
+            return
+        for n in neighbors:
+            dfs_sub(n, path + [n], visited_nodes | {n})
+
+    endpoints = [n for n in valid_nodes if sum(1 for x in mol.get_neighbors(n) if x in valid_nodes) <= 1]
+    start_nodes = endpoints if endpoints else valid_nodes
+    for start in start_nodes:
+        dfs_sub(start, [start], {start})
+    return paths
+
+
+def _select_subgraph_parent(mol: Molecule, start_idx: int, component: set[int], sub_exclude: set[int]):
+    """Select parent candidates for a recursive substituent component.
+
+    Blue Book references: P-44, P-45, P-52, and P-53 for parent selection in
+    chains, rings, fused systems, and retained parents.
+    """
+
+    cyclic_atoms = get_cyclic_atoms(mol, sub_exclude)
+    if start_idx in cyclic_atoms:
+        ring_systems = find_ring_systems(mol, sub_exclude)
+        valid_rings = [rs for rs in ring_systems if start_idx in rs.atoms]
+        if not valid_rings:
+            return None
+        selection = select_principal_parent(mol, [], valid_rings, [start_idx])
+        if selection is None:
+            return None
+        return selection.with_fixed_start(selection.requires_fixed_substituent_start)
+
+    paths = _find_acyclic_subgraph_paths(mol, start_idx, component, cyclic_atoms, sub_exclude)
+    if not paths:
+        return None
+    selection = select_principal_parent(mol, paths, [], [start_idx])
+    if selection is None:
+        return None
+    return selection.with_fixed_start(False)
+
+
+def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> SpiroAssembly:
+    """Name a side ring as structured spiro assembly data.
+
+    Blue Book references: P-24 and P-52.3; the attachment atom is temporarily
+    represented as silicon so the side ring can be named independently, then the
+    silane marker is stripped back out before assembly rendering.
+    """
+
+    retained_n_ring = _retained_n_ring_spiro_assembly(mol, c_idx, sub_comp)
+    if retained_n_ring is not None:
+        return retained_n_ring
+
+    simple_side_ring = _simple_monocyclic_spiro_side_assembly(mol, c_idx, sub_comp)
+    if simple_side_ring is not None:
+        return simple_side_ring
+
+    heteroaromatic_side = _heteroaromatic_spiro_side_assembly(mol, c_idx, sub_comp)
+    if heteroaromatic_side is not None:
+        return heteroaromatic_side
+
+    sub_mol = Molecule()
+    for n in sub_comp:
+        atom = mol.atoms[n]
+        symbol = "Si" if n == c_idx else atom.symbol
+        sub_mol.add_atom(
+            symbol=symbol,
+            idx=n,
+            charge=atom.charge,
+            stereo=atom.stereo,
+            is_aromatic=atom.is_aromatic,
+            explicit_h_count=atom.explicit_h_count,
+            total_h_count=atom.total_h_count,
+        )
+    for n in sub_comp:
+        for nxt in mol.get_neighbors(n):
+            if nxt in sub_comp and n < nxt:
+                bond = mol.get_bond(n, nxt)
+                sub_mol.add_bond(u=n, v=nxt, order=bond.order, stereo=bond.stereo, in_small_ring=bond.in_small_ring)
+
+    sub_name_raw = name_component(sub_mol, sub_comp, is_substituent=False)
+    match = re.search(r"(?:(^|-)(\d+)-)?sil[a]?", sub_name_raw)
+    if not match:
+        side_prefixes, side_parent_name, side_suffixes = extract_spiro_side_prefixes(sub_name_raw)
+        return SpiroAssembly(
+            parent_locant="",
+            side_locant="1",
+            side_parent_name=side_parent_name,
+            side_prefixes=tuple(side_prefixes),
+            side_suffixes=tuple(side_suffixes),
+        )
+
+    loc = match.group(2) if match.group(2) else "1"
+    if match.group(2):
+        sub_name_clean = re.sub(rf"(^|-){loc}-sil[a]?-?", r"\1", sub_name_raw)
+    else:
+        sub_name_clean = re.sub(r"sil[a]?-?", "", sub_name_raw)
+
+    sub_name_clean = sub_name_clean.replace("--", "-").strip("-")
+    sub_name_clean = sub_name_clean.replace("-cyclo", "cyclo")
+    if not sub_name_clean:
+        sub_name_clean = "methane"
+    side_prefixes, side_parent_name, side_suffixes = extract_spiro_side_prefixes(sub_name_clean)
+    return SpiroAssembly(
+        parent_locant="",
+        side_locant=loc,
+        side_parent_name=side_parent_name,
+        side_prefixes=tuple(side_prefixes),
+        side_suffixes=tuple(side_suffixes),
+    )
+
+
+def _simple_monocyclic_spiro_side_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> SpiroAssembly | None:
+    """Name a monocyclic spiro side ring before naming its external branches."""
+
+    ring = _simple_heterocycle_containing_atom(mol, c_idx, sub_comp)
+    if ring is None:
+        return None
+    if _ring_double_bond_count(mol, ring) != 0:
+        return None
+    if not all(mol.atoms[idx].symbol == "C" for idx in ring):
+        return None
+    if not _side_ring_has_heteroaromatic_branch(mol, ring, sub_comp):
+        return None
+    locant_map = _number_simple_spiro_side_ring(mol, ring, c_idx, sub_comp)
+    parent_name = f"cyclo{stems.stem_for(len(ring))}ane"
+    side_prefixes = _spiro_side_ring_branch_prefixes(mol, ring, sub_comp, locant_map)
+    if not side_prefixes:
+        return None
+    return SpiroAssembly(
+        parent_locant="",
+        side_locant=locant_map[c_idx],
+        side_parent_name=parent_name,
+        side_prefixes=tuple(side_prefixes),
+    )
+
+
+def _side_ring_has_heteroaromatic_branch(mol: Molecule, ring: list[int], sub_comp: set[int]) -> bool:
+    ring_atoms = set(ring)
+    for atom_idx in ring:
+        for neighbor in mol.get_neighbors(atom_idx):
+            if neighbor in sub_comp and neighbor not in ring_atoms:
+                branch_atoms = _subgraph_component(mol, neighbor, set(mol.atoms) - (set(sub_comp) - ring_atoms))
+                if _component_has_unsaturated_heterocycle(mol, branch_atoms):
+                    return True
+    return False
+
+
+def _component_has_unsaturated_heterocycle(mol: Molecule, component_atoms: set[int]) -> bool:
+    for atom_idx in component_atoms:
+        ring = _simple_heterocycle_containing_atom(mol, atom_idx, component_atoms)
+        if (
+            ring
+            and _is_aromatic_ring(mol, ring)
+            and any(mol.atoms[idx].symbol != "C" for idx in ring)
+            and _ring_double_bond_count(mol, ring) > 0
+        ):
+            return True
+    return False
+
+
+def _heteroaromatic_spiro_side_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> SpiroAssembly | None:
+    """Build a graph-numbered Hantzsch-Widman side component for spiro rings."""
+
+    ring = _simple_heterocycle_containing_atom(mol, c_idx, sub_comp)
+    if ring is None or not any(mol.atoms[idx].symbol != "C" for idx in ring):
+        return None
+    if not _is_aromatic_ring(mol, ring):
+        return None
+    if _ring_double_bond_count(mol, ring) == 0:
+        return None
+    resolved = _hantzsch_widman_side_parent(mol, ring)
+    if resolved is None:
+        return None
+    parent_name, locant_map = resolved
+    side_prefixes = _spiro_side_ring_branch_prefixes(mol, ring, sub_comp, locant_map)
+    return SpiroAssembly(
+        parent_locant="",
+        side_locant=locant_map[c_idx],
+        side_parent_name=parent_name,
+        side_prefixes=tuple(side_prefixes),
+    )
+
+
+def _spiro_side_ring_branch_prefixes(
+    mol: Molecule,
+    ring: list[int],
+    sub_comp: set[int],
+    locant_map: dict[int, str],
+) -> list[str]:
+    ring_atoms = set(ring)
+    allowed_branch_atoms = set(sub_comp) - ring_atoms
+    branch_exclude = set(mol.atoms) - allowed_branch_atoms
+    side_prefixes = []
+    for atom_idx in sorted(ring_atoms, key=lambda idx: int(locant_map[idx])):
+        for neighbor in sorted(mol.get_neighbors(atom_idx)):
+            if neighbor not in allowed_branch_atoms:
+                continue
+            branch = _name_heteroaromatic_branch_substituent(mol, neighbor, atom_idx, allowed_branch_atoms)
+            if not branch:
+                branch = name_subgraph(mol, neighbor, branch_exclude, upstream_atom=atom_idx)
+            if branch:
+                side_prefixes.append(f"{locant_map[atom_idx]}'-{format_multiplier(branch, 1, safe_enclose=True)}")
+    return side_prefixes
+
+
+def _name_heteroaromatic_branch_substituent(
+    mol: Molecule,
+    start_idx: int,
+    upstream_atom: int,
+    allowed_atoms: set[int],
+) -> str:
+    """Name a heteroaromatic branch from its own graph-numbered ring."""
+
+    branch_atoms = _subgraph_component(mol, start_idx, set(mol.atoms) - allowed_atoms)
+    ring = _simple_heterocycle_containing_atom(mol, start_idx, branch_atoms)
+    if ring is None:
+        return ""
+    if (
+        not _is_aromatic_ring(mol, ring)
+        or not any(mol.atoms[idx].symbol != "C" for idx in ring)
+        or _ring_double_bond_count(mol, ring) == 0
+    ):
+        return ""
+    resolved = _hantzsch_widman_side_parent(mol, ring)
+    if resolved is None:
+        return ""
+    parent_name, locant_map = resolved
+    if start_idx not in locant_map:
+        return ""
+    ring_atoms = set(ring)
+    prefix_items = []
+    branch_allowed = set(branch_atoms) - ring_atoms
+    branch_exclude = set(mol.atoms) - branch_allowed
+    for atom_idx in sorted(ring_atoms, key=lambda idx: int(locant_map[idx])):
+        for neighbor in sorted(mol.get_neighbors(atom_idx)):
+            if neighbor == upstream_atom or neighbor not in branch_allowed:
+                continue
+            substituent = name_subgraph(mol, neighbor, branch_exclude, upstream_atom=atom_idx)
+            if substituent:
+                prefix_items.append(f"{locant_map[atom_idx]}-{substituent}")
+    stem = parent_name[:-1] if parent_name.endswith("e") else parent_name
+    substituent_name = f"{stem}-{locant_map[start_idx]}-yl"
+    if prefix_items:
+        return "-".join(prefix_items + [substituent_name])
+    return substituent_name
+
+
+def _simple_heterocycle_containing_atom(mol: Molecule, atom_idx: int, component_atoms: set[int]) -> list[int] | None:
+    """Return a simple monocyclic side ring containing atom_idx."""
+
+    candidates = []
+    neighbors = [n for n in mol.get_neighbors(atom_idx) if n in component_atoms]
+    for pos, first in enumerate(neighbors):
+        for second in neighbors[pos + 1 :]:
+            path = _shortest_path_without_atom(mol, first, second, component_atoms, atom_idx, 9)
+            if not path:
+                continue
+            ring = [atom_idx] + path
+            if len(ring) < 3 or len(ring) > 10:
+                continue
+            ring_set = set(ring)
+            if any(sum(1 for n in mol.get_neighbors(idx) if n in ring_set) != 2 for idx in ring):
+                continue
+            if any(mol.atoms[idx].element.hw_priority is None and mol.atoms[idx].symbol != "C" for idx in ring):
+                continue
+            candidates.append(_ordered_ring_from_member(mol, ring, atom_idx))
+    if not candidates:
+        return None
+    return min(candidates, key=lambda ring: (len(ring), _hantzsch_widman_ring_score(mol, ring), ring))
+
+
+def _ordered_ring_from_member(mol: Molecule, ring: list[int], start: int) -> list[int]:
+    ring_set = set(ring)
+    first = min(n for n in mol.get_neighbors(start) if n in ring_set)
+    ordered = [start, first]
+    prev = start
+    current = first
+    while True:
+        choices = [n for n in mol.get_neighbors(current) if n in ring_set and n != prev]
+        if not choices:
+            return ring
+        nxt = min(choices)
+        if nxt == start:
+            return ordered
+        if nxt in ordered:
+            return ring
+        ordered.append(nxt)
+        prev, current = current, nxt
+
+
+def _number_simple_spiro_side_ring(
+    mol: Molecule,
+    ring: list[int],
+    spiro_atom: int,
+    sub_comp: set[int],
+) -> dict[int, str]:
+    """Number a monocyclic side ring from the spiro atom with branch tie-breaks."""
+
+    spiro_pos = ring.index(spiro_atom)
+    forward = ring[spiro_pos:] + ring[:spiro_pos]
+    reverse = [forward[0], *reversed(forward[1:])]
+
+    def score(order: list[int]) -> tuple:
+        locants = {atom_idx: pos + 1 for pos, atom_idx in enumerate(order)}
+        branch_locants = []
+        ring_atoms = set(ring)
+        for atom_idx in ring:
+            if any(n in sub_comp and n not in ring_atoms for n in mol.get_neighbors(atom_idx)):
+                branch_locants.append(locants[atom_idx])
+        return (tuple(sorted(branch_locants)), order)
+
+    best = min((forward, reverse), key=score)
+    return {atom_idx: str(pos + 1) for pos, atom_idx in enumerate(best)}
+
+
+def _hantzsch_widman_side_parent(mol: Molecule, ring: list[int]) -> tuple[str, dict[int, str]] | None:
+    """Return a generic Hantzsch-Widman parent name and atom locants."""
+
+    variants = []
+    for offset in range(len(ring)):
+        rotated = ring[offset:] + ring[:offset]
+        for oriented in (rotated, [rotated[0], *reversed(rotated[1:])]):
+            first = mol.atoms[oriented[0]]
+            if first.symbol == "C" or first.element.hw_priority is None:
+                continue
+            highest = min(
+                mol.atoms[idx].element.hw_priority
+                for idx in oriented
+                if mol.atoms[idx].symbol != "C" and mol.atoms[idx].element.hw_priority is not None
+            )
+            if first.element.hw_priority != highest:
+                continue
+            name = _generic_hantzsch_widman_name(mol, oriented)
+            if not name:
+                continue
+            locant_map = {atom_idx: str(pos + 1) for pos, atom_idx in enumerate(oriented)}
+            variants.append((_hantzsch_widman_ring_score(mol, oriented), name, locant_map))
+    if not variants:
+        return None
+    _, name, locant_map = min(variants, key=lambda item: (item[0], item[1]))
+    return name, locant_map
+
+
+def _generic_hantzsch_widman_name(mol: Molecule, oriented: list[int]) -> str:
+    hetero = [
+        (pos, mol.atoms[idx].element.hw_priority or 999, mol.atoms[idx].element.hw_stem or "")
+        for pos, idx in enumerate(oriented, start=1)
+        if mol.atoms[idx].symbol != "C"
+    ]
+    if not hetero:
+        return ""
+    groups: dict[int, list[tuple[int, str]]] = {}
+    for pos, priority, prefix in hetero:
+        if not prefix:
+            return ""
+        groups.setdefault(priority, []).append((pos, prefix))
+    locants = []
+    prefix_parts = []
+    for priority in sorted(groups):
+        group = sorted(groups[priority])
+        locants.extend(str(pos) for pos, _ in group)
+        prefix_parts.append(_multiply_hw_prefix(group[0][1], len(group)))
+    suffix = _hantzsch_widman_stem(
+        len(oriented),
+        _ring_double_bond_count(mol, oriented),
+        any(mol.atoms[idx].symbol == "N" for idx in oriented),
+    )
+    if not suffix:
+        return ""
+    parent = _join_hw_parts(prefix_parts + [suffix])
+    return f"{','.join(locants)}-{parent}" if len(hetero) > 1 else parent
+
+
+def _multiply_hw_prefix(prefix: str, count: int) -> str:
+    if count == 1:
+        return prefix
+    return elision.elide_terminal_a(multipliers.basic(count), prefix)
+
+
+def _join_hw_parts(parts: list[str]) -> str:
+    if not parts:
+        return ""
+    result = parts[0]
+    for part in parts[1:]:
+        result = elision.elide_terminal_a(result, part)
+    return result
+
+
+def _hantzsch_widman_stem(size: int, double_bonds: int, has_nitrogen: bool) -> str:
+    unsaturated = double_bonds > 0
+    if size == 3:
+        if not unsaturated:
+            return "iridine" if has_nitrogen else "irane"
+        return "irine" if has_nitrogen else "irene"
+    if size == 4:
+        return ("etidine" if has_nitrogen else "etane") if not unsaturated else "ete"
+    if size == 5:
+        return ("olidine" if has_nitrogen else "olane") if not unsaturated else "ole"
+    if size == 6:
+        return ("inane" if has_nitrogen else "ane") if not unsaturated else "ine"
+    larger = {
+        7: ("epine", "epane"),
+        8: ("ocine", "ocane"),
+        9: ("onine", "onane"),
+        10: ("ecine", "ecane"),
+    }
+    if size not in larger:
+        return ""
+    unsat, sat = larger[size]
+    return unsat if unsaturated else sat
+
+
+def _hantzsch_widman_ring_score(mol: Molecule, oriented: list[int]) -> tuple:
+    hetero_positions = [
+        (pos, mol.atoms[idx].element.hw_priority or 999)
+        for pos, idx in enumerate(oriented, start=1)
+        if mol.atoms[idx].symbol != "C"
+    ]
+    grouped = []
+    for priority in sorted({priority for _, priority in hetero_positions}):
+        grouped.append(tuple(pos for pos, item_priority in hetero_positions if item_priority == priority))
+    double_positions = tuple(
+        pos
+        for pos, (a, b) in enumerate(zip(oriented, oriented[1:] + oriented[:1]), start=1)
+        if (bond := mol.get_bond(a, b)) is not None and bond.order == 2
+    )
+    return (
+        tuple(pos for pos, _ in hetero_positions),
+        tuple(grouped),
+        double_positions,
+    )
+
+
+def _ring_double_bond_count(mol: Molecule, ring: list[int]) -> int:
+    return sum(
+        1 for a, b in zip(ring, ring[1:] + ring[:1]) if (bond := mol.get_bond(a, b)) is not None and bond.order == 2
+    )
+
+
+def _is_aromatic_ring(mol: Molecule, ring: list[int]) -> bool:
+    """Return true when every ring atom came from an aromatic input atom."""
+
+    return bool(ring) and all(mol.atoms[idx].is_aromatic for idx in ring)
+
+
+def _retained_n_ring_spiro_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> SpiroAssembly | None:
+    """Name spiro side components whose shared atom is in a retained N-ring."""
+
+    ring = _small_n_ring_containing_atom(mol, c_idx, sub_comp)
+    if not ring:
+        return None
+    ring_atoms = set(ring)
+    n_atom = next(atom_idx for atom_idx in ring if mol.atoms[atom_idx].symbol == "N")
+    if mol.atoms[n_atom].charge <= 0:
+        return None
+    locant_map = _number_saturated_n_ring_for_spiro(ring, n_atom, c_idx)
+    ring_size = len(ring)
+    ionic_parent = RULES.charges.saturated_n_ring_ionic_parents.get(ring_size)
+    if not ionic_parent:
+        return None
+    neutral_parent = next(
+        (neutral for neutral, ionic in RULES.charges.retained_ionic_n_parents.items() if ionic == ionic_parent),
+        "",
+    )
+    if not neutral_parent:
+        return None
+    stem = neutral_parent[:-1] if neutral_parent.endswith("e") else neutral_parent
+    parent_name = f"{stem}-1-ium"
+
+    side_prefixes = []
+    allowed_branch_atoms = set(sub_comp) - ring_atoms
+    branch_exclude = set(mol.atoms) - allowed_branch_atoms
+    for atom_idx in sorted(ring_atoms, key=lambda idx: int(locant_map[idx])):
+        for neighbor in sorted(mol.get_neighbors(atom_idx)):
+            if neighbor not in allowed_branch_atoms:
+                continue
+            branch = name_subgraph(mol, neighbor, branch_exclude, upstream_atom=atom_idx)
+            if branch:
+                side_prefixes.append(f"{locant_map[atom_idx]}'-{branch}")
+
+    return SpiroAssembly(
+        parent_locant="",
+        side_locant=locant_map[c_idx],
+        side_parent_name=parent_name,
+        side_prefixes=tuple(side_prefixes),
+    )
+
+
+def _small_n_ring_containing_atom(mol: Molecule, atom_idx: int, component_atoms: set[int]) -> list[int] | None:
+    """Return a small saturated N-ring containing atom_idx, if present."""
+
+    supported_sizes = set(RULES.charges.saturated_n_ring_ionic_parents)
+    neighbors = [n for n in mol.get_neighbors(atom_idx) if n in component_atoms]
+    candidates = []
+    for pos, first in enumerate(neighbors):
+        for second in neighbors[pos + 1 :]:
+            path = _shortest_path_without_atom(mol, first, second, component_atoms, atom_idx, max(supported_sizes) - 1)
+            if not path:
+                continue
+            ring = [atom_idx] + path
+            if len(ring) not in supported_sizes:
+                continue
+            if sum(1 for idx in ring if mol.atoms[idx].symbol == "N") != 1:
+                continue
+            if any(mol.atoms[idx].symbol not in {"C", "N"} for idx in ring):
+                continue
+            if any((bond := mol.get_bond(a, b)) is None or bond.order != 1 for a, b in zip(ring, ring[1:] + ring[:1])):
+                continue
+            candidates.append(ring)
+    if not candidates:
+        return None
+    return min(candidates, key=lambda ring: (len(ring), sorted(ring)))
+
+
+def _shortest_path_without_atom(
+    mol: Molecule,
+    start: int,
+    end: int,
+    allowed_atoms: set[int],
+    excluded_atom: int,
+    max_edges: int,
+) -> list[int] | None:
+    queue: list[list[int]] = [[start]]
+    seen = {start}
+    while queue:
+        path = queue.pop(0)
+        if len(path) - 1 > max_edges:
+            continue
+        current = path[-1]
+        if current == end:
+            return path
+        for neighbor in mol.get_neighbors(current):
+            if neighbor == excluded_atom or neighbor not in allowed_atoms or neighbor in seen:
+                continue
+            seen.add(neighbor)
+            queue.append(path + [neighbor])
+    return None
+
+
+def _number_saturated_n_ring_for_spiro(ring: list[int], n_atom: int, spiro_atom: int) -> dict[int, str]:
+    """Number a saturated retained N-ring from N=1, preserving graph orientation."""
+
+    n_pos = ring.index(n_atom)
+    forward = ring[n_pos:] + ring[:n_pos]
+    reverse = [forward[0], *reversed(forward[1:])]
+    candidates = []
+    for order in (forward, reverse):
+        locants = {atom_idx: str(pos + 1) for pos, atom_idx in enumerate(order)}
+        candidates.append(locants)
+    return max(candidates, key=lambda locants: int(locants[spiro_atom]))
+
+
+def _spiro_subgraph_name(mol: Molecule, c_idx: int, sub_comp: set[int]) -> str:
+    """Compatibility marker for older assembly callers."""
+
+    spiro = _spiro_subgraph_assembly(mol, c_idx, sub_comp)
+    return f"[SPIRO]-{spiro.side_locant}-{spiro.side_parent_name}"
+
+
+def _collect_subgraph_substituents(
+    mol: Molecule,
+    candidate_path: list[int],
+    sub_perceived: list[PerceivedGroup],
+    sub_exclude: set[int],
+) -> dict[int, list[SubstituentItem]]:
+    """Collect prefixes attached to a recursive subgraph parent.
+
+    Blue Book references: P-14.2, P-16.5, P-44, P-61 through P-67, and P-24
+    for multiplicative prefixes, complex prefixes, parent substituents, and
+    spiro side-ring substituents.
+    """
+
+    main_set = set(candidate_path)
+    subst_mapping: dict[int, list[SubstituentItem]] = {}
+    sub_handled_atoms = set()
+
+    for group in sub_perceived:
+        if group.attachment_carbon in main_set and not group.is_principal_candidate:
+            rule = RULES.functional_groups.by_key.get(group.key)
+            name = rule.prefix if rule and rule.role == "prefix" else ""
+            if name:
+                subst_mapping.setdefault(group.attachment_carbon, []).append(
+                    SubstituentItem(
+                        name=name,
+                        locants=[],
+                        atom_ids=set(group.atoms_involved),
+                        bond_ids=_bond_ids_within(mol, set(group.atoms_involved) | {group.attachment_carbon}),
+                    )
+                )
+                sub_handled_atoms.update(group.atoms_involved)
+
+    for c_idx in candidate_path:
+        n_subs = [
+            n_idx
+            for n_idx in mol.get_neighbors(c_idx)
+            if n_idx not in main_set and n_idx not in sub_handled_atoms and n_idx not in sub_exclude
+        ]
+
+        spiro_pair = _find_spiro_side_pair(mol, c_idx, n_subs, main_set, sub_exclude)
+        if spiro_pair:
+            sub_comp = _spiro_side_component(mol, c_idx, spiro_pair[0], main_set, sub_exclude)
+            subst_mapping.setdefault(c_idx, []).append(
+                SubstituentItem(
+                    name="",
+                    locants=[],
+                    atom_ids=sub_comp - {c_idx},
+                    bond_ids=_bond_ids_within(mol, sub_comp),
+                    spiro=_spiro_subgraph_assembly(mol, c_idx, sub_comp),
+                )
+            )
+            sub_handled_atoms.update(sub_comp - {c_idx})
+            n_subs = [n for n in n_subs if n not in sub_comp]
+
+        for n_idx in n_subs:
+            if n_idx not in main_set and n_idx not in sub_handled_atoms and n_idx not in sub_exclude:
+                branch_name, branch_trace = name_subgraph(
+                    mol, n_idx, sub_exclude | main_set, upstream_atom=c_idx, return_trace=True
+                )
+                if branch_name:
+                    branch_atoms = _subgraph_component(mol, n_idx, sub_exclude | main_set)
+                    branch_with_attachment = branch_atoms | {c_idx}
+                    subst_mapping.setdefault(c_idx, []).append(
+                        SubstituentItem(
+                            name=branch_name,
+                            locants=[],
+                            atom_ids=branch_atoms,
+                            bond_ids=_bond_ids_within(mol, branch_with_attachment),
+                            trace_segments=branch_trace,
+                        )
+                    )
+
+    return subst_mapping
+
+
+def _add_subgraph_substituents(parts: AssemblyParts, subst_mapping: dict[int, list[SubstituentItem]], get_loc) -> None:
+    """Add collected substituent prefixes to assembly parts.
+
+    Blue Book references: P-14.2 and P-16.5 for locants, multiplicative
+    prefixes, and complex substituent citation.
+    """
+
+    for c_idx, items in subst_mapping.items():
+        locant = get_loc(c_idx)
+        for item in items:
+            _add_substituent_trace(
+                parts,
+                item.name,
+                locant,
+                item.atom_ids,
+                item.bond_ids,
+                item.trace_segments,
+                spiro=item.spiro,
+            )
+
+
+def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
+    """Apply recursive-substituent wrapping rules to an assembled name.
+
+    Blue Book references: P-13.6 and P-16.5 for substituent suffix citation and
+    parentheses around complex substituent prefixes.
+    """
+
+    if name == "phenyl" and not parts.substituents:
+        return name
+    if (
+        (name.endswith("yl") or name.endswith("ylidene") or name.endswith("ylidyne"))
+        and not parts.substituents
+        and not parts.unsaturations
+        and str(parts.attachment_locant) == "1"
+        and not name.startswith("bicyclo")
+        and not name.startswith("spiro")
+        and not name.startswith("tricyclo")
+    ):
+        return name
+    return f"({name})"
+
+
+def _assemble_parent_name(
+    mol: Molecule,
+    parts: AssemblyParts,
+    numbered_path: list[int],
+    get_loc,
+    *,
+    finalize_subgraph: bool = False,
+    apply_special_component_names: bool = False,
+) -> str:
+    """Assemble a parent name and apply shared post-assembly charge rules."""
+
+    name = assemble_name_raw(parts)
+    if finalize_subgraph:
+        name = _finalize_subgraph_name(name, parts)
+    name = apply_anionic_parent_names(name, mol, numbered_path, get_loc, parts.retained_name)
+    name = apply_cationic_imino_names(name, mol)
+    if apply_special_component_names:
+        name = SPECIAL_COMPONENT_NAMES.get(name, name)
+    processed_name = post_process_name(name)
+    if parts.name_atom_bindings:
+        parts.name_atom_bindings = postprocess_name_atom_bindings(parts.name_atom_bindings, post_process_name)
+    return processed_name
+
+
+def name_subgraph(
+    mol: Molecule,
+    start_idx: int,
+    exclude_atoms: set[int],
+    upstream_atom: int = None,
+    return_trace: bool = False,
+):
+    """Name a recursive substituent subgraph attached to the current parent.
+
+    Blue Book references: P-13.6, P-14.2, P-16.5, P-61, P-62, P-63, P-65,
+    P-66, and P-67.  Extendable prefix vocabularies are loaded from
+    ``data/namer_rules.json``.
+    """
+
+    start_atom = mol.atoms[start_idx]
+    cyclic_atoms_global = get_cyclic_atoms(mol, exclude_atoms)
+
+    if not start_atom.is_carbon and start_idx not in cyclic_atoms_global:
+        name = name_heteroatom_subgraph(mol, start_idx, exclude_atoms, upstream_atom, name_subgraph)
+        if name is not None:
+            return (name, []) if return_trace else name
+
+    component = _subgraph_component(mol, start_idx, exclude_atoms)
+    direct_prefix = _direct_subgraph_prefix(mol, start_idx, component)
+    if direct_prefix:
+        return (direct_prefix, []) if return_trace else direct_prefix
+
+    sub_exclude = set(mol.atoms.keys()) - component
+    parent_selection = _select_subgraph_parent(mol, start_idx, component, sub_exclude)
+    if parent_selection is None:
+        return ("", []) if return_trace else ""
+
+    retained_name_val, locant_maps = resolve_retained_parent(
+        mol,
+        parent_selection.primary_path,
+        parent_selection.is_ring,
+        parent_selection.is_bicycle,
+        parent_selection.is_polycycle,
+    )
+    sub_perceived = perceive_groups(mol)
+    subst_mapping = _collect_subgraph_substituents(mol, parent_selection.primary_path, sub_perceived, sub_exclude)
+    parent_plan = build_parent_assembly_plan(
+        mol,
+        parent_selection,
+        NamingIntent.subgraph(
+            start_idx,
+            upstream_atom,
+            fixed_start=parent_selection.fixed_start_required,
+        ),
+        subst_mapping,
+        locant_maps,
+        retained_name_val,
+    )
+    numbered_path = parent_plan.numbered_path
+    get_loc = parent_plan.get_loc
+    parts = parent_plan.parts
+    _emit_bond_stereo(mol, parts, numbered_path, get_loc, sub_exclude, upstream_atom)
+    _add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
+    _add_subgraph_substituents(parts, subst_mapping, get_loc)
+    _add_subgraph_parent_features(
+        mol,
+        parts,
+        numbered_path,
+        get_loc,
+        parent_selection.is_bicycle,
+        parent_selection.is_spiro,
+        parent_selection.is_polycycle,
+    )
+
+    name = _assemble_parent_name(mol, parts, numbered_path, get_loc, finalize_subgraph=True)
+    if return_trace:
+        return name, _assembly_trace_segments(parts)
+    return name
+
+
+def name_component(
+    mol: Molecule,
+    component_atoms: set[int],
+    is_substituent: bool = False,
+    return_trace: bool = False,
+    decision_trace: DecisionTrace | None = None,
+):
+    """Name one connected component or recursive component of a molecule."""
+
+    return _name_component_impl(
+        mol,
+        component_atoms,
+        is_substituent=is_substituent,
+        return_trace=return_trace,
+        decision_trace=decision_trace,
+        name_subgraph=name_subgraph,
+        name_spiro_subgraph=_spiro_subgraph_assembly,
+        assemble_parent_name=_assemble_parent_name,
+    )
+
+
+def name_smiles_with_trace(smiles: str) -> tuple[str, list[dict]]:
+    """Return a generated name and AssemblyParts-derived trace annotations.
+
+    Blue Book references are carried by each trace segment. This API keeps the
+    original ``name_smiles`` function unchanged while exposing atom and bond IDs
+    selected during parent, prefix, unsaturation, and suffix assembly.
+    """
+
+    return DEFAULT_NAMING_ENGINE.name_smiles_with_trace(smiles)
+
+
+def analyze_smiles(smiles: str) -> NameAnalysis:
+    """Return a generated name with structure annotations and decision traces.
+
+    The default ``name_smiles`` path stays minimal. This analysis API turns on
+    explainability and records the major choices in the pipeline: parsing,
+    component splitting, functional-group perception, priority, parent
+    selection, numbering, and final assembly.
+    """
+
+    return DEFAULT_NAMING_ENGINE.analyze_smiles(smiles)
+
+
+def name_smiles(smiles: str) -> str:
+    """Return an IUPAC-style name for a SMILES string.
+
+    Blue Book references: P-13 for name construction, P-44/P-45 for parent
+    selection and numbering, and P-72 for ordering disconnected ionic
+    components.  Component-order metal names are data-backed in
+    ``data/namer_rules.json``.
+    """
+
+    return DEFAULT_NAMING_ENGINE.name_smiles(smiles)

@@ -19,11 +19,11 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install ruff
-        run: pip install "ruff>=0.4"
+        run: pip install "ruff==0.6.9"
       - name: Ruff check
-        run: ruff check structure_to_iupac
+        run: ruff check src/bluenamer
       - name: Ruff format check
-        run: ruff format --check structure_to_iupac
+        run: ruff format --check src/bluenamer
 
   test:
     runs-on: ubuntu-latest

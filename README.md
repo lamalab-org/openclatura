@@ -1,4 +1,4 @@
-# structure-to-iupac
+# bluenamer
 
 A deterministic SMILES → IUPAC name generator implementing the rules of the
 IUPAC Blue Book (2013 recommendations).
@@ -16,7 +16,7 @@ decision trace so the *why* of a name is recoverable, not just the *what*.
 ## Install
 
 ```bash
-pip install structure_to_iupac
+pip install bluenamer
 ```
 
 Optional extras:
@@ -29,13 +29,13 @@ Optional extras:
 | `[dev]`      | pytest, ruff, pre-commit, hypothesis, py2opsin        |
 
 ```bash
-pip install "structure_to_iupac[opsin,datasets]"
+pip install "bluenamer[opsin,datasets]"
 ```
 
 ## Quick start
 
 ```python
-from structure_to_iupac import name_smiles
+from bluenamer import name_smiles
 
 name_smiles("CCO")          # 'ethanol'
 name_smiles("c1ccccc1")     # 'benzene'
@@ -45,7 +45,7 @@ name_smiles("CC(=O)O")      # 'acetic acid'
 For an explainable result with the full decision trace:
 
 ```python
-from structure_to_iupac import analyze_smiles
+from bluenamer import analyze_smiles
 
 analysis = analyze_smiles("CC(=O)Nc1ccccc1")
 print(analysis.name)        # 'N-phenylacetamide'
@@ -67,8 +67,8 @@ pytest
 pytest -m "not slow and not dataset"
 
 # lint and format
-ruff check --fix
-ruff format
+ruff check --fix src/bluenamer
+ruff format src/bluenamer
 ```
 
 Java is required for the OPSIN-based round-trip checks (see `py2opsin`).

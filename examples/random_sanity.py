@@ -1,5 +1,5 @@
 import sys
-from structure_to_iupac.namer import name_smiles
+from bluenamer.namer import name_smiles
 
 TESTS =[
     {
