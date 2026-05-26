@@ -30,10 +30,11 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/usr/local/bin:${PATH}"
 
-# Java runtime for OPSIN round-trip verification (py2opsin shells out to java).
+# Java runtime for OPSIN round-trip verification (py2opsin shells out to java;
+# OPSIN itself requires Java >=8 so the newer JRE is fine).
 RUN apt-get update -qq \
  && apt-get install -y --no-install-recommends \
-        openjdk-17-jre-headless \
+        default-jre-headless \
         curl \
         ca-certificates \
  && rm -rf /var/lib/apt/lists/*

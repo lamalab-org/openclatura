@@ -134,7 +134,7 @@ Java is required for the OPSIN-based round-trip checks (see `py2opsin`).
 ## HTTP service (Docker)
 
 The `[web]` extra ships a FastAPI app with `name`, `batch`, `describe`
-and `healthz` endpoints. The bundled `Dockerfile` includes a Java 17 JRE
+and `healthz` endpoints. The bundled `Dockerfile` includes a headless JRE
 so `verify_opsin=True` works out of the box.
 
 ```bash
