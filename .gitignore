@@ -1,0 +1,68 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Hatch
+.hatch/
+
+# Unit test / coverage / type checkers
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+.python-version
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Project-specific
+*.log
+*.jar
+opsin*.jar
+data/cache/
+.cache/
+
+# Docker
+.docker/

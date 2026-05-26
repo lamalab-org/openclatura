@@ -5,43 +5,117 @@ build-backend = "hatchling.build"
 [project]
 name = "structure_to_iupac"
 version = "0.1.0"
-description = "Deterministic Structure to Iupac translator"
+description = "Deterministic SMILES-to-IUPAC name generator based on the IUPAC Blue Book"
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "Adrian Mirza" },
+    { name = "Kevin Maik Jablonka" },
+]
+keywords = ["chemistry", "iupac", "smiles", "nomenclature", "rdkit"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Chemistry",
 ]
 
 dependencies = [
-    "rdkit==2026.3.1"
+    "rdkit>=2023.09",
 ]
 
-# 1. Add Ruff as a development dependency
 [project.optional-dependencies]
-dev = [
-    "dotenv==0.9.9",
-    "rdkit==2026.3.1"
+opsin = [
+    "py2opsin>=2.0",
 ]
+datasets = [
+    "datasets>=2.0",
+    "tqdm>=4.65",
+]
+web = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.27",
+    "pydantic>=2.5",
+]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "pytest-xdist>=3.5",
+    "hypothesis>=6.92",
+    "ruff>=0.4",
+    "pre-commit>=3.5",
+    "py2opsin>=2.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/lamalab-org/iupac-name-generator"
+Repository = "https://github.com/lamalab-org/iupac-name-generator"
+Issues = "https://github.com/lamalab-org/iupac-name-generator/issues"
+
+[project.scripts]
+structure-to-iupac = "structure_to_iupac.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["structure_to_iupac/"]
+packages = ["structure_to_iupac"]
 
-# 2. Configure Ruff
+[tool.hatch.build.targets.wheel.force-include]
+"structure_to_iupac/data" = "structure_to_iupac/data"
+
 [tool.ruff]
-# Match your requires-python version
-target-version = "py312" 
+target-version = "py310"
 line-length = 120
+extend-exclude = ["structure_to_iupac/__pycache__"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "W"]
+ignore = [
+    "E501",  # line length handled by formatter
+    "B008",  # function call in default arg (FastAPI uses this)
+    # The following are tolerated in the existing codebase and slated for
+    # gradual cleanup; tightening them all at once would balloon PR1.
+    "E701",  # multiple statements on one line (used in compact dispatchers)
+    "E741",  # ambiguous variable name (chemistry domain uses l, O, etc.)
+    "B905",  # zip() without strict=
+    "B007",  # unused loop control variable
+]
 
 [tool.ruff.format]
-# You can leave this as just line-length, or explicitly declare your style preferences:
 quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 line-ending = "auto"
 
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests", "structure_to_iupac/tests", "structure_to_iupac/tests_roundtrip"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+]
+markers = [
+    "slow: marks tests as slow (deselect with -m 'not slow')",
+    "opsin: requires py2opsin and Java",
+    "dataset: requires the [datasets] extra and network access",
+    "fuzz: hypothesis-based fuzz tests",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
 
-[tool.hatch.envs.default.scripts]
-fmt = "ruff format"
-lint = "ruff check --fix"
-all = ["fmt", "lint"]
+[tool.coverage.run]
+source = ["structure_to_iupac"]
+omit = ["*/tests/*", "*/tests_roundtrip/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]

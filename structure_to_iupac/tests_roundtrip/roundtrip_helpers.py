@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import ast
+import shutil
+import subprocess
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 import pytest
 from rdkit import Chem
@@ -16,6 +18,24 @@ try:
     import py2opsin
 except Exception:  # pragma: no cover - optional dependency
     py2opsin = None
+
+
+def _java_available() -> bool:
+    if shutil.which("java") is None:
+        return False
+    try:
+        subprocess.run(
+            ["java", "-version"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, OSError):
+        return False
+    return True
+
+
+_JAVA_AVAILABLE = _java_available()
 
 
 normalizer = rdMolStandardize.Normalizer()
@@ -39,11 +59,13 @@ def standardize_and_canonicalize_tautomer(smi: str) -> str | None:
 
 
 def repo_root() -> Path:
+    """Return the repository root by walking up to the directory containing pyproject.toml."""
+
     current = Path(__file__).resolve()
     for parent in current.parents:
-        if parent.name == "openIUPAC":
+        if (parent / "pyproject.toml").exists():
             return parent
-    raise RuntimeError("Unable to locate openIUPAC repo root.")
+    raise RuntimeError("Unable to locate repository root (no pyproject.toml found).")
 
 
 ORIGINAL_TESTS_DIR = repo_root() / "tests"
@@ -88,6 +110,8 @@ def extract_smiles_from_test_file(path: Path) -> list[str]:
 def roundtrip_smiles(smiles: str) -> None:
     if py2opsin is None:
         pytest.skip("py2opsin is not available")
+    if not _JAVA_AVAILABLE:
+        pytest.skip("Java runtime not found (OPSIN requires Java)")
 
     original = standardize_and_canonicalize_tautomer(smiles)
     assert original is not None
