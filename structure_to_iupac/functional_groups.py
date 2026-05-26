@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from .molecule import FunctionalGroupMetadata, Molecule
 from .nomenclature import RULES
 
-
 PERCEPTION_DETECTORS: list[Callable[[Molecule], list]] = []
 
 
@@ -22,7 +21,9 @@ class PerceptionDetectorSpec:
 PERCEPTION_SPECS: list[PerceptionDetectorSpec] = []
 
 
-def register_group_detector(detector: Callable[[Molecule], list], *, prepend: bool = False) -> Callable[[Molecule], list]:
+def register_group_detector(
+    detector: Callable[[Molecule], list], *, prepend: bool = False
+) -> Callable[[Molecule], list]:
     """Register a detector that returns raw ``PerceivedGroup`` objects."""
 
     if prepend:

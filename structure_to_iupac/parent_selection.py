@@ -6,7 +6,6 @@ from .molecule import Molecule
 from .naming_data import values
 from .ring_parent import RingParent
 
-
 PARENT_SELECTION_CRITERIA = tuple(values("parent_selection_criteria"))
 ELEMENT_SENIORITY = {"N": 1, "P": 2, "Si": 3, "B": 4, "O": 5, "S": 6, "C": 7}
 HETEROATOM_SENIORITY = {"N": 1, "O": 2, "S": 3, "P": 4, "Si": 5, "B": 6}

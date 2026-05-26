@@ -36,9 +36,7 @@ def subgraph_neighbors(
 ) -> list[int]:
     blocked = set(extra_exclude or [])
     return [
-        n
-        for n in mol.get_neighbors(start_idx)
-        if n not in exclude_atoms and n != upstream_atom and n not in blocked
+        n for n in mol.get_neighbors(start_idx) if n not in exclude_atoms and n != upstream_atom and n not in blocked
     ]
 
 
@@ -270,7 +268,15 @@ def name_nitrogen_subgraph(
         if mol.atoms[nxt].is_carbon and len(c_oxygens) == 1:
             branches.append(
                 name_carbonyl_like_fragment(
-                    mol, nxt, start_idx, c_oxygens, exclude_atoms, "carbonyl", "formyl", branch_namer, amino_base="carbamoyl"
+                    mol,
+                    nxt,
+                    start_idx,
+                    c_oxygens,
+                    exclude_atoms,
+                    "carbonyl",
+                    "formyl",
+                    branch_namer,
+                    amino_base="carbamoyl",
                 )
             )
         elif mol.atoms[nxt].is_carbon and len(c_sulfurs) == 1:
@@ -330,13 +336,19 @@ def name_sulfur_subgraph(
             return f"{stereo_prefix_text}{suffix}"
         if len(next_atoms) == 1:
             branch = name_branch_or_none(
-                mol, next_atoms[0], exclude_atoms | {start_idx} | set(s_oxygens) | set(s_nitrogens), start_idx, branch_namer
+                mol,
+                next_atoms[0],
+                exclude_atoms | {start_idx} | set(s_oxygens) | set(s_nitrogens),
+                start_idx,
+                branch_namer,
             )
             return f"({stereo_prefix_text}{branch}{suffix})" if branch else f"{stereo_prefix_text}{suffix}"
         branches = [
             br
             for nxt in next_atoms
-            if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx} | set(s_oxygens) | set(s_nitrogens), start_idx))
+            if (
+                br := branch_namer(mol, nxt, exclude_atoms | {start_idx} | set(s_oxygens) | set(s_nitrogens), start_idx)
+            )
         ]
         branches.extend(["oxo"] * len(s_oxygens))
         branches.extend(["imino"] * len(s_nitrogens))
@@ -349,10 +361,14 @@ def name_sulfur_subgraph(
         if not next_atoms:
             return f"{stereo_prefix_text}{suffix}"
         if len(next_atoms) == 1:
-            branch = name_branch_or_none(mol, next_atoms[0], exclude_atoms | {start_idx} | set(s_oxygens), start_idx, branch_namer)
+            branch = name_branch_or_none(
+                mol, next_atoms[0], exclude_atoms | {start_idx} | set(s_oxygens), start_idx, branch_namer
+            )
             return f"({stereo_prefix_text}{branch}{suffix})" if branch else f"{stereo_prefix_text}{suffix}"
         branches = [
-            br for nxt in next_atoms if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx} | set(s_oxygens), start_idx))
+            br
+            for nxt in next_atoms
+            if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx} | set(s_oxygens), start_idx))
         ]
         branches.extend(["oxo"] * len(s_oxygens))
         return format_lambda_substituent(
@@ -390,7 +406,11 @@ def name_chalcogen_subgraph(
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
     stereo_prefix_text = stereo_prefix(mol.atoms[start_idx])
     if not next_atoms:
-        return oxo_prefix if is_double else f"{stereo_prefix_text}{unsubstituted_prefix(mol.atoms[start_idx].symbol) or element_suffix}"
+        return (
+            oxo_prefix
+            if is_double
+            else f"{stereo_prefix_text}{unsubstituted_prefix(mol.atoms[start_idx].symbol) or element_suffix}"
+        )
     if len(next_atoms) == 1:
         branch = branch_namer(mol, next_atoms[0], exclude_atoms | {start_idx}, start_idx)
         if branch and substituent_bonding_number(mol, start_idx) != mol.atoms[start_idx].element.standard_valence:
@@ -424,7 +444,11 @@ def name_phosphorus_subgraph(
     )
     if not next_atoms:
         return f"{stereo_prefix_text}{suffix}"
-    branches = [br for nxt in next_atoms if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx} | set(p_oxygens), start_idx))]
+    branches = [
+        br
+        for nxt in next_atoms
+        if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx} | set(p_oxygens), start_idx))
+    ]
     return f"({stereo_prefix_text}{format_counted_prefixes(branches)}{suffix})"
 
 
@@ -486,7 +510,9 @@ def name_heteroatom_subgraph(
             mol, start_idx, exclude_atoms, upstream_atom, SIMPLE_SELANYL_PREFIXES, "selanyl", "selenoxo", branch_namer
         )
     if symbol == "Te":
-        return name_chalcogen_subgraph(mol, start_idx, exclude_atoms, upstream_atom, set(), "tellanyl", "telluroxo", branch_namer)
+        return name_chalcogen_subgraph(
+            mol, start_idx, exclude_atoms, upstream_atom, set(), "tellanyl", "telluroxo", branch_namer
+        )
     if symbol == "P":
         return name_phosphorus_subgraph(mol, start_idx, exclude_atoms, upstream_atom, branch_namer)
     if symbol in {"Si", "B"}:

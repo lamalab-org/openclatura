@@ -42,9 +42,7 @@ def add_unsaturations(
 
             if max_idx == min_idx + 1:
                 locant_str = min_loc_str
-            elif min_idx == 0 and max_idx == len(numbered_path) - 1 and not (
-                is_bicycle or is_spiro or is_polycycle
-            ):
+            elif min_idx == 0 and max_idx == len(numbered_path) - 1 and not (is_bicycle or is_spiro or is_polycycle):
                 locant_str = max_loc_str
             else:
                 locant_str = f"{min_loc_str}({max_loc_str})"

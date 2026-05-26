@@ -1,5 +1,5 @@
-from .functional_groups import register_group_detector
 from .engine import NamingEngine, NamingRequest, NamingResult
+from .functional_groups import register_group_detector
 from .molecule import (
     AtomBinding,
     BondBinding,
@@ -11,8 +11,8 @@ from .molecule import (
     TracePhase,
     TraceStep,
 )
-from .naming_context import NamingIntent
 from .namer import analyze_smiles, name_smiles, name_smiles_with_trace
+from .naming_context import NamingIntent
 from .nomenclature import RULES, registry
 
 __all__ = [

@@ -155,7 +155,9 @@ def _connection_tail_needs_one_locant(name: str, open_idx: int) -> bool:
         return False
     tail = name[close_idx + 1 : close_idx + 80].lower()
     normalized_tail = re.sub(r"[^a-z]", "", tail)
-    return any(stem.replace("-", "").lower() in normalized_tail for stem in RULES.assembly.connection_boundary_parent_stems)
+    return any(
+        stem.replace("-", "").lower() in normalized_tail for stem in RULES.assembly.connection_boundary_parent_stems
+    )
 
 
 def _matching_close_paren(name: str, open_idx: int) -> int | None:

@@ -444,10 +444,7 @@ def homonuclear_chain_parent_name(mol: Molecule, component_atoms: set[int]) -> s
             return ""
         if not _terminal_ligand_name(mol, atom_idx, backbone_neighbors[0]):
             return ""
-    bond_orders = [
-        mol.get_bond(chain[idx], chain[idx + 1]).order
-        for idx in range(len(chain) - 1)
-    ]
+    bond_orders = [mol.get_bond(chain[idx], chain[idx + 1]).order for idx in range(len(chain) - 1)]
     parent = _same_element_parent_name(symbol, len(chain), bond_orders)
     if not parent:
         return ""
@@ -598,7 +595,9 @@ def _grouped_ligand_prefix(names: list[str]) -> str:
 
 
 def _lambda_text(mol: Molecule, atom_idx: int) -> str:
-    bond_order_sum = sum((mol.get_bond(atom_idx, n).order if mol.get_bond(atom_idx, n) else 0) for n in mol.get_neighbors(atom_idx))
+    bond_order_sum = sum(
+        (mol.get_bond(atom_idx, n).order if mol.get_bond(atom_idx, n) else 0) for n in mol.get_neighbors(atom_idx)
+    )
     hydrogens = mol.atoms[atom_idx].total_h_count or mol.atoms[atom_idx].explicit_h_count
     bonding_number = bond_order_sum + hydrogens
     standard = mol.atoms[atom_idx].element.standard_valence
@@ -643,9 +642,7 @@ def anhydride_half_name(mol: Molecule, start_c: int, bridge_o: int, component_na
         for nxt in mol.get_neighbors(n):
             if nxt in half_atoms and n < nxt:
                 bond = mol.get_bond(n, nxt)
-                sub_mol.add_bond(
-                    u=n, v=nxt, order=bond.order, stereo=bond.stereo, in_small_ring=bond.in_small_ring
-                )
+                sub_mol.add_bond(u=n, v=nxt, order=bond.order, stereo=bond.stereo, in_small_ring=bond.in_small_ring)
 
     return component_namer(sub_mol, half_atoms).replace(" acid", "")
 

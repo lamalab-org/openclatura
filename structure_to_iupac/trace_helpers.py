@@ -6,8 +6,8 @@ from .assembly_parts import AssemblyParts, SubstituentItem
 from .formatting import strip_outer_parentheses
 from .molecule import DecisionTrace, Molecule, TracePhase
 from .nomenclature import RULES
-from .principal_suffixes import principal_suffix_terms
 from .perception import PerceivedGroup
+from .principal_suffixes import principal_suffix_terms
 from .rules import bonds, multipliers, stems
 
 
@@ -111,7 +111,10 @@ def assembly_parent_terms(parts: AssemblyParts) -> list[str]:
     """Return parent-name terms from the actual assembly configuration."""
 
     if parts.retained_name:
-        return [parts.retained_name, parts.retained_name[:-1] if parts.retained_name.endswith("e") else parts.retained_name]
+        return [
+            parts.retained_name,
+            parts.retained_name[:-1] if parts.retained_name.endswith("e") else parts.retained_name,
+        ]
 
     stem = stems.stem_for(parts.parent_length)
     terms = [stem]

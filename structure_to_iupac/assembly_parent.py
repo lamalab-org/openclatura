@@ -1,22 +1,20 @@
 """Parent stem, unsaturation, substituent-tail, and suffix formatting."""
 
-from .assembly_parts import AssemblyParts, ParentChargeItem
 from .assembly_charge import (
     append_charge_suffixes_to_terminal,
     has_ionic_retained_parent,
     has_retained_like_parent,
     inferred_ionic_retained_parent,
     parent_charge_name_operations,
-    positive_parent_n_charges,
 )
+from .assembly_parts import AssemblyParts
 from .assembly_utils import parse_locant
 from .nomenclature import RULES
 from .principal_suffixes import render_principal_suffix
-from .ring_renderer import render_ring_descriptor
 from .retained_specs import retained_parent_spec
+from .ring_renderer import render_ring_descriptor
 from .rules import bonds, elision, stems
 from .suffix_stack import suffix_operation_spelling
-
 
 UNSATURATION_ORDER = RULES.assembly.unsaturation_order
 AMBIGUOUS_CONNECTION_SUBSTITUENT_STEMS = RULES.assembly.ambiguous_connection_substituent_stems
@@ -79,7 +77,7 @@ def parent_stem_and_terminal(parts: AssemblyParts) -> tuple[str, str]:
                         a = v - 2 - b - c
                     stem_str = f"tricyclo[{a}.{b}.{c}.0^{{1,3}}]" + stem_str
                 else:
-                    stem_str = f"tricyclo[1.1.0.0^{{1,3}}]" + stem_str
+                    stem_str = "tricyclo[1.1.0.0^{1,3}]" + stem_str
         elif parts.is_ring:
             stem_str = "cyclo" + stem_str
     return stem_str, terminal_e
@@ -142,7 +140,9 @@ def format_substituent_tail(
     always_print_locant = bool(spiro_subs) or always_print_substituent_locant(parts)
     if parts.retained_name == "benzene":
         terminal_e = "yl"
-    elif (str(parts.attachment_locant) != "1" or parts.unsaturations or always_print_locant) and parts.parent_length > 1:
+    elif (
+        str(parts.attachment_locant) != "1" or parts.unsaturations or always_print_locant
+    ) and parts.parent_length > 1:
         terminal_e = f"-{parts.attachment_locant}-{suffix_yl}"
     else:
         terminal_e = suffix_yl
@@ -204,7 +204,11 @@ def format_parent_tail(parts: AssemblyParts, stem_str: str, terminal_e: str, spi
     charge_operations = parent_charge_name_operations(parts)
     if charge_operations:
         terminal_e = ""
-        suffix_str = "".join(
-            f"-{','.join(operation.locants)}-{suffix_operation_spelling(operation)}" for operation in charge_operations
-        ) + suffix_str
+        suffix_str = (
+            "".join(
+                f"-{','.join(operation.locants)}-{suffix_operation_spelling(operation)}"
+                for operation in charge_operations
+            )
+            + suffix_str
+        )
     return stem_str, unsat_str, terminal_e, suffix_str

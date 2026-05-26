@@ -32,4 +32,3 @@ def get(key: str) -> Substituent:
 
 def is_known(key: str) -> bool:
     return key in SUBSTITUENTS
-

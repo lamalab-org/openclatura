@@ -2,8 +2,8 @@
 
 from .assembly_parts import AssemblyParts, SubstituentItem
 from .molecule import Molecule
-from .namer_config import INDICATED_H_RETAINED_NAMES
 from .name_operations import HydroOperation
+from .namer_config import INDICATED_H_RETAINED_NAMES
 
 
 def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:

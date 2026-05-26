@@ -1,13 +1,10 @@
 # structure-to-iupac/assembler.py
 
 import re
-from .assembly_parts import AssemblyParts, ParentChargeItem, PrincipalGroupItem, SubstituentItem, UnsaturationItem
+
 from .assembly_charge import (
     positive_parent_n_charges,
 )
-from .assembly_utils import needs_hyphen, parse_locant
-from .assembly_spiro import format_spiro_core, split_spiro_substituents
-from .assembly_prefixes import format_replacement_prefixes, format_substituent_prefixes
 from .assembly_parent import (
     apply_replacement_prefix,
     format_parent_tail,
@@ -15,13 +12,16 @@ from .assembly_parent import (
     parent_stem_and_terminal,
     promote_benzene_retained_name,
 )
+from .assembly_parts import AssemblyParts
+from .assembly_prefixes import format_replacement_prefixes, format_substituent_prefixes
+from .assembly_spiro import format_spiro_core, split_spiro_substituents
+from .assembly_utils import needs_hyphen, parse_locant
 from .formatting import ensure_stereo_descriptor_boundary
 from .name_postprocessing import (
     apply_acyl_amido_postprocessing,
     apply_connection_boundary_postprocessing,
     apply_data_postprocessing,
 )
-from .nomenclature import RULES
 from .rules import multipliers
 
 
@@ -81,7 +81,7 @@ def _post_process_name(name: str) -> str:
     name = re.sub(r"\b1-([a-zA-Z0-9\-\[\]\(\)\,]+?)aminomethanenitrile\b", r"\1cyanamide", name)
     name = name.replace("aminomethanenitrile", "cyanamide")
 
-    replacements =[
+    replacements = [
         ("1-hydroxymethanoic acid", "carbonic acid"),
         ("1-hydroxymethanoate", "carbonate"),
         ("1-hydroxymethanamide", "carbamic acid"),
@@ -200,10 +200,18 @@ def _post_process_name(name: str) -> str:
         ("1-thiacyclohexan-", "thian-"),
     ]
     for old, new in replacements:
-        if old in["2-methylpropan-2-yl", "1,1-dimethylethyl"]:
+        if old in ["2-methylpropan-2-yl", "1,1-dimethylethyl"]:
             name = re.sub(rf"(?<![a-zA-Z0-9\-,]){re.escape(old)}(?![a-zA-Z])", new, name)
         else:
-            if old in["1-azacyclobutane", "1-azacyclopentane", "1-azacyclohexane", "1-oxacyclopentane", "1-oxacyclohexane", "1-thiacyclopentane", "1-thiacyclohexane"]:
+            if old in [
+                "1-azacyclobutane",
+                "1-azacyclopentane",
+                "1-azacyclohexane",
+                "1-oxacyclopentane",
+                "1-oxacyclohexane",
+                "1-thiacyclopentane",
+                "1-thiacyclohexane",
+            ]:
                 name = re.sub(rf"-{re.escape(old)}(?![a-zA-Z])", new, name)
             name = re.sub(rf"(?<![a-zA-Z]){re.escape(old)}(?![a-zA-Z])", new, name)
 
@@ -246,11 +254,11 @@ def _post_process_name(name: str) -> str:
 
     name = re.sub(r"\b(amino|imino)([a-z]+oxy)methyl\b", r"\1(\2)methyl", name)
     name = re.sub(r"\b(amino|imino)([a-z]+oxy)methylidene\b", r"\1(\2)methylidene", name)
-    
+
     name = re.sub(r"ane-(\d+(?:,\d+)*)-hydrazine\b", r"an-\1-ylhydrazine", name)
     name = re.sub(r"ene-(\d+(?:,\d+)*)-hydrazine\b", r"en-\1-ylhydrazine", name)
     name = re.sub(r"yne-(\d+(?:,\d+)*)-hydrazine\b", r"yn-\1-ylhydrazine", name)
-    
+
     name = re.sub(r"\b(amino|imino)\(", r"(\1)(", name)
     name = apply_data_postprocessing(name)
     name = apply_connection_boundary_postprocessing(name)
@@ -276,7 +284,7 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
 def _add_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:
     if not parts.stereo_features:
         return final_word
-    unique_stereo =[]
+    unique_stereo = []
     seen = set()
     for feature in parts.stereo_features:
         if feature not in seen:
@@ -293,7 +301,7 @@ def _add_front_modifiers(parts: AssemblyParts, final_word: str) -> str:
     counts = {}
     for mod in parts.front_modifiers:
         counts[mod] = counts.get(mod, 0) + 1
-    front_words =[multipliers.basic(c) + m if c > 1 else m for m, c in sorted(counts.items())]
+    front_words = [multipliers.basic(c) + m if c > 1 else m for m, c in sorted(counts.items())]
     return f"{' '.join(front_words)} {final_word}"
 
 
@@ -309,9 +317,7 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
     stem_str, terminal_e = parent_stem_and_terminal(parts)
     stem_str = apply_replacement_prefix(stem_str, a_prefix_str)
     if parts.is_substituent:
-        stem_str, unsat_str, terminal_e, suffix_str = format_substituent_tail(
-            parts, stem_str, terminal_e, spiro_subs
-        )
+        stem_str, unsat_str, terminal_e, suffix_str = format_substituent_tail(parts, stem_str, terminal_e, spiro_subs)
     else:
         stem_str, unsat_str, terminal_e, suffix_str = format_parent_tail(parts, stem_str, terminal_e, spiro_subs)
 

@@ -8,17 +8,16 @@ can be reviewed against the relevant IUPAC recommendation before use.
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+from functools import cache, lru_cache
 from pathlib import Path
 from typing import Any
 
 from .rule_layout import RuleGroupView, rule_groups
 
-
 DATA_DIR = Path(__file__).with_name("data")
 
 
-@lru_cache(maxsize=None)
+@cache
 def load_json_table(filename: str) -> dict[str, Any]:
     """Load an extendable JSON nomenclature table.
 

@@ -20,10 +20,7 @@ def render_principal_suffix(rule: FunctionalGroupRule, count: int) -> str:
     words = rule.suffix.split()
     positions = set(rule.suffix_multiplier_positions or (0,))
     multiplier = multipliers.basic(count)
-    rendered = [
-        f"{multiplier}{word}" if idx in positions else word
-        for idx, word in enumerate(words)
-    ]
+    rendered = [f"{multiplier}{word}" if idx in positions else word for idx, word in enumerate(words)]
     return " ".join(rendered)
 
 

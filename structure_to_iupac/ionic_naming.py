@@ -6,8 +6,8 @@ charge to be explicit in the generated name.
 """
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from .formatting import format_counted_prefixes
 from .molecule import Molecule
@@ -15,12 +15,13 @@ from .name_operations import ParentSuffixOperation
 from .nomenclature import RULES
 from .suffix_stack import place_anion_suffix_operations
 
-
 IONIC_PARENT_SUFFIX_PATTERN = (
     r"(?P<suffix>-\d+-carboxylate|carboxylate|-\d+-carboxamide|-\d+-carbonitrile|"
     r"-\d+-carbaldehyde|-\d+-ol|-\d+-one|-\d+-ylidynyl|-\d+-ylidyne|-\d+-ylidene|"
     r"-\d+-ylmethyl|-\d+-yl|$)"
 )
+
+
 @dataclass(frozen=True)
 class ParentChargeSite:
     """A charged atom that belongs to the numbered parent."""
@@ -212,7 +213,9 @@ def _name_has_parent_ium_locant(name: str, locant: str) -> bool:
     return suffix_tail == ""
 
 
-def _charged_nitrogens_are_adjacent_or_conjugated(mol: Molecule, parent_set: set[int], anion_idx: int, cation_idx: int) -> bool:
+def _charged_nitrogens_are_adjacent_or_conjugated(
+    mol: Molecule, parent_set: set[int], anion_idx: int, cation_idx: int
+) -> bool:
     if cation_idx in mol.get_neighbors(anion_idx):
         return True
     queue: list[tuple[int, int]] = [(anion_idx, 0)]
@@ -315,8 +318,7 @@ def insert_parent_ium_suffix(name: str, locant: str) -> str:
     if f"-{locant}-ium" in name or f"{locant}-azonia" in name:
         return name
     pattern = re.compile(
-        r"(?P<parent>(?:\d+(?:,\d+)*-)?(?:\d+H-)?[A-Za-z][A-Za-z0-9,\-\[\]\^\{\}]*?)"
-        + IONIC_PARENT_SUFFIX_PATTERN
+        r"(?P<parent>(?:\d+(?:,\d+)*-)?(?:\d+H-)?[A-Za-z][A-Za-z0-9,\-\[\]\^\{\}]*?)" + IONIC_PARENT_SUFFIX_PATTERN
     )
 
     def repl(match: re.Match) -> str:

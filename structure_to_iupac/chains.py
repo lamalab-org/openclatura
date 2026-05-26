@@ -1,6 +1,7 @@
 # structure-to-iupac/chains.py
 
 from dataclasses import dataclass, field
+
 from .molecule import Molecule
 from .polycycle_topology import (
     bicyclo_proof,
@@ -9,8 +10,9 @@ from .polycycle_topology import (
     monospiro_proof,
     ring_system_topology,
 )
-from .ring_renderer import render_ring_descriptor, render_von_baeyer_descriptor
 from .ring_parent import RingParent
+from .ring_renderer import render_ring_descriptor, render_von_baeyer_descriptor
+
 
 @dataclass
 class RingSystem:
@@ -26,50 +28,48 @@ class RingSystem:
     polycycle_descriptor: str | None = None
     ring_parent: RingParent | None = None
 
+
 def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
     adj = {n: set() for n in comp_nodes}
     for u, v in comp_edges:
         adj[u].add(v)
         adj[v].add(u)
-        
+
     cycles = []
+
     def dfs(curr, start, path, visited):
         for n in adj[curr]:
             if n == start and len(path) >= 3:
                 cycles.append(path)
             elif n not in visited:
                 dfs(n, start, path + [n], visited | {n})
-                
+
     for n in comp_nodes:
         dfs(n, n, [n], {n})
-        
+
     if not cycles:
         return None, [list(comp_nodes)]
-        
+
     max_len = max(len(c) for c in cycles)
-    largest_cycles =[c for c in cycles if len(c) == max_len]
-    
+    largest_cycles = [c for c in cycles if len(c) == max_len]
+
     best_main_ring = None
     best_bridges = None
     best_main_bridge_len = -1
-    
+
     for main_ring in largest_cycles:
         main_ring_set = set(main_ring)
-        bridges =[]
+        bridges = []
         main_ring_edges = set()
         for i in range(len(main_ring)):
-            u, v = main_ring[i], main_ring[(i+1)%len(main_ring)]
+            u, v = main_ring[i], main_ring[(i + 1) % len(main_ring)]
             main_ring_edges.add(tuple(sorted((u, v))))
-            
+
         for u, v in comp_edges:
             if u in main_ring_set and v in main_ring_set:
                 if tuple(sorted((u, v))) not in main_ring_edges:
-                    bridges.append({
-                        'nodes':[],
-                        'endpoints': (u, v),
-                        'length': 0
-                    })
-                    
+                    bridges.append({"nodes": [], "endpoints": (u, v), "length": 0})
+
         non_main_nodes = comp_nodes - main_ring_set
         visited_non_main = set()
         for n in non_main_nodes:
@@ -84,32 +84,26 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
                         if neighbor in non_main_nodes and neighbor not in visited_non_main:
                             visited_non_main.add(neighbor)
                             q.append(neighbor)
-                
-                connections =[]
+
+                connections = []
                 for cn in sorted(comp):
                     for neighbor in sorted(adj[cn]):
                         if neighbor in main_ring_set:
                             connections.append((cn, neighbor))
-                
+
                 if len(connections) >= 2:
-                    bridges.append({
-                        'nodes': comp,
-                        'endpoints': (connections[0][1], connections[1][1]),
-                        'length': len(comp)
-                    })
+                    bridges.append(
+                        {"nodes": comp, "endpoints": (connections[0][1], connections[1][1]), "length": len(comp)}
+                    )
                     for cn, neighbor in connections[2:]:
-                        bridges.append({
-                            'nodes':[],
-                            'endpoints': (cn, neighbor),
-                            'length': 0
-                        })
-                    
+                        bridges.append({"nodes": [], "endpoints": (cn, neighbor), "length": 0})
+
         if not bridges:
             continue
-            
-        bridges.sort(key=lambda b: b['length'], reverse=True)
-        main_bridge_len = bridges[0]['length']
-        
+
+        bridges.sort(key=lambda b: b["length"], reverse=True)
+        main_bridge_len = bridges[0]["length"]
+
         if main_bridge_len > best_main_bridge_len:
             best_main_bridge_len = main_bridge_len
             best_main_ring = main_ring
@@ -117,41 +111,41 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
 
     if not best_bridges:
         return None, [largest_cycles[0]]
-        
+
     main_ring = best_main_ring
     bridges = best_bridges
     main_bridge = bridges[0]
-    
-    ep1, ep2 = main_bridge['endpoints']
+
+    ep1, ep2 = main_bridge["endpoints"]
     idx1 = main_ring.index(ep1)
     idx2 = main_ring.index(ep2)
-    
+
     if idx1 < idx2:
-        pathA = main_ring[idx1:idx2+1]
-        pathB = main_ring[idx2:] + main_ring[:idx1+1]
+        pathA = main_ring[idx1 : idx2 + 1]
+        pathB = main_ring[idx2:] + main_ring[: idx1 + 1]
     else:
-        pathA = main_ring[idx2:idx1+1]
-        pathB = main_ring[idx1:] + main_ring[:idx2+1]
-        
+        pathA = main_ring[idx2 : idx1 + 1]
+        pathB = main_ring[idx1:] + main_ring[: idx2 + 1]
+
     lenA = len(pathA) - 2
     lenB = len(pathB) - 2
-    
+
     if lenA >= lenB:
         branch1 = pathA
         branch2 = pathB[::-1]
     else:
         branch1 = pathB
         branch2 = pathA[::-1]
-        
+
     if branch1[0] != ep1:
         branch1 = branch1[::-1]
         branch2 = branch2[::-1]
-        
+
     bridge_path = []
-    if main_bridge['length'] > 0:
+    if main_bridge["length"] > 0:
         q = [(ep1, [])]
         visited = set()
-        found_path =[]
+        found_path = []
         while q:
             curr, p = q.pop(0)
             if curr == ep2 and len(p) > 0:
@@ -159,30 +153,30 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
                 break
             visited.add(curr)
             for neighbor in adj[curr]:
-                if neighbor in main_bridge['nodes'] or neighbor == ep2:
+                if neighbor in main_bridge["nodes"] or neighbor == ep2:
                     if neighbor not in visited:
                         q.append((neighbor, p + [neighbor]))
         bridge_path = found_path
-        
-    path1 =[]
+
+    path1 = []
     path1.extend(branch1)
     path1.extend(branch2[::-1][1:-1])
     path1.extend(bridge_path)
-    
+
     path2 = []
     path2.extend(branch1[::-1])
     path2.extend(branch2[1:-1])
     path2.extend(bridge_path[::-1])
-    
+
     def add_extra_nodes(base_path):
         path = list(base_path)
         visited = set(path)
         for br in bridges[1:]:
-            if br['length'] > 0:
-                b_ep1, b_ep2 = br['endpoints']
+            if br["length"] > 0:
+                b_ep1, b_ep2 = br["endpoints"]
                 q = [(b_ep1, [])]
                 v2 = set()
-                found =[]
+                found = []
                 while q:
                     curr, p = q.pop(0)
                     if curr == b_ep2 and len(p) > 0:
@@ -190,7 +184,7 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
                         break
                     v2.add(curr)
                     for nxt in adj[curr]:
-                        if nxt in br['nodes'] or nxt == b_ep2:
+                        if nxt in br["nodes"] or nxt == b_ep2:
                             if nxt not in v2:
                                 q.append((nxt, p + [nxt]))
                 for node in found:
@@ -205,35 +199,35 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
 
     path1 = add_extra_nodes(path1)
     path2 = add_extra_nodes(path2)
-    
+
     a_len = max(0, len(branch1) - 2)
     b_len = max(0, len(branch2) - 2)
-    c_len = main_bridge['length']
-    
+    c_len = main_bridge["length"]
+
     main_lens = sorted([a_len, b_len, c_len], reverse=True)
     a, b, c = main_lens
-    
+
     def build_desc(path):
-        pos = {n: i+1 for i, n in enumerate(path)}
+        pos = {n: i + 1 for i, n in enumerate(path)}
         extra_chords_data = []
         for b_idx, br in enumerate(bridges[1:]):
-            b_ep1, b_ep2 = br['endpoints']
+            b_ep1, b_ep2 = br["endpoints"]
             loc1, loc2 = sorted([pos.get(b_ep1, 1), pos.get(b_ep2, 1)])
-            extra_chords_data.append((br['length'], loc2, loc1))
+            extra_chords_data.append((br["length"], loc2, loc1))
         extra_chords_data.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
-        
+
         comp_seq = []
-        extra_chords =[]
+        extra_chords = []
         for length, loc2, loc1 in extra_chords_data:
             comp_seq.extend([loc1, loc2])
             extra_chords.append(f".{length}^{{{loc1},{loc2}}}")
-            
+
         desc_str = f"[{a}.{b}.{c}" + "".join(extra_chords) + "]"
         return desc_str, tuple(comp_seq)
 
     desc1_str, comp1 = build_desc(path1)
     desc2_str, comp2 = build_desc(path2)
-    
+
     if comp1 < comp2:
         best_desc = desc1_str
         valid_paths = [path1]
@@ -247,7 +241,7 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
         # heteroatom or unsaturation locants, but those locants no longer
         # describe the emitted von Baeyer descriptor graph.
         valid_paths = [path1]
-        
+
     return render_von_baeyer_descriptor(len(bridges), best_desc), valid_paths
 
 
@@ -263,7 +257,9 @@ def get_linear_dispiro_descriptor_and_paths(mol: Molecule, comp_nodes, comp_edge
     """
 
     topology = ring_system_topology(mol, set(comp_nodes), set(comp_edges))
-    proof = linear_dispiro_proof(topology.atoms, topology.edges, degrees=topology.internal_degrees, spiro_atoms=topology.spiro_atoms)
+    proof = linear_dispiro_proof(
+        topology.atoms, topology.edges, degrees=topology.internal_degrees, spiro_atoms=topology.spiro_atoms
+    )
     if proof is None or topology.classification != "linear_dispiro":
         return None
 
@@ -351,7 +347,9 @@ def _terminal_dispiro_sort_key(mol: Molecule, component: set[int]) -> tuple:
     return (0 if hetero_positions else 1, -len(component), sorted(component))
 
 
-def _component_path_between_spiro_neighbors(component: set[int], spiro_atom: int, adj: dict[int, set[int]]) -> list[int]:
+def _component_path_between_spiro_neighbors(
+    component: set[int], spiro_atom: int, adj: dict[int, set[int]]
+) -> list[int]:
     endpoints = sorted(atom for atom in component if spiro_atom in adj[atom])
     if len(endpoints) < 2:
         return sorted(component)
@@ -388,11 +386,13 @@ def _shortest_component_path(start: int, end: int, component: set[int], adj: dic
                 queue.append((neighbor, path + [neighbor]))
     return [start]
 
+
 def get_cyclic_atoms(mol: Molecule, exclude_atoms: set[int] = None) -> set[int]:
-    if exclude_atoms is None: exclude_atoms = set()
+    if exclude_atoms is None:
+        exclude_atoms = set()
     valid_nodes = {a.idx for a in mol if a.idx not in exclude_atoms and (a.is_carbon or mol.degree(a.idx) >= 2)}
     cyclic = set()
-    
+
     for n in valid_nodes:
         neighbors = [x for x in mol.get_neighbors(n) if x in valid_nodes]
         in_cycle = False
@@ -410,38 +410,45 @@ def get_cyclic_atoms(mol: Molecule, exclude_atoms: set[int] = None) -> set[int]:
                         elif nn not in visited:
                             visited.add(nn)
                             q.append(nn)
-                if found: break
+                if found:
+                    break
             if found:
                 in_cycle = True
                 break
         if in_cycle:
             cyclic.add(n)
-            
+
     return cyclic
 
+
 def find_all_carbon_paths(mol: Molecule, exclude_atoms: set[int] = None) -> list[list[int]]:
-    if exclude_atoms is None: exclude_atoms = set()
+    if exclude_atoms is None:
+        exclude_atoms = set()
     cyclic_atoms = get_cyclic_atoms(mol, exclude_atoms)
     # Only map continuous carbon sequences as pure chains to allow S and O to act as substituents
-    valid_nodes = {a.idx for a in mol if a.idx not in exclude_atoms and a.idx not in cyclic_atoms and mol.atoms[a.idx].is_carbon}
-    if not valid_nodes: return []
+    valid_nodes = {
+        a.idx for a in mol if a.idx not in exclude_atoms and a.idx not in cyclic_atoms and mol.atoms[a.idx].is_carbon
+    }
+    if not valid_nodes:
+        return []
 
     all_paths = []
+
     def dfs(current: int, path: list[int], visited: set[int]):
-        neighbors =[n for n in mol.get_neighbors(current) if n in valid_nodes and n not in visited]
+        neighbors = [n for n in mol.get_neighbors(current) if n in valid_nodes and n not in visited]
         if not neighbors:
             all_paths.append(path)
             return
         for n in neighbors:
             dfs(n, path + [n], visited | {n})
 
-    endpoints =[n for n in valid_nodes if sum(1 for x in mol.get_neighbors(n) if x in valid_nodes) <= 1]
+    endpoints = [n for n in valid_nodes if sum(1 for x in mol.get_neighbors(n) if x in valid_nodes) <= 1]
     start_nodes = endpoints if endpoints else valid_nodes
 
     for start in start_nodes:
         dfs(start, [start], {start})
 
-    unique_paths =[]
+    unique_paths = []
     seen = set()
     for p in all_paths:
         p_set = frozenset(p)
@@ -451,14 +458,19 @@ def find_all_carbon_paths(mol: Molecule, exclude_atoms: set[int] = None) -> list
                 seen.add(p_set)
     return unique_paths
 
+
 def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[RingSystem]:
     from .rules import retained as retained_rules
-    if exclude_atoms is None: exclude_atoms = set()
+
+    if exclude_atoms is None:
+        exclude_atoms = set()
     valid_nodes = {a.idx for a in mol if a.idx not in exclude_atoms and (a.is_carbon or mol.degree(a.idx) >= 2)}
-    cycles =[]
+    cycles = []
+
     def dfs_cycle(curr, start, path, visited):
         for n in mol.get_neighbors(curr):
-            if n not in valid_nodes: continue
+            if n not in valid_nodes:
+                continue
             if n == start and len(path) >= 3:
                 cycles.append(path)
             elif n not in visited:
@@ -467,20 +479,21 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
     for n in valid_nodes:
         dfs_cycle(n, n, [n], {n})
 
-    if not cycles: return []
+    if not cycles:
+        return []
 
-    cycle_edge_sets =[]
+    cycle_edge_sets = []
     for c in cycles:
         c_edges = set()
         for i in range(len(c)):
-            u, v = c[i], c[(i+1)%len(c)]
+            u, v = c[i], c[(i + 1) % len(c)]
             c_edges.add(tuple(sorted((u, v))))
         cycle_edge_sets.append(c_edges)
 
-    blocks_edges =[]
+    blocks_edges = []
     for c_edges in cycle_edge_sets:
         merged_edges = c_edges
-        new_blocks =[]
+        new_blocks = []
         for b in blocks_edges:
             if not b.isdisjoint(merged_edges):
                 merged_edges |= b
@@ -489,39 +502,31 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
         new_blocks.append(merged_edges)
         blocks_edges = new_blocks
 
-    blocks =[]
+    blocks = []
     for b_edges in blocks_edges:
         b_nodes = set()
         for u, v in b_edges:
             b_nodes.add(u)
             b_nodes.add(v)
-        is_monocycle = (len(b_edges) == len(b_nodes))
-        blocks.append({
-            'nodes': b_nodes,
-            'edges': b_edges,
-            'is_monocycle': is_monocycle
-        })
+        is_monocycle = len(b_edges) == len(b_nodes)
+        blocks.append({"nodes": b_nodes, "edges": b_edges, "is_monocycle": is_monocycle})
 
     changed = True
     while changed:
         changed = False
-        new_blocks =[]
+        new_blocks = []
         while blocks:
             b1 = blocks.pop(0)
             merged = False
             for i, b2 in enumerate(blocks):
-                shared = b1['nodes'].intersection(b2['nodes'])
-                merged_nodes = b1['nodes'] | b2['nodes']
-                merged_edges = b1['edges'] | b2['edges']
-                should_merge = (
-                    len(shared) == 1 and b1['is_monocycle'] and b2['is_monocycle']
-                ) or (shared and _has_multiple_spiro_centers(merged_nodes, merged_edges))
+                shared = b1["nodes"].intersection(b2["nodes"])
+                merged_nodes = b1["nodes"] | b2["nodes"]
+                merged_edges = b1["edges"] | b2["edges"]
+                should_merge = (len(shared) == 1 and b1["is_monocycle"] and b2["is_monocycle"]) or (
+                    shared and _has_multiple_spiro_centers(merged_nodes, merged_edges)
+                )
                 if should_merge:
-                    blocks[i] = {
-                        'nodes': merged_nodes,
-                        'edges': merged_edges,
-                        'is_monocycle': False
-                    }
+                    blocks[i] = {"nodes": merged_nodes, "edges": merged_edges, "is_monocycle": False}
                     merged = True
                     changed = True
                     break
@@ -529,11 +534,11 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                 new_blocks.append(b1)
         blocks = new_blocks
 
-    systems =[]
+    systems = []
     for block in blocks:
-        comp_nodes = block['nodes']
-        comp_edges = block['edges']
-            
+        comp_nodes = block["nodes"]
+        comp_edges = block["edges"]
+
         comp_adj = {n: set() for n in comp_nodes}
         for u, v in comp_edges:
             comp_adj[u].add(v)
@@ -574,7 +579,7 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
 
         elif E >= V + 2:
             descriptor, numbered_paths = _polyspiro_descriptor_or_von_baeyer(mol, comp_nodes, comp_edges)
-            
+
             recognized_via_retained = False
             if retained_rules.recognizes_retained_ring(mol, numbered_paths[0]):
                 systems.append(
@@ -611,20 +616,23 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                         )
                         recognized_via_retained = True
                         break
-                        
+
             if not recognized_via_retained:
                 if descriptor:
-                    systems.append(RingSystem(
-                        atoms=comp_nodes, is_polycycle=True,
-                        paths=numbered_paths,
-                        polycycle_descriptor=descriptor,
-                        ring_parent=RingParent.from_paths(
-                            kind="polycycle",
+                    systems.append(
+                        RingSystem(
                             atoms=comp_nodes,
-                            descriptor=descriptor,
+                            is_polycycle=True,
                             paths=numbered_paths,
-                        ),
-                    ))
+                            polycycle_descriptor=descriptor,
+                            ring_parent=RingParent.from_paths(
+                                kind="polycycle",
+                                atoms=comp_nodes,
+                                descriptor=descriptor,
+                                paths=numbered_paths,
+                            ),
+                        )
+                    )
                 else:
                     systems.append(
                         RingSystem(
@@ -698,13 +706,19 @@ def merge_polyspiro_ring_systems(mol: Molecule, systems: list[RingSystem]) -> li
     return result
 
 
-def _proven_monospiro_or_bicyclo_system(mol: Molecule, comp_nodes: set[int], comp_edges: set[tuple[int, int]]) -> RingSystem | None:
+def _proven_monospiro_or_bicyclo_system(
+    mol: Molecule, comp_nodes: set[int], comp_edges: set[tuple[int, int]]
+) -> RingSystem | None:
     from .rules import retained as retained_rules
 
     topology = ring_system_topology(mol, comp_nodes, comp_edges)
-    spiro = monospiro_proof(topology.atoms, topology.edges, degrees=topology.internal_degrees, spiro_atoms=topology.spiro_atoms)
+    spiro = monospiro_proof(
+        topology.atoms, topology.edges, degrees=topology.internal_degrees, spiro_atoms=topology.spiro_atoms
+    )
     if spiro is not None and topology.classification == "monospiro":
-        numberings = _audited_ring_numberings(mol, "spiro", spiro.descriptor_numbers, spiro.numbering_paths, topology.edges)
+        numberings = _audited_ring_numberings(
+            mol, "spiro", spiro.descriptor_numbers, spiro.numbering_paths, topology.edges
+        )
         if not numberings:
             return None
         paths = _dedupe_numbering_paths([list(numbering.path) for numbering in numberings])
@@ -733,7 +747,9 @@ def _proven_monospiro_or_bicyclo_system(mol: Molecule, comp_nodes: set[int], com
         bridgeheads=topology.bridgeheads,
     )
     if bicyclo is not None and topology.classification == "bicyclic":
-        numberings = _audited_ring_numberings(mol, "bicyclo", bicyclo.descriptor_numbers, bicyclo.numbering_paths, topology.edges)
+        numberings = _audited_ring_numberings(
+            mol, "bicyclo", bicyclo.descriptor_numbers, bicyclo.numbering_paths, topology.edges
+        )
         if not numberings:
             return None
         paths = _dedupe_numbering_paths([list(numbering.path) for numbering in numberings])
@@ -818,7 +834,9 @@ def _dedupe_ring_numberings(numberings):
     return unique
 
 
-def _is_plain_hydrocarbon_ring_system(mol: Molecule, comp_nodes: set[int], comp_edges: set[tuple[int, int]] | frozenset[tuple[int, int]]) -> bool:
+def _is_plain_hydrocarbon_ring_system(
+    mol: Molecule, comp_nodes: set[int], comp_edges: set[tuple[int, int]] | frozenset[tuple[int, int]]
+) -> bool:
     if any(mol.atoms[atom_idx].symbol != "C" or mol.atoms[atom_idx].charge for atom_idx in comp_nodes):
         return False
     for first, second in comp_edges:
@@ -828,7 +846,9 @@ def _is_plain_hydrocarbon_ring_system(mol: Molecule, comp_nodes: set[int], comp_
     return True
 
 
-def _adjacency_from_edges(nodes: set[int], edges: set[tuple[int, int]] | frozenset[tuple[int, int]]) -> dict[int, set[int]]:
+def _adjacency_from_edges(
+    nodes: set[int], edges: set[tuple[int, int]] | frozenset[tuple[int, int]]
+) -> dict[int, set[int]]:
     adjacency = {node: set() for node in nodes}
     for first, second in edges:
         adjacency[first].add(second)

@@ -56,11 +56,7 @@ def parent_charge_suffix_locs(parts: AssemblyParts) -> list[str]:
         return []
     represented_as_azonia = single_charged_replacement_locants(parts)
     return sorted(
-        [
-            charge.locant
-            for charge in positive_parent_n_charges(parts)
-            if charge.locant not in represented_as_azonia
-        ],
+        [charge.locant for charge in positive_parent_n_charges(parts) if charge.locant not in represented_as_azonia],
         key=parse_locant,
     )
 
@@ -97,6 +93,7 @@ def append_charge_suffixes_to_terminal(parts: AssemblyParts, terminal_e: str) ->
     operations = parent_charge_name_operations(parts)
     if not operations:
         return terminal_e
-    return "".join(
-        f"-{','.join(operation.locants)}-{suffix_operation_spelling(operation)}" for operation in operations
-    ) + terminal_e
+    return (
+        "".join(f"-{','.join(operation.locants)}-{suffix_operation_spelling(operation)}" for operation in operations)
+        + terminal_e
+    )

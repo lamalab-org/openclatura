@@ -8,7 +8,6 @@ from .molecule import Molecule
 from .namer_config import INDICATED_H_RETAINED_NAMES
 from .naming_data import mapping
 
-
 NUMBERING_CRITERIA = mapping("numbering_criteria")
 
 
@@ -315,9 +314,7 @@ def _has_indicated_hydrogen_metadata(
 ) -> bool:
     atom = mol.atoms[atom_idx]
     ring_bonds = [
-        mol.get_bond(atom_idx, neighbor)
-        for neighbor in mol.get_neighbors(atom_idx)
-        if neighbor in parent_atoms
+        mol.get_bond(atom_idx, neighbor) for neighbor in mol.get_neighbors(atom_idx) if neighbor in parent_atoms
     ]
     is_ring_atom = len(ring_bonds) >= 2
     if not is_ring_atom or atom.total_h_count <= 0:
@@ -330,14 +327,14 @@ def _has_retained_indicated_hydrogen_proxy(mol: Molecule, atom_idx: int, parent_
     if atom.symbol not in {"C", "N"}:
         return False
     ring_bonds = [
-        mol.get_bond(atom_idx, neighbor)
-        for neighbor in mol.get_neighbors(atom_idx)
-        if neighbor in parent_atoms
+        mol.get_bond(atom_idx, neighbor) for neighbor in mol.get_neighbors(atom_idx) if neighbor in parent_atoms
     ]
     return sum(bond.order for bond in ring_bonds if bond is not None) == 2
 
 
-def _substituent_citation_locants(oriented_path: list[int], substituent_mapping: dict[int, list[str]]) -> tuple[int, ...]:
+def _substituent_citation_locants(
+    oriented_path: list[int], substituent_mapping: dict[int, list[str]]
+) -> tuple[int, ...]:
     alpha_list = []
     for idx in oriented_path:
         if idx not in substituent_mapping:

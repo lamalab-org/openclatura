@@ -28,8 +28,7 @@ def retained_parent_spec(name: str | None) -> RetainedParentSpec | None:
     terminal = stem_data[1] if stem_data else None
     normalized_stem = (stem or name).lower().rstrip("e")
     needs_locant = any(
-        normalized_stem.endswith(policy_stem)
-        for policy_stem in RULES.assembly.ambiguous_connection_substituent_stems
+        normalized_stem.endswith(policy_stem) for policy_stem in RULES.assembly.ambiguous_connection_substituent_stems
     )
     return RetainedParentSpec(
         name=name,

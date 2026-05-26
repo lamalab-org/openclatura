@@ -39,7 +39,5 @@ def assert_component_fully_named(mol: Molecule, component_atoms: set[int], parts
 
     coverage = component_named_atom_coverage(mol, component_atoms, parts)
     if coverage.unnamed_atoms:
-        details = ", ".join(
-            f"{idx}:{mol.atoms[idx].symbol}" for idx in sorted(coverage.unnamed_atoms)
-        )
+        details = ", ".join(f"{idx}:{mol.atoms[idx].symbol}" for idx in sorted(coverage.unnamed_atoms))
         raise UnnamedAtomError(f"Generated name {name!r} left unnamed atoms: {details}")

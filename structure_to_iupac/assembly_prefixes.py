@@ -2,13 +2,12 @@
 
 import re
 
-from .assembly_parts import AssemblyParts, SubstituentItem
 from .assembly_charge import inferred_ionic_retained_parent, single_charged_replacement_locants
+from .assembly_parts import AssemblyParts, SubstituentItem
 from .assembly_utils import is_fully_enclosed, needs_hyphen, parse_locant
 from .nomenclature import RULES
 from .retained_specs import retained_parent_spec
 from .rules import multipliers
-
 
 SUBSTITUENT_SORT_PREFIX_RE = re.compile(RULES.assembly.substituent_sort_prefix_pattern)
 A_PREFIX_ORDER = RULES.assembly.replacement_prefix_order
@@ -33,7 +32,12 @@ def group_substituents(substituents: list[SubstituentItem]) -> dict[str, list[Su
 
 
 def substituent_locant_string(parts: AssemblyParts, locs: list[str], grouped_count: int, spiro_subs) -> str:
-    if parts.parent_length == 1 and all(str(l).isdigit() for l in locs) and not parts.principal_group and not parts.a_prefixes:
+    if (
+        parts.parent_length == 1
+        and all(str(l).isdigit() for l in locs)
+        and not parts.principal_group
+        and not parts.a_prefixes
+    ):
         return ""
     retained_spec = retained_parent_spec(parts.retained_name)
     must_print_retained_locant = bool(
@@ -96,11 +100,14 @@ def _parent_attachment_orbit(parts: AssemblyParts, source: str, locants: list[st
     return {
         target
         for target in locants
-        if labels[target] == labels[source] and _has_parent_automorphism_mapping(source, target, locants, labels, adjacency)
+        if labels[target] == labels[source]
+        and _has_parent_automorphism_mapping(source, target, locants, labels, adjacency)
     }
 
 
-def _has_parent_automorphism_mapping(source: str, target: str, locants: list[str], labels: dict, adjacency: dict) -> bool:
+def _has_parent_automorphism_mapping(
+    source: str, target: str, locants: list[str], labels: dict, adjacency: dict
+) -> bool:
     mapping = {source: target}
     used = {target}
 

@@ -13,8 +13,8 @@ References:
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
 
+from dataclasses import dataclass
 
 # Type alias: a locant set is a list of integers, e.g. [2, 4, 5] for positions
 # 2, 4, and 5. Always treated as a sorted sequence when comparing.
@@ -102,6 +102,7 @@ class LocantCriteria:
     Fields are ordered by P-31.1.4.3 priority (most important first).
     None values are skipped during comparison (treated as "not applicable").
     """
+
     principal_group: LocantSet | None = None
     heteroatoms: LocantSet | None = None
     indicated_hydrogen: LocantSet | None = None

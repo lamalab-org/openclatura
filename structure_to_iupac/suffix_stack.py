@@ -1,7 +1,7 @@
 """Structured parent suffix rendering helpers."""
 
-from dataclasses import dataclass, field
 import re
+from dataclasses import dataclass, field
 
 from .name_operations import ParentSuffixOperation
 from .nomenclature import RULES

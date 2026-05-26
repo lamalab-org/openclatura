@@ -24,8 +24,9 @@ from .principal_groups import (
     filter_component_groups_to_parent,
     partition_principal_and_prefix_groups,
 )
+from .special_cases import single_atom_component_name, structural_replacement_parent_name, try_name_anhydride_component
+from .spiro_assembly import SpiroAssembly
 from .stereo_audit import audit_stereochemistry
-from .special_cases import structural_replacement_parent_name, single_atom_component_name, try_name_anhydride_component
 from .subgraph_tools import (
     add_indicated_hydrogens,
     add_parent_features,
@@ -41,7 +42,6 @@ from .trace_helpers import (
     functional_group_trace_data,
     trace_decision,
 )
-from .spiro_assembly import SpiroAssembly
 
 SubgraphNamer = Callable[..., str]
 SpiroSubgraphNamer = Callable[[Molecule, int, set[int]], SpiroAssembly]
@@ -207,7 +207,9 @@ def name_component(
         data={"principal_key": state.principal_key, "is_substituent": state.is_substituent},
     )
 
-    anhydride_name = try_name_anhydride_component(mol, state.perceived_groups, state.principal_key, name_component_again)
+    anhydride_name = try_name_anhydride_component(
+        mol, state.perceived_groups, state.principal_key, name_component_again
+    )
     if anhydride_name:
         trace_decision(
             decision_trace,
@@ -333,13 +335,18 @@ def name_component(
         "selected numbering",
         "Numbering minimizes principal-group, heteroatom, substituent, and unsaturation locants.",
         atoms=set(numbered_path),
-        data={"numbered_path": numbered_path, "locants": locant_map or {atom: i + 1 for i, atom in enumerate(numbered_path)}},
+        data={
+            "numbered_path": numbered_path,
+            "locants": locant_map or {atom: i + 1 for i, atom in enumerate(numbered_path)},
+        },
     )
     get_loc = parent_plan.get_loc
     parts = parent_plan.parts
     emit_bond_stereo(mol, parts, numbered_path, get_loc, state.base_exclude)
     add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
-    add_component_front_modifiers(mol, parts, state.perceived_groups, state.principal_key, state.sub_exclude, name_subgraph)
+    add_component_front_modifiers(
+        mol, parts, state.perceived_groups, state.principal_key, state.sub_exclude, name_subgraph
+    )
     add_component_n_substituents(
         mol,
         parts,

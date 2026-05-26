@@ -192,7 +192,9 @@ class FunctionalGroupRules:
         return {key for key, rule in self.by_key.items() if rule.prefix}
 
     def most_senior(self, keys: list[str]) -> FunctionalGroupRule:
-        principal_rules = [self.by_key[key] for key in keys if key in self.by_key and self.by_key[key].seniority is not None]
+        principal_rules = [
+            self.by_key[key] for key in keys if key in self.by_key and self.by_key[key].seniority is not None
+        ]
         if not principal_rules:
             raise KeyError(f"No seniority metadata for functional-group keys: {keys!r}")
         return min(principal_rules, key=lambda rule: rule.seniority)
@@ -399,7 +401,9 @@ def registry() -> NomenclatureRegistry:
         ),
         rings=RingRules(
             descriptor_templates=ring_descriptors.mapping("ring_descriptor_templates"),
-            polycycle_prefixes={int(key): value for key, value in ring_descriptors.mapping("polycycle_prefixes").items()},
+            polycycle_prefixes={
+                int(key): value for key, value in ring_descriptors.mapping("polycycle_prefixes").items()
+            },
         ),
         prefixes=PrefixRules(
             direct_group_prefixes=substituent_vocabulary.mapping("direct_group_prefixes"),
@@ -431,11 +435,17 @@ def registry() -> NomenclatureRegistry:
         ),
         charges=_charge_rules(),
         assembly=AssemblyRules(
-            replacement_prefix_order={key: int(value) for key, value in assembly_grammar.mapping("replacement_prefix_order").items()},
-            unsaturation_order={key: int(value) for key, value in assembly_grammar.mapping("unsaturation_order").items()},
+            replacement_prefix_order={
+                key: int(value) for key, value in assembly_grammar.mapping("replacement_prefix_order").items()
+            },
+            unsaturation_order={
+                key: int(value) for key, value in assembly_grammar.mapping("unsaturation_order").items()
+            },
             acid_halide_suffix_keys=set(assembly_grammar.values("acid_halide_suffix_keys")),
             substituent_sort_prefix_pattern=assembly_grammar.mapping("substituent_sort")["prefix_pattern"],
-            ambiguous_connection_substituent_stems=set(assembly_grammar.values("ambiguous_connection_substituent_stems")),
+            ambiguous_connection_substituent_stems=set(
+                assembly_grammar.values("ambiguous_connection_substituent_stems")
+            ),
             connection_boundary_parent_stems=tuple(assembly_grammar.values("connection_boundary_parent_stems")),
         ),
         functional_groups=_functional_group_rules(),

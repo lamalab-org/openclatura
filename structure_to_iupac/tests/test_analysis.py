@@ -1,24 +1,62 @@
 import pytest
 
-from structure_to_iupac import NamingEngine, NamingIntent, OperationClass, RULES, TracePhase, analyze_smiles, name_smiles
-from structure_to_iupac.assembler import AssemblyParts, ParentChargeItem, SubstituentItem, UnsaturationItem, assemble_name, post_process_name
+from structure_to_iupac import (
+    RULES,
+    NamingEngine,
+    NamingIntent,
+    OperationClass,
+    TracePhase,
+    analyze_smiles,
+    name_smiles,
+)
+from structure_to_iupac.additive import add_indicated_hydrogens
+from structure_to_iupac.assembler import (
+    AssemblyParts,
+    ParentChargeItem,
+    SubstituentItem,
+    UnsaturationItem,
+    assemble_name,
+    post_process_name,
+)
 from structure_to_iupac.assembly_charge import parent_charge_operations
-from structure_to_iupac.assembly_spiro import _spiro_side_locant, extract_spiro_side_prefixes, format_spiro_core, split_spiro_substituents
+from structure_to_iupac.assembly_parts import NameAtomBinding
+from structure_to_iupac.assembly_spiro import (
+    _spiro_side_locant,
+    extract_spiro_side_prefixes,
+    format_spiro_core,
+    split_spiro_substituents,
+)
 from structure_to_iupac.chains import find_all_carbon_paths, find_ring_systems
-from structure_to_iupac.functional_groups import PERCEPTION_DETECTORS, PERCEPTION_SPECS, PerceptionDetectorSpec, register_group_detector, register_perception_spec
 from structure_to_iupac.formatting import ensure_stereo_descriptor_boundary
+from structure_to_iupac.functional_groups import (
+    PERCEPTION_DETECTORS,
+    PERCEPTION_SPECS,
+    PerceptionDetectorSpec,
+    register_group_detector,
+    register_perception_spec,
+)
+from structure_to_iupac.heteroatom_substituent_specs import ligand_prefix, unsubstituted_prefix
 from structure_to_iupac.ionic_naming import (
-    apply_ring_parent_nitrogen_zwitterion_stack,
     apply_parent_charge_names,
     apply_retained_parent_ide,
+    apply_ring_parent_nitrogen_zwitterion_stack,
     apply_terminal_parent_ide,
     contains_invalid_locant_ide,
     parent_charge_sites,
 )
 from structure_to_iupac.locants import as_display_locant, coerce_display_numbering, locant_text, parse_locant
-from structure_to_iupac.name_postprocessing import apply_connection_boundary_postprocessing, postprocessing_rule_inventory
+from structure_to_iupac.molecule import Molecule
+from structure_to_iupac.name_bindings import postprocess_name_atom_bindings
+from structure_to_iupac.name_operations import HydroOperation, ParentSuffixOperation
+from structure_to_iupac.name_postprocessing import (
+    apply_connection_boundary_postprocessing,
+    postprocessing_rule_inventory,
+)
 from structure_to_iupac.namer import _spiro_subgraph_assembly, name_component, read_smiles
+from structure_to_iupac.naming_audit import UnnamedAtomError, assert_component_fully_named
+from structure_to_iupac.naming_data import namer_rules
 from structure_to_iupac.numbering import NUMBERING_CRITERIA, NumberingPreference, polycycle_numbering_key
+from structure_to_iupac.parent_pipeline import build_parent_assembly_plan
 from structure_to_iupac.parent_selection import (
     PARENT_SELECTION_CRITERIA,
     ParentCandidate,
@@ -26,7 +64,6 @@ from structure_to_iupac.parent_selection import (
     ParentSeniorityProfile,
     select_principal_parent,
 )
-from structure_to_iupac.parent_pipeline import build_parent_assembly_plan
 from structure_to_iupac.perception import PerceivedGroup, perceive_groups
 from structure_to_iupac.polycycle_topology import (
     bicyclo_proof,
@@ -37,22 +74,14 @@ from structure_to_iupac.polycycle_topology import (
 )
 from structure_to_iupac.principal_suffixes import render_principal_suffix
 from structure_to_iupac.retained_specs import retained_parent_spec
-from structure_to_iupac.rules.retained import get_retained_ring
-from structure_to_iupac.ring_systems import ring_system_fragment
 from structure_to_iupac.ring_renderer import render_ring_descriptor, render_von_baeyer_descriptor
-from structure_to_iupac.spiro_assembly import SpiroAssembly
-from structure_to_iupac.special_cases import _alkyl_ligand_name, structural_replacement_parent_name
-from structure_to_iupac.heteroatom_substituent_specs import ligand_prefix, unsubstituted_prefix
-from structure_to_iupac.name_operations import HydroOperation, ParentSuffixOperation
-from structure_to_iupac.name_bindings import postprocess_name_atom_bindings
-from structure_to_iupac.naming_audit import UnnamedAtomError, assert_component_fully_named
-from structure_to_iupac.naming_data import namer_rules
+from structure_to_iupac.ring_systems import ring_system_fragment
 from structure_to_iupac.rule_layout import rule_group_specs, rule_groups, section_group_map, unassigned_sections
-from structure_to_iupac.suffix_stack import SuffixStack
-from structure_to_iupac.molecule import Molecule
-from structure_to_iupac.assembly_parts import NameAtomBinding
+from structure_to_iupac.rules.retained import get_retained_ring
+from structure_to_iupac.special_cases import _alkyl_ligand_name, structural_replacement_parent_name
+from structure_to_iupac.spiro_assembly import SpiroAssembly
 from structure_to_iupac.stereo_audit import audit_stereochemistry
-from structure_to_iupac.additive import add_indicated_hydrogens
+from structure_to_iupac.suffix_stack import SuffixStack
 
 
 def test_name_smiles_stays_plain_fast_api():
@@ -683,23 +712,183 @@ def test_parent_seniority_criteria_follow_brief_guide_section_6_order():
     ):
         mol.add_bond(u, v, order=order)
 
-    no_group = ParentCandidate.build([0, 1], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
-    one_group = ParentCandidate.build([0, 1], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=1, mol=mol)
-    two_groups = ParentCandidate.build([0, 1, 2], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=2, mol=mol)
-    n_parent = ParentCandidate.build([3], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
-    si_parent = ParentCandidate.build([4], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
-    carbon_ring = ParentCandidate.build([10, 11, 12, 13], is_ring=True, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol, ring_count=1)
-    carbon_chain = ParentCandidate.build([10, 11, 12, 13], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
-    o_ring = ParentCandidate.build([5, 10, 11], is_ring=True, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol, ring_count=1)
-    p_ring = ParentCandidate.build([6, 10, 11], is_ring=True, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol, ring_count=1)
-    bicycle = ParentCandidate.build([10, 11, 12, 13], is_ring=True, is_bicycle=True, is_spiro=False, is_polycycle=False, xyz=(1, 1, 0), principal_groups_count=0, mol=mol, ring_count=2)
-    monocycle = ParentCandidate.build([10, 11, 12, 13], is_ring=True, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol, ring_count=1)
-    piperazine_like = ParentCandidate.build([7, 8, 10, 11, 12, 13], is_ring=True, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol, ring_count=1)
-    oxazinane_like = ParentCandidate.build([7, 9, 10, 11, 12, 13], is_ring=True, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol, ring_count=1)
-    shorter_chain = ParentCandidate.build([10, 11, 12], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
-    longer_chain = ParentCandidate.build([10, 11, 12, 13], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
-    saturated_chain = ParentCandidate.build([10, 11, 12], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
-    unsaturated_chain = ParentCandidate.build([0, 1, 2], is_ring=False, is_bicycle=False, is_spiro=False, is_polycycle=False, xyz=(0, 0, 0), principal_groups_count=0, mol=mol)
+    no_group = ParentCandidate.build(
+        [0, 1],
+        is_ring=False,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+    )
+    one_group = ParentCandidate.build(
+        [0, 1],
+        is_ring=False,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=1,
+        mol=mol,
+    )
+    two_groups = ParentCandidate.build(
+        [0, 1, 2],
+        is_ring=False,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=2,
+        mol=mol,
+    )
+    n_parent = ParentCandidate.build(
+        [3],
+        is_ring=False,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+    )
+    si_parent = ParentCandidate.build(
+        [4],
+        is_ring=False,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+    )
+    carbon_ring = ParentCandidate.build(
+        [10, 11, 12, 13],
+        is_ring=True,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+        ring_count=1,
+    )
+    carbon_chain = ParentCandidate.build(
+        [10, 11, 12, 13],
+        is_ring=False,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+    )
+    o_ring = ParentCandidate.build(
+        [5, 10, 11],
+        is_ring=True,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+        ring_count=1,
+    )
+    p_ring = ParentCandidate.build(
+        [6, 10, 11],
+        is_ring=True,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+        ring_count=1,
+    )
+    bicycle = ParentCandidate.build(
+        [10, 11, 12, 13],
+        is_ring=True,
+        is_bicycle=True,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(1, 1, 0),
+        principal_groups_count=0,
+        mol=mol,
+        ring_count=2,
+    )
+    monocycle = ParentCandidate.build(
+        [10, 11, 12, 13],
+        is_ring=True,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+        ring_count=1,
+    )
+    piperazine_like = ParentCandidate.build(
+        [7, 8, 10, 11, 12, 13],
+        is_ring=True,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+        ring_count=1,
+    )
+    oxazinane_like = ParentCandidate.build(
+        [7, 9, 10, 11, 12, 13],
+        is_ring=True,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+        ring_count=1,
+    )
+    shorter_chain = ParentCandidate.build(
+        [10, 11, 12],
+        is_ring=False,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+    )
+    longer_chain = ParentCandidate.build(
+        [10, 11, 12, 13],
+        is_ring=False,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+    )
+    saturated_chain = ParentCandidate.build(
+        [10, 11, 12],
+        is_ring=False,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+    )
+    unsaturated_chain = ParentCandidate.build(
+        [0, 1, 2],
+        is_ring=False,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=mol,
+    )
 
     assert min([no_group, one_group], key=lambda candidate: candidate.score_tuple) is one_group
     assert min([one_group, two_groups], key=lambda candidate: candidate.score_tuple) is two_groups
@@ -1205,7 +1394,9 @@ def test_simple_bicyclo_numbering_map_matches_bridge_descriptor_and_attachment_l
     assert system.paths == [list(path) for path in proof.numbering_paths]
 
     numberings = [
-        build_ring_numbering("bicyclo", proof.descriptor_numbers, path, topology.edges, mol, substituent_attachment_atoms={1})
+        build_ring_numbering(
+            "bicyclo", proof.descriptor_numbers, path, topology.edges, mol, substituent_attachment_atoms={1}
+        )
         for path in proof.numbering_paths
     ]
     assert all(numbering.audit_ok for numbering in numberings)
@@ -1398,9 +1589,7 @@ def test_invalid_ide_morphology_is_normalized():
         == "5-(ammoniomethyl)imidazolidin-1-ide-2,4-dione"
     )
     assert (
-        apply_retained_parent_ide(
-            "5-(ammoniomethyl)-1,2,3-triazole-4-carbonitrile", "1,2,3-triazole", {"1": {"C"}}
-        )
+        apply_retained_parent_ide("5-(ammoniomethyl)-1,2,3-triazole-4-carbonitrile", "1,2,3-triazole", {"1": {"C"}})
         == "5-(ammoniomethyl)-1,2,3-triazol-1-ide-4-carbonitrile"
     )
 

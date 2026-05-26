@@ -160,7 +160,11 @@ def monospiro_proof(
     spiro_atoms: tuple[int, ...] | None = None,
 ) -> MonospiroProof | None:
     degrees = degrees if degrees is not None else internal_degrees(atom_set, edge_set)
-    spiro_atoms = spiro_atoms if spiro_atoms is not None else tuple(sorted(atom for atom, degree in degrees.items() if degree >= 4))
+    spiro_atoms = (
+        spiro_atoms
+        if spiro_atoms is not None
+        else tuple(sorted(atom for atom, degree in degrees.items() if degree >= 4))
+    )
     if len(spiro_atoms) != 1:
         return None
     spiro_atom = spiro_atoms[0]
@@ -197,7 +201,11 @@ def bicyclo_proof(
     bridgeheads: tuple[int, ...] | None = None,
 ) -> BicycloProof | None:
     degrees = degrees if degrees is not None else internal_degrees(atom_set, edge_set)
-    bridgeheads = bridgeheads if bridgeheads is not None else tuple(sorted(atom for atom, degree in degrees.items() if degree == 3))
+    bridgeheads = (
+        bridgeheads
+        if bridgeheads is not None
+        else tuple(sorted(atom for atom, degree in degrees.items() if degree == 3))
+    )
     if len(bridgeheads) != 2:
         return None
     first_bridgehead, second_bridgehead = bridgeheads
@@ -206,10 +214,7 @@ def bicyclo_proof(
     for component in connected_components(non_bridgehead, edge_set):
         frozen = frozenset(component)
         attachments = {
-            neighbor
-            for atom in frozen
-            for neighbor in adjacent_atoms(atom, edge_set)
-            if neighbor in bridgeheads
+            neighbor for atom in frozen for neighbor in adjacent_atoms(atom, edge_set) if neighbor in bridgeheads
         }
         if attachments != set(bridgeheads):
             return None
@@ -218,7 +223,9 @@ def bicyclo_proof(
     if len(components) + int(has_direct_bridge) != 3:
         return None
     bridge_components = sorted(components, key=lambda component: (-len(component), sorted(component)))
-    descriptor_numbers = tuple(sorted([len(component) for component in bridge_components] + ([0] if has_direct_bridge else []), reverse=True))
+    descriptor_numbers = tuple(
+        sorted([len(component) for component in bridge_components] + ([0] if has_direct_bridge else []), reverse=True)
+    )
     paths = []
     component_paths = [
         _component_path_between_centers(component, first_bridgehead, second_bridgehead, edge_set)
@@ -227,10 +234,7 @@ def bicyclo_proof(
     if has_direct_bridge:
         component_paths.append(())
     for start, end in ((first_bridgehead, second_bridgehead), (second_bridgehead, first_bridgehead)):
-        oriented_paths = [
-            path if start == first_bridgehead else tuple(reversed(path))
-            for path in component_paths
-        ]
+        oriented_paths = [path if start == first_bridgehead else tuple(reversed(path)) for path in component_paths]
         for ordered_paths in _permutations_unique(oriented_paths):
             first_path, second_path, third_path = ordered_paths
             if tuple(len(path) for path in ordered_paths) != descriptor_numbers:
@@ -255,7 +259,11 @@ def linear_dispiro_proof(
     spiro_atoms: tuple[int, ...] | None = None,
 ) -> LinearDispiroProof | None:
     degrees = degrees if degrees is not None else internal_degrees(atom_set, edge_set)
-    spiro_atoms = spiro_atoms if spiro_atoms is not None else tuple(sorted(atom for atom, degree in degrees.items() if degree >= 4))
+    spiro_atoms = (
+        spiro_atoms
+        if spiro_atoms is not None
+        else tuple(sorted(atom for atom, degree in degrees.items() if degree >= 4))
+    )
     if len(spiro_atoms) != 2:
         return None
     if any(degrees[atom] > 2 for atom in atom_set if atom not in spiro_atoms):
@@ -266,10 +274,7 @@ def linear_dispiro_proof(
     components = []
     for component in connected_components(non_spiro, edge_set):
         attachments = frozenset(
-            neighbor
-            for atom in component
-            for neighbor in adjacent_atoms(atom, edge_set)
-            if neighbor in spiro_atoms
+            neighbor for atom in component for neighbor in adjacent_atoms(atom, edge_set) if neighbor in spiro_atoms
         )
         components.append((frozenset(component), attachments))
 
@@ -336,14 +341,8 @@ def build_ring_numbering(
     atom_charges_by_locant = None
     bond_orders_by_locants = None
     if mol is not None:
-        atom_symbols_by_locant = {
-            locant: mol.atoms[atom].symbol
-            for locant, atom in locant_to_atom.items()
-        }
-        atom_charges_by_locant = {
-            locant: mol.atoms[atom].charge
-            for locant, atom in locant_to_atom.items()
-        }
+        atom_symbols_by_locant = {locant: mol.atoms[atom].symbol for locant, atom in locant_to_atom.items()}
+        atom_charges_by_locant = {locant: mol.atoms[atom].charge for locant, atom in locant_to_atom.items()}
         bond_orders_by_locants = {}
         for first, second in normalized_edges:
             bond = mol.get_bond(first, second)
@@ -395,14 +394,18 @@ def _dispiro_edges_from_numbering(
     edges = []
     _append_ring_segment_edges(edges, locant_to_atom, 1, first_terminal, first_spiro_locant)
     if first_middle:
-        _append_bridge_edges(edges, locant_to_atom, first_spiro_locant, second_spiro_locant, first_spiro_locant + 1, first_middle)
+        _append_bridge_edges(
+            edges, locant_to_atom, first_spiro_locant, second_spiro_locant, first_spiro_locant + 1, first_middle
+        )
     else:
         edges.append((locant_to_atom[first_spiro_locant], locant_to_atom[second_spiro_locant]))
     second_terminal_start = second_spiro_locant + 1
     _append_ring_segment_edges(edges, locant_to_atom, second_terminal_start, second_terminal, second_spiro_locant)
     second_middle_start = second_terminal_start + second_terminal
     if second_middle:
-        _append_bridge_edges(edges, locant_to_atom, second_spiro_locant, first_spiro_locant, second_middle_start, second_middle)
+        _append_bridge_edges(
+            edges, locant_to_atom, second_spiro_locant, first_spiro_locant, second_middle_start, second_middle
+        )
     if len(locant_to_atom) != total:
         return frozenset()
     return frozenset(_normalize_edges(edges))

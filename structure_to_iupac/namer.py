@@ -2,45 +2,54 @@
 
 import re
 
-from .formatting import format_counted_prefixes, format_multiplier, strip_outer_parentheses
-from .group_atom_roles import amide_nitrogen
-from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
-from .naming_context import ComponentNamingState, NamingIntent
-from .perception import perceive_groups, PerceivedGroup
-from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
-from .parent_selection import select_principal_parent
-from .assembler import assemble_name, assemble_name_raw, post_process_name
+from .assembler import assemble_name_raw, post_process_name
 from .assembly_parts import AssemblyParts, SubstituentItem
 from .assembly_spiro import extract_spiro_side_prefixes
+from .chains import find_ring_systems, get_cyclic_atoms
 from .component_namer import name_component as _name_component_impl
 from .engine import DEFAULT_NAMING_ENGINE
-from .graph_io import get_connected_components, read_smiles
+from .formatting import format_counted_prefixes, format_multiplier, strip_outer_parentheses
+from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names
+from .molecule import DecisionTrace, Molecule, NameAnalysis
 from .name_bindings import postprocess_name_atom_bindings
 from .namer_config import (
-    SALT_METAL_NAMES,
     SPECIAL_COMPONENT_NAMES,
 )
+from .naming_context import NamingIntent
 from .nomenclature import RULES
-from .operations import infer_operations
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
+from .parent_selection import select_principal_parent
+from .perception import PerceivedGroup, perceive_groups
 from .rules import elision, multipliers, stems
 from .spiro_assembly import SpiroAssembly
 from .subgraph_tools import (
     add_indicated_hydrogens as _add_indicated_hydrogens,
+)
+from .subgraph_tools import (
     add_parent_features as _add_subgraph_parent_features,
+)
+from .subgraph_tools import (
     emit_bond_stereo as _emit_bond_stereo,
+)
+from .subgraph_tools import (
     find_spiro_side_pair as _find_spiro_side_pair,
+)
+from .subgraph_tools import (
     spiro_side_component as _spiro_side_component,
+)
+from .subgraph_tools import (
     subgraph_component as _subgraph_component,
 )
 from .trace_helpers import (
     add_substituent_trace as _add_substituent_trace,
+)
+from .trace_helpers import (
     assembly_trace_segments as _assembly_trace_segments,
+)
+from .trace_helpers import (
     bond_ids_within as _bond_ids_within,
-    functional_group_trace_data as _functional_group_trace_data,
-    trace_decision as _trace_decision,
 )
 
 
@@ -546,9 +555,7 @@ def _hantzsch_widman_ring_score(mol: Molecule, oriented: list[int]) -> tuple:
 
 def _ring_double_bond_count(mol: Molecule, ring: list[int]) -> int:
     return sum(
-        1
-        for a, b in zip(ring, ring[1:] + ring[:1])
-        if (bond := mol.get_bond(a, b)) is not None and bond.order == 2
+        1 for a, b in zip(ring, ring[1:] + ring[:1]) if (bond := mol.get_bond(a, b)) is not None and bond.order == 2
     )
 
 
@@ -931,6 +938,7 @@ def analyze_smiles(smiles: str) -> NameAnalysis:
     """
 
     return DEFAULT_NAMING_ENGINE.analyze_smiles(smiles)
+
 
 def name_smiles(smiles: str) -> str:
     """Return an IUPAC-style name for a SMILES string.

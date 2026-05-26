@@ -2,7 +2,6 @@
 
 from collections.abc import Callable
 
-from .molecule import Molecule
 from .group_atom_roles import (
     amide_nitrogen,
     bridge_oxygen,
@@ -10,6 +9,7 @@ from .group_atom_roles import (
     peroxy_ester_single_oxygen,
     sulfonyl_sulfur,
 )
+from .molecule import Molecule
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 

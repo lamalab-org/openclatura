@@ -6,7 +6,6 @@ These names remain for existing modules and external imports.
 
 from .nomenclature import RULES
 
-
 INDICATED_H_RETAINED_NAMES = RULES.retained.indicated_hydrogen_names
 ALKYL_OXY_PREFIXES = RULES.heteroatoms.alkyl_oxy_prefixes
 SIMPLE_SULFANYL_PREFIXES = RULES.heteroatoms.simple_sulfanyl_prefixes

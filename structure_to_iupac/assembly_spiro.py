@@ -8,7 +8,6 @@ from .nomenclature import RULES
 from .rules import elision, stems
 from .spiro_assembly import SpiroAssembly
 
-
 SPIRO_SUBSTITUENT_RE = re.compile(r"^\[SPIRO\]-(\d+)-(.*)$")
 AMBIGUOUS_CONNECTION_SUBSTITUENT_STEMS = RULES.assembly.ambiguous_connection_substituent_stems
 
@@ -25,13 +24,13 @@ def split_spiro_substituents(parts: AssemblyParts) -> list[SpiroAssembly]:
             side_prefixes, side_parent_name, side_suffixes = extract_spiro_side_prefixes(match.group(2))
             spiro_subs.append(
                 _normalize_spiro_assembly(
-                SpiroAssembly(
-                    parent_locant=str(sub.locants[0]),
-                    side_locant=match.group(1),
-                    side_parent_name=side_parent_name,
-                    side_prefixes=tuple(side_prefixes),
-                    side_suffixes=tuple(side_suffixes),
-                )
+                    SpiroAssembly(
+                        parent_locant=str(sub.locants[0]),
+                        side_locant=match.group(1),
+                        side_parent_name=side_parent_name,
+                        side_prefixes=tuple(side_prefixes),
+                        side_suffixes=tuple(side_suffixes),
+                    )
                 )
             )
         else:
@@ -55,7 +54,9 @@ def _normalize_spiro_assembly(spiro: SpiroAssembly) -> SpiroAssembly:
     )
 
 
-def format_spiro_core(stem_str: str, unsat_str: str, terminal_e: str, spiro_subs: list[SpiroAssembly]) -> tuple[str, str]:
+def format_spiro_core(
+    stem_str: str, unsat_str: str, terminal_e: str, spiro_subs: list[SpiroAssembly]
+) -> tuple[str, str]:
     if not spiro_subs:
         return stem_str + unsat_str + terminal_e, terminal_e
     core_name = stem_str + unsat_str + ("" if stem_str.endswith("ium") else "e")
@@ -92,7 +93,9 @@ def format_spiro_core(stem_str: str, unsat_str: str, terminal_e: str, spiro_subs
         core_name = f"spiro[{core_name}-{spiro.parent_locant},{_spiro_side_locant(spiro)}'-{s_name_str}]"
 
     if terminal_e and terminal_e != "e":
-        if ("yl" in terminal_e or elision.is_vowel_start(terminal_e.lstrip("-0123456789,"))) and core_name.endswith("e"):
+        if ("yl" in terminal_e or elision.is_vowel_start(terminal_e.lstrip("-0123456789,"))) and core_name.endswith(
+            "e"
+        ):
             core_name = core_name[:-1]
         core_name += _merge_terminal_and_side_suffixes(terminal_e, side_suffixes)
     elif side_suffixes:

@@ -1,6 +1,6 @@
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterator
 
 from .rules import elements
 

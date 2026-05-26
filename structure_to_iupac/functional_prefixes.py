@@ -111,12 +111,22 @@ def fallback_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> st
 PREFIX_HANDLERS: dict[str, PrefixHandler] = {}
 PREFIX_HANDLERS.update({key: ester_prefix_handler for key in RULES.functional_groups.keys_with_family("ester_like")})
 PREFIX_HANDLERS.update({key: amide_prefix_handler for key in RULES.functional_groups.keys_with_family("amide_like")})
-PREFIX_HANDLERS.update({key: static_prefix_handler("carboxy") for key in RULES.functional_groups.keys_with_family("carboxy_prefix")})
-PREFIX_HANDLERS.update({key: static_prefix_handler("cyano") for key in RULES.functional_groups.keys_with_family("cyano_prefix")})
-PREFIX_HANDLERS.update({key: acid_halide_prefix_handler for key in RULES.functional_groups.keys_with_family("acid_halide")})
-PREFIX_HANDLERS.update({key: static_prefix_handler("carboperoxy") for key in RULES.functional_groups.keys_with_family("peroxy_acid")})
+PREFIX_HANDLERS.update(
+    {key: static_prefix_handler("carboxy") for key in RULES.functional_groups.keys_with_family("carboxy_prefix")}
+)
+PREFIX_HANDLERS.update(
+    {key: static_prefix_handler("cyano") for key in RULES.functional_groups.keys_with_family("cyano_prefix")}
+)
+PREFIX_HANDLERS.update(
+    {key: acid_halide_prefix_handler for key in RULES.functional_groups.keys_with_family("acid_halide")}
+)
+PREFIX_HANDLERS.update(
+    {key: static_prefix_handler("carboperoxy") for key in RULES.functional_groups.keys_with_family("peroxy_acid")}
+)
 PREFIX_HANDLERS.update({key: sulfonyl_prefix_handler for key in RULES.functional_groups.keys_with_family("sulfonyl")})
-PREFIX_HANDLERS.update({key: direct_prefix_handler for key in RULES.functional_groups.keys_with_family("direct_prefix")})
+PREFIX_HANDLERS.update(
+    {key: direct_prefix_handler for key in RULES.functional_groups.keys_with_family("direct_prefix")}
+)
 PREFIX_HANDLERS["iminium"] = iminium_prefix_handler
 
 
@@ -140,7 +150,10 @@ def collect_component_prefix_substituents(
     context = PrefixContext(mol=mol, parent_path=parent_path, sub_exclude=sub_exclude, branch_namer=branch_namer)
 
     for group in prefix_groups:
-        if group.key in RULES.functional_groups.keys_with_family("prefix_skip") or group.attachment_carbon not in main_set:
+        if (
+            group.key in RULES.functional_groups.keys_with_family("prefix_skip")
+            or group.attachment_carbon not in main_set
+        ):
             continue
 
         name = prefix_from_group(context, group)

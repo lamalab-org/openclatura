@@ -1,7 +1,7 @@
 """Stereochemistry metadata audit helpers."""
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 from .assembly_parts import AssemblyParts
 from .molecule import Molecule

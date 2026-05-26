@@ -42,4 +42,3 @@ def is_fully_enclosed(text: str) -> bool:
         if depth == 0 and index < len(text) - 1:
             return False
     return depth == 0
-

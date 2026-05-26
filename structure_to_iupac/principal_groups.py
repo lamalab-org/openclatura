@@ -4,7 +4,7 @@ from .assembly_parts import AssemblyParts, PrincipalGroupItem
 from .locants import parse_locant
 from .molecule import Molecule
 from .nomenclature import RULES
-from .perception import perceive_groups, PerceivedGroup
+from .perception import PerceivedGroup, perceive_groups
 from .trace_helpers import bond_ids_within
 
 

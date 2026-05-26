@@ -5,14 +5,16 @@ import pytest
 from structure_to_iupac.tests_roundtrip.roundtrip_helpers import roundtrip_smiles
 
 SMILES = [
-    'N1CCCCC1',
-    'c1ccc2ccccc2c1',
-    'CC(C)(C)C',
+    "N1CCCCC1",
+    "c1ccc2ccccc2c1",
+    "CC(C)(C)C",
 ]
+
 
 @pytest.mark.parametrize("smiles", SMILES)
 def test_roundtrip(smiles):
     roundtrip_smiles(smiles)
+
 
 def test_has_smiles():
     if not SMILES:

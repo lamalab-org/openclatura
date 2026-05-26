@@ -1,8 +1,8 @@
 """Context and result objects for structure-to-name decisions."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Callable
 
 from .molecule import DecisionTrace, Molecule
 from .parent_selection import ParentSelection
