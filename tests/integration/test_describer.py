@@ -1,4 +1,4 @@
-"""Tests for the natural-language describer added in PR4."""
+"""Tests for the structure-driven natural-language describer."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 import subprocess
 import sys
 
-from bluenamer import DescribedComponent, Description, describe
+from bluenamer import Description, DescriptionFacts, describe
 
 
 def test_describe_returns_structured_description():
@@ -14,56 +14,69 @@ def test_describe_returns_structured_description():
     assert isinstance(d, Description)
     assert d.smiles == "CCO"
     assert d.name == "ethanol"
-    # The summary line names the result.
-    assert "ethanol" in d.summary
-    # Multiple paragraphs render as text.
-    assert "\n\n" in str(d)
-    # rules_hit are extracted.
-    assert d.rules_hit, "expected at least one P-XX rule id"
-    # Components are typed and phase-tagged.
-    assert all(isinstance(c, DescribedComponent) for c in d.components)
-    assert any(c.phase == "parent_selection" for c in d.components)
+    assert d.text
+    assert isinstance(d.facts, tuple)
+    assert all(isinstance(f, DescriptionFacts) for f in d.facts)
 
 
-def test_describe_explains_functional_group_selection():
-    d = describe("CC(=O)Nc1ccccc1")
-    text = str(d)
-    assert "N-phenylacetamide" in text
-    assert "amide" in text
-    # Parent selection is mentioned.
-    assert "parent skeleton" in text
-    # Trace name pieces appear in the prose.
-    assert "Name pieces" in text
+def test_describe_emits_structural_prose():
+    d = describe("CCO")
+    # Structure-driven prose: speaks about the parent and substituents.
+    assert "parent" in d.text
+    assert "hydroxy group" in d.text
+    assert "carbon chain" in d.text
 
 
-def test_describe_handles_benzene_without_functional_group():
+def test_describe_benzene_speaks_about_carbocycle_and_double_bonds():
     d = describe("c1ccccc1")
     assert d.name == "benzene"
-    text = str(d)
-    assert "benzene" in text
-    # No principal group → that fact is stated.
-    assert "no nameable principal groups" in text
+    assert "6-membered carbocycle" in d.text
+    assert "double bond between positions" in d.text
 
 
-def test_str_of_description_returns_text():
-    s = str(describe("CCO"))
-    assert isinstance(s, str)
-    assert "ethanol" in s
+def test_describe_heterocycle_includes_heteroatom_positions():
+    d = describe("OCC1OC(O)C(O)C(O)C1O")  # tetrahydropyran sugar
+    assert d.name  # the namer should give some non-empty result
+    facts = d.facts[0]
+    assert any("oxygen" in h for h in facts.heteroatoms)
+    assert any("hydroxy" in s for s in facts.substituents)
+
+
+def test_describe_includes_reconstruction_connectivity():
+    d = describe("C1CCCCC1")
+    facts = d.facts[0]
+    # cyclohexane → 6 bonds in the ring, all single
+    assert len(facts.connectivity) == 6
+    assert all("single" in c for c in facts.connectivity)
 
 
 def test_describe_is_deterministic():
     a = describe("CC(=O)Nc1ccccc1")
     b = describe("CC(=O)Nc1ccccc1")
-    assert str(a) == str(b)
-    assert a.rules_hit == b.rules_hit
+    assert a.text == b.text
+    assert a.facts == b.facts
 
 
-def test_describe_failure_case_still_returns_description():
-    """Even when naming yields no name, describe must not raise."""
-
+def test_describe_handles_empty_smiles():
     d = describe("")
     assert isinstance(d, Description)
-    assert "could not be named" in d.summary or d.name == ""
+    assert d.text == ""
+    assert d.facts == ()
+
+
+def test_str_of_description_returns_text():
+    s = str(describe("CCO"))
+    assert isinstance(s, str)
+    assert "carbon chain" in s
+
+
+def test_to_dict_is_json_serialisable():
+    payload = describe("CCO").to_dict()
+    json.dumps(payload)
+    assert payload["name"] == "ethanol"
+    assert payload["text"]
+    assert isinstance(payload["facts"], list)
+    assert payload["facts"][0]["parent_summary"]
 
 
 def test_cli_describe_subcommand():
@@ -74,8 +87,8 @@ def test_cli_describe_subcommand():
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    assert "ethanol" in result.stdout
-    assert "RDKit parsed" in result.stdout
+    assert "carbon chain" in result.stdout
+    assert "hydroxy group" in result.stdout
 
 
 def test_cli_describe_json():
@@ -89,7 +102,5 @@ def test_cli_describe_json():
     payload = json.loads(result.stdout)
     assert payload["name"] == "ethanol"
     assert payload["smiles"] == "CCO"
-    assert isinstance(payload["paragraphs"], list)
-    assert payload["paragraphs"]
-    assert isinstance(payload["components"], list)
-    assert any(c["phase"] == "parent_selection" for c in payload["components"])
+    assert payload["text"]
+    assert isinstance(payload["facts"], list)

@@ -2,7 +2,7 @@
 
 from collections.abc import Iterable
 
-from .describer import DescribedComponent, Description, describe
+from .describer import Description, DescriptionFacts, describe
 from .engine import DEFAULT_NAMING_ENGINE, NamingEngine, NamingRequest, NamingResult
 from .functional_groups import register_group_detector
 from .molecule import (
@@ -66,8 +66,8 @@ __all__ = [
     "AtomBinding",
     "BondBinding",
     "DecisionTrace",
-    "DescribedComponent",
     "Description",
+    "DescriptionFacts",
     "FunctionalGroupMetadata",
     "NameAnalysis",
     "NamingEngine",
