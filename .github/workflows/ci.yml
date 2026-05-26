@@ -55,3 +55,32 @@ jobs:
           pytest -m "not slow and not dataset" \
                  --maxfail=20 \
                  --durations=20
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [lint]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: bluenamer:ci
+
+      - name: Smoke-test the image
+        run: |
+          docker run -d --name bluenamer-ci -p 8000:8000 bluenamer:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/healthz > /tmp/health.json; then
+              cat /tmp/health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs bluenamer-ci
+          exit 1
