@@ -1,0 +1,532 @@
+[
+  {
+    "smiles": "C",
+    "name": "methane",
+    "category": "alkane"
+  },
+  {
+    "smiles": "CC",
+    "name": "ethane",
+    "category": "alkane"
+  },
+  {
+    "smiles": "CCC",
+    "name": "propane",
+    "category": "alkane"
+  },
+  {
+    "smiles": "CCCC",
+    "name": "butane",
+    "category": "alkane"
+  },
+  {
+    "smiles": "CC(C)C",
+    "name": "2-methylpropane",
+    "category": "alkane"
+  },
+  {
+    "smiles": "CC(C)(C)C",
+    "name": "2,2-dimethylpropane",
+    "category": "alkane"
+  },
+  {
+    "smiles": "CCCCCCCC",
+    "name": "octane",
+    "category": "alkane"
+  },
+  {
+    "smiles": "C1CCCCC1",
+    "name": "cyclohexane",
+    "category": "alicyclic"
+  },
+  {
+    "smiles": "C1CCCC1",
+    "name": "cyclopentane",
+    "category": "alicyclic"
+  },
+  {
+    "smiles": "C1CCC1",
+    "name": "cyclobutane",
+    "category": "alicyclic"
+  },
+  {
+    "smiles": "C1CC1",
+    "name": "cyclopropane",
+    "category": "alicyclic"
+  },
+  {
+    "smiles": "C=C",
+    "name": "eth-1-ene",
+    "category": "alkene"
+  },
+  {
+    "smiles": "CC=C",
+    "name": "prop-1-ene",
+    "category": "alkene"
+  },
+  {
+    "smiles": "C=CC=C",
+    "name": "buta-1,3-diene",
+    "category": "alkene"
+  },
+  {
+    "smiles": "C#C",
+    "name": "eth-1-yne",
+    "category": "alkyne"
+  },
+  {
+    "smiles": "CC#C",
+    "name": "prop-1-yne",
+    "category": "alkyne"
+  },
+  {
+    "smiles": "c1ccccc1",
+    "name": "benzene",
+    "category": "aromatic"
+  },
+  {
+    "smiles": "Cc1ccccc1",
+    "name": "methylbenzene",
+    "category": "aromatic"
+  },
+  {
+    "smiles": "c1ccc(O)cc1",
+    "name": "benzen-1-ol",
+    "category": "aromatic"
+  },
+  {
+    "smiles": "c1ccc(N)cc1",
+    "name": "benzen-1-amine",
+    "category": "aromatic"
+  },
+  {
+    "smiles": "c1ccc(Cl)cc1",
+    "name": "chlorobenzene",
+    "category": "aromatic"
+  },
+  {
+    "smiles": "c1ccc2ccccc2c1",
+    "name": "naphthalene",
+    "category": "aromatic"
+  },
+  {
+    "smiles": "CO",
+    "name": "methanol",
+    "category": "alcohol"
+  },
+  {
+    "smiles": "CCO",
+    "name": "ethanol",
+    "category": "alcohol"
+  },
+  {
+    "smiles": "CCCO",
+    "name": "propan-1-ol",
+    "category": "alcohol"
+  },
+  {
+    "smiles": "CC(C)O",
+    "name": "propan-2-ol",
+    "category": "alcohol"
+  },
+  {
+    "smiles": "OCCO",
+    "name": "ethane-1,2-diol",
+    "category": "alcohol"
+  },
+  {
+    "smiles": "OCC(O)CO",
+    "name": "propane-1,2,3-triol",
+    "category": "alcohol"
+  },
+  {
+    "smiles": "CC(=O)",
+    "name": "ethanal",
+    "category": "carbonyl"
+  },
+  {
+    "smiles": "CCC(=O)",
+    "name": "propanal",
+    "category": "carbonyl"
+  },
+  {
+    "smiles": "CC(=O)C",
+    "name": "propan-2-one",
+    "category": "carbonyl"
+  },
+  {
+    "smiles": "CCC(=O)CC",
+    "name": "pentan-3-one",
+    "category": "carbonyl"
+  },
+  {
+    "smiles": "CC(=O)O",
+    "name": "acetic acid",
+    "category": "carboxylic_acid"
+  },
+  {
+    "smiles": "CCC(=O)O",
+    "name": "propanoic acid",
+    "category": "carboxylic_acid"
+  },
+  {
+    "smiles": "OC(=O)CC(=O)O",
+    "name": "malonic acid",
+    "category": "carboxylic_acid"
+  },
+  {
+    "smiles": "OC(=O)C(O)C(O)C(=O)O",
+    "name": "2,3-dihydroxybutanedioic acid",
+    "category": "carboxylic_acid"
+  },
+  {
+    "smiles": "OC(=O)c1ccccc1",
+    "name": "benzoic acid",
+    "category": "carboxylic_acid"
+  },
+  {
+    "smiles": "CC(=O)OC",
+    "name": "methyl acetate",
+    "category": "ester"
+  },
+  {
+    "smiles": "CCOC(C)=O",
+    "name": "ethyl acetate",
+    "category": "ester"
+  },
+  {
+    "smiles": "CC(=O)OCC",
+    "name": "ethyl acetate",
+    "category": "ester"
+  },
+  {
+    "smiles": "CN",
+    "name": "methanamine",
+    "category": "amine"
+  },
+  {
+    "smiles": "CCN",
+    "name": "ethanamine",
+    "category": "amine"
+  },
+  {
+    "smiles": "CCCN",
+    "name": "propan-1-amine",
+    "category": "amine"
+  },
+  {
+    "smiles": "CC(C)N",
+    "name": "propan-2-amine",
+    "category": "amine"
+  },
+  {
+    "smiles": "CN(C)C",
+    "name": "trimethyl-azane",
+    "category": "amine"
+  },
+  {
+    "smiles": "CC(=O)N",
+    "name": "acetamide",
+    "category": "amide"
+  },
+  {
+    "smiles": "CC(=O)NC",
+    "name": "N-methylacetamide",
+    "category": "amide"
+  },
+  {
+    "smiles": "CC(=O)Nc1ccccc1",
+    "name": "N-phenylacetamide",
+    "category": "amide"
+  },
+  {
+    "smiles": "COC",
+    "name": "methoxymethane",
+    "category": "ether"
+  },
+  {
+    "smiles": "CCOCC",
+    "name": "1-ethoxyethane",
+    "category": "ether"
+  },
+  {
+    "smiles": "C1CCOCC1",
+    "name": "oxane",
+    "category": "ether"
+  },
+  {
+    "smiles": "C1COCC1",
+    "name": "oxolane",
+    "category": "heterocycle"
+  },
+  {
+    "smiles": "C1COCO1",
+    "name": "1,3-dioxolane",
+    "category": "heterocycle"
+  },
+  {
+    "smiles": "c1ccoc1",
+    "name": "furan",
+    "category": "heterocycle"
+  },
+  {
+    "smiles": "c1cc[nH]c1",
+    "name": "1H-pyrrole",
+    "category": "heterocycle"
+  },
+  {
+    "smiles": "c1ccncc1",
+    "name": "pyridine",
+    "category": "heterocycle"
+  },
+  {
+    "smiles": "c1ccsc1",
+    "name": "thiophene",
+    "category": "heterocycle"
+  },
+  {
+    "smiles": "c1cnc[nH]1",
+    "name": "1H-imidazole",
+    "category": "heterocycle"
+  },
+  {
+    "smiles": "c1ccc2[nH]ccc2c1",
+    "name": "1H-indole",
+    "category": "heterocycle"
+  },
+  {
+    "smiles": "ClCCl",
+    "name": "dichloromethane",
+    "category": "haloalkane"
+  },
+  {
+    "smiles": "ClC(Cl)(Cl)Cl",
+    "name": "tetrachloromethane",
+    "category": "haloalkane"
+  },
+  {
+    "smiles": "FC(F)(F)F",
+    "name": "tetrafluoromethane",
+    "category": "haloalkane"
+  },
+  {
+    "smiles": "BrCC",
+    "name": "1-bromoethane",
+    "category": "haloalkane"
+  },
+  {
+    "smiles": "ClCC(Cl)C",
+    "name": "1,2-dichloropropane",
+    "category": "haloalkane"
+  },
+  {
+    "smiles": "N#CC",
+    "name": "acetonitrile",
+    "category": "nitrile"
+  },
+  {
+    "smiles": "N#Cc1ccccc1",
+    "name": "benzonitrile",
+    "category": "nitrile"
+  },
+  {
+    "smiles": "[N+](=O)(C)[O-]",
+    "name": "nitromethane",
+    "category": "nitro"
+  },
+  {
+    "smiles": "[N+](=O)([O-])c1ccccc1",
+    "name": "nitrobenzene",
+    "category": "nitro"
+  },
+  {
+    "smiles": "CS",
+    "name": "methanethiol",
+    "category": "thiol"
+  },
+  {
+    "smiles": "CSC",
+    "name": "dimethyl-sulfane",
+    "category": "sulfide"
+  },
+  {
+    "smiles": "CS(=O)(=O)O",
+    "name": "methanesulfonic acid",
+    "category": "sulfonic_acid"
+  },
+  {
+    "smiles": "CS(C)(=O)=O",
+    "name": "(methylsulfonyl)methane",
+    "category": "sulfone"
+  },
+  {
+    "smiles": "CS(C)=O",
+    "name": "dimethyl sulfoxide",
+    "category": "sulfoxide"
+  },
+  {
+    "smiles": "N#CC#N",
+    "name": "ethanedinitrile",
+    "category": "multifunctional"
+  },
+  {
+    "smiles": "OCC(N)C(=O)O",
+    "name": "2-amino-3-hydroxypropanoic acid",
+    "category": "amino_acid"
+  },
+  {
+    "smiles": "NC(Cc1ccccc1)C(=O)O",
+    "name": "2-amino-3-phenylpropanoic acid",
+    "category": "amino_acid"
+  },
+  {
+    "smiles": "NC(C(=O)O)C",
+    "name": "2-aminopropanoic acid",
+    "category": "amino_acid"
+  },
+  {
+    "smiles": "CC(N)C(=O)O",
+    "name": "2-aminopropanoic acid",
+    "category": "amino_acid"
+  },
+  {
+    "smiles": "OC1OC(CO)C(O)C(O)C1O",
+    "name": "6-(hydroxymethyl)oxane-2,3,4,5-tetraol",
+    "category": "sugar"
+  },
+  {
+    "smiles": "OCC1OC(O)C(O)C(O)C1O",
+    "name": "6-(hydroxymethyl)oxane-2,3,4,5-tetraol",
+    "category": "sugar"
+  },
+  {
+    "smiles": "CCCCCC=CCC=CCCCCCCCC(=O)O",
+    "name": "octadeca-9,12-dienoic acid",
+    "category": "fatty_acid"
+  },
+  {
+    "smiles": "CCCCCCCCCCCCCC(=O)O",
+    "name": "tetradecanoic acid",
+    "category": "fatty_acid"
+  },
+  {
+    "smiles": "Oc1ccc(O)cc1",
+    "name": "benzene-1,4-diol",
+    "category": "aromatic_alcohol"
+  },
+  {
+    "smiles": "Oc1cccc(O)c1",
+    "name": "benzene-1,3-diol",
+    "category": "aromatic_alcohol"
+  },
+  {
+    "smiles": "COc1ccccc1",
+    "name": "methoxybenzene",
+    "category": "aromatic_ether"
+  },
+  {
+    "smiles": "CC1=CC=CC=C1",
+    "name": "methylbenzene",
+    "category": "aromatic"
+  },
+  {
+    "smiles": "CC(C)C1CCCCC1",
+    "name": "(propan-2-yl)cyclohexane",
+    "category": "alicyclic"
+  },
+  {
+    "smiles": "O=C1CCCCC1",
+    "name": "cyclohexanone",
+    "category": "ketone"
+  },
+  {
+    "smiles": "O=C1OCCO1",
+    "name": "1,3-dioxolan-2-one",
+    "category": "lactone"
+  },
+  {
+    "smiles": "O=C1OCC1",
+    "name": "1-oxacyclobutan-2-one",
+    "category": "lactone"
+  },
+  {
+    "smiles": "O=C1NCCC1",
+    "name": "pyrrolidin-2-one",
+    "category": "lactam"
+  },
+  {
+    "smiles": "O=C1CCCC1",
+    "name": "cyclopentanone",
+    "category": "ketone"
+  },
+  {
+    "smiles": "O=C1CCC=CC1",
+    "name": "cyclohex-3-en-1-one",
+    "category": "enone"
+  },
+  {
+    "smiles": "c1ccc(-c2ccccc2)cc1",
+    "name": "phenylbenzene",
+    "category": "aromatic"
+  },
+  {
+    "smiles": "c1ccc2c(c1)c1ccccc1n2",
+    "name": "8-azatricyclo[7.4.0.0^{2,7}]tridecane",
+    "category": "heterocycle"
+  },
+  {
+    "smiles": "CC(=O)OC1CCCCC1",
+    "name": "cyclohexyl acetate",
+    "category": "ester"
+  },
+  {
+    "smiles": "CCCCCC",
+    "name": "hexane",
+    "category": "alkane"
+  },
+  {
+    "smiles": "CC(C)(C)CC",
+    "name": "2,2-dimethylbutane",
+    "category": "alkane"
+  },
+  {
+    "smiles": "CCC(C)CC",
+    "name": "3-methylpentane",
+    "category": "alkane"
+  },
+  {
+    "smiles": "CC=CC",
+    "name": "but-2-ene",
+    "category": "alkene"
+  },
+  {
+    "smiles": "CC(C)=C",
+    "name": "2-methylprop-1-ene",
+    "category": "alkene"
+  },
+  {
+    "smiles": "C1=CC=CC=C1Cl",
+    "name": "chlorobenzene",
+    "category": "aromatic"
+  },
+  {
+    "smiles": "NC(=O)N",
+    "name": "1-aminomethanamide",
+    "category": "amide"
+  },
+  {
+    "smiles": "NC(=N)N",
+    "name": "1-iminomethanediamine",
+    "category": "guanidine"
+  },
+  {
+    "smiles": "N=C=O",
+    "name": "1-iminomethanal",
+    "category": "isocyanate"
+  },
+  {
+    "smiles": "S=C=N",
+    "name": "1-thioxomethanimine",
+    "category": "isothiocyanate"
+  }
+]

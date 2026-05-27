@@ -130,7 +130,10 @@ pip install -e ".[dev]"
 pytest
 
 # run only fast tests
-pytest -m "not slow and not dataset"
+pytest -m "not slow and not dataset and not golden"
+
+# strict RDKit-version regression suite (also runs in the rdkit-compat CI job)
+pytest -m golden
 
 # lint and format
 ruff check --fix src/bluenamer
