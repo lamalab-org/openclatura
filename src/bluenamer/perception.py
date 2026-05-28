@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from .chains import get_cyclic_atoms
 from .functional_groups import PERCEPTION_DETECTORS, PERCEPTION_SPECS, PerceptionDetectorSpec, metadata_for_group
 from .molecule import AtomBinding, BondBinding, FunctionalGroupMetadata, Molecule
+from .nitrogen_roles import nitrogen_chain_roles
 
 
 @dataclass
@@ -96,6 +97,20 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                 if mol.get_bond(atom.idx, oxygens[0]).order == 2:
                     groups.append(PerceivedGroup("nitroso", False, adj_atoms[0], {atom.idx, oxygens[0]}))
                     consumed.update([atom.idx, oxygens[0]])
+
+    for role in nitrogen_chain_roles(mol, cyclic_atoms, consumed):
+        groups.append(
+            PerceivedGroup(
+                role.key,
+                role.is_principal_candidate,
+                role.attachment_atom,
+                set(role.atom_ids),
+                variant=role.variant,
+                role="nitrogen_chain",
+                decision_reasons=(role.reason,),
+            )
+        )
+        consumed.update(role.atom_ids)
 
     for atom in mol:
         if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
@@ -501,9 +516,10 @@ def _enrich_groups(mol: Molecule, groups: list[PerceivedGroup]) -> list[Perceive
         group.metadata = _metadata_for_group(group.key)
         group.atom_bindings = _atom_bindings_for_group(group)
         group.bond_bindings = _bond_bindings_for_group(mol, group)
-        group.decision_reasons = (
-            f"Matched {group.key.replace('_', ' ')} pattern near atom {group.attachment_carbon}.",
-        )
+        if not group.decision_reasons:
+            group.decision_reasons = (
+                f"Matched {group.key.replace('_', ' ')} pattern near atom {group.attachment_carbon}.",
+            )
     return groups
 
 

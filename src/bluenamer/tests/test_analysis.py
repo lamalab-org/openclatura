@@ -230,6 +230,76 @@ def test_oxoacid_esters_use_recursive_front_modifier_namer():
     assert calls == [(2, {0, 1, 3, 4}, 1)]
 
 
+def test_nitrogen_chain_roles_classify_azido_from_graph():
+    mol = _carbon_bound_n3_graph(attachment_order=1, first_nn_order=2, second_nn_order=2)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
+        ("azido", 0, {1, 2, 3})
+    ]
+
+
+def test_nitrogen_chain_roles_do_not_collapse_hydrazone_to_azido():
+    mol = _carbon_bound_n3_graph(attachment_order=2, first_nn_order=1, second_nn_order=2)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert roles[0].key == "aldehyde_hydrazone"
+    assert not any(role.key == "azido" for role in roles)
+
+
+def test_nitrogen_chain_roles_classify_charged_diazonio_from_graph():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("N", 1, charge=1)
+    mol.add_atom("N", 2, charge=-1)
+    mol.add_bond(0, 1, order=2)
+    mol.add_bond(1, 2, order=2)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
+        ("diazonio", 0, {1, 2})
+    ]
+
+
+def test_nitrogen_chain_roles_classify_hydrazine_from_graph():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("N", 1)
+    mol.add_atom("N", 2)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=1)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
+        ("hydrazine", 0, {1, 2})
+    ]
+
+
+def test_perception_consumes_nitrogen_chain_roles_before_legacy_azido():
+    mol = _carbon_bound_n3_graph(attachment_order=2, first_nn_order=1, second_nn_order=2)
+
+    groups = perceive_groups(mol)
+
+    assert any(group.key == "aldehyde_hydrazone" and group.role == "nitrogen_chain" for group in groups)
+    assert not any(group.key == "azido" for group in groups)
+
+
+def _carbon_bound_n3_graph(attachment_order: int, first_nn_order: int, second_nn_order: int) -> Molecule:
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("N", 1)
+    mol.add_atom("N", 2)
+    mol.add_atom("N", 3)
+    mol.add_bond(0, 1, order=attachment_order)
+    mol.add_bond(1, 2, order=first_nn_order)
+    mol.add_bond(2, 3, order=second_nn_order)
+    return mol
+
+
 def _oxoacid_graph(central_symbol: str, single_o: int, double_o: int) -> Molecule:
     mol = Molecule()
     mol.add_atom(symbol=central_symbol, idx=0)
