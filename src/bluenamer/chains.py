@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from .molecule import Molecule
 from .polycycle_topology import (
+    audit_von_baeyer_descriptor,
     bicyclo_proof,
     build_ring_numbering,
     linear_dispiro_proof,
@@ -637,9 +638,10 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                     systems.append(
                         RingSystem(
                             atoms=comp_nodes,
+                            is_polycycle=True,
                             paths=[numbered_paths[0]],
                             ring_parent=RingParent.from_paths(
-                                kind="complex_ring",
+                                kind="polycycle",
                                 atoms=comp_nodes,
                                 descriptor=None,
                                 paths=[numbered_paths[0]],
@@ -1010,7 +1012,11 @@ def _polyspiro_descriptor_or_von_baeyer(mol: Molecule, atoms: set[int], edges: s
     dispiro = get_linear_dispiro_descriptor_and_paths(mol, atoms, edges)
     if dispiro is not None:
         return dispiro
-    return get_von_baeyer_descriptor_and_path(atoms, edges)
+    descriptor, paths = get_von_baeyer_descriptor_and_path(atoms, edges)
+    if not descriptor:
+        return descriptor, paths
+    audited_paths = [path for path in paths if audit_von_baeyer_descriptor(descriptor, path, edges).audit_ok]
+    return (descriptor, audited_paths) if audited_paths else (descriptor, paths)
 
 
 def _has_multiple_spiro_centers(nodes: set[int], edges: set[tuple[int, int]]) -> bool:

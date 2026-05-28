@@ -60,6 +60,32 @@ def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) 
     as nitro, cyano, carboxy, carbamoyl, and halo-carbonyl prefixes.
     """
 
+    if mol.atoms[start_idx].is_carbon and start_idx in component:
+        triple_phosphorus = [
+            neighbor
+            for neighbor in mol.get_neighbors(start_idx)
+            if mol.atoms[neighbor].symbol == "P"
+            and neighbor in component
+            and (bond := mol.get_bond(start_idx, neighbor)) is not None
+            and bond.order == 3
+        ]
+        if len(triple_phosphorus) == 1:
+            phosphorus = triple_phosphorus[0]
+            terminal_oxo = [
+                neighbor
+                for neighbor in mol.get_neighbors(phosphorus)
+                if neighbor in component
+                and neighbor != start_idx
+                and mol.atoms[neighbor].symbol == "O"
+                and (bond := mol.get_bond(phosphorus, neighbor)) is not None
+                and bond.order == 2
+                and all(other == phosphorus for other in mol.get_neighbors(neighbor))
+            ]
+            if component == {start_idx, phosphorus}:
+                return "phosphanylidynemethyl"
+            if len(terminal_oxo) == 1 and component == {start_idx, phosphorus, terminal_oxo[0]}:
+                return "oxophosphanylidynemethyl"
+
     for group in perceive_groups(mol):
         if start_idx in group.atoms_involved and group.atoms_involved.issubset(component):
             if group.key in RULES.prefixes.amide_like_groups:
@@ -782,6 +808,8 @@ def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
     parentheses around complex substituent prefixes.
     """
 
+    if parts.principal_group is not None and parts.principal_group.key in {"nitrile", "ring_nitrile"}:
+        name = name.replace("nitrilo", "cyano")
     if name == "phenyl" and not parts.substituents:
         return name
     if (

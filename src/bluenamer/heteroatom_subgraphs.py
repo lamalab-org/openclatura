@@ -10,7 +10,8 @@ from .formatting import (
     oxy_prefix_from_branch,
     strip_outer_parentheses,
 )
-from .heteroatom_substituent_specs import unsubstituted_prefix
+from .heterocumulene_roles import nitrogen_heterocumulene_role
+from .heteroatom_substituent_specs import central_oxo_substituent_prefix, unsubstituted_prefix
 from .ionic_naming import ammonio_prefix
 from .molecule import Molecule
 from .namer_config import (
@@ -20,6 +21,8 @@ from .namer_config import (
     SIMPLE_SULFANYL_PREFIXES,
 )
 from .nomenclature import RULES
+from .oxoacid_roles import OxoLigandRole, central_oxo_substituent_role
+from .rules import multipliers
 
 BranchNamer = Callable[[Molecule, int, set[int], int | None], str]
 
@@ -64,6 +67,43 @@ def stereo_prefix(atom) -> str:
 
 def sulfur_oxo_suffix(oxo_count: int) -> str:
     return "sulfonyl" if oxo_count == 2 else "sulfinyl"
+
+
+def central_oxo_ligand_atoms(mol: Molecule, atom_idx: int, exclude_atoms: set[int]) -> list[int]:
+    """Return graph-classified oxo/oxido ligand atoms for a substituent center."""
+
+    role = central_oxo_substituent_role_for_center(mol, atom_idx, exclude_atoms)
+    if role is None:
+        return []
+    return [
+        ligand.oxygen
+        for ligand in role.ligands
+        if ligand.role in {OxoLigandRole.OXO, OxoLigandRole.OXIDO}
+    ]
+
+
+def central_oxo_substituent_role_for_center(mol: Molecule, atom_idx: int, exclude_atoms: set[int]):
+    component_atoms = set(mol.atoms) - set(exclude_atoms)
+    component_atoms.add(atom_idx)
+    return central_oxo_substituent_role(mol, component_atoms, atom_idx)
+
+
+def central_oxo_substituent_excluded_ligand_atoms(mol: Molecule, atom_idx: int, exclude_atoms: set[int]) -> list[int]:
+    """Return oxygen ligands represented by an exact class prefix."""
+
+    role = central_oxo_substituent_role_for_center(mol, atom_idx, exclude_atoms)
+    if role is None or central_oxo_substituent_prefix(role) is None:
+        return central_oxo_ligand_atoms(mol, atom_idx, exclude_atoms)
+    return role.oxygen_atoms
+
+
+def central_oxo_substituent_prefix_for_center(mol: Molecule, atom_idx: int, exclude_atoms: set[int]) -> str | None:
+    """Return a data-backed oxo-substituent class prefix for a center."""
+
+    role = central_oxo_substituent_role_for_center(mol, atom_idx, exclude_atoms)
+    if role is None:
+        return None
+    return central_oxo_substituent_prefix(role)
 
 
 def name_branch_or_none(
@@ -250,6 +290,9 @@ def name_nitrogen_subgraph(
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
     is_cation = mol.atoms[start_idx].charge > 0
     is_anion = mol.atoms[start_idx].charge < 0
+    heterocumulene = nitrogen_heterocumulene_role(mol, start_idx, exclude_atoms, upstream_atom)
+    if heterocumulene is not None:
+        return heterocumulene.prefix
     if not next_atoms:
         if is_double:
             return "imino"
@@ -325,10 +368,11 @@ def name_sulfur_subgraph(
     branch_namer: BranchNamer,
 ) -> str:
     is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
-    s_oxygens = double_bonded_neighbors(mol, start_idx, "O")
-    s_nitrogens = double_bonded_neighbors(mol, start_idx, "N")
+    s_oxygens = central_oxo_substituent_excluded_ligand_atoms(mol, start_idx, exclude_atoms)
+    s_nitrogens = [n for n in double_bonded_neighbors(mol, start_idx, "N") if n != upstream_atom]
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom, s_oxygens + s_nitrogens)
     stereo_prefix_text = stereo_prefix(mol.atoms[start_idx])
+    class_prefix = central_oxo_substituent_prefix_for_center(mol, start_idx, exclude_atoms)
 
     if len(s_oxygens) == 1 and len(s_nitrogens) == 1:
         suffix = "sulfonimidoyl" + ("idene" if is_double else "")
@@ -357,7 +401,7 @@ def name_sulfur_subgraph(
         )
 
     if s_oxygens:
-        suffix = sulfur_oxo_suffix(len(s_oxygens)) + ("idene" if is_double else "")
+        suffix = (class_prefix or sulfur_oxo_suffix(len(s_oxygens))) + ("idene" if is_double else "")
         if not next_atoms:
             return f"{stereo_prefix_text}{suffix}"
         if len(next_atoms) == 1:
@@ -374,6 +418,23 @@ def name_sulfur_subgraph(
         return format_lambda_substituent(
             mol, start_idx, branches, stereo_prefix_text, "sulfanylidene" if is_double else "sulfanyl"
         )
+
+    if s_nitrogens:
+        base = "sulfanylidene" if is_double else "sulfanyl"
+        if not next_atoms:
+            return f"{stereo_prefix_text}imino{base}"
+        branches = [
+            br
+            for nxt in next_atoms
+            if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx} | set(s_nitrogens), start_idx))
+        ]
+        if len(s_nitrogens) == 1:
+            branches = ["imino", *branches]
+        else:
+            branches = [f"{multipliers.basic(len(s_nitrogens))}imino", *branches]
+        if not is_double and len(next_atoms) == 1 and len(s_nitrogens) == 1:
+            return f"({stereo_prefix_text}{''.join(branches)}{base})"
+        return format_lambda_substituent(mol, start_idx, branches, stereo_prefix_text, base)
 
     if not next_atoms:
         return "thioxo" if is_double else f"{stereo_prefix_text}{unsubstituted_prefix('S') or 'sulfanyl'}"
@@ -403,8 +464,26 @@ def name_chalcogen_subgraph(
     branch_namer: BranchNamer,
 ) -> str:
     is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
-    next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
+    oxo_ligands = central_oxo_substituent_excluded_ligand_atoms(mol, start_idx, exclude_atoms)
+    next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom, oxo_ligands)
     stereo_prefix_text = stereo_prefix(mol.atoms[start_idx])
+    if oxo_ligands:
+        suffix = (
+            central_oxo_substituent_prefix_for_center(mol, start_idx, exclude_atoms)
+            or unsubstituted_prefix(mol.atoms[start_idx].symbol, len(oxo_ligands))
+            or element_suffix
+        )
+        if not next_atoms:
+            return f"{stereo_prefix_text}{suffix}"
+        branches = [
+            br
+            for nxt in next_atoms
+            if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx} | set(oxo_ligands), start_idx))
+        ]
+        branches.extend(["oxo"] * len(oxo_ligands))
+        return format_lambda_substituent(
+            mol, start_idx, branches, stereo_prefix_text, element_suffix + ("idene" if is_double else "")
+        )
     if not next_atoms:
         return (
             oxo_prefix
@@ -435,13 +514,16 @@ def name_phosphorus_subgraph(
     upstream_atom: int | None,
     branch_namer: BranchNamer,
 ) -> str:
-    is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
-    p_oxygens = double_bonded_neighbors(mol, start_idx, "O")
+    upstream_order = upstream_bond_order(mol, start_idx, upstream_atom)
+    multiple_bond_suffix = {2: "idene", 3: "idyne"}.get(upstream_order, "")
+    p_oxygens = central_oxo_substituent_excluded_ligand_atoms(mol, start_idx, exclude_atoms)
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom, p_oxygens)
     stereo_prefix_text = stereo_prefix(mol.atoms[start_idx])
-    suffix = (unsubstituted_prefix("P", len(p_oxygens)) or ("phosphoryl" if p_oxygens else "phosphanyl")) + (
-        "idene" if is_double else ""
-    )
+    suffix = (
+        central_oxo_substituent_prefix_for_center(mol, start_idx, exclude_atoms)
+        or unsubstituted_prefix("P", len(p_oxygens))
+        or ("phosphoryl" if p_oxygens else "phosphanyl")
+    ) + multiple_bond_suffix
     if not next_atoms:
         return f"{stereo_prefix_text}{suffix}"
     branches = [

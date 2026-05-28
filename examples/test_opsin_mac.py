@@ -39,7 +39,7 @@ def main():
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
     # 1. Load dataset and select random N using indices
-    print(f"Sampling {N_TEST} random molecules using .select()...")
+    print(f"Loading all QM9 molecules")
     ds = load_dataset(
         "jablonkagroup/pubchem-smiles-molecular-formula",
         split="train",

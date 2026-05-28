@@ -1,6 +1,7 @@
 """Principal characteristic-group selection and suffix assembly."""
 
 from .assembly_parts import AssemblyParts, PrincipalGroupItem
+from .group_atom_roles import hydrazone_characteristic_carbon
 from .locants import parse_locant
 from .molecule import Molecule
 from .nomenclature import RULES
@@ -68,6 +69,10 @@ def add_component_principal_group(
         if group.key == principal_key and group.attachment_carbon in numbered_path:
             atom_ids.add(group.attachment_carbon)
             atom_ids.update(group.atoms_involved)
+            if group.key in RULES.functional_groups.keys_with_family("hydrazone"):
+                hydrazone_carbon = hydrazone_characteristic_carbon(mol, group)
+                if hydrazone_carbon is not None:
+                    atom_ids.add(hydrazone_carbon)
     parts.principal_group = PrincipalGroupItem(
         key=principal_key,
         locants=locants,

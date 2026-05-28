@@ -1,14 +1,16 @@
 """Characteristic-group prefix collection for component naming."""
 
 from collections.abc import Callable
+from collections import Counter
 from dataclasses import dataclass
 
 from .assembly_parts import SubstituentItem
-from .formatting import format_counted_prefixes, oxy_prefix_from_branch
+from .formatting import format_counted_prefixes, is_complex_prefix, oxy_prefix_from_branch, strip_outer_parentheses
 from .group_atom_roles import amide_nitrogen, ester_or_peroxy_single_oxygen
 from .molecule import Molecule
 from .nomenclature import RULES
 from .perception import PerceivedGroup
+from .rules import multipliers
 from .subgraph_tools import subgraph_component
 from .trace_helpers import bond_ids_within
 
@@ -86,6 +88,64 @@ def iminium_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str
     return f"({format_counted_prefixes(sub_names)}iminio)"
 
 
+def hydrazine_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    """Render C-N-N hydrazines as graph-bound hydrazinyl prefixes."""
+
+    nitrogens = [n for n in group.atoms_involved if context.mol.atoms[n].symbol == "N"]
+    attached = next(
+        (
+            n
+            for n in nitrogens
+            if context.mol.get_bond(n, group.attachment_carbon) is not None
+        ),
+        None,
+    )
+    if attached is None:
+        return "hydrazinyl"
+    terminal = next((n for n in nitrogens if n != attached), None)
+    if terminal is None:
+        return "hydrazinyl"
+    substituents: list[tuple[str, int]] = []
+    substituents.extend(
+        (
+            "N",
+            n,
+        )
+        for n in context.mol.get_neighbors(attached)
+        if n != group.attachment_carbon and n not in group.atoms_involved and context.mol.atoms[n].symbol != "H"
+    )
+    substituents.extend(
+        (
+            "N'",
+            n,
+        )
+        for n in context.mol.get_neighbors(terminal)
+        if n != attached and n not in group.atoms_involved and context.mol.atoms[n].symbol != "H"
+    )
+    if not substituents:
+        return "hydrazinyl"
+    prefix_items = []
+    for locant, n_sub in substituents:
+        owner = attached if locant == "N" else terminal
+        branch = context.branch_namer(context.mol, n_sub, context.sub_exclude | {owner}, upstream_atom=owner)
+        if not branch:
+            continue
+        branch = strip_outer_parentheses(branch)
+        prefix_items.append((locant, branch))
+    if not prefix_items:
+        return "hydrazinyl"
+    prefixes = []
+    for (locant, branch), count in Counter(prefix_items).items():
+        locants = ",".join([locant] * count)
+        branch_text = branch
+        if count > 1:
+            branch_text = f"{multipliers.basic(count)}{branch}"
+        elif is_complex_prefix(branch_text):
+            branch_text = f"({branch_text})"
+        prefixes.append(f"{locants}-{branch_text}")
+    return f"({'-'.join(prefixes)}hydrazinyl)"
+
+
 def sulfonyl_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     return ester_prefix_from_group(context.mol, group, context.sub_exclude, "sulfonyl", context.branch_namer) or "sulfo"
 
@@ -128,6 +188,7 @@ PREFIX_HANDLERS.update(
     {key: direct_prefix_handler for key in RULES.functional_groups.keys_with_family("direct_prefix")}
 )
 PREFIX_HANDLERS["iminium"] = iminium_prefix_handler
+PREFIX_HANDLERS["hydrazine"] = hydrazine_prefix_handler
 
 
 def prefix_from_group(context: PrefixContext, group: PerceivedGroup) -> str:

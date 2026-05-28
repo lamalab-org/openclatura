@@ -286,6 +286,7 @@ def name_component(
         )
 
     state.principal_involved_atoms = principal_involved_atoms(
+        mol,
         state.perceived_groups,
         state.principal_key,
         state.parent_path,

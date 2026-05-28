@@ -5,6 +5,7 @@ except for descriptor/audit data that can be proven from the graph.
 """
 
 from dataclasses import dataclass
+import re
 
 from .molecule import Molecule
 from .ring_renderer import render_ring_descriptor
@@ -304,6 +305,109 @@ def linear_dispiro_proof(
 
 def audit_dispiro_atom_count(proof: LinearDispiroProof, atom_count: int) -> bool:
     return proof.atom_count == atom_count
+
+
+@dataclass(frozen=True)
+class VonBaeyerAudit:
+    """Structural audit for a rendered von Baeyer descriptor."""
+
+    descriptor: str
+    path: tuple[int, ...]
+    audit_ok: bool
+    audit_errors: tuple[str, ...] = ()
+    expected_edges: frozenset[tuple[int, int]] = frozenset()
+
+
+def audit_von_baeyer_descriptor(
+    descriptor: str,
+    path: tuple[int, ...] | list[int],
+    edge_set: frozenset[tuple[int, int]] | set[tuple[int, int]],
+) -> VonBaeyerAudit:
+    """Reconstruct a tricyclo/tetracyclo descriptor and compare it to graph edges."""
+
+    numbered_path = tuple(path)
+    normalized_edges = frozenset(_normalize_edges(edge_set))
+    errors = []
+    parsed = _parse_von_baeyer_descriptor(descriptor)
+    if parsed is None:
+        errors.append("unsupported von Baeyer descriptor syntax")
+        return VonBaeyerAudit(descriptor, numbered_path, False, tuple(errors), frozenset())
+    kind_count, base_numbers, extra_bridges = parsed
+    if kind_count != len(extra_bridges) + 2:
+        errors.append("polycycle prefix does not match descriptor bridge count")
+    atom_count = sum(base_numbers) + 2 + sum(length for length, _locants in extra_bridges)
+    if atom_count != len(numbered_path):
+        errors.append(f"descriptor atom count {atom_count} does not match path length {len(numbered_path)}")
+    if len(set(numbered_path)) != len(numbered_path):
+        errors.append("numbering path contains duplicate atoms")
+    if set(numbered_path) != set(atom for edge in normalized_edges for atom in edge):
+        errors.append("numbering path does not cover the ring graph atoms")
+    expected_edges = _von_baeyer_edges_from_numbering(base_numbers, extra_bridges, numbered_path)
+    if not expected_edges:
+        errors.append("descriptor could not be reconstructed from locants")
+    elif expected_edges != normalized_edges:
+        missing = sorted(normalized_edges - expected_edges)
+        extra = sorted(expected_edges - normalized_edges)
+        errors.append(f"von Baeyer descriptor edge audit failed: missing={missing} extra={extra}")
+    return VonBaeyerAudit(descriptor, numbered_path, not errors, tuple(errors), expected_edges)
+
+
+def _parse_von_baeyer_descriptor(
+    descriptor: str,
+) -> tuple[int, tuple[int, int, int], tuple[tuple[int, tuple[int, int]], ...]] | None:
+    match = re.fullmatch(r"(?P<prefix>tri|tetra|penta|hexa)cyclo\[(?P<body>.+)\]", descriptor)
+    if match is None:
+        return None
+    kind_count = {"tri": 3, "tetra": 4, "penta": 5, "hexa": 6}[match.group("prefix")]
+    parts = match.group("body").split(".")
+    if len(parts) < 4:
+        return None
+    try:
+        base_numbers = tuple(int(part) for part in parts[:3])
+    except ValueError:
+        return None
+    extra_bridges = []
+    for part in parts[3:]:
+        bridge = re.fullmatch(r"(?P<length>\d+)\^\{(?P<first>\d+),(?P<second>\d+)\}", part)
+        if bridge is None:
+            return None
+        first = int(bridge.group("first"))
+        second = int(bridge.group("second"))
+        if first == second:
+            return None
+        extra_bridges.append((int(bridge.group("length")), tuple(sorted((first, second)))))
+    return kind_count, base_numbers, tuple(extra_bridges)
+
+
+def _von_baeyer_edges_from_numbering(
+    base_numbers: tuple[int, int, int],
+    extra_bridges: tuple[tuple[int, tuple[int, int]], ...],
+    numbered_path: tuple[int, ...],
+) -> frozenset[tuple[int, int]]:
+    locant_to_atom = {locant: atom for locant, atom in enumerate(numbered_path, start=1)}
+    if len(locant_to_atom) != len(numbered_path):
+        return frozenset()
+    base_count = sum(base_numbers) + 2
+    if base_count > len(numbered_path):
+        return frozenset()
+    edges = set(_bicyclo_edges_from_numbering(base_numbers, locant_to_atom))
+    next_bridge_locant = base_count + 1
+    for length, (first_locant, second_locant) in extra_bridges:
+        if first_locant not in locant_to_atom or second_locant not in locant_to_atom:
+            return frozenset()
+        if length == 0:
+            edges.add(tuple(sorted((locant_to_atom[first_locant], locant_to_atom[second_locant]))))
+            continue
+        bridge_locants = tuple(range(next_bridge_locant, next_bridge_locant + length))
+        if any(locant not in locant_to_atom for locant in bridge_locants):
+            return frozenset()
+        locant_chain = (first_locant, *bridge_locants, second_locant)
+        for left, right in zip(locant_chain, locant_chain[1:]):
+            edges.add(tuple(sorted((locant_to_atom[left], locant_to_atom[right]))))
+        next_bridge_locant += length
+    if next_bridge_locant != len(numbered_path) + 1:
+        return frozenset()
+    return frozenset(edges)
 
 
 def build_ring_numbering(

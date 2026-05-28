@@ -4,6 +4,7 @@ from bluenamer import (
     RULES,
     NamingEngine,
     NamingIntent,
+    NamingRequest,
     OperationClass,
     TracePhase,
     analyze_smiles,
@@ -38,7 +39,9 @@ from bluenamer.functional_groups import (
     register_perception_spec,
 )
 from bluenamer.graph_io import read_smiles
-from bluenamer.heteroatom_substituent_specs import ligand_prefix, unsubstituted_prefix
+from bluenamer.heteroatom_subgraphs import name_heteroatom_subgraph
+from bluenamer.heteroatom_substituent_specs import central_oxo_substituent_prefix, ligand_prefix, unsubstituted_prefix
+from bluenamer.heterocumulene_roles import nitrogen_heterocumulene_role
 from bluenamer.ionic_naming import (
     apply_parent_charge_names,
     apply_retained_parent_ide,
@@ -58,6 +61,8 @@ from bluenamer.name_postprocessing import (
 from bluenamer.namer import _spiro_subgraph_assembly, name_component
 from bluenamer.naming_audit import UnnamedAtomError, assert_component_fully_named
 from bluenamer.naming_data import namer_rules
+from bluenamer.nitrogen_roles import nitrogen_chain_roles
+from bluenamer.oxoacid_roles import OxoLigandRole, central_oxo_roles, central_oxo_substituent_role
 from bluenamer.numbering import NUMBERING_CRITERIA, NumberingPreference, polycycle_numbering_key
 from bluenamer.parent_pipeline import build_parent_assembly_plan
 from bluenamer.parent_selection import (
@@ -69,6 +74,7 @@ from bluenamer.parent_selection import (
 )
 from bluenamer.perception import PerceivedGroup, perceive_groups
 from bluenamer.polycycle_topology import (
+    audit_von_baeyer_descriptor,
     bicyclo_proof,
     build_ring_numbering,
     linear_dispiro_proof,
@@ -200,9 +206,10 @@ def test_oxoacid_alkyl_esters_are_data_backed():
         ("Br", 1, 2, 2, 0): "ethyl bromate",
         ("Br", 1, 2, 3, 0): "propyl bromate",
         ("I", 1, 2, 1, 0): "methyl iodate",
-        ("P", 3, 1, 1, 0): "methyl phosphate",
-        ("S", 2, 2, 2, 0): "ethyl sulfate",
+        ("P", 3, 1, 1, 0): "methyl dihydrogen phosphate",
+        ("S", 2, 2, 2, 0): "ethyl hydrogen sulfate",
         ("N", 2, 1, 1, 1): "methyl nitrate",
+        ("C", 2, 1, 2, 0): "ethyl hydrogen carbonate",
     }
 
     for (central_symbol, single_o, double_o, carbon_count, central_charge), expected in cases.items():
@@ -230,6 +237,181 @@ def test_oxoacid_esters_use_recursive_front_modifier_namer():
     assert calls == [(2, {0, 1, 3, 4}, 1)]
 
 
+def test_central_oxo_role_classifies_acid_ligands_from_graph():
+    mol = _oxoacid_graph("P", single_o=3, double_o=1)
+
+    roles = central_oxo_roles(mol, set(mol.atoms))
+
+    assert len(roles) == 1
+    assert roles[0].central_symbol == "P"
+    assert roles[0].count(OxoLigandRole.HYDROXY) == 3
+    assert roles[0].count(OxoLigandRole.OXO) == 1
+    assert roles[0].spec_counts() == (3, 1)
+
+
+def test_central_oxo_role_classifies_alkoxy_and_oxido_ligands_from_graph():
+    mol = _halogen_oxoacid_ester_graph("Br", charged_oxo_o=2, carbon_count=1, central_charge=2)
+
+    roles = central_oxo_roles(mol, set(mol.atoms))
+
+    assert len(roles) == 1
+    assert roles[0].count(OxoLigandRole.ALKOXY) == 1
+    assert roles[0].count(OxoLigandRole.OXO) == 2
+    assert roles[0].spec_counts() == (1, 2)
+
+
+def test_central_oxo_parent_names_full_anions_from_role_data():
+    mol = Molecule()
+    mol.add_atom("S", 0)
+    mol.add_atom("O", 1, charge=-1)
+    mol.add_atom("O", 2, charge=-1)
+    mol.add_atom("O", 3)
+    mol.add_atom("O", 4)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(0, 2, order=1)
+    mol.add_bond(0, 3, order=2)
+    mol.add_bond(0, 4, order=2)
+
+    assert structural_replacement_parent_name(mol, set(mol.atoms)) == "sulfate"
+
+
+def test_neutral_oxoacid_ester_suffix_preserves_remaining_hydrogens():
+    phosphate = _oxoacid_ester_graph("P", single_o=3, double_o=1, carbon_count=1)
+    sulfate = _oxoacid_ester_graph("S", single_o=2, double_o=2, carbon_count=2)
+    carbonate = _oxoacid_ester_graph("C", single_o=2, double_o=1, carbon_count=3)
+
+    assert structural_replacement_parent_name(phosphate, set(phosphate.atoms)) == "methyl dihydrogen phosphate"
+    assert structural_replacement_parent_name(sulfate, set(sulfate.atoms)) == "ethyl hydrogen sulfate"
+    assert structural_replacement_parent_name(carbonate, set(carbonate.atoms)) == "propyl hydrogen carbonate"
+
+
+def test_central_oxo_substituent_role_allows_non_oxygen_ligands():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("S", 1)
+    mol.add_atom("O", 2)
+    mol.add_atom("O", 3, charge=-1)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=2)
+    mol.add_bond(1, 3, order=1)
+
+    role = central_oxo_substituent_role(mol, set(mol.atoms), 1)
+
+    assert role is not None
+    assert role.central_symbol == "S"
+    assert role.count(OxoLigandRole.OXO) == 1
+    assert role.count(OxoLigandRole.OXIDO) == 1
+
+
+def test_central_oxo_substituent_class_rendering_is_data_backed():
+    mol = _phosphorus_oxo_substituent_graph(oxo_count=2)
+    role = central_oxo_substituent_role(mol, set(mol.atoms), 1)
+
+    assert role is not None
+    assert central_oxo_substituent_prefix(role) == "dioxophosphanyl"
+    assert name_heteroatom_subgraph(mol, 1, exclude_atoms={0}, upstream_atom=0, branch_namer=_empty_branch_namer) == (
+        "dioxophosphanyl"
+    )
+
+
+def test_central_oxo_substituent_class_falls_back_when_unconfigured():
+    mol = _phosphorus_oxo_substituent_graph(oxo_count=3)
+    role = central_oxo_substituent_role(mol, set(mol.atoms), 1)
+
+    assert role is not None
+    assert central_oxo_substituent_prefix(role) is None
+    assert name_heteroatom_subgraph(mol, 1, exclude_atoms={0}, upstream_atom=0, branch_namer=_empty_branch_namer) == (
+        "phosphoryl"
+    )
+
+
+def test_central_oxo_substituent_class_renders_one_oxo_phosphorus_explicitly():
+    mol = _phosphorus_oxo_substituent_graph(oxo_count=1)
+    role = central_oxo_substituent_role(mol, set(mol.atoms), 1)
+
+    assert role is not None
+    assert central_oxo_substituent_prefix(role) == "oxophosphanyl"
+    assert name_heteroatom_subgraph(mol, 1, exclude_atoms={0}, upstream_atom=0, branch_namer=_empty_branch_namer) == (
+        "oxophosphanyl"
+    )
+
+
+def test_central_oxo_substituent_class_handles_sulfo_signature():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("S", 1)
+    mol.add_atom("O", 2)
+    mol.add_atom("O", 3)
+    mol.add_atom("O", 4)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=2)
+    mol.add_bond(1, 3, order=2)
+    mol.add_bond(1, 4, order=1)
+
+    role = central_oxo_substituent_role(mol, set(mol.atoms), 1)
+
+    assert role is not None
+    assert central_oxo_substituent_prefix(role) == "sulfo"
+    assert name_heteroatom_subgraph(mol, 1, exclude_atoms={0}, upstream_atom=0, branch_namer=_empty_branch_namer) == "sulfo"
+
+
+def test_central_oxo_substituent_class_excludes_implied_hydroxy_ligands():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("P", 1)
+    mol.add_atom("O", 2)
+    mol.add_atom("O", 3)
+    mol.add_atom("O", 4)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=2)
+    mol.add_bond(1, 3, order=1)
+    mol.add_bond(1, 4, order=1)
+
+    role = central_oxo_substituent_role(mol, set(mol.atoms), 1)
+
+    assert role is not None
+    assert central_oxo_substituent_prefix(role) == "dihydroxyphosphoryl"
+    assert name_heteroatom_subgraph(mol, 1, exclude_atoms={0}, upstream_atom=0, branch_namer=_empty_branch_namer) == (
+        "dihydroxyphosphoryl"
+    )
+
+
+def test_nitrogen_heterocumulene_role_precedes_formamido_fallback():
+    mol = Molecule()
+    mol.add_atom("P", 0)
+    mol.add_atom("N", 1)
+    mol.add_atom("C", 2)
+    mol.add_atom("O", 3)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=2)
+    mol.add_bond(2, 3, order=2)
+
+    role = nitrogen_heterocumulene_role(mol, 1, exclude_atoms={0}, upstream_atom=0)
+
+    assert role is not None
+    assert role.prefix == "isocyanato"
+    assert role.atom_ids == {1, 2, 3}
+    assert name_heteroatom_subgraph(mol, 1, exclude_atoms={0}, upstream_atom=0, branch_namer=_empty_branch_namer) == (
+        "isocyanato"
+    )
+
+
+def _phosphorus_oxo_substituent_graph(oxo_count: int) -> Molecule:
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("P", 1)
+    mol.add_bond(0, 1, order=1)
+    for offset in range(oxo_count):
+        oxygen = offset + 2
+        mol.add_atom("O", oxygen)
+        mol.add_bond(1, oxygen, order=2)
+    return mol
+
+
+def _empty_branch_namer(_mol: Molecule, _start_idx: int, _exclude_atoms: set[int], _upstream_atom: int | None = None):
+    return ""
+
+
 def test_nitrogen_chain_roles_classify_azido_from_graph():
     mol = _carbon_bound_n3_graph(attachment_order=1, first_nn_order=2, second_nn_order=2)
 
@@ -240,13 +422,117 @@ def test_nitrogen_chain_roles_classify_azido_from_graph():
     ]
 
 
-def test_nitrogen_chain_roles_do_not_collapse_hydrazone_to_azido():
+def test_terminal_thioaldehyde_on_ring_uses_carbothialdehyde_suffix():
+    generated = name_smiles("Cc1cc(Cl)c(C=S)c(Cl)n1")
+
+    assert generated == "2,4-dichloro-6-methylpyridine-3-carbothialdehyde"
+
+
+def test_thioester_is_not_perceived_as_ring_thioaldehyde():
+    generated = name_smiles("CCSC(=S)C1=CCC=CN1")
+
+    assert generated == "2-((ethylsulfanyl)(thioxo)methyl)-1-azacyclohexa-2,5-diene"
+
+
+def test_cyclic_thioamide_is_not_perceived_as_thioaldehyde():
+    generated = name_smiles("CCCCCCCCCCCCCC(=S)N1CCCCC1")
+
+    assert generated == "1-(1-thioxotetradecyl)piperidine"
+
+
+def test_nitrile_oxide_is_not_rendered_as_isocyano():
+    generated = name_smiles("Nc1ccccc1C#[N+][O-]")
+
+    assert generated == "2-aminobenzene-1-carbonitrile oxide"
+
+
+def test_direct_phosphonic_acid_substituent_keeps_p_c_bond():
+    generated = name_smiles("NCC(O)C(O)P(=O)(O)O")
+
+    assert generated == "3-amino-1-dihydroxyphosphorylpropane-1,2-diol"
+
+
+def test_terminal_carbon_phosphorus_triple_substituent_keeps_triple_bond():
+    generated = name_smiles("CC(=O)NC#P")
+
+    assert generated == "N-phosphanylidynemethylacetamide"
+
+
+def test_terminal_oxophosphorus_triple_substituent_keeps_triple_bond():
+    generated = name_smiles("O=P#Cc1ccncc1")
+
+    assert generated == "4-oxophosphanylidynemethylpyridine"
+
+
+def test_oxophosphorus_triple_substituent_through_sulfur_keeps_triple_bond():
+    generated = name_smiles("NCC(S)S#P=O")
+
+    assert generated == "2-amino-1-(oxophosphanylidynesulfanyl)ethane-1-thiol"
+
+
+def test_upstream_sulfur_imide_attachment_renders_sulfinyl_not_sulfonimidoylidene():
+    generated = name_smiles("NC(=S)N=S=O")
+
+    assert generated == "1-amino-N-sulfinylidenemethanethioamide"
+
+
+def test_repeated_cyanoalkyl_front_modifiers_use_complex_multiplier():
+    generated = name_smiles("CC(C(=O)OCC#N)C(=O)OCC#N")
+
+    assert generated == "bis(2-nitriloethyl) 2-methylpropanedioate"
+
+
+def test_simple_azine_uses_hydrazone_template_not_hydrazinyl_prefix():
+    generated = name_smiles(r"CC/C(C)=N\N=C(C)C")
+
+    assert generated == "(2Z)-butan-2-one propan-2-ylidenehydrazone"
+
+
+def test_hydrazone_prefix_with_terminal_carbon_imino_keeps_connectivity():
+    generated = name_smiles(r"COC(=O)CC(C)=N/N=C(\N)SC")
+
+    assert generated == "methyl 3-((((1E)-(amino)(methylsulfanyl)methylidene)amino)imino)butanoate"
+
+
+def test_nitrogen_chain_roles_classify_neutral_diazene_amino_prefix():
+    mol = _carbon_bound_n3_graph(attachment_order=1, first_nn_order=2, second_nn_order=1)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
+        ("aminodiazenyl", 0, {1, 2, 3})
+    ]
+
+
+def test_nitrogen_chain_roles_classify_neutral_diazenylamino_prefix():
+    mol = _carbon_bound_n3_graph(attachment_order=1, first_nn_order=1, second_nn_order=2)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
+        ("diazenylamino", 0, {1, 2, 3})
+    ]
+
+
+def test_nitrogen_chain_roles_do_not_call_neutral_triazane_azido():
+    mol = _carbon_bound_n3_graph(attachment_order=1, first_nn_order=1, second_nn_order=1)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
+        ("hydrazinylamino", 0, {1, 2, 3})
+    ]
+
+
+def test_nitrogen_chain_roles_keep_imino_hydrazone_distinct_from_azido():
     mol = _carbon_bound_n3_graph(attachment_order=2, first_nn_order=1, second_nn_order=2)
 
     roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
 
-    assert roles[0].key == "aldehyde_hydrazone"
     assert not any(role.key == "azido" for role in roles)
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
+        ("aldehyde_hydrazone", 0, {1, 2})
+    ]
 
 
 def test_nitrogen_chain_roles_classify_charged_diazonio_from_graph():
@@ -260,7 +546,49 @@ def test_nitrogen_chain_roles_classify_charged_diazonio_from_graph():
     roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
 
     assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
+        ("diazo", 0, {1, 2})
+    ]
+
+
+def test_nitrogen_chain_roles_classify_singly_attached_charged_n2_as_diazonio():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("N", 1, charge=1)
+    mol.add_atom("N", 2)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=3)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
         ("diazonio", 0, {1, 2})
+    ]
+
+
+def test_nitrogen_chain_roles_allow_terminal_imino_hydrazone():
+    mol = _carbon_bound_n3_graph(attachment_order=2, first_nn_order=1, second_nn_order=2)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert any(role.key.endswith("hydrazone") for role in roles)
+
+
+def test_nitrogen_chain_roles_allow_n_substituted_hydrazones():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("N", 1)
+    mol.add_atom("N", 2)
+    mol.add_atom("C", 3)
+    mol.add_atom("C", 4)
+    mol.add_bond(0, 1, order=2)
+    mol.add_bond(1, 2, order=1)
+    mol.add_bond(2, 3, order=1)
+    mol.add_bond(2, 4, order=1)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
+        ("aldehyde_hydrazone", 0, {1, 2})
     ]
 
 
@@ -274,9 +602,36 @@ def test_nitrogen_chain_roles_classify_hydrazine_from_graph():
 
     roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
 
-    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
-        ("hydrazine", 0, {1, 2})
+    assert [(role.key, role.is_principal_candidate, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
+        ("hydrazine", False, 0, {1, 2})
     ]
+
+
+def test_nitrogen_chain_roles_make_cyclic_hydrazines_prefixes():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("N", 1)
+    mol.add_atom("N", 2)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=1)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms={0})
+
+    assert [(role.key, role.is_principal_candidate, role.variant) for role in roles] == [
+        ("hydrazine", False, "prefix")
+    ]
+
+
+def test_cyclic_hydrazines_render_as_hydrazinyl_prefixes():
+    generated = name_smiles("NNc1cn[nH]c1")
+
+    assert generated == "4-hydrazinyl-1H-pyrazole"
+
+
+def test_substituted_cyclic_hydrazines_keep_n_ligands_in_prefix():
+    generated = name_smiles("CN(C)Nc1cccc2ncccc12")
+
+    assert generated == "5-(N',N'-dimethylhydrazinyl)quinoline"
 
 
 def test_perception_consumes_nitrogen_chain_roles_before_legacy_azido():
@@ -284,7 +639,6 @@ def test_perception_consumes_nitrogen_chain_roles_before_legacy_azido():
 
     groups = perceive_groups(mol)
 
-    assert any(group.key == "aldehyde_hydrazone" and group.role == "nitrogen_chain" for group in groups)
     assert not any(group.key == "azido" for group in groups)
 
 
@@ -1796,6 +2150,76 @@ def test_von_baeyer_polycycle_keeps_descriptor_source_numbering():
 
     for smiles, expected in cases.items():
         assert name_smiles(smiles) == expected
+
+
+def test_polycycle_without_descriptor_fails_closed():
+    parts = AssemblyParts(parent_length=6, is_polycycle=True)
+
+    with pytest.raises(ValueError, match="polycyclic parent has no audited descriptor"):
+        assemble_name(parts)
+
+
+def test_von_baeyer_descriptor_audit_reconstructs_source_edges():
+    mol = read_smiles("C1C2C1C13COC21CO3")
+    ring = next(system for system in find_ring_systems(mol, set()) if system.polycycle_descriptor)
+    audit = audit_von_baeyer_descriptor(
+        ring.polycycle_descriptor,
+        ring.paths[0],
+        {(a, b) for a in ring.atoms for b in mol.get_neighbors(a) if b in ring.atoms and a < b},
+    )
+
+    assert audit.audit_ok
+
+
+def test_von_baeyer_descriptor_audit_rejects_wrong_locants():
+    mol = read_smiles("C1C2C1C13COC21CO3")
+    ring = next(system for system in find_ring_systems(mol, set()) if system.polycycle_descriptor)
+    bad_descriptor = ring.polycycle_descriptor.replace("0^{1,5}", "0^{1,4}")
+    audit = audit_von_baeyer_descriptor(
+        bad_descriptor,
+        ring.paths[0],
+        {(a, b) for a in ring.atoms for b in mol.get_neighbors(a) if b in ring.atoms and a < b},
+    )
+
+    assert not audit.audit_ok
+
+
+def test_high_risk_polycycle_audit_is_informative_not_suppressing():
+    result = NamingEngine().run(NamingRequest(smiles="C1Oc2c3c(c(c4c2C4)O1)C3"))
+
+    assert result.name == "6,8-dioxatricyclo[3.3.3.0^{2,4}]undeca-1,4,9-triene"
+    assert result.error is None
+
+    mol = read_smiles("C1Oc2c3c(c(c4c2C4)O1)C3")
+    ring = next(system for system in find_ring_systems(mol, set()) if system.polycycle_descriptor)
+    audits = [
+        audit_von_baeyer_descriptor(
+            ring.polycycle_descriptor,
+            path,
+            {(a, b) for a in ring.atoms for b in mol.get_neighbors(a) if b in ring.atoms and a < b},
+        )
+        for path in ring.paths
+    ]
+    assert audits
+    assert not any(audit.audit_ok for audit in audits)
+
+
+def test_charge_separated_sulfonium_ylide_requires_single_bond():
+    assert name_smiles("C[S+](C)[CH-]C") == "dimethyl(methylmethanidyl)sulfonium"
+    assert name_smiles("C[SH+](C)=[C-]c1ccccc1") == "((dimethyl-lambda^5-sulfanylidene)methyl)benzene"
+
+
+def test_terminal_chalcogen_imides_render_as_imino_prefixes():
+    assert name_smiles("N=S1C=CC1") == "1-imino-1lambda^4-thiacyclobut-2-ene"
+    assert name_smiles("N=[Se]1C=CC=C1") == "1-imino-1lambda^4-selenacyclopenta-2,4-diene"
+
+
+def test_sulfur_imide_substituents_preserve_double_bonded_nitrogen():
+    assert name_smiles("N=S(Cl)CF") == "fluoro(iminochlorosulfanyl)methane"
+
+
+def test_terminal_s_minus_uses_thiolate_role():
+    assert name_smiles("[S-][n+]1ccc(-c2ccncc2)cc1") == "4-(pyridin-4-yl)pyridin-1-ium-1-thiolate"
 
 
 def test_substituted_alkoxy_prefixes_preserve_imino_ether_connectivity():

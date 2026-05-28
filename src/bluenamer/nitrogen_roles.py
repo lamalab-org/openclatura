@@ -73,7 +73,7 @@ def _diazo_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -> li
             n_n_bond = mol.get_bond(n1, n2)
             if n_n_bond is None or n_n_bond.order < 2:
                 continue
-            key = "diazonio" if mol.atoms[n1].charge > 0 or mol.atoms[n2].charge > 0 else "diazo"
+            key = "diazonio" if c_n_bond.order == 1 and (mol.atoms[n1].charge > 0 or mol.atoms[n2].charge > 0) else "diazo"
             roles.append(
                 NitrogenChainRole(
                     key=key,
@@ -116,14 +116,30 @@ def _azido_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -> li
         n3 = n3_candidates[0]
         if _other_non_h_neighbors(mol, n3, {n2}):
             continue
+        first_bond = mol.get_bond(n_attach.idx, n2)
+        second_bond = mol.get_bond(n2, n3)
+        key = "azido"
+        if (
+            first_bond is not None
+            and second_bond is not None
+            and mol.atoms[n_attach.idx].charge == 0
+            and mol.atoms[n2].charge == 0
+            and mol.atoms[n3].charge == 0
+        ):
+            if first_bond.order == 1 and second_bond.order == 2:
+                key = "diazenylamino"
+            elif first_bond.order == 2 and second_bond.order == 1:
+                key = "aminodiazenyl"
+            elif first_bond.order == 1 and second_bond.order == 1:
+                key = "hydrazinylamino"
         roles.append(
             NitrogenChainRole(
-                key="azido",
+                key=key,
                 is_principal_candidate=False,
                 attachment_atom=ext_atom,
                 atom_ids=frozenset({n_attach.idx, n2, n3}),
                 variant="linear_n3",
-                reason=f"Matched singly attached terminal N3 azido fragment at atom {ext_atom}.",
+                reason=f"Matched singly attached terminal N3 {key} fragment at atom {ext_atom}.",
             )
         )
     return roles
@@ -155,6 +171,10 @@ def _hydrazone_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -
         n1_n2_bond = mol.get_bond(n1.idx, n2)
         if n1_n2_bond is None or n1_n2_bond.order != 1:
             continue
+        if _has_non_h_multiple_bond_neighbor(mol, n2, {n1.idx}) and not _has_terminal_imino_substituent(
+            mol, n2, {n1.idx}
+        ):
+            continue
         key = _hydrazone_key(mol, carbon, cyclic_atoms)
         roles.append(
             NitrogenChainRole(
@@ -172,9 +192,10 @@ def _hydrazone_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -
 def _hydrazone_key(mol: Molecule, carbon: int, cyclic_atoms: set[int]) -> str:
     ring_neighbors = [n for n in mol.get_neighbors(carbon) if n in cyclic_atoms]
     carbon_neighbors = [n for n in mol.get_neighbors(carbon) if mol.atoms[n].is_carbon]
+    non_h_neighbors = [n for n in mol.get_neighbors(carbon) if mol.atoms[n].symbol != "H"]
     if carbon not in cyclic_atoms and len(ring_neighbors) == 1 and len(carbon_neighbors) == 1:
         bond = mol.get_bond(carbon, ring_neighbors[0])
-        if bond is not None and bond.order == 1:
+        if bond is not None and bond.order == 1 and len(non_h_neighbors) == 2:
             return "ring_aldehyde_hydrazone"
     if len(carbon_neighbors) <= 1 and carbon not in cyclic_atoms:
         return "aldehyde_hydrazone"
@@ -211,13 +232,19 @@ def _hydrazine_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -
         c_neighbors = [n for n in mol.get_neighbors(n1.idx) if mol.atoms[n].is_carbon]
         if len(c_neighbors) != 1:
             continue
+        c_bond = mol.get_bond(n1.idx, c_neighbors[0])
+        if c_bond is None or c_bond.order != 1:
+            continue
+        if _has_non_h_multiple_bond_neighbor(mol, n2, {n1.idx}):
+            continue
+        attached_to_ring_parent = c_neighbors[0] in cyclic_atoms
         roles.append(
             NitrogenChainRole(
                 key="hydrazine",
-                is_principal_candidate=True,
+                is_principal_candidate=False,
                 attachment_atom=c_neighbors[0],
                 atom_ids=frozenset({n1.idx, n2}),
-                variant="single_n_n",
+                variant="prefix",
                 reason=f"Matched C-N-N hydrazine fragment at atom {c_neighbors[0]}.",
             )
         )
@@ -249,3 +276,26 @@ def _other_non_h_neighbors(mol: Molecule, atom_idx: int, allowed: set[int]) -> l
         for n in mol.get_neighbors(atom_idx)
         if n not in allowed and mol.atoms[n].symbol != "H"
     ]
+
+
+def _has_non_h_multiple_bond_neighbor(mol: Molecule, atom_idx: int, allowed: set[int]) -> bool:
+    for neighbor in mol.get_neighbors(atom_idx):
+        if neighbor in allowed or mol.atoms[neighbor].symbol == "H":
+            continue
+        bond = mol.get_bond(atom_idx, neighbor)
+        if bond is not None and bond.order != 1:
+            return True
+    return False
+
+
+def _has_terminal_imino_substituent(mol: Molecule, atom_idx: int, allowed: set[int]) -> bool:
+    for neighbor in mol.get_neighbors(atom_idx):
+        if neighbor in allowed or mol.atoms[neighbor].symbol not in {"C", "N"}:
+            continue
+        bond = mol.get_bond(atom_idx, neighbor)
+        if bond is None or bond.order != 2:
+            continue
+        if mol.atoms[neighbor].symbol == "N" and _other_non_h_neighbors(mol, neighbor, {atom_idx}):
+            continue
+        return True
+    return False

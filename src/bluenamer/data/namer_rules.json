@@ -137,6 +137,13 @@
         "charge": 1
       },
       {
+        "name": "carbonic acid",
+        "ester_suffix": "carbonate",
+        "central": "C",
+        "single_o": 2,
+        "double_o": 1
+      },
+      {
         "name": "hypofluorous acid",
         "ester_suffix": "hypofluorite",
         "central": "F",
@@ -500,7 +507,6 @@
       "amine",
       "aminium",
       "anhydride",
-      "hydrazine",
       "hydrazone",
       "imine",
       "aldehyde_hydrazone",
@@ -997,6 +1003,32 @@
         "suffix_with_locant": true,
         "needs_locant": true
       },
+      "nitrile_oxide": {
+        "role": "principal",
+        "prefix": "cyanooxido",
+        "suffix": "nitrile oxide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 70,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_nitrile_oxide": {
+        "role": "principal",
+        "prefix": "cyanooxido",
+        "suffix": "carbonitrile oxide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 70,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
       "aldehyde": {
         "role": "principal",
         "prefix": "oxo",
@@ -1023,6 +1055,32 @@
         "suffix_with_locant": true,
         "needs_locant": true
       },
+      "thioaldehyde": {
+        "role": "principal",
+        "prefix": "thioxo",
+        "suffix": "thial",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 80,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_thioaldehyde": {
+        "role": "principal",
+        "prefix": "carbonothioyl",
+        "suffix": "carbothialdehyde",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 80,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
       "ketone": {
         "role": "principal",
         "prefix": "oxo",
@@ -1034,6 +1092,15 @@
         },
         "seniority": 90,
         "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "imino_prefix": {
+        "role": "prefix",
+        "prefix": "imino",
+        "suffix": null,
+        "multi_suffix": null,
+        "seniority": null,
+        "suffix_with_locant": false,
         "needs_locant": true
       },
       "hydrazone": {
@@ -1216,6 +1283,21 @@
       "azido": {
         "role": "prefix",
         "prefix": "azido",
+        "needs_locant": true
+      },
+      "diazenylamino": {
+        "role": "prefix",
+        "prefix": "diazenylamino",
+        "needs_locant": true
+      },
+      "aminodiazenyl": {
+        "role": "prefix",
+        "prefix": "aminodiazenyl",
+        "needs_locant": true
+      },
+      "hydrazinylamino": {
+        "role": "prefix",
+        "prefix": "hydrazinylamino",
         "needs_locant": true
       },
       "diazo": {

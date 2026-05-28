@@ -68,16 +68,7 @@ def parent_stem_and_terminal(parts: AssemblyParts) -> tuple[str, str]:
             if parts.polycycle_descriptor:
                 stem_str = parts.polycycle_descriptor + stem_str
             else:
-                v = parts.parent_length
-                if v >= 4:
-                    a = max(1, (v - 2) - 2)
-                    b = 1
-                    c = 1
-                    if a + b + c + 2 != v:
-                        a = v - 2 - b - c
-                    stem_str = f"tricyclo[{a}.{b}.{c}.0^{{1,3}}]" + stem_str
-                else:
-                    stem_str = "tricyclo[1.1.0.0^{1,3}]" + stem_str
+                raise ValueError("polycyclic parent has no audited descriptor")
         elif parts.is_ring:
             stem_str = "cyclo" + stem_str
     return stem_str, terminal_e

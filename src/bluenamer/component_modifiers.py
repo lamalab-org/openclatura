@@ -83,6 +83,7 @@ def add_component_n_substituents(
                 n
                 for n in mol.get_neighbors(single_n)
                 if n != c_idx and n not in group.atoms_involved and mol.atoms[n].symbol != "H"
+                and not _is_principal_hydrazone_carbon(mol, principal_key, single_n, n)
             ]
             if not n_substituents:
                 n_idx_global += 1
@@ -92,8 +93,8 @@ def add_component_n_substituents(
                 principal_key, len(principal_groups), len(nitrogens), n_idx_local, n_idx_global
             )
             for n_sub in n_substituents:
-                branch_name, branch_trace = branch_namer(
-                    mol, n_sub, sub_exclude | {single_n}, upstream_atom=single_n, return_trace=True
+                branch_name, branch_trace = _nitrogen_substituent_name(
+                    mol, single_n, n_sub, sub_exclude, branch_namer
                 )
                 if branch_name:
                     branch_atoms = subgraph_component(mol, n_sub, sub_exclude | {single_n})
@@ -106,3 +107,32 @@ def add_component_n_substituents(
                         branch_trace,
                     )
             n_idx_global += 1
+
+
+def _nitrogen_substituent_name(
+    mol: Molecule,
+    nitrogen: int,
+    substituent: int,
+    sub_exclude: set[int],
+    branch_namer: BranchNamer,
+) -> tuple[str, list]:
+    """Render graph-bound N-substituents on principal nitrogen groups."""
+
+    bond = mol.get_bond(nitrogen, substituent)
+    if (
+        bond is not None
+        and bond.order == 2
+        and mol.atoms[substituent].symbol == "N"
+        and not [n for n in mol.get_neighbors(substituent) if n != nitrogen and mol.atoms[n].symbol != "H"]
+    ):
+        return "imino", []
+    return branch_namer(mol, substituent, sub_exclude | {nitrogen}, upstream_atom=nitrogen, return_trace=True)
+
+
+def _is_principal_hydrazone_carbon(mol: Molecule, principal_key: str | None, nitrogen: int, neighbor: int) -> bool:
+    if principal_key not in RULES.functional_groups.keys_with_family("hydrazone"):
+        return False
+    if not mol.atoms[neighbor].is_carbon:
+        return False
+    bond = mol.get_bond(nitrogen, neighbor)
+    return bond is not None and bond.order == 2

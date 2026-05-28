@@ -156,7 +156,7 @@ def main():
     
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    print(f"Sampling {N_TEST} random molecules using .select()...")
+    print(f"Loading all QM9 molecules")
 
     ds = load_dataset(
         "yairschiff/qm9",

@@ -16,7 +16,7 @@ from .assembly_parts import AssemblyParts
 from .assembly_prefixes import format_replacement_prefixes, format_substituent_prefixes
 from .assembly_spiro import format_spiro_core, split_spiro_substituents
 from .assembly_utils import needs_hyphen, parse_locant
-from .formatting import ensure_stereo_descriptor_boundary
+from .formatting import ensure_stereo_descriptor_boundary, format_multiplier
 from .name_postprocessing import (
     apply_acyl_amido_postprocessing,
     apply_connection_boundary_postprocessing,
@@ -301,7 +301,7 @@ def _add_front_modifiers(parts: AssemblyParts, final_word: str) -> str:
     counts = {}
     for mod in parts.front_modifiers:
         counts[mod] = counts.get(mod, 0) + 1
-    front_words = [multipliers.basic(c) + m if c > 1 else m for m, c in sorted(counts.items())]
+    front_words = [format_multiplier(m, c, safe_enclose=True) if c > 1 else m for m, c in sorted(counts.items())]
     return f"{' '.join(front_words)} {final_word}"
 
 

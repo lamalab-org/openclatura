@@ -6,6 +6,7 @@ from .group_atom_roles import (
     amide_nitrogen,
     bridge_oxygen,
     ester_single_oxygen,
+    hydrazone_characteristic_carbon,
     peroxy_ester_single_oxygen,
     sulfonyl_sulfur,
 )
@@ -68,7 +69,7 @@ def exclude_nonparent_group_atoms(
 
 
 def principal_involved_atoms(
-    perceived_groups: list[PerceivedGroup], principal_key: str | None, parent_path: list[int]
+    mol: Molecule, perceived_groups: list[PerceivedGroup], principal_key: str | None, parent_path: list[int]
 ) -> set[int]:
     """Return atoms already consumed by the principal group on the parent."""
 
@@ -77,4 +78,8 @@ def principal_involved_atoms(
         for group in perceived_groups:
             if group.key == principal_key and group.attachment_carbon in parent_path:
                 atoms.update(group.atoms_involved)
+                if group.key == "ring_aldehyde_hydrazone":
+                    hydrazone_carbon = hydrazone_characteristic_carbon(mol, group)
+                    if hydrazone_carbon is not None and hydrazone_carbon not in parent_path:
+                        atoms.add(hydrazone_carbon)
     return atoms
