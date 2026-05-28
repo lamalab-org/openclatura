@@ -1,11 +1,10 @@
 import os
 import random
-import tempfile
-import contextlib
-import warnings
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
+import contextlib
 
+import io
 import numpy as np
 import pandas as pd
 import py2opsin
@@ -13,13 +12,26 @@ from datasets import load_dataset
 from bluenamer.namer import name_smiles
 from rdkit.Chem import CanonSmiles
 from tqdm import tqdm
+import os
+import tempfile
+import contextlib
+import warnings
+from rdkit import Chem
+from rdkit.Chem.MolStandardize import rdMolStandardize
+
+
+normalizer = rdMolStandardize.Normalizer()
+reionizer = rdMolStandardize.Reionizer()
+uncharger = rdMolStandardize.Uncharger()
+fragment_chooser = rdMolStandardize.LargestFragmentChooser()
+tautomer_enum = rdMolStandardize.TautomerEnumerator()
+
+
 
 
 # --- Configuration ---
-N_TEST = 100_000
-SEED = 42
-FAILURES_CSV = "ZINC_failures.csv"
 
+FAILURES_CSV = "qm9_failures.csv"
 
 @contextlib.contextmanager
 def capture_fds():
@@ -32,7 +44,9 @@ def capture_fds():
     try:
         os.dup2(stdout_tmp.fileno(), 1)
         os.dup2(stderr_tmp.fileno(), 2)
+
         yield stdout_tmp, stderr_tmp
+
     finally:
         os.dup2(old_stdout_fd, 1)
         os.dup2(old_stderr_fd, 2)
@@ -68,7 +82,9 @@ def try_opsin_single(name):
                 stdout_text = read_tmp_file(stdout_tmp)
                 stderr_text = read_tmp_file(stderr_tmp)
 
-            warning_text = "\n".join(str(w.message) for w in caught_warnings).strip()
+            warning_text = "\n".join(
+                str(w.message) for w in caught_warnings
+            ).strip()
 
         console_output = "\n".join(
             x for x in [stdout_text, stderr_text, warning_text] if x
@@ -94,11 +110,35 @@ def try_opsin_single(name):
         return None, err, stdout_text, stderr_text, warning_text
 
 
+def standardize_and_canonicalize_tautomer(smi):
+    mol = Chem.MolFromSmiles(smi)
+    if mol is None:
+        return None
+
+
+
+    mol = rdMolStandardize.Cleanup(mol)
+    mol = normalizer.normalize(mol)
+    mol = reionizer.reionize(mol)
+    mol = uncharger.uncharge(mol)
+    mol = tautomer_enum.Canonicalize(mol)
+
+    return Chem.MolToSmiles(mol, canonical=True)
+
+def normalize_tautomer_smiles(smi):
+    mol = Chem.MolFromSmiles(smi)
+    if mol is None:
+        return None
+    taut = tautomer_enum.Canonicalize(mol)
+    return Chem.MolToSmiles(taut, canonical=True)
+
+te = rdMolStandardize.TautomerEnumerator()
+
 def canon(smi):
     if not smi:
         return None
     try:
-        return CanonSmiles(smi)
+        return standardize_and_canonicalize_tautomer(smi)
     except Exception:
         return None
 
@@ -110,24 +150,21 @@ def try_name_smiles(smi):
         return None, repr(e)
 
 
-def main():
-    random.seed(SEED)
 
+
+def main():
+    
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    os.environ["PYTHONIOENCODING"] = "utf-8"
-    os.environ["JAVA_TOOL_OPTIONS"] = "-Dfile.encoding=UTF-8"
 
     print(f"Sampling {N_TEST} random molecules using .select()...")
 
     ds = load_dataset(
-    "parquet",
-    data_files="hf://datasets/YinkaiW/ZINC20-filtered/data/train-00000-of-00111.parquet",
-    split="train"
-)
+        "yairschiff/qm9",
+        split="train",
+    )
 
-    n = min(N_TEST, len(ds))
-    indices = random.sample(range(len(ds)), n)
-    dataset = list(ds.select(indices)["SMILES"])
+    #all_smiles = ds["smiles"]
+    dataset = list(ds["smiles"])
 
     print("Converting SMILES to IUPAC names...")
 
@@ -181,27 +218,19 @@ def main():
     ]
 
     for i in tqdm(failed_indices):
+        original_smiles = dataset[i]
         iupac_name = predicted_names[i]
 
         single_opsin_smiles = None
         single_opsin_error = None
-        opsin_stdout = None
-        opsin_stderr = None
-        opsin_warnings = None
 
         if naming_errors[i] is None:
-            (
-                single_opsin_smiles,
-                single_opsin_error,
-                opsin_stdout,
-                opsin_stderr,
-                opsin_warnings,
-            ) = try_opsin_single(iupac_name)
+            single_opsin_smiles, single_opsin_error, opsin_stdout, opsin_stderr, opsin_warnings = try_opsin_single(iupac_name)
 
         failure_rows.append(
             {
                 "index": i,
-                "original_smiles": dataset[i],
+                "original_smiles": original_smiles,
                 "original_canonical_smiles": original_canon[i],
                 "predicted_iupac_name": iupac_name,
                 "naming_error": naming_errors[i],
@@ -209,11 +238,11 @@ def main():
                 "batch_predicted_canonical_smiles": smiles_strings[i],
                 "single_opsin_smiles": single_opsin_smiles,
                 "single_opsin_error": single_opsin_error,
+                "matched": bool(matches[i]),
+                "batch_error": batch_error,
                 "opsin_stdout": opsin_stdout,
                 "opsin_stderr": opsin_stderr,
                 "opsin_warnings": opsin_warnings,
-                "matched": bool(matches[i]),
-                "batch_error": batch_error,
             }
         )
 
