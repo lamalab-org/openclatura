@@ -42,15 +42,55 @@ name_smiles("c1ccccc1")     # 'benzene'
 name_smiles("CC(=O)O")      # 'acetic acid'
 ```
 
-For an explainable result with the full decision trace:
+### Typed result with rules hit + OPSIN round-trip
+
+For everything richer than the bare string, use `bluenamer.name`:
+
+```python
+from bluenamer import name
+
+result = name("CC(=O)Nc1ccccc1", include_trace=True, verify_opsin=True)
+
+result.name           # 'N-phenylacetamide'
+result.smiles         # 'CC(=O)Nc1ccccc1'
+result.ok             # True
+result.rules_hit      # ('P-44', 'P-45', 'P-41', 'P-61', 'P-67', ...)
+result.rule_hints     # ('Parent hydride / parent structure: Blue Book P-44 ...',)
+result.opsin_check.status   # 'matched' | 'mismatched' | 'skipped_no_java' | ...
+result.verified       # True when opsin_check is matched
+```
+
+Errors do not raise — they are captured on `result.error`, which makes
+the batch API safe to point at noisy datasets:
+
+```python
+from bluenamer import name_many
+
+results = name_many(
+    ["CCO", "c1ccccc1", "definitely-not-a-smiles"],
+    processes="auto",       # or an integer, or 1 for in-process
+    verify_opsin=False,
+)
+[r.name for r in results if r.ok]
+```
+
+For the full decision trace (one `TraceStep` per phase: parse, perception,
+parent selection, numbering, assembly, …):
 
 ```python
 from bluenamer import analyze_smiles
 
 analysis = analyze_smiles("CC(=O)Nc1ccccc1")
-print(analysis.name)        # 'N-phenylacetamide'
 for step in analysis.decisions:
     print(step.phase, step.decision, step.reason)
+```
+
+### CLI
+
+```bash
+bluenamer name "CC(=O)Nc1ccccc1"            # → N-phenylacetamide
+bluenamer name "CC(=O)Nc1ccccc1" --json     # JSON with trace + rules
+bluenamer batch smiles.txt --output names.jsonl --processes auto
 ```
 
 ## Development
