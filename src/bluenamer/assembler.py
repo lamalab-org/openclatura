@@ -18,6 +18,8 @@ from .assembly_spiro import format_spiro_core, split_spiro_substituents
 from .assembly_utils import needs_hyphen, parse_locant
 from .formatting import ensure_stereo_descriptor_boundary, format_multiplier
 from .fused_ion_templates import consume_fused_ion_operation, select_fused_ion_operation
+from .name_assembly import NameAssemblyResult
+from .name_bindings import refresh_name_atom_bindings
 from .name_postprocessing import (
     apply_acyl_amido_postprocessing,
     apply_connection_boundary_postprocessing,
@@ -366,4 +368,25 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
 
 
 def assemble_name(parts: AssemblyParts) -> str:
-    return post_process_name(assemble_name_raw(parts))
+    return assemble_name_result(parts).text
+
+
+def assemble_name_result(parts: AssemblyParts) -> NameAssemblyResult:
+    """Assemble a name while preserving final atom/bond binding metadata."""
+
+    if not parts.name_atom_bindings:
+        refresh_name_atom_bindings(parts)
+    raw_name = assemble_name_raw(parts)
+    result = NameAssemblyResult.from_raw_name(raw_name, parts.name_atom_bindings, postprocess=post_process_name)
+    parts.name_atom_bindings = list(result.bindings)
+    parts.name_rewrite_history = [
+        {
+            "name": operation.name,
+            "before": operation.before,
+            "after": operation.after,
+            "binding_count": operation.binding_count,
+            "changed_binding_count": operation.changed_binding_count,
+        }
+        for operation in result.rewrite_history
+    ]
+    return result

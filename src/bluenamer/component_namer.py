@@ -13,6 +13,7 @@ from .component_modifiers import add_component_front_modifiers, add_component_n_
 from .functional_prefixes import collect_component_prefix_substituents
 from .molecule import DecisionTrace, Molecule, TracePhase
 from .name_bindings import binding_trace_data, refresh_name_atom_bindings
+from .name_assembly import NameAssemblyResult, assert_final_name_assembly
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
 from .naming_context import ComponentNamingState, NamingIntent
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
@@ -393,6 +394,8 @@ def name_component(
     parts.stereo_audit_issues = list(audit_stereochemistry(mol, parts).issues)
     assert_component_fully_named(mol, state.component_atoms, parts, "<component>")
     name = assemble_parent_name(mol, parts, numbered_path, get_loc, apply_special_component_names=True)
+    final_result = NameAssemblyResult.from_final_name(name, parts.name_atom_bindings)
+    assert_final_name_assembly(mol, state.component_atoms, parts, final_result)
     trace_decision(
         decision_trace,
         TracePhase.ASSEMBLY,
@@ -406,6 +409,7 @@ def name_component(
             "unsaturation_count": len(parts.unsaturations),
             "stereo_audit_issues": parts.stereo_audit_issues,
             "name_atom_bindings": binding_trace_data(parts.name_atom_bindings),
+            "name_rewrite_history": parts.name_rewrite_history,
         },
     )
     if return_trace:

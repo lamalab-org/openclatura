@@ -13,6 +13,7 @@ from bluenamer import (
 from bluenamer.additive import add_indicated_hydrogens
 from bluenamer.assembler import (
     assemble_name,
+    assemble_name_result,
     post_process_name,
 )
 from bluenamer.assembly_charge import parent_charge_operations
@@ -77,6 +78,11 @@ from bluenamer.ionic_naming import (
 from bluenamer.locants import as_display_locant, coerce_display_numbering, locant_text, parse_locant
 from bluenamer.molecule import Molecule
 from bluenamer.name_bindings import postprocess_name_atom_bindings
+from bluenamer.name_assembly import (
+    FinalAssemblyAuditError,
+    NameAssemblyResult,
+    assert_final_name_assembly,
+)
 from bluenamer.name_operations import HydroOperation, ParentSuffixOperation
 from bluenamer.name_postprocessing import (
     apply_connection_boundary_postprocessing,
@@ -181,6 +187,59 @@ def test_postprocessing_updates_binding_terms():
 
     assert processed[0].term == "acetic acid"
     assert processed[0].atom_ids == {0, 1, 2}
+
+
+def test_name_assembly_result_preserves_binding_metadata_through_postprocessing():
+    bindings = [NameAtomBinding(stage="suffix", role="acid", term="ethanoic acid", atom_ids={0, 1, 2}, bond_ids={0, 1})]
+
+    result = NameAssemblyResult.from_raw_name("ethanoic acid", bindings, postprocess=post_process_name)
+
+    assert result.text == "acetic acid"
+    assert result.bindings[0].term == "acetic acid"
+    assert result.bindings[0].atom_ids == {0, 1, 2}
+    assert result.bindings[0].bond_ids == {0, 1}
+    assert result.rewrite_history[0].changed_binding_count == 1
+
+
+def test_assemble_name_result_updates_parts_bindings():
+    parts = AssemblyParts(parent_length=2, parent_atom_ids={0, 1})
+
+    result = assemble_name_result(parts)
+
+    assert result.text == "ethane"
+    assert parts.name_atom_bindings
+    assert parts.name_atom_bindings[0].atom_ids == {0, 1}
+    assert parts.name_rewrite_history
+
+
+def test_final_assembly_audit_rejects_metadata_lost_after_postprocessing():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("O", 1)
+    mol.add_bond(0, 1, order=1)
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0}, parent_bond_ids={0})
+    result = NameAssemblyResult.from_final_name(
+        "methanol",
+        [NameAtomBinding(stage="parent", role="parent", term="methane", atom_ids={0})],
+    )
+
+    with pytest.raises(FinalAssemblyAuditError):
+        assert_final_name_assembly(mol, {0, 1}, parts, result)
+
+
+def test_final_assembly_audit_rejects_missing_consumed_bond_metadata():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("C", 1)
+    mol.add_bond(0, 1, order=1)
+    parts = AssemblyParts(parent_length=2, parent_atom_ids={0, 1}, parent_bond_ids={0})
+    result = NameAssemblyResult.from_final_name(
+        "ethane",
+        [NameAtomBinding(stage="parent", role="parent", term="ethane", atom_ids={0, 1})],
+    )
+
+    with pytest.raises(FinalAssemblyAuditError):
+        assert_final_name_assembly(mol, {0, 1}, parts, result)
 
 
 def test_stereo_descriptor_boundary_is_inserted_before_substituent_stems():

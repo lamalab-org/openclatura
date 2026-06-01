@@ -13,7 +13,7 @@ from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names
 from .molecule import DecisionTrace, Molecule, NameAnalysis
-from .name_bindings import postprocess_name_atom_bindings
+from .name_assembly import NameAssemblyResult
 from .namer_config import (
     SPECIAL_COMPONENT_NAMES,
 )
@@ -875,10 +875,19 @@ def _assemble_parent_name(
     name = apply_cationic_imino_names(name, mol)
     if apply_special_component_names:
         name = SPECIAL_COMPONENT_NAMES.get(name, name)
-    processed_name = post_process_name(name)
-    if parts.name_atom_bindings:
-        parts.name_atom_bindings = postprocess_name_atom_bindings(parts.name_atom_bindings, post_process_name)
-    return processed_name
+    result = NameAssemblyResult.from_raw_name(name, parts.name_atom_bindings, postprocess=post_process_name)
+    parts.name_atom_bindings = list(result.bindings)
+    parts.name_rewrite_history = [
+        {
+            "name": operation.name,
+            "before": operation.before,
+            "after": operation.after,
+            "binding_count": operation.binding_count,
+            "changed_binding_count": operation.changed_binding_count,
+        }
+        for operation in result.rewrite_history
+    ]
+    return result.text
 
 
 def _simple_rooted_carbanion_substituent_name(
