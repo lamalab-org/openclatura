@@ -33,7 +33,13 @@ def strip_outer_parentheses(name: str) -> str:
 def is_complex_prefix(name: str) -> bool:
     """Return true when a substituent prefix needs protective parentheses."""
 
-    return "(" in name or name[0].isdigit() or "-" in name or " " in name
+    return "(" in name or name[0].isdigit() or "-" in name or " " in name or _starts_with_multiplier(name)
+
+
+def _starts_with_multiplier(name: str) -> bool:
+    """Return true when a prefix already begins with a multiplicative prefix."""
+
+    return any(name.startswith(mult.basic) for mult in multipliers.MULTIPLIERS.values())
 
 
 def format_multiplier(name: str, count: int, safe_enclose: bool = False) -> str:

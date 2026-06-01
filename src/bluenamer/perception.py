@@ -202,6 +202,8 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                 if len(double_o_list) >= 2:
                     c_idx = adj_atoms[0]
                     single_o_list = [o for o in oxygens if mol.get_bond(atom.idx, o).order == 1]
+                    if atom.idx in cyclic_atoms and any(o in cyclic_atoms for o in single_o_list):
+                        continue
                     ester_o = next((o for o in single_o_list if mol.degree(o) == 2), None)
                     anion_o = next((o for o in single_o_list if mol.atoms[o].charge == -1), None)
 
@@ -355,14 +357,24 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                         peroxy_o = next(x for x in o_neighbors if mol.atoms[x].symbol == "O")
 
                     if is_peroxy:
-                        if mol.degree(peroxy_o) == 1 or mol.atoms[peroxy_o].charge == -1:
-                            key = "ring_peroxy_acid" if is_exocyclic else "peroxy_acid"
+                        if target_carbon == atom.idx and single_o in cyclic_atoms and peroxy_o in cyclic_atoms:
+                            groups.append(PerceivedGroup("ketone", True, target_carbon, {atom.idx, double_o}))
+                            consumed.update([double_o])
+                        elif mol.degree(peroxy_o) == 1 or mol.atoms[peroxy_o].charge == -1:
+                            if mol.atoms[peroxy_o].charge == -1:
+                                key = "ring_peroxy_ester" if is_exocyclic else "peroxy_ester"
+                            else:
+                                key = "ring_peroxy_acid" if is_exocyclic else "peroxy_acid"
+                            groups.append(
+                                PerceivedGroup(key, True, target_carbon, {atom.idx, double_o, single_o, peroxy_o})
+                            )
+                            consumed.update([double_o, single_o, peroxy_o])
                         else:
                             key = "ring_peroxy_ester" if is_exocyclic else "peroxy_ester"
-                        groups.append(
-                            PerceivedGroup(key, True, target_carbon, {atom.idx, double_o, single_o, peroxy_o})
-                        )
-                        consumed.update([double_o, single_o, peroxy_o])
+                            groups.append(
+                                PerceivedGroup(key, True, target_carbon, {atom.idx, double_o, single_o, peroxy_o})
+                            )
+                            consumed.update([double_o, single_o, peroxy_o])
                     else:
                         is_lactone = False
                         if target_carbon == atom.idx and single_o in cyclic_atoms:
@@ -479,28 +491,39 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                 if len(n_neighbors) > 0:
                     n2 = n_neighbors[0]
                     if mol.get_bond(atom.idx, n2).order == 1:
-                        if _has_non_h_multiple_bond_neighbor(mol, n2, {atom.idx}):
+                        amidino_tail_atoms = _amidinohydrazone_tail_atoms(mol, n2, {atom.idx})
+                        if _has_non_h_multiple_bond_neighbor(mol, n2, {atom.idx}) and not amidino_tail_atoms:
                             continue
                         if n2 not in cyclic_atoms:
                             ring_neighbors = [n for n in mol.get_neighbors(double_c) if n in cyclic_atoms]
                             c_of_double_c = [n for n in mol.get_neighbors(double_c) if mol.atoms[n].is_carbon]
+                            hydrazone_atoms = {atom.idx, n2} | amidino_tail_atoms
                             if (
                                 double_c not in cyclic_atoms
                                 and len(ring_neighbors) == 1
                                 and len(c_of_double_c) == 1
                                 and mol.get_bond(double_c, ring_neighbors[0]).order == 1
                             ):
+                                key = (
+                                    "ring_aldehyde_amidinohydrazone"
+                                    if amidino_tail_atoms
+                                    else "ring_aldehyde_hydrazone"
+                                )
                                 groups.append(
                                     PerceivedGroup(
-                                        "ring_aldehyde_hydrazone", True, ring_neighbors[0], {double_c, atom.idx, n2}
+                                        key,
+                                        True,
+                                        ring_neighbors[0],
+                                        {double_c} | hydrazone_atoms,
                                     )
                                 )
                             else:
                                 if len(c_of_double_c) <= 1 and double_c not in cyclic_atoms:
-                                    groups.append(PerceivedGroup("aldehyde_hydrazone", True, double_c, {atom.idx, n2}))
+                                    key = "aldehyde_amidinohydrazone" if amidino_tail_atoms else "aldehyde_hydrazone"
+                                    groups.append(PerceivedGroup(key, True, double_c, hydrazone_atoms))
                                 else:
-                                    groups.append(PerceivedGroup("hydrazone", True, double_c, {atom.idx, n2}))
-                            consumed.update([atom.idx, n2])
+                                    groups.append(PerceivedGroup("hydrazone", True, double_c, hydrazone_atoms))
+                            consumed.update(hydrazone_atoms)
                         else:
                             key = "iminium" if atom.charge > 0 else "imine"
                             groups.append(PerceivedGroup(key, True, double_c, {atom.idx}))
@@ -691,3 +714,25 @@ def _has_non_h_multiple_bond_neighbor(mol: Molecule, atom_idx: int, allowed: set
         if bond is not None and bond.order != 1:
             return True
     return False
+
+
+def _amidinohydrazone_tail_atoms(mol: Molecule, hydrazone_terminal_n: int, allowed: set[int]) -> set[int]:
+    """Return atoms for an N-C(=N)-N amidino tail attached to a hydrazone N."""
+
+    for carbon in mol.get_neighbors(hydrazone_terminal_n):
+        if carbon in allowed or not mol.atoms[carbon].is_carbon:
+            continue
+        n_c_bond = mol.get_bond(hydrazone_terminal_n, carbon)
+        if n_c_bond is None or n_c_bond.order != 2:
+            continue
+        terminal_ns = [
+            neighbor
+            for neighbor in mol.get_neighbors(carbon)
+            if neighbor != hydrazone_terminal_n
+            and mol.atoms[neighbor].symbol == "N"
+            and (bond := mol.get_bond(carbon, neighbor)) is not None
+            and bond.order == 1
+        ]
+        if len(terminal_ns) == 2:
+            return {carbon, *terminal_ns}
+    return set()

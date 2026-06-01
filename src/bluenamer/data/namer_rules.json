@@ -511,6 +511,8 @@
       "imine",
       "aldehyde_hydrazone",
       "ring_aldehyde_hydrazone",
+      "aldehyde_amidinohydrazone",
+      "ring_aldehyde_amidinohydrazone",
       "aldehyde_imine",
       "ring_aldehyde_imine"
     ]
@@ -635,7 +637,9 @@
     "values": [
       "hydrazone",
       "aldehyde_hydrazone",
-      "ring_aldehyde_hydrazone"
+      "ring_aldehyde_hydrazone",
+      "aldehyde_amidinohydrazone",
+      "ring_aldehyde_amidinohydrazone"
     ]
   },
   "special_component_names": {
@@ -1070,7 +1074,7 @@
       },
       "ring_thioaldehyde": {
         "role": "principal",
-        "prefix": "carbonothioyl",
+        "prefix": "thioformyl",
         "suffix": "carbothialdehyde",
         "multi_suffix": {
           "multiplier_positions": [
@@ -1135,6 +1139,34 @@
         "role": "principal",
         "prefix": "hydrazonomethyl",
         "suffix": "carbaldehyde hydrazone",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0,
+            1
+          ]
+        },
+        "seniority": 95,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "aldehyde_amidinohydrazone": {
+        "role": "principal",
+        "prefix": "amidinohydrazonomethyl",
+        "suffix": "al amidinohydrazone",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0,
+            1
+          ]
+        },
+        "seniority": 95,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_aldehyde_amidinohydrazone": {
+        "role": "principal",
+        "prefix": "amidinohydrazonomethyl",
+        "suffix": "carbaldehyde amidinohydrazone",
         "multi_suffix": {
           "multiplier_positions": [
             0,
@@ -1298,6 +1330,11 @@
       "hydrazinylamino": {
         "role": "prefix",
         "prefix": "hydrazinylamino",
+        "needs_locant": true
+      },
+      "diazenyl": {
+        "role": "prefix",
+        "prefix": "diazenyl",
         "needs_locant": true
       },
       "diazo": {

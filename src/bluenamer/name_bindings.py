@@ -27,6 +27,16 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
                 atom_ids=set(parts.front_modifier_atom_ids),
             )
         )
+    for item in parts.principal_suffix_modifiers:
+        bindings.append(
+            NameAtomBinding(
+                stage="modifier",
+                role="principal_suffix_modifier",
+                term=item.name,
+                atom_ids=set(item.atom_ids),
+                bond_ids=set(item.bond_ids),
+            )
+        )
     for item in parts.a_prefixes:
         bindings.append(
             NameAtomBinding(

@@ -70,6 +70,7 @@ class AssemblyParts:
     retained_name: str | None = None
     front_modifiers: list[str] = field(default_factory=list)
     front_modifier_atom_ids: set[int] = field(default_factory=set)
+    principal_suffix_modifiers: list[SubstituentItem] = field(default_factory=list)
     a_prefixes: list[SubstituentItem] = field(default_factory=list)
     principal_group: PrincipalGroupItem | None = None
     unsaturations: list[UnsaturationItem] = field(default_factory=list)

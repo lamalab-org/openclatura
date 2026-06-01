@@ -6,6 +6,7 @@ from .namer_config import RETAINED_RING_ELEMENTS
 from .naming_context import NamingIntent, ParentAssemblyPlan
 from .numbering import choose_parent_numbering
 from .parent_selection import ParentSelection
+from .ring_renderer import is_von_baeyer_descriptor
 from .rules import retained
 from .subgraph_tools import subgraph_locant_getter
 from .trace_helpers import bond_ids_within
@@ -39,6 +40,18 @@ def build_parent_assembly_plan(
 ) -> ParentAssemblyPlan:
     """Number a selected parent and create base assembly parts."""
 
+    if (
+        locant_maps is None
+        and selection.ring_parent is not None
+        and selection.ring_parent.numbering_candidates
+        and _is_von_baeyer_descriptor(selection.ring_parent.descriptor)
+    ):
+        audited_maps = [
+            numbering.locant_map
+            for numbering in selection.ring_parent.numbering_candidates
+            if numbering.audit_ok
+        ]
+        locant_maps = audited_maps or None
     numbered_path, locant_map = choose_parent_numbering(
         mol,
         selection.paths,
@@ -62,6 +75,10 @@ def build_parent_assembly_plan(
         intent,
     )
     return ParentAssemblyPlan(numbered_path=numbered_path, locant_map=locant_map, get_loc=get_loc, parts=parts)
+
+
+def _is_von_baeyer_descriptor(descriptor: str | None) -> bool:
+    return is_von_baeyer_descriptor(descriptor)
 
 
 def build_parent_parts(

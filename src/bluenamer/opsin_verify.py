@@ -14,6 +14,8 @@ import subprocess
 from dataclasses import dataclass
 from typing import Literal
 
+from .resonance_compare import canonical_smiles, equivalent_smiles
+
 OpsinStatus = Literal[
     "matched",
     "mismatched",
@@ -67,16 +69,7 @@ def _java_available() -> bool:
 
 
 def _canonicalize(smiles: str) -> str | None:
-    if not smiles:
-        return None
-    try:
-        from rdkit.Chem import CanonSmiles  # type: ignore
-    except Exception:  # pragma: no cover - rdkit always available
-        return None
-    try:
-        return CanonSmiles(smiles)
-    except Exception:
-        return None
+    return canonical_smiles(smiles)
 
 
 def verify_with_opsin(name: str, smiles: str) -> OpsinCheck:
@@ -129,7 +122,7 @@ def verify_with_opsin(name: str, smiles: str) -> OpsinCheck:
             error_message="Failed to canonicalize SMILES for comparison.",
         )
 
-    if canonical_original == canonical_roundtrip:
+    if equivalent_smiles(smiles, opsin_smiles):
         return OpsinCheck(
             status="matched",
             name=name,

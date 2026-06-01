@@ -181,7 +181,7 @@ PREFIX_HANDLERS.update(
     {key: acid_halide_prefix_handler for key in RULES.functional_groups.keys_with_family("acid_halide")}
 )
 PREFIX_HANDLERS.update(
-    {key: static_prefix_handler("carboperoxy") for key in RULES.functional_groups.keys_with_family("peroxy_acid")}
+    {key: static_prefix_handler("hydroperoxycarbonyl") for key in RULES.functional_groups.keys_with_family("peroxy_acid")}
 )
 PREFIX_HANDLERS.update({key: sulfonyl_prefix_handler for key in RULES.functional_groups.keys_with_family("sulfonyl")})
 PREFIX_HANDLERS.update(

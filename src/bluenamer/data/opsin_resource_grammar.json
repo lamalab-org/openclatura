@@ -1,0 +1,297 @@
+{
+  "source": {
+    "name": "OPSIN 1.2.0 resource grammar",
+    "resource_root": "opsin-core/src/main/resources/uk/ac/cam/ch/wwmm/opsin/resources",
+    "files": [
+      "arylGroups.xml",
+      "arylSubstituents.xml",
+      "fusionComponents.xml",
+      "inlineChargeSuffixes.xml",
+      "nonCarboxylicAcids.xml",
+      "hwHeteroAtoms.xml"
+    ],
+    "note": "This table records parser grammar facts observed in OPSIN resources. Production support is gated separately from token presence."
+  },
+  "retained_fused_derivative_gate": {
+    "source_files": [
+      "arylGroups.xml",
+      "arylSubstituents.xml",
+      "fusionComponents.xml",
+      "suffixes.xml",
+      "inlineSuffixes.xml",
+      "suffixApplicability.xml"
+    ],
+    "production_parent_names": [
+      "naphthalene",
+      "quinoline",
+      "isoquinoline",
+      "1,5-naphthyridine",
+      "1,6-naphthyridine",
+      "1,7-naphthyridine",
+      "1,8-naphthyridine",
+      "2,6-naphthyridine",
+      "2,7-naphthyridine",
+      "quinazoline",
+      "quinoxaline",
+      "cinnoline",
+      "phthalazine"
+    ],
+    "audit_only_parent_names": [
+      "azulene",
+      "1H-phenalene",
+      "acenaphthylene",
+      "fluoranthene",
+      "1H-perimidine",
+      "pteridine",
+      "2H-isoindole",
+      "indolizine",
+      "1H-indole"
+    ],
+    "allowed_principal_keys": [
+      null,
+      "alcohol",
+      "amine",
+      "ring_nitrile",
+      "ring_aldehyde",
+      "ring_amide",
+      "ring_carboxylic_acid"
+    ],
+    "allowed_group_keys": [
+      "alcohol",
+      "amine",
+      "ring_nitrile",
+      "ring_aldehyde",
+      "ring_amide",
+      "ring_carboxylic_acid",
+      "ether",
+      "fluoro",
+      "chloro",
+      "bromo",
+      "iodo"
+    ],
+    "allowed_substituent_names": [
+      "methyl",
+      "fluoro",
+      "chloro",
+      "bromo",
+      "iodo",
+      "amino",
+      "hydroxy",
+      "methoxy"
+    ]
+  },
+  "retained_fused_tokens": {
+    "naphthalene": {
+      "parent_stems": ["naphthalen"],
+      "substituent_stems": ["naphth", "naphthal"],
+      "fusion_stems": ["naphtho", "naphthaleno"],
+      "derivative_status": "production_safe"
+    },
+    "quinoline": {
+      "parent_stems": ["quinolin"],
+      "substituent_stems": ["quinol", "quinolin"],
+      "fusion_stems": ["quinolino"],
+      "derivative_status": "production_safe"
+    },
+    "isoquinoline": {
+      "parent_stems": ["isoquinolin"],
+      "substituent_stems": ["isoquinol", "isoquinolin"],
+      "fusion_stems": ["isoquinolino"],
+      "derivative_status": "production_safe"
+    },
+    "1,5-naphthyridine": {
+      "parent_stems": ["1,5-naphthyridin"],
+      "substituent_stems": ["1,5-naphthyridin"],
+      "fusion_stems": ["1,5-naphthyridino"],
+      "derivative_status": "production_safe"
+    },
+    "1,6-naphthyridine": {
+      "parent_stems": ["1,6-naphthyridin"],
+      "substituent_stems": ["1,6-naphthyridin"],
+      "fusion_stems": ["1,6-naphthyridino"],
+      "derivative_status": "production_safe"
+    },
+    "1,7-naphthyridine": {
+      "parent_stems": ["1,7-naphthyridin"],
+      "substituent_stems": ["1,7-naphthyridin"],
+      "fusion_stems": ["1,7-naphthyridino"],
+      "derivative_status": "production_safe"
+    },
+    "1,8-naphthyridine": {
+      "parent_stems": ["1,8-naphthyridin"],
+      "substituent_stems": ["1,8-naphthyridin"],
+      "fusion_stems": ["1,8-naphthyridino"],
+      "derivative_status": "production_safe"
+    },
+    "2,6-naphthyridine": {
+      "parent_stems": ["2,6-naphthyridin"],
+      "substituent_stems": ["2,6-naphthyridin"],
+      "fusion_stems": ["2,6-naphthyridino"],
+      "derivative_status": "production_safe"
+    },
+    "2,7-naphthyridine": {
+      "parent_stems": ["2,7-naphthyridin"],
+      "substituent_stems": ["2,7-naphthyridin"],
+      "fusion_stems": ["2,7-naphthyridino"],
+      "derivative_status": "production_safe"
+    },
+    "quinazoline": {
+      "parent_stems": ["quinazolin"],
+      "substituent_stems": ["quinazolin"],
+      "fusion_stems": ["quinazolino"],
+      "derivative_status": "production_safe"
+    },
+    "quinoxaline": {
+      "parent_stems": ["quinoxalin"],
+      "substituent_stems": ["quinoxalin"],
+      "fusion_stems": ["quinoxalino"],
+      "derivative_status": "production_safe"
+    },
+    "cinnoline": {
+      "parent_stems": ["cinnolin"],
+      "substituent_stems": ["cinnolin"],
+      "fusion_stems": ["cinnolino"],
+      "derivative_status": "production_safe"
+    },
+    "phthalazine": {
+      "parent_stems": ["phthalazin"],
+      "substituent_stems": ["phthalazin"],
+      "fusion_stems": ["phthalazino"],
+      "derivative_status": "production_safe"
+    },
+    "azulene": {
+      "parent_stems": ["azulen"],
+      "substituent_stems": ["azul", "azulen"],
+      "fusion_stems": ["azuleno"],
+      "derivative_status": "audit_only"
+    },
+    "1H-phenalene": {
+      "parent_stems": ["phenalen"],
+      "substituent_stems": ["phenal"],
+      "fusion_stems": ["phenaleno"],
+      "derivative_status": "audit_only",
+      "default_indicated_h": ["1"]
+    },
+    "acenaphthylene": {
+      "parent_stems": ["acenaphthylen"],
+      "substituent_stems": ["acenaphth"],
+      "fusion_stems": ["acenaphthyleno", "acenaphth", "acenaphtho"],
+      "derivative_status": "audit_only"
+    },
+    "fluoranthene": {
+      "parent_stems": ["fluoranthen"],
+      "substituent_stems": ["fluoranthen"],
+      "fusion_stems": ["fluorantheno"],
+      "derivative_status": "audit_only"
+    },
+    "1H-perimidine": {
+      "parent_stems": ["perimidin"],
+      "substituent_stems": ["perimid", "perimidin"],
+      "fusion_stems": ["perimidino"],
+      "derivative_status": "audit_only",
+      "default_indicated_h": ["1"]
+    },
+    "pteridine": {
+      "parent_stems": ["pteridin"],
+      "substituent_stems": ["pterid", "pteridin"],
+      "fusion_stems": ["pteridino"],
+      "derivative_status": "audit_only"
+    },
+    "2H-isoindole": {
+      "parent_stems": ["isoindol"],
+      "substituent_stems": ["isoindol"],
+      "fusion_stems": ["isoindolo"],
+      "derivative_status": "audit_only",
+      "default_indicated_h": ["2"]
+    },
+    "indolizine": {
+      "parent_stems": ["indolizin"],
+      "substituent_stems": ["indolizin"],
+      "fusion_stems": ["indolizino"],
+      "derivative_status": "audit_only"
+    },
+    "1H-indole": {
+      "parent_stems": ["indol"],
+      "substituent_stems": ["indol"],
+      "fusion_stems": ["indolo"],
+      "derivative_status": "audit_only",
+      "default_indicated_h": ["1"]
+    }
+  },
+  "charge_suffixes": {
+    "source_file": "inlineChargeSuffixes.xml",
+    "canonical": ["ium", "ide", "ylium", "uide"],
+    "accepted_spellings": {
+      "ium": ["ium"],
+      "ide": ["ide", "id"],
+      "ylium": ["ylium", "(ylium)"],
+      "uide": ["uide", "uid"]
+    }
+  },
+  "hetero_replacement_priority": {
+    "source_file": "hwHeteroAtoms.xml",
+    "prefix_order": [
+      "fluora",
+      "chlora",
+      "broma",
+      "ioda",
+      "oxa",
+      "thia",
+      "selena",
+      "tellura",
+      "aza",
+      "phospha",
+      "arsa",
+      "stiba",
+      "bisma",
+      "sila",
+      "germa",
+      "stanna",
+      "plumba",
+      "bora"
+    ]
+  },
+  "halogen_oxoacid_common_names": {
+    "source_file": "nonCarboxylicAcids.xml",
+    "Cl": {
+      "XO": "hypochlorous acid",
+      "XO2": "chlorous acid",
+      "XO3": "chloric acid",
+      "XO4": "perchloric acid"
+    },
+    "Br": {
+      "XO": "hypobromous acid",
+      "XO2": "bromous acid",
+      "XO3": "bromic acid",
+      "XO4": "perbromic acid"
+    },
+    "I": {
+      "XO": "hypoiodous acid",
+      "XO2": "iodous acid",
+      "XO3": "iodic acid",
+      "XO4": "periodic acid"
+    }
+  },
+  "oxoacid_ester_suffix_templates": {
+    "source_files": [
+      "nonCarboxylicAcids.xml",
+      "suffixes.xml",
+      "suffixApplicability.xml"
+    ],
+    "phosphate": {
+      "neutral_monoester": "dihydrogen phosphate",
+      "monoanion_monoester": "hydrogen phosphate",
+      "dianion_monoester": "phosphate"
+    },
+    "charge_normalized_halogen_oxoester": {
+      "Cl": "chlorate",
+      "Br": "bromate",
+      "I": "iodate"
+    },
+    "charge_normalized_halogen_peroxy_oxoester": {
+      "Cl": "peroxychlorate",
+      "Br": "peroxybromate",
+      "I": "peroxyiodate"
+    }
+  }
+}

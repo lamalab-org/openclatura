@@ -20,6 +20,12 @@ def positive_parent_n_charges(parts: AssemblyParts) -> list[ParentChargeItem]:
     return [charge for charge in parts.parent_charges if charge.symbol == "N" and charge.charge > 0]
 
 
+def positive_parent_ium_charges(parts: AssemblyParts) -> list[ParentChargeItem]:
+    """Return parent atoms whose positive charge is represented by an ium suffix."""
+
+    return [charge for charge in parts.parent_charges if charge.symbol in {"N", "O"} and charge.charge > 0]
+
+
 def has_ionic_retained_parent(parts: AssemblyParts) -> bool:
     return bool(parts.retained_name in RULES.charges.retained_ionic_n_parents and positive_parent_n_charges(parts))
 
@@ -56,7 +62,7 @@ def parent_charge_suffix_locs(parts: AssemblyParts) -> list[str]:
         return []
     represented_as_azonia = single_charged_replacement_locants(parts)
     return sorted(
-        [charge.locant for charge in positive_parent_n_charges(parts) if charge.locant not in represented_as_azonia],
+        [charge.locant for charge in positive_parent_ium_charges(parts) if charge.locant not in represented_as_azonia],
         key=parse_locant,
     )
 
@@ -84,7 +90,7 @@ def parent_charge_name_operations(parts: AssemblyParts) -> list[ParentSuffixOper
             suffix=rule.suffix,
             reason=rule.reason,
             charge=1,
-            atom_symbols=("N",),
+            atom_symbols=tuple(sorted({charge.symbol for charge in positive_parent_ium_charges(parts)})),
         )
     ]
 

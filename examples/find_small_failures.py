@@ -4,14 +4,16 @@ import csv
 from collections import Counter
 from datasets import load_dataset
 from bluenamer.namer import name_smiles
+from bluenamer.resonance_compare import equivalent_smiles
 from rdkit.Chem import CanonSmiles
 from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm
+from utils import standardize_mol
 
 def canon(smi):
     if not smi: return None
     try:
-        return CanonSmiles(smi)        
+        return standardize_mol(smi)        
     except:
         return None
 
@@ -89,7 +91,7 @@ def run_pipeline():
             failure_reason = "SMILES_TO_NAME_FAILED"
         elif not recon_smi:
             failure_reason = "NAME_TO_SMILES_FAILED"
-        elif orig_canon != recon_canon:
+        elif orig_canon != recon_canon and not equivalent_smiles(orig_smi, recon_smi):
             failure_reason = "SMILES_MISMATCH"
         
         if failure_reason:

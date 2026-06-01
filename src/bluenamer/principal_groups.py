@@ -73,9 +73,59 @@ def add_component_principal_group(
                 hydrazone_carbon = hydrazone_characteristic_carbon(mol, group)
                 if hydrazone_carbon is not None:
                     atom_ids.add(hydrazone_carbon)
+                    if _hydrazone_allows_unlocanted_stereo(mol, group, hydrazone_carbon):
+                        for nitrogen in [idx for idx in group.atoms_involved if mol.atoms[idx].symbol == "N"]:
+                            bond = mol.get_bond(hydrazone_carbon, nitrogen)
+                            if bond is not None and bond.order == 2 and bond.stereo in {"E", "Z"}:
+                                parts.stereo_features.append(("", bond.stereo))
     parts.principal_group = PrincipalGroupItem(
         key=principal_key,
         locants=locants,
         atom_ids=atom_ids,
         bond_ids=bond_ids_within(mol, atom_ids),
     )
+
+
+def _hydrazone_allows_unlocanted_stereo(mol: Molecule, group: PerceivedGroup, carbon: int) -> bool:
+    """Return whether hydrazone E/Z can be rendered as a parent-name prefix.
+
+    OPSIN accepts unlocanted `(E)`/`(Z)` for ordinary aldehyde hydrazones such
+    as benzaldehyde hydrazone. It does not reliably attach that descriptor when
+    the hydrazone N-N side is itself part of an azo/diazo/chalcogen-imide chain.
+    This guard keeps stereo rendering tied to the simple hydrazone suffix class
+    instead of broadcasting it across every C=N-N fragment.
+    """
+
+    if group.key not in {"aldehyde_hydrazone", "ring_aldehyde_hydrazone"}:
+        return False
+    hydrazone_n = None
+    terminal_n = None
+    for atom_idx in group.atoms_involved:
+        if mol.atoms[atom_idx].symbol != "N":
+            continue
+        bond = mol.get_bond(carbon, atom_idx)
+        if bond is not None and bond.order == 2:
+            hydrazone_n = atom_idx
+            break
+    if hydrazone_n is None:
+        return False
+    carbon_substituents = [n for n in mol.get_neighbors(carbon) if n != hydrazone_n]
+    if len(carbon_substituents) != 1 or mol.atoms[carbon_substituents[0]].symbol != "C":
+        return False
+    terminal_candidates = [
+        n
+        for n in mol.get_neighbors(hydrazone_n)
+        if n != carbon and mol.atoms[n].symbol == "N" and n in group.atoms_involved
+    ]
+    if len(terminal_candidates) != 1:
+        return False
+    terminal_n = terminal_candidates[0]
+    for neighbor in mol.get_neighbors(terminal_n):
+        if neighbor == hydrazone_n:
+            continue
+        bond = mol.get_bond(terminal_n, neighbor)
+        if bond is not None and bond.order != 1:
+            return False
+        if mol.atoms[neighbor].symbol not in {"C", "H"}:
+            return False
+    return True

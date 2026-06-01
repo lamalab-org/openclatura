@@ -171,19 +171,27 @@ def apply_ring_parent_nitrogen_zwitterion_stack(name: str, mol: Molecule, number
     sites = parent_charge_sites(mol, numbered_path, get_loc)
     negative_nitrogens = [site for site in sites if site.symbol == "N" and site.charge < 0]
     positive_nitrogens = [site for site in sites if site.symbol == "N" and site.charge > 0]
-    if len(negative_nitrogens) != 1 or len(positive_nitrogens) != 1:
+    if not negative_nitrogens or not positive_nitrogens:
         return name
-    negative = negative_nitrogens[0]
-    positive = positive_nitrogens[0]
-    if not _name_has_parent_ium_locant(name, positive.locant):
+    positive_locants = tuple(site.locant for site in positive_nitrogens)
+    if not _name_has_parent_ium_locants(name, positive_locants):
         return name
-    if not _charged_nitrogens_are_adjacent_or_conjugated(mol, parent_set, negative.atom_idx, positive.atom_idx):
+    if not all(
+        any(
+            _charged_nitrogens_are_adjacent_or_conjugated(mol, parent_set, negative.atom_idx, positive.atom_idx)
+            for positive in positive_nitrogens
+        )
+        for negative in negative_nitrogens
+    ):
         return name
-    if f"-{negative.locant}-ide-{positive.locant}-ium" in name:
+    negative_locants = tuple(site.locant for site in negative_nitrogens)
+    negative_text = ",".join(sorted(negative_locants, key=_locant_sort_key))
+    positive_text = ",".join(sorted(positive_locants, key=_locant_sort_key))
+    if f"-{negative_text}-ide-{positive_text}-ium" in name:
         return name
     return re.sub(
-        rf"-{re.escape(positive.locant)}-ium\b",
-        f"-{negative.locant}-ide-{positive.locant}-ium",
+        rf"-{re.escape(positive_text)}-ium\b",
+        f"-{negative_text}-ide-{positive_text}-ium",
         name,
         count=1,
     )
@@ -206,11 +214,20 @@ def _is_unsaturated_ring_parent(mol: Molecule, parent_set: set[int]) -> bool:
 
 
 def _name_has_parent_ium_locant(name: str, locant: str) -> bool:
-    match = re.search(rf"-{re.escape(locant)}-ium\b", name)
+    return _name_has_parent_ium_locants(name, (locant,))
+
+
+def _name_has_parent_ium_locants(name: str, locants: tuple[str, ...]) -> bool:
+    locant_text = ",".join(sorted(locants, key=_locant_sort_key))
+    match = re.search(rf"-{re.escape(locant_text)}-ium\b", name)
     if match is None:
         return False
     suffix_tail = name[match.end() :]
     return suffix_tail == ""
+
+
+def _locant_sort_key(locant: str) -> tuple[int, str]:
+    return (int(locant), "") if locant.isdigit() else (999, locant)
 
 
 def _charged_nitrogens_are_adjacent_or_conjugated(

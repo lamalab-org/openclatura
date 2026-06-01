@@ -61,6 +61,18 @@ def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) 
     """
 
     if mol.atoms[start_idx].is_carbon and start_idx in component:
+        terminal_sulfurs = [
+            neighbor
+            for neighbor in mol.get_neighbors(start_idx)
+            if neighbor in component
+            and mol.atoms[neighbor].symbol == "S"
+            and (bond := mol.get_bond(start_idx, neighbor)) is not None
+            and bond.order == 2
+            and all(other == start_idx for other in mol.get_neighbors(neighbor))
+        ]
+        if len(terminal_sulfurs) == 1 and component == {start_idx, terminal_sulfurs[0]}:
+            return "thioformyl"
+
         triple_phosphorus = [
             neighbor
             for neighbor in mol.get_neighbors(start_idx)
@@ -246,7 +258,7 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
     sub_name_clean = sub_name_clean.replace("--", "-").strip("-")
     sub_name_clean = sub_name_clean.replace("-cyclo", "cyclo")
     if not sub_name_clean:
-        sub_name_clean = "methane"
+        raise ValueError("spiro side component marker removal left no named parent")
     side_prefixes, side_parent_name, side_suffixes = extract_spiro_side_prefixes(sub_name_clean)
     return SpiroAssembly(
         parent_locant="",
@@ -601,7 +613,7 @@ def _retained_n_ring_spiro_assembly(mol: Molecule, c_idx: int, sub_comp: set[int
     n_atom = next(atom_idx for atom_idx in ring if mol.atoms[atom_idx].symbol == "N")
     if mol.atoms[n_atom].charge <= 0:
         return None
-    locant_map = _number_saturated_n_ring_for_spiro(ring, n_atom, c_idx)
+    locant_map = _number_saturated_n_ring_for_spiro(mol, ring, n_atom, c_idx, sub_comp)
     ring_size = len(ring)
     ionic_parent = RULES.charges.saturated_n_ring_ionic_parents.get(ring_size)
     if not ionic_parent:
@@ -685,17 +697,32 @@ def _shortest_path_without_atom(
     return None
 
 
-def _number_saturated_n_ring_for_spiro(ring: list[int], n_atom: int, spiro_atom: int) -> dict[int, str]:
-    """Number a saturated retained N-ring from N=1, preserving graph orientation."""
+def _number_saturated_n_ring_for_spiro(
+    mol: Molecule,
+    ring: list[int],
+    n_atom: int,
+    spiro_atom: int,
+    sub_comp: set[int],
+) -> dict[int, str]:
+    """Number a saturated retained N-ring from N=1 with graph-feature tie-breaks."""
 
     n_pos = ring.index(n_atom)
     forward = ring[n_pos:] + ring[:n_pos]
     reverse = [forward[0], *reversed(forward[1:])]
     candidates = []
+    ring_atoms = set(ring)
     for order in (forward, reverse):
         locants = {atom_idx: str(pos + 1) for pos, atom_idx in enumerate(order)}
-        candidates.append(locants)
-    return max(candidates, key=lambda locants: int(locants[spiro_atom]))
+        branch_locants = tuple(
+            sorted(
+                int(locants[atom_idx])
+                for atom_idx in ring
+                if atom_idx != spiro_atom
+                and any(neighbor in sub_comp and neighbor not in ring_atoms for neighbor in mol.get_neighbors(atom_idx))
+            )
+        )
+        candidates.append((branch_locants, -int(locants[spiro_atom]), tuple(order), locants))
+    return min(candidates)[3]
 
 
 def _spiro_subgraph_name(mol: Molecule, c_idx: int, sub_comp: set[int]) -> str:
@@ -838,6 +865,10 @@ def _assemble_parent_name(
 
     name = assemble_name_raw(parts)
     if finalize_subgraph:
+        carbanion_name = _simple_rooted_carbanion_substituent_name(mol, parts, numbered_path, get_loc)
+        if carbanion_name:
+            name = carbanion_name
+    if finalize_subgraph:
         name = _finalize_subgraph_name(name, parts)
     name = apply_anionic_parent_names(name, mol, numbered_path, get_loc, parts.retained_name)
     name = apply_cationic_imino_names(name, mol)
@@ -847,6 +878,38 @@ def _assemble_parent_name(
     if parts.name_atom_bindings:
         parts.name_atom_bindings = postprocess_name_atom_bindings(parts.name_atom_bindings, post_process_name)
     return processed_name
+
+
+def _simple_rooted_carbanion_substituent_name(
+    mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc
+) -> str:
+    """Render simple C- substituent roots as methanidyl ligand names.
+
+    This is deliberately narrow: only an acyclic all-carbon substituent whose
+    charged carbon is locant 1 is converted. More complex carbanions need a
+    charge-pair role template rather than a global ``-ide`` suffix.
+    """
+
+    if parts.substituents or parts.principal_group is not None or parts.unsaturations:
+        return ""
+    charged = [atom_idx for atom_idx in numbered_path if mol.atoms[atom_idx].is_carbon and mol.atoms[atom_idx].charge < 0]
+    if len(charged) != 1 or str(get_loc(charged[0])) != "1":
+        return ""
+    if any(not mol.atoms[atom_idx].is_carbon for atom_idx in numbered_path):
+        return ""
+    if any(
+        mol.get_bond(a, b).order != 1
+        for a, b in zip(numbered_path, numbered_path[1:])
+        if mol.get_bond(a, b) is not None
+    ):
+        return ""
+    side_len = len(numbered_path) - 1
+    if side_len == 0:
+        return "methanidyl"
+    side_stem = stems.stem_for(side_len)
+    if not side_stem:
+        return ""
+    return f"{side_stem}ylmethanidyl"
 
 
 def name_subgraph(

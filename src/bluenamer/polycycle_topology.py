@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import re
 
 from .molecule import Molecule
-from .ring_renderer import render_ring_descriptor
+from .ring_renderer import render_ring_descriptor, von_baeyer_cycle_count, von_baeyer_kind
 
 
 @dataclass(frozen=True)
@@ -355,10 +355,12 @@ def audit_von_baeyer_descriptor(
 def _parse_von_baeyer_descriptor(
     descriptor: str,
 ) -> tuple[int, tuple[int, int, int], tuple[tuple[int, tuple[int, int]], ...]] | None:
-    match = re.fullmatch(r"(?P<prefix>tri|tetra|penta|hexa)cyclo\[(?P<body>.+)\]", descriptor)
+    match = re.fullmatch(r"(?P<prefix>[a-z]+)cyclo\[(?P<body>.+)\]", descriptor)
     if match is None:
         return None
-    kind_count = {"tri": 3, "tetra": 4, "penta": 5, "hexa": 6}[match.group("prefix")]
+    kind_count = von_baeyer_cycle_count(descriptor)
+    if kind_count is None or kind_count < 3:
+        return None
     parts = match.group("body").split(".")
     if len(parts) < 4:
         return None
@@ -469,6 +471,64 @@ def build_ring_numbering(
         bond_orders_by_locants=bond_orders_by_locants,
         spiro_locants=_spiro_locants(kind, descriptor_numbers),
         bridgehead_locants=_bridgehead_locants(kind, descriptor_numbers),
+        substituent_attachment_locants=tuple(
+            sorted(atom_to_locant[atom] for atom in substituent_attachment_atoms if atom in atom_to_locant)
+        ),
+    )
+
+
+def build_von_baeyer_numbering(
+    descriptor: str,
+    path: tuple[int, ...] | list[int],
+    edge_set: frozenset[tuple[int, int]] | set[tuple[int, int]],
+    mol: Molecule | None = None,
+    substituent_attachment_atoms: set[int] | frozenset[int] | None = None,
+) -> RingNumbering:
+    """Build a numbering only when a von Baeyer descriptor proves the graph."""
+
+    audit = audit_von_baeyer_descriptor(descriptor, path, edge_set)
+    numbered_path = tuple(path)
+    atom_to_locant = {atom: locant for locant, atom in enumerate(numbered_path, start=1)}
+    locant_to_atom = {locant: atom for atom, locant in atom_to_locant.items()}
+    parsed = _parse_von_baeyer_descriptor(descriptor)
+    descriptor_numbers = ()
+    kind = "polycycle"
+    if parsed is not None:
+        kind_count, base_numbers, extra_bridges = parsed
+        descriptor_numbers = tuple(base_numbers) + tuple(length for length, _locants in extra_bridges)
+        kind = von_baeyer_kind(kind_count)
+
+    normalized_edges = frozenset(_normalize_edges(edge_set))
+    errors = list(audit.audit_errors)
+    atom_symbols_by_locant = None
+    atom_charges_by_locant = None
+    bond_orders_by_locants = None
+    if mol is not None:
+        atom_symbols_by_locant = {locant: mol.atoms[atom].symbol for locant, atom in locant_to_atom.items()}
+        atom_charges_by_locant = {locant: mol.atoms[atom].charge for locant, atom in locant_to_atom.items()}
+        bond_orders_by_locants = {}
+        for first, second in normalized_edges:
+            bond = mol.get_bond(first, second)
+            if bond is None:
+                errors.append(f"ring edge has no source bond: {(first, second)}")
+                continue
+            if first in atom_to_locant and second in atom_to_locant:
+                locants = tuple(sorted((atom_to_locant[first], atom_to_locant[second])))
+                bond_orders_by_locants[locants] = bond.order
+
+    substituent_attachment_atoms = substituent_attachment_atoms or set()
+    return RingNumbering(
+        kind=kind,
+        descriptor_numbers=descriptor_numbers,
+        path=numbered_path,
+        atom_to_locant=atom_to_locant,
+        locant_to_atom=locant_to_atom,
+        audit_ok=audit.audit_ok and not errors,
+        audit_errors=tuple(errors),
+        atom_symbols_by_locant=atom_symbols_by_locant,
+        atom_charges_by_locant=atom_charges_by_locant,
+        bond_orders_by_locants=bond_orders_by_locants,
+        bridgehead_locants=_bridgehead_locants("bicyclo", descriptor_numbers[:3]) if len(descriptor_numbers) >= 3 else (),
         substituent_attachment_locants=tuple(
             sorted(atom_to_locant[atom] for atom in substituent_attachment_atoms if atom in atom_to_locant)
         ),

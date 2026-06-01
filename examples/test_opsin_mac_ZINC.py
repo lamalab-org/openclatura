@@ -13,6 +13,7 @@ from datasets import load_dataset
 from bluenamer.namer import name_smiles
 from rdkit.Chem import CanonSmiles
 from tqdm import tqdm
+from utils import standardize_mol
 
 
 # --- Configuration ---
@@ -98,7 +99,7 @@ def canon(smi):
     if not smi:
         return None
     try:
-        return CanonSmiles(smi)
+        return standardize_mol(smi)
     except Exception:
         return None
 

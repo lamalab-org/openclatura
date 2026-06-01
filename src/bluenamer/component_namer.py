@@ -24,6 +24,7 @@ from .principal_groups import (
     filter_component_groups_to_parent,
     partition_principal_and_prefix_groups,
 )
+from .retained_fused_production import production_retained_fused_parent
 from .special_cases import single_atom_component_name, structural_replacement_parent_name, try_name_anhydride_component
 from .spiro_assembly import SpiroAssembly
 from .stereo_audit import audit_stereochemistry
@@ -312,6 +313,16 @@ def name_component(
         name_subgraph=name_subgraph,
         name_spiro_subgraph=name_spiro_subgraph,
     )
+    retained_fused = production_retained_fused_parent(
+        mol,
+        state.parent_path,
+        state.component_atoms,
+        state.perceived_groups,
+        state.principal_key,
+        subst_mapping,
+    )
+    if retained_fused is not None:
+        state.retained_name, state.locant_maps = retained_fused
     if (
         state.retained_name
         and state.locant_maps is None

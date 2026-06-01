@@ -7,12 +7,14 @@ from .polycycle_topology import (
     audit_von_baeyer_descriptor,
     bicyclo_proof,
     build_ring_numbering,
+    build_von_baeyer_numbering,
     linear_dispiro_proof,
     monospiro_proof,
     ring_system_topology,
 )
 from .ring_parent import RingParent
-from .ring_renderer import render_ring_descriptor, render_von_baeyer_descriptor
+from .ring_renderer import is_von_baeyer_descriptor, render_ring_descriptor, render_von_baeyer_descriptor
+from .von_baeyer import find_von_baeyer_candidates
 
 
 @dataclass
@@ -28,6 +30,20 @@ class RingSystem:
     chord_edges: list[tuple[int, int]] = field(default_factory=list)
     polycycle_descriptor: str | None = None
     ring_parent: RingParent | None = None
+
+
+@dataclass(frozen=True)
+class PolycycleDescriptorCandidate:
+    """Descriptor candidates with audited numbering kept next to the text."""
+
+    descriptor: str | None
+    paths: list[list[int]]
+    is_von_baeyer: bool = False
+    numberings: tuple = ()
+
+    @property
+    def descriptor_allowed(self) -> bool:
+        return not self.is_von_baeyer or bool(self.numberings)
 
 
 def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
@@ -579,10 +595,15 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                     systems.append(legacy_system)
 
         elif E >= V + 2:
-            descriptor, numbered_paths = _polyspiro_descriptor_or_von_baeyer(mol, comp_nodes, comp_edges)
+            candidate = _polyspiro_or_von_baeyer_candidate(mol, comp_nodes, comp_edges)
+            descriptor = candidate.descriptor
+            numbered_paths = candidate.paths
+            is_von_baeyer = candidate.is_von_baeyer
+            von_baeyer_numberings = list(candidate.numberings)
 
             recognized_via_retained = False
-            if retained_rules.recognizes_retained_ring(mol, numbered_paths[0]):
+            allow_descriptor = candidate.descriptor_allowed
+            if allow_descriptor and numbered_paths and retained_rules.recognizes_retained_ring(mol, numbered_paths[0]):
                 systems.append(
                     RingSystem(
                         atoms=comp_nodes,
@@ -594,12 +615,21 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                             atoms=comp_nodes,
                             descriptor=descriptor,
                             paths=[numbered_paths[0]],
+                        )
+                        if not is_von_baeyer
+                        else RingParent.from_numberings(
+                            kind="polycycle",
+                            atoms=comp_nodes,
+                            descriptor=descriptor,
+                            descriptor_numbers=von_baeyer_numberings[0].descriptor_numbers,
+                            numberings=von_baeyer_numberings,
+                            selected_path=numbered_paths[0],
                         ),
                     )
                 )
                 recognized_via_retained = True
             else:
-                for c in cycles:
+                for c in (() if is_von_baeyer else cycles if allow_descriptor else ()):
                     if len(c) == V and retained_rules.recognizes_retained_ring(mol, c):
                         systems.append(
                             RingSystem(
@@ -619,7 +649,25 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                         break
 
             if not recognized_via_retained:
-                if descriptor:
+                if is_von_baeyer and descriptor and von_baeyer_numberings:
+                    paths = _dedupe_numbering_paths([list(numbering.path) for numbering in von_baeyer_numberings])
+                    systems.append(
+                        RingSystem(
+                            atoms=comp_nodes,
+                            is_polycycle=True,
+                            paths=paths,
+                            polycycle_descriptor=descriptor,
+                            ring_parent=RingParent.from_numberings(
+                                kind="polycycle",
+                                atoms=comp_nodes,
+                                descriptor=descriptor,
+                                descriptor_numbers=von_baeyer_numberings[0].descriptor_numbers,
+                                numberings=von_baeyer_numberings,
+                                selected_path=paths[0],
+                            ),
+                        )
+                    )
+                elif descriptor and not is_von_baeyer:
                     systems.append(
                         RingSystem(
                             atoms=comp_nodes,
@@ -635,16 +683,17 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                         )
                     )
                 else:
+                    fallback_path = numbered_paths[0] if numbered_paths else list(comp_nodes)
                     systems.append(
                         RingSystem(
                             atoms=comp_nodes,
                             is_polycycle=True,
-                            paths=[numbered_paths[0]],
+                            paths=[fallback_path],
                             ring_parent=RingParent.from_paths(
                                 kind="polycycle",
                                 atoms=comp_nodes,
                                 descriptor=None,
-                                paths=[numbered_paths[0]],
+                                paths=[fallback_path],
                             ),
                         )
                     )
@@ -823,6 +872,24 @@ def _audited_ring_paths(
     return _dedupe_numbering_paths(
         [list(numbering.path) for numbering in _audited_ring_numberings(mol, kind, descriptor_numbers, paths, edges)]
     )
+
+
+def _audited_von_baeyer_numberings(
+    mol: Molecule,
+    descriptor: str,
+    paths: list[list[int]] | tuple[tuple[int, ...], ...],
+    edges: frozenset[tuple[int, int]],
+):
+    audited = []
+    for path in paths:
+        numbering = build_von_baeyer_numbering(descriptor, path, edges, mol)
+        if numbering.audit_ok:
+            audited.append(numbering)
+    return _dedupe_ring_numberings(audited)
+
+
+def _is_von_baeyer_descriptor(descriptor: str) -> bool:
+    return is_von_baeyer_descriptor(descriptor)
 
 
 def _dedupe_ring_numberings(numberings):
@@ -1008,15 +1075,74 @@ def _edges_within_atoms(mol: Molecule, atoms: set[int]) -> set[tuple[int, int]]:
     return edges
 
 
-def _polyspiro_descriptor_or_von_baeyer(mol: Molecule, atoms: set[int], edges: set[tuple[int, int]]):
+def _polyspiro_or_von_baeyer_candidate(
+    mol: Molecule,
+    atoms: set[int],
+    edges: set[tuple[int, int]],
+) -> PolycycleDescriptorCandidate:
     dispiro = get_linear_dispiro_descriptor_and_paths(mol, atoms, edges)
     if dispiro is not None:
-        return dispiro
-    descriptor, paths = get_von_baeyer_descriptor_and_path(atoms, edges)
+        descriptor, paths = dispiro
+        return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
+    legacy_descriptor, legacy_paths = get_von_baeyer_descriptor_and_path(atoms, edges)
+    if legacy_descriptor and _is_von_baeyer_descriptor(legacy_descriptor):
+        legacy_numberings = tuple(_audited_von_baeyer_numberings(mol, legacy_descriptor, legacy_paths, frozenset(edges)))
+        if legacy_numberings:
+            return PolycycleDescriptorCandidate(
+                descriptor=legacy_descriptor,
+                paths=_dedupe_numbering_paths([list(numbering.path) for numbering in legacy_numberings]),
+                is_von_baeyer=True,
+                numberings=legacy_numberings,
+            )
+    # Spiro side-component discovery temporarily marks the shared atom as Si so
+    # the locant can be recovered from the generated side name.  That marker is
+    # not a real replacement heteroatom and must not participate in the new
+    # von Baeyer numbering tie-breakers.
+    if any(mol.atoms[atom].symbol == "Si" for atom in atoms):
+        descriptor, paths = get_von_baeyer_descriptor_and_path(atoms, edges)
+        if not descriptor or not _is_von_baeyer_descriptor(descriptor):
+            return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
+        numberings = tuple(_audited_von_baeyer_numberings(mol, descriptor, paths, frozenset(edges)))
+        return PolycycleDescriptorCandidate(
+            descriptor=descriptor,
+            paths=_dedupe_numbering_paths([list(numbering.path) for numbering in numberings]),
+            is_von_baeyer=True,
+            numberings=numberings,
+        )
+    audited_candidates = find_von_baeyer_candidates(mol, atoms, edges)
+    if audited_candidates:
+        descriptor = audited_candidates[0].descriptor
+        same_descriptor = tuple(candidate for candidate in audited_candidates if candidate.descriptor == descriptor)
+        numberings = []
+        if legacy_descriptor == descriptor:
+            numberings.extend(_audited_von_baeyer_numberings(mol, descriptor, legacy_paths, frozenset(edges)))
+        numberings.extend(candidate.numbering for candidate in same_descriptor)
+        numberings = _dedupe_ring_numberings(numberings)
+        return PolycycleDescriptorCandidate(
+            descriptor=descriptor,
+            paths=_dedupe_numbering_paths([list(numbering.path) for numbering in numberings]),
+            is_von_baeyer=True,
+            numberings=tuple(numberings),
+        )
+    descriptor, paths = legacy_descriptor, legacy_paths
     if not descriptor:
-        return descriptor, paths
-    audited_paths = [path for path in paths if audit_von_baeyer_descriptor(descriptor, path, edges).audit_ok]
-    return (descriptor, audited_paths) if audited_paths else (descriptor, paths)
+        return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
+    if not _is_von_baeyer_descriptor(descriptor):
+        return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
+    numberings = tuple(_audited_von_baeyer_numberings(mol, descriptor, paths, frozenset(edges)))
+    return PolycycleDescriptorCandidate(
+        descriptor=descriptor,
+        paths=_dedupe_numbering_paths([list(numbering.path) for numbering in numberings]),
+        is_von_baeyer=True,
+        numberings=numberings,
+    )
+
+
+def _polyspiro_descriptor_or_von_baeyer(mol: Molecule, atoms: set[int], edges: set[tuple[int, int]]):
+    """Legacy tuple wrapper for callers that have not migrated to candidates."""
+
+    candidate = _polyspiro_or_von_baeyer_candidate(mol, atoms, edges)
+    return candidate.descriptor, candidate.paths
 
 
 def _has_multiple_spiro_centers(nodes: set[int], edges: set[tuple[int, int]]) -> bool:

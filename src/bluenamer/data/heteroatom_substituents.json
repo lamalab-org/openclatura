@@ -133,6 +133,24 @@
       "alkoxy": 0,
       "peroxy": 0,
       "prefix": "selenonyl"
+    },
+    {
+      "symbol": "Te",
+      "oxo": 1,
+      "oxido": 0,
+      "hydroxy": 1,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "(hydroxy)(oxo)-lambda^4-tellanyl"
+    },
+    {
+      "symbol": "Te",
+      "oxo": 2,
+      "oxido": 0,
+      "hydroxy": 1,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "(hydroxy)dioxo-lambda^6-tellanyl"
     }
   ]
 }

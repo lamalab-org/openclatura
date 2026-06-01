@@ -78,7 +78,7 @@ def principal_involved_atoms(
         for group in perceived_groups:
             if group.key == principal_key and group.attachment_carbon in parent_path:
                 atoms.update(group.atoms_involved)
-                if group.key == "ring_aldehyde_hydrazone":
+                if group.key in {"ring_aldehyde_hydrazone", "ring_aldehyde_amidinohydrazone"}:
                     hydrazone_carbon = hydrazone_characteristic_carbon(mol, group)
                     if hydrazone_carbon is not None and hydrazone_carbon not in parent_path:
                         atoms.add(hydrazone_carbon)

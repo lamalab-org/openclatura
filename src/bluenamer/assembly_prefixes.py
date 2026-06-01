@@ -5,6 +5,7 @@ import re
 from .assembly_charge import inferred_ionic_retained_parent, single_charged_replacement_locants
 from .assembly_parts import AssemblyParts, SubstituentItem
 from .assembly_utils import is_fully_enclosed, needs_hyphen, parse_locant
+from .formatting import is_complex_prefix
 from .nomenclature import RULES
 from .retained_specs import retained_parent_spec
 from .rules import multipliers
@@ -151,7 +152,7 @@ def format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:
         attachments_per_group = 2 if ("diyl" in name and "ylidene" not in name) else 1
         count_raw = len(locs) if locs else len(items)
         count = max(1, count_raw // attachments_per_group)
-        is_complex = "(" in name or name[0].isdigit() or "-" in name or " " in name
+        is_complex = is_complex_prefix(name)
         mult = (multipliers.complex_(count) if is_complex else multipliers.basic(count)) if count > 1 else ""
         loc_str = substituent_locant_string(parts, locs, len(grouped), spiro_subs)
 

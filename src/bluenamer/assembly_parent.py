@@ -13,7 +13,7 @@ from .nomenclature import RULES
 from .principal_suffixes import render_principal_suffix
 from .retained_specs import retained_parent_spec
 from .ring_renderer import render_ring_descriptor
-from .rules import bonds, elision, stems
+from .rules import bonds, elision, multipliers, stems
 from .suffix_stack import suffix_operation_spelling
 
 UNSATURATION_ORDER = RULES.assembly.unsaturation_order
@@ -176,12 +176,36 @@ def format_principal_suffix(parts: AssemblyParts, terminal_e: str, spiro_subs) -
             omit_locant = True
 
     suffix_text = render_principal_suffix(group, len(locs))
+    if parts.principal_suffix_modifiers and group.key in RULES.functional_groups.keys_with_family("hydrazone"):
+        modifier_text = _format_principal_suffix_modifiers(parts)
+        if modifier_text and suffix_text.endswith("hydrazone"):
+            suffix_text = suffix_text[: -len("hydrazone")] + f"{modifier_text}hydrazone"
 
     if elision.is_vowel_start(suffix_text):
         terminal_e = ""
     if group.suffix_with_locant and locs and not omit_locant:
         return terminal_e, f"-{','.join(map(str, locs))}-{suffix_text}"
     return terminal_e, suffix_text
+
+
+def _format_principal_suffix_modifiers(parts: AssemblyParts) -> str:
+    grouped: dict[tuple[str, tuple[str, ...]], int] = {}
+    for modifier in parts.principal_suffix_modifiers:
+        key = (modifier.name, tuple(modifier.locants))
+        grouped[key] = grouped.get(key, 0) + 1
+    rendered = []
+    for name, locants in sorted(grouped):
+        locant_text = ""
+        if locants:
+            locant_text = f"{','.join(locants)}-"
+        count = grouped[(name, locants)]
+        if count > 1:
+            repeated_locants = locants * count
+            locant_text = f"{','.join(repeated_locants)}-" if repeated_locants else ""
+            rendered.append(f"{locant_text}{multipliers.basic(count)}{name}")
+        else:
+            rendered.append(f"{locant_text}{name}")
+    return "".join(rendered)
 
 
 def format_parent_tail(parts: AssemblyParts, stem_str: str, terminal_e: str, spiro_subs) -> tuple[str, str, str, str]:

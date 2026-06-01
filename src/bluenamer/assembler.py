@@ -17,6 +17,7 @@ from .assembly_prefixes import format_replacement_prefixes, format_substituent_p
 from .assembly_spiro import format_spiro_core, split_spiro_substituents
 from .assembly_utils import needs_hyphen, parse_locant
 from .formatting import ensure_stereo_descriptor_boundary, format_multiplier
+from .fused_ion_templates import consume_fused_ion_operation, select_fused_ion_operation
 from .name_postprocessing import (
     apply_acyl_amido_postprocessing,
     apply_connection_boundary_postprocessing,
@@ -290,8 +291,15 @@ def _add_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:
         if feature not in seen:
             seen.add(feature)
             unique_stereo.append(feature)
-    sorted_stereo = sorted(unique_stereo, key=lambda f: parse_locant(f[0]))
-    stereo_str = "(" + ",".join(f"{loc}{st}" for loc, st in sorted_stereo) + ")-"
+    unlocanted_descriptors = {descriptor for locant, descriptor in unique_stereo if not locant}
+    if unlocanted_descriptors:
+        unique_stereo = [
+            feature
+            for feature in unique_stereo
+            if not (feature[0] == "1" and feature[1] in unlocanted_descriptors)
+        ]
+    sorted_stereo = sorted(unique_stereo, key=lambda f: parse_locant(f[0]) if f[0] else (0, ""))
+    stereo_str = "(" + ",".join(f"{loc}{st}" if loc else st for loc, st in sorted_stereo) + ")-"
     return stereo_str + final_word
 
 
@@ -310,20 +318,27 @@ def post_process_name(name: str) -> str:
 
 
 def assemble_name_raw(parts: AssemblyParts) -> str:
+    fused_ion_candidate = select_fused_ion_operation(parts)
+    if fused_ion_candidate is not None:
+        consume_fused_ion_operation(parts, fused_ion_candidate)
+
     spiro_subs = split_spiro_substituents(parts)
     prefix_str = format_substituent_prefixes(parts, spiro_subs)
     a_prefix_str = format_replacement_prefixes(parts)
     promote_benzene_retained_name(parts)
-    stem_str, terminal_e = parent_stem_and_terminal(parts)
-    stem_str = apply_replacement_prefix(stem_str, a_prefix_str)
-    if parts.is_substituent:
-        stem_str, unsat_str, terminal_e, suffix_str = format_substituent_tail(parts, stem_str, terminal_e, spiro_subs)
+    if fused_ion_candidate is not None and fused_ion_candidate.rendered_name is not None:
+        core_name = fused_ion_candidate.rendered_name
     else:
-        stem_str, unsat_str, terminal_e, suffix_str = format_parent_tail(parts, stem_str, terminal_e, spiro_subs)
+        stem_str, terminal_e = parent_stem_and_terminal(parts)
+        stem_str = apply_replacement_prefix(stem_str, a_prefix_str)
+        if parts.is_substituent:
+            stem_str, unsat_str, terminal_e, suffix_str = format_substituent_tail(parts, stem_str, terminal_e, spiro_subs)
+        else:
+            stem_str, unsat_str, terminal_e, suffix_str = format_parent_tail(parts, stem_str, terminal_e, spiro_subs)
 
-    core_name, terminal_e = format_spiro_core(stem_str, unsat_str, terminal_e, spiro_subs)
-    core_name = _add_indicated_hydrogen_prefix(parts, core_name)
-    core_name += suffix_str
+        core_name, terminal_e = format_spiro_core(stem_str, unsat_str, terminal_e, spiro_subs)
+        core_name = _add_indicated_hydrogen_prefix(parts, core_name)
+        core_name += suffix_str
     parent_needs_prefix_hyphen = bool(
         prefix_str and positive_parent_n_charges(parts) and parts.retained_name and parts.indicated_hydrogens
     )
