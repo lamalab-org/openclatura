@@ -1,0 +1,1128 @@
+{
+  "format": "bluenamer.parser_xml_resource.v1",
+  "root": {
+    "attributes": {
+      "subType": "elementaryAtom",
+      "symbol": "\u00bb",
+      "tagname": "group",
+      "type": "simpleGroup"
+    },
+    "children": [
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1:1",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Li]"
+        },
+        "tag": "token",
+        "text": "lithium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1:1",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Na]"
+        },
+        "tag": "token",
+        "text": "sodium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1:1",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Na]"
+        },
+        "tag": "token",
+        "text": "natrium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1:1",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[K]"
+        },
+        "tag": "token",
+        "text": "potassium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1:1",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[K]"
+        },
+        "tag": "token",
+        "text": "kalium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1:1",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Rb]"
+        },
+        "tag": "token",
+        "text": "rubidium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1:1",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Cs]"
+        },
+        "tag": "token",
+        "text": "caesium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1:1",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Cs]"
+        },
+        "tag": "token",
+        "text": "cesium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1:1",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Fr]"
+        },
+        "tag": "token",
+        "text": "francium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2:2",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Be]"
+        },
+        "tag": "token",
+        "text": "beryllium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2:2",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Mg]"
+        },
+        "tag": "token",
+        "text": "magnesium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2:2",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ca]"
+        },
+        "tag": "token",
+        "text": "calcium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2:2",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Sr]"
+        },
+        "tag": "token",
+        "text": "strontium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2:2",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ba]"
+        },
+        "tag": "token",
+        "text": "barium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2:2",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ra]"
+        },
+        "tag": "token",
+        "text": "radium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Al]"
+        },
+        "tag": "token",
+        "text": "aluminium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Al]"
+        },
+        "tag": "token",
+        "text": "aluminum"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ga]"
+        },
+        "tag": "token",
+        "text": "gallium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[In]"
+        },
+        "tag": "token",
+        "text": "indium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1,3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Tl]"
+        },
+        "tag": "token",
+        "text": "thallium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Sn]"
+        },
+        "tag": "token",
+        "text": "tin"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Sn]"
+        },
+        "tag": "token",
+        "text": "stannum"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2,4:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Pb]"
+        },
+        "tag": "token",
+        "text": "lead"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2,4:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Pb]"
+        },
+        "tag": "token",
+        "text": "plumbum"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:5",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Bi]"
+        },
+        "tag": "token",
+        "text": "bismuth"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2,4:6",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Po]"
+        },
+        "tag": "token",
+        "text": "polonium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Sc]"
+        },
+        "tag": "token",
+        "text": "scandium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ti]"
+        },
+        "tag": "token",
+        "text": "titanium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "5:5",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[V]"
+        },
+        "tag": "token",
+        "text": "vanadium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3,6:6",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Cr]"
+        },
+        "tag": "token",
+        "text": "chromium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2,4,7:7",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Mn]"
+        },
+        "tag": "token",
+        "text": "manganese"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2,3:6",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Fe]"
+        },
+        "tag": "token",
+        "text": "iron"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2,3:5",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Co]"
+        },
+        "tag": "token",
+        "text": "cobalt"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ni]"
+        },
+        "tag": "token",
+        "text": "nickel"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Cu]"
+        },
+        "tag": "token",
+        "text": "copper"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2:2",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Zn]"
+        },
+        "tag": "token",
+        "text": "zinc"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Y]"
+        },
+        "tag": "token",
+        "text": "yttrium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Zr]"
+        },
+        "tag": "token",
+        "text": "zirconium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "5:5",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Nb]"
+        },
+        "tag": "token",
+        "text": "niobium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4,6:6",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Mo]"
+        },
+        "tag": "token",
+        "text": "molybdenum"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4,7:7",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Tc]"
+        },
+        "tag": "token",
+        "text": "technetium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3,4:8",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ru]"
+        },
+        "tag": "token",
+        "text": "ruthenium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:6",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Rh]"
+        },
+        "tag": "token",
+        "text": "rhodium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2,4:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Pd]"
+        },
+        "tag": "token",
+        "text": "palladium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ag]"
+        },
+        "tag": "token",
+        "text": "silver"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2:2",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Cd]"
+        },
+        "tag": "token",
+        "text": "cadmium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[La]"
+        },
+        "tag": "token",
+        "text": "lanthanum"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3,4:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ce]"
+        },
+        "tag": "token",
+        "text": "cerium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Pr]"
+        },
+        "tag": "token",
+        "text": "praseodymium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Nd]"
+        },
+        "tag": "token",
+        "text": "neodymium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Pm]"
+        },
+        "tag": "token",
+        "text": "promethium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Sm]"
+        },
+        "tag": "token",
+        "text": "samarium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Eu]"
+        },
+        "tag": "token",
+        "text": "europium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Gd]"
+        },
+        "tag": "token",
+        "text": "gadolinium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Tb]"
+        },
+        "tag": "token",
+        "text": "terbium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Dy]"
+        },
+        "tag": "token",
+        "text": "dysprosium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ho]"
+        },
+        "tag": "token",
+        "text": "holmium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Er]"
+        },
+        "tag": "token",
+        "text": "erbium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Tm]"
+        },
+        "tag": "token",
+        "text": "thulium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Yb]"
+        },
+        "tag": "token",
+        "text": "ytterbium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Lu]"
+        },
+        "tag": "token",
+        "text": "lutetium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Hf]"
+        },
+        "tag": "token",
+        "text": "hafnium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "5:5",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ta]"
+        },
+        "tag": "token",
+        "text": "tantalum"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4,6:6",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[W]"
+        },
+        "tag": "token",
+        "text": "tungsten"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4:7",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Re]"
+        },
+        "tag": "token",
+        "text": "rhenium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4:8",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Os]"
+        },
+        "tag": "token",
+        "text": "osmium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3,4:6",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ir]"
+        },
+        "tag": "token",
+        "text": "iridium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2,4:6",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Pt]"
+        },
+        "tag": "token",
+        "text": "platinum"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:5",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Au]"
+        },
+        "tag": "token",
+        "text": "gold"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1,2:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Hg]"
+        },
+        "tag": "token",
+        "text": "mercury"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1,2:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Hg]"
+        },
+        "tag": "token",
+        "text": "hydrargyrum"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ac]"
+        },
+        "tag": "token",
+        "text": "actinium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Th]"
+        },
+        "tag": "token",
+        "text": "thorium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "5:5",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Pa]"
+        },
+        "tag": "token",
+        "text": "protactinium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "6:6",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[U]"
+        },
+        "tag": "token",
+        "text": "uranium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "5:7",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Np]"
+        },
+        "tag": "token",
+        "text": "neptunium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4:7",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Pu]"
+        },
+        "tag": "token",
+        "text": "plutonium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:6",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Am]"
+        },
+        "tag": "token",
+        "text": "americium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Cm]"
+        },
+        "tag": "token",
+        "text": "curium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Bk]"
+        },
+        "tag": "token",
+        "text": "berkelium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Cf]"
+        },
+        "tag": "token",
+        "text": "californium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Es]"
+        },
+        "tag": "token",
+        "text": "einsteinium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Fm]"
+        },
+        "tag": "token",
+        "text": "fermium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Md]"
+        },
+        "tag": "token",
+        "text": "mendelevium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[No]"
+        },
+        "tag": "token",
+        "text": "nobelium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Lr]"
+        },
+        "tag": "token",
+        "text": "lawrencium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Rf]"
+        },
+        "tag": "token",
+        "text": "rutherfordium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[B]"
+        },
+        "tag": "token",
+        "text": "boron"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[C]"
+        },
+        "tag": "token",
+        "text": "carbon"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "4:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Si]"
+        },
+        "tag": "token",
+        "text": "silicon"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2,4:4",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ge]"
+        },
+        "tag": "token",
+        "text": "germanium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3:3",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[N]"
+        },
+        "tag": "token",
+        "text": "nitrogen"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3,5:5",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[P]"
+        },
+        "tag": "token",
+        "text": "phosphorus"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3,5:5",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[As]"
+        },
+        "tag": "token",
+        "text": "arsenic"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3,5:5",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Sb]"
+        },
+        "tag": "token",
+        "text": "antimony"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "3,5:5",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Sb]"
+        },
+        "tag": "token",
+        "text": "stibium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2:2",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[O]"
+        },
+        "tag": "token",
+        "text": "oxygen"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2,4,6:6",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[S]"
+        },
+        "tag": "token",
+        "text": "sulfur"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2,4,6:6",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Se]"
+        },
+        "tag": "token",
+        "text": "selenium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2,4,6:6",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Te]"
+        },
+        "tag": "token",
+        "text": "tellurium"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "2,4:6",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Po]"
+        },
+        "tag": "token",
+        "text": "polonium"
+      },
+      {
+        "attributes": {
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[F]"
+        },
+        "tag": "token",
+        "text": "fluorine"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1,3,5,7:7",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Cl]"
+        },
+        "tag": "token",
+        "text": "chlorine"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1,3,5,7:7",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Br]"
+        },
+        "tag": "token",
+        "text": "bromine"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1,3,5,7:7",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[I]"
+        },
+        "tag": "token",
+        "text": "iodine"
+      },
+      {
+        "attributes": {
+          "commonOxidationStatesAndMax": "1:5",
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[At]"
+        },
+        "tag": "token",
+        "text": "astatine"
+      },
+      {
+        "attributes": {
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[He]"
+        },
+        "tag": "token",
+        "text": "helium"
+      },
+      {
+        "attributes": {
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ne]"
+        },
+        "tag": "token",
+        "text": "neon"
+      },
+      {
+        "attributes": {
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Ar]"
+        },
+        "tag": "token",
+        "text": "argon"
+      },
+      {
+        "attributes": {
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Kr]"
+        },
+        "tag": "token",
+        "text": "krypton"
+      },
+      {
+        "attributes": {
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Xe]"
+        },
+        "tag": "token",
+        "text": "xenon"
+      },
+      {
+        "attributes": {
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "[Rn]"
+        },
+        "tag": "token",
+        "text": "radon"
+      }
+    ],
+    "tag": "tokenList"
+  },
+  "source_xml_file": "elementaryAtoms.xml"
+}

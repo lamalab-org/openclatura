@@ -54,6 +54,14 @@ from bluenamer.functional_groups import (
     register_perception_spec,
 )
 from bluenamer.graph_io import read_smiles
+from bluenamer.grammar_snapshot_data import (
+    local_grammar_snapshot,
+    oxoacid_ester_suffix_templates,
+    retained_fused_derivative_gate,
+    retained_fused_token,
+    retained_fused_token_status,
+    retained_fused_tokens,
+)
 from bluenamer.heteroatom_subgraphs import name_heteroatom_subgraph
 from bluenamer.heteroatom_substituent_specs import central_oxo_substituent_prefix, ligand_prefix, unsubstituted_prefix
 from bluenamer.heterocumulene_roles import nitrogen_heterocumulene_role
@@ -76,7 +84,7 @@ from bluenamer.name_postprocessing import (
 )
 from bluenamer.namer import _number_saturated_n_ring_for_spiro, _spiro_subgraph_assembly, name_component, name_subgraph
 from bluenamer.naming_audit import UnnamedAtomError, assert_component_fully_named, audit_charge_pair_templates
-from bluenamer.naming_data import namer_rules
+from bluenamer.naming_data import DATA_DIR, load_json_table, namer_rules
 from bluenamer.nitrogen_roles import (
     acid_derived_hydrazone_roles,
     azine_roles,
@@ -85,14 +93,6 @@ from bluenamer.nitrogen_roles import (
 )
 from bluenamer.oxoacid_roles import OxoLigandRole, central_oxo_roles, central_oxo_substituent_role
 from bluenamer.oxoacid_templates import OxoacidTemplateKind, oxoacid_role_template
-from bluenamer.opsin_resource_data import (
-    oxoacid_ester_suffix_templates,
-    opsin_resource_grammar,
-    retained_fused_derivative_gate,
-    retained_fused_token,
-    retained_fused_token_status,
-    retained_fused_tokens,
-)
 from bluenamer.numbering import NUMBERING_CRITERIA, NumberingPreference, polycycle_numbering_key
 from bluenamer.parent_pipeline import build_parent_assembly_plan
 from bluenamer.parent_selection import (
@@ -1650,8 +1650,8 @@ def test_retained_fused_graph_template_data_file_validates_guarded_core_entries(
     assert by_name["isoquinoline"].atom_by_locant["2"].symbol == "N"
 
 
-def test_opsin_resource_grammar_separates_tokens_from_production_gate():
-    grammar = opsin_resource_grammar()
+def test_parser_grammar_snapshot_separates_tokens_from_production_gate():
+    grammar = local_grammar_snapshot()
     gate = retained_fused_derivative_gate()
     tokens = grammar["retained_fused_tokens"]
 
@@ -1668,7 +1668,32 @@ def test_opsin_resource_grammar_separates_tokens_from_production_gate():
         assert retained_fused_token_status(parent) == "audit_only"
 
 
-def test_opsin_resource_retained_fused_gate_is_derived_from_token_status():
+def test_parser_grammar_snapshot_is_owned_runtime_data():
+    grammar = local_grammar_snapshot()
+    snapshot = local_grammar_snapshot()
+
+    assert grammar is snapshot
+    assert snapshot["source"]["format"] == "bluenamer.parser_grammar_snapshot.v1"
+    assert snapshot["source"]["resource_json_dir"] == "parser_xml_resources"
+    assert "resource_root" not in snapshot["source"]
+    assert "external_resource_path" not in snapshot["source"]
+    assert "retained_fused_tokens" in snapshot
+
+
+def test_parser_xml_resources_are_owned_json_datafiles():
+    resource_files = sorted((DATA_DIR / "parser_xml_resources").glob("*.json"))
+
+    assert len(resource_files) >= 39
+    assert not (DATA_DIR / "parser_xml_resources" / "index.json").exists()
+    inline_charge = load_json_table("parser_xml_resources/inlineChargeSuffixes.json")
+    assert inline_charge["source_xml_file"] == "inlineChargeSuffixes.xml"
+    assert inline_charge["root"]["attributes"]["type"] == "charge"
+    tokens = inline_charge["root"]["children"]
+    assert {token["text"] for token in tokens} >= {"ium", "ide", "uide"}
+    assert {token["attributes"]["value"] for token in tokens} >= {"ium", "ide", "ylium", "uide"}
+
+
+def test_parser_grammar_retained_fused_gate_is_derived_from_token_status():
     tokens = retained_fused_tokens()
     gate = retained_fused_derivative_gate()
 
@@ -1685,7 +1710,7 @@ def test_opsin_resource_retained_fused_gate_is_derived_from_token_status():
     assert gate.audit_only_parent_names == expected_audit_only
 
 
-def test_opsin_resource_tokens_cover_retained_fused_template_stems():
+def test_parser_grammar_tokens_cover_retained_fused_template_stems():
     templates = retained_fused_graph_templates(include_disabled=True)
 
     for template in templates:
@@ -1705,8 +1730,8 @@ def test_opsin_resource_tokens_cover_retained_fused_template_stems():
             assert not template.derivative_production_enabled
 
 
-def test_opsin_resource_grammar_records_charge_and_heteroatom_tokens():
-    grammar = opsin_resource_grammar()
+def test_parser_grammar_records_charge_and_heteroatom_tokens():
+    grammar = local_grammar_snapshot()
 
     assert grammar["charge_suffixes"]["canonical"] == ["ium", "ide", "ylium", "uide"]
     assert grammar["charge_suffixes"]["accepted_spellings"]["uide"] == ["uide", "uid"]
@@ -2539,6 +2564,35 @@ def test_stereochemistry_audit_checks_bound_substituent_terms():
     assert "0 R/S descriptors for 1 stereo atoms" in audit.issues[0]
 
 
+def test_unassigned_ring_stereo_tags_are_preserved_as_raw_metadata():
+    mol = read_smiles("C[C@H]1CC[C@@H](N)CC1")
+
+    raw_atoms = {atom.idx: atom.raw_stereo for atom in mol if atom.raw_stereo}
+
+    assert raw_atoms == {1: "CW", 4: "CW"}
+    assert all(mol.atoms[idx].stereo is None for idx in raw_atoms)
+
+
+def test_relative_ring_stereo_is_rendered_as_cis_trans_parent():
+    assert name_smiles("C[C@H]1CC[C@@H](N)CC1") == "cis-4-methylcyclohexanamine"
+    assert name_smiles("C[C@H]1CC[C@H](N)CC1") == "trans-4-methylcyclohexanamine"
+
+
+def test_relative_ring_stereo_is_rendered_inside_substituent():
+    assert name_smiles("CC(=O)N[C@H]1CC[C@@H](C)CC1") == "N-((1R,4s)-4-methylcyclohexyl)acetamide"
+
+
+def test_scoped_small_ring_stereo_renders_local_descriptors_for_cyclobutyl_substituent():
+    assert (
+        name_smiles("CN1CCC[C@](O)(CC(=O)N[C@]2(C)C[C@H](NC(=O)CCC3CC3)C2)C1")
+        == "3-cyclopropyl-N-((1R,3s)-3-(((3S)-3-hydroxy-1-methylpiperidin-3-yl)methylcarbonylamino)-3-methylcyclobutyl)propanamide"
+    )
+
+
+def test_dense_polycyclic_cage_fails_closed_without_von_baeyer_path_explosion():
+    assert name_smiles("C1C2CC34CC5CC67CC8CC9%10CC%11CC1%12C9C(C2)(C36)C58C(C%11)(C%124)C%107") == ""
+
+
 @pytest.mark.xfail(
     reason=(
         "Output depends on RDKit's aromaticity perception. On rdkit 2026.x "
@@ -3282,8 +3336,8 @@ def test_connection_boundary_regression_names_keep_unambiguous_attachment():
     cases = {
         "CCN([C@H](C)CO)S(=O)(=O)c1ccccc1": "(2R)-2-(N-ethylbenzenesulfonamido)propan-1-ol",
         "Cc1[nH+]c(cn1Cc2cc(cnc2)F)C(=O)OC": "methyl 1-((5-fluoropyridin-3-yl)methyl)-2-methyl-imidazol-3-ium-4-carboxylate",
-        "COc1c(cccc1)C2(CC2)C(=O)O[C@H]3C[C@H](C3)c4ccccc4": "3-phenylcyclobutyl 1-(2-methoxyphenyl)cyclopropanecarboxylate",
-        "CO[C@H]1C[C@H](C1)OC(=O)c2n(ncc2)C(F)F": "3-methoxycyclobutyl 1-(difluoromethyl)-1H-pyrazole-5-carboxylate",
+        "COc1c(cccc1)C2(CC2)C(=O)O[C@H]3C[C@H](C3)c4ccccc4": "(1S,3r)-3-phenylcyclobutyl 1-(2-methoxyphenyl)cyclopropanecarboxylate",
+        "CO[C@H]1C[C@H](C1)OC(=O)c2n(ncc2)C(F)F": "(1S,3r)-3-methoxycyclobutyl 1-(difluoromethyl)-1H-pyrazole-5-carboxylate",
     }
 
     for smiles, expected in cases.items():

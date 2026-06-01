@@ -6,14 +6,13 @@ from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 import py2opsin
 from datasets import load_dataset
-from bluenamer.namer import name_smiles
+from structure_to_iupac.namer import name_smiles
 from rdkit.Chem import CanonSmiles
 from tqdm import tqdm
-from utils import standardize_mol
 
 
 # --- Configuration ---
-N_TEST = 1000_000
+N_TEST = 5_000
 SEED = 42
 
 
@@ -21,7 +20,7 @@ def canon(smi):
     if not smi:
         return None
     try:
-        return standardize_mol(smi)
+        return CanonSmiles(smi)
     except Exception:
         return None
 
@@ -39,18 +38,20 @@ def main():
     # Optional, but avoids some noisy multiprocessing warnings from tokenizers/datasets
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    # 1. Load dataset and select random N using indices
-    print(f"Testing on {N_TEST} random molecules from the Pubchem dataset")
+    # 1. Load QM9 dataset and sample random molecules
+    print(f"Sampling {N_TEST} random molecules using .select()...")
+
     ds = load_dataset(
-        "jablonkagroup/pubchem-smiles-molecular-formula",
+        "yairschiff/qm9",
         split="train",
     )
 
-    indices = random.sample(range(len(ds)), N_TEST)
-    dataset = ds.select(indices)["smiles"]
+    # QM9 uses the "smiles" column
+    all_smiles = ds["smiles"]
 
-    # Convert to plain list before multiprocessing
-    dataset = list(dataset)
+    indices = random.sample(range(len(all_smiles)), min(N_TEST, len(all_smiles)))
+    dataset = [all_smiles[i] for i in indices]
+    #dataset = all_smiles
 
     # 2. Parallelize SMILES -> IUPAC
     print("Converting SMILES to IUPAC names...")

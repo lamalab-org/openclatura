@@ -76,6 +76,7 @@ class AssemblyParts:
     unsaturations: list[UnsaturationItem] = field(default_factory=list)
     substituents: list[SubstituentItem] = field(default_factory=list)
     stereo_features: list[tuple[str, str]] = field(default_factory=list)
+    relative_stereo_prefixes: list[str] = field(default_factory=list)
     indicated_hydrogens: list[str] = field(default_factory=list)
     hydro_operations: list[HydroOperation] = field(default_factory=list)
     parent_charges: list[ParentChargeItem] = field(default_factory=list)

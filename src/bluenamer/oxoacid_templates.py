@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from .molecule import Molecule
-from .opsin_resource_data import oxoacid_ester_suffix_templates
+from .grammar_snapshot_data import oxoacid_ester_suffix_templates
 from .oxoacid_roles import CentralOxoRole, OxoLigandRole
 
 

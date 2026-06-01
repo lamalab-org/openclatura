@@ -1,7 +1,8 @@
 {
   "source": {
-    "name": "OPSIN 1.2.0 resource grammar",
-    "resource_root": "opsin-core/src/main/resources/uk/ac/cam/ch/wwmm/opsin/resources",
+    "name": "BlueNamer parser grammar snapshot",
+    "format": "bluenamer.parser_grammar_snapshot.v1",
+    "resource_json_dir": "parser_xml_resources",
     "files": [
       "arylGroups.xml",
       "arylSubstituents.xml",
@@ -10,7 +11,7 @@
       "nonCarboxylicAcids.xml",
       "hwHeteroAtoms.xml"
     ],
-    "note": "This table records parser grammar facts observed in OPSIN resources. Production support is gated separately from token presence."
+    "note": "This checked-in JSON is the runtime grammar source. Runtime code does not import external parser internals or read external resource directories."
   },
   "retained_fused_derivative_gate": {
     "source_files": [
@@ -82,150 +83,315 @@
   },
   "retained_fused_tokens": {
     "naphthalene": {
-      "parent_stems": ["naphthalen"],
-      "substituent_stems": ["naphth", "naphthal"],
-      "fusion_stems": ["naphtho", "naphthaleno"],
+      "parent_stems": [
+        "naphthalen"
+      ],
+      "substituent_stems": [
+        "naphth",
+        "naphthal"
+      ],
+      "fusion_stems": [
+        "naphtho",
+        "naphthaleno"
+      ],
       "derivative_status": "production_safe"
     },
     "quinoline": {
-      "parent_stems": ["quinolin"],
-      "substituent_stems": ["quinol", "quinolin"],
-      "fusion_stems": ["quinolino"],
+      "parent_stems": [
+        "quinolin"
+      ],
+      "substituent_stems": [
+        "quinol",
+        "quinolin"
+      ],
+      "fusion_stems": [
+        "quinolino"
+      ],
       "derivative_status": "production_safe"
     },
     "isoquinoline": {
-      "parent_stems": ["isoquinolin"],
-      "substituent_stems": ["isoquinol", "isoquinolin"],
-      "fusion_stems": ["isoquinolino"],
+      "parent_stems": [
+        "isoquinolin"
+      ],
+      "substituent_stems": [
+        "isoquinol",
+        "isoquinolin"
+      ],
+      "fusion_stems": [
+        "isoquinolino"
+      ],
       "derivative_status": "production_safe"
     },
     "1,5-naphthyridine": {
-      "parent_stems": ["1,5-naphthyridin"],
-      "substituent_stems": ["1,5-naphthyridin"],
-      "fusion_stems": ["1,5-naphthyridino"],
+      "parent_stems": [
+        "1,5-naphthyridin"
+      ],
+      "substituent_stems": [
+        "1,5-naphthyridin"
+      ],
+      "fusion_stems": [
+        "1,5-naphthyridino"
+      ],
       "derivative_status": "production_safe"
     },
     "1,6-naphthyridine": {
-      "parent_stems": ["1,6-naphthyridin"],
-      "substituent_stems": ["1,6-naphthyridin"],
-      "fusion_stems": ["1,6-naphthyridino"],
+      "parent_stems": [
+        "1,6-naphthyridin"
+      ],
+      "substituent_stems": [
+        "1,6-naphthyridin"
+      ],
+      "fusion_stems": [
+        "1,6-naphthyridino"
+      ],
       "derivative_status": "production_safe"
     },
     "1,7-naphthyridine": {
-      "parent_stems": ["1,7-naphthyridin"],
-      "substituent_stems": ["1,7-naphthyridin"],
-      "fusion_stems": ["1,7-naphthyridino"],
+      "parent_stems": [
+        "1,7-naphthyridin"
+      ],
+      "substituent_stems": [
+        "1,7-naphthyridin"
+      ],
+      "fusion_stems": [
+        "1,7-naphthyridino"
+      ],
       "derivative_status": "production_safe"
     },
     "1,8-naphthyridine": {
-      "parent_stems": ["1,8-naphthyridin"],
-      "substituent_stems": ["1,8-naphthyridin"],
-      "fusion_stems": ["1,8-naphthyridino"],
+      "parent_stems": [
+        "1,8-naphthyridin"
+      ],
+      "substituent_stems": [
+        "1,8-naphthyridin"
+      ],
+      "fusion_stems": [
+        "1,8-naphthyridino"
+      ],
       "derivative_status": "production_safe"
     },
     "2,6-naphthyridine": {
-      "parent_stems": ["2,6-naphthyridin"],
-      "substituent_stems": ["2,6-naphthyridin"],
-      "fusion_stems": ["2,6-naphthyridino"],
+      "parent_stems": [
+        "2,6-naphthyridin"
+      ],
+      "substituent_stems": [
+        "2,6-naphthyridin"
+      ],
+      "fusion_stems": [
+        "2,6-naphthyridino"
+      ],
       "derivative_status": "production_safe"
     },
     "2,7-naphthyridine": {
-      "parent_stems": ["2,7-naphthyridin"],
-      "substituent_stems": ["2,7-naphthyridin"],
-      "fusion_stems": ["2,7-naphthyridino"],
+      "parent_stems": [
+        "2,7-naphthyridin"
+      ],
+      "substituent_stems": [
+        "2,7-naphthyridin"
+      ],
+      "fusion_stems": [
+        "2,7-naphthyridino"
+      ],
       "derivative_status": "production_safe"
     },
     "quinazoline": {
-      "parent_stems": ["quinazolin"],
-      "substituent_stems": ["quinazolin"],
-      "fusion_stems": ["quinazolino"],
+      "parent_stems": [
+        "quinazolin"
+      ],
+      "substituent_stems": [
+        "quinazolin"
+      ],
+      "fusion_stems": [
+        "quinazolino"
+      ],
       "derivative_status": "production_safe"
     },
     "quinoxaline": {
-      "parent_stems": ["quinoxalin"],
-      "substituent_stems": ["quinoxalin"],
-      "fusion_stems": ["quinoxalino"],
+      "parent_stems": [
+        "quinoxalin"
+      ],
+      "substituent_stems": [
+        "quinoxalin"
+      ],
+      "fusion_stems": [
+        "quinoxalino"
+      ],
       "derivative_status": "production_safe"
     },
     "cinnoline": {
-      "parent_stems": ["cinnolin"],
-      "substituent_stems": ["cinnolin"],
-      "fusion_stems": ["cinnolino"],
+      "parent_stems": [
+        "cinnolin"
+      ],
+      "substituent_stems": [
+        "cinnolin"
+      ],
+      "fusion_stems": [
+        "cinnolino"
+      ],
       "derivative_status": "production_safe"
     },
     "phthalazine": {
-      "parent_stems": ["phthalazin"],
-      "substituent_stems": ["phthalazin"],
-      "fusion_stems": ["phthalazino"],
+      "parent_stems": [
+        "phthalazin"
+      ],
+      "substituent_stems": [
+        "phthalazin"
+      ],
+      "fusion_stems": [
+        "phthalazino"
+      ],
       "derivative_status": "production_safe"
     },
     "azulene": {
-      "parent_stems": ["azulen"],
-      "substituent_stems": ["azul", "azulen"],
-      "fusion_stems": ["azuleno"],
+      "parent_stems": [
+        "azulen"
+      ],
+      "substituent_stems": [
+        "azul",
+        "azulen"
+      ],
+      "fusion_stems": [
+        "azuleno"
+      ],
       "derivative_status": "audit_only"
     },
     "1H-phenalene": {
-      "parent_stems": ["phenalen"],
-      "substituent_stems": ["phenal"],
-      "fusion_stems": ["phenaleno"],
+      "parent_stems": [
+        "phenalen"
+      ],
+      "substituent_stems": [
+        "phenal"
+      ],
+      "fusion_stems": [
+        "phenaleno"
+      ],
       "derivative_status": "audit_only",
-      "default_indicated_h": ["1"]
+      "default_indicated_h": [
+        "1"
+      ]
     },
     "acenaphthylene": {
-      "parent_stems": ["acenaphthylen"],
-      "substituent_stems": ["acenaphth"],
-      "fusion_stems": ["acenaphthyleno", "acenaphth", "acenaphtho"],
+      "parent_stems": [
+        "acenaphthylen"
+      ],
+      "substituent_stems": [
+        "acenaphth"
+      ],
+      "fusion_stems": [
+        "acenaphthyleno",
+        "acenaphth",
+        "acenaphtho"
+      ],
       "derivative_status": "audit_only"
     },
     "fluoranthene": {
-      "parent_stems": ["fluoranthen"],
-      "substituent_stems": ["fluoranthen"],
-      "fusion_stems": ["fluorantheno"],
+      "parent_stems": [
+        "fluoranthen"
+      ],
+      "substituent_stems": [
+        "fluoranthen"
+      ],
+      "fusion_stems": [
+        "fluorantheno"
+      ],
       "derivative_status": "audit_only"
     },
     "1H-perimidine": {
-      "parent_stems": ["perimidin"],
-      "substituent_stems": ["perimid", "perimidin"],
-      "fusion_stems": ["perimidino"],
+      "parent_stems": [
+        "perimidin"
+      ],
+      "substituent_stems": [
+        "perimid",
+        "perimidin"
+      ],
+      "fusion_stems": [
+        "perimidino"
+      ],
       "derivative_status": "audit_only",
-      "default_indicated_h": ["1"]
+      "default_indicated_h": [
+        "1"
+      ]
     },
     "pteridine": {
-      "parent_stems": ["pteridin"],
-      "substituent_stems": ["pterid", "pteridin"],
-      "fusion_stems": ["pteridino"],
+      "parent_stems": [
+        "pteridin"
+      ],
+      "substituent_stems": [
+        "pterid",
+        "pteridin"
+      ],
+      "fusion_stems": [
+        "pteridino"
+      ],
       "derivative_status": "audit_only"
     },
     "2H-isoindole": {
-      "parent_stems": ["isoindol"],
-      "substituent_stems": ["isoindol"],
-      "fusion_stems": ["isoindolo"],
+      "parent_stems": [
+        "isoindol"
+      ],
+      "substituent_stems": [
+        "isoindol"
+      ],
+      "fusion_stems": [
+        "isoindolo"
+      ],
       "derivative_status": "audit_only",
-      "default_indicated_h": ["2"]
+      "default_indicated_h": [
+        "2"
+      ]
     },
     "indolizine": {
-      "parent_stems": ["indolizin"],
-      "substituent_stems": ["indolizin"],
-      "fusion_stems": ["indolizino"],
+      "parent_stems": [
+        "indolizin"
+      ],
+      "substituent_stems": [
+        "indolizin"
+      ],
+      "fusion_stems": [
+        "indolizino"
+      ],
       "derivative_status": "audit_only"
     },
     "1H-indole": {
-      "parent_stems": ["indol"],
-      "substituent_stems": ["indol"],
-      "fusion_stems": ["indolo"],
+      "parent_stems": [
+        "indol"
+      ],
+      "substituent_stems": [
+        "indol"
+      ],
+      "fusion_stems": [
+        "indolo"
+      ],
       "derivative_status": "audit_only",
-      "default_indicated_h": ["1"]
+      "default_indicated_h": [
+        "1"
+      ]
     }
   },
   "charge_suffixes": {
     "source_file": "inlineChargeSuffixes.xml",
-    "canonical": ["ium", "ide", "ylium", "uide"],
+    "canonical": [
+      "ium",
+      "ide",
+      "ylium",
+      "uide"
+    ],
     "accepted_spellings": {
-      "ium": ["ium"],
-      "ide": ["ide", "id"],
-      "ylium": ["ylium", "(ylium)"],
-      "uide": ["uide", "uid"]
+      "ium": [
+        "ium"
+      ],
+      "ide": [
+        "ide",
+        "id"
+      ],
+      "ylium": [
+        "ylium",
+        "(ylium)"
+      ],
+      "uide": [
+        "uide",
+        "uid"
+      ]
     }
   },
   "hetero_replacement_priority": {

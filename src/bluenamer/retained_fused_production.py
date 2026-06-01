@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from .assembly_parts import SubstituentItem
 from .molecule import Molecule
-from .opsin_resource_data import retained_fused_derivative_gate
+from .grammar_snapshot_data import retained_fused_derivative_gate
 from .perception import PerceivedGroup
 from .retained_fused_templates import match_retained_fused_templates
 

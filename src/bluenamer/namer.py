@@ -227,6 +227,7 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
             idx=n,
             charge=atom.charge,
             stereo=atom.stereo,
+            raw_stereo=atom.raw_stereo,
             is_aromatic=atom.is_aromatic,
             explicit_h_count=atom.explicit_h_count,
             total_h_count=atom.total_h_count,

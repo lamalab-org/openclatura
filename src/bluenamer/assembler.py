@@ -303,6 +303,18 @@ def _add_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:
     return stereo_str + final_word
 
 
+def _add_relative_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:
+    if not parts.relative_stereo_prefixes:
+        return final_word
+    prefixes = []
+    seen = set()
+    for prefix in parts.relative_stereo_prefixes:
+        if prefix not in seen:
+            prefixes.append(prefix)
+            seen.add(prefix)
+    return "".join(f"{prefix}-" for prefix in prefixes) + final_word
+
+
 def _add_front_modifiers(parts: AssemblyParts, final_word: str) -> str:
     if not parts.front_modifiers:
         return final_word
@@ -348,6 +360,7 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
         else prefix_str + core_name
     )
     final_word = _add_stereo_prefix(parts, final_word)
+    final_word = _add_relative_stereo_prefix(parts, final_word)
     final_word = _add_front_modifiers(parts, final_word)
     return final_word
 

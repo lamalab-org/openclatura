@@ -1,0 +1,349 @@
+{
+  "format": "bluenamer.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "symbol": "\u2591",
+          "tagname": "chargeSpecifier"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "1"
+            },
+            "tag": "token",
+            "text": "(1+)"
+          },
+          {
+            "attributes": {
+              "value": "2"
+            },
+            "tag": "token",
+            "text": "(2+)"
+          },
+          {
+            "attributes": {
+              "value": "3"
+            },
+            "tag": "token",
+            "text": "(3+)"
+          },
+          {
+            "attributes": {
+              "value": "4"
+            },
+            "tag": "token",
+            "text": "(4+)"
+          },
+          {
+            "attributes": {
+              "value": "5"
+            },
+            "tag": "token",
+            "text": "(5+)"
+          },
+          {
+            "attributes": {
+              "value": "6"
+            },
+            "tag": "token",
+            "text": "(6+)"
+          },
+          {
+            "attributes": {
+              "value": "7"
+            },
+            "tag": "token",
+            "text": "(7+)"
+          },
+          {
+            "attributes": {
+              "value": "8"
+            },
+            "tag": "token",
+            "text": "(8+)"
+          },
+          {
+            "attributes": {
+              "value": "9"
+            },
+            "tag": "token",
+            "text": "(9+)"
+          },
+          {
+            "attributes": {
+              "value": "1"
+            },
+            "tag": "token",
+            "text": "(+1)"
+          },
+          {
+            "attributes": {
+              "value": "2"
+            },
+            "tag": "token",
+            "text": "(+2)"
+          },
+          {
+            "attributes": {
+              "value": "3"
+            },
+            "tag": "token",
+            "text": "(+3)"
+          },
+          {
+            "attributes": {
+              "value": "4"
+            },
+            "tag": "token",
+            "text": "(+4)"
+          },
+          {
+            "attributes": {
+              "value": "5"
+            },
+            "tag": "token",
+            "text": "(+5)"
+          },
+          {
+            "attributes": {
+              "value": "6"
+            },
+            "tag": "token",
+            "text": "(+6)"
+          },
+          {
+            "attributes": {
+              "value": "7"
+            },
+            "tag": "token",
+            "text": "(+7)"
+          },
+          {
+            "attributes": {
+              "value": "8"
+            },
+            "tag": "token",
+            "text": "(+8)"
+          },
+          {
+            "attributes": {
+              "value": "9"
+            },
+            "tag": "token",
+            "text": "(+9)"
+          },
+          {
+            "attributes": {
+              "value": "-1"
+            },
+            "tag": "token",
+            "text": "(-1)"
+          },
+          {
+            "attributes": {
+              "value": "-2"
+            },
+            "tag": "token",
+            "text": "(-2)"
+          },
+          {
+            "attributes": {
+              "value": "-3"
+            },
+            "tag": "token",
+            "text": "(-3)"
+          },
+          {
+            "attributes": {
+              "value": "-4"
+            },
+            "tag": "token",
+            "text": "(-4)"
+          },
+          {
+            "attributes": {
+              "value": "-5"
+            },
+            "tag": "token",
+            "text": "(-5)"
+          },
+          {
+            "attributes": {
+              "value": "-6"
+            },
+            "tag": "token",
+            "text": "(-6)"
+          },
+          {
+            "attributes": {
+              "value": "-7"
+            },
+            "tag": "token",
+            "text": "(-7)"
+          },
+          {
+            "attributes": {
+              "value": "-8"
+            },
+            "tag": "token",
+            "text": "(-8)"
+          },
+          {
+            "attributes": {
+              "value": "-9"
+            },
+            "tag": "token",
+            "text": "(-9)"
+          },
+          {
+            "attributes": {
+              "value": "-1"
+            },
+            "tag": "token",
+            "text": "(1-)"
+          },
+          {
+            "attributes": {
+              "value": "-2"
+            },
+            "tag": "token",
+            "text": "(2-)"
+          },
+          {
+            "attributes": {
+              "value": "-3"
+            },
+            "tag": "token",
+            "text": "(3-)"
+          },
+          {
+            "attributes": {
+              "value": "-4"
+            },
+            "tag": "token",
+            "text": "(4-)"
+          },
+          {
+            "attributes": {
+              "value": "-5"
+            },
+            "tag": "token",
+            "text": "(5-)"
+          },
+          {
+            "attributes": {
+              "value": "-6"
+            },
+            "tag": "token",
+            "text": "(6-)"
+          },
+          {
+            "attributes": {
+              "value": "-7"
+            },
+            "tag": "token",
+            "text": "(7-)"
+          },
+          {
+            "attributes": {
+              "value": "-8"
+            },
+            "tag": "token",
+            "text": "(8-)"
+          },
+          {
+            "attributes": {
+              "value": "-9"
+            },
+            "tag": "token",
+            "text": "(9-)"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u2591",
+          "tagname": "oxidationNumberSpecifier"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "0"
+            },
+            "tag": "token",
+            "text": "(0)"
+          },
+          {
+            "attributes": {
+              "value": "1"
+            },
+            "tag": "token",
+            "text": "(i)"
+          },
+          {
+            "attributes": {
+              "value": "2"
+            },
+            "tag": "token",
+            "text": "(ii)"
+          },
+          {
+            "attributes": {
+              "value": "3"
+            },
+            "tag": "token",
+            "text": "(iii)"
+          },
+          {
+            "attributes": {
+              "value": "4"
+            },
+            "tag": "token",
+            "text": "(iv)"
+          },
+          {
+            "attributes": {
+              "value": "5"
+            },
+            "tag": "token",
+            "text": "(v)"
+          },
+          {
+            "attributes": {
+              "value": "6"
+            },
+            "tag": "token",
+            "text": "(vi)"
+          },
+          {
+            "attributes": {
+              "value": "7"
+            },
+            "tag": "token",
+            "text": "(vii)"
+          },
+          {
+            "attributes": {
+              "value": "8"
+            },
+            "tag": "token",
+            "text": "(viii)"
+          },
+          {
+            "attributes": {
+              "value": "9"
+            },
+            "tag": "token",
+            "text": "(ix)"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "chargeAndOxidationNumberSpecifiers.xml"
+}

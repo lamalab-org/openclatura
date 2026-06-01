@@ -1564,6 +1564,7 @@ def anhydride_half_name(mol: Molecule, start_c: int, bridge_o: int, component_na
             idx=n,
             charge=atom.charge,
             stereo=atom.stereo,
+            raw_stereo=atom.raw_stereo,
             is_aromatic=atom.is_aromatic,
             explicit_h_count=atom.explicit_h_count,
             total_h_count=atom.total_h_count,

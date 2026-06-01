@@ -14,7 +14,7 @@ from typing import Any
 
 from .assembly_parts import AssemblyParts, NameAtomBinding
 from .naming_data import load_json_table
-from .opsin_resource_data import opsin_resource_grammar, retained_fused_token_status
+from .grammar_snapshot_data import local_grammar_snapshot, retained_fused_token_status
 
 
 @dataclass(frozen=True)
@@ -126,7 +126,7 @@ def _template_from_row(row: dict[str, Any]) -> FusedIonTemplate:
 
 
 def _validate_charge_suffix_vocabulary(templates: tuple[FusedIonTemplate, ...]) -> None:
-    allowed = set(opsin_resource_grammar()["charge_suffixes"]["canonical"]) | {"oxide"}
+    allowed = set(local_grammar_snapshot()["charge_suffixes"]["canonical"]) | {"oxide"}
     invalid = sorted(
         {
             template.suffix_or_prefix_form

@@ -13,7 +13,7 @@ from functools import lru_cache
 
 from .molecule import Molecule
 from .naming_data import load_json_table
-from .opsin_resource_data import RetainedFusedToken, retained_fused_token, retained_fused_token_status
+from .grammar_snapshot_data import RetainedFusedToken, retained_fused_token, retained_fused_token_status
 from .polycycle_topology import RingSystemTopology, edges_within_atoms, ring_system_topology
 from .retained_fused_templates import (
     RetainedFusedGraphTemplate,

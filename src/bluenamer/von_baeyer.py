@@ -14,6 +14,10 @@ from .molecule import Molecule
 from .polycycle_topology import RingNumbering, build_von_baeyer_numbering
 from .ring_renderer import render_von_baeyer_descriptor
 
+MAX_AUDITED_VON_BAEYER_RINGS = 8
+MAX_AUDITED_BRIDGEHEADS = 12
+MAX_PATHS_PER_BRIDGEHEAD_PAIR = 96
+
 
 @dataclass(frozen=True)
 class VonBaeyerBridge:
@@ -53,10 +57,14 @@ def find_von_baeyer_candidates(
     adjacency = _adjacency(atom_set, edge_set)
     ring_count = len(edge_set) - len(atom_set) + 1
     bridgeheads = tuple(sorted(atom for atom in atom_set if len(adjacency[atom]) >= 3))
+    if ring_count > MAX_AUDITED_VON_BAEYER_RINGS or len(bridgeheads) > MAX_AUDITED_BRIDGEHEADS:
+        return ()
     candidates: list[VonBaeyerCandidate] = []
 
     for first, second in combinations(bridgeheads, 2):
-        paths = _simple_paths_between(first, second, adjacency, max_paths=512)
+        paths = _simple_paths_between(first, second, adjacency, max_paths=MAX_PATHS_PER_BRIDGEHEAD_PAIR)
+        if len(paths) >= MAX_PATHS_PER_BRIDGEHEAD_PAIR:
+            continue
         for primary_paths in combinations(paths, 3):
             if not _paths_are_internally_disjoint(primary_paths):
                 continue

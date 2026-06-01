@@ -1,6 +1,6 @@
 """Shared parent planning steps for component and subgraph naming."""
 
-from .assembly_parts import AssemblyParts, ParentChargeItem
+from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem
 from .molecule import Molecule
 from .namer_config import RETAINED_RING_ELEMENTS
 from .naming_context import NamingIntent, ParentAssemblyPlan
@@ -8,6 +8,7 @@ from .numbering import choose_parent_numbering
 from .parent_selection import ParentSelection
 from .ring_renderer import is_von_baeyer_descriptor
 from .rules import retained
+from .small_ring_stereo import scoped_small_ring_stereo_features
 from .subgraph_tools import subgraph_locant_getter
 from .trace_helpers import bond_ids_within
 
@@ -135,6 +136,7 @@ def build_parent_parts(
                     atom_id=atom_idx,
                 )
             )
+    _add_relative_ring_stereo(mol, parts, numbered_path, get_loc)
     parent_set = set(numbered_path)
     for atom_idx in numbered_path:
         locant = str(get_loc(atom_idx))
@@ -145,6 +147,55 @@ def build_parent_parts(
                 if bond is not None:
                     parts.parent_bond_orders_by_locants[tuple(sorted((locant, neighbor_locant)))] = bond.order
     return parts
+
+
+def _add_relative_ring_stereo(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
+    """Render unassigned tetrahedral ring stereo as cis/trans for simple rings."""
+
+    if not parts.is_ring or parts.is_bicycle or parts.is_spiro or parts.is_polycycle:
+        return
+    scoped_features = scoped_small_ring_stereo_features(mol, parts, numbered_path, get_loc)
+    if scoped_features:
+        parts.stereo_features.extend(scoped_features)
+        parts.name_atom_bindings.append(
+            NameAtomBinding(
+                stage="assembly",
+                role="small_ring_stereo",
+                term=",".join(f"{locant}{descriptor}" for locant, descriptor in scoped_features),
+                atom_ids={atom_idx for atom_idx in numbered_path if mol.atoms[atom_idx].raw_stereo},
+                locants=tuple(locant for locant, _ in scoped_features),
+            )
+        )
+        return
+    raw_atoms = [
+        atom_idx
+        for atom_idx in numbered_path
+        if mol.atoms[atom_idx].raw_stereo and not mol.atoms[atom_idx].stereo
+    ]
+    if len(raw_atoms) != 2:
+        return
+
+    first, second = raw_atoms
+    first_tag = mol.atoms[first].raw_stereo
+    second_tag = mol.atoms[second].raw_stereo
+    if first_tag not in {"CW", "CCW"} or second_tag not in {"CW", "CCW"}:
+        return
+    parent_set = set(numbered_path)
+    if any(sum(1 for neighbor_idx in mol.get_neighbors(atom_idx) if neighbor_idx not in parent_set) != 1 for atom_idx in raw_atoms):
+        return
+
+    term = "cis" if first_tag == second_tag else "trans"
+    locants = tuple(str(get_loc(atom_idx)) for atom_idx in raw_atoms)
+    parts.relative_stereo_prefixes.append(term)
+    parts.name_atom_bindings.append(
+        NameAtomBinding(
+            stage="assembly",
+            role="relative_stereo",
+            term=term,
+            atom_ids=set(raw_atoms),
+            locants=locants,
+        )
+    )
 
 
 def _upstream_bond_order(mol: Molecule, start_idx: int, upstream_atom: int | None) -> int:
