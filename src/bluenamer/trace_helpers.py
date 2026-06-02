@@ -2,7 +2,7 @@
 
 from dataclasses import replace
 
-from .assembly_parts import AssemblyParts, SubstituentItem
+from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem
 from .formatting import strip_outer_parentheses
 from .molecule import DecisionTrace, Molecule, TracePhase
 from .nomenclature import RULES
@@ -68,6 +68,7 @@ def add_substituent_trace(
     bond_ids=None,
     charge_atom_ids=None,
     trace_segments=None,
+    emitted_tokens: tuple[NameTokenBinding, ...] = (),
     spiro=None,
 ) -> None:
     """Append or merge a substituent while preserving trace atom/bond IDs."""
@@ -85,6 +86,7 @@ def add_substituent_trace(
         existing.bond_ids.update(bond_ids)
         existing.charge_atom_ids.update(charge_atom_ids)
         existing.trace_segments.extend(trace_segments)
+        existing.emitted_tokens = existing.emitted_tokens + tuple(emitted_tokens)
     else:
         parts.substituents.append(
             SubstituentItem(
@@ -93,6 +95,7 @@ def add_substituent_trace(
                 atom_ids=atom_ids,
                 bond_ids=bond_ids,
                 charge_atom_ids=charge_atom_ids,
+                emitted_tokens=tuple(emitted_tokens),
                 trace_segments=trace_segments,
                 spiro=spiro,
             )

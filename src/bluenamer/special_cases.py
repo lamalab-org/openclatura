@@ -1503,7 +1503,7 @@ def organophosphinic_acid_result(mol: Molecule, component_atoms: set[int]) -> Sp
     carbon_roots = []
     for neighbor in mol.get_neighbors(central):
         if neighbor not in component_atoms:
-            return ""
+            return None
         symbol = mol.atoms[neighbor].symbol
         bond = mol.get_bond(central, neighbor)
         if symbol == "O" and bond and bond.order == 2:
@@ -1559,7 +1559,7 @@ def sulfoxide_parent_result(mol: Molecule, component_atoms: set[int]) -> Special
     carbon_roots = []
     for neighbor in mol.get_neighbors(central):
         if neighbor not in component_atoms:
-            return ""
+            return None
         symbol = mol.atoms[neighbor].symbol
         bond = mol.get_bond(central, neighbor)
         if symbol == "O" and bond and (bond.order == 2 or mol.atoms[neighbor].charge == -1):

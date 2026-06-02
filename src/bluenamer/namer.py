@@ -837,6 +837,7 @@ def _add_subgraph_substituents(parts: AssemblyParts, subst_mapping: dict[int, li
                 item.bond_ids,
                 item.charge_atom_ids,
                 item.trace_segments,
+                item.emitted_tokens,
                 spiro=item.spiro,
             )
 

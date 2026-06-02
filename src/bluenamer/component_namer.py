@@ -152,6 +152,7 @@ def add_component_substituents(
                     item.bond_ids,
                     item.charge_atom_ids,
                     item.trace_segments,
+                    item.emitted_tokens,
                     spiro=item.spiro,
                 )
 

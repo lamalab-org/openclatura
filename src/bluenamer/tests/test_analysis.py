@@ -20,6 +20,7 @@ from bluenamer.assembly_charge import parent_charge_operations
 from bluenamer.assembly_parts import (
     AssemblyParts,
     NameAtomBinding,
+    NameTokenBinding,
     ParentChargeItem,
     PrincipalGroupItem,
     SubstituentItem,
@@ -78,7 +79,7 @@ from bluenamer.ionic_naming import (
 )
 from bluenamer.locants import as_display_locant, coerce_display_numbering, locant_text, parse_locant
 from bluenamer.molecule import Molecule
-from bluenamer.name_bindings import postprocess_name_atom_bindings
+from bluenamer.name_bindings import postprocess_name_atom_bindings, refresh_name_atom_bindings
 from bluenamer.name_assembly import (
     FinalAssemblyAuditError,
     NameAssemblyResult,
@@ -141,10 +142,16 @@ from bluenamer.ring_systems import ring_system_fragment
 from bluenamer.rule_layout import rule_group_specs, rule_groups, section_group_map, unassigned_sections
 from bluenamer.rules.retained import get_retained_ring
 import bluenamer.rules.retained as retained_rules
-from bluenamer.special_cases import _alkyl_ligand_name, structural_replacement_parent_name
+from bluenamer.special_cases import (
+    _alkyl_ligand_name,
+    organophosphinic_acid_result,
+    structural_replacement_parent_name,
+    sulfoxide_parent_result,
+)
 from bluenamer.spiro_assembly import SpiroAssembly
 from bluenamer.stereo_audit import audit_stereochemistry
 from bluenamer.suffix_stack import SuffixStack
+from bluenamer.trace_helpers import add_substituent_trace
 from bluenamer.von_baeyer import _classify_secondary_bridges, find_von_baeyer_candidates
 
 
@@ -196,6 +203,53 @@ def test_component_coverage_audit_rejects_unnamed_atoms():
 
     with pytest.raises(UnnamedAtomError):
         assert_component_fully_named(mol, {0, 1}, parts, "methane")
+
+
+def test_typed_shortcut_results_return_none_on_out_of_component_neighbors():
+    phosphinic = Molecule()
+    phosphinic.add_atom("P", 0, explicit_h_count=1)
+    phosphinic.add_atom("C", 1)
+    phosphinic.add_atom("O", 2)
+    phosphinic.add_atom("O", 3)
+    phosphinic.add_bond(0, 1, order=1)
+    phosphinic.add_bond(0, 2, order=2)
+    phosphinic.add_bond(0, 3, order=1)
+
+    assert organophosphinic_acid_result(phosphinic, {0, 2, 3}) is None
+
+    sulfoxide = Molecule()
+    sulfoxide.add_atom("S", 0)
+    sulfoxide.add_atom("C", 1)
+    sulfoxide.add_atom("C", 2)
+    sulfoxide.add_atom("O", 3)
+    sulfoxide.add_atom("C", 4)
+    sulfoxide.add_bond(0, 1, order=1)
+    sulfoxide.add_bond(0, 2, order=1)
+    sulfoxide.add_bond(0, 3, order=2)
+    sulfoxide.add_bond(0, 4, order=1)
+
+    assert sulfoxide_parent_result(sulfoxide, {0, 1, 2, 3}) is None
+
+
+def test_add_substituent_trace_preserves_emitted_tokens_into_bindings():
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0})
+    emitted_tokens = (
+        NameTokenBinding(text="ethyl", atom_ids={1, 2}, bond_ids={1}),
+        NameTokenBinding(text="amino", atom_ids={3}, bond_ids={2}),
+    )
+
+    add_substituent_trace(
+        parts,
+        "ethylamino",
+        "1",
+        atom_ids={1, 2, 3},
+        bond_ids={1, 2},
+        emitted_tokens=emitted_tokens,
+    )
+    bindings = refresh_name_atom_bindings(parts)
+    substituent_binding = next(binding for binding in bindings if binding.role == "substituent")
+
+    assert substituent_binding.emitted_tokens == emitted_tokens
 
 
 def test_analysis_carries_name_atom_bindings():
