@@ -66,6 +66,7 @@ def add_substituent_trace(
     locant: str,
     atom_ids=None,
     bond_ids=None,
+    charge_atom_ids=None,
     trace_segments=None,
     spiro=None,
 ) -> None:
@@ -73,6 +74,7 @@ def add_substituent_trace(
 
     atom_ids = set(atom_ids or ())
     bond_ids = set(bond_ids or ())
+    charge_atom_ids = set(charge_atom_ids or ())
     trace_segments = list(trace_segments or ())
     if spiro is not None:
         spiro = replace(spiro, parent_locant=str(locant))
@@ -81,6 +83,7 @@ def add_substituent_trace(
         existing.locants.append(locant)
         existing.atom_ids.update(atom_ids)
         existing.bond_ids.update(bond_ids)
+        existing.charge_atom_ids.update(charge_atom_ids)
         existing.trace_segments.extend(trace_segments)
     else:
         parts.substituents.append(
@@ -89,6 +92,7 @@ def add_substituent_trace(
                 locants=[locant],
                 atom_ids=atom_ids,
                 bond_ids=bond_ids,
+                charge_atom_ids=charge_atom_ids,
                 trace_segments=trace_segments,
                 spiro=spiro,
             )
@@ -145,6 +149,7 @@ def assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
             target.locants.extend(item.locants)
             target.atom_ids.update(item.atom_ids)
             target.bond_ids.update(item.bond_ids)
+            target.charge_atom_ids.update(item.charge_atom_ids)
             target.trace_segments.extend(item.trace_segments)
         for item in grouped.values():
             if item.trace_segments and strip_outer_parentheses(item.name) != "methyl":
@@ -171,6 +176,7 @@ def assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
             target.locants.extend(item.locants)
             target.atom_ids.update(item.atom_ids)
             target.bond_ids.update(item.bond_ids)
+            target.charge_atom_ids.update(item.charge_atom_ids)
         for item in grouped_a.values():
             segments.append(
                 {

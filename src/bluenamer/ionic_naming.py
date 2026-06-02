@@ -489,12 +489,37 @@ def apply_parent_anion_rule(name: str, site: ParentChargeSite, context: ParentCh
     updated = apply_carbaldehyde_suffix_ide(updated, negative_locants)
     updated = apply_nitrile_suffix_ide(updated, negative_locants)
     updated = apply_terminal_characteristic_suffix_ide(updated, negative_locants)
+    updated = apply_substituent_parent_yl_ide(updated, negative_locants)
     if updated != name:
         return updated
     updated = apply_retained_parent_ide(name, context.retained_name, negative_locants)
     if updated != name:
         return updated
     return apply_terminal_parent_ide(name, negative_locants)
+
+
+def apply_substituent_parent_yl_ide(name: str, negative_locants: dict[str, set[str]]) -> str:
+    """Insert parent ``-ide`` before a matching locanted substituent ``-yl``.
+
+    This is a class-specific grammar path for charged substituent parents such
+    as ``...propan-2-yl`` where the graph-proven anionic atom is locant 2.
+    OPSIN accepts ``...propan-2-ide-2-yl`` for that class. It is intentionally
+    narrower than a terminal ``-<locant>-ide`` fallback.
+    """
+
+    updated = name
+    for locant, symbols in sorted(negative_locants.items(), key=lambda item: _locant_sort_key(item[0])):
+        if "C" not in symbols:
+            continue
+        pattern = re.compile(
+            rf"(?P<stem>[A-Za-z0-9,\-\[\]\^\{{\}}]+?an)-{re.escape(locant)}-yl\b"
+        )
+        updated = pattern.sub(
+            lambda match: f"{match.group('stem')}-{locant}-ide-{locant}-yl",
+            updated,
+            count=1,
+        )
+    return updated
 
 
 def apply_terminal_parent_ide(name: str, negative_locants: dict[str, set[str]]) -> str:
@@ -593,6 +618,25 @@ def apply_cationic_imino_names(name: str, mol: Molecule) -> str:
     name = name.replace("(imino)methyl", "(iminio)methyl")
     name = name.replace("iminomethyl", "iminiomethyl")
     return name
+
+
+def apply_cationic_imino_parent_prefixes(name: str, mol: Molecule, numbered_path: list[int], get_loc) -> str:
+    """Convert locanted imino prefixes to iminio when the imino N is cationic."""
+
+    updated = name
+    parent_set = set(numbered_path)
+    for atom_idx, atom in mol.atoms.items():
+        if atom.symbol != "N" or atom.charge <= 0:
+            continue
+        for neighbor in mol.get_neighbors(atom_idx):
+            if neighbor not in parent_set:
+                continue
+            bond = mol.get_bond(atom_idx, neighbor)
+            if bond is None or bond.order != 2 or not mol.atoms[neighbor].is_carbon:
+                continue
+            locant = str(get_loc(neighbor))
+            updated = re.sub(rf"(?<![A-Za-z0-9]){re.escape(locant)}-imino\b", f"{locant}-iminio", updated)
+    return updated
 
 
 def carbon_has_two_hetero_substituents(mol: Molecule, carbon_idx: int, imino_n_idx: int) -> bool:

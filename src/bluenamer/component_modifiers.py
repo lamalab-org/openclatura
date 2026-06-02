@@ -38,8 +38,10 @@ def add_component_front_modifiers(
             continue
         branch_name = branch_namer(mol, r_group_c, sub_exclude | {single_o}, upstream_atom=single_o)
         if branch_name:
+            modifier_atoms = subgraph_component(mol, r_group_c, sub_exclude | {single_o})
             parts.front_modifiers.append(strip_outer_parentheses(branch_name))
-            parts.front_modifier_atom_ids.update(subgraph_component(mol, r_group_c, sub_exclude | {single_o}))
+            parts.front_modifier_atom_ids.update(modifier_atoms)
+            parts.front_modifier_charge_atom_ids.update(_charged_atoms(mol, modifier_atoms))
 
 
 def n_substituent_locant(
@@ -105,6 +107,7 @@ def add_component_n_substituents(
                                 [],
                                 atom_ids=branch_atoms,
                                 bond_ids=bond_ids_within(mol, branch_atoms | {single_n}),
+                                charge_atom_ids=_charged_atoms(mol, branch_atoms),
                                 trace_segments=branch_trace,
                             )
                         )
@@ -115,9 +118,16 @@ def add_component_n_substituents(
                         loc_prefix,
                         branch_atoms,
                         bond_ids_within(mol, branch_atoms | {single_n}),
+                        _charged_atoms(mol, branch_atoms),
                         branch_trace,
                     )
             n_idx_global += 1
+
+
+def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
+    """Return formally charged atoms from an already named graph fragment."""
+
+    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
 
 
 def _nitrogen_substituent_name(

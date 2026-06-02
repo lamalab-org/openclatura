@@ -11,7 +11,7 @@ from .engine import DEFAULT_NAMING_ENGINE
 from .formatting import format_counted_prefixes, format_multiplier, strip_outer_parentheses
 from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
-from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names
+from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
 from .molecule import DecisionTrace, Molecule, NameAnalysis
 from .name_assembly import NameAssemblyResult
 from .namer_config import (
@@ -761,6 +761,7 @@ def _collect_subgraph_substituents(
                         locants=[],
                         atom_ids=set(group.atoms_involved),
                         bond_ids=_bond_ids_within(mol, set(group.atoms_involved) | {group.attachment_carbon}),
+                        charge_atom_ids=_charged_atoms(mol, set(group.atoms_involved)),
                     )
                 )
                 sub_handled_atoms.update(group.atoms_involved)
@@ -781,6 +782,7 @@ def _collect_subgraph_substituents(
                     locants=[],
                     atom_ids=sub_comp - {c_idx},
                     bond_ids=_bond_ids_within(mol, sub_comp),
+                    charge_atom_ids=_charged_atoms(mol, sub_comp - {c_idx}),
                     spiro=_spiro_subgraph_assembly(mol, c_idx, sub_comp),
                 )
             )
@@ -801,6 +803,7 @@ def _collect_subgraph_substituents(
                             locants=[],
                             atom_ids=branch_atoms,
                             bond_ids=_bond_ids_within(mol, branch_with_attachment),
+                            charge_atom_ids=_charged_atoms(mol, branch_atoms),
                             trace_segments=branch_trace,
                         )
                     )
@@ -824,9 +827,16 @@ def _add_subgraph_substituents(parts: AssemblyParts, subst_mapping: dict[int, li
                 locant,
                 item.atom_ids,
                 item.bond_ids,
+                item.charge_atom_ids,
                 item.trace_segments,
                 spiro=item.spiro,
             )
+
+
+def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
+    """Return formally charged atoms from an already named graph fragment."""
+
+    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
 
 
 def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
@@ -865,17 +875,32 @@ def _assemble_parent_name(
     """Assemble a parent name and apply shared post-assembly charge rules."""
 
     name = assemble_name_raw(parts)
+    rewrites = []
     if finalize_subgraph:
-        carbanion_name = _simple_rooted_carbanion_substituent_name(mol, parts, numbered_path, get_loc)
-        if carbanion_name:
-            name = carbanion_name
-    if finalize_subgraph:
-        name = _finalize_subgraph_name(name, parts)
-    name = apply_anionic_parent_names(name, mol, numbered_path, get_loc, parts.retained_name)
-    name = apply_cationic_imino_names(name, mol)
+        rewrites.append(
+            (
+                "simple_rooted_carbanion_substituent_name",
+                lambda text: _simple_rooted_carbanion_substituent_name(mol, parts, numbered_path, get_loc) or text,
+            )
+        )
+        rewrites.append(("finalize_subgraph_name", lambda text: _finalize_subgraph_name(text, parts)))
+    rewrites.extend(
+        (
+            (
+                "apply_anionic_parent_names",
+                lambda text: apply_anionic_parent_names(text, mol, numbered_path, get_loc, parts.retained_name),
+            ),
+            (
+                "apply_cationic_imino_parent_prefixes",
+                lambda text: apply_cationic_imino_parent_prefixes(text, mol, numbered_path, get_loc),
+            ),
+            ("apply_cationic_imino_names", lambda text: apply_cationic_imino_names(text, mol)),
+        )
+    )
     if apply_special_component_names:
-        name = SPECIAL_COMPONENT_NAMES.get(name, name)
-    result = NameAssemblyResult.from_raw_name(name, parts.name_atom_bindings, postprocess=post_process_name)
+        rewrites.append(("special_component_names", lambda text: SPECIAL_COMPONENT_NAMES.get(text, text)))
+    rewrites.append(("post_process_name", post_process_name))
+    result = NameAssemblyResult.from_rewrite_pipeline(name, parts.name_atom_bindings, rewrites=tuple(rewrites))
     parts.name_atom_bindings = list(result.bindings)
     parts.name_rewrite_history = [
         {

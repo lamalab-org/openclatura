@@ -81,6 +81,7 @@ from bluenamer.name_bindings import postprocess_name_atom_bindings
 from bluenamer.name_assembly import (
     FinalAssemblyAuditError,
     NameAssemblyResult,
+    audit_final_name_assembly,
     assert_final_name_assembly,
 )
 from bluenamer.name_operations import HydroOperation, ParentSuffixOperation
@@ -201,6 +202,46 @@ def test_name_assembly_result_preserves_binding_metadata_through_postprocessing(
     assert result.rewrite_history[0].changed_binding_count == 1
 
 
+def test_name_assembly_result_tracks_named_rewrite_pipeline():
+    bindings = [NameAtomBinding(stage="suffix", role="acid", term="ethanoic acid", atom_ids={0, 1, 2})]
+
+    result = NameAssemblyResult.from_rewrite_pipeline(
+        "ethanoic acid",
+        bindings,
+        rewrites=(
+            ("retained_acid_name", lambda text: text.replace("ethanoic acid", "acetic acid")),
+            ("noop", lambda text: text),
+        ),
+    )
+
+    assert result.text == "acetic acid"
+    assert result.bindings[0].term == "acetic acid"
+    assert [operation.name for operation in result.rewrite_history] == ["retained_acid_name", "noop"]
+    assert result.rewrite_history[0].changed_binding_count == 1
+    assert result.rewrite_history[1].changed_binding_count == 0
+
+
+def test_contextual_postprocessing_updates_absorbed_binding_terms():
+    bindings = [
+        NameAtomBinding(stage="prefix", role="substituent", term="hydroxy", atom_ids={2}),
+        NameAtomBinding(stage="suffix", role="amide", term="methanamide", atom_ids={0, 1, 3}),
+    ]
+
+    result = NameAssemblyResult.from_raw_name("hydroxymethanamide", bindings, postprocess=post_process_name)
+
+    assert result.text == "carbamic acid"
+    assert {binding.term for binding in result.bindings} == {"carbamic acid"}
+
+    carbonate = NameAssemblyResult.from_raw_name(
+        "hydroxymethanoate",
+        [NameAtomBinding(stage="prefix", role="substituent", term="hydroxy", atom_ids={0})],
+        postprocess=post_process_name,
+    )
+
+    assert carbonate.text == "carbonate"
+    assert carbonate.bindings[0].term == "carbonate"
+
+
 def test_assemble_name_result_updates_parts_bindings():
     parts = AssemblyParts(parent_length=2, parent_atom_ids={0, 1})
 
@@ -240,6 +281,93 @@ def test_final_assembly_audit_rejects_missing_consumed_bond_metadata():
 
     with pytest.raises(FinalAssemblyAuditError):
         assert_final_name_assembly(mol, {0, 1}, parts, result)
+
+
+def test_final_assembly_audit_rejects_charged_atoms_without_charge_binding():
+    mol = Molecule()
+    mol.add_atom("N", 0, charge=1)
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0})
+    result = NameAssemblyResult.from_final_name(
+        "azane",
+        [NameAtomBinding(stage="parent", role="parent", term="azane", atom_ids={0})],
+    )
+
+    with pytest.raises(FinalAssemblyAuditError):
+        assert_final_name_assembly(mol, {0}, parts, result)
+
+
+def test_final_assembly_audit_accepts_explicit_charge_binding_metadata():
+    mol = Molecule()
+    mol.add_atom("N", 0, charge=1)
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0})
+    result = NameAssemblyResult.from_final_name(
+        "azanium",
+        [
+            NameAtomBinding(
+                stage="parent",
+                role="parent",
+                term="azanium",
+                atom_ids={0},
+                charge_atom_ids={0},
+            )
+        ],
+    )
+
+    audit = audit_final_name_assembly(mol, {0}, parts, result)
+
+    assert audit.ok
+
+
+def test_final_assembly_audit_does_not_infer_charge_from_name_words():
+    mol = Molecule()
+    mol.add_atom("N", 0, charge=1)
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0})
+    result = NameAssemblyResult.from_final_name(
+        "azanium",
+        [NameAtomBinding(stage="parent", role="parent", term="azanium", atom_ids={0})],
+    )
+
+    with pytest.raises(FinalAssemblyAuditError):
+        assert_final_name_assembly(mol, {0}, parts, result)
+
+
+def test_final_assembly_audit_rejects_stale_binding_text():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("C", 1)
+    mol.add_bond(0, 1, order=1)
+    parts = AssemblyParts(parent_length=2, parent_atom_ids={0, 1}, parent_bond_ids={0})
+    result = NameAssemblyResult.from_final_name(
+        "ethane",
+        [NameAtomBinding(stage="parent", role="parent", term="propane", atom_ids={0, 1}, bond_ids={0})],
+    )
+
+    with pytest.raises(FinalAssemblyAuditError):
+        assert_final_name_assembly(mol, {0, 1}, parts, result)
+
+
+def test_final_assembly_audit_accepts_retained_ionic_parent_morphology():
+    mol = Molecule()
+    for idx, symbol in enumerate(["C", "O", "C", "N", "C"]):
+        charge = -1 if idx == 3 else 0
+        mol.add_atom(symbol, idx, charge=charge)
+    parts = AssemblyParts(parent_length=5, parent_atom_ids={0, 1, 2, 3, 4})
+    result = NameAssemblyResult.from_final_name(
+        "oxazolidine-3-ide",
+        [
+            NameAtomBinding(
+                stage="parent",
+                role="parent",
+                term="1,3-oxazolidin-3-ide",
+                atom_ids={0, 1, 2, 3, 4},
+                charge_atom_ids={3},
+            )
+        ],
+    )
+
+    audit = audit_final_name_assembly(mol, {0, 1, 2, 3, 4}, parts, result)
+
+    assert audit.ok
 
 
 def test_stereo_descriptor_boundary_is_inserted_before_substituent_stems():
@@ -3232,6 +3360,7 @@ def test_pyopsin_regression_names_keep_formate_esters_principal():
     cases = {
         "O=COCC#N": "2-nitriloethyl formate",
         "O=COCCC#N": "3-nitrilopropyl formate",
+        "NC(=[NH2+])[C-](OC=O)C#N": "1-amino-1-iminio-3-nitrilopropan-2-ide-2-yl formate",
     }
 
     for smiles, expected in cases.items():

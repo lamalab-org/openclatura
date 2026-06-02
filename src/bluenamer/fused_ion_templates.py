@@ -311,6 +311,7 @@ def _replace_fused_ion_bindings(parts: AssemblyParts, candidate: FusedIonOperati
             term=template.opsin_grammar_name,
             atom_ids=set(candidate.represented_atom_ids),
             bond_ids=set(candidate.represented_bond_ids),
+            charge_atom_ids=set(candidate.represented_atom_ids),
             locants=template.allowed_locants,
         )
     )

@@ -12,6 +12,7 @@ class SubstituentItem:
     locants: list[str]
     atom_ids: set[int] = field(default_factory=set)
     bond_ids: set[int] = field(default_factory=set)
+    charge_atom_ids: set[int] = field(default_factory=set)
     trace_segments: list[dict] = field(default_factory=list)
     spiro: SpiroAssembly | None = None
 
@@ -30,6 +31,7 @@ class PrincipalGroupItem:
     locants: list[str]
     atom_ids: set[int] = field(default_factory=set)
     bond_ids: set[int] = field(default_factory=set)
+    charge_atom_ids: set[int] = field(default_factory=set)
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,7 @@ class NameAtomBinding:
     term: str
     atom_ids: set[int] = field(default_factory=set)
     bond_ids: set[int] = field(default_factory=set)
+    charge_atom_ids: set[int] = field(default_factory=set)
     locants: tuple[str, ...] = ()
 
 
@@ -70,6 +73,7 @@ class AssemblyParts:
     retained_name: str | None = None
     front_modifiers: list[str] = field(default_factory=list)
     front_modifier_atom_ids: set[int] = field(default_factory=set)
+    front_modifier_charge_atom_ids: set[int] = field(default_factory=set)
     principal_suffix_modifiers: list[SubstituentItem] = field(default_factory=list)
     a_prefixes: list[SubstituentItem] = field(default_factory=list)
     principal_group: PrincipalGroupItem | None = None

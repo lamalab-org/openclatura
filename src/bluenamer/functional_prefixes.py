@@ -231,7 +231,13 @@ def collect_component_prefix_substituents(
                         trace_atoms.update(subgraph_component(mol, neighbor, context.sub_exclude | {atom_idx}))
             trace_bonds = bond_ids_within(mol, trace_atoms | {group.attachment_carbon})
             subst_mapping.setdefault(group.attachment_carbon, []).append(
-                SubstituentItem(name=name, locants=[], atom_ids=trace_atoms, bond_ids=trace_bonds)
+                SubstituentItem(
+                    name=name,
+                    locants=[],
+                    atom_ids=trace_atoms,
+                    bond_ids=trace_bonds,
+                    charge_atom_ids={atom_idx for atom_idx in trace_atoms if mol.atoms[atom_idx].charge != 0},
+                )
             )
             handled_prefix_atoms.update(group.atoms_involved)
 

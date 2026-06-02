@@ -94,6 +94,7 @@ def collect_component_branch_substituents(
                     locants=[],
                     atom_ids=sub_comp - {c_idx},
                     bond_ids=bond_ids_within(mol, sub_comp),
+                    charge_atom_ids=_charged_atoms(mol, sub_comp - {c_idx}),
                     spiro=name_spiro_subgraph(mol, c_idx, sub_comp),
                 )
             )
@@ -113,6 +114,7 @@ def collect_component_branch_substituents(
                             locants=[],
                             atom_ids=branch_atoms,
                             bond_ids=bond_ids_within(mol, branch_atoms | {c_idx}),
+                            charge_atom_ids=_charged_atoms(mol, branch_atoms),
                             trace_segments=branch_trace,
                         )
                     )
@@ -133,9 +135,16 @@ def add_component_substituents(
                     locant,
                     item.atom_ids,
                     item.bond_ids,
+                    item.charge_atom_ids,
                     item.trace_segments,
                     spiro=item.spiro,
                 )
+
+
+def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
+    """Return formally charged atoms from an already named graph fragment."""
+
+    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
 
 
 def name_component(

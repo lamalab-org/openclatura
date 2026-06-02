@@ -83,6 +83,7 @@ def add_component_principal_group(
         locants=locants,
         atom_ids=atom_ids,
         bond_ids=bond_ids_within(mol, atom_ids),
+        charge_atom_ids={atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0},
     )
 
 
