@@ -642,12 +642,6 @@
       "ring_aldehyde_amidinohydrazone"
     ]
   },
-  "special_component_names": {
-    "bluebook_rule": "P-13.5, P-52, P-53; retained and contracted component names",
-    "values": {
-      "1-phenylbenzene": "1,1'-biphenyl"
-    }
-  },
   "functional_groups": {
     "bluebook_rule": "Unified functional-group metadata. Add or override functional groups here with role, suffix templates, locant policy, multiplication strategy, handlers, and optional family tags.",
     "values": {

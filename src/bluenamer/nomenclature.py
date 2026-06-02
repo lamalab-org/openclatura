@@ -57,7 +57,6 @@ class ComponentRules:
     front_modifier_principal_groups: set[str]
     n_substituent_principal_groups: set[str]
     hydrazone_principal_groups: set[str]
-    special_names: dict[str, str]
     salt_metal_names: set[str]
     mononuclear_parent_hydrides: dict[str, str]
     replacement_parent_oxoacid_specs: tuple[dict, ...]
@@ -424,7 +423,6 @@ def registry() -> NomenclatureRegistry:
             front_modifier_principal_groups=set(functional_group_rules.values("front_modifier_principal_groups")),
             n_substituent_principal_groups=set(functional_group_rules.values("n_substituent_principal_groups")),
             hydrazone_principal_groups=set(functional_group_rules.values("hydrazone_principal_groups")),
-            special_names=simple_components.mapping("special_component_names"),
             salt_metal_names=set(simple_components.values("salt_metal_names")),
             mononuclear_parent_hydrides=simple_components.mapping("mononuclear_parent_hydrides"),
             replacement_parent_oxoacid_specs=tuple(simple_components.values("replacement_parent_oxoacid_specs")),

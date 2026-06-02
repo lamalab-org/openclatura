@@ -19,6 +19,14 @@ def scoped_small_ring_stereo_features(
     lower-case descriptors.
     """
 
+    # OPSIN currently treats mixed local R/S + lower-case r/s descriptor groups
+    # inside substituent scopes as ordinary absolute stereochemistry and often
+    # cannot attach the locants to the named fragment. Until a grammar-backed
+    # relative-stereo renderer exists for these scopes, prefer the generic
+    # cis/trans fallback in parent_pipeline._add_relative_ring_stereo.
+    if parts.is_substituent:
+        return []
+
     if not parts.is_substituent or not parts.is_ring or parts.is_bicycle or parts.is_spiro or parts.is_polycycle:
         return []
     if not 3 <= len(numbered_path) <= 7:

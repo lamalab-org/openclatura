@@ -6,6 +6,17 @@ from .name_operations import HydroOperation
 from .spiro_assembly import SpiroAssembly
 
 
+@dataclass(frozen=True)
+class NameTokenBinding:
+    """Renderer-emitted token metadata before final string positioning."""
+
+    text: str
+    atom_ids: set[int] = field(default_factory=set)
+    bond_ids: set[int] = field(default_factory=set)
+    charge_atom_ids: set[int] = field(default_factory=set)
+    locants: tuple[str, ...] = ()
+
+
 @dataclass
 class SubstituentItem:
     name: str
@@ -13,6 +24,7 @@ class SubstituentItem:
     atom_ids: set[int] = field(default_factory=set)
     bond_ids: set[int] = field(default_factory=set)
     charge_atom_ids: set[int] = field(default_factory=set)
+    emitted_tokens: tuple[NameTokenBinding, ...] = ()
     trace_segments: list[dict] = field(default_factory=list)
     spiro: SpiroAssembly | None = None
 
@@ -53,6 +65,7 @@ class NameAtomBinding:
     bond_ids: set[int] = field(default_factory=set)
     charge_atom_ids: set[int] = field(default_factory=set)
     locants: tuple[str, ...] = ()
+    emitted_tokens: tuple[NameTokenBinding, ...] = ()
 
 
 @dataclass
@@ -91,5 +104,6 @@ class AssemblyParts:
     parent_atom_charges_by_locant: dict[str, int] = field(default_factory=dict)
     parent_bond_orders_by_locants: dict[tuple[str, str], int] = field(default_factory=dict)
     name_atom_bindings: list[NameAtomBinding] = field(default_factory=list)
+    name_token_spans: list[dict] = field(default_factory=list)
     name_rewrite_history: list[dict] = field(default_factory=list)
     stereo_audit_issues: list[str] = field(default_factory=list)

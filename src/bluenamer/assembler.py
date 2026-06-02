@@ -18,7 +18,7 @@ from .assembly_spiro import format_spiro_core, split_spiro_substituents
 from .assembly_utils import needs_hyphen, parse_locant
 from .formatting import ensure_stereo_descriptor_boundary, format_multiplier
 from .fused_ion_templates import consume_fused_ion_operation, select_fused_ion_operation
-from .name_assembly import NameAssemblyResult
+from .name_assembly import NameAssemblyResult, token_span_trace_data
 from .name_bindings import refresh_name_atom_bindings
 from .name_postprocessing import (
     apply_acyl_amido_postprocessing,
@@ -381,6 +381,7 @@ def assemble_name_result(parts: AssemblyParts) -> NameAssemblyResult:
     raw_name = assemble_name_raw(parts)
     result = NameAssemblyResult.from_raw_name(raw_name, parts.name_atom_bindings, postprocess=post_process_name)
     parts.name_atom_bindings = list(result.bindings)
+    parts.name_token_spans = token_span_trace_data(result)
     parts.name_rewrite_history = [
         {
             "name": operation.name,
@@ -388,6 +389,8 @@ def assemble_name_result(parts: AssemblyParts) -> NameAssemblyResult:
             "after": operation.after,
             "binding_count": operation.binding_count,
             "changed_binding_count": operation.changed_binding_count,
+            "token_count": operation.token_count,
+            "changed_token_count": operation.changed_token_count,
         }
         for operation in result.rewrite_history
     ]

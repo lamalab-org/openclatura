@@ -3,6 +3,7 @@
 from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem
 from .molecule import Molecule
 from .namer_config import RETAINED_RING_ELEMENTS
+from .name_bindings import ensure_name_atom_binding_tokens
 from .naming_context import NamingIntent, ParentAssemblyPlan
 from .numbering import choose_parent_numbering
 from .parent_selection import ParentSelection
@@ -158,12 +159,14 @@ def _add_relative_ring_stereo(mol: Molecule, parts: AssemblyParts, numbered_path
     if scoped_features:
         parts.stereo_features.extend(scoped_features)
         parts.name_atom_bindings.append(
-            NameAtomBinding(
-                stage="assembly",
-                role="small_ring_stereo",
-                term=",".join(f"{locant}{descriptor}" for locant, descriptor in scoped_features),
-                atom_ids={atom_idx for atom_idx in numbered_path if mol.atoms[atom_idx].raw_stereo},
-                locants=tuple(locant for locant, _ in scoped_features),
+            ensure_name_atom_binding_tokens(
+                NameAtomBinding(
+                    stage="assembly",
+                    role="small_ring_stereo",
+                    term=",".join(f"{locant}{descriptor}" for locant, descriptor in scoped_features),
+                    atom_ids={atom_idx for atom_idx in numbered_path if mol.atoms[atom_idx].raw_stereo},
+                    locants=tuple(locant for locant, _ in scoped_features),
+                )
             )
         )
         return
@@ -188,12 +191,14 @@ def _add_relative_ring_stereo(mol: Molecule, parts: AssemblyParts, numbered_path
     locants = tuple(str(get_loc(atom_idx)) for atom_idx in raw_atoms)
     parts.relative_stereo_prefixes.append(term)
     parts.name_atom_bindings.append(
-        NameAtomBinding(
-            stage="assembly",
-            role="relative_stereo",
-            term=term,
-            atom_ids=set(raw_atoms),
-            locants=locants,
+        ensure_name_atom_binding_tokens(
+            NameAtomBinding(
+                stage="assembly",
+                role="relative_stereo",
+                term=term,
+                atom_ids=set(raw_atoms),
+                locants=locants,
+            )
         )
     )
 

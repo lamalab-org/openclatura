@@ -29,7 +29,6 @@ DIRECT_PREFIX_GROUPS = RULES.prefixes.direct_prefixes
 FRONT_MODIFIER_PRINCIPAL_GROUPS = RULES.components.front_modifier_principal_groups
 N_SUBSTITUENT_PRINCIPAL_GROUPS = RULES.components.n_substituent_principal_groups
 HYDRAZONE_PRINCIPAL_GROUPS = RULES.components.hydrazone_principal_groups
-SPECIAL_COMPONENT_NAMES = RULES.components.special_names
 SINGLE_ATOM_CATIONS = RULES.ions.single_atom_cations
 SINGLE_ATOM_ANIONS = RULES.ions.single_atom_anions
 SALT_METAL_NAMES = RULES.components.salt_metal_names

@@ -15,6 +15,7 @@ from typing import Any
 from .assembly_parts import AssemblyParts, NameAtomBinding
 from .naming_data import load_json_table
 from .grammar_snapshot_data import local_grammar_snapshot, retained_fused_token_status
+from .name_bindings import ensure_name_atom_binding_tokens
 
 
 @dataclass(frozen=True)
@@ -305,13 +306,15 @@ def _replace_fused_ion_bindings(parts: AssemblyParts, candidate: FusedIonOperati
     else:
         role = "fused_ion_operation"
     parts.name_atom_bindings.append(
-        NameAtomBinding(
-            stage="charge",
-            role=role,
-            term=template.opsin_grammar_name,
-            atom_ids=set(candidate.represented_atom_ids),
-            bond_ids=set(candidate.represented_bond_ids),
-            charge_atom_ids=set(candidate.represented_atom_ids),
-            locants=template.allowed_locants,
+        ensure_name_atom_binding_tokens(
+            NameAtomBinding(
+                stage="charge",
+                role=role,
+                term=template.opsin_grammar_name,
+                atom_ids=set(candidate.represented_atom_ids),
+                bond_ids=set(candidate.represented_bond_ids),
+                charge_atom_ids=set(candidate.represented_atom_ids),
+                locants=template.allowed_locants,
+            )
         )
     )

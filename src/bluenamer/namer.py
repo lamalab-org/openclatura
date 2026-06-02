@@ -13,10 +13,7 @@ from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
 from .molecule import DecisionTrace, Molecule, NameAnalysis
-from .name_assembly import NameAssemblyResult
-from .namer_config import (
-    SPECIAL_COMPONENT_NAMES,
-)
+from .name_assembly import NameAssemblyResult, token_span_trace_data
 from .naming_context import NamingIntent
 from .nomenclature import RULES
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
@@ -42,6 +39,7 @@ from .subgraph_tools import (
 from .subgraph_tools import (
     subgraph_component as _subgraph_component,
 )
+from .substituent_tokens import graph_bound_substituent_tokens
 from .trace_helpers import (
     add_substituent_trace as _add_substituent_trace,
 )
@@ -795,7 +793,8 @@ def _collect_subgraph_substituents(
                     mol, n_idx, sub_exclude | main_set, upstream_atom=c_idx, return_trace=True
                 )
                 if branch_name:
-                    branch_atoms = _subgraph_component(mol, n_idx, sub_exclude | main_set)
+                    branch_exclude = sub_exclude | main_set
+                    branch_atoms = _subgraph_component(mol, n_idx, branch_exclude)
                     branch_with_attachment = branch_atoms | {c_idx}
                     subst_mapping.setdefault(c_idx, []).append(
                         SubstituentItem(
@@ -804,6 +803,15 @@ def _collect_subgraph_substituents(
                             atom_ids=branch_atoms,
                             bond_ids=_bond_ids_within(mol, branch_with_attachment),
                             charge_atom_ids=_charged_atoms(mol, branch_atoms),
+                            emitted_tokens=graph_bound_substituent_tokens(
+                                mol,
+                                n_idx,
+                                branch_atoms,
+                                branch_name,
+                                c_idx,
+                                branch_exclude,
+                                name_subgraph,
+                            ),
                             trace_segments=branch_trace,
                         )
                     )
@@ -870,7 +878,6 @@ def _assemble_parent_name(
     get_loc,
     *,
     finalize_subgraph: bool = False,
-    apply_special_component_names: bool = False,
 ) -> str:
     """Assemble a parent name and apply shared post-assembly charge rules."""
 
@@ -897,11 +904,10 @@ def _assemble_parent_name(
             ("apply_cationic_imino_names", lambda text: apply_cationic_imino_names(text, mol)),
         )
     )
-    if apply_special_component_names:
-        rewrites.append(("special_component_names", lambda text: SPECIAL_COMPONENT_NAMES.get(text, text)))
     rewrites.append(("post_process_name", post_process_name))
     result = NameAssemblyResult.from_rewrite_pipeline(name, parts.name_atom_bindings, rewrites=tuple(rewrites))
     parts.name_atom_bindings = list(result.bindings)
+    parts.name_token_spans = token_span_trace_data(result)
     parts.name_rewrite_history = [
         {
             "name": operation.name,
@@ -909,6 +915,8 @@ def _assemble_parent_name(
             "after": operation.after,
             "binding_count": operation.binding_count,
             "changed_binding_count": operation.changed_binding_count,
+            "token_count": operation.token_count,
+            "changed_token_count": operation.changed_token_count,
         }
         for operation in result.rewrite_history
     ]
