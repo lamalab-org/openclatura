@@ -1,7 +1,6 @@
 """Collect final-name token binding confidence for QM9.
 
-This is the token-audit companion to ``qm9_iupac_collect_warnings.py``.
-It intentionally does not call OPSIN.  Instead, it names QM9 molecules with
+It names QM9 molecules with
 trace collection enabled and writes one row per emitted final-name token so
 fallback/ambiguous/unbound token bindings can be inspected and patched.
 """
