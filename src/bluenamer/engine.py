@@ -184,7 +184,7 @@ class NamingEngine:
         *,
         include_trace: bool = False,
         verify_opsin: bool = False,
-        processes: int | None = 1,
+        processes: int | None | str = 1,
         chunksize: int = 64,
     ) -> list[NamingResult]:
         """Name a batch of SMILES, optionally in parallel.
@@ -196,6 +196,8 @@ class NamingEngine:
         than propagated, so a single bad SMILES cannot stop the batch.
         """
 
+        if processes == "auto":
+            processes = None
         smiles_list = list(smiles_iter)
         if processes == 1:
             return [

@@ -45,10 +45,13 @@ def name_many(
     *,
     include_trace: bool = False,
     verify_opsin: bool = False,
-    processes: int | None = 1,
+    processes: int | None | str = 1,
     chunksize: int = 64,
 ) -> list[NamingResult]:
     """Batch convenience wrapper around :meth:`NamingEngine.name_many`."""
+
+    if processes == "auto":
+        processes = None
 
     return DEFAULT_NAMING_ENGINE.name_many(
         smiles_iter,
