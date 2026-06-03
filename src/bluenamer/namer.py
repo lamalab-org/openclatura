@@ -914,10 +914,36 @@ def _assemble_parent_name(
             "name": operation.name,
             "before": operation.before,
             "after": operation.after,
+            "ownership": operation.ownership,
+            "source": operation.source,
             "binding_count": operation.binding_count,
             "changed_binding_count": operation.changed_binding_count,
             "token_count": operation.token_count,
             "changed_token_count": operation.changed_token_count,
+            "edits": [
+                {
+                    "before_start": edit.before_start,
+                    "before_end": edit.before_end,
+                    "after_start": edit.after_start,
+                    "after_end": edit.after_end,
+                    "before_text": edit.before_text,
+                    "after_text": edit.after_text,
+                    "segments": [
+                        {
+                            "before_start": segment.before_start,
+                            "before_end": segment.before_end,
+                            "after_start": segment.after_start,
+                            "after_end": segment.after_end,
+                            "before_text": segment.before_text,
+                            "after_text": segment.after_text,
+                            "ownership": segment.ownership,
+                            "group": segment.group,
+                        }
+                        for segment in edit.segments
+                    ],
+                }
+                for edit in operation.edits
+            ],
         }
         for operation in result.rewrite_history
     ]

@@ -11,6 +11,12 @@ class NameTokenBinding:
     """Renderer-emitted token metadata before final string positioning."""
 
     text: str
+    token_kind: str = "structural"
+    ownership: str = "exact"
+    confidence: str = "exact"
+    source: str = "renderer"
+    grammar_role: str = ""
+    binding_key: str = ""
     atom_ids: set[int] = field(default_factory=set)
     bond_ids: set[int] = field(default_factory=set)
     charge_atom_ids: set[int] = field(default_factory=set)

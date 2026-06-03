@@ -83,6 +83,7 @@ from bluenamer.name_bindings import postprocess_name_atom_bindings, refresh_name
 from bluenamer.name_assembly import (
     FinalAssemblyAuditError,
     NameAssemblyResult,
+    NameRewriteRule,
     audit_final_name_assembly,
     assert_final_name_assembly,
     build_name_token_spans,
@@ -169,7 +170,12 @@ def test_hydrogen_cyanide_absorbed_nitrile_name_passes_final_audit():
     analysis = analyze_smiles("C#N")
     assembly_steps = [step for step in analysis.decisions if step.decision == "assembled component name"]
     tokens = assembly_steps[-1].data["name_token_spans"]
+    hydrogen = next(token for token in tokens if token["text"] == "hydrogen")
     cyanide = next(token for token in tokens if token["text"] == "cyanide")
+    assert hydrogen["source"] == "retained_alias_context"
+    assert hydrogen["confidence"] == "derived"
+    assert hydrogen["ownership"] == "retained_alias_context"
+    assert hydrogen["binding_indices"] == cyanide["binding_indices"]
     assert cyanide["binding_indices"]
     assert cyanide["atoms"]
 
@@ -249,7 +255,105 @@ def test_add_substituent_trace_preserves_emitted_tokens_into_bindings():
     bindings = refresh_name_atom_bindings(parts)
     substituent_binding = next(binding for binding in bindings if binding.role == "substituent")
 
-    assert substituent_binding.emitted_tokens == emitted_tokens
+    assert substituent_binding.emitted_tokens[0].text == "1"
+    assert substituent_binding.emitted_tokens[0].token_kind == "locant"
+    assert substituent_binding.emitted_tokens[1:] == emitted_tokens
+
+
+def test_principal_suffix_tokens_are_emitted_from_functional_group_renderer():
+    parts = AssemblyParts(
+        parent_length=3,
+        is_ring=True,
+        parent_atom_ids={0, 1, 2},
+        principal_group=PrincipalGroupItem(
+            key="ring_aldehyde",
+            locants=["1", "1"],
+            atom_ids={0, 3, 4},
+            bond_ids={2, 3},
+        ),
+    )
+
+    bindings = refresh_name_atom_bindings(parts)
+    suffix_binding = next(binding for binding in bindings if binding.stage == "suffix")
+    suffix_tokens = [token for token in suffix_binding.emitted_tokens if token.token_kind == "suffix"]
+
+    assert [token.text for token in suffix_tokens] == ["dicarbaldehyde"]
+    assert suffix_tokens[0].source == "renderer_suffix"
+    assert suffix_tokens[0].atom_ids == {0, 3, 4}
+    assert suffix_tokens[0].bond_ids == {2, 3}
+
+
+def test_carbon_root_substituent_renderer_emits_alkyl_token_bindings():
+    analysis = analyze_smiles("CCC1(CC1)OC")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    ethyl = next(token for token in assembly.data["name_token_spans"] if token["text"] == "ethyl")
+
+    assert analysis.name == "1-ethyl-1-methoxycyclopropane"
+    assert ethyl["source"] == "substituent_renderer"
+    assert ethyl["confidence"] == "derived"
+    assert ethyl["ownership"] == "exact"
+    assert ethyl["atoms"] == [0, 1]
+
+
+def test_dihydro_locants_bind_to_parent_scope_without_broad_fallback():
+    analysis = analyze_smiles("O=CC1=CNCC1")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    dihydro_locants = next(token for token in assembly.data["name_token_spans"] if token["text"] == "4,5")
+
+    assert analysis.name == "4,5-dihydro-1H-pyrrole-3-carbaldehyde"
+    assert dihydro_locants["source"] == "dihydro_locant_fallback"
+    assert dihydro_locants["confidence"] == "derived"
+    assert dihydro_locants["ownership"] == "locanted_hydro"
+    assert dihydro_locants["token_kind"] == "hydro"
+
+
+def test_carbonyl_prefix_morphology_is_bound_from_renderer_data():
+    analysis = analyze_smiles("NC(=O)N1CC(=O)C1")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    carbonyl = next(token for token in assembly.data["name_token_spans"] if token["text"] == "carbonyl")
+
+    assert analysis.name == "1-((amino)carbonyl)-azetidin-3-one"
+    assert carbonyl["source"] in {"functional_prefix_renderer", "substituent_renderer"}
+    assert carbonyl["confidence"] == "derived"
+    assert carbonyl["ownership"] == "exact"
+    assert carbonyl["atoms"] == [0, 1, 2]
+
+
+def test_unmatched_retained_parent_morphology_uses_operation_scope():
+    analysis = analyze_smiles("N=C1COCO1")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    dioxolan = next(token for token in assembly.data["name_token_spans"] if token["text"] == "dioxolan")
+
+    assert analysis.name == "1,3-dioxolan-4-imine"
+    assert dioxolan["source"] == "operation_trace"
+    assert dioxolan["confidence"] == "derived"
+    assert dioxolan["ownership"] == "operation_scope"
+    assert set(dioxolan["atoms"]) == {1, 2, 3, 4, 5}
+
+
+def test_unmatched_spiro_parent_morphology_uses_operation_scope_not_broad_fallback():
+    analysis = analyze_smiles("CN1CC11C2C3CC2C13")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    methylspiro = next(token for token in assembly.data["name_token_spans"] if token["text"] == "methylspiro")
+
+    assert analysis.name == "1'-methylspiro[tricyclo[2.2.0.0^{2,5}]hexane-6,2'-aziridine]"
+    assert methylspiro["source"] == "operation_trace"
+    assert methylspiro["confidence"] == "derived"
+    assert methylspiro["ownership"] == "operation_scope"
+    assert methylspiro["token_kind"] == "prefix"
+
+
+def test_primed_spiro_component_locant_uses_component_scope_not_broad_fallback():
+    analysis = analyze_smiles("OC1CC11CC2NC12")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    primed_locant = next(token for token in assembly.data["name_token_spans"] if token["text"] == "5")
+
+    assert analysis.name == "5'-azaspiro[cyclopropane-2,2'-bicyclo[2.1.0]pentane]-1-ol"
+    assert primed_locant["source"] == "primed_component_locant_fallback"
+    assert primed_locant["confidence"] == "derived"
+    assert primed_locant["ownership"] == "component_locant"
+    assert primed_locant["token_kind"] == "locant"
+    assert primed_locant["atoms"] == [4, 5, 6, 7]
 
 
 def test_analysis_carries_name_atom_bindings():
@@ -395,6 +499,9 @@ def test_postprocessing_rewrites_keep_token_metadata_auditable():
     assert result.rewrite_history[0].changed_token_count >= 1
     assert all(token.binding_indices for token in result.token_spans)
     assert {token.text for token in result.token_spans} == {"acetic", "acid"}
+    assert {token.source for token in result.token_spans} == {"typed_rewrite"}
+    assert {token.confidence for token in result.token_spans} == {"derived"}
+    assert result.rewrite_history[0].ownership == "preserve_all"
 
 
 def test_postprocessing_rewrites_bindings_to_final_emitted_direction():
@@ -440,7 +547,12 @@ def test_name_assembly_result_tracks_named_rewrite_pipeline():
         "ethanoic acid",
         bindings,
         rewrites=(
-            ("retained_acid_name", lambda text: text.replace("ethanoic acid", "acetic acid")),
+            NameRewriteRule(
+                "retained_acid_name",
+                lambda text: text.replace("ethanoic acid", "acetic acid"),
+                ownership="retained_replace",
+                source="typed_rewrite",
+            ),
             ("noop", lambda text: text),
         ),
     )
@@ -448,8 +560,255 @@ def test_name_assembly_result_tracks_named_rewrite_pipeline():
     assert result.text == "acetic acid"
     assert result.bindings[0].term == "acetic acid"
     assert [operation.name for operation in result.rewrite_history] == ["retained_acid_name", "noop"]
+    assert result.rewrite_history[0].ownership == "retained_replace"
+    assert result.rewrite_history[1].ownership == "preserve_all"
     assert result.rewrite_history[0].changed_binding_count == 1
     assert result.rewrite_history[1].changed_binding_count == 0
+
+
+def test_literal_rewrite_carries_native_token_ownership_through_replaced_span():
+    bindings = [
+        NameAtomBinding(
+            stage="prefix",
+            role="substituent",
+            term="aminoiminomethyl",
+            atom_ids={1, 2, 3},
+            emitted_tokens=(
+                NameTokenBinding(
+                    text="aminoiminomethyl",
+                    atom_ids={1, 2, 3},
+                    token_kind="prefix",
+                    ownership="exact",
+                    source="renderer",
+                    grammar_role="substituent",
+                    binding_key="prefix:substituent",
+                ),
+            ),
+        )
+    ]
+
+    result = NameAssemblyResult.from_rewrite_pipeline(
+        "aminoiminomethylbenzene",
+        bindings,
+        rewrites=(
+            NameRewriteRule.literal(
+                "carbamimidoyl_alias",
+                "aminoiminomethyl",
+                "carbamimidoyl",
+                ownership="merge_replaced_span",
+            ),
+        ),
+    )
+
+    assert result.text == "carbamimidoylbenzene"
+    assert result.bindings[0].emitted_tokens[0].text == "carbamimidoyl"
+    assert result.bindings[0].emitted_tokens[0].ownership == "merge_replaced_span"
+    assert result.rewrite_history[0].edits[0].before_text == "aminoiminomethyl"
+    assert result.rewrite_history[0].edits[0].after_text == "carbamimidoyl"
+
+    carbamimidoyl = next(token for token in result.token_spans if token.text == "carbamimidoyl")
+    assert carbamimidoyl.atom_ids == frozenset({1, 2, 3})
+    assert carbamimidoyl.source == "typed_rewrite"
+    assert carbamimidoyl.ownership == "merge_replaced_span"
+    assert carbamimidoyl.confidence == "derived"
+    assert carbamimidoyl.binding_key == "prefix:substituent"
+
+
+def test_regex_rewrite_preserves_reordered_capture_ownership_by_group_identity():
+    bindings = [
+        NameAtomBinding(
+            stage="prefix",
+            role="first",
+            term="foo",
+            atom_ids={1},
+            emitted_tokens=(NameTokenBinding(text="foo", atom_ids={1}, binding_key="prefix:first"),),
+        ),
+        NameAtomBinding(
+            stage="prefix",
+            role="second",
+            term="bar",
+            atom_ids={2},
+            emitted_tokens=(NameTokenBinding(text="bar", atom_ids={2}, binding_key="prefix:second"),),
+        ),
+    ]
+
+    result = NameAssemblyResult.from_rewrite_pipeline(
+        "foobar",
+        bindings,
+        rewrites=(NameRewriteRule.regex("swap_captures", r"(foo)(bar)", r"\2\1"),),
+    )
+
+    assert result.text == "barfoo"
+    assert [(token.text, token.atom_ids, token.ownership) for token in result.token_spans] == [
+        ("bar", frozenset({2}), "capture_reference"),
+        ("foo", frozenset({1}), "capture_reference"),
+    ]
+    assert [(segment.group, segment.before_text, segment.after_text) for segment in result.rewrite_history[0].edits[0].segments] == [
+        ("2", "bar", "bar"),
+        ("1", "foo", "foo"),
+    ]
+
+
+def test_regex_rewrite_clones_duplicated_capture_ownership():
+    bindings = [
+        NameAtomBinding(
+            stage="prefix",
+            role="first",
+            term="foo",
+            atom_ids={1},
+            emitted_tokens=(NameTokenBinding(text="foo", atom_ids={1}, binding_key="prefix:first"),),
+        )
+    ]
+
+    result = NameAssemblyResult.from_rewrite_pipeline(
+        "foo",
+        bindings,
+        rewrites=(NameRewriteRule.regex("duplicate_capture", r"(foo)", r"\1\1"),),
+    )
+
+    assert result.text == "foofoo"
+    assert [(token.text, token.start, token.end, token.atom_ids, token.ownership) for token in result.token_spans] == [
+        ("foo", 0, 3, frozenset({1}), "capture_reference"),
+        ("foo", 3, 6, frozenset({1}), "cloned_capture"),
+    ]
+
+
+def test_regex_rewrite_records_deleted_capture_as_absorbed():
+    bindings = [
+        NameAtomBinding(
+            stage="prefix",
+            role="first",
+            term="foo",
+            atom_ids={1},
+            emitted_tokens=(NameTokenBinding(text="foo", atom_ids={1}, binding_key="prefix:first"),),
+        ),
+        NameAtomBinding(
+            stage="prefix",
+            role="second",
+            term="bar",
+            atom_ids={2},
+            emitted_tokens=(NameTokenBinding(text="bar", atom_ids={2}, binding_key="prefix:second"),),
+        ),
+    ]
+
+    result = NameAssemblyResult.from_rewrite_pipeline(
+        "foobar",
+        bindings,
+        rewrites=(NameRewriteRule.regex("absorb_second_capture", r"(foo)(bar)", r"\1"),),
+    )
+
+    assert result.text == "foo"
+    assert [(token.text, token.atom_ids) for token in result.token_spans] == [("foo", frozenset({1}))]
+    absorbed = [segment for segment in result.rewrite_history[0].edits[0].segments if segment.ownership == "absorbed"]
+    assert [(segment.before_text, segment.after_text) for segment in absorbed] == [("bar", "")]
+
+
+def test_broad_token_fallback_is_marked_ambiguous_not_exact():
+    result = NameAssemblyResult.from_final_name(
+        "unmodelled",
+        [
+            NameAtomBinding(stage="prefix", role="left", term="left_role", atom_ids={0}),
+            NameAtomBinding(stage="suffix", role="right", term="right_role", atom_ids={1}),
+        ],
+    )
+
+    token = result.token_spans[0]
+
+    assert token.text == "unmodelled"
+    assert token.binding_indices == (0, 1)
+    assert token.source == "broad_fallback"
+    assert token.confidence == "fallback"
+    assert token.ownership == "ambiguous"
+
+
+def test_unsaturated_chain_parent_stem_uses_native_parent_binding_not_broad_fallback():
+    analysis = analyze_smiles("C#C")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    eth = next(token for token in assembly.data["name_token_spans"] if token["text"] == "eth")
+
+    assert analysis.name == "eth-1-yne"
+    assert eth["source"] == "typed_rewrite"
+    assert eth["confidence"] == "derived"
+    assert eth["ownership"] == "exact"
+    assert eth["binding_key"] == "parent:parent"
+
+
+def test_spiro_descriptor_digits_and_parent_stem_use_native_parent_binding():
+    analysis = analyze_smiles("C1CC2(C1)CC2")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    tokens = {token["text"]: token for token in assembly.data["name_token_spans"]}
+
+    assert analysis.name == "spiro[2.3]hexane"
+    for text in ["spiro", "2", "3", "hexane"]:
+        assert tokens[text]["source"] == "typed_rewrite"
+        assert tokens[text]["confidence"] == "derived"
+        assert tokens[text]["ownership"] == "exact"
+        assert tokens[text]["binding_key"] == "parent:parent"
+
+
+def test_indicated_hydrogen_prefix_uses_hydro_operation_binding():
+    analysis = analyze_smiles("N1C=CC=C1")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    tokens = {token["text"]: token for token in assembly.data["name_token_spans"]}
+
+    assert analysis.name == "1H-pyrrole"
+    for text in ["1", "H"]:
+        assert tokens[text]["source"] == "typed_rewrite"
+        assert tokens[text]["confidence"] == "derived"
+        assert tokens[text]["ownership"] == "exact"
+        assert tokens[text]["binding_key"] == "hydro:indicated_hydrogen"
+
+
+def test_n_substituent_locant_survives_retained_suffix_postprocessing():
+    analysis = analyze_smiles("CNC(C)=O")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    n_locant = next(token for token in assembly.data["name_token_spans"] if token["text"] == "N")
+
+    assert analysis.name == "N-methylacetamide"
+    assert n_locant["source"] in {"default_binding", "typed_rewrite"}
+    assert n_locant["confidence"] in {"exact", "derived"}
+    assert n_locant["ownership"] == "exact"
+    assert n_locant["token_kind"] == "locant"
+    assert n_locant["binding_key"] == "prefix:substituent"
+
+
+def test_mixed_numeric_and_element_locants_are_bound_individually():
+    analysis = analyze_smiles("CNC(=O)C(C)C")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    tokens = {(token["text"], token["start"]): token for token in assembly.data["name_token_spans"]}
+
+    assert analysis.name == "2,N-dimethylpropanamide"
+    for key in [("2", 0), ("N", 2)]:
+        token = tokens[key]
+        assert token["source"] == "typed_rewrite"
+        assert token["confidence"] == "derived"
+        assert token["ownership"] == "exact"
+        assert token["binding_key"] == "prefix:substituent"
+
+
+def test_multiplier_token_is_grammar_scoped_not_broad_fallback():
+    analysis = analyze_smiles("N=CN(C=N)C=O")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    bis = next(token for token in assembly.data["name_token_spans"] if token["text"] == "bis")
+
+    assert analysis.name == "N,N-bis(iminomethyl)formamide"
+    assert bis["source"] == "grammar_token"
+    assert bis["confidence"] == "derived"
+    assert bis["ownership"] == "grammar_scope"
+    assert bis["token_kind"] == "grammar"
+
+
+def test_retained_dihydro_and_indicated_h_tokens_avoid_broad_fallback():
+    analysis = analyze_smiles("O=C1NC(=O)C=C1")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    tokens = {token["text"]: token for token in assembly.data["name_token_spans"]}
+
+    assert analysis.name == "2,5-dihydro-1H-pyrrole-2,5-dione"
+    assert tokens["dihydro"]["source"] == "grammar_token"
+    assert tokens["dihydro"]["ownership"] == "grammar_scope"
+    assert tokens["H"]["source"] == "indicated_hydrogen_fallback"
+    assert tokens["H"]["token_kind"] == "hydro"
+    assert tokens["H"]["ownership"] == "locanted_hydro"
 
 
 def test_contextual_postprocessing_updates_absorbed_binding_terms():

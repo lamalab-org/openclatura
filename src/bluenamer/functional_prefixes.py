@@ -3,8 +3,9 @@
 from collections.abc import Callable
 from collections import Counter
 from dataclasses import dataclass
+import re
 
-from .assembly_parts import SubstituentItem
+from .assembly_parts import NameTokenBinding, SubstituentItem
 from .formatting import format_counted_prefixes, is_complex_prefix, oxy_prefix_from_branch, strip_outer_parentheses
 from .group_atom_roles import amide_nitrogen, ester_or_peroxy_single_oxygen
 from .molecule import Molecule
@@ -237,8 +238,41 @@ def collect_component_prefix_substituents(
                     atom_ids=trace_atoms,
                     bond_ids=trace_bonds,
                     charge_atom_ids={atom_idx for atom_idx in trace_atoms if mol.atoms[atom_idx].charge != 0},
+                    emitted_tokens=functional_prefix_tokens(mol, group, name, trace_atoms, trace_bonds),
                 )
             )
             handled_prefix_atoms.update(group.atoms_involved)
 
     return subst_mapping, handled_prefix_atoms
+
+
+def functional_prefix_tokens(
+    mol: Molecule,
+    group: PerceivedGroup,
+    name: str,
+    atom_ids: set[int],
+    bond_ids: set[int],
+) -> tuple[NameTokenBinding, ...]:
+    """Return graph-bound tokens emitted by a functional-prefix renderer."""
+
+    charge_atoms = {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
+    return tuple(
+        NameTokenBinding(
+            text=token_text,
+            token_kind="prefix",
+            source="functional_prefix_renderer",
+            grammar_role=group.key,
+            binding_key=f"prefix:{group.key}",
+            atom_ids=set(atom_ids),
+            bond_ids=set(bond_ids),
+            charge_atom_ids=set(charge_atoms),
+        )
+        for token_text in _prefix_lexical_tokens(name)
+    )
+
+
+def _prefix_lexical_tokens(text: str) -> tuple[str, ...]:
+    return tuple(match.group(0) for match in _PREFIX_TOKEN_RE.finditer(strip_outer_parentheses(text)))
+
+
+_PREFIX_TOKEN_RE = re.compile(r"[A-Za-z]+(?:\^[0-9]+)?|\d+(?:,\d+)*(?:'\")?|[0-9]+(?:\([0-9,]+\))?")

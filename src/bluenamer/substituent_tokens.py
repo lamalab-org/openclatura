@@ -25,7 +25,30 @@ def graph_bound_substituent_tokens(
 
     if mol.atoms[root].symbol == "N":
         return _nitrogen_substituent_tokens(mol, root, atom_ids, term, upstream_atom, exclude_atoms, branch_namer)
+    if mol.atoms[root].is_carbon:
+        return _carbon_substituent_tokens(mol, atom_ids, term)
     return _generic_heteroatom_substituent_tokens(mol, root, atom_ids, term, upstream_atom, exclude_atoms, branch_namer)
+
+
+def _carbon_substituent_tokens(mol: Molecule, atom_ids: set[int], term: str) -> tuple[NameTokenBinding, ...]:
+    """Return graph-bound tokens for carbon-root substituent renderings."""
+
+    term_text = strip_outer_parentheses(term)
+    if not term_text:
+        return ()
+    return tuple(
+        NameTokenBinding(
+            text=token_text,
+            token_kind="prefix",
+            source="substituent_renderer",
+            grammar_role="carbon_substituent",
+            binding_key="prefix:carbon_substituent",
+            atom_ids=set(atom_ids),
+            bond_ids=bond_ids_within(mol, atom_ids),
+            charge_atom_ids={idx for idx in atom_ids if mol.atoms[idx].charge != 0},
+        )
+        for token_text in _lexical_tokens(term_text)
+    )
 
 
 def _generic_heteroatom_substituent_tokens(
