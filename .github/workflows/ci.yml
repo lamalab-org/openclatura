@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install ruff
-        run: pip install "ruff==0.6.9"
+        run: pip install "ruff==0.15.15
       - name: Ruff check
         run: ruff check src/bluenamer
       - name: Ruff format check
