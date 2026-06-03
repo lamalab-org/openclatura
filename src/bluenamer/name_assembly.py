@@ -47,7 +47,7 @@ class NameFragment:
     template: RendererTemplate | None = None
 
     @classmethod
-    def from_binding(cls, binding: NameAtomBinding) -> "NameFragment":
+    def from_binding(cls, binding: NameAtomBinding) -> NameFragment:
         return cls(text=binding.term, bindings=(binding,))
 
 
@@ -74,7 +74,7 @@ class NameRewriteRule:
         ownership: str = "replace_span",
         source: str = "typed_rewrite",
         reason: str = "",
-    ) -> "NameRewriteRule":
+    ) -> NameRewriteRule:
         """Build a rule whose replaced spans can carry graph ownership forward."""
 
         return cls(
@@ -98,7 +98,7 @@ class NameRewriteRule:
         ownership: str = "regex_changed_span",
         source: str = "typed_rewrite",
         reason: str = "",
-    ) -> "NameRewriteRule":
+    ) -> NameRewriteRule:
         """Build a regex rule whose capture references carry source ownership."""
 
         compiled = re.compile(pattern)
@@ -113,7 +113,7 @@ class NameRewriteRule:
             match_kind="regex",
         )
 
-    def apply_to_text(self, text: str) -> tuple[str, tuple["NameRewriteEdit", ...]]:
+    def apply_to_text(self, text: str) -> tuple[str, tuple[NameRewriteEdit, ...]]:
         """Apply the rule and return concrete edit spans when the rule supports them."""
 
         if self.match_kind == "literal" and self.pattern:
@@ -133,7 +133,7 @@ class NameRewriteEdit:
     after_end: int
     before_text: str
     after_text: str
-    segments: tuple["NameRewriteSegment", ...] = ()
+    segments: tuple[NameRewriteSegment, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -172,7 +172,7 @@ class NameRewriteOperation:
         bindings: tuple[NameAtomBinding, ...],
         *,
         rule: NameRewriteRule,
-    ) -> tuple[str, tuple[NameAtomBinding, ...], "NameRewriteOperation"]:
+    ) -> tuple[str, tuple[NameAtomBinding, ...], NameRewriteOperation]:
         """Apply a rewrite to final text and every bound term."""
 
         rewritten_name, edits = rule.apply_to_text(name)
@@ -289,7 +289,7 @@ class NameAssemblyResult:
         bindings: list[NameAtomBinding] | tuple[NameAtomBinding, ...],
         *,
         postprocess: Callable[[str], str],
-    ) -> "NameAssemblyResult":
+    ) -> NameAssemblyResult:
         """Build a final assembly result while keeping binding metadata in sync."""
 
         return cls.from_rewrite_pipeline(
@@ -313,7 +313,7 @@ class NameAssemblyResult:
         bindings: list[NameAtomBinding] | tuple[NameAtomBinding, ...],
         *,
         rewrites: tuple[NameRewriteRule | tuple[str, Callable[[str], str]], ...],
-    ) -> "NameAssemblyResult":
+    ) -> NameAssemblyResult:
         """Build a final result by applying named rewrites to text and bindings."""
 
         text = raw_text
@@ -350,7 +350,7 @@ class NameAssemblyResult:
         bindings: list[NameAtomBinding] | tuple[NameAtomBinding, ...],
         *,
         rewrite_history: tuple[NameRewriteOperation, ...] = (),
-    ) -> "NameAssemblyResult":
+    ) -> NameAssemblyResult:
         """Build a result for callers that already finalized text and bindings."""
 
         binding_tuple = _ensure_emitted_token_bindings(tuple(bindings))
@@ -740,12 +740,7 @@ def _complete_token_spans(
 ) -> tuple[NameTokenSpan, ...]:
     built = build_name_token_spans(text, bindings)
     complete = list(propagated)
-    covered_positions = {
-        pos
-        for token in propagated
-        if token.binding_indices
-        for pos in range(token.start, token.end)
-    }
+    covered_positions = {pos for token in propagated if token.binding_indices for pos in range(token.start, token.end)}
     for token in built:
         token_positions = set(range(token.start, token.end))
         if token_positions and token_positions <= covered_positions:
@@ -815,9 +810,7 @@ def audit_final_name_assembly(
         errors.append(_format_atom_error("unnamed atoms", mol, unnamed_atoms))
 
     expected_charged_atoms = {
-        idx
-        for idx in explicit_component_atoms
-        if idx in mol.atoms and mol.atoms[idx].charge != 0
+        idx for idx in explicit_component_atoms if idx in mol.atoms and mol.atoms[idx].charge != 0
     }
     missing_charged_atoms = expected_charged_atoms - result.charged_atom_ids
     if missing_charged_atoms:
@@ -856,7 +849,9 @@ def assert_final_name_assembly(
 
     audit = audit_final_name_assembly(mol, component_atoms, parts, result)
     if not audit.ok:
-        raise FinalAssemblyAuditError(f"Generated name {result.text!r} failed final metadata audit: {'; '.join(audit.errors)}")
+        raise FinalAssemblyAuditError(
+            f"Generated name {result.text!r} failed final metadata audit: {'; '.join(audit.errors)}"
+        )
 
 
 def _consumed_bond_ids(parts: AssemblyParts) -> set[int]:
@@ -1251,9 +1246,7 @@ def _charge_suffix_binding_indices(
     if not locants:
         return charge_indices
     return {
-        idx
-        for idx in charge_indices
-        if locants <= {str(locant).strip("'") for locant in bindings[idx].locants}
+        idx for idx in charge_indices if locants <= {str(locant).strip("'") for locant in bindings[idx].locants}
     } or charge_indices
 
 
@@ -1480,9 +1473,7 @@ def _graph_bearing_binding_indices(bindings: tuple[NameAtomBinding, ...]) -> set
     """Return conservative owners for tokens not yet assignable to one role."""
 
     return {
-        idx
-        for idx, binding in enumerate(bindings)
-        if binding.atom_ids or binding.bond_ids or binding.charge_atom_ids
+        idx for idx, binding in enumerate(bindings) if binding.atom_ids or binding.bond_ids or binding.charge_atom_ids
     }
 
 
@@ -1857,7 +1848,10 @@ def _binding_term_occurs_in_final_name(binding: NameAtomBinding, term: str, fina
     if _term_occurs_in_final_name(term, final_text):
         return True
     role = binding.role.replace("_", "").lower()
-    if any(_term_occurs_in_final_name(_normalise_name_text(alias), final_text) for alias in _ROLE_TOKEN_ALIASES.get(role, ())):
+    if any(
+        _term_occurs_in_final_name(_normalise_name_text(alias), final_text)
+        for alias in _ROLE_TOKEN_ALIASES.get(role, ())
+    ):
         return True
     if binding.stage == "parent" and _ionic_parent_stem_occurs(term, final_text):
         return True

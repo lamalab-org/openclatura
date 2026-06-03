@@ -1,9 +1,9 @@
 """Characteristic-group prefix collection for component naming."""
 
-from collections.abc import Callable
-from collections import Counter
-from dataclasses import dataclass
 import re
+from collections import Counter
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from .assembly_parts import NameTokenBinding, SubstituentItem
 from .formatting import format_counted_prefixes, is_complex_prefix, oxy_prefix_from_branch, strip_outer_parentheses
@@ -94,11 +94,7 @@ def hydrazine_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> s
 
     nitrogens = [n for n in group.atoms_involved if context.mol.atoms[n].symbol == "N"]
     attached = next(
-        (
-            n
-            for n in nitrogens
-            if context.mol.get_bond(n, group.attachment_carbon) is not None
-        ),
+        (n for n in nitrogens if context.mol.get_bond(n, group.attachment_carbon) is not None),
         None,
     )
     if attached is None:
@@ -182,7 +178,10 @@ PREFIX_HANDLERS.update(
     {key: acid_halide_prefix_handler for key in RULES.functional_groups.keys_with_family("acid_halide")}
 )
 PREFIX_HANDLERS.update(
-    {key: static_prefix_handler("hydroperoxycarbonyl") for key in RULES.functional_groups.keys_with_family("peroxy_acid")}
+    {
+        key: static_prefix_handler("hydroperoxycarbonyl")
+        for key in RULES.functional_groups.keys_with_family("peroxy_acid")
+    }
 )
 PREFIX_HANDLERS.update({key: sulfonyl_prefix_handler for key in RULES.functional_groups.keys_with_family("sulfonyl")})
 PREFIX_HANDLERS.update(

@@ -511,11 +511,9 @@ def apply_substituent_parent_yl_ide(name: str, negative_locants: dict[str, set[s
     for locant, symbols in sorted(negative_locants.items(), key=lambda item: _locant_sort_key(item[0])):
         if "C" not in symbols:
             continue
-        pattern = re.compile(
-            rf"(?P<stem>[A-Za-z0-9,\-\[\]\^\{{\}}]+?an)-{re.escape(locant)}-yl\b"
-        )
+        pattern = re.compile(rf"(?P<stem>[A-Za-z0-9,\-\[\]\^\{{\}}]+?an)-{re.escape(locant)}-yl\b")
         updated = pattern.sub(
-            lambda match: f"{match.group('stem')}-{locant}-ide-{locant}-yl",
+            lambda match, locant=locant: f"{match.group('stem')}-{locant}-ide-{locant}-yl",
             updated,
             count=1,
         )

@@ -1,13 +1,12 @@
 """Graph-derived emitted-token metadata for composed substituent prefixes."""
 
-from collections.abc import Callable
 import re
+from collections.abc import Callable
 
 from .assembly_parts import NameTokenBinding
 from .formatting import strip_outer_parentheses
 from .molecule import Molecule
 from .trace_helpers import bond_ids_within
-
 
 BranchNamer = Callable[..., str]
 
@@ -82,7 +81,9 @@ def _generic_heteroatom_substituent_tokens(
                 )
             )
 
-    branch_roots = [root for root in ligand_roots if root not in {atom for _token, atoms in ligand_atoms_by_token for atom in atoms}]
+    branch_roots = [
+        root for root in ligand_roots if root not in {atom for _token, atoms in ligand_atoms_by_token for atom in atoms}
+    ]
     for ligand_root in branch_roots:
         ligand_atoms = _component_within(mol, ligand_root, atom_ids - {center})
         if not ligand_atoms:
@@ -219,7 +220,9 @@ def _direct_ligand_tokens(
                 if oxygen_neighbors and mol.atoms[oxygen_neighbors[0]].symbol == "O":
                     tokens.append(("peroxy", {root, oxygen_neighbors[0]}))
                 elif oxygen_neighbors:
-                    tokens.append(("oxy", {root, *(_component_within(mol, oxygen_neighbors[0], atom_ids - {center, root}))}))
+                    tokens.append(
+                        ("oxy", {root, *(_component_within(mol, oxygen_neighbors[0], atom_ids - {center, root}))})
+                    )
                 else:
                     tokens.append(("hydroxy", {root}))
         elif atom.symbol == "N" and bond and bond.order == 2:

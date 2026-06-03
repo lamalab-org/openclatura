@@ -10,11 +10,10 @@ OPSIN-verified grammar classes.
 from __future__ import annotations
 
 from .assembly_parts import SubstituentItem
-from .molecule import Molecule
 from .grammar_snapshot_data import retained_fused_derivative_gate
+from .molecule import Molecule
 from .perception import PerceivedGroup
 from .retained_fused_templates import match_retained_fused_templates
-
 
 _DERIVATIVE_GATE = retained_fused_derivative_gate()
 PRODUCTION_RETAINED_FUSED_PARENTS = _DERIVATIVE_GATE.production_parent_names
@@ -53,8 +52,7 @@ def production_retained_fused_parent(
     matches = [
         match
         for match in match_retained_fused_templates(mol, parent_atoms, include_disabled=True)
-        if match.template.name in PRODUCTION_RETAINED_FUSED_PARENTS
-        and match.template.derivative_production_enabled
+        if match.template.name in PRODUCTION_RETAINED_FUSED_PARENTS and match.template.derivative_production_enabled
     ]
     if not matches:
         return None
@@ -63,7 +61,8 @@ def production_retained_fused_parent(
     maps = [
         match.atom_to_locant
         for match in matches
-        if match.template.name == parent_name and _feature_locants_are_substitutable(match.atom_to_locant, feature_atoms)
+        if match.template.name == parent_name
+        and _feature_locants_are_substitutable(match.atom_to_locant, feature_atoms)
     ]
     if not maps:
         return None

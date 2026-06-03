@@ -1,31 +1,37 @@
+import random
+from concurrent.futures import ProcessPoolExecutor
+
 import numpy as np
 import py2opsin
-import random
 from datasets import load_dataset
-from bluenamer.namer import name_smiles
 from rdkit.Chem import CanonSmiles
-from concurrent.futures import ProcessPoolExecutor
 from tqdm import tqdm
 
+from bluenamer.namer import name_smiles
+
+
 def canon(smi):
-    if not smi: return None
-    try:
-        return CanonSmiles(smi)        
-    except:
+    if not smi:
         return None
+    try:
+        return CanonSmiles(smi)
+    except Exception:
+        return None
+
 
 def try_name_smiles(smi):
     try:
         return name_smiles(smi)
-    except:
+    except Exception:
         return None
+
 
 # --- Configuration ---
 N_TEST = 50_000
 
 # 1. Load dataset and select random N using indices
 print(f"Sampling {N_TEST} random molecules using .select()...")
-ds = load_dataset('jablonkagroup/pubchem-smiles-molecular-formula', split='train')
+ds = load_dataset("jablonkagroup/pubchem-smiles-molecular-formula", split="train")
 
 # Generate N random distinct integers and select
 indices = random.sample(range(len(ds)), N_TEST)
@@ -56,4 +62,3 @@ accuracy = np.mean(matches)
 
 print(f"Accuracy: {accuracy:.2%}")
 
-import pdb; pdb.set_trace()

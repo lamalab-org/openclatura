@@ -81,11 +81,7 @@ def _indicated_hydrogen_like_locant(mol: Molecule, atom_to_locant: dict[int, str
         atom = mol.atoms[atom_idx]
         if atom.symbol not in {"N", "C"}:
             continue
-        ring_bonds = [
-            mol.get_bond(atom_idx, neighbor)
-            for neighbor in mol.get_neighbors(atom_idx)
-            if neighbor in atoms
-        ]
+        ring_bonds = [mol.get_bond(atom_idx, neighbor) for neighbor in mol.get_neighbors(atom_idx) if neighbor in atoms]
         if sum(bond.order for bond in ring_bonds if bond is not None) != 2:
             continue
         best = min(best, (_locant_rank(locant), locant))

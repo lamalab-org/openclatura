@@ -105,9 +105,7 @@ class RoleCertificate:
         """Return charged expected atoms not covered by this certificate."""
 
         expected_charged = {
-            atom_id
-            for atom_id in expected_atoms
-            if atom_id in mol.atoms and mol.atoms[atom_id].charge != 0
+            atom_id for atom_id in expected_atoms if atom_id in mol.atoms and mol.atoms[atom_id].charge != 0
         }
         return expected_charged - set(self.represented_charges)
 
@@ -147,7 +145,9 @@ def audit_role_certificate(
     missing_atoms = expected_atom_set - certificate.represented_atoms
     extra_atoms = certificate.represented_atoms - expected_atom_set
     if missing_atoms or extra_atoms:
-        errors.append(f"certificate atom coverage mismatch: missing={sorted(missing_atoms)} extra={sorted(extra_atoms)}")
+        errors.append(
+            f"certificate atom coverage mismatch: missing={sorted(missing_atoms)} extra={sorted(extra_atoms)}"
+        )
     missing_bonds = expected_bond_set - certificate.represented_bonds
     if missing_bonds:
         errors.append(f"certificate bond coverage mismatch: missing={sorted(missing_bonds)}")

@@ -11,9 +11,9 @@ from dataclasses import dataclass
 from enum import StrEnum
 from functools import lru_cache
 
+from .grammar_snapshot_data import RetainedFusedToken, retained_fused_token, retained_fused_token_status
 from .molecule import Molecule
 from .naming_data import load_json_table
-from .grammar_snapshot_data import RetainedFusedToken, retained_fused_token, retained_fused_token_status
 from .polycycle_topology import RingSystemTopology, edges_within_atoms, ring_system_topology
 from .retained_fused_templates import (
     RetainedFusedGraphTemplate,
@@ -21,7 +21,6 @@ from .retained_fused_templates import (
     match_retained_fused_templates,
     retained_fused_graph_templates,
 )
-
 
 HETEROATOM_SENIORITY = {
     "F": 1,
@@ -191,11 +190,7 @@ class FusedComponentRegistry:
         *,
         include_audit_only: bool = False,
     ) -> tuple[FusedComponentRegistryEntry, ...]:
-        candidates = (
-            entry
-            for entry in self.entries
-            if include_audit_only or entry.is_allowed_as_fusion_component
-        )
+        candidates = (entry for entry in self.entries if include_audit_only or entry.is_allowed_as_fusion_component)
         return tuple(sorted(candidates, key=lambda entry: entry.parent_component_key))
 
 
@@ -256,9 +251,7 @@ def classify_ring_topology_route(
 
     atom_set = frozenset(atoms)
     topology = ring_system_topology(mol, atom_set)
-    retained_matches = tuple(
-        match_retained_fused_templates(mol, atom_set, include_disabled=include_disabled_retained)
-    )
+    retained_matches = tuple(match_retained_fused_templates(mol, atom_set, include_disabled=include_disabled_retained))
     if retained_matches:
         return RingTopologyRoute(
             kind=RingTopologyRouteKind.RETAINED_FUSED,
@@ -304,11 +297,7 @@ def fused_component_from_retained_match(
     """Project a retained fused template match into a fused component record."""
 
     ring_sizes = tuple(sorted((len(ring) for ring in match.template.rings), reverse=True))
-    heteroatoms = tuple(
-        atom.symbol
-        for atom in match.template.atoms
-        if atom.symbol != "C"
-    )
+    heteroatoms = tuple(atom.symbol for atom in match.template.atoms if atom.symbol != "C")
     heteroatom_ranks = tuple(PARENT_COMPONENT_HETEROATOM_SENIORITY.get(symbol, 10_000) for symbol in heteroatoms)
     senior_rank = min(heteroatom_ranks, default=10_000)
     return FusedComponentCandidate(
@@ -419,10 +408,7 @@ def fused_emission_examples() -> FusedEmissionExampleSet:
     raw = load_json_table("fused_emission_examples.json")
     return FusedEmissionExampleSet(
         name_policy=str(raw["name_policy"]),
-        stages={
-            str(stage): tuple(str(name) for name in names)
-            for stage, names in raw.get("stages", {}).items()
-        },
+        stages={str(stage): tuple(str(name) for name in names) for stage, names in raw.get("stages", {}).items()},
     )
 
 
@@ -539,9 +525,7 @@ def spiro_component_reference(
     return SpiroComponentReference(
         component_name=component_name,
         atom_to_locant=dict(atom_to_locant),
-        display_atom_to_locant={
-            atom: _prime_locant(locant, prime_count) for atom, locant in atom_to_locant.items()
-        },
+        display_atom_to_locant={atom: _prime_locant(locant, prime_count) for atom, locant in atom_to_locant.items()},
         spiro_atom=spiro_atom,
         atoms=atom_set,
         source=source,

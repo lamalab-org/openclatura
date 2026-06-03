@@ -1,20 +1,19 @@
+import contextlib
+import multiprocessing as mp
 import os
 import random
 import tempfile
-import contextlib
 import warnings
-import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import pandas as pd
 import py2opsin
 from datasets import load_dataset
-from bluenamer.namer import name_smiles
-from rdkit.Chem import CanonSmiles
 from tqdm import tqdm
 from utils import standardize_mol
 
+from bluenamer.namer import name_smiles
 
 # --- Configuration ---
 N_TEST = 100_000
@@ -71,9 +70,7 @@ def try_opsin_single(name):
 
             warning_text = "\n".join(str(w.message) for w in caught_warnings).strip()
 
-        console_output = "\n".join(
-            x for x in [stdout_text, stderr_text, warning_text] if x
-        )
+        console_output = "\n".join(x for x in [stdout_text, stderr_text, warning_text] if x)
 
         if not result:
             return None, console_output or "opsin_returned_empty_result", stdout_text, stderr_text, warning_text
@@ -84,9 +81,7 @@ def try_opsin_single(name):
         return result[0], console_output, stdout_text, stderr_text, warning_text
 
     except Exception as e:
-        console_output = "\n".join(
-            x for x in [stdout_text, stderr_text, warning_text] if x
-        )
+        console_output = "\n".join(x for x in [stdout_text, stderr_text, warning_text] if x)
 
         err = repr(e)
         if console_output:
@@ -170,10 +165,7 @@ def main():
     original_canon = [canon(smi) for smi in dataset]
 
     matches = np.array(
-        [
-            predicted == original and predicted is not None
-            for predicted, original in zip(smiles_strings, original_canon)
-        ]
+        [predicted == original and predicted is not None for predicted, original in zip(smiles_strings, original_canon)]
     )
 
     accuracy = np.mean(matches)
@@ -183,10 +175,7 @@ def main():
 
     failure_rows = []
 
-    failed_indices = [
-        i for i, match in enumerate(matches)
-        if not match or naming_errors[i] is not None
-    ]
+    failed_indices = [i for i, match in enumerate(matches) if not match or naming_errors[i] is not None]
 
     for i in tqdm(failed_indices):
         iupac_name = predicted_names[i]

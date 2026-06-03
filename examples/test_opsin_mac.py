@@ -1,16 +1,15 @@
+import multiprocessing as mp
 import os
 import random
-import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import py2opsin
 from datasets import load_dataset
-from bluenamer.namer import name_smiles
-from rdkit.Chem import CanonSmiles
 from tqdm import tqdm
 from utils import standardize_mol
 
+from bluenamer.namer import name_smiles
 
 # --- Configuration ---
 N_TEST = 1000_000
@@ -84,10 +83,7 @@ def main():
 
     # 5. Calculate Accuracy
     matches = np.array(
-        [
-            predicted == original and predicted is not None
-            for predicted, original in zip(smiles_strings, original_canon)
-        ]
+        [predicted == original and predicted is not None for predicted, original in zip(smiles_strings, original_canon)]
     )
 
     accuracy = np.mean(matches)

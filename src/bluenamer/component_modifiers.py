@@ -84,7 +84,9 @@ def add_component_n_substituents(
             n_substituents = [
                 n
                 for n in mol.get_neighbors(single_n)
-                if n != c_idx and n not in group.atoms_involved and mol.atoms[n].symbol != "H"
+                if n != c_idx
+                and n not in group.atoms_involved
+                and mol.atoms[n].symbol != "H"
                 and not _is_principal_hydrazone_carbon(mol, principal_key, single_n, n)
             ]
             if not n_substituents:
@@ -95,9 +97,7 @@ def add_component_n_substituents(
                 principal_key, len(principal_groups), len(nitrogens), n_idx_local, n_idx_global
             )
             for n_sub in n_substituents:
-                branch_name, branch_trace = _nitrogen_substituent_name(
-                    mol, single_n, n_sub, sub_exclude, branch_namer
-                )
+                branch_name, branch_trace = _nitrogen_substituent_name(mol, single_n, n_sub, sub_exclude, branch_namer)
                 if branch_name:
                     branch_atoms = subgraph_component(mol, n_sub, sub_exclude | {single_n})
                     if _use_hydrazone_suffix_modifier(parts, principal_key):

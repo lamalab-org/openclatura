@@ -134,11 +134,7 @@ def _build_candidates_for_decomposition(
     if main_bridge[0] != main_bridgeheads[0]:
         main_bridge = tuple(reversed(main_bridge))
 
-    primary_edges = (
-        _path_edges(first_ring)
-        | _path_edges(second_ring)
-        | _path_edges(main_bridge)
-    )
+    primary_edges = _path_edges(first_ring) | _path_edges(second_ring) | _path_edges(main_bridge)
     primary_atoms = set(first_ring) | set(second_ring) | set(main_bridge)
     remaining_edges = edge_set - primary_edges
     secondary = _classify_secondary_bridges(

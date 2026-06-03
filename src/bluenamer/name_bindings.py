@@ -2,8 +2,8 @@
 
 import re
 
-from .assembly_parts import AssemblyParts, NameAtomBinding, NameTokenBinding
 from .assembly_parent import parent_stem_and_terminal
+from .assembly_parts import AssemblyParts, NameAtomBinding, NameTokenBinding
 from .nomenclature import RULES
 from .principal_suffixes import render_principal_suffix
 from .rules import bonds, stems
@@ -123,9 +123,7 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
                 atom_ids=set(parts.principal_group.atom_ids),
                 bond_ids=set(parts.principal_group.bond_ids),
                 charge_atom_ids=set(parts.principal_group.charge_atom_ids)
-                or _exact_charge_renderer_atom_ids(
-                    parts.principal_group.key, set(parts.principal_group.atom_ids)
-                ),
+                or _exact_charge_renderer_atom_ids(parts.principal_group.key, set(parts.principal_group.atom_ids)),
                 locants=tuple(str(locant) for locant in parts.principal_group.locants),
                 emitted_tokens=_principal_suffix_emitted_tokens(parts.principal_group),
             )
@@ -263,16 +261,18 @@ def _with_default_emitted_tokens(binding: NameAtomBinding) -> NameAtomBinding:
     if binding.emitted_tokens:
         return _with_required_locant_tokens(binding)
     token_bindings = _operation_emitted_tokens(binding)
-    return _with_required_locant_tokens(NameAtomBinding(
-        stage=binding.stage,
-        role=binding.role,
-        term=binding.term,
-        atom_ids=set(binding.atom_ids),
-        bond_ids=set(binding.bond_ids),
-        charge_atom_ids=set(binding.charge_atom_ids),
-        locants=tuple(binding.locants),
-        emitted_tokens=token_bindings,
-    ))
+    return _with_required_locant_tokens(
+        NameAtomBinding(
+            stage=binding.stage,
+            role=binding.role,
+            term=binding.term,
+            atom_ids=set(binding.atom_ids),
+            bond_ids=set(binding.bond_ids),
+            charge_atom_ids=set(binding.charge_atom_ids),
+            locants=tuple(binding.locants),
+            emitted_tokens=token_bindings,
+        )
+    )
 
 
 def _with_required_locant_tokens(binding: NameAtomBinding) -> NameAtomBinding:
@@ -370,7 +370,13 @@ def _parent_display_tokens(parts: AssemblyParts) -> tuple[str, ...]:
         tokens.append("spiro")
     if parts.is_bicycle:
         tokens.append("bicyclo")
-    if parts.is_ring and not parts.retained_name and not parts.is_polycycle and not parts.is_spiro and not parts.is_bicycle:
+    if (
+        parts.is_ring
+        and not parts.retained_name
+        and not parts.is_polycycle
+        and not parts.is_spiro
+        and not parts.is_bicycle
+    ):
         tokens.append("cyclo" + stems.stem_for(parts.parent_length))
     stem = stems.stem_for(parts.parent_length)
     if stem:
@@ -729,7 +735,10 @@ def _contextual_match_scope(text: str, before: str, after: str, allow_suffix_con
     return (
         text == before
         or text == after
-        or (len(text) >= 4 and (_normalised_rendered_term_occurs(text, before) or _normalised_rendered_term_occurs(text, after)))
+        or (
+            len(text) >= 4
+            and (_normalised_rendered_term_occurs(text, before) or _normalised_rendered_term_occurs(text, after))
+        )
         or (allow_suffix_context and len(text) >= 6 and (before.endswith(text) or after.endswith(text)))
     )
 
@@ -753,9 +762,8 @@ def _normalised_rendered_term_occurs(term: str, final_text: str) -> bool:
 def _contextual_postprocess_replacements() -> tuple[tuple[str, str], ...]:
     from .assembler import LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS
 
-    return (
-        tuple((rule.pattern, rule.replacement) for rule in RULES.postprocess.literal_replacements)
-        + tuple(LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS)
+    return tuple((rule.pattern, rule.replacement) for rule in RULES.postprocess.literal_replacements) + tuple(
+        LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS
     )
 
 
@@ -770,9 +778,7 @@ def _replacement_charge_atom_ids(parts: AssemblyParts, item) -> set[int]:
     """Return charged replacement-prefix atoms represented by this binding."""
 
     charged_locants = {
-        str(locant)
-        for locant in item.locants
-        if parts.parent_atom_charges_by_locant.get(str(locant), 0) != 0
+        str(locant) for locant in item.locants if parts.parent_atom_charges_by_locant.get(str(locant), 0) != 0
     }
     if not charged_locants:
         return set()

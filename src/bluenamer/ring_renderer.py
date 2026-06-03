@@ -5,7 +5,6 @@ import re
 from .nomenclature import RULES
 from .rules import multipliers, stems
 
-
 _VON_BAEYER_DESCRIPTOR_RE = re.compile(r"^(?P<prefix>[a-z]+)cyclo\[")
 
 

@@ -107,7 +107,9 @@ def _apply_anion_suffix_rule(text: str, operation: ParentSuffixOperation, key: s
         return re.sub(
             r"(?P<stem>[A-Za-z0-9,\-\[\]\^\{\}\.'](?:[A-Za-z0-9,\-\[\]\^\{\}\.']|\(\d+\))*?)"
             r"-(?P<suffix_locant>\d+)-carbaldehyde\b",
-            lambda match: f"{explicit_implicit_cation_locant(match.group('stem'))}-{locant}-ide-{match.group('suffix_locant')}-carbaldehyde",
+            lambda match: (
+                f"{explicit_implicit_cation_locant(match.group('stem'))}-{locant}-ide-{match.group('suffix_locant')}-carbaldehyde"
+            ),
             text,
             count=1,
         )

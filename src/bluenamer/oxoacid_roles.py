@@ -64,7 +64,6 @@ class CentralOxoRole:
         return any(ligand.role == OxoLigandRole.OXIDO for ligand in self.ligands)
 
 
-
 def central_oxo_role(mol: Molecule, component_atoms: set[int], central: int) -> CentralOxoRole | None:
     """Classify an oxoacid-like central atom and its oxygen ligands."""
 

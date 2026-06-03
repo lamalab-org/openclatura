@@ -12,8 +12,8 @@ from .component_group_rules import (
 from .component_modifiers import add_component_front_modifiers, add_component_n_substituents
 from .functional_prefixes import collect_component_prefix_substituents
 from .molecule import DecisionTrace, Molecule, TracePhase
-from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .name_assembly import NameAssemblyResult, assert_final_name_assembly, token_span_trace_data
+from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
 from .naming_context import ComponentNamingState, NamingIntent
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent

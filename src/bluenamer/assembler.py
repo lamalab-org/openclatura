@@ -25,8 +25,6 @@ from .name_postprocessing import (
     apply_connection_boundary_postprocessing,
     apply_data_postprocessing,
 )
-from .rules import multipliers
-
 
 LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
     ("1-hydroxymethanoic acid", "carbonic acid"),
@@ -298,9 +296,7 @@ def _add_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:
     unlocanted_descriptors = {descriptor for locant, descriptor in unique_stereo if not locant}
     if unlocanted_descriptors:
         unique_stereo = [
-            feature
-            for feature in unique_stereo
-            if not (feature[0] == "1" and feature[1] in unlocanted_descriptors)
+            feature for feature in unique_stereo if not (feature[0] == "1" and feature[1] in unlocanted_descriptors)
         ]
     sorted_stereo = sorted(unique_stereo, key=lambda f: parse_locant(f[0]) if f[0] else (0, ""))
     stereo_str = "(" + ",".join(f"{loc}{st}" if loc else st for loc, st in sorted_stereo) + ")-"
@@ -348,7 +344,9 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
         stem_str, terminal_e = parent_stem_and_terminal(parts)
         stem_str = apply_replacement_prefix(stem_str, a_prefix_str)
         if parts.is_substituent:
-            stem_str, unsat_str, terminal_e, suffix_str = format_substituent_tail(parts, stem_str, terminal_e, spiro_subs)
+            stem_str, unsat_str, terminal_e, suffix_str = format_substituent_tail(
+                parts, stem_str, terminal_e, spiro_subs
+            )
         else:
             stem_str, unsat_str, terminal_e, suffix_str = format_parent_tail(parts, stem_str, terminal_e, spiro_subs)
 

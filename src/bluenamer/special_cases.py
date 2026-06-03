@@ -14,8 +14,7 @@ from .oxoacid_roles import CentralOxoRole, OxoLigandRole, central_oxo_roles
 from .oxoacid_templates import OxoacidTemplateKind, oxoacid_role_template
 from .perception import PerceivedGroup
 from .retained_specs import retained_parent_spec
-from .rules import retained
-from .rules import multipliers, stems
+from .rules import multipliers, retained, stems
 
 ComponentNamer = Callable[..., str]
 BranchNamer = Callable[..., str]
@@ -208,9 +207,11 @@ def diazo_lambda_heteroring_parent_name(mol: Molecule, component_atoms: set[int]
     if not replacement_prefixes:
         return ""
     unsaturation = _lambda_ring_unsaturation_suffix(mol, ring_path)
-    replacement_text = "-".join(replacement_prefixes[:-1]) + "-" + replacement_prefixes[-1] if len(
-        replacement_prefixes
-    ) > 1 else replacement_prefixes[0]
+    replacement_text = (
+        "-".join(replacement_prefixes[:-1]) + "-" + replacement_prefixes[-1]
+        if len(replacement_prefixes) > 1
+        else replacement_prefixes[0]
+    )
     return f"1-diazo-{replacement_text}cyclo{stems.stem_for(len(ring_path))}{unsaturation}"
 
 
@@ -275,7 +276,9 @@ def _preferred_lambda_ring_path(mol: Molecule, hetero: int, ring_atoms: set[int]
     candidates = [path for path in candidates if path]
     if not candidates:
         return []
-    return min(candidates, key=lambda path: (_hetero_locants_for_path(mol, path), _double_bond_locants_for_path(mol, path)))
+    return min(
+        candidates, key=lambda path: (_hetero_locants_for_path(mol, path), _double_bond_locants_for_path(mol, path))
+    )
 
 
 def _lambda_ring_path_from(mol: Molecule, hetero: int, start: int, ring_atoms: set[int]) -> list[int]:
@@ -409,7 +412,9 @@ def phosphane_borane_zwitterion_result(
 ) -> SpecialComponentName | None:
     """Name graph-proven B(-)(H)3-P(+) zwitterions with bound ligands and charges."""
 
-    role = next((role for role in charge_pair_roles(mol, component_atoms) if role.key == "phosphane_borane_zwitterion"), None)
+    role = next(
+        (role for role in charge_pair_roles(mol, component_atoms) if role.key == "phosphane_borane_zwitterion"), None
+    )
     if role is None or not role.template_supported or not role.template_audit(mol).ok:
         return None
     phosphorus = role.positive_atom
@@ -497,12 +502,7 @@ def _double_bonded_carbon(mol: Molecule, nitrogen: int, blocked: set[int]) -> in
 def _simple_carbonyl_side_name(mol: Molecule, side_atoms: set[int], carbonyl_carbon: int, *, as_ylidene: bool) -> str:
     if any(not mol.atoms[idx].is_carbon for idx in side_atoms):
         return ""
-    internal_edges = [
-        (a, b)
-        for a in side_atoms
-        for b in mol.get_neighbors(a)
-        if b in side_atoms and a < b
-    ]
+    internal_edges = [(a, b) for a in side_atoms for b in mol.get_neighbors(a) if b in side_atoms and a < b]
     if any(mol.get_bond(a, b).order not in {1, 2, 3} for a, b in internal_edges):
         return ""
     if len(internal_edges) != len(side_atoms) - 1:
@@ -711,11 +711,7 @@ def _simple_ring_numbering_score(mol: Molecule, oriented: list[int], attachment_
         first = mol.atoms[oriented[0]]
         if first.symbol == "C" or first.element.hw_priority != min(hetero_priorities):
             return None
-    hetero_locants = tuple(
-        pos
-        for pos, idx in enumerate(oriented, start=1)
-        if mol.atoms[idx].symbol != "C"
-    )
+    hetero_locants = tuple(pos for pos, idx in enumerate(oriented, start=1) if mol.atoms[idx].symbol != "C")
     attachment_locant = oriented.index(attachment_atom) + 1
     return (hetero_locants, attachment_locant, tuple(oriented))
 
@@ -765,11 +761,9 @@ def _simple_cycle_unsaturation_locants(mol: Molecule, oriented: list[int]) -> tu
 
 
 def _longest_carbon_path_through(mol: Molecule, side_atoms: set[int], required: int) -> list[int]:
-    endpoints = [
-        idx
-        for idx in side_atoms
-        if sum(1 for n in mol.get_neighbors(idx) if n in side_atoms) <= 1
-    ] or list(side_atoms)
+    endpoints = [idx for idx in side_atoms if sum(1 for n in mol.get_neighbors(idx) if n in side_atoms) <= 1] or list(
+        side_atoms
+    )
     best: list[int] = []
 
     def walk(curr: int, path: list[int], seen: set[int]) -> None:
@@ -1008,8 +1002,22 @@ def hydroxyurea_parent_result(
         idx
         for idx in component_atoms
         if mol.atoms[idx].is_carbon
-        and len([n for n in mol.get_neighbors(idx) if n in component_atoms and mol.atoms[n].symbol == "O" and mol.get_bond(idx, n).order == 2]) == 1
-        and len([n for n in mol.get_neighbors(idx) if n in component_atoms and mol.atoms[n].symbol == "N" and mol.get_bond(idx, n).order == 1]) == 2
+        and len(
+            [
+                n
+                for n in mol.get_neighbors(idx)
+                if n in component_atoms and mol.atoms[n].symbol == "O" and mol.get_bond(idx, n).order == 2
+            ]
+        )
+        == 1
+        and len(
+            [
+                n
+                for n in mol.get_neighbors(idx)
+                if n in component_atoms and mol.atoms[n].symbol == "N" and mol.get_bond(idx, n).order == 1
+            ]
+        )
+        == 2
     ]
     if len(carbonyl_carbons) != 1:
         return None
@@ -1611,7 +1619,9 @@ def sulfoxide_parent_result(mol: Molecule, component_atoms: set[int]) -> Special
         bond_ids=_bond_ids_within_atoms(mol, core_atoms),
         charge_atom_ids=_charged_atoms(mol, core_atoms),
     )
-    return _component_name_result(mol, component_atoms, name, "sulfoxide_parent", bindings=ligand_bindings + (core_binding,))
+    return _component_name_result(
+        mol, component_atoms, name, "sulfoxide_parent", bindings=ligand_bindings + (core_binding,)
+    )
 
 
 def _carbon_ligand_atoms(mol: Molecule, component_atoms: set[int], root: int, central: int) -> set[int]:
@@ -2025,7 +2035,9 @@ def _anhydride_core_atoms(mol: Molecule, bridge_o: int, carbonyl_carbons: list[i
     return core_atoms
 
 
-def _anhydride_core_bond_ids(mol: Molecule, bridge_o: int, carbonyl_carbons: list[int], core_atoms: set[int]) -> set[int]:
+def _anhydride_core_bond_ids(
+    mol: Molecule, bridge_o: int, carbonyl_carbons: list[int], core_atoms: set[int]
+) -> set[int]:
     link_bonds = _bond_ids_between(mol, {(bridge_o, carbon) for carbon in carbonyl_carbons})
     carbonyl_bonds = set()
     for carbon in carbonyl_carbons:

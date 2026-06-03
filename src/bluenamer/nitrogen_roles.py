@@ -82,14 +82,16 @@ class NitrogenChainTemplate:
     def matches(self, bond_orders: tuple[int, ...], charges: tuple[int, ...]) -> bool:
         if len(bond_orders) != len(self.bond_orders) or len(charges) != len(self.charges):
             return False
-        return all(_template_value_matches(expected, actual) for expected, actual in zip(self.bond_orders, bond_orders)) and all(
-            _template_value_matches(expected, actual) for expected, actual in zip(self.charges, charges)
-        )
+        return all(
+            _template_value_matches(expected, actual) for expected, actual in zip(self.bond_orders, bond_orders)
+        ) and all(_template_value_matches(expected, actual) for expected, actual in zip(self.charges, charges))
 
 
 CARBON_BOUND_N2_TEMPLATES: tuple[NitrogenChainTemplate, ...] = (
     NitrogenChainTemplate("diazenyl", (1, 2), (0, 0, 0), "carbon_bound_neutral_diazene"),
-    NitrogenChainTemplate("diazonio", (1, frozenset({2, 3})), (0, frozenset({0, 1}), frozenset({0, 1})), "carbon_bound_diazonium"),
+    NitrogenChainTemplate(
+        "diazonio", (1, frozenset({2, 3})), (0, frozenset({0, 1}), frozenset({0, 1})), "carbon_bound_diazonium"
+    ),
     NitrogenChainTemplate("diazo", (2, frozenset({2, 3})), (None, None, None), "carbon_bound_diazo"),
 )
 
@@ -121,7 +123,9 @@ def _match_template(
     return next((template for template in templates if template.matches(bond_orders, charges)), None)
 
 
-def nitrogen_chain_roles(mol: Molecule, cyclic_atoms: set[int], consumed: set[int] | None = None) -> list[NitrogenChainRole]:
+def nitrogen_chain_roles(
+    mol: Molecule, cyclic_atoms: set[int], consumed: set[int] | None = None
+) -> list[NitrogenChainRole]:
     """Return azido/diazo/diazonio/hydrazone/hydrazine roles in priority order."""
 
     blocked = consumed or set()
@@ -480,7 +484,9 @@ def _nitrogen_with_terminal_n(
     excluded: set[int],
     blocked: set[int],
 ) -> int | None:
-    matches = [nitrogen for nitrogen in nitrogens if _terminal_nitrogen_neighbor(mol, nitrogen, excluded, blocked) is not None]
+    matches = [
+        nitrogen for nitrogen in nitrogens if _terminal_nitrogen_neighbor(mol, nitrogen, excluded, blocked) is not None
+    ]
     return matches[0] if len(matches) == 1 else None
 
 
@@ -591,9 +597,7 @@ def terminal_n3_substituent_role(
         return None
     n2 = n2_candidates[0]
     n3_candidates = [
-        n
-        for n in mol.get_neighbors(n2)
-        if n != start_idx and n not in exclude_atoms and mol.atoms[n].symbol == "N"
+        n for n in mol.get_neighbors(n2) if n != start_idx and n not in exclude_atoms and mol.atoms[n].symbol == "N"
     ]
     if len(n3_candidates) != 1:
         return None
@@ -682,11 +686,7 @@ def _single_external_attachment(
 
 
 def _other_non_h_neighbors(mol: Molecule, atom_idx: int, allowed: set[int]) -> list[int]:
-    return [
-        n
-        for n in mol.get_neighbors(atom_idx)
-        if n not in allowed and mol.atoms[n].symbol != "H"
-    ]
+    return [n for n in mol.get_neighbors(atom_idx) if n not in allowed and mol.atoms[n].symbol != "H"]
 
 
 def _has_non_h_multiple_bond_neighbor(mol: Molecule, atom_idx: int, allowed: set[int]) -> bool:

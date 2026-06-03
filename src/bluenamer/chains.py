@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 
 from .molecule import Molecule
 from .polycycle_topology import (
-    audit_von_baeyer_descriptor,
     bicyclo_proof,
     build_ring_numbering,
     build_von_baeyer_numbering,
@@ -629,7 +628,7 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                 )
                 recognized_via_retained = True
             else:
-                for c in (() if is_von_baeyer else cycles if allow_descriptor else ()):
+                for c in () if is_von_baeyer else cycles if allow_descriptor else ():
                     if len(c) == V and retained_rules.recognizes_retained_ring(mol, c):
                         systems.append(
                             RingSystem(
@@ -1086,7 +1085,9 @@ def _polyspiro_or_von_baeyer_candidate(
         return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
     legacy_descriptor, legacy_paths = get_von_baeyer_descriptor_and_path(atoms, edges)
     if legacy_descriptor and _is_von_baeyer_descriptor(legacy_descriptor):
-        legacy_numberings = tuple(_audited_von_baeyer_numberings(mol, legacy_descriptor, legacy_paths, frozenset(edges)))
+        legacy_numberings = tuple(
+            _audited_von_baeyer_numberings(mol, legacy_descriptor, legacy_paths, frozenset(edges))
+        )
         if legacy_numberings:
             return PolycycleDescriptorCandidate(
                 descriptor=legacy_descriptor,

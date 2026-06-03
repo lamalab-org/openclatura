@@ -962,7 +962,9 @@ def _simple_rooted_carbanion_substituent_name(
 
     if parts.substituents or parts.principal_group is not None or parts.unsaturations:
         return ""
-    charged = [atom_idx for atom_idx in numbered_path if mol.atoms[atom_idx].is_carbon and mol.atoms[atom_idx].charge < 0]
+    charged = [
+        atom_idx for atom_idx in numbered_path if mol.atoms[atom_idx].is_carbon and mol.atoms[atom_idx].charge < 0
+    ]
     if len(charged) != 1 or str(get_loc(charged[0])) != "1":
         return ""
     if any(not mol.atoms[atom_idx].is_carbon for atom_idx in numbered_path):

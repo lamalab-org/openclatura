@@ -10,8 +10,8 @@ from .formatting import (
     oxy_prefix_from_branch,
     strip_outer_parentheses,
 )
-from .heterocumulene_roles import nitrogen_heterocumulene_role
 from .heteroatom_substituent_specs import central_oxo_substituent_prefix, unsubstituted_prefix
+from .heterocumulene_roles import nitrogen_heterocumulene_role
 from .hypervalent_roles import HypervalentCenterRole, HypervalentLigandRole, hypervalent_center_role
 from .ionic_naming import ammonio_prefix
 from .molecule import Molecule
@@ -103,11 +103,7 @@ def central_oxo_ligand_atoms(mol: Molecule, atom_idx: int, exclude_atoms: set[in
     role = central_oxo_substituent_role_for_center(mol, atom_idx, exclude_atoms)
     if role is None:
         return []
-    return [
-        ligand.oxygen
-        for ligand in role.ligands
-        if ligand.role in {OxoLigandRole.OXO, OxoLigandRole.OXIDO}
-    ]
+    return [ligand.oxygen for ligand in role.ligands if ligand.role in {OxoLigandRole.OXO, OxoLigandRole.OXIDO}]
 
 
 def central_oxo_substituent_role_for_center(mol: Molecule, atom_idx: int, exclude_atoms: set[int]):
@@ -409,9 +405,7 @@ def name_nitrogen_subgraph(
         else:
             s_oxygens = double_bonded_neighbors(mol, nxt, "O")
             if mol.atoms[nxt].symbol == "S" and s_oxygens:
-                sulfur_imide = _sulfur_imide_branch_name(
-                    mol, start_idx, nxt, exclude_atoms, s_oxygens, branch_namer
-                )
+                sulfur_imide = _sulfur_imide_branch_name(mol, start_idx, nxt, exclude_atoms, s_oxygens, branch_namer)
                 if sulfur_imide:
                     branches.append(sulfur_imide)
             else:
@@ -455,11 +449,7 @@ def _sulfur_imide_branch_name(
         cyclic_name = _cyclic_sulfur_imide_ligand_name(mol, sulfur, nitrogen, next_atoms, s_oxygens)
         if cyclic_name:
             return cyclic_name
-        branches = [
-            br
-            for nxt in next_atoms
-            if (br := branch_namer(mol, nxt, local_exclude, sulfur))
-        ]
+        branches = [br for nxt in next_atoms if (br := branch_namer(mol, nxt, local_exclude, sulfur))]
         branches.extend(["oxo"] * len(s_oxygens))
         if not branches:
             return "sulfanylidene"

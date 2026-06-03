@@ -11,9 +11,8 @@ from dataclasses import dataclass
 from typing import Any
 
 from .molecule import Molecule
-from .nomenclature import RULES
 from .naming_data import load_json_table
-
+from .nomenclature import RULES
 
 ALLOWED_BOND_CLASSES = {"single", "double", "aromatic", "mancude", "fusion"}
 
@@ -120,8 +119,7 @@ def pending_retained_fused_parent_names() -> tuple[str, ...]:
     """
 
     return tuple(
-        str(row["name"])
-        for row in load_json_table("retained_fused_graph_templates.json").get("pending_parents", ())
+        str(row["name"]) for row in load_json_table("retained_fused_graph_templates.json").get("pending_parents", ())
     )
 
 
@@ -263,11 +261,7 @@ def _retained_fused_match_rank(match: RetainedFusedTemplateMatch) -> tuple:
     """Rank retained fused matches by retained-parent and numbering criteria."""
 
     template = match.template
-    hetero_locants = tuple(
-        _locant_sort_key(atom.locant)
-        for atom in template.atoms
-        if atom.symbol != "C"
-    )
+    hetero_locants = tuple(_locant_sort_key(atom.locant) for atom in template.atoms if atom.symbol != "C")
     fusion_locants = tuple(_locant_sort_key(locant) for locant in template.fusion_atoms)
     indicated_h_rank = tuple(_locant_sort_key(locant) for locant in match.indicated_h)
     atom_order = tuple(match.locant_to_atom[locant] for locant in template.locants)
@@ -327,9 +321,7 @@ def retained_fused_template_from_data(row: dict[str, Any]) -> RetainedFusedGraph
         peripheral_atoms=peripheral_atoms,
         interior_atoms=interior_atoms,
         numbering_policy=str(template_data.get("numbering_policy", "retained_template")),
-        aromatic_equivalence_policy=str(
-            template_data.get("aromatic_equivalence_policy", "neutral_kekule_equivalent")
-        ),
+        aromatic_equivalence_policy=str(template_data.get("aromatic_equivalence_policy", "neutral_kekule_equivalent")),
         enabled=bool(template_data.get("enabled", row.get("template_enabled", False))),
         derivative_production_enabled=bool(template_data.get("derivative_production_enabled", False)),
     )
@@ -364,10 +356,7 @@ def _expand_locant_atom_shorthand(template_data: dict[str, Any]) -> dict[str, An
         return expanded
 
     heteroatoms = {str(item["locant"]): str(item["symbol"]) for item in template_data.get("heteroatoms", ())}
-    atom_overrides = {
-        str(item["locant"]): dict(item)
-        for item in template_data.get("atom_overrides", ())
-    }
+    atom_overrides = {str(item["locant"]): dict(item) for item in template_data.get("atom_overrides", ())}
     fusion_atoms = set(str(locant) for locant in expanded.get("fusion_atoms", ()))
     indicated_h = set(str(locant) for locant in expanded.get("default_indicated_h", ()))
     atoms = []

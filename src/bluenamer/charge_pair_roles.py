@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from .molecule import Molecule
 from .role_certificate import RoleCertificate, RoleCertificateAudit, RoleProjection, audit_role_certificate
 
-
 SUPPORTED_TEMPLATE_ROLES = frozenset(
     {
         "diazonium_azanide",
@@ -170,8 +169,11 @@ def _classify_charge_pair(
                 "Matched terminal chalcogenide paired with a charged heteroarenium atom.",
             )
 
-    if pos_atom.symbol == "P" and neg_atom.symbol == "B" and bond is not None and _is_boranuide_phosphanium_pair(
-        mol, component_atoms, positive, negative
+    if (
+        pos_atom.symbol == "P"
+        and neg_atom.symbol == "B"
+        and bond is not None
+        and _is_boranuide_phosphanium_pair(mol, component_atoms, positive, negative)
     ):
         return _role(
             mol,

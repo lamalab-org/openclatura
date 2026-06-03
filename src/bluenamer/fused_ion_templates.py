@@ -13,9 +13,9 @@ from functools import lru_cache
 from typing import Any
 
 from .assembly_parts import AssemblyParts, NameAtomBinding
-from .naming_data import load_json_table
 from .grammar_snapshot_data import local_grammar_snapshot, retained_fused_token_status
 from .name_bindings import ensure_name_atom_binding_tokens
+from .naming_data import load_json_table
 
 
 @dataclass(frozen=True)
@@ -65,10 +65,7 @@ class FusedIonTemplateRegistry:
         locants: tuple[str, ...],
     ) -> FusedIonTemplate | None:
         for template in self.for_parent(parent_name):
-            if (
-                template.allowed_charge_operation == operation
-                and template.allowed_locants == locants
-            ):
+            if template.allowed_charge_operation == operation and template.allowed_locants == locants:
                 return template
         return None
 
@@ -129,11 +126,7 @@ def _template_from_row(row: dict[str, Any]) -> FusedIonTemplate:
 def _validate_charge_suffix_vocabulary(templates: tuple[FusedIonTemplate, ...]) -> None:
     allowed = set(local_grammar_snapshot()["charge_suffixes"]["canonical"]) | {"oxide"}
     invalid = sorted(
-        {
-            template.suffix_or_prefix_form
-            for template in templates
-            if template.suffix_or_prefix_form not in allowed
-        }
+        {template.suffix_or_prefix_form for template in templates if template.suffix_or_prefix_form not in allowed}
     )
     if invalid:
         raise ValueError(f"fused ion template uses unsupported charge suffixes: {invalid}")
@@ -269,9 +262,7 @@ def _retained_fused_n_oxide_operation(
 
     template = fused_ion_template_registry().for_operation(parts.retained_name, "ring_n_oxide", (locant,))
     charge_atoms = {
-        charge.atom_id
-        for charge in parts.parent_charges
-        if charge.atom_id is not None and str(charge.locant) == locant
+        charge.atom_id for charge in parts.parent_charges if charge.atom_id is not None and str(charge.locant) == locant
     }
     represented_atoms = frozenset(set(oxido_item.atom_ids) | {atom for atom in charge_atoms if atom is not None})
     return FusedIonOperationCandidate(

@@ -273,9 +273,7 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                     (
                         x
                         for x in mol.get_neighbors(triple_n)
-                        if x != atom.idx
-                        and mol.atoms[x].symbol == "O"
-                        and mol.get_bond(triple_n, x).order == 1
+                        if x != atom.idx and mol.atoms[x].symbol == "O" and mol.get_bond(triple_n, x).order == 1
                     ),
                     None,
                 )
@@ -448,9 +446,7 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                 ring_neighbors = [n for n in mol.get_neighbors(atom.idx) if n in cyclic_atoms]
                 carbon_neighbors = [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].is_carbon]
                 non_chalcogen_neighbors = [
-                    n
-                    for n in mol.get_neighbors(atom.idx)
-                    if n != double_s and mol.atoms[n].symbol != "H"
+                    n for n in mol.get_neighbors(atom.idx) if n != double_s and mol.atoms[n].symbol != "H"
                 ]
                 if single_n is not None and single_n not in cyclic_atoms:
                     target_carbon = atom.idx

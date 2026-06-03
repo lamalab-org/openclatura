@@ -2,8 +2,8 @@
 
 from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem
 from .molecule import Molecule
-from .namer_config import RETAINED_RING_ELEMENTS
 from .name_bindings import ensure_name_atom_binding_tokens
+from .namer_config import RETAINED_RING_ELEMENTS
 from .naming_context import NamingIntent, ParentAssemblyPlan
 from .numbering import choose_parent_numbering
 from .parent_selection import ParentSelection
@@ -49,9 +49,7 @@ def build_parent_assembly_plan(
         and _is_von_baeyer_descriptor(selection.ring_parent.descriptor)
     ):
         audited_maps = [
-            numbering.locant_map
-            for numbering in selection.ring_parent.numbering_candidates
-            if numbering.audit_ok
+            numbering.locant_map for numbering in selection.ring_parent.numbering_candidates if numbering.audit_ok
         ]
         locant_maps = audited_maps or None
     numbered_path, locant_map = choose_parent_numbering(
@@ -171,9 +169,7 @@ def _add_relative_ring_stereo(mol: Molecule, parts: AssemblyParts, numbered_path
         )
         return
     raw_atoms = [
-        atom_idx
-        for atom_idx in numbered_path
-        if mol.atoms[atom_idx].raw_stereo and not mol.atoms[atom_idx].stereo
+        atom_idx for atom_idx in numbered_path if mol.atoms[atom_idx].raw_stereo and not mol.atoms[atom_idx].stereo
     ]
     if len(raw_atoms) != 2:
         return
@@ -184,7 +180,10 @@ def _add_relative_ring_stereo(mol: Molecule, parts: AssemblyParts, numbered_path
     if first_tag not in {"CW", "CCW"} or second_tag not in {"CW", "CCW"}:
         return
     parent_set = set(numbered_path)
-    if any(sum(1 for neighbor_idx in mol.get_neighbors(atom_idx) if neighbor_idx not in parent_set) != 1 for atom_idx in raw_atoms):
+    if any(
+        sum(1 for neighbor_idx in mol.get_neighbors(atom_idx) if neighbor_idx not in parent_set) != 1
+        for atom_idx in raw_atoms
+    ):
         return
 
     term = "cis" if first_tag == second_tag else "trans"

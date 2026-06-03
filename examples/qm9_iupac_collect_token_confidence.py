@@ -8,9 +8,9 @@ fallback/ambiguous/unbound token bindings can be inspected and patched.
 
 from __future__ import annotations
 
+import multiprocessing as mp
 import os
 import random
-import multiprocessing as mp
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
 from typing import Any
@@ -19,8 +19,7 @@ import pandas as pd
 from datasets import load_dataset
 from tqdm import tqdm
 
-from bluenamer import NamingRequest, DEFAULT_NAMING_ENGINE
-
+from bluenamer import DEFAULT_NAMING_ENGINE, NamingRequest
 
 # --- Configuration ---
 N_TEST = 5_000
@@ -96,7 +95,9 @@ def _summary_for_result(index: int, smiles: str, result, token_rows: list[dict])
     fallback_rows = [
         row
         for row in token_rows
-        if row["confidence"] == "fallback" or row["ownership"] in {"ambiguous", "unbound"} or row["source"] in {"broad_fallback", "unresolved"}
+        if row["confidence"] == "fallback"
+        or row["ownership"] in {"ambiguous", "unbound"}
+        or row["source"] in {"broad_fallback", "unresolved"}
     ]
     unbound_rows = [row for row in token_rows if row["ownership"] == "unbound" or row["source"] == "unresolved"]
 
@@ -188,9 +189,15 @@ def main() -> None:
 
     print(f"Total molecules: {len(summary_df)}")
     print(f"Total token rows: {len(token_df)}")
-    print(f"Molecules with fallback tokens: {int((summary_df['fallback_token_count'] > 0).sum()) if not summary_df.empty else 0}")
-    print(f"Molecules with ambiguous tokens: {int((summary_df['ambiguous_token_count'] > 0).sum()) if not summary_df.empty else 0}")
-    print(f"Molecules with unbound tokens: {int((summary_df['unbound_token_count'] > 0).sum()) if not summary_df.empty else 0}")
+    print(
+        f"Molecules with fallback tokens: {int((summary_df['fallback_token_count'] > 0).sum()) if not summary_df.empty else 0}"
+    )
+    print(
+        f"Molecules with ambiguous tokens: {int((summary_df['ambiguous_token_count'] > 0).sum()) if not summary_df.empty else 0}"
+    )
+    print(
+        f"Molecules with unbound tokens: {int((summary_df['unbound_token_count'] > 0).sum()) if not summary_df.empty else 0}"
+    )
 
 
 if __name__ == "__main__":

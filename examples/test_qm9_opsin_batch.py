@@ -1,24 +1,19 @@
-import os
-import random
-import multiprocessing as mp
-from concurrent.futures import ProcessPoolExecutor
 import contextlib
+import multiprocessing as mp
+import os
+import tempfile
+import warnings
+from concurrent.futures import ProcessPoolExecutor
 
-import io
 import numpy as np
 import pandas as pd
 import py2opsin
 from datasets import load_dataset
-from bluenamer.namer import name_smiles
-from rdkit.Chem import CanonSmiles
-from tqdm import tqdm
-import os
-import tempfile
-import contextlib
-import warnings
 from rdkit import Chem
 from rdkit.Chem.MolStandardize import rdMolStandardize
+from tqdm import tqdm
 
+from bluenamer.namer import name_smiles
 
 normalizer = rdMolStandardize.Normalizer()
 reionizer = rdMolStandardize.Reionizer()
@@ -27,11 +22,10 @@ fragment_chooser = rdMolStandardize.LargestFragmentChooser()
 tautomer_enum = rdMolStandardize.TautomerEnumerator()
 
 
-
-
 # --- Configuration ---
 
 FAILURES_CSV = "qm9_failures.csv"
+
 
 @contextlib.contextmanager
 def capture_fds():
@@ -82,13 +76,9 @@ def try_opsin_single(name):
                 stdout_text = read_tmp_file(stdout_tmp)
                 stderr_text = read_tmp_file(stderr_tmp)
 
-            warning_text = "\n".join(
-                str(w.message) for w in caught_warnings
-            ).strip()
+            warning_text = "\n".join(str(w.message) for w in caught_warnings).strip()
 
-        console_output = "\n".join(
-            x for x in [stdout_text, stderr_text, warning_text] if x
-        )
+        console_output = "\n".join(x for x in [stdout_text, stderr_text, warning_text] if x)
 
         if not result:
             return None, console_output or "opsin_returned_empty_result", stdout_text, stderr_text, warning_text
@@ -99,9 +89,7 @@ def try_opsin_single(name):
         return result[0], console_output, stdout_text, stderr_text, warning_text
 
     except Exception as e:
-        console_output = "\n".join(
-            x for x in [stdout_text, stderr_text, warning_text] if x
-        )
+        console_output = "\n".join(x for x in [stdout_text, stderr_text, warning_text] if x)
 
         err = repr(e)
         if console_output:
@@ -115,8 +103,6 @@ def standardize_and_canonicalize_tautomer(smi):
     if mol is None:
         return None
 
-
-
     mol = rdMolStandardize.Cleanup(mol)
     mol = normalizer.normalize(mol)
     mol = reionizer.reionize(mol)
@@ -125,6 +111,7 @@ def standardize_and_canonicalize_tautomer(smi):
 
     return Chem.MolToSmiles(mol, canonical=True)
 
+
 def normalize_tautomer_smiles(smi):
     mol = Chem.MolFromSmiles(smi)
     if mol is None:
@@ -132,7 +119,9 @@ def normalize_tautomer_smiles(smi):
     taut = tautomer_enum.Canonicalize(mol)
     return Chem.MolToSmiles(taut, canonical=True)
 
+
 te = rdMolStandardize.TautomerEnumerator()
+
 
 def canon(smi):
     if not smi:
@@ -150,20 +139,18 @@ def try_name_smiles(smi):
         return None, repr(e)
 
 
-
-
 def main():
-    
+
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-    print(f"Loading all QM9 molecules")
+    print("Loading all QM9 molecules")
 
     ds = load_dataset(
         "yairschiff/qm9",
         split="train",
     )
 
-    #all_smiles = ds["smiles"]
+    # all_smiles = ds["smiles"]
     dataset = list(ds["smiles"])
 
     print("Converting SMILES to IUPAC names...")
@@ -199,10 +186,7 @@ def main():
     original_canon = [canon(smi) for smi in dataset]
 
     matches = np.array(
-        [
-            predicted == original and predicted is not None
-            for predicted, original in zip(smiles_strings, original_canon)
-        ]
+        [predicted == original and predicted is not None for predicted, original in zip(smiles_strings, original_canon)]
     )
 
     accuracy = np.mean(matches)
@@ -212,10 +196,7 @@ def main():
 
     failure_rows = []
 
-    failed_indices = [
-        i for i, match in enumerate(matches)
-        if not match or naming_errors[i] is not None
-    ]
+    failed_indices = [i for i, match in enumerate(matches) if not match or naming_errors[i] is not None]
 
     for i in tqdm(failed_indices):
         original_smiles = dataset[i]
@@ -225,7 +206,9 @@ def main():
         single_opsin_error = None
 
         if naming_errors[i] is None:
-            single_opsin_smiles, single_opsin_error, opsin_stdout, opsin_stderr, opsin_warnings = try_opsin_single(iupac_name)
+            single_opsin_smiles, single_opsin_error, opsin_stdout, opsin_stderr, opsin_warnings = try_opsin_single(
+                iupac_name
+            )
 
         failure_rows.append(
             {

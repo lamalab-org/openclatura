@@ -134,7 +134,11 @@ def _classify_peroxy_carbonyl(
             attachment,
         )
     if mol.atoms[attachment].is_carbon:
-        kind = PeroxyCarbonylKind.CARBONATE_LIKE if _has_second_single_oxygen(mol, component_atoms, carbonyl, proximal_oxygen) else PeroxyCarbonylKind.PEROXOATE
+        kind = (
+            PeroxyCarbonylKind.CARBONATE_LIKE
+            if _has_second_single_oxygen(mol, component_atoms, carbonyl, proximal_oxygen)
+            else PeroxyCarbonylKind.PEROXOATE
+        )
         return PeroxyCarbonylRole(carbonyl, carbonyl_oxygen, proximal_oxygen, distal_oxygen, kind, attachment)
     return None
 

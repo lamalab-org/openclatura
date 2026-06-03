@@ -1,27 +1,31 @@
-import numpy as np
-import py2opsin
 import csv
 from collections import Counter
-from datasets import load_dataset
-from bluenamer.namer import name_smiles
-from bluenamer.resonance_compare import equivalent_smiles
-from rdkit.Chem import CanonSmiles
 from concurrent.futures import ProcessPoolExecutor
+
+import py2opsin
+from datasets import load_dataset
 from tqdm import tqdm
 from utils import standardize_mol
 
+from bluenamer.namer import name_smiles
+from bluenamer.resonance_compare import equivalent_smiles
+
+
 def canon(smi):
-    if not smi: return None
-    try:
-        return standardize_mol(smi)        
-    except:
+    if not smi:
         return None
+    try:
+        return standardize_mol(smi)
+    except Exception:
+        return None
+
 
 def try_name_smiles(smi):
     try:
         return name_smiles(smi)
     except Exception:
         return None
+
 
 def failure_bucket(failure):
     name = (failure["iupac"] or "").lower()
@@ -46,11 +50,12 @@ def failure_bucket(failure):
         return "stereo"
     return "other"
 
+
 def run_pipeline():
     # 1. Load and Filter Data
     print("Loading and filtering dataset...")
-    raw_data = load_dataset('jablonkagroup/pubchem-smiles-molecular-formula')["train"]["smiles"][2_300_000:2_600_000]
-    
+    raw_data = load_dataset("jablonkagroup/pubchem-smiles-molecular-formula")["train"]["smiles"][2_300_000:2_600_000]
+
     # Filter: Only molecules < 30 characters
     filtered_dataset = [s for s in raw_data if len(s) < 30]
     print(f"Filtered {len(raw_data)} down to {len(filtered_dataset)} molecules.")
@@ -64,7 +69,7 @@ def run_pipeline():
     print("Converting IUPAC names back to SMILES...")
     # Replace None with empty strings for py2opsin batch processing
     query_names = [n if n is not None else "" for n in predicted_names]
-    
+
     try:
         reconstructed_smiles = py2opsin.py2opsin(query_names)
     except Exception as e:
@@ -80,7 +85,7 @@ def run_pipeline():
         orig_smi = filtered_dataset[i]
         iupac_name = predicted_names[i]
         recon_smi = reconstructed_smiles[i]
-        
+
         # Canonicalize for fair comparison
         orig_canon = canon(orig_smi)
         recon_canon = canon(recon_smi)
@@ -93,26 +98,23 @@ def run_pipeline():
             failure_reason = "NAME_TO_SMILES_FAILED"
         elif orig_canon != recon_canon and not equivalent_smiles(orig_smi, recon_smi):
             failure_reason = "SMILES_MISMATCH"
-        
+
         if failure_reason:
-            failures.append({
-                "original": orig_smi,
-                "iupac": iupac_name,
-                "reconstructed": recon_smi,
-                "reason": failure_reason
-            })
+            failures.append(
+                {"original": orig_smi, "iupac": iupac_name, "reconstructed": recon_smi, "reason": failure_reason}
+            )
         else:
             success_count += 1
 
     # 5. Reporting
     accuracy = success_count / len(filtered_dataset)
-    print(f"\n--- Results ---")
+    print("\n--- Results ---")
     print(f"Total Processed: {len(filtered_dataset)}")
     print(f"Accuracy: {accuracy:.2%}")
     print(f"Total Failures: {len(failures)}")
-    
+
     # Categorize failures
-    reasons = [f['reason'] for f in failures]
+    reasons = [f["reason"] for f in failures]
     unique_reasons = set(reasons)
     for r in unique_reasons:
         print(f" - {r}: {reasons.count(r)}")
@@ -175,6 +177,7 @@ def run_pipeline():
             print(f"  Orig: {f['original']}")
             print(f"  Name: {f['iupac']}")
             print(f"  Back: {f['reconstructed']}\n")
+
 
 if __name__ == "__main__":
     run_pipeline()

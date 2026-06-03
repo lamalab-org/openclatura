@@ -3,8 +3,8 @@
 from dataclasses import dataclass
 from enum import StrEnum
 
-from .molecule import Molecule
 from .grammar_snapshot_data import oxoacid_ester_suffix_templates
+from .molecule import Molecule
 from .oxoacid_roles import CentralOxoRole, OxoLigandRole
 
 

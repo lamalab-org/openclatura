@@ -83,7 +83,9 @@ def retained_fused_derivative_gate() -> RetainedFusedDerivativeGate:
     return RetainedFusedDerivativeGate(
         production_parent_names=production_parent_names,
         audit_only_parent_names=audit_only_parent_names,
-        allowed_principal_keys=frozenset(None if value is None else str(value) for value in raw["allowed_principal_keys"]),
+        allowed_principal_keys=frozenset(
+            None if value is None else str(value) for value in raw["allowed_principal_keys"]
+        ),
         allowed_group_keys=frozenset(str(value) for value in raw["allowed_group_keys"]),
         allowed_substituent_names=frozenset(str(value) for value in raw["allowed_substituent_names"]),
     )
@@ -143,7 +145,13 @@ def _validate_snapshot(snapshot: dict[str, Any]) -> None:
             raise ValueError(f"retained fused token {parent_name!r} must define at least one parent stem")
 
     gate = snapshot["retained_fused_derivative_gate"]
-    for key in ("production_parent_names", "audit_only_parent_names", "allowed_principal_keys", "allowed_group_keys", "allowed_substituent_names"):
+    for key in (
+        "production_parent_names",
+        "audit_only_parent_names",
+        "allowed_principal_keys",
+        "allowed_group_keys",
+        "allowed_substituent_names",
+    ):
         if key not in gate:
             raise ValueError(f"local grammar snapshot retained_fused_derivative_gate is missing {key!r}")
 

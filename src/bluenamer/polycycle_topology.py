@@ -4,8 +4,8 @@ This module classifies topology only.  It intentionally does not render names
 except for descriptor/audit data that can be proven from the graph.
 """
 
-from dataclasses import dataclass
 import re
+from dataclasses import dataclass
 
 from .molecule import Molecule
 from .ring_renderer import render_ring_descriptor, von_baeyer_cycle_count, von_baeyer_kind
@@ -528,7 +528,9 @@ def build_von_baeyer_numbering(
         atom_symbols_by_locant=atom_symbols_by_locant,
         atom_charges_by_locant=atom_charges_by_locant,
         bond_orders_by_locants=bond_orders_by_locants,
-        bridgehead_locants=_bridgehead_locants("bicyclo", descriptor_numbers[:3]) if len(descriptor_numbers) >= 3 else (),
+        bridgehead_locants=_bridgehead_locants("bicyclo", descriptor_numbers[:3])
+        if len(descriptor_numbers) >= 3
+        else (),
         substituent_attachment_locants=tuple(
             sorted(atom_to_locant[atom] for atom in substituent_attachment_atoms if atom in atom_to_locant)
         ),
