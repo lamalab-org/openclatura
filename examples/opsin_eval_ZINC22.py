@@ -5,6 +5,7 @@ import random
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
+from huggingface_hub import HfApi, hf_hub_url
 
 import numpy as np
 import py2opsin
@@ -15,6 +16,18 @@ from utils import standardize_mol
 from bluenamer.namer import name_smiles
 
 # --- Configuration ---
+ZINC22_REPO_ID = "chandar-lab/ZINC_22"
+ZINC22_REVISION = None  # set to a commit hash for fully frozen reproducibility
+SMILES_COLUMN = "SMILES"
+
+# Number of parquet files to consider as one random "batch"
+PARQUET_BATCH_SIZE = 4
+
+# Build a larger candidate pool, then sample N_PER_SEED from it.
+# 2 means: collect ~200K candidates, then sample 100K.
+SAMPLE_POOL_MULTIPLIER = 2
+
+HF_TOKEN = os.environ.get("HF_TOKEN")
 N_PER_SEED = 100_000
 SEEDS = [42, 17, 87, 5, 63]
 OUT_DIR = Path("eval_failures")
@@ -26,6 +39,163 @@ OPSIN_BATCH_SIZE = 1000
 NO_NAME = "no name generated"
 OPSIN_MISMATCH = "opsin smiles mismatch"
 OPSIN_UNRECOGNIZED = "opsin - name is not recognized"
+
+
+def list_zinc22_parquet_files():
+    """
+    Lists parquet shards in the HF dataset repo without downloading the dataset.
+    """
+    api = HfApi(token=HF_TOKEN)
+
+    files = api.list_repo_files(
+        repo_id=ZINC22_REPO_ID,
+        repo_type="dataset",
+        revision=ZINC22_REVISION,
+    )
+
+    parquet_files = sorted(f for f in files if f.endswith(".parquet"))
+
+    if not parquet_files:
+        raise RuntimeError(f"No parquet files found in {ZINC22_REPO_ID}")
+
+    print(f"Found {len(parquet_files):,} parquet files in {ZINC22_REPO_ID}")
+    return parquet_files
+
+
+def load_parquet_shard(parquet_path):
+    """
+    Loads one remote parquet shard from the HF dataset repo.
+
+    This downloads/caches only this shard, not the full ZINC22 dataset.
+    """
+    url = hf_hub_url(
+        repo_id=ZINC22_REPO_ID,
+        filename=parquet_path,
+        repo_type="dataset",
+        revision=ZINC22_REVISION,
+    )
+
+    kwargs = {
+        "data_files": url,
+        "split": "train",
+    }
+
+    if HF_TOKEN:
+        kwargs["token"] = HF_TOKEN
+
+    try:
+        ds = load_dataset("parquet", **kwargs)
+    except TypeError:
+        # Compatibility with older `datasets` versions.
+        if HF_TOKEN:
+            kwargs.pop("token", None)
+            kwargs["use_auth_token"] = HF_TOKEN
+        ds = load_dataset("parquet", **kwargs)
+
+    if SMILES_COLUMN not in ds.column_names:
+        raise RuntimeError(
+            f"Column {SMILES_COLUMN!r} not found in {parquet_path}. "
+            f"Available columns: {ds.column_names}"
+        )
+
+    return ds
+
+
+def sample_zinc22_from_random_parquet_batches(parquet_files, seed):
+    """
+    Deterministically:
+      1. shuffle parquet shards using `seed`
+      2. read random parquet batches
+      3. sample rows from those shards into a candidate pool
+      4. sample exactly N_PER_SEED molecules from the pool
+
+    Returns:
+      sampled_rows: list of dicts with smiles + source metadata
+      sample_stats: summary metadata
+    """
+    rng = random.Random(seed)
+
+    shuffled_parquets = list(parquet_files)
+    rng.shuffle(shuffled_parquets)
+
+    target_pool_size = max(
+        N_PER_SEED,
+        int(N_PER_SEED * SAMPLE_POOL_MULTIPLIER),
+    )
+
+    pool = []
+    used_parquets = []
+    parquet_batches_read = 0
+
+    progress = tqdm(
+        total=target_pool_size,
+        desc=f"Sampling ZINC22 parquet batches seed {seed}",
+    )
+
+    for batch_start in range(0, len(shuffled_parquets), PARQUET_BATCH_SIZE):
+        batch = shuffled_parquets[
+            batch_start : batch_start + PARQUET_BATCH_SIZE
+        ]
+        parquet_batches_read += 1
+
+        print(
+            f"Seed {seed}: reading parquet batch {parquet_batches_read} "
+            f"with {len(batch)} shard(s)"
+        )
+
+        for parquet_path in batch:
+            if len(pool) >= target_pool_size:
+                break
+
+            ds = load_parquet_shard(parquet_path)
+            n_rows = len(ds)
+
+            remaining = target_pool_size - len(pool)
+            n_take = min(n_rows, remaining)
+
+            if n_take <= 0:
+                continue
+
+            row_indices = rng.sample(range(n_rows), n_take)
+            sampled_smiles = ds.select(row_indices)[SMILES_COLUMN]
+
+            before = len(pool)
+
+            for row_i, smi in zip(row_indices, sampled_smiles):
+                if smi and str(smi).strip():
+                    pool.append(
+                        {
+                            "smiles": str(smi),
+                            "source_parquet": parquet_path,
+                            "source_row": int(row_i),
+                        }
+                    )
+
+            used_parquets.append(parquet_path)
+
+            progress.update(min(len(pool), target_pool_size) - before)
+
+        if len(pool) >= target_pool_size:
+            break
+
+    progress.close()
+
+    if len(pool) < N_PER_SEED:
+        raise RuntimeError(
+            f"Only collected {len(pool):,} valid molecules, "
+            f"but need {N_PER_SEED:,}. Try increasing PARQUET_BATCH_SIZE "
+            f"or lowering SAMPLE_POOL_MULTIPLIER."
+        )
+
+    sampled_rows = rng.sample(pool, N_PER_SEED)
+
+    sample_stats = {
+        "candidate_pool_size": len(pool),
+        "parquet_batches_read": parquet_batches_read,
+        "parquet_files_read": len(used_parquets),
+    }
+
+    return sampled_rows, sample_stats
 
 
 def canon(smi):
@@ -148,13 +318,22 @@ def write_csv(path, rows, fieldnames):
         writer.writerows(rows)
 
 
-def evaluate_seed(ds, seed):
+def evaluate_seed(parquet_files, seed):
     print(f"\n=== Seed {seed} | N={N_PER_SEED:,} ===")
 
-    rng = random.Random(seed)
+    sampled_rows, sample_stats = sample_zinc22_from_random_parquet_batches(
+        parquet_files,
+        seed,
+    )
 
-    indices = rng.sample(range(len(ds)), N_PER_SEED)
-    dataset = list(ds.select(indices)["smiles"])
+    dataset = [row["smiles"] for row in sampled_rows]
+
+    print(
+        f"Seed {seed}: sampled {len(dataset):,} molecules from "
+        f"{sample_stats['parquet_files_read']:,} parquet file(s), "
+        f"{sample_stats['parquet_batches_read']:,} parquet batch(es), "
+        f"candidate pool size={sample_stats['candidate_pool_size']:,}"
+    )
 
     print("Converting SMILES to IUPAC names...")
     predicted_names = parallel_map(
@@ -186,7 +365,7 @@ def evaluate_seed(ds, seed):
     matches = []
 
     for local_i, (
-        dataset_index,
+        source_row,
         original_smiles,
         original_canon_smiles,
         generated_name,
@@ -194,7 +373,7 @@ def evaluate_seed(ds, seed):
         canon_opsin_smiles,
     ) in enumerate(
         zip(
-            indices,
+            sampled_rows,
             dataset,
             original_canon,
             predicted_names,
@@ -217,7 +396,9 @@ def evaluate_seed(ds, seed):
                 {
                     "seed": seed,
                     "local_position": local_i,
-                    "dataset_index": dataset_index,
+                    "dataset_index": f"{source_row['source_parquet']}:{source_row['source_row']}",
+                    "source_parquet": source_row["source_parquet"],
+                    "source_row": source_row["source_row"],
                     "failure_reason": failure_reason,
                     "original_smiles": original_smiles,
                     "original_canon_smiles": original_canon_smiles,
@@ -237,6 +418,9 @@ def evaluate_seed(ds, seed):
         "matches": int(matches.sum()),
         "failures": len(failures),
         "accuracy": accuracy,
+        "candidate_pool_size": sample_stats["candidate_pool_size"],
+        "parquet_batches_read": sample_stats["parquet_batches_read"],
+        "parquet_files_read": sample_stats["parquet_files_read"],
         NO_NAME: counts[NO_NAME],
         OPSIN_MISMATCH: counts[OPSIN_MISMATCH],
         OPSIN_UNRECOGNIZED: counts[OPSIN_UNRECOGNIZED],
@@ -250,6 +434,8 @@ def evaluate_seed(ds, seed):
         "seed",
         "local_position",
         "dataset_index",
+        "source_parquet",
+        "source_row",
         "failure_reason",
         "original_smiles",
         "original_canon_smiles",
@@ -272,14 +458,14 @@ def main():
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    print("Loading ZINC22 dataset once...")
-    ds = load_dataset("chandar-lab/ZINC_22", split=None)
+    print("Listing ZINC22 parquet shards...")
+    parquet_files = list_zinc22_parquet_files()
 
     all_summaries = []
     all_failures = []
 
     for seed in SEEDS:
-        summary, failures = evaluate_seed(ds, seed)
+        summary, failures = evaluate_seed(parquet_files, seed)
         all_summaries.append(summary)
         all_failures.extend(failures)
 
@@ -289,6 +475,9 @@ def main():
         "matches",
         "failures",
         "accuracy",
+        "candidate_pool_size",
+        "parquet_batches_read",
+        "parquet_files_read",
         NO_NAME,
         OPSIN_MISMATCH,
         OPSIN_UNRECOGNIZED,
@@ -298,6 +487,8 @@ def main():
         "seed",
         "local_position",
         "dataset_index",
+        "source_parquet",
+        "source_row",
         "failure_reason",
         "original_smiles",
         "original_canon_smiles",
@@ -319,7 +510,6 @@ def main():
     print(f"Overall accuracy: {overall_accuracy:.2%}")
     print(f"Total failures: {len(all_failures):,}")
     print(f"Wrote results to: {OUT_DIR.resolve()}")
-
 
 if __name__ == "__main__":
     mp.freeze_support()
