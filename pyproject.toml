@@ -98,7 +98,11 @@ line-ending = "auto"
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-testpaths = ["tests", "src/bluenamer/tests", "src/bluenamer/tests_roundtrip"]
+testpaths = [
+    "tests",
+    "src/bluenamer/tests",
+    "src/bluenamer/tests_roundtrip",
+]
 addopts = [
     "-ra",
     "--strict-markers",
