@@ -13,6 +13,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from typing import Literal
+
 from bluenamer.utils import standardize_mol
 
 from .resonance_compare import canonical_smiles, equivalent_smiles
