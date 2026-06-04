@@ -13,6 +13,7 @@ import shutil
 import subprocess
 from dataclasses import dataclass
 from typing import Literal
+from bluenamer.utils import standardize_mol
 
 from .resonance_compare import canonical_smiles, equivalent_smiles
 
@@ -72,7 +73,7 @@ def _canonicalize(smiles: str) -> str | None:
     return canonical_smiles(smiles)
 
 
-def verify_with_opsin(name: str, smiles: str) -> OpsinCheck:
+def verify_with_opsin(name: str, smiles: str, standardize_smiles: bool = True) -> OpsinCheck:
     """Round-trip ``name`` through OPSIN and compare to ``smiles``.
 
     Returns an ``OpsinCheck`` with one of the documented ``status`` values.
@@ -90,7 +91,11 @@ def verify_with_opsin(name: str, smiles: str) -> OpsinCheck:
     if not _java_available():
         return OpsinCheck(status="skipped_no_java", name=name)
 
-    canonical_original = _canonicalize(smiles)
+    if standardize_smiles:
+
+        canonical_original = standardize_mol(smiles)
+    else:
+        canonical_original = _canonicalize(smiles)
 
     try:
         decoded = py2opsin.py2opsin([name])
@@ -119,7 +124,7 @@ def verify_with_opsin(name: str, smiles: str) -> OpsinCheck:
             canonical_original=canonical_original,
             opsin_smiles=opsin_smiles,
             canonical_roundtrip=canonical_roundtrip,
-            error_message="Failed to canonicalize SMILES for comparison.",
+            error_message= "Failed to standardize SMILES for comparison." if standardize_smiles else "Failed to canonicalize SMILES for comparison.",
         )
 
     if equivalent_smiles(smiles, opsin_smiles):
