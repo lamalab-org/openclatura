@@ -5,7 +5,7 @@ from concurrent.futures import ProcessPoolExecutor
 import py2opsin
 from datasets import load_dataset
 from tqdm import tqdm
-from utils import standardize_mol
+from bluenamer.utils import standardize_mol
 
 from bluenamer.namer import name_smiles
 from bluenamer.resonance_compare import equivalent_smiles
