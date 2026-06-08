@@ -52,6 +52,9 @@ dev = [
     "ruff==0.15.15",
     "pre-commit>=3.5",
     "py2opsin>=1.2",
+    "fastapi>=0.110",
+    "httpx>=0.27",
+    "pydantic>=2.5",
 ]
 
 [project.urls]
