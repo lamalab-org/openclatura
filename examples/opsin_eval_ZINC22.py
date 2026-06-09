@@ -30,7 +30,7 @@ SAMPLE_POOL_MULTIPLIER = 2
 HF_TOKEN = os.environ.get("HF_TOKEN")
 N_PER_SEED = 100_000
 SEEDS = [42, 17, 87, 5, 63]
-OUT_DIR = Path("eval_failures")
+OUT_DIR = Path("eval_failures/zinc22")
 
 NAME_CHUNKSIZE = 10
 OPSIN_BATCH_SIZE = 1000

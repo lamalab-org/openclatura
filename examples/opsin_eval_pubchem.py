@@ -10,14 +10,14 @@ import numpy as np
 import py2opsin
 from datasets import load_dataset
 from tqdm import tqdm
-from utils import standardize_mol
+from bluenamer.utils import standardize_mol
 
 from bluenamer.namer import name_smiles
 
 # --- Configuration ---
 N_PER_SEED = 100_000
 SEEDS = [42, 17, 87, 5, 63]
-OUT_DIR = Path("eval_failures")
+OUT_DIR = Path("eval_failures/pubchem")
 
 NAME_CHUNKSIZE = 10
 OPSIN_BATCH_SIZE = 1000
