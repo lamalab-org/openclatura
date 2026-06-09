@@ -35,11 +35,13 @@ def read_smiles(smiles: str) -> Molecule:
         stereo = chiral_centers.get(atom.GetIdx())
         if stereo and atom.GetSymbol() == "S" and atom.GetTotalDegree() == 3:
             stereo = "R" if stereo == "S" else "S"
+        raw_stereo = _raw_tetrahedral_stereo(atom) if not stereo else None
         mol.add_atom(
             symbol=atom.GetSymbol(),
             idx=atom.GetIdx(),
             charge=atom.GetFormalCharge(),
             stereo=stereo,
+            raw_stereo=raw_stereo,
             is_aromatic=atom_metadata[atom.GetIdx()]["is_aromatic"],
             explicit_h_count=atom_metadata[atom.GetIdx()]["explicit_h_count"],
             total_h_count=atom_metadata[atom.GetIdx()]["total_h_count"],
@@ -63,6 +65,17 @@ def read_smiles(smiles: str) -> Molecule:
             in_small_ring=in_small_ring,
         )
     return mol
+
+
+def _raw_tetrahedral_stereo(atom: Chem.Atom) -> str | None:
+    """Return raw tetrahedral chirality tags that do not have CIP assignment."""
+
+    tag = atom.GetChiralTag()
+    if tag == Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CW:
+        return "CW"
+    if tag == Chem.rdchem.ChiralType.CHI_TETRAHEDRAL_CCW:
+        return "CCW"
+    return None
 
 
 def _atom_metadata(rdmol: Chem.Mol) -> dict[int, dict[str, int | bool]]:

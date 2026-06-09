@@ -63,6 +63,39 @@ def _has_no_cumulated_double_bonds(mol: Molecule, path: list[int]) -> bool:
     return True
 
 
+def _locant_rank(locant: str) -> int:
+    digits = ""
+    for char in str(locant):
+        if char.isdigit():
+            digits += char
+        else:
+            break
+    return int(digits) if digits else 10**6
+
+
+def _indicated_hydrogen_like_locant(mol: Molecule, atom_to_locant: dict[int, str], atoms: set[int]) -> tuple[int, str]:
+    """Return the lowest locant of an atom that needs indicated-H wording."""
+
+    best = (10**6, "")
+    for atom_idx, locant in atom_to_locant.items():
+        atom = mol.atoms[atom_idx]
+        if atom.symbol not in {"N", "C"}:
+            continue
+        ring_bonds = [mol.get_bond(atom_idx, neighbor) for neighbor in mol.get_neighbors(atom_idx) if neighbor in atoms]
+        if sum(bond.order for bond in ring_bonds if bond is not None) != 2:
+            continue
+        best = min(best, (_locant_rank(locant), locant))
+    return best
+
+
+def _rank_retained_maps_by_indicated_hydrogen(
+    mol: Molecule,
+    maps: list[dict[int, str]],
+    atoms: set[int],
+) -> list[dict[int, str]]:
+    return sorted(maps, key=lambda atom_to_locant: _indicated_hydrogen_like_locant(mol, atom_to_locant, atoms))
+
+
 def recognizes_retained_ring(mol: Molecule, path: list[int]) -> bool:
     """Return whether a path matches any retained-ring recognizer."""
 
@@ -305,7 +338,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                     rot_path = [rot_path[0]] + rot_path[1:][::-1]
                 if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
                     locants = _retained_locants("benzofuran")
-                    return "benzofuran", [{rot_path[i]: locants[i] for i in range(9)}]
+                    return "1-benzofuran", [{rot_path[i]: locants[i] for i in range(9)}]
             if s_count == 1 and n_count == 0 and o_count == 0:
                 if "S" not in small_symbols:
                     return None
@@ -319,7 +352,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                     rot_path = [rot_path[0]] + rot_path[1:][::-1]
                 if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
                     locants = _retained_locants("benzothiophene")
-                    return "benzothiophene", [{rot_path[i]: locants[i] for i in range(9)}]
+                    return "1-benzothiophene", [{rot_path[i]: locants[i] for i in range(9)}]
             if n_count == 1 and s_count == 1 and o_count == 0:
                 if "N" not in small_symbols or "S" not in small_symbols:
                     return None
@@ -363,6 +396,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                     return None
                 n_indices = [idx for idx in path if mol.atoms[idx].symbol == "N"]
                 if all(internal_degrees[n] == 2 for n in n_indices):
+                    benzimidazole_maps: list[dict[int, str]] = []
                     n1, n2 = n_indices
                     rot_path = path[path.index(n1) :] + path[: path.index(n1)]
                     if internal_degrees[rot_path[1]] == 3:
@@ -370,7 +404,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                     if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
                         if rot_path[2] == n2:
                             locants = _retained_locants("benzimidazole")
-                            return "benzimidazole", [{rot_path[i]: locants[i] for i in range(9)}]
+                            benzimidazole_maps.append({rot_path[i]: locants[i] for i in range(9)})
                         elif rot_path[1] == n2:
                             locants = _retained_locants("indazole")
                             return "indazole", [{rot_path[i]: locants[i] for i in range(9)}]
@@ -381,10 +415,16 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                     if internal_degrees[rot_path2[3]] == 3 and internal_degrees[rot_path2[8]] == 3:
                         if rot_path2[2] == n1:
                             locants = _retained_locants("benzimidazole")
-                            return "benzimidazole", [{rot_path2[i]: locants[i] for i in range(9)}]
+                            benzimidazole_maps.append({rot_path2[i]: locants[i] for i in range(9)})
                         elif rot_path2[1] == n1:
                             locants = _retained_locants("indazole")
                             return "indazole", [{rot_path2[i]: locants[i] for i in range(9)}]
+                    if benzimidazole_maps:
+                        return "benzimidazole", _rank_retained_maps_by_indicated_hydrogen(
+                            mol,
+                            benzimidazole_maps,
+                            path_set,
+                        )
 
     if _matches_any_retained_signature(("indoline", "indane"), sig, symbols, deg3_nodes, mol):
         if len(deg3_nodes) == 2 and mol.get_bond(deg3_nodes[0], deg3_nodes[1]) is not None:

@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 
-from .assembly_parts import AssemblyParts
+from .assembly_parts import AssemblyParts, SubstituentItem
 from .formatting import strip_outer_parentheses
 from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
@@ -38,8 +38,10 @@ def add_component_front_modifiers(
             continue
         branch_name = branch_namer(mol, r_group_c, sub_exclude | {single_o}, upstream_atom=single_o)
         if branch_name:
+            modifier_atoms = subgraph_component(mol, r_group_c, sub_exclude | {single_o})
             parts.front_modifiers.append(strip_outer_parentheses(branch_name))
-            parts.front_modifier_atom_ids.update(subgraph_component(mol, r_group_c, sub_exclude | {single_o}))
+            parts.front_modifier_atom_ids.update(modifier_atoms)
+            parts.front_modifier_charge_atom_ids.update(_charged_atoms(mol, modifier_atoms))
 
 
 def n_substituent_locant(
@@ -82,7 +84,10 @@ def add_component_n_substituents(
             n_substituents = [
                 n
                 for n in mol.get_neighbors(single_n)
-                if n != c_idx and n not in group.atoms_involved and mol.atoms[n].symbol != "H"
+                if n != c_idx
+                and n not in group.atoms_involved
+                and mol.atoms[n].symbol != "H"
+                and not _is_principal_hydrazone_carbon(mol, principal_key, single_n, n)
             ]
             if not n_substituents:
                 n_idx_global += 1
@@ -92,17 +97,71 @@ def add_component_n_substituents(
                 principal_key, len(principal_groups), len(nitrogens), n_idx_local, n_idx_global
             )
             for n_sub in n_substituents:
-                branch_name, branch_trace = branch_namer(
-                    mol, n_sub, sub_exclude | {single_n}, upstream_atom=single_n, return_trace=True
-                )
+                branch_name, branch_trace = _nitrogen_substituent_name(mol, single_n, n_sub, sub_exclude, branch_namer)
                 if branch_name:
                     branch_atoms = subgraph_component(mol, n_sub, sub_exclude | {single_n})
+                    if _use_hydrazone_suffix_modifier(parts, principal_key):
+                        parts.principal_suffix_modifiers.append(
+                            SubstituentItem(
+                                branch_name,
+                                [],
+                                atom_ids=branch_atoms,
+                                bond_ids=bond_ids_within(mol, branch_atoms | {single_n}),
+                                charge_atom_ids=_charged_atoms(mol, branch_atoms),
+                                trace_segments=branch_trace,
+                            )
+                        )
+                        continue
                     add_substituent_trace(
                         parts,
                         branch_name,
                         loc_prefix,
                         branch_atoms,
                         bond_ids_within(mol, branch_atoms | {single_n}),
+                        _charged_atoms(mol, branch_atoms),
                         branch_trace,
                     )
             n_idx_global += 1
+
+
+def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
+    """Return formally charged atoms from an already named graph fragment."""
+
+    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
+
+
+def _nitrogen_substituent_name(
+    mol: Molecule,
+    nitrogen: int,
+    substituent: int,
+    sub_exclude: set[int],
+    branch_namer: BranchNamer,
+) -> tuple[str, list]:
+    """Render graph-bound N-substituents on principal nitrogen groups."""
+
+    bond = mol.get_bond(nitrogen, substituent)
+    if (
+        bond is not None
+        and bond.order == 2
+        and mol.atoms[substituent].symbol == "N"
+        and not [n for n in mol.get_neighbors(substituent) if n != nitrogen and mol.atoms[n].symbol != "H"]
+    ):
+        return "imino", []
+    return branch_namer(mol, substituent, sub_exclude | {nitrogen}, upstream_atom=nitrogen, return_trace=True)
+
+
+def _use_hydrazone_suffix_modifier(parts: AssemblyParts, principal_key: str | None) -> bool:
+    """Avoid ambiguous N-prefixes when a hydrazone parent already has ring N atoms."""
+
+    if principal_key not in RULES.functional_groups.keys_with_family("hydrazone"):
+        return False
+    return any(symbol == "N" for symbol in parts.parent_atom_symbols_by_locant.values())
+
+
+def _is_principal_hydrazone_carbon(mol: Molecule, principal_key: str | None, nitrogen: int, neighbor: int) -> bool:
+    if principal_key not in RULES.functional_groups.keys_with_family("hydrazone"):
+        return False
+    if not mol.atoms[neighbor].is_carbon:
+        return False
+    bond = mol.get_bond(nitrogen, neighbor)
+    return bond is not None and bond.order == 2

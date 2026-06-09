@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 
-from .assembly_parts import AssemblyParts, SubstituentItem
+from .assembly_parts import AssemblyParts, NameAtomBinding, SubstituentItem
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
 from .component_group_rules import (
     exclude_nonparent_group_atoms,
@@ -12,6 +12,7 @@ from .component_group_rules import (
 from .component_modifiers import add_component_front_modifiers, add_component_n_substituents
 from .functional_prefixes import collect_component_prefix_substituents
 from .molecule import DecisionTrace, Molecule, TracePhase
+from .name_assembly import NameAssemblyResult, assert_final_name_assembly, token_span_trace_data
 from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
 from .naming_context import ComponentNamingState, NamingIntent
@@ -24,7 +25,12 @@ from .principal_groups import (
     filter_component_groups_to_parent,
     partition_principal_and_prefix_groups,
 )
-from .special_cases import single_atom_component_name, structural_replacement_parent_name, try_name_anhydride_component
+from .retained_fused_production import production_retained_fused_parent
+from .special_cases import (
+    single_atom_component_name,
+    structural_replacement_parent_result,
+    try_name_anhydride_component_result,
+)
 from .spiro_assembly import SpiroAssembly
 from .stereo_audit import audit_stereochemistry
 from .subgraph_tools import (
@@ -35,6 +41,7 @@ from .subgraph_tools import (
     spiro_side_component,
     subgraph_component,
 )
+from .substituent_tokens import graph_bound_substituent_tokens
 from .trace_helpers import (
     add_substituent_trace,
     assembly_trace_segments,
@@ -92,6 +99,7 @@ def collect_component_branch_substituents(
                     locants=[],
                     atom_ids=sub_comp - {c_idx},
                     bond_ids=bond_ids_within(mol, sub_comp),
+                    charge_atom_ids=_charged_atoms(mol, sub_comp - {c_idx}),
                     spiro=name_spiro_subgraph(mol, c_idx, sub_comp),
                 )
             )
@@ -104,13 +112,24 @@ def collect_component_branch_substituents(
                     mol, n_idx, sub_exclude | main_set, upstream_atom=c_idx, return_trace=True
                 )
                 if branch_name:
-                    branch_atoms = subgraph_component(mol, n_idx, sub_exclude | main_set)
+                    branch_exclude = sub_exclude | main_set
+                    branch_atoms = subgraph_component(mol, n_idx, branch_exclude)
                     subst_mapping.setdefault(c_idx, []).append(
                         SubstituentItem(
                             name=branch_name,
                             locants=[],
                             atom_ids=branch_atoms,
                             bond_ids=bond_ids_within(mol, branch_atoms | {c_idx}),
+                            charge_atom_ids=_charged_atoms(mol, branch_atoms),
+                            emitted_tokens=graph_bound_substituent_tokens(
+                                mol,
+                                n_idx,
+                                branch_atoms,
+                                branch_name,
+                                c_idx,
+                                branch_exclude,
+                                name_subgraph,
+                            ),
                             trace_segments=branch_trace,
                         )
                     )
@@ -131,9 +150,50 @@ def add_component_substituents(
                     locant,
                     item.atom_ids,
                     item.bond_ids,
+                    item.charge_atom_ids,
                     item.trace_segments,
+                    item.emitted_tokens,
                     spiro=item.spiro,
                 )
+
+
+def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
+    """Return formally charged atoms from an already named graph fragment."""
+
+    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
+
+
+def _shortcut_component_result(
+    mol: Molecule,
+    component_atoms: set[int],
+    name: str,
+    *,
+    stage: str,
+    role: str,
+    bindings: list[NameAtomBinding] | tuple[NameAtomBinding, ...] | None = None,
+) -> tuple[str, list[dict], list[dict], list[dict]]:
+    """Build audited metadata for a component shortcut name."""
+
+    parts = AssemblyParts(parent_length=max(1, len(component_atoms)), parent_atom_ids=set(component_atoms))
+    parts.name_atom_bindings = (
+        list(bindings)
+        if bindings is not None
+        else [
+            NameAtomBinding(
+                stage=stage,
+                role=role,
+                term=name,
+                atom_ids=set(component_atoms),
+                bond_ids=bond_ids_within(mol, component_atoms),
+                charge_atom_ids=_charged_atoms(mol, component_atoms),
+            )
+        ]
+    )
+    result = NameAssemblyResult.from_final_name(name, parts.name_atom_bindings)
+    parts.name_atom_bindings = list(result.bindings)
+    parts.name_token_spans = token_span_trace_data(result)
+    assert_final_name_assembly(mol, component_atoms, parts, result)
+    return name, binding_trace_data(parts.name_atom_bindings), parts.name_token_spans, parts.name_rewrite_history
 
 
 def name_component(
@@ -151,17 +211,29 @@ def name_component(
 
     single_atom_name = single_atom_component_name(mol, component_atoms)
     if single_atom_name:
+        name, bindings, token_spans, rewrite_history = _shortcut_component_result(
+            mol,
+            component_atoms,
+            single_atom_name,
+            stage="shortcut",
+            role="single_atom_component",
+        )
         trace_decision(
             decision_trace,
             TracePhase.COMPONENT,
             "named single-atom component",
             "A one-atom ionic component is named directly before parent selection.",
             atoms=component_atoms,
-            data={"name": single_atom_name},
+            data={
+                "name": name,
+                "name_atom_bindings": bindings,
+                "name_token_spans": token_spans,
+                "name_rewrite_history": rewrite_history,
+            },
         )
         if return_trace:
-            return single_atom_name, []
-        return single_atom_name
+            return name, []
+        return name
 
     def name_component_again(next_mol: Molecule, next_atoms: set[int], is_substituent: bool = False):
         return name_component(
@@ -173,19 +245,32 @@ def name_component(
             assemble_parent_name=assemble_parent_name,
         )
 
-    structural_parent_name = structural_replacement_parent_name(mol, component_atoms, name_subgraph)
-    if structural_parent_name:
+    structural_parent_result = structural_replacement_parent_result(mol, component_atoms, name_subgraph)
+    if structural_parent_result is not None:
+        name, bindings, token_spans, rewrite_history = _shortcut_component_result(
+            mol,
+            component_atoms,
+            structural_parent_result.name,
+            stage="shortcut",
+            role=structural_parent_result.role,
+            bindings=structural_parent_result.bindings,
+        )
         trace_decision(
             decision_trace,
             TracePhase.COMPONENT,
             "named structural replacement parent",
             "A graph-derived replacement-parent hydride class matched the full component graph.",
             atoms=component_atoms,
-            data={"name": structural_parent_name},
+            data={
+                "name": name,
+                "name_atom_bindings": bindings,
+                "name_token_spans": token_spans,
+                "name_rewrite_history": rewrite_history,
+            },
         )
         if return_trace:
-            return structural_parent_name, []
-        return structural_parent_name
+            return name, []
+        return name
 
     state = ComponentNamingState(component_atoms=set(component_atoms), is_substituent=is_substituent)
     state.perceived_groups = component_groups(mol, state.component_atoms)
@@ -207,21 +292,34 @@ def name_component(
         data={"principal_key": state.principal_key, "is_substituent": state.is_substituent},
     )
 
-    anhydride_name = try_name_anhydride_component(
+    anhydride_result = try_name_anhydride_component_result(
         mol, state.perceived_groups, state.principal_key, name_component_again
     )
-    if anhydride_name:
+    if anhydride_result is not None:
+        name, bindings, token_spans, rewrite_history = _shortcut_component_result(
+            mol,
+            state.component_atoms,
+            anhydride_result.name,
+            stage="shortcut",
+            role="anhydride_component",
+            bindings=anhydride_result.bindings,
+        )
         trace_decision(
             decision_trace,
             TracePhase.ASSEMBLY,
             "used anhydride component shortcut",
             "Anhydrides are split into acid halves and assembled before normal parent selection.",
             atoms=state.component_atoms,
-            data={"name": anhydride_name},
+            data={
+                "name": name,
+                "name_atom_bindings": bindings,
+                "name_token_spans": token_spans,
+                "name_rewrite_history": rewrite_history,
+            },
         )
         if return_trace:
-            return anhydride_name, []
-        return anhydride_name
+            return name, []
+        return name
 
     state.exclude_atoms = set(mol.atoms.keys()) - state.component_atoms
     state.cyclic_atoms_all = get_cyclic_atoms(mol, set())
@@ -286,6 +384,7 @@ def name_component(
         )
 
     state.principal_involved_atoms = principal_involved_atoms(
+        mol,
         state.perceived_groups,
         state.principal_key,
         state.parent_path,
@@ -311,6 +410,16 @@ def name_component(
         name_subgraph=name_subgraph,
         name_spiro_subgraph=name_spiro_subgraph,
     )
+    retained_fused = production_retained_fused_parent(
+        mol,
+        state.parent_path,
+        state.component_atoms,
+        state.perceived_groups,
+        state.principal_key,
+        subst_mapping,
+    )
+    if retained_fused is not None:
+        state.retained_name, state.locant_maps = retained_fused
     if (
         state.retained_name
         and state.locant_maps is None
@@ -380,7 +489,10 @@ def name_component(
     refresh_name_atom_bindings(parts)
     parts.stereo_audit_issues = list(audit_stereochemistry(mol, parts).issues)
     assert_component_fully_named(mol, state.component_atoms, parts, "<component>")
-    name = assemble_parent_name(mol, parts, numbered_path, get_loc, apply_special_component_names=True)
+    name = assemble_parent_name(mol, parts, numbered_path, get_loc)
+    final_result = NameAssemblyResult.from_final_name(name, parts.name_atom_bindings)
+    parts.name_token_spans = token_span_trace_data(final_result)
+    assert_final_name_assembly(mol, state.component_atoms, parts, final_result)
     trace_decision(
         decision_trace,
         TracePhase.ASSEMBLY,
@@ -394,6 +506,8 @@ def name_component(
             "unsaturation_count": len(parts.unsaturations),
             "stereo_audit_issues": parts.stereo_audit_issues,
             "name_atom_bindings": binding_trace_data(parts.name_atom_bindings),
+            "name_token_spans": parts.name_token_spans,
+            "name_rewrite_history": parts.name_rewrite_history,
         },
     )
     if return_trace:

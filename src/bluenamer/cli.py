@@ -16,7 +16,6 @@ recommended entrypoint.
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import json
 import os
 import sys
@@ -24,23 +23,8 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 from . import __version__, name_many
+from . import describe as describe_one
 from . import name as name_one
-
-
-def _result_to_jsonable(result, *, with_trace: bool) -> dict:
-    payload: dict = {
-        "smiles": result.smiles,
-        "name": result.name,
-        "ok": result.ok,
-        "error": result.error,
-        "rules_hit": list(result.rules_hit),
-        "rule_hints": list(result.rule_hints),
-    }
-    if with_trace:
-        payload["trace_segments"] = result.trace_segments
-    if result.opsin_check is not None:
-        payload["opsin_check"] = dataclasses.asdict(result.opsin_check)
-    return payload
 
 
 def _iter_smiles(path: str) -> Iterator[str]:
@@ -61,7 +45,7 @@ def _cmd_name(args: argparse.Namespace) -> int:
         verify_opsin=args.verify,
     )
     if args.json:
-        json.dump(_result_to_jsonable(result, with_trace=True), sys.stdout, indent=2, default=str)
+        json.dump(result.to_dict(include_trace=True), sys.stdout, indent=2, default=str)
         sys.stdout.write("\n")
     else:
         if result.error:
@@ -89,7 +73,7 @@ def _cmd_batch(args: argparse.Namespace) -> int:
     out = sys.stdout if args.output == "-" else open(args.output, "w", encoding="utf-8")  # noqa: SIM115
     try:
         for r in results:
-            json.dump(_result_to_jsonable(r, with_trace=args.trace), out, default=str)
+            json.dump(r.to_dict(include_trace=args.trace), out, default=str)
             out.write("\n")
     finally:
         if out is not sys.stdout:
@@ -99,6 +83,16 @@ def _cmd_batch(args: argparse.Namespace) -> int:
         print(f"{failed}/{len(results)} failed", file=sys.stderr)
         return 0 if args.allow_failures else 2
     return 0
+
+
+def _cmd_describe(args: argparse.Namespace) -> int:
+    description = describe_one(args.smiles)
+    if args.json:
+        json.dump(description.to_dict(), sys.stdout, indent=2)
+        sys.stdout.write("\n")
+    else:
+        sys.stdout.write(str(description) + "\n")
+    return 0 if description.name else 1
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -132,6 +126,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="exit 0 even if some rows produced an error",
     )
     p_batch.set_defaults(func=_cmd_batch)
+
+    p_describe = sub.add_parser(
+        "describe",
+        help="Natural-language description of how the name is built",
+    )
+    p_describe.add_argument("smiles")
+    p_describe.add_argument("--json", action="store_true", help="emit structured Description as JSON")
+    p_describe.set_defaults(func=_cmd_describe)
 
     return parser
 

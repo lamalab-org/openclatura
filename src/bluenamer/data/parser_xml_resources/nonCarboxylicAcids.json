@@ -1,0 +1,2605 @@
+{
+  "format": "bluenamer.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "subType": "ylForAcyl",
+          "symbol": "\u00d6",
+          "tagname": "group",
+          "type": "nonCarboxylicAcid"
+        },
+        "children": [
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[As](O)(O)(O)=O"
+            },
+            "tag": "token",
+            "text": "arsor"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[As](O)(O)(O)=O"
+            },
+            "tag": "token",
+            "text": "arsen"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[N+](O)(O)(O)[O-]"
+            },
+            "tag": "token",
+            "text": "azor"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[N+](O)(O)(O)[O-]"
+            },
+            "tag": "token",
+            "text": "nitror"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "P(O)(O)(O)=O"
+            },
+            "tag": "token",
+            "text": "phosphor"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "P(O)(O)(O)=O"
+            },
+            "tag": "token",
+            "text": "orthophosphor"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "P(O)(O)(O)=O"
+            },
+            "tag": "token",
+            "text": "ortho-phosphor"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[Sb](O)(O)(O)=O"
+            },
+            "tag": "token",
+            "text": "stibor"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[Sb](O)(O)(O)=O"
+            },
+            "tag": "token",
+            "text": "antimon"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "S(O)(O)(=O)=O"
+            },
+            "tag": "token",
+            "text": "sulfur"
+          },
+          {
+            "attributes": {
+              "defaultInID": "2",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "C(N)(O)=O"
+            },
+            "tag": "token",
+            "text": "carbam"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "C(O)(O)=O"
+            },
+            "tag": "token",
+            "text": "carbon"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "CS(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "mesyl"
+          },
+          {
+            "attributes": {
+              "defaultInID": "2",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "S(N)(O)(=O)=O"
+            },
+            "tag": "token",
+            "text": "sulfam"
+          },
+          {
+            "attributes": {
+              "defaultInID": "2",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "S(N)(O)=O"
+            },
+            "tag": "token",
+            "text": "sulfinam"
+          },
+          {
+            "attributes": {
+              "defaultInID": "2",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "S(N)O"
+            },
+            "tag": "token",
+            "text": "sulfenam"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)(C(F)(F)F)O"
+            },
+            "tag": "token",
+            "text": "trifl"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "ylForNothing",
+          "symbol": "\u00d6",
+          "tagname": "group",
+          "type": "nonCarboxylicAcid"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[AsH2](O)=O"
+            },
+            "tag": "token",
+            "text": "arsin"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[AsH](O)(O)=O"
+            },
+            "tag": "token",
+            "text": "arson"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[NH2+](O)[O-]"
+            },
+            "tag": "token",
+            "text": "azin"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[NH+](O)(O)[O-]"
+            },
+            "tag": "token",
+            "text": "azon"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "P(O)(=O)=O"
+            },
+            "tag": "token",
+            "text": "phosphen"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[PH2](O)=O"
+            },
+            "tag": "token",
+            "text": "phosphin"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[PH](O)(O)=O"
+            },
+            "tag": "token",
+            "text": "phosphon"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[SbH2](O)=O"
+            },
+            "tag": "token",
+            "text": "stibin"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[SbH](O)(O)=O"
+            },
+            "tag": "token",
+            "text": "stibon"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "noAcyl",
+          "symbol": "\u0192",
+          "tagname": "group",
+          "type": "nonCarboxylicAcid"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[As](=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "arsenen"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "B(O)(O)O"
+            },
+            "tag": "token",
+            "text": "bor"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "B(O)(O)O"
+            },
+            "tag": "token",
+            "text": "orthobor"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "B(O)(O)O"
+            },
+            "tag": "token",
+            "text": "ortho-bor"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "BO"
+            },
+            "tag": "token",
+            "text": "borin"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "B(O)O"
+            },
+            "tag": "token",
+            "text": "boron"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Se](O)(O)(=O)=O"
+            },
+            "tag": "token",
+            "text": "selen"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Te](O)(O)(=O)=O"
+            },
+            "tag": "token",
+            "text": "tellur"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Cr](=O)(=O)(O)O"
+            },
+            "tag": "token",
+            "text": "chrom"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///",
+              "suffixAppliesTo": "1,6",
+              "valType": "SMILES",
+              "value": "[Cr](=O)(=O)(O)O[Cr](=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "dichrom"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Mn](=O)(=O)(O)O"
+            },
+            "tag": "token",
+            "text": "mangan"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Mn](=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "permangan"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Tc](=O)(=O)(O)O"
+            },
+            "tag": "token",
+            "text": "technet"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Tc](=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "pertechnet"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Re](=O)(=O)(O)O"
+            },
+            "tag": "token",
+            "text": "rhen"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Re](=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "perrhen"
+          },
+          {
+            "attributes": {
+              "labels": "1///2/3//",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "B(O)(O)OB(O)O"
+            },
+            "tag": "token",
+            "text": "dibor"
+          },
+          {
+            "attributes": {
+              "labels": "1//2/3/",
+              "suffixAppliesTo": "1,4",
+              "valType": "SMILES",
+              "value": "B(O)OBO"
+            },
+            "tag": "token",
+            "text": "diboron"
+          },
+          {
+            "attributes": {
+              "labels": "1///2/3//",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "P(=O)(O)OP(=O)O"
+            },
+            "tag": "token",
+            "text": "diphosphon"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///",
+              "suffixAppliesTo": "1,6",
+              "valType": "SMILES",
+              "value": "P(=O)(O)(O)OP(=O)(O)O"
+            },
+            "tag": "token",
+            "text": "diphosphor"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///",
+              "suffixAppliesTo": "1,6",
+              "valType": "SMILES",
+              "value": "P(=O)(O)(O)OP(=O)(O)O"
+            },
+            "tag": "token",
+            "text": "pyrophosphor"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///",
+              "suffixAppliesTo": "1,6",
+              "valType": "SMILES",
+              "value": "P(=O)(O)(O)OP(=O)(O)O"
+            },
+            "tag": "token",
+            "text": "pyro-phosphor"
+          },
+          {
+            "attributes": {
+              "labels": "1///2/3//",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "[As](=O)(O)O[As](=O)O"
+            },
+            "tag": "token",
+            "text": "diarson"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///",
+              "suffixAppliesTo": "1,6",
+              "valType": "SMILES",
+              "value": "[As](=O)(O)(O)O[As](=O)(O)O"
+            },
+            "tag": "token",
+            "text": "diarsor"
+          },
+          {
+            "attributes": {
+              "labels": "1///2/3//",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "[Sb](=O)(O)O[Sb](=O)O"
+            },
+            "tag": "token",
+            "text": "distibon"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///",
+              "suffixAppliesTo": "1,6",
+              "valType": "SMILES",
+              "value": "[Sb](=O)(O)(O)O[Sb](=O)(O)O"
+            },
+            "tag": "token",
+            "text": "distibor"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///",
+              "suffixAppliesTo": "1,6",
+              "valType": "SMILES",
+              "value": "[Te](=O)(=O)(O)O[Te](=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "ditellur"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///",
+              "suffixAppliesTo": "1,6",
+              "valType": "SMILES",
+              "value": "[Se](=O)(=O)(O)O[Se](=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "diselen"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///",
+              "suffixAppliesTo": "1,6",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)(O)OS(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "disulfur"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///",
+              "suffixAppliesTo": "1,6",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)(O)OS(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "pyrosulfur"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///",
+              "suffixAppliesTo": "1,6",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)(O)OS(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "pyro-sulfur"
+          },
+          {
+            "attributes": {
+              "labels": "1//2/",
+              "suffixAppliesTo": "1,3",
+              "valType": "SMILES",
+              "value": "B(O)BO"
+            },
+            "tag": "token",
+            "text": "hypodiboron"
+          },
+          {
+            "attributes": {
+              "labels": "1///2//",
+              "suffixAppliesTo": "1,4",
+              "valType": "SMILES",
+              "value": "P(=O)(O)P(=O)O"
+            },
+            "tag": "token",
+            "text": "hypodiphosphon"
+          },
+          {
+            "attributes": {
+              "labels": "1////2///",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "P(=O)(O)(O)P(=O)(O)O"
+            },
+            "tag": "token",
+            "text": "hypodiphosphor"
+          },
+          {
+            "attributes": {
+              "labels": "1///2//",
+              "suffixAppliesTo": "1,4",
+              "valType": "SMILES",
+              "value": "[As](=O)(O)[As](=O)O"
+            },
+            "tag": "token",
+            "text": "hypodiarson"
+          },
+          {
+            "attributes": {
+              "labels": "1////2///",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "[As](=O)(O)(O)[As](=O)(O)O"
+            },
+            "tag": "token",
+            "text": "hypodiarsor"
+          },
+          {
+            "attributes": {
+              "labels": "1///2//",
+              "suffixAppliesTo": "1,4",
+              "valType": "SMILES",
+              "value": "[Sb](=O)(O)[Sb](=O)O"
+            },
+            "tag": "token",
+            "text": "hypodistibon"
+          },
+          {
+            "attributes": {
+              "labels": "1////2///",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "[Sb](=O)(O)(O)[Sb](=O)(O)O"
+            },
+            "tag": "token",
+            "text": "hypodistibor"
+          },
+          {
+            "attributes": {
+              "labels": "1////2///",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)(O)S(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "hypodisulfur"
+          },
+          {
+            "attributes": {
+              "labels": "1////2///",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)(O)S(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "dithion"
+          },
+          {
+            "attributes": {
+              "labels": "1////2///",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "[Se](=O)(=O)(O)[Se](=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "hypodiselen"
+          },
+          {
+            "attributes": {
+              "labels": "1////2///",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "[Te](=O)(=O)(O)[Te](=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "hypoditellur"
+          },
+          {
+            "attributes": {
+              "labels": "1///2/3//",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "C(=O)(O)OC(=O)O"
+            },
+            "tag": "token",
+            "text": "dicarbon"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///",
+              "suffixAppliesTo": "1,6",
+              "valType": "SMILES",
+              "value": "[Si](O)(O)(O)O[Si](O)(O)O"
+            },
+            "tag": "token",
+            "text": "disilic"
+          },
+          {
+            "attributes": {
+              "labels": "1///2/3///4/5//",
+              "suffixAppliesTo": "1,5,9",
+              "valType": "SMILES",
+              "value": "P(=O)(O)OP(=O)(O)OP(=O)O"
+            },
+            "tag": "token",
+            "text": "triphosphon"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///4/5///",
+              "suffixAppliesTo": "1,6,10",
+              "valType": "SMILES",
+              "value": "P(=O)(O)(O)OP(=O)(O)OP(=O)(O)O"
+            },
+            "tag": "token",
+            "text": "triphosphor"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///4/5///",
+              "suffixAppliesTo": "1,6,10",
+              "valType": "SMILES",
+              "value": "[Se](=O)(=O)(O)O[Se](=O)(=O)O[Se](=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "triselen"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///4/5///",
+              "suffixAppliesTo": "1,6,10",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)(O)OS(=O)(=O)OS(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "trisulfur"
+          },
+          {
+            "attributes": {
+              "labels": "1///2/3//4/5//",
+              "suffixAppliesTo": "1,5,8",
+              "valType": "SMILES",
+              "value": "C(=O)(O)OC(=O)OC(=O)O"
+            },
+            "tag": "token",
+            "text": "tricarbon"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///4/5///6/7///",
+              "suffixAppliesTo": "1,6,10,14",
+              "valType": "SMILES",
+              "value": "P(=O)(O)(O)OP(=O)(O)OP(=O)(O)OP(=O)(O)O"
+            },
+            "tag": "token",
+            "text": "tetraphosphor"
+          },
+          {
+            "attributes": {
+              "labels": "1///2/3//4/5//6/7//",
+              "suffixAppliesTo": "1,5,8,11",
+              "valType": "SMILES",
+              "value": "C(=O)(O)OC(=O)OC(=O)OC(=O)O"
+            },
+            "tag": "token",
+            "text": "tetracarbon"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///",
+              "suffixAppliesTo": "1,6",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)(O)SS(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "trithion"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3/4///",
+              "suffixAppliesTo": "1,7",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)(O)SSS(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "tetrathion"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3/4/5///",
+              "suffixAppliesTo": "1,8",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)(O)SSSS(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "pentathion"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "noAcyl",
+          "symbol": "\u0192",
+          "tagname": "group",
+          "type": "nonCarboxylicAcid"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[As](O)(=O)(C)C"
+            },
+            "tag": "token",
+            "text": "cacodyl"
+          },
+          {
+            "attributes": {
+              "labels": "////1/2////",
+              "suffixAppliesTo": "1,7",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)(O)CCS(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "ethion"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[N+]([O-])(O)=NO"
+            },
+            "tag": "token",
+            "text": "hyponitr"
+          },
+          {
+            "attributes": {
+              "labels": "1////2///",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "P(=O)(O)(O)P(=O)(O)O"
+            },
+            "tag": "token",
+            "text": "hypophosphor"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)(O)CCO"
+            },
+            "tag": "token",
+            "text": "isethion"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "P(=O)(O)OP(=O)(O)O"
+            },
+            "tag": "token",
+            "text": "isohypophosphor"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3///",
+              "suffixAppliesTo": "1,6",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)(O)CS(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "methion"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[N+](O)([O-])=C"
+            },
+            "tag": "token",
+            "text": "nitron"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C(O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "orthocarbon"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C(O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "ortho-carbon"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C(O)(O)O"
+            },
+            "tag": "token",
+            "text": "orthoform"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C(O)(O)O"
+            },
+            "tag": "token",
+            "text": "ortho-form"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C(C)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "orthoacet"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C(C)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "ortho-acet"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C(CC)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "orthopropion"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C(CC)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "ortho-propion"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C(CCC)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "orthobutyr"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C(CCC)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "ortho-butyr"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C(CCCC)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "orthovaler"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C(CCCC)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "ortho-valer"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Te](O)(O)(O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "orthotellur"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Te](O)(O)(O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "ortho-tellur"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "1,4",
+              "valType": "SMILES",
+              "value": "B(O)(O)B(O)O"
+            },
+            "tag": "token",
+            "text": "hypobor"
+          },
+          {
+            "attributes": {
+              "labels": "2/1///",
+              "valType": "SMILES",
+              "value": "C(C)(=O)OO"
+            },
+            "tag": "token",
+            "text": "peracet"
+          },
+          {
+            "attributes": {
+              "labels": "1///",
+              "valType": "SMILES",
+              "value": "C(=O)OO"
+            },
+            "tag": "token",
+            "text": "perform"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "C(O)(=O)OC(=O)O"
+            },
+            "tag": "token",
+            "text": "pyrocarbon"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "1,5",
+              "valType": "SMILES",
+              "value": "C(O)(=O)OC(=O)O"
+            },
+            "tag": "token",
+            "text": "pyro-carbon"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)(N)O"
+            },
+            "tag": "token",
+            "text": "sulfamid"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S(O)(O)"
+            },
+            "tag": "token",
+            "text": "sulfoxyl"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "noAcyl",
+          "symbol": "G",
+          "tagname": "group",
+          "type": "nonCarboxylicAcid"
+        },
+        "children": [
+          {
+            "attributes": {
+              "functionalIDs": "2,3,4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[As](O)(O)O"
+            },
+            "tag": "token",
+            "text": "arsenious"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2,3,4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[As](O)(O)O"
+            },
+            "tag": "token",
+            "text": "arseniousacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2,3,4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[As](O)(O)O"
+            },
+            "tag": "token",
+            "text": "arsenious acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C([O-])(O)=O"
+            },
+            "tag": "token",
+            "text": "bicarbonate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S([O-])(O)(=O)=O"
+            },
+            "tag": "token",
+            "text": "bisulfate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S([O-])(O)=O"
+            },
+            "tag": "token",
+            "text": "bisulfite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "1,3,8,9",
+              "labels": "/1///2/3///",
+              "valType": "SMILES",
+              "value": "[O-]P([O-])(=O)OP(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "diphosphate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,7",
+              "labels": "1///2/3//",
+              "valType": "SMILES",
+              "value": "[Se](=O)(O)O[Se](=O)O"
+            },
+            "tag": "token",
+            "text": "diselenious"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,7",
+              "labels": "1///2/3//",
+              "valType": "SMILES",
+              "value": "[Se](=O)(O)O[Se](=O)O"
+            },
+            "tag": "token",
+            "text": "diseleniousacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,7",
+              "labels": "1///2/3//",
+              "valType": "SMILES",
+              "value": "[Se](=O)(O)O[Se](=O)O"
+            },
+            "tag": "token",
+            "text": "diselenious acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,9",
+              "labels": "1////2/3///",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)([O-])OS(=O)(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "disulfate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,9",
+              "labels": "1////2/3///",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)([O-])OS(=O)(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "pyrosulfate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,9",
+              "labels": "1////2/3///",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)([O-])OS(=O)(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "pyro-sulfate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,7",
+              "labels": "1///2/3//",
+              "valType": "SMILES",
+              "value": "S(=O)([O-])OS(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "disulfite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,7",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)([O-])S(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "pyrosulfite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,7",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)([O-])S(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "pyro-sulfite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,8",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)([O-])S(=O)(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "metabisulfate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,7",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)([O-])S(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "metabisulfite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4,7,8",
+              "labels": "1////2///",
+              "valType": "SMILES",
+              "value": "P(=O)([O-])([O-])P(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "hypophosphate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,7,8",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "P(=O)([O-])OP(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "isohypophosphate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "P(=O)([O-])([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "orthophosphate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "P(=O)([O-])([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "ortho-phosphate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "1,3,8,12,16,20,21",
+              "labels": "/1///2/3///4/5///6/7///8/9///",
+              "valType": "SMILES",
+              "value": "[O-]P([O-])(=O)OP(=O)([O-])OP(=O)([O-])OP(=O)([O-])OP(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "pentaphosphate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,10",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)([O-])OOS(=O)(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "persulfate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2,3,4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "P([O-])([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "phosphite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "P(=O)([O-])([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "phosphate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "P(=O)([O-])([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "phosphoate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "1,3,8,9",
+              "labels": "/1///2/3///",
+              "valType": "SMILES",
+              "value": "[O-]P([O-])(=O)OP(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "pyrophosphate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "1,3,8,9",
+              "labels": "/1///2/3///",
+              "valType": "SMILES",
+              "value": "[O-]P([O-])(=O)OP(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "pyro-phosphate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Se](=O)(O)O"
+            },
+            "tag": "token",
+            "text": "selenious"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Se](=O)(O)O"
+            },
+            "tag": "token",
+            "text": "seleniousacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Se](=O)(O)O"
+            },
+            "tag": "token",
+            "text": "selenious acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Se](=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "selenite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Se](=O)(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "selenate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Se](=O)(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "selenoate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "sulfite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "sulfate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "sulfoate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Te](=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "tellurite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Te](=O)(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "tellurate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Te](=O)(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "telluroate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "1,3,8,12,16,17",
+              "labels": "/1///2/3///4/5///6/7///",
+              "valType": "SMILES",
+              "value": "[O-]P([O-])(=O)OP(=O)([O-])OP(=O)([O-])OP(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "tetraphosphate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "1,3,8,12,13",
+              "labels": "/1///2/3///4/5///",
+              "valType": "SMILES",
+              "value": "[O-]P([O-])(=O)OP(=O)([O-])OP(=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "triphosphate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Br(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "bromic"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Br(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "bromicacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Br(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "bromic acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Br(=O)O"
+            },
+            "tag": "token",
+            "text": "bromous"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Br(=O)O"
+            },
+            "tag": "token",
+            "text": "bromousacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Br(=O)O"
+            },
+            "tag": "token",
+            "text": "bromous acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Cl(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "chloric"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Cl(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "chloricacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Cl(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "chloric acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Cl(=O)O"
+            },
+            "tag": "token",
+            "text": "chlorous"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Cl(=O)O"
+            },
+            "tag": "token",
+            "text": "chlorousacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Cl(=O)O"
+            },
+            "tag": "token",
+            "text": "chlorous acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[F|5](=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "fluoric"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[F|5](=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "fluoricacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[F|5](=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "fluoric acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[F|3](=O)O"
+            },
+            "tag": "token",
+            "text": "fluorous"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[F|3](=O)O"
+            },
+            "tag": "token",
+            "text": "fluorousacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[F|3](=O)O"
+            },
+            "tag": "token",
+            "text": "fluorous acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "iodic"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "iodicacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "iodic acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)O"
+            },
+            "tag": "token",
+            "text": "iodous"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)O"
+            },
+            "tag": "token",
+            "text": "iodousacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)O"
+            },
+            "tag": "token",
+            "text": "iodous acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "BrO"
+            },
+            "tag": "token",
+            "text": "hypobromous"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "BrO"
+            },
+            "tag": "token",
+            "text": "hypobromousacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "BrO"
+            },
+            "tag": "token",
+            "text": "hypobromous acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "ClO"
+            },
+            "tag": "token",
+            "text": "hypochlorous"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "ClO"
+            },
+            "tag": "token",
+            "text": "hypochlorousacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "ClO"
+            },
+            "tag": "token",
+            "text": "hypochlorous acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "FO"
+            },
+            "tag": "token",
+            "text": "hypofluorous"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "FO"
+            },
+            "tag": "token",
+            "text": "hypofluorousacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "FO"
+            },
+            "tag": "token",
+            "text": "hypofluorous acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "IO"
+            },
+            "tag": "token",
+            "text": "hypoiodous"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "IO"
+            },
+            "tag": "token",
+            "text": "hypoiodousacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "IO"
+            },
+            "tag": "token",
+            "text": "hypoiodous acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "metaperiodic"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "metaperiodicacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "metaperiodic acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[N+](=O)(O)[O-]"
+            },
+            "tag": "token",
+            "text": "nitric"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[N+](=O)(O)[O-]"
+            },
+            "tag": "token",
+            "text": "nitricacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[N+](=O)(O)[O-]"
+            },
+            "tag": "token",
+            "text": "nitric acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "N(=O)O"
+            },
+            "tag": "token",
+            "text": "nitrous"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "N(=O)O"
+            },
+            "tag": "token",
+            "text": "nitrousacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "N(=O)O"
+            },
+            "tag": "token",
+            "text": "nitrous acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4,5,6,7",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(O)(O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "orthoperiodic"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4,5,6,7",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(O)(O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "orthoperiodicacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4,5,6,7",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(O)(O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "orthoperiodic acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4,5,6,7",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(O)(O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "ortho-periodic acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2,3,4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Si](O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "silicic"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2,3,4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Si](O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "silicicacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2,3,4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Si](O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "silicic acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2,3,4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Si](O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "orthosilicic"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2,3,4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Si](O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "orthosilicicacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2,3,4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Si](O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "orthosilicic acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2,3,4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Si](O)(O)(O)O"
+            },
+            "tag": "token",
+            "text": "ortho-silicic acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Br(=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "perbromic"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Br(=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "perbromicacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Br(=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "perbromic acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Cl(=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "perchloric"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Cl(=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "perchloricacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Cl(=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "perchloric acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[F|7](=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "perfluoric"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[F|7](=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "perfluoricacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[F|7](=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "perfluoric acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "periodic"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "periodicacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "periodic acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Br(=O)(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "bromate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Br(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "bromite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Cl(=O)(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "chlorate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Cl(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "chlorite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[F|5](=O)(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "fluorate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[F|3](=O)[O-]"
+            },
+            "tag": "token",
+            "text": "fluorite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "4",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "iodate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "iodite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Br[O-]"
+            },
+            "tag": "token",
+            "text": "hypobromite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Cl[O-]"
+            },
+            "tag": "token",
+            "text": "hypochlorite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "F[O-]"
+            },
+            "tag": "token",
+            "text": "hypofluorite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I[O-]"
+            },
+            "tag": "token",
+            "text": "hypoiodite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(=O)(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "metaperiodate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[N+](=O)([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "nitrate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "N(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "nitrite"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4,5,6,7",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)([O-])([O-])([O-])([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "orthoperiodate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3,4,5,6,7",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)([O-])([O-])([O-])([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "ortho-periodate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2,3,4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Si]([O-])([O-])([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "silicate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2,3,4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Si]([O-])([O-])([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "orthosilicate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "2,3,4,5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[Si]([O-])([O-])([O-])[O-]"
+            },
+            "tag": "token",
+            "text": "ortho-silicate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Br(=O)(=O)(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "perbromate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "Cl(=O)(=O)(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "perchlorate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[F|7](=O)(=O)(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "perfluorate"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "I(=O)(=O)(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "periodate"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "none",
+          "symbol": "\u00f1",
+          "tagname": "group",
+          "type": "chalcogenAcidStem"
+        },
+        "children": [
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "S(=O)(=O)"
+            },
+            "tag": "token",
+            "text": "sulfon"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "S(=O)"
+            },
+            "tag": "token",
+            "text": "sulfin"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "S(=O)"
+            },
+            "tag": "token",
+            "text": "thion"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "S"
+            },
+            "tag": "token",
+            "text": "sulfen"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[SeH2](=O)(=O)"
+            },
+            "tag": "token",
+            "text": "selenon"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[SeH2](=O)"
+            },
+            "tag": "token",
+            "text": "selenin"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[SeH2]"
+            },
+            "tag": "token",
+            "text": "selenen"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[TeH2](=O)(=O)"
+            },
+            "tag": "token",
+            "text": "telluron"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[TeH2](=O)"
+            },
+            "tag": "token",
+            "text": "tellurin"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[TeH2]"
+            },
+            "tag": "token",
+            "text": "telluren"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "nonCarboxylicAcids.xml"
+}

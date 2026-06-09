@@ -1,0 +1,103 @@
+{
+  "format": "bluenamer.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "subType": "halideOrPseudoHalide",
+          "symbol": "x",
+          "tagname": "group",
+          "type": "substituent"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "-Br"
+            },
+            "tag": "token",
+            "text": "brom"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "-Cl"
+            },
+            "tag": "token",
+            "text": "chlor"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "-F"
+            },
+            "tag": "token",
+            "text": "fluor"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "-I"
+            },
+            "tag": "token",
+            "text": "iod"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "perhalogeno",
+          "symbol": "x",
+          "tagname": "group",
+          "type": "substituent"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "-F"
+            },
+            "tag": "token",
+            "text": "perfluor"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "-Br"
+            },
+            "tag": "token",
+            "text": "perbrom"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "-Cl"
+            },
+            "tag": "token",
+            "text": "perchlor"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "-I"
+            },
+            "tag": "token",
+            "text": "period"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "germanTokens.xml"
+}

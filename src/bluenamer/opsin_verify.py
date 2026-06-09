@@ -14,6 +14,10 @@ import subprocess
 from dataclasses import dataclass
 from typing import Literal
 
+from bluenamer.utils import standardize_mol
+
+from .resonance_compare import canonical_smiles, equivalent_smiles
+
 OpsinStatus = Literal[
     "matched",
     "mismatched",
@@ -42,6 +46,22 @@ class OpsinCheck:
 
         return self.status == "matched"
 
+    def __bool__(self) -> bool:
+        return self.ok
+
+    def __str__(self) -> str:
+        return self.status
+
+    def to_dict(self) -> dict:
+        return {
+            "status": self.status,
+            "name": self.name,
+            "canonical_original": self.canonical_original,
+            "opsin_smiles": self.opsin_smiles,
+            "canonical_roundtrip": self.canonical_roundtrip,
+            "error_message": self.error_message,
+        }
+
 
 def _try_import_py2opsin():
     try:
@@ -66,20 +86,17 @@ def _java_available() -> bool:
     return True
 
 
+def opsin_available() -> bool:
+    """``True`` iff both ``py2opsin`` and a Java runtime are usable."""
+
+    return _try_import_py2opsin() is not None and _java_available()
+
+
 def _canonicalize(smiles: str) -> str | None:
-    if not smiles:
-        return None
-    try:
-        from rdkit.Chem import CanonSmiles  # type: ignore
-    except Exception:  # pragma: no cover - rdkit always available
-        return None
-    try:
-        return CanonSmiles(smiles)
-    except Exception:
-        return None
+    return canonical_smiles(smiles)
 
 
-def verify_with_opsin(name: str, smiles: str) -> OpsinCheck:
+def verify_with_opsin(name: str, smiles: str, standardize_smiles: bool = True) -> OpsinCheck:
     """Round-trip ``name`` through OPSIN and compare to ``smiles``.
 
     Returns an ``OpsinCheck`` with one of the documented ``status`` values.
@@ -97,7 +114,10 @@ def verify_with_opsin(name: str, smiles: str) -> OpsinCheck:
     if not _java_available():
         return OpsinCheck(status="skipped_no_java", name=name)
 
-    canonical_original = _canonicalize(smiles)
+    if standardize_smiles:
+        canonical_original = standardize_mol(smiles)
+    else:
+        canonical_original = _canonicalize(smiles)
 
     try:
         decoded = py2opsin.py2opsin([name])
@@ -126,10 +146,12 @@ def verify_with_opsin(name: str, smiles: str) -> OpsinCheck:
             canonical_original=canonical_original,
             opsin_smiles=opsin_smiles,
             canonical_roundtrip=canonical_roundtrip,
-            error_message="Failed to canonicalize SMILES for comparison.",
+            error_message="Failed to standardize SMILES for comparison."
+            if standardize_smiles
+            else "Failed to canonicalize SMILES for comparison.",
         )
 
-    if canonical_original == canonical_roundtrip:
+    if equivalent_smiles(smiles, opsin_smiles):
         return OpsinCheck(
             status="matched",
             name=name,
@@ -147,4 +169,4 @@ def verify_with_opsin(name: str, smiles: str) -> OpsinCheck:
     )
 
 
-__all__ = ["OpsinCheck", "OpsinStatus", "verify_with_opsin"]
+__all__ = ["OpsinCheck", "OpsinStatus", "opsin_available", "verify_with_opsin"]

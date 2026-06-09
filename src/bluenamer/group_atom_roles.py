@@ -43,3 +43,16 @@ def sulfonyl_sulfur(mol: Molecule, group: PerceivedGroup) -> int | None:
 
 def amide_nitrogen(mol: Molecule, group: PerceivedGroup) -> int | None:
     return next((n for n in group.atoms_involved if mol.atoms[n].symbol == "N"), None)
+
+
+def hydrazone_characteristic_carbon(mol: Molecule, group: PerceivedGroup) -> int | None:
+    """Return the C=N carbon represented by a hydrazone suffix."""
+
+    for nitrogen in [idx for idx in group.atoms_involved if mol.atoms[idx].symbol == "N"]:
+        for neighbor in mol.get_neighbors(nitrogen):
+            if not mol.atoms[neighbor].is_carbon:
+                continue
+            bond = mol.get_bond(nitrogen, neighbor)
+            if bond is not None and bond.order == 2:
+                return neighbor
+    return None

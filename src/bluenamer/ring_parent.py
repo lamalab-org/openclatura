@@ -9,6 +9,11 @@ plain paths independently.
 from dataclasses import dataclass
 
 from .polycycle_topology import RingNumbering
+from .ring_renderer import is_von_baeyer_descriptor
+
+
+def _is_von_baeyer_descriptor(descriptor: str | None) -> bool:
+    return is_von_baeyer_descriptor(descriptor)
 
 
 @dataclass(frozen=True)
@@ -36,7 +41,7 @@ class RingParent:
     @property
     def audit_ok(self) -> bool:
         if not self.numbering_candidates:
-            return True
+            return not _is_von_baeyer_descriptor(self.descriptor)
         return all(numbering.audit_ok for numbering in self.numbering_candidates)
 
     @classmethod
@@ -76,6 +81,8 @@ class RingParent:
         paths: list[list[int]] | tuple[tuple[int, ...], ...],
         descriptor_numbers: tuple[int, ...] = (),
     ) -> "RingParent":
+        if _is_von_baeyer_descriptor(descriptor):
+            raise ValueError("von Baeyer RingParent requires audited numbering candidates")
         return cls(
             kind=kind,
             atoms=frozenset(atoms),

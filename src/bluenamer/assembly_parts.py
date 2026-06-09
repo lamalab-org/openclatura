@@ -6,12 +6,31 @@ from .name_operations import HydroOperation
 from .spiro_assembly import SpiroAssembly
 
 
+@dataclass(frozen=True)
+class NameTokenBinding:
+    """Renderer-emitted token metadata before final string positioning."""
+
+    text: str
+    token_kind: str = "structural"
+    ownership: str = "exact"
+    confidence: str = "exact"
+    source: str = "renderer"
+    grammar_role: str = ""
+    binding_key: str = ""
+    atom_ids: set[int] = field(default_factory=set)
+    bond_ids: set[int] = field(default_factory=set)
+    charge_atom_ids: set[int] = field(default_factory=set)
+    locants: tuple[str, ...] = ()
+
+
 @dataclass
 class SubstituentItem:
     name: str
     locants: list[str]
     atom_ids: set[int] = field(default_factory=set)
     bond_ids: set[int] = field(default_factory=set)
+    charge_atom_ids: set[int] = field(default_factory=set)
+    emitted_tokens: tuple[NameTokenBinding, ...] = ()
     trace_segments: list[dict] = field(default_factory=list)
     spiro: SpiroAssembly | None = None
 
@@ -30,6 +49,7 @@ class PrincipalGroupItem:
     locants: list[str]
     atom_ids: set[int] = field(default_factory=set)
     bond_ids: set[int] = field(default_factory=set)
+    charge_atom_ids: set[int] = field(default_factory=set)
 
 
 @dataclass(frozen=True)
@@ -49,7 +69,9 @@ class NameAtomBinding:
     term: str
     atom_ids: set[int] = field(default_factory=set)
     bond_ids: set[int] = field(default_factory=set)
+    charge_atom_ids: set[int] = field(default_factory=set)
     locants: tuple[str, ...] = ()
+    emitted_tokens: tuple[NameTokenBinding, ...] = ()
 
 
 @dataclass
@@ -70,11 +92,14 @@ class AssemblyParts:
     retained_name: str | None = None
     front_modifiers: list[str] = field(default_factory=list)
     front_modifier_atom_ids: set[int] = field(default_factory=set)
+    front_modifier_charge_atom_ids: set[int] = field(default_factory=set)
+    principal_suffix_modifiers: list[SubstituentItem] = field(default_factory=list)
     a_prefixes: list[SubstituentItem] = field(default_factory=list)
     principal_group: PrincipalGroupItem | None = None
     unsaturations: list[UnsaturationItem] = field(default_factory=list)
     substituents: list[SubstituentItem] = field(default_factory=list)
     stereo_features: list[tuple[str, str]] = field(default_factory=list)
+    relative_stereo_prefixes: list[str] = field(default_factory=list)
     indicated_hydrogens: list[str] = field(default_factory=list)
     hydro_operations: list[HydroOperation] = field(default_factory=list)
     parent_charges: list[ParentChargeItem] = field(default_factory=list)
@@ -85,4 +110,6 @@ class AssemblyParts:
     parent_atom_charges_by_locant: dict[str, int] = field(default_factory=dict)
     parent_bond_orders_by_locants: dict[tuple[str, str], int] = field(default_factory=dict)
     name_atom_bindings: list[NameAtomBinding] = field(default_factory=list)
+    name_token_spans: list[dict] = field(default_factory=list)
+    name_rewrite_history: list[dict] = field(default_factory=list)
     stereo_audit_issues: list[str] = field(default_factory=list)

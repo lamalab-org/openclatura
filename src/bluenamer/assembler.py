@@ -16,13 +16,134 @@ from .assembly_parts import AssemblyParts
 from .assembly_prefixes import format_replacement_prefixes, format_substituent_prefixes
 from .assembly_spiro import format_spiro_core, split_spiro_substituents
 from .assembly_utils import needs_hyphen, parse_locant
-from .formatting import ensure_stereo_descriptor_boundary
+from .formatting import ensure_stereo_descriptor_boundary, format_multiplier
+from .fused_ion_templates import consume_fused_ion_operation, select_fused_ion_operation
+from .name_assembly import NameAssemblyResult, token_span_trace_data
+from .name_bindings import refresh_name_atom_bindings
 from .name_postprocessing import (
     apply_acyl_amido_postprocessing,
     apply_connection_boundary_postprocessing,
     apply_data_postprocessing,
 )
-from .rules import multipliers
+
+LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
+    ("1-hydroxymethanoic acid", "carbonic acid"),
+    ("1-hydroxymethanoate", "carbonate"),
+    ("1-hydroxymethanamide", "carbamic acid"),
+    ("1-hydroxymethanenitrile", "cyanic acid"),
+    ("1-hydroxymethanoyl", "carboxy"),
+    ("1-hydroxymethanoic anhydride", "dicarbonic acid"),
+    ("hydroxymethanoic acid", "carbonic acid"),
+    ("hydroxymethanoate", "carbonate"),
+    ("hydroxymethanamide", "carbamic acid"),
+    ("hydroxymethanenitrile", "cyanic acid"),
+    ("hydroxymethanoyl", "carboxy"),
+    ("hydroxymethanoic anhydride", "dicarbonic acid"),
+    ("benzene-1-carboxylic acid", "benzoic acid"),
+    ("benzene-1-carboxamide", "benzamide"),
+    ("benzene-1-carboxylate", "benzoate"),
+    ("benzene-1-carbonitrile", "benzonitrile"),
+    ("benzene-1-carbaldehyde", "benzaldehyde"),
+    ("benzene-1-carbonyl", "benzoyl"),
+    ("benzenecarboxylic acid", "benzoic acid"),
+    ("benzenecarcarboxamide", "benzamide"),
+    ("benzenecarboxylate", "benzoate"),
+    ("benzenecarcarbonitrile", "benzonitrile"),
+    ("benzenecarbaldehyde", "benzaldehyde"),
+    ("methanoic acid", "formic acid"),
+    ("methanamide", "formamide"),
+    ("methanoate", "formate"),
+    ("methanoyl", "formyl"),
+    ("ethanoic acid", "acetic acid"),
+    ("ethanamide", "acetamide"),
+    ("ethanenitrile", "acetonitrile"),
+    ("ethanoate", "acetate"),
+    ("ethanoyl", "acetyl"),
+    ("propanenitrile", "propionitrile"),
+    ("butanenitrile", "butyronitrile"),
+    ("2-methylpropan-2-yl", "tert-butyl"),
+    ("1,1-dimethylethyl", "tert-butyl"),
+    ("(1,1-dimethylethyl)oxy", "tert-butoxy"),
+    ("(tert-butyl)oxy", "tert-butoxy"),
+    ("tert-butyloxy", "tert-butoxy"),
+    ("methylcarbonyloxy", "acetoxy"),
+    ("methylcarbonyl", "acetyl"),
+    ("ethylcarbonyl", "propionyl"),
+    ("propylcarbonyl", "butyryl"),
+    ("phenylcarbonyl", "benzoyl"),
+    ("(methylcarbonyl)oxy", "acetoxy"),
+    ("(ethylcarbonyl)oxy", "propionyloxy"),
+    ("(phenylcarbonyl)oxy", "benzoyloxy"),
+    ("aminocarbonothioyl", "carbamothioyl"),
+    ("ethan-1-ol", "ethanol"),
+    ("methan-1-ol", "methanol"),
+    ("ethan-1-amine", "ethanamine"),
+    ("methan-1-amine", "methanamine"),
+    ("(phenylsulfonyl)amino", "benzenesulfonamido"),
+    ("phenylsulfonylamino", "benzenesulfonamido"),
+    ("(benzenesulfonyl)amino", "benzenesulfonamido"),
+    ("benzenesulfonylamino", "benzenesulfonamido"),
+    ("(methanesulfonyl)amino", "methanesulfonamido"),
+    ("methanesulfonylamino", "methanesulfonamido"),
+    ("(ethanesulfonyl)amino", "ethanesulfonamido"),
+    ("ethanesulfonylamino", "ethanesulfonamido"),
+    ("(chloromethyl)carbonyl", "chloroacetyl"),
+    ("((chloromethyl)carbonyl)amino", "2-chloroacetamido"),
+    ("(prop-2-enoyl)amino", "acrylamido"),
+    ("prop-2-enoylamino", "acrylamido"),
+    ("prop-2-enoyloxy", "acryloyloxy"),
+    ("1-oxoethan-1-yl", "acetyl"),
+    ("1-oxopropan-1-yl", "propionyl"),
+    ("1-oxobutan-1-yl", "butyryl"),
+    ("1-oxopentan-1-yl", "pentanoyl"),
+    ("1-oxohexan-1-yl", "hexanoyl"),
+    ("1-oxoethyl", "acetyl"),
+    ("1-oxopropyl", "propionyl"),
+    ("1-oxobutyl", "butyryl"),
+    ("1-oxopentyl", "pentanoyl"),
+    ("1-oxohexyl", "hexanoyl"),
+    ("benzene-1-sulfonic acid", "benzenesulfonic acid"),
+    ("benzene-1-sulfonamide", "benzenesulfonamide"),
+    ("benzene-1-thiol", "benzenethiol"),
+    ("ethanedioic acid", "oxalic acid"),
+    ("propanedioic acid", "malonic acid"),
+    ("butanedioic acid", "succinic acid"),
+    ("pentanedioic acid", "glutaric acid"),
+    ("hexanedioic acid", "adipic acid"),
+    ("phenylmethyl", "benzyl"),
+    ("benzylcarbonyl", "phenylacetyl"),
+    ("phenylmethoxy", "benzyloxy"),
+    ("methanehydrazine", "methylhydrazine"),
+    ("ethanehydrazine", "ethylhydrazine"),
+    ("propanehydrazine", "propylhydrazine"),
+    ("benzenehydrazine", "phenylhydrazine"),
+    ("fluoroethanoate", "fluoroacetate"),
+    ("chloroethanoate", "chloroacetate"),
+    ("bromoethanoate", "bromoacetate"),
+    ("iodoethanoate", "iodoacetate"),
+    ("fluoroethanoic acid", "fluoroacetic acid"),
+    ("chloroethanoic acid", "chloroacetic acid"),
+    ("bromoethanoic acid", "bromoacetic acid"),
+    ("iodoethanoic acid", "iodoacetic acid"),
+    ("fluoroethanoyl", "fluoroacetyl"),
+    ("chloroethanoyl", "chloroacetyl"),
+    ("bromoethanoyl", "bromoacetyl"),
+    ("iodoethanoyl", "iodoacetyl"),
+    ("1-azacyclobutane", "azetidine"),
+    ("1-azacyclobutan-", "azetidin-"),
+    ("1-azacyclopentane", "pyrrolidine"),
+    ("1-azacyclopentan-", "pyrrolidin-"),
+    ("1-azacyclohexane", "piperidine"),
+    ("1-azacyclohexan-", "piperidin-"),
+    ("1-oxacyclopentane", "oxolane"),
+    ("1-oxacyclopentan-", "oxolan-"),
+    ("1-oxacyclohexane", "oxane"),
+    ("1-oxacyclohexan-", "oxan-"),
+    ("1-thiacyclopentane", "thiolane"),
+    ("1-thiacyclopentan-", "thiolan-"),
+    ("1-thiacyclohexane", "thiane"),
+    ("1-thiacyclohexan-", "thian-"),
+)
 
 
 def _post_process_name(name: str) -> str:
@@ -81,125 +202,7 @@ def _post_process_name(name: str) -> str:
     name = re.sub(r"\b1-([a-zA-Z0-9\-\[\]\(\)\,]+?)aminomethanenitrile\b", r"\1cyanamide", name)
     name = name.replace("aminomethanenitrile", "cyanamide")
 
-    replacements = [
-        ("1-hydroxymethanoic acid", "carbonic acid"),
-        ("1-hydroxymethanoate", "carbonate"),
-        ("1-hydroxymethanamide", "carbamic acid"),
-        ("1-hydroxymethanenitrile", "cyanic acid"),
-        ("1-hydroxymethanoyl", "carboxy"),
-        ("1-hydroxymethanoic anhydride", "dicarbonic acid"),
-        ("hydroxymethanoic acid", "carbonic acid"),
-        ("hydroxymethanoate", "carbonate"),
-        ("hydroxymethanamide", "carbamic acid"),
-        ("hydroxymethanenitrile", "cyanic acid"),
-        ("hydroxymethanoyl", "carboxy"),
-        ("hydroxymethanoic anhydride", "dicarbonic acid"),
-        ("benzene-1-carboxylic acid", "benzoic acid"),
-        ("benzene-1-carboxamide", "benzamide"),
-        ("benzene-1-carboxylate", "benzoate"),
-        ("benzene-1-carbonitrile", "benzonitrile"),
-        ("benzene-1-carbaldehyde", "benzaldehyde"),
-        ("benzene-1-carbonyl", "benzoyl"),
-        ("benzenecarboxylic acid", "benzoic acid"),
-        ("benzenecarcarboxamide", "benzamide"),
-        ("benzenecarboxylate", "benzoate"),
-        ("benzenecarcarbonitrile", "benzonitrile"),
-        ("benzenecarbaldehyde", "benzaldehyde"),
-        ("methanoic acid", "formic acid"),
-        ("methanamide", "formamide"),
-        ("methanoate", "formate"),
-        ("methanoyl", "formyl"),
-        ("ethanoic acid", "acetic acid"),
-        ("ethanamide", "acetamide"),
-        ("ethanenitrile", "acetonitrile"),
-        ("ethanoate", "acetate"),
-        ("ethanoyl", "acetyl"),
-        ("propanenitrile", "propionitrile"),
-        ("butanenitrile", "butyronitrile"),
-        ("2-methylpropan-2-yl", "tert-butyl"),
-        ("1,1-dimethylethyl", "tert-butyl"),
-        ("(1,1-dimethylethyl)oxy", "tert-butoxy"),
-        ("(tert-butyl)oxy", "tert-butoxy"),
-        ("tert-butyloxy", "tert-butoxy"),
-        ("methylcarbonyloxy", "acetoxy"),
-        ("methylcarbonyl", "acetyl"),
-        ("ethylcarbonyl", "propionyl"),
-        ("propylcarbonyl", "butyryl"),
-        ("phenylcarbonyl", "benzoyl"),
-        ("(methylcarbonyl)oxy", "acetoxy"),
-        ("(ethylcarbonyl)oxy", "propionyloxy"),
-        ("(phenylcarbonyl)oxy", "benzoyloxy"),
-        ("aminocarbonothioyl", "carbamothioyl"),
-        ("ethan-1-ol", "ethanol"),
-        ("methan-1-ol", "methanol"),
-        ("ethan-1-amine", "ethanamine"),
-        ("methan-1-amine", "methanamine"),
-        ("(phenylsulfonyl)amino", "benzenesulfonamido"),
-        ("phenylsulfonylamino", "benzenesulfonamido"),
-        ("(benzenesulfonyl)amino", "benzenesulfonamido"),
-        ("benzenesulfonylamino", "benzenesulfonamido"),
-        ("(methanesulfonyl)amino", "methanesulfonamido"),
-        ("methanesulfonylamino", "methanesulfonamido"),
-        ("(ethanesulfonyl)amino", "ethanesulfonamido"),
-        ("ethanesulfonylamino", "ethanesulfonamido"),
-        ("(chloromethyl)carbonyl", "chloroacetyl"),
-        ("((chloromethyl)carbonyl)amino", "2-chloroacetamido"),
-        ("(prop-2-enoyl)amino", "acrylamido"),
-        ("prop-2-enoylamino", "acrylamido"),
-        ("prop-2-enoyloxy", "acryloyloxy"),
-        ("1-oxoethan-1-yl", "acetyl"),
-        ("1-oxopropan-1-yl", "propionyl"),
-        ("1-oxobutan-1-yl", "butyryl"),
-        ("1-oxopentan-1-yl", "pentanoyl"),
-        ("1-oxohexan-1-yl", "hexanoyl"),
-        ("1-oxoethyl", "acetyl"),
-        ("1-oxopropyl", "propionyl"),
-        ("1-oxobutyl", "butyryl"),
-        ("1-oxopentyl", "pentanoyl"),
-        ("1-oxohexyl", "hexanoyl"),
-        ("benzene-1-sulfonic acid", "benzenesulfonic acid"),
-        ("benzene-1-sulfonamide", "benzenesulfonamide"),
-        ("benzene-1-thiol", "benzenethiol"),
-        ("ethanedioic acid", "oxalic acid"),
-        ("propanedioic acid", "malonic acid"),
-        ("butanedioic acid", "succinic acid"),
-        ("pentanedioic acid", "glutaric acid"),
-        ("hexanedioic acid", "adipic acid"),
-        ("phenylmethyl", "benzyl"),
-        ("benzylcarbonyl", "phenylacetyl"),
-        ("phenylmethoxy", "benzyloxy"),
-        ("methanehydrazine", "methylhydrazine"),
-        ("ethanehydrazine", "ethylhydrazine"),
-        ("propanehydrazine", "propylhydrazine"),
-        ("benzenehydrazine", "phenylhydrazine"),
-        ("fluoroethanoate", "fluoroacetate"),
-        ("chloroethanoate", "chloroacetate"),
-        ("bromoethanoate", "bromoacetate"),
-        ("iodoethanoate", "iodoacetate"),
-        ("fluoroethanoic acid", "fluoroacetic acid"),
-        ("chloroethanoic acid", "chloroacetic acid"),
-        ("bromoethanoic acid", "bromoacetic acid"),
-        ("iodoethanoic acid", "iodoacetic acid"),
-        ("fluoroethanoyl", "fluoroacetyl"),
-        ("chloroethanoyl", "chloroacetyl"),
-        ("bromoethanoyl", "bromoacetyl"),
-        ("iodoethanoyl", "iodoacetyl"),
-        ("1-azacyclobutane", "azetidine"),
-        ("1-azacyclobutan-", "azetidin-"),
-        ("1-azacyclopentane", "pyrrolidine"),
-        ("1-azacyclopentan-", "pyrrolidin-"),
-        ("1-azacyclohexane", "piperidine"),
-        ("1-azacyclohexan-", "piperidin-"),
-        ("1-oxacyclopentane", "oxolane"),
-        ("1-oxacyclopentan-", "oxolan-"),
-        ("1-oxacyclohexane", "oxane"),
-        ("1-oxacyclohexan-", "oxan-"),
-        ("1-thiacyclopentane", "thiolane"),
-        ("1-thiacyclopentan-", "thiolan-"),
-        ("1-thiacyclohexane", "thiane"),
-        ("1-thiacyclohexan-", "thian-"),
-    ]
-    for old, new in replacements:
+    for old, new in LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS:
         if old in ["2-methylpropan-2-yl", "1,1-dimethylethyl"]:
             name = re.sub(rf"(?<![a-zA-Z0-9\-,]){re.escape(old)}(?![a-zA-Z])", new, name)
         else:
@@ -290,9 +293,26 @@ def _add_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:
         if feature not in seen:
             seen.add(feature)
             unique_stereo.append(feature)
-    sorted_stereo = sorted(unique_stereo, key=lambda f: parse_locant(f[0]))
-    stereo_str = "(" + ",".join(f"{loc}{st}" for loc, st in sorted_stereo) + ")-"
+    unlocanted_descriptors = {descriptor for locant, descriptor in unique_stereo if not locant}
+    if unlocanted_descriptors:
+        unique_stereo = [
+            feature for feature in unique_stereo if not (feature[0] == "1" and feature[1] in unlocanted_descriptors)
+        ]
+    sorted_stereo = sorted(unique_stereo, key=lambda f: parse_locant(f[0]) if f[0] else (0, ""))
+    stereo_str = "(" + ",".join(f"{loc}{st}" if loc else st for loc, st in sorted_stereo) + ")-"
     return stereo_str + final_word
+
+
+def _add_relative_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:
+    if not parts.relative_stereo_prefixes:
+        return final_word
+    prefixes = []
+    seen = set()
+    for prefix in parts.relative_stereo_prefixes:
+        if prefix not in seen:
+            prefixes.append(prefix)
+            seen.add(prefix)
+    return "".join(f"{prefix}-" for prefix in prefixes) + final_word
 
 
 def _add_front_modifiers(parts: AssemblyParts, final_word: str) -> str:
@@ -301,7 +321,7 @@ def _add_front_modifiers(parts: AssemblyParts, final_word: str) -> str:
     counts = {}
     for mod in parts.front_modifiers:
         counts[mod] = counts.get(mod, 0) + 1
-    front_words = [multipliers.basic(c) + m if c > 1 else m for m, c in sorted(counts.items())]
+    front_words = [format_multiplier(m, c, safe_enclose=True) if c > 1 else m for m, c in sorted(counts.items())]
     return f"{' '.join(front_words)} {final_word}"
 
 
@@ -310,20 +330,29 @@ def post_process_name(name: str) -> str:
 
 
 def assemble_name_raw(parts: AssemblyParts) -> str:
+    fused_ion_candidate = select_fused_ion_operation(parts)
+    if fused_ion_candidate is not None:
+        consume_fused_ion_operation(parts, fused_ion_candidate)
+
     spiro_subs = split_spiro_substituents(parts)
     prefix_str = format_substituent_prefixes(parts, spiro_subs)
     a_prefix_str = format_replacement_prefixes(parts)
     promote_benzene_retained_name(parts)
-    stem_str, terminal_e = parent_stem_and_terminal(parts)
-    stem_str = apply_replacement_prefix(stem_str, a_prefix_str)
-    if parts.is_substituent:
-        stem_str, unsat_str, terminal_e, suffix_str = format_substituent_tail(parts, stem_str, terminal_e, spiro_subs)
+    if fused_ion_candidate is not None and fused_ion_candidate.rendered_name is not None:
+        core_name = fused_ion_candidate.rendered_name
     else:
-        stem_str, unsat_str, terminal_e, suffix_str = format_parent_tail(parts, stem_str, terminal_e, spiro_subs)
+        stem_str, terminal_e = parent_stem_and_terminal(parts)
+        stem_str = apply_replacement_prefix(stem_str, a_prefix_str)
+        if parts.is_substituent:
+            stem_str, unsat_str, terminal_e, suffix_str = format_substituent_tail(
+                parts, stem_str, terminal_e, spiro_subs
+            )
+        else:
+            stem_str, unsat_str, terminal_e, suffix_str = format_parent_tail(parts, stem_str, terminal_e, spiro_subs)
 
-    core_name, terminal_e = format_spiro_core(stem_str, unsat_str, terminal_e, spiro_subs)
-    core_name = _add_indicated_hydrogen_prefix(parts, core_name)
-    core_name += suffix_str
+        core_name, terminal_e = format_spiro_core(stem_str, unsat_str, terminal_e, spiro_subs)
+        core_name = _add_indicated_hydrogen_prefix(parts, core_name)
+        core_name += suffix_str
     parent_needs_prefix_hyphen = bool(
         prefix_str and positive_parent_n_charges(parts) and parts.retained_name and parts.indicated_hydrogens
     )
@@ -333,9 +362,60 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
         else prefix_str + core_name
     )
     final_word = _add_stereo_prefix(parts, final_word)
+    final_word = _add_relative_stereo_prefix(parts, final_word)
     final_word = _add_front_modifiers(parts, final_word)
     return final_word
 
 
 def assemble_name(parts: AssemblyParts) -> str:
-    return post_process_name(assemble_name_raw(parts))
+    return assemble_name_result(parts).text
+
+
+def assemble_name_result(parts: AssemblyParts) -> NameAssemblyResult:
+    """Assemble a name while preserving final atom/bond binding metadata."""
+
+    if not parts.name_atom_bindings:
+        refresh_name_atom_bindings(parts)
+    raw_name = assemble_name_raw(parts)
+    result = NameAssemblyResult.from_raw_name(raw_name, parts.name_atom_bindings, postprocess=post_process_name)
+    parts.name_atom_bindings = list(result.bindings)
+    parts.name_token_spans = token_span_trace_data(result)
+    parts.name_rewrite_history = [
+        {
+            "name": operation.name,
+            "before": operation.before,
+            "after": operation.after,
+            "ownership": operation.ownership,
+            "source": operation.source,
+            "binding_count": operation.binding_count,
+            "changed_binding_count": operation.changed_binding_count,
+            "token_count": operation.token_count,
+            "changed_token_count": operation.changed_token_count,
+            "edits": [
+                {
+                    "before_start": edit.before_start,
+                    "before_end": edit.before_end,
+                    "after_start": edit.after_start,
+                    "after_end": edit.after_end,
+                    "before_text": edit.before_text,
+                    "after_text": edit.after_text,
+                    "segments": [
+                        {
+                            "before_start": segment.before_start,
+                            "before_end": segment.before_end,
+                            "after_start": segment.after_start,
+                            "after_end": segment.after_end,
+                            "before_text": segment.before_text,
+                            "after_text": segment.after_text,
+                            "ownership": segment.ownership,
+                            "group": segment.group,
+                        }
+                        for segment in edit.segments
+                    ],
+                }
+                for edit in operation.edits
+            ],
+        }
+        for operation in result.rewrite_history
+    ]
+    return result

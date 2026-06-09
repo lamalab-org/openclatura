@@ -11,12 +11,9 @@ from .engine import DEFAULT_NAMING_ENGINE
 from .formatting import format_counted_prefixes, format_multiplier, strip_outer_parentheses
 from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
-from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names
+from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
 from .molecule import DecisionTrace, Molecule, NameAnalysis
-from .name_bindings import postprocess_name_atom_bindings
-from .namer_config import (
-    SPECIAL_COMPONENT_NAMES,
-)
+from .name_assembly import NameAssemblyResult, token_span_trace_data
 from .naming_context import NamingIntent
 from .nomenclature import RULES
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
@@ -42,6 +39,7 @@ from .subgraph_tools import (
 from .subgraph_tools import (
     subgraph_component as _subgraph_component,
 )
+from .substituent_tokens import graph_bound_substituent_tokens
 from .trace_helpers import (
     add_substituent_trace as _add_substituent_trace,
 )
@@ -59,6 +57,44 @@ def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) 
     Blue Book references: P-63 through P-67 for direct detachable prefixes such
     as nitro, cyano, carboxy, carbamoyl, and halo-carbonyl prefixes.
     """
+
+    if mol.atoms[start_idx].is_carbon and start_idx in component:
+        terminal_sulfurs = [
+            neighbor
+            for neighbor in mol.get_neighbors(start_idx)
+            if neighbor in component
+            and mol.atoms[neighbor].symbol == "S"
+            and (bond := mol.get_bond(start_idx, neighbor)) is not None
+            and bond.order == 2
+            and all(other == start_idx for other in mol.get_neighbors(neighbor))
+        ]
+        if len(terminal_sulfurs) == 1 and component == {start_idx, terminal_sulfurs[0]}:
+            return "thioformyl"
+
+        triple_phosphorus = [
+            neighbor
+            for neighbor in mol.get_neighbors(start_idx)
+            if mol.atoms[neighbor].symbol == "P"
+            and neighbor in component
+            and (bond := mol.get_bond(start_idx, neighbor)) is not None
+            and bond.order == 3
+        ]
+        if len(triple_phosphorus) == 1:
+            phosphorus = triple_phosphorus[0]
+            terminal_oxo = [
+                neighbor
+                for neighbor in mol.get_neighbors(phosphorus)
+                if neighbor in component
+                and neighbor != start_idx
+                and mol.atoms[neighbor].symbol == "O"
+                and (bond := mol.get_bond(phosphorus, neighbor)) is not None
+                and bond.order == 2
+                and all(other == phosphorus for other in mol.get_neighbors(neighbor))
+            ]
+            if component == {start_idx, phosphorus}:
+                return "phosphanylidynemethyl"
+            if len(terminal_oxo) == 1 and component == {start_idx, phosphorus, terminal_oxo[0]}:
+                return "oxophosphanylidynemethyl"
 
     for group in perceive_groups(mol):
         if start_idx in group.atoms_involved and group.atoms_involved.issubset(component):
@@ -189,6 +225,7 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
             idx=n,
             charge=atom.charge,
             stereo=atom.stereo,
+            raw_stereo=atom.raw_stereo,
             is_aromatic=atom.is_aromatic,
             explicit_h_count=atom.explicit_h_count,
             total_h_count=atom.total_h_count,
@@ -220,7 +257,7 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
     sub_name_clean = sub_name_clean.replace("--", "-").strip("-")
     sub_name_clean = sub_name_clean.replace("-cyclo", "cyclo")
     if not sub_name_clean:
-        sub_name_clean = "methane"
+        raise ValueError("spiro side component marker removal left no named parent")
     side_prefixes, side_parent_name, side_suffixes = extract_spiro_side_prefixes(sub_name_clean)
     return SpiroAssembly(
         parent_locant="",
@@ -575,7 +612,7 @@ def _retained_n_ring_spiro_assembly(mol: Molecule, c_idx: int, sub_comp: set[int
     n_atom = next(atom_idx for atom_idx in ring if mol.atoms[atom_idx].symbol == "N")
     if mol.atoms[n_atom].charge <= 0:
         return None
-    locant_map = _number_saturated_n_ring_for_spiro(ring, n_atom, c_idx)
+    locant_map = _number_saturated_n_ring_for_spiro(mol, ring, n_atom, c_idx, sub_comp)
     ring_size = len(ring)
     ionic_parent = RULES.charges.saturated_n_ring_ionic_parents.get(ring_size)
     if not ionic_parent:
@@ -659,17 +696,32 @@ def _shortest_path_without_atom(
     return None
 
 
-def _number_saturated_n_ring_for_spiro(ring: list[int], n_atom: int, spiro_atom: int) -> dict[int, str]:
-    """Number a saturated retained N-ring from N=1, preserving graph orientation."""
+def _number_saturated_n_ring_for_spiro(
+    mol: Molecule,
+    ring: list[int],
+    n_atom: int,
+    spiro_atom: int,
+    sub_comp: set[int],
+) -> dict[int, str]:
+    """Number a saturated retained N-ring from N=1 with graph-feature tie-breaks."""
 
     n_pos = ring.index(n_atom)
     forward = ring[n_pos:] + ring[:n_pos]
     reverse = [forward[0], *reversed(forward[1:])]
     candidates = []
+    ring_atoms = set(ring)
     for order in (forward, reverse):
         locants = {atom_idx: str(pos + 1) for pos, atom_idx in enumerate(order)}
-        candidates.append(locants)
-    return max(candidates, key=lambda locants: int(locants[spiro_atom]))
+        branch_locants = tuple(
+            sorted(
+                int(locants[atom_idx])
+                for atom_idx in ring
+                if atom_idx != spiro_atom
+                and any(neighbor in sub_comp and neighbor not in ring_atoms for neighbor in mol.get_neighbors(atom_idx))
+            )
+        )
+        candidates.append((branch_locants, -int(locants[spiro_atom]), tuple(order), locants))
+    return min(candidates)[3]
 
 
 def _spiro_subgraph_name(mol: Molecule, c_idx: int, sub_comp: set[int]) -> str:
@@ -707,6 +759,7 @@ def _collect_subgraph_substituents(
                         locants=[],
                         atom_ids=set(group.atoms_involved),
                         bond_ids=_bond_ids_within(mol, set(group.atoms_involved) | {group.attachment_carbon}),
+                        charge_atom_ids=_charged_atoms(mol, set(group.atoms_involved)),
                     )
                 )
                 sub_handled_atoms.update(group.atoms_involved)
@@ -727,6 +780,7 @@ def _collect_subgraph_substituents(
                     locants=[],
                     atom_ids=sub_comp - {c_idx},
                     bond_ids=_bond_ids_within(mol, sub_comp),
+                    charge_atom_ids=_charged_atoms(mol, sub_comp - {c_idx}),
                     spiro=_spiro_subgraph_assembly(mol, c_idx, sub_comp),
                 )
             )
@@ -739,7 +793,8 @@ def _collect_subgraph_substituents(
                     mol, n_idx, sub_exclude | main_set, upstream_atom=c_idx, return_trace=True
                 )
                 if branch_name:
-                    branch_atoms = _subgraph_component(mol, n_idx, sub_exclude | main_set)
+                    branch_exclude = sub_exclude | main_set
+                    branch_atoms = _subgraph_component(mol, n_idx, branch_exclude)
                     branch_with_attachment = branch_atoms | {c_idx}
                     subst_mapping.setdefault(c_idx, []).append(
                         SubstituentItem(
@@ -747,6 +802,16 @@ def _collect_subgraph_substituents(
                             locants=[],
                             atom_ids=branch_atoms,
                             bond_ids=_bond_ids_within(mol, branch_with_attachment),
+                            charge_atom_ids=_charged_atoms(mol, branch_atoms),
+                            emitted_tokens=graph_bound_substituent_tokens(
+                                mol,
+                                n_idx,
+                                branch_atoms,
+                                branch_name,
+                                c_idx,
+                                branch_exclude,
+                                name_subgraph,
+                            ),
                             trace_segments=branch_trace,
                         )
                     )
@@ -770,9 +835,17 @@ def _add_subgraph_substituents(parts: AssemblyParts, subst_mapping: dict[int, li
                 locant,
                 item.atom_ids,
                 item.bond_ids,
+                item.charge_atom_ids,
                 item.trace_segments,
+                item.emitted_tokens,
                 spiro=item.spiro,
             )
+
+
+def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
+    """Return formally charged atoms from an already named graph fragment."""
+
+    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
 
 
 def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
@@ -782,6 +855,8 @@ def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
     parentheses around complex substituent prefixes.
     """
 
+    if parts.principal_group is not None and parts.principal_group.key in {"nitrile", "ring_nitrile"}:
+        name = name.replace("nitrilo", "cyano")
     if name == "phenyl" and not parts.substituents:
         return name
     if (
@@ -804,21 +879,109 @@ def _assemble_parent_name(
     get_loc,
     *,
     finalize_subgraph: bool = False,
-    apply_special_component_names: bool = False,
 ) -> str:
     """Assemble a parent name and apply shared post-assembly charge rules."""
 
     name = assemble_name_raw(parts)
+    rewrites = []
     if finalize_subgraph:
-        name = _finalize_subgraph_name(name, parts)
-    name = apply_anionic_parent_names(name, mol, numbered_path, get_loc, parts.retained_name)
-    name = apply_cationic_imino_names(name, mol)
-    if apply_special_component_names:
-        name = SPECIAL_COMPONENT_NAMES.get(name, name)
-    processed_name = post_process_name(name)
-    if parts.name_atom_bindings:
-        parts.name_atom_bindings = postprocess_name_atom_bindings(parts.name_atom_bindings, post_process_name)
-    return processed_name
+        rewrites.append(
+            (
+                "simple_rooted_carbanion_substituent_name",
+                lambda text: _simple_rooted_carbanion_substituent_name(mol, parts, numbered_path, get_loc) or text,
+            )
+        )
+        rewrites.append(("finalize_subgraph_name", lambda text: _finalize_subgraph_name(text, parts)))
+    rewrites.extend(
+        (
+            (
+                "apply_anionic_parent_names",
+                lambda text: apply_anionic_parent_names(text, mol, numbered_path, get_loc, parts.retained_name),
+            ),
+            (
+                "apply_cationic_imino_parent_prefixes",
+                lambda text: apply_cationic_imino_parent_prefixes(text, mol, numbered_path, get_loc),
+            ),
+            ("apply_cationic_imino_names", lambda text: apply_cationic_imino_names(text, mol)),
+        )
+    )
+    rewrites.append(("post_process_name", post_process_name))
+    result = NameAssemblyResult.from_rewrite_pipeline(name, parts.name_atom_bindings, rewrites=tuple(rewrites))
+    parts.name_atom_bindings = list(result.bindings)
+    parts.name_token_spans = token_span_trace_data(result)
+    parts.name_rewrite_history = [
+        {
+            "name": operation.name,
+            "before": operation.before,
+            "after": operation.after,
+            "ownership": operation.ownership,
+            "source": operation.source,
+            "binding_count": operation.binding_count,
+            "changed_binding_count": operation.changed_binding_count,
+            "token_count": operation.token_count,
+            "changed_token_count": operation.changed_token_count,
+            "edits": [
+                {
+                    "before_start": edit.before_start,
+                    "before_end": edit.before_end,
+                    "after_start": edit.after_start,
+                    "after_end": edit.after_end,
+                    "before_text": edit.before_text,
+                    "after_text": edit.after_text,
+                    "segments": [
+                        {
+                            "before_start": segment.before_start,
+                            "before_end": segment.before_end,
+                            "after_start": segment.after_start,
+                            "after_end": segment.after_end,
+                            "before_text": segment.before_text,
+                            "after_text": segment.after_text,
+                            "ownership": segment.ownership,
+                            "group": segment.group,
+                        }
+                        for segment in edit.segments
+                    ],
+                }
+                for edit in operation.edits
+            ],
+        }
+        for operation in result.rewrite_history
+    ]
+    return result.text
+
+
+def _simple_rooted_carbanion_substituent_name(
+    mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc
+) -> str:
+    """Render simple C- substituent roots as methanidyl ligand names.
+
+    This is deliberately narrow: only an acyclic all-carbon substituent whose
+    charged carbon is locant 1 is converted. More complex carbanions need a
+    charge-pair role template rather than a global ``-ide`` suffix.
+    """
+
+    if parts.substituents or parts.principal_group is not None or parts.unsaturations:
+        return ""
+    charged = [
+        atom_idx for atom_idx in numbered_path if mol.atoms[atom_idx].is_carbon and mol.atoms[atom_idx].charge < 0
+    ]
+    if len(charged) != 1 or str(get_loc(charged[0])) != "1":
+        return ""
+    if any(not mol.atoms[atom_idx].is_carbon for atom_idx in numbered_path):
+        return ""
+    if any(
+        mol.get_bond(a, b).order != 1
+        for a, b in zip(numbered_path, numbered_path[1:])
+        if mol.get_bond(a, b) is not None
+    ):
+        return ""
+    side_len = len(numbered_path) - 1
+    if side_len == 0:
+        return "methanidyl"
+    side_stem = stems.stem_for(side_len)
+    if not side_stem:
+        return ""
+    return f"{side_stem}ylmethanidyl"
 
 
 def name_subgraph(

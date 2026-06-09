@@ -33,5 +33,124 @@
       "unsubstituted_prefixes": {"0": "silyl"},
       "ligand_prefixes": {"0": "silyl"}
     }
-  }
+  },
+  "central_oxo_substituent_classes": [
+    {
+      "symbol": "P",
+      "oxo": 1,
+      "oxido": 0,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "oxophosphanyl"
+    },
+    {
+      "symbol": "P",
+      "oxo": 1,
+      "oxido": 0,
+      "hydroxy": 2,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "dihydroxyphosphoryl"
+    },
+    {
+      "symbol": "P",
+      "oxo": 1,
+      "oxido": 1,
+      "hydroxy": 1,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "phosphonato"
+    },
+    {
+      "symbol": "P",
+      "oxo": 1,
+      "oxido": 2,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "phosphonato"
+    },
+    {
+      "symbol": "P",
+      "oxo": 2,
+      "oxido": 0,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "dioxophosphanyl"
+    },
+    {
+      "symbol": "S",
+      "oxo": 1,
+      "oxido": 0,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "sulfinyl"
+    },
+    {
+      "symbol": "S",
+      "oxo": 2,
+      "oxido": 0,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "sulfonyl"
+    },
+    {
+      "symbol": "S",
+      "oxo": 2,
+      "oxido": 0,
+      "hydroxy": 1,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "sulfo"
+    },
+    {
+      "symbol": "S",
+      "oxo": 2,
+      "oxido": 1,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "sulfonato"
+    },
+    {
+      "symbol": "Se",
+      "oxo": 1,
+      "oxido": 0,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "seleninyl"
+    },
+    {
+      "symbol": "Se",
+      "oxo": 2,
+      "oxido": 0,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "selenonyl"
+    },
+    {
+      "symbol": "Te",
+      "oxo": 1,
+      "oxido": 0,
+      "hydroxy": 1,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "(hydroxy)(oxo)-lambda^4-tellanyl"
+    },
+    {
+      "symbol": "Te",
+      "oxo": 2,
+      "oxido": 0,
+      "hydroxy": 1,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "(hydroxy)dioxo-lambda^6-tellanyl"
+    }
+  ]
 }

@@ -65,7 +65,6 @@ RULE_GROUPS: tuple[RuleGroupSpec, ...] = (
             "salt_metal_names",
             "mononuclear_parent_hydrides",
             "replacement_parent_oxoacid_specs",
-            "special_component_names",
         ),
         reason="Disconnected/simple component names are resolved before parent assembly.",
     ),

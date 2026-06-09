@@ -54,6 +54,7 @@ def ring_system_fragment(mol: Molecule, atom_indices: set[int] | list[int] | tup
             idx=new_idx,
             charge=atom.charge,
             stereo=atom.stereo,
+            raw_stereo=atom.raw_stereo,
             is_aromatic=atom.is_aromatic,
             explicit_h_count=atom.explicit_h_count,
             total_h_count=atom.total_h_count,

@@ -171,19 +171,27 @@ def apply_ring_parent_nitrogen_zwitterion_stack(name: str, mol: Molecule, number
     sites = parent_charge_sites(mol, numbered_path, get_loc)
     negative_nitrogens = [site for site in sites if site.symbol == "N" and site.charge < 0]
     positive_nitrogens = [site for site in sites if site.symbol == "N" and site.charge > 0]
-    if len(negative_nitrogens) != 1 or len(positive_nitrogens) != 1:
+    if not negative_nitrogens or not positive_nitrogens:
         return name
-    negative = negative_nitrogens[0]
-    positive = positive_nitrogens[0]
-    if not _name_has_parent_ium_locant(name, positive.locant):
+    positive_locants = tuple(site.locant for site in positive_nitrogens)
+    if not _name_has_parent_ium_locants(name, positive_locants):
         return name
-    if not _charged_nitrogens_are_adjacent_or_conjugated(mol, parent_set, negative.atom_idx, positive.atom_idx):
+    if not all(
+        any(
+            _charged_nitrogens_are_adjacent_or_conjugated(mol, parent_set, negative.atom_idx, positive.atom_idx)
+            for positive in positive_nitrogens
+        )
+        for negative in negative_nitrogens
+    ):
         return name
-    if f"-{negative.locant}-ide-{positive.locant}-ium" in name:
+    negative_locants = tuple(site.locant for site in negative_nitrogens)
+    negative_text = ",".join(sorted(negative_locants, key=_locant_sort_key))
+    positive_text = ",".join(sorted(positive_locants, key=_locant_sort_key))
+    if f"-{negative_text}-ide-{positive_text}-ium" in name:
         return name
     return re.sub(
-        rf"-{re.escape(positive.locant)}-ium\b",
-        f"-{negative.locant}-ide-{positive.locant}-ium",
+        rf"-{re.escape(positive_text)}-ium\b",
+        f"-{negative_text}-ide-{positive_text}-ium",
         name,
         count=1,
     )
@@ -206,11 +214,20 @@ def _is_unsaturated_ring_parent(mol: Molecule, parent_set: set[int]) -> bool:
 
 
 def _name_has_parent_ium_locant(name: str, locant: str) -> bool:
-    match = re.search(rf"-{re.escape(locant)}-ium\b", name)
+    return _name_has_parent_ium_locants(name, (locant,))
+
+
+def _name_has_parent_ium_locants(name: str, locants: tuple[str, ...]) -> bool:
+    locant_text = ",".join(sorted(locants, key=_locant_sort_key))
+    match = re.search(rf"-{re.escape(locant_text)}-ium\b", name)
     if match is None:
         return False
     suffix_tail = name[match.end() :]
     return suffix_tail == ""
+
+
+def _locant_sort_key(locant: str) -> tuple[int, str]:
+    return (int(locant), "") if locant.isdigit() else (999, locant)
 
 
 def _charged_nitrogens_are_adjacent_or_conjugated(
@@ -472,12 +489,35 @@ def apply_parent_anion_rule(name: str, site: ParentChargeSite, context: ParentCh
     updated = apply_carbaldehyde_suffix_ide(updated, negative_locants)
     updated = apply_nitrile_suffix_ide(updated, negative_locants)
     updated = apply_terminal_characteristic_suffix_ide(updated, negative_locants)
+    updated = apply_substituent_parent_yl_ide(updated, negative_locants)
     if updated != name:
         return updated
     updated = apply_retained_parent_ide(name, context.retained_name, negative_locants)
     if updated != name:
         return updated
     return apply_terminal_parent_ide(name, negative_locants)
+
+
+def apply_substituent_parent_yl_ide(name: str, negative_locants: dict[str, set[str]]) -> str:
+    """Insert parent ``-ide`` before a matching locanted substituent ``-yl``.
+
+    This is a class-specific grammar path for charged substituent parents such
+    as ``...propan-2-yl`` where the graph-proven anionic atom is locant 2.
+    OPSIN accepts ``...propan-2-ide-2-yl`` for that class. It is intentionally
+    narrower than a terminal ``-<locant>-ide`` fallback.
+    """
+
+    updated = name
+    for locant, symbols in sorted(negative_locants.items(), key=lambda item: _locant_sort_key(item[0])):
+        if "C" not in symbols:
+            continue
+        pattern = re.compile(rf"(?P<stem>[A-Za-z0-9,\-\[\]\^\{{\}}]+?an)-{re.escape(locant)}-yl\b")
+        updated = pattern.sub(
+            lambda match, locant=locant: f"{match.group('stem')}-{locant}-ide-{locant}-yl",
+            updated,
+            count=1,
+        )
+    return updated
 
 
 def apply_terminal_parent_ide(name: str, negative_locants: dict[str, set[str]]) -> str:
@@ -576,6 +616,25 @@ def apply_cationic_imino_names(name: str, mol: Molecule) -> str:
     name = name.replace("(imino)methyl", "(iminio)methyl")
     name = name.replace("iminomethyl", "iminiomethyl")
     return name
+
+
+def apply_cationic_imino_parent_prefixes(name: str, mol: Molecule, numbered_path: list[int], get_loc) -> str:
+    """Convert locanted imino prefixes to iminio when the imino N is cationic."""
+
+    updated = name
+    parent_set = set(numbered_path)
+    for atom_idx, atom in mol.atoms.items():
+        if atom.symbol != "N" or atom.charge <= 0:
+            continue
+        for neighbor in mol.get_neighbors(atom_idx):
+            if neighbor not in parent_set:
+                continue
+            bond = mol.get_bond(atom_idx, neighbor)
+            if bond is None or bond.order != 2 or not mol.atoms[neighbor].is_carbon:
+                continue
+            locant = str(get_loc(neighbor))
+            updated = re.sub(rf"(?<![A-Za-z0-9]){re.escape(locant)}-imino\b", f"{locant}-iminio", updated)
+    return updated
 
 
 def carbon_has_two_hetero_substituents(mol: Molecule, carbon_idx: int, imino_n_idx: int) -> bool:

@@ -1,9 +1,11 @@
 import pytest
 
+import bluenamer.rules.retained as retained_rules
 from bluenamer import (
     RULES,
     NamingEngine,
     NamingIntent,
+    NamingRequest,
     OperationClass,
     TracePhase,
     analyze_smiles,
@@ -12,13 +14,16 @@ from bluenamer import (
 from bluenamer.additive import add_indicated_hydrogens
 from bluenamer.assembler import (
     assemble_name,
+    assemble_name_result,
     post_process_name,
 )
 from bluenamer.assembly_charge import parent_charge_operations
 from bluenamer.assembly_parts import (
     AssemblyParts,
     NameAtomBinding,
+    NameTokenBinding,
     ParentChargeItem,
+    PrincipalGroupItem,
     SubstituentItem,
     UnsaturationItem,
 )
@@ -29,7 +34,8 @@ from bluenamer.assembly_spiro import (
     split_spiro_substituents,
 )
 from bluenamer.chains import find_all_carbon_paths, find_ring_systems
-from bluenamer.formatting import ensure_stereo_descriptor_boundary
+from bluenamer.charge_pair_roles import charge_pair_roles, unsupported_charge_pair_roles
+from bluenamer.formatting import ensure_stereo_descriptor_boundary, format_counted_prefixes
 from bluenamer.functional_groups import (
     PERCEPTION_DETECTORS,
     PERCEPTION_SPECS,
@@ -37,8 +43,33 @@ from bluenamer.functional_groups import (
     register_group_detector,
     register_perception_spec,
 )
+from bluenamer.fused_ion_templates import fused_ion_operation_candidates, fused_ion_template_registry
+from bluenamer.fused_topology import (
+    RingTopologyRoute,
+    RingTopologyRouteKind,
+    bridged_fused_candidates,
+    charged_fused_template_gate,
+    classify_ring_topology_route,
+    fused_component_from_retained_match,
+    fused_component_registry,
+    fused_emission_examples,
+    fused_numbering_from_retained_match,
+    fused_parent_side_letters,
+    spiro_component_reference,
+)
+from bluenamer.grammar_snapshot_data import (
+    local_grammar_snapshot,
+    oxoacid_ester_suffix_templates,
+    retained_fused_derivative_gate,
+    retained_fused_token,
+    retained_fused_token_status,
+    retained_fused_tokens,
+)
 from bluenamer.graph_io import read_smiles
-from bluenamer.heteroatom_substituent_specs import ligand_prefix, unsubstituted_prefix
+from bluenamer.heteroatom_subgraphs import name_heteroatom_subgraph
+from bluenamer.heteroatom_substituent_specs import central_oxo_substituent_prefix, ligand_prefix, unsubstituted_prefix
+from bluenamer.heterocumulene_roles import nitrogen_heterocumulene_role
+from bluenamer.hypervalent_roles import HypervalentLigandRole, hypervalent_center_role, hypervalent_center_roles
 from bluenamer.ionic_naming import (
     apply_parent_charge_names,
     apply_retained_parent_ide,
@@ -49,16 +80,32 @@ from bluenamer.ionic_naming import (
 )
 from bluenamer.locants import as_display_locant, coerce_display_numbering, locant_text, parse_locant
 from bluenamer.molecule import Molecule
-from bluenamer.name_bindings import postprocess_name_atom_bindings
+from bluenamer.name_assembly import (
+    FinalAssemblyAuditError,
+    NameAssemblyResult,
+    NameRewriteRule,
+    assert_final_name_assembly,
+    audit_final_name_assembly,
+    build_name_token_spans,
+)
+from bluenamer.name_bindings import postprocess_name_atom_bindings, refresh_name_atom_bindings
 from bluenamer.name_operations import HydroOperation, ParentSuffixOperation
 from bluenamer.name_postprocessing import (
     apply_connection_boundary_postprocessing,
     postprocessing_rule_inventory,
 )
-from bluenamer.namer import _spiro_subgraph_assembly, name_component
-from bluenamer.naming_audit import UnnamedAtomError, assert_component_fully_named
-from bluenamer.naming_data import namer_rules
+from bluenamer.namer import _number_saturated_n_ring_for_spiro, _spiro_subgraph_assembly, name_component, name_subgraph
+from bluenamer.naming_audit import UnnamedAtomError, assert_component_fully_named, audit_charge_pair_templates
+from bluenamer.naming_data import DATA_DIR, load_json_table, namer_rules
+from bluenamer.nitrogen_roles import (
+    acid_derived_hydrazone_roles,
+    azine_roles,
+    nitrogen_chain_roles,
+    terminal_n3_substituent_role,
+)
 from bluenamer.numbering import NUMBERING_CRITERIA, NumberingPreference, polycycle_numbering_key
+from bluenamer.oxoacid_roles import OxoLigandRole, central_oxo_roles, central_oxo_substituent_role
+from bluenamer.oxoacid_templates import OxoacidTemplateKind, oxoacid_role_template
 from bluenamer.parent_pipeline import build_parent_assembly_plan
 from bluenamer.parent_selection import (
     PARENT_SELECTION_CRITERIA,
@@ -68,7 +115,9 @@ from bluenamer.parent_selection import (
     select_principal_parent,
 )
 from bluenamer.perception import PerceivedGroup, perceive_groups
+from bluenamer.peroxy_carbonyl_roles import PeroxyCarbonylKind, peroxy_carbonyl_roles
 from bluenamer.polycycle_topology import (
+    audit_von_baeyer_descriptor,
     bicyclo_proof,
     build_ring_numbering,
     linear_dispiro_proof,
@@ -76,15 +125,39 @@ from bluenamer.polycycle_topology import (
     ring_system_topology,
 )
 from bluenamer.principal_suffixes import render_principal_suffix
+from bluenamer.resonance_compare import equivalent_smiles
+from bluenamer.retained_fused_templates import (
+    RetainedFusedGraphTemplate,
+    match_retained_fused_template,
+    match_retained_fused_templates,
+    pending_retained_fused_parent_names,
+    retained_fused_graph_templates,
+    retained_fused_template_from_data,
+    template_molecule,
+)
 from bluenamer.retained_specs import retained_parent_spec
+from bluenamer.ring_parent import RingParent
 from bluenamer.ring_renderer import render_ring_descriptor, render_von_baeyer_descriptor
 from bluenamer.ring_systems import ring_system_fragment
+from bluenamer.role_certificate import (
+    audit_role_certificate,
+    certificate_from_perceived_group,
+    certificates_from_assembly,
+)
 from bluenamer.rule_layout import rule_group_specs, rule_groups, section_group_map, unassigned_sections
 from bluenamer.rules.retained import get_retained_ring
-from bluenamer.special_cases import _alkyl_ligand_name, structural_replacement_parent_name
+from bluenamer.special_cases import (
+    _alkyl_ligand_name,
+    organophosphinic_acid_result,
+    structural_replacement_parent_name,
+    sulfoxide_parent_result,
+)
 from bluenamer.spiro_assembly import SpiroAssembly
 from bluenamer.stereo_audit import audit_stereochemistry
+from bluenamer.substituent_tokens import graph_bound_substituent_tokens
 from bluenamer.suffix_stack import SuffixStack
+from bluenamer.trace_helpers import add_substituent_trace
+from bluenamer.von_baeyer import _classify_secondary_bridges, find_von_baeyer_candidates
 
 
 def test_name_smiles_stays_plain_fast_api():
@@ -93,6 +166,33 @@ def test_name_smiles_stays_plain_fast_api():
 
 def test_methane_is_named_without_parent_selection_fallback():
     assert name_smiles("C") == "methane"
+
+
+def test_hydrogen_cyanide_absorbed_nitrile_name_passes_final_audit():
+    assert name_smiles("C#N") == "hydrogen cyanide"
+
+    analysis = analyze_smiles("C#N")
+    assembly_steps = [step for step in analysis.decisions if step.decision == "assembled component name"]
+    tokens = assembly_steps[-1].data["name_token_spans"]
+    hydrogen = next(token for token in tokens if token["text"] == "hydrogen")
+    cyanide = next(token for token in tokens if token["text"] == "cyanide")
+    assert hydrogen["source"] == "retained_alias_context"
+    assert hydrogen["confidence"] == "derived"
+    assert hydrogen["ownership"] == "retained_alias_context"
+    assert hydrogen["binding_indices"] == cyanide["binding_indices"]
+    assert cyanide["binding_indices"]
+    assert cyanide["atoms"]
+
+
+def test_cyanamide_absorbed_nitrile_name_passes_final_audit():
+    assert name_smiles("N#CNN=C(N)N") == "((diaminomethylidene)amino)cyanamide"
+
+    analysis = analyze_smiles("N#CNN=C(N)N")
+    assembly_steps = [step for step in analysis.decisions if step.decision == "assembled component name"]
+    tokens = assembly_steps[-1].data["name_token_spans"]
+    cyanamide = next(token for token in tokens if token["text"] == "cyanamide")
+    assert cyanamide["binding_indices"]
+    assert cyanamide["atoms"]
 
 
 def test_component_without_supported_parent_raises_instead_of_methane_fallback():
@@ -115,12 +215,309 @@ def test_component_coverage_audit_rejects_unnamed_atoms():
         assert_component_fully_named(mol, {0, 1}, parts, "methane")
 
 
+def test_typed_shortcut_results_return_none_on_out_of_component_neighbors():
+    phosphinic = Molecule()
+    phosphinic.add_atom("P", 0, explicit_h_count=1)
+    phosphinic.add_atom("C", 1)
+    phosphinic.add_atom("O", 2)
+    phosphinic.add_atom("O", 3)
+    phosphinic.add_bond(0, 1, order=1)
+    phosphinic.add_bond(0, 2, order=2)
+    phosphinic.add_bond(0, 3, order=1)
+
+    assert organophosphinic_acid_result(phosphinic, {0, 2, 3}) is None
+
+    sulfoxide = Molecule()
+    sulfoxide.add_atom("S", 0)
+    sulfoxide.add_atom("C", 1)
+    sulfoxide.add_atom("C", 2)
+    sulfoxide.add_atom("O", 3)
+    sulfoxide.add_atom("C", 4)
+    sulfoxide.add_bond(0, 1, order=1)
+    sulfoxide.add_bond(0, 2, order=1)
+    sulfoxide.add_bond(0, 3, order=2)
+    sulfoxide.add_bond(0, 4, order=1)
+
+    assert sulfoxide_parent_result(sulfoxide, {0, 1, 2, 3}) is None
+
+
+def test_add_substituent_trace_preserves_emitted_tokens_into_bindings():
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0})
+    emitted_tokens = (
+        NameTokenBinding(text="ethyl", atom_ids={1, 2}, bond_ids={1}),
+        NameTokenBinding(text="amino", atom_ids={3}, bond_ids={2}),
+    )
+
+    add_substituent_trace(
+        parts,
+        "ethylamino",
+        "1",
+        atom_ids={1, 2, 3},
+        bond_ids={1, 2},
+        emitted_tokens=emitted_tokens,
+    )
+    bindings = refresh_name_atom_bindings(parts)
+    substituent_binding = next(binding for binding in bindings if binding.role == "substituent")
+
+    assert substituent_binding.emitted_tokens[0].text == "1"
+    assert substituent_binding.emitted_tokens[0].token_kind == "locant"
+    assert substituent_binding.emitted_tokens[1:] == emitted_tokens
+
+
+def test_principal_suffix_tokens_are_emitted_from_functional_group_renderer():
+    parts = AssemblyParts(
+        parent_length=3,
+        is_ring=True,
+        parent_atom_ids={0, 1, 2},
+        principal_group=PrincipalGroupItem(
+            key="ring_aldehyde",
+            locants=["1", "1"],
+            atom_ids={0, 3, 4},
+            bond_ids={2, 3},
+        ),
+    )
+
+    bindings = refresh_name_atom_bindings(parts)
+    suffix_binding = next(binding for binding in bindings if binding.stage == "suffix")
+    suffix_tokens = [token for token in suffix_binding.emitted_tokens if token.token_kind == "suffix"]
+
+    assert [token.text for token in suffix_tokens] == ["dicarbaldehyde"]
+    assert suffix_tokens[0].source == "renderer_suffix"
+    assert suffix_tokens[0].atom_ids == {0, 3, 4}
+    assert suffix_tokens[0].bond_ids == {2, 3}
+
+
+def test_carbon_root_substituent_renderer_emits_alkyl_token_bindings():
+    analysis = analyze_smiles("CCC1(CC1)OC")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    ethyl = next(token for token in assembly.data["name_token_spans"] if token["text"] == "ethyl")
+
+    assert analysis.name == "1-ethyl-1-methoxycyclopropane"
+    assert ethyl["source"] == "substituent_renderer"
+    assert ethyl["confidence"] == "derived"
+    assert ethyl["ownership"] == "exact"
+    assert ethyl["atoms"] == [0, 1]
+
+
+def test_dihydro_locants_bind_to_parent_scope_without_broad_fallback():
+    analysis = analyze_smiles("O=CC1=CNCC1")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    dihydro_locants = next(token for token in assembly.data["name_token_spans"] if token["text"] == "4,5")
+
+    assert analysis.name == "4,5-dihydro-1H-pyrrole-3-carbaldehyde"
+    assert dihydro_locants["source"] == "dihydro_locant_fallback"
+    assert dihydro_locants["confidence"] == "derived"
+    assert dihydro_locants["ownership"] == "locanted_hydro"
+    assert dihydro_locants["token_kind"] == "hydro"
+
+
+def test_carbonyl_prefix_morphology_is_bound_from_renderer_data():
+    analysis = analyze_smiles("NC(=O)N1CC(=O)C1")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    carbonyl = next(token for token in assembly.data["name_token_spans"] if token["text"] == "carbonyl")
+
+    assert analysis.name == "1-((amino)carbonyl)-azetidin-3-one"
+    assert carbonyl["source"] in {"functional_prefix_renderer", "substituent_renderer"}
+    assert carbonyl["confidence"] == "derived"
+    assert carbonyl["ownership"] == "exact"
+    assert carbonyl["atoms"] == [0, 1, 2]
+
+
+def test_unmatched_retained_parent_morphology_uses_operation_scope():
+    analysis = analyze_smiles("N=C1COCO1")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    dioxolan = next(token for token in assembly.data["name_token_spans"] if token["text"] == "dioxolan")
+
+    assert analysis.name == "1,3-dioxolan-4-imine"
+    assert dioxolan["source"] == "operation_trace"
+    assert dioxolan["confidence"] == "derived"
+    assert dioxolan["ownership"] == "operation_scope"
+    assert set(dioxolan["atoms"]) == {1, 2, 3, 4, 5}
+
+
+def test_unmatched_spiro_parent_morphology_uses_operation_scope_not_broad_fallback():
+    analysis = analyze_smiles("CN1CC11C2C3CC2C13")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    methylspiro = next(token for token in assembly.data["name_token_spans"] if token["text"] == "methylspiro")
+
+    assert analysis.name == "1'-methylspiro[tricyclo[2.2.0.0^{2,5}]hexane-6,2'-aziridine]"
+    assert methylspiro["source"] == "operation_trace"
+    assert methylspiro["confidence"] == "derived"
+    assert methylspiro["ownership"] == "operation_scope"
+    assert methylspiro["token_kind"] == "prefix"
+
+
+def test_primed_spiro_component_locant_uses_component_scope_not_broad_fallback():
+    analysis = analyze_smiles("OC1CC11CC2NC12")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    primed_locant = next(token for token in assembly.data["name_token_spans"] if token["text"] == "5")
+
+    assert analysis.name == "5'-azaspiro[cyclopropane-2,2'-bicyclo[2.1.0]pentane]-1-ol"
+    assert primed_locant["source"] == "primed_component_locant_fallback"
+    assert primed_locant["confidence"] == "derived"
+    assert primed_locant["ownership"] == "component_locant"
+    assert primed_locant["token_kind"] == "locant"
+    assert primed_locant["atoms"] == [4, 5, 6, 7]
+
+
 def test_analysis_carries_name_atom_bindings():
     analysis = analyze_smiles("CCO")
     assembly_steps = [step for step in analysis.decisions if step.decision == "assembled component name"]
     bindings = assembly_steps[-1].data["name_atom_bindings"]
     assert any(binding["role"] == "parent" and binding["atoms"] == [0, 1] for binding in bindings)
     assert any(binding["role"] == "alcohol" and binding["atoms"] == [1, 2] for binding in bindings)
+    token_spans = assembly_steps[-1].data["name_token_spans"]
+    assert token_spans
+    assert all(token["binding_indices"] for token in token_spans)
+    assert any(token["text"] == "ethanol" and token["atoms"] for token in token_spans)
+
+
+@pytest.mark.parametrize(
+    ("smiles", "decision", "role"),
+    [
+        ("[Na+]", "named single-atom component", "single_atom_component"),
+        ("OP(=O)(O)O", "named structural replacement parent", "oxoacid_parent"),
+    ],
+)
+def test_component_shortcuts_are_final_binding_audited(smiles, decision, role):
+    analysis = analyze_smiles(smiles)
+    steps = [step for step in analysis.decisions if step.decision == decision]
+
+    assert steps
+    data = steps[-1].data
+    assert data["name"]
+    assert data["name_atom_bindings"]
+    assert data["name_atom_bindings"][0]["role"] == role
+    assert data["name_token_spans"]
+    assert all(token["binding_indices"] for token in data["name_token_spans"])
+
+    bound_atoms = {atom for binding in data["name_atom_bindings"] for atom in binding["atoms"]}
+    token_atoms = {atom for token in data["name_token_spans"] for atom in token["atoms"]}
+    assert token_atoms == bound_atoms
+
+
+def test_anhydride_shortcut_binds_acid_halves_and_core_separately():
+    analysis = analyze_smiles("CC(=O)OC(C)=O")
+    steps = [step for step in analysis.decisions if step.decision == "used anhydride component shortcut"]
+
+    assert steps
+    data = steps[-1].data
+    bindings = data["name_atom_bindings"]
+    assert {binding["role"] for binding in bindings} == {"anhydride_half", "anhydride_core"}
+    assert not any(binding["role"] == "anhydride_component" for binding in bindings)
+
+    half_binding = next(binding for binding in bindings if binding["role"] == "anhydride_half")
+    core_binding = next(binding for binding in bindings if binding["role"] == "anhydride_core")
+    assert half_binding["term"] == "acetic"
+    assert core_binding["term"] == "anhydride"
+    assert set(half_binding["atoms"]) != set(core_binding["atoms"])
+    assert set(half_binding["atoms"]) | set(core_binding["atoms"]) == set(range(7))
+
+    token_spans = data["name_token_spans"]
+    assert all(token["binding_indices"] for token in token_spans)
+    acetic_span = next(token for token in token_spans if token["text"] == "acetic")
+    anhydride_span = next(token for token in token_spans if token["text"] == "anhydride")
+    assert set(acetic_span["atoms"]) == set(half_binding["atoms"])
+    assert set(anhydride_span["atoms"]) == set(core_binding["atoms"])
+
+
+def test_biphenyl_is_graph_selected_not_exact_name_rewritten():
+    analysis = analyze_smiles("c1ccccc1-c1ccccc1")
+    steps = [step for step in analysis.decisions if step.decision == "named structural replacement parent"]
+
+    assert steps
+    data = steps[-1].data
+    assert data["name"] == "1,1'-biphenyl"
+    assert any(binding["role"] == "biphenyl_bridge" for binding in data["name_atom_bindings"])
+    rewrite_names = [operation["name"] for operation in data["name_rewrite_history"]]
+    assert "special_component_names" not in rewrite_names
+    assert all(token["binding_indices"] for token in data["name_token_spans"])
+
+
+def test_oxoacid_shortcut_exposes_central_oxo_ligand_roles():
+    analysis = analyze_smiles("OP(=O)(O)O")
+    steps = [step for step in analysis.decisions if step.decision == "named structural replacement parent"]
+
+    assert steps
+    bindings = steps[-1].data["name_atom_bindings"]
+    roles = {binding["role"] for binding in bindings}
+    assert "oxoacid_parent" in roles
+    assert "oxoacid_ligand_oxo" in roles
+    assert "oxoacid_ligand_hydroxy" in roles
+    assert all(token["binding_indices"] for token in steps[-1].data["name_token_spans"])
+
+
+def test_non_n_heteroatom_substituent_tokens_bind_center_and_ligands():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("S", 1)
+    mol.add_atom("C", 2)
+    mol.add_atom("O", 3)
+    mol.add_atom("O", 4)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=1)
+    mol.add_bond(1, 3, order=2)
+    mol.add_bond(1, 4, order=2)
+
+    def branch_namer(_mol, start_idx, _exclude_atoms, upstream_atom=None):
+        assert upstream_atom == 1
+        return "methyl" if start_idx == 2 else ""
+
+    emitted_tokens = graph_bound_substituent_tokens(
+        mol,
+        root=1,
+        atom_ids={1, 2, 3, 4},
+        term="methylsulfonyl",
+        upstream_atom=0,
+        exclude_atoms={0},
+        branch_namer=branch_namer,
+    )
+    result = NameAssemblyResult.from_final_name(
+        "methylsulfonyl",
+        [
+            NameAtomBinding(
+                stage="prefix",
+                role="substituent",
+                term="methylsulfonyl",
+                atom_ids={1, 2, 3, 4},
+                emitted_tokens=emitted_tokens,
+            )
+        ],
+    )
+
+    methyl = next(token for token in result.token_spans if token.text == "methyl")
+    sulfonyl = next(token for token in result.token_spans if token.text == "sulfonyl")
+    assert methyl.atom_ids == frozenset({2})
+    assert sulfonyl.atom_ids == frozenset({1})
+
+
+def test_postprocessing_rewrites_keep_token_metadata_auditable():
+    result = NameAssemblyResult.from_raw_name(
+        "ethanoic acid",
+        [NameAtomBinding(stage="suffix", role="acid", term="ethanoic acid", atom_ids={0, 1, 2}, bond_ids={0, 1})],
+        postprocess=post_process_name,
+    )
+
+    assert result.text == "acetic acid"
+    assert result.rewrite_history[0].changed_binding_count == 1
+    assert result.rewrite_history[0].changed_token_count >= 1
+    assert all(token.binding_indices for token in result.token_spans)
+    assert {token.text for token in result.token_spans} == {"acetic", "acid"}
+    assert {token.source for token in result.token_spans} == {"typed_rewrite"}
+    assert {token.confidence for token in result.token_spans} == {"derived"}
+    assert result.rewrite_history[0].ownership == "preserve_all"
+
+
+def test_postprocessing_rewrites_bindings_to_final_emitted_direction():
+    result = NameAssemblyResult.from_raw_name(
+        "2-phenylsulfonylaminopropanamide",
+        [NameAtomBinding(stage="prefix", role="substituent", term="benzenesulfonamido", atom_ids={1, 2, 3})],
+        postprocess=post_process_name,
+    )
+
+    assert result.text == "2-phenylsulfonylaminopropanamide"
+    assert result.bindings[0].term == "(phenylsulfonyl)amino"
+    assert all(token.binding_indices for token in result.token_spans)
 
 
 def test_postprocessing_updates_binding_terms():
@@ -132,9 +529,627 @@ def test_postprocessing_updates_binding_terms():
     assert processed[0].atom_ids == {0, 1, 2}
 
 
+def test_name_assembly_result_preserves_binding_metadata_through_postprocessing():
+    bindings = [NameAtomBinding(stage="suffix", role="acid", term="ethanoic acid", atom_ids={0, 1, 2}, bond_ids={0, 1})]
+
+    result = NameAssemblyResult.from_raw_name("ethanoic acid", bindings, postprocess=post_process_name)
+
+    assert result.text == "acetic acid"
+    assert result.bindings[0].term == "acetic acid"
+    assert result.bindings[0].atom_ids == {0, 1, 2}
+    assert result.bindings[0].bond_ids == {0, 1}
+    assert result.rewrite_history[0].changed_binding_count == 1
+    assert result.rewrite_history[0].changed_token_count >= 1
+    assert all(token.binding_indices for token in result.token_spans)
+    assert next(token for token in result.token_spans if token.text == "acetic").atom_ids == frozenset({0, 1, 2})
+
+
+def test_name_assembly_result_tracks_named_rewrite_pipeline():
+    bindings = [NameAtomBinding(stage="suffix", role="acid", term="ethanoic acid", atom_ids={0, 1, 2})]
+
+    result = NameAssemblyResult.from_rewrite_pipeline(
+        "ethanoic acid",
+        bindings,
+        rewrites=(
+            NameRewriteRule(
+                "retained_acid_name",
+                lambda text: text.replace("ethanoic acid", "acetic acid"),
+                ownership="retained_replace",
+                source="typed_rewrite",
+            ),
+            ("noop", lambda text: text),
+        ),
+    )
+
+    assert result.text == "acetic acid"
+    assert result.bindings[0].term == "acetic acid"
+    assert [operation.name for operation in result.rewrite_history] == ["retained_acid_name", "noop"]
+    assert result.rewrite_history[0].ownership == "retained_replace"
+    assert result.rewrite_history[1].ownership == "preserve_all"
+    assert result.rewrite_history[0].changed_binding_count == 1
+    assert result.rewrite_history[1].changed_binding_count == 0
+
+
+def test_literal_rewrite_carries_native_token_ownership_through_replaced_span():
+    bindings = [
+        NameAtomBinding(
+            stage="prefix",
+            role="substituent",
+            term="aminoiminomethyl",
+            atom_ids={1, 2, 3},
+            emitted_tokens=(
+                NameTokenBinding(
+                    text="aminoiminomethyl",
+                    atom_ids={1, 2, 3},
+                    token_kind="prefix",
+                    ownership="exact",
+                    source="renderer",
+                    grammar_role="substituent",
+                    binding_key="prefix:substituent",
+                ),
+            ),
+        )
+    ]
+
+    result = NameAssemblyResult.from_rewrite_pipeline(
+        "aminoiminomethylbenzene",
+        bindings,
+        rewrites=(
+            NameRewriteRule.literal(
+                "carbamimidoyl_alias",
+                "aminoiminomethyl",
+                "carbamimidoyl",
+                ownership="merge_replaced_span",
+            ),
+        ),
+    )
+
+    assert result.text == "carbamimidoylbenzene"
+    assert result.bindings[0].emitted_tokens[0].text == "carbamimidoyl"
+    assert result.bindings[0].emitted_tokens[0].ownership == "merge_replaced_span"
+    assert result.rewrite_history[0].edits[0].before_text == "aminoiminomethyl"
+    assert result.rewrite_history[0].edits[0].after_text == "carbamimidoyl"
+
+    carbamimidoyl = next(token for token in result.token_spans if token.text == "carbamimidoyl")
+    assert carbamimidoyl.atom_ids == frozenset({1, 2, 3})
+    assert carbamimidoyl.source == "typed_rewrite"
+    assert carbamimidoyl.ownership == "merge_replaced_span"
+    assert carbamimidoyl.confidence == "derived"
+    assert carbamimidoyl.binding_key == "prefix:substituent"
+
+
+def test_regex_rewrite_preserves_reordered_capture_ownership_by_group_identity():
+    bindings = [
+        NameAtomBinding(
+            stage="prefix",
+            role="first",
+            term="foo",
+            atom_ids={1},
+            emitted_tokens=(NameTokenBinding(text="foo", atom_ids={1}, binding_key="prefix:first"),),
+        ),
+        NameAtomBinding(
+            stage="prefix",
+            role="second",
+            term="bar",
+            atom_ids={2},
+            emitted_tokens=(NameTokenBinding(text="bar", atom_ids={2}, binding_key="prefix:second"),),
+        ),
+    ]
+
+    result = NameAssemblyResult.from_rewrite_pipeline(
+        "foobar",
+        bindings,
+        rewrites=(NameRewriteRule.regex("swap_captures", r"(foo)(bar)", r"\2\1"),),
+    )
+
+    assert result.text == "barfoo"
+    assert [(token.text, token.atom_ids, token.ownership) for token in result.token_spans] == [
+        ("bar", frozenset({2}), "capture_reference"),
+        ("foo", frozenset({1}), "capture_reference"),
+    ]
+    assert [
+        (segment.group, segment.before_text, segment.after_text)
+        for segment in result.rewrite_history[0].edits[0].segments
+    ] == [
+        ("2", "bar", "bar"),
+        ("1", "foo", "foo"),
+    ]
+
+
+def test_regex_rewrite_clones_duplicated_capture_ownership():
+    bindings = [
+        NameAtomBinding(
+            stage="prefix",
+            role="first",
+            term="foo",
+            atom_ids={1},
+            emitted_tokens=(NameTokenBinding(text="foo", atom_ids={1}, binding_key="prefix:first"),),
+        )
+    ]
+
+    result = NameAssemblyResult.from_rewrite_pipeline(
+        "foo",
+        bindings,
+        rewrites=(NameRewriteRule.regex("duplicate_capture", r"(foo)", r"\1\1"),),
+    )
+
+    assert result.text == "foofoo"
+    assert [(token.text, token.start, token.end, token.atom_ids, token.ownership) for token in result.token_spans] == [
+        ("foo", 0, 3, frozenset({1}), "capture_reference"),
+        ("foo", 3, 6, frozenset({1}), "cloned_capture"),
+    ]
+
+
+def test_regex_rewrite_records_deleted_capture_as_absorbed():
+    bindings = [
+        NameAtomBinding(
+            stage="prefix",
+            role="first",
+            term="foo",
+            atom_ids={1},
+            emitted_tokens=(NameTokenBinding(text="foo", atom_ids={1}, binding_key="prefix:first"),),
+        ),
+        NameAtomBinding(
+            stage="prefix",
+            role="second",
+            term="bar",
+            atom_ids={2},
+            emitted_tokens=(NameTokenBinding(text="bar", atom_ids={2}, binding_key="prefix:second"),),
+        ),
+    ]
+
+    result = NameAssemblyResult.from_rewrite_pipeline(
+        "foobar",
+        bindings,
+        rewrites=(NameRewriteRule.regex("absorb_second_capture", r"(foo)(bar)", r"\1"),),
+    )
+
+    assert result.text == "foo"
+    assert [(token.text, token.atom_ids) for token in result.token_spans] == [("foo", frozenset({1}))]
+    absorbed = [segment for segment in result.rewrite_history[0].edits[0].segments if segment.ownership == "absorbed"]
+    assert [(segment.before_text, segment.after_text) for segment in absorbed] == [("bar", "")]
+
+
+def test_broad_token_fallback_is_marked_ambiguous_not_exact():
+    result = NameAssemblyResult.from_final_name(
+        "unmodelled",
+        [
+            NameAtomBinding(stage="prefix", role="left", term="left_role", atom_ids={0}),
+            NameAtomBinding(stage="suffix", role="right", term="right_role", atom_ids={1}),
+        ],
+    )
+
+    token = result.token_spans[0]
+
+    assert token.text == "unmodelled"
+    assert token.binding_indices == (0, 1)
+    assert token.source == "broad_fallback"
+    assert token.confidence == "fallback"
+    assert token.ownership == "ambiguous"
+
+
+def test_unsaturated_chain_parent_stem_uses_native_parent_binding_not_broad_fallback():
+    analysis = analyze_smiles("C#C")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    eth = next(token for token in assembly.data["name_token_spans"] if token["text"] == "eth")
+
+    assert analysis.name == "eth-1-yne"
+    assert eth["source"] == "typed_rewrite"
+    assert eth["confidence"] == "derived"
+    assert eth["ownership"] == "exact"
+    assert eth["binding_key"] == "parent:parent"
+
+
+def test_spiro_descriptor_digits_and_parent_stem_use_native_parent_binding():
+    analysis = analyze_smiles("C1CC2(C1)CC2")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    tokens = {token["text"]: token for token in assembly.data["name_token_spans"]}
+
+    assert analysis.name == "spiro[2.3]hexane"
+    for text in ["spiro", "2", "3", "hexane"]:
+        assert tokens[text]["source"] == "typed_rewrite"
+        assert tokens[text]["confidence"] == "derived"
+        assert tokens[text]["ownership"] == "exact"
+        assert tokens[text]["binding_key"] == "parent:parent"
+
+
+def test_indicated_hydrogen_prefix_uses_hydro_operation_binding():
+    analysis = analyze_smiles("N1C=CC=C1")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    tokens = {token["text"]: token for token in assembly.data["name_token_spans"]}
+
+    assert analysis.name == "1H-pyrrole"
+    for text in ["1", "H"]:
+        assert tokens[text]["source"] == "typed_rewrite"
+        assert tokens[text]["confidence"] == "derived"
+        assert tokens[text]["ownership"] == "exact"
+        assert tokens[text]["binding_key"] == "hydro:indicated_hydrogen"
+
+
+def test_n_substituent_locant_survives_retained_suffix_postprocessing():
+    analysis = analyze_smiles("CNC(C)=O")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    n_locant = next(token for token in assembly.data["name_token_spans"] if token["text"] == "N")
+
+    assert analysis.name == "N-methylacetamide"
+    assert n_locant["source"] in {"default_binding", "typed_rewrite"}
+    assert n_locant["confidence"] in {"exact", "derived"}
+    assert n_locant["ownership"] == "exact"
+    assert n_locant["token_kind"] == "locant"
+    assert n_locant["binding_key"] == "prefix:substituent"
+
+
+def test_mixed_numeric_and_element_locants_are_bound_individually():
+    analysis = analyze_smiles("CNC(=O)C(C)C")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    tokens = {(token["text"], token["start"]): token for token in assembly.data["name_token_spans"]}
+
+    assert analysis.name == "2,N-dimethylpropanamide"
+    for key in [("2", 0), ("N", 2)]:
+        token = tokens[key]
+        assert token["source"] == "typed_rewrite"
+        assert token["confidence"] == "derived"
+        assert token["ownership"] == "exact"
+        assert token["binding_key"] == "prefix:substituent"
+
+
+def test_multiplier_token_is_grammar_scoped_not_broad_fallback():
+    analysis = analyze_smiles("N=CN(C=N)C=O")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    bis = next(token for token in assembly.data["name_token_spans"] if token["text"] == "bis")
+
+    assert analysis.name == "N,N-bis(iminomethyl)formamide"
+    assert bis["source"] == "grammar_token"
+    assert bis["confidence"] == "derived"
+    assert bis["ownership"] == "grammar_scope"
+    assert bis["token_kind"] == "grammar"
+
+
+def test_retained_dihydro_and_indicated_h_tokens_avoid_broad_fallback():
+    analysis = analyze_smiles("O=C1NC(=O)C=C1")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    tokens = {token["text"]: token for token in assembly.data["name_token_spans"]}
+
+    assert analysis.name == "2,5-dihydro-1H-pyrrole-2,5-dione"
+    assert tokens["dihydro"]["source"] == "grammar_token"
+    assert tokens["dihydro"]["ownership"] == "grammar_scope"
+    assert tokens["H"]["source"] == "indicated_hydrogen_fallback"
+    assert tokens["H"]["token_kind"] == "hydro"
+    assert tokens["H"]["ownership"] == "locanted_hydro"
+
+
+def test_contextual_postprocessing_updates_absorbed_binding_terms():
+    bindings = [
+        NameAtomBinding(stage="prefix", role="substituent", term="hydroxy", atom_ids={2}),
+        NameAtomBinding(stage="suffix", role="amide", term="methanamide", atom_ids={0, 1, 3}),
+    ]
+
+    result = NameAssemblyResult.from_raw_name("hydroxymethanamide", bindings, postprocess=post_process_name)
+
+    assert result.text == "carbamic acid"
+    assert {binding.term for binding in result.bindings} == {"carbamic acid"}
+
+    carbonate = NameAssemblyResult.from_raw_name(
+        "hydroxymethanoate",
+        [NameAtomBinding(stage="prefix", role="substituent", term="hydroxy", atom_ids={0})],
+        postprocess=post_process_name,
+    )
+
+    assert carbonate.text == "carbonate"
+    assert carbonate.bindings[0].term == "carbonate"
+
+
+def test_assemble_name_result_updates_parts_bindings():
+    parts = AssemblyParts(parent_length=2, parent_atom_ids={0, 1})
+
+    result = assemble_name_result(parts)
+
+    assert result.text == "ethane"
+    assert parts.name_atom_bindings
+    assert parts.name_atom_bindings[0].atom_ids == {0, 1}
+    assert parts.name_atom_bindings[0].emitted_tokens
+    assert parts.name_token_spans
+    assert parts.name_rewrite_history
+
+
+def test_final_assembly_audit_rejects_metadata_lost_after_postprocessing():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("O", 1)
+    mol.add_bond(0, 1, order=1)
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0}, parent_bond_ids={0})
+    result = NameAssemblyResult.from_final_name(
+        "methanol",
+        [NameAtomBinding(stage="parent", role="parent", term="methane", atom_ids={0})],
+    )
+
+    with pytest.raises(FinalAssemblyAuditError):
+        assert_final_name_assembly(mol, {0, 1}, parts, result)
+
+
+def test_final_assembly_audit_rejects_missing_consumed_bond_metadata():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("C", 1)
+    mol.add_bond(0, 1, order=1)
+    parts = AssemblyParts(parent_length=2, parent_atom_ids={0, 1}, parent_bond_ids={0})
+    result = NameAssemblyResult.from_final_name(
+        "ethane",
+        [NameAtomBinding(stage="parent", role="parent", term="ethane", atom_ids={0, 1})],
+    )
+
+    with pytest.raises(FinalAssemblyAuditError):
+        assert_final_name_assembly(mol, {0, 1}, parts, result)
+
+
+def test_final_assembly_audit_rejects_charged_atoms_without_charge_binding():
+    mol = Molecule()
+    mol.add_atom("N", 0, charge=1)
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0})
+    result = NameAssemblyResult.from_final_name(
+        "azane",
+        [NameAtomBinding(stage="parent", role="parent", term="azane", atom_ids={0})],
+    )
+
+    with pytest.raises(FinalAssemblyAuditError):
+        assert_final_name_assembly(mol, {0}, parts, result)
+
+
+def test_final_assembly_audit_accepts_explicit_charge_binding_metadata():
+    mol = Molecule()
+    mol.add_atom("N", 0, charge=1)
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0})
+    result = NameAssemblyResult.from_final_name(
+        "azanium",
+        [
+            NameAtomBinding(
+                stage="parent",
+                role="parent",
+                term="azanium",
+                atom_ids={0},
+                charge_atom_ids={0},
+            )
+        ],
+    )
+
+    audit = audit_final_name_assembly(mol, {0}, parts, result)
+
+    assert audit.ok
+
+
+def test_final_assembly_audit_does_not_infer_charge_from_name_words():
+    mol = Molecule()
+    mol.add_atom("N", 0, charge=1)
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0})
+    result = NameAssemblyResult.from_final_name(
+        "azanium",
+        [NameAtomBinding(stage="parent", role="parent", term="azanium", atom_ids={0})],
+    )
+
+    with pytest.raises(FinalAssemblyAuditError):
+        assert_final_name_assembly(mol, {0}, parts, result)
+
+
+def test_final_assembly_audit_rejects_stale_binding_text():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("C", 1)
+    mol.add_bond(0, 1, order=1)
+    parts = AssemblyParts(parent_length=2, parent_atom_ids={0, 1}, parent_bond_ids={0})
+    result = NameAssemblyResult.from_final_name(
+        "ethane",
+        [NameAtomBinding(stage="parent", role="parent", term="propane", atom_ids={0, 1}, bond_ids={0})],
+    )
+
+    with pytest.raises(FinalAssemblyAuditError):
+        assert_final_name_assembly(mol, {0, 1}, parts, result)
+
+
+def test_final_assembly_audit_accepts_retained_ionic_parent_morphology():
+    mol = Molecule()
+    for idx, symbol in enumerate(["C", "O", "C", "N", "C"]):
+        charge = -1 if idx == 3 else 0
+        mol.add_atom(symbol, idx, charge=charge)
+    parts = AssemblyParts(parent_length=5, parent_atom_ids={0, 1, 2, 3, 4})
+    result = NameAssemblyResult.from_final_name(
+        "oxazolidine-3-ide",
+        [
+            NameAtomBinding(
+                stage="parent",
+                role="parent",
+                term="1,3-oxazolidin-3-ide",
+                atom_ids={0, 1, 2, 3, 4},
+                charge_atom_ids={3},
+            )
+        ],
+    )
+
+    audit = audit_final_name_assembly(mol, {0, 1, 2, 3, 4}, parts, result)
+
+    assert audit.ok
+
+
+def test_name_assembly_binds_every_final_token_to_graph_metadata():
+    bindings = [
+        NameAtomBinding(
+            stage="prefix",
+            role="substituent",
+            term="ammoniomethyl",
+            atom_ids={0, 1},
+            charge_atom_ids={0},
+            locants=("5",),
+        ),
+        NameAtomBinding(
+            stage="parent",
+            role="parent",
+            term="1,3-oxazolidin-3-ide",
+            atom_ids={2, 3, 4, 6, 7},
+        ),
+        NameAtomBinding(stage="suffix", role="ketone", term="ketone", atom_ids={4, 5, 7, 8}, locants=("2", "4")),
+        NameAtomBinding(
+            stage="charge",
+            role="parent_charge",
+            term="N-1",
+            atom_ids={6},
+            charge_atom_ids={6},
+            locants=("3",),
+        ),
+    ]
+
+    tokens = build_name_token_spans("5-(ammoniomethyl)-oxazolidine-3-ide-2,4-dione", tuple(bindings))
+
+    assert tokens
+    assert all(token.binding_indices for token in tokens)
+    assert next(token for token in tokens if token.text == "ammoniomethyl").atom_ids == frozenset({0, 1})
+    assert next(token for token in tokens if token.text == "oxazolidine").atom_ids == frozenset({2, 3, 4, 6, 7})
+    assert next(token for token in tokens if token.text == "ide").charge_atom_ids == frozenset({6})
+    assert next(token for token in tokens if token.text == "dione").atom_ids == frozenset({4, 5, 7, 8})
+
+
+def test_name_assembly_binds_ring_descriptor_tokens_to_parent_graph():
+    parent_atoms = frozenset(range(12))
+    bindings = (
+        NameAtomBinding(
+            stage="parent",
+            role="parent",
+            term="bicyclo parent",
+            atom_ids=parent_atoms,
+            bond_ids=frozenset(range(13)),
+        ),
+    )
+
+    tokens = build_name_token_spans("bicyclo[8.2.0]dodecane", bindings)
+
+    assert all(token.binding_indices for token in tokens)
+    assert next(token for token in tokens if token.text == "bicyclo").atom_ids == parent_atoms
+    assert next(token for token in tokens if token.text == "dodecane").atom_ids == parent_atoms
+
+
+def test_graph_bound_n_substituted_amino_tokens_bind_ligands_precisely():
+    mol = Molecule()
+    for idx in range(5):
+        mol.add_atom("N" if idx == 1 else "C", idx)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=1)
+    mol.add_bond(2, 3, order=1)
+    mol.add_bond(1, 4, order=1)
+
+    def branch_namer(_mol, start_idx, _exclude_atoms, upstream_atom=None):
+        assert upstream_atom == 1
+        return {2: "ethyl", 4: "methyl"}.get(start_idx, "")
+
+    emitted_tokens = graph_bound_substituent_tokens(
+        mol,
+        root=1,
+        atom_ids={1, 2, 3, 4},
+        term="N-ethyl-N-methylamino",
+        upstream_atom=0,
+        exclude_atoms={0},
+        branch_namer=branch_namer,
+    )
+    result = NameAssemblyResult.from_final_name(
+        "N-ethyl-N-methylamino",
+        [
+            NameAtomBinding(
+                stage="prefix",
+                role="substituent",
+                term="N-ethyl-N-methylamino",
+                atom_ids={1, 2, 3, 4},
+                emitted_tokens=emitted_tokens,
+            )
+        ],
+    )
+
+    spans_by_text = {}
+    for token in result.token_spans:
+        spans_by_text.setdefault(token.text, []).append(token)
+
+    assert [token.atom_ids for token in spans_by_text["N"]] == [frozenset({1}), frozenset({1})]
+    assert spans_by_text["ethyl"][0].atom_ids == frozenset({2, 3})
+    assert spans_by_text["methyl"][0].atom_ids == frozenset({4})
+    assert spans_by_text["amino"][0].atom_ids == frozenset({1})
+
+
+def test_replacement_prefix_tokens_bind_locants_multiplier_and_replacement_atoms():
+    bindings = (
+        NameAtomBinding(stage="replacement", role="replacement_prefix", term="aza", atom_ids={0}, locants=("1",)),
+        NameAtomBinding(stage="replacement", role="replacement_prefix", term="aza", atom_ids={2}, locants=("3",)),
+    )
+
+    result = NameAssemblyResult.from_final_name("1,3-diazacyclopentane", bindings)
+
+    spans = result.token_spans
+    assert [(token.text, token.atom_ids) for token in spans if token.text in {"1", "3"}] == [
+        ("1", frozenset({0})),
+        ("3", frozenset({2})),
+    ]
+    assert next(token for token in spans if token.text == "di").atom_ids == frozenset({0, 2})
+    assert next(token for token in spans if token.text == "aza").atom_ids == frozenset({0, 2})
+
+
+def test_suffix_unsaturation_and_charge_operations_emit_precise_tokens():
+    result = NameAssemblyResult.from_final_name(
+        "cyclohex-2-ene-4-one-1-ium",
+        [
+            NameAtomBinding(
+                stage="unsaturation",
+                role="double",
+                term="ene",
+                atom_ids={1, 2},
+                bond_ids={12},
+                locants=("2",),
+            ),
+            NameAtomBinding(
+                stage="suffix",
+                role="ketone",
+                term="one",
+                atom_ids={3, 6},
+                bond_ids={36},
+                locants=("4",),
+            ),
+            NameAtomBinding(
+                stage="charge",
+                role="parent_charge",
+                term="N+1",
+                atom_ids={0},
+                charge_atom_ids={0},
+                locants=("1",),
+            ),
+        ],
+    )
+
+    by_text = {}
+    for token in result.token_spans:
+        by_text.setdefault(token.text, []).append(token)
+
+    assert by_text["2"][0].bond_ids == frozenset({12})
+    assert by_text["ene"][0].bond_ids == frozenset({12})
+    assert by_text["4"][0].atom_ids == frozenset({3, 6})
+    assert by_text["one"][0].bond_ids == frozenset({36})
+    assert by_text["1"][0].charge_atom_ids == frozenset({0})
+    assert by_text["ium"][0].charge_atom_ids == frozenset({0})
+
+
+def test_final_assembly_audit_rejects_unbound_name_tokens():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0})
+    result = NameAssemblyResult.from_final_name(
+        "methane mystery",
+        [NameAtomBinding(stage="parent", role="parent", term="methane", atom_ids={0})],
+    )
+
+    with pytest.raises(FinalAssemblyAuditError):
+        assert_final_name_assembly(mol, {0}, parts, result)
+
+
 def test_stereo_descriptor_boundary_is_inserted_before_substituent_stems():
     assert ensure_stereo_descriptor_boundary("((1R,2R)cyclopropan-2-yl)") == "((1R,2R)-cyclopropan-2-yl)"
     assert ensure_stereo_descriptor_boundary("(1R)-cyclohexyl") == "(1R)-cyclohexyl"
+
+
+def test_repeated_substituent_with_internal_multiplier_uses_complex_multiplier():
+    assert format_counted_prefixes(["dihydroxyphosphoryl", "dihydroxyphosphoryl"]) == "bis(dihydroxyphosphoryl)"
 
 
 def test_charge_vocabulary_is_registry_backed():
@@ -200,9 +1215,10 @@ def test_oxoacid_alkyl_esters_are_data_backed():
         ("Br", 1, 2, 2, 0): "ethyl bromate",
         ("Br", 1, 2, 3, 0): "propyl bromate",
         ("I", 1, 2, 1, 0): "methyl iodate",
-        ("P", 3, 1, 1, 0): "methyl phosphate",
-        ("S", 2, 2, 2, 0): "ethyl sulfate",
+        ("P", 3, 1, 1, 0): "methyl dihydrogen phosphate",
+        ("S", 2, 2, 2, 0): "ethyl hydrogen sulfate",
         ("N", 2, 1, 1, 1): "methyl nitrate",
+        ("C", 2, 1, 2, 0): "ethyl hydrogen carbonate",
     }
 
     for (central_symbol, single_o, double_o, carbon_count, central_charge), expected in cases.items():
@@ -218,6 +1234,52 @@ def test_charge_normalized_halogen_oxoacid_esters_match_acid_ester_specs():
     assert structural_replacement_parent_name(ester, set(ester.atoms)) == "methyl bromate"
 
 
+def test_oxoacid_ester_suffixes_are_role_template_backed():
+    phosphate = _oxoacid_ester_graph("P", single_o=3, double_o=1, carbon_count=1)
+    phosphate_role = central_oxo_roles(phosphate, set(phosphate.atoms))[0]
+
+    template = oxoacid_role_template(phosphate, phosphate_role)
+
+    assert template is not None
+    assert template.key == "phosphate_monoester_neutral"
+    assert template.kind == OxoacidTemplateKind.ESTER_SUFFIX
+    assert template.opsin_verified
+    assert template.preserves_formal_charges
+    assert structural_replacement_parent_name(phosphate, set(phosphate.atoms)) == "methyl dihydrogen phosphate"
+
+
+def test_charge_normalized_halogen_oxoacid_esters_are_template_classified():
+    ester = _halogen_oxoacid_ester_graph("Cl", charged_oxo_o=2, carbon_count=1, central_charge=2)
+    role = central_oxo_roles(ester, set(ester.atoms))[0]
+
+    template = oxoacid_role_template(ester, role)
+
+    assert template is not None
+    assert template.key == "charge_normalized_halogen_oxoester"
+    assert template.kind == OxoacidTemplateKind.ESTER_SUFFIX
+    assert template.opsin_verified
+    assert not template.preserves_formal_charges
+    assert structural_replacement_parent_name(ester, set(ester.atoms)) == "methyl chlorate"
+
+
+def test_charge_normalized_halogen_peroxy_roles_use_common_peroxyhalate_template():
+    peroxy = _halogen_peroxy_oxo_graph("Cl", charged_oxo_o=2, central_charge=2)
+    role = central_oxo_roles(peroxy, set(peroxy.atoms))[0]
+
+    template = oxoacid_role_template(peroxy, role)
+
+    assert template is not None
+    assert template.key == "charge_normalized_chlorine_peroxy_oxoester"
+    assert template.kind == OxoacidTemplateKind.ESTER_SUFFIX
+    assert template.opsin_verified
+    assert template.preserves_formal_charges
+    assert structural_replacement_parent_name(peroxy, set(peroxy.atoms)) == "methyl peroxychlorate"
+
+
+def test_mixed_central_hydride_ligands_are_boundary_protected():
+    assert name_smiles("CCOSCl") == "(chloro)(ethoxy)sulfane"
+
+
 def test_oxoacid_esters_use_recursive_front_modifier_namer():
     ester = _halogen_oxoacid_ester_graph("Br", charged_oxo_o=2, carbon_count=1, central_charge=2)
     calls = []
@@ -228,6 +1290,601 @@ def test_oxoacid_esters_use_recursive_front_modifier_namer():
 
     assert structural_replacement_parent_name(ester, set(ester.atoms), branch_namer) == "custom modifier bromate"
     assert calls == [(2, {0, 1, 3, 4}, 1)]
+
+
+def test_central_oxo_role_classifies_acid_ligands_from_graph():
+    mol = _oxoacid_graph("P", single_o=3, double_o=1)
+
+    roles = central_oxo_roles(mol, set(mol.atoms))
+
+    assert len(roles) == 1
+    assert roles[0].central_symbol == "P"
+    assert roles[0].count(OxoLigandRole.HYDROXY) == 3
+    assert roles[0].count(OxoLigandRole.OXO) == 1
+    assert roles[0].spec_counts() == (3, 1)
+
+
+def test_central_oxo_role_classifies_alkoxy_and_oxido_ligands_from_graph():
+    mol = _halogen_oxoacid_ester_graph("Br", charged_oxo_o=2, carbon_count=1, central_charge=2)
+
+    roles = central_oxo_roles(mol, set(mol.atoms))
+
+    assert len(roles) == 1
+    assert roles[0].count(OxoLigandRole.ALKOXY) == 1
+    assert roles[0].count(OxoLigandRole.OXO) == 2
+    assert roles[0].spec_counts() == (1, 2)
+
+
+def test_central_oxo_parent_names_full_anions_from_role_data():
+    mol = Molecule()
+    mol.add_atom("S", 0)
+    mol.add_atom("O", 1, charge=-1)
+    mol.add_atom("O", 2, charge=-1)
+    mol.add_atom("O", 3)
+    mol.add_atom("O", 4)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(0, 2, order=1)
+    mol.add_bond(0, 3, order=2)
+    mol.add_bond(0, 4, order=2)
+
+    assert structural_replacement_parent_name(mol, set(mol.atoms)) == "sulfate"
+
+
+def test_neutral_oxoacid_ester_suffix_preserves_remaining_hydrogens():
+    phosphate = _oxoacid_ester_graph("P", single_o=3, double_o=1, carbon_count=1)
+    sulfate = _oxoacid_ester_graph("S", single_o=2, double_o=2, carbon_count=2)
+    carbonate = _oxoacid_ester_graph("C", single_o=2, double_o=1, carbon_count=3)
+
+    assert structural_replacement_parent_name(phosphate, set(phosphate.atoms)) == "methyl dihydrogen phosphate"
+    assert structural_replacement_parent_name(sulfate, set(sulfate.atoms)) == "ethyl hydrogen sulfate"
+    assert structural_replacement_parent_name(carbonate, set(carbonate.atoms)) == "propyl hydrogen carbonate"
+
+
+def test_central_oxo_substituent_role_allows_non_oxygen_ligands():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("S", 1)
+    mol.add_atom("O", 2)
+    mol.add_atom("O", 3, charge=-1)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=2)
+    mol.add_bond(1, 3, order=1)
+
+    role = central_oxo_substituent_role(mol, set(mol.atoms), 1)
+
+    assert role is not None
+    assert role.central_symbol == "S"
+    assert role.count(OxoLigandRole.OXO) == 1
+    assert role.count(OxoLigandRole.OXIDO) == 1
+
+
+def test_central_oxo_substituent_class_rendering_is_data_backed():
+    mol = _phosphorus_oxo_substituent_graph(oxo_count=2)
+    role = central_oxo_substituent_role(mol, set(mol.atoms), 1)
+
+    assert role is not None
+    assert central_oxo_substituent_prefix(role) == "dioxophosphanyl"
+    assert name_heteroatom_subgraph(mol, 1, exclude_atoms={0}, upstream_atom=0, branch_namer=_empty_branch_namer) == (
+        "dioxophosphanyl"
+    )
+
+
+def test_central_oxo_substituent_class_falls_back_when_unconfigured():
+    mol = _phosphorus_oxo_substituent_graph(oxo_count=3)
+    role = central_oxo_substituent_role(mol, set(mol.atoms), 1)
+
+    assert role is not None
+    assert central_oxo_substituent_prefix(role) is None
+    assert name_heteroatom_subgraph(mol, 1, exclude_atoms={0}, upstream_atom=0, branch_namer=_empty_branch_namer) == (
+        "phosphoryl"
+    )
+
+
+def test_central_oxo_substituent_class_renders_one_oxo_phosphorus_explicitly():
+    mol = _phosphorus_oxo_substituent_graph(oxo_count=1)
+    role = central_oxo_substituent_role(mol, set(mol.atoms), 1)
+
+    assert role is not None
+    assert central_oxo_substituent_prefix(role) == "oxophosphanyl"
+    assert name_heteroatom_subgraph(mol, 1, exclude_atoms={0}, upstream_atom=0, branch_namer=_empty_branch_namer) == (
+        "oxophosphanyl"
+    )
+
+
+def test_central_oxo_substituent_class_handles_sulfo_signature():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("S", 1)
+    mol.add_atom("O", 2)
+    mol.add_atom("O", 3)
+    mol.add_atom("O", 4)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=2)
+    mol.add_bond(1, 3, order=2)
+    mol.add_bond(1, 4, order=1)
+
+    role = central_oxo_substituent_role(mol, set(mol.atoms), 1)
+
+    assert role is not None
+    assert central_oxo_substituent_prefix(role) == "sulfo"
+    assert (
+        name_heteroatom_subgraph(mol, 1, exclude_atoms={0}, upstream_atom=0, branch_namer=_empty_branch_namer)
+        == "sulfo"
+    )
+
+
+def test_central_oxo_substituent_class_excludes_implied_hydroxy_ligands():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("P", 1)
+    mol.add_atom("O", 2)
+    mol.add_atom("O", 3)
+    mol.add_atom("O", 4)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=2)
+    mol.add_bond(1, 3, order=1)
+    mol.add_bond(1, 4, order=1)
+
+    role = central_oxo_substituent_role(mol, set(mol.atoms), 1)
+
+    assert role is not None
+    assert central_oxo_substituent_prefix(role) == "dihydroxyphosphoryl"
+    assert name_heteroatom_subgraph(mol, 1, exclude_atoms={0}, upstream_atom=0, branch_namer=_empty_branch_namer) == (
+        "dihydroxyphosphoryl"
+    )
+
+
+def test_nitrogen_heterocumulene_role_precedes_formamido_fallback():
+    mol = Molecule()
+    mol.add_atom("P", 0)
+    mol.add_atom("N", 1)
+    mol.add_atom("C", 2)
+    mol.add_atom("O", 3)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=2)
+    mol.add_bond(2, 3, order=2)
+
+    role = nitrogen_heterocumulene_role(mol, 1, exclude_atoms={0}, upstream_atom=0)
+
+    assert role is not None
+    assert role.prefix == "isocyanato"
+    assert role.atom_ids == {1, 2, 3}
+    assert name_heteroatom_subgraph(mol, 1, exclude_atoms={0}, upstream_atom=0, branch_namer=_empty_branch_namer) == (
+        "isocyanato"
+    )
+
+
+def _phosphorus_oxo_substituent_graph(oxo_count: int) -> Molecule:
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("P", 1)
+    mol.add_bond(0, 1, order=1)
+    for offset in range(oxo_count):
+        oxygen = offset + 2
+        mol.add_atom("O", oxygen)
+        mol.add_bond(1, oxygen, order=2)
+    return mol
+
+
+def _empty_branch_namer(_mol: Molecule, _start_idx: int, _exclude_atoms: set[int], _upstream_atom: int | None = None):
+    return ""
+
+
+def test_nitrogen_chain_roles_classify_azido_from_graph():
+    mol = _carbon_bound_n3_graph(attachment_order=1, first_nn_order=2, second_nn_order=2)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [("azido", 0, {1, 2, 3})]
+    role = roles[0]
+    assert role.ordered_atoms == (0, 1, 2, 3)
+    assert role.bond_orders == (1, 2, 2)
+    assert role.charge_pattern == (0, 0, 0, 0)
+
+
+def test_terminal_thioaldehyde_on_ring_uses_carbothialdehyde_suffix():
+    generated = name_smiles("Cc1cc(Cl)c(C=S)c(Cl)n1")
+
+    assert generated == "2,4-dichloro-6-methylpyridine-3-carbothialdehyde"
+
+
+def test_terminal_thioaldehyde_prefix_uses_monovalent_thioformyl():
+    generated = name_smiles("NC(=O)c1cccc(N)c1C=S")
+
+    assert generated == "3-amino-2-thioformylbenzene-1-carboxamide"
+
+
+def test_terminal_thioformyl_subgraph_is_graph_derived():
+    mol = Molecule()
+    mol.add_atom("N", 0)
+    mol.add_atom("C", 1)
+    mol.add_atom("S", 2)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=2)
+
+    assert name_subgraph(mol, 1, {0}, upstream_atom=0) == "thioformyl"
+
+
+def test_thioester_is_not_perceived_as_ring_thioaldehyde():
+    generated = name_smiles("CCSC(=S)C1=CCC=CN1")
+
+    assert generated == "2-((ethylsulfanyl)(thioxo)methyl)-1-azacyclohexa-2,5-diene"
+
+
+def test_cyclic_thioamide_is_not_perceived_as_thioaldehyde():
+    generated = name_smiles("CCCCCCCCCCCCCC(=S)N1CCCCC1")
+
+    assert generated == "1-(1-thioxotetradecyl)piperidine"
+
+
+def test_cyclic_sulfone_ring_is_not_perceived_as_sulfonate_suffix():
+    generated = name_smiles("C=CC(=O)NC1C(C)COS1(=O)=O")
+
+    assert generated == "N-(4-methyl-2,2-dioxo-1-oxa-2lambda^6-thiacyclopentan-3-yl)prop-2-enamide"
+
+
+def test_nitrile_oxide_is_not_rendered_as_isocyano():
+    generated = name_smiles("Nc1ccccc1C#[N+][O-]")
+
+    assert generated == "2-aminobenzene-1-carbonitrile oxide"
+
+
+def test_direct_phosphonic_acid_substituent_keeps_p_c_bond():
+    generated = name_smiles("NCC(O)C(O)P(=O)(O)O")
+
+    assert generated == "3-amino-1-(dihydroxyphosphoryl)propane-1,2-diol"
+
+
+def test_terminal_carbon_phosphorus_triple_substituent_keeps_triple_bond():
+    generated = name_smiles("CC(=O)NC#P")
+
+    assert generated == "N-phosphanylidynemethylacetamide"
+
+
+def test_terminal_oxophosphorus_triple_substituent_keeps_triple_bond():
+    generated = name_smiles("O=P#Cc1ccncc1")
+
+    assert generated == "4-oxophosphanylidynemethylpyridine"
+
+
+def test_oxophosphorus_triple_substituent_through_sulfur_keeps_triple_bond():
+    generated = name_smiles("NCC(S)S#P=O")
+
+    assert generated == "2-amino-1-(oxophosphanylidynesulfanyl)ethane-1-thiol"
+
+
+def test_upstream_sulfur_imide_attachment_renders_sulfinyl_not_sulfonimidoylidene():
+    generated = name_smiles("NC(=S)N=S=O")
+
+    assert generated == "1-amino-N-sulfinylidenemethanethioamide"
+
+
+def test_oxosulfur_imide_branch_preserves_n_s_double_bond():
+    mol = Molecule()
+    for idx, symbol in enumerate(["C", "N", "S", "O", "O"]):
+        mol.add_atom(symbol, idx)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=2)
+    mol.add_bond(2, 3, order=2)
+    mol.add_bond(2, 4, order=2)
+
+    def empty_branch_namer(*args, **kwargs):
+        return ""
+
+    assert name_heteroatom_subgraph(mol, 1, {0}, 0, empty_branch_namer) == "((dioxosulfanylidene)amino)"
+
+
+def test_chiral_sulfoxide_parent_keeps_sulfur_descriptor():
+    assert name_smiles("CC[S@@](=O)CC(C)C") == "(R)-2-methylpropyl ethyl sulfoxide"
+    assert name_smiles("CCC[S@@](=O)CC") == "(S)-ethyl propyl sulfoxide"
+
+
+def test_repeated_cyanoalkyl_front_modifiers_use_complex_multiplier():
+    generated = name_smiles("CC(C(=O)OCC#N)C(=O)OCC#N")
+
+    assert generated == "bis(2-nitriloethyl) 2-methylpropanedioate"
+
+
+def test_simple_azine_uses_hydrazone_template_not_hydrazinyl_prefix():
+    generated = name_smiles(r"CC/C(C)=N\N=C(C)C")
+
+    assert generated == "(2Z)-butan-2-one propan-2-ylidenehydrazone"
+
+
+def test_azine_uses_recursive_ylidene_side_for_complex_branch():
+    generated = name_smiles(r"CC(C)=N/N=C(\C)C(C)c1cnccn1")
+
+    assert generated == "propan-2-one (2E)-3-(pyrazin-2-yl)butan-2-ylidenehydrazone"
+
+
+def test_azine_roles_preserve_ordered_sides_from_graph():
+    mol = Molecule()
+    for idx, symbol in enumerate(["C", "N", "N", "C", "C", "C"]):
+        mol.add_atom(symbol, idx)
+    mol.add_bond(0, 1, order=2)
+    mol.add_bond(1, 2, order=1)
+    mol.add_bond(2, 3, order=2)
+    mol.add_bond(0, 4, order=1)
+    mol.add_bond(3, 5, order=1)
+
+    roles = azine_roles(mol, set(range(6)))
+
+    assert len(roles) == 1
+    role = roles[0]
+    assert role.ordered_atoms == (0, 1, 2, 3)
+    assert role.left.side_atoms == frozenset({0, 4})
+    assert role.right.side_atoms == frozenset({3, 5})
+    assert [(segment.start_atom, segment.end_atom, segment.bond_order) for segment in role.segments] == [
+        (0, 1, 2),
+        (1, 2, 1),
+        (2, 3, 2),
+    ]
+
+
+def test_hydrazone_prefix_with_terminal_carbon_imino_keeps_connectivity():
+    generated = name_smiles(r"COC(=O)CC(C)=N/N=C(\N)SC")
+
+    assert generated == "methyl 3-((((1E)-(amino)(methylsulfanyl)methylidene)amino)imino)butanoate"
+
+
+def test_hydrazone_role_preserves_parent_side_metadata():
+    mol = _carbon_bound_n3_graph(attachment_order=2, first_nn_order=1, second_nn_order=2)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+    role = roles[0]
+
+    assert role.key == "aldehyde_hydrazone"
+    assert role.ordered_atoms == (0, 1, 2)
+    assert role.bond_orders == (2, 1)
+    assert role.hydrazone_side is not None
+    assert role.hydrazone_side.carbon_atom == 0
+    assert role.hydrazone_side.nitrogen_atom == 1
+    assert role.hydrazone_side.attachment_atom == 0
+    assert role.hydrazone_side.parent_kind == "aldehyde_hydrazone"
+
+
+def test_amidinohydrazone_tail_is_part_of_principal_group():
+    generated = name_smiles(r"Cc1cccc(Cl)c1/C=N\N=C(N)N")
+
+    assert generated == "2-chloro-6-methylbenzene-1-carbaldehyde amidinohydrazone"
+
+
+def test_hydrazone_suffix_preserves_unlocanted_ez_stereo():
+    generated = name_smiles(r"N/N=C/c1ccc(N)cc1S(N)(=O)=O")
+
+    assert generated == "(E)-4-amino-2-(sulfamoyl)benzaldehyde hydrazone"
+
+
+def test_hydrazone_stereo_does_not_duplicate_unlocanted_descriptor():
+    generated = name_smiles(r"C/C=N\Nc1nc2ccccc2o1")
+
+    assert generated == "(Z)-N-(benzoxazol-2-yl)acetaldehyde hydrazone"
+
+
+def test_hydrazone_n_substituent_uses_suffix_modifier_for_nitrogen_parent():
+    generated = name_smiles("c1ccc(NN=C2CCNCC2)cc1")
+
+    assert generated == "piperidin-4-one phenylhydrazone"
+
+
+def test_nitrogen_chain_roles_classify_neutral_diazene_amino_prefix():
+    mol = _carbon_bound_n3_graph(attachment_order=1, first_nn_order=2, second_nn_order=1)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [("aminodiazenyl", 0, {1, 2, 3})]
+
+
+def test_nitrogen_chain_roles_classify_neutral_diazenylamino_prefix():
+    mol = _carbon_bound_n3_graph(attachment_order=1, first_nn_order=1, second_nn_order=2)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [("diazenylamino", 0, {1, 2, 3})]
+
+
+def test_nitrogen_chain_roles_do_not_call_neutral_triazane_azido():
+    mol = _carbon_bound_n3_graph(attachment_order=1, first_nn_order=1, second_nn_order=1)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
+        ("hydrazinylamino", 0, {1, 2, 3})
+    ]
+
+
+def test_nitrogen_chain_roles_keep_imino_hydrazone_distinct_from_azido():
+    mol = _carbon_bound_n3_graph(attachment_order=2, first_nn_order=1, second_nn_order=2)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert not any(role.key == "azido" for role in roles)
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
+        ("aldehyde_hydrazone", 0, {1, 2})
+    ]
+
+
+def test_nitrogen_chain_roles_split_acid_derived_hydrazonamide_from_hydrazone():
+    mol = Molecule()
+    for idx, symbol in enumerate(["C", "N", "N", "N", "N"]):
+        mol.add_atom(symbol, idx)
+    mol.add_bond(0, 1, order=2)
+    mol.add_bond(0, 2, order=1)
+    mol.add_bond(0, 3, order=1)
+    mol.add_bond(3, 4, order=1)
+
+    roles = acid_derived_hydrazone_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids), role.bond_orders) for role in roles] == [
+        ("hydrazonamide", 0, {0, 1, 2, 3, 4}, (2, 1, 1))
+    ]
+    assert not any(role.key.endswith("hydrazone") for role in roles)
+
+
+def test_nitrogen_chain_roles_split_imidohydrazide_and_thiohydrazide_from_hydrazone():
+    imido = Molecule()
+    for idx, symbol in enumerate(["C", "N", "N", "N"]):
+        imido.add_atom(symbol, idx)
+    imido.add_bond(0, 1, order=2)
+    imido.add_bond(0, 2, order=1)
+    imido.add_bond(2, 3, order=1)
+
+    thio = Molecule()
+    for idx, symbol in enumerate(["C", "S", "N", "N"]):
+        thio.add_atom(symbol, idx)
+    thio.add_bond(0, 1, order=2)
+    thio.add_bond(0, 2, order=1)
+    thio.add_bond(2, 3, order=1)
+
+    imido_roles = acid_derived_hydrazone_roles(imido, cyclic_atoms=set())
+    thio_roles = acid_derived_hydrazone_roles(thio, cyclic_atoms=set())
+
+    assert [(role.key, set(role.atom_ids), role.bond_orders) for role in imido_roles] == [
+        ("imidohydrazide", {0, 1, 2, 3}, (2, 1, 1))
+    ]
+    assert [(role.key, set(role.atom_ids), role.bond_orders) for role in thio_roles] == [
+        ("thiohydrazide", {0, 1, 2, 3}, (2, 1, 1))
+    ]
+
+
+def test_nitrogen_chain_roles_classify_charged_diazonio_from_graph():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("N", 1, charge=1)
+    mol.add_atom("N", 2, charge=-1)
+    mol.add_bond(0, 1, order=2)
+    mol.add_bond(1, 2, order=2)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [("diazo", 0, {1, 2})]
+    assert roles[0].charge_pattern == (0, 1, -1)
+    assert roles[0].bond_orders == (2, 2)
+
+
+def test_nitrogen_chain_roles_classify_singly_attached_charged_n2_as_diazonio():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("N", 1, charge=1)
+    mol.add_atom("N", 2)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=3)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [("diazonio", 0, {1, 2})]
+
+
+def test_neutral_single_bonded_diazene_prefix_is_not_diazo():
+    generated = name_smiles("CCOC(=O)C(C#N)N=N")
+
+    assert generated == "ethyl 2-cyano-2-(diazenyl)acetate"
+
+
+def test_nitrogen_chain_roles_allow_terminal_imino_hydrazone():
+    mol = _carbon_bound_n3_graph(attachment_order=2, first_nn_order=1, second_nn_order=2)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert any(role.key.endswith("hydrazone") for role in roles)
+
+
+def test_nitrogen_chain_roles_allow_n_substituted_hydrazones():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("N", 1)
+    mol.add_atom("N", 2)
+    mol.add_atom("C", 3)
+    mol.add_atom("C", 4)
+    mol.add_bond(0, 1, order=2)
+    mol.add_bond(1, 2, order=1)
+    mol.add_bond(2, 3, order=1)
+    mol.add_bond(2, 4, order=1)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
+        ("aldehyde_hydrazone", 0, {1, 2})
+    ]
+
+
+def test_nitrogen_chain_roles_classify_hydrazine_from_graph():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("N", 1)
+    mol.add_atom("N", 2)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=1)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms=set())
+
+    assert [(role.key, role.is_principal_candidate, role.attachment_atom, set(role.atom_ids)) for role in roles] == [
+        ("hydrazine", False, 0, {1, 2})
+    ]
+
+
+def test_nitrogen_chain_roles_make_cyclic_hydrazines_prefixes():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("N", 1)
+    mol.add_atom("N", 2)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=1)
+
+    roles = nitrogen_chain_roles(mol, cyclic_atoms={0})
+
+    assert [(role.key, role.is_principal_candidate, role.variant) for role in roles] == [("hydrazine", False, "prefix")]
+
+
+def test_cyclic_hydrazines_render_as_hydrazinyl_prefixes():
+    generated = name_smiles("NNc1cn[nH]c1")
+
+    assert generated == "4-hydrazinyl-1H-pyrazole"
+
+
+def test_terminal_n3_substituent_role_preserves_charge_and_bond_pattern():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("N", 1)
+    mol.add_atom("N", 2, charge=1)
+    mol.add_atom("N", 3, charge=-1)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=2)
+    mol.add_bond(2, 3, order=2)
+
+    role = terminal_n3_substituent_role(mol, 1, {0}, 0)
+
+    assert role is not None
+    assert role.key == "azido"
+    assert role.ordered_atoms == (0, 1, 2, 3)
+    assert role.charge_pattern == (0, 0, 1, -1)
+    assert role.bond_orders == (1, 2, 2)
+
+
+def test_substituted_cyclic_hydrazines_keep_n_ligands_in_prefix():
+    generated = name_smiles("CN(C)Nc1cccc2ncccc12")
+
+    assert generated == "5-(N',N'-dimethylhydrazinyl)quinoline"
+
+
+def test_perception_consumes_nitrogen_chain_roles_before_legacy_azido():
+    mol = _carbon_bound_n3_graph(attachment_order=2, first_nn_order=1, second_nn_order=2)
+
+    groups = perceive_groups(mol)
+
+    assert not any(group.key == "azido" for group in groups)
+
+
+def _carbon_bound_n3_graph(attachment_order: int, first_nn_order: int, second_nn_order: int) -> Molecule:
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("N", 1)
+    mol.add_atom("N", 2)
+    mol.add_atom("N", 3)
+    mol.add_bond(0, 1, order=attachment_order)
+    mol.add_bond(1, 2, order=first_nn_order)
+    mol.add_bond(2, 3, order=second_nn_order)
+    return mol
 
 
 def _oxoacid_graph(central_symbol: str, single_o: int, double_o: int) -> Molecule:
@@ -317,10 +1974,30 @@ def _halogen_oxoacid_ester_graph(
     return mol
 
 
+def _halogen_peroxy_oxo_graph(central_symbol: str, charged_oxo_o: int, central_charge: int) -> Molecule:
+    mol = Molecule()
+    mol.add_atom(symbol=central_symbol, idx=0, charge=central_charge)
+    mol.add_atom(symbol="O", idx=1)
+    mol.add_bond(0, 1, order=1)
+    mol.add_atom(symbol="O", idx=2)
+    mol.add_bond(1, 2, order=1)
+    mol.add_atom(symbol="C", idx=3)
+    mol.add_bond(2, 3, order=1)
+    next_idx = 4
+    for _ in range(charged_oxo_o):
+        mol.add_atom(symbol="O", idx=next_idx, charge=-1)
+        mol.add_bond(0, next_idx, order=1)
+        next_idx += 1
+    return mol
+
+
 def test_ring_descriptor_rendering_is_registry_backed():
     assert render_ring_descriptor("spiro", (2, 3)) == "spiro[2.3]"
     assert render_ring_descriptor("bicyclo", (2, 1, 0)) == "bicyclo[2.1.0]"
     assert render_von_baeyer_descriptor(2, "[3.2.2.0^{1,5}]") == "tricyclo[3.2.2.0^{1,5}]"
+    assert render_von_baeyer_descriptor(6, "[2.2.1.0^{2,6}.0^{2,7}.0^{3,5}.0^{3,7}.0^{5,7}]").startswith("heptacyclo[")
+    assert render_von_baeyer_descriptor(10, "[2.2.1.0^{2,6}]").startswith("undecacyclo[")
+    assert render_von_baeyer_descriptor(20, "[2.2.1.0^{2,6}]").startswith("henicosacyclo[")
 
 
 def test_suffix_stack_places_tested_parent_anion_before_terminal_suffix_stack():
@@ -402,6 +2079,155 @@ def test_functional_groups_carry_metadata_and_graph_bindings():
         "characteristic_group",
         "full_group",
     }
+
+
+def test_role_certificate_projects_perceived_group_graph_metadata():
+    mol = read_smiles("CC(=O)[O-]")
+    groups = perceive_groups(mol)
+
+    carboxylate = next(group for group in groups if group.key == "carboxylate")
+    certificate = certificate_from_perceived_group(mol, carboxylate)
+
+    assert certificate.key == "carboxylate"
+    assert certificate.represented_atoms == carboxylate.atom_ids
+    assert certificate.represented_bonds == carboxylate.bond_ids
+    assert certificate.represented_charges == {3: -1}
+    assert certificate.missing_charged_atoms(mol, carboxylate.atom_ids) == set()
+
+
+def test_role_certificate_projects_assembled_name_bindings():
+    mol = read_smiles("[NH4+]")
+    parts = AssemblyParts(
+        parent_length=1,
+        parent_atom_ids={0},
+        parent_charges=[ParentChargeItem(locant="1", symbol="N", charge=1, atom_id=0)],
+    )
+
+    certificates = certificates_from_assembly(mol, parts)
+    charge = next(certificate for certificate in certificates if certificate.key == "charge:parent_charge")
+
+    assert charge.represented_atoms == {0}
+    assert charge.represented_charges == {0: 1}
+    assert charge.locants_by_atom == {0: "1"}
+
+
+def test_charge_pair_roles_classify_supported_and_unsupported_templates():
+    supported = read_smiles("C[S+](C)[CH-]C")
+    supported_roles = charge_pair_roles(supported)
+
+    sulfonium = next(role for role in supported_roles if role.key == "sulfonium_ylide_single_bond")
+    assert sulfonium.template_supported
+    assert sulfonium.certificate(supported).represented_charges == {1: 1, 3: -1}
+    assert sulfonium.template_audit(supported).ok
+
+    unsupported = read_smiles("C[SH+](C)=[C-]c1ccccc1")
+    unsupported_roles = unsupported_charge_pair_roles(unsupported)
+
+    assert [(role.key, role.template_supported) for role in unsupported_roles] == [
+        ("sulfur_carbanion_resonance_charge_pair", False)
+    ]
+
+
+def test_charge_pair_roles_classify_n_oxide_and_diazonium_azanide():
+    n_oxide = read_smiles("C[N+]([O-])C")
+    n_oxide_role = next(role for role in charge_pair_roles(n_oxide) if role.key == "n_oxide")
+    assert n_oxide_role.template_supported
+    assert n_oxide_role.certificate(n_oxide).represented_charges == {1: 1, 2: -1}
+    assert n_oxide_role.template_audit(n_oxide).ok
+
+    diazonium = read_smiles("C[N+]=[N-]")
+    diazonium_role = next(role for role in charge_pair_roles(diazonium) if role.key == "diazonium_azanide")
+    assert diazonium_role.template_supported
+    assert diazonium_role.atom_ids == {1, 2}
+    assert diazonium_role.template_audit(diazonium).ok
+
+
+def test_charge_pair_template_audit_blocks_unsupported_resonance_charge_pair():
+    mol = read_smiles("C[SH+](C)=[C-]c1ccccc1")
+
+    audit = audit_charge_pair_templates(mol, set(mol.atoms))
+
+    assert not audit.ok
+    assert [role.key for role in audit.unsupported_roles] == ["sulfur_carbanion_resonance_charge_pair"]
+
+
+def test_phosphane_borane_zwitterion_is_classified_and_opsin_enabled():
+    mol = read_smiles("[BH3-][P+](C)(C)C")
+    role = next(role for role in charge_pair_roles(mol) if role.key == "phosphane_borane_zwitterion")
+
+    assert role.template_supported
+    assert role.template_audit(mol).ok
+
+
+def test_phosphane_borane_zwitterions_render_connected_boranuide_parent():
+    assert name_smiles("[BH3-][P+](C)(C)C") == "(trimethylphosphaniumyl)boranuide"
+    assert name_smiles("[BH3-][P+](CC)(CC)CO") == "(diethyl(hydroxymethyl)phosphaniumyl)boranuide"
+
+
+def test_hypervalent_center_role_classifies_oxo_hydroxy_and_charge_pair_ligands():
+    mol = _halogen_oxoacid_graph("Cl", single_o=0, charged_oxo_o=2, central_charge=2)
+
+    role = hypervalent_center_role(mol, set(mol.atoms), 0)
+
+    assert role is not None
+    assert role.center_symbol == "Cl"
+    assert role.count(HypervalentLigandRole.OXO) == 2
+    assert role.certificate(mol).represented_charges == {0: 2, 1: -1, 2: -1}
+    assert role.template_audit(mol).ok
+
+
+def test_hypervalent_center_role_classifies_imino_thioxo_peroxy_ligands():
+    mol = Molecule()
+    mol.add_atom("S", 0)
+    mol.add_atom("N", 1)
+    mol.add_atom("S", 2)
+    mol.add_atom("O", 3)
+    mol.add_atom("O", 4)
+    mol.add_bond(0, 1, order=2)
+    mol.add_bond(0, 2, order=2)
+    mol.add_bond(0, 3, order=1)
+    mol.add_bond(3, 4, order=1)
+
+    role = hypervalent_center_roles(mol, set(mol.atoms))[0]
+
+    assert role.count(HypervalentLigandRole.IMINO) == 1
+    assert role.count(HypervalentLigandRole.THIOXO) == 1
+    assert role.count(HypervalentLigandRole.PEROXY) == 1
+    assert role.template_audit(mol).ok
+
+
+def test_peroxy_carbonyl_roles_classify_hydroperoxide_peroxoate_and_carbonate_like():
+    hydroperoxide = read_smiles("CC(=O)OO")
+    hydro_role = peroxy_carbonyl_roles(hydroperoxide, set(hydroperoxide.atoms))[0]
+    assert hydro_role.kind == PeroxyCarbonylKind.HYDROPEROXIDE
+    assert hydro_role.certificate(hydroperoxide).represented_atoms == hydro_role.atom_ids
+    assert hydro_role.template_audit(hydroperoxide).ok
+
+    peroxoate = read_smiles("CC(=O)O[O-]")
+    peroxoate_role = peroxy_carbonyl_roles(peroxoate, set(peroxoate.atoms))[0]
+    assert peroxoate_role.kind == PeroxyCarbonylKind.PEROXOATE
+    assert peroxoate_role.certificate(peroxoate).represented_charges == {4: -1}
+    assert peroxoate_role.template_audit(peroxoate).ok
+
+    carbonate = read_smiles("COC(=O)OOC")
+    carbonate_role = peroxy_carbonyl_roles(carbonate, set(carbonate.atoms))[0]
+    assert carbonate_role.kind == PeroxyCarbonylKind.CARBONATE_LIKE
+    assert carbonate_role.template_audit(carbonate).ok
+
+
+def test_terminal_peroxy_carbonyl_charge_selects_peroxoate_suffix():
+    assert name_smiles("CC(=O)OO") == "ethaneperoxoic acid"
+    assert name_smiles("CC(=O)O[O-]") == "ethaneperoxoate"
+
+
+def test_role_certificate_audit_reports_missing_template_coverage():
+    mol = read_smiles("C[N+]([O-])C")
+    role = next(role for role in charge_pair_roles(mol) if role.key == "n_oxide")
+
+    audit = audit_role_certificate(mol, role.certificate(mol), expected_atoms={1, 2, 3})
+
+    assert not audit.ok
+    assert "missing=[3]" in audit.audit_errors[0]
 
 
 def test_custom_perception_detector_extension_point():
@@ -531,6 +2357,21 @@ def test_spiro_side_retained_ionic_ring_locants_are_registry_derived():
     assert _spiro_side_locant(SpiroAssembly("3", "1", "azetidin-1-ium")) == "3"
 
 
+def test_saturated_n_ring_spiro_numbering_prefers_side_features_before_spiro_locant():
+    mol = Molecule()
+    for idx, symbol in enumerate(["N", "C", "C", "C", "C", "C", "C"]):
+        mol.add_atom(symbol, idx=idx)
+    for idx, (first, second) in enumerate([(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 0), (1, 6)], start=1):
+        mol.add_bond(first, second, order=1, idx=idx)
+
+    locants = _number_saturated_n_ring_for_spiro(
+        mol, [0, 1, 2, 3, 4, 5], n_atom=0, spiro_atom=2, sub_comp=set(range(7))
+    )
+
+    assert locants[1] == "2"
+    assert locants[2] == "3"
+
+
 def test_charge_and_postprocessing_rules_are_inventory_backed():
     parts = AssemblyParts(
         parent_length=3,
@@ -585,6 +2426,714 @@ def test_fused_and_polycyclic_retained_signatures_are_data_driven():
         mol = read_smiles(smiles)
         ring = find_ring_systems(mol)[0]
         assert get_retained_ring(mol, list(ring.atoms))[0] == expected
+
+
+def test_stage3_retained_fused_pin_forms_and_indicated_hydrogens_are_validated():
+    cases = {
+        "c1ccc2occc2c1": "1-benzofuran",
+        "c1ccc2sccc2c1": "1-benzothiophene",
+        "c1ccc2[nH]cnc2c1": "1H-benzimidazole",
+        "c1ccc2[nH]ncc2c1": "1H-indazole",
+        "c1ccc2[nH]ccc2c1": "1H-indole",
+        "c1ccc2cc3ccccc3cc2c1": "anthracene",
+        "c1ccc2c(c1)ccc1ccccc12": "phenanthrene",
+        "c1cc2ccc3cccc4ccc(c1)c2c34": "pyrene",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def _naphthalene_graph_template_row() -> dict:
+    locants = ("1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a")
+    return {
+        "name": "naphthalene",
+        "pin": True,
+        "priority": 1,
+        "aliases": [],
+        "fusion_prefix": "naphtho",
+        "derivative_stem": "naphthalen",
+        "template": {
+            "enabled": False,
+            "locants": locants,
+            "atoms": [
+                {"locant": locant, "symbol": "C", "aromatic": True, "fusion": locant in {"4a", "8a"}}
+                for locant in locants
+            ],
+            "bonds": [
+                {"locants": ["1", "2"], "bond_class": "aromatic"},
+                {"locants": ["2", "3"], "bond_class": "aromatic"},
+                {"locants": ["3", "4"], "bond_class": "aromatic"},
+                {"locants": ["4", "4a"], "bond_class": "aromatic"},
+                {"locants": ["4a", "8a"], "bond_class": "fusion"},
+                {"locants": ["8a", "1"], "bond_class": "aromatic"},
+                {"locants": ["4a", "5"], "bond_class": "aromatic"},
+                {"locants": ["5", "6"], "bond_class": "aromatic"},
+                {"locants": ["6", "7"], "bond_class": "aromatic"},
+                {"locants": ["7", "8"], "bond_class": "aromatic"},
+                {"locants": ["8", "8a"], "bond_class": "aromatic"},
+            ],
+            "rings": [
+                ["1", "2", "3", "4", "4a", "8a"],
+                ["4a", "5", "6", "7", "8", "8a"],
+            ],
+            "fusion_atoms": ["4a", "8a"],
+            "peripheral_atoms": locants,
+            "interior_atoms": [],
+            "numbering_policy": "retained_template",
+        },
+    }
+
+
+def test_retained_fused_graph_template_schema_validates_locant_graphs():
+    template = retained_fused_template_from_data(_naphthalene_graph_template_row())
+
+    assert isinstance(template, RetainedFusedGraphTemplate)
+    assert template.name == "naphthalene"
+    assert template.locants == ("1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a")
+    assert template.fusion_atoms == ("4a", "8a")
+    assert template.attached_prefix == "naphtho"
+    assert not template.enabled
+
+
+def test_retained_fused_graph_template_builds_local_graph():
+    template = retained_fused_template_from_data(_naphthalene_graph_template_row())
+    mol = template_molecule(template)
+
+    assert len(mol.atoms) == 10
+    assert len(mol.bonds) == 11
+    assert all(atom.symbol == "C" for atom in mol.atoms.values())
+    assert sum(1 for atom in mol.atoms.values() if atom.is_aromatic) == 10
+
+
+def test_retained_fused_graph_template_match_returns_locant_map():
+    template = retained_fused_template_from_data(_naphthalene_graph_template_row())
+    mol = template_molecule(template)
+
+    match = match_retained_fused_template(mol, set(mol.atoms), template)
+
+    assert match is not None
+    assert match.template.name == "naphthalene"
+    assert match.locant_to_atom["1"] == 0
+    assert match.atom_to_locant[4] == "4a"
+    assert match.locant_to_atom["8a"] == 9
+    assert match.matched_atoms == frozenset(mol.atoms)
+
+
+def test_retained_fused_graph_template_data_file_validates_guarded_core_entries():
+    templates = retained_fused_graph_templates(include_disabled=True)
+    by_name = {template.name: template for template in templates}
+
+    assert {
+        "naphthalene",
+        "quinoline",
+        "isoquinoline",
+        "1,5-naphthyridine",
+        "1,6-naphthyridine",
+        "1,7-naphthyridine",
+        "1,8-naphthyridine",
+        "2,6-naphthyridine",
+        "2,7-naphthyridine",
+        "quinazoline",
+        "quinoxaline",
+        "cinnoline",
+        "phthalazine",
+        "azulene",
+        "1H-phenalene",
+        "acenaphthylene",
+        "fluoranthene",
+        "1H-perimidine",
+        "pteridine",
+        "2H-isoindole",
+        "indolizine",
+        "1H-indole",
+    } <= set(by_name)
+    enabled_names = {template.name for template in retained_fused_graph_templates()}
+    assert not (
+        {
+            "naphthalene",
+            "quinoline",
+            "isoquinoline",
+            "1,5-naphthyridine",
+            "1,6-naphthyridine",
+            "1,7-naphthyridine",
+            "1,8-naphthyridine",
+            "2,6-naphthyridine",
+            "2,7-naphthyridine",
+            "quinazoline",
+            "quinoxaline",
+            "cinnoline",
+            "phthalazine",
+            "azulene",
+            "1H-phenalene",
+            "acenaphthylene",
+            "fluoranthene",
+            "1H-perimidine",
+            "pteridine",
+            "2H-isoindole",
+            "indolizine",
+            "1H-indole",
+        }
+        & enabled_names
+    )
+    production_derivative_names = {template.name for template in templates if template.derivative_production_enabled}
+    assert production_derivative_names == {
+        "naphthalene",
+        "quinoline",
+        "isoquinoline",
+        "1,5-naphthyridine",
+        "1,6-naphthyridine",
+        "1,7-naphthyridine",
+        "1,8-naphthyridine",
+        "2,6-naphthyridine",
+        "2,7-naphthyridine",
+        "quinazoline",
+        "quinoxaline",
+        "cinnoline",
+        "phthalazine",
+    }
+    assert by_name["1H-indole"].default_indicated_h == ("1",)
+    assert by_name["quinoline"].atom_by_locant["1"].symbol == "N"
+    assert by_name["isoquinoline"].atom_by_locant["2"].symbol == "N"
+
+
+def test_parser_grammar_snapshot_separates_tokens_from_production_gate():
+    grammar = local_grammar_snapshot()
+    gate = retained_fused_derivative_gate()
+    tokens = grammar["retained_fused_tokens"]
+
+    assert tokens["quinoline"]["parent_stems"] == ["quinolin"]
+    assert "quinolino" in tokens["quinoline"]["fusion_stems"]
+    assert "quinol" in tokens["quinoline"]["substituent_stems"]
+    assert "quinoline" in gate.production_parent_names
+    assert retained_fused_token_status("quinoline") == "production_safe"
+
+    for parent in ("azulene", "1H-phenalene", "acenaphthylene", "fluoranthene", "pteridine"):
+        assert parent in tokens
+        assert parent in gate.audit_only_parent_names
+        assert parent not in gate.production_parent_names
+        assert retained_fused_token_status(parent) == "audit_only"
+
+
+def test_parser_grammar_snapshot_is_owned_runtime_data():
+    grammar = local_grammar_snapshot()
+    snapshot = local_grammar_snapshot()
+
+    assert grammar is snapshot
+    assert snapshot["source"]["format"] == "bluenamer.parser_grammar_snapshot.v1"
+    assert snapshot["source"]["resource_json_dir"] == "parser_xml_resources"
+    assert "resource_root" not in snapshot["source"]
+    assert "external_resource_path" not in snapshot["source"]
+    assert "retained_fused_tokens" in snapshot
+
+
+def test_parser_xml_resources_are_owned_json_datafiles():
+    resource_files = sorted((DATA_DIR / "parser_xml_resources").glob("*.json"))
+
+    assert len(resource_files) >= 39
+    assert not (DATA_DIR / "parser_xml_resources" / "index.json").exists()
+    inline_charge = load_json_table("parser_xml_resources/inlineChargeSuffixes.json")
+    assert inline_charge["source_xml_file"] == "inlineChargeSuffixes.xml"
+    assert inline_charge["root"]["attributes"]["type"] == "charge"
+    tokens = inline_charge["root"]["children"]
+    assert {token["text"] for token in tokens} >= {"ium", "ide", "uide"}
+    assert {token["attributes"]["value"] for token in tokens} >= {"ium", "ide", "ylium", "uide"}
+
+
+def test_parser_grammar_retained_fused_gate_is_derived_from_token_status():
+    tokens = retained_fused_tokens()
+    gate = retained_fused_derivative_gate()
+
+    expected_production = {parent for parent, token in tokens.items() if token.derivative_status == "production_safe"}
+    expected_audit_only = {parent for parent, token in tokens.items() if token.derivative_status == "audit_only"}
+
+    assert gate.production_parent_names == expected_production
+    assert gate.audit_only_parent_names == expected_audit_only
+
+
+def test_parser_grammar_tokens_cover_retained_fused_template_stems():
+    templates = retained_fused_graph_templates(include_disabled=True)
+
+    for template in templates:
+        token = retained_fused_token(template.name)
+        if token is None:
+            continue
+        derivative_stems = {template.derivative_stem}
+        if len(template.derivative_stem) > 3 and template.derivative_stem[1:3] == "H-":
+            derivative_stems.add(template.derivative_stem[3:])
+        assert derivative_stems & set(token.parent_stems)
+        assert template.attached_prefix in token.fusion_stems
+        if template.default_indicated_h:
+            assert template.default_indicated_h == token.default_indicated_h
+        if token.derivative_status == "production_safe":
+            assert template.derivative_production_enabled
+        else:
+            assert not template.derivative_production_enabled
+
+
+def test_parser_grammar_records_charge_and_heteroatom_tokens():
+    grammar = local_grammar_snapshot()
+
+    assert grammar["charge_suffixes"]["canonical"] == ["ium", "ide", "ylium", "uide"]
+    assert grammar["charge_suffixes"]["accepted_spellings"]["uide"] == ["uide", "uid"]
+    assert grammar["hetero_replacement_priority"]["prefix_order"][:9] == [
+        "fluora",
+        "chlora",
+        "broma",
+        "ioda",
+        "oxa",
+        "thia",
+        "selena",
+        "tellura",
+        "aza",
+    ]
+    assert grammar["halogen_oxoacid_common_names"]["Cl"]["XO4"] == "perchloric acid"
+    suffixes = oxoacid_ester_suffix_templates()
+    assert suffixes["phosphate"]["neutral_monoester"] == "dihydrogen phosphate"
+    assert suffixes["charge_normalized_halogen_peroxy_oxoester"]["Cl"] == "peroxychlorate"
+
+
+def test_retained_fused_graph_templates_match_core_numbering_when_enabled_for_audit():
+    cases = {
+        "c1ccc2ccccc2c1": ("naphthalene", {"1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"}),
+        "c1ccc2ncccc2c1": ("quinoline", {"1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"}),
+        "c1ccc2cnccc2c1": ("isoquinoline", {"1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"}),
+        "n1cccc2ncccc12": ("1,5-naphthyridine", {"1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"}),
+        "n1cccc2cnccc12": ("1,6-naphthyridine", {"1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"}),
+        "n1cccc2ccncc12": ("1,7-naphthyridine", {"1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"}),
+        "n1cccc2cccnc12": ("1,8-naphthyridine", {"1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"}),
+        "c1nccc2cnccc12": ("2,6-naphthyridine", {"1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"}),
+        "c1nccc2ccncc12": ("2,7-naphthyridine", {"1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"}),
+        "n1cncc2ccccc12": ("quinazoline", {"1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"}),
+        "n1ccnc2ccccc12": ("quinoxaline", {"1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"}),
+        "n1nccc2ccccc12": ("cinnoline", {"1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"}),
+        "c1nncc2ccccc12": ("phthalazine", {"1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"}),
+        "C1=CC=C2C=CC=CC=C12": ("azulene", {"1", "2", "3", "3a", "4", "5", "6", "7", "8", "8a"}),
+        "C1C=CC2=CC=CC3=CC=CC1=C23": (
+            "1H-phenalene",
+            {"1", "2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b"},
+        ),
+        "C1=CC2=CC=CC3=CC=CC1=C23": (
+            "acenaphthylene",
+            {"1", "2", "2a", "3", "4", "5", "5a", "6", "7", "8", "8a", "8b"},
+        ),
+        "C1=CC=C2C=CC=C3C4=CC=CC=C4C1=C23": (
+            "fluoranthene",
+            {"1", "2", "3", "3a", "4", "5", "6", "6a", "6b", "7", "8", "9", "10", "10a", "10b", "10c"},
+        ),
+        "N1=CN=CC2=NC=CN=C12": ("pteridine", {"1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"}),
+        "N1C=NC2=CC=CC3=CC=CC1=C23": (
+            "1H-perimidine",
+            {"1", "2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b"},
+        ),
+        "C=1NC=C2C=CC=CC12": ("2H-isoindole", {"1", "2", "3", "3a", "4", "5", "6", "7", "7a"}),
+        "C=1C=CN2C=CC=CC12": ("indolizine", {"1", "2", "3", "4", "5", "6", "7", "8", "8a"}),
+    }
+
+    for smiles, (expected_parent, expected_locants) in cases.items():
+        mol = read_smiles(smiles)
+        ring = find_ring_systems(mol)[0]
+        matches = match_retained_fused_templates(mol, list(ring.atoms), include_disabled=True)
+        matches = [match for match in matches if match.template.name == expected_parent]
+
+        assert matches
+        assert set(matches[0].atom_to_locant.values()) == expected_locants
+        assert set(matches[0].atom_to_locant) == set(ring.atoms)
+
+
+def test_retained_fused_template_matching_is_charge_exact():
+    row = _naphthalene_graph_template_row()
+    row["template"]["atoms"][0]["symbol"] = "N"
+    row["template"]["atoms"][0]["charge"] = 1
+    template = retained_fused_template_from_data(row)
+    charged = template_molecule(template)
+    neutral = template_molecule(template)
+    neutral.atoms[0].charge = 0
+
+    assert match_retained_fused_template(charged, set(charged.atoms), template) is not None
+    assert match_retained_fused_template(neutral, set(neutral.atoms), template) is None
+
+
+def test_requested_retained_fused_parents_are_pending_until_graph_verified():
+    pending = set(pending_retained_fused_parent_names())
+
+    assert {
+        "pleiadene",
+        "phenanthridine",
+        "4H-quinolizine",
+        "1H-pyrrolizine",
+    } <= pending
+    assert not (pending & {template.name for template in retained_fused_graph_templates(include_disabled=True)})
+
+
+def test_fused_topology_route_keeps_disabled_retained_templates_out_of_production():
+    mol = read_smiles("c1ccc2ccccc2c1")
+    ring = find_ring_systems(mol)[0]
+
+    live_route = classify_ring_topology_route(mol, set(ring.atoms))
+    audit_route = classify_ring_topology_route(mol, set(ring.atoms), include_disabled_retained=True)
+
+    assert live_route.kind == RingTopologyRouteKind.SYSTEMATIC_FUSED
+    assert live_route.production_ready is False
+    assert audit_route.kind == RingTopologyRouteKind.RETAINED_FUSED
+    assert audit_route.production_ready is False
+    assert audit_route.retained_matches[0].template.name == "naphthalene"
+
+
+def test_general_retained_ring_recognizer_does_not_call_fused_template_matcher():
+    assert not hasattr(retained_rules, "match_retained_fused_templates")
+
+
+def test_fused_component_and_numbering_candidates_are_graph_bound():
+    mol = read_smiles("c1ccc2ncccc2c1")
+    ring = find_ring_systems(mol)[0]
+    route = classify_ring_topology_route(mol, set(ring.atoms), include_disabled_retained=True)
+    match = next(match for match in route.retained_matches if match.template.name == "quinoline")
+
+    component = fused_component_from_retained_match(mol, match)
+    numbering = fused_numbering_from_retained_match(match)
+
+    assert component.name == "quinoline"
+    assert component.source == "retained_fused_template"
+    assert component.production_ready is False
+    assert component.heteroatom_symbols == ("N",)
+    assert numbering.audit_ok
+    assert set(numbering.atom_to_locant) == set(ring.atoms)
+    assert numbering.locant_to_atom["1"] in ring.atoms
+    assert numbering.peripheral_locants == match.template.peripheral_atoms
+    assert numbering.fusion_atom_locants == match.template.fusion_atoms
+    assert numbering.heteroatom_locants == ("1",)
+    assert numbering.orientation_source == "retained_template"
+
+
+def test_stage6_fused_component_candidate_carries_descriptor_inputs():
+    mol = read_smiles("c1ccc2ncccc2c1")
+    ring = find_ring_systems(mol)[0]
+    route = classify_ring_topology_route(mol, set(ring.atoms), include_disabled_retained=True)
+    match = next(match for match in route.retained_matches if match.template.name == "quinoline")
+
+    component = fused_component_from_retained_match(mol, match)
+
+    assert component.component_locants == ("1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a")
+    assert component.attached_prefix == "quinolino"
+    assert component.derivative_stem == "quinolin"
+    assert component.opsin_token_status == "production_safe"
+    assert component.heteroatom_symbols == ("N",)
+    assert component.heteroatom_count == 1
+    assert component.heteroatom_variety == 1
+    assert component.senior_heteroatom_count == 1
+    assert component.fusion_sides[:3] == (
+        ("a", ("1", "2")),
+        ("b", ("2", "3")),
+        ("c", ("3", "4")),
+    )
+
+
+def test_stage6_parent_side_letters_are_template_bond_backed():
+    template = next(
+        template for template in retained_fused_graph_templates(include_disabled=True) if template.name == "naphthalene"
+    )
+
+    sides = fused_parent_side_letters(template)
+
+    assert sides[0] == ("a", ("1", "2"))
+    assert ("e", ("4a", "5")) in sides
+    assert all(
+        tuple(sorted(locants)) in {tuple(sorted(bond.locants)) for bond in template.bonds} for _, locants in sides
+    )
+
+
+def test_stage6_fused_component_registry_uses_templates_and_opsin_tokens():
+    registry = fused_component_registry(include_disabled=True)
+    quinoline = registry.by_name["quinoline"]
+
+    assert quinoline.component_id == "retained_fused:quinoline"
+    assert quinoline.accepted_name == "quinoline"
+    assert quinoline.fusion_prefix_name == "quinolino"
+    assert quinoline.derivative_stem == "quinolin"
+    assert quinoline.atom_locants == ("1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a")
+    assert quinoline.fusion_side_letters[:3] == (
+        ("a", ("1", "2")),
+        ("b", ("2", "3")),
+        ("c", ("3", "4")),
+    )
+    assert quinoline.ring_count == 2
+    assert quinoline.ring_size_sequence == (6, 6)
+    assert quinoline.heteroatom_symbols == ("N",)
+    assert quinoline.retained_seniority_rank == 13
+    assert quinoline.is_mancude
+    assert quinoline.is_retained_parent_component
+    assert quinoline.is_allowed_as_fusion_component
+    assert quinoline.opsin_token_status == "production_safe"
+    assert "quinoline" in quinoline.opsin_parseable_names
+
+    indole = registry.by_name["1H-indole"]
+    assert indole.opsin_token_status == "audit_only"
+    assert not indole.is_allowed_as_fusion_component
+
+
+def test_stage6_fused_component_registry_orders_allowed_parent_candidates():
+    registry = fused_component_registry(include_disabled=True)
+    candidates = registry.parent_component_candidates()
+
+    assert candidates
+    assert all(candidate.is_allowed_as_fusion_component for candidate in candidates)
+    assert "1H-indole" not in {candidate.accepted_name for candidate in candidates}
+    assert candidates == tuple(sorted(candidates, key=lambda candidate: candidate.parent_component_key))
+
+
+def test_plain_fused_parent_does_not_create_bridged_fused_candidate():
+    mol = read_smiles("c1ccc2ccccc2c1")
+    ring = find_ring_systems(mol)[0]
+    route = classify_ring_topology_route(mol, set(ring.atoms))
+
+    assert route.kind == RingTopologyRouteKind.SYSTEMATIC_FUSED
+    assert bridged_fused_candidates(mol, route) == ()
+
+
+def test_spiro_component_reference_requires_a_complete_component_locant_map():
+    incomplete = spiro_component_reference(
+        "cyclopropane",
+        {0: "1", 1: "2"},
+        0,
+        {0, 1, 2},
+        source="unit-test",
+    )
+    complete = spiro_component_reference(
+        "cyclopropane",
+        {0: "1", 1: "2", 2: "3"},
+        0,
+        {0, 1, 2},
+        source="unit-test",
+    )
+
+    assert not incomplete.audit_ok
+    assert "spiro component locant map does not cover component atoms" in incomplete.audit_errors
+    assert complete.audit_ok
+
+
+def test_stage8_bridged_fused_candidate_binds_bridge_attachment_locants():
+    template = next(
+        template for template in retained_fused_graph_templates(include_disabled=True) if template.name == "naphthalene"
+    )
+    mol = template_molecule(template)
+    mol.add_atom("C", 10)
+    mol.add_bond(template.locants.index("2"), 10, order=1, idx=100)
+    mol.add_bond(template.locants.index("7"), 10, order=1, idx=101)
+    match = match_retained_fused_template(mol, set(range(10)), template)
+    assert match is not None
+    route = RingTopologyRoute(
+        kind=RingTopologyRouteKind.BRIDGED_FUSED,
+        atoms=frozenset(mol.atoms),
+        topology=ring_system_topology(mol, set(mol.atoms)),
+        retained_matches=(match,),
+        reason="unit-test bridged fused route",
+    )
+
+    candidates = bridged_fused_candidates(mol, route)
+    bridge_candidate = next(candidate for candidate in candidates if candidate.bridge_atoms == frozenset({10}))
+
+    assert candidates
+    assert bridge_candidate.bridge_attachment_locants == ("2", "7")
+    assert bridge_candidate.bridge_length == 1
+
+
+def test_stage9_spiro_component_reference_carries_primed_display_locants():
+    reference = spiro_component_reference(
+        "cyclopropane",
+        {0: "1", 1: "2", 2: "3"},
+        0,
+        {0, 1, 2},
+        source="unit-test",
+        prime_count=1,
+    )
+
+    assert reference.audit_ok
+    assert reference.atom_to_locant[0] == "1"
+    assert reference.display_atom_to_locant[0] == "1'"
+
+
+def test_charged_fused_template_gate_waits_for_neutral_parent_verification():
+    mol = read_smiles("[nH+]1ccccc1")
+    ring = find_ring_systems(mol)[0]
+
+    gate = charged_fused_template_gate(
+        "pyridin-1-ium",
+        mol,
+        set(ring.atoms),
+        neutral_parent_verified=False,
+    )
+
+    assert gate.charged_atoms
+    assert not gate.production_ready
+
+
+def test_stage10_fused_ion_template_registry_is_data_backed_and_gated():
+    registry = fused_ion_template_registry()
+    quinoline_ium = registry.by_id["quinoline_ring_n_1_ium"]
+
+    assert quinoline_ium.base_parent_name == "quinoline"
+    assert quinoline_ium.allowed_charge_operation == "ring_n_ium"
+    assert quinoline_ium.allowed_locants == ("1",)
+    assert quinoline_ium.suffix_or_prefix_form == "ium"
+    assert quinoline_ium.opsin_grammar_name == "quinolin-1-ium"
+    assert quinoline_ium.opsin_compatible_spelling == "quinolin-1-ium"
+    assert quinoline_ium.base_parent_token_status == "production_safe"
+    assert quinoline_ium.production_ready
+    assert {template.template_id for template in registry.production_templates()} == {
+        "quinoline_ring_n_1_ium",
+        "isoquinoline_ring_n_2_ium",
+        "quinoline_ring_n_1_oxide",
+        "isoquinoline_ring_n_2_oxide",
+    }
+    assert registry.for_parent("1H-indole")[0].suffix_or_prefix_form == "ide"
+    assert registry.for_parent("indole")[0].suffix_or_prefix_form == "ide"
+    assert registry.by_id["quinoline_ring_n_1_oxide"].opsin_grammar_name == "quinoline 1-oxide"
+
+
+def test_stage10_retained_fused_ring_n_charge_uses_graph_operation_renderer():
+    cases = {
+        "[nH+]1cccc2ccccc12": ("quinolin-1-ium", "fused_ring_n_ium", "1"),
+        "[nH+]1ccc2ccccc2c1": ("isoquinolin-2-ium", "fused_ring_n_ium", "2"),
+    }
+
+    for smiles, (expected, role, locant) in cases.items():
+        analysis = analyze_smiles(smiles)
+        assembly = [step for step in analysis.decisions if step.decision == "assembled component name"][-1]
+        bindings = assembly.data["name_atom_bindings"]
+
+        assert analysis.name == expected
+        assert any(
+            binding["role"] == role and binding["term"] == expected and binding["locants"] == [locant]
+            for binding in bindings
+        )
+        assert not any(binding["role"] == "parent_charge" and binding["locants"] == [locant] for binding in bindings)
+
+
+def test_stage10_retained_fused_ion_derivatives_keep_substituents_on_candidate_parent():
+    cases = {
+        "C[n+]1cccc2ccccc12": ("1-methylquinolin-1-ium", "fused_ring_n_ium", "quinolin-1-ium"),
+        "C[n+]1ccc2ccccc2c1": ("2-methylisoquinolin-2-ium", "fused_ring_n_ium", "isoquinolin-2-ium"),
+        "Cc1cc[n+]([O-])c2ccccc12": ("4-methylquinoline 1-oxide", "fused_n_oxide", "quinoline 1-oxide"),
+        "Cc1c[n+]([O-])cc2ccccc12": ("4-methylisoquinoline 2-oxide", "fused_n_oxide", "isoquinoline 2-oxide"),
+    }
+
+    for smiles, (expected, role, fused_term) in cases.items():
+        analysis = analyze_smiles(smiles)
+        assembly = [step for step in analysis.decisions if step.decision == "assembled component name"][-1]
+        bindings = assembly.data["name_atom_bindings"]
+
+        assert analysis.name == expected
+        assert any(binding["role"] == "substituent" and binding["term"] == "methyl" for binding in bindings)
+        assert any(binding["role"] == role and binding["term"] == fused_term for binding in bindings)
+        assert not any(binding["role"] == "parent_charge" for binding in bindings)
+        if role == "fused_n_oxide":
+            assert not any(binding["role"] == "substituent" and binding["term"] == "oxido" for binding in bindings)
+
+
+def test_stage10_fused_ion_candidates_are_graph_operations_before_rendering():
+    parts = AssemblyParts(
+        parent_length=10,
+        is_ring=True,
+        retained_name="quinoline",
+        substituents=[SubstituentItem(name="oxido", locants=["1"], atom_ids={0, 1}, bond_ids={99})],
+        parent_charges=[ParentChargeItem(locant="1", symbol="N", charge=1, atom_id=1)],
+        parent_atom_symbols_by_locant={"1": "N"},
+        parent_atom_charges_by_locant={"1": 1},
+    )
+
+    candidates = fused_ion_operation_candidates(parts)
+
+    assert len(candidates) == 2
+    candidate = candidates[0]
+    assert candidate.operation == "ring_n_oxide"
+    assert candidate.locants == ("1",)
+    assert candidate.represented_atom_ids == frozenset({0, 1})
+    assert candidate.represented_bond_ids == frozenset({99})
+    assert candidate.production_ready
+    assert candidate.rendered_name == "quinoline 1-oxide"
+
+
+def test_stage10_retained_fused_n_oxide_uses_generic_opsin_grammar_renderer():
+    cases = {
+        "[O-][n+]1cccc2ccccc12": "quinoline 1-oxide",
+        "[O-][n+]1ccc2ccccc2c1": "isoquinoline 2-oxide",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_stage10_retained_fused_n_oxide_binding_consumes_charge_pair():
+    analysis = analyze_smiles("[O-][n+]1cccc2ccccc12")
+    assembly = [step for step in analysis.decisions if step.decision == "assembled component name"][-1]
+    bindings = assembly.data["name_atom_bindings"]
+
+    assert analysis.name == "quinoline 1-oxide"
+    assert any(
+        binding["role"] == "fused_n_oxide"
+        and binding["term"] == "quinoline 1-oxide"
+        and binding["locants"] == ["1"]
+        and binding["atoms"] == [0, 1]
+        for binding in bindings
+    )
+    assert not any(binding["role"] == "substituent" and binding["term"] == "oxido" for binding in bindings)
+    assert not any(binding["role"] == "parent_charge" and binding["locants"] == ["1"] for binding in bindings)
+
+
+def test_stage6_to_10_emission_examples_are_generic_opsin_grammar_targets():
+    examples = fused_emission_examples()
+
+    assert examples.name_policy == "generic_opsin_grammar"
+    assert "furo[3,2-b]thieno[2,3-e]pyridine" in examples.stages["stage_6_systematic_fused_descriptor"]
+    assert "1H-cyclopenta[l]phenanthrene" in examples.stages["stage_7_fused_layout_numbering"]
+    assert "10,5-[2,3]furanobenzo[g]quinoline" in examples.stages["stage_8_bridged_fused"]
+    assert "1'H-spiro[imidazolidine-4,2'-quinoxaline]" in examples.stages["stage_9_spiro_wrapper"]
+    assert set(examples.stages["stage_10_charged_fused_heteroaromatics"]) == {
+        "quinolin-1-ium",
+        "isoquinolin-2-ium",
+        "quinoline 1-oxide",
+        "indol-1-ide",
+        "carbazol-9-ide",
+    }
+
+
+def test_retained_fused_derivative_gate_uses_template_locants_for_opsin_safe_classes():
+    cases = {
+        "Cc1ccc2ncccc2c1": "6-methylquinoline",
+        "COc1ccc2ncccc2c1": "6-methoxyquinoline",
+        "Clc1ccc2ncccc2c1": "6-chloroquinoline",
+        "Oc1ccc2ncccc2c1": "quinolin-6-ol",
+        "Nc1ccc2ncccc2c1": "quinolin-6-amine",
+        "N#Cc1ccc2ncccc2c1": "quinoline-6-carbonitrile",
+        "O=Cc1ccc2ncccc2c1": "quinoline-6-carbaldehyde",
+        "O=C(N)c1ccc2ncccc2c1": "quinoline-6-carboxamide",
+        "O=C(O)c1ccc2ncccc2c1": "quinoline-6-carboxylic acid",
+        "Cc1ccc2cnccc2c1": "6-methylisoquinoline",
+        "n1cccc2ncccc12": "1,5-naphthyridine",
+        "n1cccc2cnccc12": "1,6-naphthyridine",
+        "n1cccc2ccncc12": "1,7-naphthyridine",
+        "n1cccc2cccnc12": "1,8-naphthyridine",
+        "c1nccc2cnccc12": "2,6-naphthyridine",
+        "c1nccc2ccncc12": "2,7-naphthyridine",
+        "Cc1nccc2cnccc12": "1-methyl-2,6-naphthyridine",
+        "n1cncc2ccccc12": "quinazoline",
+        "n1ccnc2ccccc12": "quinoxaline",
+        "n1nccc2ccccc12": "cinnoline",
+        "c1nncc2ccccc12": "phthalazine",
+        "Cc1ncnc2ccccc12": "4-methylquinazoline",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_retained_fused_graph_template_rejects_incomplete_locant_maps():
+    row = _naphthalene_graph_template_row()
+    row["template"]["atoms"] = row["template"]["atoms"][:-1]
+
+    with pytest.raises(ValueError, match="atom locants do not match"):
+        retained_fused_template_from_data(row)
 
 
 def test_tetrazole_substitution_keeps_retained_parent_attachment_explicit():
@@ -964,6 +3513,37 @@ def test_stereochemistry_audit_checks_bound_substituent_terms():
     assert "0 R/S descriptors for 1 stereo atoms" in audit.issues[0]
 
 
+def test_unassigned_ring_stereo_tags_are_preserved_as_raw_metadata():
+    mol = read_smiles("C[C@H]1CC[C@@H](N)CC1")
+
+    raw_atoms = {atom.idx: atom.raw_stereo for atom in mol if atom.raw_stereo}
+
+    assert raw_atoms == {1: "CW", 4: "CW"}
+    assert all(mol.atoms[idx].stereo is None for idx in raw_atoms)
+
+
+def test_relative_ring_stereo_is_rendered_as_cis_trans_parent():
+    assert name_smiles("C[C@H]1CC[C@@H](N)CC1") == "cis-4-methylcyclohexanamine"
+    assert name_smiles("C[C@H]1CC[C@H](N)CC1") == "trans-4-methylcyclohexanamine"
+
+
+def test_relative_ring_stereo_is_rendered_inside_substituent():
+    assert name_smiles("CC(=O)N[C@H]1CC[C@@H](C)CC1") == "N-(cis-4-methylcyclohexyl)acetamide"
+
+
+def test_scoped_small_ring_stereo_does_not_emit_unsupported_relative_locant_descriptors():
+    name = name_smiles("CN1CCC[C@](O)(CC(=O)N[C@]2(C)C[C@H](NC(=O)CCC3CC3)C2)C1")
+
+    assert name == (
+        "3-cyclopropyl-N-(3-(((3S)-3-hydroxy-1-methylpiperidin-3-yl)methylcarbonylamino)-3-methylcyclobutyl)propanamide"
+    )
+    assert "1R,3s" not in name
+
+
+def test_dense_polycyclic_cage_fails_closed_without_von_baeyer_path_explosion():
+    assert name_smiles("C1C2CC34CC5CC67CC8CC9%10CC%11CC1%12C9C(C2)(C36)C58C(C%11)(C%124)C%107") == ""
+
+
 @pytest.mark.xfail(
     reason=(
         "Output depends on RDKit's aromaticity perception. On rdkit 2026.x "
@@ -1098,7 +3678,7 @@ def test_pyopsin_regression_names_preserve_positive_nitrogen_charge():
         "C[NH+](C)C(C#C)C([O-])=O": "2-(dimethylammonio)but-3-ynoate",
         "[O-]C(=O)C1[NH2+]CC2CC12": "3-azoniabicyclo[3.1.0]hexane-2-carboxylate",
         "CC(C)(C)/C=C/C(=O)N1CCC[C@@H]2[C@H]1C[NH2+]C2": "(2E)-1-((1S,6S)-2,8-diazabicyclo[4.3.0]nonan-8-ium-2-yl)-4,4-dimethylpent-2-en-1-one",
-        "C[C@H]1C[NH+](CCN1c2[nH]c3ccccc3n2)C": "2-((2S)-2,4-dimethylpiperazin-4-ium-1-yl)-3H-benzimidazole",
+        "C[C@H]1C[NH+](CCN1c2[nH]c3ccccc3n2)C": "2-((2S)-2,4-dimethylpiperazin-4-ium-1-yl)-1H-benzimidazole",
         "Cc1cn2c(cccc2[nH+]1)c3cccc(c3F)C[NH+]4CCCCC4": "2-(2-fluoro-3-(piperidinium-1-ylmethyl)phenyl)-8-methyl-1,7-diazabicyclo[4.3.0]nona-2,4,6,8-tetraen-7-ium",
         "Cc1cn2c(cccc2[nH+]1)c3ccc(cc3F)N4CCCCC4": "2-(2-fluoro-4-(piperidin-1-yl)phenyl)-8-methyl-1,7-diazabicyclo[4.3.0]nona-2,4,6,8-tetraen-7-ium",
         "C[C@@H]1CC[C@H](C[NH2+]1)N2C[C@@H](C[C@H]2C)F": "(2R,5R)-5-((2R,4R)-4-fluoro-2-methylpyrrolidin-1-yl)-2-methylpiperidinium",
@@ -1544,6 +4124,7 @@ def test_pyopsin_regression_names_keep_formate_esters_principal():
     cases = {
         "O=COCC#N": "2-nitriloethyl formate",
         "O=COCCC#N": "3-nitrilopropyl formate",
+        "NC(=[NH2+])[C-](OC=O)C#N": "1-amino-1-iminio-3-nitrilopropan-2-ide-2-yl formate",
     }
 
     for smiles, expected in cases.items():
@@ -1667,6 +4248,28 @@ def test_ring_parent_nitrogen_zwitterion_stack_is_graph_gated_not_name_literal()
     assert updated == "1,2,8-triazatricyclo[4.3.0.0]nona-1,3,5,7-tetraen-1-ide-2-ium"
 
 
+def test_ring_parent_nitrogen_zwitterion_stack_handles_cumulative_charge_sites():
+    mol = Molecule()
+    for idx, charge in enumerate((-1, 1, 0, -1, 1, 0)):
+        mol.add_atom("N" if idx in {0, 1, 3, 4} else "C", idx=idx, charge=charge)
+    for idx, (first, second, order) in enumerate(
+        [(0, 1, 2), (1, 2, 1), (2, 3, 2), (3, 4, 1), (4, 5, 2), (5, 0, 1)],
+        start=1,
+    ):
+        mol.add_bond(first, second, order=order, idx=idx)
+    numbered_path = [0, 1, 2, 3, 4, 5]
+    locants = {atom_idx: str(idx + 1) for idx, atom_idx in enumerate(numbered_path)}
+
+    updated = apply_ring_parent_nitrogen_zwitterion_stack(
+        "1,2,4,5-tetrazacyclohexa-1,3,5-trien-2,5-ium",
+        mol,
+        numbered_path,
+        lambda atom_idx: locants[atom_idx],
+    )
+
+    assert updated == "1,2,4,5-tetrazacyclohexa-1,3,5-trien-1,4-ide-2,5-ium"
+
+
 def test_ring_parent_nitrogen_zwitterion_stack_rejects_acyclic_ium_names():
     mol = read_smiles("[NH+]=C[N-]")
     numbered_path = [0, 1, 2]
@@ -1685,8 +4288,8 @@ def test_connection_boundary_regression_names_keep_unambiguous_attachment():
     cases = {
         "CCN([C@H](C)CO)S(=O)(=O)c1ccccc1": "(2R)-2-(N-ethylbenzenesulfonamido)propan-1-ol",
         "Cc1[nH+]c(cn1Cc2cc(cnc2)F)C(=O)OC": "methyl 1-((5-fluoropyridin-3-yl)methyl)-2-methyl-imidazol-3-ium-4-carboxylate",
-        "COc1c(cccc1)C2(CC2)C(=O)O[C@H]3C[C@H](C3)c4ccccc4": "3-phenylcyclobutyl 1-(2-methoxyphenyl)cyclopropanecarboxylate",
-        "CO[C@H]1C[C@H](C1)OC(=O)c2n(ncc2)C(F)F": "3-methoxycyclobutyl 1-(difluoromethyl)-1H-pyrazole-5-carboxylate",
+        "COc1c(cccc1)C2(CC2)C(=O)O[C@H]3C[C@H](C3)c4ccccc4": "trans-3-phenylcyclobutyl 1-(2-methoxyphenyl)cyclopropanecarboxylate",
+        "CO[C@H]1C[C@H](C1)OC(=O)c2n(ncc2)C(F)F": "trans-3-methoxycyclobutyl 1-(difluoromethyl)-1H-pyrazole-5-carboxylate",
     }
 
     for smiles, expected in cases.items():
@@ -1722,6 +4325,306 @@ def test_von_baeyer_polycycle_keeps_descriptor_source_numbering():
         "C1C2C1C13COC21CO3": "7,9-dioxatetracyclo[3.2.2.0^{1,5}.0^{2,4}]nonane",
         "C1NC23COC12C=CC3": "9-oxa-7-azatricyclo[3.2.2.0^{1,5}]non-3-ene",
         "C1NC23COC12COC3": "3,9-dioxa-7-azatricyclo[3.2.2.0^{1,5}]nonane",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_von_baeyer_candidate_search_builds_graph_ranked_descriptor():
+    mol = Molecule()
+    for idx in range(1, 8):
+        mol.add_atom("C", idx=idx)
+    edges = {
+        (1, 2),
+        (2, 3),
+        (3, 4),
+        (4, 5),
+        (5, 6),
+        (6, 1),
+        (1, 7),
+        (7, 4),
+        (2, 6),
+    }
+    for idx, (first, second) in enumerate(sorted(edges), start=1):
+        mol.add_bond(first, second, order=1, idx=idx)
+
+    candidates = find_von_baeyer_candidates(mol, set(range(1, 8)), edges)
+
+    assert candidates
+    assert candidates[0].descriptor == "tricyclo[2.2.1.0^{2,6}]"
+    assert candidates[0].numbering.audit_ok
+    assert candidates[0].numbering.atom_to_locant[2] == 2
+    assert candidates[0].numbering.atom_to_locant[6] == 6
+
+
+def test_von_baeyer_audit_accepts_high_cycle_count_prefixes():
+    descriptor = "heptacyclo[2.2.1.0^{2,6}.0^{2,7}.0^{3,5}.0^{3,7}.0^{5,7}]"
+    path = tuple(range(1, 8))
+    base_edges = {
+        (1, 2),
+        (2, 3),
+        (3, 4),
+        (4, 5),
+        (5, 6),
+        (1, 6),
+        (1, 7),
+        (4, 7),
+    }
+    extra_edges = {(2, 6), (2, 7), (3, 5), (3, 7), (5, 7)}
+
+    audit = audit_von_baeyer_descriptor(descriptor, path, base_edges | extra_edges)
+
+    assert audit.audit_ok
+
+
+def test_von_baeyer_candidate_search_can_render_heptacyclo_candidate():
+    mol = Molecule()
+    for idx in range(1, 8):
+        mol.add_atom("C", idx=idx)
+    edges = {
+        (1, 2),
+        (2, 3),
+        (3, 4),
+        (4, 5),
+        (5, 6),
+        (1, 6),
+        (1, 7),
+        (4, 7),
+        (2, 6),
+        (2, 7),
+        (3, 5),
+        (3, 7),
+        (5, 7),
+    }
+    for idx, (first, second) in enumerate(sorted(edges), start=1):
+        mol.add_bond(first, second, order=1, idx=idx)
+
+    candidates = find_von_baeyer_candidates(mol, set(range(1, 8)), edges)
+
+    assert candidates
+    assert candidates[0].descriptor.startswith("heptacyclo[")
+    assert candidates[0].numbering.audit_ok
+
+
+def test_von_baeyer_secondary_bridge_classifier_keeps_dependent_bridges_after_independent_bridges():
+    atom_set = frozenset(range(1, 10))
+    edge_set = frozenset(
+        {
+            (1, 2),
+            (2, 3),
+            (3, 4),
+            (4, 5),
+            (5, 6),
+            (6, 1),
+            (1, 7),
+            (7, 4),
+            (2, 8),
+            (8, 9),
+            (6, 9),
+            (4, 8),
+        }
+    )
+    primary_atoms = {1, 2, 3, 4, 5, 6, 7}
+    primary_edges = {
+        (1, 2),
+        (2, 3),
+        (3, 4),
+        (4, 5),
+        (5, 6),
+        (6, 1),
+        (1, 7),
+        (7, 4),
+    }
+
+    bridges = _classify_secondary_bridges(
+        atom_set=atom_set,
+        edge_set=edge_set,
+        primary_atoms=primary_atoms,
+        remaining_edges=frozenset(edge_set - primary_edges),
+    )
+
+    assert bridges is not None
+    assert [(bridge.length, bridge.dependent) for bridge in bridges] == [(2, False), (0, True)]
+
+
+def test_polycycle_without_descriptor_fails_closed():
+    parts = AssemblyParts(parent_length=6, is_polycycle=True)
+
+    with pytest.raises(ValueError, match="polycyclic parent has no audited descriptor"):
+        assemble_name(parts)
+
+
+def test_von_baeyer_descriptor_audit_reconstructs_source_edges():
+    mol = read_smiles("C1C2C1C13COC21CO3")
+    ring = next(system for system in find_ring_systems(mol, set()) if system.polycycle_descriptor)
+    audit = audit_von_baeyer_descriptor(
+        ring.polycycle_descriptor,
+        ring.paths[0],
+        {(a, b) for a in ring.atoms for b in mol.get_neighbors(a) if b in ring.atoms and a < b},
+    )
+
+    assert audit.audit_ok
+    assert ring.ring_parent is not None
+    assert ring.ring_parent.numbering_candidates
+    assert ring.ring_parent.audit_ok
+
+
+def test_von_baeyer_descriptor_audit_rejects_wrong_locants():
+    mol = read_smiles("C1C2C1C13COC21CO3")
+    ring = next(system for system in find_ring_systems(mol, set()) if system.polycycle_descriptor)
+    bad_descriptor = ring.polycycle_descriptor.replace("0^{1,5}", "0^{1,4}")
+    audit = audit_von_baeyer_descriptor(
+        bad_descriptor,
+        ring.paths[0],
+        {(a, b) for a in ring.atoms for b in mol.get_neighbors(a) if b in ring.atoms and a < b},
+    )
+
+    assert not audit.audit_ok
+
+
+def test_von_baeyer_ring_parent_requires_audited_numbering_candidates():
+    with pytest.raises(ValueError, match="requires audited numbering"):
+        RingParent.from_paths(
+            kind="polycycle",
+            atoms={0, 1, 2},
+            descriptor="tricyclo[1.1.0.0^{1,3}]butane",
+            paths=[[0, 1, 2]],
+        )
+
+
+def test_parent_pipeline_uses_audited_von_baeyer_locant_maps():
+    mol = read_smiles("C1C2C1C13COC21CO3")
+    ring = next(system for system in find_ring_systems(mol, set()) if system.polycycle_descriptor)
+    selection = ParentSelection(
+        paths=ring.paths,
+        is_ring=True,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=True,
+        xyz=(0, 0, 0),
+        polycycle_descriptor=ring.polycycle_descriptor,
+        ring_parent=ring.ring_parent,
+    )
+
+    plan = build_parent_assembly_plan(mol, selection, NamingIntent.component([]), {}, None, None)
+
+    assert ring.ring_parent is not None
+    assert ring.ring_parent.selected_numbering is not None
+    assert plan.locant_map in [numbering.locant_map for numbering in ring.ring_parent.numbering_candidates]
+    assert plan.parts.parent_atom_ids_by_locant["1"] == next(
+        atom for atom, locant in plan.locant_map.items() if locant == "1"
+    )
+
+
+def test_high_risk_polycycle_audit_fails_closed_without_proof_candidate():
+    result = NamingEngine().run(NamingRequest(smiles="C1Oc2c3c(c(c4c2C4)O1)C3"))
+
+    assert result.name == ""
+    assert result.error is not None
+
+    mol = read_smiles("C1Oc2c3c(c(c4c2C4)O1)C3")
+    rings = [system for system in find_ring_systems(mol, set()) if system.is_polycycle]
+    assert rings
+    assert not any(ring.polycycle_descriptor for ring in rings)
+
+
+def test_charge_separated_sulfonium_ylide_requires_single_bond():
+    assert name_smiles("C[S+](C)[CH-]C") == "1-(dimethylsulfaniumyl)ethan-1-ide"
+    assert name_smiles("C[SH+](C)=[C-]c1ccccc1") == "((dimethyl-lambda^4-sulfanylidene)methyl)benzene"
+
+
+def test_sulfur_ylide_resonance_compare_accepts_lambda_fallback_graph():
+    assert equivalent_smiles("C[SH+](C)=[C-]c1ccccc1", "CS(C)=CC1=CC=CC=C1")
+    assert equivalent_smiles("C[S+](C)[CH-]C", "CS(C)=CC")
+    assert not equivalent_smiles("C[S+](C)[CH-]C", "CCSC")
+
+
+def test_charge_separated_diazo_hypervalent_ring_templates_do_not_use_imino_aminium():
+    assert name_smiles("[N-]=[N+]=P1=CC=CC=C1") == "1-diazo-1lambda^5-phosphacyclohexa-1,3,5-triene"
+    assert name_smiles("[N-]=[N+]=[Se]1C=CN=C1") == "1-diazo-3-aza-1lambda^4-selenacyclopenta-2,4-diene"
+    assert name_smiles("[N-]=[N+]=S1C=CC1") == "1-diazo-1lambda^4-thiacyclobut-2-ene"
+
+
+def test_terminal_chalcogen_imides_render_as_imino_prefixes():
+    assert name_smiles("N=S1C=CC1") == "1-imino-1lambda^4-thiacyclobut-2-ene"
+    assert name_smiles("N=[Se]1C=CC=C1") == "1-imino-1lambda^4-selenacyclopenta-2,4-diene"
+
+
+def test_sulfur_imide_substituents_preserve_double_bonded_nitrogen():
+    assert name_smiles("N=S(Cl)CF") == "((chloro)(imino)sulfanyl)fluoromethane"
+    assert name_smiles("CSC(=O)S(C)=N") == "1-((imino)(methyl)sulfanyl)-1-(methylsulfanyl)methanone"
+
+
+def test_sulfonimidoyl_substituents_keep_imino_n_ligand():
+    assert name_smiles("CC(C)N=S(C)(=O)c1ccc(N)cc1") == "4-(N-propan-2-yl-S-methylsulfonimidoyl)benzen-1-amine"
+    assert name_smiles("CN=S(=O)(CC(C)N)NOC") == "1-(N-methyl-S-methoxyaminosulfonimidoyl)propan-2-amine"
+
+
+def test_cyclic_sulfur_imide_substituent_keeps_ring_ligand_together():
+    assert name_smiles("CC(C)(C)OC(=O)N=S1(=O)CCC1") == "tert-butyl ((1-oxo-1lambda^6-thietan-1-ylidene)amino)formate"
+
+
+def test_terminal_s_minus_uses_thiolate_role():
+    assert name_smiles("[S-][n+]1ccc(-c2ccncc2)cc1") == "4-(pyridin-4-yl)pyridin-1-ium-1-thiolate"
+
+
+def test_terminal_selenium_anion_substituent_preserves_charge():
+    assert name_smiles("[Se-]C1=CC2(C=CN1)CC[NH2+]CC2") == "2-selenido-3,9-diazaspiro[5.5]undeca-1,4-dien-9-ium"
+
+
+def test_charge_separated_terminal_n3_renders_as_azido_role():
+    cases = {
+        "C=CC(=O)NN=[N+]=[N-]": "N-azidoprop-2-enamide",
+        "[N-]=[N+]=Nn1cncn1": "1-azido-1H-1,2,4-triazole",
+        "CCP(CC)(CC)(CC)N=[N+]=[N-]": "1-((azido)triethylphosphanyl)ethane",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_azine_retained_and_simple_ring_sides_are_graph_bound():
+    assert (
+        name_smiles("C1=CC(C=NN=C2SCCS2)C=C1")
+        == "cyclopenta-2,4-dien-1-carbaldehyde 1,3-dithiacyclopentan-2-ylidenehydrazone"
+    )
+
+
+def test_charged_sulfur_substituent_preserves_sulfanium_center():
+    assert name_smiles("C[SH+]C(C)C(=O)[O-]") == "2-(methylsulfaniumyl)propanoate"
+
+
+def test_positive_oxygen_parent_charge_uses_ium_suffix():
+    cases = {
+        "[O-]c1c[o+]co1": "1,3-dioxacyclopenta-1,4-dien-1-ium-4-olate",
+        "[O-][o+]1ccc(=S)c2ccccc21": "2-oxido-5-thioxo-2-oxabicyclo[4.4.0]deca-1(10),3,6,8-tetraen-2-ium",
+    }
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_n_hydroxyurea_roles_avoid_carbamic_acid_fallback():
+    cases = {
+        "O=C(NO)NC1CCCCCCC1": "N-cyclooctyl-N'-hydroxyurea",
+        "CCN(O)C(=O)NC1CCCCC1": "N-cyclohexyl-N'-ethyl-N'-hydroxyurea",
+        "CC(C)(C)CCNC(=O)NO": "N-(3,3-dimethylbutyl)-N'-hydroxyurea",
+        "CC(C)(C)CNC(=O)NO": "N-(2,2-dimethylpropyl)-N'-hydroxyurea",
+    }
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_simple_rooted_carbanion_substituent_preserves_charge():
+    assert name_smiles("CC[CH-][n+]1cccc(C)c1") == "1-ethylmethanidyl-3-methylpyridin-1-ium"
+
+
+def test_cyclic_peroxy_esters_render_as_oxo_dioxacycles():
+    cases = {
+        "O=C1OOCCCCC1C1CCCCCCC1": "4-cyclooctyl-1,2-dioxacyclooctan-3-one",
+        "O=C1CCCCCCC(=O)OOCC1": "1,2-dioxacyclododecane-3,10-dione",
+        "Cc1ccc2c(c1)C=CC(=O)OO2": "9-methyl-2,3-dioxabicyclo[5.4.0]undeca-1(7),5,8,10-tetraen-4-one",
+        "CC(C)=CCC/C(C)=C1\\OOC1=O": "(4Z)-4-(6-methylhept-5-en-2-ylidene)-1,2-dioxacyclobutan-3-one",
     }
 
     for smiles, expected in cases.items():
