@@ -147,11 +147,21 @@ def main():
 
     ds = load_dataset(
         "yairschiff/qm9",
-        split="train",
+        split=None,
     )
+    if isinstance(ds, dict):
+        ds = ds.values()
+        ds = ds[0] if isinstance(ds, list) else list(ds)[0]
 
-    # all_smiles = ds["smiles"]
-    dataset = list(ds["smiles"])
+    if "SMILES" in ds.column_names:
+        smiles_col = "SMILES"
+    elif "smiles" in ds.column_names:
+        smiles_col = "smiles"
+    else:
+        smiles_col = ds.column_names[0]
+
+
+    dataset = list([smiles_col])
 
     print("Converting SMILES to IUPAC names...")
 

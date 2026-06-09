@@ -11,9 +11,9 @@ import pandas as pd
 import py2opsin
 from datasets import load_dataset
 from tqdm import tqdm
-from bluenamer.utils import standardize_mol
 
 from bluenamer.namer import name_smiles
+from bluenamer.utils import standardize_mol
 
 # --- Configuration ---
 N_TEST = 100_000
