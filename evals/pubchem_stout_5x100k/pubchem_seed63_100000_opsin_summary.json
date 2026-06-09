@@ -1,0 +1,14 @@
+{
+  "rows": 100000,
+  "original_valid": 100000,
+  "opsin_nonempty": 83147,
+  "opsin_valid": 83136,
+  "matches": 42120,
+  "failures": 57880,
+  "accuracy": 42.120000000000005,
+  "elapsed_seconds": 16.571019630879164,
+  "rows_per_second": 6034.631677923767,
+  "workers": 8,
+  "chunk_size": 2000,
+  "failures_csv": "evals/pubchem_stout_5x100k/pubchem_seed63_100000_stout_opsin_failures.csv"
+}
