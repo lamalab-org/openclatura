@@ -72,12 +72,11 @@ class NamingRequest:
 class NamingResult:
     """Named molecule plus optional explainability and verification data.
 
-    Backwards compatible with the previous shape: ``name``,
-    ``trace_segments``, ``decisions`` and ``analysis`` are preserved.
-    Adds ``smiles`` (the input that produced this result), ``error``
-    (populated when naming itself raised), ``rules_hit`` /
-    ``rule_hints`` (extracted from the trace) and ``opsin_check`` (only
-    when verification was requested).
+    Ergonomics:
+
+    - ``str(result)`` → the generated name (empty string on failure).
+    - ``bool(result)`` → ``result.ok``.
+    - ``result.to_dict()`` → JSON-friendly dict, ready for dataset rows.
     """
 
     name: str
@@ -101,6 +100,32 @@ class NamingResult:
         """``True`` when an OPSIN round-trip was requested and matched."""
 
         return self.opsin_check is not None and self.opsin_check.ok
+
+    def __str__(self) -> str:
+        return self.name
+
+    def __bool__(self) -> bool:
+        return self.ok
+
+    def __repr__(self) -> str:
+        return f"NamingResult(name={self.name!r}, smiles={self.smiles!r}, ok={self.ok})"
+
+    def to_dict(self, *, include_trace: bool = False) -> dict:
+        """JSON-friendly dict view. Pass ``include_trace=True`` to keep the raw trace."""
+
+        payload: dict = {
+            "smiles": self.smiles,
+            "name": self.name,
+            "ok": self.ok,
+            "error": self.error,
+            "rules_hit": list(self.rules_hit),
+            "rule_hints": list(self.rule_hints),
+        }
+        if include_trace:
+            payload["trace_segments"] = self.trace_segments
+        if self.opsin_check is not None:
+            payload["opsin_check"] = self.opsin_check.to_dict()
+        return payload
 
 
 class NamingEngine:

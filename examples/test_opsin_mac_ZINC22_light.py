@@ -12,7 +12,7 @@ import py2opsin
 from datasets import load_dataset
 from huggingface_hub import list_repo_files
 from tqdm import tqdm
-from utils import standardize_mol
+from bluenamer.utils import standardize_mol
 
 from bluenamer.namer import name_smiles
 

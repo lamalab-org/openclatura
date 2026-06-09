@@ -52,6 +52,9 @@ dev = [
     "ruff==0.15.15",
     "pre-commit>=3.5",
     "py2opsin>=1.2",
+    "fastapi>=0.110",
+    "httpx>=0.27",
+    "pydantic>=2.5",
 ]
 
 [project.urls]
@@ -65,11 +68,6 @@ bluenamer = "bluenamer.cli:main"
 [tool.hatch.build.targets.wheel]
 packages = ["src/bluenamer"]
 
-[tool.hatch.build.targets.wheel.sources]
-"src" = ""
-
-[tool.hatch.build.targets.wheel.force-include]
-"src/bluenamer/data" = "bluenamer/data"
 
 [tool.ruff]
 target-version = "py310"
@@ -98,7 +96,11 @@ line-ending = "auto"
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-testpaths = ["tests", "src/bluenamer/tests", "src/bluenamer/tests_roundtrip"]
+testpaths = [
+    "tests",
+    "src/bluenamer/tests",
+    "src/bluenamer/tests_roundtrip",
+]
 addopts = [
     "-ra",
     "--strict-markers",
@@ -108,6 +110,7 @@ markers = [
     "opsin: requires py2opsin and Java",
     "dataset: requires the [datasets] extra and network access",
     "fuzz: hypothesis-based fuzz tests",
+    "golden: strict golden-output regression test; run via the rdkit-compat job",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",

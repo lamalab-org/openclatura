@@ -2,6 +2,7 @@
 
 from collections.abc import Iterable
 
+from .describer import Description, DescriptionFacts, describe
 from .engine import DEFAULT_NAMING_ENGINE, NamingEngine, NamingRequest, NamingResult
 from .functional_groups import register_group_detector
 from .molecule import (
@@ -18,7 +19,7 @@ from .molecule import (
 from .namer import analyze_smiles, name_smiles, name_smiles_with_trace
 from .naming_context import NamingIntent
 from .nomenclature import RULES, registry
-from .opsin_verify import OpsinCheck, OpsinStatus, verify_with_opsin
+from .opsin_verify import OpsinCheck, OpsinStatus, opsin_available, verify_with_opsin
 
 
 def name(
@@ -68,6 +69,8 @@ __all__ = [
     "AtomBinding",
     "BondBinding",
     "DecisionTrace",
+    "Description",
+    "DescriptionFacts",
     "FunctionalGroupMetadata",
     "NameAnalysis",
     "NamingEngine",
@@ -83,10 +86,12 @@ __all__ = [
     "TraceStep",
     "__version__",
     "analyze_smiles",
+    "describe",
     "name",
     "name_many",
     "name_smiles",
     "name_smiles_with_trace",
+    "opsin_available",
     "register_group_detector",
     "registry",
     "verify_with_opsin",

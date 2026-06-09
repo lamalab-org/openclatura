@@ -85,6 +85,32 @@ for step in analysis.decisions:
     print(step.phase, step.decision, step.reason)
 ```
 
+### Natural-language description (`describe`)
+
+`bluenamer.describe(smiles)` emits structure-driven, reconstructable
+prose about the molecule: the parent skeleton, heteroatoms, unsaturation,
+stereochemistry, substituents, and connectivity for atom-by-atom
+rebuilding. Useful for explainability views and for generating
+(SMILES, name, description) training tuples:
+
+```python
+from bluenamer import describe
+
+d = describe("CCO")
+print(d)
+# The molecule is built around a 2-atom carbon chain. Within that parent
+# framework, all parent-chain bonds are single. Attached to the parent is
+# a hydroxy group at position 1. For reconstruction, number the parent
+# as follows: 1-2 single.
+
+d.facts[0].parent_summary       # 'a 2-atom carbon chain'
+d.facts[0].substituents         # ('a hydroxy group at position 1',)
+d.facts[0].connectivity         # ('1-2 single',)
+d.name                          # 'ethanol'  (handy, from the namer)
+```
+
+Same input → same output. No LLM in the loop.
+
 ### CLI
 
 ```bash
@@ -104,7 +130,10 @@ pip install -e ".[dev]"
 pytest
 
 # run only fast tests
-pytest -m "not slow and not dataset"
+pytest -m "not slow and not dataset and not golden"
+
+# strict RDKit-version regression suite (also runs in the rdkit-compat CI job)
+pytest -m golden
 
 # lint and format
 ruff check --fix src/bluenamer
@@ -112,6 +141,36 @@ ruff format src/bluenamer
 ```
 
 Java is required for the OPSIN-based round-trip checks (see `py2opsin`).
+
+## HTTP service (Docker)
+
+The `[web]` extra ships a FastAPI app with `name`, `batch`, `describe`
+and `healthz` endpoints. The bundled `Dockerfile` includes a headless JRE
+so `verify_opsin=True` works out of the box.
+
+```bash
+# build + run
+docker build -t bluenamer:local .
+docker run --rm -p 8000:8000 bluenamer:local
+
+# or via compose
+docker compose -f docker/compose.yaml up --build
+```
+
+Call the API:
+
+```bash
+curl -X POST localhost:8000/name -H 'content-type: application/json' \
+     -d '{"smiles":"CC(=O)Nc1ccccc1","include_trace":true,"verify_opsin":true}'
+
+curl -X POST localhost:8000/batch -H 'content-type: application/json' \
+     -d '{"smiles":["CCO","c1ccccc1","CC(=O)O"],"processes":1}'
+
+curl -X POST localhost:8000/describe -H 'content-type: application/json' \
+     -d '{"smiles":"CC(=O)Nc1ccccc1"}'
+```
+
+OpenAPI docs are served at `http://localhost:8000/docs`.
 
 ## Debugging
 
