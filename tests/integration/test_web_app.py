@@ -62,8 +62,9 @@ def test_describe_endpoint(client):
     assert r.status_code == 200
     body = r.json()
     assert body["name"] == "ethanol"
-    assert isinstance(body["paragraphs"], list)
-    assert body["paragraphs"]
+    assert "carbon chain" in body["text"]
+    assert isinstance(body["facts"], list)
+    assert body["facts"][0]["parent_summary"]
 
 
 def test_name_endpoint_validates_payload(client):

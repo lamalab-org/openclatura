@@ -87,18 +87,26 @@ for step in analysis.decisions:
 
 ### Natural-language description (`describe`)
 
-`bluenamer.describe(smiles)` walks the same trace and renders a
-deterministic, multi-paragraph explanation of how the name is built.
-Useful for explainability views and for generating (SMILES, name,
-description) training tuples:
+`bluenamer.describe(smiles)` emits structure-driven, reconstructable
+prose about the molecule: the parent skeleton, heteroatoms, unsaturation,
+stereochemistry, substituents, and connectivity for atom-by-atom
+rebuilding. Useful for explainability views and for generating
+(SMILES, name, description) training tuples:
 
 ```python
 from bluenamer import describe
 
-d = describe("CC(=O)Nc1ccccc1")
-print(d)            # multi-paragraph prose
-d.rules_hit         # ('P-44', 'P-45', 'P-41', 'P-61', 'P-67')
-d.components[0]     # DescribedComponent(phase='parse', text='RDKit parsed ...')
+d = describe("CCO")
+print(d)
+# The molecule is built around a 2-atom carbon chain. Within that parent
+# framework, all parent-chain bonds are single. Attached to the parent is
+# a hydroxy group at position 1. For reconstruction, number the parent
+# as follows: 1-2 single.
+
+d.facts[0].parent_summary       # 'a 2-atom carbon chain'
+d.facts[0].substituents         # ('a hydroxy group at position 1',)
+d.facts[0].connectivity         # ('1-2 single',)
+d.name                          # 'ethanol'  (handy, from the namer)
 ```
 
 Same input → same output. No LLM in the loop.
@@ -122,7 +130,10 @@ pip install -e ".[dev]"
 pytest
 
 # run only fast tests
-pytest -m "not slow and not dataset"
+pytest -m "not slow and not dataset and not golden"
+
+# strict RDKit-version regression suite (also runs in the rdkit-compat CI job)
+pytest -m golden
 
 # lint and format
 ruff check --fix src/bluenamer

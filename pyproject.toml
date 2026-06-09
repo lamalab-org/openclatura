@@ -110,6 +110,7 @@ markers = [
     "opsin: requires py2opsin and Java",
     "dataset: requires the [datasets] extra and network access",
     "fuzz: hypothesis-based fuzz tests",
+    "golden: strict golden-output regression test; run via the rdkit-compat job",
 ]
 filterwarnings = [
     "ignore::DeprecationWarning",
