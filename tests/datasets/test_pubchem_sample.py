@@ -1,15 +1,10 @@
-"""Opt-in PubChem sampling test.
+"""Opt-in PubChem sample test.
 
 Pulls a small random sample from ``jablonkagroup/pubchem-smiles-molecular-formula``
-on Hugging Face Datasets, runs the namer over it, and reports basic
-metrics. Marked ``dataset`` (and ``slow``) so it is excluded from the
-default pytest run.
+and reports naming + OPSIN match rates. Marked ``dataset``/``slow``;
+run with ``pytest -m dataset``.
 
-Run with::
-
-    pytest -m dataset
-
-Requires the ``[datasets]`` extra and network access.
+Tunable via env: ``BLUENAMER_DATASET_SAMPLE_N``, ``BLUENAMER_DATASET_SEED``.
 """
 
 from __future__ import annotations
@@ -24,67 +19,45 @@ from bluenamer.opsin_verify import verify_with_opsin
 
 pytestmark = [pytest.mark.dataset, pytest.mark.slow]
 
-
-@pytest.fixture(scope="module")
-def datasets_module():
-    pytest.importorskip("datasets")
-    import datasets  # noqa: F401 — ensured importable
-
-    return datasets
+PUBCHEM_DATASET = "jablonkagroup/pubchem-smiles-molecular-formula"
 
 
 @pytest.fixture(scope="module")
-def pubchem_sample(datasets_module):
-    """Return ~200 SMILES sampled from the public PubChem mirror."""
-
+def pubchem_sample():
+    datasets = pytest.importorskip("datasets")
     n = int(os.environ.get("BLUENAMER_DATASET_SAMPLE_N", "200"))
     seed = int(os.environ.get("BLUENAMER_DATASET_SEED", "42"))
     try:
-        ds = datasets_module.load_dataset(
-            "jablonkagroup/pubchem-smiles-molecular-formula",
-            split="train",
-        )
+        ds = datasets.load_dataset(PUBCHEM_DATASET, split="train")
     except Exception as exc:  # pragma: no cover - network-dependent
-        pytest.skip(f"Could not load PubChem dataset: {exc}")
-    if len(ds) < n:
-        n = len(ds)
+        pytest.skip(f"Could not load {PUBCHEM_DATASET}: {exc}")
     random.seed(seed)
-    indices = random.sample(range(len(ds)), n)
+    indices = random.sample(range(len(ds)), min(n, len(ds)))
     return ds.select(indices)["smiles"]
 
 
 def test_pubchem_naming_rate(pubchem_sample, capsys):
     results = name_many(pubchem_sample, processes=1)
-    named = sum(1 for r in results if r.name)
-    errored = sum(1 for r in results if r.error)
+    named = sum(1 for r in results if r)
     total = len(results)
     with capsys.disabled():
-        print(f"\n[pubchem] sampled={total} named={named} errored={errored} " f"name_rate={named / total:.2%}")
-    # Defensive minimum: at least 10% must yield a name. Real numbers
-    # are much higher; the floor exists to flag total breakage.
-    assert named / total > 0.10, f"PubChem naming rate dropped below 10%: {named}/{total}"
+        print(f"\n[pubchem] sampled={total} named={named} rate={named / total:.2%}")
+    # PubChem is the headline coverage target; anything below 90% is a
+    # regression that needs investigation, not just a "rate drift".
+    assert named / total > 0.90, f"PubChem naming rate {named}/{total} = {named / total:.2%} below 90%"
 
 
 def test_pubchem_opsin_match_rate(pubchem_sample, capsys):
     results = name_many(pubchem_sample, processes=1)
-    matched = mismatched = unparseable = skipped = 0
+    counts: dict[str, int] = {}
     for r in results:
-        if not r.name:
+        if not r:
             continue
-        check = verify_with_opsin(r.name, r.smiles)
-        if check.status.startswith("skipped_"):
-            skipped += 1
-        elif check.status == "matched":
-            matched += 1
-        elif check.status == "mismatched":
-            mismatched += 1
-        elif check.status == "name_unparseable":
-            unparseable += 1
-    total = len(results)
-    if skipped == sum(1 for r in results if r.name):
+        status = verify_with_opsin(r.name, r.smiles).status
+        counts[status] = counts.get(status, 0) + 1
+
+    if counts.get("skipped_no_opsin") or counts.get("skipped_no_java"):
         pytest.skip("OPSIN / Java not available")
+
     with capsys.disabled():
-        print(
-            f"\n[pubchem] opsin: matched={matched} mismatched={mismatched} "
-            f"unparseable={unparseable} skipped={skipped}/{total}"
-        )
+        print(f"\n[pubchem] opsin: {counts}")

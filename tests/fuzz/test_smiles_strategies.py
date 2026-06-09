@@ -25,6 +25,9 @@ from rdkit import Chem
 
 from bluenamer import name as name_one
 from bluenamer import name_many
+from bluenamer.opsin_verify import opsin_available
+
+_OPSIN_AVAILABLE = opsin_available()
 
 
 def _rdkit_parses(smiles: str) -> bool:
@@ -170,3 +173,40 @@ def test_batch_preserves_order(smiles):
         return
     results = name_many(smiles, processes=1)
     assert [r.smiles for r in results] == smiles
+
+
+# OPSIN round-trip uses a JVM subprocess per call, so we run fewer examples
+# than the never-raise / determinism properties above.
+_ROUNDTRIP_SETTINGS = settings(
+    max_examples=40,
+    deadline=None,
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
+)
+
+
+@pytest.mark.fuzz
+@pytest.mark.opsin
+@pytest.mark.skipif(not _OPSIN_AVAILABLE, reason="py2opsin or Java unavailable")
+@_ROUNDTRIP_SETTINGS
+@given(smiles=smiles_grammar)
+def test_opsin_roundtrip_never_silently_mismatches(smiles):
+    """An OPSIN-parseable name must canonicalise back to the input SMILES.
+
+    We assert against ``status == "mismatched"`` only. The other
+    non-matched statuses are namer/coverage gaps (``name_unparseable``)
+    or unsuccessful namings (empty name) — those are acceptable
+    incompleteness. A *mismatched* round-trip is always a bug: it means
+    the engine produced a name OPSIN successfully parses to a *different*
+    molecule.
+    """
+
+    if not _rdkit_parses(smiles):
+        return
+    result = name_one(smiles, verify_opsin=True)
+    check = result.opsin_check
+    if check is None or not result.name:
+        return  # naming failed; out of scope for this invariant
+    assert check.status != "mismatched", (
+        f"name({smiles!r}) → {result.name!r} → OPSIN → {check.opsin_smiles!r}\n"
+        f"canonical: {check.canonical_original!r} vs {check.canonical_roundtrip!r}"
+    )

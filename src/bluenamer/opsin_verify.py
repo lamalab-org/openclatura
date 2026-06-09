@@ -86,6 +86,12 @@ def _java_available() -> bool:
     return True
 
 
+def opsin_available() -> bool:
+    """``True`` iff both ``py2opsin`` and a Java runtime are usable."""
+
+    return _try_import_py2opsin() is not None and _java_available()
+
+
 def _canonicalize(smiles: str) -> str | None:
     return canonical_smiles(smiles)
 
@@ -162,4 +168,4 @@ def verify_with_opsin(name: str, smiles: str, standardize_smiles: bool = True) -
     )
 
 
-__all__ = ["OpsinCheck", "OpsinStatus", "verify_with_opsin"]
+__all__ = ["OpsinCheck", "OpsinStatus", "opsin_available", "verify_with_opsin"]

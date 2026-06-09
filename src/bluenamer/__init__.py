@@ -19,7 +19,7 @@ from .molecule import (
 from .namer import analyze_smiles, name_smiles, name_smiles_with_trace
 from .naming_context import NamingIntent
 from .nomenclature import RULES, registry
-from .opsin_verify import OpsinCheck, OpsinStatus, verify_with_opsin
+from .opsin_verify import OpsinCheck, OpsinStatus, opsin_available, verify_with_opsin
 
 
 def name(
@@ -91,6 +91,7 @@ __all__ = [
     "name_many",
     "name_smiles",
     "name_smiles_with_trace",
+    "opsin_available",
     "register_group_detector",
     "registry",
     "verify_with_opsin",
