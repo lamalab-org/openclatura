@@ -106,10 +106,7 @@ def opsin_batch_with_fallback(names):
                 converted = [converted]
 
             if len(converted) != len(name_chunk):
-                raise ValueError(
-                    f"OPSIN returned {len(converted)} results for "
-                    f"{len(name_chunk)} names"
-                )
+                raise ValueError(f"OPSIN returned {len(converted)} results for {len(name_chunk)} names")
 
         except Exception:
             converted = [opsin_one(name) for name in name_chunk]

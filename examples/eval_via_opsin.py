@@ -61,4 +61,3 @@ matches = np.array([s == o and s is not None for s, o in zip(smiles_strings, ori
 accuracy = np.mean(matches)
 
 print(f"Accuracy: {accuracy:.2%}")
-

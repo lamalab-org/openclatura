@@ -115,7 +115,6 @@ def verify_with_opsin(name: str, smiles: str, standardize_smiles: bool = True) -
         return OpsinCheck(status="skipped_no_java", name=name)
 
     if standardize_smiles:
-
         canonical_original = standardize_mol(smiles)
     else:
         canonical_original = _canonicalize(smiles)
@@ -147,7 +146,9 @@ def verify_with_opsin(name: str, smiles: str, standardize_smiles: bool = True) -
             canonical_original=canonical_original,
             opsin_smiles=opsin_smiles,
             canonical_roundtrip=canonical_roundtrip,
-            error_message= "Failed to standardize SMILES for comparison." if standardize_smiles else "Failed to canonicalize SMILES for comparison.",
+            error_message="Failed to standardize SMILES for comparison."
+            if standardize_smiles
+            else "Failed to canonicalize SMILES for comparison.",
         )
 
     if equivalent_smiles(smiles, opsin_smiles):

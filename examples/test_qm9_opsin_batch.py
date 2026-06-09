@@ -160,7 +160,6 @@ def main():
     else:
         smiles_col = ds.column_names[0]
 
-
     dataset = list([smiles_col])
 
     print("Converting SMILES to IUPAC names...")
