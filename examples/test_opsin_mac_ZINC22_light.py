@@ -12,9 +12,9 @@ import py2opsin
 from datasets import load_dataset
 from huggingface_hub import list_repo_files
 from tqdm import tqdm
-from bluenamer.utils import standardize_mol
 
 from bluenamer.namer import name_smiles
+from bluenamer.utils import standardize_mol
 
 # --- Configuration ---
 N_TEST = 100_000

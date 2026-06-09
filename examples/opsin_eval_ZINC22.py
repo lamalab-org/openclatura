@@ -5,15 +5,15 @@ import random
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
-from huggingface_hub import HfApi, hf_hub_url
 
 import numpy as np
 import py2opsin
 from datasets import load_dataset
+from huggingface_hub import HfApi, hf_hub_url
 from tqdm import tqdm
-from bluenamer.utils import standardize_mol
 
 from bluenamer.namer import name_smiles
+from bluenamer.utils import standardize_mol
 
 # --- Configuration ---
 ZINC22_REPO_ID = "chandar-lab/ZINC_22"
@@ -94,8 +94,7 @@ def load_parquet_shard(parquet_path):
 
     if SMILES_COLUMN not in ds.column_names:
         raise RuntimeError(
-            f"Column {SMILES_COLUMN!r} not found in {parquet_path}. "
-            f"Available columns: {ds.column_names}"
+            f"Column {SMILES_COLUMN!r} not found in {parquet_path}. Available columns: {ds.column_names}"
         )
 
     return ds
@@ -133,15 +132,10 @@ def sample_zinc22_from_random_parquet_batches(parquet_files, seed):
     )
 
     for batch_start in range(0, len(shuffled_parquets), PARQUET_BATCH_SIZE):
-        batch = shuffled_parquets[
-            batch_start : batch_start + PARQUET_BATCH_SIZE
-        ]
+        batch = shuffled_parquets[batch_start : batch_start + PARQUET_BATCH_SIZE]
         parquet_batches_read += 1
 
-        print(
-            f"Seed {seed}: reading parquet batch {parquet_batches_read} "
-            f"with {len(batch)} shard(s)"
-        )
+        print(f"Seed {seed}: reading parquet batch {parquet_batches_read} with {len(batch)} shard(s)")
 
         for parquet_path in batch:
             if len(pool) >= target_pool_size:
@@ -276,10 +270,7 @@ def opsin_batch_with_fallback(names):
                 converted = [converted]
 
             if len(converted) != len(name_chunk):
-                raise ValueError(
-                    f"OPSIN returned {len(converted)} results for "
-                    f"{len(name_chunk)} names"
-                )
+                raise ValueError(f"OPSIN returned {len(converted)} results for {len(name_chunk)} names")
 
         except Exception:
             converted = [opsin_one(name) for name in name_chunk]
@@ -510,6 +501,7 @@ def main():
     print(f"Overall accuracy: {overall_accuracy:.2%}")
     print(f"Total failures: {len(all_failures):,}")
     print(f"Wrote results to: {OUT_DIR.resolve()}")
+
 
 if __name__ == "__main__":
     mp.freeze_support()

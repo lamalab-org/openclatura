@@ -92,7 +92,7 @@ def _cmd_describe(args: argparse.Namespace) -> int:
         sys.stdout.write("\n")
     else:
         sys.stdout.write(str(description) + "\n")
-    return 0 if description.text else 1
+    return 0 if description.name else 1
 
 
 def _build_parser() -> argparse.ArgumentParser:
