@@ -1,6 +1,7 @@
 # bluenamer/api.py
 
 import re
+from dataclasses import dataclass, field
 
 from .assembler import assemble_name_raw, post_process_name
 from .assembly_parts import AssemblyParts, SubstituentItem
@@ -12,7 +13,7 @@ from .formatting import format_counted_prefixes, format_multiplier, strip_outer_
 from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
-from .molecule import DecisionTrace, Molecule, NameAnalysis
+from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
 from .name_assembly import NameAssemblyResult, token_span_trace_data
 from .naming_context import NamingIntent
 from .nomenclature import RULES
@@ -49,9 +50,44 @@ from .trace_helpers import (
 from .trace_helpers import (
     bond_ids_within as _bond_ids_within,
 )
+from .trace_helpers import assembly_substituent_tree as _assembly_substituent_tree
+from .trace_helpers import decision_trace_data, trace_decision
 
 
-def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) -> str:
+@dataclass
+class DirectSubgraphPrefix:
+    """Structured result for a direct functional-prefix subgraph."""
+
+    name: str
+    group_key: str = ""
+    attachment_atom: int | None = None
+    group_atoms: set[int] = field(default_factory=set)
+    core_atoms: set[int] = field(default_factory=set)
+    group_bonds: set[int] = field(default_factory=set)
+    ligand_trees: list[dict] = field(default_factory=list)
+    ligand_trace_segments: list[dict] = field(default_factory=list)
+    ligand_decisions: list[dict] = field(default_factory=list)
+    source: str = "direct_subgraph_prefix"
+
+    def __bool__(self) -> bool:
+        return bool(self.name)
+
+    def trace_data(self) -> dict:
+        """Return JSON-safe metadata for decision traces and tree nodes."""
+
+        return {
+            "name": self.name,
+            "group_key": self.group_key,
+            "attachment_atom": self.attachment_atom,
+            "group_atoms": sorted(self.group_atoms),
+            "core_atoms": sorted(self.core_atoms),
+            "group_bonds": sorted(self.group_bonds),
+            "ligand_count": len(self.ligand_trees),
+            "source": self.source,
+        }
+
+
+def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) -> DirectSubgraphPrefix | None:
     """Return a direct functional-group prefix when the subgraph is one group.
 
     Blue Book references: P-63 through P-67 for direct detachable prefixes such
@@ -69,7 +105,7 @@ def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) 
             and all(other == start_idx for other in mol.get_neighbors(neighbor))
         ]
         if len(terminal_sulfurs) == 1 and component == {start_idx, terminal_sulfurs[0]}:
-            return "thioformyl"
+            return DirectSubgraphPrefix(name="thioformyl", core_atoms=set(component), source="structural_direct_prefix")
 
         triple_phosphorus = [
             neighbor
@@ -92,9 +128,17 @@ def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) 
                 and all(other == phosphorus for other in mol.get_neighbors(neighbor))
             ]
             if component == {start_idx, phosphorus}:
-                return "phosphanylidynemethyl"
+                return DirectSubgraphPrefix(
+                    name="phosphanylidynemethyl",
+                    core_atoms=set(component),
+                    source="structural_direct_prefix",
+                )
             if len(terminal_oxo) == 1 and component == {start_idx, phosphorus, terminal_oxo[0]}:
-                return "oxophosphanylidynemethyl"
+                return DirectSubgraphPrefix(
+                    name="oxophosphanylidynemethyl",
+                    core_atoms=set(component),
+                    source="structural_direct_prefix",
+                )
 
     for group in perceive_groups(mol):
         if start_idx in group.atoms_involved and group.atoms_involved.issubset(component):
@@ -104,16 +148,25 @@ def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) 
                     return substituted
             prefix = RULES.functional_groups.direct_subgraph_prefix_for(group.key)
             if prefix:
-                return prefix
-    return ""
+                return DirectSubgraphPrefix(
+                    name=prefix,
+                    group_key=group.key,
+                    attachment_atom=group.attachment_carbon,
+                    group_atoms=set(group.atom_ids),
+                    core_atoms=set(group.atoms_involved),
+                    group_bonds=set(group.bond_ids),
+                )
+    return None
 
 
-def _direct_amide_subgraph_prefix(mol: Molecule, group: PerceivedGroup, component: set[int]) -> str:
+def _direct_amide_subgraph_prefix(
+    mol: Molecule, group: PerceivedGroup, component: set[int]
+) -> DirectSubgraphPrefix | None:
     """Return substituted carbamoyl/carbamothioyl for direct amide subgraphs."""
 
     amide_n = amide_nitrogen(mol, group)
     if amide_n is None:
-        return ""
+        return None
     n_substituents = [
         n
         for n in mol.get_neighbors(amide_n)
@@ -121,24 +174,51 @@ def _direct_amide_subgraph_prefix(mol: Molecule, group: PerceivedGroup, componen
     ]
     base = RULES.functional_groups.prefix_for(group.key) or ""
     if not base:
-        return ""
+        return None
     if not n_substituents:
-        return base
+        return DirectSubgraphPrefix(
+            name=base,
+            group_key=group.key,
+            attachment_atom=group.attachment_carbon,
+            group_atoms=set(group.atom_ids),
+            core_atoms=set(group.atoms_involved),
+            group_bonds=set(group.bond_ids),
+        )
     outside_component = set(mol.atoms.keys()) - component
     branch_names = []
+    ligand_trees = []
+    ligand_trace_segments = []
+    ligand_decisions = []
     for n_sub in n_substituents:
-        branch = name_subgraph(
+        branch_decisions = DecisionTrace()
+        branch, branch_trace, branch_tree = name_subgraph(
             mol,
             n_sub,
             outside_component | set(group.atoms_involved) | {amide_n},
             upstream_atom=amide_n,
+            return_trace=True,
+            return_tree=True,
+            decision_trace=branch_decisions,
         )
         branch = strip_outer_parentheses(branch)
         if branch:
             branch_names.append(branch)
-    if not branch_names:
-        return base
-    return f"({format_counted_prefixes(branch_names)}{base})"
+            ligand_trace_segments.extend(branch_trace)
+            ligand_decisions.extend(decision_trace_data(branch_decisions))
+            if branch_tree:
+                ligand_trees.append(branch_tree)
+    name = base if not branch_names else f"({format_counted_prefixes(branch_names)}{base})"
+    return DirectSubgraphPrefix(
+        name=name,
+        group_key=group.key,
+        attachment_atom=group.attachment_carbon,
+        group_atoms=set(group.atom_ids),
+        core_atoms=set(group.atoms_involved),
+        group_bonds=set(group.bond_ids),
+        ligand_trees=ligand_trees,
+        ligand_trace_segments=ligand_trace_segments,
+        ligand_decisions=ligand_decisions,
+    )
 
 
 def _find_acyclic_subgraph_paths(
@@ -789,8 +869,15 @@ def _collect_subgraph_substituents(
 
         for n_idx in n_subs:
             if n_idx not in main_set and n_idx not in sub_handled_atoms and n_idx not in sub_exclude:
-                branch_name, branch_trace = name_subgraph(
-                    mol, n_idx, sub_exclude | main_set, upstream_atom=c_idx, return_trace=True
+                branch_decisions = DecisionTrace()
+                branch_name, branch_trace, branch_tree = name_subgraph(
+                    mol,
+                    n_idx,
+                    sub_exclude | main_set,
+                    upstream_atom=c_idx,
+                    return_trace=True,
+                    return_tree=True,
+                    decision_trace=branch_decisions,
                 )
                 if branch_name:
                     branch_exclude = sub_exclude | main_set
@@ -813,6 +900,8 @@ def _collect_subgraph_substituents(
                                 name_subgraph,
                             ),
                             trace_segments=branch_trace,
+                            nested_decisions=decision_trace_data(branch_decisions),
+                            substituent_tree=branch_tree,
                         )
                     )
 
@@ -837,7 +926,9 @@ def _add_subgraph_substituents(parts: AssemblyParts, subst_mapping: dict[int, li
                 item.bond_ids,
                 item.charge_atom_ids,
                 item.trace_segments,
+                item.nested_decisions,
                 item.emitted_tokens,
+                substituent_tree=item.substituent_tree,
                 spiro=item.spiro,
             )
 
@@ -990,6 +1081,8 @@ def name_subgraph(
     exclude_atoms: set[int],
     upstream_atom: int = None,
     return_trace: bool = False,
+    return_tree: bool = False,
+    decision_trace: DecisionTrace | None = None,
 ):
     """Name a recursive substituent subgraph attached to the current parent.
 
@@ -1000,21 +1093,97 @@ def name_subgraph(
 
     start_atom = mol.atoms[start_idx]
     cyclic_atoms_global = get_cyclic_atoms(mol, exclude_atoms)
+    component = _subgraph_component(mol, start_idx, exclude_atoms)
+    trace_decision(
+        decision_trace,
+        TracePhase.COMPONENT,
+        "selected substituent subgraph",
+        "Recursive branch naming starts from the atom attached to the parent and stops at the parent boundary.",
+        atoms=component,
+        bonds=_bond_ids_within(mol, component),
+        data={
+            "start_atom": start_idx,
+            "upstream_atom": upstream_atom,
+            "excluded_atom_count": len(exclude_atoms),
+        },
+    )
 
     if not start_atom.is_carbon and start_idx not in cyclic_atoms_global:
         name = name_heteroatom_subgraph(mol, start_idx, exclude_atoms, upstream_atom, name_subgraph)
         if name is not None:
-            return (name, []) if return_trace else name
+            trace_decision(
+                decision_trace,
+                TracePhase.ASSEMBLY,
+                "assembled heteroatom substituent shortcut",
+                "A terminal non-carbon branch was rendered by the heteroatom-subgraph renderer.",
+                atoms=component,
+                bonds=_bond_ids_within(mol, component),
+                data={"name": name},
+            )
+            tree = _shortcut_substituent_tree(name, component, mol, decision_trace)
+            if return_trace and return_tree:
+                return name, [], tree
+            if return_trace:
+                return name, []
+            if return_tree:
+                return name, tree
+            return name
 
-    component = _subgraph_component(mol, start_idx, exclude_atoms)
     direct_prefix = _direct_subgraph_prefix(mol, start_idx, component)
     if direct_prefix:
-        return (direct_prefix, []) if return_trace else direct_prefix
+        direct_prefix_name = direct_prefix.name
+        trace_decision(
+            decision_trace,
+            TracePhase.ASSEMBLY,
+            "assembled direct substituent prefix",
+            "The complete recursive component matches a direct functional-prefix role.",
+            atoms=component,
+            bonds=_bond_ids_within(mol, component),
+            data=direct_prefix.trace_data(),
+        )
+        tree = _shortcut_substituent_tree(direct_prefix_name, component, mol, decision_trace, direct_prefix)
+        if return_trace and return_tree:
+            return direct_prefix_name, [], tree
+        if return_trace:
+            return direct_prefix_name, []
+        if return_tree:
+            return direct_prefix_name, tree
+        return direct_prefix_name
 
     sub_exclude = set(mol.atoms.keys()) - component
     parent_selection = _select_subgraph_parent(mol, start_idx, component, sub_exclude)
     if parent_selection is None:
-        return ("", []) if return_trace else ""
+        trace_decision(
+            decision_trace,
+            TracePhase.PARENT_SELECTION,
+            "failed substituent parent selection",
+            "No chain or ring parent could be selected inside the recursive component.",
+            atoms=component,
+            bonds=_bond_ids_within(mol, component),
+        )
+        if return_trace and return_tree:
+            return "", [], None
+        if return_trace:
+            return "", []
+        if return_tree:
+            return "", None
+        return ""
+    trace_decision(
+        decision_trace,
+        TracePhase.PARENT_SELECTION,
+        "selected substituent parent skeleton",
+        "The recursive branch uses the same parent-candidate ranking as ordinary components, scoped to the branch graph.",
+        atoms=set(parent_selection.primary_path),
+        bonds=_bond_ids_within(mol, set(parent_selection.primary_path)),
+        data={
+            "primary_path": list(parent_selection.primary_path),
+            "is_ring": parent_selection.is_ring,
+            "is_bicycle": parent_selection.is_bicycle,
+            "is_spiro": parent_selection.is_spiro,
+            "is_polycycle": parent_selection.is_polycycle,
+            "fixed_start_required": parent_selection.fixed_start_required,
+        },
+    )
 
     retained_name_val, locant_maps = resolve_retained_parent(
         mol,
@@ -1040,6 +1209,19 @@ def name_subgraph(
     numbered_path = parent_plan.numbered_path
     get_loc = parent_plan.get_loc
     parts = parent_plan.parts
+    trace_decision(
+        decision_trace,
+        TracePhase.NUMBERING,
+        "selected substituent numbering",
+        "The branch parent numbering was selected before replacement, unsaturation, suffix, and substituent locants were emitted.",
+        atoms=set(numbered_path),
+        bonds=_bond_ids_within(mol, set(numbered_path)),
+        data={
+            "numbered_path": list(numbered_path),
+            "atom_to_locant": {atom_idx: get_loc(atom_idx) for atom_idx in numbered_path},
+            "retained_name": retained_name_val,
+        },
+    )
     _emit_bond_stereo(mol, parts, numbered_path, get_loc, sub_exclude, upstream_atom)
     _add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
     _add_subgraph_substituents(parts, subst_mapping, get_loc)
@@ -1054,9 +1236,88 @@ def name_subgraph(
     )
 
     name = _assemble_parent_name(mol, parts, numbered_path, get_loc, finalize_subgraph=True)
+    trace_decision(
+        decision_trace,
+        TracePhase.ASSEMBLY,
+        "assembled substituent name",
+        "The scoped branch assembly was rendered as a substituent name.",
+        atoms=component,
+        bonds=_bond_ids_within(mol, component),
+        data={
+            "name": name,
+            "trace_segment_count": len(_assembly_trace_segments(parts)) if return_trace else 0,
+        },
+    )
     if return_trace:
-        return name, _assembly_trace_segments(parts)
+        trace_segments = _assembly_trace_segments(parts)
+        if return_tree:
+            return (
+                name,
+                trace_segments,
+                _assembly_substituent_tree(
+                    parts,
+                    name=name,
+                    atom_ids=component,
+                    bond_ids=_bond_ids_within(mol, component),
+                    decisions=decision_trace_data(decision_trace),
+                ),
+            )
+        return name, trace_segments
+    if return_tree:
+        return (
+            name,
+            _assembly_substituent_tree(
+                parts,
+                name=name,
+                atom_ids=component,
+                bond_ids=_bond_ids_within(mol, component),
+                decisions=decision_trace_data(decision_trace),
+            ),
+        )
     return name
+
+
+def _shortcut_substituent_tree(
+    name: str,
+    component: set[int],
+    mol: Molecule,
+    decision_trace: DecisionTrace | None,
+    direct_prefix: DirectSubgraphPrefix | None = None,
+) -> dict:
+    """Return a minimal recursive tree node for shortcut substituent names."""
+
+    node = {
+        "kind": "substituent",
+        "name": name,
+        "atoms": sorted(component),
+        "bonds": sorted(_bond_ids_within(mol, component)),
+        "parent": None,
+        "principal_group": None,
+        "substituents": [],
+        "replacement_prefixes": [],
+        "unsaturations": [],
+        "trace_segments": [],
+        "nested_decisions": decision_trace_data(decision_trace),
+    }
+    if direct_prefix is not None:
+        node["functional_prefix"] = {
+            "kind": "functional_prefix",
+            "name": direct_prefix.name,
+            "group_key": direct_prefix.group_key,
+            "attachment_atom": direct_prefix.attachment_atom,
+            "group_atoms": sorted(direct_prefix.group_atoms),
+            "core_atoms": sorted(direct_prefix.core_atoms),
+            "group_bonds": sorted(direct_prefix.group_bonds),
+            "source": direct_prefix.source,
+            "ligands": list(direct_prefix.ligand_trees),
+            "ligand_trace_segments": list(direct_prefix.ligand_trace_segments),
+            "ligand_decisions": list(direct_prefix.ligand_decisions),
+        }
+        if direct_prefix.ligand_trees:
+            node["substituents"] = list(direct_prefix.ligand_trees)
+        if direct_prefix.ligand_trace_segments:
+            node["trace_segments"] = list(direct_prefix.ligand_trace_segments)
+    return node
 
 
 def name_component(
@@ -1064,6 +1325,7 @@ def name_component(
     component_atoms: set[int],
     is_substituent: bool = False,
     return_trace: bool = False,
+    return_tree: bool = False,
     decision_trace: DecisionTrace | None = None,
 ):
     """Name one connected component or recursive component of a molecule."""
@@ -1073,6 +1335,7 @@ def name_component(
         component_atoms,
         is_substituent=is_substituent,
         return_trace=return_trace,
+        return_tree=return_tree,
         decision_trace=decision_trace,
         name_subgraph=name_subgraph,
         name_spiro_subgraph=_spiro_subgraph_assembly,

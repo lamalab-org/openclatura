@@ -160,6 +160,7 @@ class NameAnalysis:
     name: str
     trace_segments: list[dict]
     decisions: list[TraceStep]
+    substituent_tree: list[dict] = field(default_factory=list)
     operations: list[NomenclatureOperation] = field(default_factory=list)
 
 

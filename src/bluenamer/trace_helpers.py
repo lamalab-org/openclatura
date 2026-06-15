@@ -11,6 +11,28 @@ from .principal_suffixes import principal_suffix_terms
 from .rules import bonds, multipliers, stems
 
 
+def decision_trace_data(trace: DecisionTrace | list | tuple | None) -> list[dict]:
+    """Return JSON-safe decision trace data for nested name fragments."""
+
+    if trace is None:
+        return []
+    steps = trace.steps if isinstance(trace, DecisionTrace) else trace
+    data = []
+    for step in steps:
+        phase = step.phase.value if hasattr(step.phase, "value") else str(step.phase)
+        data.append(
+            {
+                "phase": phase,
+                "decision": step.decision,
+                "reason": step.reason,
+                "atoms": list(step.atoms),
+                "bonds": list(step.bonds),
+                "data": step.data,
+            }
+        )
+    return data
+
+
 def trace_decision(
     trace: DecisionTrace | None,
     phase: TracePhase,
@@ -68,7 +90,9 @@ def add_substituent_trace(
     bond_ids=None,
     charge_atom_ids=None,
     trace_segments=None,
+    nested_decisions=None,
     emitted_tokens: tuple[NameTokenBinding, ...] = (),
+    substituent_tree=None,
     spiro=None,
 ) -> None:
     """Append or merge a substituent while preserving trace atom/bond IDs."""
@@ -77,6 +101,7 @@ def add_substituent_trace(
     bond_ids = set(bond_ids or ())
     charge_atom_ids = set(charge_atom_ids or ())
     trace_segments = list(trace_segments or ())
+    nested_decisions = list(nested_decisions or ())
     if spiro is not None:
         spiro = replace(spiro, parent_locant=str(locant))
     existing = next((s for s in parts.substituents if s.name == name and s.spiro == spiro), None)
@@ -86,6 +111,9 @@ def add_substituent_trace(
         existing.bond_ids.update(bond_ids)
         existing.charge_atom_ids.update(charge_atom_ids)
         existing.trace_segments.extend(trace_segments)
+        existing.nested_decisions.extend(nested_decisions)
+        if substituent_tree:
+            existing.substituent_tree = substituent_tree
         existing.emitted_tokens = existing.emitted_tokens + tuple(emitted_tokens)
     else:
         parts.substituents.append(
@@ -97,6 +125,8 @@ def add_substituent_trace(
                 charge_atom_ids=charge_atom_ids,
                 emitted_tokens=tuple(emitted_tokens),
                 trace_segments=trace_segments,
+                nested_decisions=nested_decisions,
+                substituent_tree=substituent_tree,
                 spiro=spiro,
             )
         )
@@ -154,20 +184,29 @@ def assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
             target.bond_ids.update(item.bond_ids)
             target.charge_atom_ids.update(item.charge_atom_ids)
             target.trace_segments.extend(item.trace_segments)
+            target.nested_decisions.extend(item.nested_decisions)
+            if item.substituent_tree:
+                target.substituent_tree = item.substituent_tree
         for item in grouped.values():
             if item.trace_segments and strip_outer_parentheses(item.name) != "methyl":
-                segments.extend(item.trace_segments)
+                for segment in item.trace_segments:
+                    segment = dict(segment)
+                    if item.nested_decisions:
+                        segment.setdefault("substituent_name", item.name)
+                        segment.setdefault("nested_decisions", item.nested_decisions)
+                    segments.append(segment)
                 continue
-            segments.append(
-                {
-                    "key": f"substituent:{item.name}",
-                    "label": f"{strip_outer_parentheses(item.name)} substituent",
-                    "atoms": sorted(item.atom_ids),
-                    "bonds": sorted(item.bond_ids),
-                    "name_terms": multiplied_name_terms(item.name, max(1, len(item.locants))),
-                    "rule_hint": "Detachable prefixes: Blue Book P-14.2, P-16.5, and P-61.",
-                }
-            )
+            segment = {
+                "key": f"substituent:{item.name}",
+                "label": f"{strip_outer_parentheses(item.name)} substituent",
+                "atoms": sorted(item.atom_ids),
+                "bonds": sorted(item.bond_ids),
+                "name_terms": multiplied_name_terms(item.name, max(1, len(item.locants))),
+                "rule_hint": "Detachable prefixes: Blue Book P-14.2, P-16.5, and P-61.",
+            }
+            if item.nested_decisions:
+                segment["nested_decisions"] = item.nested_decisions
+            segments.append(segment)
 
     if parts.a_prefixes:
         grouped_a: dict[str, SubstituentItem] = {}
@@ -257,3 +296,147 @@ def assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
             }
         )
     return segments
+
+
+def assembly_substituent_tree(
+    parts: AssemblyParts,
+    *,
+    name: str,
+    atom_ids=None,
+    bond_ids=None,
+    decisions=None,
+) -> dict:
+    """Return a nested substituent tree from the graph-bound assembly parts."""
+
+    component_atoms = set(atom_ids or parts.parent_atom_ids)
+    component_bonds = set(bond_ids or parts.parent_bond_ids)
+    parent_node = {
+        "kind": "fragment",
+        "name": name,
+        "atoms": sorted(component_atoms),
+        "bonds": sorted(component_bonds),
+        "parent": _parent_tree_node(parts),
+        "principal_group": _principal_group_tree_node(parts),
+        "substituents": _substituent_tree_nodes(parts.substituents),
+        "replacement_prefixes": _simple_item_tree_nodes(parts.a_prefixes, "replacement_prefix"),
+        "unsaturations": [
+            {
+                "kind": "unsaturation",
+                "bond_key": item.bond_key,
+                "locants": list(item.locants),
+                "atoms": sorted(item.atom_ids),
+                "bonds": sorted(item.bond_ids),
+            }
+            for item in parts.unsaturations
+        ],
+        "stereo_features": [
+            {"descriptor": descriptor, "locant": locant}
+            for descriptor, locant in parts.stereo_features
+        ],
+        "indicated_hydrogens": list(parts.indicated_hydrogens),
+        "hydro_operations": [
+            {
+                "key": operation.key,
+                "reason": operation.reason,
+                "locants": list(operation.locants),
+                "atom_ids": sorted(operation.atom_ids),
+                "operation_kind": operation.operation_kind,
+            }
+            for operation in parts.hydro_operations
+        ],
+        "parent_charges": [
+            {
+                "locant": item.locant,
+                "symbol": item.symbol,
+                "charge": item.charge,
+                "atom_id": item.atom_id,
+            }
+            for item in parts.parent_charges
+        ],
+        "trace_segments": assembly_trace_segments(parts),
+        "nested_decisions": list(decisions or ()),
+    }
+    return parent_node
+
+
+def _parent_tree_node(parts: AssemblyParts) -> dict:
+    return {
+        "kind": "parent",
+        "retained_name": parts.retained_name,
+        "parent_length": parts.parent_length,
+        "is_ring": parts.is_ring,
+        "is_bicycle": parts.is_bicycle,
+        "is_spiro": parts.is_spiro,
+        "is_polycycle": parts.is_polycycle,
+        "bicycle_descriptor": list(parts.bicycle_xyz) if parts.is_bicycle else [],
+        "spiro_descriptor": list(parts.spiro_xy) if parts.is_spiro else [],
+        "polycycle_descriptor": parts.polycycle_descriptor,
+        "atoms": sorted(parts.parent_atom_ids),
+        "bonds": sorted(parts.parent_bond_ids),
+        "atom_ids_by_locant": dict(parts.parent_atom_ids_by_locant),
+        "atom_symbols_by_locant": dict(parts.parent_atom_symbols_by_locant),
+        "atom_charges_by_locant": dict(parts.parent_atom_charges_by_locant),
+    }
+
+
+def _principal_group_tree_node(parts: AssemblyParts) -> dict | None:
+    if parts.principal_group is None:
+        return None
+    return {
+        "kind": "principal_group",
+        "key": parts.principal_group.key,
+        "locants": list(parts.principal_group.locants),
+        "atoms": sorted(parts.principal_group.atom_ids),
+        "bonds": sorted(parts.principal_group.bond_ids),
+        "charge_atoms": sorted(parts.principal_group.charge_atom_ids),
+    }
+
+
+def _simple_item_tree_nodes(items: list[SubstituentItem], kind: str) -> list[dict]:
+    return [
+        {
+            "kind": kind,
+            "name": item.name,
+            "locants": list(item.locants),
+            "atoms": sorted(item.atom_ids),
+            "bonds": sorted(item.bond_ids),
+            "charge_atoms": sorted(item.charge_atom_ids),
+            "trace_segments": list(item.trace_segments),
+            "nested_decisions": list(item.nested_decisions),
+        }
+        for item in items
+    ]
+
+
+def _substituent_tree_nodes(items: list[SubstituentItem]) -> list[dict]:
+    nodes = []
+    for item in items:
+        child = dict(item.substituent_tree or {})
+        if child:
+            child.setdefault("kind", "substituent")
+            child.setdefault("name", item.name)
+            child.setdefault("atoms", sorted(item.atom_ids))
+            child.setdefault("bonds", sorted(item.bond_ids))
+            child.setdefault("trace_segments", list(item.trace_segments))
+            child.setdefault("nested_decisions", list(item.nested_decisions))
+        else:
+            child = {
+                "kind": "substituent",
+                "name": item.name,
+                "atoms": sorted(item.atom_ids),
+                "bonds": sorted(item.bond_ids),
+                "trace_segments": list(item.trace_segments),
+                "nested_decisions": list(item.nested_decisions),
+                "substituents": [],
+            }
+        child["locants"] = list(item.locants)
+        child["charge_atoms"] = sorted(item.charge_atom_ids)
+        if item.spiro is not None:
+            child["spiro"] = {
+                "parent_locant": item.spiro.parent_locant,
+                "side_locant": item.spiro.side_locant,
+                "side_parent_name": item.spiro.side_parent_name,
+                "prefixes": list(item.spiro.prefixes),
+            }
+        nodes.append(child)
+    return nodes

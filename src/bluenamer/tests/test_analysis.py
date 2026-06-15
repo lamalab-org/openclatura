@@ -156,7 +156,7 @@ from bluenamer.spiro_assembly import SpiroAssembly
 from bluenamer.stereo_audit import audit_stereochemistry
 from bluenamer.substituent_tokens import graph_bound_substituent_tokens
 from bluenamer.suffix_stack import SuffixStack
-from bluenamer.trace_helpers import add_substituent_trace
+from bluenamer.trace_helpers import add_substituent_trace, assembly_trace_segments
 from bluenamer.von_baeyer import _classify_secondary_bridges, find_von_baeyer_candidates
 
 
@@ -262,6 +262,32 @@ def test_add_substituent_trace_preserves_emitted_tokens_into_bindings():
     assert substituent_binding.emitted_tokens[0].text == "1"
     assert substituent_binding.emitted_tokens[0].token_kind == "locant"
     assert substituent_binding.emitted_tokens[1:] == emitted_tokens
+
+
+def test_add_substituent_trace_preserves_nested_decisions_into_segments():
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0})
+    nested_decisions = [
+        {
+            "phase": "parent_selection",
+            "decision": "selected substituent parent skeleton",
+            "reason": "test",
+            "atoms": [1, 2],
+            "bonds": [1],
+            "data": {"primary_path": [1, 2]},
+        }
+    ]
+
+    add_substituent_trace(
+        parts,
+        "ethyl",
+        "1",
+        atom_ids={1, 2},
+        bond_ids={1},
+        nested_decisions=nested_decisions,
+    )
+
+    assert parts.substituents[0].nested_decisions == nested_decisions
+    assert assembly_trace_segments(parts)[0]["nested_decisions"] == nested_decisions
 
 
 def test_principal_suffix_tokens_are_emitted_from_functional_group_renderer():
@@ -3159,6 +3185,23 @@ def test_analyze_smiles_exposes_decision_trace():
     assert TracePhase.PARENT_SELECTION in phases
     assert TracePhase.NUMBERING in phases
     assert TracePhase.ASSEMBLY in phases
+
+
+def test_recursive_substituent_trace_segments_include_nested_decisions():
+    analysis = analyze_smiles("CCCCC(c1ccccc1)C(=O)O")
+
+    nested_segments = [segment for segment in analysis.trace_segments if segment.get("nested_decisions")]
+    nested_decisions = [
+        decision
+        for segment in nested_segments
+        for decision in segment["nested_decisions"]
+    ]
+
+    assert nested_segments
+    assert any(decision["decision"] == "selected substituent subgraph" for decision in nested_decisions)
+    assert any(decision["decision"] == "selected substituent parent skeleton" for decision in nested_decisions)
+    assert any(decision["decision"] == "selected substituent numbering" for decision in nested_decisions)
+    assert any(decision["decision"] == "assembled substituent name" for decision in nested_decisions)
 
 
 def test_parent_selection_has_named_shape():

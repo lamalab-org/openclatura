@@ -83,6 +83,7 @@ class NamingResult:
     smiles: str = ""
     error: str | None = None
     trace_segments: list[dict] = field(default_factory=list)
+    substituent_tree: list[dict] = field(default_factory=list)
     decisions: list = field(default_factory=list)
     analysis: NameAnalysis | None = None
     rules_hit: tuple[str, ...] = ()
@@ -123,6 +124,7 @@ class NamingResult:
         }
         if include_trace:
             payload["trace_segments"] = self.trace_segments
+            payload["substituent_tree"] = self.substituent_tree
         if self.opsin_check is not None:
             payload["opsin_check"] = self.opsin_check.to_dict()
         return payload
@@ -163,7 +165,7 @@ class NamingEngine:
 
         result = self.run(NamingRequest(smiles=smiles, include_trace=True))
         if result.analysis is None:
-            return NameAnalysis(result.name, result.trace_segments, result.decisions)
+            return NameAnalysis(result.name, result.trace_segments, result.decisions, result.substituent_tree)
         return result.analysis
 
     def analyze_smiles(self, smiles: str) -> NameAnalysis:
@@ -187,6 +189,7 @@ class NamingEngine:
                     name=analysis.name,
                     smiles=request.smiles,
                     trace_segments=analysis.trace_segments,
+                    substituent_tree=analysis.substituent_tree,
                     decisions=analysis.decisions,
                     analysis=analysis,
                     rules_hit=rules,
@@ -279,32 +282,37 @@ class NamingEngine:
 
         named_components = []
         for component in components:
-            component_name, trace = self._name_component(
+            component_name, trace, tree = self._name_component(
                 mol,
                 component,
                 return_trace=True,
+                return_tree=True,
                 decision_trace=decisions,
             )
             if component_name:
-                named_components.append((component_name, trace))
+                named_components.append((component_name, trace, tree))
 
         named_components.sort(key=lambda item: self._component_sort_key(item[0]))
-        final_name = " ".join(name for name, _ in named_components)
+        final_name = " ".join(name for name, _, _ in named_components)
         trace_segments = []
-        for _, trace in named_components:
+        substituent_tree = []
+        for _, trace, tree in named_components:
             trace_segments.extend(trace)
+            if tree:
+                substituent_tree.append(tree)
         trace_decision(
             decisions,
             TracePhase.ASSEMBLY,
             "assembled final molecule name",
             "Named components are sorted with supported salt metals first, then joined.",
             atoms=set(mol.atoms.keys()),
-            data={"name": final_name, "components": [name for name, _ in named_components]},
+            data={"name": final_name, "components": [name for name, _, _ in named_components]},
         )
         return NameAnalysis(
             name=final_name,
             trace_segments=trace_segments,
             decisions=decisions.steps,
+            substituent_tree=substituent_tree,
             operations=infer_operations(decisions.steps, trace_segments),
         )
 
