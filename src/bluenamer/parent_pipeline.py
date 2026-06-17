@@ -144,7 +144,9 @@ def build_parent_parts(
                 neighbor_locant = str(get_loc(neighbor_idx))
                 bond = mol.get_bond(atom_idx, neighbor_idx)
                 if bond is not None:
-                    parts.parent_bond_orders_by_locants[tuple(sorted((locant, neighbor_locant)))] = bond.order
+                    locant_pair = tuple(sorted((locant, neighbor_locant)))
+                    parts.parent_bond_orders_by_locants[locant_pair] = bond.order
+                    parts.parent_bond_ids_by_locants[locant_pair] = bond.idx
     return parts
 
 

@@ -3670,6 +3670,66 @@ def test_relative_ring_stereo_is_rendered_inside_substituent():
     assert name_smiles("CC(=O)N[C@H]1CC[C@@H](C)CC1") == "N-(cis-4-methylcyclohexyl)acetamide"
 
 
+def test_relative_ring_stereo_tokens_bind_to_stereocenter_atoms():
+    parent = analyze_smiles("C[C@H]1CC[C@@H](N)CC1")
+    parent_assembly = [step for step in parent.decisions if step.decision == "assembled component name"][-1]
+    parent_cis = next(token for token in parent_assembly.data["name_token_spans"] if token["text"] == "cis")
+
+    assert parent_cis["atoms"] == [1, 4]
+    assert parent_cis["token_kind"] == "stereo"
+    assert parent_cis["source"] == "renderer_stereo"
+    assert parent_cis["confidence"] != "fallback"
+
+    substituent = analyze_smiles("CC(=O)N[C@H]1CC[C@@H](C)CC1")
+    substituent_assembly = [step for step in substituent.decisions if step.decision == "assembled component name"][-1]
+    substituent_cis = next(token for token in substituent_assembly.data["name_token_spans"] if token["text"] == "cis")
+
+    assert substituent.name == "N-(cis-4-methylcyclohexyl)acetamide"
+    assert substituent_cis["atoms"] == [4, 7]
+    assert substituent_cis["token_kind"] == "stereo"
+    assert substituent_cis["source"] == "renderer_stereo"
+    assert substituent_cis["confidence"] != "fallback"
+
+
+def test_heteroatom_subgraph_absolute_stereo_token_binds_to_center_atom():
+    mol = Molecule()
+    mol.add_atom("C", 0)
+    mol.add_atom("S", 1, stereo="R")
+    mol.add_atom("O", 2)
+    mol.add_bond(0, 1, order=1)
+    mol.add_bond(1, 2, order=2)
+
+    term = name_heteroatom_subgraph(mol, 1, exclude_atoms={0}, upstream_atom=0, branch_namer=_empty_branch_namer)
+    tokens = graph_bound_substituent_tokens(
+        mol,
+        root=1,
+        atom_ids={1, 2},
+        term=term,
+        upstream_atom=0,
+        exclude_atoms={0},
+        branch_namer=_empty_branch_namer,
+    )
+    stereo = next(token for token in tokens if token.text == "R")
+
+    assert term == "(R)-sulfinyl"
+    assert stereo.atom_ids == {1}
+    assert stereo.token_kind == "stereo"
+    assert stereo.source == "renderer_stereo"
+
+
+def test_locanted_ez_stereo_token_binds_to_double_bond_scope():
+    result = analyze_smiles(r"C/C=C\C")
+    assembly = [step for step in result.decisions if step.decision == "assembled component name"][-1]
+    z_token = next(token for token in assembly.data["name_token_spans"] if token["text"] == "Z")
+
+    assert result.name == "(2Z)-but-2-ene"
+    assert z_token["token_kind"] == "stereo"
+    assert z_token["source"] == "renderer_stereo"
+    assert z_token["confidence"] != "fallback"
+    assert z_token["atoms"]
+    assert z_token["bonds"]
+
+
 def test_scoped_small_ring_stereo_does_not_emit_unsupported_relative_locant_descriptors():
     name = name_smiles("CN1CCC[C@](O)(CC(=O)N[C@]2(C)C[C@H](NC(=O)CCC3CC3)C2)C1")
 

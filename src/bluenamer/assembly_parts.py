@@ -111,6 +111,7 @@ class AssemblyParts:
     parent_atom_symbols_by_locant: dict[str, str] = field(default_factory=dict)
     parent_atom_charges_by_locant: dict[str, int] = field(default_factory=dict)
     parent_bond_orders_by_locants: dict[tuple[str, str], int] = field(default_factory=dict)
+    parent_bond_ids_by_locants: dict[tuple[str, str], int] = field(default_factory=dict)
     name_atom_bindings: list[NameAtomBinding] = field(default_factory=list)
     name_token_spans: list[dict] = field(default_factory=list)
     name_rewrite_history: list[dict] = field(default_factory=list)

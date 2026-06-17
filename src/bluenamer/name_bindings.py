@@ -7,11 +7,17 @@ from .assembly_parts import AssemblyParts, NameAtomBinding, NameTokenBinding
 from .nomenclature import RULES
 from .principal_suffixes import render_principal_suffix
 from .rules import bonds, stems
+from .stereo_descriptors import ABSOLUTE_STEREO_DESCRIPTORS, BOND_STEREO_DESCRIPTORS
 
 
 def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
     """Populate structured bindings for the current assembly parts."""
 
+    preserved_assembly_stereo = [
+        binding
+        for binding in parts.name_atom_bindings
+        if binding.stage == "assembly" and binding.role in {"relative_stereo", "small_ring_stereo"}
+    ]
     bindings: list[NameAtomBinding] = []
     if parts.parent_atom_ids:
         bindings.append(
@@ -37,6 +43,40 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
                 emitted_tokens=_hydro_operation_tokens(operation),
             )
         )
+    for locant, descriptor in parts.stereo_features:
+        if descriptor not in ABSOLUTE_STEREO_DESCRIPTORS or not locant:
+            continue
+        atom_idx = parts.parent_atom_ids_by_locant.get(str(locant))
+        if atom_idx is None:
+            continue
+        bindings.append(
+            NameAtomBinding(
+                stage="assembly",
+                role="absolute_stereo",
+                term=f"{locant}{descriptor}",
+                atom_ids={atom_idx},
+                locants=(str(locant),),
+                emitted_tokens=_absolute_stereo_tokens(str(locant), descriptor, atom_idx),
+            )
+        )
+    for locant, descriptor in parts.stereo_features:
+        if descriptor not in BOND_STEREO_DESCRIPTORS or not locant:
+            continue
+        _bond_locants, atom_ids, bond_ids = _bond_stereo_graph_scope(parts, str(locant))
+        if not atom_ids:
+            continue
+        bindings.append(
+            NameAtomBinding(
+                stage="assembly",
+                role="bond_stereo",
+                term=descriptor,
+                atom_ids=atom_ids,
+                bond_ids=bond_ids,
+                locants=(str(locant),),
+                emitted_tokens=_bond_stereo_tokens(str(locant), descriptor, atom_ids, bond_ids),
+            )
+        )
+    bindings.extend(preserved_assembly_stereo)
     if parts.front_modifiers:
         bindings.append(
             NameAtomBinding(
@@ -328,6 +368,8 @@ def _operation_emitted_tokens(binding: NameAtomBinding) -> tuple[NameTokenBindin
         return _locanted_operation_tokens(binding, charge_from_binding=True)
     if binding.stage == "charge" or binding.role == "parent_charge":
         return _charge_operation_tokens(binding)
+    if binding.stage == "assembly" and binding.role == "relative_stereo":
+        return _relative_stereo_tokens(binding)
     if binding.stage == "assembly" and "stereo" in binding.role:
         return _locanted_operation_tokens(binding)
     if binding.stage == "modifier":
@@ -428,6 +470,114 @@ def _hydro_operation_tokens(operation) -> tuple[NameTokenBinding, ...]:
         )
     )
     return tuple(tokens)
+
+
+def _absolute_stereo_tokens(locant: str, descriptor: str, atom_idx: int) -> tuple[NameTokenBinding, ...]:
+    """Return native tokens for an absolute stereochemical descriptor."""
+
+    return (
+        NameTokenBinding(
+            text=locant,
+            token_kind="locant",
+            ownership="exact",
+            confidence="exact",
+            source="renderer_stereo",
+            grammar_role="absolute_stereo",
+            binding_key="assembly:absolute_stereo",
+            atom_ids={atom_idx},
+            locants=(locant,),
+        ),
+        NameTokenBinding(
+            text=descriptor,
+            token_kind="stereo",
+            ownership="exact",
+            confidence="exact",
+            source="renderer_stereo",
+            grammar_role="absolute_stereo",
+            binding_key="assembly:absolute_stereo",
+            atom_ids={atom_idx},
+            locants=(locant,),
+        ),
+    )
+
+
+def _bond_stereo_graph_scope(parts: AssemblyParts, locant: str) -> tuple[tuple[str, ...], set[int], set[int]]:
+    """Return the graph scope for an E/Z descriptor rendered at a parent locant."""
+
+    for locant_pair, order in parts.parent_bond_orders_by_locants.items():
+        if locant not in locant_pair or order != 2:
+            continue
+        atom_ids = {
+            atom_idx
+            for pair_locant in locant_pair
+            if (atom_idx := parts.parent_atom_ids_by_locant.get(str(pair_locant))) is not None
+        }
+        if len(atom_ids) != 2:
+            continue
+        bond_id = parts.parent_bond_ids_by_locants.get(locant_pair)
+        return (
+            tuple(str(pair_locant) for pair_locant in locant_pair),
+            atom_ids,
+            {bond_id} if bond_id is not None else set(),
+        )
+    atom_idx = parts.parent_atom_ids_by_locant.get(locant)
+    return (locant,), {atom_idx} if atom_idx is not None else set(), set()
+
+
+def _bond_stereo_tokens(
+    locant: str,
+    descriptor: str,
+    atom_ids: set[int],
+    bond_ids: set[int],
+) -> tuple[NameTokenBinding, ...]:
+    """Return native tokens for an E/Z bond stereochemical descriptor."""
+
+    return (
+        NameTokenBinding(
+            text=locant,
+            token_kind="locant",
+            ownership="exact",
+            confidence="exact",
+            source="renderer_stereo",
+            grammar_role="bond_stereo",
+            binding_key="assembly:bond_stereo",
+            atom_ids=atom_ids,
+            bond_ids=bond_ids,
+            locants=(locant,),
+        ),
+        NameTokenBinding(
+            text=descriptor,
+            token_kind="stereo",
+            ownership="exact",
+            confidence="exact",
+            source="renderer_stereo",
+            grammar_role="bond_stereo",
+            binding_key="assembly:bond_stereo",
+            atom_ids=atom_ids,
+            bond_ids=bond_ids,
+            locants=(locant,),
+        ),
+    )
+
+
+def _relative_stereo_tokens(binding: NameAtomBinding) -> tuple[NameTokenBinding, ...]:
+    """Return native token metadata for relative cis/trans descriptors."""
+
+    return (
+        NameTokenBinding(
+            text=binding.term,
+            token_kind="stereo",
+            ownership="exact",
+            confidence="exact",
+            source="renderer_stereo",
+            grammar_role=binding.role,
+            binding_key=f"{binding.stage}:{binding.role}",
+            atom_ids=set(binding.atom_ids),
+            bond_ids=set(binding.bond_ids),
+            charge_atom_ids=set(binding.charge_atom_ids),
+            locants=tuple(binding.locants),
+        ),
+    )
 
 
 def _locanted_emitted_tokens(

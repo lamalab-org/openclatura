@@ -106,6 +106,32 @@ def test_substituent_tree_preserves_nested_branch_hierarchy_and_flat_trace():
     assert assembly.data["name_token_spans"]
 
 
+def test_absolute_stereo_tokens_bind_to_stereocenter_atoms():
+    result = name(
+        "O=C(O)C[C@H](O)C[C@H](O)CCn2c(c(c(c2c1ccc(F)cc1)c3ccccc3)C(=O)Nc4ccccc4)C(C)C",
+        include_trace=True,
+    )
+    assembly = [step for step in result.decisions if step.decision == "assembled component name"][-1]
+    token_spans = assembly.data["name_token_spans"]
+
+    expected_tokens = [
+        ("3", 4, "locant", "renderer_stereo"),
+        ("R", 4, "stereo", "renderer_stereo"),
+        ("5", 7, "locant", "renderer_stereo"),
+        ("R", 7, "stereo", "renderer_stereo"),
+    ]
+    for text, atom, token_kind, source in expected_tokens:
+        token = next(
+            token
+            for token in token_spans
+            if token["text"] == text
+            and token["atoms"] == [atom]
+            and token["token_kind"] == token_kind
+            and token["source"] == source
+        )
+        assert token["confidence"] != "fallback"
+
+
 def test_naming_errors_become_result_error_not_exception():
     # Empty SMILES is a well-defined "no atoms" path; assert at a different angle
     # by feeding clearly malformed text — the engine must capture, not raise.
