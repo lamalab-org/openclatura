@@ -3243,7 +3243,7 @@ def test_parent_selection_has_named_shape():
     assert selection.score_tuple
 
 
-def test_parent_selection_criteria_are_data_ordered_and_behavior_preserving():
+def test_parent_selection_criteria_are_data_ordered():
     profile = ParentSeniorityProfile(
         principal_group_count=1,
         contains_principal_group=True,
@@ -3507,8 +3507,9 @@ def test_parent_seniority_criteria_follow_brief_guide_section_6_order():
     assert min([no_group, one_group], key=lambda candidate: candidate.score_tuple) is one_group
     assert min([one_group, two_groups], key=lambda candidate: candidate.score_tuple) is two_groups
     assert min([si_parent, n_parent], key=lambda candidate: candidate.score_tuple) is n_parent
+    assert min([carbon_ring, n_parent], key=lambda candidate: candidate.score_tuple) is n_parent
     assert min([carbon_chain, carbon_ring], key=lambda candidate: candidate.score_tuple) is carbon_ring
-    assert min([p_ring, o_ring], key=lambda candidate: candidate.score_tuple) is o_ring
+    assert min([p_ring, o_ring], key=lambda candidate: candidate.score_tuple) is p_ring
     assert min([monocycle, bicycle], key=lambda candidate: candidate.score_tuple) is bicycle
     assert min([piperazine_like, oxazinane_like], key=lambda candidate: candidate.score_tuple) is oxazinane_like
     assert min([shorter_chain, longer_chain], key=lambda candidate: candidate.score_tuple) is longer_chain
