@@ -61,11 +61,49 @@ def test_name_with_trace_populates_rules_hit_and_hints():
     result = name("CC(=O)Nc1ccccc1", include_trace=True)
     assert result.name == "N-phenylacetamide"
     assert result.trace_segments, "trace_segments must be populated when include_trace=True"
+    assert result.substituent_tree, "substituent_tree must be populated when include_trace=True"
     assert result.decisions, "decisions must be populated when include_trace=True"
     # Rule hints should reference Blue Book P-XX identifiers in this case.
     assert result.rules_hit, "expected at least one P-XX rule id"
     assert all(rid.startswith("P-") for rid in result.rules_hit)
     assert len(result.rule_hints) >= 1
+
+
+def test_substituent_tree_preserves_nested_branch_hierarchy_and_flat_trace():
+    result = name(
+        "O=C(O)C[C@H](O)C[C@H](O)CCn2c(c(c(c2c1ccc(F)cc1)c3ccccc3)C(=O)Nc4ccccc4)C(C)C",
+        include_trace=True,
+    )
+
+    root = result.substituent_tree[0]
+    pyrrolyl = next(child for child in root["substituents"] if "pyrrol" in child["name"])
+    fluorophenyl = next(child for child in pyrrolyl["substituents"] if "fluorophenyl" in child["name"])
+    phenylcarbamoyl = next(child for child in pyrrolyl["substituents"] if "phenylcarbamoyl" in child["name"])
+
+    assert root["kind"] == "component"
+    assert root["parent"]["parent_length"] == 7
+    assert pyrrolyl["locants"] == ["7"]
+    assert pyrrolyl["parent"]["retained_name"] == "pyrrole"
+    assert {child["name"].strip("()") for child in pyrrolyl["substituents"]} >= {
+        "propan-2-yl",
+        "phenylcarbamoyl",
+        "phenyl",
+        "4-fluorophenyl",
+    }
+    assert fluorophenyl["parent"]["retained_name"] == "benzene"
+    assert fluorophenyl["substituents"][0]["name"] == "fluoro"
+    assert fluorophenyl["substituents"][0]["locants"] == ["4"]
+    assert phenylcarbamoyl["functional_prefix"]["group_key"] == "ring_amide"
+    assert phenylcarbamoyl["functional_prefix"]["attachment_atom"] == 13
+    assert phenylcarbamoyl["functional_prefix"]["core_atoms"] == [29, 30, 31]
+    assert phenylcarbamoyl["functional_prefix"]["group_atoms"] == [13, 29, 30, 31]
+    assert phenylcarbamoyl["functional_prefix"]["ligands"][0]["parent"]["retained_name"] == "benzene"
+    assert phenylcarbamoyl["substituents"][0]["name"] == "phenyl"
+
+    assert result.trace_segments
+    assert any(segment.get("nested_decisions") for segment in result.trace_segments)
+    assembly = [step for step in result.decisions if step.decision == "assembled component name"][-1]
+    assert assembly.data["name_token_spans"]
 
 
 def test_naming_errors_become_result_error_not_exception():
@@ -154,6 +192,7 @@ def test_cli_name_json_emits_structured_payload():
     assert payload["smiles"] == "CC(=O)O"
     assert payload["ok"] is True
     assert "trace_segments" in payload
+    assert "substituent_tree" in payload
 
 
 @pytest.mark.parametrize("processes", [1, 2])

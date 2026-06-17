@@ -1,18 +1,72 @@
 """Data-driven component modifiers attached after parent numbering."""
 
-from collections.abc import Callable
+from typing import Literal, Protocol, overload
 
 from .assembly_parts import AssemblyParts, SubstituentItem
 from .formatting import strip_outer_parentheses
 from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
-from .molecule import Molecule
+from .molecule import DecisionTrace, Molecule
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .subgraph_tools import subgraph_component
-from .trace_helpers import add_substituent_trace, bond_ids_within
+from .trace_helpers import add_substituent_trace, bond_ids_within, decision_trace_data
 
-BranchNamer = Callable[..., str]
+
+class BranchNamer(Protocol):
+    """Recursive branch namer with simple and traced/tree return modes."""
+
+    @overload
+    def __call__(
+        self,
+        mol: Molecule,
+        start_idx: int,
+        exclude_atoms: set[int],
+        *,
+        upstream_atom: int | None = None,
+        return_trace: Literal[False] = False,
+        return_tree: Literal[False] = False,
+        decision_trace: DecisionTrace | None = None,
+    ) -> str: ...
+
+    @overload
+    def __call__(
+        self,
+        mol: Molecule,
+        start_idx: int,
+        exclude_atoms: set[int],
+        *,
+        upstream_atom: int | None = None,
+        return_trace: Literal[True],
+        return_tree: Literal[False] = False,
+        decision_trace: DecisionTrace | None = None,
+    ) -> tuple[str, list[dict]]: ...
+
+    @overload
+    def __call__(
+        self,
+        mol: Molecule,
+        start_idx: int,
+        exclude_atoms: set[int],
+        *,
+        upstream_atom: int | None = None,
+        return_trace: Literal[True],
+        return_tree: Literal[True],
+        decision_trace: DecisionTrace | None = None,
+    ) -> tuple[str, list[dict], dict | None]: ...
+
+    @overload
+    def __call__(
+        self,
+        mol: Molecule,
+        start_idx: int,
+        exclude_atoms: set[int],
+        *,
+        upstream_atom: int | None = None,
+        return_trace: Literal[False] = False,
+        return_tree: Literal[True],
+        decision_trace: DecisionTrace | None = None,
+    ) -> tuple[str, dict | None]: ...
 
 
 def add_component_front_modifiers(
@@ -97,9 +151,13 @@ def add_component_n_substituents(
                 principal_key, len(principal_groups), len(nitrogens), n_idx_local, n_idx_global
             )
             for n_sub in n_substituents:
-                branch_name, branch_trace = _nitrogen_substituent_name(mol, single_n, n_sub, sub_exclude, branch_namer)
+                branch_decisions = DecisionTrace()
+                branch_name, branch_trace, branch_tree = _nitrogen_substituent_name(
+                    mol, single_n, n_sub, sub_exclude, branch_namer, branch_decisions
+                )
                 if branch_name:
                     branch_atoms = subgraph_component(mol, n_sub, sub_exclude | {single_n})
+                    nested_decisions = decision_trace_data(branch_decisions)
                     if _use_hydrazone_suffix_modifier(parts, principal_key):
                         parts.principal_suffix_modifiers.append(
                             SubstituentItem(
@@ -109,6 +167,8 @@ def add_component_n_substituents(
                                 bond_ids=bond_ids_within(mol, branch_atoms | {single_n}),
                                 charge_atom_ids=_charged_atoms(mol, branch_atoms),
                                 trace_segments=branch_trace,
+                                nested_decisions=nested_decisions,
+                                substituent_tree=branch_tree,
                             )
                         )
                         continue
@@ -120,6 +180,8 @@ def add_component_n_substituents(
                         bond_ids_within(mol, branch_atoms | {single_n}),
                         _charged_atoms(mol, branch_atoms),
                         branch_trace,
+                        nested_decisions,
+                        substituent_tree=branch_tree,
                     )
             n_idx_global += 1
 
@@ -136,7 +198,8 @@ def _nitrogen_substituent_name(
     substituent: int,
     sub_exclude: set[int],
     branch_namer: BranchNamer,
-) -> tuple[str, list]:
+    decision_trace: DecisionTrace | None = None,
+) -> tuple[str, list, dict | None]:
     """Render graph-bound N-substituents on principal nitrogen groups."""
 
     bond = mol.get_bond(nitrogen, substituent)
@@ -146,8 +209,16 @@ def _nitrogen_substituent_name(
         and mol.atoms[substituent].symbol == "N"
         and not [n for n in mol.get_neighbors(substituent) if n != nitrogen and mol.atoms[n].symbol != "H"]
     ):
-        return "imino", []
-    return branch_namer(mol, substituent, sub_exclude | {nitrogen}, upstream_atom=nitrogen, return_trace=True)
+        return "imino", [], None
+    return branch_namer(
+        mol,
+        substituent,
+        sub_exclude | {nitrogen},
+        upstream_atom=nitrogen,
+        return_trace=True,
+        return_tree=True,
+        decision_trace=decision_trace,
+    )
 
 
 def _use_hydrazone_suffix_modifier(parts: AssemblyParts, principal_key: str | None) -> bool:

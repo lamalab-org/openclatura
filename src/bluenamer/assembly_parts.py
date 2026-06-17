@@ -32,6 +32,8 @@ class SubstituentItem:
     charge_atom_ids: set[int] = field(default_factory=set)
     emitted_tokens: tuple[NameTokenBinding, ...] = ()
     trace_segments: list[dict] = field(default_factory=list)
+    nested_decisions: list[dict] = field(default_factory=list)
+    substituent_tree: dict | None = None
     spiro: SpiroAssembly | None = None
 
 
