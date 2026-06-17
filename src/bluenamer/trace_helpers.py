@@ -25,8 +25,8 @@ def decision_trace_data(trace: DecisionTrace | list | tuple | None) -> list[dict
                 "phase": phase,
                 "decision": step.decision,
                 "reason": step.reason,
-                "atoms": list(step.atoms),
-                "bonds": list(step.bonds),
+                "atoms": sorted(step.atoms),
+                "bonds": sorted(step.bonds),
                 "data": step.data,
             }
         )
@@ -330,8 +330,7 @@ def assembly_substituent_tree(
             for item in parts.unsaturations
         ],
         "stereo_features": [
-            {"descriptor": descriptor, "locant": locant}
-            for descriptor, locant in parts.stereo_features
+            {"descriptor": descriptor, "locant": locant} for descriptor, locant in parts.stereo_features
         ],
         "indicated_hydrogens": list(parts.indicated_hydrogens),
         "hydro_operations": [

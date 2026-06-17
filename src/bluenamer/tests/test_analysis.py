@@ -3191,11 +3191,7 @@ def test_recursive_substituent_trace_segments_include_nested_decisions():
     analysis = analyze_smiles("CCCCC(c1ccccc1)C(=O)O")
 
     nested_segments = [segment for segment in analysis.trace_segments if segment.get("nested_decisions")]
-    nested_decisions = [
-        decision
-        for segment in nested_segments
-        for decision in segment["nested_decisions"]
-    ]
+    nested_decisions = [decision for segment in nested_segments for decision in segment["nested_decisions"]]
 
     assert nested_segments
     assert any(decision["decision"] == "selected substituent subgraph" for decision in nested_decisions)

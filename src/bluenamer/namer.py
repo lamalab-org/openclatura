@@ -44,13 +44,13 @@ from .substituent_tokens import graph_bound_substituent_tokens
 from .trace_helpers import (
     add_substituent_trace as _add_substituent_trace,
 )
+from .trace_helpers import assembly_substituent_tree as _assembly_substituent_tree
 from .trace_helpers import (
     assembly_trace_segments as _assembly_trace_segments,
 )
 from .trace_helpers import (
     bond_ids_within as _bond_ids_within,
 )
-from .trace_helpers import assembly_substituent_tree as _assembly_substituent_tree
 from .trace_helpers import decision_trace_data, trace_decision
 
 

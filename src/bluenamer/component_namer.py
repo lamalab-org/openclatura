@@ -1,6 +1,7 @@
 """Connected-component naming pipeline."""
 
 from collections.abc import Callable
+from typing import Literal, Protocol, overload
 
 from .assembly_parts import AssemblyParts, NameAtomBinding, SubstituentItem
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
@@ -52,7 +53,63 @@ from .trace_helpers import (
     trace_decision,
 )
 
-SubgraphNamer = Callable[..., str]
+
+class SubgraphNamer(Protocol):
+    """Recursive subgraph namer with simple and traced/tree return modes."""
+
+    @overload
+    def __call__(
+        self,
+        mol: Molecule,
+        start_idx: int,
+        exclude_atoms: set[int],
+        *,
+        upstream_atom: int | None = None,
+        return_trace: Literal[False] = False,
+        return_tree: Literal[False] = False,
+        decision_trace: DecisionTrace | None = None,
+    ) -> str: ...
+
+    @overload
+    def __call__(
+        self,
+        mol: Molecule,
+        start_idx: int,
+        exclude_atoms: set[int],
+        *,
+        upstream_atom: int | None = None,
+        return_trace: Literal[True],
+        return_tree: Literal[False] = False,
+        decision_trace: DecisionTrace | None = None,
+    ) -> tuple[str, list[dict]]: ...
+
+    @overload
+    def __call__(
+        self,
+        mol: Molecule,
+        start_idx: int,
+        exclude_atoms: set[int],
+        *,
+        upstream_atom: int | None = None,
+        return_trace: Literal[True],
+        return_tree: Literal[True],
+        decision_trace: DecisionTrace | None = None,
+    ) -> tuple[str, list[dict], dict | None]: ...
+
+    @overload
+    def __call__(
+        self,
+        mol: Molecule,
+        start_idx: int,
+        exclude_atoms: set[int],
+        *,
+        upstream_atom: int | None = None,
+        return_trace: Literal[False] = False,
+        return_tree: Literal[True],
+        decision_trace: DecisionTrace | None = None,
+    ) -> tuple[str, dict | None]: ...
+
+
 SpiroSubgraphNamer = Callable[[Molecule, int, set[int]], SpiroAssembly]
 ParentAssembler = Callable[..., str]
 
