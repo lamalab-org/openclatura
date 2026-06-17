@@ -1766,12 +1766,11 @@ def _token_span_from_native_binding_group(
     )
 
 
-def _should_prioritize_renderer_stereo(text: str, matches: list[tuple[int, NameTokenBinding]]) -> bool:
+def _should_prioritize_renderer_stereo(_text: str, matches: list[tuple[int, NameTokenBinding]]) -> bool:
     """Return whether a span is owned by an explicit stereo-renderer token."""
 
-    token_text = text.lower()
     for _binding_idx, token_binding in matches:
-        if token_binding.token_kind == "stereo" and is_searchable_stereo_token(token_text):
+        if token_binding.token_kind == "stereo" and is_searchable_stereo_token(token_binding.text):
             return True
         if token_binding.token_kind == "locant" and token_binding.grammar_role in {"absolute_stereo", "bond_stereo"}:
             return True
