@@ -10,6 +10,7 @@ from .molecule import DecisionTrace, Molecule
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .subgraph_tools import subgraph_component
+from .substituent_tokens import graph_bound_substituent_tokens
 from .trace_helpers import add_substituent_trace, bond_ids_within, decision_trace_data
 
 
@@ -156,8 +157,18 @@ def add_component_n_substituents(
                     mol, single_n, n_sub, sub_exclude, branch_namer, branch_decisions
                 )
                 if branch_name:
-                    branch_atoms = subgraph_component(mol, n_sub, sub_exclude | {single_n})
+                    branch_exclude = sub_exclude | {single_n}
+                    branch_atoms = subgraph_component(mol, n_sub, branch_exclude)
                     nested_decisions = decision_trace_data(branch_decisions)
+                    emitted_tokens = graph_bound_substituent_tokens(
+                        mol,
+                        n_sub,
+                        branch_atoms,
+                        branch_name,
+                        single_n,
+                        branch_exclude,
+                        branch_namer,
+                    )
                     if _use_hydrazone_suffix_modifier(parts, principal_key):
                         parts.principal_suffix_modifiers.append(
                             SubstituentItem(
@@ -166,6 +177,7 @@ def add_component_n_substituents(
                                 atom_ids=branch_atoms,
                                 bond_ids=bond_ids_within(mol, branch_atoms | {single_n}),
                                 charge_atom_ids=_charged_atoms(mol, branch_atoms),
+                                emitted_tokens=emitted_tokens,
                                 trace_segments=branch_trace,
                                 nested_decisions=nested_decisions,
                                 substituent_tree=branch_tree,
@@ -181,6 +193,7 @@ def add_component_n_substituents(
                         _charged_atoms(mol, branch_atoms),
                         branch_trace,
                         nested_decisions,
+                        emitted_tokens,
                         substituent_tree=branch_tree,
                     )
             n_idx_global += 1

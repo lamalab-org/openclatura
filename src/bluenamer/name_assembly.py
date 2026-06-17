@@ -922,6 +922,9 @@ def _native_token_spans(
         if binding.stage == "hydro" and binding.role == "indicated_hydrogen":
             spans.extend(_indicated_hydrogen_native_token_spans(search_text, binding_idx, binding))
             continue
+        if binding.stage == "assembly" and binding.role in {"absolute_stereo", "bond_stereo"}:
+            spans.extend(_absolute_stereo_native_token_spans(search_text, binding_idx, binding))
+            continue
         if not any(_is_locant_search_token(token_binding) for token_binding in binding.emitted_tokens):
             ordered_spans = _ordered_native_token_spans(text, search_text, binding_idx, binding)
             if ordered_spans:
@@ -929,7 +932,7 @@ def _native_token_spans(
                 continue
         for token_binding in binding.emitted_tokens:
             token = token_binding.text.strip().lower()
-            if not _native_token_is_searchable(token):
+            if not _native_token_is_searchable(token, token_binding):
                 continue
             pos = 0
             for found in _native_token_occurrences(text, search_text, token_binding, pos):
@@ -961,6 +964,30 @@ def _indicated_hydrogen_native_token_spans(
     return spans
 
 
+def _absolute_stereo_native_token_spans(
+    search_text: str,
+    binding_idx: int,
+    binding: NameAtomBinding,
+) -> list[tuple[int, int, int, NameTokenBinding]]:
+    locant_token = next((token for token in binding.emitted_tokens if token.token_kind == "locant"), None)
+    stereo_token = next((token for token in binding.emitted_tokens if token.token_kind == "stereo"), None)
+    if locant_token is None or stereo_token is None:
+        return []
+    locant_text = locant_token.text.lower()
+    stereo_text = stereo_token.text.lower()
+    pattern = f"{locant_text}{stereo_text}"
+    spans: list[tuple[int, int, int, NameTokenBinding]] = []
+    pos = 0
+    while True:
+        found = search_text.find(pattern, pos)
+        if found < 0:
+            break
+        spans.append((found, found + len(locant_text), binding_idx, locant_token))
+        spans.append((found + len(locant_text), found + len(pattern), binding_idx, stereo_token))
+        pos = found + 1
+    return spans
+
+
 def _ordered_native_token_spans(
     text: str,
     search_text: str,
@@ -973,7 +1000,7 @@ def _ordered_native_token_spans(
     cursor = 0
     for token_binding in binding.emitted_tokens:
         token = token_binding.text.strip().lower()
-        if not _native_token_is_searchable(token):
+        if not _native_token_is_searchable(token, token_binding):
             continue
         found = next(iter(_native_token_occurrences(text, search_text, token_binding, cursor)), -1)
         if found < 0:
@@ -1020,8 +1047,12 @@ def _is_standalone_locant_span(text: str, start: int, end: int) -> bool:
     return (not before or before in "-,( ") and (not after or after in "-,)' ")
 
 
-def _native_token_is_searchable(token: str) -> bool:
-    return bool(token) and (len(token) >= 2 or token.isdigit() or "," in token or token in _ELEMENT_LOCANT_TOKENS)
+def _native_token_is_searchable(token: str, token_binding: NameTokenBinding | None = None) -> bool:
+    if not token:
+        return False
+    if token_binding is not None and token_binding.token_kind == "stereo":
+        return token in {"r", "s", "e", "z", "cis", "trans"}
+    return len(token) >= 2 or token.isdigit() or "," in token or token in _ELEMENT_LOCANT_TOKENS
 
 
 def _direct_binding_spans(text: str, bindings: tuple[NameAtomBinding, ...]) -> list[tuple[int, int, int]]:
@@ -1684,6 +1715,13 @@ def _token_span_from_native_binding_group(
     end: int,
     matches: list[tuple[int, NameTokenBinding]],
 ) -> NameTokenSpan:
+    stereo_matches = [
+        (binding_idx, token_binding)
+        for binding_idx, token_binding in matches
+        if token_binding.source == "renderer_stereo"
+    ]
+    if stereo_matches:
+        matches = stereo_matches
     atoms: set[int] = set()
     bonds: set[int] = set()
     charges: set[int] = set()

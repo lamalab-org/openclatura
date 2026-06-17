@@ -35,18 +35,58 @@ def _carbon_substituent_tokens(mol: Molecule, atom_ids: set[int], term: str) -> 
     term_text = strip_outer_parentheses(term)
     if not term_text:
         return ()
-    return tuple(
-        NameTokenBinding(
-            text=token_text,
-            token_kind="prefix",
-            source="substituent_renderer",
-            grammar_role="carbon_substituent",
-            binding_key="prefix:carbon_substituent",
-            atom_ids=set(atom_ids),
-            bond_ids=bond_ids_within(mol, atom_ids),
-            charge_atom_ids={idx for idx in atom_ids if mol.atoms[idx].charge != 0},
+    stereo_atoms = {idx for idx in atom_ids if mol.atoms[idx].raw_stereo and not mol.atoms[idx].stereo}
+    tokens = []
+    for token_text in _lexical_tokens(term_text):
+        if token_text.lower() in {"cis", "trans"} and len(stereo_atoms) >= 2:
+            tokens.append(
+                NameTokenBinding(
+                    text=token_text,
+                    token_kind="stereo",
+                    ownership="exact",
+                    confidence="exact",
+                    source="renderer_stereo",
+                    grammar_role="relative_stereo",
+                    binding_key="prefix:relative_stereo",
+                    atom_ids=set(stereo_atoms),
+                    bond_ids=bond_ids_within(mol, stereo_atoms),
+                )
+            )
+            continue
+        tokens.append(
+            NameTokenBinding(
+                text=token_text,
+                token_kind="prefix",
+                source="substituent_renderer",
+                grammar_role="carbon_substituent",
+                binding_key="prefix:carbon_substituent",
+                atom_ids=set(atom_ids),
+                bond_ids=bond_ids_within(mol, atom_ids),
+                charge_atom_ids={idx for idx in atom_ids if mol.atoms[idx].charge != 0},
+            )
         )
-        for token_text in _lexical_tokens(term_text)
+    return tuple(tokens)
+
+
+def _embedded_absolute_stereo_tokens(mol: Molecule, center: int, term_text: str) -> tuple[NameTokenBinding, ...]:
+    """Return graph-bound tokens for directly rendered non-parent R/S descriptors."""
+
+    descriptor = mol.atoms[center].stereo
+    if descriptor not in {"R", "S"}:
+        return ()
+    if not re.search(rf"\({re.escape(descriptor)}\)-", term_text):
+        return ()
+    return (
+        NameTokenBinding(
+            text=descriptor,
+            token_kind="stereo",
+            ownership="exact",
+            confidence="exact",
+            source="renderer_stereo",
+            grammar_role="absolute_stereo",
+            binding_key="prefix:absolute_stereo",
+            atom_ids={center},
+        ),
     )
 
 
@@ -67,7 +107,7 @@ def _generic_heteroatom_substituent_tokens(
     if not center_tokens:
         return ()
 
-    tokens: list[NameTokenBinding] = []
+    tokens: list[NameTokenBinding] = list(_embedded_absolute_stereo_tokens(mol, center, term_text))
     ligand_roots = _heteroatom_ligand_roots(mol, center, atom_ids, upstream_atom)
     ligand_atoms_by_token = _direct_ligand_tokens(mol, center, ligand_roots, atom_ids)
     for token_text, ligand_atoms in ligand_atoms_by_token:
@@ -130,7 +170,7 @@ def _nitrogen_substituent_tokens(
     if not central_tokens:
         return ()
 
-    tokens: list[NameTokenBinding] = []
+    tokens: list[NameTokenBinding] = list(_embedded_absolute_stereo_tokens(mol, nitrogen, term_text))
     uses_n_ligand_locants = "n-" in lower_term or lower_term.startswith("n")
 
     for ligand_root in _heteroatom_ligand_roots(mol, nitrogen, atom_ids, upstream_atom):
