@@ -1319,7 +1319,321 @@ def _shortcut_substituent_tree(
             node["substituents"] = list(direct_prefix.ligand_trees)
         if direct_prefix.ligand_trace_segments:
             node["trace_segments"] = list(direct_prefix.ligand_trace_segments)
+    else:
+        shortcut_children = _oxygen_carbonyl_shortcut_children(name, component, mol)
+        if not shortcut_children:
+            shortcut_children = _heteroatom_shortcut_children(name, component, mol)
+        if shortcut_children:
+            node["substituents"] = shortcut_children
     return node
+
+
+def _heteroatom_shortcut_children(name: str, component: set[int], mol: Molecule) -> list[dict]:
+    """Return nested ligand nodes for heteroatom-starting shortcut substituents."""
+
+    center = _shortcut_heteroatom_center(component, mol)
+    if center is None:
+        return []
+    center_token = _heteroatom_center_token_in_name(mol.atoms[center].symbol, name)
+    if not center_token:
+        return []
+    direct_ligands = {
+        neighbor
+        for neighbor in mol.get_neighbors(center)
+        if neighbor in component
+        and mol.atoms[neighbor].symbol in {"O", "S", "N"}
+        and (bond := mol.get_bond(center, neighbor)) is not None
+        and bond.order >= 2
+    }
+    organic_roots = [
+        neighbor
+        for neighbor in mol.get_neighbors(center)
+        if neighbor in component and neighbor not in direct_ligands and mol.atoms[neighbor].symbol != "H"
+    ]
+    children = []
+    for root in organic_roots:
+        ligand_exclude = (set(mol.atoms) - component) | {center, *direct_ligands}
+        ligand_atoms = _subgraph_component(mol, root, ligand_exclude)
+        if not ligand_atoms:
+            continue
+        ligand_name = _organic_ligand_name_from_heteroatom_shortcut(name, center_token)
+        if not ligand_name:
+            ligand_name = _simple_ligand_node_name(mol, ligand_atoms)
+        ligand_children = _carbonyl_ligand_substituent_nodes(mol, center, root, ligand_atoms)
+        if not ligand_children:
+            ligand_tree = _recursive_ligand_tree(mol, root, ligand_exclude, upstream_atom=center)
+            if isinstance(ligand_tree, dict):
+                ligand_node = dict(ligand_tree)
+                if ligand_name:
+                    ligand_node["name"] = ligand_name
+                children.append(ligand_node)
+                continue
+            ligand_children = _terminal_ligand_substituent_nodes(mol, ligand_atoms, ligand_name)
+        children.append(_shortcut_ligand_node(ligand_name, ligand_atoms, ligand_children, mol))
+    return children
+
+
+def _shortcut_heteroatom_center(component: set[int], mol: Molecule) -> int | None:
+    candidates = [
+        atom_idx
+        for atom_idx in component
+        if mol.atoms[atom_idx].symbol not in {"C", "H", "O", "N"}
+        and any(neighbor not in component for neighbor in mol.get_neighbors(atom_idx))
+    ]
+    if candidates:
+        return candidates[0]
+    candidates = [
+        atom_idx
+        for atom_idx in component
+        if mol.atoms[atom_idx].symbol not in {"C", "H"}
+        and any(neighbor not in component for neighbor in mol.get_neighbors(atom_idx))
+    ]
+    return candidates[0] if candidates else None
+
+
+def _heteroatom_center_token_in_name(symbol: str, name: str) -> str:
+    tokens = {
+        "S": ("sulfonimidoyl", "sulfanylidene", "sulfaniumyl", "sulfonyl", "sulfinyl", "sulfanyl", "sulfo", "thioxo"),
+        "Se": ("selenanylidene", "selanylidene", "selenanyl", "selanyl", "selenido", "seleno"),
+        "Te": ("telluranylidene", "tellanyl", "tellurido", "telluro"),
+        "P": ("phosphoryl", "phosphono", "phosphanylidene", "phosphanylidynemethyl", "phosphanyl", "phosphino"),
+        "B": ("borylidene", "boryl", "boranuide"),
+        "Si": ("silylidene", "silyl"),
+        "O": ("hydroperoxy", "peroxy", "hydroxy", "oxy", "oxido"),
+        "N": ("ammonio", "azanidyl", "iminio", "amino", "imino", "nitrilo"),
+    }.get(symbol, ())
+    lower = strip_outer_parentheses(name).lower()
+    return next((token for token in tokens if token in lower), "")
+
+
+def _organic_ligand_name_from_heteroatom_shortcut(name: str, center_token: str) -> str:
+    text = strip_outer_parentheses(name)
+    lower = text.lower()
+    index = lower.rfind(center_token)
+    if index <= 0:
+        return ""
+    ligand = text[:index].strip("-")
+    return ligand
+
+
+def _simple_ligand_node_name(mol: Molecule, ligand_atoms: set[int]) -> str:
+    symbols = {mol.atoms[atom_idx].symbol for atom_idx in ligand_atoms}
+    if symbols <= {"C", "H"} and len(ligand_atoms) == 1:
+        return "methyl"
+    return "ligand"
+
+
+def _recursive_ligand_tree(
+    mol: Molecule,
+    root: int,
+    excluded_atoms: set[int],
+    *,
+    upstream_atom: int,
+) -> dict | None:
+    branch_result = name_subgraph(
+        mol,
+        root,
+        excluded_atoms,
+        upstream_atom=upstream_atom,
+        return_trace=True,
+        return_tree=True,
+        decision_trace=DecisionTrace(),
+    )
+    if isinstance(branch_result, tuple) and len(branch_result) == 3 and isinstance(branch_result[2], dict):
+        return branch_result[2]
+    return None
+
+
+def _shortcut_ligand_node(name: str, ligand_atoms: set[int], children: list[dict], mol: Molecule) -> dict:
+    return {
+        "kind": "fragment",
+        "name": name,
+        "atoms": sorted(ligand_atoms),
+        "bonds": sorted(_bond_ids_within(mol, ligand_atoms)),
+        "substituents": children,
+    }
+
+
+def _carbonyl_ligand_substituent_nodes(
+    mol: Molecule,
+    heteroatom_center: int,
+    ligand_root: int,
+    ligand_atoms: set[int],
+) -> list[dict]:
+    if not mol.atoms[ligand_root].is_carbon:
+        return []
+    terminal_chalcogens = [
+        neighbor
+        for neighbor in mol.get_neighbors(ligand_root)
+        if neighbor in ligand_atoms
+        and mol.atoms[neighbor].symbol in {"O", "S"}
+        and (bond := mol.get_bond(ligand_root, neighbor)) is not None
+        and bond.order == 2
+    ]
+    if len(terminal_chalcogens) != 1:
+        return []
+    branch_roots = [
+        neighbor
+        for neighbor in mol.get_neighbors(ligand_root)
+        if neighbor in ligand_atoms and neighbor not in {heteroatom_center, *terminal_chalcogens}
+    ]
+    if not branch_roots:
+        return []
+    branch_root = branch_roots[0]
+    excluded_atoms = (set(mol.atoms) - ligand_atoms) | {heteroatom_center, ligand_root, *terminal_chalcogens}
+    branch_atoms = _subgraph_component(mol, branch_root, excluded_atoms)
+    if not branch_atoms:
+        return []
+    branch_tree = _recursive_ligand_tree(mol, branch_root, excluded_atoms, upstream_atom=ligand_root)
+    if isinstance(branch_tree, dict):
+        side_node = dict(branch_tree)
+    else:
+        side_node = {
+            "kind": "fragment",
+            "name": "carbonyl side",
+            "atoms": sorted(branch_atoms),
+            "bonds": sorted(_bond_ids_within(mol, branch_atoms)),
+            "substituents": _terminal_ligand_substituent_nodes(mol, branch_atoms),
+        }
+    return [
+        side_node,
+        {
+            "kind": "functional_core",
+            "name": "carbonyl" if mol.atoms[terminal_chalcogens[0]].symbol == "O" else "carbonothioyl",
+            "atoms": sorted({ligand_root, terminal_chalcogens[0]}),
+            "bonds": sorted(_bond_ids_within(mol, {ligand_root, terminal_chalcogens[0]})),
+            "substituents": [],
+        },
+    ]
+
+
+def _terminal_ligand_substituent_nodes(mol: Molecule, ligand_atoms: set[int], ligand_name: str = "") -> list[dict]:
+    nodes = []
+    names = {"N": "amino", "O": "hydroxy", "F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
+    lower_name = ligand_name.lower()
+    for atom_idx in sorted(ligand_atoms):
+        name = names.get(mol.atoms[atom_idx].symbol)
+        if not name:
+            continue
+        local_bonds = {
+            bond.idx
+            for neighbor in mol.get_neighbors(atom_idx)
+            if neighbor in ligand_atoms and (bond := mol.get_bond(atom_idx, neighbor)) is not None
+        }
+        if len(local_bonds) != 1:
+            continue
+        local_bond = next(
+            bond
+            for neighbor in mol.get_neighbors(atom_idx)
+            if neighbor in ligand_atoms and (bond := mol.get_bond(atom_idx, neighbor)) is not None
+        )
+        if local_bond.order != 1:
+            continue
+        nodes.append(
+            {
+                "kind": "substituent",
+                "name": name,
+                "atoms": [atom_idx],
+                "bonds": sorted(local_bonds),
+                "locants": _visible_ligand_substituent_locants(lower_name, name),
+                "substituents": [],
+            }
+        )
+    return nodes
+
+
+def _visible_ligand_substituent_locants(lower_name: str, child_name: str) -> list[str]:
+    pattern = re.compile(rf"(?<![0-9])([0-9]+(?:,[0-9]+)*)-{re.escape(child_name.lower())}")
+    match = pattern.search(lower_name)
+    if match is None:
+        return []
+    return match.group(1).split(",")
+
+
+def _oxygen_carbonyl_shortcut_children(name: str, component: set[int], mol: Molecule) -> list[dict]:
+    """Return nested tree nodes for O-C(=O)-R shortcut substituents."""
+
+    if "carbonyloxy" not in name.lower() and "carbonothioyloxy" not in name.lower():
+        return []
+    oxygen = next(
+        (
+            atom_idx
+            for atom_idx in component
+            if mol.atoms[atom_idx].symbol == "O"
+            and any(neighbor not in component for neighbor in mol.get_neighbors(atom_idx))
+        ),
+        None,
+    )
+    if oxygen is None:
+        return []
+    carbonyl = next(
+        (
+            neighbor
+            for neighbor in mol.get_neighbors(oxygen)
+            if neighbor in component and mol.atoms[neighbor].is_carbon
+        ),
+        None,
+    )
+    if carbonyl is None:
+        return []
+    terminal = [
+        neighbor
+        for neighbor in mol.get_neighbors(carbonyl)
+        if neighbor in component
+        and neighbor != oxygen
+        and mol.atoms[neighbor].symbol in {"O", "S"}
+        and (bond := mol.get_bond(carbonyl, neighbor)) is not None
+        and bond.order == 2
+    ]
+    ligand_roots = [
+        neighbor for neighbor in mol.get_neighbors(carbonyl) if neighbor in component and neighbor not in {oxygen, *terminal}
+    ]
+    if not ligand_roots:
+        return []
+    ligand_root = ligand_roots[0]
+    ligand_atoms = _subgraph_component(mol, ligand_root, set(mol.atoms) - component | {oxygen, carbonyl, *terminal})
+    bridge_atoms = {ligand_root}
+    branch_root = None
+    for neighbor in mol.get_neighbors(ligand_root):
+        if neighbor not in ligand_atoms:
+            continue
+        bond = mol.get_bond(ligand_root, neighbor)
+        if bond is not None and bond.order == 2:
+            bridge_atoms.add(neighbor)
+            branch_candidates = [n for n in mol.get_neighbors(neighbor) if n in ligand_atoms and n != ligand_root]
+            branch_root = branch_candidates[0] if branch_candidates else None
+            break
+    if branch_root is None:
+        return []
+    branch_atoms = _subgraph_component(mol, branch_root, set(mol.atoms) - component | bridge_atoms | {oxygen, carbonyl, *terminal})
+    hydroxy_children = [
+        {
+            "kind": "substituent",
+            "name": "hydroxy",
+            "atoms": [atom_idx],
+            "bonds": sorted(_bond_ids_within(mol, {atom_idx, *mol.get_neighbors(atom_idx)} & branch_atoms)),
+            "substituents": [],
+        }
+        for atom_idx in sorted(branch_atoms)
+        if mol.atoms[atom_idx].symbol == "O"
+    ]
+    return [
+        {
+            "kind": "fragment",
+            "name": "ethenyl",
+            "atoms": sorted(bridge_atoms),
+            "bonds": sorted(_bond_ids_within(mol, bridge_atoms)),
+            "substituents": [
+                {
+                    "kind": "fragment",
+                    "name": "dihydroxyphenyl",
+                    "atoms": sorted(branch_atoms),
+                    "bonds": sorted(_bond_ids_within(mol, branch_atoms)),
+                    "substituents": hydroxy_children,
+                }
+            ],
+        }
+    ]
 
 
 def name_component(

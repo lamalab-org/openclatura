@@ -112,7 +112,12 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
     for item in parts.substituents:
         role = "spiro_substituent" if item.spiro is not None else "substituent"
         term = item.spiro.side_parent_name if item.spiro is not None else item.name
-        prefix_tokens = tuple(item.emitted_tokens) or _rendered_term_tokens(
+        prefix_tokens = (
+            _tree_substituent_emitted_tokens(item)
+            if _use_tree_substituent_tokens(item)
+            else tuple(item.emitted_tokens)
+        )
+        prefix_tokens = prefix_tokens or _rendered_term_tokens(
             term,
             token_kind="prefix",
             grammar_role=role,
@@ -152,6 +157,7 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
                 atom_ids=set(item.atom_ids),
                 bond_ids=set(item.bond_ids),
                 locants=tuple(str(locant) for locant in item.locants),
+                emitted_tokens=_unsaturation_emitted_tokens(parts, item),
             )
         )
     if parts.principal_group is not None:
@@ -318,6 +324,8 @@ def _with_default_emitted_tokens(binding: NameAtomBinding) -> NameAtomBinding:
 def _with_required_locant_tokens(binding: NameAtomBinding) -> NameAtomBinding:
     if not binding.locants:
         return binding
+    if binding.stage == "unsaturation" and binding.emitted_tokens:
+        return binding
     locant_text = ",".join(str(locant) for locant in binding.locants)
     required_tokens = []
     if not any(token.text == locant_text for token in binding.emitted_tokens):
@@ -472,6 +480,70 @@ def _hydro_operation_tokens(operation) -> tuple[NameTokenBinding, ...]:
     return tuple(tokens)
 
 
+def _unsaturation_emitted_tokens(parts: AssemblyParts, item) -> tuple[NameTokenBinding, ...]:
+    """Emit per-locant tokens for parent unsaturation from the locant map."""
+
+    tokens: list[NameTokenBinding] = []
+    locants = tuple(str(locant) for locant in item.locants)
+    for locant in reversed(_displayed_unsaturation_locants(locants)):
+        atom_ids, bond_ids = _unsaturation_locant_scope(parts, locant, set(item.bond_ids))
+        if not atom_ids and not bond_ids:
+            continue
+        tokens.insert(
+            0,
+            NameTokenBinding(
+                text=locant,
+                token_kind="locant",
+                source="default_binding",
+                grammar_role=item.bond_key,
+                binding_key=f"unsaturation:{item.bond_key}",
+                atom_ids=atom_ids,
+                bond_ids=bond_ids,
+                locants=(locant,),
+            ),
+        )
+    tokens.append(
+        NameTokenBinding(
+            text=bonds.get(item.bond_key).suffix,
+            token_kind="unsaturation",
+            source="default_binding",
+            grammar_role=item.bond_key,
+            binding_key=f"unsaturation:{item.bond_key}",
+            atom_ids=set(item.atom_ids),
+            bond_ids=set(item.bond_ids),
+            locants=locants,
+        )
+    )
+    return tuple(tokens)
+
+
+def _displayed_unsaturation_locants(locants: tuple[str, ...]) -> tuple[str, ...]:
+    displayed: list[str] = []
+    for locant in locants:
+        match = re.fullmatch(r"([^()]+)\(([^()]+)\)", locant)
+        if match:
+            displayed.extend([match.group(1), match.group(2)])
+        else:
+            displayed.append(locant)
+    return tuple(displayed)
+
+
+def _unsaturation_locant_scope(
+    parts: AssemblyParts,
+    locant: str,
+    allowed_bond_ids: set[int],
+) -> tuple[set[int], set[int]]:
+    atom_idx = parts.parent_atom_ids_by_locant.get(str(locant))
+    atom_ids = {atom_idx} if atom_idx is not None else set()
+    bond_ids = {
+        bond_id
+        for locant_pair, bond_id in parts.parent_bond_ids_by_locants.items()
+        if str(locant) in {str(value) for value in locant_pair}
+        and (not allowed_bond_ids or bond_id in allowed_bond_ids)
+    }
+    return atom_ids, bond_ids
+
+
 def _absolute_stereo_tokens(locant: str, descriptor: str, atom_idx: int) -> tuple[NameTokenBinding, ...]:
     """Return native tokens for an absolute stereochemical descriptor."""
 
@@ -593,9 +665,25 @@ def _locanted_emitted_tokens(
 ) -> tuple[NameTokenBinding, ...]:
     if not locants:
         return emitted_tokens
+    instance_tokens = _instance_tokens_for_locants(emitted_tokens, locants)
     locant_text = ",".join(locants)
     tokens = list(emitted_tokens)
-    if not any(token.text == locant_text for token in tokens):
+    tokens.extend(
+        _multiplied_hydroxy_tokens(
+            tokens,
+            locants,
+            grammar_role=grammar_role,
+            binding_key=binding_key,
+            atom_ids=atom_ids,
+            bond_ids=bond_ids,
+            charge_atom_ids=charge_atom_ids,
+        )
+    )
+    has_required_locant = any(_same_required_locant_token(token, locant_text, binding_key) for token in tokens)
+    has_existing_element_locant = locant_text in {"N", "O", "P", "S"} and any(
+        token.text == locant_text and token.token_kind == "locant" for token in tokens
+    )
+    if not has_required_locant and not has_existing_element_locant:
         tokens.insert(
             0,
             NameTokenBinding(
@@ -613,8 +701,14 @@ def _locanted_emitted_tokens(
     for locant in reversed(locants):
         if len(locants) <= 1:
             continue
-        if any(token.text == locant for token in tokens):
+        if any(token.text == locant and token.token_kind == "locant" for token in tokens):
             continue
+        instance_token = instance_tokens.get(locant)
+        locant_atom_ids = set(instance_token.atom_ids) if instance_token is not None else set(atom_ids)
+        locant_bond_ids = set(instance_token.bond_ids) if instance_token is not None else set(bond_ids)
+        locant_charge_atom_ids = (
+            set(instance_token.charge_atom_ids) if instance_token is not None else set(charge_atom_ids)
+        )
         tokens.insert(
             0,
             NameTokenBinding(
@@ -623,13 +717,79 @@ def _locanted_emitted_tokens(
                 source="default_binding",
                 grammar_role=grammar_role,
                 binding_key=binding_key,
-                atom_ids=set(atom_ids),
-                bond_ids=set(bond_ids),
-                charge_atom_ids=set(charge_atom_ids),
-                locants=locants,
+                atom_ids=locant_atom_ids,
+                bond_ids=locant_bond_ids,
+                charge_atom_ids=locant_charge_atom_ids,
+                locants=(locant,),
             ),
         )
     return tuple(tokens)
+
+
+def _multiplied_hydroxy_tokens(
+    tokens: list[NameTokenBinding],
+    locants: tuple[str, ...],
+    *,
+    grammar_role: str,
+    binding_key: str,
+    atom_ids: set[int],
+    bond_ids: set[int],
+    charge_atom_ids: set[int],
+) -> tuple[NameTokenBinding, ...]:
+    if len(locants) <= 1:
+        return ()
+    if not any(token.text in {"hydroxy", "oxy", "carboxy"} for token in tokens):
+        return ()
+    if any(token.text in {"dihydr", "trihydr", "tetrahydr"} for token in tokens):
+        return ()
+    multiplier_stem = {2: "dihydr", 3: "trihydr", 4: "tetrahydr"}.get(len(locants))
+    if multiplier_stem is None:
+        return ()
+    return (
+        NameTokenBinding(
+            text=multiplier_stem,
+            token_kind="grammar",
+            source="substituent_renderer",
+            grammar_role=grammar_role,
+            binding_key=binding_key,
+            atom_ids=set(atom_ids),
+            bond_ids=set(bond_ids),
+            charge_atom_ids=set(charge_atom_ids),
+            locants=locants,
+        ),
+        NameTokenBinding(
+            text="oxy",
+            token_kind="prefix",
+            source="substituent_renderer",
+            grammar_role=grammar_role,
+            binding_key=binding_key,
+            atom_ids=set(atom_ids),
+            bond_ids=set(bond_ids),
+            charge_atom_ids=set(charge_atom_ids),
+            locants=locants,
+        ),
+    )
+
+
+def _same_required_locant_token(token: NameTokenBinding, text: str, binding_key: str) -> bool:
+    return token.text == text and token.token_kind == "locant" and token.binding_key == binding_key
+
+
+def _instance_tokens_for_locants(
+    emitted_tokens: tuple[NameTokenBinding, ...],
+    locants: tuple[str, ...],
+) -> dict[str, NameTokenBinding]:
+    locant_count = len(locants)
+    if locant_count <= 1:
+        return {}
+    structural_tokens = [
+        token
+        for token in emitted_tokens
+        if token.token_kind != "locant" and (token.atom_ids or token.bond_ids or token.charge_atom_ids)
+    ]
+    if len(structural_tokens) != locant_count:
+        return {}
+    return {str(locant): token for locant, token in zip(locants, structural_tokens, strict=False)}
 
 
 def _principal_suffix_emitted_tokens(group) -> tuple[NameTokenBinding, ...]:
@@ -681,6 +841,281 @@ def _rendered_term_tokens(
             )
         )
     return tuple(tokens)
+
+
+def _tree_substituent_emitted_tokens(item) -> tuple[NameTokenBinding, ...]:
+    """Emit precise tokens for a recursive substituent tree.
+
+    A complex substituent such as
+    ``(2-(4-fluorophenyl)-...-1H-pyrrol-1-yl)`` has one top-level graph scope
+    but many nested name pieces with narrower graph ownership. Tokenizing the
+    whole top-level phrase would make every child token inherit the full
+    substituent graph. Instead, reuse the recursive tree's local fragments.
+    """
+
+    tree = item.substituent_tree
+    if not isinstance(tree, dict):
+        return tuple(item.emitted_tokens)
+    tokens: list[NameTokenBinding] = []
+    _extend_tree_substituent_tokens(tokens, tree, include_node_name=False)
+    tokens.extend(_preserved_renderer_tokens_for_tree_substituent(item.emitted_tokens))
+    return _dedupe_token_bindings(tokens) or tuple(item.emitted_tokens)
+
+
+def _use_tree_substituent_tokens(item) -> bool:
+    tree = item.substituent_tree
+    if not isinstance(tree, dict):
+        return False
+    return any(_is_recursive_fragment_child(child) for child in tree.get("substituents") or ())
+
+
+def _is_recursive_fragment_child(child: dict) -> bool:
+    return isinstance(child, dict) and (
+        child.get("kind") == "fragment"
+        or isinstance(child.get("parent"), dict)
+        or bool(child.get("substituents"))
+    )
+
+
+def _preserved_renderer_tokens_for_tree_substituent(
+    emitted_tokens: tuple[NameTokenBinding, ...],
+) -> tuple[NameTokenBinding, ...]:
+    return tuple(
+        token
+        for token in emitted_tokens
+        if token.token_kind == "stereo"
+        or token.source == "renderer_stereo"
+        or token.source == "n_substituent_locant"
+        or (
+            token.source == "substituent_renderer"
+            and token.binding_key
+            in {
+                "prefix:alkenyl_branch_locant",
+                "prefix:alkenyl_bridge",
+                "prefix:alkenyl_bridge_stereo",
+                "prefix:aryl_branch",
+                "prefix:aryl_branch_locants",
+                "prefix:carbonyl_like_core",
+                "prefix:heteroatom_center",
+            }
+        )
+    )
+
+
+def _extend_tree_substituent_tokens(tokens: list[NameTokenBinding], node: dict, *, include_node_name: bool) -> None:
+    if not isinstance(node, dict):
+        return
+    node_atoms = set(node.get("atoms") or [])
+    node_bonds = set(node.get("bonds") or [])
+    node_charges = set(node.get("charge_atoms") or [])
+    emitted_node_name = False
+    if include_node_name:
+        emitted_node_name = _append_name_tokens(tokens, node.get("name") or "", node_atoms, node_bonds, node_charges)
+    parent = node.get("parent") if isinstance(node.get("parent"), dict) else None
+    node_name = str(node.get("name") or "")
+    if parent is not None:
+        parent_atoms = set(parent.get("atoms") or [])
+        parent_bonds = set(parent.get("bonds") or [])
+        parent_name = str(parent.get("retained_name") or "")
+        _append_parent_locant_tokens(tokens, node.get("name") or "", parent, parent_bonds, node_charges)
+        _append_substituent_suffix_tokens(tokens, node_name, parent, parent_bonds, node_charges)
+        if parent_name and _term_visible_in_name(parent_name, node_name):
+            _append_name_tokens(tokens, parent_name, parent_atoms, parent_bonds, node_charges)
+        for segment in node.get("trace_segments") or ():
+            if not isinstance(segment, dict):
+                continue
+            if segment.get("label") != "parent skeleton":
+                continue
+            if set(segment.get("atoms") or []) != parent_atoms:
+                continue
+            for term in segment.get("name_terms") or ():
+                if not _term_visible_in_name(str(term), node_name):
+                    continue
+                _append_name_tokens(tokens, str(term), parent_atoms, parent_bonds, node_charges)
+    for hydro in node.get("hydro_operations") or ():
+        if not isinstance(hydro, dict):
+            continue
+        atoms = set(hydro.get("atom_ids") or [])
+        for locant in hydro.get("locants") or ():
+            tokens.append(
+                NameTokenBinding(
+                    text=str(locant),
+                    token_kind="locant",
+                    source="substituent_tree",
+                    grammar_role="indicated_hydrogen",
+                    binding_key="prefix:tree_hydro",
+                    atom_ids=set(atoms),
+                    locants=(str(locant),),
+                )
+            )
+        tokens.append(
+            NameTokenBinding(
+                text="H",
+                token_kind="hydro",
+                source="substituent_tree",
+                grammar_role="indicated_hydrogen",
+                binding_key="prefix:tree_hydro",
+                atom_ids=set(atoms),
+            )
+        )
+    for simple_key in ("replacement_prefixes", "substituents"):
+        for child in node.get(simple_key) or ():
+            if not isinstance(child, dict):
+                continue
+            child_atoms = set(child.get("atoms") or [])
+            child_bonds = set(child.get("bonds") or [])
+            child_charges = set(child.get("charge_atoms") or [])
+            for locant in child.get("locants") or ():
+                tokens.append(
+                    NameTokenBinding(
+                        text=str(locant),
+                        token_kind="locant",
+                        source="substituent_tree",
+                        grammar_role=child.get("kind") or simple_key,
+                        binding_key="prefix:tree_locant",
+                        atom_ids=set(child_atoms),
+                        bond_ids=set(child_bonds),
+                        charge_atom_ids=set(child_charges),
+                        locants=(str(locant),),
+                    )
+                )
+            if not emitted_node_name:
+                _extend_tree_substituent_tokens(tokens, child, include_node_name=True)
+
+
+def _append_name_tokens(
+    tokens: list[NameTokenBinding],
+    name: str,
+    atom_ids: set[int],
+    bond_ids: set[int],
+    charge_atom_ids: set[int],
+) -> bool:
+    emitted = False
+    for token_text in _binding_term_tokens(name):
+        if _is_locant_like_token(token_text):
+            continue
+        emitted = True
+        tokens.append(
+            NameTokenBinding(
+                text=token_text,
+                token_kind="prefix",
+                source="substituent_tree",
+                grammar_role="recursive_substituent",
+                binding_key="prefix:tree_substituent",
+                atom_ids=set(atom_ids),
+                bond_ids=set(bond_ids),
+                charge_atom_ids=set(charge_atom_ids),
+            )
+        )
+    return emitted
+
+
+def _term_visible_in_name(term: str, name: str) -> bool:
+    term_norm = re.sub(r"[^a-z0-9]+", "", term.lower())
+    name_norm = re.sub(r"[^a-z0-9]+", "", name.lower())
+    return bool(term_norm) and term_norm in name_norm
+
+
+def _append_parent_locant_tokens(
+    tokens: list[NameTokenBinding],
+    name: str,
+    parent: dict,
+    bond_ids: set[int],
+    charge_atom_ids: set[int],
+) -> None:
+    locant_map = parent.get("atom_ids_by_locant")
+    if not isinstance(locant_map, dict):
+        return
+    name_locants = set(_locant_like_tokens_in_name(name))
+    for locant, atom_id in locant_map.items():
+        locant_text = str(locant)
+        if locant_text not in name_locants:
+            continue
+        try:
+            atom_idx = int(atom_id)
+        except (TypeError, ValueError):
+            continue
+        tokens.append(
+            NameTokenBinding(
+                text=locant_text,
+                token_kind="locant",
+                source="substituent_tree",
+                grammar_role="recursive_parent_locant",
+                binding_key="prefix:tree_parent_locant",
+                atom_ids={atom_idx},
+                bond_ids=set(bond_ids),
+                charge_atom_ids=set(charge_atom_ids) & {atom_idx},
+                locants=(locant_text,),
+            )
+        )
+
+
+def _append_substituent_suffix_tokens(
+    tokens: list[NameTokenBinding],
+    name: str,
+    parent: dict,
+    bond_ids: set[int],
+    charge_atom_ids: set[int],
+) -> None:
+    match = re.search(r"(?:^|[-(])([0-9]+|N|O|P|S)-(?P<suffix>yl|ylidene|ylidyne)\)?$", name)
+    if not match:
+        return
+    locant = match.group(1)
+    atom_id = _parent_atom_for_locant(parent, locant)
+    if atom_id is None:
+        return
+    suffix = match.group("suffix")
+    tokens.append(
+        NameTokenBinding(
+            text=suffix,
+            token_kind="prefix",
+            source="substituent_tree",
+            grammar_role="recursive_substituent_suffix",
+            binding_key="prefix:tree_substituent_suffix",
+            atom_ids={atom_id},
+            bond_ids=set(bond_ids),
+            charge_atom_ids=set(charge_atom_ids) & {atom_id},
+            locants=(locant,),
+        )
+    )
+
+
+def _parent_atom_for_locant(parent: dict, locant: str) -> int | None:
+    locant_map = parent.get("atom_ids_by_locant")
+    if not isinstance(locant_map, dict):
+        return None
+    atom_id = locant_map.get(str(locant))
+    try:
+        return int(atom_id)
+    except (TypeError, ValueError):
+        return None
+
+
+def _locant_like_tokens_in_name(name: str) -> tuple[str, ...]:
+    return tuple(token for token in _binding_term_tokens(name) if _is_locant_like_token(token))
+
+
+def _is_locant_like_token(token: str) -> bool:
+    return bool(re.fullmatch(r"(?:[0-9]+|N|O|P|S)(?:,(?:[0-9]+|N|O|P|S))*", token))
+
+
+def _dedupe_token_bindings(tokens: list[NameTokenBinding]) -> tuple[NameTokenBinding, ...]:
+    deduped: list[NameTokenBinding] = []
+    seen: set[tuple] = set()
+    for token in tokens:
+        key = (
+            token.text,
+            token.token_kind,
+            tuple(sorted(token.atom_ids)),
+            tuple(sorted(token.bond_ids)),
+            tuple(sorted(token.charge_atom_ids)),
+            tuple(token.locants),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(token)
+    return tuple(deduped)
 
 
 def _data_backed_prefix_subtokens(term: str) -> tuple[str, ...]:

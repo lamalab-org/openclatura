@@ -538,7 +538,60 @@ def test_non_n_heteroatom_substituent_tokens_bind_center_and_ligands():
     methyl = next(token for token in result.token_spans if token.text == "methyl")
     sulfonyl = next(token for token in result.token_spans if token.text == "sulfonyl")
     assert methyl.atom_ids == frozenset({2})
-    assert sulfonyl.atom_ids == frozenset({1})
+    assert sulfonyl.atom_ids == frozenset({1, 3, 4})
+    assert sulfonyl.bond_ids == frozenset({3, 4})
+
+
+def test_heteroatom_shortcut_leaf_tokens_and_tree_are_graph_local():
+    analysis = analyze_smiles("O=S(=O)(Nc1nc(cc(n1)C)C)c2ccc(N)cc2")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    tokens = {(token["text"], token["start"]): token for token in assembly.data["name_token_spans"]}
+    name = analysis.name
+
+    assert analysis.name == "N-(4-aminophenylsulfonyl)-4,6-dimethylpyrimidin-2-amine"
+    assert tokens[("N", name.index("N-("))]["atoms"] == [3]
+    assert tokens[("N", name.index("N-("))]["source"] == "n_substituent_locant"
+    assert tokens[("4", name.index("4-aminophenyl"))]["atoms"] == [16]
+    assert tokens[("aminophenyl", name.index("aminophenyl"))]["atoms"] == [12, 13, 14, 15, 16, 17, 18]
+    assert tokens[("sulfonyl", name.index("sulfonyl"))]["atoms"] == [0, 1, 2]
+    assert tokens[("sulfonyl", name.index("sulfonyl"))]["bonds"] == [1, 2]
+
+    component = analysis.substituent_tree[0]
+    sulfonyl_branch = next(item for item in component["substituents"] if item["name"] == "(4-aminophenylsulfonyl)")
+    ligand = sulfonyl_branch["substituents"][0]
+    assert ligand["name"] == "4-aminophenyl"
+    assert ligand["substituents"][0]["name"] == "amino"
+    assert ligand["substituents"][0]["locants"] == ["4"]
+
+
+def test_carbonylamino_heteroatom_shortcut_tree_does_not_invent_hydroxy_children():
+    analysis = analyze_smiles("CC(C)C[C@@H](C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CC(C)C)C(=O)O)N")
+    component = analysis.substituent_tree[0]
+    peptide_branch = next(
+        item
+        for item in component["substituents"]
+        if item["name"]
+        == "(1S)-1-((1S)-1-amino-3-methylbutylcarbonylamino)-3-methylbutylcarbonylamino"
+    )
+    branch_children = peptide_branch["substituents"][0]["substituents"]
+    child_names = [child["name"] for child in branch_children]
+
+    assert "hydroxy" not in child_names
+    assert "carbonyl" in child_names
+    carbonyl = next(child for child in branch_children if child["name"] == "carbonyl")
+    assert carbonyl["atoms"] == [13, 14]
+    assert carbonyl["bonds"] == [14]
+    side = next(child for child in branch_children if child["name"].endswith("methylbutyl)"))
+    assert side["parent"]["parent_length"] == 4
+    assert any(child["name"] == "methyl" for child in side["substituents"])
+    carbonylamino = next(child for child in side["substituents"] if child["name"].endswith("carbonylamino"))
+    assert carbonylamino["atoms"] == [0, 1, 2, 3, 4, 5, 6, 7, 24]
+    inner_carbonyl = carbonylamino["substituents"][0]
+    inner_side = next(child for child in inner_carbonyl["substituents"] if child["name"].endswith("methylbutyl)"))
+    amino = next(child for child in inner_side["substituents"] if child["name"] == "amino")
+    assert amino["locants"] == ["1"]
+    core = next(child for child in inner_carbonyl["substituents"] if child["name"] == "carbonyl")
+    assert core["atoms"] == [5, 6]
 
 
 def test_postprocessing_rewrites_keep_token_metadata_auditable():
@@ -822,11 +875,27 @@ def test_n_substituent_locant_survives_retained_suffix_postprocessing():
     n_locant = next(token for token in assembly.data["name_token_spans"] if token["text"] == "N")
 
     assert analysis.name == "N-methylacetamide"
-    assert n_locant["source"] in {"default_binding", "typed_rewrite"}
+    assert n_locant["source"] == "n_substituent_locant"
     assert n_locant["confidence"] in {"exact", "derived"}
     assert n_locant["ownership"] == "exact"
     assert n_locant["token_kind"] == "locant"
-    assert n_locant["binding_key"] == "prefix:substituent"
+    assert n_locant["binding_key"] == "prefix:n_substituent_locant"
+
+
+def test_n_substituent_and_parent_suffix_morphology_tokens_have_local_scope():
+    analysis = analyze_smiles("CC(=O)Nc1ccccc1")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    tokens = {token["text"]: token for token in assembly.data["name_token_spans"]}
+
+    assert analysis.name == "N-phenylacetamide"
+    assert tokens["N"]["atoms"] == [3]
+    assert tokens["N"]["bonds"] == [4]
+    assert tokens["N"]["source"] == "n_substituent_locant"
+    assert tokens["phenyl"]["atoms"] == [4, 5, 6, 7, 8, 9]
+    assert tokens["acet"]["atoms"] == [0, 1, 2, 3]
+    assert tokens["acet"]["bonds"] == [1, 2, 3]
+    assert tokens["acet"]["source"] == "parent_suffix_gap"
+    assert tokens["amide"]["atoms"] == [1, 2, 3]
 
 
 def test_mixed_numeric_and_element_locants_are_bound_individually():
@@ -837,10 +906,11 @@ def test_mixed_numeric_and_element_locants_are_bound_individually():
     assert analysis.name == "2,N-dimethylpropanamide"
     for key in [("2", 0), ("N", 2)]:
         token = tokens[key]
-        assert token["source"] == "typed_rewrite"
+        expected_source = "typed_rewrite" if key[0] == "2" else "n_substituent_locant"
+        assert token["source"] == expected_source
         assert token["confidence"] == "derived"
         assert token["ownership"] == "exact"
-        assert token["binding_key"] == "prefix:substituent"
+        assert token["binding_key"] in {"prefix:substituent", "prefix:n_substituent_locant"}
 
 
 def test_multiplier_token_is_grammar_scoped_not_broad_fallback():
@@ -866,6 +936,221 @@ def test_retained_dihydro_and_indicated_h_tokens_avoid_broad_fallback():
     assert tokens["H"]["source"] == "indicated_hydrogen_fallback"
     assert tokens["H"]["token_kind"] == "hydro"
     assert tokens["H"]["ownership"] == "locanted_hydro"
+
+
+def test_recursive_substituent_tree_tokens_keep_nested_scopes_local():
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0})
+    parts.substituents.append(
+        SubstituentItem(
+            name="(2-(4-fluorophenyl)-3-phenyl-4-(phenylcarbamoyl)-5-(propan-2-yl)-1H-pyrrol-1-yl)",
+            locants=["7"],
+            atom_ids=set(range(11, 41)),
+            bond_ids=set(range(11, 45)),
+            substituent_tree={
+                "name": "(2-(4-fluorophenyl)-3-phenyl-4-(phenylcarbamoyl)-5-(propan-2-yl)-1H-pyrrol-1-yl)",
+                "atoms": list(range(11, 41)),
+                "bonds": list(range(11, 45)),
+                "parent": {
+                    "retained_name": "pyrrole",
+                    "atoms": [11, 12, 13, 14, 15],
+                    "bonds": [12, 13, 14, 15, 42],
+                },
+                "trace_segments": [
+                    {
+                        "label": "parent skeleton",
+                        "atoms": [11, 12, 13, 14, 15],
+                        "bonds": [12, 13, 14, 15, 42],
+                        "name_terms": ["pyrrole", "pyrrol"],
+                    }
+                ],
+                "hydro_operations": [{"locants": ["1"], "atom_ids": [11]}],
+                "substituents": [
+                    {
+                        "name": "(4-fluorophenyl)",
+                        "locants": ["2"],
+                        "atoms": [16, 17, 18, 19, 20, 21, 22],
+                        "bonds": [17, 18, 19, 20, 21, 22, 41],
+                        "substituents": [
+                            {
+                                "name": "fluoro",
+                                "locants": ["4"],
+                                "atoms": [20],
+                                "bonds": [20],
+                                "substituents": [],
+                            }
+                        ],
+                    },
+                    {
+                        "name": "phenyl",
+                        "locants": ["3"],
+                        "atoms": [23, 24, 25, 26, 27, 28],
+                        "bonds": [24, 25, 26, 27, 28, 43],
+                        "substituents": [],
+                    },
+                    {
+                        "name": "(phenylcarbamoyl)",
+                        "locants": ["4"],
+                        "atoms": [29, 30, 31, 32, 33, 34, 35, 36, 37],
+                        "bonds": [30, 31, 32, 33, 34, 35, 36, 37, 44],
+                        "substituents": [
+                            {
+                                "name": "phenyl",
+                                "atoms": [32, 33, 34, 35, 36, 37],
+                                "bonds": [33, 34, 35, 36, 37, 44],
+                                "substituents": [],
+                            }
+                        ],
+                    },
+                    {
+                        "name": "(propan-2-yl)",
+                        "locants": ["5"],
+                        "atoms": [38, 39, 40],
+                        "bonds": [39, 40],
+                        "parent": {
+                            "atoms": [38, 39, 40],
+                            "bonds": [39, 40],
+                            "atom_ids_by_locant": {"1": 39, "2": 38, "3": 40},
+                        },
+                        "substituents": [],
+                    },
+                ],
+            },
+        )
+    )
+
+    bindings = tuple(refresh_name_atom_bindings(parts))
+    text = "7-(2-(4-fluorophenyl)-3-phenyl-4-(phenylcarbamoyl)-5-(propan-2-yl)-1H-pyrrol-1-yl)"
+    tokens = build_name_token_spans(text, bindings)
+    by_text = {(token.text, token.start): token for token in tokens}
+
+    assert by_text[("fluorophenyl", text.index("fluorophenyl"))].atom_ids == frozenset(
+        {16, 17, 18, 19, 20, 21, 22}
+    )
+    assert by_text[("4", text.index("4-fluorophenyl"))].atom_ids == frozenset({20})
+    assert by_text[("phenyl", text.index("-3-phenyl") + 3)].atom_ids == frozenset({23, 24, 25, 26, 27, 28})
+    assert by_text[("4", text.index("4-(phenylcarbamoyl"))].atom_ids == frozenset(
+        {29, 30, 31, 32, 33, 34, 35, 36, 37}
+    )
+    assert by_text[("phenylcarbamoyl", text.index("phenylcarbamoyl"))].atom_ids == frozenset(
+        {29, 30, 31, 32, 33, 34, 35, 36, 37}
+    )
+    assert by_text[("2", text.index("propan-2-yl") + len("propan-"))].atom_ids == frozenset({38})
+
+
+def test_repeated_grouped_locants_use_following_structural_scope():
+    parts = AssemblyParts(
+        parent_length=9,
+        is_ring=True,
+        is_bicycle=True,
+        bicycle_xyz=(4, 3, 0),
+        parent_atom_ids={1, 2, 3, 4, 5, 6, 8, 9, 11},
+        parent_bond_ids={2, 3, 4, 5, 6, 8, 9, 11, 14, 15},
+    )
+    parts.a_prefixes.extend(
+        [
+            SubstituentItem(name="aza", locants=["2"], atom_ids={11}),
+            SubstituentItem(name="aza", locants=["4"], atom_ids={8}),
+            SubstituentItem(name="aza", locants=["7"], atom_ids={1}),
+            SubstituentItem(name="aza", locants=["9"], atom_ids={3}),
+        ]
+    )
+    parts.substituents.append(
+        SubstituentItem(
+            name="methyl",
+            locants=["2", "4", "7"],
+            atom_ids={0, 12, 13},
+            bond_ids={1, 12, 13},
+            emitted_tokens=(
+                NameTokenBinding(text="methyl", atom_ids={12}, source="substituent_renderer"),
+                NameTokenBinding(text="methyl", atom_ids={13}, source="substituent_renderer"),
+                NameTokenBinding(text="methyl", atom_ids={0}, source="substituent_renderer"),
+            ),
+        )
+    )
+    bindings = tuple(refresh_name_atom_bindings(parts))
+    text = "2,4,7-trimethyl-2,4,7,9-tetraazabicyclo[4.3.0]nona"
+    tokens = build_name_token_spans(text, bindings)
+    by_start = {(token.text, token.start): token for token in tokens}
+
+    assert by_start[("2,4,7", 0)].atom_ids == frozenset({0, 12, 13})
+    assert by_start[("methyl", text.index("methyl"))].atom_ids == frozenset({0, 12, 13})
+    assert by_start[("2", text.index("2,4,7,9"))].atom_ids == frozenset({11})
+    assert by_start[("4", text.index("2,4,7,9") + 2)].atom_ids == frozenset({8})
+    assert by_start[("7", text.index("2,4,7,9") + 4)].atom_ids == frozenset({1})
+    assert by_start[("9", text.index("2,4,7,9") + 6)].atom_ids == frozenset({3})
+    assert by_start[(",", text.index("2,4,7,9") + 1)].atom_ids == frozenset()
+    assert by_start[("tetra", text.index("tetra"))].atom_ids == frozenset({1, 3, 8, 11})
+    assert by_start[("aza", text.index("aza"))].atom_ids == frozenset({1, 3, 8, 11})
+
+
+def test_parenthesized_unsaturation_locants_bind_to_double_bond_endpoints():
+    analysis = analyze_smiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)C")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    tokens = {(token["text"], token["start"]): token for token in assembly.data["name_token_spans"]}
+    name = analysis.name
+
+    assert analysis.name == "2,4,7-trimethyl-2,4,7,9-tetraazabicyclo[4.3.0]nona-1(6),8-diene-3,5-dione"
+    assert tokens[("1", name.index("1(6)"))]["atoms"] == [4]
+    assert tokens[("1", name.index("1(6)"))]["bonds"] == [5]
+    assert tokens[("6", name.index("6),8"))]["atoms"] == [5]
+    assert tokens[("6", name.index("6),8"))]["bonds"] == [5]
+    assert tokens[("8", name.index("8-diene"))]["atoms"] == [2]
+    assert tokens[("8", name.index("8-diene"))]["bonds"] == [3]
+
+
+def test_nested_hydroxyphenyl_propan_yl_tokens_keep_local_scopes():
+    analysis = analyze_smiles("CC(C)(C1=CC=C(C=C1)O)C2=CC=C(C=C2)O")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    tokens = {(token["text"], token["start"]): token for token in assembly.data["name_token_spans"]}
+    name = analysis.name
+
+    assert analysis.name == "4-(2-(4-hydroxyphenyl)propan-2-yl)benzen-1-ol"
+    assert tokens[("2", name.index("2-(4-hydroxyphenyl"))]["atoms"] == [1]
+    assert tokens[("4", name.index("4-hydroxyphenyl"))]["atoms"] == [16]
+    assert tokens[("hydroxyphenyl", name.index("hydroxyphenyl"))]["atoms"] == [10, 11, 12, 13, 14, 15, 16]
+    assert tokens[("prop", name.index("propan"))]["atoms"] == [0, 1, 2]
+    assert tokens[("2", name.index("2-yl"))]["atoms"] == [1]
+    assert tokens[("yl", name.index("yl)benzen"))]["atoms"] == [1]
+    assert tokens[("benzen", name.index("benzen"))]["atoms"] == [3, 4, 5, 6, 7, 8]
+
+
+def test_oxygen_carbonyl_alkenyl_aryl_substituent_tokens_keep_local_scopes():
+    analysis = analyze_smiles("C1[C@H]([C@@H]([C@@H](C=C1C(=O)O)OC(=O)/C=C/C2=CC(=C(C=C2)O)O)O)O")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    tokens = {(token["text"], token["start"]): token for token in assembly.data["name_token_spans"]}
+    name = analysis.name
+
+    assert (
+        analysis.name
+        == "(3R,4S,5R)-3-((1E)-2-(3,4-dihydroxyphenyl)ethenylcarbonyloxy)-4,5-dihydroxycyclohex-1-ene-1-carboxylic acid"
+    )
+    assert tokens[("1", name.index("1E"))]["atoms"] == [12, 13]
+    assert tokens[("1", name.index("1E"))]["bonds"] == [13]
+    assert tokens[("E", name.index("E)-2"))]["atoms"] == [12, 13]
+    assert tokens[("2", name.index("2-(3,4-dihydroxyphenyl"))]["atoms"] == [14, 15, 16, 17, 18, 19, 20, 21]
+    assert tokens[("3,4", name.index("3,4-dihydroxyphenyl"))]["atoms"] == [20, 21]
+    assert tokens[("3,4", name.index("3,4-dihydroxyphenyl"))]["bonds"] == [20, 21]
+    assert tokens[("dihydroxyphenyl", name.index("dihydroxyphenyl"))]["atoms"] == [
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+    ]
+    assert tokens[("eth", name.index("ethenyl"))]["atoms"] == [12, 13]
+    ethenyl_start = name.index("ethenyl")
+    assert tokens[("en", name.index("enyl", ethenyl_start))]["bonds"] == [13]
+    assert tokens[("yl", name.index("ylcarbonyloxy", ethenyl_start))]["atoms"] == [12, 13]
+    assert tokens[("carbonyl", name.index("carbonyloxy"))]["atoms"] == [10, 11]
+    assert tokens[("oxy", name.index("oxy)-4,5"))]["atoms"] == [9]
+    assert tokens[("4,5", name.index("4,5-dihydroxycyclohex"))]["atoms"] == [22, 23]
+    assert tokens[("dihydr", name.index("dihydroxycyclohex"))]["atoms"] == [22, 23]
+    assert tokens[("oxy", name.index("oxycyclohex"))]["atoms"] == [22, 23]
+    assert tokens[("1", name.index("1-ene"))]["atoms"] == [5]
+    assert tokens[("en", name.index("ene-1-carboxylic"))]["atoms"] == [4, 5]
 
 
 def test_contextual_postprocessing_updates_absorbed_binding_terms():

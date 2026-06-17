@@ -892,7 +892,7 @@ def build_name_token_spans(text: str, bindings: tuple[NameAtomBinding, ...]) -> 
             if _spans_overlap(start, end, span_start, span_end)
         ]
         if native_matches:
-            tokens.extend(_token_spans_from_native_matches(text, start, end, native_matches))
+            tokens.extend(_token_spans_from_native_matches(text, start, end, native_matches, native_spans, bindings))
             continue
         binding_indices = {
             binding_idx
@@ -926,6 +926,11 @@ def _native_token_spans(
         if binding.stage == "assembly" and binding.role in {"absolute_stereo", "bond_stereo"}:
             spans.extend(_absolute_stereo_native_token_spans(search_text, binding_idx, binding))
             continue
+        if binding.stage == "unsaturation":
+            unsaturation_spans = _unsaturation_native_token_spans(search_text, binding_idx, binding)
+            if unsaturation_spans:
+                spans.extend(unsaturation_spans)
+                continue
         if not any(_is_locant_search_token(token_binding) for token_binding in binding.emitted_tokens):
             ordered_spans = _ordered_native_token_spans(text, search_text, binding_idx, binding)
             if ordered_spans:
@@ -989,6 +994,26 @@ def _absolute_stereo_native_token_spans(
     return spans
 
 
+def _unsaturation_native_token_spans(
+    search_text: str,
+    binding_idx: int,
+    binding: NameAtomBinding,
+) -> list[tuple[int, int, int, NameTokenBinding]]:
+    locant_token = next((token for token in binding.emitted_tokens if token.token_kind == "locant"), None)
+    unsat_token = next((token for token in binding.emitted_tokens if token.token_kind == "unsaturation"), None)
+    if locant_token is None or unsat_token is None:
+        return []
+    locant_text = locant_token.text.lower()
+    unsat_text = unsat_token.text.lower()
+    pattern = re.compile(rf"{re.escape(locant_text)}-{re.escape(unsat_text)}(?=e?\\b)")
+    spans: list[tuple[int, int, int, NameTokenBinding]] = []
+    for match in pattern.finditer(search_text):
+        spans.append((match.start(), match.start() + len(locant_text), binding_idx, locant_token))
+        unsat_start = match.start() + len(locant_text) + 1
+        spans.append((unsat_start, unsat_start + len(unsat_text), binding_idx, unsat_token))
+    return spans
+
+
 def _ordered_native_token_spans(
     text: str,
     search_text: str,
@@ -1019,6 +1044,58 @@ def _native_token_occurrences(
 ) -> tuple[int, ...]:
     raw_token = token_binding.text.strip()
     token = raw_token.lower()
+    if token_binding.binding_key == "prefix:alkenyl_bridge_stereo" and token_binding.token_kind == "locant":
+        return tuple(
+            match.start()
+            for match in re.finditer(re.escape(raw_token), text)
+            if match.start() >= start
+            and match.end() < len(text)
+            and text[match.end()] in "EZ"
+        )
+    if token_binding.grammar_role == "alkenyl_bridge_unsaturation" and token == "en":
+        return tuple(
+            match.start()
+            for match in re.finditer(re.escape(raw_token), search_text)
+            if match.start() >= start
+            and search_text[match.end() : match.end() + 2] == "yl"
+        )
+    if (
+        token_binding.binding_key == "prefix:substituent"
+        and token_binding.source == "substituent_renderer"
+        and token in {"dihydr", "trihydr", "tetrahydr", "oxy"}
+        and len(token_binding.locants) > 1
+    ):
+        locant_prefix = ",".join(str(locant).lower() for locant in token_binding.locants)
+        return tuple(
+            match.start()
+            for match in re.finditer(re.escape(raw_token), search_text)
+            if match.start() >= start
+            and (
+                search_text[max(0, match.start() - len(locant_prefix) - 1) : match.start()]
+                == f"{locant_prefix}-"
+                or search_text[max(0, match.start() - len(locant_prefix) - len("-dihydr")) : match.start()]
+                == f"{locant_prefix}-dihydr"
+            )
+        )
+    if token_binding.grammar_role == "alkenyl_bridge_suffix" and token == "yl":
+        return tuple(
+            match.start()
+            for match in re.finditer(re.escape(raw_token), search_text)
+            if match.start() >= start and search_text[max(0, match.start() - 2) : match.start()] == "en"
+        )
+    if token_binding.binding_key == "prefix:heteroatom_center" and token == "oxy":
+        return tuple(
+            match.start()
+            for match in re.finditer(re.escape(raw_token), search_text)
+            if match.start() >= start
+            and search_text[max(0, match.start() - len("carbonyl")) : match.start()] == "carbonyl"
+        )
+    if token_binding.token_kind == "stereo" and len(raw_token) == 1:
+        return tuple(
+            match.start()
+            for match in re.finditer(re.escape(raw_token), text)
+            if match.start() >= start
+        )
     if _is_locant_search_token(token_binding):
         return tuple(
             match.start()
@@ -1045,7 +1122,7 @@ def _is_locant_search_token(token_binding: NameTokenBinding) -> bool:
 def _is_standalone_locant_span(text: str, start: int, end: int) -> bool:
     before = text[start - 1] if start > 0 else ""
     after = text[end] if end < len(text) else ""
-    return (not before or before in "-,( ") and (not after or after in "-,)' ")
+    return (not before or before in "-,( ") and (not after or after in "-,()' " or after in "EZRS")
 
 
 def _native_token_is_searchable(token: str, token_binding: NameTokenBinding | None = None) -> bool:
@@ -1571,15 +1648,22 @@ def _token_spans_from_native_matches(
     start: int,
     end: int,
     matches: list[tuple[int, int, int, NameTokenBinding]],
+    all_matches: list[tuple[int, int, int, NameTokenBinding]] | None = None,
+    bindings: tuple[NameAtomBinding, ...] = (),
 ) -> list[NameTokenSpan]:
     exact_matches = [
         (binding_idx, token_binding)
         for span_start, span_end, binding_idx, token_binding in matches
         if span_start == start and span_end == end
     ]
+    exact_matches = _disambiguate_locant_exact_matches(text, start, end, exact_matches, all_matches or matches)
+    exact_matches = _disambiguate_structural_exact_matches(text, start, end, exact_matches)
+    if exact_matches and _should_split_broad_exact_match(text, start, end, exact_matches, matches):
+        exact_matches = []
     if exact_matches:
         return [_token_span_from_native_binding_group(text[start:end], start, end, exact_matches)]
 
+    matches = _filter_locant_matches_by_governing_scope(text, start, end, matches, all_matches or matches)
     spans = []
     sorted_matches = sorted(matches, key=lambda item: (item[0], item[1], item[2]))
     grouped_matches: dict[tuple[int, int], list[tuple[int, NameTokenBinding]]] = {}
@@ -1588,6 +1672,7 @@ def _token_spans_from_native_matches(
         clipped_end = min(end, span_end)
         if clipped_start < clipped_end:
             grouped_matches.setdefault((clipped_start, clipped_end), []).append((binding_idx, token_binding))
+    grouped_matches = _prune_overlapping_native_match_groups(grouped_matches)
     ordered_keys = sorted(grouped_matches)
     cursor = start
     previous_key: tuple[int, int] | None = None
@@ -1603,6 +1688,7 @@ def _token_spans_from_native_matches(
                         clipped_start,
                         text,
                         _adjacent_native_gap_matches(grouped_matches, previous_key, next_key),
+                        bindings,
                     )
                 )
         spans.append(
@@ -1610,7 +1696,13 @@ def _token_spans_from_native_matches(
                 text[clipped_start:clipped_end],
                 clipped_start,
                 clipped_end,
-                grouped_matches[(clipped_start, clipped_end)],
+                _disambiguate_locant_exact_matches(
+                    text,
+                    clipped_start,
+                    clipped_end,
+                    grouped_matches[(clipped_start, clipped_end)],
+                    all_matches or matches,
+                ),
             )
         )
         cursor = max(cursor, clipped_end)
@@ -1625,9 +1717,310 @@ def _token_spans_from_native_matches(
                     end,
                     text,
                     _adjacent_native_gap_matches(grouped_matches, previous_key, None),
+                    bindings,
                 )
             )
     return spans
+
+
+def _filter_locant_matches_by_governing_scope(
+    text: str,
+    start: int,
+    end: int,
+    matches: list[tuple[int, int, int, NameTokenBinding]],
+    all_matches: list[tuple[int, int, int, NameTokenBinding]],
+) -> list[tuple[int, int, int, NameTokenBinding]]:
+    token_text = text[start:end]
+    if not re.fullmatch(r"(?:[0-9]+|N|O|P|S)(?:,(?:[0-9]+|N|O|P|S))*", token_text):
+        return matches
+    next_scope = _governing_structural_scope_after_locant_cluster(text, end, all_matches)
+    if not next_scope:
+        return matches
+    filtered = []
+    for span_start, span_end, binding_idx, token in matches:
+        if token.token_kind != "locant" or not token.atom_ids:
+            filtered.append((span_start, span_end, binding_idx, token))
+            continue
+        atom_ids = set(token.atom_ids)
+        if atom_ids <= next_scope or atom_ids & next_scope:
+            filtered.append((span_start, span_end, binding_idx, token))
+    return filtered or matches
+
+
+def _disambiguate_locant_exact_matches(
+    text: str,
+    start: int,
+    end: int,
+    exact_matches: list[tuple[int, NameTokenBinding]],
+    all_matches: list[tuple[int, int, int, NameTokenBinding]],
+) -> list[tuple[int, NameTokenBinding]]:
+    """Resolve repeated locants by the structural token they introduce."""
+
+    if len(exact_matches) <= 1:
+        return exact_matches
+    token_text = text[start:end]
+    if not re.fullmatch(r"(?:[0-9]+|N|O|P|S)(?:,(?:[0-9]+|N|O|P|S))*", token_text):
+        return exact_matches
+    if not all(token.token_kind == "locant" for _binding_idx, token in exact_matches):
+        return exact_matches
+    if end < len(text) and text[end] in "EZRS":
+        stereo_locants = [
+            (binding_idx, token)
+            for binding_idx, token in exact_matches
+            if token.source == "renderer_stereo" or token.grammar_role in {"absolute_stereo", "bond_stereo"}
+        ]
+        if stereo_locants:
+            return stereo_locants
+    preferred_element_locants = _preferred_element_locant_matches(token_text, exact_matches)
+    if preferred_element_locants:
+        return preferred_element_locants
+    if _following_text_starts_suffix(text, end):
+        return _widest_locant_scope(exact_matches)
+    if start == 0 and text[end : end + 2] == "-(":
+        return _widest_locant_scope(exact_matches)
+    next_scope = _governing_structural_scope_after_locant_cluster(text, end, all_matches)
+    if not next_scope:
+        next_scope = _next_structural_native_scope(text, end, all_matches)
+    if text[end : end + 2] == "-(" and not next_scope:
+        return _widest_locant_scope(exact_matches)
+    if not next_scope:
+        return exact_matches
+    contained = [
+        (binding_idx, token)
+        for binding_idx, token in exact_matches
+        if token.atom_ids and set(token.atom_ids) <= next_scope
+    ]
+    if contained:
+        min_size = min(len(token.atom_ids) + len(token.bond_ids) for _binding_idx, token in contained)
+        return [
+            (binding_idx, token)
+            for binding_idx, token in contained
+            if len(token.atom_ids) + len(token.bond_ids) == min_size
+        ]
+    overlapping = [
+        (binding_idx, token)
+        for binding_idx, token in exact_matches
+        if token.atom_ids and bool(set(token.atom_ids) & next_scope)
+    ]
+    if overlapping:
+        return overlapping
+    return exact_matches
+
+
+def _disambiguate_structural_exact_matches(
+    text: str,
+    start: int,
+    end: int,
+    exact_matches: list[tuple[int, NameTokenBinding]],
+) -> list[tuple[int, NameTokenBinding]]:
+    if len(exact_matches) <= 1:
+        return exact_matches
+    token_text = text[start:end].lower()
+    if token_text == "en":
+        if text[end : end + 2].lower() == "yl":
+            preferred = [
+                (binding_idx, token)
+                for binding_idx, token in exact_matches
+                if token.grammar_role == "alkenyl_bridge_unsaturation" or token.binding_key == "prefix:alkenyl_bridge"
+            ]
+            if preferred:
+                return preferred
+        if text[end : end + 1].lower() == "e":
+            preferred = [
+                (binding_idx, token)
+                for binding_idx, token in exact_matches
+                if token.binding_key == "unsaturation:double"
+            ]
+            if preferred:
+                return preferred
+    if token_text == "oxy" and text[max(0, start - len("carbonyl")) : start].lower() == "carbonyl":
+        preferred = [
+            (binding_idx, token)
+            for binding_idx, token in exact_matches
+            if token.binding_key == "prefix:heteroatom_center"
+        ]
+        if preferred:
+            return preferred
+    if token_text == "oxy" and text[max(0, start - len("dihydr")) : start].lower() == "dihydr":
+        preferred = [
+            (binding_idx, token)
+            for binding_idx, token in exact_matches
+            if token.binding_key.startswith("prefix:")
+        ]
+        if preferred:
+            return preferred
+    return exact_matches
+
+
+def _prune_overlapping_native_match_groups(
+    grouped_matches: dict[tuple[int, int], list[tuple[int, NameTokenBinding]]],
+) -> dict[tuple[int, int], list[tuple[int, NameTokenBinding]]]:
+    """Drop broader helper matches when graph-local subpieces explain the same text."""
+
+    pruned = {key: list(matches) for key, matches in grouped_matches.items()}
+    for key, matches in list(grouped_matches.items()):
+        start, end = key
+        kept: list[tuple[int, NameTokenBinding]] = []
+        for binding_idx, token in matches:
+            if _is_redundant_tree_container(start, end, token, grouped_matches):
+                continue
+            if _has_longer_same_start_token(start, end, token, grouped_matches):
+                continue
+            kept.append((binding_idx, token))
+        if kept:
+            pruned[key] = kept
+        else:
+            pruned.pop(key, None)
+    return pruned
+
+
+def _is_redundant_tree_container(
+    start: int,
+    end: int,
+    token: NameTokenBinding,
+    grouped_matches: dict[tuple[int, int], list[tuple[int, NameTokenBinding]]],
+) -> bool:
+    if token.source != "substituent_tree" or not token.atom_ids:
+        return False
+    covered = set()
+    for (other_start, other_end), other_matches in grouped_matches.items():
+        if other_start < start or other_end > end or (other_start, other_end) == (start, end):
+            continue
+        for _binding_idx, other in other_matches:
+            if other.source != "substituent_renderer":
+                continue
+            if set(other.atom_ids) != set(token.atom_ids) or set(other.bond_ids) != set(token.bond_ids):
+                continue
+            covered.update(range(other_start, other_end))
+    return len(covered) >= max(1, (end - start) // 2)
+
+
+def _has_longer_same_start_token(
+    start: int,
+    end: int,
+    token: NameTokenBinding,
+    grouped_matches: dict[tuple[int, int], list[tuple[int, NameTokenBinding]]],
+) -> bool:
+    if token.source != "substituent_renderer" or not token.atom_ids:
+        return False
+    for (other_start, other_end), other_matches in grouped_matches.items():
+        if other_start != start or other_end <= end:
+            continue
+        for _binding_idx, other in other_matches:
+            if other.source != token.source:
+                continue
+            if other.binding_key != token.binding_key:
+                continue
+            if set(other.atom_ids) == set(token.atom_ids) and set(other.bond_ids) == set(token.bond_ids):
+                return True
+    return False
+
+
+def _should_split_broad_exact_match(
+    text: str,
+    start: int,
+    end: int,
+    exact_matches: list[tuple[int, NameTokenBinding]],
+    matches: list[tuple[int, int, int, NameTokenBinding]],
+) -> bool:
+    """Prefer graph-local sub-tokens over broad recursive fragment names."""
+
+    if not exact_matches:
+        return False
+    if not all(token.source == "substituent_tree" for _binding_idx, token in exact_matches):
+        return False
+    exact_atoms = set().union(*(set(token.atom_ids) for _binding_idx, token in exact_matches))
+    if not exact_atoms:
+        return False
+    contained_renderer_matches = [
+        (span_start, span_end, token)
+        for span_start, span_end, _binding_idx, token in matches
+        if start <= span_start
+        and span_end <= end
+        and not (span_start == start and span_end == end)
+        and token.source == "substituent_renderer"
+        and token.atom_ids
+        and set(token.atom_ids) <= exact_atoms
+    ]
+    if not contained_renderer_matches:
+        return False
+    covered = {
+        index
+        for span_start, span_end, _token in contained_renderer_matches
+        for index in range(max(start, span_start), min(end, span_end))
+        if text[index].isalnum()
+    }
+    alnum_positions = {index for index in range(start, end) if text[index].isalnum()}
+    return bool(alnum_positions) and len(covered) >= max(1, len(alnum_positions) // 2)
+
+
+def _following_text_starts_suffix(text: str, end: int) -> bool:
+    following = text[end:].lower()
+    return following.startswith("-carboxylic") or following.startswith("-carboxylate") or following.startswith("-amide")
+
+
+def _preferred_element_locant_matches(
+    token_text: str,
+    exact_matches: list[tuple[int, NameTokenBinding]],
+) -> list[tuple[int, NameTokenBinding]]:
+    if token_text not in _ELEMENT_LOCANT_TOKENS:
+        return []
+    preferred = [
+        (binding_idx, token)
+        for binding_idx, token in exact_matches
+        if token.source == "n_substituent_locant" or token.binding_key == "prefix:n_substituent_locant"
+    ]
+    return preferred
+
+
+def _widest_locant_scope(exact_matches: list[tuple[int, NameTokenBinding]]) -> list[tuple[int, NameTokenBinding]]:
+    if len(exact_matches) <= 1:
+        return exact_matches
+    max_size = max(len(token.atom_ids) + len(token.bond_ids) for _binding_idx, token in exact_matches)
+    if max_size <= 0:
+        return exact_matches
+    return [
+        (binding_idx, token)
+        for binding_idx, token in exact_matches
+        if len(token.atom_ids) + len(token.bond_ids) == max_size
+    ]
+
+
+def _governing_structural_scope_after_locant_cluster(
+    text: str,
+    end: int,
+    all_matches: list[tuple[int, int, int, NameTokenBinding]],
+) -> set[int]:
+    pos = end
+    while pos < len(text) and (text[pos].isdigit() or text[pos] in {",", "'", '"', "(", ")"}):
+        pos += 1
+    if pos >= len(text) or text[pos] != "-":
+        return set()
+    return _next_structural_native_scope(text, pos + 1, all_matches)
+
+
+def _next_structural_native_scope(
+    text: str,
+    end: int,
+    all_matches: list[tuple[int, int, int, NameTokenBinding]],
+) -> set[int]:
+    next_lexical = _LEXICAL_TOKEN_RE.search(text, end)
+    while next_lexical:
+        token_norm = _normalise_name_text(next_lexical.group(0))
+        if token_norm in _NON_STRUCTURAL_GRAMMAR_TOKENS:
+            next_lexical = _LEXICAL_TOKEN_RE.search(text, next_lexical.end())
+            continue
+        next_start, next_end = next_lexical.span()
+        atom_ids: set[int] = set()
+        for span_start, span_end, _binding_idx, token in all_matches:
+            if token.token_kind == "locant":
+                continue
+            if _spans_overlap(next_start, next_end, span_start, span_end):
+                atom_ids.update(token.atom_ids)
+        if atom_ids:
+            return atom_ids
+        next_lexical = _LEXICAL_TOKEN_RE.search(text, next_lexical.end())
+    return set()
 
 
 def _adjacent_native_gap_matches(
@@ -1649,8 +2042,20 @@ def _token_span_for_native_gap(
     end: int,
     full_text: str,
     adjacent_matches: list[tuple[int, NameTokenBinding]] | None = None,
+    bindings: tuple[NameAtomBinding, ...] = (),
 ) -> NameTokenSpan:
     token_norm = _normalise_name_text(text)
+    if _is_punctuation_only_gap(text):
+        return NameTokenSpan(
+            text=text,
+            start=start,
+            end=end,
+            token_kind="grammar",
+            ownership="grammar_scope",
+            confidence="derived",
+            source="compound_gap_token",
+            grammar_role="punctuation",
+        )
     if token_norm in _COMPOUND_CONNECTIVE_TOKENS and adjacent_matches:
         bridged = _token_span_from_native_binding_group(text, start, end, adjacent_matches)
         return NameTokenSpan(
@@ -1681,6 +2086,9 @@ def _token_span_for_native_gap(
             grammar_role=token_norm,
         )
     if adjacent_matches:
+        parent_suffix_gap = _parent_suffix_morphology_gap_resolution(adjacent_matches, bindings)
+        if parent_suffix_gap is not None:
+            return _token_span_from_binding_indices(text, start, end, parent_suffix_gap, bindings)
         bridged = _token_span_from_native_binding_group(text, start, end, adjacent_matches)
         return NameTokenSpan(
             text=bridged.text,
@@ -1710,12 +2118,68 @@ def _token_span_for_native_gap(
     )
 
 
+def _is_punctuation_only_gap(text: str) -> bool:
+    return bool(text) and all(not char.isalnum() for char in text)
+
+
+def _parent_suffix_morphology_gap_resolution(
+    adjacent_matches: list[tuple[int, NameTokenBinding]],
+    bindings: tuple[NameAtomBinding, ...],
+) -> TokenBindingResolution | None:
+    """Bind parent/suffix morphology gaps without pulling in prefix scope."""
+
+    if not bindings:
+        return None
+    adjacent_indices = {binding_idx for binding_idx, _token in adjacent_matches}
+    has_prefix = any(bindings[idx].stage == "prefix" for idx in adjacent_indices)
+    suffix_indices = {idx for idx in adjacent_indices if bindings[idx].stage == "suffix"}
+    if not has_prefix or not suffix_indices:
+        return None
+    parent_indices = _parent_binding_indices(bindings)
+    scoped = tuple(sorted(parent_indices | suffix_indices))
+    if not scoped:
+        return None
+    return TokenBindingResolution(
+        binding_indices=scoped,
+        token_kind="parent",
+        ownership="morphology_gap",
+        confidence="derived",
+        source="parent_suffix_gap",
+        grammar_role="parent_suffix_morphology",
+        binding_key="parent_suffix_gap",
+    )
+
+
 def _token_span_from_native_binding_group(
     text: str,
     start: int,
     end: int,
     matches: list[tuple[int, NameTokenBinding]],
 ) -> NameTokenSpan:
+    if text.lower() == "en":
+        bridge_matches = [
+            (binding_idx, token_binding)
+            for binding_idx, token_binding in matches
+            if token_binding.binding_key == "prefix:alkenyl_bridge"
+        ]
+        if bridge_matches:
+            matches = bridge_matches
+    if text.lower() == "oxy":
+        oxy_matches = [
+            (binding_idx, token_binding)
+            for binding_idx, token_binding in matches
+            if token_binding.binding_key == "prefix:heteroatom_center"
+        ]
+        if oxy_matches:
+            matches = oxy_matches
+        else:
+            prefix_oxy_matches = [
+                (binding_idx, token_binding)
+                for binding_idx, token_binding in matches
+                if token_binding.binding_key.startswith("prefix:")
+            ]
+            if prefix_oxy_matches:
+                matches = prefix_oxy_matches
     stereo_matches = [
         (binding_idx, token_binding)
         for binding_idx, token_binding in matches
