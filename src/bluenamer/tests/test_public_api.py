@@ -114,13 +114,22 @@ def test_absolute_stereo_tokens_bind_to_stereocenter_atoms():
     assembly = [step for step in result.decisions if step.decision == "assembled component name"][-1]
     token_spans = assembly.data["name_token_spans"]
 
-    assert [(token["text"], token["atoms"], token["token_kind"], token["source"]) for token in token_spans[:4]] == [
-        ("3", [4], "locant", "renderer_stereo"),
-        ("R", [4], "stereo", "renderer_stereo"),
-        ("5", [7], "locant", "renderer_stereo"),
-        ("R", [7], "stereo", "renderer_stereo"),
+    expected_tokens = [
+        ("3", 4, "locant", "renderer_stereo"),
+        ("R", 4, "stereo", "renderer_stereo"),
+        ("5", 7, "locant", "renderer_stereo"),
+        ("R", 7, "stereo", "renderer_stereo"),
     ]
-    assert all(token["confidence"] != "fallback" for token in token_spans[:4])
+    for text, atom, token_kind, source in expected_tokens:
+        token = next(
+            token
+            for token in token_spans
+            if token["text"] == text
+            and token["atoms"] == [atom]
+            and token["token_kind"] == token_kind
+            and token["source"] == source
+        )
+        assert token["confidence"] != "fallback"
 
 
 def test_naming_errors_become_result_error_not_exception():

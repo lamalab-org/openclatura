@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from .assembly_parts import AssemblyParts, NameAtomBinding, NameTokenBinding
 from .molecule import Molecule
 from .name_bindings import ensure_name_atom_binding_tokens, postprocess_name_atom_bindings
+from .stereo_descriptors import is_searchable_stereo_token
 
 
 @dataclass(frozen=True)
@@ -1051,7 +1052,7 @@ def _native_token_is_searchable(token: str, token_binding: NameTokenBinding | No
     if not token:
         return False
     if token_binding is not None and token_binding.token_kind == "stereo":
-        return token in {"r", "s", "e", "z", "cis", "trans"}
+        return is_searchable_stereo_token(token)
     return len(token) >= 2 or token.isdigit() or "," in token or token in _ELEMENT_LOCANT_TOKENS
 
 
@@ -1720,7 +1721,7 @@ def _token_span_from_native_binding_group(
         for binding_idx, token_binding in matches
         if token_binding.source == "renderer_stereo"
     ]
-    if stereo_matches:
+    if stereo_matches and _should_prioritize_renderer_stereo(text, stereo_matches):
         matches = stereo_matches
     atoms: set[int] = set()
     bonds: set[int] = set()
@@ -1763,6 +1764,18 @@ def _token_span_from_native_binding_group(
         grammar_role=_collapse_metadata(grammar_roles, default=""),
         binding_key=_collapse_metadata(binding_keys, default=""),
     )
+
+
+def _should_prioritize_renderer_stereo(text: str, matches: list[tuple[int, NameTokenBinding]]) -> bool:
+    """Return whether a span is owned by an explicit stereo-renderer token."""
+
+    token_text = text.lower()
+    for _binding_idx, token_binding in matches:
+        if token_binding.token_kind == "stereo" and is_searchable_stereo_token(token_text):
+            return True
+        if token_binding.token_kind == "locant" and token_binding.grammar_role in {"absolute_stereo", "bond_stereo"}:
+            return True
+    return False
 
 
 def _collapse_metadata(values: list[str], *, default: str) -> str:

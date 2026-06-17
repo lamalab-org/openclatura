@@ -7,6 +7,7 @@ from .assembly_parts import AssemblyParts, NameAtomBinding, NameTokenBinding
 from .nomenclature import RULES
 from .principal_suffixes import render_principal_suffix
 from .rules import bonds, stems
+from .stereo_descriptors import ABSOLUTE_STEREO_DESCRIPTORS, BOND_STEREO_DESCRIPTORS
 
 
 def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
@@ -43,7 +44,7 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
             )
         )
     for locant, descriptor in parts.stereo_features:
-        if descriptor not in {"R", "S"} or not locant:
+        if descriptor not in ABSOLUTE_STEREO_DESCRIPTORS or not locant:
             continue
         atom_idx = parts.parent_atom_ids_by_locant.get(str(locant))
         if atom_idx is None:
@@ -59,7 +60,7 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
             )
         )
     for locant, descriptor in parts.stereo_features:
-        if descriptor not in {"E", "Z"} or not locant:
+        if descriptor not in BOND_STEREO_DESCRIPTORS or not locant:
             continue
         _bond_locants, atom_ids, bond_ids = _bond_stereo_graph_scope(parts, str(locant))
         if not atom_ids:
@@ -69,10 +70,10 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
                 stage="assembly",
                 role="bond_stereo",
                 term=descriptor,
-                atom_ids=set(atom_ids),
-                bond_ids=set(bond_ids),
+                atom_ids=atom_ids,
+                bond_ids=bond_ids,
                 locants=(str(locant),),
-                emitted_tokens=_bond_stereo_tokens(str(locant), descriptor, set(atom_ids), set(bond_ids)),
+                emitted_tokens=_bond_stereo_tokens(str(locant), descriptor, atom_ids, bond_ids),
             )
         )
     bindings.extend(preserved_assembly_stereo)
@@ -540,8 +541,8 @@ def _bond_stereo_tokens(
             source="renderer_stereo",
             grammar_role="bond_stereo",
             binding_key="assembly:bond_stereo",
-            atom_ids=set(atom_ids),
-            bond_ids=set(bond_ids),
+            atom_ids=atom_ids,
+            bond_ids=bond_ids,
             locants=(locant,),
         ),
         NameTokenBinding(
@@ -552,8 +553,8 @@ def _bond_stereo_tokens(
             source="renderer_stereo",
             grammar_role="bond_stereo",
             binding_key="assembly:bond_stereo",
-            atom_ids=set(atom_ids),
-            bond_ids=set(bond_ids),
+            atom_ids=atom_ids,
+            bond_ids=bond_ids,
             locants=(locant,),
         ),
     )
