@@ -405,7 +405,9 @@ def _prefer_spiro_backbone_components(
     eligible_ring_components = [
         candidate
         for candidate in eligible
-        if candidate.is_ring and shared_counts.get(tuple(candidate.path), 0) > 0 and tuple(candidate.path) in ring_system_by_path
+        if candidate.is_ring
+        and shared_counts.get(tuple(candidate.path), 0) > 0
+        and tuple(candidate.path) in ring_system_by_path
     ]
     if len(eligible_ring_components) < 2:
         return candidates
