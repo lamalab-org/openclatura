@@ -593,17 +593,21 @@ def name_component(
             "name_rewrite_history": parts.name_rewrite_history,
         },
     )
-    tree = assembly_substituent_tree(
-        parts,
-        name=name,
-        atom_ids=state.component_atoms,
-        bond_ids=bond_ids_within(mol, state.component_atoms),
-    )
-    tree["kind"] = "component"
+    trace_segments = assembly_trace_segments(parts) if return_trace or return_tree else []
+    tree = None
+    if return_tree:
+        tree = assembly_substituent_tree(
+            parts,
+            name=name,
+            atom_ids=state.component_atoms,
+            bond_ids=bond_ids_within(mol, state.component_atoms),
+            trace_segments=trace_segments,
+        )
+        tree["kind"] = "component"
     if return_trace and return_tree:
-        return name, assembly_trace_segments(parts), tree
+        return name, trace_segments, tree
     if return_trace:
-        return name, assembly_trace_segments(parts)
+        return name, trace_segments
     if return_tree:
         return name, tree
     return name

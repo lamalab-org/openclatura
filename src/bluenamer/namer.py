@@ -1236,6 +1236,7 @@ def name_subgraph(
     )
 
     name = _assemble_parent_name(mol, parts, numbered_path, get_loc, finalize_subgraph=True)
+    trace_segments = _assembly_trace_segments(parts) if return_trace or return_tree else []
     trace_decision(
         decision_trace,
         TracePhase.ASSEMBLY,
@@ -1245,11 +1246,10 @@ def name_subgraph(
         bonds=_bond_ids_within(mol, component),
         data={
             "name": name,
-            "trace_segment_count": len(_assembly_trace_segments(parts)) if return_trace else 0,
+            "trace_segment_count": len(trace_segments),
         },
     )
     if return_trace:
-        trace_segments = _assembly_trace_segments(parts)
         if return_tree:
             return (
                 name,
@@ -1260,6 +1260,7 @@ def name_subgraph(
                     atom_ids=component,
                     bond_ids=_bond_ids_within(mol, component),
                     decisions=decision_trace_data(decision_trace),
+                    trace_segments=trace_segments,
                 ),
             )
         return name, trace_segments
@@ -1272,6 +1273,7 @@ def name_subgraph(
                 atom_ids=component,
                 bond_ids=_bond_ids_within(mol, component),
                 decisions=decision_trace_data(decision_trace),
+                trace_segments=trace_segments,
             ),
         )
     return name

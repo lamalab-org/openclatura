@@ -113,7 +113,11 @@ def add_substituent_trace(
         existing.trace_segments.extend(trace_segments)
         existing.nested_decisions.extend(nested_decisions)
         if substituent_tree:
-            existing.substituent_tree = substituent_tree
+            existing.substituent_tree = _merge_substituent_tree_instances(
+                existing.substituent_tree,
+                substituent_tree,
+                existing.name,
+            )
         existing.emitted_tokens = existing.emitted_tokens + tuple(emitted_tokens)
     else:
         parts.substituents.append(
@@ -186,7 +190,11 @@ def assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
             target.trace_segments.extend(item.trace_segments)
             target.nested_decisions.extend(item.nested_decisions)
             if item.substituent_tree:
-                target.substituent_tree = item.substituent_tree
+                target.substituent_tree = _merge_substituent_tree_instances(
+                    target.substituent_tree,
+                    item.substituent_tree,
+                    target.name,
+                )
         for item in grouped.values():
             if item.trace_segments and strip_outer_parentheses(item.name) != "methyl":
                 for segment in item.trace_segments:
@@ -305,9 +313,12 @@ def assembly_substituent_tree(
     atom_ids=None,
     bond_ids=None,
     decisions=None,
+    trace_segments=None,
 ) -> dict:
     """Return a nested substituent tree from the graph-bound assembly parts."""
 
+    if trace_segments is None:
+        trace_segments = assembly_trace_segments(parts)
     component_atoms = set(atom_ids or parts.parent_atom_ids)
     component_bonds = set(bond_ids or parts.parent_bond_ids)
     parent_node = {
@@ -352,10 +363,30 @@ def assembly_substituent_tree(
             }
             for item in parts.parent_charges
         ],
-        "trace_segments": assembly_trace_segments(parts),
+        "trace_segments": list(trace_segments),
         "nested_decisions": list(decisions or ()),
     }
     return parent_node
+
+
+def _merge_substituent_tree_instances(existing: dict | None, new: dict, name: str) -> dict:
+    """Preserve all tree instances when same-name substituents are grouped."""
+
+    if existing is None:
+        return new
+    if existing == new:
+        merged = dict(existing)
+        merged["instance_count"] = int(merged.get("instance_count", 1)) + 1
+        return merged
+    if existing.get("kind") == "grouped_substituent_instances":
+        merged = dict(existing)
+        merged["instances"] = [*existing.get("instances", ()), new]
+        return merged
+    return {
+        "kind": "grouped_substituent_instances",
+        "name": name,
+        "instances": [existing, new],
+    }
 
 
 def _parent_tree_node(parts: AssemblyParts) -> dict:

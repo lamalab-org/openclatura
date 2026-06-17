@@ -290,6 +290,29 @@ def test_add_substituent_trace_preserves_nested_decisions_into_segments():
     assert assembly_trace_segments(parts)[0]["nested_decisions"] == nested_decisions
 
 
+def test_add_substituent_trace_preserves_grouped_tree_instances():
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={0})
+
+    add_substituent_trace(
+        parts,
+        "ethyl",
+        "1",
+        atom_ids={1, 2},
+        substituent_tree={"kind": "substituent", "name": "ethyl", "atoms": [1, 2]},
+    )
+    add_substituent_trace(
+        parts,
+        "ethyl",
+        "2",
+        atom_ids={3, 4},
+        substituent_tree={"kind": "substituent", "name": "ethyl", "atoms": [3, 4]},
+    )
+
+    tree = parts.substituents[0].substituent_tree
+    assert tree["kind"] == "grouped_substituent_instances"
+    assert [instance["atoms"] for instance in tree["instances"]] == [[1, 2], [3, 4]]
+
+
 def test_principal_suffix_tokens_are_emitted_from_functional_group_renderer():
     parts = AssemblyParts(
         parent_length=3,
