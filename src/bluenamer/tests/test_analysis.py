@@ -33,7 +33,7 @@ from bluenamer.assembly_spiro import (
     format_spiro_core,
     split_spiro_substituents,
 )
-from bluenamer.chains import find_all_carbon_paths, find_ring_systems
+from bluenamer.chains import RingSystem, find_all_carbon_paths, find_ring_systems
 from bluenamer.charge_pair_roles import charge_pair_roles, unsupported_charge_pair_roles
 from bluenamer.formatting import ensure_stereo_descriptor_boundary, format_counted_prefixes
 from bluenamer.functional_groups import (
@@ -112,6 +112,7 @@ from bluenamer.parent_selection import (
     ParentCandidate,
     ParentSelection,
     ParentSeniorityProfile,
+    _prefer_spiro_backbone_components,
     select_principal_parent,
 )
 from bluenamer.perception import PerceivedGroup, perceive_groups
@@ -3243,7 +3244,7 @@ def test_parent_selection_has_named_shape():
     assert selection.score_tuple
 
 
-def test_parent_selection_criteria_are_data_ordered_and_behavior_preserving():
+def test_parent_selection_criteria_are_data_ordered():
     profile = ParentSeniorityProfile(
         principal_group_count=1,
         contains_principal_group=True,
@@ -3274,6 +3275,81 @@ def test_parent_selection_criteria_are_data_ordered_and_behavior_preserving():
         "path_tiebreak",
     )
     assert profile.score_tuple() == (-1, -1, (7,), 0, (), (-2, 0, (0, 0, 0, 0, 0, 0)), 0, 0, (0, 1))
+
+
+def test_senior_element_vector_orders_ring_and_chain_parent_profiles():
+    def profile(*, ring_parent: bool, senior_element_vector: tuple[int, ...]) -> ParentSeniorityProfile:
+        return ParentSeniorityProfile(
+            principal_group_count=0,
+            contains_principal_group=False,
+            senior_element_vector=senior_element_vector,
+            polycycle_parent=False,
+            bicycle_parent=False,
+            spiro_parent=False,
+            ring_parent=ring_parent,
+            ring_count=1 if ring_parent else 0,
+            parent_atom_count=4,
+            heteroatom_count=1,
+            senior_heteroatom_vector=(),
+            senior_heteroatom_count_vector=(0, 0, 0, 0, 0, 0),
+            multiple_bond_count=0,
+            double_bond_count=0,
+            path_tiebreak=(0, 1, 2, 3),
+        )
+
+    n_ring = profile(ring_parent=True, senior_element_vector=(1, 7))
+    o_ring = profile(ring_parent=True, senior_element_vector=(5, 7))
+    n_chain = profile(ring_parent=False, senior_element_vector=(1, 7))
+    o_chain = profile(ring_parent=False, senior_element_vector=(5, 7))
+
+    assert n_ring.score_tuple() < o_ring.score_tuple()
+    assert n_chain.score_tuple() < o_chain.score_tuple()
+
+
+def test_spiro_backbone_filter_keeps_noncompeting_candidates_and_matches_all_ring_paths():
+    backbone = ParentCandidate.build(
+        [3, 2, 1, 0],
+        is_ring=True,
+        is_bicycle=False,
+        is_spiro=True,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=None,
+        ring_count=2,
+    )
+    side_ring = ParentCandidate.build(
+        [3, 4, 5],
+        is_ring=True,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=None,
+        ring_count=1,
+    )
+    unrelated_chain = ParentCandidate.build(
+        [10, 11, 12],
+        is_ring=False,
+        is_bicycle=False,
+        is_spiro=False,
+        is_polycycle=False,
+        xyz=(0, 0, 0),
+        principal_groups_count=0,
+        mol=None,
+    )
+    ring_systems = [
+        RingSystem(atoms={0, 1, 2, 3}, is_spiro=True, paths=[[0, 1, 2, 3], [3, 2, 1, 0]]),
+        RingSystem(atoms={3, 4, 5}, paths=[[3, 4, 5]]),
+    ]
+
+    filtered = _prefer_spiro_backbone_components([side_ring, unrelated_chain, backbone], ring_systems)
+
+    assert backbone in filtered
+    assert unrelated_chain in filtered
+    assert side_ring not in filtered
+    assert [candidate.path for candidate in filtered] == [[10, 11, 12], [3, 2, 1, 0]]
 
 
 def test_parent_seniority_profile_exposes_brief_guide_extension_fields():
@@ -3507,8 +3583,9 @@ def test_parent_seniority_criteria_follow_brief_guide_section_6_order():
     assert min([no_group, one_group], key=lambda candidate: candidate.score_tuple) is one_group
     assert min([one_group, two_groups], key=lambda candidate: candidate.score_tuple) is two_groups
     assert min([si_parent, n_parent], key=lambda candidate: candidate.score_tuple) is n_parent
+    assert min([carbon_ring, n_parent], key=lambda candidate: candidate.score_tuple) is n_parent
     assert min([carbon_chain, carbon_ring], key=lambda candidate: candidate.score_tuple) is carbon_ring
-    assert min([p_ring, o_ring], key=lambda candidate: candidate.score_tuple) is o_ring
+    assert min([p_ring, o_ring], key=lambda candidate: candidate.score_tuple) is p_ring
     assert min([monocycle, bicycle], key=lambda candidate: candidate.score_tuple) is bicycle
     assert min([piperazine_like, oxazinane_like], key=lambda candidate: candidate.score_tuple) is oxazinane_like
     assert min([shorter_chain, longer_chain], key=lambda candidate: candidate.score_tuple) is longer_chain

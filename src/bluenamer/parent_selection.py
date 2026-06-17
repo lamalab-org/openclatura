@@ -40,8 +40,6 @@ class ParentSeniorityProfile:
         if criterion == "contains_principal_group":
             return -int(self.contains_principal_group)
         if criterion == "senior_element_vector":
-            if self.ring_parent:
-                return ()
             return self.senior_element_vector
         if criterion == "polycycle_parent":
             return -int(self.polycycle_parent)
@@ -79,12 +77,11 @@ class ParentSeniorityProfile:
         return tuple(self.criterion_value(criterion) for criterion in criteria)
 
     def ring_seniority_key(self) -> tuple:
-        """Return ring-system seniority criteria with a polycycle topology guard."""
+        """Return ring-system seniority criteria after ring-over-chain selection."""
 
         if not self.ring_parent:
             return ()
         return (
-            -self.ring_count if self.ring_count > 1 else 0,
             self.senior_heteroatom_vector,
             -self.ring_count,
             -self.parent_atom_count,
@@ -280,6 +277,7 @@ def select_principal_parent(
     if not candidates:
         return None
 
+    candidates = _prefer_spiro_backbone_components(candidates, ring_systems)
     candidates.sort(key=lambda m: m.score_tuple)
     best = candidates[0]
 
@@ -360,6 +358,87 @@ def _multiple_bond_count(mol: Molecule | None, path: list[int], *, include_doubl
             elif not include_double and bond.order == 2:
                 count += 1
     return count
+
+
+def _prefer_spiro_backbone_components(
+    candidates: list[ParentCandidate], ring_systems: list[RingSystem]
+) -> list[ParentCandidate]:
+    """Limit spiro-component competitions to the graph backbone component.
+
+    Spiro-connected ring components are not independent whole-parent hydride
+    candidates.  When principal-group coverage is tied, choose the component
+    that represents the shared spiro backbone before applying ordinary parent
+    seniority.  This prevents a small hetero side ring from stealing the parent
+    slot only because senior-element ordering is evaluated before ring
+    complexity.
+    """
+
+    if len(ring_systems) < 2:
+        return candidates
+
+    shared_counts: dict[tuple[int, ...], int] = {}
+    for system in ring_systems:
+        shared_count = sum(1 for other in ring_systems if other is not system and system.atoms & other.atoms)
+        for path in system.paths:
+            shared_counts[tuple(path)] = shared_count
+
+    max_shared = max(shared_counts.values(), default=0)
+    if max_shared == 0:
+        return candidates
+
+    best_principal_key = min(
+        (
+            candidate.seniority_profile.criterion_value("contains_principal_group"),
+            candidate.seniority_profile.criterion_value("principal_group_count"),
+        )
+        for candidate in candidates
+    )
+    eligible = [
+        candidate
+        for candidate in candidates
+        if (
+            candidate.seniority_profile.criterion_value("contains_principal_group"),
+            candidate.seniority_profile.criterion_value("principal_group_count"),
+        )
+        == best_principal_key
+    ]
+    eligible_ring_components = []
+    for candidate in eligible:
+        if not candidate.is_ring:
+            continue
+        path_key = tuple(candidate.path)
+        if shared_counts.get(path_key, 0) <= 0:
+            continue
+        eligible_ring_components.append(candidate)
+    if len(eligible_ring_components) < 2:
+        return candidates
+
+    backbone_keys = {
+        tuple(candidate.path): _spiro_backbone_rank_key(candidate, shared_counts)
+        for candidate in eligible_ring_components
+    }
+    best_backbone_key = min(backbone_keys.values())
+    backbone_paths = {path for path, key in backbone_keys.items() if key == best_backbone_key}
+    if not backbone_paths:
+        return candidates
+    competing_paths = set(backbone_keys)
+    return [
+        candidate
+        for candidate in candidates
+        if tuple(candidate.path) not in competing_paths or tuple(candidate.path) in backbone_paths
+    ]
+
+
+def _spiro_backbone_rank_key(candidate: ParentCandidate, shared_counts: dict[tuple[int, ...], int]) -> tuple:
+    """Return the local rank key for competing spiro-connected ring components."""
+
+    path_key = tuple(candidate.path)
+    return (
+        -shared_counts[path_key],
+        -candidate.seniority_profile.ring_count,
+        -candidate.seniority_profile.parent_atom_count,
+        candidate.seniority_profile.path_tiebreak,
+    )
 
 
 def _ring_count_for_system(ring_system: RingSystem) -> int:
