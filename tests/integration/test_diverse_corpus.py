@@ -82,7 +82,7 @@ def test_corpus_naming_pass_rate(corpus):
         # Surface the offenders so the failure is actionable.
         sample = "\n".join(f"  - {s} [{c}]" for s, c in unnamed[:10])
         pytest.fail(
-            f"Naming pass rate {rate:.2%} below floor {NAME_PASS_RATE_FLOOR:.2%}.\n" f"First unnamed entries:\n{sample}"
+            f"Naming pass rate {rate:.2%} below floor {NAME_PASS_RATE_FLOOR:.2%}.\nFirst unnamed entries:\n{sample}"
         )
 
 

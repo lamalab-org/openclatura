@@ -58,6 +58,5 @@ def test_corpus_names_match_golden(goldens, capsys):
                 print(f"    expected: {want}")
                 print(f"    got:      {got}")
         pytest.fail(
-            f"{len(mismatches)} corpus entries name differently on rdkit "
-            f"{rdkit.__version__} than the committed goldens"
+            f"{len(mismatches)} corpus entries name differently on rdkit {rdkit.__version__} than the committed goldens"
         )

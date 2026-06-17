@@ -376,11 +376,11 @@ def _prefer_spiro_backbone_components(
     if len(ring_systems) < 2:
         return candidates
 
-    ring_system_by_path = {tuple(system.paths[0]): system for system in ring_systems}
     shared_counts: dict[tuple[int, ...], int] = {}
     for system in ring_systems:
-        path_key = tuple(system.paths[0])
-        shared_counts[path_key] = sum(1 for other in ring_systems if other is not system and system.atoms & other.atoms)
+        shared_count = sum(1 for other in ring_systems if other is not system and system.atoms & other.atoms)
+        for path in system.paths:
+            shared_counts[tuple(path)] = shared_count
 
     max_shared = max(shared_counts.values(), default=0)
     if max_shared == 0:
@@ -402,39 +402,43 @@ def _prefer_spiro_backbone_components(
         )
         == best_principal_key
     ]
-    eligible_ring_components = [
-        candidate
-        for candidate in eligible
-        if candidate.is_ring
-        and shared_counts.get(tuple(candidate.path), 0) > 0
-        and tuple(candidate.path) in ring_system_by_path
-    ]
+    eligible_ring_components = []
+    for candidate in eligible:
+        if not candidate.is_ring:
+            continue
+        path_key = tuple(candidate.path)
+        if shared_counts.get(path_key, 0) <= 0:
+            continue
+        eligible_ring_components.append(candidate)
     if len(eligible_ring_components) < 2:
         return candidates
 
-    best_backbone_key = min(
-        (
-            -shared_counts[tuple(candidate.path)],
-            -candidate.seniority_profile.ring_count,
-            -candidate.seniority_profile.parent_atom_count,
-            candidate.seniority_profile.path_tiebreak,
-        )
+    backbone_keys = {
+        tuple(candidate.path): _spiro_backbone_rank_key(candidate, shared_counts)
         for candidate in eligible_ring_components
-    )
-    backbone = [
-        candidate
-        for candidate in eligible_ring_components
-        if (
-            -shared_counts[tuple(candidate.path)],
-            -candidate.seniority_profile.ring_count,
-            -candidate.seniority_profile.parent_atom_count,
-            candidate.seniority_profile.path_tiebreak,
-        )
-        == best_backbone_key
-    ]
-    if not backbone:
+    }
+    best_backbone_key = min(backbone_keys.values())
+    backbone_paths = {path for path, key in backbone_keys.items() if key == best_backbone_key}
+    if not backbone_paths:
         return candidates
-    return backbone
+    competing_paths = set(backbone_keys)
+    return [
+        candidate
+        for candidate in candidates
+        if tuple(candidate.path) not in competing_paths or tuple(candidate.path) in backbone_paths
+    ]
+
+
+def _spiro_backbone_rank_key(candidate: ParentCandidate, shared_counts: dict[tuple[int, ...], int]) -> tuple:
+    """Return the local rank key for competing spiro-connected ring components."""
+
+    path_key = tuple(candidate.path)
+    return (
+        -shared_counts[path_key],
+        -candidate.seniority_profile.ring_count,
+        -candidate.seniority_profile.parent_atom_count,
+        candidate.seniority_profile.path_tiebreak,
+    )
 
 
 def _ring_count_for_system(ring_system: RingSystem) -> int:
