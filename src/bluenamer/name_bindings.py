@@ -939,7 +939,7 @@ def _extend_tree_substituent_tokens(tokens: list[NameTokenBinding], node: dict, 
         parent_bonds = set(parent.get("bonds") or [])
         parent_name = str(parent.get("retained_name") or "")
         _append_parent_locant_tokens(tokens, node.get("name") or "", parent, parent_bonds, node_charges)
-        _append_substituent_suffix_tokens(tokens, parent, parent_bonds, node_charges)
+        _append_substituent_suffix_tokens(tokens, node.get("name") or "", parent, parent_bonds, node_charges)
         if parent_name and _term_visible_in_name(parent_name, node_name):
             _append_name_tokens(tokens, parent_name, parent_atoms, parent_bonds, node_charges)
         for segment in node.get("trace_segments") or ():
@@ -986,20 +986,21 @@ def _extend_tree_substituent_tokens(tokens: list[NameTokenBinding], node: dict, 
             child_atoms = set(child.get("atoms") or [])
             child_bonds = set(child.get("bonds") or [])
             child_charges = set(child.get("charge_atoms") or [])
-            for locant in child.get("locants") or ():
-                tokens.append(
-                    NameTokenBinding(
-                        text=str(locant),
-                        token_kind="locant",
-                        source="substituent_tree",
-                        grammar_role=child.get("kind") or simple_key,
-                        binding_key="prefix:tree_locant",
-                        atom_ids=set(child_atoms),
-                        bond_ids=set(child_bonds),
-                        charge_atom_ids=set(child_charges),
-                        locants=(str(locant),),
+            if not isinstance(child.get("parent"), dict):
+                for locant in child.get("locants") or ():
+                    tokens.append(
+                        NameTokenBinding(
+                            text=str(locant),
+                            token_kind="locant",
+                            source="substituent_tree",
+                            grammar_role=child.get("kind") or simple_key,
+                            binding_key="prefix:tree_locant",
+                            atom_ids=set(child_atoms),
+                            bond_ids=set(child_bonds),
+                            charge_atom_ids=set(child_charges),
+                            locants=(str(locant),),
+                        )
                     )
-                )
             if not emitted_node_name:
                 _extend_tree_substituent_tokens(tokens, child, include_node_name=True)
 
@@ -1073,6 +1074,7 @@ def _append_parent_locant_tokens(
 
 def _append_substituent_suffix_tokens(
     tokens: list[NameTokenBinding],
+    name: str,
     parent: dict,
     bond_ids: set[int],
     charge_atom_ids: set[int],
@@ -1084,6 +1086,8 @@ def _append_substituent_suffix_tokens(
     suffix = str(suffix_data.get("suffix") or "")
     atom_id = suffix_data.get("atom_id")
     if not locant or not suffix:
+        return
+    if locant not in set(locant_tokens_in_text(name)):
         return
     try:
         atom_idx = int(atom_id)

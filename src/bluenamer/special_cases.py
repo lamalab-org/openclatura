@@ -4,7 +4,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from .assembly_parts import NameAtomBinding
+from .assembly_parts import NameAtomBinding, NameTokenBinding
 from .charge_pair_roles import charge_pair_roles
 from .formatting import format_counted_prefixes, format_multiplier, oxy_prefix_from_branch, strip_outer_parentheses
 from .molecule import Molecule
@@ -121,8 +121,8 @@ def structural_replacement_parent_result(
         ("oxoacid_parent", lambda: oxoacid_parent_result(mol, component_atoms)),
         ("organophosphinic_acid", lambda: organophosphinic_acid_result(mol, component_atoms)),
         ("sulfoxide_parent", lambda: sulfoxide_parent_result(mol, component_atoms)),
-        ("homonuclear_chain_parent", lambda: homonuclear_chain_parent_name(mol, component_atoms)),
-        ("simple_central_parent_hydride", lambda: simple_central_parent_hydride_name(mol, component_atoms)),
+        ("homonuclear_chain_parent", lambda: homonuclear_chain_parent_result(mol, component_atoms)),
+        ("simple_central_parent_hydride", lambda: simple_central_parent_hydride_result(mol, component_atoms)),
     )
     for role, render in renderers:
         rendered = render()
@@ -162,6 +162,48 @@ def biphenyl_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialC
             return None
         ring_components.append(atoms)
     bindings = (
+        NameAtomBinding(
+            stage="shortcut",
+            role="biphenyl_parent",
+            term="biphenyl",
+            atom_ids=set(component_atoms),
+            bond_ids=_bond_ids_within_atoms(mol, component_atoms),
+            locants=("1", "1'"),
+            emitted_tokens=(
+                NameTokenBinding(
+                    text="1",
+                    token_kind="locant",
+                    source="shortcut_renderer",
+                    grammar_role="biphenyl_attachment",
+                    binding_key="shortcut:biphenyl_attachment:left",
+                    atom_ids={left_root},
+                    bond_ids={bridge_bond},
+                    locants=("1",),
+                    render_order=0,
+                ),
+                NameTokenBinding(
+                    text="1",
+                    token_kind="locant",
+                    source="shortcut_renderer",
+                    grammar_role="biphenyl_attachment",
+                    binding_key="shortcut:biphenyl_attachment:right",
+                    atom_ids={right_root},
+                    bond_ids={bridge_bond},
+                    locants=("1'",),
+                    render_order=1,
+                ),
+                NameTokenBinding(
+                    text="biphenyl",
+                    token_kind="parent",
+                    source="shortcut_renderer",
+                    grammar_role="biphenyl_parent",
+                    binding_key="shortcut:biphenyl_parent",
+                    atom_ids=set(component_atoms),
+                    bond_ids=_bond_ids_within_atoms(mol, component_atoms),
+                    render_order=2,
+                ),
+            ),
+        ),
         NameAtomBinding(
             stage="shortcut",
             role="biphenyl_ring",
@@ -1772,6 +1814,11 @@ def _carbon_degree(mol: Molecule, carbon_atoms: set[int], atom_idx: int) -> int:
 
 
 def homonuclear_chain_parent_name(mol: Molecule, component_atoms: set[int]) -> str:
+    result = homonuclear_chain_parent_result(mol, component_atoms)
+    return result.name if result is not None else ""
+
+
+def homonuclear_chain_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
     """Name acyclic same-element parent hydride chains and simple ligands."""
 
     backbone_symbols = {
@@ -1781,35 +1828,66 @@ def homonuclear_chain_parent_name(mol: Molecule, component_atoms: set[int]) -> s
         and mol.atoms[idx].symbol not in {"O", "F", "Cl", "Br", "I"}
     }
     if len(backbone_symbols) != 1:
-        return ""
+        return None
     symbol = next(iter(backbone_symbols))
     backbone = [idx for idx in component_atoms if mol.atoms[idx].symbol == symbol]
     if len(backbone) < 2:
-        return ""
+        return None
     if any(mol.atoms[idx].symbol not in {symbol, "C", "F", "Cl", "Br", "I"} for idx in component_atoms):
-        return ""
+        return None
     chain = _ordered_backbone_chain(mol, backbone)
     if chain is None:
-        return ""
+        return None
     chain_set = set(chain)
+    ligand_bindings = []
     for atom_idx in component_atoms - chain_set:
         backbone_neighbors = [n for n in mol.get_neighbors(atom_idx) if n in chain_set]
         if len(backbone_neighbors) != 1:
-            return ""
+            return None
         bond = mol.get_bond(atom_idx, backbone_neighbors[0])
         if bond is None or bond.order != 1:
-            return ""
-        if not _terminal_ligand_name(mol, atom_idx, backbone_neighbors[0]):
-            return ""
+            return None
+        ligand_name = _terminal_ligand_name(mol, atom_idx, backbone_neighbors[0])
+        if not ligand_name:
+            return None
+        ligand_bindings.append(
+            NameAtomBinding(
+                stage="shortcut",
+                role="homonuclear_chain_ligand",
+                term=ligand_name,
+                atom_ids={atom_idx},
+                bond_ids={bond.idx},
+                locants=(str(chain.index(backbone_neighbors[0]) + 1),),
+            )
+        )
     bond_orders = [mol.get_bond(chain[idx], chain[idx + 1]).order for idx in range(len(chain) - 1)]
     parent = _same_element_parent_name(symbol, len(chain), bond_orders)
     if not parent:
-        return ""
+        return None
     prefixes = _simple_chain_ligand_prefixes(mol, component_atoms, chain)
-    return f"{prefixes}{parent}" if prefixes else parent
+    name = f"{prefixes}{parent}" if prefixes else parent
+    parent_binding = NameAtomBinding(
+        stage="shortcut",
+        role="homonuclear_chain_parent",
+        term=parent,
+        atom_ids=set(chain),
+        bond_ids=_bond_ids_within_atoms(mol, set(chain)),
+    )
+    return _component_name_result(
+        mol,
+        component_atoms,
+        name,
+        "homonuclear_chain_parent",
+        bindings=(parent_binding, *ligand_bindings),
+    )
 
 
 def simple_central_parent_hydride_name(mol: Molecule, component_atoms: set[int]) -> str:
+    result = simple_central_parent_hydride_result(mol, component_atoms)
+    return result.name if result is not None else ""
+
+
+def simple_central_parent_hydride_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
     """Name simple mononuclear parent hydrides with halogen/alkoxy ligands."""
 
     central_candidates = [
@@ -1820,22 +1898,50 @@ def simple_central_parent_hydride_name(mol: Molecule, component_atoms: set[int])
         and mol.degree(idx) >= 2
     ]
     if len(central_candidates) != 1:
-        return ""
+        return None
     central = central_candidates[0]
     central_symbol = mol.atoms[central].symbol
     ligand_names = []
+    ligand_bindings = []
     for neighbor in mol.get_neighbors(central):
         if neighbor not in component_atoms:
             continue
         ligand = _central_ligand_name(mol, component_atoms, central, neighbor)
         if not ligand:
-            return ""
+            return None
         ligand_names.append(ligand)
+        ligand_atoms = _component_atoms_until_blocked(mol, component_atoms, neighbor, {central})
+        ligand_atoms = ligand_atoms or {neighbor}
+        bond = mol.get_bond(central, neighbor)
+        ligand_bindings.append(
+            NameAtomBinding(
+                stage="shortcut",
+                role="central_parent_hydride_ligand",
+                term=ligand,
+                atom_ids=set(ligand_atoms),
+                bond_ids={bond.idx} if bond else set(),
+            )
+        )
     if not ligand_names:
-        return ""
+        return None
     prefix = _grouped_ligand_prefix(ligand_names)
     lambda_text = _lambda_text(mol, central)
-    return f"{prefix}{lambda_text}{RULES.components.mononuclear_parent_hydrides[central_symbol]}"
+    parent = f"{lambda_text}{RULES.components.mononuclear_parent_hydrides[central_symbol]}"
+    name = f"{prefix}{parent}"
+    core_binding = NameAtomBinding(
+        stage="shortcut",
+        role="central_parent_hydride_core",
+        term=parent,
+        atom_ids={central},
+        charge_atom_ids={central} if mol.atoms[central].charge else set(),
+    )
+    return _component_name_result(
+        mol,
+        component_atoms,
+        name,
+        "simple_central_parent_hydride",
+        bindings=(core_binding, *ligand_bindings),
+    )
 
 
 def _ordered_backbone_chain(mol: Molecule, atoms: list[int]) -> list[int] | None:

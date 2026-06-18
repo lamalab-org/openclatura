@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import shutil
 import subprocess
+import tempfile
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -119,7 +120,9 @@ def roundtrip_smiles(smiles: str) -> None:
     name = name_smiles(original)
     assert name
 
-    result = py2opsin.py2opsin([name])
+    with tempfile.NamedTemporaryFile(prefix="bluenamer_opsin_", suffix=".txt", delete=True) as handle:
+        tmp_fpath = handle.name
+    result = py2opsin.py2opsin([name], tmp_fpath=tmp_fpath)
     assert result and result[0]
 
     back = standardize_and_canonicalize_tautomer(result[0])

@@ -329,6 +329,12 @@ def post_process_name(name: str) -> str:
     return _post_process_name(name)
 
 
+def post_process_rewrite_rules():
+    """Return shared post-processing rewrites for metadata-aware assembly paths."""
+
+    return (("post_process_name", _post_process_name),)
+
+
 def assemble_name_raw(parts: AssemblyParts) -> str:
     fused_ion_candidate = select_fused_ion_operation(parts)
     if fused_ion_candidate is not None:

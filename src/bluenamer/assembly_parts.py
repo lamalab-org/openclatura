@@ -21,6 +21,10 @@ class NameTokenBinding:
     bond_ids: set[int] = field(default_factory=set)
     charge_atom_ids: set[int] = field(default_factory=set)
     locants: tuple[str, ...] = ()
+    render_order: int | None = None
+    match_priority: int = 0
+    left_context: str = ""
+    right_context: str = ""
 
 
 @dataclass
