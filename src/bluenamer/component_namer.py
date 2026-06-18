@@ -135,6 +135,7 @@ def collect_component_branch_substituents(
     *,
     name_subgraph: SubgraphNamer,
     name_spiro_subgraph: SpiroSubgraphNamer,
+    emit_metadata: bool = True,
 ) -> None:
     """Collect ordinary branch and spiro substituents from the component parent."""
 
@@ -167,16 +168,26 @@ def collect_component_branch_substituents(
 
         for n_idx in n_subs:
             if n_idx not in main_set and n_idx not in principal_involved_atom_ids and n_idx not in handled_prefix_atoms:
-                branch_decisions = DecisionTrace()
-                branch_name, branch_trace, branch_tree = name_subgraph(
-                    mol,
-                    n_idx,
-                    sub_exclude | main_set,
-                    upstream_atom=c_idx,
-                    return_trace=True,
-                    return_tree=True,
-                    decision_trace=branch_decisions,
-                )
+                branch_decisions = DecisionTrace() if emit_metadata else None
+                if emit_metadata:
+                    branch_name, branch_trace, branch_tree = name_subgraph(
+                        mol,
+                        n_idx,
+                        sub_exclude | main_set,
+                        upstream_atom=c_idx,
+                        return_trace=True,
+                        return_tree=True,
+                        decision_trace=branch_decisions,
+                    )
+                else:
+                    branch_name = name_subgraph(
+                        mol,
+                        n_idx,
+                        sub_exclude | main_set,
+                        upstream_atom=c_idx,
+                    )
+                    branch_trace = []
+                    branch_tree = None
                 if branch_name:
                     branch_exclude = sub_exclude | main_set
                     branch_atoms = subgraph_component(mol, n_idx, branch_exclude)
@@ -187,18 +198,22 @@ def collect_component_branch_substituents(
                             atom_ids=branch_atoms,
                             bond_ids=bond_ids_within(mol, branch_atoms | {c_idx}),
                             charge_atom_ids=_charged_atoms(mol, branch_atoms),
-                            emitted_tokens=graph_bound_substituent_tokens(
-                                mol,
-                                n_idx,
-                                branch_atoms,
-                                branch_name,
-                                c_idx,
-                                branch_exclude,
-                                name_subgraph,
+                            emitted_tokens=(
+                                graph_bound_substituent_tokens(
+                                    mol,
+                                    n_idx,
+                                    branch_atoms,
+                                    branch_name,
+                                    c_idx,
+                                    branch_exclude,
+                                    name_subgraph,
+                                )
+                                if emit_metadata
+                                else ()
                             ),
-                            trace_segments=branch_trace,
-                            nested_decisions=decision_trace_data(branch_decisions),
-                            substituent_tree=branch_tree,
+                            trace_segments=branch_trace if emit_metadata else [],
+                            nested_decisions=decision_trace_data(branch_decisions) if emit_metadata else [],
+                            substituent_tree=branch_tree if emit_metadata else None,
                         )
                     )
 
@@ -241,9 +256,12 @@ def _shortcut_component_result(
     stage: str,
     role: str,
     bindings: list[NameAtomBinding] | tuple[NameAtomBinding, ...] | None = None,
+    emit_metadata: bool = True,
 ) -> tuple[str, list[dict], list[dict], list[dict]]:
     """Build audited metadata for a component shortcut name."""
 
+    if not emit_metadata:
+        return name, [], [], []
     parts = AssemblyParts(parent_length=max(1, len(component_atoms)), parent_atom_ids=set(component_atoms))
     parts.name_atom_bindings = (
         list(bindings)
@@ -280,6 +298,8 @@ def name_component(
 ):
     """Name one connected component or recursive component of a molecule."""
 
+    emit_metadata = return_trace or return_tree or decision_trace is not None
+
     single_atom_name = single_atom_component_name(mol, component_atoms)
     if single_atom_name:
         name, bindings, token_spans, rewrite_history = _shortcut_component_result(
@@ -288,6 +308,7 @@ def name_component(
             single_atom_name,
             stage="shortcut",
             role="single_atom_component",
+            emit_metadata=emit_metadata,
         )
         trace_decision(
             decision_trace,
@@ -329,6 +350,7 @@ def name_component(
             stage="shortcut",
             role=structural_parent_result.role,
             bindings=structural_parent_result.bindings,
+            emit_metadata=emit_metadata,
         )
         trace_decision(
             decision_trace,
@@ -382,6 +404,7 @@ def name_component(
             stage="shortcut",
             role="anhydride_component",
             bindings=anhydride_result.bindings,
+            emit_metadata=emit_metadata,
         )
         trace_decision(
             decision_trace,
@@ -492,6 +515,7 @@ def name_component(
         state.sub_exclude,
         name_subgraph=name_subgraph,
         name_spiro_subgraph=name_spiro_subgraph,
+        emit_metadata=emit_metadata,
     )
     retained_fused = production_retained_fused_parent(
         mol,
@@ -572,10 +596,11 @@ def name_component(
     refresh_name_atom_bindings(parts)
     parts.stereo_audit_issues = list(audit_stereochemistry(mol, parts).issues)
     assert_component_fully_named(mol, state.component_atoms, parts, "<component>")
-    name = assemble_parent_name(mol, parts, numbered_path, get_loc)
-    final_result = NameAssemblyResult.from_final_name(name, parts.name_atom_bindings)
-    parts.name_token_spans = token_span_trace_data(final_result)
-    assert_final_name_assembly(mol, state.component_atoms, parts, final_result)
+    name = assemble_parent_name(mol, parts, numbered_path, get_loc, emit_metadata=emit_metadata)
+    if emit_metadata:
+        final_result = NameAssemblyResult.from_final_name(name, parts.name_atom_bindings)
+        parts.name_token_spans = token_span_trace_data(final_result)
+        assert_final_name_assembly(mol, state.component_atoms, parts, final_result)
     trace_decision(
         decision_trace,
         TracePhase.ASSEMBLY,
