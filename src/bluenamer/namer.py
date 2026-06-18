@@ -1617,11 +1617,7 @@ def _oxygen_carbonyl_shortcut_children(name: str, component: set[int], mol: Mole
     if oxygen is None:
         return []
     carbonyl = next(
-        (
-            neighbor
-            for neighbor in mol.get_neighbors(oxygen)
-            if neighbor in component and mol.atoms[neighbor].is_carbon
-        ),
+        (neighbor for neighbor in mol.get_neighbors(oxygen) if neighbor in component and mol.atoms[neighbor].is_carbon),
         None,
     )
     if carbonyl is None:
@@ -1636,7 +1632,9 @@ def _oxygen_carbonyl_shortcut_children(name: str, component: set[int], mol: Mole
         and bond.order == 2
     ]
     ligand_roots = [
-        neighbor for neighbor in mol.get_neighbors(carbonyl) if neighbor in component and neighbor not in {oxygen, *terminal}
+        neighbor
+        for neighbor in mol.get_neighbors(carbonyl)
+        if neighbor in component and neighbor not in {oxygen, *terminal}
     ]
     if not ligand_roots:
         return []
@@ -1655,7 +1653,9 @@ def _oxygen_carbonyl_shortcut_children(name: str, component: set[int], mol: Mole
             break
     if branch_root is None:
         return []
-    branch_atoms = _subgraph_component(mol, branch_root, set(mol.atoms) - component | bridge_atoms | {oxygen, carbonyl, *terminal})
+    branch_atoms = _subgraph_component(
+        mol, branch_root, set(mol.atoms) - component | bridge_atoms | {oxygen, carbonyl, *terminal}
+    )
     hydroxy_children = [
         {
             "kind": "substituent",

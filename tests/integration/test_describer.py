@@ -160,9 +160,7 @@ def test_describe_explains_parenthesized_unsaturation_locants():
 
 
 def test_describe_renders_oxygen_carbonyl_shortcut_substituent_tree():
-    text = str(
-        describe("C1[C@H]([C@@H]([C@@H](C=C1C(=O)O)OC(=O)/C=C/C2=CC(=C(C=C2)O)O)O)O")
-    )
+    text = str(describe("C1[C@H]([C@@H]([C@@H](C=C1C(=O)O)OC(=O)/C=C/C2=CC(=C(C=C2)O)O)O)O"))
 
     assert "Substituent at 3: ((1E)-2-(3,4-dihydroxyphenyl)ethenylcarbonyloxy)" in text
     assert "Substituent: ethenyl covers 2 atoms and 1 bond" in text

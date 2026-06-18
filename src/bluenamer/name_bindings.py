@@ -118,9 +118,7 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
         role = "spiro_substituent" if item.spiro is not None else "substituent"
         term = item.spiro.side_parent_name if item.spiro is not None else item.name
         prefix_tokens = (
-            _tree_substituent_emitted_tokens(item)
-            if _use_tree_substituent_tokens(item)
-            else tuple(item.emitted_tokens)
+            _tree_substituent_emitted_tokens(item) if _use_tree_substituent_tokens(item) else tuple(item.emitted_tokens)
         )
         prefix_tokens = prefix_tokens or _rendered_term_tokens(
             term,
@@ -892,9 +890,7 @@ def _use_tree_substituent_tokens(item) -> bool:
 
 def _is_recursive_fragment_child(child: dict) -> bool:
     return isinstance(child, dict) and (
-        child.get("kind") == "fragment"
-        or isinstance(child.get("parent"), dict)
-        or bool(child.get("substituents"))
+        child.get("kind") == "fragment" or isinstance(child.get("parent"), dict) or bool(child.get("substituents"))
     )
 
 

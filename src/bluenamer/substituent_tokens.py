@@ -163,7 +163,9 @@ def _generic_heteroatom_substituent_tokens(
                 )
 
     charge_atoms = {center} if mol.atoms[center].charge != 0 else set()
-    direct_ligand_atoms = {atom for token_text, atoms in ligand_atoms_by_token for atom in atoms if token_text in {"oxo", "oxido", "imino"}}
+    direct_ligand_atoms = {
+        atom for token_text, atoms in ligand_atoms_by_token for atom in atoms if token_text in {"oxo", "oxido", "imino"}
+    }
     center_atoms = {center, *direct_ligand_atoms}
     center_bonds = bond_ids_within(mol, center_atoms)
     for token_text in center_tokens:
@@ -396,11 +398,7 @@ def _alkenyl_bridge_tokens(
                 left_context="en",
             )
         )
-    stereo_bonds = {
-        bond.idx
-        for bond in mol.bonds.values()
-        if bond.idx in bridge_bonds and bond.stereo in {"E", "Z"}
-    }
+    stereo_bonds = {bond.idx for bond in mol.bonds.values() if bond.idx in bridge_bonds and bond.stereo in {"E", "Z"}}
     if stereo_bonds:
         descriptor = next(bond.stereo for bond in mol.bonds.values() if bond.idx in stereo_bonds and bond.stereo)
         tokens.append(
@@ -439,7 +437,8 @@ def _branch_phrase_tokens(mol: Molecule, branch_atoms: set[int], lower_term: str
     hydroxy_atoms = {
         atom_idx
         for atom_idx in branch_atoms
-        if mol.atoms[atom_idx].symbol == "O" and any(neighbor in branch_atoms for neighbor in mol.get_neighbors(atom_idx))
+        if mol.atoms[atom_idx].symbol == "O"
+        and any(neighbor in branch_atoms for neighbor in mol.get_neighbors(atom_idx))
     }
     if "dihydroxyphenyl" in lower_term:
         tokens.append(

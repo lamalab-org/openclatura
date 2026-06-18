@@ -374,7 +374,7 @@ def _token_line(token: dict) -> str:
     source = token.get("source", "unknown")
     locants = token.get("locants") or []
     locant_text = f"; locants {','.join(str(locant) for locant in locants)}" if locants else ""
-    return f"\"{text}\" [{kind}] -> {atoms}; {bonds}{locant_text}; confidence={confidence}; source={source}."
+    return f'"{text}" [{kind}] -> {atoms}; {bonds}{locant_text}; confidence={confidence}; source={source}.'
 
 
 def _counter_text(counter: dict[str, int]) -> str:
@@ -531,7 +531,9 @@ def _node_trace_segment_lines(node: dict, *, depth: int, seen: set[tuple]) -> li
     principal_atoms = set(principal.get("atoms") or [])
 
     ordered: list[dict] = []
-    ordered.extend(_pop_segments(segments, lambda seg: (seg.get("label") == "parent skeleton") and _same_atoms(seg, parent_atoms)))
+    ordered.extend(
+        _pop_segments(segments, lambda seg: (seg.get("label") == "parent skeleton") and _same_atoms(seg, parent_atoms))
+    )
     ordered.extend(_pop_segments(segments, lambda seg: bool(principal_atoms) and _same_atoms(seg, principal_atoms)))
     ordered.extend(_pop_segments(segments, lambda seg: _is_local_segment(seg, node, child_atoms)))
 
@@ -597,7 +599,7 @@ def _trace_segment_line(seg: dict, *, depth: int) -> str | None:
         graph.append(_bond_text(bonds))
     suffix = f" ({'; '.join(graph)})" if graph else ""
     indent = "  " * depth
-    return f"{indent}- {label}: contributes \"{terms[0]}\"{suffix}."
+    return f'{indent}- {label}: contributes "{terms[0]}"{suffix}.'
 
 
 __all__ = [

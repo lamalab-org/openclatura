@@ -11,9 +11,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from rdkit import Chem
+
 from .engine import DEFAULT_NAMING_ENGINE, NamingRequest, NamingResult
 from .graph_io import read_smiles
 from .molecule import Molecule
+from .rules import stems
 
 
 @dataclass(frozen=True)
@@ -52,6 +55,9 @@ def describe_human(smiles: str) -> HumanDescription:
     result = DEFAULT_NAMING_ENGINE.run(NamingRequest(smiles=smiles, include_trace=True))
     mol = read_smiles(smiles)
     paragraphs: list[str] = []
+    smiles_sentence = _processed_smiles_sentence(smiles)
+    if smiles_sentence:
+        paragraphs.append(smiles_sentence)
     if result.error:
         paragraphs.append(f"The structure could not be named: {result.error}.")
     elif not result.name:
@@ -65,6 +71,63 @@ def describe_human(smiles: str) -> HumanDescription:
             paragraphs.append(description)
 
     return HumanDescription(smiles=smiles, name=result.name, paragraphs=tuple(paragraphs), result=result)
+
+
+def _processed_smiles_sentence(smiles: str) -> str:
+    rdmol = Chem.MolFromSmiles(smiles)
+    if rdmol is None:
+        return ""
+    processed = Chem.MolToSmiles(rdmol, canonical=False)
+    atom_order = _smiles_atom_output_order(rdmol)
+    annotated = _annotated_smiles_atom_order(processed, atom_order)
+    if annotated:
+        return f"Processed SMILES: {processed}\nAtom ids in that SMILES: {annotated}"
+    return f"Processed SMILES: {processed}\nAtom ids in that SMILES order: {atom_order}"
+
+
+def _smiles_atom_output_order(rdmol: Chem.Mol) -> list[int]:
+    """Return RDKit's atom order for the most recent SMILES write."""
+
+    if not rdmol.HasProp("_smilesAtomOutputOrder"):
+        return []
+    raw = rdmol.GetProp("_smilesAtomOutputOrder")
+    return [int(part) for part in raw.strip("[]").split(",") if part.strip()]
+
+
+def _annotated_smiles_atom_order(smiles: str, atom_order: list[int]) -> str:
+    if not atom_order:
+        return ""
+    pieces: list[str] = []
+    atom_idx = 0
+    pos = 0
+    while pos < len(smiles):
+        token, end = _next_smiles_atom_token(smiles, pos)
+        if token is None:
+            pieces.append(smiles[pos])
+            pos += 1
+            continue
+        if atom_idx >= len(atom_order):
+            return ""
+        pieces.append(f"{token}{{{atom_order[atom_idx]}}}")
+        atom_idx += 1
+        pos = end
+    if atom_idx != len(atom_order):
+        return ""
+    return "".join(pieces)
+
+
+def _next_smiles_atom_token(smiles: str, pos: int) -> tuple[str | None, int]:
+    char = smiles[pos]
+    if char == "[":
+        end = smiles.find("]", pos + 1)
+        if end != -1:
+            return smiles[pos : end + 1], end + 1
+        return None, pos
+    if smiles.startswith(("Cl", "Br"), pos):
+        return smiles[pos : pos + 2], pos + 2
+    if char in {"B", "C", "N", "O", "P", "S", "F", "I", "b", "c", "n", "o", "p", "s"}:
+        return char, pos + 1
+    return None, pos
 
 
 def _describe_node(node: dict[str, Any], mol: Molecule, *, subject: str, depth: int) -> str:
@@ -90,7 +153,7 @@ def _describe_node(node: dict[str, Any], mol: Molecule, *, subject: str, depth: 
     if charge_sentence:
         sentences.append(charge_sentence)
 
-    substituent_sentence = _substituent_summary_sentence(node)
+    substituent_sentence = _substituent_summary_sentence(node, mol)
     if substituent_sentence:
         sentences.append(substituent_sentence)
 
@@ -98,14 +161,14 @@ def _describe_node(node: dict[str, Any], mol: Molecule, *, subject: str, depth: 
     for child in _iter_child_nodes(node):
         if not _should_expand_child(child):
             continue
-        child_subject = _child_subject(child)
+        child_subject = _child_subject(child, parent, mol)
         rendered = _describe_node(child, mol, subject=child_subject, depth=depth + 1)
         if rendered:
             child_sentences.append(rendered)
 
     if child_sentences:
         sentences.extend(child_sentences)
-    return " ".join(sentences)
+    return "\n".join(sentences)
 
 
 def _parent_sentence(subject: str, parent: dict[str, Any]) -> str:
@@ -147,7 +210,7 @@ def _heteroatom_sentence(parent: dict[str, Any]) -> str:
     phrases = []
     for symbol, locants in groups:
         element = _element_name(symbol)
-        phrases.append(f"{element} at {_positions(locants)}")
+        phrases.append(f"{element} at {_positions(locants, parent)}")
     return "Within that parent framework, there is " + _join_phrases(phrases) + "."
 
 
@@ -169,17 +232,18 @@ def _unsaturation_sentence(node: dict[str, Any], parent: dict[str, Any], mol: Mo
         kind = "triple" if item.get("bond_key") == "triple" else "double"
         for loc_pair in _unsaturation_position_pairs(item, parent, mol):
             if len(loc_pair) == 2:
-                bond_phrases.append(f"a {kind} bond between positions {loc_pair[0]} and {loc_pair[1]}")
+                bond_phrases.append(
+                    f"a {kind} bond between {_position_label(loc_pair[0], parent)} "
+                    f"and {_position_label(loc_pair[1], parent)}"
+                )
             elif loc_pair:
-                bond_phrases.append(f"a {kind} bond at position {loc_pair[0]}")
+                bond_phrases.append(f"a {kind} bond at {_position_label(loc_pair[0], parent)}")
     if not bond_phrases:
         return ""
     return "Within that parent framework, there is " + _join_phrases(bond_phrases) + "."
 
 
-def _unsaturation_position_pairs(
-    item: dict[str, Any], parent: dict[str, Any], mol: Molecule
-) -> list[tuple[str, ...]]:
+def _unsaturation_position_pairs(item: dict[str, Any], parent: dict[str, Any], mol: Molecule) -> list[tuple[str, ...]]:
     atom_to_locant = {int(atom): str(locant) for locant, atom in (parent.get("atom_ids_by_locant") or {}).items()}
     pairs: list[tuple[str, ...]] = []
     used_bonds: set[int] = set()
@@ -217,7 +281,7 @@ def _principal_group_sentence(node: dict[str, Any]) -> str:
     label = _principal_group_label(key, len(locants))
     article = "" if label.endswith("s") else "an " if label[0].lower() in "aeiou" else "a "
     if locants:
-        return f"The principal characteristic feature is {article}{label} at {_positions(locants)}."
+        return f"The principal characteristic feature is {article}{label} at {_positions(locants, node.get('parent') or {})}."
     return f"The principal characteristic feature is {article}{label}."
 
 
@@ -246,26 +310,28 @@ def _charge_sentence(node: dict[str, Any]) -> str:
         value = int(charge.get("charge") or 0)
         if value:
             sign = "positive" if value > 0 else "negative"
-            phrases.append(f"a {sign} {_element_name(symbol)} center at position {locant}")
+            phrases.append(
+                f"a {sign} {_element_name(symbol)} center at {_position_label(str(locant), node.get('parent') or {})}"
+            )
     if not phrases:
         return ""
     return "The parent carries " + _join_phrases(phrases) + "."
 
 
-def _substituent_summary_sentence(node: dict[str, Any]) -> str:
+def _substituent_summary_sentence(node: dict[str, Any], mol: Molecule) -> str:
     children = list(_iter_child_nodes(node, recurse_group_instances=False))
     if not children:
         return ""
     phrases = []
     has_plural = False
     for child in children:
-        name = _clean_name(child.get("name") or "substituent")
+        name = _display_substituent_name(child, mol)
         locants = [str(loc) for loc in child.get("locants") or ()]
         count = _child_instance_count(child)
         has_plural = has_plural or count > 1
         display_name = _pluralized_substituent_name(name, count)
         if locants:
-            phrases.append(f"{display_name} at {_positions(locants)}")
+            phrases.append(f"{display_name} at {_positions(locants, node.get('parent') or {})}")
         else:
             phrases.append(display_name)
     verb = "are" if has_plural or len(phrases) > 1 else "is"
@@ -276,23 +342,21 @@ def _iter_child_nodes(node: dict[str, Any], *, recurse_group_instances: bool = T
     for child in node.get("substituents") or ():
         if child.get("kind") == "grouped_substituent_instances":
             if recurse_group_instances:
-                for instance in child.get("instances") or ():
-                    yield instance
+                yield from child.get("instances") or ()
             else:
                 yield child
             continue
         yield child
     functional_prefix = node.get("functional_prefix")
     if isinstance(functional_prefix, dict):
-        for ligand in functional_prefix.get("ligands") or ():
-            yield ligand
+        yield from functional_prefix.get("ligands") or ()
 
 
-def _child_subject(child: dict[str, Any]) -> str:
-    name = _clean_name(child.get("name") or "substituent")
+def _child_subject(child: dict[str, Any], containing_parent: dict[str, Any], mol: Molecule) -> str:
+    name = _display_substituent_name(child, mol)
     locants = [str(loc) for loc in child.get("locants") or ()]
     if locants:
-        return f"The {name} substituent at {_positions(locants)}"
+        return f"The {name} substituent at {_positions(locants, containing_parent)}"
     return f"The {name} substituent"
 
 
@@ -320,10 +384,100 @@ def _child_instance_count(child: dict[str, Any]) -> int:
 
 def _pluralized_substituent_name(name: str, count: int) -> str:
     if count <= 1:
-        return f"a {name} group"
-    if name.endswith("yl"):
-        return f"{name} groups"
+        return f"{_article_for(name)} {name} group"
     return f"{name} groups"
+
+
+def _article_for(word: str) -> str:
+    return "an" if word[:1].lower() in "aeiou" else "a"
+
+
+def _display_substituent_name(child: dict[str, Any], mol: Molecule) -> str:
+    """Return the local substituent role from tree and graph metadata."""
+
+    if child.get("kind") == "grouped_substituent_instances":
+        for instance in child.get("instances") or ():
+            if isinstance(instance, dict):
+                return _display_substituent_name(instance, mol)
+
+    parent = child.get("parent") if isinstance(child.get("parent"), dict) else {}
+    parent_label = _parent_substituent_label(parent)
+    if parent_label:
+        return parent_label
+    graph_label = _graph_substituent_label(child, mol)
+    if graph_label:
+        return graph_label
+    return _readable_key(str(child.get("kind") or "substituent"))
+
+
+def _parent_substituent_label(parent: dict[str, Any]) -> str:
+    suffix = parent.get("substituent_suffix") if isinstance(parent.get("substituent_suffix"), dict) else {}
+    suffix_text = str(suffix.get("suffix") or "")
+    if not suffix_text:
+        return ""
+    retained = str(parent.get("retained_name") or "")
+    if retained == "benzene" and suffix_text == "yl":
+        return "phenyl"
+    length = parent.get("parent_length")
+    if isinstance(length, int) and length > 0 and not retained:
+        try:
+            return stems.stem_for(length) + suffix_text
+        except KeyError:
+            return ""
+    if retained:
+        return f"{retained}-derived"
+    return ""
+
+
+def _graph_substituent_label(child: dict[str, Any], mol: Molecule) -> str:
+    own_atoms = _local_role_atoms(child)
+    if not own_atoms:
+        return ""
+    symbols = [mol.atoms[idx].symbol for idx in sorted(own_atoms) if idx in mol.atoms]
+    symbol_set = set(symbols)
+    if len(own_atoms) == 1 and symbols:
+        symbol = symbols[0]
+        has_nested_ligand = bool(list(_iter_child_nodes(child)))
+        return {
+            "N": "amino",
+            "O": "oxy" if has_nested_ligand else "hydroxy",
+            "S": "sulfanyl",
+            "F": "fluoro",
+            "Cl": "chloro",
+            "Br": "bromo",
+            "I": "iodo",
+        }.get(symbol, "")
+    if "S" in symbol_set and symbols.count("O") >= 2:
+        return "sulfonyl"
+    if "S" in symbol_set and symbols.count("O") == 1:
+        return "sulfinyl"
+    if "C" in symbol_set and "O" in symbol_set and _has_double_bond_between(mol, own_atoms, "C", "O"):
+        return "carbonyl"
+    return ""
+
+
+def _local_role_atoms(child: dict[str, Any]) -> set[int]:
+    atoms = {int(atom) for atom in child.get("atoms") or ()}
+    nested_atoms: set[int] = set()
+    for nested in _iter_child_nodes(child):
+        nested_atoms.update(int(atom) for atom in nested.get("atoms") or ())
+    local = atoms - nested_atoms
+    return local or atoms
+
+
+def _has_double_bond_between(mol: Molecule, atom_ids: set[int], symbol_a: str, symbol_b: str) -> bool:
+    for atom_idx in atom_ids:
+        atom = mol.atoms.get(atom_idx)
+        if atom is None or atom.symbol != symbol_a:
+            continue
+        for neighbor in mol.get_neighbors(atom_idx):
+            if neighbor not in atom_ids:
+                continue
+            neighbor_atom = mol.atoms.get(neighbor)
+            bond = mol.get_bond(atom_idx, neighbor)
+            if neighbor_atom is not None and neighbor_atom.symbol == symbol_b and bond is not None and bond.order == 2:
+                return True
+    return False
 
 
 def _element_name(symbol: str) -> str:
@@ -344,12 +498,31 @@ def _readable_key(key: str) -> str:
     return key.replace("_", " ").replace("-", " ")
 
 
-def _clean_name(name: str) -> str:
-    return name.strip().strip("()")
+def _positions(locants: list[str], parent: dict[str, Any] | None = None) -> str:
+    sorted_locants = _sort_locants(locants)
+    if len(sorted_locants) == 1:
+        return _position_label(sorted_locants[0], parent or {})
+    return "positions " + _join_phrases([_locant_with_atom_id(locant, parent or {}) for locant in sorted_locants])
 
 
-def _positions(locants: list[str]) -> str:
-    return "position " + locants[0] if len(locants) == 1 else "positions " + _join_phrases(_sort_locants(locants))
+def _position_label(locant: str, parent: dict[str, Any] | None = None) -> str:
+    return "position " + _locant_with_atom_id(locant, parent or {})
+
+
+def _locant_with_atom_id(locant: str, parent: dict[str, Any]) -> str:
+    atom_id = _atom_id_for_locant(locant, parent)
+    return f"{locant} (atom id {atom_id})" if atom_id is not None else locant
+
+
+def _atom_id_for_locant(locant: str, parent: dict[str, Any]) -> int | None:
+    locant_map = parent.get("atom_ids_by_locant") if isinstance(parent, dict) else None
+    if not isinstance(locant_map, dict):
+        return None
+    atom_id = locant_map.get(str(locant))
+    try:
+        return int(atom_id)
+    except (TypeError, ValueError):
+        return None
 
 
 def _join_phrases(items: list[str]) -> str:

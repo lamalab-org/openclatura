@@ -670,8 +670,7 @@ def test_carbonylamino_heteroatom_shortcut_tree_does_not_invent_hydroxy_children
     peptide_branch = next(
         item
         for item in component["substituents"]
-        if item["name"]
-        == "(1S)-1-((1S)-1-amino-3-methylbutylcarbonylamino)-3-methylbutylcarbonylamino"
+        if item["name"] == "(1S)-1-((1S)-1-amino-3-methylbutylcarbonylamino)-3-methylbutylcarbonylamino"
     )
     branch_children = peptide_branch["substituents"][0]["substituents"]
     child_names = [child["name"] for child in branch_children]
@@ -1123,14 +1122,10 @@ def test_recursive_substituent_tree_tokens_keep_nested_scopes_local():
     tokens = build_name_token_spans(text, bindings)
     by_text = {(token.text, token.start): token for token in tokens}
 
-    assert by_text[("fluorophenyl", text.index("fluorophenyl"))].atom_ids == frozenset(
-        {16, 17, 18, 19, 20, 21, 22}
-    )
+    assert by_text[("fluorophenyl", text.index("fluorophenyl"))].atom_ids == frozenset({16, 17, 18, 19, 20, 21, 22})
     assert by_text[("4", text.index("4-fluorophenyl"))].atom_ids == frozenset({20})
     assert by_text[("phenyl", text.index("-3-phenyl") + 3)].atom_ids == frozenset({23, 24, 25, 26, 27, 28})
-    assert by_text[("4", text.index("4-(phenylcarbamoyl"))].atom_ids == frozenset(
-        {29, 30, 31, 32, 33, 34, 35, 36, 37}
-    )
+    assert by_text[("4", text.index("4-(phenylcarbamoyl"))].atom_ids == frozenset({29, 30, 31, 32, 33, 34, 35, 36, 37})
     assert by_text[("phenylcarbamoyl", text.index("phenylcarbamoyl"))].atom_ids == frozenset(
         {29, 30, 31, 32, 33, 34, 35, 36, 37}
     )
