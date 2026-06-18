@@ -167,7 +167,7 @@ OpenAPI docs are served at `http://localhost:8000/docs`.
 
 ## Human-like description
 
-OpenBlue can generate uncanny human-like description.
+OpenBlue can generate uncanny human-like descriptions.
 ```python
 
 from bluenamer import describe_human
