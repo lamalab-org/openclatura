@@ -164,6 +164,32 @@ curl -X POST localhost:8000/describe -H 'content-type: application/json' \
 
 OpenAPI docs are served at `http://localhost:8000/docs`.
 
+
+## Human-like description
+
+OpenBlue can generate uncanny human-like descriptions.
+```python
+
+from bluenamer import describe_human
+
+d = describe_human("CN1C=NC2=C1C(=O)N(C(=O)N2C)C")
+print(d.text)
+
+""" Processed SMILES: Cn1cnc2c1c(=O)n(C)c(=O)n2C
+Atom ids in that SMILES: C{0}n{1}1c{2}n{3}c{4}2c{5}1c{6}(=O{7})n{8}(C{13})c{9}(=O{10})n{11}2C{12}
+
+The molecule is named 2,4,7-trimethyl-2,4,7,9-tetraazabicyclo[4.3.0]nona-1(6),8-diene-3,5-dione.
+
+The molecule is built around a 9-membered bicyclic [4.3.0] heteroskeleton.
+Within that parent framework, there is nitrogen at positions 2 (atom id 11), 4 (atom id 8), 7 (atom id 1), and 9 (atom id 3).
+Within that parent framework, there is a double bond between position 1 (atom id 4) and position 6 (atom id 5) and a double bond between position 8 (atom id 2) and position 9 (atom id 3).
+The principal characteristic feature is oxo groups at positions 3 (atom id 9) and 5 (atom id 6).
+Attached to this framework are methyl groups at positions 2 (atom id 11), 4 (atom id 8), and 7 (atom id 1). """
+
+```
+
+
+
 ## Debugging
 
 Token binding metadata is currently available through the assembly decision trace when `include_trace=True`.

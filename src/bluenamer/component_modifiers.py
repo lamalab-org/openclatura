@@ -2,7 +2,7 @@
 
 from typing import Literal, Protocol, overload
 
-from .assembly_parts import AssemblyParts, SubstituentItem
+from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem
 from .formatting import strip_outer_parentheses
 from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
@@ -169,6 +169,12 @@ def add_component_n_substituents(
                         branch_exclude,
                         branch_namer,
                     )
+                    emitted_tokens = _with_n_substituent_locant_token(
+                        emitted_tokens,
+                        loc_prefix,
+                        single_n,
+                        bond_ids_within(mol, {single_n, n_sub}),
+                    )
                     if _use_hydrazone_suffix_modifier(parts, principal_key):
                         parts.principal_suffix_modifiers.append(
                             SubstituentItem(
@@ -203,6 +209,30 @@ def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
     """Return formally charged atoms from an already named graph fragment."""
 
     return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
+
+
+def _with_n_substituent_locant_token(
+    emitted_tokens: tuple[NameTokenBinding, ...],
+    locant: str,
+    nitrogen_atom: int,
+    branch_bonds: set[int],
+) -> tuple[NameTokenBinding, ...]:
+    """Bind N-substituent locants to the principal nitrogen atom."""
+
+    locant_token = NameTokenBinding(
+        text=locant,
+        token_kind="locant",
+        source="n_substituent_locant",
+        grammar_role="n_substituent",
+        binding_key="prefix:n_substituent_locant",
+        atom_ids={nitrogen_atom},
+        bond_ids=set(branch_bonds),
+        locants=(locant,),
+    )
+    return (
+        locant_token,
+        *tuple(token for token in emitted_tokens if not (token.token_kind == "locant" and token.text == locant)),
+    )
 
 
 def _nitrogen_substituent_name(

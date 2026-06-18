@@ -390,7 +390,7 @@ def _merge_substituent_tree_instances(existing: dict | None, new: dict, name: st
 
 
 def _parent_tree_node(parts: AssemblyParts) -> dict:
-    return {
+    node = {
         "kind": "parent",
         "retained_name": parts.retained_name,
         "parent_length": parts.parent_length,
@@ -406,6 +406,27 @@ def _parent_tree_node(parts: AssemblyParts) -> dict:
         "atom_ids_by_locant": dict(parts.parent_atom_ids_by_locant),
         "atom_symbols_by_locant": dict(parts.parent_atom_symbols_by_locant),
         "atom_charges_by_locant": dict(parts.parent_atom_charges_by_locant),
+    }
+    suffix_data = _substituent_suffix_tree_node(parts)
+    if suffix_data:
+        node["substituent_suffix"] = suffix_data
+    return node
+
+
+def _substituent_suffix_tree_node(parts: AssemblyParts) -> dict | None:
+    if not parts.is_substituent:
+        return None
+    locant = str(parts.attachment_locant)
+    atom_id = parts.parent_atom_ids_by_locant.get(locant)
+    if atom_id is None:
+        return None
+    suffix = "ylidyne" if parts.is_triple_attach else "ylidene" if parts.is_double_attach else "yl"
+    return {
+        "locant": locant,
+        "suffix": suffix,
+        "atom_id": atom_id,
+        "is_double_attach": bool(parts.is_double_attach),
+        "is_triple_attach": bool(parts.is_triple_attach),
     }
 
 

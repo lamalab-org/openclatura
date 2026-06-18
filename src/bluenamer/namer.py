@@ -3,7 +3,7 @@
 import re
 from dataclasses import dataclass, field
 
-from .assembler import assemble_name_raw, post_process_name
+from .assembler import assemble_name_raw, post_process_rewrite_rules
 from .assembly_parts import AssemblyParts, SubstituentItem
 from .assembly_spiro import extract_spiro_side_prefixes
 from .chains import find_ring_systems, get_cyclic_atoms
@@ -816,6 +816,8 @@ def _collect_subgraph_substituents(
     candidate_path: list[int],
     sub_perceived: list[PerceivedGroup],
     sub_exclude: set[int],
+    *,
+    emit_metadata: bool = True,
 ) -> dict[int, list[SubstituentItem]]:
     """Collect prefixes attached to a recursive subgraph parent.
 
@@ -869,20 +871,43 @@ def _collect_subgraph_substituents(
 
         for n_idx in n_subs:
             if n_idx not in main_set and n_idx not in sub_handled_atoms and n_idx not in sub_exclude:
-                branch_decisions = DecisionTrace()
-                branch_name, branch_trace, branch_tree = name_subgraph(
-                    mol,
-                    n_idx,
-                    sub_exclude | main_set,
-                    upstream_atom=c_idx,
-                    return_trace=True,
-                    return_tree=True,
-                    decision_trace=branch_decisions,
-                )
+                branch_decisions = DecisionTrace() if emit_metadata else None
+                branch_exclude = sub_exclude | main_set
+                if emit_metadata:
+                    branch_name, branch_trace, branch_tree = name_subgraph(
+                        mol,
+                        n_idx,
+                        branch_exclude,
+                        upstream_atom=c_idx,
+                        return_trace=True,
+                        return_tree=True,
+                        decision_trace=branch_decisions,
+                    )
+                else:
+                    branch_name = name_subgraph(
+                        mol,
+                        n_idx,
+                        branch_exclude,
+                        upstream_atom=c_idx,
+                    )
+                    branch_trace = []
+                    branch_tree = None
                 if branch_name:
-                    branch_exclude = sub_exclude | main_set
                     branch_atoms = _subgraph_component(mol, n_idx, branch_exclude)
                     branch_with_attachment = branch_atoms | {c_idx}
+                    emitted_tokens = (
+                        graph_bound_substituent_tokens(
+                            mol,
+                            n_idx,
+                            branch_atoms,
+                            branch_name,
+                            c_idx,
+                            branch_exclude,
+                            name_subgraph,
+                        )
+                        if emit_metadata
+                        else ()
+                    )
                     subst_mapping.setdefault(c_idx, []).append(
                         SubstituentItem(
                             name=branch_name,
@@ -890,17 +915,9 @@ def _collect_subgraph_substituents(
                             atom_ids=branch_atoms,
                             bond_ids=_bond_ids_within(mol, branch_with_attachment),
                             charge_atom_ids=_charged_atoms(mol, branch_atoms),
-                            emitted_tokens=graph_bound_substituent_tokens(
-                                mol,
-                                n_idx,
-                                branch_atoms,
-                                branch_name,
-                                c_idx,
-                                branch_exclude,
-                                name_subgraph,
-                            ),
+                            emitted_tokens=emitted_tokens,
                             trace_segments=branch_trace,
-                            nested_decisions=decision_trace_data(branch_decisions),
+                            nested_decisions=decision_trace_data(branch_decisions) if emit_metadata else [],
                             substituent_tree=branch_tree,
                         )
                     )
@@ -970,6 +987,7 @@ def _assemble_parent_name(
     get_loc,
     *,
     finalize_subgraph: bool = False,
+    emit_metadata: bool = True,
 ) -> str:
     """Assemble a parent name and apply shared post-assembly charge rules."""
 
@@ -996,7 +1014,14 @@ def _assemble_parent_name(
             ("apply_cationic_imino_names", lambda text: apply_cationic_imino_names(text, mol)),
         )
     )
-    rewrites.append(("post_process_name", post_process_name))
+    rewrites.extend(post_process_rewrite_rules())
+    if not emit_metadata:
+        for rewrite in rewrites:
+            if isinstance(rewrite, tuple):
+                name = rewrite[1](name)
+            else:
+                name = rewrite.rewrite(name)
+        return name
     result = NameAssemblyResult.from_rewrite_pipeline(name, parts.name_atom_bindings, rewrites=tuple(rewrites))
     parts.name_atom_bindings = list(result.bindings)
     parts.name_token_spans = token_span_trace_data(result)
@@ -1091,36 +1116,39 @@ def name_subgraph(
     ``data/namer_rules.json``.
     """
 
+    emit_metadata = return_trace or return_tree or decision_trace is not None
     start_atom = mol.atoms[start_idx]
     cyclic_atoms_global = get_cyclic_atoms(mol, exclude_atoms)
     component = _subgraph_component(mol, start_idx, exclude_atoms)
-    trace_decision(
-        decision_trace,
-        TracePhase.COMPONENT,
-        "selected substituent subgraph",
-        "Recursive branch naming starts from the atom attached to the parent and stops at the parent boundary.",
-        atoms=component,
-        bonds=_bond_ids_within(mol, component),
-        data={
-            "start_atom": start_idx,
-            "upstream_atom": upstream_atom,
-            "excluded_atom_count": len(exclude_atoms),
-        },
-    )
+    if decision_trace is not None:
+        trace_decision(
+            decision_trace,
+            TracePhase.COMPONENT,
+            "selected substituent subgraph",
+            "Recursive branch naming starts from the atom attached to the parent and stops at the parent boundary.",
+            atoms=component,
+            bonds=_bond_ids_within(mol, component),
+            data={
+                "start_atom": start_idx,
+                "upstream_atom": upstream_atom,
+                "excluded_atom_count": len(exclude_atoms),
+            },
+        )
 
     if not start_atom.is_carbon and start_idx not in cyclic_atoms_global:
         name = name_heteroatom_subgraph(mol, start_idx, exclude_atoms, upstream_atom, name_subgraph)
         if name is not None:
-            trace_decision(
-                decision_trace,
-                TracePhase.ASSEMBLY,
-                "assembled heteroatom substituent shortcut",
-                "A terminal non-carbon branch was rendered by the heteroatom-subgraph renderer.",
-                atoms=component,
-                bonds=_bond_ids_within(mol, component),
-                data={"name": name},
-            )
-            tree = _shortcut_substituent_tree(name, component, mol, decision_trace)
+            if decision_trace is not None:
+                trace_decision(
+                    decision_trace,
+                    TracePhase.ASSEMBLY,
+                    "assembled heteroatom substituent shortcut",
+                    "A terminal non-carbon branch was rendered by the heteroatom-subgraph renderer.",
+                    atoms=component,
+                    bonds=_bond_ids_within(mol, component),
+                    data={"name": name},
+                )
+            tree = _shortcut_substituent_tree(name, component, mol, decision_trace) if return_tree else None
             if return_trace and return_tree:
                 return name, [], tree
             if return_trace:
@@ -1132,16 +1160,21 @@ def name_subgraph(
     direct_prefix = _direct_subgraph_prefix(mol, start_idx, component)
     if direct_prefix:
         direct_prefix_name = direct_prefix.name
-        trace_decision(
-            decision_trace,
-            TracePhase.ASSEMBLY,
-            "assembled direct substituent prefix",
-            "The complete recursive component matches a direct functional-prefix role.",
-            atoms=component,
-            bonds=_bond_ids_within(mol, component),
-            data=direct_prefix.trace_data(),
+        if decision_trace is not None:
+            trace_decision(
+                decision_trace,
+                TracePhase.ASSEMBLY,
+                "assembled direct substituent prefix",
+                "The complete recursive component matches a direct functional-prefix role.",
+                atoms=component,
+                bonds=_bond_ids_within(mol, component),
+                data=direct_prefix.trace_data(),
+            )
+        tree = (
+            _shortcut_substituent_tree(direct_prefix_name, component, mol, decision_trace, direct_prefix)
+            if return_tree
+            else None
         )
-        tree = _shortcut_substituent_tree(direct_prefix_name, component, mol, decision_trace, direct_prefix)
         if return_trace and return_tree:
             return direct_prefix_name, [], tree
         if return_trace:
@@ -1153,14 +1186,15 @@ def name_subgraph(
     sub_exclude = set(mol.atoms.keys()) - component
     parent_selection = _select_subgraph_parent(mol, start_idx, component, sub_exclude)
     if parent_selection is None:
-        trace_decision(
-            decision_trace,
-            TracePhase.PARENT_SELECTION,
-            "failed substituent parent selection",
-            "No chain or ring parent could be selected inside the recursive component.",
-            atoms=component,
-            bonds=_bond_ids_within(mol, component),
-        )
+        if decision_trace is not None:
+            trace_decision(
+                decision_trace,
+                TracePhase.PARENT_SELECTION,
+                "failed substituent parent selection",
+                "No chain or ring parent could be selected inside the recursive component.",
+                atoms=component,
+                bonds=_bond_ids_within(mol, component),
+            )
         if return_trace and return_tree:
             return "", [], None
         if return_trace:
@@ -1168,22 +1202,23 @@ def name_subgraph(
         if return_tree:
             return "", None
         return ""
-    trace_decision(
-        decision_trace,
-        TracePhase.PARENT_SELECTION,
-        "selected substituent parent skeleton",
-        "The recursive branch uses the same parent-candidate ranking as ordinary components, scoped to the branch graph.",
-        atoms=set(parent_selection.primary_path),
-        bonds=_bond_ids_within(mol, set(parent_selection.primary_path)),
-        data={
-            "primary_path": list(parent_selection.primary_path),
-            "is_ring": parent_selection.is_ring,
-            "is_bicycle": parent_selection.is_bicycle,
-            "is_spiro": parent_selection.is_spiro,
-            "is_polycycle": parent_selection.is_polycycle,
-            "fixed_start_required": parent_selection.fixed_start_required,
-        },
-    )
+    if decision_trace is not None:
+        trace_decision(
+            decision_trace,
+            TracePhase.PARENT_SELECTION,
+            "selected substituent parent skeleton",
+            "The recursive branch uses the same parent-candidate ranking as ordinary components, scoped to the branch graph.",
+            atoms=set(parent_selection.primary_path),
+            bonds=_bond_ids_within(mol, set(parent_selection.primary_path)),
+            data={
+                "primary_path": list(parent_selection.primary_path),
+                "is_ring": parent_selection.is_ring,
+                "is_bicycle": parent_selection.is_bicycle,
+                "is_spiro": parent_selection.is_spiro,
+                "is_polycycle": parent_selection.is_polycycle,
+                "fixed_start_required": parent_selection.fixed_start_required,
+            },
+        )
 
     retained_name_val, locant_maps = resolve_retained_parent(
         mol,
@@ -1193,7 +1228,13 @@ def name_subgraph(
         parent_selection.is_polycycle,
     )
     sub_perceived = perceive_groups(mol)
-    subst_mapping = _collect_subgraph_substituents(mol, parent_selection.primary_path, sub_perceived, sub_exclude)
+    subst_mapping = _collect_subgraph_substituents(
+        mol,
+        parent_selection.primary_path,
+        sub_perceived,
+        sub_exclude,
+        emit_metadata=emit_metadata,
+    )
     parent_plan = build_parent_assembly_plan(
         mol,
         parent_selection,
@@ -1209,19 +1250,20 @@ def name_subgraph(
     numbered_path = parent_plan.numbered_path
     get_loc = parent_plan.get_loc
     parts = parent_plan.parts
-    trace_decision(
-        decision_trace,
-        TracePhase.NUMBERING,
-        "selected substituent numbering",
-        "The branch parent numbering was selected before replacement, unsaturation, suffix, and substituent locants were emitted.",
-        atoms=set(numbered_path),
-        bonds=_bond_ids_within(mol, set(numbered_path)),
-        data={
-            "numbered_path": list(numbered_path),
-            "atom_to_locant": {atom_idx: get_loc(atom_idx) for atom_idx in numbered_path},
-            "retained_name": retained_name_val,
-        },
-    )
+    if decision_trace is not None:
+        trace_decision(
+            decision_trace,
+            TracePhase.NUMBERING,
+            "selected substituent numbering",
+            "The branch parent numbering was selected before replacement, unsaturation, suffix, and substituent locants were emitted.",
+            atoms=set(numbered_path),
+            bonds=_bond_ids_within(mol, set(numbered_path)),
+            data={
+                "numbered_path": list(numbered_path),
+                "atom_to_locant": {atom_idx: get_loc(atom_idx) for atom_idx in numbered_path},
+                "retained_name": retained_name_val,
+            },
+        )
     _emit_bond_stereo(mol, parts, numbered_path, get_loc, sub_exclude, upstream_atom)
     _add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
     _add_subgraph_substituents(parts, subst_mapping, get_loc)
@@ -1235,20 +1277,28 @@ def name_subgraph(
         parent_selection.is_polycycle,
     )
 
-    name = _assemble_parent_name(mol, parts, numbered_path, get_loc, finalize_subgraph=True)
-    trace_segments = _assembly_trace_segments(parts) if return_trace or return_tree else []
-    trace_decision(
-        decision_trace,
-        TracePhase.ASSEMBLY,
-        "assembled substituent name",
-        "The scoped branch assembly was rendered as a substituent name.",
-        atoms=component,
-        bonds=_bond_ids_within(mol, component),
-        data={
-            "name": name,
-            "trace_segment_count": len(trace_segments),
-        },
+    name = _assemble_parent_name(
+        mol,
+        parts,
+        numbered_path,
+        get_loc,
+        finalize_subgraph=True,
+        emit_metadata=emit_metadata,
     )
+    trace_segments = _assembly_trace_segments(parts) if return_trace or return_tree else []
+    if decision_trace is not None:
+        trace_decision(
+            decision_trace,
+            TracePhase.ASSEMBLY,
+            "assembled substituent name",
+            "The scoped branch assembly was rendered as a substituent name.",
+            atoms=component,
+            bonds=_bond_ids_within(mol, component),
+            data={
+                "name": name,
+                "trace_segment_count": len(trace_segments),
+            },
+        )
     if return_trace:
         if return_tree:
             return (
@@ -1319,7 +1369,321 @@ def _shortcut_substituent_tree(
             node["substituents"] = list(direct_prefix.ligand_trees)
         if direct_prefix.ligand_trace_segments:
             node["trace_segments"] = list(direct_prefix.ligand_trace_segments)
+    else:
+        shortcut_children = _oxygen_carbonyl_shortcut_children(name, component, mol)
+        if not shortcut_children:
+            shortcut_children = _heteroatom_shortcut_children(name, component, mol)
+        if shortcut_children:
+            node["substituents"] = shortcut_children
     return node
+
+
+def _heteroatom_shortcut_children(name: str, component: set[int], mol: Molecule) -> list[dict]:
+    """Return nested ligand nodes for heteroatom-starting shortcut substituents."""
+
+    center = _shortcut_heteroatom_center(component, mol)
+    if center is None:
+        return []
+    center_token = _heteroatom_center_token_in_name(mol.atoms[center].symbol, name)
+    if not center_token:
+        return []
+    direct_ligands = {
+        neighbor
+        for neighbor in mol.get_neighbors(center)
+        if neighbor in component
+        and mol.atoms[neighbor].symbol in {"O", "S", "N"}
+        and (bond := mol.get_bond(center, neighbor)) is not None
+        and bond.order >= 2
+    }
+    organic_roots = [
+        neighbor
+        for neighbor in mol.get_neighbors(center)
+        if neighbor in component and neighbor not in direct_ligands and mol.atoms[neighbor].symbol != "H"
+    ]
+    children = []
+    for root in organic_roots:
+        ligand_exclude = (set(mol.atoms) - component) | {center, *direct_ligands}
+        ligand_atoms = _subgraph_component(mol, root, ligand_exclude)
+        if not ligand_atoms:
+            continue
+        ligand_name = _organic_ligand_name_from_heteroatom_shortcut(name, center_token)
+        if not ligand_name:
+            ligand_name = _simple_ligand_node_name(mol, ligand_atoms)
+        ligand_children = _carbonyl_ligand_substituent_nodes(mol, center, root, ligand_atoms)
+        if not ligand_children:
+            ligand_tree = _recursive_ligand_tree(mol, root, ligand_exclude, upstream_atom=center)
+            if isinstance(ligand_tree, dict):
+                ligand_node = dict(ligand_tree)
+                if ligand_name:
+                    ligand_node["name"] = ligand_name
+                children.append(ligand_node)
+                continue
+            ligand_children = _terminal_ligand_substituent_nodes(mol, ligand_atoms, ligand_name)
+        children.append(_shortcut_ligand_node(ligand_name, ligand_atoms, ligand_children, mol))
+    return children
+
+
+def _shortcut_heteroatom_center(component: set[int], mol: Molecule) -> int | None:
+    candidates = [
+        atom_idx
+        for atom_idx in component
+        if mol.atoms[atom_idx].symbol not in {"C", "H", "O", "N"}
+        and any(neighbor not in component for neighbor in mol.get_neighbors(atom_idx))
+    ]
+    if candidates:
+        return candidates[0]
+    candidates = [
+        atom_idx
+        for atom_idx in component
+        if mol.atoms[atom_idx].symbol not in {"C", "H"}
+        and any(neighbor not in component for neighbor in mol.get_neighbors(atom_idx))
+    ]
+    return candidates[0] if candidates else None
+
+
+def _heteroatom_center_token_in_name(symbol: str, name: str) -> str:
+    tokens = {
+        "S": ("sulfonimidoyl", "sulfanylidene", "sulfaniumyl", "sulfonyl", "sulfinyl", "sulfanyl", "sulfo", "thioxo"),
+        "Se": ("selenanylidene", "selanylidene", "selenanyl", "selanyl", "selenido", "seleno"),
+        "Te": ("telluranylidene", "tellanyl", "tellurido", "telluro"),
+        "P": ("phosphoryl", "phosphono", "phosphanylidene", "phosphanylidynemethyl", "phosphanyl", "phosphino"),
+        "B": ("borylidene", "boryl", "boranuide"),
+        "Si": ("silylidene", "silyl"),
+        "O": ("hydroperoxy", "peroxy", "hydroxy", "oxy", "oxido"),
+        "N": ("ammonio", "azanidyl", "iminio", "amino", "imino", "nitrilo"),
+    }.get(symbol, ())
+    lower = strip_outer_parentheses(name).lower()
+    return next((token for token in tokens if token in lower), "")
+
+
+def _organic_ligand_name_from_heteroatom_shortcut(name: str, center_token: str) -> str:
+    text = strip_outer_parentheses(name)
+    lower = text.lower()
+    index = lower.rfind(center_token)
+    if index <= 0:
+        return ""
+    ligand = text[:index].strip("-")
+    return ligand
+
+
+def _simple_ligand_node_name(mol: Molecule, ligand_atoms: set[int]) -> str:
+    symbols = {mol.atoms[atom_idx].symbol for atom_idx in ligand_atoms}
+    if symbols <= {"C", "H"} and len(ligand_atoms) == 1:
+        return "methyl"
+    return "ligand"
+
+
+def _recursive_ligand_tree(
+    mol: Molecule,
+    root: int,
+    excluded_atoms: set[int],
+    *,
+    upstream_atom: int,
+) -> dict | None:
+    branch_result = name_subgraph(
+        mol,
+        root,
+        excluded_atoms,
+        upstream_atom=upstream_atom,
+        return_trace=True,
+        return_tree=True,
+        decision_trace=DecisionTrace(),
+    )
+    if isinstance(branch_result, tuple) and len(branch_result) == 3 and isinstance(branch_result[2], dict):
+        return branch_result[2]
+    return None
+
+
+def _shortcut_ligand_node(name: str, ligand_atoms: set[int], children: list[dict], mol: Molecule) -> dict:
+    return {
+        "kind": "fragment",
+        "name": name,
+        "atoms": sorted(ligand_atoms),
+        "bonds": sorted(_bond_ids_within(mol, ligand_atoms)),
+        "substituents": children,
+    }
+
+
+def _carbonyl_ligand_substituent_nodes(
+    mol: Molecule,
+    heteroatom_center: int,
+    ligand_root: int,
+    ligand_atoms: set[int],
+) -> list[dict]:
+    if not mol.atoms[ligand_root].is_carbon:
+        return []
+    terminal_chalcogens = [
+        neighbor
+        for neighbor in mol.get_neighbors(ligand_root)
+        if neighbor in ligand_atoms
+        and mol.atoms[neighbor].symbol in {"O", "S"}
+        and (bond := mol.get_bond(ligand_root, neighbor)) is not None
+        and bond.order == 2
+    ]
+    if len(terminal_chalcogens) != 1:
+        return []
+    branch_roots = [
+        neighbor
+        for neighbor in mol.get_neighbors(ligand_root)
+        if neighbor in ligand_atoms and neighbor not in {heteroatom_center, *terminal_chalcogens}
+    ]
+    if not branch_roots:
+        return []
+    branch_root = branch_roots[0]
+    excluded_atoms = (set(mol.atoms) - ligand_atoms) | {heteroatom_center, ligand_root, *terminal_chalcogens}
+    branch_atoms = _subgraph_component(mol, branch_root, excluded_atoms)
+    if not branch_atoms:
+        return []
+    branch_tree = _recursive_ligand_tree(mol, branch_root, excluded_atoms, upstream_atom=ligand_root)
+    if isinstance(branch_tree, dict):
+        side_node = dict(branch_tree)
+    else:
+        side_node = {
+            "kind": "fragment",
+            "name": "carbonyl side",
+            "atoms": sorted(branch_atoms),
+            "bonds": sorted(_bond_ids_within(mol, branch_atoms)),
+            "substituents": _terminal_ligand_substituent_nodes(mol, branch_atoms),
+        }
+    return [
+        side_node,
+        {
+            "kind": "functional_core",
+            "name": "carbonyl" if mol.atoms[terminal_chalcogens[0]].symbol == "O" else "carbonothioyl",
+            "atoms": sorted({ligand_root, terminal_chalcogens[0]}),
+            "bonds": sorted(_bond_ids_within(mol, {ligand_root, terminal_chalcogens[0]})),
+            "substituents": [],
+        },
+    ]
+
+
+def _terminal_ligand_substituent_nodes(mol: Molecule, ligand_atoms: set[int], ligand_name: str = "") -> list[dict]:
+    nodes = []
+    names = {"N": "amino", "O": "hydroxy", "F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
+    lower_name = ligand_name.lower()
+    for atom_idx in sorted(ligand_atoms):
+        name = names.get(mol.atoms[atom_idx].symbol)
+        if not name:
+            continue
+        local_bonds = {
+            bond.idx
+            for neighbor in mol.get_neighbors(atom_idx)
+            if neighbor in ligand_atoms and (bond := mol.get_bond(atom_idx, neighbor)) is not None
+        }
+        if len(local_bonds) != 1:
+            continue
+        local_bond = next(
+            bond
+            for neighbor in mol.get_neighbors(atom_idx)
+            if neighbor in ligand_atoms and (bond := mol.get_bond(atom_idx, neighbor)) is not None
+        )
+        if local_bond.order != 1:
+            continue
+        nodes.append(
+            {
+                "kind": "substituent",
+                "name": name,
+                "atoms": [atom_idx],
+                "bonds": sorted(local_bonds),
+                "locants": _visible_ligand_substituent_locants(lower_name, name),
+                "substituents": [],
+            }
+        )
+    return nodes
+
+
+def _visible_ligand_substituent_locants(lower_name: str, child_name: str) -> list[str]:
+    pattern = re.compile(rf"(?<![0-9])([0-9]+(?:,[0-9]+)*)-{re.escape(child_name.lower())}")
+    match = pattern.search(lower_name)
+    if match is None:
+        return []
+    return match.group(1).split(",")
+
+
+def _oxygen_carbonyl_shortcut_children(name: str, component: set[int], mol: Molecule) -> list[dict]:
+    """Return nested tree nodes for O-C(=O)-R shortcut substituents."""
+
+    if "carbonyloxy" not in name.lower() and "carbonothioyloxy" not in name.lower():
+        return []
+    oxygen = next(
+        (
+            atom_idx
+            for atom_idx in component
+            if mol.atoms[atom_idx].symbol == "O"
+            and any(neighbor not in component for neighbor in mol.get_neighbors(atom_idx))
+        ),
+        None,
+    )
+    if oxygen is None:
+        return []
+    carbonyl = next(
+        (neighbor for neighbor in mol.get_neighbors(oxygen) if neighbor in component and mol.atoms[neighbor].is_carbon),
+        None,
+    )
+    if carbonyl is None:
+        return []
+    terminal = [
+        neighbor
+        for neighbor in mol.get_neighbors(carbonyl)
+        if neighbor in component
+        and neighbor != oxygen
+        and mol.atoms[neighbor].symbol in {"O", "S"}
+        and (bond := mol.get_bond(carbonyl, neighbor)) is not None
+        and bond.order == 2
+    ]
+    ligand_roots = [
+        neighbor
+        for neighbor in mol.get_neighbors(carbonyl)
+        if neighbor in component and neighbor not in {oxygen, *terminal}
+    ]
+    if not ligand_roots:
+        return []
+    ligand_root = ligand_roots[0]
+    ligand_atoms = _subgraph_component(mol, ligand_root, set(mol.atoms) - component | {oxygen, carbonyl, *terminal})
+    bridge_atoms = {ligand_root}
+    branch_root = None
+    for neighbor in mol.get_neighbors(ligand_root):
+        if neighbor not in ligand_atoms:
+            continue
+        bond = mol.get_bond(ligand_root, neighbor)
+        if bond is not None and bond.order == 2:
+            bridge_atoms.add(neighbor)
+            branch_candidates = [n for n in mol.get_neighbors(neighbor) if n in ligand_atoms and n != ligand_root]
+            branch_root = branch_candidates[0] if branch_candidates else None
+            break
+    if branch_root is None:
+        return []
+    branch_atoms = _subgraph_component(
+        mol, branch_root, set(mol.atoms) - component | bridge_atoms | {oxygen, carbonyl, *terminal}
+    )
+    hydroxy_children = [
+        {
+            "kind": "substituent",
+            "name": "hydroxy",
+            "atoms": [atom_idx],
+            "bonds": sorted(_bond_ids_within(mol, {atom_idx, *mol.get_neighbors(atom_idx)} & branch_atoms)),
+            "substituents": [],
+        }
+        for atom_idx in sorted(branch_atoms)
+        if mol.atoms[atom_idx].symbol == "O"
+    ]
+    return [
+        {
+            "kind": "fragment",
+            "name": "ethenyl",
+            "atoms": sorted(bridge_atoms),
+            "bonds": sorted(_bond_ids_within(mol, bridge_atoms)),
+            "substituents": [
+                {
+                    "kind": "fragment",
+                    "name": "dihydroxyphenyl",
+                    "atoms": sorted(branch_atoms),
+                    "bonds": sorted(_bond_ids_within(mol, branch_atoms)),
+                    "substituents": hydroxy_children,
+                }
+            ],
+        }
+    ]
 
 
 def name_component(

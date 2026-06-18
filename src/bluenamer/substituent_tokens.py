@@ -7,6 +7,7 @@ from .assembly_parts import NameTokenBinding
 from .formatting import strip_outer_parentheses
 from .molecule import Molecule
 from .stereo_descriptors import ABSOLUTE_STEREO_DESCRIPTORS, RELATIVE_STEREO_DESCRIPTORS
+from .token_grammar import is_locant_token, lexical_token_spans, lexical_tokens
 from .trace_helpers import bond_ids_within
 
 BranchNamer = Callable[..., str]
@@ -112,15 +113,23 @@ def _generic_heteroatom_substituent_tokens(
         return ()
 
     tokens: list[NameTokenBinding] = list(_embedded_absolute_stereo_tokens(mol, center, term_text))
+    carbonyl_like_tokens = _oxygen_carbonyl_like_tokens(mol, center, atom_ids, term_text, upstream_atom)
+    if carbonyl_like_tokens:
+        return tuple([*tokens, *carbonyl_like_tokens])
     ligand_roots = _heteroatom_ligand_roots(mol, center, atom_ids, upstream_atom)
     ligand_atoms_by_token = _direct_ligand_tokens(mol, center, ligand_roots, atom_ids)
     for token_text, ligand_atoms in ligand_atoms_by_token:
         if token_text.lower() in lower_term:
+            ligand_bonds = bond_ids_within(mol, set(ligand_atoms) | {center})
             tokens.append(
                 NameTokenBinding(
                     text=token_text,
+                    token_kind="prefix",
+                    source="substituent_renderer",
+                    grammar_role="heteroatom_direct_ligand",
+                    binding_key="prefix:heteroatom_direct_ligand",
                     atom_ids=set(ligand_atoms),
-                    bond_ids=bond_ids_within(mol, set(ligand_atoms) | {center}),
+                    bond_ids=ligand_bonds,
                     charge_atom_ids={idx for idx in ligand_atoms if mol.atoms[idx].charge != 0},
                 )
             )
@@ -138,25 +147,344 @@ def _generic_heteroatom_substituent_tokens(
             continue
         for token_text in _lexical_tokens(ligand_text):
             if token_text.lower() in lower_term:
+                token_atoms, token_bonds = _organic_ligand_token_scope(mol, token_text, ligand_atoms, lower_term)
                 tokens.append(
                     NameTokenBinding(
                         text=token_text,
-                        atom_ids=set(ligand_atoms),
-                        bond_ids=bond_ids_within(mol, ligand_atoms),
-                        charge_atom_ids={idx for idx in ligand_atoms if mol.atoms[idx].charge != 0},
+                        token_kind="locant" if is_locant_token(token_text, allow_element=False) else "prefix",
+                        source="substituent_renderer",
+                        grammar_role="heteroatom_organic_ligand",
+                        binding_key="prefix:heteroatom_organic_ligand",
+                        atom_ids=set(token_atoms),
+                        bond_ids=set(token_bonds),
+                        charge_atom_ids={idx for idx in token_atoms if mol.atoms[idx].charge != 0},
+                        locants=(token_text,) if is_locant_token(token_text, allow_element=False) else (),
                     )
                 )
 
     charge_atoms = {center} if mol.atoms[center].charge != 0 else set()
+    direct_ligand_atoms = {
+        atom for token_text, atoms in ligand_atoms_by_token for atom in atoms if token_text in {"oxo", "oxido", "imino"}
+    }
+    center_atoms = {center, *direct_ligand_atoms}
+    center_bonds = bond_ids_within(mol, center_atoms)
     for token_text in center_tokens:
         tokens.append(
             NameTokenBinding(
                 text=token_text,
-                atom_ids={center},
+                token_kind="prefix",
+                source="substituent_renderer",
+                grammar_role="heteroatom_center",
+                binding_key="prefix:heteroatom_center",
+                atom_ids=set(center_atoms),
+                bond_ids=set(center_bonds),
                 charge_atom_ids=set(charge_atoms),
+                match_priority=80,
             )
         )
     return tuple(tokens)
+
+
+def _organic_ligand_token_scope(
+    mol: Molecule,
+    token_text: str,
+    ligand_atoms: set[int],
+    lower_term: str,
+) -> tuple[set[int], set[int]]:
+    """Return the most local graph scope for a token inside an organic ligand."""
+
+    token_lower = token_text.lower()
+    if is_locant_token(token_text, allow_element=False):
+        locant_atoms = _terminal_substituent_atoms_for_locant_token(mol, ligand_atoms, token_text, lower_term)
+        if locant_atoms:
+            return locant_atoms, bond_ids_within(mol, locant_atoms | ligand_atoms)
+    if token_lower in {"amino", "hydroxy", "fluoro", "chloro", "bromo", "iodo"}:
+        atoms = _terminal_atoms_for_prefix(mol, ligand_atoms, token_lower)
+        if atoms:
+            return atoms, bond_ids_within(mol, atoms | ligand_atoms)
+    return set(ligand_atoms), bond_ids_within(mol, ligand_atoms)
+
+
+def _terminal_substituent_atoms_for_locant_token(
+    mol: Molecule,
+    ligand_atoms: set[int],
+    token_text: str,
+    lower_term: str,
+) -> set[int]:
+    token_lower = token_text.lower()
+    candidates = []
+    for match in re.finditer(re.escape(token_lower), lower_term):
+        after = lower_term[match.end() :]
+        if not after.startswith("-"):
+            continue
+        next_tokens = lexical_token_spans(after, 1)
+        if not next_tokens:
+            continue
+        candidates.extend(_terminal_atoms_for_prefix(mol, ligand_atoms, next_tokens[0].text.lower()))
+    return set(candidates)
+
+
+def _terminal_atoms_for_prefix(mol: Molecule, ligand_atoms: set[int], token_lower: str) -> set[int]:
+    prefix_symbols = {
+        "amino": {"N"},
+        "hydroxy": {"O"},
+        "fluoro": {"F"},
+        "chloro": {"Cl"},
+        "bromo": {"Br"},
+        "iodo": {"I"},
+    }.get(token_lower)
+    if not prefix_symbols:
+        return set()
+    return {
+        atom_idx
+        for atom_idx in ligand_atoms
+        if mol.atoms[atom_idx].symbol in prefix_symbols
+        and sum(1 for neighbor in mol.get_neighbors(atom_idx) if neighbor in ligand_atoms) == 1
+    }
+
+
+def _oxygen_carbonyl_like_tokens(
+    mol: Molecule,
+    oxygen: int,
+    atom_ids: set[int],
+    term_text: str,
+    upstream_atom: int,
+) -> tuple[NameTokenBinding, ...]:
+    """Return graph scopes for O-C(=O)-R prefixes such as carbonyloxy."""
+
+    if mol.atoms[oxygen].symbol != "O":
+        return ()
+    lower = term_text.lower()
+    if "carbonyloxy" not in lower and "carbonothioyloxy" not in lower:
+        return ()
+    carbonyl = next(
+        (
+            neighbor
+            for neighbor in mol.get_neighbors(oxygen)
+            if neighbor != upstream_atom and neighbor in atom_ids and mol.atoms[neighbor].is_carbon
+        ),
+        None,
+    )
+    if carbonyl is None:
+        return ()
+    terminal_chalcogens = [
+        neighbor
+        for neighbor in mol.get_neighbors(carbonyl)
+        if neighbor in atom_ids
+        and neighbor != oxygen
+        and mol.atoms[neighbor].symbol in {"O", "S"}
+        and (bond := mol.get_bond(carbonyl, neighbor)) is not None
+        and bond.order == 2
+    ]
+    if len(terminal_chalcogens) != 1:
+        return ()
+    carbonyl_atoms = {carbonyl, terminal_chalcogens[0]}
+    carbonyl_bonds = bond_ids_within(mol, carbonyl_atoms | {oxygen})
+    tokens: list[NameTokenBinding] = [
+        NameTokenBinding(
+            text="carbon",
+            token_kind="prefix",
+            source="substituent_renderer",
+            grammar_role="carbonyl_like_core",
+            binding_key="prefix:carbonyl_like_core",
+            atom_ids=set(carbonyl_atoms),
+            bond_ids=set(carbonyl_bonds),
+        ),
+        NameTokenBinding(
+            text="carbonyl",
+            token_kind="prefix",
+            source="substituent_renderer",
+            grammar_role="carbonyl_like_core",
+            binding_key="prefix:carbonyl_like_core",
+            atom_ids=set(carbonyl_atoms),
+            bond_ids=set(carbonyl_bonds),
+        ),
+        NameTokenBinding(
+            text="oxy",
+            token_kind="prefix",
+            source="substituent_renderer",
+            grammar_role="heteroatom_center",
+            binding_key="prefix:heteroatom_center",
+            atom_ids={oxygen},
+            bond_ids=bond_ids_within(mol, {oxygen, carbonyl}),
+            match_priority=80,
+            left_context="carbonyl",
+        ),
+    ]
+    ligand_roots = [
+        neighbor
+        for neighbor in mol.get_neighbors(carbonyl)
+        if neighbor in atom_ids and neighbor not in {oxygen, terminal_chalcogens[0]}
+    ]
+    if not ligand_roots:
+        return tuple(tokens)
+    ligand_root = ligand_roots[0]
+    ligand_atoms = _component_within(mol, ligand_root, atom_ids - {oxygen, carbonyl, terminal_chalcogens[0]})
+    bridge_atoms, branch_atoms, bridge_bonds = _alkenyl_bridge_scope(mol, ligand_root, ligand_atoms)
+    if bridge_atoms:
+        tokens.extend(_alkenyl_bridge_tokens(mol, bridge_atoms, bridge_bonds, lower))
+    if branch_atoms:
+        tokens.extend(_branch_phrase_tokens(mol, branch_atoms, lower))
+    return tuple(tokens)
+
+
+def _alkenyl_bridge_scope(
+    mol: Molecule,
+    ligand_root: int,
+    ligand_atoms: set[int],
+) -> tuple[set[int], set[int], set[int]]:
+    bridge_atoms = {ligand_root}
+    branch_root = None
+    for neighbor in mol.get_neighbors(ligand_root):
+        if neighbor not in ligand_atoms:
+            continue
+        bond = mol.get_bond(ligand_root, neighbor)
+        if bond is not None and bond.order == 2:
+            bridge_atoms.add(neighbor)
+            branch_candidates = [n for n in mol.get_neighbors(neighbor) if n in ligand_atoms and n != ligand_root]
+            branch_root = branch_candidates[0] if branch_candidates else None
+            break
+    if branch_root is None:
+        return bridge_atoms, ligand_atoms - bridge_atoms, bond_ids_within(mol, bridge_atoms)
+    branch_atoms = _component_within(mol, branch_root, ligand_atoms - bridge_atoms)
+    return bridge_atoms, branch_atoms, bond_ids_within(mol, bridge_atoms)
+
+
+def _alkenyl_bridge_tokens(
+    mol: Molecule,
+    bridge_atoms: set[int],
+    bridge_bonds: set[int],
+    lower_term: str,
+) -> list[NameTokenBinding]:
+    tokens: list[NameTokenBinding] = []
+    if "eth" in lower_term:
+        tokens.append(
+            NameTokenBinding(
+                text="eth",
+                token_kind="prefix",
+                source="substituent_renderer",
+                grammar_role="alkenyl_bridge",
+                binding_key="prefix:alkenyl_bridge",
+                atom_ids=set(bridge_atoms),
+                bond_ids=set(bridge_bonds),
+                match_priority=60,
+            )
+        )
+    if "en" in lower_term:
+        tokens.append(
+            NameTokenBinding(
+                text="en",
+                token_kind="unsaturation",
+                source="substituent_renderer",
+                grammar_role="alkenyl_bridge_unsaturation",
+                binding_key="prefix:alkenyl_bridge",
+                atom_ids=set(bridge_atoms),
+                bond_ids=set(bridge_bonds),
+                match_priority=60,
+                right_context="yl",
+            )
+        )
+    if "yl" in lower_term:
+        tokens.append(
+            NameTokenBinding(
+                text="yl",
+                token_kind="prefix",
+                source="substituent_renderer",
+                grammar_role="alkenyl_bridge_suffix",
+                binding_key="prefix:alkenyl_bridge",
+                atom_ids=set(bridge_atoms),
+                bond_ids=set(bridge_bonds),
+                match_priority=60,
+                left_context="en",
+            )
+        )
+    stereo_bonds = {bond.idx for bond in mol.bonds.values() if bond.idx in bridge_bonds and bond.stereo in {"E", "Z"}}
+    if stereo_bonds:
+        descriptor = next(bond.stereo for bond in mol.bonds.values() if bond.idx in stereo_bonds and bond.stereo)
+        tokens.append(
+            NameTokenBinding(
+                text="1",
+                token_kind="locant",
+                source="renderer_stereo",
+                grammar_role="bond_stereo",
+                binding_key="prefix:alkenyl_bridge_stereo",
+                atom_ids=set(bridge_atoms),
+                bond_ids=set(stereo_bonds),
+                locants=("1",),
+                match_priority=100,
+                right_context=descriptor,
+            )
+        )
+        tokens.append(
+            NameTokenBinding(
+                text=descriptor,
+                token_kind="stereo",
+                source="renderer_stereo",
+                grammar_role="bond_stereo",
+                binding_key="prefix:alkenyl_bridge_stereo",
+                atom_ids=set(bridge_atoms),
+                bond_ids=set(stereo_bonds),
+                locants=("1",),
+                match_priority=100,
+            )
+        )
+    return tokens
+
+
+def _branch_phrase_tokens(mol: Molecule, branch_atoms: set[int], lower_term: str) -> list[NameTokenBinding]:
+    tokens: list[NameTokenBinding] = []
+    branch_bonds = bond_ids_within(mol, branch_atoms)
+    hydroxy_atoms = {
+        atom_idx
+        for atom_idx in branch_atoms
+        if mol.atoms[atom_idx].symbol == "O"
+        and any(neighbor in branch_atoms for neighbor in mol.get_neighbors(atom_idx))
+    }
+    if "dihydroxyphenyl" in lower_term:
+        tokens.append(
+            NameTokenBinding(
+                text="dihydroxyphenyl",
+                token_kind="prefix",
+                source="substituent_renderer",
+                grammar_role="aryl_branch",
+                binding_key="prefix:aryl_branch",
+                atom_ids=set(branch_atoms),
+                bond_ids=set(branch_bonds),
+            )
+        )
+    if "3,4" in lower_term and hydroxy_atoms:
+        hydroxy_bonds = {
+            bond.idx
+            for oxygen in hydroxy_atoms
+            for neighbor in mol.get_neighbors(oxygen)
+            if neighbor in branch_atoms and (bond := mol.get_bond(oxygen, neighbor)) is not None
+        }
+        tokens.append(
+            NameTokenBinding(
+                text="3,4",
+                token_kind="locant",
+                source="substituent_renderer",
+                grammar_role="aryl_branch_substituent_locants",
+                binding_key="prefix:aryl_branch_locants",
+                atom_ids=set(hydroxy_atoms),
+                bond_ids=hydroxy_bonds,
+                locants=("3", "4"),
+            )
+        )
+    if "2-" in lower_term and branch_atoms:
+        tokens.append(
+            NameTokenBinding(
+                text="2",
+                token_kind="locant",
+                source="substituent_renderer",
+                grammar_role="alkenyl_branch_locant",
+                binding_key="prefix:alkenyl_branch_locant",
+                atom_ids=set(branch_atoms),
+                bond_ids=set(branch_bonds),
+                locants=("2",),
+            )
+        )
+    return tokens
 
 
 def _nitrogen_substituent_tokens(
@@ -300,7 +628,4 @@ def _component_within(mol: Molecule, root: int, allowed_atoms: set[int]) -> set[
 
 
 def _lexical_tokens(text: str) -> tuple[str, ...]:
-    return tuple(match.group(0) for match in _TOKEN_RE.finditer(text))
-
-
-_TOKEN_RE = re.compile(r"[A-Za-z]+(?:\^[0-9]+)?|\d+(?:,\d+)*(?:'\")?|[0-9]+(?:\([0-9,]+\))?")
+    return lexical_tokens(text)

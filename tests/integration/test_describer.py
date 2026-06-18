@@ -93,3 +93,94 @@ def test_cli_describe_json():
     assert payload["paragraphs"]
     assert isinstance(payload["components"], list)
     assert any(c["phase"] == "parent_selection" for c in payload["components"])
+    assert "token_summary" not in payload
+    assert "token_spans" not in payload
+
+
+def test_describe_hides_token_binding_summary_by_default():
+    d = describe("CCO")
+    payload = d.to_dict()
+
+    assert "token_summary" not in payload
+    assert "token_spans" not in payload
+    assert "Name-token graph bindings" not in str(d)
+
+
+def test_describe_exposes_token_binding_summary_in_debug_mode():
+    d = describe("CCO", debugging_tokens=True)
+    payload = d.to_dict()
+
+    assert payload["token_summary"]["total"] >= 1
+    assert payload["token_summary"]["fallback_tokens"] == []
+    assert payload["token_spans"]
+    assert any(token["atoms"] for token in payload["token_spans"])
+    assert "Name-token graph bindings" in str(d)
+
+
+def test_cli_describe_json_exposes_token_binding_summary_in_debug_mode():
+    result = subprocess.run(
+        [sys.executable, "-m", "bluenamer.cli", "describe", "CCO", "--json", "--debug-tokens"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["token_summary"]["total"] >= 1
+    assert payload["token_spans"]
+
+
+def test_describe_renders_nested_substituent_tree_from_metadata():
+    d = describe("CC(=O)Nc1ccccc1")
+    text = str(d)
+
+    assert d.substituent_tree
+    assert "Component and substituent structure" in text
+    assert "Substituent" in text
+    assert "phenyl" in text
+    assert "retained as benzene" in text
+
+
+def test_describe_orders_main_parent_trace_before_nested_substituent_trace():
+    text = str(describe("CC(=O)Nc1ccccc1"))
+
+    assert "The final assembled name is **N-phenylacetamide**." not in text
+    assert "Component assembled as **N-phenylacetamide**" not in text
+    eth_index = text.index('contributes "eth"')
+    amide_index = text.index('contributes "amide"')
+    benzene_index = text.index('contributes "benzene"')
+    assert eth_index < amide_index < benzene_index
+
+
+def test_describe_explains_parenthesized_unsaturation_locants():
+    text = str(describe("CN1C=NC2=C1C(=O)N(C(=O)N2C)C"))
+
+    assert "Unsaturation: double at 1(6),8" in text
+    assert "1(6) means a multiple bond between locants 1 and 6" in text
+
+
+def test_describe_renders_oxygen_carbonyl_shortcut_substituent_tree():
+    text = str(describe("C1[C@H]([C@@H]([C@@H](C=C1C(=O)O)OC(=O)/C=C/C2=CC(=C(C=C2)O)O)O)O"))
+
+    assert "Substituent at 3: ((1E)-2-(3,4-dihydroxyphenyl)ethenylcarbonyloxy)" in text
+    assert "Substituent: ethenyl covers 2 atoms and 1 bond" in text
+    assert "Substituent: dihydroxyphenyl covers 8 atoms and 8 bonds" in text
+    assert text.count("Substituent: hydroxy covers 1 atom and 1 bond") >= 2
+
+
+def test_describe_renders_heteroatom_shortcut_ligand_tree():
+    text = str(describe("O=S(=O)(Nc1nc(cc(n1)C)C)c2ccc(N)cc2"))
+
+    assert "Substituent at N: (4-aminophenylsulfonyl)" in text
+    assert "Substituent: 4-aminophenyl covers 7 atoms and 7 bonds" in text
+    assert "Parent: ring parent with 6 atoms retained as benzene" in text
+    assert "Substituent at 4: amino covers 1 atom" in text
+
+
+def test_describe_carbonylamino_shortcut_does_not_render_carbonyl_oxygen_as_hydroxy():
+    text = str(describe("CC(C)C[C@@H](C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CC(C)C)C(=O)O)N"))
+
+    assert "Substituent: carbonyl covers 2 atoms and 1 bond" in text
+    assert "Substituent at 1: (1S)-1-amino-3-methylbutylcarbonylamino covers 9 atoms and 8 bonds" in text
+    assert "Substituent: (1S)-1-amino-3-methylbutylcarbonyl covers 8 atoms and 7 bonds" in text
+    assert "Substituent: hydroxy covers 1 atom and 1 bond" not in text

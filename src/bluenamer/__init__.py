@@ -2,9 +2,10 @@
 
 from collections.abc import Iterable
 
-from .describer import DescribedComponent, Description, describe
+from .describer import DescribedComponent, Description, DescriptionTokenSummary, describe
 from .engine import DEFAULT_NAMING_ENGINE, NamingEngine, NamingRequest, NamingResult
 from .functional_groups import register_group_detector
+from .human_descriptor import HumanDescription, describe_human
 from .molecule import (
     AtomBinding,
     BondBinding,
@@ -71,7 +72,9 @@ __all__ = [
     "DecisionTrace",
     "DescribedComponent",
     "Description",
+    "DescriptionTokenSummary",
     "FunctionalGroupMetadata",
+    "HumanDescription",
     "NameAnalysis",
     "NamingEngine",
     "NamingIntent",
@@ -87,6 +90,7 @@ __all__ = [
     "__version__",
     "analyze_smiles",
     "describe",
+    "describe_human",
     "name",
     "name_many",
     "name_smiles",
