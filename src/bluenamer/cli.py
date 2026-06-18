@@ -86,9 +86,9 @@ def _cmd_batch(args: argparse.Namespace) -> int:
 
 
 def _cmd_describe(args: argparse.Namespace) -> int:
-    description = describe_one(args.smiles)
+    description = describe_one(args.smiles, debugging_tokens=args.debug_tokens)
     if args.json:
-        json.dump(description.to_dict(), sys.stdout, indent=2)
+        json.dump(description.to_dict(debugging_tokens=args.debug_tokens), sys.stdout, indent=2)
         sys.stdout.write("\n")
     else:
         sys.stdout.write(str(description) + "\n")
@@ -133,6 +133,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_describe.add_argument("smiles")
     p_describe.add_argument("--json", action="store_true", help="emit structured Description as JSON")
+    p_describe.add_argument("--debug-tokens", action="store_true", help="include experimental token binding details")
     p_describe.set_defaults(func=_cmd_describe)
 
     return parser
