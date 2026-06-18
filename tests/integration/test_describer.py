@@ -93,10 +93,21 @@ def test_cli_describe_json():
     assert payload["paragraphs"]
     assert isinstance(payload["components"], list)
     assert any(c["phase"] == "parent_selection" for c in payload["components"])
+    assert "token_summary" not in payload
+    assert "token_spans" not in payload
 
 
-def test_describe_exposes_token_binding_summary():
+def test_describe_hides_token_binding_summary_by_default():
     d = describe("CCO")
+    payload = d.to_dict()
+
+    assert "token_summary" not in payload
+    assert "token_spans" not in payload
+    assert "Name-token graph bindings" not in str(d)
+
+
+def test_describe_exposes_token_binding_summary_in_debug_mode():
+    d = describe("CCO", debugging_tokens=True)
     payload = d.to_dict()
 
     assert payload["token_summary"]["total"] >= 1
@@ -104,6 +115,19 @@ def test_describe_exposes_token_binding_summary():
     assert payload["token_spans"]
     assert any(token["atoms"] for token in payload["token_spans"])
     assert "Name-token graph bindings" in str(d)
+
+
+def test_cli_describe_json_exposes_token_binding_summary_in_debug_mode():
+    result = subprocess.run(
+        [sys.executable, "-m", "bluenamer.cli", "describe", "CCO", "--json", "--debug-tokens"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["token_summary"]["total"] >= 1
+    assert payload["token_spans"]
 
 
 def test_describe_renders_nested_substituent_tree_from_metadata():

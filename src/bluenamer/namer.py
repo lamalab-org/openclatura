@@ -3,7 +3,7 @@
 import re
 from dataclasses import dataclass, field
 
-from .assembler import assemble_name_raw, post_process_name
+from .assembler import assemble_name_raw, post_process_rewrite_rules
 from .assembly_parts import AssemblyParts, SubstituentItem
 from .assembly_spiro import extract_spiro_side_prefixes
 from .chains import find_ring_systems, get_cyclic_atoms
@@ -816,6 +816,8 @@ def _collect_subgraph_substituents(
     candidate_path: list[int],
     sub_perceived: list[PerceivedGroup],
     sub_exclude: set[int],
+    *,
+    emit_metadata: bool = True,
 ) -> dict[int, list[SubstituentItem]]:
     """Collect prefixes attached to a recursive subgraph parent.
 
@@ -869,20 +871,43 @@ def _collect_subgraph_substituents(
 
         for n_idx in n_subs:
             if n_idx not in main_set and n_idx not in sub_handled_atoms and n_idx not in sub_exclude:
-                branch_decisions = DecisionTrace()
-                branch_name, branch_trace, branch_tree = name_subgraph(
-                    mol,
-                    n_idx,
-                    sub_exclude | main_set,
-                    upstream_atom=c_idx,
-                    return_trace=True,
-                    return_tree=True,
-                    decision_trace=branch_decisions,
-                )
+                branch_decisions = DecisionTrace() if emit_metadata else None
+                branch_exclude = sub_exclude | main_set
+                if emit_metadata:
+                    branch_name, branch_trace, branch_tree = name_subgraph(
+                        mol,
+                        n_idx,
+                        branch_exclude,
+                        upstream_atom=c_idx,
+                        return_trace=True,
+                        return_tree=True,
+                        decision_trace=branch_decisions,
+                    )
+                else:
+                    branch_name = name_subgraph(
+                        mol,
+                        n_idx,
+                        branch_exclude,
+                        upstream_atom=c_idx,
+                    )
+                    branch_trace = []
+                    branch_tree = None
                 if branch_name:
-                    branch_exclude = sub_exclude | main_set
                     branch_atoms = _subgraph_component(mol, n_idx, branch_exclude)
                     branch_with_attachment = branch_atoms | {c_idx}
+                    emitted_tokens = (
+                        graph_bound_substituent_tokens(
+                            mol,
+                            n_idx,
+                            branch_atoms,
+                            branch_name,
+                            c_idx,
+                            branch_exclude,
+                            name_subgraph,
+                        )
+                        if emit_metadata
+                        else ()
+                    )
                     subst_mapping.setdefault(c_idx, []).append(
                         SubstituentItem(
                             name=branch_name,
@@ -890,17 +915,9 @@ def _collect_subgraph_substituents(
                             atom_ids=branch_atoms,
                             bond_ids=_bond_ids_within(mol, branch_with_attachment),
                             charge_atom_ids=_charged_atoms(mol, branch_atoms),
-                            emitted_tokens=graph_bound_substituent_tokens(
-                                mol,
-                                n_idx,
-                                branch_atoms,
-                                branch_name,
-                                c_idx,
-                                branch_exclude,
-                                name_subgraph,
-                            ),
+                            emitted_tokens=emitted_tokens,
                             trace_segments=branch_trace,
-                            nested_decisions=decision_trace_data(branch_decisions),
+                            nested_decisions=decision_trace_data(branch_decisions) if emit_metadata else [],
                             substituent_tree=branch_tree,
                         )
                     )
@@ -970,6 +987,7 @@ def _assemble_parent_name(
     get_loc,
     *,
     finalize_subgraph: bool = False,
+    emit_metadata: bool = True,
 ) -> str:
     """Assemble a parent name and apply shared post-assembly charge rules."""
 
@@ -996,7 +1014,14 @@ def _assemble_parent_name(
             ("apply_cationic_imino_names", lambda text: apply_cationic_imino_names(text, mol)),
         )
     )
-    rewrites.append(("post_process_name", post_process_name))
+    rewrites.extend(post_process_rewrite_rules())
+    if not emit_metadata:
+        for rewrite in rewrites:
+            if isinstance(rewrite, tuple):
+                name = rewrite[1](name)
+            else:
+                name = rewrite.rewrite(name)
+        return name
     result = NameAssemblyResult.from_rewrite_pipeline(name, parts.name_atom_bindings, rewrites=tuple(rewrites))
     parts.name_atom_bindings = list(result.bindings)
     parts.name_token_spans = token_span_trace_data(result)
@@ -1091,36 +1116,39 @@ def name_subgraph(
     ``data/namer_rules.json``.
     """
 
+    emit_metadata = return_trace or return_tree or decision_trace is not None
     start_atom = mol.atoms[start_idx]
     cyclic_atoms_global = get_cyclic_atoms(mol, exclude_atoms)
     component = _subgraph_component(mol, start_idx, exclude_atoms)
-    trace_decision(
-        decision_trace,
-        TracePhase.COMPONENT,
-        "selected substituent subgraph",
-        "Recursive branch naming starts from the atom attached to the parent and stops at the parent boundary.",
-        atoms=component,
-        bonds=_bond_ids_within(mol, component),
-        data={
-            "start_atom": start_idx,
-            "upstream_atom": upstream_atom,
-            "excluded_atom_count": len(exclude_atoms),
-        },
-    )
+    if decision_trace is not None:
+        trace_decision(
+            decision_trace,
+            TracePhase.COMPONENT,
+            "selected substituent subgraph",
+            "Recursive branch naming starts from the atom attached to the parent and stops at the parent boundary.",
+            atoms=component,
+            bonds=_bond_ids_within(mol, component),
+            data={
+                "start_atom": start_idx,
+                "upstream_atom": upstream_atom,
+                "excluded_atom_count": len(exclude_atoms),
+            },
+        )
 
     if not start_atom.is_carbon and start_idx not in cyclic_atoms_global:
         name = name_heteroatom_subgraph(mol, start_idx, exclude_atoms, upstream_atom, name_subgraph)
         if name is not None:
-            trace_decision(
-                decision_trace,
-                TracePhase.ASSEMBLY,
-                "assembled heteroatom substituent shortcut",
-                "A terminal non-carbon branch was rendered by the heteroatom-subgraph renderer.",
-                atoms=component,
-                bonds=_bond_ids_within(mol, component),
-                data={"name": name},
-            )
-            tree = _shortcut_substituent_tree(name, component, mol, decision_trace)
+            if decision_trace is not None:
+                trace_decision(
+                    decision_trace,
+                    TracePhase.ASSEMBLY,
+                    "assembled heteroatom substituent shortcut",
+                    "A terminal non-carbon branch was rendered by the heteroatom-subgraph renderer.",
+                    atoms=component,
+                    bonds=_bond_ids_within(mol, component),
+                    data={"name": name},
+                )
+            tree = _shortcut_substituent_tree(name, component, mol, decision_trace) if return_tree else None
             if return_trace and return_tree:
                 return name, [], tree
             if return_trace:
@@ -1132,16 +1160,21 @@ def name_subgraph(
     direct_prefix = _direct_subgraph_prefix(mol, start_idx, component)
     if direct_prefix:
         direct_prefix_name = direct_prefix.name
-        trace_decision(
-            decision_trace,
-            TracePhase.ASSEMBLY,
-            "assembled direct substituent prefix",
-            "The complete recursive component matches a direct functional-prefix role.",
-            atoms=component,
-            bonds=_bond_ids_within(mol, component),
-            data=direct_prefix.trace_data(),
+        if decision_trace is not None:
+            trace_decision(
+                decision_trace,
+                TracePhase.ASSEMBLY,
+                "assembled direct substituent prefix",
+                "The complete recursive component matches a direct functional-prefix role.",
+                atoms=component,
+                bonds=_bond_ids_within(mol, component),
+                data=direct_prefix.trace_data(),
+            )
+        tree = (
+            _shortcut_substituent_tree(direct_prefix_name, component, mol, decision_trace, direct_prefix)
+            if return_tree
+            else None
         )
-        tree = _shortcut_substituent_tree(direct_prefix_name, component, mol, decision_trace, direct_prefix)
         if return_trace and return_tree:
             return direct_prefix_name, [], tree
         if return_trace:
@@ -1153,14 +1186,15 @@ def name_subgraph(
     sub_exclude = set(mol.atoms.keys()) - component
     parent_selection = _select_subgraph_parent(mol, start_idx, component, sub_exclude)
     if parent_selection is None:
-        trace_decision(
-            decision_trace,
-            TracePhase.PARENT_SELECTION,
-            "failed substituent parent selection",
-            "No chain or ring parent could be selected inside the recursive component.",
-            atoms=component,
-            bonds=_bond_ids_within(mol, component),
-        )
+        if decision_trace is not None:
+            trace_decision(
+                decision_trace,
+                TracePhase.PARENT_SELECTION,
+                "failed substituent parent selection",
+                "No chain or ring parent could be selected inside the recursive component.",
+                atoms=component,
+                bonds=_bond_ids_within(mol, component),
+            )
         if return_trace and return_tree:
             return "", [], None
         if return_trace:
@@ -1168,22 +1202,23 @@ def name_subgraph(
         if return_tree:
             return "", None
         return ""
-    trace_decision(
-        decision_trace,
-        TracePhase.PARENT_SELECTION,
-        "selected substituent parent skeleton",
-        "The recursive branch uses the same parent-candidate ranking as ordinary components, scoped to the branch graph.",
-        atoms=set(parent_selection.primary_path),
-        bonds=_bond_ids_within(mol, set(parent_selection.primary_path)),
-        data={
-            "primary_path": list(parent_selection.primary_path),
-            "is_ring": parent_selection.is_ring,
-            "is_bicycle": parent_selection.is_bicycle,
-            "is_spiro": parent_selection.is_spiro,
-            "is_polycycle": parent_selection.is_polycycle,
-            "fixed_start_required": parent_selection.fixed_start_required,
-        },
-    )
+    if decision_trace is not None:
+        trace_decision(
+            decision_trace,
+            TracePhase.PARENT_SELECTION,
+            "selected substituent parent skeleton",
+            "The recursive branch uses the same parent-candidate ranking as ordinary components, scoped to the branch graph.",
+            atoms=set(parent_selection.primary_path),
+            bonds=_bond_ids_within(mol, set(parent_selection.primary_path)),
+            data={
+                "primary_path": list(parent_selection.primary_path),
+                "is_ring": parent_selection.is_ring,
+                "is_bicycle": parent_selection.is_bicycle,
+                "is_spiro": parent_selection.is_spiro,
+                "is_polycycle": parent_selection.is_polycycle,
+                "fixed_start_required": parent_selection.fixed_start_required,
+            },
+        )
 
     retained_name_val, locant_maps = resolve_retained_parent(
         mol,
@@ -1193,7 +1228,13 @@ def name_subgraph(
         parent_selection.is_polycycle,
     )
     sub_perceived = perceive_groups(mol)
-    subst_mapping = _collect_subgraph_substituents(mol, parent_selection.primary_path, sub_perceived, sub_exclude)
+    subst_mapping = _collect_subgraph_substituents(
+        mol,
+        parent_selection.primary_path,
+        sub_perceived,
+        sub_exclude,
+        emit_metadata=emit_metadata,
+    )
     parent_plan = build_parent_assembly_plan(
         mol,
         parent_selection,
@@ -1209,19 +1250,20 @@ def name_subgraph(
     numbered_path = parent_plan.numbered_path
     get_loc = parent_plan.get_loc
     parts = parent_plan.parts
-    trace_decision(
-        decision_trace,
-        TracePhase.NUMBERING,
-        "selected substituent numbering",
-        "The branch parent numbering was selected before replacement, unsaturation, suffix, and substituent locants were emitted.",
-        atoms=set(numbered_path),
-        bonds=_bond_ids_within(mol, set(numbered_path)),
-        data={
-            "numbered_path": list(numbered_path),
-            "atom_to_locant": {atom_idx: get_loc(atom_idx) for atom_idx in numbered_path},
-            "retained_name": retained_name_val,
-        },
-    )
+    if decision_trace is not None:
+        trace_decision(
+            decision_trace,
+            TracePhase.NUMBERING,
+            "selected substituent numbering",
+            "The branch parent numbering was selected before replacement, unsaturation, suffix, and substituent locants were emitted.",
+            atoms=set(numbered_path),
+            bonds=_bond_ids_within(mol, set(numbered_path)),
+            data={
+                "numbered_path": list(numbered_path),
+                "atom_to_locant": {atom_idx: get_loc(atom_idx) for atom_idx in numbered_path},
+                "retained_name": retained_name_val,
+            },
+        )
     _emit_bond_stereo(mol, parts, numbered_path, get_loc, sub_exclude, upstream_atom)
     _add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
     _add_subgraph_substituents(parts, subst_mapping, get_loc)
@@ -1235,20 +1277,28 @@ def name_subgraph(
         parent_selection.is_polycycle,
     )
 
-    name = _assemble_parent_name(mol, parts, numbered_path, get_loc, finalize_subgraph=True)
-    trace_segments = _assembly_trace_segments(parts) if return_trace or return_tree else []
-    trace_decision(
-        decision_trace,
-        TracePhase.ASSEMBLY,
-        "assembled substituent name",
-        "The scoped branch assembly was rendered as a substituent name.",
-        atoms=component,
-        bonds=_bond_ids_within(mol, component),
-        data={
-            "name": name,
-            "trace_segment_count": len(trace_segments),
-        },
+    name = _assemble_parent_name(
+        mol,
+        parts,
+        numbered_path,
+        get_loc,
+        finalize_subgraph=True,
+        emit_metadata=emit_metadata,
     )
+    trace_segments = _assembly_trace_segments(parts) if return_trace or return_tree else []
+    if decision_trace is not None:
+        trace_decision(
+            decision_trace,
+            TracePhase.ASSEMBLY,
+            "assembled substituent name",
+            "The scoped branch assembly was rendered as a substituent name.",
+            atoms=component,
+            bonds=_bond_ids_within(mol, component),
+            data={
+                "name": name,
+                "trace_segment_count": len(trace_segments),
+            },
+        )
     if return_trace:
         if return_tree:
             return (

@@ -8,6 +8,11 @@ from .nomenclature import RULES
 from .principal_suffixes import render_principal_suffix
 from .rules import bonds, stems
 from .stereo_descriptors import ABSOLUTE_STEREO_DESCRIPTORS, BOND_STEREO_DESCRIPTORS
+from .token_grammar import (
+    binding_term_tokens,
+    is_locant_token,
+    locant_tokens_in_text,
+)
 
 
 def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
@@ -207,6 +212,10 @@ def binding_trace_data(bindings: list[NameAtomBinding]) -> list[dict]:
             "emitted_tokens": [
                 {
                     "text": token.text,
+                    "render_order": token.render_order,
+                    "match_priority": token.match_priority,
+                    "left_context": token.left_context,
+                    "right_context": token.right_context,
                     "locants": list(token.locants),
                     "atoms": sorted(token.atom_ids),
                     "bonds": sorted(token.bond_ids),
@@ -288,6 +297,7 @@ def _postprocess_token_binding(
     token_changed = processed_text != token.text
     return NameTokenBinding(
         text=processed_text,
+        render_order=token.render_order,
         token_kind=token.token_kind,
         ownership=rewritten_token_ownership if token_changed and rewritten_token_ownership else token.ownership,
         confidence="derived" if token.confidence == "exact" else token.confidence,
@@ -298,6 +308,9 @@ def _postprocess_token_binding(
         bond_ids=set(token.bond_ids),
         charge_atom_ids=set(token.charge_atom_ids),
         locants=tuple(token.locants),
+        match_priority=token.match_priority,
+        left_context=token.left_context,
+        right_context=token.right_context,
     )
 
 
@@ -558,6 +571,7 @@ def _absolute_stereo_tokens(locant: str, descriptor: str, atom_idx: int) -> tupl
             binding_key="assembly:absolute_stereo",
             atom_ids={atom_idx},
             locants=(locant,),
+            match_priority=100,
         ),
         NameTokenBinding(
             text=descriptor,
@@ -569,6 +583,7 @@ def _absolute_stereo_tokens(locant: str, descriptor: str, atom_idx: int) -> tupl
             binding_key="assembly:absolute_stereo",
             atom_ids={atom_idx},
             locants=(locant,),
+            match_priority=100,
         ),
     )
 
@@ -616,6 +631,7 @@ def _bond_stereo_tokens(
             atom_ids=atom_ids,
             bond_ids=bond_ids,
             locants=(locant,),
+            match_priority=100,
         ),
         NameTokenBinding(
             text=descriptor,
@@ -628,6 +644,7 @@ def _bond_stereo_tokens(
             atom_ids=atom_ids,
             bond_ids=bond_ids,
             locants=(locant,),
+            match_priority=100,
         ),
     )
 
@@ -648,6 +665,7 @@ def _relative_stereo_tokens(binding: NameAtomBinding) -> tuple[NameTokenBinding,
             bond_ids=set(binding.bond_ids),
             charge_atom_ids=set(binding.charge_atom_ids),
             locants=tuple(binding.locants),
+            match_priority=100,
         ),
     )
 
@@ -756,6 +774,7 @@ def _multiplied_hydroxy_tokens(
             bond_ids=set(bond_ids),
             charge_atom_ids=set(charge_atom_ids),
             locants=locants,
+            match_priority=50,
         ),
         NameTokenBinding(
             text="oxy",
@@ -767,6 +786,8 @@ def _multiplied_hydroxy_tokens(
             bond_ids=set(bond_ids),
             charge_atom_ids=set(charge_atom_ids),
             locants=locants,
+            match_priority=50,
+            left_context=multiplier_stem,
         ),
     )
 
@@ -918,7 +939,7 @@ def _extend_tree_substituent_tokens(tokens: list[NameTokenBinding], node: dict, 
         parent_bonds = set(parent.get("bonds") or [])
         parent_name = str(parent.get("retained_name") or "")
         _append_parent_locant_tokens(tokens, node.get("name") or "", parent, parent_bonds, node_charges)
-        _append_substituent_suffix_tokens(tokens, node_name, parent, parent_bonds, node_charges)
+        _append_substituent_suffix_tokens(tokens, parent, parent_bonds, node_charges)
         if parent_name and _term_visible_in_name(parent_name, node_name):
             _append_name_tokens(tokens, parent_name, parent_atoms, parent_bonds, node_charges)
         for segment in node.get("trace_segments") or ():
@@ -992,7 +1013,7 @@ def _append_name_tokens(
 ) -> bool:
     emitted = False
     for token_text in _binding_term_tokens(name):
-        if _is_locant_like_token(token_text):
+        if is_locant_token(token_text):
             continue
         emitted = True
         tokens.append(
@@ -1026,7 +1047,7 @@ def _append_parent_locant_tokens(
     locant_map = parent.get("atom_ids_by_locant")
     if not isinstance(locant_map, dict):
         return
-    name_locants = set(_locant_like_tokens_in_name(name))
+    name_locants = set(locant_tokens_in_text(name))
     for locant, atom_id in locant_map.items():
         locant_text = str(locant)
         if locant_text not in name_locants:
@@ -1052,19 +1073,24 @@ def _append_parent_locant_tokens(
 
 def _append_substituent_suffix_tokens(
     tokens: list[NameTokenBinding],
-    name: str,
     parent: dict,
     bond_ids: set[int],
     charge_atom_ids: set[int],
 ) -> None:
-    match = re.search(r"(?:^|[-(])([0-9]+|N|O|P|S)-(?P<suffix>yl|ylidene|ylidyne)\)?$", name)
-    if not match:
+    suffix_data = parent.get("substituent_suffix")
+    if not isinstance(suffix_data, dict):
         return
-    locant = match.group(1)
-    atom_id = _parent_atom_for_locant(parent, locant)
-    if atom_id is None:
+    locant = str(suffix_data.get("locant") or "")
+    suffix = str(suffix_data.get("suffix") or "")
+    atom_id = suffix_data.get("atom_id")
+    if not locant or not suffix:
         return
-    suffix = match.group("suffix")
+    try:
+        atom_idx = int(atom_id)
+    except (TypeError, ValueError):
+        atom_idx = _parent_atom_for_locant(parent, locant)
+    if atom_idx is None:
+        return
     tokens.append(
         NameTokenBinding(
             text=suffix,
@@ -1072,9 +1098,9 @@ def _append_substituent_suffix_tokens(
             source="substituent_tree",
             grammar_role="recursive_substituent_suffix",
             binding_key="prefix:tree_substituent_suffix",
-            atom_ids={atom_id},
+            atom_ids={atom_idx},
             bond_ids=set(bond_ids),
-            charge_atom_ids=set(charge_atom_ids) & {atom_id},
+            charge_atom_ids=set(charge_atom_ids) & {atom_idx},
             locants=(locant,),
         )
     )
@@ -1089,14 +1115,6 @@ def _parent_atom_for_locant(parent: dict, locant: str) -> int | None:
         return int(atom_id)
     except (TypeError, ValueError):
         return None
-
-
-def _locant_like_tokens_in_name(name: str) -> tuple[str, ...]:
-    return tuple(token for token in _binding_term_tokens(name) if _is_locant_like_token(token))
-
-
-def _is_locant_like_token(token: str) -> bool:
-    return bool(re.fullmatch(r"(?:[0-9]+|N|O|P|S)(?:,(?:[0-9]+|N|O|P|S))*", token))
 
 
 def _dedupe_token_bindings(tokens: list[NameTokenBinding]) -> tuple[NameTokenBinding, ...]:
@@ -1187,6 +1205,7 @@ def _charge_operation_tokens(binding: NameAtomBinding) -> tuple[NameTokenBinding
                 atom_ids=set(binding.atom_ids),
                 charge_atom_ids=set(binding.charge_atom_ids or binding.atom_ids),
                 locants=tuple(binding.locants),
+                match_priority=90,
             )
         )
     charge_atoms = set(binding.charge_atom_ids or binding.atom_ids)
@@ -1201,6 +1220,7 @@ def _charge_operation_tokens(binding: NameAtomBinding) -> tuple[NameTokenBinding
                 atom_ids=set(binding.atom_ids),
                 charge_atom_ids=set(charge_atoms),
                 locants=tuple(binding.locants),
+                match_priority=90,
             )
         )
     return tuple(tokens)
@@ -1274,7 +1294,7 @@ def _binding_term_tokens(term: str) -> tuple[str, ...]:
 
     if not term.strip() or "_" in term:
         return ()
-    return tuple(match.group(0) for match in _BINDING_TOKEN_RE.finditer(term) if match.group(0).lower() != "parent")
+    return binding_term_tokens(term)
 
 
 def _token_kind_for_binding(binding: NameAtomBinding) -> str:
@@ -1354,9 +1374,6 @@ def _contextual_postprocess_replacements() -> tuple[tuple[str, str], ...]:
 
 def _normalise_name_text(text: str) -> str:
     return text.lower().replace(" ", "").replace("(", "").replace(")", "")
-
-
-_BINDING_TOKEN_RE = re.compile(r"[A-Za-z]+(?:\^[0-9]+)?|\d+(?:,\d+)*(?:'\")?|[0-9]+(?:\([0-9,]+\))?")
 
 
 def _replacement_charge_atom_ids(parts: AssemblyParts, item) -> set[int]:

@@ -2,9 +2,10 @@
 
 The describer is intentionally not a second naming engine. It calls the
 normal namer with tracing enabled and renders prose from the resulting
-decision trace, graph-bound token spans, and substituent tree. That keeps the
-description aligned with the name that was actually generated, including
-recursive substituents and token-to-atom confidence metadata.
+decision trace and substituent tree. Optional debug mode also exposes
+graph-bound token spans. That keeps the description aligned with the name
+that was actually generated without showing experimental token metadata by
+default.
 """
 
 from __future__ import annotations
@@ -62,6 +63,7 @@ class Description:
     token_summary: DescriptionTokenSummary = field(default_factory=DescriptionTokenSummary)
     token_spans: tuple[dict, ...] = ()
     substituent_tree: tuple[dict, ...] = ()
+    debugging_tokens: bool = False
 
     def __str__(self) -> str:
         return "\n\n".join(self.paragraphs)
@@ -70,8 +72,9 @@ class Description:
     def summary(self) -> str:
         return self.paragraphs[0] if self.paragraphs else ""
 
-    def to_dict(self) -> dict:
-        return {
+    def to_dict(self, *, debugging_tokens: bool | None = None) -> dict:
+        include_tokens = self.debugging_tokens if debugging_tokens is None else debugging_tokens
+        payload = {
             "smiles": self.smiles,
             "name": self.name,
             "summary": self.summary,
@@ -79,18 +82,24 @@ class Description:
             "components": [{"phase": c.phase, "text": c.text} for c in self.components],
             "rules_hit": list(self.rules_hit),
             "rule_hints": list(self.rule_hints),
-            "token_summary": self.token_summary.to_dict(),
-            "token_spans": list(self.token_spans),
             "substituent_tree": list(self.substituent_tree),
         }
+        if include_tokens:
+            payload["token_summary"] = self.token_summary.to_dict()
+            payload["token_spans"] = list(self.token_spans)
+        return payload
 
 
-def describe(smiles: str) -> Description:
+def describe(
+    smiles: str,
+    *,
+    debugging_tokens: bool = False,
+) -> Description:
     """Render a deterministic metadata-backed description for ``smiles``."""
 
     result = DEFAULT_NAMING_ENGINE.run(NamingRequest(smiles=smiles, include_trace=True))
-    token_spans = tuple(_collect_token_spans(result))
-    token_summary = _summarize_tokens(token_spans)
+    token_spans = tuple(_collect_token_spans(result)) if debugging_tokens else ()
+    token_summary = _summarize_tokens(token_spans) if debugging_tokens else DescriptionTokenSummary()
 
     if result.error:
         summary = f"The structure {smiles} could not be named: {result.error}."
@@ -108,8 +117,8 @@ def describe(smiles: str) -> Description:
     if tree_lines:
         paragraphs.append("Component and substituent structure:\n" + "\n".join(tree_lines))
 
-    token_lines = _token_binding_lines(token_summary, token_spans)
-    if token_lines:
+    token_lines = _token_binding_lines(token_summary, token_spans) if debugging_tokens else []
+    if debugging_tokens and token_lines:
         paragraphs.append("Name-token graph bindings:\n" + "\n".join(token_lines))
 
     seg_lines = _trace_segment_lines(result.trace_segments, result.substituent_tree)
@@ -130,6 +139,7 @@ def describe(smiles: str) -> Description:
         token_summary=token_summary,
         token_spans=token_spans,
         substituent_tree=tuple(result.substituent_tree),
+        debugging_tokens=debugging_tokens,
     )
 
 

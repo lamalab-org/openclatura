@@ -151,18 +151,109 @@ from bluenamer.special_cases import (
     _alkyl_ligand_name,
     organophosphinic_acid_result,
     structural_replacement_parent_name,
+    structural_replacement_parent_result,
     sulfoxide_parent_result,
 )
 from bluenamer.spiro_assembly import SpiroAssembly
 from bluenamer.stereo_audit import audit_stereochemistry
 from bluenamer.substituent_tokens import graph_bound_substituent_tokens
 from bluenamer.suffix_stack import SuffixStack
-from bluenamer.trace_helpers import add_substituent_trace, assembly_trace_segments
+from bluenamer.token_grammar import (
+    binding_term_tokens,
+    is_locant_binding_token,
+    is_locant_token,
+    lexical_token_spans,
+)
+from bluenamer.trace_helpers import add_substituent_trace, assembly_substituent_tree, assembly_trace_segments
 from bluenamer.von_baeyer import _classify_secondary_bridges, find_von_baeyer_candidates
 
 
 def test_name_smiles_stays_plain_fast_api():
     assert name_smiles("CCO") == "ethanol"
+
+
+def test_shared_token_scanner_and_locant_metadata_predicate():
+    assert binding_term_tokens("(propan-2-yl)") == ("propan", "2", "yl")
+    spans = lexical_token_spans("(pyridin-1-ium-1-yl)")
+    assert [(token.text, token.start, token.end) for token in spans] == [
+        ("pyridin", 1, 8),
+        ("1", 9, 10),
+        ("ium", 11, 14),
+        ("1", 15, 16),
+        ("yl", 17, 19),
+    ]
+    assert is_locant_token("2")
+    assert is_locant_token("N")
+    assert is_locant_token("2,4,7")
+    assert not is_locant_token("methyl")
+
+    token = NameTokenBinding(text="N", token_kind="locant")
+    assert is_locant_binding_token(token)
+
+
+def test_ordered_renderer_tokens_place_repeated_text_by_metadata_order():
+    bindings = (
+        NameAtomBinding(
+            stage="shortcut",
+            role="left_attachment",
+            term="1",
+            atom_ids={5},
+            emitted_tokens=(
+                NameTokenBinding(
+                    text="1",
+                    render_order=0,
+                    token_kind="locant",
+                    source="shortcut_renderer",
+                    atom_ids={5},
+                    locants=("1",),
+                ),
+            ),
+        ),
+        NameAtomBinding(
+            stage="shortcut",
+            role="right_attachment",
+            term="1",
+            atom_ids={6},
+            emitted_tokens=(
+                NameTokenBinding(
+                    text="1",
+                    render_order=1,
+                    token_kind="locant",
+                    source="shortcut_renderer",
+                    atom_ids={6},
+                    locants=("1",),
+                ),
+            ),
+        ),
+    )
+
+    tokens = build_name_token_spans("1,1-parent", bindings)
+    locants = [token for token in tokens if token.text == "1"]
+
+    assert [set(token.atom_ids) for token in locants] == [{5}, {6}]
+    assert all(token.source == "shortcut_renderer" for token in locants)
+
+
+def test_substituent_suffix_metadata_is_emitted_by_assembly_parts():
+    parts = AssemblyParts(
+        parent_length=3,
+        is_substituent=True,
+        attachment_locant=2,
+        parent_atom_ids={0, 1, 2},
+        parent_bond_ids={1, 2},
+        parent_atom_ids_by_locant={"1": 0, "2": 1, "3": 2},
+    )
+    assert assemble_name(parts) == "propan-2-yl"
+
+    tree = assembly_substituent_tree(parts, name="propan-2-yl", atom_ids={0, 1, 2}, bond_ids={1, 2})
+
+    assert tree["parent"]["substituent_suffix"] == {
+        "locant": "2",
+        "suffix": "yl",
+        "atom_id": 1,
+        "is_double_attach": False,
+        "is_triple_attach": False,
+    }
 
 
 def test_methane_is_named_without_parent_selection_fallback():
@@ -439,7 +530,7 @@ def test_component_shortcuts_are_final_binding_audited(smiles, decision, role):
     assert data["name_atom_bindings"]
     assert data["name_atom_bindings"][0]["role"] == role
     assert data["name_token_spans"]
-    assert all(token["binding_indices"] for token in data["name_token_spans"])
+    assert all(token["binding_indices"] for token in data["name_token_spans"] if token["token_kind"] != "grammar")
 
     bound_atoms = {atom for binding in data["name_atom_bindings"] for atom in binding["atoms"]}
     token_atoms = {atom for token in data["name_token_spans"] for atom in token["atoms"]}
@@ -478,10 +569,19 @@ def test_biphenyl_is_graph_selected_not_exact_name_rewritten():
     assert steps
     data = steps[-1].data
     assert data["name"] == "1,1'-biphenyl"
-    assert any(binding["role"] == "biphenyl_bridge" for binding in data["name_atom_bindings"])
+    assert any(binding["role"] == "biphenyl_parent" for binding in data["name_atom_bindings"])
     rewrite_names = [operation["name"] for operation in data["name_rewrite_history"]]
     assert "special_component_names" not in rewrite_names
-    assert all(token["binding_indices"] for token in data["name_token_spans"])
+    assert all(token["binding_indices"] for token in data["name_token_spans"] if token["token_kind"] != "grammar")
+    parent_token = next(token for token in data["name_token_spans"] if token["text"] == "biphenyl")
+    assert set(parent_token["atoms"]) == set(range(12))
+    attachment_locants = [
+        token
+        for token in data["name_token_spans"]
+        if token["text"] in {"1", "1'"} and token["source"] == "shortcut_renderer"
+    ]
+    assert len(attachment_locants) == 2
+    assert {tuple(token["atoms"]) for token in attachment_locants} == {(5,), (6,)}
 
 
 def test_oxoacid_shortcut_exposes_central_oxo_ligand_roles():
@@ -1334,9 +1434,9 @@ def test_name_assembly_binds_every_final_token_to_graph_metadata():
     tokens = build_name_token_spans("5-(ammoniomethyl)-oxazolidine-3-ide-2,4-dione", tuple(bindings))
 
     assert tokens
-    assert all(token.binding_indices for token in tokens)
+    assert all(token.binding_indices for token in tokens if token.token_kind != "grammar")
     assert next(token for token in tokens if token.text == "ammoniomethyl").atom_ids == frozenset({0, 1})
-    assert next(token for token in tokens if token.text == "oxazolidine").atom_ids == frozenset({2, 3, 4, 6, 7})
+    assert next(token for token in tokens if token.text == "oxazolidin").atom_ids == frozenset({2, 3, 4, 6, 7})
     assert next(token for token in tokens if token.text == "ide").charge_atom_ids == frozenset({6})
     assert next(token for token in tokens if token.text == "dione").atom_ids == frozenset({4, 5, 7, 8})
 
@@ -1516,6 +1616,29 @@ def test_replacement_parents_are_graph_class_backed():
 
     oxoacid = read_smiles("OP(=O)(O)O")
     assert structural_replacement_parent_name(oxoacid, set(oxoacid.atoms)) == "phosphoric acid"
+
+
+def test_special_replacement_parent_results_have_role_bindings_not_full_fallbacks():
+    cases = {
+        "C[Si]#[Si]C": {"homonuclear_chain_parent", "homonuclear_chain_ligand"},
+        "CCOSCl": {"central_parent_hydride_core", "central_parent_hydride_ligand"},
+        "CC[S@@](=O)CC(C)C": {"sulfoxide_core", "sulfoxide_ligand"},
+    }
+
+    for smiles, expected_roles in cases.items():
+        mol = read_smiles(smiles)
+        result = structural_replacement_parent_result(mol, set(mol.atoms))
+
+        assert result is not None
+        roles = {binding.role for binding in result.bindings}
+        assert expected_roles <= roles
+        assert len(result.bindings) > 1
+        assert not (
+            len(result.bindings) == 1
+            and result.bindings[0].role == result.role
+            and result.bindings[0].atom_ids == set(mol.atoms)
+        )
+        assert all(binding.atom_ids for binding in result.bindings)
 
 
 def test_halogen_oxoacid_replacement_parents_are_data_backed():

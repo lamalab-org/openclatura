@@ -7,6 +7,7 @@ from .assembly_parts import NameTokenBinding
 from .formatting import strip_outer_parentheses
 from .molecule import Molecule
 from .stereo_descriptors import ABSOLUTE_STEREO_DESCRIPTORS, RELATIVE_STEREO_DESCRIPTORS
+from .token_grammar import is_locant_token, lexical_token_spans, lexical_tokens
 from .trace_helpers import bond_ids_within
 
 BranchNamer = Callable[..., str]
@@ -150,14 +151,14 @@ def _generic_heteroatom_substituent_tokens(
                 tokens.append(
                     NameTokenBinding(
                         text=token_text,
-                        token_kind="locant" if _is_locant_like_token(token_text) else "prefix",
+                        token_kind="locant" if is_locant_token(token_text, allow_element=False) else "prefix",
                         source="substituent_renderer",
                         grammar_role="heteroatom_organic_ligand",
                         binding_key="prefix:heteroatom_organic_ligand",
                         atom_ids=set(token_atoms),
                         bond_ids=set(token_bonds),
                         charge_atom_ids={idx for idx in token_atoms if mol.atoms[idx].charge != 0},
-                        locants=(token_text,) if _is_locant_like_token(token_text) else (),
+                        locants=(token_text,) if is_locant_token(token_text, allow_element=False) else (),
                     )
                 )
 
@@ -176,6 +177,7 @@ def _generic_heteroatom_substituent_tokens(
                 atom_ids=set(center_atoms),
                 bond_ids=set(center_bonds),
                 charge_atom_ids=set(charge_atoms),
+                match_priority=80,
             )
         )
     return tuple(tokens)
@@ -190,7 +192,7 @@ def _organic_ligand_token_scope(
     """Return the most local graph scope for a token inside an organic ligand."""
 
     token_lower = token_text.lower()
-    if _is_locant_like_token(token_text):
+    if is_locant_token(token_text, allow_element=False):
         locant_atoms = _terminal_substituent_atoms_for_locant_token(mol, ligand_atoms, token_text, lower_term)
         if locant_atoms:
             return locant_atoms, bond_ids_within(mol, locant_atoms | ligand_atoms)
@@ -213,10 +215,10 @@ def _terminal_substituent_atoms_for_locant_token(
         after = lower_term[match.end() :]
         if not after.startswith("-"):
             continue
-        next_token = _TOKEN_RE.search(after, 1)
-        if next_token is None:
+        next_tokens = lexical_token_spans(after, 1)
+        if not next_tokens:
             continue
-        candidates.extend(_terminal_atoms_for_prefix(mol, ligand_atoms, next_token.group(0).lower()))
+        candidates.extend(_terminal_atoms_for_prefix(mol, ligand_atoms, next_tokens[0].text.lower()))
     return set(candidates)
 
 
@@ -303,6 +305,8 @@ def _oxygen_carbonyl_like_tokens(
             binding_key="prefix:heteroatom_center",
             atom_ids={oxygen},
             bond_ids=bond_ids_within(mol, {oxygen, carbonyl}),
+            match_priority=80,
+            left_context="carbonyl",
         ),
     ]
     ligand_roots = [
@@ -361,6 +365,7 @@ def _alkenyl_bridge_tokens(
                 binding_key="prefix:alkenyl_bridge",
                 atom_ids=set(bridge_atoms),
                 bond_ids=set(bridge_bonds),
+                match_priority=60,
             )
         )
     if "en" in lower_term:
@@ -373,6 +378,8 @@ def _alkenyl_bridge_tokens(
                 binding_key="prefix:alkenyl_bridge",
                 atom_ids=set(bridge_atoms),
                 bond_ids=set(bridge_bonds),
+                match_priority=60,
+                right_context="yl",
             )
         )
     if "yl" in lower_term:
@@ -385,6 +392,8 @@ def _alkenyl_bridge_tokens(
                 binding_key="prefix:alkenyl_bridge",
                 atom_ids=set(bridge_atoms),
                 bond_ids=set(bridge_bonds),
+                match_priority=60,
+                left_context="en",
             )
         )
     stereo_bonds = {
@@ -393,6 +402,7 @@ def _alkenyl_bridge_tokens(
         if bond.idx in bridge_bonds and bond.stereo in {"E", "Z"}
     }
     if stereo_bonds:
+        descriptor = next(bond.stereo for bond in mol.bonds.values() if bond.idx in stereo_bonds and bond.stereo)
         tokens.append(
             NameTokenBinding(
                 text="1",
@@ -403,9 +413,10 @@ def _alkenyl_bridge_tokens(
                 atom_ids=set(bridge_atoms),
                 bond_ids=set(stereo_bonds),
                 locants=("1",),
+                match_priority=100,
+                right_context=descriptor,
             )
         )
-        descriptor = next(bond.stereo for bond in mol.bonds.values() if bond.idx in stereo_bonds and bond.stereo)
         tokens.append(
             NameTokenBinding(
                 text=descriptor,
@@ -416,6 +427,7 @@ def _alkenyl_bridge_tokens(
                 atom_ids=set(bridge_atoms),
                 bond_ids=set(stereo_bonds),
                 locants=("1",),
+                match_priority=100,
             )
         )
     return tokens
@@ -617,11 +629,4 @@ def _component_within(mol: Molecule, root: int, allowed_atoms: set[int]) -> set[
 
 
 def _lexical_tokens(text: str) -> tuple[str, ...]:
-    return tuple(match.group(0) for match in _TOKEN_RE.finditer(text))
-
-
-def _is_locant_like_token(text: str) -> bool:
-    return bool(re.fullmatch(r"\d+(?:,\d+)*", text))
-
-
-_TOKEN_RE = re.compile(r"[A-Za-z]+(?:\^[0-9]+)?|\d+(?:,\d+)*(?:'\")?|[0-9]+(?:\([0-9,]+\))?")
+    return lexical_tokens(text)
