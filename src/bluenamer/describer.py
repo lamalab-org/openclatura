@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .engine import DEFAULT_NAMING_ENGINE, NamingRequest, NamingResult, _extract_rules_hit
+from .human_descriptor import _processed_smiles_sentence
 from .molecule import TracePhase, TraceStep
 
 
@@ -110,6 +111,9 @@ def describe(
 
     components = tuple(_decision_components(result))
     paragraphs: list[str] = [summary]
+    smiles_sentence = _processed_smiles_sentence(smiles)
+    if smiles_sentence:
+        paragraphs.append(smiles_sentence)
     if components:
         paragraphs.append("\n".join(c.text for c in components))
 

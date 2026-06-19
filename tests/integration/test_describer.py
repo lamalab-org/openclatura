@@ -25,6 +25,16 @@ def test_describe_returns_structured_description():
     assert any(c.phase == "parent_selection" for c in d.components)
 
 
+def test_describe_includes_processed_smiles_atom_ids():
+    d = describe("C[C@@H](Cl)C(=O)c1ccccc1")
+    text = str(d)
+
+    assert d.summary.startswith("The molecule C[C@@H](Cl)C(=O)c1ccccc1 is named")
+    assert "Processed SMILES: C[C@@H](Cl)C(=O)c1ccccc1" in text
+    assert "Atom ids in that SMILES:" in text
+    assert "C{0}[C@@H]{1}(Cl{2})C{3}(=O{4})c{5}1c{6}c{7}c{8}c{9}c{10}1" in text
+
+
 def test_describe_explains_functional_group_selection():
     d = describe("CC(=O)Nc1ccccc1")
     text = str(d)
