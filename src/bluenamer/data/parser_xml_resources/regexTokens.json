@@ -1,0 +1,355 @@
+{
+  "format": "bluenamer.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "name": "%elementSymbol%",
+          "regex": "(He|Li|Be|B|C|N|O|F|Ne|Na|Mg|Al|Si|P|S|Cl|Ar|K|Ca|Sc|Ti|V|Cr|Mn|Fe|Co|Ni|Cu|Zn|Ga|Ge|As|Se|Br|Kr|Rb|Sr|Y|Zr|Nb|Mo|Tc|Ru|Rh|Pd|Ag|Cd|In|Sn|Sb|Te|I|Xe|Cs|Ba|La|Ce|Pr|Nd|Pm|Sm|Eu|Gd|Tb|Dy|Ho|Er|Tm|Yb|Lu|Hf|Ta|W|Re|Os|Ir|Pt|Au|Hg|Tl|Pb|Po|At|Rn|Fr|Ra|Ac|Th|Pa|U|Np|Pu|Am|Cm|Bk|Cf|Es|Fm|Md|No|Lr|Rf|Db|Sg|Bh|Hs|Mt|Ds)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%openBracket%",
+          "regex": "[\\[\\(\\{]"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%closeBracket%",
+          "regex": "[\\]\\)\\}]"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%locantNoPrime%",
+          "regex": "([1-9][0-9]*[a-g]?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%superScriptedNumber%",
+          "regex": "(\\^[0-9]+(\\^\\^)?|\\^?%openBracket%([sS][uU][pP][ ]?)?[0-9]+%closeBracket%|\\~[0-9]+\\~)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%locant%",
+          "regex": "([1-9][0-9]*[a-g]?'*)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%locantDoesNotEndInLetter%",
+          "regex": "([1-9][0-9]*([a-g]'+)?'*)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%greek%",
+          "regex": "([aA][lL][pP][hH][aA]|[bB][eE][tT][aA]|[gG][aA][mM][mM][aA]|[dD][eE][lL][tT][aA]|[eE][pP][sS][iI][lL][oO][nN]|[zZ][eE][tT][aA]|[eE][tT][aA]|[oO][mM][eE][gG][aA])"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%superScriptedLocant%",
+          "regex": "(\\^(%locant%|%greek%'*)(\\^\\^)?|\\^?%openBracket%([sS][uU][pP][ ]?)?(%locant%|%greek%'*)%closeBracket%|\\~(%locant%|%greek%'*)\\~)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%locantTypes%",
+          "regex": "(%locant%(-%elementSymbol%'*)?|%elementSymbol%'*(%locant%|%superScriptedLocant%|%greek%'*)?|%greek%'*)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%locantTypesOptionalHyphen%",
+          "regex": "(%locantDoesNotEndInLetter%|%locant%-%elementSymbol%'+|%elementSymbol%'+|%elementSymbol%'*(%locantDoesNotEndInLetter%|%superScriptedLocant%|%greek%'*)|%greek%'*)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%indicatedHydrogen%",
+          "regex": "(%locant%[hH])"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%compoundLocantOrAddedHydrogen%",
+          "regex": "(%openBracket%(%locant%|%indicatedHydrogen%(,%indicatedHydrogen%)*)%closeBracket%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%RSstereochemAfterLocant%",
+          "regex": "(-?%openBracket%[RS]%closeBracket%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%allLocantForms%",
+          "regex": "(%locantTypes%(%compoundLocantOrAddedHydrogen%|%RSstereochemAfterLocant%)?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%formsWhereHyphenIsOptional%",
+          "regex": "((%locantTypes%(%compoundLocantOrAddedHydrogen%|%RSstereochemAfterLocant%)|%locantTypesOptionalHyphen%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "(%allLocantForms%,)*(%allLocantForms%-|%formsWhereHyphenIsOptional%)",
+          "symbol": "l",
+          "tagname": "locant"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "(%locant%,)*%locant%-?",
+          "symbol": "\u00c9",
+          "tagname": "locant",
+          "type": "bracketedLocant"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "name": "%lambdaConvention%",
+          "regex": "(%locantTypes%?lambda(%superScriptedNumber%|[0-9]+))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "(%lambdaConvention%,|%locantTypes%,)*(%lambdaConvention%,(%lambdaConvention%,|%locantTypes%,)*(lambdaConvention-?|%locantTypes%-|%locantTypesOptionalHyphen%-?)|%lambdaConvention%-?)",
+          "symbol": "\u00c7",
+          "tagname": "lambdaConvention"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "[sS][pP][iI][rR][oO]-?%openBracket%[1-9][0-9]*([\\.,][0-9]+%superScriptedNumber%?)+%closeBracket%-?",
+          "symbol": "S",
+          "tagname": "spiro"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "name": "%superScriptedVonBaeyerDescriptor%",
+          "regex": "([\\.,][0-9]+(\\^[0-9]+,[0-9]+(\\^\\^)?|\\^?%openBracket%([sS][uU][pP][ ]?)?[0-9]+,[0-9]+%closeBracket%|\\~[0-9]+,[0-9]+\\~|[0-9]+,[0-9]+))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "[cC][yY][cC][lL][oO]-?%openBracket%[0-9]+[\\.,][0-9]+[\\.,][0-9]+%superScriptedVonBaeyerDescriptor%*%closeBracket%-?",
+          "symbol": "B",
+          "tagname": "vonBaeyer"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "%openBracket%[1-9][0-9]*%closeBracket%[aA][nN][nN][uU][lL][eE][nN]",
+          "symbol": "N",
+          "tagname": "annulen"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "name": "%firstOrderFusion%",
+          "regex": "(%locant%(,%locant%)+-([a-zA-Z]'*)+)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%omittedLocantFirstOrderFusion%",
+          "regex": "(([a-zA-Z]'*)+)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%omittedLocantAmbiguousOrderFusion%",
+          "regex": "(%locant%(,%locant%)+)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%higherOrderFusion%",
+          "regex": "(%locant%(,%locant%)+:%locant%(,%locant%)+)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "%openBracket%(%firstOrderFusion%|%omittedLocantFirstOrderFusion%|%omittedLocantAmbiguousOrderFusion%|%higherOrderFusion%)%closeBracket%",
+          "symbol": "F",
+          "tagname": "fusion"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "%openBracket%((%firstOrderFusion%(:%firstOrderFusion%)+)|(%omittedLocantFirstOrderFusion%(,%omittedLocantFirstOrderFusion%)+)|(%higherOrderFusion%(;%higherOrderFusion%)+)|(%omittedLocantAmbiguousOrderFusion%(:%omittedLocantAmbiguousOrderFusion%)+))%closeBracket%",
+          "symbol": "\u00c4",
+          "tagname": "fusion"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "%indicatedHydrogen%(,%indicatedHydrogen%)*-|%openBracket%%indicatedHydrogen%(,%indicatedHydrogen%)*%closeBracket%-?",
+          "symbol": "e",
+          "tagname": "indicatedHydrogen"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "[isn]-",
+          "symbol": "n",
+          "tagname": "alkaneStemModifier"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "([oO][rR][tT][hH][oO]|[mM][eE][tT][aA]|[pP][aA][rR][aA])-?|(o|[mM]|[p])-",
+          "symbol": "O",
+          "tagname": "orthoMetaPara"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "%locantTypes%,%locantTypes%(:%locantTypes%,%locantTypes%)*(:%locantTypes%,(%locantTypes%-|%locantTypesOptionalHyphen%-?))",
+          "symbol": "L",
+          "tagname": "colonSeperatedLocant"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "[EZ]",
+          "symbol": "t",
+          "tagname": "stereoChemistry",
+          "type": "EorZ"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "name": "%alphaBetaLocant%",
+          "regex": "([1-9][0-9]?([abx]|[aA][lL][pP][hH][aA]|[bB][eE][tT][aA]|[xX][iI]))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "((%alphaBetaLocant%,|%locantTypes%,)*(%alphaBetaLocant%,(%alphaBetaLocant%,|%locantTypes%,)*(%alphaBetaLocant%-?|%locantTypes%-|%locantTypesOptionalHyphen%-?)|%alphaBetaLocant%-?))",
+          "symbol": "\u00a2",
+          "tagname": "stereoChemistry",
+          "type": "alphaOrBeta"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "name": "%stereochemPossibilities%",
+          "regex": "(%locantTypes%?([EZez]|[RSrs](\\^?\\*)?|RS|SR|[cC][iI][sS]|[tT][rR][aA][nN][sS])|%alphaBetaLocant%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "(rel-|rac-)?%openBracket%%stereochemPossibilities%([,-]%stereochemPossibilities%)*%closeBracket%-?",
+          "symbol": "E",
+          "tagname": "stereoChemistry",
+          "type": "stereochemistryBracket"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "([rct]-%allLocantForms%,)*[rct]-(%allLocantForms%-|%formsWhereHyphenIsOptional%)",
+          "symbol": "\u00bc",
+          "tagname": "stereoChemistry",
+          "type": "relativeCisTrans"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "%locant%,%locant%:%locant%,%locant%-?[dD][iI][sS][pP][iI][rR][oO][tT][eE][rR]-?",
+          "symbol": "\u00bf",
+          "tagname": "polyCyclicSpiro",
+          "value": "dispiroter"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "regex": "%locant%(%openBracket%%indicatedHydrogen%%closeBracket%)?,%locant%'+(%openBracket%%indicatedHydrogen%%closeBracket%)?-?",
+          "symbol": "\u00bd",
+          "tagname": "spiroLocant"
+        },
+        "tag": "regexToken"
+      },
+      {
+        "attributes": {
+          "determinise": "yes",
+          "ignoreWhenWritingXML": "yes",
+          "regex": "%openBracket%([+\\-]|[+][,\\\\/]?-|-[,\\\\/]?[+])%closeBracket%-?",
+          "symbol": "\u00aa",
+          "tagname": "lightRotation"
+        },
+        "tag": "regexToken"
+      }
+    ],
+    "tag": "regexTokenList"
+  },
+  "source_xml_file": "regexTokens.xml"
+}

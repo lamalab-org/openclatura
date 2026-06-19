@@ -1,0 +1,412 @@
+{
+  "format": "bluenamer.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "symbol": "i",
+          "tagname": "suffix",
+          "type": "inline"
+        },
+        "children": [
+          {
+            "attributes": {
+              "additionalValue": "aldehyde",
+              "value": "oyl"
+            },
+            "tag": "token",
+            "text": "aldehydoyl"
+          },
+          {
+            "attributes": {
+              "value": "amido"
+            },
+            "tag": "token",
+            "text": "amido"
+          },
+          {
+            "attributes": {
+              "value": "amido"
+            },
+            "tag": "token",
+            "text": "amidyl"
+          },
+          {
+            "attributes": {
+              "value": "aminyl"
+            },
+            "tag": "token",
+            "text": "aminyl"
+          },
+          {
+            "attributes": {
+              "additionalValue": "amide",
+              "value": "oyl"
+            },
+            "tag": "token",
+            "text": "amoyl"
+          },
+          {
+            "attributes": {
+              "additionalValue": "anilide",
+              "value": "oyl"
+            },
+            "tag": "token",
+            "text": "aniloyl"
+          },
+          {
+            "attributes": {
+              "value": "carbonyl"
+            },
+            "tag": "token",
+            "text": "carbonyl"
+          },
+          {
+            "attributes": {
+              "value": "io"
+            },
+            "tag": "token",
+            "text": "io"
+          },
+          {
+            "attributes": {
+              "additionalValue": "aldehyde",
+              "value": "amido"
+            },
+            "tag": "token",
+            "text": "imido"
+          },
+          {
+            "attributes": {
+              "additionalValue": "aldehyde",
+              "value": "amido"
+            },
+            "tag": "token",
+            "text": "imidyl"
+          },
+          {
+            "attributes": {
+              "value": "iminyl"
+            },
+            "tag": "token",
+            "text": "iminyl"
+          },
+          {
+            "attributes": {
+              "value": "oxy"
+            },
+            "tag": "token",
+            "text": "oxy"
+          },
+          {
+            "attributes": {
+              "value": "oyl"
+            },
+            "tag": "token",
+            "text": "oyl"
+          },
+          {
+            "attributes": {
+              "value": "selenenyl"
+            },
+            "tag": "token",
+            "text": "selenenyl"
+          },
+          {
+            "attributes": {
+              "value": "seleninyl"
+            },
+            "tag": "token",
+            "text": "seleninyl"
+          },
+          {
+            "attributes": {
+              "value": "selenonyl"
+            },
+            "tag": "token",
+            "text": "selenonyl"
+          },
+          {
+            "attributes": {
+              "value": "sulfenamido"
+            },
+            "tag": "token",
+            "text": "sulfenamido"
+          },
+          {
+            "attributes": {
+              "value": "sulfenoselenoyl"
+            },
+            "tag": "token",
+            "text": "sulfenoselenoyl"
+          },
+          {
+            "attributes": {
+              "value": "sulfenothioyl"
+            },
+            "tag": "token",
+            "text": "sulfenothioyl"
+          },
+          {
+            "attributes": {
+              "value": "sulfenyl"
+            },
+            "tag": "token",
+            "text": "sulfenyl"
+          },
+          {
+            "attributes": {
+              "value": "sulfinyl"
+            },
+            "tag": "token",
+            "text": "sulfinyl"
+          },
+          {
+            "attributes": {
+              "value": "sulfonyl"
+            },
+            "tag": "token",
+            "text": "sulfonyl"
+          },
+          {
+            "attributes": {
+              "value": "tellurenyl"
+            },
+            "tag": "token",
+            "text": "tellurenyl"
+          },
+          {
+            "attributes": {
+              "value": "tellurinyl"
+            },
+            "tag": "token",
+            "text": "tellurinyl"
+          },
+          {
+            "attributes": {
+              "value": "telluronyl"
+            },
+            "tag": "token",
+            "text": "telluronyl"
+          },
+          {
+            "attributes": {
+              "value": "yl"
+            },
+            "tag": "token",
+            "text": "yl"
+          },
+          {
+            "attributes": {
+              "value": "ylidene"
+            },
+            "tag": "token",
+            "text": "ylidene"
+          },
+          {
+            "attributes": {
+              "value": "ylidyne"
+            },
+            "tag": "token",
+            "text": "ylidyne"
+          },
+          {
+            "attributes": {
+              "value": "ylidene"
+            },
+            "tag": "token",
+            "text": "yliden"
+          },
+          {
+            "attributes": {
+              "value": "ylidyne"
+            },
+            "tag": "token",
+            "text": "ylidyn"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "w",
+          "tagname": "suffix",
+          "type": "inline"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "amido"
+            },
+            "tag": "token",
+            "text": "amido"
+          },
+          {
+            "attributes": {
+              "value": "oyl"
+            },
+            "tag": "token",
+            "text": "oyl"
+          },
+          {
+            "attributes": {
+              "value": "yl"
+            },
+            "tag": "token",
+            "text": "yl"
+          },
+          {
+            "attributes": {
+              "value": "ylidene"
+            },
+            "tag": "token",
+            "text": "ylidene"
+          },
+          {
+            "attributes": {
+              "value": "ylidyne"
+            },
+            "tag": "token",
+            "text": "ylidyne"
+          },
+          {
+            "attributes": {
+              "value": "ylidene"
+            },
+            "tag": "token",
+            "text": "yliden"
+          },
+          {
+            "attributes": {
+              "value": "ylidyne"
+            },
+            "tag": "token",
+            "text": "ylidyn"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u00ff",
+          "tagname": "suffix",
+          "type": "inline"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "amido"
+            },
+            "tag": "token",
+            "text": "amido"
+          },
+          {
+            "attributes": {
+              "value": "amido"
+            },
+            "tag": "token",
+            "text": "amidyl"
+          },
+          {
+            "attributes": {
+              "value": "carbonyl"
+            },
+            "tag": "token",
+            "text": "carbonyl"
+          },
+          {
+            "attributes": {
+              "value": "oxy"
+            },
+            "tag": "token",
+            "text": "oxy"
+          },
+          {
+            "attributes": {
+              "value": "oyl"
+            },
+            "tag": "token",
+            "text": "oyl"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u255c",
+          "tagname": "suffix",
+          "type": "inline"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "amido"
+            },
+            "tag": "token",
+            "text": "amido"
+          },
+          {
+            "attributes": {
+              "value": "amido"
+            },
+            "tag": "token",
+            "text": "amidyl"
+          },
+          {
+            "attributes": {
+              "value": "oyl"
+            },
+            "tag": "token",
+            "text": "oyl"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u00a5",
+          "tagname": "suffix",
+          "type": "inline"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "aminoAcidYl"
+            },
+            "tag": "token",
+            "text": "yl"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u2563",
+          "tagname": "suffix",
+          "type": "inline"
+        },
+        "children": [
+          {
+            "attributes": {
+              "additionalValue": "yl",
+              "value": "yl"
+            },
+            "tag": "token",
+            "text": "ylene"
+          },
+          {
+            "attributes": {
+              "additionalValue": "yl",
+              "value": "yl"
+            },
+            "tag": "token",
+            "text": "ylen"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "inlineSuffixes.xml"
+}

@@ -1,0 +1,584 @@
+{
+  "bluebook_rule": "P-25 retained fused parent templates. Rows are locant-keyed graph templates, not SMILES/SMARTS keys.",
+  "pending_parents": [
+    {"name": "pleiadene", "pin": false, "priority": 100, "attached_prefix": "pleiadeno"},
+    {"name": "phenanthridine", "pin": true, "priority": 5},
+    {"name": "4H-quinolizine", "pin": true, "priority": 15, "default_indicated_h": ["4"]},
+    {"name": "1H-pyrrolizine", "pin": true, "priority": 21, "default_indicated_h": ["1"]}
+  ],
+  "parents": [
+    {
+      "name": "naphthalene",
+      "pin": true,
+      "priority": 1,
+      "aliases": [],
+      "derivative_stem": "naphthalen",
+      "attached_prefix": "naphtho",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "atoms": [
+          {"locant": "1"}, {"locant": "2"}, {"locant": "3"}, {"locant": "4"},
+          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6"},
+          {"locant": "7"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+        ],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
+          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+        ],
+        "rings": [
+          ["1", "2", "3", "4", "4a", "8a"],
+          ["4a", "5", "6", "7", "8", "8a"]
+        ],
+        "fusion_atoms": ["4a", "8a"],
+        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+      }
+    },
+    {
+      "name": "quinoline",
+      "pin": true,
+      "priority": 13,
+      "aliases": [],
+      "derivative_stem": "quinolin",
+      "attached_prefix": "quinolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "atoms": [
+          {"locant": "1", "symbol": "N"}, {"locant": "2"}, {"locant": "3"}, {"locant": "4"},
+          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6"},
+          {"locant": "7"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+        ],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
+          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+        ],
+        "rings": [
+          ["1", "2", "3", "4", "4a", "8a"],
+          ["4a", "5", "6", "7", "8", "8a"]
+        ],
+        "fusion_atoms": ["4a", "8a"],
+        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+      }
+    },
+    {
+      "name": "isoquinoline",
+      "pin": true,
+      "priority": 14,
+      "aliases": [],
+      "derivative_stem": "isoquinolin",
+      "attached_prefix": "isoquinolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "atoms": [
+          {"locant": "1"}, {"locant": "2", "symbol": "N"}, {"locant": "3"}, {"locant": "4"},
+          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6"},
+          {"locant": "7"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+        ],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
+          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+        ],
+        "rings": [
+          ["1", "2", "3", "4", "4a", "8a"],
+          ["4a", "5", "6", "7", "8", "8a"]
+        ],
+        "fusion_atoms": ["4a", "8a"],
+        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+      }
+    },
+    {
+      "name": "1,5-naphthyridine",
+      "pin": true,
+      "priority": 11,
+      "aliases": [],
+      "derivative_stem": "1,5-naphthyridin",
+      "attached_prefix": "1,5-naphthyridino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "atoms": [
+          {"locant": "1", "symbol": "N"}, {"locant": "2"}, {"locant": "3"}, {"locant": "4"},
+          {"locant": "4a", "fusion": true}, {"locant": "5", "symbol": "N"}, {"locant": "6"},
+          {"locant": "7"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+        ],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
+          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+        ],
+        "rings": [
+          ["1", "2", "3", "4", "4a", "8a"],
+          ["4a", "5", "6", "7", "8", "8a"]
+        ],
+        "fusion_atoms": ["4a", "8a"],
+        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+      }
+    },
+    {
+      "name": "1,6-naphthyridine",
+      "pin": true,
+      "priority": 11,
+      "aliases": [],
+      "derivative_stem": "1,6-naphthyridin",
+      "attached_prefix": "1,6-naphthyridino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "atoms": [
+          {"locant": "1", "symbol": "N"}, {"locant": "2"}, {"locant": "3"}, {"locant": "4"},
+          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6", "symbol": "N"},
+          {"locant": "7"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+        ],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
+          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+        ],
+        "rings": [
+          ["1", "2", "3", "4", "4a", "8a"],
+          ["4a", "5", "6", "7", "8", "8a"]
+        ],
+        "fusion_atoms": ["4a", "8a"],
+        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+      }
+    },
+    {
+      "name": "1,7-naphthyridine",
+      "pin": true,
+      "priority": 11,
+      "aliases": [],
+      "derivative_stem": "1,7-naphthyridin",
+      "attached_prefix": "1,7-naphthyridino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "atoms": [
+          {"locant": "1", "symbol": "N"}, {"locant": "2"}, {"locant": "3"}, {"locant": "4"},
+          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6"},
+          {"locant": "7", "symbol": "N"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+        ],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
+          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+        ],
+        "rings": [
+          ["1", "2", "3", "4", "4a", "8a"],
+          ["4a", "5", "6", "7", "8", "8a"]
+        ],
+        "fusion_atoms": ["4a", "8a"],
+        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+      }
+    },
+    {
+      "name": "1,8-naphthyridine",
+      "pin": true,
+      "priority": 11,
+      "aliases": [],
+      "derivative_stem": "1,8-naphthyridin",
+      "attached_prefix": "1,8-naphthyridino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "atoms": [
+          {"locant": "1", "symbol": "N"}, {"locant": "2"}, {"locant": "3"}, {"locant": "4"},
+          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6"},
+          {"locant": "7"}, {"locant": "8", "symbol": "N"}, {"locant": "8a", "fusion": true}
+        ],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
+          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+        ],
+        "rings": [
+          ["1", "2", "3", "4", "4a", "8a"],
+          ["4a", "5", "6", "7", "8", "8a"]
+        ],
+        "fusion_atoms": ["4a", "8a"],
+        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+      }
+    },
+    {
+      "name": "2,6-naphthyridine",
+      "pin": true,
+      "priority": 11,
+      "aliases": [],
+      "derivative_stem": "2,6-naphthyridin",
+      "attached_prefix": "2,6-naphthyridino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "atoms": [
+          {"locant": "1"}, {"locant": "2", "symbol": "N"}, {"locant": "3"}, {"locant": "4"},
+          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6", "symbol": "N"},
+          {"locant": "7"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+        ],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
+          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+        ],
+        "rings": [
+          ["1", "2", "3", "4", "4a", "8a"],
+          ["4a", "5", "6", "7", "8", "8a"]
+        ],
+        "fusion_atoms": ["4a", "8a"],
+        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+      }
+    },
+    {
+      "name": "2,7-naphthyridine",
+      "pin": true,
+      "priority": 11,
+      "aliases": [],
+      "derivative_stem": "2,7-naphthyridin",
+      "attached_prefix": "2,7-naphthyridino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "atoms": [
+          {"locant": "1"}, {"locant": "2", "symbol": "N"}, {"locant": "3"}, {"locant": "4"},
+          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6"},
+          {"locant": "7", "symbol": "N"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+        ],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
+          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+        ],
+        "rings": [
+          ["1", "2", "3", "4", "4a", "8a"],
+          ["4a", "5", "6", "7", "8", "8a"]
+        ],
+        "fusion_atoms": ["4a", "8a"],
+        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+      }
+    },
+    {
+      "name": "quinazoline",
+      "pin": true,
+      "priority": 9,
+      "aliases": [],
+      "derivative_stem": "quinazolin",
+      "attached_prefix": "quinazolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "naphthalenoid_10",
+        "heteroatoms": [
+          {"locant": "1", "symbol": "N"},
+          {"locant": "3", "symbol": "N"}
+        ]
+      }
+    },
+    {
+      "name": "quinoxaline",
+      "pin": true,
+      "priority": 10,
+      "aliases": [],
+      "derivative_stem": "quinoxalin",
+      "attached_prefix": "quinoxalino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "naphthalenoid_10",
+        "heteroatoms": [
+          {"locant": "1", "symbol": "N"},
+          {"locant": "4", "symbol": "N"}
+        ]
+      }
+    },
+    {
+      "name": "cinnoline",
+      "pin": true,
+      "priority": 8,
+      "aliases": [],
+      "derivative_stem": "cinnolin",
+      "attached_prefix": "cinnolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "naphthalenoid_10",
+        "heteroatoms": [
+          {"locant": "1", "symbol": "N"},
+          {"locant": "2", "symbol": "N"}
+        ]
+      }
+    },
+    {
+      "name": "phthalazine",
+      "pin": true,
+      "priority": 12,
+      "aliases": [],
+      "derivative_stem": "phthalazin",
+      "attached_prefix": "phthalazino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "naphthalenoid_10",
+        "heteroatoms": [
+          {"locant": "2", "symbol": "N"},
+          {"locant": "3", "symbol": "N"}
+        ]
+      }
+    },
+    {
+      "name": "azulene",
+      "pin": true,
+      "priority": 10,
+      "aliases": [],
+      "derivative_stem": "azulen",
+      "attached_prefix": "azuleno",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": false,
+        "locants": ["1", "2", "3", "3a", "4", "5", "6", "7", "8", "8a"],
+        "fusion_atoms": ["3a", "8a"],
+        "peripheral_atoms": ["1", "2", "3", "3a", "4", "5", "6", "7", "8", "8a"],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "3a"]},
+          {"locants": ["3a", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]},
+          {"locants": ["8a", "1"]}, {"locants": ["8a", "3a"], "bond_class": "fusion"}
+        ]
+      }
+    },
+    {
+      "name": "acenaphthylene",
+      "pin": true,
+      "priority": 12,
+      "aliases": [],
+      "derivative_stem": "acenaphthylen",
+      "attached_prefix": "acenaphthyleno",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": false,
+        "locants": ["1", "2", "2a", "3", "4", "5", "5a", "6", "7", "8", "8a", "8b"],
+        "atom_overrides": [
+          {"locant": "1", "aromatic": false},
+          {"locant": "2", "aromatic": false}
+        ],
+        "fusion_atoms": ["2a", "5a", "8a", "8b"],
+        "peripheral_atoms": ["1", "2", "2a", "3", "4", "5", "5a", "6", "7", "8", "8a", "8b"],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "2a"]}, {"locants": ["2a", "3"]},
+          {"locants": ["3", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "5a"]},
+          {"locants": ["5a", "6"]}, {"locants": ["6", "7"]}, {"locants": ["7", "8"]},
+          {"locants": ["8", "8a"]}, {"locants": ["8a", "1"]}, {"locants": ["8a", "8b"], "bond_class": "fusion"},
+          {"locants": ["8b", "2a"], "bond_class": "fusion"}, {"locants": ["8b", "5a"], "bond_class": "fusion"}
+        ]
+      }
+    },
+    {
+      "name": "1H-phenalene",
+      "pin": true,
+      "priority": 9,
+      "aliases": ["phenalene"],
+      "default_indicated_h": ["1"],
+      "derivative_stem": "1H-phenalen",
+      "attached_prefix": "phenaleno",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": false,
+        "default_indicated_h": ["1"],
+        "locants": ["1", "2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b"],
+        "atom_overrides": [
+          {"locant": "1", "aromatic": false},
+          {"locant": "2", "aromatic": false},
+          {"locant": "3", "aromatic": false}
+        ],
+        "fusion_atoms": ["3a", "6a", "9a", "9b"],
+        "peripheral_atoms": ["1", "2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b"],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "3a"]},
+          {"locants": ["3a", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "6a"]}, {"locants": ["6a", "7"]}, {"locants": ["7", "8"]},
+          {"locants": ["8", "9"]}, {"locants": ["9", "9a"]}, {"locants": ["9a", "1"]},
+          {"locants": ["9a", "9b"], "bond_class": "fusion"}, {"locants": ["9b", "6a"], "bond_class": "fusion"},
+          {"locants": ["9b", "3a"], "bond_class": "fusion"}
+        ]
+      }
+    },
+    {
+      "name": "fluoranthene",
+      "pin": true,
+      "priority": 5,
+      "aliases": [],
+      "derivative_stem": "fluoranthen",
+      "attached_prefix": "fluorantheno",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": false,
+        "locants": ["1", "2", "3", "3a", "4", "5", "6", "6a", "6b", "7", "8", "9", "10", "10a", "10b", "10c"],
+        "fusion_atoms": ["3a", "6a", "6b", "10a", "10b", "10c"],
+        "peripheral_atoms": ["1", "2", "3", "3a", "4", "5", "6", "6a", "6b", "7", "8", "9", "10", "10a", "10b", "10c"],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "3a"]},
+          {"locants": ["3a", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "6a"]}, {"locants": ["6a", "6b"], "bond_class": "fusion"},
+          {"locants": ["6b", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "9"]},
+          {"locants": ["9", "10"]}, {"locants": ["10", "10a"]}, {"locants": ["10a", "6b"], "bond_class": "fusion"},
+          {"locants": ["10a", "10b"], "bond_class": "fusion"}, {"locants": ["10b", "1"]},
+          {"locants": ["10b", "10c"], "bond_class": "fusion"}, {"locants": ["10c", "3a"], "bond_class": "fusion"},
+          {"locants": ["10c", "6a"], "bond_class": "fusion"}
+        ]
+      }
+    },
+    {
+      "name": "pteridine",
+      "pin": true,
+      "priority": 7,
+      "aliases": [],
+      "derivative_stem": "pteridin",
+      "attached_prefix": "pteridino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": false,
+        "base_template": "naphthalenoid_10",
+        "heteroatoms": [
+          {"locant": "1", "symbol": "N"},
+          {"locant": "3", "symbol": "N"},
+          {"locant": "5", "symbol": "N"},
+          {"locant": "8", "symbol": "N"}
+        ]
+      }
+    },
+    {
+      "name": "1H-perimidine",
+      "pin": true,
+      "priority": 3,
+      "aliases": ["perimidine"],
+      "default_indicated_h": ["1"],
+      "derivative_stem": "1H-perimidin",
+      "attached_prefix": "perimidino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": false,
+        "default_indicated_h": ["1"],
+        "locants": ["1", "2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b"],
+        "heteroatoms": [
+          {"locant": "1", "symbol": "N"},
+          {"locant": "3", "symbol": "N"}
+        ],
+        "atom_overrides": [
+          {"locant": "1", "aromatic": false},
+          {"locant": "2", "aromatic": false},
+          {"locant": "3", "aromatic": false}
+        ],
+        "fusion_atoms": ["3a", "6a", "9a", "9b"],
+        "peripheral_atoms": ["1", "2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b"],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "3a"]},
+          {"locants": ["3a", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "6a"]}, {"locants": ["6a", "7"]}, {"locants": ["7", "8"]},
+          {"locants": ["8", "9"]}, {"locants": ["9", "9a"]}, {"locants": ["9a", "1"]},
+          {"locants": ["9a", "9b"], "bond_class": "fusion"}, {"locants": ["9b", "6a"], "bond_class": "fusion"},
+          {"locants": ["9b", "3a"], "bond_class": "fusion"}
+        ]
+      }
+    },
+    {
+      "name": "2H-isoindole",
+      "pin": true,
+      "priority": 19,
+      "aliases": ["isoindole"],
+      "default_indicated_h": ["2"],
+      "derivative_stem": "2H-isoindol",
+      "attached_prefix": "isoindolo",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": false,
+        "default_indicated_h": ["2"],
+        "locants": ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"],
+        "heteroatoms": [
+          {"locant": "2", "symbol": "N"}
+        ],
+        "fusion_atoms": ["3a", "7a"],
+        "peripheral_atoms": ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "3a"]},
+          {"locants": ["3a", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "7"]}, {"locants": ["7", "7a"]}, {"locants": ["7a", "3a"], "bond_class": "fusion"},
+          {"locants": ["7a", "1"]}
+        ]
+      }
+    },
+    {
+      "name": "indolizine",
+      "pin": true,
+      "priority": 20,
+      "aliases": [],
+      "derivative_stem": "indolizin",
+      "attached_prefix": "indolizino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": false,
+        "locants": ["1", "2", "3", "4", "5", "6", "7", "8", "8a"],
+        "heteroatoms": [
+          {"locant": "4", "symbol": "N"}
+        ],
+        "fusion_atoms": ["8a"],
+        "peripheral_atoms": ["1", "2", "3", "4", "5", "6", "7", "8", "8a"],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+          {"locants": ["4", "5"]}, {"locants": ["5", "6"]}, {"locants": ["6", "7"]},
+          {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}, {"locants": ["8a", "4"], "bond_class": "fusion"},
+          {"locants": ["8a", "1"]}
+        ]
+      }
+    },
+    {
+      "name": "1H-indole",
+      "pin": true,
+      "priority": 18,
+      "aliases": ["indole"],
+      "default_indicated_h": ["1"],
+      "derivative_stem": "1H-indol",
+      "attached_prefix": "indolo",
+      "template": {
+        "enabled": false,
+        "locants": ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"],
+        "atoms": [
+          {"locant": "1", "symbol": "N", "default_h": true}, {"locant": "2"}, {"locant": "3"},
+          {"locant": "3a", "fusion": true}, {"locant": "4"}, {"locant": "5"},
+          {"locant": "6"}, {"locant": "7"}, {"locant": "7a", "fusion": true}
+        ],
+        "bonds": [
+          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "3a"]},
+          {"locants": ["3a", "7a"], "bond_class": "fusion"}, {"locants": ["7a", "1"]},
+          {"locants": ["3a", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "6"]},
+          {"locants": ["6", "7"]}, {"locants": ["7", "7a"]}
+        ],
+        "rings": [
+          ["1", "2", "3", "3a", "7a"],
+          ["3a", "4", "5", "6", "7", "7a"]
+        ],
+        "fusion_atoms": ["3a", "7a"],
+        "peripheral_atoms": ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]
+      }
+    }
+  ]
+}

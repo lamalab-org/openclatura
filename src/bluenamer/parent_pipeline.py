@@ -1,0 +1,211 @@
+"""Shared parent planning steps for component and subgraph naming."""
+
+from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem
+from .molecule import Molecule
+from .name_bindings import ensure_name_atom_binding_tokens
+from .namer_config import RETAINED_RING_ELEMENTS
+from .naming_context import NamingIntent, ParentAssemblyPlan
+from .numbering import choose_parent_numbering
+from .parent_selection import ParentSelection
+from .ring_renderer import is_von_baeyer_descriptor
+from .rules import retained
+from .small_ring_stereo import scoped_small_ring_stereo_features
+from .subgraph_tools import subgraph_locant_getter
+from .trace_helpers import bond_ids_within
+
+
+def resolve_retained_parent(
+    mol: Molecule, path: list[int], is_ring: bool, is_bicycle: bool, is_polycycle: bool
+) -> tuple[str | None, list[dict[int, str]] | None]:
+    """Return a retained parent name and locant maps when valid for a path."""
+
+    temp_retained = retained.get_retained_ring(mol, path) if is_ring else None
+    if not temp_retained:
+        return None, None
+    retained_name, locant_maps = temp_retained
+    if any(mol.atoms[idx].symbol not in RETAINED_RING_ELEMENTS for idx in path):
+        return None, None
+    if locant_maps is None and (is_bicycle or is_polycycle):
+        if all(mol.atoms[idx].symbol == "C" and mol.atoms[idx].charge == 0 for idx in path):
+            return retained_name, None
+        return None, None
+    return retained_name, locant_maps
+
+
+def build_parent_assembly_plan(
+    mol: Molecule,
+    selection: ParentSelection,
+    intent: NamingIntent,
+    substituent_mapping: dict[int, list],
+    locant_maps,
+    retained_name: str | None,
+) -> ParentAssemblyPlan:
+    """Number a selected parent and create base assembly parts."""
+
+    if (
+        locant_maps is None
+        and selection.ring_parent is not None
+        and selection.ring_parent.numbering_candidates
+        and _is_von_baeyer_descriptor(selection.ring_parent.descriptor)
+    ):
+        audited_maps = [
+            numbering.locant_map for numbering in selection.ring_parent.numbering_candidates if numbering.audit_ok
+        ]
+        locant_maps = audited_maps or None
+    numbered_path, locant_map = choose_parent_numbering(
+        mol,
+        selection.paths,
+        intent.principal_atoms,
+        substituent_mapping,
+        locant_maps,
+        selection.is_ring,
+        selection.is_bicycle,
+        selection.is_spiro,
+        selection.is_polycycle,
+        retained_name,
+        fixed_start=intent.fixed_start,
+    )
+    get_loc = subgraph_locant_getter(numbered_path, locant_map)
+    parts = build_parent_parts(
+        mol,
+        numbered_path,
+        get_loc,
+        retained_name,
+        selection,
+        intent,
+    )
+    return ParentAssemblyPlan(numbered_path=numbered_path, locant_map=locant_map, get_loc=get_loc, parts=parts)
+
+
+def _is_von_baeyer_descriptor(descriptor: str | None) -> bool:
+    return is_von_baeyer_descriptor(descriptor)
+
+
+def build_parent_parts(
+    mol: Molecule,
+    numbered_path: list[int],
+    get_loc,
+    retained_name: str | None,
+    selection: ParentSelection,
+    intent: NamingIntent,
+) -> AssemblyParts:
+    """Create shared parent assembly parts for a naming intent."""
+
+    assembly_overrides = {}
+    if intent.is_substituent:
+        if intent.root_atom is None:
+            raise ValueError("Subgraph naming intent requires a root atom.")
+        upstream_order = _upstream_bond_order(mol, intent.root_atom, intent.upstream_atom)
+        assembly_overrides.update(
+            {
+                "is_substituent": True,
+                "is_double_attach": upstream_order == 2,
+                "is_triple_attach": upstream_order == 3,
+                "attachment_locant": get_loc(intent.root_atom),
+            }
+        )
+
+    parts = AssemblyParts(
+        parent_length=len(numbered_path),
+        is_ring=selection.is_ring,
+        is_bicycle=selection.is_bicycle,
+        is_spiro=selection.is_spiro,
+        is_polycycle=selection.is_polycycle,
+        bicycle_xyz=selection.xyz if selection.is_bicycle else (0, 0, 0),
+        spiro_xy=(selection.xyz[0], selection.xyz[1]) if selection.is_spiro else (0, 0),
+        polycycle_descriptor=selection.polycycle_descriptor,
+        retained_name=retained_name,
+        parent_atom_ids=set(numbered_path),
+        parent_bond_ids=bond_ids_within(mol, set(numbered_path)),
+        **assembly_overrides,
+    )
+    for atom_idx in numbered_path:
+        locant = str(get_loc(atom_idx))
+        parts.parent_atom_ids_by_locant[locant] = atom_idx
+        parts.parent_atom_symbols_by_locant[locant] = mol.atoms[atom_idx].symbol
+        parts.parent_atom_charges_by_locant[locant] = mol.atoms[atom_idx].charge
+        if mol.atoms[atom_idx].stereo:
+            parts.stereo_features.append((get_loc(atom_idx), mol.atoms[atom_idx].stereo))
+        if mol.atoms[atom_idx].charge:
+            parts.parent_charges.append(
+                ParentChargeItem(
+                    locant=locant,
+                    symbol=mol.atoms[atom_idx].symbol,
+                    charge=mol.atoms[atom_idx].charge,
+                    atom_id=atom_idx,
+                )
+            )
+    _add_relative_ring_stereo(mol, parts, numbered_path, get_loc)
+    parent_set = set(numbered_path)
+    for atom_idx in numbered_path:
+        locant = str(get_loc(atom_idx))
+        for neighbor_idx in mol.get_neighbors(atom_idx):
+            if neighbor_idx in parent_set and atom_idx < neighbor_idx:
+                neighbor_locant = str(get_loc(neighbor_idx))
+                bond = mol.get_bond(atom_idx, neighbor_idx)
+                if bond is not None:
+                    locant_pair = tuple(sorted((locant, neighbor_locant)))
+                    parts.parent_bond_orders_by_locants[locant_pair] = bond.order
+                    parts.parent_bond_ids_by_locants[locant_pair] = bond.idx
+    return parts
+
+
+def _add_relative_ring_stereo(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
+    """Render unassigned tetrahedral ring stereo as cis/trans for simple rings."""
+
+    if not parts.is_ring or parts.is_bicycle or parts.is_spiro or parts.is_polycycle:
+        return
+    scoped_features = scoped_small_ring_stereo_features(mol, parts, numbered_path, get_loc)
+    if scoped_features:
+        parts.stereo_features.extend(scoped_features)
+        parts.name_atom_bindings.append(
+            ensure_name_atom_binding_tokens(
+                NameAtomBinding(
+                    stage="assembly",
+                    role="small_ring_stereo",
+                    term=",".join(f"{locant}{descriptor}" for locant, descriptor in scoped_features),
+                    atom_ids={atom_idx for atom_idx in numbered_path if mol.atoms[atom_idx].raw_stereo},
+                    locants=tuple(locant for locant, _ in scoped_features),
+                )
+            )
+        )
+        return
+    raw_atoms = [
+        atom_idx for atom_idx in numbered_path if mol.atoms[atom_idx].raw_stereo and not mol.atoms[atom_idx].stereo
+    ]
+    if len(raw_atoms) != 2:
+        return
+
+    first, second = raw_atoms
+    first_tag = mol.atoms[first].raw_stereo
+    second_tag = mol.atoms[second].raw_stereo
+    if first_tag not in {"CW", "CCW"} or second_tag not in {"CW", "CCW"}:
+        return
+    parent_set = set(numbered_path)
+    if any(
+        sum(1 for neighbor_idx in mol.get_neighbors(atom_idx) if neighbor_idx not in parent_set) != 1
+        for atom_idx in raw_atoms
+    ):
+        return
+
+    term = "cis" if first_tag == second_tag else "trans"
+    locants = tuple(str(get_loc(atom_idx)) for atom_idx in raw_atoms)
+    parts.relative_stereo_prefixes.append(term)
+    parts.name_atom_bindings.append(
+        ensure_name_atom_binding_tokens(
+            NameAtomBinding(
+                stage="assembly",
+                role="relative_stereo",
+                term=term,
+                atom_ids=set(raw_atoms),
+                locants=locants,
+            )
+        )
+    )
+
+
+def _upstream_bond_order(mol: Molecule, start_idx: int, upstream_atom: int | None) -> int:
+    if upstream_atom is None:
+        return 0
+    bond = mol.get_bond(start_idx, upstream_atom)
+    return bond.order if bond else 0

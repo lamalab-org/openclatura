@@ -1,0 +1,849 @@
+{
+  "format": "bluenamer.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "subType": "carbohydrate",
+          "symbol": "\u251c",
+          "tagname": "group",
+          "type": "carbohydrateStem"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "/1/2//3/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "glycero"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "erythro"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "threo"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "ribo"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "arabino"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "xylo"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "lyxo"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "allo"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "altro"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "gluco"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "manno"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "gulo"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "ido"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "galacto"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "talo"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "erythrulo"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "ribulo"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "xylulo"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "psico"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "fructo"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "sorbo"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "tagato"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6//7/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "sedoheptulo"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6//7/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "mannoheptulo"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u2500",
+          "tagname": "carbohydrateRingSize"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "3"
+            },
+            "tag": "token",
+            "text": "oxirose"
+          },
+          {
+            "attributes": {
+              "value": "4"
+            },
+            "tag": "token",
+            "text": "oxetose"
+          },
+          {
+            "attributes": {
+              "value": "5"
+            },
+            "tag": "token",
+            "text": "furanose"
+          },
+          {
+            "attributes": {
+              "value": "6"
+            },
+            "tag": "token",
+            "text": "pyranose"
+          },
+          {
+            "attributes": {
+              "value": "7"
+            },
+            "tag": "token",
+            "text": "septanose"
+          },
+          {
+            "attributes": {
+              "value": "8"
+            },
+            "tag": "token",
+            "text": "octanose"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u252c",
+          "tagname": "stereoChemistry",
+          "type": "carbohydrateConfigurationalPrefix"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "r"
+            },
+            "tag": "token",
+            "text": "glycero"
+          },
+          {
+            "attributes": {
+              "value": "r/r"
+            },
+            "tag": "token",
+            "text": "erythro"
+          },
+          {
+            "attributes": {
+              "value": "l/r"
+            },
+            "tag": "token",
+            "text": "threo"
+          },
+          {
+            "attributes": {
+              "value": "r/r/r"
+            },
+            "tag": "token",
+            "text": "ribo"
+          },
+          {
+            "attributes": {
+              "value": "l/r/r"
+            },
+            "tag": "token",
+            "text": "arabino"
+          },
+          {
+            "attributes": {
+              "value": "r/l/r"
+            },
+            "tag": "token",
+            "text": "xylo"
+          },
+          {
+            "attributes": {
+              "value": "l/l/r"
+            },
+            "tag": "token",
+            "text": "lyxo"
+          },
+          {
+            "attributes": {
+              "value": "r/r/r/r"
+            },
+            "tag": "token",
+            "text": "allo"
+          },
+          {
+            "attributes": {
+              "value": "l/r/r/r"
+            },
+            "tag": "token",
+            "text": "altro"
+          },
+          {
+            "attributes": {
+              "value": "r/l/r/r"
+            },
+            "tag": "token",
+            "text": "gluco"
+          },
+          {
+            "attributes": {
+              "value": "l/l/r/r"
+            },
+            "tag": "token",
+            "text": "manno"
+          },
+          {
+            "attributes": {
+              "value": "r/r/l/r"
+            },
+            "tag": "token",
+            "text": "gulo"
+          },
+          {
+            "attributes": {
+              "value": "l/r/l/r"
+            },
+            "tag": "token",
+            "text": "ido"
+          },
+          {
+            "attributes": {
+              "value": "r/l/l/r"
+            },
+            "tag": "token",
+            "text": "galacto"
+          },
+          {
+            "attributes": {
+              "value": "l/l/l/r"
+            },
+            "tag": "token",
+            "text": "talo"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "carbohydrate",
+          "symbol": "\u253c",
+          "tagname": "group",
+          "type": "carbohydrateChainLength"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "/1/2//3/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "triose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "tetrose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "pentose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "hexose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6//7/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "heptose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6//7//8/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "octose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6//7//8//9/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "nonose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6//7//8//9//10/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "decose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6//7//8//9//10//11/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "undecose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6//7//8//9//10//11//12/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "dodecose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6//7//8//9//10//11//12//13/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "tridecose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6//7//8//9//10//11//12//13//14/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "tetradecose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6//7//8//9//10//11//12//13//14//15/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "pentadecose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6//7//8//9//10//11//12//13//14//15//16/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "hexadecose"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "carbohydrate",
+          "symbol": "\u2514",
+          "tagname": "group",
+          "type": "simpleGroup"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "/1/2//3//4/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "erythrose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "threose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "ribose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "arabinose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "xylose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "lyxose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "allose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "altrose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "glucose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "mannose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "gulose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)[C@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "idose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "galactose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)[C@@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "talose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "erythrulose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "ribulose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "xylulose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "psicose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "fructose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "sorbose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "tagatose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6//7/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@@H](O)[C@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "sedoheptulose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6//7/",
+              "valType": "SMILES",
+              "value": "OCC(=O)[C@@H](O)[C@@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "mannoheptulose"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](N)[C@@H](O)[C@@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "galactosamine"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](N)[C@@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "glucosamine"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](N)[C@@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "mannosamine"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6",
+              "valType": "SMILES",
+              "value": "O=C[C@H](N)[C@@H](O)[C@@H](O)[C@H](O)C"
+            },
+            "tag": "token",
+            "text": "fucosamine"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6",
+              "valType": "SMILES",
+              "value": "O=C[C@H](N)[C@@H](O)[C@H](O)[C@H](O)C"
+            },
+            "tag": "token",
+            "text": "quinovosamine"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "carbohydrate",
+          "symbol": "G",
+          "tagname": "group",
+          "type": "simpleGroup"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "/1/2//3/",
+              "valType": "SMILES",
+              "value": "O=CC(O)CO"
+            },
+            "tag": "token",
+            "text": "glyceraldehyde"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "d-glyceraldehyde"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3/",
+              "valType": "SMILES",
+              "value": "O=C[C@@H](O)CO"
+            },
+            "tag": "token",
+            "text": "l-glyceraldehyde"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "O=C[C@H](O)[C@@H](O)[C@H](O)[C@H](O)CO"
+            },
+            "tag": "token",
+            "text": "dextrose"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "carbohydrates.xml"
+}

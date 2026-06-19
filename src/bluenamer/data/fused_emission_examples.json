@@ -1,0 +1,40 @@
+{
+  "name_policy": "generic_opsin_grammar",
+  "stages": {
+    "stage_6_systematic_fused_descriptor": [
+      "furo[3,2-b]thieno[2,3-e]pyridine",
+      "imidazo[2,1-b][1,3]thiazole",
+      "difuro[3,2-b:2',3'-e]pyridine",
+      "1H-pyrrolo[3,2-b]pyridine",
+      "benzo[1,2-c:3,4-c']bis([1,2,5]oxadiazole)"
+    ],
+    "stage_7_fused_layout_numbering": [
+      "azulene",
+      "phenanthrene",
+      "pyrene",
+      "thieno[2,3-b]furan",
+      "1H-cyclopenta[l]phenanthrene"
+    ],
+    "stage_8_bridged_fused": [
+      "1,4-epoxynaphthalene",
+      "1,4-epoxy-5,8-methanonaphthalene",
+      "5,8-epoxy-1,3-methanoanthracene",
+      "1,5-methanoindole",
+      "10,5-[2,3]furanobenzo[g]quinoline"
+    ],
+    "stage_9_spiro_wrapper": [
+      "spiro[piperidine-4,9'-xanthene]",
+      "spiro[cyclohexane-1,1'-indene]",
+      "1'H-spiro[imidazolidine-4,2'-quinoxaline]",
+      "7,7'-spirobi[bicyclo[4.1.0]heptane]",
+      "3,3':6',6''-dispiroter[bicyclo[3.1.0]hexane]"
+    ],
+    "stage_10_charged_fused_heteroaromatics": [
+      "quinolin-1-ium",
+      "isoquinolin-2-ium",
+      "quinoline 1-oxide",
+      "indol-1-ide",
+      "carbazol-9-ide"
+    ]
+  }
+}
