@@ -5,7 +5,6 @@ Subcommands::
     bluenamer name    "CCO"                # print one name
     bluenamer name    "CCO" --json         # JSON with trace + rules
     bluenamer batch   smiles.txt           # one SMILES per line, write JSONL
-    bluenamer batch   smiles.txt --verify  # also run OPSIN round-trip
     bluenamer version
 
 The CLI is intentionally thin — for anything beyond quick experiments
@@ -104,7 +103,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_name.add_argument("smiles")
     p_name.add_argument("--trace", action="store_true", help="also print rule hints to stderr")
     p_name.add_argument("--json", action="store_true", help="emit JSON to stdout")
-    p_name.add_argument("--verify", action="store_true", help="round-trip via OPSIN")
+    p_name.add_argument("--verify",action=argparse.BooleanOptionalAction,default=True,help="round-trip via OPSIN or --no-verify to skip")
     p_name.set_defaults(func=_cmd_name)
 
     p_batch = sub.add_parser("batch", help="Name a file of SMILES (JSONL output)")
@@ -112,7 +111,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_batch.add_argument("--output", default="-", help="output file path, or '-' for stdout")
     p_batch.add_argument("--trace", action="store_true", help="include trace_segments in JSON output")
     p_batch.add_argument("--json", action="store_true", help="alias of --trace; emit full JSON")
-    p_batch.add_argument("--verify", action="store_true", help="round-trip via OPSIN")
+    p_batch.add_argument("--verify",action=argparse.BooleanOptionalAction,default=True,help="round-trip via OPSIN or --no-verify to skip")
     p_batch.add_argument(
         "--processes",
         type=lambda v: None if v in {"", "auto"} else int(v),

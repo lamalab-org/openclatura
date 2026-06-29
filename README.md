@@ -11,7 +11,7 @@ decision trace so the *why* of a name is recoverable, not just the *what*.
 > **Status:** alpha. The naming engine handles a broad slice of organic
 > structures (alkanes/alkenes/alkynes, common functional groups, simple
 > heterocycles, fused/spiro/bridged systems, retained names from the Blue
-> Book). PubChem/QM9 coverage is being measured; see `examples/`.
+> Book). PubChem/QM9/ZINC22 coverage is being measured; see `examples/`.
 
 ## Install
 
@@ -110,6 +110,11 @@ bluenamer name "CC(=O)Nc1ccccc1"            # → N-phenylacetamide
 bluenamer name "CC(=O)Nc1ccccc1" --json     # JSON with trace + rules
 bluenamer batch smiles.txt --output names.jsonl --processes auto
 ```
+The CLI tool has a OPSIN verification turned on by default. It can be turned-off with
+
+```bash
+bluenamer name "CN1C=NC2=C1C(=O)N(C(=O)N2C)C" --no-verify       
+```
 
 ## Development
 
@@ -167,7 +172,7 @@ OpenAPI docs are served at `http://localhost:8000/docs`.
 
 ## Human-like description
 
-OpenBlue can generate uncanny human-like descriptions.
+Bluenamer can generate uncanny human-like descriptions of molecules.
 ```python
 
 from bluenamer import describe_human
