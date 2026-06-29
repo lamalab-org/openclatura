@@ -195,11 +195,12 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
     return bindings
 
 
-def binding_trace_data(bindings: list[NameAtomBinding]) -> list[dict]:
+def binding_trace_data(bindings: list[NameAtomBinding], *, include_emitted_tokens: bool = False) -> list[dict]:
     """Return JSON-friendly binding data for decision traces."""
 
-    return [
-        {
+    data = []
+    for binding in bindings:
+        item = {
             "stage": binding.stage,
             "role": binding.role,
             "term": binding.term,
@@ -207,7 +208,9 @@ def binding_trace_data(bindings: list[NameAtomBinding]) -> list[dict]:
             "atoms": sorted(binding.atom_ids),
             "bonds": sorted(binding.bond_ids),
             "charge_atoms": sorted(binding.charge_atom_ids),
-            "emitted_tokens": [
+        }
+        if include_emitted_tokens:
+            item["emitted_tokens"] = [
                 {
                     "text": token.text,
                     "render_order": token.render_order,
@@ -220,10 +223,9 @@ def binding_trace_data(bindings: list[NameAtomBinding]) -> list[dict]:
                     "charge_atoms": sorted(token.charge_atom_ids),
                 }
                 for token in binding.emitted_tokens
-            ],
-        }
-        for binding in bindings
-    ]
+            ]
+        data.append(item)
+    return data
 
 
 def ensure_name_atom_binding_tokens(binding: NameAtomBinding) -> NameAtomBinding:
@@ -941,7 +943,7 @@ def _extend_tree_substituent_tokens(tokens: list[NameTokenBinding], node: dict, 
         for segment in node.get("trace_segments") or ():
             if not isinstance(segment, dict):
                 continue
-            if segment.get("label") != "parent skeleton":
+            if not _is_parent_trace_segment(segment):
                 continue
             if set(segment.get("atoms") or []) != parent_atoms:
                 continue
@@ -999,6 +1001,13 @@ def _extend_tree_substituent_tokens(tokens: list[NameTokenBinding], node: dict, 
                     )
             if not emitted_node_name:
                 _extend_tree_substituent_tokens(tokens, child, include_node_name=True)
+
+
+def _is_parent_trace_segment(segment: dict) -> bool:
+    return segment.get("key") in {"parent", "substituent_parent"} or segment.get("label") in {
+        "parent skeleton",
+        "substituent parent skeleton",
+    }
 
 
 def _append_name_tokens(

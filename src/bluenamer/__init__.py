@@ -28,6 +28,7 @@ def name(
     *,
     include_trace: bool = False,
     verify_opsin: bool = False,
+    token_debug: bool = False,
 ) -> NamingResult:
     """One-shot naming with the default engine. Returns a typed ``NamingResult``.
 
@@ -38,7 +39,12 @@ def name(
     """
 
     return DEFAULT_NAMING_ENGINE.run(
-        NamingRequest(smiles=smiles, include_trace=include_trace, verify_opsin=verify_opsin)
+        NamingRequest(
+            smiles=smiles,
+            include_trace=include_trace,
+            verify_opsin=verify_opsin,
+            token_debug=token_debug,
+        )
     )
 
 
@@ -47,6 +53,7 @@ def name_many(
     *,
     include_trace: bool = False,
     verify_opsin: bool = False,
+    token_debug: bool = False,
     processes: int | None | str = 1,
     chunksize: int = 64,
 ) -> list[NamingResult]:
@@ -59,6 +66,7 @@ def name_many(
         smiles_iter,
         include_trace=include_trace,
         verify_opsin=verify_opsin,
+        token_debug=token_debug,
         processes=processes,
         chunksize=chunksize,
     )

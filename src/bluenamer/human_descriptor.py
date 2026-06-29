@@ -44,7 +44,7 @@ class HumanDescription:
         }
 
 
-def describe_human(smiles: str) -> HumanDescription:
+def describe_human(smiles: str, verify_opsin: bool = False) -> HumanDescription:
     """Return a readable metadata-backed description for ``smiles``.
 
     The descriptor intentionally uses ``substituent_tree`` and graph metadata,
@@ -52,12 +52,14 @@ def describe_human(smiles: str) -> HumanDescription:
     currently evolving token-span alignment layer.
     """
 
-    result = DEFAULT_NAMING_ENGINE.run(NamingRequest(smiles=smiles, include_trace=True))
+    result = DEFAULT_NAMING_ENGINE.run(NamingRequest(smiles=smiles, include_trace=True,verify_opsin=verify_opsin))
     mol = read_smiles(smiles)
     paragraphs: list[str] = []
     smiles_sentence = _processed_smiles_sentence(smiles)
     if smiles_sentence:
         paragraphs.append(smiles_sentence)
+    if verify_opsin and not result.ok:
+        paragraphs.append("The OPSIN verification failed for this structure.")
     if result.error:
         paragraphs.append(f"The structure could not be named: {result.error}.")
     elif not result.name:

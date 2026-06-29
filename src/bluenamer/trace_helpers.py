@@ -277,10 +277,12 @@ def assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
             }
         )
     elif parts.parent_atom_ids:
+        parent_key = "substituent_parent" if parts.is_substituent else "parent"
+        parent_label = "substituent parent skeleton" if parts.is_substituent else "parent skeleton"
         segments.append(
             {
-                "key": "parent",
-                "label": "parent skeleton",
+                "key": parent_key,
+                "label": parent_label,
                 "atoms": sorted(parts.parent_atom_ids),
                 "bonds": sorted(parts.parent_bond_ids),
                 "name_terms": assembly_parent_terms(parts),
@@ -304,6 +306,37 @@ def assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
             }
         )
     return segments
+
+
+def attach_main_parent_decisions(trace_segments: list[dict], decisions: DecisionTrace | list | tuple | None) -> list[dict]:
+    """Attach main-component parent decisions to matching main parent segments.
+
+    Recursive substituent parent decisions already travel as ``nested_decisions``
+    on their substituent trace segments.  Main parent segments are generated from
+    ``AssemblyParts`` and need this small join against the decision trace so
+    parent selection and numbering are visible in the same trace object.
+    """
+
+    serialized = decision_trace_data(decisions)
+    if not serialized:
+        return trace_segments
+    parent_decisions = [
+        step
+        for step in serialized
+        if step.get("decision") in {"selected parent skeleton", "used retained parent name", "selected numbering"}
+    ]
+    if not parent_decisions:
+        return trace_segments
+    enriched: list[dict] = []
+    for segment in trace_segments:
+        item = dict(segment)
+        if item.get("key") == "parent":
+            atom_set = set(item.get("atoms") or ())
+            decisions_for_segment = [step for step in parent_decisions if set(step.get("atoms") or ()) == atom_set]
+            if decisions_for_segment:
+                item.setdefault("decisions", decisions_for_segment)
+        enriched.append(item)
+    return enriched
 
 
 def assembly_substituent_tree(

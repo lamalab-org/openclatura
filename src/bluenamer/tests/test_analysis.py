@@ -8,7 +8,7 @@ from bluenamer import (
     NamingRequest,
     OperationClass,
     TracePhase,
-    analyze_smiles,
+    analyze_smiles as _analyze_smiles,
     name_smiles,
 )
 from bluenamer.additive import add_indicated_hydrogens
@@ -165,6 +165,12 @@ from bluenamer.token_grammar import (
     lexical_token_spans,
 )
 from bluenamer.trace_helpers import add_substituent_trace, assembly_substituent_tree, assembly_trace_segments
+
+
+def analyze_smiles(smiles: str):
+    """Test helper: token-binding assertions need explicit token-debug traces."""
+
+    return _analyze_smiles(smiles, token_debug=True)
 from bluenamer.von_baeyer import _classify_secondary_bridges, find_von_baeyer_candidates
 
 
