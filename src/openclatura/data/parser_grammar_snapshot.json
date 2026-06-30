@@ -1,6 +1,6 @@
 {
   "source": {
-    "name": "BlueNamer parser grammar snapshot",
+    "name": "Openclatura parser grammar snapshot",
     "format": "openclatura.parser_grammar_snapshot.v1",
     "resource_json_dir": "parser_xml_resources",
     "files": [

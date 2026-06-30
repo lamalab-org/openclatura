@@ -1,11 +1,10 @@
 # openclatura
 
-A deterministic SMILES → IUPAC name generator derived from the rules of the
-IUPAC Blue Book (2013 recommendations).
+**Open Nomenclature Framework**
 
-The package walks the molecular graph (parsed via RDKit), perceives functional
-groups and ring systems, selects a principal parent, assigns locants, and
-assembles the substitutive name. Every step is recorded in an inspectable
+`openclatura` is a deterministic SMILES-to-IUPAC name generator inspired by the IUPAC Blue Book 2013 recommendations.
+
+Built on top of RDKit, the package walks the molecular graph, detects functional groups and ring systems, selects the principal parent, assigns locants, and constructs the corresponding substitutive IUPAC name. Every step is recorded in an inspectable
 decision trace so the *why* of a name is recoverable, not just the *what*.
 
 > **Status:** alpha. The naming engine handles a broad slice of organic
