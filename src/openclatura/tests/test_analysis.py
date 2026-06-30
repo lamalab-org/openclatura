@@ -96,7 +96,12 @@ from openclatura.name_postprocessing import (
     apply_connection_boundary_postprocessing,
     postprocessing_rule_inventory,
 )
-from openclatura.namer import _number_saturated_n_ring_for_spiro, _spiro_subgraph_assembly, name_component, name_subgraph
+from openclatura.namer import (
+    _number_saturated_n_ring_for_spiro,
+    _spiro_subgraph_assembly,
+    name_component,
+    name_subgraph,
+)
 from openclatura.naming_audit import UnnamedAtomError, assert_component_fully_named, audit_charge_pair_templates
 from openclatura.naming_data import DATA_DIR, load_json_table, namer_rules
 from openclatura.nitrogen_roles import (
