@@ -4,7 +4,7 @@ Pulls a small random sample from ``jablonkagroup/pubchem-smiles-molecular-formul
 and reports naming + OPSIN match rates. Marked ``dataset``/``slow``;
 run with ``pytest -m dataset``.
 
-Tunable via env: ``BLUENAMER_DATASET_SAMPLE_N``, ``BLUENAMER_DATASET_SEED``.
+Tunable via env: ``OPENCLATURA_DATASET_SAMPLE_N``, ``OPENCLATURA_DATASET_SEED``.
 """
 
 from __future__ import annotations
@@ -25,8 +25,8 @@ PUBCHEM_DATASET = "jablonkagroup/pubchem-smiles-molecular-formula"
 @pytest.fixture(scope="module")
 def pubchem_sample():
     datasets = pytest.importorskip("datasets")
-    n = int(os.environ.get("BLUENAMER_DATASET_SAMPLE_N", "200"))
-    seed = int(os.environ.get("BLUENAMER_DATASET_SEED", "42"))
+    n = int(os.environ.get("OPENCLATURA_DATASET_SAMPLE_N", "200"))
+    seed = int(os.environ.get("OPENCLATURA_DATASET_SEED", "42"))
     try:
         ds = datasets.load_dataset(PUBCHEM_DATASET, split="train")
     except Exception as exc:  # pragma: no cover - network-dependent
