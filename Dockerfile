@@ -43,13 +43,13 @@ RUN apt-get update -qq \
 COPY --from=builder /install /usr/local
 
 # Non-root user.
-RUN useradd --create-home --shell /bin/bash bluenamer
-USER bluenamer
-WORKDIR /home/bluenamer
+RUN useradd --create-home --shell /bin/bash openclatura
+USER openclatura
+WORKDIR /home/openclatura
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
   CMD curl -fsS http://127.0.0.1:8000/healthz || exit 1
 
-CMD ["python", "-m", "bluenamer.web", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "openclatura.web", "--host", "0.0.0.0", "--port", "8000"]

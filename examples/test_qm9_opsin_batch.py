@@ -13,7 +13,7 @@ from rdkit import Chem
 from rdkit.Chem.MolStandardize import rdMolStandardize
 from tqdm import tqdm
 
-from bluenamer.namer import name_smiles
+from openclatura.namer import name_smiles
 
 normalizer = rdMolStandardize.Normalizer()
 reionizer = rdMolStandardize.Reionizer()

@@ -1,0 +1,403 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "subType": "groupStem",
+          "symbol": "g",
+          "tagname": "group",
+          "type": "substituent"
+        },
+        "children": [
+          {
+            "attributes": {
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "C=C=C"
+            },
+            "tag": "token",
+            "text": "allen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5",
+              "suffixAppliesToByDefault": "3",
+              "valType": "SMILES",
+              "value": "N=NC=NN"
+            },
+            "tag": "token",
+            "text": "formazan"
+          },
+          {
+            "attributes": {
+              "labels": "1///2//3",
+              "valType": "SMILES",
+              "value": "OCC(O)CO"
+            },
+            "tag": "token",
+            "text": "glycerol"
+          },
+          {
+            "attributes": {
+              "labels": "1///2//3",
+              "valType": "SMILES",
+              "value": "OCC(O)CO"
+            },
+            "tag": "token",
+            "text": "glycerin"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[NH2+]=[N-]"
+            },
+            "tag": "token",
+            "text": "isodiazen"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C=C=O"
+            },
+            "tag": "token",
+            "text": "keten"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "NC(=O)OCC"
+            },
+            "tag": "token",
+            "text": "urethan"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C=CC(C)=C"
+            },
+            "tag": "token",
+            "text": "isopren"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[NH4+]"
+            },
+            "tag": "token",
+            "text": "ammonium"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[PH4+]"
+            },
+            "tag": "token",
+            "text": "phosphonium"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[AsH4+]"
+            },
+            "tag": "token",
+            "text": "arsonium"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[SbH4+]"
+            },
+            "tag": "token",
+            "text": "stibonium"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[BiH4+]"
+            },
+            "tag": "token",
+            "text": "bismuthonium"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[OH3+]"
+            },
+            "tag": "token",
+            "text": "oxonium"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[SH3+]"
+            },
+            "tag": "token",
+            "text": "sulfonium"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[SeH3+]"
+            },
+            "tag": "token",
+            "text": "selenonium"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[TeH3+]"
+            },
+            "tag": "token",
+            "text": "telluronium"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[FH2+]"
+            },
+            "tag": "token",
+            "text": "fluoronium"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[ClH2+]"
+            },
+            "tag": "token",
+            "text": "chloronium"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[BrH2+]"
+            },
+            "tag": "token",
+            "text": "bromonium"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[IH2+]"
+            },
+            "tag": "token",
+            "text": "iodonium"
+          },
+          {
+            "attributes": {
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[PH3]"
+            },
+            "tag": "token",
+            "text": "phosphine"
+          },
+          {
+            "attributes": {
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[AsH3]"
+            },
+            "tag": "token",
+            "text": "arsine"
+          },
+          {
+            "attributes": {
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[SbH3]"
+            },
+            "tag": "token",
+            "text": "stibin"
+          },
+          {
+            "attributes": {
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[BiH3]"
+            },
+            "tag": "token",
+            "text": "bismuthin"
+          },
+          {
+            "attributes": {
+              "defaultInLocant": "3",
+              "labels": "1/2//3",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "CC(=O)C"
+            },
+            "tag": "token",
+            "text": "aceton"
+          },
+          {
+            "attributes": {
+              "defaultInLocant": "5",
+              "labels": "1/2/3//4/5",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "CCC(=O)CC"
+            },
+            "tag": "token",
+            "text": "propionon"
+          },
+          {
+            "attributes": {
+              "defaultInLocant": "7",
+              "labels": "1/2/3/4//5/6/7",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "CCCC(=O)CCC"
+            },
+            "tag": "token",
+            "text": "butyron"
+          },
+          {
+            "attributes": {
+              "defaultInLocant": "9",
+              "labels": "1/2/3/4/5//6/7/8/9",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "CCCCC(=O)CCCC"
+            },
+            "tag": "token",
+            "text": "valeron"
+          },
+          {
+            "attributes": {
+              "defaultInLocant": "13",
+              "labels": "1/2/3/4/5/6/7//8/9/10/11/12/13",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "CCCCCCC(=O)CCCCCC"
+            },
+            "tag": "token",
+            "text": "enanthon"
+          },
+          {
+            "attributes": {
+              "defaultInLocant": "15",
+              "labels": "1/2/3/4/5/6/7/8//9/10/11/12/13/14/15",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "CCCCCCCC(=O)CCCCCCC"
+            },
+            "tag": "token",
+            "text": "caprylon"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "CC(C)C(=O)C(C)C"
+            },
+            "tag": "token",
+            "text": "isobutyron"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "CC(C)CC(=O)CC(C)C"
+            },
+            "tag": "token",
+            "text": "isovaleron"
+          },
+          {
+            "attributes": {
+              "defaultInLocant": "23",
+              "labels": "1/2/3/4/5/6/7/8/9/10/11/12//13/14/15/16/17/18/19/20/21/22/23",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "CCCCCCCCCCCC(=O)CCCCCCCCCCC"
+            },
+            "tag": "token",
+            "text": "lauron"
+          },
+          {
+            "attributes": {
+              "defaultInLocant": "27",
+              "labels": "1/2/3/4/5/6/7/8/9/10/11/12/13/14//15/16/17/18/19/20/21/22/23/24/25/26/27",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "CCCCCCCCCCCCCC(=O)CCCCCCCCCCCCC"
+            },
+            "tag": "token",
+            "text": "myriston"
+          },
+          {
+            "attributes": {
+              "defaultInLocant": "31",
+              "labels": "1/2/3/4/5/6/7/8/9/10/11/12/13/14/15/16//17/18/19/20/21/22/23/24/25/26/27/28/29/30/31",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "CCCCCCCCCCCCCCCC(=O)CCCCCCCCCCCCCCC"
+            },
+            "tag": "token",
+            "text": "palmiton"
+          },
+          {
+            "attributes": {
+              "defaultInLocant": "35",
+              "labels": "1/2/3/4/5/6/7/8/9/10/11/12/13/14/15/16/17/18//19/20/21/22/23/24/25/26/27/28/29/30/31/32/33/34/35",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "CCCCCCCCCCCCCCCCCC(=O)CCCCCCCCCCCCCCCCC"
+            },
+            "tag": "token",
+            "text": "stearon"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "groupStem",
+          "symbol": "g",
+          "tagname": "group",
+          "type": "substituent"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "N[C@H](C(=O)O)CCC(=O)N[C@@H](CS)C(=O)NCC(=O)O"
+            },
+            "tag": "token",
+            "text": "glutathion"
+          },
+          {
+            "attributes": {
+              "labels": "1,N//2,N''/3,N'",
+              "valType": "SMILES",
+              "value": "NC(=N)N"
+            },
+            "tag": "token",
+            "text": "guanidin"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "groupStemsAllowingInlineSuffixes.xml"
+}

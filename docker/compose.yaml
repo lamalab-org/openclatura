@@ -1,9 +1,9 @@
 services:
-  bluenamer:
+  openclatura:
     build:
       context: ..
       dockerfile: Dockerfile
-    image: bluenamer:local
+    image: openclatura:local
     ports:
       - "8000:8000"
     restart: unless-stopped

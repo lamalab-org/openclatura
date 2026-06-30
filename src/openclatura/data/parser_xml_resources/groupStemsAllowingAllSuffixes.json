@@ -1,0 +1,53 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "attributes": {
+      "subType": "groupStem",
+      "symbol": "\u00ea",
+      "tagname": "group",
+      "type": "chain"
+    },
+    "children": [
+      {
+        "attributes": {
+          "usableAsAJoiner": "yes",
+          "valType": "SMILES",
+          "value": "NN"
+        },
+        "tag": "token",
+        "text": "hydrazin"
+      },
+      {
+        "attributes": {
+          "usableAsAJoiner": "yes",
+          "valType": "SMILES",
+          "value": "C#C"
+        },
+        "tag": "token",
+        "text": "acetylen"
+      },
+      {
+        "attributes": {
+          "labels": "N/O",
+          "usableAsAJoiner": "yes",
+          "valType": "SMILES",
+          "value": "NO"
+        },
+        "tag": "token",
+        "text": "hydroxylamin"
+      },
+      {
+        "attributes": {
+          "labels": "1/2/3/////////////////",
+          "suffixAppliesTo": "1",
+          "valType": "SMILES",
+          "value": "CCC(C)CCCC(C)CCCC(C)CCCC(C)C"
+        },
+        "tag": "token",
+        "text": "phytan"
+      }
+    ],
+    "tag": "tokenList"
+  },
+  "source_xml_file": "groupStemsAllowingAllSuffixes.xml"
+}

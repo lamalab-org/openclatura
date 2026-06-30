@@ -1,0 +1,63 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "attributes": {
+      "symbol": "I",
+      "tagname": "suffix",
+      "type": "charge"
+    },
+    "children": [
+      {
+        "attributes": {
+          "value": "ium"
+        },
+        "tag": "token",
+        "text": "ium"
+      },
+      {
+        "attributes": {
+          "value": "ide"
+        },
+        "tag": "token",
+        "text": "ide"
+      },
+      {
+        "attributes": {
+          "value": "ide"
+        },
+        "tag": "token",
+        "text": "id"
+      },
+      {
+        "attributes": {
+          "value": "ylium"
+        },
+        "tag": "token",
+        "text": "ylium"
+      },
+      {
+        "attributes": {
+          "value": "ylium"
+        },
+        "tag": "token",
+        "text": "(ylium)"
+      },
+      {
+        "attributes": {
+          "value": "uide"
+        },
+        "tag": "token",
+        "text": "uide"
+      },
+      {
+        "attributes": {
+          "value": "uide"
+        },
+        "tag": "token",
+        "text": "uid"
+      }
+    ],
+    "tag": "tokenList"
+  },
+  "source_xml_file": "inlineChargeSuffixes.xml"
+}

@@ -7,7 +7,7 @@ from datasets import load_dataset
 from rdkit.Chem import CanonSmiles
 from tqdm import tqdm
 
-from bluenamer.namer import name_smiles
+from openclatura.namer import name_smiles
 
 
 def canon(smi):

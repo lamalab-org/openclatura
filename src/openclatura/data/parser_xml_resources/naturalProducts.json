@@ -1,0 +1,302 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "subType": "biochemical",
+          "symbol": "\u2562",
+          "tagname": "group",
+          "type": "ring"
+        },
+        "children": [
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "10/9/8/7/6/5/4/3/2/1/11",
+              "labels": "14/13/12/10/9/8/15/16/7/6/5/4/3/2/1/11/17/18/19",
+              "valType": "SMILES",
+              "value": "C1[C@@H]2C[C@@H]3[C@H]1[C@H](CC2)[C@H]1C[C@@H]2[C@H]4CCC[C@@]32[C@@H]1NC4"
+            },
+            "tag": "token",
+            "text": "aconit"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "1/11/19/9/14/8/7/6/5/13/12/4/3/2",
+              "labels": "1/2/3/4/12/13/5/6/7/8/14/9/10/11/17/16/15",
+              "valType": "SMILES",
+              "value": "c1cccc2[C@@]34CCCC[C@H]3[C@@H](Cc12)NCC4"
+            },
+            "tag": "token",
+            "text": "morphin"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "1/2/3/4/5/6/7",
+              "labels": "1/2/3/4/5/6/7/8/9",
+              "valType": "SMILES",
+              "value": "[C@H]12CCC[C@@H]3CC1.N23C"
+            },
+            "tag": "token",
+            "text": "trop"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "18/13/17/16/15/14/8/7/6/5/4/3/2/1/10/19/9/11/12",
+              "valType": "SMILES",
+              "value": "[CH3][C@@]12[CH2][CH2][CH2][C@H]1[C@@H]1[CH2][CH2][CH]3[CH2][CH2][CH2][CH2][C@]3([CH3])[C@H]1[CH2][CH2]2"
+            },
+            "tag": "token",
+            "text": "androst"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "26/25/27/24/28/23/22/20/21/17/16/15/14/8/7/6/5/4/3/2/1/10/19/9/11/12/13/18",
+              "valType": "SMILES",
+              "value": "[CH3][CH]([CH3])[C@H]([CH3])[CH2][CH2][C@@H]([CH3])[C@H]1[CH2][CH2][C@H]2[C@@H]3[CH2][CH2][CH]4[CH2][CH2][CH2][CH2][C@]4([CH3])[C@H]3[CH2][CH2][C@]12[CH3]"
+            },
+            "tag": "token",
+            "text": "campest"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "24/23/22/20/21/17/16/15/14/8/7/6/5/4/3/2/1/10/19/9/11/12/13/18",
+              "valType": "SMILES",
+              "value": "[CH3][CH2][CH2][C@@H]([CH3])[C@H]1[CH2][CH2][C@H]2[C@@H]3[CH2][CH2][CH]4[CH2][CH2][CH2][CH2][C@]4([CH3])[C@H]3[CH2][CH2][C@]12[CH3]"
+            },
+            "tag": "token",
+            "text": "chol"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "26/25/27/24/23/22/20/21/17/16/15/14/8/7/6/5/4/3/2/1/10/19/9/11/12/13/18",
+              "valType": "SMILES",
+              "value": "[CH3][CH]([CH3])[CH2][CH2][CH2][C@@H]([CH3])[C@H]1[CH2][CH2][C@H]2[C@@H]3[CH2][CH2][CH]4[CH2][CH2][CH2][CH2][C@]4([CH3])[C@H]3[CH2][CH2][C@]12[CH3]"
+            },
+            "tag": "token",
+            "text": "cholest"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "26/25/27/24/28/23/22/20/21/17/16/15/14/8/7/6/5/4/3/2/1/10/19/9/11/12/13/18",
+              "valType": "SMILES",
+              "value": "[CH3][CH]([CH3])[C@@H]([CH3])[CH2][CH2][C@@H]([CH3])[C@H]1[CH2][CH2][C@H]2[C@@H]3[CH2][CH2][CH]4[CH2][CH2][CH2][CH2][C@]4([CH3])[C@H]3[CH2][CH2][C@]12[CH3]"
+            },
+            "tag": "token",
+            "text": "ergost"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "18/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9/11/12",
+              "valType": "SMILES",
+              "value": "[CH3][C@@]12[CH2][CH2][CH2][C@H]1[C@@H]1[CH2][CH2][CH]3[CH2][CH2][CH2][CH2][C@@H]3[C@H]1[CH2][CH2]2"
+            },
+            "tag": "token",
+            "text": "estr"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/20/22/UnlabelledO/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "27/25/26/24/23/22/UnlabelledO/16/15/14/8/7/6/5/4/3/2/1/10/19/9/11/12/13/18/17/20/21",
+              "valType": "SMILES",
+              "value": "[CH3][CH]([CH3])[CH2][CH2][CH]1[O][C@H]2[CH2][C@H]3[C@@H]4[CH2][CH2][CH]5[CH2][CH2][CH2][CH2][C@]5([CH3])[C@H]4[CH2][CH2][C@]3([CH3])[C@H]2[C@@H]1[CH3]"
+            },
+            "tag": "token",
+            "text": "furost"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "16/17/13/12/11/9/8/7/6/5/4/3/2/1/10/14/15",
+              "valType": "SMILES",
+              "value": "[CH2]1[CH2][C@H]2[CH2][CH2][C@H]3[C@@H]([CH2][CH2][CH]4[CH2][CH2][CH2][CH2][C@H]34)[C@@H]2[CH2]1"
+            },
+            "tag": "token",
+            "text": "gon"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "26/25/27/24/28/23/33/34/22/20/21/17/16/15/14/8/7/6/5/4/3/2/1/10/19/9/11/12/13/18",
+              "valType": "SMILES",
+              "value": "[CH3][CH]([CH3])[C@@H]([CH3])[C@@]1([CH3])[CH2][C@@H]1[C@@H]([CH3])[C@H]1[CH2][CH2][C@H]2[C@@H]3[CH2][CH2][CH]4[CH2][CH2][CH2][CH2][C@]4([CH3])[C@H]3[CH2][CH2][C@]12[CH3]"
+            },
+            "tag": "token",
+            "text": "gorgoste"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "29/28/24/23/22/20/21/17/16/15/14/8/7/6/5/4/3/2/1/10/19/9/11/12/13/18/25/26/27",
+              "valType": "SMILES",
+              "value": "[CH3][CH2][C@@H]([CH2][CH2][C@@H]([CH3])[C@H]1[CH2][CH2][C@H]2[C@@H]3[CH2][CH2][CH]4[CH2][CH2][CH2][CH2][C@]4([CH3])[C@H]3[CH2][CH2][C@]12[CH3])[CH]([CH3])[CH3]"
+            },
+            "tag": "token",
+            "text": "poriferast"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "21/20/17/16/15/14/8/7/6/5/4/3/2/1/10/19/9/11/12/13/18",
+              "valType": "SMILES",
+              "value": "[CH3][CH2][C@H]1[CH2][CH2][C@H]2[C@@H]3[CH2][CH2][CH]4[CH2][CH2][CH2][CH2][C@]4([CH3])[C@H]3[CH2][CH2][C@]12[CH3]"
+            },
+            "tag": "token",
+            "text": "pregn"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/20/22/UnlabelledO/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "21/20/17/16/15/14/8/7/6/5/4/3/2/1/10/19/9/11/12/13/18/UnlabelledO/22/23/24/25/27/26/",
+              "valType": "SMILES",
+              "value": "[CH3][C@H]1[C@H]2[C@H]([CH2][C@H]3[C@@H]4[CH2][CH2][CH]5[CH2][CH2][CH2][CH2][C@]5([CH3])[C@H]4[CH2][CH2][C@]23[CH3])[O][C@]11[CH2][CH2][CH]([CH3])[CH2][O]1"
+            },
+            "tag": "token",
+            "text": "spirost"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "29/28/24/23/22/20/21/17/16/15/14/8/7/6/5/4/3/2/1/10/19/9/11/12/13/18/25/26/27",
+              "valType": "SMILES",
+              "value": "[CH3][CH2][C@H]([CH2][CH2][C@@H]([CH3])[C@H]1[CH2][CH2][C@H]2[C@@H]3[CH2][CH2][CH]4[CH2][CH2][CH2][CH2][C@]4([CH3])[C@H]3[CH2][CH2][C@]12[CH3])[CH]([CH3])[CH3]"
+            },
+            "tag": "token",
+            "text": "stigmast"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "8/12/11/10/9",
+              "labels": "1/2/3/4/5/6/7/8/9/10/11/12/13/14/15/16/17/18/19/20",
+              "valType": "SMILES",
+              "value": "CCCCCCC[C@H]1CCC[C@@H]1CCCCCCCC"
+            },
+            "tag": "token",
+            "text": "prost"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "8/12/11a/11/10/9",
+              "labels": "1/2/3/4/5/6/7/8/9/10/11/11a/12/13/14/15/16/17/18/19/20",
+              "valType": "SMILES",
+              "value": "CCCCCCC[C@H]1CCCO[C@@H]1CCCCCCCC"
+            },
+            "tag": "token",
+            "text": "thrombox"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "biochemical",
+          "symbol": "G",
+          "tagname": "group",
+          "type": "ring"
+        },
+        "children": [
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "18/13/12/11/9/8/7/6/5/4/3/2/1/10/19/14/15/16/17/20/22/23/24///21",
+              "valType": "SMILES",
+              "value": "[CH3][C@]12[CH2][CH2][C@H]3[C@@H]([CH2][CH2][CH]4[CH2][CH2][CH2][CH2][C@]34[CH3])[C@H]1[CH2][CH2][C@@H]2[C@H]1[CH2][CH2][C](=[O])[O][CH2]1"
+            },
+            "tag": "token",
+            "text": "bufanolide"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "18/13/12/11/9/8/7/6/5/4/3/2/1/10/19/14/15/16/17/20/21//23//22",
+              "valType": "SMILES",
+              "value": "[CH3][C@]12[CH2][CH2][C@H]3[C@@H]([CH2][CH2][CH]4[CH2][CH2][CH2][CH2][C@]34[CH3])[C@H]1[CH2][CH2][C@@H]2[C@@H]1[CH2][O][C](=[O])[CH2]1"
+            },
+            "tag": "token",
+            "text": "cardanolide"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "11/12/13/17/16/15/14/8/7/6/5/4/3/2/1/10/9",
+              "labels": "26/25/27/24/23/22/20/21/17/16/15/14/8/7/6/5/4/3//2/1/10/19/9/11/12/13/18",
+              "valType": "SMILES",
+              "value": "[CH3][CH]([CH3])[CH2][CH2][CH2][C@@H]([CH3])[C@H]1[CH2][CH2][C@H]2[C@@H]3[CH2][CH]=C4[CH2][C@@H](O)[CH2][CH2][C@]4([CH3])[C@H]3[CH2][CH2][C@]12[CH3]"
+            },
+            "tag": "token",
+            "text": "cholesterol"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "biochemical",
+          "symbol": "z",
+          "tagname": "group",
+          "type": "ring"
+        },
+        "children": [
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "1/2/3/3a/4/5/6/6a/7/7a/8/9/10/11/11a/11b",
+              "labels": "1/2/3/3a/4/5/6/12/6a/7/7a/8/9/10/11/11a/11b/11c",
+              "valType": "SMILES",
+              "value": "c1ccc2CCN(C)C3Cc4ccccc4c1c23"
+            },
+            "tag": "token",
+            "text": "aporphin"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "1/2/3/4/4a/5/6/7/8/8a/9/10/11/12/12a/13/13a/13b",
+              "labels": "1/2/3/4/4a/5/6/7/8/8a/9/10/11/12/12a/13/13a/13b",
+              "valType": "SMILES",
+              "value": "c1cccc2CCN3Cc4ccccc4CC3c12"
+            },
+            "tag": "token",
+            "text": "berbin"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "1/15/14/13/12/11/10/9/8/7/6/5/4/3/2",
+              "labels": "8/7/6/5/4/3/2/1/15/14/13/12/11/10/9/16",
+              "valType": "SMILES",
+              "value": "C1CN[C@@H]2Cc3c[nH]c4cccc([C@H]2C1)c34"
+            },
+            "tag": "token",
+            "text": "ergolin"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "1/2/3/4/5/8/7/6",
+              "labels": "1/2/3/4/5/6/7/8/",
+              "valType": "SMILES",
+              "value": "S1CCCN2[C@H]1CC2=O"
+            },
+            "tag": "token",
+            "text": "cepham"
+          },
+          {
+            "attributes": {
+              "alphaBetaClockWiseAtomOrdering": "1/2/3/4/7/6/5",
+              "labels": "1/2/3/4/5/6/7/",
+              "valType": "SMILES",
+              "value": "S1CCN2[C@H]1CC2=O"
+            },
+            "tag": "token",
+            "text": "penam"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "naturalProducts.xml"
+}

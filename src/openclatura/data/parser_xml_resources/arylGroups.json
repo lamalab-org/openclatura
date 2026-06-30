@@ -1,0 +1,3037 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "subType": "arylGroup",
+          "symbol": "z",
+          "tagname": "group",
+          "type": "ring"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "1/2/2a/3/4/5/5a/6/6a/7/8/9/10/10a/10b/10c",
+              "valType": "SMILES",
+              "value": "C1Cc2cccc3cc4ccccc4c1c23"
+            },
+            "tag": "token",
+            "text": "aceanthren"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "aceanthrylene"
+            },
+            "tag": "token",
+            "text": "aceanthrylen"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "acenaphthylene"
+            },
+            "tag": "token",
+            "text": "acenaphthylen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/2a/3/4/5/5a/6/7/8/8a/8b",
+              "valType": "SMILES",
+              "value": "C1Cc2cccc3cccc1c23"
+            },
+            "tag": "token",
+            "text": "acenaphthen"
+          },
+          {
+            "attributes": {
+              "addGroup": "=O locant1;=O locant2",
+              "frontLocantsExpected": "1,2,3,4,5,6,7,8",
+              "labels": "1/2/2a/3/4/5/5a/6/7/8/8a/8b",
+              "valType": "SMILES",
+              "value": "c1cc2cccc3cccc1c23"
+            },
+            "tag": "token",
+            "text": "acenaphthoquinon"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/4/5/5a/6/6a/7/8/9/10/10a/10b/10c",
+              "valType": "SMILES",
+              "value": "c1ccc2CCc3cc4ccccc4c1c23"
+            },
+            "tag": "token",
+            "text": "acephenanthren"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "acephenanthrylene"
+            },
+            "tag": "token",
+            "text": "acephenanthrylen"
+          },
+          {
+            "attributes": {
+              "fusedRingNumbering": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "labels": "1/2/3/4/4a/10/10a/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1cccc2Nc3ccccc3Cc12"
+            },
+            "tag": "token",
+            "text": "acridan"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2[as]c3ccccc3cc12"
+            },
+            "tag": "token",
+            "text": "acridarsin"
+          },
+          {
+            "attributes": {
+              "fusedRingNumbering": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "labels": "1/2/3/4/4a/10/10a/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1cccc2nc3ccccc3cc12"
+            },
+            "tag": "token",
+            "text": "acridin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2pc3ccccc3cc12"
+            },
+            "tag": "token",
+            "text": "acridophosphin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/4b/5/6/6a/7/7a/8/9/10/11/11a/12/12a/12b/13/13a",
+              "valType": "SMILES",
+              "value": "c1cccc2c3ccc4cc5ccccc5nc4c3nc12"
+            },
+            "tag": "token",
+            "text": "acrindolin"
+          },
+          {
+            "attributes": {
+              "labels": "/////1/2/3//4//5/6",
+              "valType": "SMILES",
+              "value": "CNCC(O)c1cc(O)c(O)cc1"
+            },
+            "tag": "token",
+            "text": "adrenalin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3/4//5//6/",
+              "valType": "SMILES",
+              "value": "N1C(=O)NC(=O)C(=O)C(=O)1"
+            },
+            "tag": "token",
+            "text": "alloxan"
+          },
+          {
+            "attributes": {
+              "labels": "////1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "NC(C)Cc1ccccc1"
+            },
+            "tag": "token",
+            "text": "amphetamin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para////5/6//alpha",
+              "valType": "SMILES",
+              "value": "c1(ccc(C=CC)cc1)OC"
+            },
+            "tag": "token",
+            "text": "anethol"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "Nc1ccccc1"
+            },
+            "tag": "token",
+            "text": "anilin"
+          },
+          {
+            "attributes": {
+              "addGroup": "N locant4",
+              "frontLocantsExpected": "2,ortho,3,meta,4,para,5,6",
+              "labels": "alpha//1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "COc1ccccc1"
+            },
+            "tag": "token",
+            "text": "anisidin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6//alpha",
+              "valType": "SMILES",
+              "value": "c1(ccccc1)OC"
+            },
+            "tag": "token",
+            "text": "anisol"
+          },
+          {
+            "attributes": {
+              "fusedRingNumbering": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10",
+              "labels": "1/2/3/4/4a/10/10a/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1cccc2cc3ccccc3cc12"
+            },
+            "tag": "token",
+            "text": "anthracen"
+          },
+          {
+            "attributes": {
+              "addGroup": "=O locant9;=O locant10",
+              "frontLocantsExpected": "1,2,3,4,5,6,7,8,9,10",
+              "labels": "1/2/3/4/4a/10/10a/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1cccc2cc3ccccc3cc12"
+            },
+            "tag": "token",
+            "text": "anthraquinon"
+          },
+          {
+            "attributes": {
+              "addGroup": "=O locant1;=O locant4;=O locant9;=O locant10",
+              "frontLocantsExpected": "1,2,3,4,5,6,7,8,9,10",
+              "labels": "1/2/3/4/4a/10/10a/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1cccc2cc3ccccc3cc12"
+            },
+            "tag": "token",
+            "text": "anthradiquinon"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/5b/6/6a/7/8/8a/9/9a/10/11/12/13/13a/14/14a/14b/15/15a/16/17/17a/18/18a",
+              "valType": "SMILES",
+              "value": "c1cccc2cc3c4nc5ccc6cc7ccccc7cc6c5nc4ccc3cc12"
+            },
+            "tag": "token",
+            "text": "anthrazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "n1cccc2cc3cccnc3nc12"
+            },
+            "tag": "token",
+            "text": "anthyridin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2[as]c3ccccc3[as]c12"
+            },
+            "tag": "token",
+            "text": "arsanthren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/6a/7/8/9/10/10a/10b",
+              "valType": "SMILES",
+              "value": "c1cccc2[as]cc3ccccc3c12"
+            },
+            "tag": "token",
+            "text": "arsanthridin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/4/5/6/7/7a",
+              "valType": "SMILES",
+              "value": "[asH]1ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "arsindol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "[as]1cccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "arsindolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "c1cc[as]2ccccc12"
+            },
+            "tag": "token",
+            "text": "arsindolizin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "[as]1cccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "arsinolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/8/9/9a",
+              "valType": "SMILES",
+              "value": "c1cc[cH2][as]2ccccc12"
+            },
+            "tag": "token",
+            "text": "arsinolizin"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "as-indacene"
+            },
+            "tag": "token",
+            "text": "as-indacen"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "azulene"
+            },
+            "tag": "token",
+            "text": "azulen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/4/5/6/6a/7//7a/8/9/10/11/11a/11b/11c",
+              "valType": "SMILES",
+              "value": "c1ccc2cccc3c(=O)c4ccccc4c1c23"
+            },
+            "tag": "token",
+            "text": "benzanthron"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4//5/6/1'/2'/3'/4'//5'/6'",
+              "valType": "SMILES",
+              "value": "c1(ccc(N)cc1)c2ccc(N)cc2"
+            },
+            "tag": "token",
+            "text": "benzidin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4//5/6/1'/2'/3'/4'//5'/6'",
+              "valType": "SMILES",
+              "value": "c1(ccc(N)cc1)c2ccc(N)cc2"
+            },
+            "tag": "token",
+            "text": "4,4'-benzidin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "c1ccccc1"
+            },
+            "tag": "token",
+            "text": "benzen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6///alpha//1'/2'/3'/4'/5'/6'",
+              "valType": "SMILES",
+              "value": "c1(ccccc1)C(=O)C(O)c2ccccc2"
+            },
+            "tag": "token",
+            "text": "benzoin"
+          },
+          {
+            "attributes": {
+              "addGroup": "=O locant1;=O locant4",
+              "frontLocantsExpected": "1,2,ortho,3,meta,4,para,5,6",
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "c1ccccc1"
+            },
+            "tag": "token",
+            "text": "benzoquinon"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "C1#CC=CC=C1"
+            },
+            "tag": "token",
+            "text": "benzyn"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/4b/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1nccc2c3ccccc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "betacarbolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/4b/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1nccc2c3ccccc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "beta-carbolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/4b/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1nccc2c3ccccc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "b-carbolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/alpha/alpha'/1'/2'/3'/4'/5'/6'",
+              "valType": "SMILES",
+              "value": "c1(ccccc1)CCc2ccccc2"
+            },
+            "tag": "token",
+            "text": "bibenzyl"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "C1=CC=CC=2B=C3C=CC=CC3=BC12"
+            },
+            "tag": "token",
+            "text": "boranthren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/8/9/10/",
+              "valType": "SMILES",
+              "value": "C123C4CC5CC1.C25(C)C.C3.O4"
+            },
+            "tag": "token",
+            "text": "borneol"
+          },
+          {
+            "attributes": {
+              "labels": "1//2//3//4/9/8/7//5/6/",
+              "valType": "SMILES",
+              "value": "N1(C)c(=O)N(C)c2ncN(C)c2c1=O"
+            },
+            "tag": "token",
+            "text": "caffein"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/4b/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1cccc2c3ccccc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "carbazol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2///3//4/5/6/7",
+              "valType": "SMILES",
+              "value": "C12C(C)(C)C(=C)C(CC2)C1"
+            },
+            "tag": "token",
+            "text": "camphen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3//4/5/6/7/8/9/10",
+              "valType": "SMILES",
+              "value": "C123C(=O)C(=O)C4CC1.C24(C)C.C3"
+            },
+            "tag": "token",
+            "text": "camphorquinon"
+          },
+          {
+            "attributes": {
+              "defaultInLocant": "3",
+              "labels": "1//2,ortho//3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "c1(O)c(O)cccc1"
+            },
+            "tag": "token",
+            "text": "catechol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/////1'/2'/3'/4'/5'/6'",
+              "valType": "SMILES",
+              "value": "c1(ccccc1)C=CC(=O)c2ccccc2"
+            },
+            "tag": "token",
+            "text": "chalcon"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/2a/3/4/5/5a/6/6a/6b/7/8/9/10/10a/11/12/12a/12b/12c",
+              "valType": "SMILES",
+              "value": "C1Cc2cccc3cc4c5ccccc5ccc4c1c23"
+            },
+            "tag": "token",
+            "text": "cholanthren"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "chromane"
+            },
+            "tag": "token",
+            "text": "chroman"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "S1CCCc2ccccc12"
+            },
+            "tag": "token",
+            "text": "thiochroman"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "[Se]1CCCc2ccccc12"
+            },
+            "tag": "token",
+            "text": "selenochroman"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "[Te]1CCCc2ccccc12"
+            },
+            "tag": "token",
+            "text": "tellurochroman"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "o1[cH2]ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "chromen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "s1[cH2]ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "thiochromen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "[se]1[cH2]ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "selenochromen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "[te]1[cH2]ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "tellurochromen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "[o+]1cccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "chromenylium"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "[s+]1cccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "thiochromenylium"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "[se+]1cccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "selenochromenylium"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "[te+]1cccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "tellurochromenylium"
+          },
+          {
+            "attributes": {
+              "addGroup": "=O locant4",
+              "frontLocantsExpected": "2,3,4,5,6,7,8",
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "o1[cH2]ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "chromon"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "chrysene"
+            },
+            "tag": "token",
+            "text": "chrysen"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "cinnoline"
+            },
+            "tag": "token",
+            "text": "cinnolin"
+          },
+          {
+            "attributes": {
+              "addGroup": "C locant2;C locant4;C locant6",
+              "frontLocantsExpected": "2,3,4,5,6",
+              "labels": "1/2/3/4/5/6",
+              "valType": "SMILES",
+              "value": "n1ccccc1"
+            },
+            "tag": "token",
+            "text": "collidin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "o1c(=O)ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "coumarin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/2a/3/4/4a/5/6/6a/7/8/8a/9/10/10a/11/12/12a/12b/12c/12d/12e/12f/12g",
+              "valType": "SMILES",
+              "value": "c1cc2ccc3ccc4ccc5ccc6ccc71.c28c3c4c5c6c78"
+            },
+            "tag": "token",
+            "text": "coronen"
+          },
+          {
+            "attributes": {
+              "addGroup": "C locant2 alpha",
+              "frontLocantsExpected": "2,ortho,3,meta,4,para,5,6",
+              "labels": "2,ortho/3,meta/4,para/5/6/1/",
+              "valType": "SMILES",
+              "value": "c1ccccc1O"
+            },
+            "tag": "token",
+            "text": "cresol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6///",
+              "valType": "SMILES",
+              "value": "c12ccccc1.C2(C)C"
+            },
+            "tag": "token",
+            "text": "cumen"
+          },
+          {
+            "attributes": {
+              "addGroup": "C locant4 alpha",
+              "frontLocantsExpected": "2,ortho,3,meta,4,para,5,6",
+              "labels": "1/2,ortho/3,meta/4,para/5/6///",
+              "valType": "SMILES",
+              "value": "c12ccccc1.C2(C)C"
+            },
+            "tag": "token",
+            "text": "cymen"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "cyclopenta[a]phenanthrene"
+            },
+            "tag": "token",
+            "text": "cyclopenta[a]phenanthren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "C1CCCC2CCCCC12"
+            },
+            "tag": "token",
+            "text": "decalin"
+          },
+          {
+            "attributes": {
+              "labels": "///1/2/3//4//5/6",
+              "valType": "SMILES",
+              "value": "NCCc1cc(O)c(O)cc1"
+            },
+            "tag": "token",
+            "text": "dopamin"
+          },
+          {
+            "attributes": {
+              "labels": "1//2//3/4//5//6",
+              "suffixAppliesToByDefault": "5",
+              "valType": "SMILES",
+              "value": "c1(C)c(C)cc(C)c(C)c1"
+            },
+            "tag": "token",
+            "text": "duren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho//3,meta/4,para/5////6//alpha",
+              "valType": "SMILES",
+              "value": "c1(c(O)ccc(CC=C)c1)OC"
+            },
+            "tag": "token",
+            "text": "eugenol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a,10/5/6/7/8/8a,9/1'/2'/3'/4'/5'/6'",
+              "valType": "SMILES",
+              "value": "[o+]1c(ccc2ccccc12)c3ccccc3"
+            },
+            "tag": "token",
+            "text": "flavylium"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "fluoranthene"
+            },
+            "tag": "token",
+            "text": "fluoranthen"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "fluorene"
+            },
+            "tag": "token",
+            "text": "fluoren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6",
+              "valType": "SMILES",
+              "value": "C1=CC=CC1=C"
+            },
+            "tag": "token",
+            "text": "fulven"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5",
+              "valType": "SMILES",
+              "value": "o1cccc1"
+            },
+            "tag": "token",
+            "text": "furan"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5",
+              "valType": "SMILES",
+              "value": "o1nccn1"
+            },
+            "tag": "token",
+            "text": "furazan"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho//3,meta/4,para/5/6//alpha",
+              "valType": "SMILES",
+              "value": "c1(c(O)cccc1)OC"
+            },
+            "tag": "token",
+            "text": "guaiacol"
+          },
+          {
+            "attributes": {
+              "labels": "1//2/3/4/4a/4b/5/6/7///8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1(C)nCCc2c3ccc(OC)cc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "harmalin"
+          },
+          {
+            "attributes": {
+              "labels": "1//2/3/4/4a/4b/5/6/7//8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1(C)nCCc2c3ccc(O)cc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "harmalol"
+          },
+          {
+            "attributes": {
+              "labels": "1//2/3/4/4a/4b/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1(C)nCCc2c3ccccc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "harman"
+          },
+          {
+            "attributes": {
+              "labels": "1////2/3/4/4a/4b/5/6/7///8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1(C(=O)N)nccc2c3ccc(OC)cc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "harmanamid"
+          },
+          {
+            "attributes": {
+              "labels": "1//2/3/4/4a/4b/5/6/7///8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1(C)nccc2c3ccc(OC)cc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "harmin"
+          },
+          {
+            "attributes": {
+              "labels": "1//2//3//4/5/6",
+              "valType": "SMILES",
+              "value": "c1(C)c(C)c(C)ccc1"
+            },
+            "tag": "token",
+            "text": "hemimelliten"
+          },
+          {
+            "attributes": {
+              "labels": "/alpha/beta/4/5/1,tele,tau/2/3,pros,pi",
+              "valType": "SMILES",
+              "value": "NCCc1c[nH]cn1"
+            },
+            "tag": "token",
+            "text": "histamin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7",
+              "valType": "SMILES",
+              "value": "N1CCNCCC1"
+            },
+            "tag": "token",
+            "text": "homopiperazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7",
+              "valType": "SMILES",
+              "value": "N1CCCCCC1"
+            },
+            "tag": "token",
+            "text": "homopiperidin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3/4//5",
+              "valType": "SMILES",
+              "value": "N1C(=O)NC(=O)C1"
+            },
+            "tag": "token",
+            "text": "hydantoin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/////1'/2'/3'/4'/5'/6'",
+              "valType": "SMILES",
+              "value": "c1(ccccc1)C(O)C(O)c2ccccc2"
+            },
+            "tag": "token",
+            "text": "hydrobenzoin"
+          },
+          {
+            "attributes": {
+              "defaultInLocant": "2",
+              "labels": "1//2,ortho/3,meta/4,para//5/6",
+              "valType": "SMILES",
+              "value": "c1(O)ccc(O)cc1"
+            },
+            "tag": "token",
+            "text": "hydroquinon"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "imidazole"
+            },
+            "tag": "token",
+            "text": "imidazol"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "imidazolidine"
+            },
+            "tag": "token",
+            "text": "imidazolidin"
+          },
+          {
+            "attributes": {
+              "addBond": "2 locant2",
+              "frontLocantsExpected": "1,2,3,4,5",
+              "valType": "SMILES",
+              "value": "N1CNCC1"
+            },
+            "tag": "token",
+            "text": "imidazolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/4/5/6/7/7a",
+              "valType": "SMILES",
+              "value": "C1CCc2ccccc12"
+            },
+            "tag": "token",
+            "text": "indan"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "indazole"
+            },
+            "tag": "token",
+            "text": "indazol"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "indene"
+            },
+            "tag": "token",
+            "text": "inden"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "indole"
+            },
+            "tag": "token",
+            "text": "indol"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "indoline"
+            },
+            "tag": "token",
+            "text": "indolin"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "indolizine"
+            },
+            "tag": "token",
+            "text": "indolizin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3//3a/4/5/6/7/7a",
+              "valType": "SMILES",
+              "value": "N1C(=O)C(=O)c2ccccc12"
+            },
+            "tag": "token",
+            "text": "isatin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/4/5/6/7/7a",
+              "valType": "SMILES",
+              "value": "c1[asH]cc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isoarsindol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "c1[as]ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isoarsinolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/4/5/6/7/7a",
+              "valType": "SMILES",
+              "value": "c1occ2ccccc12"
+            },
+            "tag": "token",
+            "text": "isobenzofuran"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "isochromane"
+            },
+            "tag": "token",
+            "text": "isochroman"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "C1SCCc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isothiochroman"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "C1[Se]CCc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isoselenochroman"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "C1[Te]CCc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isotellurochroman"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "[cH2]1occc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isochromen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "[cH2]1sccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isothiochromen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "[cH2]1[se]ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isoselenochromen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "[cH2]1[te]ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isotellurochromen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "c1[o+]ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isochromenylium"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "c1[s+]ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isothiochromenylium"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "c1[se+]ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isoselenochromenylium"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "c1[te+]ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isotellurochromenylium"
+          },
+          {
+            "attributes": {
+              "labels": "1//2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "c1(=O)occc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isocoumarin"
+          },
+          {
+            "attributes": {
+              "labels": "1//2//3//4/5//6",
+              "suffixAppliesToByDefault": "7",
+              "valType": "SMILES",
+              "value": "c1(C)c(C)c(C)cc(C)c1"
+            },
+            "tag": "token",
+            "text": "isoduren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3/4/9/8/7/5/6/",
+              "valType": "SMILES",
+              "value": "[nH]1c(=O)nc2nc[nH]c2c1N"
+            },
+            "tag": "token",
+            "text": "isoguanin"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "isoindole"
+            },
+            "tag": "token",
+            "text": "isoindol"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "isoindoline"
+            },
+            "tag": "token",
+            "text": "isoindolin"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "isoquinoline"
+            },
+            "tag": "token",
+            "text": "isoquinolin"
+          },
+          {
+            "attributes": {
+              "addGroup": "=O locant1",
+              "frontLocantsExpected": "1,3,4,5,6,7,8",
+              "valType": "dbkey",
+              "value": "isoquinoline"
+            },
+            "tag": "token",
+            "text": "isoquinolon"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/4/5/6/7/7a",
+              "valType": "SMILES",
+              "value": "c1[pH]cc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isophosphindol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "c1pccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "isophosphinolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/4/5/1'/2'/3'/6/7/7a",
+              "valType": "SMILES",
+              "value": "O1COc2cc(C=CC)ccc12"
+            },
+            "tag": "token",
+            "text": "isosafrol"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[se]1nccc1"
+            },
+            "tag": "token",
+            "text": "isoselenazol"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Se]1NCCC1"
+            },
+            "tag": "token",
+            "text": "isoselenazolidin"
+          },
+          {
+            "attributes": {
+              "addBond": "2 locant2",
+              "frontLocantsExpected": "1,2,3,4,5",
+              "valType": "SMILES",
+              "value": "[Se]1NCCC1"
+            },
+            "tag": "token",
+            "text": "isoselenazolin"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[te]1nccc1"
+            },
+            "tag": "token",
+            "text": "isotellurazol"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Te]1NCCC1"
+            },
+            "tag": "token",
+            "text": "isotellurazolidin"
+          },
+          {
+            "attributes": {
+              "addBond": "2 locant2",
+              "frontLocantsExpected": "1,2,3,4,5",
+              "valType": "SMILES",
+              "value": "[Te]1NCCC1"
+            },
+            "tag": "token",
+            "text": "isotellurazolin"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "s1nccc1"
+            },
+            "tag": "token",
+            "text": "isothiazol"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "S1NCCC1"
+            },
+            "tag": "token",
+            "text": "isothiazolidin"
+          },
+          {
+            "attributes": {
+              "addBond": "2 locant2",
+              "frontLocantsExpected": "1,2,3,4,5",
+              "valType": "SMILES",
+              "value": "S1NCCC1"
+            },
+            "tag": "token",
+            "text": "isothiazolin"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "o1nccc1"
+            },
+            "tag": "token",
+            "text": "isoxazol"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "o1nccc1"
+            },
+            "tag": "token",
+            "text": "isooxazol"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "O1NCCC1"
+            },
+            "tag": "token",
+            "text": "isoxazolidin"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "O1NCCC1"
+            },
+            "tag": "token",
+            "text": "isooxazolidin"
+          },
+          {
+            "attributes": {
+              "addBond": "2 locant2",
+              "frontLocantsExpected": "1,2,3,4,5",
+              "valType": "SMILES",
+              "value": "O1NCCC1"
+            },
+            "tag": "token",
+            "text": "isoxazolin"
+          },
+          {
+            "attributes": {
+              "addBond": "2 locant2",
+              "frontLocantsExpected": "1,2,3,4,5",
+              "valType": "SMILES",
+              "value": "O1NCCC1"
+            },
+            "tag": "token",
+            "text": "isooxazolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/4b/5/6/6a/6b/7/8/8a/9/9a/10/11/12/13/13a/13b/14/15/15a/15b/16/17/17a/18/18a/18b/18c/18d/18e",
+              "valType": "SMILES",
+              "value": "c1cccc2c3ccc4c5ccc6Cc7ccccc7c8ccc9c%10ccc%11Cc12.c3%11c4%10.c59c68"
+            },
+            "tag": "token",
+            "text": "isoviolanthren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4//4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "n1ccc(C)c2ccccc12"
+            },
+            "tag": "token",
+            "text": "lepidin"
+          },
+          {
+            "attributes": {
+              "addGroup": "C locant2;C locant6",
+              "frontLocantsExpected": "1,2,3,4,5,6",
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "N1CCCCC1"
+            },
+            "tag": "token",
+            "text": "lupetidin"
+          },
+          {
+            "attributes": {
+              "addGroup": "C locant2;C locant6",
+              "frontLocantsExpected": "2,3,4,5,6",
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "n1ccccc1"
+            },
+            "tag": "token",
+            "text": "lutidin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6/7/8/9/10/",
+              "valType": "SMILES",
+              "value": "C12CC3C4CC1.C2.C4(C)C.O3"
+            },
+            "tag": "token",
+            "text": "menthol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2[Hg]c3ccccc3[Hg]c12"
+            },
+            "tag": "token",
+            "text": "mercuranthren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6///",
+              "valType": "SMILES",
+              "value": "c12cc3cc4c1.C2.C3.C4"
+            },
+            "tag": "token",
+            "text": "mesitylen"
+          },
+          {
+            "attributes": {
+              "labels": "1//2//3//4//5//6/",
+              "valType": "SMILES",
+              "value": "c1(C)c(C)c(C)c(C)c(C)c1C"
+            },
+            "tag": "token",
+            "text": "melliten"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "O1CCNCC1"
+            },
+            "tag": "token",
+            "text": "morpholin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "S1CCNCC1"
+            },
+            "tag": "token",
+            "text": "thiomorpholin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "[Se]1CCNCC1"
+            },
+            "tag": "token",
+            "text": "selenomorpholin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "[Te]1CCNCC1"
+            },
+            "tag": "token",
+            "text": "telluromorpholin"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "naphthacene"
+            },
+            "tag": "token",
+            "text": "naphthacen"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "naphthalene"
+            },
+            "tag": "token",
+            "text": "naphthalen"
+          },
+          {
+            "attributes": {
+              "addGroup": "=O locant1;=O locant4",
+              "frontLocantsExpected": "1,2,3,4,5,6,7,8",
+              "valType": "dbkey",
+              "value": "naphthalene"
+            },
+            "tag": "token",
+            "text": "naphthoquinon"
+          },
+          {
+            "attributes": {
+              "addGroup": "=O locant1;=O locant4;=O locant5;=O locant8",
+              "frontLocantsExpected": "1,2,3,4,5,6,7,8",
+              "valType": "dbkey",
+              "value": "naphthalene"
+            },
+            "tag": "token",
+            "text": "naphthodiquinon"
+          },
+          {
+            "attributes": {
+              "addHeteroAtom": "N locant1;N locant8",
+              "frontLocantsExpected": "1,2,3,4,4a,5,6,7,8,8a",
+              "valType": "dbkey",
+              "value": "naphthalene"
+            },
+            "tag": "token",
+            "text": "naphthyridin"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "C12C=CC(CC2)C1"
+            },
+            "tag": "token",
+            "text": "norbornen"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "C12C=CC(CC2)C1"
+            },
+            "tag": "token",
+            "text": "norcamphen"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "C12C=CC(CC2)C1"
+            },
+            "tag": "token",
+            "text": "norbornylen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/4b/5/6/7///8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1nccc2c3ccc(OC)cc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "norharmin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/2a/3/4/4a/5/6/6a/7/7a/8/9/9a/10/11/11a/12/13/13a/14/14a/14b/14c/14d/14e/14f/14g/14h/14i/14j/14k",
+              "valType": "SMILES",
+              "value": "c1cc2ccc3ccc4cc5ccc6ccc7ccc8cc91.c19c2c3c4c9c5c6c7c8c19"
+            },
+            "tag": "token",
+            "text": "ovalen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2oc3ccccc3oc12"
+            },
+            "tag": "token",
+            "text": "oxanthren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3/3a/4/5/6/7/7a",
+              "valType": "SMILES",
+              "value": "N1C(=O)Cc2ccccc12"
+            },
+            "tag": "token",
+            "text": "oxindol"
+          },
+          {
+            "attributes": {
+              "labels": "////1/2,ortho/3,meta/4,para//5/6",
+              "valType": "SMILES",
+              "value": "N(C(=O)C)c1ccc(O)cc1"
+            },
+            "tag": "token",
+            "text": "paracetamol"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "perimidine"
+            },
+            "tag": "token",
+            "text": "perimidin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/4/5/6/6a/6b/7/8/9/9a/10/11/12/12a/12b/12c/12d",
+              "valType": "SMILES",
+              "value": "c1ccc2cccc3c4cccc5cccc6c71.c237.c456"
+            },
+            "tag": "token",
+            "text": "perylen"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "phenalene"
+            },
+            "tag": "token",
+            "text": "phenalen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/4b/5/6/7/8/8a/8b/9/9a/9b/10/11/12/13/13a/13b/14/15/16/17/17a/17b/18/18a/18b",
+              "valType": "SMILES",
+              "value": "c1cccc2c3ccccc3c4nc5c6ccccc6c7ccccc7c5nc4c12"
+            },
+            "tag": "token",
+            "text": "phenanthrazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/4b/5/6/7/8/8a/9/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2c3ccccc3ccc12"
+            },
+            "tag": "token",
+            "text": "phenanthren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/6a/7/8/9/10/10a/10b",
+              "valType": "SMILES",
+              "value": "c1cccc2ncc3ccccc3c12"
+            },
+            "tag": "token",
+            "text": "phenanthridin"
+          },
+          {
+            "attributes": {
+              "addHeteroAtom": "N locant1;N locant7",
+              "frontLocantsExpected": "1,2,3,4,4a,5,6,6a,7,8,9,10,10a,10b",
+              "labels": "1/2/3/4/4a/5/6/6a/7/8/9/10/10a/10b",
+              "valType": "SMILES",
+              "value": "c1cccc2ccc3ccccc3c12"
+            },
+            "tag": "token",
+            "text": "phenanthrolin"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "phenarsazine"
+            },
+            "tag": "token",
+            "text": "phenarsazin"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "phenazine"
+            },
+            "tag": "token",
+            "text": "phenazin"
+          },
+          {
+            "attributes": {
+              "addGroup": "N locant4",
+              "frontLocantsExpected": "2,ortho,3,meta,4,para,5,6",
+              "labels": "beta/alpha//1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "CCOc1ccccc1"
+            },
+            "tag": "token",
+            "text": "phenetidin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6//alpha/beta",
+              "valType": "SMILES",
+              "value": "c1(ccccc1)OCC"
+            },
+            "tag": "token",
+            "text": "phenetol"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "[O-]c1ccccc1"
+            },
+            "tag": "token",
+            "text": "phenoxid"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "[O+]c1ccccc1"
+            },
+            "tag": "token",
+            "text": "phenoxylium"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2[Hg]c3ccccc3[Hg]c12"
+            },
+            "tag": "token",
+            "text": "phenomercurin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2oc3ccccc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "phenoxazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2sc3ccccc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "phenothiazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2[se]c3ccccc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "phenoselenazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2[te]c3ccccc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "phenotellurazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2nc3ccccc3pc12"
+            },
+            "tag": "token",
+            "text": "phenophosphazinin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2nc3ccccc3pc12"
+            },
+            "tag": "token",
+            "text": "phenophosphazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2nc3ccccc3[as]c12"
+            },
+            "tag": "token",
+            "text": "phenarsazinin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2nc3ccccc3[as]c12"
+            },
+            "tag": "token",
+            "text": "phenoarsazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2[nH]c3ccccc3[Hg]c12"
+            },
+            "tag": "token",
+            "text": "phenomercurazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2[nH]c3ccccc3[Hg]c12"
+            },
+            "tag": "token",
+            "text": "phenomercazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2oc3ccccc3sc12"
+            },
+            "tag": "token",
+            "text": "phenoxathiin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2oc3ccccc3[se]c12"
+            },
+            "tag": "token",
+            "text": "phenoxaselenin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2oc3ccccc3[te]c12"
+            },
+            "tag": "token",
+            "text": "phenoxatellurin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2oc3ccccc3[pH]c12"
+            },
+            "tag": "token",
+            "text": "phenoxaphosphinin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2oc3ccccc3[pH]c12"
+            },
+            "tag": "token",
+            "text": "phenoxaphosphin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2oc3ccccc3[asH]c12"
+            },
+            "tag": "token",
+            "text": "phenoxarsinin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2oc3ccccc3[asH]c12"
+            },
+            "tag": "token",
+            "text": "phenoxarsin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2oc3ccccc3[sbH]c12"
+            },
+            "tag": "token",
+            "text": "phenoxastibinin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2oc3ccccc3[sbH]c12"
+            },
+            "tag": "token",
+            "text": "phenoxantimonin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2sc3ccccc3[asH]c12"
+            },
+            "tag": "token",
+            "text": "phenothiarsinin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2sc3ccccc3[asH]c12"
+            },
+            "tag": "token",
+            "text": "phenothiarsin"
+          },
+          {
+            "attributes": {
+              "labels": "1//2,ortho/3,meta//4,para/5//6",
+              "valType": "SMILES",
+              "value": "c1(O)cc(O)cc(O)c1"
+            },
+            "tag": "token",
+            "text": "phloroglucinol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2pc3ccccc3pc12"
+            },
+            "tag": "token",
+            "text": "phosphanthren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/6a/7/8/9/10/10a/10b",
+              "valType": "SMILES",
+              "value": "c1cccc2pcc3ccccc3c12"
+            },
+            "tag": "token",
+            "text": "phosphanthridin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/4/5/6/7/7a",
+              "valType": "SMILES",
+              "value": "[pH]1ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "phosphindol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "c1ccp2ccccc12"
+            },
+            "tag": "token",
+            "text": "phosphindolizin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "p1cccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "phosphinolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/8/9/9a",
+              "valType": "SMILES",
+              "value": "c1cc[cH2]p2ccccc12"
+            },
+            "tag": "token",
+            "text": "phosphinolizin"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "phthalazine"
+            },
+            "tag": "token",
+            "text": "phthalazin"
+          },
+          {
+            "attributes": {
+              "labels": "1//2/3/3a/4/5/6/7/7a",
+              "valType": "SMILES",
+              "value": "C1(=O)OCc2ccccc12"
+            },
+            "tag": "token",
+            "text": "phthalid"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/4/5/6/6a/7/7a/7b/8/9/10/11/11a/12/13/13a/13b",
+              "valType": "SMILES",
+              "value": "c1ccc2cccc3nc4c5ccccc5cn4c1c23"
+            },
+            "tag": "token",
+            "text": "phthaloperin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/4b/5/6///7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "C1NCCc2c3cc(OC)ccc3[nH]c12"
+            },
+            "tag": "token",
+            "text": "pinolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "N1CCNCC1"
+            },
+            "tag": "token",
+            "text": "piperazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "N1CCCCC1"
+            },
+            "tag": "token",
+            "text": "piperidin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/6a/6b/7/8/8a/9/10/11/12/12a/12b/13/14/14a/14b",
+              "valType": "SMILES",
+              "value": "c1cccc2ccc3c4ccc5ccccc5c4ccc3c21"
+            },
+            "tag": "token",
+            "text": "picen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/4/5/6/6a/7/7a/8/9/10/11/11a/12/12a/12b",
+              "valType": "SMILES",
+              "value": "c1ccc2cccc3cc4ccccc4cc51.c235"
+            },
+            "tag": "token",
+            "text": "pleiaden"
+          },
+          {
+            "attributes": {
+              "labels": "1//2//3//4//5/6",
+              "suffixAppliesToByDefault": "9",
+              "valType": "SMILES",
+              "value": "c1(C)c(C)c(C)c(C)cc1"
+            },
+            "tag": "token",
+            "text": "prehniten"
+          },
+          {
+            "attributes": {
+              "labels": "1//2//3/4//5/6",
+              "suffixAppliesToByDefault": "8",
+              "valType": "SMILES",
+              "value": "c1(C)c(C)cc(C)cc1"
+            },
+            "tag": "token",
+            "text": "pseudocumen"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "pteridine"
+            },
+            "tag": "token",
+            "text": "pteridin"
+          },
+          {
+            "attributes": {
+              "fusedRingNumbering": "1/2/3/3a/4/5/6/6a/7",
+              "labels": "1/2/3/4/9/8/7/5/6",
+              "valType": "SMILES",
+              "value": "n1cnc2nc[nH]c2c1"
+            },
+            "tag": "token",
+            "text": "purin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "o1[cH2]cccc1"
+            },
+            "tag": "token",
+            "text": "pyran"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "s1[cH2]cccc1"
+            },
+            "tag": "token",
+            "text": "thiopyran"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "[se]1[cH2]cccc1"
+            },
+            "tag": "token",
+            "text": "selenopyran"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "[te]1[cH2]cccc1"
+            },
+            "tag": "token",
+            "text": "telluropyran"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/4b/5/5a/6/7/7a/8/8a/9/10/11/12/12a/12b/13/13a/14/15/15a/16/16a/15b/15c/15d/15e",
+              "valType": "SMILES",
+              "value": "c1cccc2c3cc4ccc5cc6ccccc6c6cc7ccc8cc12.c38c7c4c56"
+            },
+            "tag": "token",
+            "text": "pyranthren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "n1ccncc1"
+            },
+            "tag": "token",
+            "text": "pyrazin"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "pyrazole"
+            },
+            "tag": "token",
+            "text": "pyrazol"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "N1NCCC1"
+            },
+            "tag": "token",
+            "text": "pyrazolidin"
+          },
+          {
+            "attributes": {
+              "addBond": "2 locant3",
+              "frontLocantsExpected": "1,2,3,4,5",
+              "valType": "dbkey",
+              "value": "pyrazoline"
+            },
+            "tag": "token",
+            "text": "pyrazolin"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "pyrene"
+            },
+            "tag": "token",
+            "text": "pyren"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "pyridazine"
+            },
+            "tag": "token",
+            "text": "pyridazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "n1ccccc1"
+            },
+            "tag": "token",
+            "text": "pyridin"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "pyrimidine"
+            },
+            "tag": "token",
+            "text": "pyrimidin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/7a",
+              "valType": "SMILES",
+              "value": "[nH]1cccc2cccc12"
+            },
+            "tag": "token",
+            "text": "1-pyrinden"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/7a",
+              "valType": "SMILES",
+              "value": "c1[nH]ccc2cccc12"
+            },
+            "tag": "token",
+            "text": "2-pyrinden"
+          },
+          {
+            "attributes": {
+              "defaultInLocant": "3",
+              "labels": "1//2,ortho//3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "c1(O)c(O)cccc1"
+            },
+            "tag": "token",
+            "text": "pyrocatechol"
+          },
+          {
+            "attributes": {
+              "labels": "1//2,ortho//3,meta//4,para/5/6",
+              "valType": "SMILES",
+              "value": "c1(O)c(O)c(O)ccc1"
+            },
+            "tag": "token",
+            "text": "pyrogallol"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "pyrrole"
+            },
+            "tag": "token",
+            "text": "pyrrol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/7a",
+              "valType": "SMILES",
+              "value": "[cH2]1ccn2cccc12"
+            },
+            "tag": "token",
+            "text": "pyrrolizin"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "pyrrolidine"
+            },
+            "tag": "token",
+            "text": "pyrrolidin"
+          },
+          {
+            "attributes": {
+              "addGroup": "=O locant2",
+              "frontLocantsExpected": "2,3,4,5",
+              "valType": "dbkey",
+              "value": "pyrrolidine"
+            },
+            "tag": "token",
+            "text": "pyrrolidon"
+          },
+          {
+            "attributes": {
+              "addBond": "2 locant2",
+              "frontLocantsExpected": "1,2,3,4,5",
+              "valType": "SMILES",
+              "value": "N1CCCC1"
+            },
+            "tag": "token",
+            "text": "pyrrolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "[o+]1ccccc1"
+            },
+            "tag": "token",
+            "text": "pyrylium"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "n1c(C)ccc2ccccc12"
+            },
+            "tag": "token",
+            "text": "quinaldin"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "quinazoline"
+            },
+            "tag": "token",
+            "text": "quinazolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/5b/6/7/8/9/9a/10/10a/11/11a",
+              "valType": "SMILES",
+              "value": "c1cccc2nc3c4ccccc4nc3cc12"
+            },
+            "tag": "token",
+            "text": "quindolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/6a/7/8/9/10/10a/10b/11/11a",
+              "valType": "SMILES",
+              "value": "c1cccc2nc3nc4ccccc4c3cc12"
+            },
+            "tag": "token",
+            "text": "quinindolin"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "quinoline"
+            },
+            "tag": "token",
+            "text": "quinolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/8/9/9a",
+              "valType": "SMILES",
+              "value": "c1cc[cH2]n2ccccc12"
+            },
+            "tag": "token",
+            "text": "quinolizin"
+          },
+          {
+            "attributes": {
+              "addGroup": "=O locant2",
+              "frontLocantsExpected": "2,3,4,5,6,7,8",
+              "valType": "dbkey",
+              "value": "quinoline"
+            },
+            "tag": "token",
+            "text": "quinolon"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "quinoxaline"
+            },
+            "tag": "token",
+            "text": "quinoxalin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/8",
+              "valType": "SMILES",
+              "value": "N1(CCC2CC1)CC2"
+            },
+            "tag": "token",
+            "text": "quinuclidin"
+          },
+          {
+            "attributes": {
+              "labels": "1//2,ortho/3,meta//4,para/5/6",
+              "valType": "SMILES",
+              "value": "c1(O)cc(O)ccc1"
+            },
+            "tag": "token",
+            "text": "resorcinol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3/4//5",
+              "valType": "SMILES",
+              "value": "S1C(=S)NC(=O)C1"
+            },
+            "tag": "token",
+            "text": "rhodanin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/3b/4/5/6/7/7a/7b/7c/8/9/10/10a/10b/11/12/13/14/14a/14b/14c/14d/14e",
+              "valType": "SMILES",
+              "value": "c1ccc2c3ccccc3c3c4cccc5c6ccccc6c6c71.c237.c456"
+            },
+            "tag": "token",
+            "text": "rubicen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/4/5/1'/2'/3'/6/7/7a",
+              "valType": "SMILES",
+              "value": "O1COc2cc(CC=C)ccc12"
+            },
+            "tag": "token",
+            "text": "safrol"
+          },
+          {
+            "attributes": {
+              "valType": "dbkey",
+              "value": "s-indacene"
+            },
+            "tag": "token",
+            "text": "s-indacen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "n1cncnc1"
+            },
+            "tag": "token",
+            "text": "s-triazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "n1cncnc1"
+            },
+            "tag": "token",
+            "text": "sym-triazin"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[nH]1ncnc1"
+            },
+            "tag": "token",
+            "text": "s-triazol"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[nH]1ncnc1"
+            },
+            "tag": "token",
+            "text": "sym-triazol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "C1=CC=CC=2[SiH]=C3C=CC=CC3=[SiH]C12"
+            },
+            "tag": "token",
+            "text": "silanthren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3//3a/4/5/6/7/7a",
+              "valType": "SMILES",
+              "value": "N1cc(C)c2ccccc12"
+            },
+            "tag": "token",
+            "text": "skatol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/alpha/beta/1'/2'/3'/4'/5'/6'",
+              "valType": "SMILES",
+              "value": "c1(ccccc1)C=Cc2ccccc2"
+            },
+            "tag": "token",
+            "text": "stilben"
+          },
+          {
+            "attributes": {
+              "labels": "1///2/3/4/5",
+              "valType": "SMILES",
+              "value": "S1(=O)(=O)CCCC1"
+            },
+            "tag": "token",
+            "text": "sulfolan"
+          },
+          {
+            "attributes": {
+              "labels": "beta/alpha/1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "C=Cc1ccccc1"
+            },
+            "tag": "token",
+            "text": "styren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2[se]c3ccccc3[se]c12"
+            },
+            "tag": "token",
+            "text": "selenanthren"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[se]1cccc1"
+            },
+            "tag": "token",
+            "text": "selenophen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2[te]c3ccccc3[te]c12"
+            },
+            "tag": "token",
+            "text": "telluranthren"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[te]1cccc1"
+            },
+            "tag": "token",
+            "text": "tellurophen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "C1CCCc2ccccc12"
+            },
+            "tag": "token",
+            "text": "tetralin"
+          },
+          {
+            "attributes": {
+              "addGroup": "=O locant1",
+              "frontLocantsExpected": "1,2,3,4,5,6,7,8",
+              "labels": "1/2/3/4/4a/5/6/7/8/8a",
+              "valType": "SMILES",
+              "value": "C1CCCc2ccccc12"
+            },
+            "tag": "token",
+            "text": "tetralon"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/4/5/5a/6/7/8/8a/9/10/10a/10b/10c",
+              "valType": "SMILES",
+              "value": "c1ccc2ncc3cccc4ccc1c2c34"
+            },
+            "tag": "token",
+            "text": "thebenidin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3//4/9/8/7//5/6/",
+              "valType": "SMILES",
+              "value": "N1C(=O)N(C)c2ncN(C)c2C1=O"
+            },
+            "tag": "token",
+            "text": "theobromin"
+          },
+          {
+            "attributes": {
+              "labels": "1//2//3//4/9/8/7/5/6/",
+              "valType": "SMILES",
+              "value": "N1(C)C(=O)N(C)c2nc[nH]c2C1=O"
+            },
+            "tag": "token",
+            "text": "theophyllin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "valType": "SMILES",
+              "value": "c1cccc2sc3ccccc3sc12"
+            },
+            "tag": "token",
+            "text": "thianthren"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5",
+              "valType": "SMILES",
+              "value": "s1cccc1"
+            },
+            "tag": "token",
+            "text": "thiophen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6///1'/2'/3'/4'/5'/6'",
+              "valType": "SMILES",
+              "value": "c1(ccccc1)C#Cc2ccccc2"
+            },
+            "tag": "token",
+            "text": "tolan"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6/alpha",
+              "valType": "SMILES",
+              "value": "c12ccccc1.C2"
+            },
+            "tag": "token",
+            "text": "toluen"
+          },
+          {
+            "attributes": {
+              "addGroup": "C locant2 alpha",
+              "frontLocantsExpected": "2,ortho,3,meta,4,para,5,6",
+              "labels": "/1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "Nc1ccccc1"
+            },
+            "tag": "token",
+            "text": "toluidin"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "1",
+              "labels": "////1/2,ortho/3,meta/4,para//5/6",
+              "valType": "SMILES",
+              "value": "[O-]S(=O)(=O)c1ccc(C)cc1"
+            },
+            "tag": "token",
+            "text": "tosylat"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/3a/3b/4/5/6/6a/6b/7/8/9/9a/9b",
+              "valType": "SMILES",
+              "value": "[cH2]1ccc2c3cccc3c4cccc4c12"
+            },
+            "tag": "token",
+            "text": "trinden"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/6a/7/7a/8/9/10/11/11a/12/12a/13/13a/14/14a",
+              "valType": "SMILES",
+              "value": "c1cccc2oc3cc4nc5ccccc5oc4cc3nc12"
+            },
+            "tag": "token",
+            "text": "triphenodioxazin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/6a/7/7a/8/9/10/11/11a/12/12a/13/13a/14/14a",
+              "valType": "SMILES",
+              "value": "c1cccc2sc3cc4nc5ccccc5sc4cc3nc12"
+            },
+            "tag": "token",
+            "text": "triphenodithiazin"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2/3/4/5/6/1'/2'/3'/4'/5'/6'/1''/2''/3''/4''/5''/6''",
+              "valType": "SMILES",
+              "value": "C(c1ccccc1)(c1ccccc1)c1ccccc1"
+            },
+            "tag": "token",
+            "text": "tritan"
+          },
+          {
+            "attributes": {
+              "labels": "/alpha/beta/1/2,ortho/3,meta/4,para/5/6/",
+              "valType": "SMILES",
+              "value": "NCCc1ccc(cc1)O"
+            },
+            "tag": "token",
+            "text": "tyramin"
+          },
+          {
+            "attributes": {
+              "labels": "/alpha/beta/3/2/1/7a/7/6/5/4/3a",
+              "valType": "SMILES",
+              "value": "NCCc1c[nH]c2ccccc12"
+            },
+            "tag": "token",
+            "text": "tryptamin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/4b/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "C1NCCc2c3ccccc3Nc12"
+            },
+            "tag": "token",
+            "text": "tryptolin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3//4/5/",
+              "valType": "SMILES",
+              "value": "N1NC(=O)NC1=O"
+            },
+            "tag": "token",
+            "text": "urazol"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho//alpha'/3,meta/4,para/5/6//alpha",
+              "valType": "SMILES",
+              "value": "c1(c(OC)cccc1)OC"
+            },
+            "tag": "token",
+            "text": "veratrol"
+          },
+          {
+            "attributes": {
+              "fusedRingNumbering": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "labels": "1/2/3/4/4a/10/10a/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1cccc2oc3ccccc3[cH2]c12"
+            },
+            "tag": "token",
+            "text": "xanthen"
+          },
+          {
+            "attributes": {
+              "fusedRingNumbering": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "labels": "1/2/3/4/4a/10/10a/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1cccc2sc3ccccc3[cH2]c12"
+            },
+            "tag": "token",
+            "text": "thioxanthen"
+          },
+          {
+            "attributes": {
+              "fusedRingNumbering": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "labels": "1/2/3/4/4a/10/10a/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1cccc2[se]c3ccccc3[cH2]c12"
+            },
+            "tag": "token",
+            "text": "selenoxanthen"
+          },
+          {
+            "attributes": {
+              "fusedRingNumbering": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "labels": "1/2/3/4/4a/10/10a/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1cccc2[te]c3ccccc3[cH2]c12"
+            },
+            "tag": "token",
+            "text": "telluroxanthen"
+          },
+          {
+            "attributes": {
+              "fusedRingNumbering": "1/2/3/4/4a/5/5a/6/7/8/9/9a/10/10a",
+              "labels": "1/2/3/4/4a/10/10a/5/6/7/8/8a/9/9a",
+              "valType": "SMILES",
+              "value": "c1cccc2[o+]c3ccccc3cc12"
+            },
+            "tag": "token",
+            "text": "xanthylium"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/5a/6/7/7a/7b/8/9/9a/10/10a/11/12/13/14/14a/14b/15/16/16a/16b/17/18/18a/18b/18c/18d/18e/18f",
+              "valType": "SMILES",
+              "value": "c1cccc2Cc3ccc4c5ccc6Cc7ccccc7c8ccc9c%10ccc%11c12.c3%11c4%10.c59c68"
+            },
+            "tag": "token",
+            "text": "violanthren"
+          },
+          {
+            "attributes": {
+              "addGroup": "C locant1 alpha;C locant2 alpha'",
+              "frontLocantsExpected": "1,2,ortho,3,meta,4,para,5,6",
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "c1ccccc1"
+            },
+            "tag": "token",
+            "text": "xylen"
+          },
+          {
+            "attributes": {
+              "addGroup": "C locant2;C locant3",
+              "frontLocantsExpected": "1,2,ortho,3,meta,4,para,5,6",
+              "labels": "/1/2,ortho/3,meta/4,para/5/6",
+              "valType": "SMILES",
+              "value": "Nc1ccccc1"
+            },
+            "tag": "token",
+            "text": "xylidin"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "biochemical",
+          "symbol": "z",
+          "tagname": "group",
+          "type": "ring"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "1/2/3/4/9/8/7/5/6/",
+              "valType": "SMILES",
+              "value": "n1cnc2nc[nH]c2c1N"
+            },
+            "tag": "token",
+            "text": "adenin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3/4//5/6",
+              "valType": "SMILES",
+              "value": "N1c(=O)nc(N)cc1"
+            },
+            "tag": "token",
+            "text": "cytosin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3/4/9/8/7/5/6/",
+              "valType": "SMILES",
+              "value": "[nH]1c(N)nc2nc[nH]c2c1=O"
+            },
+            "tag": "token",
+            "text": "guanin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/9/8/7/5/6/",
+              "valType": "SMILES",
+              "value": "[nH]1cnc2nc[nH]c2c1=O"
+            },
+            "tag": "token",
+            "text": "hypoxanthin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3/4//5//6",
+              "valType": "SMILES",
+              "value": "N1c(=O)Nc(=O)c(C)c1"
+            },
+            "tag": "token",
+            "text": "thymin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3/4//5/6",
+              "valType": "SMILES",
+              "value": "[nH]1c(=O)Nc(=O)cc1"
+            },
+            "tag": "token",
+            "text": "uracil"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3/4/9/8/7/5/6/",
+              "valType": "SMILES",
+              "value": "N1c(=O)[nH]c2nc[nH]c2c1=O"
+            },
+            "tag": "token",
+            "text": "xanthin"
+          },
+          {
+            "attributes": {
+              "labels": "1'/2'//3'//4'/5'///9/8/7/5/6/N/1/2/3/4",
+              "valType": "SMILES",
+              "value": "[C@@H]1([C@H](O)[C@H](O)[C@@H](CO)O1)n2cnc3c(N)ncnc23"
+            },
+            "tag": "token",
+            "text": "adenosin"
+          },
+          {
+            "attributes": {
+              "labels": "1'/2'//3'//4'/5'///1/2//3/4/N/5/6",
+              "valType": "SMILES",
+              "value": "[C@@H]1([C@H](O)[C@H](O)[C@@H](CO)O1)n2c(=O)nc(N)cc2"
+            },
+            "tag": "token",
+            "text": "cytidin"
+          },
+          {
+            "attributes": {
+              "labels": "1'/2'//3'//4'/5'///9/8/7/5/6//1/2//3/4",
+              "valType": "SMILES",
+              "value": "[C@@H]1([C@H](O)[C@H](O)[C@@H](CO)O1)n2cnc3c(=O)[nH]c(N)nc23"
+            },
+            "tag": "token",
+            "text": "guanosin"
+          },
+          {
+            "attributes": {
+              "labels": "1'/2'//3'//4'/5'///9/8/7/5/6//1/2/3/4",
+              "valType": "SMILES",
+              "value": "[C@@H]1([C@H](O)[C@H](O)[C@@H](CO)O1)n2cnc3c(O)ncnc23"
+            },
+            "tag": "token",
+            "text": "inosine"
+          },
+          {
+            "attributes": {
+              "labels": "1'/2'/3'//4'/5'///1/2//3/4//5/alpha/6",
+              "valType": "SMILES",
+              "value": "[C@@H]1(C[C@H](O)[C@@H](CO)O1)n2c(=O)[nH]c(=O)c(C)c2"
+            },
+            "tag": "token",
+            "text": "thymidin"
+          },
+          {
+            "attributes": {
+              "labels": "1'/2'//3'//4'/5'///1/2//3/4//5/6",
+              "valType": "SMILES",
+              "value": "[C@@H]1([C@H](O)[C@H](O)[C@@H](CO)O1)n2c(=O)[nH]c(=O)cc2"
+            },
+            "tag": "token",
+            "text": "uridin"
+          },
+          {
+            "attributes": {
+              "labels": "1'/2'//3'//4'/5'///9/8/7/5/6//1/2//3/4",
+              "valType": "SMILES",
+              "value": "[C@@H]1([C@H](O)[C@H](O)[C@@H](CO)O1)n2cnc3c(=O)[nH]c(=O)[nH]c23"
+            },
+            "tag": "token",
+            "text": "xanthosin"
+          },
+          {
+            "attributes": {
+              "labels": "1'/2'//3'//4'//5'///////9/8/7/5/6//1/2/3/4",
+              "valType": "SMILES",
+              "value": "[C@@H]1([C@H](O)[C@H](O)[C@@](F)(COS(=O)(=O)N)O1)n2cnc3c(N)ncnc23"
+            },
+            "tag": "token",
+            "text": "nucleocidin"
+          },
+          {
+            "attributes": {
+              "labels": "1'/2'/3'//4'/5'///1/2//3/4//5//6",
+              "valType": "SMILES",
+              "value": "[C@@H]1(C[C@H](O)[C@@H](CO)O1)n2c(=O)[nH]c(=O)c(I)c2"
+            },
+            "tag": "token",
+            "text": "idoxuridin"
+          },
+          {
+            "attributes": {
+              "labels": "1'/2'//3'//4'/5'///1/2//3/4//5/alpha/6",
+              "valType": "SMILES",
+              "value": "[C@@H]1([C@H](O)[C@H](O)[C@@H](CO)O1)n2c(=O)[nH]c(=O)c(C)c2"
+            },
+            "tag": "token",
+            "text": "ribosylthymin"
+          },
+          {
+            "attributes": {
+              "labels": "1'/2'//3'//4'/5'///1/2//3/4//5/6///",
+              "valType": "SMILES",
+              "value": "[C@@H]1([C@H](O)[C@H](O)[C@@H](CO)O1)n2c(=O)[nH]c(=O)cc2C(=O)O"
+            },
+            "tag": "token",
+            "text": "orotidin"
+          },
+          {
+            "attributes": {
+              "labels": "1'/2'//3'//4'/5'///5/6/1/2//3/4/",
+              "valType": "SMILES",
+              "value": "[C@@H]1([C@H](O)[C@H](O)[C@@H](CO)O1)c2c[nH]c(=O)[nH]c2(=O)"
+            },
+            "tag": "token",
+            "text": "pseudouridin"
+          },
+          {
+            "attributes": {
+              "labels": "21/1/2/3/4/5/6/7/8/9/22/10/11/12/13/14/23/15/16/17/18/19/24",
+              "valType": "SMILES",
+              "value": "[nH]1cccc1cc2ccc(n2)cc3ccc(n3)cc4cccn4"
+            },
+            "tag": "token",
+            "text": "bilin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/21/5/6/7/8/9/22/10/11/12/13/14/23/15/16/17/18/19/24",
+              "valType": "SMILES",
+              "value": "C12CCC(=N1)C=C3CCC(=N3)C=C4CCC(=N4)C=C5CCC2N5"
+            },
+            "tag": "token",
+            "text": "corrin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/21/5/6/7/8/9/22/10/11/12/13/14/23/15/16/17/18/19/24/20",
+              "valType": "SMILES",
+              "value": "c12ccc([nH]1)cc3ccc(n3)cc4ccc([nH]4)cc5ccc(n5)c2"
+            },
+            "tag": "token",
+            "text": "porphyrin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/21/5/6/7/8/9/22/10/11/12/13/14/23/15/16/17/18/19/24/20",
+              "valType": "SMILES",
+              "value": "c12ccc([nH]1)cc3ccc(n3)cc4ccc([nH]4)cc5ccc(n5)c2"
+            },
+            "tag": "token",
+            "text": "porphin"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a/1'/2'/3'/4'/5'/6'",
+              "valType": "SMILES",
+              "value": "O1C(CCc2ccccc12)c3ccccc3"
+            },
+            "tag": "token",
+            "text": "flavan"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a/1'/2'/3'/4'/5'/6'",
+              "valType": "SMILES",
+              "value": "O1CC(Cc2ccccc12)c3ccccc3"
+            },
+            "tag": "token",
+            "text": "isoflavan"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/4a/5/6/7/8/8a/1'/2'/3'/4'/5'/6'",
+              "valType": "SMILES",
+              "value": "O1CCC(c2ccccc12)c3ccccc3"
+            },
+            "tag": "token",
+            "text": "neoflavan"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4//4a,10/5/6/7/8/8a,9/1'/2'/3'/4'/5'/6'",
+              "suffixAppliesToByDefault": "3",
+              "valType": "SMILES",
+              "value": "o1c(cc(=O)c2ccccc12)c3ccccc3"
+            },
+            "tag": "token",
+            "text": "flavon"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4//4a,10/5/6/7/8/8a,9/1'/2'/3'/4'/5'/6'",
+              "suffixAppliesToByDefault": "3",
+              "valType": "SMILES",
+              "value": "O1C(CC(=O)c2ccccc12)c3ccccc3"
+            },
+            "tag": "token",
+            "text": "flavanon"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "arylGroups.xml"
+}

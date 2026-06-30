@@ -1,0 +1,732 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "symbol": "D",
+          "tagname": "heteroatom"
+        },
+        "children": [
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "F"
+            },
+            "tag": "token",
+            "text": "fluora"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "Cl"
+            },
+            "tag": "token",
+            "text": "chlora"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "Br"
+            },
+            "tag": "token",
+            "text": "broma"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "I"
+            },
+            "tag": "token",
+            "text": "ioda"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "O"
+            },
+            "tag": "token",
+            "text": "oxa"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "S"
+            },
+            "tag": "token",
+            "text": "thia"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Se]"
+            },
+            "tag": "token",
+            "text": "selena"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Te]"
+            },
+            "tag": "token",
+            "text": "tellura"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "N"
+            },
+            "tag": "token",
+            "text": "aza"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "P"
+            },
+            "tag": "token",
+            "text": "phospha"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[As]"
+            },
+            "tag": "token",
+            "text": "arsa"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Sb]"
+            },
+            "tag": "token",
+            "text": "stiba"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Bi]"
+            },
+            "tag": "token",
+            "text": "bisma"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Si]"
+            },
+            "tag": "token",
+            "text": "sila"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Ge]"
+            },
+            "tag": "token",
+            "text": "germa"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Sn]"
+            },
+            "tag": "token",
+            "text": "stanna"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Pb]"
+            },
+            "tag": "token",
+            "text": "plumba"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "B"
+            },
+            "tag": "token",
+            "text": "bora"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Al]"
+            },
+            "tag": "token",
+            "text": "aluma"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Ga]"
+            },
+            "tag": "token",
+            "text": "galla"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[In]"
+            },
+            "tag": "token",
+            "text": "indiga"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Tl]"
+            },
+            "tag": "token",
+            "text": "thalla"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Hg]"
+            },
+            "tag": "token",
+            "text": "mercura"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "F"
+            },
+            "tag": "token",
+            "text": "fluor"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "Cl"
+            },
+            "tag": "token",
+            "text": "chlor"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "Br"
+            },
+            "tag": "token",
+            "text": "brom"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "I"
+            },
+            "tag": "token",
+            "text": "iod"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "O"
+            },
+            "tag": "token",
+            "text": "ox"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "S"
+            },
+            "tag": "token",
+            "text": "thi"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Se]"
+            },
+            "tag": "token",
+            "text": "selen"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Te]"
+            },
+            "tag": "token",
+            "text": "tellur"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "N"
+            },
+            "tag": "token",
+            "text": "az"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "P"
+            },
+            "tag": "token",
+            "text": "phosph"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[As]"
+            },
+            "tag": "token",
+            "text": "ars"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Sb]"
+            },
+            "tag": "token",
+            "text": "stib"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Bi]"
+            },
+            "tag": "token",
+            "text": "bism"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Si]"
+            },
+            "tag": "token",
+            "text": "sil"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Ge]"
+            },
+            "tag": "token",
+            "text": "germ"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Sn]"
+            },
+            "tag": "token",
+            "text": "stann"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Pb]"
+            },
+            "tag": "token",
+            "text": "plumb"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "B"
+            },
+            "tag": "token",
+            "text": "bor"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Al]"
+            },
+            "tag": "token",
+            "text": "alum"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Ga]"
+            },
+            "tag": "token",
+            "text": "gall"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[In]"
+            },
+            "tag": "token",
+            "text": "indig"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Tl]"
+            },
+            "tag": "token",
+            "text": "thall"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Hg]"
+            },
+            "tag": "token",
+            "text": "mercur"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "P"
+            },
+            "tag": "token",
+            "text": "phosphor"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[As]"
+            },
+            "tag": "token",
+            "text": "arsen"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Sb]"
+            },
+            "tag": "token",
+            "text": "antimon"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "J",
+          "tagname": "heteroatom"
+        },
+        "children": [
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "O"
+            },
+            "tag": "token",
+            "text": "oxa"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "S"
+            },
+            "tag": "token",
+            "text": "thia"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Se]"
+            },
+            "tag": "token",
+            "text": "selena"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Te]"
+            },
+            "tag": "token",
+            "text": "tellura"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "N"
+            },
+            "tag": "token",
+            "text": "aza"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Bi]"
+            },
+            "tag": "token",
+            "text": "bisma"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Si]"
+            },
+            "tag": "token",
+            "text": "sila"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Ge]"
+            },
+            "tag": "token",
+            "text": "germa"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Sn]"
+            },
+            "tag": "token",
+            "text": "stanna"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Pb]"
+            },
+            "tag": "token",
+            "text": "plumba"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Hg]"
+            },
+            "tag": "token",
+            "text": "mercura"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "O"
+            },
+            "tag": "token",
+            "text": "ox"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "S"
+            },
+            "tag": "token",
+            "text": "thi"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Se]"
+            },
+            "tag": "token",
+            "text": "selen"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Te]"
+            },
+            "tag": "token",
+            "text": "tellur"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "N"
+            },
+            "tag": "token",
+            "text": "az"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Bi]"
+            },
+            "tag": "token",
+            "text": "bism"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Si]"
+            },
+            "tag": "token",
+            "text": "sil"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Ge]"
+            },
+            "tag": "token",
+            "text": "germ"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Sn]"
+            },
+            "tag": "token",
+            "text": "stann"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Pb]"
+            },
+            "tag": "token",
+            "text": "plumb"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Hg]"
+            },
+            "tag": "token",
+            "text": "mercur"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "P"
+            },
+            "tag": "token",
+            "text": "phosphor"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[As]"
+            },
+            "tag": "token",
+            "text": "arsen"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Sb]"
+            },
+            "tag": "token",
+            "text": "antimon"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "j",
+          "tagname": "heteroatom"
+        },
+        "children": [
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "O"
+            },
+            "tag": "token",
+            "text": "oxa"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "S"
+            },
+            "tag": "token",
+            "text": "thia"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Se]"
+            },
+            "tag": "token",
+            "text": "selena"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Te]"
+            },
+            "tag": "token",
+            "text": "tellura"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Bi]"
+            },
+            "tag": "token",
+            "text": "bisma"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Hg]"
+            },
+            "tag": "token",
+            "text": "mercura"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "O"
+            },
+            "tag": "token",
+            "text": "ox"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "S"
+            },
+            "tag": "token",
+            "text": "thi"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Se]"
+            },
+            "tag": "token",
+            "text": "selen"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Te]"
+            },
+            "tag": "token",
+            "text": "tellur"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Bi]"
+            },
+            "tag": "token",
+            "text": "bism"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[Hg]"
+            },
+            "tag": "token",
+            "text": "mercur"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "[As]"
+            },
+            "tag": "token",
+            "text": "arsen"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "hwHeteroAtoms.xml"
+}

@@ -38,7 +38,7 @@ pytest tests/datasets/test_qm9_sample.py -v -s
 The sample size and random seed can be adjusted with environment variables:
 
 ```bash
-BLUENAMER_DATASET_SAMPLE_N=50 BLUENAMER_DATASET_SEED=123 pytest -m dataset -v -s
+OPENCLATURA_DATASET_SAMPLE_N=50 OPENCLATURA_DATASET_SEED=123 pytest -m dataset -v -s
 ```
 
 ## Testing OPSIN-specific behavior

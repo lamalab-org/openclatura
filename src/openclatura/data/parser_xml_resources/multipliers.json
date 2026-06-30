@@ -1,0 +1,1090 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "symbol": "m",
+          "tagname": "multiplier",
+          "type": "basic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "1"
+            },
+            "tag": "token",
+            "text": "mono"
+          },
+          {
+            "attributes": {
+              "value": "2"
+            },
+            "tag": "token",
+            "text": "di"
+          },
+          {
+            "attributes": {
+              "value": "3"
+            },
+            "tag": "token",
+            "text": "tri"
+          },
+          {
+            "attributes": {
+              "value": "4"
+            },
+            "tag": "token",
+            "text": "tetra"
+          },
+          {
+            "attributes": {
+              "value": "5"
+            },
+            "tag": "token",
+            "text": "penta"
+          },
+          {
+            "attributes": {
+              "value": "6"
+            },
+            "tag": "token",
+            "text": "hexa"
+          },
+          {
+            "attributes": {
+              "value": "7"
+            },
+            "tag": "token",
+            "text": "hepta"
+          },
+          {
+            "attributes": {
+              "value": "8"
+            },
+            "tag": "token",
+            "text": "octa"
+          },
+          {
+            "attributes": {
+              "value": "9"
+            },
+            "tag": "token",
+            "text": "nona"
+          },
+          {
+            "attributes": {
+              "value": "10"
+            },
+            "tag": "token",
+            "text": "deca"
+          },
+          {
+            "attributes": {
+              "value": "11"
+            },
+            "tag": "token",
+            "text": "undeca"
+          },
+          {
+            "attributes": {
+              "value": "12"
+            },
+            "tag": "token",
+            "text": "dodeca"
+          },
+          {
+            "attributes": {
+              "value": "13"
+            },
+            "tag": "token",
+            "text": "trideca"
+          },
+          {
+            "attributes": {
+              "value": "14"
+            },
+            "tag": "token",
+            "text": "tetradeca"
+          },
+          {
+            "attributes": {
+              "value": "15"
+            },
+            "tag": "token",
+            "text": "pentadeca"
+          },
+          {
+            "attributes": {
+              "value": "16"
+            },
+            "tag": "token",
+            "text": "hexadeca"
+          },
+          {
+            "attributes": {
+              "value": "17"
+            },
+            "tag": "token",
+            "text": "heptadeca"
+          },
+          {
+            "attributes": {
+              "value": "18"
+            },
+            "tag": "token",
+            "text": "octadeca"
+          },
+          {
+            "attributes": {
+              "value": "19"
+            },
+            "tag": "token",
+            "text": "nonadeca"
+          },
+          {
+            "attributes": {
+              "value": "20"
+            },
+            "tag": "token",
+            "text": "eicosa"
+          },
+          {
+            "attributes": {
+              "value": "20"
+            },
+            "tag": "token",
+            "text": "icosa"
+          },
+          {
+            "attributes": {
+              "value": "21"
+            },
+            "tag": "token",
+            "text": "henicosa"
+          },
+          {
+            "attributes": {
+              "value": "21"
+            },
+            "tag": "token",
+            "text": "heneicosa"
+          },
+          {
+            "attributes": {
+              "value": "22"
+            },
+            "tag": "token",
+            "text": "docosa"
+          },
+          {
+            "attributes": {
+              "value": "23"
+            },
+            "tag": "token",
+            "text": "tricosa"
+          },
+          {
+            "attributes": {
+              "value": "24"
+            },
+            "tag": "token",
+            "text": "tetracosa"
+          },
+          {
+            "attributes": {
+              "value": "25"
+            },
+            "tag": "token",
+            "text": "pentacosa"
+          },
+          {
+            "attributes": {
+              "value": "26"
+            },
+            "tag": "token",
+            "text": "hexacosa"
+          },
+          {
+            "attributes": {
+              "value": "27"
+            },
+            "tag": "token",
+            "text": "heptacosa"
+          },
+          {
+            "attributes": {
+              "value": "28"
+            },
+            "tag": "token",
+            "text": "octacosa"
+          },
+          {
+            "attributes": {
+              "value": "29"
+            },
+            "tag": "token",
+            "text": "nonacosa"
+          },
+          {
+            "attributes": {
+              "value": "30"
+            },
+            "tag": "token",
+            "text": "triaconta"
+          },
+          {
+            "attributes": {
+              "value": "31"
+            },
+            "tag": "token",
+            "text": "hentriaconta"
+          },
+          {
+            "attributes": {
+              "value": "32"
+            },
+            "tag": "token",
+            "text": "dotriaconta"
+          },
+          {
+            "attributes": {
+              "value": "33"
+            },
+            "tag": "token",
+            "text": "tritriaconta"
+          },
+          {
+            "attributes": {
+              "value": "34"
+            },
+            "tag": "token",
+            "text": "tetratriaconta"
+          },
+          {
+            "attributes": {
+              "value": "35"
+            },
+            "tag": "token",
+            "text": "pentatriaconta"
+          },
+          {
+            "attributes": {
+              "value": "36"
+            },
+            "tag": "token",
+            "text": "hexatriaconta"
+          },
+          {
+            "attributes": {
+              "value": "37"
+            },
+            "tag": "token",
+            "text": "heptatriaconta"
+          },
+          {
+            "attributes": {
+              "value": "38"
+            },
+            "tag": "token",
+            "text": "octatriaconta"
+          },
+          {
+            "attributes": {
+              "value": "39"
+            },
+            "tag": "token",
+            "text": "nonatriaconta"
+          },
+          {
+            "attributes": {
+              "value": "40"
+            },
+            "tag": "token",
+            "text": "tetraconta"
+          },
+          {
+            "attributes": {
+              "value": "41"
+            },
+            "tag": "token",
+            "text": "hentetraconta"
+          },
+          {
+            "attributes": {
+              "value": "42"
+            },
+            "tag": "token",
+            "text": "dotetraconta"
+          },
+          {
+            "attributes": {
+              "value": "43"
+            },
+            "tag": "token",
+            "text": "tritetraconta"
+          },
+          {
+            "attributes": {
+              "value": "44"
+            },
+            "tag": "token",
+            "text": "tetratetraconta"
+          },
+          {
+            "attributes": {
+              "value": "45"
+            },
+            "tag": "token",
+            "text": "pentatetraconta"
+          },
+          {
+            "attributes": {
+              "value": "46"
+            },
+            "tag": "token",
+            "text": "hexatetraconta"
+          },
+          {
+            "attributes": {
+              "value": "47"
+            },
+            "tag": "token",
+            "text": "heptatetraconta"
+          },
+          {
+            "attributes": {
+              "value": "48"
+            },
+            "tag": "token",
+            "text": "octatetraconta"
+          },
+          {
+            "attributes": {
+              "value": "49"
+            },
+            "tag": "token",
+            "text": "nonatetraconta"
+          },
+          {
+            "attributes": {
+              "value": "50"
+            },
+            "tag": "token",
+            "text": "pentaconta"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "R",
+          "tagname": "multiplier",
+          "type": "group"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "2"
+            },
+            "tag": "token",
+            "text": "bis"
+          },
+          {
+            "attributes": {
+              "value": "3"
+            },
+            "tag": "token",
+            "text": "tris"
+          },
+          {
+            "attributes": {
+              "value": "4"
+            },
+            "tag": "token",
+            "text": "tetrakis"
+          },
+          {
+            "attributes": {
+              "value": "5"
+            },
+            "tag": "token",
+            "text": "pentakis"
+          },
+          {
+            "attributes": {
+              "value": "6"
+            },
+            "tag": "token",
+            "text": "hexakis"
+          },
+          {
+            "attributes": {
+              "value": "7"
+            },
+            "tag": "token",
+            "text": "heptakis"
+          },
+          {
+            "attributes": {
+              "value": "8"
+            },
+            "tag": "token",
+            "text": "octakis"
+          },
+          {
+            "attributes": {
+              "value": "9"
+            },
+            "tag": "token",
+            "text": "nonakis"
+          },
+          {
+            "attributes": {
+              "value": "10"
+            },
+            "tag": "token",
+            "text": "decakis"
+          },
+          {
+            "attributes": {
+              "value": "11"
+            },
+            "tag": "token",
+            "text": "undecakis"
+          },
+          {
+            "attributes": {
+              "value": "12"
+            },
+            "tag": "token",
+            "text": "dodecakis"
+          },
+          {
+            "attributes": {
+              "value": "13"
+            },
+            "tag": "token",
+            "text": "tridecakis"
+          },
+          {
+            "attributes": {
+              "value": "14"
+            },
+            "tag": "token",
+            "text": "tetradecakis"
+          },
+          {
+            "attributes": {
+              "value": "15"
+            },
+            "tag": "token",
+            "text": "pentadecakis"
+          },
+          {
+            "attributes": {
+              "value": "16"
+            },
+            "tag": "token",
+            "text": "hexadecakis"
+          },
+          {
+            "attributes": {
+              "value": "17"
+            },
+            "tag": "token",
+            "text": "heptadecakis"
+          },
+          {
+            "attributes": {
+              "value": "18"
+            },
+            "tag": "token",
+            "text": "octadecakis"
+          },
+          {
+            "attributes": {
+              "value": "19"
+            },
+            "tag": "token",
+            "text": "nonadecakis"
+          },
+          {
+            "attributes": {
+              "value": "20"
+            },
+            "tag": "token",
+            "text": "eicosakis"
+          },
+          {
+            "attributes": {
+              "value": "20"
+            },
+            "tag": "token",
+            "text": "icosakis"
+          },
+          {
+            "attributes": {
+              "value": "21"
+            },
+            "tag": "token",
+            "text": "henicosakis"
+          },
+          {
+            "attributes": {
+              "value": "21"
+            },
+            "tag": "token",
+            "text": "heneicosakis"
+          },
+          {
+            "attributes": {
+              "value": "22"
+            },
+            "tag": "token",
+            "text": "docosakis"
+          },
+          {
+            "attributes": {
+              "value": "23"
+            },
+            "tag": "token",
+            "text": "tricosakis"
+          },
+          {
+            "attributes": {
+              "value": "24"
+            },
+            "tag": "token",
+            "text": "tetracosakis"
+          },
+          {
+            "attributes": {
+              "value": "25"
+            },
+            "tag": "token",
+            "text": "pentacosakis"
+          },
+          {
+            "attributes": {
+              "value": "26"
+            },
+            "tag": "token",
+            "text": "hexacosakis"
+          },
+          {
+            "attributes": {
+              "value": "27"
+            },
+            "tag": "token",
+            "text": "heptacosakis"
+          },
+          {
+            "attributes": {
+              "value": "28"
+            },
+            "tag": "token",
+            "text": "octacosakis"
+          },
+          {
+            "attributes": {
+              "value": "29"
+            },
+            "tag": "token",
+            "text": "nonacosakis"
+          },
+          {
+            "attributes": {
+              "value": "30"
+            },
+            "tag": "token",
+            "text": "triacontakis"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "r",
+          "tagname": "multiplier",
+          "type": "basic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "4"
+            },
+            "tag": "token",
+            "text": "tetr"
+          },
+          {
+            "attributes": {
+              "value": "5"
+            },
+            "tag": "token",
+            "text": "pent"
+          },
+          {
+            "attributes": {
+              "value": "6"
+            },
+            "tag": "token",
+            "text": "hex"
+          },
+          {
+            "attributes": {
+              "value": "7"
+            },
+            "tag": "token",
+            "text": "hept"
+          },
+          {
+            "attributes": {
+              "value": "8"
+            },
+            "tag": "token",
+            "text": "oct"
+          },
+          {
+            "attributes": {
+              "value": "9"
+            },
+            "tag": "token",
+            "text": "non"
+          },
+          {
+            "attributes": {
+              "value": "10"
+            },
+            "tag": "token",
+            "text": "dec"
+          },
+          {
+            "attributes": {
+              "value": "11"
+            },
+            "tag": "token",
+            "text": "undec"
+          },
+          {
+            "attributes": {
+              "value": "12"
+            },
+            "tag": "token",
+            "text": "dodec"
+          },
+          {
+            "attributes": {
+              "value": "13"
+            },
+            "tag": "token",
+            "text": "tridec"
+          },
+          {
+            "attributes": {
+              "value": "14"
+            },
+            "tag": "token",
+            "text": "tetradec"
+          },
+          {
+            "attributes": {
+              "value": "15"
+            },
+            "tag": "token",
+            "text": "pentadec"
+          },
+          {
+            "attributes": {
+              "value": "16"
+            },
+            "tag": "token",
+            "text": "hexadec"
+          },
+          {
+            "attributes": {
+              "value": "17"
+            },
+            "tag": "token",
+            "text": "heptadec"
+          },
+          {
+            "attributes": {
+              "value": "18"
+            },
+            "tag": "token",
+            "text": "octadec"
+          },
+          {
+            "attributes": {
+              "value": "19"
+            },
+            "tag": "token",
+            "text": "nonadec"
+          },
+          {
+            "attributes": {
+              "value": "20"
+            },
+            "tag": "token",
+            "text": "eicos"
+          },
+          {
+            "attributes": {
+              "value": "20"
+            },
+            "tag": "token",
+            "text": "icos"
+          },
+          {
+            "attributes": {
+              "value": "21"
+            },
+            "tag": "token",
+            "text": "henicos"
+          },
+          {
+            "attributes": {
+              "value": "21"
+            },
+            "tag": "token",
+            "text": "heneicos"
+          },
+          {
+            "attributes": {
+              "value": "22"
+            },
+            "tag": "token",
+            "text": "docos"
+          },
+          {
+            "attributes": {
+              "value": "23"
+            },
+            "tag": "token",
+            "text": "tricos"
+          },
+          {
+            "attributes": {
+              "value": "24"
+            },
+            "tag": "token",
+            "text": "tetracos"
+          },
+          {
+            "attributes": {
+              "value": "25"
+            },
+            "tag": "token",
+            "text": "pentacos"
+          },
+          {
+            "attributes": {
+              "value": "26"
+            },
+            "tag": "token",
+            "text": "hexacos"
+          },
+          {
+            "attributes": {
+              "value": "27"
+            },
+            "tag": "token",
+            "text": "heptacos"
+          },
+          {
+            "attributes": {
+              "value": "28"
+            },
+            "tag": "token",
+            "text": "octacos"
+          },
+          {
+            "attributes": {
+              "value": "29"
+            },
+            "tag": "token",
+            "text": "nonacos"
+          },
+          {
+            "attributes": {
+              "value": "30"
+            },
+            "tag": "token",
+            "text": "triacont"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "M",
+          "tagname": "multiplier",
+          "type": "VonBaeyer"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "2"
+            },
+            "tag": "token",
+            "text": "bi"
+          },
+          {
+            "attributes": {
+              "value": "3"
+            },
+            "tag": "token",
+            "text": "tri"
+          },
+          {
+            "attributes": {
+              "value": "4"
+            },
+            "tag": "token",
+            "text": "tetra"
+          },
+          {
+            "attributes": {
+              "value": "5"
+            },
+            "tag": "token",
+            "text": "penta"
+          },
+          {
+            "attributes": {
+              "value": "6"
+            },
+            "tag": "token",
+            "text": "hexa"
+          },
+          {
+            "attributes": {
+              "value": "7"
+            },
+            "tag": "token",
+            "text": "hepta"
+          },
+          {
+            "attributes": {
+              "value": "8"
+            },
+            "tag": "token",
+            "text": "octa"
+          },
+          {
+            "attributes": {
+              "value": "9"
+            },
+            "tag": "token",
+            "text": "nona"
+          },
+          {
+            "attributes": {
+              "value": "10"
+            },
+            "tag": "token",
+            "text": "deca"
+          },
+          {
+            "attributes": {
+              "value": "11"
+            },
+            "tag": "token",
+            "text": "undeca"
+          },
+          {
+            "attributes": {
+              "value": "12"
+            },
+            "tag": "token",
+            "text": "dodeca"
+          },
+          {
+            "attributes": {
+              "value": "13"
+            },
+            "tag": "token",
+            "text": "trideca"
+          },
+          {
+            "attributes": {
+              "value": "14"
+            },
+            "tag": "token",
+            "text": "tetradeca"
+          },
+          {
+            "attributes": {
+              "value": "15"
+            },
+            "tag": "token",
+            "text": "pentadeca"
+          },
+          {
+            "attributes": {
+              "value": "16"
+            },
+            "tag": "token",
+            "text": "hexadeca"
+          },
+          {
+            "attributes": {
+              "value": "17"
+            },
+            "tag": "token",
+            "text": "heptadeca"
+          },
+          {
+            "attributes": {
+              "value": "18"
+            },
+            "tag": "token",
+            "text": "octadeca"
+          },
+          {
+            "attributes": {
+              "value": "19"
+            },
+            "tag": "token",
+            "text": "nonadeca"
+          },
+          {
+            "attributes": {
+              "value": "20"
+            },
+            "tag": "token",
+            "text": "eicosa"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "P",
+          "tagname": "ringAssemblyMultiplier"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "2"
+            },
+            "tag": "token",
+            "text": "bi"
+          },
+          {
+            "attributes": {
+              "value": "3"
+            },
+            "tag": "token",
+            "text": "ter"
+          },
+          {
+            "attributes": {
+              "value": "4"
+            },
+            "tag": "token",
+            "text": "quater"
+          },
+          {
+            "attributes": {
+              "value": "5"
+            },
+            "tag": "token",
+            "text": "quinque"
+          },
+          {
+            "attributes": {
+              "value": "6"
+            },
+            "tag": "token",
+            "text": "sexi"
+          },
+          {
+            "attributes": {
+              "value": "7"
+            },
+            "tag": "token",
+            "text": "septi"
+          },
+          {
+            "attributes": {
+              "value": "8"
+            },
+            "tag": "token",
+            "text": "octi"
+          },
+          {
+            "attributes": {
+              "value": "9"
+            },
+            "tag": "token",
+            "text": "novi"
+          },
+          {
+            "attributes": {
+              "value": "10"
+            },
+            "tag": "token",
+            "text": "deci"
+          },
+          {
+            "attributes": {
+              "value": "11"
+            },
+            "tag": "token",
+            "text": "undeci"
+          },
+          {
+            "attributes": {
+              "value": "12"
+            },
+            "tag": "token",
+            "text": "dodeci"
+          },
+          {
+            "attributes": {
+              "value": "13"
+            },
+            "tag": "token",
+            "text": "trideci"
+          },
+          {
+            "attributes": {
+              "value": "14"
+            },
+            "tag": "token",
+            "text": "tetradeci"
+          },
+          {
+            "attributes": {
+              "value": "15"
+            },
+            "tag": "token",
+            "text": "pentadeci"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u2556",
+          "tagname": "multiplier",
+          "type": "basic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "1"
+            },
+            "tag": "token",
+            "text": "mono"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "multipliers.xml"
+}

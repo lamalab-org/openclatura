@@ -1,0 +1,1325 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "name": "monovalentFunctionalGroup",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "monovalentFunctionalGroup",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "monovalentFunctionalGroup",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "monovalentFunctionalGroup",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "ester",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "\\S(at[e]?|amid[e]?|it[e]?)[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "amide",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "(ic|ous)([ ]?(acid)?)?[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "amid[e]?[\\]\\)\\}]*",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "amide",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "(ic|ous)([ ]?(acid)?)?[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "^amid[e]?[\\]\\)\\}]*",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "functionGroupAsGroup",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "amid[e]?[\\]\\)\\}]*",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "functionalClassEster",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "(ic|ous)([ ]?(acid)?)?[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "functionalTerm",
+              "value": "ester"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "functionalClassEster",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "(ic|ous)([ ]?(acid)?)?[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "functionalTerm",
+              "value": "ester"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "functionalClassEster",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "(ic|ous)([ ]?(acid)?)?[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "functionalTerm",
+              "value": "ester"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "functionalClassEster",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "(at[e]?|amid[e]?|it[e]?)[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "functionalTerm",
+              "value": "ester"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "functionalClassEster",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "(at[e]?|amid[e]?|it[e]?)[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "functionalTerm",
+              "value": "ester"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "functionalClassEster",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "(at[e]?|amid[e]?|it[e]?)[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "functionalTerm",
+              "value": "ester"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "multiEster",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "(at[e]?|amid[e]?|it[e]?)[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "multiEster",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "(at[e]?|amid[e]?|it[e]?)[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "multiEster",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "(at[e]?|amid[e]?|it[e]?)[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "divalentFunctionalGroup",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "diValentGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "divalentFunctionalGroup",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "diValentGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "glycol",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "(diyl|ylen[e]?)[\\]\\)\\}]*",
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "(glycol|fluorohydrin|chlorohydrin|bromohydrin|iodohydrin|cyanohydrin)",
+              "functionalGroupType": "functionalClass",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "glycolEther",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "glycol",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "functionalTerm",
+              "value": "ether"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "(at[e]?|amid[e]?|it[e]?)[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "glycolEther",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "glycol",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "functionalTerm",
+              "value": "ether"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "oxide",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "(?<!ic|ous)",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "(oxide|sulfide|selenide|telluride)",
+              "functionalGroupType": "functionalClass",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "hydrazide",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "(ic|ous)([ ]?(acid)?)?[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "(hydrazide)",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "carbonylDerivative",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "^((thi|selen|tellur)?oxime|hydrazone|semicarbazone|thiosemicarbazone|selenosemicarbazone|tellurosemicarbazone|imide|imine)[\\]\\)\\}]*",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "carbonylDerivative",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "((thi|selen|tellur)?oxime|hydrazone|semicarbazone|imide|imine)[\\]\\)\\}]*",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "anhydride",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "(ic|ous)([ ]?(acid)?)?[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "(ic|ous)([ ]?(acid)?)?[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "anhydride[\\]\\)\\}]*",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "anhydride",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "(ic|ous)([ ]?(acid)?)?[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "anhydride[\\]\\)\\}]*",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "acidHalideOrPseudoHalide",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "((?<!^arsen)ic|ous)",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "acidHalideOrPseudoHalide",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "((?<!^arsen)ic|ous)",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "acidHalideOrPseudoHalide",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "((?<!^arsen)ic|ous)",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "acidHalideOrPseudoHalide",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithRegex": "((?<!^arsen)ic|ous)",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "functionGroupAsGroup",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "functionalClassEster",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithGroupType": "aminoAcid",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "functionalTerm",
+              "value": "ester"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "additionCompound",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithGroupSubType": "elementaryAtom",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "additionCompound",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithGroupSubType": "elementaryAtom",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "additionCompound",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithGroupSubType": "elementaryAtom",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "additionCompound",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithGroupSubType": "elementaryAtom",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "functionalGroupType": "monoValentStandaloneGroup",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "acetal",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "(acetal|ketal)",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "acetal",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "(acetal|ketal)",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "acetal",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "(acetal|ketal)",
+              "type": "functionalTerm"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "biochemicalEster",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithGroupSubType": "biochemical",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "\\S((?<!hydr)at[e]?|amid[e]?|it[e]?)[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "biochemicalEster",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithGroupType": "aminoAcid",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "\\S((?<!hydr)at[e]?|amid[e]?|it[e]?)[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "biochemicalEster",
+          "type": "full"
+        },
+        "children": [
+          {
+            "attributes": {
+              "endsWithGroupSubType": "carbohydrate",
+              "type": "full"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "endsWithRegex": "\\S((?<!hydr)at[e]?|amid[e]?|it[e]?)[\\]\\)\\}]*",
+              "type": "full"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "polymer",
+          "type": "polymer"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "functionalTerm",
+              "value": "poly"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      },
+      {
+        "attributes": {
+          "name": "polymer",
+          "type": "polymer"
+        },
+        "children": [
+          {
+            "attributes": {
+              "type": "functionalTerm",
+              "value": "oligo"
+            },
+            "tag": "word"
+          },
+          {
+            "attributes": {
+              "type": "substituent"
+            },
+            "tag": "word"
+          }
+        ],
+        "tag": "wordRule"
+      }
+    ],
+    "tag": "wordRules"
+  },
+  "source_xml_file": "wordRules.xml"
+}

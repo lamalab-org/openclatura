@@ -1,0 +1,138 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "attributes": {
+      "subType": "substituent",
+      "symbol": "X",
+      "tagname": "group",
+      "type": "substituent"
+    },
+    "children": [
+      {
+        "attributes": {
+          "labels": "none",
+          "usableAsAJoiner": "yes",
+          "valType": "SMILES",
+          "value": "B"
+        },
+        "tag": "token",
+        "text": "bor"
+      },
+      {
+        "attributes": {
+          "labels": "none",
+          "usableAsAJoiner": "yes",
+          "valType": "SMILES",
+          "value": "[SiH4]"
+        },
+        "tag": "token",
+        "text": "sil"
+      },
+      {
+        "attributes": {
+          "labels": "none",
+          "usableAsAJoiner": "yes",
+          "valType": "SMILES",
+          "value": "[GeH4]"
+        },
+        "tag": "token",
+        "text": "germ"
+      },
+      {
+        "attributes": {
+          "labels": "none",
+          "usableAsAJoiner": "yes",
+          "valType": "SMILES",
+          "value": "[SnH4]"
+        },
+        "tag": "token",
+        "text": "stann"
+      },
+      {
+        "attributes": {
+          "labels": "none",
+          "usableAsAJoiner": "yes",
+          "valType": "SMILES",
+          "value": "[PbH4]"
+        },
+        "tag": "token",
+        "text": "plumb"
+      },
+      {
+        "attributes": {
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "CCc1cc2OCOc2cc1"
+        },
+        "tag": "token",
+        "text": "homopiperon"
+      },
+      {
+        "attributes": {
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "C/C=C(C)/CCC[C@H](C)CCC[C@H](C)CCCC(C)C"
+        },
+        "tag": "token",
+        "text": "phyt"
+      },
+      {
+        "attributes": {
+          "labels": "///1/2,ortho/3,meta/4,para/5/6",
+          "valType": "SMILES",
+          "value": "CC(=O)c1ccccc1"
+        },
+        "tag": "token",
+        "text": "phenac"
+      },
+      {
+        "attributes": {
+          "labels": "none",
+          "valType": "SMILES",
+          "value": "Cc1cc2OCOc2cc1"
+        },
+        "tag": "token",
+        "text": "piperon"
+      },
+      {
+        "attributes": {
+          "defaultInID": "4",
+          "labels": "/1/2,ortho//3,meta/4,para/5/6",
+          "valType": "SMILES",
+          "value": "Cc1c(O)cccc1"
+        },
+        "tag": "token",
+        "text": "salic"
+      },
+      {
+        "attributes": {
+          "usableAsAJoiner": "yes",
+          "valType": "SMILES",
+          "value": "CC=C"
+        },
+        "tag": "token",
+        "text": "all"
+      },
+      {
+        "attributes": {
+          "usableAsAJoiner": "yes",
+          "valType": "SMILES",
+          "value": "CC=C"
+        },
+        "tag": "token",
+        "text": "allan"
+      },
+      {
+        "attributes": {
+          "usableAsAJoiner": "yes",
+          "valType": "SMILES",
+          "value": "C=C"
+        },
+        "tag": "token",
+        "text": "vin"
+      }
+    ],
+    "tag": "tokenList"
+  },
+  "source_xml_file": "substituents.xml"
+}

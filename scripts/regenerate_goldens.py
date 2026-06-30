@@ -18,7 +18,7 @@ from pathlib import Path
 
 import rdkit
 
-from bluenamer import name_smiles
+from openclatura import name_smiles
 
 ROOT = Path(__file__).resolve().parent.parent
 CORPUS = ROOT / "tests/fixtures/diverse_corpus.csv"

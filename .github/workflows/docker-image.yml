@@ -37,14 +37,14 @@ jobs:
         with:
           context: .
           load: true
-          tags: bluenamer:test
+          tags: openclatura:test
 
       - name: Smoke test Docker image
         run: |
-          docker run --rm -d -p 8000:8000 --name bluenamer-test bluenamer:test
+          docker run --rm -d -p 8000:8000 --name openclatura-test openclatura:test
           sleep 5
           curl --fail http://localhost:8000/healthz
-          docker stop bluenamer-test
+          docker stop openclatura-test
 
       - name: Build and push image from main
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'

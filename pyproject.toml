@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "bluenamer"
+name = "openclatura"
 version = "0.1.0"
 description = "Deterministic SMILES-to-IUPAC name generator based on the IUPAC Blue Book"
 readme = "README.md"
@@ -64,10 +64,10 @@ Repository = "https://github.com/lamalab-org/iupac-name-generator"
 Issues = "https://github.com/lamalab-org/iupac-name-generator/issues"
 
 [project.scripts]
-bluenamer = "bluenamer.cli:main"
+openclatura = "openclatura.cli:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/bluenamer"]
+packages = ["src/openclatura"]
 
 
 [tool.ruff]
@@ -99,8 +99,8 @@ line-ending = "auto"
 minversion = "7.0"
 testpaths = [
     "tests",
-    "src/bluenamer/tests",
-    "src/bluenamer/tests_roundtrip",
+    "src/openclatura/tests",
+    "src/openclatura/tests_roundtrip",
 ]
 addopts = [
     "-ra",
@@ -118,7 +118,7 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["bluenamer"]
+source = ["openclatura"]
 omit = ["*/tests/*", "*/tests_roundtrip/*"]
 
 [tool.coverage.report]

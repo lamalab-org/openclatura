@@ -1,0 +1,977 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "subType": "multiRadicalSubstituent",
+          "symbol": "x",
+          "tagname": "group",
+          "type": "substituent"
+        },
+        "children": [
+          {
+            "attributes": {
+              "iminoLike": "yes",
+              "labels": "1",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "C"
+            },
+            "tag": "token",
+            "text": "methylene"
+          },
+          {
+            "attributes": {
+              "iminoLike": "yes",
+              "labels": "1",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "C"
+            },
+            "tag": "token",
+            "text": "methylen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2",
+              "outIDs": "1,2",
+              "valType": "SMILES",
+              "value": "CC"
+            },
+            "tag": "token",
+            "text": "ethylene"
+          },
+          {
+            "attributes": {
+              "labels": "1/2",
+              "outIDs": "1,2",
+              "valType": "SMILES",
+              "value": "CC"
+            },
+            "tag": "token",
+            "text": "ethylen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3",
+              "outIDs": "1,2",
+              "valType": "SMILES",
+              "value": "CCC"
+            },
+            "tag": "token",
+            "text": "propylene"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3",
+              "outIDs": "1,2",
+              "valType": "SMILES",
+              "value": "CCC"
+            },
+            "tag": "token",
+            "text": "propylen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4",
+              "outIDs": "1,4",
+              "valType": "SMILES",
+              "value": "CCCC"
+            },
+            "tag": "token",
+            "text": "butylene"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4",
+              "outIDs": "1,4",
+              "valType": "SMILES",
+              "value": "CCCC"
+            },
+            "tag": "token",
+            "text": "butylen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5",
+              "outIDs": "1,5",
+              "valType": "SMILES",
+              "value": "CCCCC"
+            },
+            "tag": "token",
+            "text": "pentylene"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5",
+              "outIDs": "1,5",
+              "valType": "SMILES",
+              "value": "CCCCC"
+            },
+            "tag": "token",
+            "text": "pentylen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6",
+              "outIDs": "1,6",
+              "valType": "SMILES",
+              "value": "CCCCCC"
+            },
+            "tag": "token",
+            "text": "hexylene"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6",
+              "outIDs": "1,6",
+              "valType": "SMILES",
+              "value": "CCCCCC"
+            },
+            "tag": "token",
+            "text": "hexylen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7",
+              "outIDs": "1,7",
+              "valType": "SMILES",
+              "value": "CCCCCCC"
+            },
+            "tag": "token",
+            "text": "heptylene"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7",
+              "outIDs": "1,7",
+              "valType": "SMILES",
+              "value": "CCCCCCC"
+            },
+            "tag": "token",
+            "text": "heptylen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/8",
+              "outIDs": "1,8",
+              "valType": "SMILES",
+              "value": "CCCCCCCC"
+            },
+            "tag": "token",
+            "text": "octylene"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/8",
+              "outIDs": "1,8",
+              "valType": "SMILES",
+              "value": "CCCCCCCC"
+            },
+            "tag": "token",
+            "text": "octylen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/8/9",
+              "outIDs": "1,9",
+              "valType": "SMILES",
+              "value": "CCCCCCCCC"
+            },
+            "tag": "token",
+            "text": "nonylene"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/8/9",
+              "outIDs": "1,9",
+              "valType": "SMILES",
+              "value": "CCCCCCCCC"
+            },
+            "tag": "token",
+            "text": "nonylen"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/8/9/10/11",
+              "outIDs": "1,11",
+              "valType": "SMILES",
+              "value": "CCCCCCCCCCC"
+            },
+            "tag": "token",
+            "text": "undecylene"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/8/9/10/11",
+              "outIDs": "1,11",
+              "valType": "SMILES",
+              "value": "CCCCCCCCCCC"
+            },
+            "tag": "token",
+            "text": "undecylen"
+          },
+          {
+            "attributes": {
+              "iminoLike": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "C"
+            },
+            "tag": "token",
+            "text": "carbene"
+          },
+          {
+            "attributes": {
+              "outIDs": "1,2",
+              "valType": "SMILES",
+              "value": "C=C"
+            },
+            "tag": "token",
+            "text": "vinylene"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,3",
+              "valType": "SMILES",
+              "value": "CC(C)(C)C"
+            },
+            "tag": "token",
+            "text": "neopentylene"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,6",
+              "valType": "SMILES",
+              "value": "c1c(C)c(C)cc(C)c1C"
+            },
+            "tag": "token",
+            "text": "durylene"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "outIDs": "1,2",
+              "valType": "SMILES",
+              "value": "c1ccccc1"
+            },
+            "tag": "token",
+            "text": "phenylene"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2,ortho/3,meta/4,para/5/6/",
+              "valType": "SMILES",
+              "value": "=Cc1c2cccc1.C2="
+            },
+            "tag": "token",
+            "text": "phthalylidene"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2,ortho/3,meta/4,para/5/6/",
+              "valType": "SMILES",
+              "value": "=Cc1c2cccc1.C2="
+            },
+            "tag": "token",
+            "text": "phthalal"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2,ortho/3,meta/4,para/5/6/",
+              "valType": "SMILES",
+              "value": "=Cc1cc2ccc1.C2="
+            },
+            "tag": "token",
+            "text": "isophthalylidene"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2,ortho/3,meta/4,para/5/6/",
+              "valType": "SMILES",
+              "value": "=Cc1cc2ccc1.C2="
+            },
+            "tag": "token",
+            "text": "isophthalal"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2,ortho/3,meta/4,para/5/6/",
+              "valType": "SMILES",
+              "value": "=Cc1ccc2cc1.C2="
+            },
+            "tag": "token",
+            "text": "terephthalylidene"
+          },
+          {
+            "attributes": {
+              "labels": "/1/2,ortho/3,meta/4,para/5/6/",
+              "valType": "SMILES",
+              "value": "=Cc1ccc2cc1.C2="
+            },
+            "tag": "token",
+            "text": "terephthalal"
+          },
+          {
+            "attributes": {
+              "labels": "alpha/1/2,ortho/3,meta/4,para/5/6",
+              "outIDs": "3,5",
+              "valType": "SMILES",
+              "value": "Cc1ccccc1"
+            },
+            "tag": "token",
+            "text": "tolylene"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3//4",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "NNC(=O)N"
+            },
+            "tag": "token",
+            "text": "semicarbazono"
+          },
+          {
+            "attributes": {
+              "outIDs": "1,2",
+              "valType": "SMILES",
+              "value": "[SiH3]O"
+            },
+            "tag": "token",
+            "text": "siloxane"
+          },
+          {
+            "attributes": {
+              "labels": "3/2//1",
+              "outIDs": "1,4",
+              "valType": "SMILES",
+              "value": "NC(=O)N"
+            },
+            "tag": "token",
+            "text": "ureylene"
+          },
+          {
+            "attributes": {
+              "addGroup": "C locant1;C locant2",
+              "frontLocantsExpected": "1,2,ortho,3,meta,4,para,5,6",
+              "labels": "1/2,ortho/3,meta/4,para/5/6",
+              "outIDs": "7,8",
+              "valType": "SMILES",
+              "value": "c1ccccc1"
+            },
+            "tag": "token",
+            "text": "xylylene"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "outIDs": "1,2",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "NN"
+            },
+            "tag": "token",
+            "text": "hydrazo"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "=NN="
+            },
+            "tag": "token",
+            "text": "azino"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,2",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "N=N"
+            },
+            "tag": "token",
+            "text": "azo"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "defaultInID": "2",
+              "labels": "none",
+              "outIDs": "1,3",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[NH+]([O-])=N"
+            },
+            "tag": "token",
+            "text": "azoxy"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "defaultInID": "2",
+              "labels": "none",
+              "outIDs": "1,2",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "N=[NH+][O-]"
+            },
+            "tag": "token",
+            "text": "nno-azoxy"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "defaultInID": "2",
+              "labels": "none",
+              "outIDs": "1,3",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[NH+]([O-])=N"
+            },
+            "tag": "token",
+            "text": "non-azoxy"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "defaultInID": "3",
+              "labels": "none",
+              "outIDs": "1,3",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[NH+]([O-])=N"
+            },
+            "tag": "token",
+            "text": "onn-azoxy"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,3",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "NN=N"
+            },
+            "tag": "token",
+            "text": "diazoamino"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "N"
+            },
+            "tag": "token",
+            "text": "nitrene"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "N"
+            },
+            "tag": "token",
+            "text": "aminylene"
+          },
+          {
+            "attributes": {
+              "iminoLike": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "N"
+            },
+            "tag": "token",
+            "text": "imino"
+          },
+          {
+            "attributes": {
+              "iminoLike": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[NH4+]"
+            },
+            "tag": "token",
+            "text": "iminio"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1,1",
+              "valType": "SMILES",
+              "value": "N"
+            },
+            "tag": "token",
+            "text": "nitrilo"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1,1",
+              "valType": "SMILES",
+              "value": "[NH4+]"
+            },
+            "tag": "token",
+            "text": "nitrilio"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1,1",
+              "valType": "SMILES",
+              "value": "[P|3]"
+            },
+            "tag": "token",
+            "text": "phosphinidyne"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1,1",
+              "valType": "SMILES",
+              "value": "[As|3]"
+            },
+            "tag": "token",
+            "text": "arsinidyne"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1,1",
+              "valType": "SMILES",
+              "value": "[Sb|3]"
+            },
+            "tag": "token",
+            "text": "stibylidyne"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1,1",
+              "valType": "SMILES",
+              "value": "[Bi|3]"
+            },
+            "tag": "token",
+            "text": "bismuthylidyne"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "[P|4+]"
+            },
+            "tag": "token",
+            "text": "phosphinidenio"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "[As|4+]"
+            },
+            "tag": "token",
+            "text": "arsinidenio"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "[P|5](=O)(O)"
+            },
+            "tag": "token",
+            "text": "phosphinico"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "[As|5](=O)(O)"
+            },
+            "tag": "token",
+            "text": "arsinico"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "[Sb|5](=O)(O)"
+            },
+            "tag": "token",
+            "text": "stibinico"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,2",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "OO"
+            },
+            "tag": "token",
+            "text": "peroxy"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[NH3+][O-]"
+            },
+            "tag": "token",
+            "text": "nitroryl"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[P|5](=O)[O-]"
+            },
+            "tag": "token",
+            "text": "phosphinato"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[As|5](=O)[O-]"
+            },
+            "tag": "token",
+            "text": "arsinato"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[Sb|5](=O)[O-]"
+            },
+            "tag": "token",
+            "text": "stibinato"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "[SiH4]"
+            },
+            "tag": "token",
+            "text": "silylene"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "[GeH4]"
+            },
+            "tag": "token",
+            "text": "germylene"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "[SnH4]"
+            },
+            "tag": "token",
+            "text": "stannylene"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "[PbH4]"
+            },
+            "tag": "token",
+            "text": "plumbylene"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "B"
+            },
+            "tag": "token",
+            "text": "borylene"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "O"
+            },
+            "tag": "token",
+            "text": "oxy"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "S"
+            },
+            "tag": "token",
+            "text": "thio"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[SeH2]"
+            },
+            "tag": "token",
+            "text": "seleno"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[TeH2]"
+            },
+            "tag": "token",
+            "text": "telluro"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "C=S"
+            },
+            "tag": "token",
+            "text": "carbothioyl"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "C=[Se]"
+            },
+            "tag": "token",
+            "text": "carboselenoyl"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "C=[Te]"
+            },
+            "tag": "token",
+            "text": "carbotelluroyl"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "C=NN"
+            },
+            "tag": "token",
+            "text": "carbohydrazonoyl"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "C=N"
+            },
+            "tag": "token",
+            "text": "carboimidoyl"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "C=NO"
+            },
+            "tag": "token",
+            "text": "carbohydroximoyl"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "epoxyLike",
+          "symbol": "x",
+          "tagname": "group",
+          "type": "substituent"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "O"
+            },
+            "tag": "token",
+            "text": "epoxy"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "S"
+            },
+            "tag": "token",
+            "text": "epithio"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "[SeH2]"
+            },
+            "tag": "token",
+            "text": "episeleno"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1",
+              "valType": "SMILES",
+              "value": "[TeH2]"
+            },
+            "tag": "token",
+            "text": "epitelluro"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u00e3",
+          "tagname": "fusedRingBridge"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "O"
+            },
+            "tag": "token",
+            "text": "epoxy"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "S"
+            },
+            "tag": "token",
+            "text": "epithio"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[SeH2]"
+            },
+            "tag": "token",
+            "text": "episeleno"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "[TeH2]"
+            },
+            "tag": "token",
+            "text": "epitelluro"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "multiRadicalSubstituent",
+          "symbol": "\u2557",
+          "tagname": "group",
+          "type": "substituent"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "1,1,1",
+              "valType": "SMILES",
+              "value": "N"
+            },
+            "tag": "token",
+            "text": "amine"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "multiRadicalSubstituents.xml"
+}

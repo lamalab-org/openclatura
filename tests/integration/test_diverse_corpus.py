@@ -27,8 +27,8 @@ from pathlib import Path
 
 import pytest
 
-from bluenamer import name as name_one
-from bluenamer.opsin_verify import verify_with_opsin
+from openclatura import name as name_one
+from openclatura.opsin_verify import verify_with_opsin
 
 FIXTURE = Path(__file__).resolve().parent.parent / "fixtures" / "diverse_corpus.csv"
 

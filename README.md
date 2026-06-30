@@ -1,11 +1,10 @@
-# bluenamer
+# openclatura
 
-A deterministic SMILES → IUPAC name generator derived from the rules of the
-IUPAC Blue Book (2013 recommendations).
+**Open Nomenclature Framework**
 
-The package walks the molecular graph (parsed via RDKit), perceives functional
-groups and ring systems, selects a principal parent, assigns locants, and
-assembles the substitutive name. Every step is recorded in an inspectable
+`openclatura` is a deterministic SMILES-to-IUPAC name generator inspired by the IUPAC Blue Book 2013 recommendations.
+
+Built on top of RDKit, the package walks the molecular graph, detects functional groups and ring systems, selects the principal parent, assigns locants, and constructs the corresponding substitutive IUPAC name. Every step is recorded in an inspectable
 decision trace so the *why* of a name is recoverable, not just the *what*.
 
 > **Status:** alpha. The naming engine handles a broad slice of organic
@@ -16,7 +15,7 @@ decision trace so the *why* of a name is recoverable, not just the *what*.
 ## Install
 
 ```bash
-pip install bluenamer
+pip install openclatura
 ```
 
 Optional extras:
@@ -29,13 +28,13 @@ Optional extras:
 | `[dev]`      | pytest, ruff, pre-commit, hypothesis, py2opsin        |
 
 ```bash
-pip install "bluenamer[opsin,datasets]"
+pip install "openclatura[opsin,datasets]"
 ```
 
 ## Quick start
 
 ```python
-from bluenamer import name_smiles
+from openclatura import name_smiles
 
 name_smiles("CCO")          # 'ethanol'
 name_smiles("c1ccccc1")     # 'benzene'
@@ -44,10 +43,10 @@ name_smiles("CC(=O)O")      # 'acetic acid'
 
 ### Typed result with rules hit + OPSIN round-trip
 
-For everything richer than the bare string, use `bluenamer.name`:
+For everything richer than the bare string, use `openclatura.name`:
 
 ```python
-from bluenamer import name
+from openclatura import name
 
 result = name("CC(=O)Nc1ccccc1", include_trace=True, verify_opsin=True)
 
@@ -64,7 +63,7 @@ Errors do not raise — they are captured on `result.error`, which makes
 the batch API safe to point at noisy datasets:
 
 ```python
-from bluenamer import name_many
+from openclatura import name_many
 
 results = name_many(
     ["CCO", "c1ccccc1", "definitely-not-a-smiles"],
@@ -78,7 +77,7 @@ For the full decision trace (one `TraceStep` per phase: parse, perception,
 parent selection, numbering, assembly, …):
 
 ```python
-from bluenamer import analyze_smiles
+from openclatura import analyze_smiles
 
 analysis = analyze_smiles("CC(=O)Nc1ccccc1")
 for step in analysis.decisions:
@@ -87,25 +86,25 @@ for step in analysis.decisions:
 ### CLI
 
 ```bash
-bluenamer name "CC(=O)Nc1ccccc1"            # → N-phenylacetamide
-bluenamer name "CC(=O)Nc1ccccc1" --json     # JSON with trace + rules
-bluenamer batch smiles.txt --output names.jsonl --processes auto
+openclatura name "CC(=O)Nc1ccccc1"            # → N-phenylacetamide
+openclatura name "CC(=O)Nc1ccccc1" --json     # JSON with trace + rules
+openclatura batch smiles.txt --output names.jsonl --processes auto
 ```
 The CLI tool has OPSIN verification turned on by default. It can be turned off with
 
 ```bash
-bluenamer name "CN1C=NC2=C1C(=O)N(C(=O)N2C)C" --no-verify       
+openclatura name "CN1C=NC2=C1C(=O)N(C(=O)N2C)C" --no-verify       
 ```
 
 ### Natural-language description (`describe`)
 
-`bluenamer.describe(smiles)` walks the same trace and renders a
+`openclatura.describe(smiles)` walks the same trace and renders a
 deterministic, multi-paragraph explanation of how the name is built.
 Useful for explainability views and for generating (SMILES, name,
 description) training tuples:
 
 ```python
-from bluenamer import describe
+from openclatura import describe
 
 d = describe("CC(=O)Nc1ccccc1")
 print(d)            # multi-paragraph prose
@@ -117,10 +116,10 @@ Same input → same output. No LLM in the loop.
 
 ## Human-like description
 
-Bluenamer can generate uncanny human-like descriptions of molecules.
+Openclatura can generate uncanny human-like descriptions of molecules.
 ```python
 
-from bluenamer import describe_human
+from openclatura import describe_human
 
 d = describe_human("CN1C=NC2=C1C(=O)N(C(=O)N2C)C")
 print(d.text)
@@ -155,8 +154,8 @@ pytest -m "not slow and not dataset and not golden"
 pytest -m golden
 
 # lint and format
-ruff check --fix src/bluenamer
-ruff format src/bluenamer
+ruff check --fix src/openclatura
+ruff format src/openclatura
 ```
 
 Java is required for the OPSIN-based round-trip checks (see `py2opsin`).
@@ -169,8 +168,8 @@ so `verify_opsin=True` works out of the box.
 
 ```bash
 # build + run
-docker build -t bluenamer:local .
-docker run --rm -p 8000:8000 bluenamer:local
+docker build -t openclatura:local .
+docker run --rm -p 8000:8000 openclatura:local
 
 # or via compose
 docker compose -f docker/compose.yaml up --build

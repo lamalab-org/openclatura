@@ -4,7 +4,7 @@ Property-based naming engine tests. Each strategy emits SMILES that
 RDKit parses cleanly (we validate that as a precondition), then we
 assert engine invariants:
 
-- ``bluenamer.name(s)`` never raises (it captures internal errors on
+- ``openclatura.name(s)`` never raises (it captures internal errors on
   ``result.error`` instead). Marker: ``fuzz``.
 - Outputs are stable across repeated calls for the same input.
 - ``name_many([s, s, s])[0].name == name(s).name`` — batch and single
@@ -23,9 +23,9 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from rdkit import Chem
 
-from bluenamer import name as name_one
-from bluenamer import name_many
-from bluenamer.opsin_verify import opsin_available
+from openclatura import name as name_one
+from openclatura import name_many
+from openclatura.opsin_verify import opsin_available
 
 _OPSIN_AVAILABLE = opsin_available()
 
@@ -124,7 +124,7 @@ _FUZZ_SETTINGS = settings(
 @_FUZZ_SETTINGS
 @given(smiles=smiles_grammar)
 def test_name_never_raises_on_grammar_smiles(smiles):
-    """``bluenamer.name`` must never raise on grammar-valid SMILES.
+    """``openclatura.name`` must never raise on grammar-valid SMILES.
 
     Errors must surface as ``result.error`` instead. We pre-filter on
     RDKit parsing so we don't flag the engine for unparseable inputs;
