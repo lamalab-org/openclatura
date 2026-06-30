@@ -1,5 +1,5 @@
 """
-bluenamer/rules/stems.py
+openclatura/rules/stems.py
 
 Chain-length stems for IUPAC nomenclature.
 Used for alkane parent names, substituent names, and ring stems.

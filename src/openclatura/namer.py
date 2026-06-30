@@ -1,4 +1,4 @@
-# bluenamer/api.py
+# openclatura/api.py
 
 import re
 from dataclasses import dataclass, field

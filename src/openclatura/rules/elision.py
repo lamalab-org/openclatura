@@ -1,5 +1,5 @@
 """
-bluenamer/rules/elision.py
+openclatura/rules/elision.py
 
 Vowel and consonant elision rules for IUPAC name assembly.
 

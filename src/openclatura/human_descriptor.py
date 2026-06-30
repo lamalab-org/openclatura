@@ -1,6 +1,6 @@
 """Human-oriented molecule descriptions from structured naming metadata.
 
-This module is separate from :mod:`bluenamer.describer` on purpose.  The
+This module is separate from :mod:`openclatura.describer` on purpose.  The
 existing describer is useful for debugging the naming pipeline and token
 bindings; this descriptor renders a compact, chemistry-facing explanation from
 the nested component/substituent tree.  It does not inspect final token spans.

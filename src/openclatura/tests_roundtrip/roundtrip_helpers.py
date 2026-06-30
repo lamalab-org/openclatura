@@ -13,7 +13,7 @@ import pytest
 from rdkit import Chem
 from rdkit.Chem.MolStandardize import rdMolStandardize
 
-from bluenamer.namer import name_smiles
+from openclatura.namer import name_smiles
 
 try:
     import py2opsin
@@ -120,7 +120,7 @@ def roundtrip_smiles(smiles: str) -> None:
     name = name_smiles(original)
     assert name
 
-    with tempfile.NamedTemporaryFile(prefix="bluenamer_opsin_", suffix=".txt", delete=True) as handle:
+    with tempfile.NamedTemporaryFile(prefix="openclatura_opsin_", suffix=".txt", delete=True) as handle:
         tmp_fpath = handle.name
     result = py2opsin.py2opsin([name], tmp_fpath=tmp_fpath)
     assert result and result[0]

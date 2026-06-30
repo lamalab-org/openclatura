@@ -1,4 +1,4 @@
-"""bluenamer — deterministic SMILES → IUPAC name generator."""
+"""openclatura — deterministic SMILES → IUPAC name generator."""
 
 from collections.abc import Iterable
 

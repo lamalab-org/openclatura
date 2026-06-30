@@ -8,7 +8,7 @@ import sys
 
 import pytest
 
-from bluenamer import (
+from openclatura import (
     DEFAULT_NAMING_ENGINE,
     NamingEngine,
     NamingRequest,
@@ -211,7 +211,7 @@ def test_name_many_swallows_per_row_errors():
 
 def test_engine_run_with_verify_opsin_skips_gracefully_without_opsin(monkeypatch):
     # Force the "no py2opsin" path even when the optional dep is installed.
-    import bluenamer.opsin_verify as ov
+    import openclatura.opsin_verify as ov
 
     monkeypatch.setattr(ov, "_try_import_py2opsin", lambda: None)
     result = DEFAULT_NAMING_ENGINE.run(NamingRequest(smiles="CCO", verify_opsin=True))
@@ -221,7 +221,7 @@ def test_engine_run_with_verify_opsin_skips_gracefully_without_opsin(monkeypatch
 
 
 def test_engine_run_with_verify_opsin_skips_gracefully_without_java(monkeypatch):
-    import bluenamer.opsin_verify as ov
+    import openclatura.opsin_verify as ov
 
     # py2opsin present, java not.
     monkeypatch.setattr(ov, "_try_import_py2opsin", lambda: object())
@@ -241,7 +241,7 @@ def test_naming_engine_is_reusable():
 
 def test_cli_name_subcommand_prints_name():
     result = subprocess.run(
-        [sys.executable, "-m", "bluenamer.cli", "name", "CCO"],
+        [sys.executable, "-m", "openclatura.cli", "name", "CCO"],
         capture_output=True,
         text=True,
         check=False,
@@ -252,7 +252,7 @@ def test_cli_name_subcommand_prints_name():
 
 def test_cli_name_json_emits_structured_payload():
     result = subprocess.run(
-        [sys.executable, "-m", "bluenamer.cli", "name", "CC(=O)O", "--json"],
+        [sys.executable, "-m", "openclatura.cli", "name", "CC(=O)O", "--json"],
         capture_output=True,
         text=True,
         check=False,

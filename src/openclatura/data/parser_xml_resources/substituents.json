@@ -1,5 +1,5 @@
 {
-  "format": "bluenamer.parser_xml_resource.v1",
+  "format": "openclatura.parser_xml_resource.v1",
   "root": {
     "attributes": {
       "subType": "substituent",

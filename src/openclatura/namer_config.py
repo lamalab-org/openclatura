@@ -1,6 +1,6 @@
 """Compatibility aliases for the central nomenclature registry.
 
-New code should import ``RULES`` from :mod:`bluenamer.nomenclature`.
+New code should import ``RULES`` from :mod:`openclatura.nomenclature`.
 These names remain for existing modules and external imports.
 """
 

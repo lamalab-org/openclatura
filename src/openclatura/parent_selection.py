@@ -1,4 +1,4 @@
-# bluenamer/parent_selection.py
+# openclatura/parent_selection.py
 from dataclasses import dataclass
 
 from .chains import RingSystem

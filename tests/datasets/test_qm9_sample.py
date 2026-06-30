@@ -13,8 +13,8 @@ import random
 
 import pytest
 
-from bluenamer import name_many
-from bluenamer.opsin_verify import verify_with_opsin
+from openclatura import name_many
+from openclatura.opsin_verify import verify_with_opsin
 
 pytestmark = [pytest.mark.dataset, pytest.mark.slow]
 

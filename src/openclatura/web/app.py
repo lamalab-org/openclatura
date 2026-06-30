@@ -1,4 +1,4 @@
-"""FastAPI HTTP surface for bluenamer.
+"""FastAPI HTTP surface for openclatura.
 
 Endpoints:
 
@@ -9,11 +9,11 @@ Endpoints:
 
 Run locally::
 
-    uvicorn bluenamer.web.app:app --host 0.0.0.0 --port 8000
+    uvicorn openclatura.web.app:app --host 0.0.0.0 --port 8000
 
 Or via the helper::
 
-    python -m bluenamer.web
+    python -m openclatura.web
 
 Requires the ``[web]`` extra. ``[opsin]`` + a JDK are needed for
 ``verify_opsin=True``; otherwise the endpoint reports the OPSIN
@@ -28,7 +28,7 @@ try:
     from fastapi import FastAPI
     from pydantic import BaseModel, Field
 except ImportError as exc:  # pragma: no cover - extra not installed
-    raise ImportError("bluenamer.web requires the [web] extra: pip install 'bluenamer[web]'") from exc
+    raise ImportError("openclatura.web requires the [web] extra: pip install 'openclatura[web]'") from exc
 
 from .. import __version__, describe, name_many
 from .. import name as name_one
@@ -58,7 +58,7 @@ def create_app() -> FastAPI:
     """Build the FastAPI app. Factory style keeps tests honest."""
 
     app = FastAPI(
-        title="bluenamer",
+        title="openclatura",
         version=__version__,
         description="SMILES → IUPAC name service (Blue Book rules).",
     )

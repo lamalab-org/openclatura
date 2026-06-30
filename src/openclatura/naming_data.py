@@ -1,4 +1,4 @@
-"""Data-backed nomenclature lookups used by :mod:`bluenamer.namer`.
+"""Data-backed nomenclature lookups used by :mod:`openclatura.namer`.
 
 The tables loaded here keep extendable naming vocabulary out of the graph
 algorithms.  Each JSON entry carries a Blue Book rule reference so new entries

@@ -1,6 +1,6 @@
 import pytest
 
-from bluenamer.tests_roundtrip.roundtrip_helpers import roundtrip_smiles
+from openclatura.tests_roundtrip.roundtrip_helpers import roundtrip_smiles
 
 CASES = [
     pytest.param("[N-]1[NH+]=CC=C2C=CN=C12", id="qm9-129001"),

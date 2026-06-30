@@ -12,7 +12,7 @@ pytest.importorskip("httpx")
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from bluenamer.web import create_app  # noqa: E402
+from openclatura.web import create_app  # noqa: E402
 
 
 @pytest.fixture(scope="module")

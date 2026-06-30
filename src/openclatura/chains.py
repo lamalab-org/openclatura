@@ -1,4 +1,4 @@
-# bluenamer/chains.py
+# openclatura/chains.py
 
 from dataclasses import dataclass, field
 

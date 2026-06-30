@@ -1,7 +1,7 @@
 {
   "source": {
     "name": "BlueNamer parser grammar snapshot",
-    "format": "bluenamer.parser_grammar_snapshot.v1",
+    "format": "openclatura.parser_grammar_snapshot.v1",
     "resource_json_dir": "parser_xml_resources",
     "files": [
       "arylGroups.xml",

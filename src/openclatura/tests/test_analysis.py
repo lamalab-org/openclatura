@@ -1,7 +1,7 @@
 import pytest
 
-import bluenamer.rules.retained as retained_rules
-from bluenamer import (
+import openclatura.rules.retained as retained_rules
+from openclatura import (
     RULES,
     NamingEngine,
     NamingIntent,
@@ -10,17 +10,17 @@ from bluenamer import (
     TracePhase,
     name_smiles,
 )
-from bluenamer import (
+from openclatura import (
     analyze_smiles as _analyze_smiles,
 )
-from bluenamer.additive import add_indicated_hydrogens
-from bluenamer.assembler import (
+from openclatura.additive import add_indicated_hydrogens
+from openclatura.assembler import (
     assemble_name,
     assemble_name_result,
     post_process_name,
 )
-from bluenamer.assembly_charge import parent_charge_operations
-from bluenamer.assembly_parts import (
+from openclatura.assembly_charge import parent_charge_operations
+from openclatura.assembly_parts import (
     AssemblyParts,
     NameAtomBinding,
     NameTokenBinding,
@@ -29,24 +29,24 @@ from bluenamer.assembly_parts import (
     SubstituentItem,
     UnsaturationItem,
 )
-from bluenamer.assembly_spiro import (
+from openclatura.assembly_spiro import (
     _spiro_side_locant,
     extract_spiro_side_prefixes,
     format_spiro_core,
     split_spiro_substituents,
 )
-from bluenamer.chains import RingSystem, find_all_carbon_paths, find_ring_systems
-from bluenamer.charge_pair_roles import charge_pair_roles, unsupported_charge_pair_roles
-from bluenamer.formatting import ensure_stereo_descriptor_boundary, format_counted_prefixes
-from bluenamer.functional_groups import (
+from openclatura.chains import RingSystem, find_all_carbon_paths, find_ring_systems
+from openclatura.charge_pair_roles import charge_pair_roles, unsupported_charge_pair_roles
+from openclatura.formatting import ensure_stereo_descriptor_boundary, format_counted_prefixes
+from openclatura.functional_groups import (
     PERCEPTION_DETECTORS,
     PERCEPTION_SPECS,
     PerceptionDetectorSpec,
     register_group_detector,
     register_perception_spec,
 )
-from bluenamer.fused_ion_templates import fused_ion_operation_candidates, fused_ion_template_registry
-from bluenamer.fused_topology import (
+from openclatura.fused_ion_templates import fused_ion_operation_candidates, fused_ion_template_registry
+from openclatura.fused_topology import (
     RingTopologyRoute,
     RingTopologyRouteKind,
     bridged_fused_candidates,
@@ -59,7 +59,7 @@ from bluenamer.fused_topology import (
     fused_parent_side_letters,
     spiro_component_reference,
 )
-from bluenamer.grammar_snapshot_data import (
+from openclatura.grammar_snapshot_data import (
     local_grammar_snapshot,
     oxoacid_ester_suffix_templates,
     retained_fused_derivative_gate,
@@ -67,12 +67,12 @@ from bluenamer.grammar_snapshot_data import (
     retained_fused_token_status,
     retained_fused_tokens,
 )
-from bluenamer.graph_io import read_smiles
-from bluenamer.heteroatom_subgraphs import name_heteroatom_subgraph
-from bluenamer.heteroatom_substituent_specs import central_oxo_substituent_prefix, ligand_prefix, unsubstituted_prefix
-from bluenamer.heterocumulene_roles import nitrogen_heterocumulene_role
-from bluenamer.hypervalent_roles import HypervalentLigandRole, hypervalent_center_role, hypervalent_center_roles
-from bluenamer.ionic_naming import (
+from openclatura.graph_io import read_smiles
+from openclatura.heteroatom_subgraphs import name_heteroatom_subgraph
+from openclatura.heteroatom_substituent_specs import central_oxo_substituent_prefix, ligand_prefix, unsubstituted_prefix
+from openclatura.heterocumulene_roles import nitrogen_heterocumulene_role
+from openclatura.hypervalent_roles import HypervalentLigandRole, hypervalent_center_role, hypervalent_center_roles
+from openclatura.ionic_naming import (
     apply_parent_charge_names,
     apply_retained_parent_ide,
     apply_ring_parent_nitrogen_zwitterion_stack,
@@ -80,9 +80,9 @@ from bluenamer.ionic_naming import (
     contains_invalid_locant_ide,
     parent_charge_sites,
 )
-from bluenamer.locants import as_display_locant, coerce_display_numbering, locant_text, parse_locant
-from bluenamer.molecule import Molecule
-from bluenamer.name_assembly import (
+from openclatura.locants import as_display_locant, coerce_display_numbering, locant_text, parse_locant
+from openclatura.molecule import Molecule
+from openclatura.name_assembly import (
     FinalAssemblyAuditError,
     NameAssemblyResult,
     NameRewriteRule,
@@ -90,26 +90,26 @@ from bluenamer.name_assembly import (
     audit_final_name_assembly,
     build_name_token_spans,
 )
-from bluenamer.name_bindings import postprocess_name_atom_bindings, refresh_name_atom_bindings
-from bluenamer.name_operations import HydroOperation, ParentSuffixOperation
-from bluenamer.name_postprocessing import (
+from openclatura.name_bindings import postprocess_name_atom_bindings, refresh_name_atom_bindings
+from openclatura.name_operations import HydroOperation, ParentSuffixOperation
+from openclatura.name_postprocessing import (
     apply_connection_boundary_postprocessing,
     postprocessing_rule_inventory,
 )
-from bluenamer.namer import _number_saturated_n_ring_for_spiro, _spiro_subgraph_assembly, name_component, name_subgraph
-from bluenamer.naming_audit import UnnamedAtomError, assert_component_fully_named, audit_charge_pair_templates
-from bluenamer.naming_data import DATA_DIR, load_json_table, namer_rules
-from bluenamer.nitrogen_roles import (
+from openclatura.namer import _number_saturated_n_ring_for_spiro, _spiro_subgraph_assembly, name_component, name_subgraph
+from openclatura.naming_audit import UnnamedAtomError, assert_component_fully_named, audit_charge_pair_templates
+from openclatura.naming_data import DATA_DIR, load_json_table, namer_rules
+from openclatura.nitrogen_roles import (
     acid_derived_hydrazone_roles,
     azine_roles,
     nitrogen_chain_roles,
     terminal_n3_substituent_role,
 )
-from bluenamer.numbering import NUMBERING_CRITERIA, NumberingPreference, polycycle_numbering_key
-from bluenamer.oxoacid_roles import OxoLigandRole, central_oxo_roles, central_oxo_substituent_role
-from bluenamer.oxoacid_templates import OxoacidTemplateKind, oxoacid_role_template
-from bluenamer.parent_pipeline import build_parent_assembly_plan
-from bluenamer.parent_selection import (
+from openclatura.numbering import NUMBERING_CRITERIA, NumberingPreference, polycycle_numbering_key
+from openclatura.oxoacid_roles import OxoLigandRole, central_oxo_roles, central_oxo_substituent_role
+from openclatura.oxoacid_templates import OxoacidTemplateKind, oxoacid_role_template
+from openclatura.parent_pipeline import build_parent_assembly_plan
+from openclatura.parent_selection import (
     PARENT_SELECTION_CRITERIA,
     ParentCandidate,
     ParentSelection,
@@ -117,9 +117,9 @@ from bluenamer.parent_selection import (
     _prefer_spiro_backbone_components,
     select_principal_parent,
 )
-from bluenamer.perception import PerceivedGroup, perceive_groups
-from bluenamer.peroxy_carbonyl_roles import PeroxyCarbonylKind, peroxy_carbonyl_roles
-from bluenamer.polycycle_topology import (
+from openclatura.perception import PerceivedGroup, perceive_groups
+from openclatura.peroxy_carbonyl_roles import PeroxyCarbonylKind, peroxy_carbonyl_roles
+from openclatura.polycycle_topology import (
     audit_von_baeyer_descriptor,
     bicyclo_proof,
     build_ring_numbering,
@@ -127,9 +127,9 @@ from bluenamer.polycycle_topology import (
     monospiro_proof,
     ring_system_topology,
 )
-from bluenamer.principal_suffixes import render_principal_suffix
-from bluenamer.resonance_compare import equivalent_smiles
-from bluenamer.retained_fused_templates import (
+from openclatura.principal_suffixes import render_principal_suffix
+from openclatura.resonance_compare import equivalent_smiles
+from openclatura.retained_fused_templates import (
     RetainedFusedGraphTemplate,
     match_retained_fused_template,
     match_retained_fused_templates,
@@ -138,36 +138,36 @@ from bluenamer.retained_fused_templates import (
     retained_fused_template_from_data,
     template_molecule,
 )
-from bluenamer.retained_specs import retained_parent_spec
-from bluenamer.ring_parent import RingParent
-from bluenamer.ring_renderer import render_ring_descriptor, render_von_baeyer_descriptor
-from bluenamer.ring_systems import ring_system_fragment
-from bluenamer.role_certificate import (
+from openclatura.retained_specs import retained_parent_spec
+from openclatura.ring_parent import RingParent
+from openclatura.ring_renderer import render_ring_descriptor, render_von_baeyer_descriptor
+from openclatura.ring_systems import ring_system_fragment
+from openclatura.role_certificate import (
     audit_role_certificate,
     certificate_from_perceived_group,
     certificates_from_assembly,
 )
-from bluenamer.rule_layout import rule_group_specs, rule_groups, section_group_map, unassigned_sections
-from bluenamer.rules.retained import get_retained_ring
-from bluenamer.special_cases import (
+from openclatura.rule_layout import rule_group_specs, rule_groups, section_group_map, unassigned_sections
+from openclatura.rules.retained import get_retained_ring
+from openclatura.special_cases import (
     _alkyl_ligand_name,
     organophosphinic_acid_result,
     structural_replacement_parent_name,
     structural_replacement_parent_result,
     sulfoxide_parent_result,
 )
-from bluenamer.spiro_assembly import SpiroAssembly
-from bluenamer.stereo_audit import audit_stereochemistry
-from bluenamer.substituent_tokens import graph_bound_substituent_tokens
-from bluenamer.suffix_stack import SuffixStack
-from bluenamer.token_grammar import (
+from openclatura.spiro_assembly import SpiroAssembly
+from openclatura.stereo_audit import audit_stereochemistry
+from openclatura.substituent_tokens import graph_bound_substituent_tokens
+from openclatura.suffix_stack import SuffixStack
+from openclatura.token_grammar import (
     binding_term_tokens,
     is_locant_binding_token,
     is_locant_token,
     lexical_token_spans,
 )
-from bluenamer.trace_helpers import add_substituent_trace, assembly_substituent_tree, assembly_trace_segments
-from bluenamer.von_baeyer import _classify_secondary_bridges, find_von_baeyer_candidates
+from openclatura.trace_helpers import add_substituent_trace, assembly_substituent_tree, assembly_trace_segments
+from openclatura.von_baeyer import _classify_secondary_bridges, find_von_baeyer_candidates
 
 
 def analyze_smiles(smiles: str):
@@ -2719,7 +2719,7 @@ def test_functional_group_registry_exposes_derived_families():
 
 
 def test_legacy_suffix_and_substituent_modules_are_registry_views():
-    from bluenamer.rules import substituents, suffixes
+    from openclatura.rules import substituents, suffixes
 
     assert suffixes.get("carboxylic_acid").suffix == RULES.functional_groups.get("carboxylic_acid").suffix
     assert substituents.get("nitro").prefix == RULES.functional_groups.get("nitro").prefix
@@ -3081,7 +3081,7 @@ def test_parser_grammar_snapshot_is_owned_runtime_data():
     snapshot = local_grammar_snapshot()
 
     assert grammar is snapshot
-    assert snapshot["source"]["format"] == "bluenamer.parser_grammar_snapshot.v1"
+    assert snapshot["source"]["format"] == "openclatura.parser_grammar_snapshot.v1"
     assert snapshot["source"]["resource_json_dir"] == "parser_xml_resources"
     assert "resource_root" not in snapshot["source"]
     assert "external_resource_path" not in snapshot["source"]

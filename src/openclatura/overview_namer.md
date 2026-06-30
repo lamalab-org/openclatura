@@ -1,6 +1,6 @@
 I assume “muramid” means a Mermaid diagram.
 
-Below is the current flow of `bluenamer/namer.py` after the refactor. At a high level, `namer.py` is now an orchestrator: it parses a molecule, splits it into graph components, names each component, recursively names substituent subgraphs when needed, then assembles the final name.
+Below is the current flow of `openclatura/namer.py` after the refactor. At a high level, `namer.py` is now an orchestrator: it parses a molecule, splits it into graph components, names each component, recursively names substituent subgraphs when needed, then assembles the final name.
 
 ```mermaid
 flowchart TD

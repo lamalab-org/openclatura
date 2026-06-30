@@ -1,4 +1,4 @@
-# bluenamer/perception.py
+# openclatura/perception.py
 
 from dataclasses import dataclass, field
 

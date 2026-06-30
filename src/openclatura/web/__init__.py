@@ -1,4 +1,4 @@
-"""FastAPI HTTP service for bluenamer.
+"""FastAPI HTTP service for openclatura.
 
 Lives behind the optional ``[web]`` extra. The package imports cleanly
 without ``fastapi``/``uvicorn`` installed; this subpackage is only

@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 import rdkit
 
-from bluenamer import name_smiles
+from openclatura import name_smiles
 
 GOLDEN = Path(__file__).resolve().parent.parent / "fixtures" / "diverse_corpus.golden.json"
 

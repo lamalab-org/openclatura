@@ -1,4 +1,4 @@
-# bluenamer/rules/bonds.py
+# openclatura/rules/bonds.py
 from dataclasses import dataclass
 
 

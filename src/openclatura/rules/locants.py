@@ -1,5 +1,5 @@
 """
-bluenamer/rules/locants.py
+openclatura/rules/locants.py
 
 Locant comparison and selection logic for IUPAC nomenclature.
 

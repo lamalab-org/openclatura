@@ -8,8 +8,8 @@ import py2opsin
 from datasets import load_dataset
 from tqdm import tqdm
 
-from bluenamer.namer import name_smiles
-from bluenamer.utils import standardize_mol
+from openclatura.namer import name_smiles
+from openclatura.utils import standardize_mol
 
 # --- Configuration ---
 N_TEST = 1000_000

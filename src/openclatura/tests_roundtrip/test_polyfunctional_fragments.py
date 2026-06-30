@@ -2,7 +2,7 @@
 
 import pytest
 
-from bluenamer.tests_roundtrip.roundtrip_helpers import roundtrip_smiles
+from openclatura.tests_roundtrip.roundtrip_helpers import roundtrip_smiles
 
 SMILES = [
     "Cc1ccc(C(=O)N[C@H](C)CC(=O)NC(C)C)c(Br)c1",

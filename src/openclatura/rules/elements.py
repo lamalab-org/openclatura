@@ -1,4 +1,4 @@
-# bluenamer/rules/elements.py
+# openclatura/rules/elements.py
 from dataclasses import dataclass
 
 

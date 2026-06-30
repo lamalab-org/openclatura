@@ -1,4 +1,4 @@
-# bluenamer/assembler.py
+# openclatura/assembler.py
 
 import re
 

@@ -1,8 +1,8 @@
-# bluenamer/rules/retained.py
+# openclatura/rules/retained.py
 import itertools
 
-from bluenamer.molecule import Molecule
-from bluenamer.nomenclature import RULES
+from openclatura.molecule import Molecule
+from openclatura.nomenclature import RULES
 
 
 def _find_two_rings(mol: Molecule, path: list[int], fused: list[int], path_set: set[int], small_ring_size: int):

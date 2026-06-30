@@ -1,6 +1,6 @@
 import pytest
 
-from bluenamer.tests_roundtrip.roundtrip_helpers import roundtrip_smiles
+from openclatura.tests_roundtrip.roundtrip_helpers import roundtrip_smiles
 
 
 @pytest.mark.parametrize(

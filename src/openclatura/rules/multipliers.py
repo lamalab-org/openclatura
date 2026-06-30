@@ -1,5 +1,5 @@
 """
-bluenamer/rules/multipliers.py
+openclatura/rules/multipliers.py
 
 Multiplicative prefixes for IUPAC nomenclature.
 Used for repeated substituents, multiple bonds, and identical structural features.

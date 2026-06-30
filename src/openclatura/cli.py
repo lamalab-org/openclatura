@@ -1,14 +1,14 @@
-"""Minimal command-line interface for bluenamer.
+"""Minimal command-line interface for openclatura.
 
 Subcommands::
 
-    bluenamer name    "CCO"                # print one name
-    bluenamer name    "CCO" --json         # JSON with trace + rules
-    bluenamer batch   smiles.txt           # one SMILES per line, write JSONL
-    bluenamer version
+    openclatura name    "CCO"                # print one name
+    openclatura name    "CCO" --json         # JSON with trace + rules
+    openclatura batch   smiles.txt           # one SMILES per line, write JSONL
+    openclatura version
 
 The CLI is intentionally thin — for anything beyond quick experiments
-the Python API (``bluenamer.name`` / ``bluenamer.name_many``) is the
+the Python API (``openclatura.name`` / ``openclatura.name_many``) is the
 recommended entrypoint.
 """
 
@@ -97,8 +97,8 @@ def _cmd_describe(args: argparse.Namespace) -> int:
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="bluenamer", description="SMILES → IUPAC name generator")
-    parser.add_argument("--version", action="version", version=f"bluenamer {__version__}")
+    parser = argparse.ArgumentParser(prog="openclatura", description="SMILES → IUPAC name generator")
+    parser.add_argument("--version", action="version", version=f"openclatura {__version__}")
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_name = sub.add_parser("name", help="Name a single SMILES")

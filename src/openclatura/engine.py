@@ -1,6 +1,6 @@
 """Public naming engine facade.
 
-The legacy module-level API in :mod:`bluenamer.namer` is kept for
+The legacy module-level API in :mod:`openclatura.namer` is kept for
 compatibility.  This module provides the architectural seam for the staged
 refactor: callers can use one engine object while the internals are migrated
 from legacy functions to typed pipeline stages.
@@ -60,7 +60,7 @@ class NamingRequest:
     ``analysis``).  ``verify_opsin`` toggles a round-trip check that feeds
     the generated name back through OPSIN and compares the canonical
     SMILES to the input.  Verification is graceful when py2opsin or Java
-    are missing (see :class:`bluenamer.opsin_verify.OpsinCheck`).
+    are missing (see :class:`openclatura.opsin_verify.OpsinCheck`).
     """
 
     smiles: str
@@ -361,7 +361,7 @@ def _run_parallel(
     processes: int,
     chunksize: int,
 ) -> list[NamingResult]:
-    # Imported lazily so the simple `import bluenamer` path stays light.
+    # Imported lazily so the simple `import openclatura` path stays light.
     from concurrent.futures import ProcessPoolExecutor
 
     payload = [(s, include_trace, verify_opsin, token_debug) for s in smiles_list]
