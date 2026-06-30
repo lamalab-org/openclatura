@@ -7,7 +7,7 @@ name = "openclatura"
 version = "0.1.0"
 description = "Deterministic SMILES-to-IUPAC name generator based on the IUPAC Blue Book"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = "MIT"
 authors = [
     { name = "Adrian Mirza" },
@@ -59,9 +59,9 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/lamalab-org/iupac-name-generator"
-Repository = "https://github.com/lamalab-org/iupac-name-generator"
-Issues = "https://github.com/lamalab-org/iupac-name-generator/issues"
+Homepage = "https://github.com/lamalab-org/openclatura"
+Repository = "https://github.com/lamalab-org/openclatura"
+Issues = "https://github.com/lamalab-org/openclatura/issues"
 
 [project.scripts]
 openclatura = "openclatura.cli:main"
