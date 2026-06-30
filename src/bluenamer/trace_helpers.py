@@ -308,7 +308,9 @@ def assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
     return segments
 
 
-def attach_main_parent_decisions(trace_segments: list[dict], decisions: DecisionTrace | list | tuple | None) -> list[dict]:
+def attach_main_parent_decisions(
+    trace_segments: list[dict], decisions: DecisionTrace | list | tuple | None
+) -> list[dict]:
     """Attach main-component parent decisions to matching main parent segments.
 
     Recursive substituent parent decisions already travel as ``nested_decisions``

@@ -52,7 +52,7 @@ def describe_human(smiles: str, verify_opsin: bool = False) -> HumanDescription:
     currently evolving token-span alignment layer.
     """
 
-    result = DEFAULT_NAMING_ENGINE.run(NamingRequest(smiles=smiles, include_trace=True,verify_opsin=verify_opsin))
+    result = DEFAULT_NAMING_ENGINE.run(NamingRequest(smiles=smiles, include_trace=True, verify_opsin=verify_opsin))
     mol = read_smiles(smiles)
     paragraphs: list[str] = []
     smiles_sentence = _processed_smiles_sentence(smiles)

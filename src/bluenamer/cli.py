@@ -105,8 +105,18 @@ def _build_parser() -> argparse.ArgumentParser:
     p_name.add_argument("smiles")
     p_name.add_argument("--trace", action="store_true", help="also print rule hints to stderr")
     p_name.add_argument("--json", action="store_true", help="emit JSON to stdout")
-    p_name.add_argument("--token-debug", action=argparse.BooleanOptionalAction,default=False, help="include verbose emitted token metadata in JSON traces")
-    p_name.add_argument("--verify",action=argparse.BooleanOptionalAction,default=True,help="round-trip via OPSIN or --no-verify to skip")
+    p_name.add_argument(
+        "--token-debug",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="include verbose emitted token metadata in JSON traces",
+    )
+    p_name.add_argument(
+        "--verify",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="round-trip via OPSIN or --no-verify to skip",
+    )
     p_name.set_defaults(func=_cmd_name)
 
     p_batch = sub.add_parser("batch", help="Name a file of SMILES (JSONL output)")
@@ -114,8 +124,18 @@ def _build_parser() -> argparse.ArgumentParser:
     p_batch.add_argument("--output", default="-", help="output file path, or '-' for stdout")
     p_batch.add_argument("--trace", action="store_true", help="include trace_segments in JSON output")
     p_batch.add_argument("--json", action="store_true", help="alias of --trace; emit full JSON")
-    p_batch.add_argument("--token-debug", action=argparse.BooleanOptionalAction,default=False, help="include verbose emitted token metadata in JSON traces")
-    p_batch.add_argument("--verify",action=argparse.BooleanOptionalAction,default=True,help="round-trip via OPSIN or --no-verify to skip")
+    p_batch.add_argument(
+        "--token-debug",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="include verbose emitted token metadata in JSON traces",
+    )
+    p_batch.add_argument(
+        "--verify",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="round-trip via OPSIN or --no-verify to skip",
+    )
     p_batch.add_argument(
         "--processes",
         type=lambda v: None if v in {"", "auto"} else int(v),
@@ -140,7 +160,8 @@ def _build_parser() -> argparse.ArgumentParser:
         "--token-debug",
         "--debug-tokens",
         dest="token_debug",
-        action=argparse.BooleanOptionalAction,default=False,
+        action=argparse.BooleanOptionalAction,
+        default=False,
         help="include experimental token binding details",
     )
     p_describe.set_defaults(func=_cmd_describe)

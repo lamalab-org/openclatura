@@ -176,7 +176,6 @@ def analyze_smiles(smiles: str):
     return _analyze_smiles(smiles, token_debug=True)
 
 
-
 def test_name_smiles_stays_plain_fast_api():
     assert name_smiles("CCO") == "ethanol"
 
