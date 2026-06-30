@@ -91,7 +91,7 @@ bluenamer name "CC(=O)Nc1ccccc1"            # → N-phenylacetamide
 bluenamer name "CC(=O)Nc1ccccc1" --json     # JSON with trace + rules
 bluenamer batch smiles.txt --output names.jsonl --processes auto
 ```
-The CLI tool has a OPSIN verification turned on by default. It can be turned-off with
+The CLI tool has OPSIN verification turned on by default. It can be turned off with
 
 ```bash
 bluenamer name "CN1C=NC2=C1C(=O)N(C(=O)N2C)C" --no-verify       
