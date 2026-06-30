@@ -5,7 +5,6 @@ Subcommands::
     bluenamer name    "CCO"                # print one name
     bluenamer name    "CCO" --json         # JSON with trace + rules
     bluenamer batch   smiles.txt           # one SMILES per line, write JSONL
-    bluenamer batch   smiles.txt --verify  # also run OPSIN round-trip
     bluenamer version
 
 The CLI is intentionally thin — for anything beyond quick experiments
@@ -43,6 +42,7 @@ def _cmd_name(args: argparse.Namespace) -> int:
         args.smiles,
         include_trace=args.json or args.trace,
         verify_opsin=args.verify,
+        token_debug=args.token_debug,
     )
     if args.json:
         json.dump(result.to_dict(include_trace=True), sys.stdout, indent=2, default=str)
@@ -67,6 +67,7 @@ def _cmd_batch(args: argparse.Namespace) -> int:
         smiles_list,
         include_trace=args.trace or args.json,
         verify_opsin=args.verify,
+        token_debug=args.token_debug,
         processes=processes,
         chunksize=args.chunksize,
     )
@@ -86,9 +87,9 @@ def _cmd_batch(args: argparse.Namespace) -> int:
 
 
 def _cmd_describe(args: argparse.Namespace) -> int:
-    description = describe_one(args.smiles, debugging_tokens=args.debug_tokens)
+    description = describe_one(args.smiles, token_debug=args.token_debug)
     if args.json:
-        json.dump(description.to_dict(debugging_tokens=args.debug_tokens), sys.stdout, indent=2)
+        json.dump(description.to_dict(token_debug=args.token_debug), sys.stdout, indent=2)
         sys.stdout.write("\n")
     else:
         sys.stdout.write(str(description) + "\n")
@@ -104,7 +105,18 @@ def _build_parser() -> argparse.ArgumentParser:
     p_name.add_argument("smiles")
     p_name.add_argument("--trace", action="store_true", help="also print rule hints to stderr")
     p_name.add_argument("--json", action="store_true", help="emit JSON to stdout")
-    p_name.add_argument("--verify", action="store_true", help="round-trip via OPSIN")
+    p_name.add_argument(
+        "--token-debug",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="include verbose emitted token metadata in JSON traces",
+    )
+    p_name.add_argument(
+        "--verify",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="round-trip via OPSIN or --no-verify to skip",
+    )
     p_name.set_defaults(func=_cmd_name)
 
     p_batch = sub.add_parser("batch", help="Name a file of SMILES (JSONL output)")
@@ -112,7 +124,18 @@ def _build_parser() -> argparse.ArgumentParser:
     p_batch.add_argument("--output", default="-", help="output file path, or '-' for stdout")
     p_batch.add_argument("--trace", action="store_true", help="include trace_segments in JSON output")
     p_batch.add_argument("--json", action="store_true", help="alias of --trace; emit full JSON")
-    p_batch.add_argument("--verify", action="store_true", help="round-trip via OPSIN")
+    p_batch.add_argument(
+        "--token-debug",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="include verbose emitted token metadata in JSON traces",
+    )
+    p_batch.add_argument(
+        "--verify",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="round-trip via OPSIN or --no-verify to skip",
+    )
     p_batch.add_argument(
         "--processes",
         type=lambda v: None if v in {"", "auto"} else int(v),
@@ -133,7 +156,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_describe.add_argument("smiles")
     p_describe.add_argument("--json", action="store_true", help="emit structured Description as JSON")
-    p_describe.add_argument("--debug-tokens", action="store_true", help="include experimental token binding details")
+    p_describe.add_argument(
+        "--token-debug",
+        "--debug-tokens",
+        dest="token_debug",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="include experimental token binding details",
+    )
     p_describe.set_defaults(func=_cmd_describe)
 
     return parser

@@ -117,7 +117,7 @@ def test_describe_hides_token_binding_summary_by_default():
 
 
 def test_describe_exposes_token_binding_summary_in_debug_mode():
-    d = describe("CCO", debugging_tokens=True)
+    d = describe("CCO", token_debug=True)
     payload = d.to_dict()
 
     assert payload["token_summary"]["total"] >= 1
@@ -129,7 +129,7 @@ def test_describe_exposes_token_binding_summary_in_debug_mode():
 
 def test_cli_describe_json_exposes_token_binding_summary_in_debug_mode():
     result = subprocess.run(
-        [sys.executable, "-m", "bluenamer.cli", "describe", "CCO", "--json", "--debug-tokens"],
+        [sys.executable, "-m", "bluenamer.cli", "describe", "CCO", "--json", "--token-debug"],
         capture_output=True,
         text=True,
         check=False,

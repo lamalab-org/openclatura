@@ -14,6 +14,7 @@ from bluenamer import (
     NamingRequest,
     NamingResult,
     OpsinCheck,
+    analyze_smiles,
     name,
     name_many,
     name_smiles,
@@ -68,11 +69,54 @@ def test_name_with_trace_populates_rules_hit_and_hints():
     assert all(rid.startswith("P-") for rid in result.rules_hit)
     assert len(result.rule_hints) >= 1
 
+    phenyl_parent = next(segment for segment in result.trace_segments if segment.get("substituent_name") == "phenyl")
+    assert phenyl_parent["key"] == "substituent_parent"
+    assert phenyl_parent["label"] == "substituent parent skeleton"
+
+    main_parent = next(segment for segment in result.trace_segments if segment.get("key") == "parent")
+    main_decisions = main_parent.get("decisions", [])
+    assert [decision["decision"] for decision in main_decisions] == [
+        "selected parent skeleton",
+        "selected numbering",
+    ]
+    numbering = main_decisions[-1]
+    assert numbering["data"]["atom_to_locant"] == {1: "1", 0: "2"}
+
+
+def test_emitted_tokens_are_only_in_trace_when_token_debug_is_enabled():
+    normal = name("CC(=O)Nc1ccccc1", include_trace=True)
+    normal_assembly = [step for step in normal.decisions if step.decision == "assembled component name"][-1]
+    normal_bindings = normal_assembly.data["name_atom_bindings"]
+
+    assert normal_bindings
+    assert all("emitted_tokens" not in binding for binding in normal_bindings)
+    assert normal_assembly.data["name_token_spans"] == []
+
+    debug = name("CC(=O)Nc1ccccc1", include_trace=True, token_debug=True)
+    debug_assembly = [step for step in debug.decisions if step.decision == "assembled component name"][-1]
+    debug_bindings = debug_assembly.data["name_atom_bindings"]
+
+    assert any(binding.get("emitted_tokens") for binding in debug_bindings)
+    assert debug_assembly.data["name_token_spans"]
+
+
+def test_analyze_smiles_token_debug_is_explicit():
+    normal = analyze_smiles("CCO")
+    normal_assembly = [step for step in normal.decisions if step.decision == "assembled component name"][-1]
+    assert normal_assembly.data["name_token_spans"] == []
+    assert all("emitted_tokens" not in binding for binding in normal_assembly.data["name_atom_bindings"])
+
+    debug = analyze_smiles("CCO", token_debug=True)
+    debug_assembly = [step for step in debug.decisions if step.decision == "assembled component name"][-1]
+    assert debug_assembly.data["name_token_spans"]
+    assert any(binding.get("emitted_tokens") for binding in debug_assembly.data["name_atom_bindings"])
+
 
 def test_substituent_tree_preserves_nested_branch_hierarchy_and_flat_trace():
     result = name(
         "O=C(O)C[C@H](O)C[C@H](O)CCn2c(c(c(c2c1ccc(F)cc1)c3ccccc3)C(=O)Nc4ccccc4)C(C)C",
         include_trace=True,
+        token_debug=True,
     )
 
     root = result.substituent_tree[0]
@@ -110,6 +154,7 @@ def test_absolute_stereo_tokens_bind_to_stereocenter_atoms():
     result = name(
         "O=C(O)C[C@H](O)C[C@H](O)CCn2c(c(c(c2c1ccc(F)cc1)c3ccccc3)C(=O)Nc4ccccc4)C(C)C",
         include_trace=True,
+        token_debug=True,
     )
     assembly = [step for step in result.decisions if step.decision == "assembled component name"][-1]
     token_spans = assembly.data["name_token_spans"]

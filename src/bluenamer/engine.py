@@ -19,7 +19,7 @@ from .molecule import DecisionTrace, NameAnalysis, TracePhase
 from .namer_config import SALT_METAL_NAMES
 from .operations import infer_operations
 from .opsin_verify import OpsinCheck, verify_with_opsin
-from .trace_helpers import trace_decision
+from .trace_helpers import attach_main_parent_decisions, trace_decision
 
 # Blue-Book-style rule identifiers (P-12, P-23.2.5, P-66.1.2.4 etc.).
 _RULE_ID_PATTERN = re.compile(r"P-\d+(?:\.\d+)*")
@@ -66,6 +66,7 @@ class NamingRequest:
     smiles: str
     include_trace: bool = False
     verify_opsin: bool = False
+    token_debug: bool = False
 
 
 @dataclass(frozen=True)
@@ -160,18 +161,18 @@ class NamingEngine:
 
         return self.name_with_trace(smiles)
 
-    def analyze(self, smiles: str) -> NameAnalysis:
+    def analyze(self, smiles: str, *, token_debug: bool = False) -> NameAnalysis:
         """Return the full explainable naming analysis for ``smiles``."""
 
-        result = self.run(NamingRequest(smiles=smiles, include_trace=True))
+        result = self.run(NamingRequest(smiles=smiles, include_trace=True, token_debug=token_debug))
         if result.analysis is None:
             return NameAnalysis(result.name, result.trace_segments, result.decisions, result.substituent_tree)
         return result.analysis
 
-    def analyze_smiles(self, smiles: str) -> NameAnalysis:
+    def analyze_smiles(self, smiles: str, *, token_debug: bool = False) -> NameAnalysis:
         """Compatibility alias for the legacy public API name."""
 
-        return self.analyze(smiles)
+        return self.analyze(smiles, token_debug=token_debug)
 
     def run(self, request: NamingRequest) -> NamingResult:
         """Execute a naming request, never raising for naming failures.
@@ -183,7 +184,7 @@ class NamingEngine:
 
         try:
             if request.include_trace or request.verify_opsin:
-                analysis = self._analyze(request.smiles)
+                analysis = self._analyze(request.smiles, token_debug=request.token_debug)
                 rules, hints = _extract_rules_hit(analysis.trace_segments)
                 result = NamingResult(
                     name=analysis.name,
@@ -212,6 +213,7 @@ class NamingEngine:
         *,
         include_trace: bool = False,
         verify_opsin: bool = False,
+        token_debug: bool = False,
         processes: int | None | str = 1,
         chunksize: int = 64,
     ) -> list[NamingResult]:
@@ -229,7 +231,14 @@ class NamingEngine:
         smiles_list = list(smiles_iter)
         if processes == 1:
             return [
-                self.run(NamingRequest(smiles=s, include_trace=include_trace, verify_opsin=verify_opsin))
+                self.run(
+                    NamingRequest(
+                        smiles=s,
+                        include_trace=include_trace,
+                        verify_opsin=verify_opsin,
+                        token_debug=token_debug,
+                    )
+                )
                 for s in smiles_list
             ]
 
@@ -238,6 +247,7 @@ class NamingEngine:
             smiles_list,
             include_trace=include_trace,
             verify_opsin=verify_opsin,
+            token_debug=token_debug,
             processes=worker_count,
             chunksize=chunksize,
         )
@@ -255,7 +265,7 @@ class NamingEngine:
         names.sort(key=self._component_sort_key)
         return " ".join(names)
 
-    def _analyze(self, smiles: str) -> NameAnalysis:
+    def _analyze(self, smiles: str, *, token_debug: bool = False) -> NameAnalysis:
         decisions = DecisionTrace()
         mol = read_smiles(smiles)
         trace_decision(
@@ -288,6 +298,7 @@ class NamingEngine:
                 return_trace=True,
                 return_tree=True,
                 decision_trace=decisions,
+                token_debug=token_debug,
             )
             if component_name:
                 named_components.append((component_name, trace, tree))
@@ -300,6 +311,7 @@ class NamingEngine:
             trace_segments.extend(trace)
             if tree:
                 substituent_tree.append(tree)
+        trace_segments = attach_main_parent_decisions(trace_segments, decisions)
         trace_decision(
             decisions,
             TracePhase.ASSEMBLY,
@@ -333,10 +345,10 @@ DEFAULT_NAMING_ENGINE = NamingEngine()
 # --- multiprocessing helpers ---------------------------------------------
 
 
-def _name_one_for_worker(args: tuple[str, bool, bool]) -> NamingResult:
-    smiles, include_trace, verify_opsin = args
+def _name_one_for_worker(args: tuple[str, bool, bool, bool]) -> NamingResult:
+    smiles, include_trace, verify_opsin, token_debug = args
     return DEFAULT_NAMING_ENGINE.run(
-        NamingRequest(smiles=smiles, include_trace=include_trace, verify_opsin=verify_opsin)
+        NamingRequest(smiles=smiles, include_trace=include_trace, verify_opsin=verify_opsin, token_debug=token_debug)
     )
 
 
@@ -345,12 +357,13 @@ def _run_parallel(
     *,
     include_trace: bool,
     verify_opsin: bool,
+    token_debug: bool,
     processes: int,
     chunksize: int,
 ) -> list[NamingResult]:
     # Imported lazily so the simple `import bluenamer` path stays light.
     from concurrent.futures import ProcessPoolExecutor
 
-    payload = [(s, include_trace, verify_opsin) for s in smiles_list]
+    payload = [(s, include_trace, verify_opsin, token_debug) for s in smiles_list]
     with ProcessPoolExecutor(max_workers=processes) as ex:
         return list(ex.map(_name_one_for_worker, payload, chunksize=chunksize))

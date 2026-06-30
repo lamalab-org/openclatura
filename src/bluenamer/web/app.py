@@ -38,12 +38,14 @@ class NameRequest(BaseModel):
     smiles: str = Field(..., description="A single SMILES string")
     include_trace: bool = Field(False, description="Include trace_segments in response")
     verify_opsin: bool = Field(False, description="Round-trip the generated name via OPSIN")
+    token_debug: bool = Field(False, description="Include verbose emitted token metadata in decisions")
 
 
 class BatchRequest(BaseModel):
     smiles: list[str] = Field(..., description="SMILES strings to name")
     include_trace: bool = False
     verify_opsin: bool = False
+    token_debug: bool = False
     processes: int | None = Field(1, description="1=serial, None/null=all CPUs, integer=N workers")
     chunksize: int = 64
 
@@ -71,6 +73,7 @@ def create_app() -> FastAPI:
             req.smiles,
             include_trace=req.include_trace,
             verify_opsin=req.verify_opsin,
+            token_debug=req.token_debug,
         )
         return result.to_dict(include_trace=req.include_trace)
 
@@ -80,6 +83,7 @@ def create_app() -> FastAPI:
             req.smiles,
             include_trace=req.include_trace,
             verify_opsin=req.verify_opsin,
+            token_debug=req.token_debug,
             processes=req.processes,
             chunksize=req.chunksize,
         )

@@ -11,6 +11,7 @@ requires-python = ">=3.10"
 license = "MIT"
 authors = [
     { name = "Adrian Mirza" },
+    { name = "Kevin Maik Jablonka" },
     { name = "Rostislav Fedorov" },
 ]
 keywords = ["chemistry", "iupac", "smiles", "nomenclature", "rdkit"]

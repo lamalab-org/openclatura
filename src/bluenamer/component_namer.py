@@ -257,6 +257,7 @@ def _shortcut_component_result(
     role: str,
     bindings: list[NameAtomBinding] | tuple[NameAtomBinding, ...] | None = None,
     emit_metadata: bool = True,
+    token_debug: bool = False,
 ) -> tuple[str, list[dict], list[dict], list[dict]]:
     """Build audited metadata for a component shortcut name."""
 
@@ -281,7 +282,12 @@ def _shortcut_component_result(
     parts.name_atom_bindings = list(result.bindings)
     parts.name_token_spans = token_span_trace_data(result)
     assert_final_name_assembly(mol, component_atoms, parts, result)
-    return name, binding_trace_data(parts.name_atom_bindings), parts.name_token_spans, parts.name_rewrite_history
+    return (
+        name,
+        binding_trace_data(parts.name_atom_bindings, include_emitted_tokens=token_debug),
+        parts.name_token_spans if token_debug else [],
+        parts.name_rewrite_history,
+    )
 
 
 def name_component(
@@ -295,6 +301,7 @@ def name_component(
     name_subgraph: SubgraphNamer,
     name_spiro_subgraph: SpiroSubgraphNamer,
     assemble_parent_name: ParentAssembler,
+    token_debug: bool = False,
 ):
     """Name one connected component or recursive component of a molecule."""
 
@@ -309,6 +316,7 @@ def name_component(
             stage="shortcut",
             role="single_atom_component",
             emit_metadata=emit_metadata,
+            token_debug=token_debug,
         )
         trace_decision(
             decision_trace,
@@ -339,6 +347,7 @@ def name_component(
             name_subgraph=name_subgraph,
             name_spiro_subgraph=name_spiro_subgraph,
             assemble_parent_name=assemble_parent_name,
+            token_debug=token_debug,
         )
 
     structural_parent_result = structural_replacement_parent_result(mol, component_atoms, name_subgraph)
@@ -351,6 +360,7 @@ def name_component(
             role=structural_parent_result.role,
             bindings=structural_parent_result.bindings,
             emit_metadata=emit_metadata,
+            token_debug=token_debug,
         )
         trace_decision(
             decision_trace,
@@ -405,6 +415,7 @@ def name_component(
             role="anhydride_component",
             bindings=anhydride_result.bindings,
             emit_metadata=emit_metadata,
+            token_debug=token_debug,
         )
         trace_decision(
             decision_trace,
@@ -545,18 +556,20 @@ def name_component(
     )
     numbered_path = parent_plan.numbered_path
     locant_map = parent_plan.locant_map
+    get_loc = parent_plan.get_loc
     trace_decision(
         decision_trace,
         TracePhase.NUMBERING,
         "selected numbering",
         "Numbering minimizes principal-group, heteroatom, substituent, and unsaturation locants.",
         atoms=set(numbered_path),
+        bonds=bond_ids_within(mol, set(numbered_path)),
         data={
             "numbered_path": numbered_path,
             "locants": locant_map or {atom: i + 1 for i, atom in enumerate(numbered_path)},
+            "atom_to_locant": {atom: get_loc(atom) for atom in numbered_path},
         },
     )
-    get_loc = parent_plan.get_loc
     parts = parent_plan.parts
     emit_bond_stereo(mol, parts, numbered_path, get_loc, state.base_exclude)
     add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
@@ -613,8 +626,8 @@ def name_component(
             "substituent_count": len(parts.substituents),
             "unsaturation_count": len(parts.unsaturations),
             "stereo_audit_issues": parts.stereo_audit_issues,
-            "name_atom_bindings": binding_trace_data(parts.name_atom_bindings),
-            "name_token_spans": parts.name_token_spans,
+            "name_atom_bindings": binding_trace_data(parts.name_atom_bindings, include_emitted_tokens=token_debug),
+            "name_token_spans": parts.name_token_spans if token_debug else [],
             "name_rewrite_history": parts.name_rewrite_history,
         },
     )

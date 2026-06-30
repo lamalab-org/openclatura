@@ -64,7 +64,7 @@ class Description:
     token_summary: DescriptionTokenSummary = field(default_factory=DescriptionTokenSummary)
     token_spans: tuple[dict, ...] = ()
     substituent_tree: tuple[dict, ...] = ()
-    debugging_tokens: bool = False
+    token_debug: bool = False
 
     def __str__(self) -> str:
         return "\n\n".join(self.paragraphs)
@@ -73,8 +73,8 @@ class Description:
     def summary(self) -> str:
         return self.paragraphs[0] if self.paragraphs else ""
 
-    def to_dict(self, *, debugging_tokens: bool | None = None) -> dict:
-        include_tokens = self.debugging_tokens if debugging_tokens is None else debugging_tokens
+    def to_dict(self, *, token_debug: bool | None = None) -> dict:
+        include_tokens = self.token_debug if token_debug is None else token_debug
         payload = {
             "smiles": self.smiles,
             "name": self.name,
@@ -94,13 +94,13 @@ class Description:
 def describe(
     smiles: str,
     *,
-    debugging_tokens: bool = False,
+    token_debug: bool = False,
 ) -> Description:
     """Render a deterministic metadata-backed description for ``smiles``."""
 
-    result = DEFAULT_NAMING_ENGINE.run(NamingRequest(smiles=smiles, include_trace=True))
-    token_spans = tuple(_collect_token_spans(result)) if debugging_tokens else ()
-    token_summary = _summarize_tokens(token_spans) if debugging_tokens else DescriptionTokenSummary()
+    result = DEFAULT_NAMING_ENGINE.run(NamingRequest(smiles=smiles, include_trace=True, token_debug=token_debug))
+    token_spans = tuple(_collect_token_spans(result)) if token_debug else ()
+    token_summary = _summarize_tokens(token_spans) if token_debug else DescriptionTokenSummary()
 
     if result.error:
         summary = f"The structure {smiles} could not be named: {result.error}."
@@ -121,8 +121,8 @@ def describe(
     if tree_lines:
         paragraphs.append("Component and substituent structure:\n" + "\n".join(tree_lines))
 
-    token_lines = _token_binding_lines(token_summary, token_spans) if debugging_tokens else []
-    if debugging_tokens and token_lines:
+    token_lines = _token_binding_lines(token_summary, token_spans) if token_debug else []
+    if token_debug and token_lines:
         paragraphs.append("Name-token graph bindings:\n" + "\n".join(token_lines))
 
     seg_lines = _trace_segment_lines(result.trace_segments, result.substituent_tree)
@@ -143,7 +143,7 @@ def describe(
         token_summary=token_summary,
         token_spans=token_spans,
         substituent_tree=tuple(result.substituent_tree),
-        debugging_tokens=debugging_tokens,
+        token_debug=token_debug,
     )
 
 

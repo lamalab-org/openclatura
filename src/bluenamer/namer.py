@@ -1693,6 +1693,7 @@ def name_component(
     return_trace: bool = False,
     return_tree: bool = False,
     decision_trace: DecisionTrace | None = None,
+    token_debug: bool = False,
 ):
     """Name one connected component or recursive component of a molecule."""
 
@@ -1706,6 +1707,7 @@ def name_component(
         name_subgraph=name_subgraph,
         name_spiro_subgraph=_spiro_subgraph_assembly,
         assemble_parent_name=_assemble_parent_name,
+        token_debug=token_debug,
     )
 
 
@@ -1720,7 +1722,7 @@ def name_smiles_with_trace(smiles: str) -> tuple[str, list[dict]]:
     return DEFAULT_NAMING_ENGINE.name_smiles_with_trace(smiles)
 
 
-def analyze_smiles(smiles: str) -> NameAnalysis:
+def analyze_smiles(smiles: str, *, token_debug: bool = False) -> NameAnalysis:
     """Return a generated name with structure annotations and decision traces.
 
     The default ``name_smiles`` path stays minimal. This analysis API turns on
@@ -1729,7 +1731,7 @@ def analyze_smiles(smiles: str) -> NameAnalysis:
     selection, numbering, and final assembly.
     """
 
-    return DEFAULT_NAMING_ENGINE.analyze_smiles(smiles)
+    return DEFAULT_NAMING_ENGINE.analyze_smiles(smiles, token_debug=token_debug)
 
 
 def name_smiles(smiles: str) -> str:
