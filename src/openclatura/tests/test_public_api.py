@@ -234,19 +234,13 @@ def test_engine_run_with_verify_opsin_skips_gracefully_without_java(monkeypatch)
 
 
 def test_py2opsin_java_import_warning_is_suppressed(monkeypatch):
-    import builtins
-
     import openclatura.opsin_verify as ov
 
-    original_import = builtins.__import__
+    def fake_import_py2opsin():
+        warnings.warn("Java may not be installed/accessible", RuntimeWarning, stacklevel=2)
+        return types.SimpleNamespace(py2opsin=lambda names: [])
 
-    def fake_import(name, *args, **kwargs):
-        if name == "py2opsin":
-            warnings.warn("Java may not be installed/accessible", RuntimeWarning, stacklevel=2)
-            return types.SimpleNamespace(py2opsin=lambda names: [])
-        return original_import(name, *args, **kwargs)
-
-    monkeypatch.setattr(builtins, "__import__", fake_import)
+    monkeypatch.setattr(ov, "_import_py2opsin", fake_import_py2opsin)
     monkeypatch.setattr(ov, "_java_available", lambda: False)
 
     with warnings.catch_warnings(record=True) as caught:
