@@ -115,7 +115,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--verify",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="round-trip via OPSIN or --no-verify to skip",
+        help="round-trip via OPSIN; use --no-verify to skip",
     )
     p_name.set_defaults(func=_cmd_name)
 
@@ -134,7 +134,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--verify",
         action=argparse.BooleanOptionalAction,
         default=True,
-        help="round-trip via OPSIN or --no-verify to skip",
+        help="round-trip via OPSIN; use --no-verify to skip",
     )
     p_batch.add_argument(
         "--processes",

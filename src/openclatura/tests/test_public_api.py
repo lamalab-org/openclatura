@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import types
+import warnings
 
 import pytest
 
@@ -229,6 +231,24 @@ def test_engine_run_with_verify_opsin_skips_gracefully_without_java(monkeypatch)
     result = DEFAULT_NAMING_ENGINE.run(NamingRequest(smiles="CCO", verify_opsin=True))
     assert result.opsin_check is not None
     assert result.opsin_check.status == "skipped_no_java"
+
+
+def test_py2opsin_java_import_warning_is_suppressed(monkeypatch):
+    import openclatura.opsin_verify as ov
+
+    def fake_import_py2opsin():
+        warnings.warn("Java may not be installed/accessible", RuntimeWarning, stacklevel=2)
+        return types.SimpleNamespace(py2opsin=lambda names: [])
+
+    monkeypatch.setattr(ov, "_import_py2opsin", fake_import_py2opsin)
+    monkeypatch.setattr(ov, "_java_available", lambda: False)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        check = ov.verify_with_opsin("ethanol", "CCO")
+
+    assert check.status == "skipped_no_java"
+    assert not [warning for warning in caught if "Java may not be installed/accessible" in str(warning.message)]
 
 
 def test_naming_engine_is_reusable():

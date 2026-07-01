@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import warnings
 from dataclasses import dataclass
 from typing import Literal
 
@@ -63,9 +64,21 @@ class OpsinCheck:
         }
 
 
+def _import_py2opsin():
+    import py2opsin
+
+    return py2opsin
+
+
 def _try_import_py2opsin():
     try:
-        import py2opsin
+        with warnings.catch_warnings():
+            # py2opsin checks Java at import time and may warn before callers
+            # can ask openclatura for the structured skipped_no_java status.
+            # Suppress RuntimeWarning broadly inside this optional import only.
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
+            warnings.filterwarnings("ignore", message=r".*(Java|py2opsin).*", category=Warning)
+            py2opsin = _import_py2opsin()
     except Exception:  # pragma: no cover - optional dependency
         return None
     return py2opsin
