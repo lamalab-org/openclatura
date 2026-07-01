@@ -31,6 +31,19 @@ Optional extras:
 pip install "openclatura[opsin,datasets]"
 ```
 
+The default install does **not** include OPSIN verification. Install the
+`[opsin]` extra and make sure Java 8+ is available if you want round-trip
+verification through OPSIN:
+
+```bash
+pip install "openclatura[opsin]"
+java -version
+```
+
+If `py2opsin` is installed but Java is missing or inaccessible, OPSIN
+verification is skipped gracefully. The name generation still succeeds and the
+verification status is reported as `skipped_no_java`.
+
 ## Quick start
 
 ```python
@@ -58,6 +71,13 @@ result.rule_hints     # ('Parent hydride / parent structure: Blue Book P-44 ...'
 result.opsin_check.status   # 'matched' | 'mismatched' | 'skipped_no_java' | ...
 result.verified       # True when opsin_check is matched
 ```
+
+`verify_opsin` defaults to `False`. When set to `True`, verification is
+best-effort and does not raise if OPSIN support is unavailable:
+
+- no `py2opsin` installed: `result.opsin_check.status == "skipped_no_opsin"`
+- `py2opsin` installed but Java unavailable: `status == "skipped_no_java"`
+- OPSIN parses and round-trips: `status == "matched"` or `"mismatched"`
 
 Errors do not raise — they are captured on `result.error`, which makes
 the batch API safe to point at noisy datasets:
@@ -90,11 +110,26 @@ openclatura name "CC(=O)Nc1ccccc1"            # → N-phenylacetamide
 openclatura name "CC(=O)Nc1ccccc1" --json     # JSON with trace + rules
 openclatura batch smiles.txt --output names.jsonl --processes auto
 ```
-The CLI tool has OPSIN verification turned on by default. It can be turned off with
+
+The CLI verifies with OPSIN by default when possible. This is different from the
+Python API, where `verify_opsin=False` by default. Disable CLI verification with
+`--no-verify`:
 
 ```bash
-openclatura name "CN1C=NC2=C1C(=O)N(C(=O)N2C)C" --no-verify       
+openclatura name "CC(=O)Nc1ccccc1" --no-verify
 ```
+
+If OPSIN support is unavailable, the command still prints the generated name and
+reports the verification status:
+
+```text
+N-phenylacetamide
+  opsin: skipped_no_java
+```
+
+Other possible skipped statuses include `skipped_no_opsin` when `py2opsin` is
+not installed. Install `openclatura[opsin]` and Java 8+ for full CLI
+verification.
 
 ### Natural-language description (`describe`)
 

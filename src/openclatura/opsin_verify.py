@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import warnings
 from dataclasses import dataclass
 from typing import Literal
 
@@ -65,7 +66,9 @@ class OpsinCheck:
 
 def _try_import_py2opsin():
     try:
-        import py2opsin
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=r".*Java may not be installed/accessible.*", category=RuntimeWarning)
+            import py2opsin
     except Exception:  # pragma: no cover - optional dependency
         return None
     return py2opsin
