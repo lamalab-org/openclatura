@@ -67,7 +67,9 @@ class OpsinCheck:
 def _try_import_py2opsin():
     try:
         with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message=r".*Java may not be installed/accessible.*", category=RuntimeWarning)
+            warnings.filterwarnings(
+                "ignore", message=r".*Java may not be installed/accessible.*", category=RuntimeWarning
+            )
             import py2opsin
     except Exception:  # pragma: no cover - optional dependency
         return None

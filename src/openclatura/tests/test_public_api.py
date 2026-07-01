@@ -235,6 +235,7 @@ def test_engine_run_with_verify_opsin_skips_gracefully_without_java(monkeypatch)
 
 def test_py2opsin_java_import_warning_is_suppressed(monkeypatch):
     import builtins
+
     import openclatura.opsin_verify as ov
 
     original_import = builtins.__import__
