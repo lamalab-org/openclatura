@@ -82,6 +82,12 @@ def _processed_smiles_sentence(smiles: str) -> str:
     processed = Chem.MolToSmiles(rdmol, canonical=False)
     atom_order = _smiles_atom_output_order(rdmol)
     annotated = _annotated_smiles_atom_order(processed, atom_order)
+
+    if processed != smiles:
+        if annotated:
+            return f"Input SMILES: {smiles}\nProcessed SMILES: {processed}\nAtom ids in that SMILES: {annotated}"
+        return f"Input SMILES: {smiles}\nProcessed SMILES: {processed}\nAtom ids in that SMILES order: {atom_order}"
+
     if annotated:
         return f"Processed SMILES: {processed}\nAtom ids in that SMILES: {annotated}"
     return f"Processed SMILES: {processed}\nAtom ids in that SMILES order: {atom_order}"

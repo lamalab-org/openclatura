@@ -159,7 +159,8 @@ from openclatura import describe_human
 d = describe_human("CN1C=NC2=C1C(=O)N(C(=O)N2C)C")
 print(d.text)
 
-""" Processed SMILES: Cn1cnc2c1c(=O)n(C)c(=O)n2C
+""" Input SMILES: CN1C=NC2=C1C(=O)N(C(=O)N2C)C
+Processed SMILES: Cn1cnc2c1c(=O)n(C)c(=O)n2C
 Atom ids in that SMILES: C{0}n{1}1c{2}n{3}c{4}2c{5}1c{6}(=O{7})n{8}(C{13})c{9}(=O{10})n{11}2C{12}
 
 The molecule is named 2,4,7-trimethyl-2,4,7,9-tetraazabicyclo[4.3.0]nona-1(6),8-diene-3,5-dione.
