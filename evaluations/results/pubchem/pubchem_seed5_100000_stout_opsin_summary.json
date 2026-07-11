@@ -1,0 +1,11 @@
+{
+  "rows": 100000,
+  "original_valid": 100000,
+  "opsin_nonempty": 99328,
+  "opsin_valid": 99325,
+  "matches": 97839,
+  "failures": 2161,
+  "accuracy": 97.839,
+  "match_method": "standardize_and_canonicalize_tautomer",
+  "failures_csv": "results/pubchem/pubchem_seed5_100000_stout_opsin_failures.csv"
+}

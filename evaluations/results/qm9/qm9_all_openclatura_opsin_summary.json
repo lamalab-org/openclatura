@@ -1,0 +1,11 @@
+{
+  "rows": 133885,
+  "original_valid": 133885,
+  "opsin_nonempty": 133885,
+  "opsin_valid": 133885,
+  "matches": 133885,
+  "failures": 0,
+  "accuracy": 100.0,
+  "match_method": "standardize_and_canonicalize_tautomer",
+  "failures_csv": "results/qm9/qm9_all_openclatura_opsin_failures.csv"
+}

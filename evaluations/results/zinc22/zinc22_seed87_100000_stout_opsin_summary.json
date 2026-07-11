@@ -1,0 +1,11 @@
+{
+  "rows": 100000,
+  "original_valid": 100000,
+  "opsin_nonempty": 95490,
+  "opsin_valid": 95490,
+  "matches": 92373,
+  "failures": 7627,
+  "accuracy": 92.373,
+  "match_method": "standardize_and_canonicalize_tautomer",
+  "failures_csv": "results/zinc22/zinc22_seed87_100000_stout_opsin_failures.csv"
+}
