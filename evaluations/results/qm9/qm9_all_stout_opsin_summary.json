@@ -1,0 +1,11 @@
+{
+  "rows": 133885,
+  "original_valid": 133885,
+  "opsin_nonempty": 133075,
+  "opsin_valid": 133075,
+  "matches": 123906,
+  "failures": 9979,
+  "accuracy": 92.547,
+  "match_method": "standardize_and_canonicalize_tautomer",
+  "failures_csv": "results/qm9/qm9_all_stout_opsin_failures.csv"
+}

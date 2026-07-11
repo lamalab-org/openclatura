@@ -1,0 +1,15 @@
+# Base conda environment for the STOUT-vs-OpenClatura evaluation.
+#
+#   conda env create -f environment.yml
+#   conda activate stout-pypi-eval
+#   ./setup_env.sh          # installs the pip packages (order matters)
+#
+# This file only creates the interpreter. The pip installs live in
+# setup_env.sh because STOUT-pypi must be installed with --no-deps (see that
+# script for why), which cannot be expressed per-package in a conda pip list.
+name: stout-pypi-eval
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
