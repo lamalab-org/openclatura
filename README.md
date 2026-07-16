@@ -7,10 +7,10 @@
 Built on top of RDKit, the package walks the molecular graph, detects functional groups and ring systems, selects the principal parent, assigns locants, and constructs the corresponding substitutive IUPAC name. Every step is recorded in an inspectable
 decision trace so the *why* of a name is recoverable, not just the *what*.
 
-> **Status:** alpha. The naming engine handles a broad slice of organic
+> **Status:** beta. The naming engine handles a broad slice of organic
 > structures (alkanes/alkenes/alkynes, common functional groups, simple
 > heterocycles, fused/spiro/bridged systems, retained names from the Blue
-> Book). PubChem/QM9/ZINC22 coverage is being measured; see `examples/`.
+> Book). PubChem/QM9/ZINC22 coverage is 99/97/100 %; see `evaluations/` .
 
 ## Install
 
@@ -230,3 +230,7 @@ OpenAPI docs are served at `http://localhost:8000/docs`.
 ## License
 
 MIT. See `LICENSE`.
+
+## How to cite 
+Adrian Mirza, Kevin Maik Jablonka, Rostislav Fedorov. Openclatura–an Open-Source Nomenclature Framework for Rule-Based Molecule Naming. ChemRxiv. 15 July 2026.
+DOI: https://doi.org/10.26434/chemrxiv.15006114/v1
