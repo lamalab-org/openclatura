@@ -142,6 +142,7 @@ from openclatura.retained_fused_templates import (
     retained_fused_base_templates,
     retained_fused_graph_templates,
     retained_fused_template_from_data,
+    retained_parent_metadata,
     template_molecule,
 )
 from openclatura.retained_specs import retained_parent_spec
@@ -2966,6 +2967,40 @@ def test_retained_fused_base_skeletons_are_loaded_from_the_graph_template_table(
     assert {"naphthalenoid_10", "linear_tricyclic_14", "purinoid_9", "indazoloid_9"} <= set(base_templates)
     assert base_templates["purinoid_9"]["fusion_atoms"] == ["4", "5"]
     assert base_templates["purinoid_9"]["mancude_double_bonds"] == 4
+
+
+def test_no_bare_retained_alias_infers_a_canonical_hydride_tautomer():
+    templates = retained_fused_graph_templates(include_disabled=True)
+    bare_hydride_aliases = {
+        alias
+        for template in templates
+        if template.default_indicated_h
+        for alias in template.aliases
+        if "H-" not in alias
+    }
+
+    # This registry-wide invariant automatically covers future retained
+    # hydrides whose bare alias omits the tautomer-defining H locant.
+    assert {"phenalene", "perimidine", "isoindole", "indole"} <= bare_hydride_aliases
+    assert all(retained_parent_metadata(alias) is None for alias in bare_hydride_aliases)
+
+    exact_hydride_templates = [template for template in templates if "H-" in template.name]
+    assert exact_hydride_templates
+    for template in exact_hydride_templates:
+        metadata = retained_parent_metadata(template.name)
+        assert metadata is not None
+        assert metadata.default_indicated_h == template.default_indicated_h
+
+
+def test_indicated_hydrogen_follows_graph_tautomer_but_not_hydrogen_free_spiro_carbon():
+    cases = {
+        "c1ccc2c(c1)CN=C2C1=NCc2ccccc21": "3-(3H-isoindol-1-yl)-1H-isoindole",
+        "O=C(OCCNC1=NCc2ccccc21)c1ccccc1": "2-((3H-isoindol-1-yl)amino)ethyl benzoate",
+        "FN1CCC2(C=Nc3ccccc32)CC1": "1'-fluorospiro[indole-3,4'-piperidine]",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
 
 
 def test_retained_fused_graph_template_schema_validates_locant_graphs():
