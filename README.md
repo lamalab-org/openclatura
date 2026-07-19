@@ -176,8 +176,8 @@ Attached to this framework are methyl groups at positions 2 (atom id 11), 4 (ato
 ## Development
 
 ```bash
-git clone https://github.com/lamalab-org/iupac-name-generator
-cd iupac-name-generator
+git clone https://github.com/lamalab-org/openclatura
+cd openclatura
 pip install -e ".[dev]"
 
 # run the unit + round-trip tests
