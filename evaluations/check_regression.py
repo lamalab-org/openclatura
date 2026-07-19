@@ -119,6 +119,7 @@ def check_regression(
     chunksize: int,
     opsin_chunk_size: int,
     limit: int = 0,
+    normalize_generation_input: bool = False,
 ) -> dict[str, Any]:
     """Run the delta-aware regression check and return a JSON-ready report."""
 
@@ -130,8 +131,9 @@ def check_regression(
     # Keep generation baseline-compatible: the paper names were produced from
     # the stored SMILES. Standardization belongs only to the structural
     # comparison on both sides of the OPSIN round trip.
-    generation_smiles = [row["smiles"] for row in rows]
-    standardized_smiles = [standardize_mol(smiles) or "" for smiles in generation_smiles]
+    stored_smiles = [row["smiles"] for row in rows]
+    standardized_smiles = [standardize_mol(smiles) or "" for smiles in stored_smiles]
+    generation_smiles = standardized_smiles if normalize_generation_input else stored_smiles
     results = name_many(
         generation_smiles,
         processes=processes,
@@ -172,7 +174,7 @@ def check_regression(
 
     return {
         "baseline_file": str(baseline_path),
-        "generation_input": "stored_smiles",
+        "generation_input": "standardized_smiles" if normalize_generation_input else "stored_smiles",
         "comparison_method": "standardize_mol(original) == standardize_mol(OPSIN(name))",
         "rows": len(rows),
         "baseline_matches": baseline_matches,
@@ -206,6 +208,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--chunksize", type=int, default=64, help="naming multiprocessing chunk size")
     parser.add_argument("--opsin-chunk-size", type=int, default=1000, help="changed names per OPSIN invocation")
     parser.add_argument("--limit", type=int, default=0, help="check only the first N rows (development only)")
+    parser.add_argument(
+        "--normalize-generation-input",
+        action="store_true",
+        help="diagnostic: name standardize_mol(smiles) instead of the stored SMILES",
+    )
     parser.add_argument("--report", type=Path, help="write the full JSON report to this path")
     return parser.parse_args(argv)
 
@@ -218,6 +225,7 @@ def main(argv: list[str] | None = None) -> int:
         chunksize=args.chunksize,
         opsin_chunk_size=args.opsin_chunk_size,
         limit=args.limit,
+        normalize_generation_input=args.normalize_generation_input,
     )
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)

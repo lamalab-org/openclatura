@@ -4,6 +4,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
+from .assembly_parts import RetainedParentMetadata
 from .molecule import DecisionTrace, Molecule
 from .parent_selection import ParentSelection
 from .perception import PerceivedGroup
@@ -98,6 +99,7 @@ class ParentPlan:
     selection: ParentSelection
     retained_name: str | None = None
     locant_maps: list[dict[int, str]] | None = None
+    retained_parent_metadata: RetainedParentMetadata | None = None
     principal: PrincipalGroupSelection | None = None
 
 
@@ -149,6 +151,7 @@ class ComponentNamingState:
     parent_selection: ParentSelection | None = None
     retained_name: str | None = None
     locant_maps: list[dict[int, str]] | None = None
+    retained_parent_metadata: RetainedParentMetadata | None = None
     principal_involved_atoms: set[int] = field(default_factory=set)
     base_exclude: set[int] = field(default_factory=set)
     sub_exclude: set[int] = field(default_factory=set)
