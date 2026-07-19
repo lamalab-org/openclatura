@@ -114,8 +114,8 @@ bluenamer batch smiles.txt --output names.jsonl --processes auto
 ## Development
 
 ```bash
-git clone https://github.com/lamalab-org/iupac-name-generator
-cd iupac-name-generator
+git clone https://github.com/lamalab-org/openclatura
+cd openclatura
 pip install -e ".[dev]"
 
 # run the unit + round-trip tests
