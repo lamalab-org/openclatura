@@ -13,7 +13,7 @@ from .assembly_parts import SubstituentItem
 from .grammar_snapshot_data import retained_fused_derivative_gate
 from .molecule import Molecule
 from .perception import PerceivedGroup
-from .retained_fused_templates import match_retained_fused_templates
+from .retained_fused_templates import RetainedFusedTemplateMatch, match_retained_fused_templates
 
 _DERIVATIVE_GATE = retained_fused_derivative_gate()
 PRODUCTION_RETAINED_FUSED_PARENTS = _DERIVATIVE_GATE.production_parent_names
@@ -51,8 +51,15 @@ def production_retained_fused_parent(
 
     matches = [
         match
-        for match in match_retained_fused_templates(mol, parent_atoms, include_disabled=True)
-        if match.template.name in PRODUCTION_RETAINED_FUSED_PARENTS and match.template.derivative_production_enabled
+        for match in match_retained_fused_templates(
+            mol,
+            parent_atoms,
+            include_disabled=True,
+            allow_nonaromatic=principal_key == "ketone",
+        )
+        if match.template.name in PRODUCTION_RETAINED_FUSED_PARENTS
+        and match.template.derivative_production_enabled
+        and (principal_key != "ketone" or _has_mancude_unsaturation(mol, parent_atoms, match))
     ]
     if not matches:
         return None
@@ -71,6 +78,33 @@ def production_retained_fused_parent(
 
 def _neutral_component(mol: Molecule, atoms: set[int]) -> bool:
     return all(mol.atoms[atom].charge == 0 for atom in atoms)
+
+
+def _has_mancude_unsaturation(
+    mol: Molecule,
+    parent_atoms: set[int],
+    match: RetainedFusedTemplateMatch,
+) -> bool:
+    """Reject hydro derivatives that merely share an oxo-parent topology."""
+
+    expected_double_bonds = match.template.mancude_double_bonds
+    if expected_double_bonds is None:
+        return False
+    nonaromatic_parent_carbonyls = sum(
+        atom_template.symbol == "C"
+        and not atom_template.aromatic
+        and any(
+            neighbor not in parent_atoms
+            and mol.atoms[neighbor].symbol == "O"
+            and mol.get_bond(match.locant_to_atom[atom_template.locant], neighbor).order == 2
+            for neighbor in mol.get_neighbors(match.locant_to_atom[atom_template.locant])
+        )
+        for atom_template in match.template.atoms
+    )
+    actual_double_bonds = sum(
+        bond.order == 2 and (bond.u in parent_atoms or bond.v in parent_atoms) for bond in mol.bonds.values()
+    )
+    return actual_double_bonds >= expected_double_bonds + nonaromatic_parent_carbonyls
 
 
 def _neutral_retained_parent(mol: Molecule, atoms: set[int]) -> bool:

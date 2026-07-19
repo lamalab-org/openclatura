@@ -162,11 +162,12 @@ def test_describe_orders_main_parent_trace_before_nested_substituent_trace():
     assert eth_index < amide_index < benzene_index
 
 
-def test_describe_explains_parenthesized_unsaturation_locants():
+def test_describe_explains_retained_purine_dione_parent():
     text = str(describe("CN1C=NC2=C1C(=O)N(C(=O)N2C)C"))
 
-    assert "Unsaturation: double at 1(6),8" in text
-    assert "1(6) means a multiple bond between locants 1 and 6" in text
+    assert "1,3,7-trimethylpurine-2,6-dione" in text
+    assert "retained as purine" in text
+    assert "Principal group: ketone at 2,6" in text
 
 
 def test_describe_renders_oxygen_carbonyl_shortcut_substituent_tree():

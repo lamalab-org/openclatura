@@ -280,7 +280,11 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
         return core_name
     if positive_parent_n_charges(parts):
         return core_name
-    ih_str = ",".join(sorted(indicated_hydrogens, key=parse_locant)) + "H-"
+    indicated_hydrogens = sorted(set(indicated_hydrogens), key=parse_locant)
+    has_carbon_h = any(parts.parent_atom_symbols_by_locant.get(locant) == "C" for locant in indicated_hydrogens)
+    if has_carbon_h and len(indicated_hydrogens) > 1:
+        return f"{','.join(indicated_hydrogens)}-{format_multiplier('hydro', len(indicated_hydrogens))}{core_name}"
+    ih_str = ",".join(indicated_hydrogens) + "H-"
     return ih_str + core_name
 
 

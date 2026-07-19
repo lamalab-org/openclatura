@@ -572,7 +572,6 @@ def name_component(
     )
     parts = parent_plan.parts
     emit_bond_stereo(mol, parts, numbered_path, get_loc, state.base_exclude)
-    add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
     add_component_front_modifiers(
         mol, parts, state.perceived_groups, state.principal_key, state.sub_exclude, name_subgraph
     )
@@ -604,6 +603,7 @@ def name_component(
         numbered_path,
         get_loc,
     )
+    add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
     add_component_substituents(parts, subst_mapping, numbered_path, get_loc)
 
     refresh_name_atom_bindings(parts)

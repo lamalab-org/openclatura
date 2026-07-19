@@ -551,6 +551,269 @@
       }
     },
     {
+      "name": "phenazine",
+      "pin": true,
+      "priority": 4,
+      "aliases": [],
+      "derivative_stem": "phenazin",
+      "attached_prefix": "phenazino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "linear_tricyclic_14",
+        "heteroatoms": [
+          {"locant": "5", "symbol": "N"},
+          {"locant": "10", "symbol": "N"}
+        ]
+      }
+    },
+    {
+      "name": "1,4-phenanthroline",
+      "pin": true,
+      "priority": 6,
+      "aliases": [],
+      "derivative_stem": "1,4-phenanthrolin",
+      "attached_prefix": "1,4-phenanthrolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "phenanthrenoid_14",
+        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "4", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "1,5-phenanthroline",
+      "pin": true,
+      "priority": 6,
+      "aliases": [],
+      "derivative_stem": "1,5-phenanthrolin",
+      "attached_prefix": "1,5-phenanthrolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "phenanthrenoid_14",
+        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "5", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "1,6-phenanthroline",
+      "pin": true,
+      "priority": 6,
+      "aliases": [],
+      "derivative_stem": "1,6-phenanthrolin",
+      "attached_prefix": "1,6-phenanthrolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "phenanthrenoid_14",
+        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "6", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "1,7-phenanthroline",
+      "pin": true,
+      "priority": 6,
+      "aliases": [],
+      "derivative_stem": "1,7-phenanthrolin",
+      "attached_prefix": "1,7-phenanthrolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "phenanthrenoid_14",
+        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "7", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "1,8-phenanthroline",
+      "pin": true,
+      "priority": 6,
+      "aliases": [],
+      "derivative_stem": "1,8-phenanthrolin",
+      "attached_prefix": "1,8-phenanthrolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "phenanthrenoid_14",
+        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "8", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "1,9-phenanthroline",
+      "pin": true,
+      "priority": 6,
+      "aliases": [],
+      "derivative_stem": "1,9-phenanthrolin",
+      "attached_prefix": "1,9-phenanthrolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "phenanthrenoid_14",
+        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "9", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "1,10-phenanthroline",
+      "pin": true,
+      "priority": 6,
+      "aliases": [],
+      "derivative_stem": "1,10-phenanthrolin",
+      "attached_prefix": "1,10-phenanthrolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "phenanthrenoid_14",
+        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "10", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "2,7-phenanthroline",
+      "pin": true,
+      "priority": 6,
+      "aliases": [],
+      "derivative_stem": "2,7-phenanthrolin",
+      "attached_prefix": "2,7-phenanthrolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "phenanthrenoid_14",
+        "heteroatoms": [{"locant": "2", "symbol": "N"}, {"locant": "7", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "2,8-phenanthroline",
+      "pin": true,
+      "priority": 6,
+      "aliases": [],
+      "derivative_stem": "2,8-phenanthrolin",
+      "attached_prefix": "2,8-phenanthrolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "phenanthrenoid_14",
+        "heteroatoms": [{"locant": "2", "symbol": "N"}, {"locant": "8", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "3,5-phenanthroline",
+      "pin": true,
+      "priority": 6,
+      "aliases": [],
+      "derivative_stem": "3,5-phenanthrolin",
+      "attached_prefix": "3,5-phenanthrolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "phenanthrenoid_14",
+        "heteroatoms": [{"locant": "3", "symbol": "N"}, {"locant": "5", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "3,6-phenanthroline",
+      "pin": true,
+      "priority": 6,
+      "aliases": [],
+      "derivative_stem": "3,6-phenanthrolin",
+      "attached_prefix": "3,6-phenanthrolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "phenanthrenoid_14",
+        "heteroatoms": [{"locant": "3", "symbol": "N"}, {"locant": "6", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "4,5-phenanthroline",
+      "pin": true,
+      "priority": 6,
+      "aliases": [],
+      "derivative_stem": "4,5-phenanthrolin",
+      "attached_prefix": "4,5-phenanthrolino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "phenanthrenoid_14",
+        "heteroatoms": [{"locant": "4", "symbol": "N"}, {"locant": "5", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "acridine",
+      "pin": true,
+      "priority": 6,
+      "aliases": [],
+      "derivative_stem": "acridin",
+      "attached_prefix": "acridino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "acridinoid_14",
+        "heteroatoms": [{"locant": "10", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "carbazole",
+      "pin": true,
+      "priority": 17,
+      "aliases": ["9H-carbazole"],
+      "default_indicated_h": ["9"],
+      "derivative_stem": "carbazol",
+      "attached_prefix": "carbazolo",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "carbazoloid_13",
+        "heteroatoms": [{"locant": "9", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "purine",
+      "pin": true,
+      "priority": 16,
+      "aliases": ["7H-purine", "9H-purine"],
+      "derivative_stem": "purin",
+      "attached_prefix": "purino",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "purinoid_9",
+        "heteroatoms": [
+          {"locant": "1", "symbol": "N"}, {"locant": "3", "symbol": "N"},
+          {"locant": "7", "symbol": "N"}, {"locant": "9", "symbol": "N"}
+        ]
+      }
+    },
+    {
+      "name": "indazole",
+      "pin": true,
+      "priority": 17,
+      "aliases": ["1H-indazole", "2H-indazole"],
+      "default_indicated_h": ["1"],
+      "derivative_stem": "indazol",
+      "attached_prefix": "indazolo",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "indazoloid_9",
+        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "2", "symbol": "N"}]
+      }
+    },
+    {
+      "name": "xanthene",
+      "pin": true,
+      "priority": 17,
+      "aliases": ["9H-xanthene"],
+      "default_indicated_h": ["9"],
+      "derivative_stem": "xanthen",
+      "attached_prefix": "xantheno",
+      "template": {
+        "enabled": false,
+        "derivative_production_enabled": true,
+        "base_template": "acridinoid_14",
+        "mancude_double_bonds": 6,
+        "heteroatoms": [{"locant": "10", "symbol": "O"}],
+        "atom_overrides": [{"locant": "9", "aromatic": false}, {"locant": "10", "aromatic": false}]
+      }
+    },
+    {
       "name": "1H-indole",
       "pin": true,
       "priority": 18,

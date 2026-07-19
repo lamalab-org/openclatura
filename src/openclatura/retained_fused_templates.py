@@ -40,6 +40,169 @@ NAPHTHALENOID_10_TEMPLATE = {
 }
 
 
+def _shared_graph_template(
+    locants: list[str],
+    bonds: list[tuple[str, str]],
+    fusion_atoms: list[str],
+    mancude_double_bonds: int,
+) -> dict:
+    return {
+        "locants": locants,
+        "bonds": [
+            {
+                "locants": [left, right],
+                **({"bond_class": "fusion"} if left in fusion_atoms and right in fusion_atoms else {}),
+            }
+            for left, right in bonds
+        ],
+        "fusion_atoms": fusion_atoms,
+        "peripheral_atoms": locants,
+        "mancude_double_bonds": mancude_double_bonds,
+    }
+
+
+LINEAR_TRICYCLIC_14_TEMPLATE = _shared_graph_template(
+    ["1", "2", "3", "4", "4a", "5", "5a", "6", "7", "8", "9", "9a", "10", "10a"],
+    [
+        ("1", "2"),
+        ("2", "3"),
+        ("3", "4"),
+        ("4", "4a"),
+        ("4a", "5"),
+        ("5", "5a"),
+        ("5a", "6"),
+        ("6", "7"),
+        ("7", "8"),
+        ("8", "9"),
+        ("9", "9a"),
+        ("5a", "9a"),
+        ("9a", "10"),
+        ("10", "10a"),
+        ("10a", "1"),
+        ("4a", "10a"),
+    ],
+    ["4a", "5a", "9a", "10a"],
+    7,
+)
+
+PHENANTHRENOID_14_TEMPLATE = _shared_graph_template(
+    ["1", "2", "3", "4", "4a", "5", "6", "6a", "7", "8", "9", "10", "10a", "10b"],
+    [
+        ("1", "2"),
+        ("2", "3"),
+        ("3", "4"),
+        ("4", "4a"),
+        ("4a", "5"),
+        ("5", "6"),
+        ("6", "6a"),
+        ("6a", "7"),
+        ("7", "8"),
+        ("8", "9"),
+        ("9", "10"),
+        ("10", "10a"),
+        ("6a", "10a"),
+        ("10a", "10b"),
+        ("10b", "1"),
+        ("4a", "10b"),
+    ],
+    ["4a", "6a", "10a", "10b"],
+    7,
+)
+
+ACRIDINOID_14_TEMPLATE = _shared_graph_template(
+    ["1", "2", "3", "4", "4a", "10", "10a", "5", "6", "7", "8", "8a", "9", "9a"],
+    [
+        ("1", "2"),
+        ("2", "3"),
+        ("3", "4"),
+        ("4", "4a"),
+        ("4a", "10"),
+        ("10", "10a"),
+        ("10a", "5"),
+        ("5", "6"),
+        ("6", "7"),
+        ("7", "8"),
+        ("8", "8a"),
+        ("10a", "8a"),
+        ("8a", "9"),
+        ("9", "9a"),
+        ("9a", "1"),
+        ("4a", "9a"),
+    ],
+    ["4a", "10a", "8a", "9a"],
+    7,
+)
+
+CARBAZOLOID_13_TEMPLATE = _shared_graph_template(
+    ["1", "2", "3", "4", "4a", "4b", "5", "6", "7", "8", "8a", "9", "9a"],
+    [
+        ("1", "2"),
+        ("2", "3"),
+        ("3", "4"),
+        ("4", "4a"),
+        ("4a", "4b"),
+        ("4b", "5"),
+        ("5", "6"),
+        ("6", "7"),
+        ("7", "8"),
+        ("8", "8a"),
+        ("4b", "8a"),
+        ("8a", "9"),
+        ("9", "9a"),
+        ("9a", "1"),
+        ("4a", "9a"),
+    ],
+    ["4a", "4b", "8a", "9a"],
+    6,
+)
+
+PURINOID_9_TEMPLATE = _shared_graph_template(
+    ["1", "2", "3", "4", "9", "8", "7", "5", "6"],
+    [
+        ("1", "2"),
+        ("2", "3"),
+        ("3", "4"),
+        ("4", "9"),
+        ("9", "8"),
+        ("8", "7"),
+        ("7", "5"),
+        ("5", "4"),
+        ("5", "6"),
+        ("6", "1"),
+    ],
+    ["4", "5"],
+    4,
+)
+
+INDAZOLOID_9_TEMPLATE = _shared_graph_template(
+    ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"],
+    [
+        ("1", "2"),
+        ("2", "3"),
+        ("3", "3a"),
+        ("3a", "4"),
+        ("4", "5"),
+        ("5", "6"),
+        ("6", "7"),
+        ("7", "7a"),
+        ("7a", "1"),
+        ("3a", "7a"),
+    ],
+    ["3a", "7a"],
+    4,
+)
+
+RETAINED_FUSED_BASE_TEMPLATES = {
+    "naphthalenoid_10": NAPHTHALENOID_10_TEMPLATE,
+    "linear_tricyclic_14": LINEAR_TRICYCLIC_14_TEMPLATE,
+    "phenanthrenoid_14": PHENANTHRENOID_14_TEMPLATE,
+    "acridinoid_14": ACRIDINOID_14_TEMPLATE,
+    "carbazoloid_13": CARBAZOLOID_13_TEMPLATE,
+    "purinoid_9": PURINOID_9_TEMPLATE,
+    "indazoloid_9": INDAZOLOID_9_TEMPLATE,
+}
+
+
 @dataclass(frozen=True)
 class RetainedFusedAtomTemplate:
     locant: str
@@ -77,6 +240,7 @@ class RetainedFusedGraphTemplate:
     aromatic_equivalence_policy: str = "neutral_kekule_equivalent"
     enabled: bool = False
     derivative_production_enabled: bool = False
+    mancude_double_bonds: int | None = None
 
     @property
     def atom_by_locant(self) -> dict[str, RetainedFusedAtomTemplate]:
@@ -127,6 +291,8 @@ def match_retained_fused_template(
     mol: Molecule,
     atom_indices: set[int] | list[int] | tuple[int, ...],
     template: RetainedFusedGraphTemplate,
+    *,
+    allow_nonaromatic: bool = False,
 ) -> RetainedFusedTemplateMatch | None:
     """Match one retained fused graph template to a molecule atom set.
 
@@ -160,7 +326,7 @@ def match_retained_fused_template(
         locant: [
             atom_idx
             for atom_idx in atom_set
-            if _atom_matches_template(mol, atom_idx, atom_by_locant[locant])
+            if _atom_matches_template(mol, atom_idx, atom_by_locant[locant], allow_nonaromatic=allow_nonaromatic)
             and molecule_degrees[atom_idx] == template_degrees[locant]
         ]
         for locant in template.locants
@@ -185,6 +351,8 @@ def _match_all_retained_fused_template(
     mol: Molecule,
     atom_indices: set[int] | list[int] | tuple[int, ...],
     template: RetainedFusedGraphTemplate,
+    *,
+    allow_nonaromatic: bool = False,
 ) -> list[RetainedFusedTemplateMatch]:
     validate_retained_fused_template(template)
     atom_set = set(atom_indices)
@@ -209,7 +377,7 @@ def _match_all_retained_fused_template(
         locant: [
             atom_idx
             for atom_idx in atom_set
-            if _atom_matches_template(mol, atom_idx, atom_by_locant[locant])
+            if _atom_matches_template(mol, atom_idx, atom_by_locant[locant], allow_nonaromatic=allow_nonaromatic)
             and molecule_degrees[atom_idx] == template_degrees[locant]
         ]
         for locant in template.locants
@@ -243,13 +411,19 @@ def match_retained_fused_templates(
     atom_indices: set[int] | list[int] | tuple[int, ...],
     *,
     include_disabled: bool = False,
+    allow_nonaromatic: bool = False,
 ) -> list[RetainedFusedTemplateMatch]:
     """Return retained fused template matches ranked by retained priority."""
 
     matches = [
         match
         for template in retained_fused_graph_templates(include_disabled=include_disabled)
-        for match in _match_all_retained_fused_template(mol, atom_indices, template)
+        for match in _match_all_retained_fused_template(
+            mol,
+            atom_indices,
+            template,
+            allow_nonaromatic=allow_nonaromatic,
+        )
     ]
     return sorted(
         matches,
@@ -324,6 +498,11 @@ def retained_fused_template_from_data(row: dict[str, Any]) -> RetainedFusedGraph
         aromatic_equivalence_policy=str(template_data.get("aromatic_equivalence_policy", "neutral_kekule_equivalent")),
         enabled=bool(template_data.get("enabled", row.get("template_enabled", False))),
         derivative_production_enabled=bool(template_data.get("derivative_production_enabled", False)),
+        mancude_double_bonds=(
+            int(template_data["mancude_double_bonds"])
+            if template_data.get("mancude_double_bonds") is not None
+            else None
+        ),
     )
     validate_retained_fused_template(template)
     return template
@@ -334,10 +513,11 @@ def _expand_template_data(template_data: dict[str, Any]) -> dict[str, Any]:
     if base_name is None:
         expanded = dict(template_data)
         return _expand_locant_atom_shorthand(expanded)
-    if base_name != "naphthalenoid_10":
+    base_template = RETAINED_FUSED_BASE_TEMPLATES.get(str(base_name))
+    if base_template is None:
         raise ValueError(f"Unknown retained fused base template {base_name!r}.")
 
-    expanded = {**NAPHTHALENOID_10_TEMPLATE, **template_data}
+    expanded = {**base_template, **template_data}
     return _expand_locant_atom_shorthand(expanded)
 
 
@@ -461,17 +641,39 @@ def _template_neighbors(template: RetainedFusedGraphTemplate) -> dict[str, set[s
     return neighbors
 
 
-def _atom_matches_template(mol: Molecule, atom_idx: int, atom_template: RetainedFusedAtomTemplate) -> bool:
+def _atom_matches_template(
+    mol: Molecule,
+    atom_idx: int,
+    atom_template: RetainedFusedAtomTemplate,
+    *,
+    allow_nonaromatic: bool = False,
+) -> bool:
     atom = mol.atoms[atom_idx]
     if atom.symbol != atom_template.symbol:
         return False
     if atom.charge != atom_template.charge:
         return False
-    if atom_template.aromatic and not atom.is_aromatic:
+    if (
+        atom_template.aromatic
+        and not atom.is_aromatic
+        and not allow_nonaromatic
+        and not _is_retained_oxo_site(mol, atom_idx)
+    ):
         return False
     if atom_template.default_h and atom.explicit_h_count + atom.total_h_count <= 0:
         return False
     return True
+
+
+def _is_retained_oxo_site(mol: Molecule, atom_idx: int) -> bool:
+    """Return whether aromaticity was lost only because this carbon bears =O."""
+
+    if mol.atoms[atom_idx].symbol != "C":
+        return False
+    return any(
+        mol.atoms[neighbor].symbol == "O" and (bond := mol.get_bond(atom_idx, neighbor)) is not None and bond.order == 2
+        for neighbor in mol.get_neighbors(atom_idx)
+    )
 
 
 def _match_locants_backtracking(
