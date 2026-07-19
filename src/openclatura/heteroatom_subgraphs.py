@@ -1,7 +1,5 @@
 """Heteroatom-starting recursive substituent naming."""
 
-from collections.abc import Callable
-
 from .formatting import (
     count_names,
     format_counted_prefixes,
@@ -21,12 +19,11 @@ from .namer_config import (
     SIMPLE_SELANYL_PREFIXES,
     SIMPLE_SULFANYL_PREFIXES,
 )
+from .naming_protocols import BranchNamer
 from .nitrogen_roles import terminal_n3_substituent_role
 from .nomenclature import RULES
 from .oxoacid_roles import OxoLigandRole, central_oxo_substituent_role
 from .rules import multipliers
-
-BranchNamer = Callable[[Molecule, int, set[int], int | None], str]
 
 
 def upstream_bond_order(mol: Molecule, start_idx: int, upstream_atom: int | None) -> int:

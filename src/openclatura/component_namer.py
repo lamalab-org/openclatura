@@ -1,7 +1,6 @@
 """Connected-component naming pipeline."""
 
 from collections.abc import Callable
-from typing import Literal, Protocol, overload
 
 from .assembly_parts import AssemblyParts, NameAtomBinding, SubstituentItem
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
@@ -17,6 +16,7 @@ from .name_assembly import NameAssemblyResult, assert_final_name_assembly, token
 from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
 from .naming_context import ComponentNamingState, NamingIntent
+from .naming_protocols import SubgraphNamer
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
 from .parent_selection import select_principal_parent
 from .principal_groups import (
@@ -48,67 +48,11 @@ from .trace_helpers import (
     assembly_substituent_tree,
     assembly_trace_segments,
     bond_ids_within,
+    build_shortcut_tree_node,
     decision_trace_data,
     functional_group_trace_data,
     trace_decision,
 )
-
-
-class SubgraphNamer(Protocol):
-    """Recursive subgraph namer with simple and traced/tree return modes."""
-
-    @overload
-    def __call__(
-        self,
-        mol: Molecule,
-        start_idx: int,
-        exclude_atoms: set[int],
-        *,
-        upstream_atom: int | None = None,
-        return_trace: Literal[False] = False,
-        return_tree: Literal[False] = False,
-        decision_trace: DecisionTrace | None = None,
-    ) -> str: ...
-
-    @overload
-    def __call__(
-        self,
-        mol: Molecule,
-        start_idx: int,
-        exclude_atoms: set[int],
-        *,
-        upstream_atom: int | None = None,
-        return_trace: Literal[True],
-        return_tree: Literal[False] = False,
-        decision_trace: DecisionTrace | None = None,
-    ) -> tuple[str, list[dict]]: ...
-
-    @overload
-    def __call__(
-        self,
-        mol: Molecule,
-        start_idx: int,
-        exclude_atoms: set[int],
-        *,
-        upstream_atom: int | None = None,
-        return_trace: Literal[True],
-        return_tree: Literal[True],
-        decision_trace: DecisionTrace | None = None,
-    ) -> tuple[str, list[dict], dict | None]: ...
-
-    @overload
-    def __call__(
-        self,
-        mol: Molecule,
-        start_idx: int,
-        exclude_atoms: set[int],
-        *,
-        upstream_atom: int | None = None,
-        return_trace: Literal[False] = False,
-        return_tree: Literal[True],
-        decision_trace: DecisionTrace | None = None,
-    ) -> tuple[str, dict | None]: ...
-
 
 SpiroSubgraphNamer = Callable[[Molecule, int, set[int]], SpiroAssembly]
 ParentAssembler = Callable[..., str]
@@ -332,11 +276,11 @@ def name_component(
             },
         )
         if return_trace and return_tree:
-            return name, [], _shortcut_tree(name, component_atoms, bindings, token_spans)
+            return name, [], _component_shortcut_tree(name, component_atoms, bindings, token_spans)
         if return_trace:
             return name, []
         if return_tree:
-            return name, _shortcut_tree(name, component_atoms, bindings, token_spans)
+            return name, _component_shortcut_tree(name, component_atoms, bindings, token_spans)
         return name
 
     def name_component_again(next_mol: Molecule, next_atoms: set[int], is_substituent: bool = False):
@@ -376,11 +320,11 @@ def name_component(
             },
         )
         if return_trace and return_tree:
-            return name, [], _shortcut_tree(name, component_atoms, bindings, token_spans)
+            return name, [], _component_shortcut_tree(name, component_atoms, bindings, token_spans)
         if return_trace:
             return name, []
         if return_tree:
-            return name, _shortcut_tree(name, component_atoms, bindings, token_spans)
+            return name, _component_shortcut_tree(name, component_atoms, bindings, token_spans)
         return name
 
     state = ComponentNamingState(component_atoms=set(component_atoms), is_substituent=is_substituent)
@@ -431,11 +375,11 @@ def name_component(
             },
         )
         if return_trace and return_tree:
-            return name, [], _shortcut_tree(name, state.component_atoms, bindings, token_spans)
+            return name, [], _component_shortcut_tree(name, state.component_atoms, bindings, token_spans)
         if return_trace:
             return name, []
         if return_tree:
-            return name, _shortcut_tree(name, state.component_atoms, bindings, token_spans)
+            return name, _component_shortcut_tree(name, state.component_atoms, bindings, token_spans)
         return name
 
     state.exclude_atoms = set(mol.atoms.keys()) - state.component_atoms
@@ -654,21 +598,15 @@ def name_component(
     return name
 
 
-def _shortcut_tree(name: str, component_atoms: set[int], bindings: list[dict], token_spans: list[dict]) -> dict:
+def _component_shortcut_tree(
+    name: str, component_atoms: set[int], bindings: list[dict], token_spans: list[dict]
+) -> dict:
     """Return a minimal component tree for shortcut component names."""
 
-    return {
-        "kind": "component",
-        "name": name,
-        "atoms": sorted(component_atoms),
-        "bonds": [],
-        "parent": None,
-        "principal_group": None,
-        "substituents": [],
-        "replacement_prefixes": [],
-        "unsaturations": [],
-        "trace_segments": [],
-        "nested_decisions": [],
-        "name_atom_bindings": bindings,
-        "name_token_spans": token_spans,
-    }
+    return build_shortcut_tree_node(
+        kind="component",
+        name=name,
+        atom_ids=component_atoms,
+        name_atom_bindings=bindings,
+        name_token_spans=token_spans,
+    )

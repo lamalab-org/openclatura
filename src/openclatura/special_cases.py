@@ -8,6 +8,7 @@ from .assembly_parts import NameAtomBinding, NameTokenBinding
 from .charge_pair_roles import charge_pair_roles
 from .formatting import format_counted_prefixes, format_multiplier, oxy_prefix_from_branch, strip_outer_parentheses
 from .molecule import Molecule
+from .naming_protocols import BranchNamer
 from .nitrogen_roles import azine_roles
 from .nomenclature import RULES
 from .oxoacid_roles import CentralOxoRole, OxoLigandRole, central_oxo_roles
@@ -17,7 +18,6 @@ from .retained_specs import retained_parent_spec
 from .rules import multipliers, retained, stems
 
 ComponentNamer = Callable[..., str]
-BranchNamer = Callable[..., str]
 
 
 @dataclass(frozen=True)

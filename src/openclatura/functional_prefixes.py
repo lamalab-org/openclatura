@@ -9,13 +9,13 @@ from .assembly_parts import NameTokenBinding, SubstituentItem
 from .formatting import format_counted_prefixes, is_complex_prefix, oxy_prefix_from_branch, strip_outer_parentheses
 from .group_atom_roles import amide_nitrogen, ester_or_peroxy_single_oxygen
 from .molecule import Molecule
+from .naming_protocols import BranchNamer
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .rules import multipliers
 from .subgraph_tools import subgraph_component
 from .trace_helpers import bond_ids_within
 
-BranchNamer = Callable[..., str]
 PrefixHandler = Callable[["PrefixContext", PerceivedGroup], str]
 
 

@@ -104,6 +104,7 @@ from openclatura.namer import (
 )
 from openclatura.naming_audit import UnnamedAtomError, assert_component_fully_named, audit_charge_pair_templates
 from openclatura.naming_data import DATA_DIR, load_json_table, namer_rules
+from openclatura.naming_protocols import BranchNamer, RecursiveSubgraphNamer, SubgraphNamer
 from openclatura.nitrogen_roles import (
     acid_derived_hydrazone_roles,
     azine_roles,
@@ -172,7 +173,13 @@ from openclatura.token_grammar import (
     is_locant_token,
     lexical_token_spans,
 )
-from openclatura.trace_helpers import add_substituent_trace, assembly_substituent_tree, assembly_trace_segments
+from openclatura.trace_helpers import (
+    add_substituent_trace,
+    assembly_substituent_tree,
+    assembly_trace_segments,
+    build_naming_tree_node,
+    build_shortcut_tree_node,
+)
 from openclatura.von_baeyer import _classify_secondary_bridges, find_von_baeyer_candidates
 
 
@@ -268,6 +275,35 @@ def test_substituent_suffix_metadata_is_emitted_by_assembly_parts():
         "is_double_attach": False,
         "is_triple_attach": False,
     }
+
+
+def test_recursive_namer_roles_share_one_callable_protocol():
+    assert BranchNamer is RecursiveSubgraphNamer
+    assert SubgraphNamer is RecursiveSubgraphNamer
+
+
+def test_tree_builders_share_schema_without_mutable_defaults():
+    assembled = build_naming_tree_node(kind="fragment", name="ethyl", atom_ids={2, 1}, bond_ids={7})
+    shortcut = build_shortcut_tree_node(kind="component", name="methane", atom_ids={0})
+
+    common_keys = {
+        "kind",
+        "name",
+        "atoms",
+        "bonds",
+        "parent",
+        "principal_group",
+        "substituents",
+        "replacement_prefixes",
+        "unsaturations",
+        "trace_segments",
+        "nested_decisions",
+    }
+    assert common_keys <= assembled.keys()
+    assert common_keys <= shortcut.keys()
+    assert assembled["atoms"] == [1, 2]
+    assembled["substituents"].append({"name": "methyl"})
+    assert shortcut["substituents"] == []
 
 
 def test_methane_is_named_without_parent_selection_fallback():

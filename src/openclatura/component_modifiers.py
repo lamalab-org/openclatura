@@ -1,73 +1,16 @@
 """Data-driven component modifiers attached after parent numbering."""
 
-from typing import Literal, Protocol, overload
-
 from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem
 from .formatting import strip_outer_parentheses
 from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
 from .molecule import DecisionTrace, Molecule
+from .naming_protocols import BranchNamer
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .subgraph_tools import subgraph_component
 from .substituent_tokens import graph_bound_substituent_tokens
 from .trace_helpers import add_substituent_trace, bond_ids_within, decision_trace_data
-
-
-class BranchNamer(Protocol):
-    """Recursive branch namer with simple and traced/tree return modes."""
-
-    @overload
-    def __call__(
-        self,
-        mol: Molecule,
-        start_idx: int,
-        exclude_atoms: set[int],
-        *,
-        upstream_atom: int | None = None,
-        return_trace: Literal[False] = False,
-        return_tree: Literal[False] = False,
-        decision_trace: DecisionTrace | None = None,
-    ) -> str: ...
-
-    @overload
-    def __call__(
-        self,
-        mol: Molecule,
-        start_idx: int,
-        exclude_atoms: set[int],
-        *,
-        upstream_atom: int | None = None,
-        return_trace: Literal[True],
-        return_tree: Literal[False] = False,
-        decision_trace: DecisionTrace | None = None,
-    ) -> tuple[str, list[dict]]: ...
-
-    @overload
-    def __call__(
-        self,
-        mol: Molecule,
-        start_idx: int,
-        exclude_atoms: set[int],
-        *,
-        upstream_atom: int | None = None,
-        return_trace: Literal[True],
-        return_tree: Literal[True],
-        decision_trace: DecisionTrace | None = None,
-    ) -> tuple[str, list[dict], dict | None]: ...
-
-    @overload
-    def __call__(
-        self,
-        mol: Molecule,
-        start_idx: int,
-        exclude_atoms: set[int],
-        *,
-        upstream_atom: int | None = None,
-        return_trace: Literal[False] = False,
-        return_tree: Literal[True],
-        decision_trace: DecisionTrace | None = None,
-    ) -> tuple[str, dict | None]: ...
 
 
 def add_component_front_modifiers(

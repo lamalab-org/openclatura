@@ -51,7 +51,11 @@ from .trace_helpers import (
 from .trace_helpers import (
     bond_ids_within as _bond_ids_within,
 )
-from .trace_helpers import decision_trace_data, trace_decision
+from .trace_helpers import (
+    build_shortcut_tree_node,
+    decision_trace_data,
+    trace_decision,
+)
 
 
 @dataclass
@@ -1338,19 +1342,13 @@ def _shortcut_substituent_tree(
 ) -> dict:
     """Return a minimal recursive tree node for shortcut substituent names."""
 
-    node = {
-        "kind": "substituent",
-        "name": name,
-        "atoms": sorted(component),
-        "bonds": sorted(_bond_ids_within(mol, component)),
-        "parent": None,
-        "principal_group": None,
-        "substituents": [],
-        "replacement_prefixes": [],
-        "unsaturations": [],
-        "trace_segments": [],
-        "nested_decisions": decision_trace_data(decision_trace),
-    }
+    node = build_shortcut_tree_node(
+        kind="substituent",
+        name=name,
+        atom_ids=component,
+        bond_ids=_bond_ids_within(mol, component),
+        decisions=decision_trace_data(decision_trace),
+    )
     if direct_prefix is not None:
         node["functional_prefix"] = {
             "kind": "functional_prefix",
