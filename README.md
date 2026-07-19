@@ -225,16 +225,41 @@ curl -X POST localhost:8000/describe -H 'content-type: application/json' \
 
 OpenAPI docs are served at `http://localhost:8000/docs`.
 
-An interactive, recording-ready visualization of the naming pipeline is
-available at `http://localhost:8000/showcase`. It accepts arbitrary SMILES,
-animates the real naming trace, and includes autoplay, looping, speed,
-fullscreen, and a distraction-free record mode.
-
 
 ## License
 
 MIT. See `LICENSE`.
 
-## How to cite 
-Adrian Mirza, Kevin Maik Jablonka, Rostislav Fedorov. Openclatura–an Open-Source Nomenclature Framework for Rule-Based Molecule Naming. ChemRxiv. 15 July 2026.
-DOI: https://doi.org/10.26434/chemrxiv.15006114/v1
+## How to cite
+
+If you use Openclatura in your research, please cite the Openclatura preprint:
+
+```bibtex
+@article{openclatura2026,
+  author  = {Mirza, Adrian and Jablonka, Kevin Maik and Fedorov, Rostislav},
+  title   = {Openclatura--An Open-Source Nomenclature Framework for Rule-Based Molecule Naming},
+  journal = {ChemRxiv},
+  year    = {2026},
+  month   = jul,
+  day     = {15},
+  doi     = {10.26434/chemrxiv.15006114/v1},
+  url     = {https://doi.org/10.26434/chemrxiv.15006114/v1},
+  note    = {Preprint}
+}
+```
+
+If you are using OPSIN for verification, please cite the original OPSIN publication:
+
+```bibtex
+@article{lowe2011opsin,
+  author  = {Lowe, Daniel M. and Corbett, Peter T. and Murray-Rust, Peter and Glen, Robert C.},
+  title   = {Chemical Name to Structure: {OPSIN}, an Open Source Solution},
+  journal = {Journal of Chemical Information and Modeling},
+  year    = {2011},
+  volume  = {51},
+  number  = {3},
+  pages   = {739--753},
+  doi     = {10.1021/ci100384d},
+  url     = {https://doi.org/10.1021/ci100384d}
+}
+```
