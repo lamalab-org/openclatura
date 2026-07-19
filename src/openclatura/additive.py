@@ -53,7 +53,10 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 and len(ring_bonds) == 3
                 and atom.explicit_h_count + atom.total_h_count > 0
             )
-            if sum(b.order for b in ring_bonds) == 2 or fusion_carbon_h:
+            indicated_h_site = sum(b.order for b in ring_bonds) == 2 and (
+                not atom.is_carbon or atom.explicit_h_count + atom.total_h_count > 0
+            )
+            if indicated_h_site or fusion_carbon_h:
                 candidates.append((locant, idx))
 
     # A hydrogenated fusion carbon changes the retained-parent hydride state.
