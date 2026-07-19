@@ -116,7 +116,8 @@ def _has_mancude_unsaturation(
         and any(
             neighbor not in parent_atoms
             and mol.atoms[neighbor].symbol == "O"
-            and mol.get_bond(match.locant_to_atom[atom_template.locant], neighbor).order == 2
+            and (bond := mol.get_bond(match.locant_to_atom[atom_template.locant], neighbor)) is not None
+            and bond.order == 2
             for neighbor in mol.get_neighbors(match.locant_to_atom[atom_template.locant])
         )
         for atom_template in match.template.atoms

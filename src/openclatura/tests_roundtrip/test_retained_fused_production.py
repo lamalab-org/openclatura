@@ -114,7 +114,18 @@ def _cml_plan(cml: str) -> tuple[dict[str, str], set[frozenset[str]], set[str]]:
 
 
 def _normalized_pairs_match(left: list[str], right: list[str]) -> bool:
-    return all(standardize_mol(a) == standardize_mol(b) is not None for a, b in zip(left, right, strict=True))
+    for left_smiles, right_smiles in zip(left, right, strict=True):
+        standardized_left = standardize_mol(left_smiles)
+        standardized_right = standardize_mol(right_smiles)
+        if standardized_left is None or standardized_right is None or standardized_left != standardized_right:
+            return False
+    return True
+
+
+def test_normalized_pairs_match_requires_parseable_equivalent_structures():
+    assert _normalized_pairs_match(["C(C)O"], ["CCO"])
+    assert not _normalized_pairs_match(["CCO"], ["CC"])
+    assert not _normalized_pairs_match(["not-a-smiles"], ["CCO"])
 
 
 @pytest.fixture(scope="module")
