@@ -30,19 +30,24 @@ def read_smiles(smiles: str) -> Molecule:
         atom_metadata = _atom_metadata(rdmol)
 
     Chem.AssignStereochemistry(rdmol, force=True, cleanIt=True)
-    # The legacy labeler above is still needed to perceive stereo units, but
-    # its CIP codes mis-rank ligands in deep-sphere comparisons (e.g.
-    # ring-closure duplicate atoms) and invert 3-coordinate sulfur centers.
-    # rdCIPLabeler overwrites the _CIPCode properties with correct labels.
+    legacy_centers = dict(Chem.FindMolChiralCenters(rdmol, includeUnassigned=False))
+    # The legacy labeler decides *which* centers carry an absolute descriptor:
+    # centers it leaves unassigned are ring-symmetry-dependent ones that the
+    # scoped small-ring / cis-trans fallbacks must handle (OPSIN rejects
+    # absolute R/S there). But its CIP *values* mis-rank ligands in
+    # deep-sphere comparisons (e.g. ring-closure duplicate atoms) and invert
+    # 3-coordinate sulfur centers, so the label itself comes from
+    # rdCIPLabeler, which overwrites the _CIPCode properties.
     try:
         rdCIPLabeler.AssignCIPLabels(rdmol)
     except Exception:
         pass  # unsanitized input; keep the legacy labels
-    chiral_centers = {
-        atom.GetIdx(): atom.GetProp("_CIPCode")
-        for atom in rdmol.GetAtoms()
-        if atom.HasProp("_CIPCode") and atom.GetProp("_CIPCode") in ("R", "S")
-    }
+    chiral_centers = {}
+    for idx, legacy_code in legacy_centers.items():
+        atom = rdmol.GetAtomWithIdx(idx)
+        code = atom.GetProp("_CIPCode") if atom.HasProp("_CIPCode") else legacy_code
+        if code in ("R", "S"):
+            chiral_centers[idx] = code
 
     for atom in rdmol.GetAtoms():
         stereo = chiral_centers.get(atom.GetIdx())
