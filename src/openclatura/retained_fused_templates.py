@@ -109,16 +109,15 @@ def retained_fused_graph_templates(*, include_disabled: bool = False) -> tuple[R
 
 @cache
 def retained_parent_metadata(parent_name: str) -> RetainedParentMetadata | None:
-    """Return graph-template metadata for a retained parent spelling."""
+    """Return metadata only when the spelling identifies one exact hydride.
+
+    Bare aliases such as ``isoindole`` do not identify the indicated-hydrogen
+    tautomer.  Those sites must be derived from the selected molecular graph;
+    production graph-template matches pass their metadata directly.
+    """
 
     for template in retained_fused_graph_templates(include_disabled=True):
-        spellings = {template.name, *template.aliases}
-        spellings.update(
-            f"{locant}H-{template.name}"
-            for locant in template.default_indicated_h
-            if not template.name.startswith(f"{locant}H-")
-        )
-        if parent_name in spellings:
+        if parent_name == template.name:
             return RetainedParentMetadata(
                 default_indicated_h=template.default_indicated_h,
                 fusion_locants=template.fusion_atoms,
