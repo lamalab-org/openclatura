@@ -1,6 +1,7 @@
 """SMILES input and graph component helpers."""
 
 from rdkit import Chem
+from rdkit.Chem import rdCIPLabeler
 
 from .molecule import Molecule
 
@@ -29,12 +30,22 @@ def read_smiles(smiles: str) -> Molecule:
         atom_metadata = _atom_metadata(rdmol)
 
     Chem.AssignStereochemistry(rdmol, force=True, cleanIt=True)
-    chiral_centers = dict(Chem.FindMolChiralCenters(rdmol, includeUnassigned=False))
+    # The legacy labeler above is still needed to perceive stereo units, but
+    # its CIP codes mis-rank ligands in deep-sphere comparisons (e.g.
+    # ring-closure duplicate atoms) and invert 3-coordinate sulfur centers.
+    # rdCIPLabeler overwrites the _CIPCode properties with correct labels.
+    try:
+        rdCIPLabeler.AssignCIPLabels(rdmol)
+    except Exception:
+        pass  # unsanitized input; keep the legacy labels
+    chiral_centers = {
+        atom.GetIdx(): atom.GetProp("_CIPCode")
+        for atom in rdmol.GetAtoms()
+        if atom.HasProp("_CIPCode") and atom.GetProp("_CIPCode") in ("R", "S")
+    }
 
     for atom in rdmol.GetAtoms():
         stereo = chiral_centers.get(atom.GetIdx())
-        if stereo and atom.GetSymbol() == "S" and atom.GetTotalDegree() == 3:
-            stereo = "R" if stereo == "S" else "S"
         raw_stereo = _raw_tetrahedral_stereo(atom) if not stereo else None
         mol.add_atom(
             symbol=atom.GetSymbol(),
@@ -48,12 +59,18 @@ def read_smiles(smiles: str) -> Molecule:
         )
 
     for bond in rdmol.GetBonds():
-        stereo = None
-        st = bond.GetStereo()
-        if st == Chem.rdchem.BondStereo.STEREOE:
-            stereo = "E"
-        elif st == Chem.rdchem.BondStereo.STEREOZ:
-            stereo = "Z"
+        # rdCIPLabeler rewrites bond enums to STEREOCIS/STEREOTRANS but stamps
+        # the authoritative E/Z label as _CIPCode; fall back to the enums when
+        # the labeler did not run.
+        stereo = bond.GetPropsAsDict().get("_CIPCode")
+        if stereo not in ("E", "Z"):
+            st = bond.GetStereo()
+            if st == Chem.rdchem.BondStereo.STEREOE:
+                stereo = "E"
+            elif st == Chem.rdchem.BondStereo.STEREOZ:
+                stereo = "Z"
+            else:
+                stereo = None
 
         in_small_ring = any(bond.IsInRingSize(i) for i in range(3, 8))
 

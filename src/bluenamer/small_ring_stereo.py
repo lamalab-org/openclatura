@@ -1,6 +1,7 @@
 """Scoped stereochemistry helpers for small cyclic substituents."""
 
 from rdkit import Chem
+from rdkit.Chem import rdCIPLabeler
 
 from .assembly_parts import AssemblyParts
 from .molecule import Molecule
@@ -64,6 +65,10 @@ def _assign_local_cip_with_locant_labels(
     if rd_mol is None:
         return {}
     Chem.AssignStereochemistry(rd_mol, force=True, cleanIt=True)
+    try:
+        rdCIPLabeler.AssignCIPLabels(rd_mol)
+    except Exception:
+        pass  # unsanitized fragment; fall back to the legacy labels
     result: dict[int, str] = {}
     rd_to_atom = {rd_idx: atom_idx for atom_idx, rd_idx in atom_to_rd.items()}
     raw_set = set(raw_atoms)
