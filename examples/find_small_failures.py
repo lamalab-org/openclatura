@@ -6,9 +6,9 @@ import py2opsin
 from datasets import load_dataset
 from tqdm import tqdm
 
-from bluenamer.namer import name_smiles
-from bluenamer.resonance_compare import equivalent_smiles
-from bluenamer.utils import standardize_mol
+from openclatura.namer import name_smiles
+from openclatura.resonance_compare import equivalent_smiles
+from openclatura.utils import standardize_mol
 
 
 def canon(smi):

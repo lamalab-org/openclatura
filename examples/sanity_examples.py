@@ -1,4 +1,4 @@
-from bluenamer.namer import name_smiles
+from openclatura.namer import name_smiles
 
 tests = {
     "1. The 'Everything' Acyclic Chain": {

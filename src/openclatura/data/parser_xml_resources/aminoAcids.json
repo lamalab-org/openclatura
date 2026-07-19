@@ -1,0 +1,1713 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "subType": "endInIne",
+          "symbol": "\u00eb",
+          "tagname": "group",
+          "type": "aminoAcid"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/1",
+              "suffixAppliesTo": "4",
+              "valType": "SMILES",
+              "value": "N[C@@H](C)C"
+            },
+            "tag": "token",
+            "text": "alan"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta//guanidino-C,99/omega/omega'/1",
+              "suffixAppliesTo": "10",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCCNC(N)=N)C"
+            },
+            "tag": "token",
+            "text": "argin"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma///1",
+              "suffixAppliesTo": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC(N)=O)C"
+            },
+            "tag": "token",
+            "text": "asparag"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/1//",
+              "suffixAppliesTo": "4",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC)C(N)=O"
+            },
+            "tag": "token",
+            "text": "isoasparag"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/1//",
+              "suffixAppliesTo": "4",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC)C(N)=O"
+            },
+            "tag": "token",
+            "text": "alpha-asparag"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "8,10",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCSC[C@@H](C)N)C"
+            },
+            "tag": "token",
+            "text": "cystathion"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta//1",
+              "suffixAppliesTo": "5",
+              "valType": "SMILES",
+              "value": "N[C@@H](CS)C"
+            },
+            "tag": "token",
+            "text": "cyste"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta//1",
+              "suffixAppliesTo": "5",
+              "valType": "SMILES",
+              "value": "N[C@@H](C[SeH])C"
+            },
+            "tag": "token",
+            "text": "selenocyste"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta///1",
+              "suffixAppliesTo": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC(N)=O)C"
+            },
+            "tag": "token",
+            "text": "glutam"
+          },
+          {
+            "attributes": {
+              "labels": "/4,gamma/3,beta/2,alpha/1///",
+              "suffixAppliesTo": "5",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC)C(N)=O"
+            },
+            "tag": "token",
+            "text": "isoglutam"
+          },
+          {
+            "attributes": {
+              "labels": "/4,gamma/3,beta/2,alpha/1///",
+              "suffixAppliesTo": "5",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC)C(N)=O"
+            },
+            "tag": "token",
+            "text": "iso-glutam"
+          },
+          {
+            "attributes": {
+              "labels": "/4,gamma/3,beta/2,alpha/1///",
+              "suffixAppliesTo": "5",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC)C(N)=O"
+            },
+            "tag": "token",
+            "text": "alpha-glutam"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/1",
+              "suffixAppliesTo": "3",
+              "valType": "SMILES",
+              "value": "NCC"
+            },
+            "tag": "token",
+            "text": "glyc"
+          },
+          {
+            "attributes": {
+              "labels": "/alpha/beta/4/5/1,tele,tau/2/3,pros,pi/",
+              "suffixAppliesTo": "9",
+              "valType": "SMILES",
+              "value": "N[C@@H](Cc1c[nH]cn1)C"
+            },
+            "tag": "token",
+            "text": "histid"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/3'/4,gamma/5,delta/1",
+              "suffixAppliesTo": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H]([C@@H](C)CC)C"
+            },
+            "tag": "token",
+            "text": "isoleuc"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/3'/4,gamma/5,delta/1",
+              "suffixAppliesTo": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H]([C@@H](C)CC)C"
+            },
+            "tag": "token",
+            "text": "iso-leuc"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/3'/4,gamma/5,delta/1",
+              "suffixAppliesTo": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H]([C@H](C)CC)C"
+            },
+            "tag": "token",
+            "text": "alloisoleuc"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/3'/4,gamma/5,delta/1",
+              "suffixAppliesTo": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H]([C@H](C)CC)C"
+            },
+            "tag": "token",
+            "text": "allo-isoleuc"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5',delta'/5,delta/1",
+              "suffixAppliesTo": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC(C)C)C"
+            },
+            "tag": "token",
+            "text": "leuc"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta/6,epsilon//1",
+              "suffixAppliesTo": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCCCN)C"
+            },
+            "tag": "token",
+            "text": "lys"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//methyl/1",
+              "suffixAppliesTo": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCSC)C"
+            },
+            "tag": "token",
+            "text": "methion"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//methyl/1",
+              "suffixAppliesTo": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC[Se]C)C"
+            },
+            "tag": "token",
+            "text": "selenomethion"
+          },
+          {
+            "attributes": {
+              "labels": "/alpha/beta/1/2,ortho/3,meta/4,para/5/6/",
+              "suffixAppliesTo": "10",
+              "valType": "SMILES",
+              "value": "N[C@@H](Cc1ccccc1)C"
+            },
+            "tag": "token",
+            "text": "phenylalan"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3/4/5",
+              "suffixAppliesTo": "3",
+              "valType": "SMILES",
+              "value": "N1[C@H](C)CCC1"
+            },
+            "tag": "token",
+            "text": "prol"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/O/1",
+              "suffixAppliesTo": "5",
+              "valType": "SMILES",
+              "value": "N[C@@H](CO)C"
+            },
+            "tag": "token",
+            "text": "ser"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/O/4,gamma/1",
+              "suffixAppliesTo": "6",
+              "valType": "SMILES",
+              "value": "N[C@@H]([C@H](O)C)C"
+            },
+            "tag": "token",
+            "text": "threon"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/O/4,gamma/1",
+              "suffixAppliesTo": "6",
+              "valType": "SMILES",
+              "value": "N[C@@H]([C@@H](O)C)C"
+            },
+            "tag": "token",
+            "text": "allothreon"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/O/4,gamma/1",
+              "suffixAppliesTo": "6",
+              "valType": "SMILES",
+              "value": "N[C@@H]([C@@H](O)C)C"
+            },
+            "tag": "token",
+            "text": "allo-threon"
+          },
+          {
+            "attributes": {
+              "labels": "/alpha/beta/1/2,ortho/3,meta/4,para/5/6/O/",
+              "suffixAppliesTo": "11",
+              "valType": "SMILES",
+              "value": "N[C@@H](Cc1ccc(cc1)O)C"
+            },
+            "tag": "token",
+            "text": "tyros"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4',gamma'/4,gamma/1",
+              "suffixAppliesTo": "6",
+              "valType": "SMILES",
+              "value": "N[C@@H](C(C)C)C"
+            },
+            "tag": "token",
+            "text": "val"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/O/1",
+              "suffixAppliesTo": "6",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCO)C"
+            },
+            "tag": "token",
+            "text": "homoser"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//1",
+              "suffixAppliesTo": "6",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCS)C"
+            },
+            "tag": "token",
+            "text": "homocyste"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//1",
+              "suffixAppliesTo": "6",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC[Se])C"
+            },
+            "tag": "token",
+            "text": "selenohomocyste"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta/1",
+              "suffixAppliesTo": "6",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC)C"
+            },
+            "tag": "token",
+            "text": "norval"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta/6,epsilon/1",
+              "suffixAppliesTo": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCCC)C"
+            },
+            "tag": "token",
+            "text": "norleuc"
+          },
+          {
+            "attributes": {
+              "labels": "/3,beta/2,alpha/1",
+              "suffixAppliesTo": "4",
+              "valType": "SMILES",
+              "value": "NCCC"
+            },
+            "tag": "token",
+            "text": "beta-alan"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta/6,epsilon//1",
+              "suffixAppliesTo": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCCC=O)C"
+            },
+            "tag": "token",
+            "text": "allys"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta/////1",
+              "suffixAppliesTo": "10",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCCNC(=O)N)C"
+            },
+            "tag": "token",
+            "text": "citrull"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta//1",
+              "suffixAppliesTo": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCCN)C"
+            },
+            "tag": "token",
+            "text": "ornith"
+          },
+          {
+            "attributes": {
+              "labels": "//2,alpha/1",
+              "suffixAppliesTo": "4",
+              "valType": "SMILES",
+              "value": "N(C)CC"
+            },
+            "tag": "token",
+            "text": "sarcos"
+          },
+          {
+            "attributes": {
+              "labels": "/alpha/beta/1/2/3/4/5/6//1'/2'/3'/4'/5'/6'//",
+              "suffixAppliesTo": "18",
+              "valType": "SMILES",
+              "value": "N[C@@H](Cc1ccc(cc1)Oc2ccc(cc2)O)C"
+            },
+            "tag": "token",
+            "text": "thyron"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "22",
+              "valType": "SMILES",
+              "value": "N[C@@H](Cc1cc(I)c(c(I)c1)Oc2cc(I)c(c(I)c2)O)C(O)=O"
+            },
+            "tag": "token",
+            "text": "thyrox"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "16",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCCCNC([C@H]1[C@H](C)CC=N1)=O)C"
+            },
+            "tag": "token",
+            "text": "pyrrolys"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "8,9",
+              "valType": "SMILES",
+              "value": "N[C@@H](CSC[C@H](N)C)C"
+            },
+            "tag": "token",
+            "text": "lanthion"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "10,11",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCSCC[C@H](N)C)C"
+            },
+            "tag": "token",
+            "text": "homolanthion"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "4",
+              "valType": "SMILES",
+              "value": "NC(=C)C"
+            },
+            "tag": "token",
+            "text": "dehydroalan"
+          },
+          {
+            "attributes": {
+              "labels": "1/2//3/4//5",
+              "suffixAppliesTo": "3",
+              "valType": "SMILES",
+              "value": "N1[C@H](C)C[C@@H](O)C1"
+            },
+            "tag": "token",
+            "text": "hydroxyprol"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta//6,epsilon//1",
+              "suffixAppliesTo": "9",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC[C@@H](O)CN)C"
+            },
+            "tag": "token",
+            "text": "hydroxylys"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "6",
+              "valType": "SMILES",
+              "value": "ON(C=O)CC"
+            },
+            "tag": "token",
+            "text": "hadacid"
+          },
+          {
+            "attributes": {
+              "labels": "/3,beta/2,alpha//1",
+              "suffixAppliesTo": "5",
+              "valType": "SMILES",
+              "value": "NCC(O)C"
+            },
+            "tag": "token",
+            "text": "isoser"
+          },
+          {
+            "attributes": {
+              "labels": "/3,beta/2,alpha//1",
+              "suffixAppliesTo": "5",
+              "valType": "SMILES",
+              "value": "NCC(O)C"
+            },
+            "tag": "token",
+            "text": "iso-ser"
+          },
+          {
+            "attributes": {
+              "labels": "//alpha/beta/3/2/1/7a/7/6/5/4/3a/",
+              "suffixAppliesTo": "14",
+              "valType": "SMILES",
+              "value": "N(C)[C@@H](Cc1c[nH]c2ccccc12)C"
+            },
+            "tag": "token",
+            "text": "abr"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/////////////1",
+              "suffixAppliesTo": "17",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC(=O)NNc1ccc(CO)cc1)C"
+            },
+            "tag": "token",
+            "text": "agarit"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta///////1",
+              "suffixAppliesTo": "10",
+              "valType": "SMILES",
+              "value": "N[C@@H](COC(=O)C=[N+]=[N-])C"
+            },
+            "tag": "token",
+            "text": "azaser"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/////1",
+              "suffixAppliesTo": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CN(O)N=O)C"
+            },
+            "tag": "token",
+            "text": "alanos"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/////1",
+              "suffixAppliesTo": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CNC(=O)N)C"
+            },
+            "tag": "token",
+            "text": "albizz"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/////1",
+              "suffixAppliesTo": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CNC(=O)N)C"
+            },
+            "tag": "token",
+            "text": "albizzi"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta//////1",
+              "suffixAppliesTo": "9",
+              "valType": "SMILES",
+              "value": "N[C@@H](CS(=O)CC=C)C"
+            },
+            "tag": "token",
+            "text": "alli"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma////1",
+              "suffixAppliesTo": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCSCC)C"
+            },
+            "tag": "token",
+            "text": "ethion"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma////1",
+              "suffixAppliesTo": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC[Se]CC)C"
+            },
+            "tag": "token",
+            "text": "selenoethion"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma///1",
+              "suffixAppliesTo": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCON)C"
+            },
+            "tag": "token",
+            "text": "canal"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//////1",
+              "suffixAppliesTo": "10",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCONC(=N)C)C"
+            },
+            "tag": "token",
+            "text": "canavan"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//1",
+              "suffixAppliesTo": "6",
+              "valType": "SMILES",
+              "value": "N[C@@](CC)(C)C"
+            },
+            "tag": "token",
+            "text": "isoval"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//1",
+              "suffixAppliesTo": "6",
+              "valType": "SMILES",
+              "value": "N[C@@](CC)(C)C"
+            },
+            "tag": "token",
+            "text": "iso-val"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H](C(C)(C)S)C"
+            },
+            "tag": "token",
+            "text": "penicillam"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta//methyl/1",
+              "suffixAppliesTo": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCCSC)C"
+            },
+            "tag": "token",
+            "text": "homomethion"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//////1",
+              "suffixAppliesTo": "10",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC(=O)NCC)C"
+            },
+            "tag": "token",
+            "text": "thean"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta////////1",
+              "suffixAppliesTo": "11",
+              "valType": "SMILES",
+              "value": "N[C@@H](CSC(C)(C)CCO)C"
+            },
+            "tag": "token",
+            "text": "felin"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta/6,epsilon////1",
+              "suffixAppliesTo": "10",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCCCN=[N+]=[N-])C"
+            },
+            "tag": "token",
+            "text": "azidonorleuc"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/1",
+              "suffixAppliesTo": "5",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC)C"
+            },
+            "tag": "token",
+            "text": "homoalan"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "5",
+              "valType": "SMILES",
+              "value": "N[C@@H](C)CC"
+            },
+            "tag": "token",
+            "text": "beta-homoalan"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma////1",
+              "suffixAppliesTo": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCN=[N+]=[N-])C"
+            },
+            "tag": "token",
+            "text": "azidohomoalan"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H](C(C)(C)C)C"
+            },
+            "tag": "token",
+            "text": "tertleuc"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H](C(C)(C)C)C"
+            },
+            "tag": "token",
+            "text": "tert-leuc"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](C(C)(C)CO)C"
+            },
+            "tag": "token",
+            "text": "panton"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta/6,epsilon/////1",
+              "suffixAppliesTo": "11",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCCC[N+](C)(C)C)C"
+            },
+            "tag": "token",
+            "text": "lamin"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta/6,epsilon/////1",
+              "suffixAppliesTo": "11",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCCCNC(=O)N)C"
+            },
+            "tag": "token",
+            "text": "homocitrull"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta/6,epsilon/////1",
+              "suffixAppliesTo": "11",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCCCNC(=N)N)C"
+            },
+            "tag": "token",
+            "text": "homoargin"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta/6,epsilon///////////1",
+              "suffixAppliesTo": "17",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCCCN[C@H](C(=O)O)CCC(=O)O)C"
+            },
+            "tag": "token",
+            "text": "saccharop"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "endInAn",
+          "symbol": "\u00e8",
+          "tagname": "group",
+          "type": "aminoAcid"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "/alpha/beta/3/2/1/7a/7/6/5/4/3a/",
+              "suffixAppliesTo": "13",
+              "valType": "SMILES",
+              "value": "N[C@@H](Cc1c[nH]c2ccccc12)C"
+            },
+            "tag": "token",
+            "text": "tryptoph"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "endInIc",
+          "symbol": "\u00ef",
+          "tagname": "group",
+          "type": "aminoAcid"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/1",
+              "suffixAppliesTo": "5,4",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC)C"
+            },
+            "tag": "token",
+            "text": "aspart"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta/1",
+              "suffixAppliesTo": "6,5",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC)C"
+            },
+            "tag": "token",
+            "text": "glutam"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/////1",
+              "suffixAppliesTo": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CS(=O)(O)=O)C"
+            },
+            "tag": "token",
+            "text": "cyste"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/////1",
+              "suffixAppliesTo": "9",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCS(=O)(O)=O)C"
+            },
+            "tag": "token",
+            "text": "homocyste"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/////1",
+              "suffixAppliesTo": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](C[Se](=O)(O)=O)C"
+            },
+            "tag": "token",
+            "text": "selenocyste"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "suffixAppliesTo": "1",
+              "valType": "SMILES",
+              "value": "CCCNC([C@H](O)C(C)(C)CO)=O"
+            },
+            "tag": "token",
+            "text": "pantothen"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "simpleSubstituent",
+          "symbol": "x",
+          "tagname": "group",
+          "type": "aminoAcid"
+        },
+        "children": [
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma///1/",
+              "outIDs": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC(O)=O)C=O"
+            },
+            "tag": "token",
+            "text": "aspart-1-yl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma///1/",
+              "outIDs": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC(O)=O)C=O"
+            },
+            "tag": "token",
+            "text": "l-aspart-1-yl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma///1/",
+              "outIDs": "7",
+              "valType": "SMILES",
+              "value": "N[C@H](CC(O)=O)C=O"
+            },
+            "tag": "token",
+            "text": "d-aspart-1-yl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma///1/",
+              "outIDs": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC(O)=O)C=O"
+            },
+            "tag": "token",
+            "text": "alpha-aspartyl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma///1/",
+              "outIDs": "7",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC(O)=O)C=O"
+            },
+            "tag": "token",
+            "text": "l-alpha-aspartyl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma///1/",
+              "outIDs": "7",
+              "valType": "SMILES",
+              "value": "N[C@H](CC(O)=O)C=O"
+            },
+            "tag": "token",
+            "text": "d-alpha-aspartyl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//1//",
+              "outIDs": "4",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC=O)C(=O)O"
+            },
+            "tag": "token",
+            "text": "aspart-4-yl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//1//",
+              "outIDs": "4",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC=O)C(=O)O"
+            },
+            "tag": "token",
+            "text": "l-aspart-4-yl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//1//",
+              "outIDs": "4",
+              "valType": "SMILES",
+              "value": "N[C@H](CC=O)C(=O)O"
+            },
+            "tag": "token",
+            "text": "d-aspart-4-yl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//1//",
+              "outIDs": "4",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC=O)C(=O)O"
+            },
+            "tag": "token",
+            "text": "beta-aspartyl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//1//",
+              "outIDs": "4",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC=O)C(=O)O"
+            },
+            "tag": "token",
+            "text": "l-beta-aspartyl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//1//",
+              "outIDs": "4",
+              "valType": "SMILES",
+              "value": "N[C@H](CC=O)C(=O)O"
+            },
+            "tag": "token",
+            "text": "d-beta-aspartyl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta///1/",
+              "outIDs": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC(O)=O)C=O"
+            },
+            "tag": "token",
+            "text": "glutam-1-yl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta///1/",
+              "outIDs": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC(O)=O)C=O"
+            },
+            "tag": "token",
+            "text": "l-glutam-1-yl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta///1/",
+              "outIDs": "8",
+              "valType": "SMILES",
+              "value": "N[C@H](CCC(O)=O)C=O"
+            },
+            "tag": "token",
+            "text": "d-glutam-1-yl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta///1/",
+              "outIDs": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC(O)=O)C=O"
+            },
+            "tag": "token",
+            "text": "alpha-glutamyl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta///1/",
+              "outIDs": "8",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC(O)=O)C=O"
+            },
+            "tag": "token",
+            "text": "l-alpha-glutamyl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta///1/",
+              "outIDs": "8",
+              "valType": "SMILES",
+              "value": "N[C@H](CCC(O)=O)C=O"
+            },
+            "tag": "token",
+            "text": "d-alpha-glutamyl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta//1//",
+              "outIDs": "5",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC=O)C(=O)O"
+            },
+            "tag": "token",
+            "text": "glutam-5-yl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta//1//",
+              "outIDs": "5",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC=O)C(=O)O"
+            },
+            "tag": "token",
+            "text": "l-glutam-5-yl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta//1//",
+              "outIDs": "5",
+              "valType": "SMILES",
+              "value": "N[C@H](CCC=O)C(=O)O"
+            },
+            "tag": "token",
+            "text": "d-glutam-5-yl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta//1//",
+              "outIDs": "5",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC=O)C(=O)O"
+            },
+            "tag": "token",
+            "text": "gamma-glutamyl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta//1//",
+              "outIDs": "5",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC=O)C(=O)O"
+            },
+            "tag": "token",
+            "text": "l-gamma-glutamyl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta//1//",
+              "outIDs": "5",
+              "valType": "SMILES",
+              "value": "N[C@H](CCC=O)C(=O)O"
+            },
+            "tag": "token",
+            "text": "d-gamma-glutamyl"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "3,10",
+              "valType": "SMILES",
+              "value": "C([C@@H](C(=O))N)SSC[C@@H](C(=O))N"
+            },
+            "tag": "token",
+            "text": "cystyl"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "3,10",
+              "valType": "SMILES",
+              "value": "C([C@@H](C(=O))N)SSC[C@@H](C(=O))N"
+            },
+            "tag": "token",
+            "text": "l-cystyl"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "outIDs": "3,10",
+              "valType": "SMILES",
+              "value": "C([C@H](C(=O))N)SSC[C@H](C(=O))N"
+            },
+            "tag": "token",
+            "text": "d-cystyl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta//1/",
+              "outIDs": "4,5",
+              "valType": "SMILES",
+              "value": "N[C@@H](CS)C=O"
+            },
+            "tag": "token",
+            "text": "half-cystyl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta//1/",
+              "outIDs": "4,5",
+              "valType": "SMILES",
+              "value": "N[C@@H](CS)C=O"
+            },
+            "tag": "token",
+            "text": "l-half-cystyl"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta//1/",
+              "outIDs": "4,5",
+              "valType": "SMILES",
+              "value": "N[C@H](CS)C=O"
+            },
+            "tag": "token",
+            "text": "d-half-cystyl"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "simpleGroup",
+          "symbol": "\u2514",
+          "tagname": "group",
+          "type": "aminoAcid"
+        },
+        "children": [
+          {
+            "attributes": {
+              "functionalIDs": "6,9",
+              "labels": "/2,alpha/3,beta/4,gamma///1//",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC(=O)[O-])C(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "aspartate(2-)"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "9",
+              "labels": "/2,alpha/3,beta/4,gamma///1//",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC(=O)O)C(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "aspartate(1-)"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "7,10",
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta///1//",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC(=O)[O-])C(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "glutamate(2-)"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "10",
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta///1//",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC(=O)O)C(=O)[O-]"
+            },
+            "tag": "token",
+            "text": "glutamate(1-)"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta/6,epsilon//1//",
+              "valType": "SMILES",
+              "value": "[NH3+][C@@H](CCCCN)C(=O)O"
+            },
+            "tag": "token",
+            "text": "lysinium(1+)"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta/6,epsilon//1//",
+              "valType": "SMILES",
+              "value": "[NH3+][C@@H](CCCC[NH3+])C(=O)O"
+            },
+            "tag": "token",
+            "text": "lysinium(2+)"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "6",
+              "labels": "/2,alpha/3,beta/4,gamma///1/",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC(=O)O)C=O"
+            },
+            "tag": "token",
+            "text": "aspart-1-al"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "8",
+              "labels": "/2,alpha/3,beta/4,gamma//1//",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC(=O))C(=O)O"
+            },
+            "tag": "token",
+            "text": "aspart-4-al"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "6",
+              "labels": "/2,alpha/3,beta/4,gamma///1/",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC(=O)O)CO"
+            },
+            "tag": "token",
+            "text": "aspart-1-ol"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "8",
+              "labels": "/2,alpha/3,beta/4,gamma//1//",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC(O))C(=O)O"
+            },
+            "tag": "token",
+            "text": "aspart-4-ol"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "7",
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta///1/",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC(=O)O)C=O"
+            },
+            "tag": "token",
+            "text": "glutam-1-al"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "9",
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta//1//",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC(=O))C(=O)O"
+            },
+            "tag": "token",
+            "text": "glutam-4-al"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "7",
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta///1/",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC(=O)O)CO"
+            },
+            "tag": "token",
+            "text": "glutam-1-ol"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "9",
+              "labels": "/2,alpha/3,beta/4,gamma/5,delta//1//",
+              "valType": "SMILES",
+              "value": "N[C@@H](CCC(O))C(=O)O"
+            },
+            "tag": "token",
+            "text": "glutam-4-ol"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "OCCCNC([C@H](O)C(C)(C)CO)=O"
+            },
+            "tag": "token",
+            "text": "pantothenol"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "OCCCNC([C@H](O)C(C)(C)CO)=O"
+            },
+            "tag": "token",
+            "text": "panthenol"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5,13",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C([C@@H](C(=O)O)N)SSC[C@@H](C(=O)O)N"
+            },
+            "tag": "token",
+            "text": "cystine"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "O=C(O)[C@@H](N)Cc1ccc(O)c(O)c1"
+            },
+            "tag": "token",
+            "text": "dopa"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "6,15",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C(C[C@@H](C(=O)O)N)SSCC[C@@H](C(=O)O)N"
+            },
+            "tag": "token",
+            "text": "homocystine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5,13",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "C([C@@H](C(=O)O)N)[Se][Se]C[C@@H](C(=O)O)N"
+            },
+            "tag": "token",
+            "text": "selenocystine"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "simpleGroup",
+          "symbol": "G",
+          "tagname": "group",
+          "type": "aminoAcid"
+        },
+        "children": [
+          {
+            "attributes": {
+              "functionalIDs": "6,11",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "N(C(C)C(=O)O)C(C)C(=O)O"
+            },
+            "tag": "token",
+            "text": "alanopine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "6,11",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "N(C(C)C(=O)O)CCC(=O)O"
+            },
+            "tag": "token",
+            "text": "beta-alanopine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "7",
+              "labels": "/2,alpha/3,beta/4,gamma/1//",
+              "valType": "SMILES",
+              "value": "NC(CC)C(=O)O"
+            },
+            "tag": "token",
+            "text": "butyrine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "6,7",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "NCCP(=O)(O)O"
+            },
+            "tag": "token",
+            "text": "ciliatine"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "NCCSSCCN"
+            },
+            "tag": "token",
+            "text": "cystamine"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/",
+              "valType": "SMILES",
+              "value": "NCCS"
+            },
+            "tag": "token",
+            "text": "cysteamine"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/4,gamma//methyl",
+              "valType": "SMILES",
+              "value": "NCCCSC"
+            },
+            "tag": "token",
+            "text": "methioninamine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "8,14",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "NCCCC(C(=O)O)NC(C)C(=O)O"
+            },
+            "tag": "token",
+            "text": "octopinic acid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "8,14",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "NCCCC(C(=O)O)NC(C)C(=O)O"
+            },
+            "tag": "token",
+            "text": "octopinicacid"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "11,17",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "NC(=N)NCCCC(C(=O)O)NC(C)C(=O)O"
+            },
+            "tag": "token",
+            "text": "octopine"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "NCC[Se][Se]CCN"
+            },
+            "tag": "token",
+            "text": "selenocystamine"
+          },
+          {
+            "attributes": {
+              "labels": "/2,alpha/3,beta/",
+              "valType": "SMILES",
+              "value": "NCC[SeH]"
+            },
+            "tag": "token",
+            "text": "selenocysteamine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "6",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "NCCS(=O)O"
+            },
+            "tag": "token",
+            "text": "hypotaurine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "11,16,21",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "NC(=N)NCCCC(C(=O)O)NC(C(=O)O)CCC(=O)O"
+            },
+            "tag": "token",
+            "text": "nopaline"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "6",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "NCC[Se](=O)O"
+            },
+            "tag": "token",
+            "text": "selenohypotaurine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "6,10",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "N(C(C)C(=O)O)CC(=O)O"
+            },
+            "tag": "token",
+            "text": "strombine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "7",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "NCCS(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "taurine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "26",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC[S+](C[C@@H]1[C@H]([C@H]([C@H](N2C=NC3=C2N=CN=C3N)O1)O)O)C)C(O)=O"
+            },
+            "tag": "token",
+            "text": "s-adenosylmethionine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "26",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC[S+](C[C@@H]1[C@H]([C@H]([C@H](N2C=NC3=C2N=CN=C3N)O1)O)O)C)C(O)=O"
+            },
+            "tag": "token",
+            "text": "s-adenosyl-l-methionine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "26",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "N[C@H](CC[S+](C[C@@H]1[C@H]([C@H]([C@H](N2C=NC3=C2N=CN=C3N)O1)O)O)C)C(O)=O"
+            },
+            "tag": "token",
+            "text": "s-adenosyl-d-methionine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "7",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "NCC[Se](=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "selenotaurine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "6,12",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "N(C(C)C(=O)O)CCS(=O)(=O)O"
+            },
+            "tag": "token",
+            "text": "tauropine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "5",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "N(CC(=O)O)C(CO)(CO)CO"
+            },
+            "tag": "token",
+            "text": "tricine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "6",
+              "labels": "/3/2/1///4/5/6/",
+              "valType": "SMILES",
+              "value": "NC(CC(=O)(O))CCCN"
+            },
+            "tag": "token",
+            "text": "isolysine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "6",
+              "labels": "/3/2/1///4/5/6/",
+              "valType": "SMILES",
+              "value": "NC(CC(=O)(O))CCCN"
+            },
+            "tag": "token",
+            "text": "beta-lysine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "O=C(O)[C@H](N[C@H](C(=O)O)CCCCN)C"
+            },
+            "tag": "token",
+            "text": "lysopine"
+          },
+          {
+            "attributes": {
+              "functionalIDs": "3",
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "O=C(O)[C@H](N[C@H](C(=O)O)CCCCN)C"
+            },
+            "tag": "token",
+            "text": "d-lysopine"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "O=C(NCCC(NCCS)=O)[C@H](O)C(C)(C)CO"
+            },
+            "tag": "token",
+            "text": "pantetheine"
+          },
+          {
+            "attributes": {
+              "labels": "none",
+              "valType": "SMILES",
+              "value": "N[C@@H](CC(C)C)[C@@H](O)CC(O)=O"
+            },
+            "tag": "token",
+            "text": "statine"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "aminoAcids.xml"
+}

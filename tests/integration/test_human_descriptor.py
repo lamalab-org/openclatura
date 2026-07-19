@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from bluenamer import HumanDescription, describe_human
+from openclatura import HumanDescription, describe_human
 
 
 def test_human_descriptor_uses_parent_metadata_without_token_spans():

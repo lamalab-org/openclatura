@@ -1,0 +1,213 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "subType": "cyclicUnsaturableHydrocarbon",
+          "symbol": "A",
+          "tagname": "group",
+          "type": "ring"
+        },
+        "children": [
+          {
+            "attributes": {
+              "frontLocantsExpected": "1,2",
+              "labels": "1/2/3/4/5/6/7/8/9/10",
+              "valType": "SMILES",
+              "value": "C12CC3CC4CC5C1.C24.C35"
+            },
+            "tag": "token",
+            "text": "adamant"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6/7/8",
+              "valType": "SMILES",
+              "value": "C12C3C4C5C3C1C5C24"
+            },
+            "tag": "token",
+            "text": "cub"
+          },
+          {
+            "attributes": {
+              "labels": "1/2/3/4/5/6",
+              "valType": "SMILES",
+              "value": "C12C3C4C1C4C32"
+            },
+            "tag": "token",
+            "text": "prism"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "cyclicUnsaturableHydrocarbon",
+          "symbol": "A",
+          "tagname": "group",
+          "type": "ring"
+        },
+        "children": [
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "C123CCC4CC1.C24(C)C.C3"
+            },
+            "tag": "token",
+            "text": "born"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "C123CCC4CC1.C24(C)C.C3"
+            },
+            "tag": "token",
+            "text": "camph"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "C123CCC4CC1.C24(C)C.C3"
+            },
+            "tag": "token",
+            "text": "bornyl"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "C12CC3CCC1C2(C)C.C3"
+            },
+            "tag": "token",
+            "text": "car"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6/7/8/9/10",
+              "suffixAppliesToByDefault": "3",
+              "valType": "SMILES",
+              "value": "C12CCC3CC1.C2.C3(C)C"
+            },
+            "tag": "token",
+            "text": "menth"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6/7/8/9/10",
+              "suffixAppliesToByDefault": "3",
+              "valType": "SMILES",
+              "value": "C12CCC3CC1.C2.C3(C)C"
+            },
+            "tag": "token",
+            "text": "p-menth"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6/7/8/9/10",
+              "suffixAppliesToByDefault": "3",
+              "valType": "SMILES",
+              "value": "C12CCC3CC1.C2.C3(C)C"
+            },
+            "tag": "token",
+            "text": "para-menth"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6/7/8/9/10",
+              "valType": "SMILES",
+              "value": "C12CC3CCC1.C2.C3(C)C"
+            },
+            "tag": "token",
+            "text": "m-menth"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6/7/8/9/10",
+              "valType": "SMILES",
+              "value": "C12CC3CCC1.C2.C3(C)C"
+            },
+            "tag": "token",
+            "text": "meta-menth"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6/7/8/9/10",
+              "valType": "SMILES",
+              "value": "C12C3CCCC1.C2.C3(C)C"
+            },
+            "tag": "token",
+            "text": "o-menth"
+          },
+          {
+            "attributes": {
+              "labels": "1/2,ortho/3,meta/4,para/5/6/7/8/9/10",
+              "valType": "SMILES",
+              "value": "C12C3CCCC1.C2.C3(C)C"
+            },
+            "tag": "token",
+            "text": "ortho-menth"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "C12CCC(CC2)C1"
+            },
+            "tag": "token",
+            "text": "norborn"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "C12CCC(CC2)C1"
+            },
+            "tag": "token",
+            "text": "norcamph"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "C12CCC(CC2)C1"
+            },
+            "tag": "token",
+            "text": "norbornyl"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "C12CCCCC2C1"
+            },
+            "tag": "token",
+            "text": "norcar"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "C12CCCC(C2)C1"
+            },
+            "tag": "token",
+            "text": "norpin"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "C12C3CCC4C156.C24.C5.C6.C3"
+            },
+            "tag": "token",
+            "text": "pin"
+          },
+          {
+            "attributes": {
+              "valType": "SMILES",
+              "value": "C123CCC4C1C2.C3(C)C.C4"
+            },
+            "tag": "token",
+            "text": "thuj"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "cyclicUnsaturableHydrocarbon.xml"
+}

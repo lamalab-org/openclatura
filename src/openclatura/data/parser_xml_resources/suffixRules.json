@@ -1,0 +1,1587 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "value": "acylium"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*]=O"
+            },
+            "tag": "addgroup"
+          },
+          {
+            "attributes": {
+              "charge": "1",
+              "protons": "-1"
+            },
+            "tag": "changecharge"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "acylium_nonCarboxylic"
+        },
+        "children": [
+          {
+            "tag": "convertHydroxyGroupsToPositiveCharge"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "aldehyde"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*]=O"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "aldoxime"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*]=NO"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "amide"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=O)N",
+              "functionalIDs": "3,3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "amidylium"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=O)[NH+]",
+              "functionalIDs": "3,3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "amidine"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=N)N",
+              "functionalIDs": "3,3",
+              "labels": "/N2/N1"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "amidinium"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=[NH2+])N",
+              "functionalIDs": "3,3",
+              "labels": "/N2/N1"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "amidium"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=O)[NH3+]",
+              "functionalIDs": "3,3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "amido"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=O)N",
+              "outIDs": "3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "amine"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]N"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "aminide"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][NH-]"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "aminium"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][NH3+]"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "aminylium"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][NH+]"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "amino"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]N",
+              "outIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "anilide"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=O)Nc1ccccc1",
+              "labels": "///1'/2',ortho/3',meta/4',para/5'/6'"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "arsonous"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]As(O)O",
+              "functionalIDs": "3,4"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ate"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=O)[O-]",
+              "functionalIDs": "3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "azonate"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][N+][O-]([O-])[O-]",
+              "functionalIDs": "4,5"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "azonic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][N+][O-](O)O",
+              "functionalIDs": "4,5"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "azonous"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]N(O)O",
+              "functionalIDs": "3,4"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ate_nonCarboxylic"
+        },
+        "children": [
+          {
+            "tag": "addFunctionalAtomsToHydroxyGroups"
+          },
+          {
+            "tag": "chargeHydroxyGroups"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "boronate"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]B([O-])[O-]",
+              "functionalIDs": "3,4"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "boronic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]B(O)O",
+              "functionalIDs": "3,4"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "carbamic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]NC(=O)O",
+              "functionalIDs": "5"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "carbonyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]C(=O)",
+              "outIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "carbonylium"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][C+]=O"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "carboxylic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]C(=O)O",
+              "functionalIDs": "4"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "carboxylate"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]C(=O)[O-]",
+              "functionalIDs": "4"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "carboxylite"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]C[O-]",
+              "functionalIDs": "3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "diazonium"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][N+]#N"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "hydrazide"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=O)NN",
+              "labels": "//1'/2'"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "hydrazonic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=NN)O",
+              "functionalIDs": "4"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "hydroxamate"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=O)N[O-]",
+              "functionalIDs": "4"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "hydroxamic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=O)NO",
+              "functionalIDs": "4"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=O)O",
+              "functionalIDs": "3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ic_nonCarboxylic"
+        },
+        "children": [
+          {
+            "tag": "addFunctionalAtomsToHydroxyGroups"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ide"
+        },
+        "children": [
+          {
+            "attributes": {
+              "charge": "-1",
+              "protons": "-1"
+            },
+            "tag": "changecharge"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "imine"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]=N"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "iminide"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]=[N-]"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "iminium"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]=[NH2+]"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "iminyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]=N",
+              "outIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "iminylium"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]=[N+]"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "io"
+        },
+        "children": [
+          {
+            "tag": "setOutAtom"
+          },
+          {
+            "attributes": {
+              "charge": "1",
+              "protons": "1"
+            },
+            "tag": "changecharge"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ite"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*][O-]",
+              "functionalIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ite_nonCarboxylic"
+        },
+        "children": [
+          {
+            "tag": "removeOneDoubleBondedOxygen"
+          },
+          {
+            "tag": "addFunctionalAtomsToHydroxyGroups"
+          },
+          {
+            "tag": "chargeHydroxyGroups"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ium"
+        },
+        "children": [
+          {
+            "attributes": {
+              "charge": "1",
+              "protons": "1"
+            },
+            "tag": "changecharge"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "nitrile"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*]#N"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "nitrilium"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*]#[NH+]"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ol"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]O"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "olate"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][O-]"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "onaphthone"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=O)c1cccc2ccccc12",
+              "labels": "//1'/2'/3'/4'/4a'/5'/6'/7'/8'/8a'"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "one"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]=O",
+              "ketoneLocant": "yes"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ophenone"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*](=O)c1ccccc1",
+              "labels": "//1'/2',ortho/3',meta/4',para/5'/6'"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ous"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]O",
+              "functionalIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ous_nonCarboxylic"
+        },
+        "children": [
+          {
+            "tag": "removeOneDoubleBondedOxygen"
+          },
+          {
+            "tag": "addFunctionalAtomsToHydroxyGroups"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "oxoAndDiYl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]=O"
+            },
+            "tag": "addgroup"
+          },
+          {
+            "tag": "setOutAtom"
+          },
+          {
+            "tag": "setOutAtom"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "oxoAndTriYl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]=O"
+            },
+            "tag": "addgroup"
+          },
+          {
+            "tag": "setOutAtom"
+          },
+          {
+            "tag": "setOutAtom"
+          },
+          {
+            "tag": "setOutAtom"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "oxy"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]O",
+              "outIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "oxy-ylForAcyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*](=O)O",
+              "outIDs": "3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "oyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "C"
+            },
+            "tag": "addSuffixPrefixIfNonePresentAndCyclic"
+          },
+          {
+            "attributes": {
+              "SMILES": "[*]=O"
+            },
+            "tag": "addgroup"
+          },
+          {
+            "tag": "setOutAtom"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "oyl_nonCarboxylic"
+        },
+        "children": [
+          {
+            "tag": "convertHydroxyGroupsToOutAtoms"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "phosphonous"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]P(O)O",
+              "functionalIDs": "3,4"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "selenenic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][Se]O",
+              "functionalIDs": "3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "selenenyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][SeH]",
+              "outIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "seleninic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][Se](=O)O",
+              "functionalIDs": "4"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "seleninyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][SeH](=O)",
+              "outIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "selenonic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][Se](=O)(=O)O",
+              "functionalIDs": "5"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "selenonyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][SeH](=O)(=O)",
+              "outIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "selone"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]=[Se]",
+              "ketoneLocant": "yes"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "stibonous"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][Sb](O)O",
+              "functionalIDs": "3,4"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "sulfamic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]NS(=O)(=O)O",
+              "functionalIDs": "6"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "sulfenamide"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]SN",
+              "functionalIDs": "3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "sulfenamido"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]SN",
+              "outIDs": "3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "sulfenic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]SO",
+              "functionalIDs": "3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "sulfenoselenoic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]S[SeH]",
+              "functionalIDs": "3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "sulfenoselenoyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]S[SeH]",
+              "outIDs": "3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "sulfenothioic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]SS",
+              "functionalIDs": "3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "sulfenothioyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]SS",
+              "outIDs": "3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "sulfenyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]S",
+              "outIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "sulfinic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]S(=O)O",
+              "functionalIDs": "4"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "sulfinyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]S(=O)",
+              "outIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "sulfonic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]S(=O)(=O)O",
+              "functionalIDs": "5"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "sulfonyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]S(=O)(=O)",
+              "outIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "tellone"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*]=[Te]",
+              "ketoneLocant": "yes"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "tellurenic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][Te]O",
+              "functionalIDs": "3"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "tellurenyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][TeH]",
+              "outIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "tellurinic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][Te](=O)O",
+              "functionalIDs": "4"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "tellurinyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][TeH](=O)",
+              "outIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "telluronic"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][Te](=O)(=O)O",
+              "functionalIDs": "5"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "telluronyl"
+        },
+        "children": [
+          {
+            "attributes": {
+              "SMILES": "[*][TeH](=O)(=O)",
+              "outIDs": "2"
+            },
+            "tag": "addgroup"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "uide"
+        },
+        "children": [
+          {
+            "attributes": {
+              "charge": "-1",
+              "protons": "1"
+            },
+            "tag": "changecharge"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "yl"
+        },
+        "children": [
+          {
+            "tag": "setOutAtom"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "diyl"
+        },
+        "children": [
+          {
+            "tag": "setOutAtom"
+          },
+          {
+            "tag": "setOutAtom"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ylidene"
+        },
+        "children": [
+          {
+            "attributes": {
+              "outValency": "2"
+            },
+            "tag": "setOutAtom"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ylidyne"
+        },
+        "children": [
+          {
+            "attributes": {
+              "outValency": "3"
+            },
+            "tag": "setOutAtom"
+          }
+        ],
+        "tag": "rule"
+      },
+      {
+        "attributes": {
+          "value": "ylium"
+        },
+        "children": [
+          {
+            "attributes": {
+              "charge": "1",
+              "protons": "-1"
+            },
+            "tag": "changecharge"
+          }
+        ],
+        "tag": "rule"
+      }
+    ],
+    "tag": "suffixRulesList"
+  },
+  "source_xml_file": "suffixRules.xml"
+}

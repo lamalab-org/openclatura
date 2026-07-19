@@ -3,7 +3,7 @@
 Pulls a small random sample from ``yairschiff/qm9`` and reports naming +
 OPSIN match rates. Marked ``dataset``/``slow``; run with ``pytest -m dataset``.
 
-Tunable via env: ``BLUENAMER_DATASET_SAMPLE_N``, ``BLUENAMER_DATASET_SEED``.
+Tunable via env: ``OPENCLATURA_DATASET_SAMPLE_N``, ``OPENCLATURA_DATASET_SEED``.
 """
 
 from __future__ import annotations
@@ -13,8 +13,8 @@ import random
 
 import pytest
 
-from bluenamer import name_many
-from bluenamer.opsin_verify import verify_with_opsin
+from openclatura import name_many
+from openclatura.opsin_verify import verify_with_opsin
 
 pytestmark = [pytest.mark.dataset, pytest.mark.slow]
 
@@ -24,8 +24,8 @@ QM9_DATASET = "yairschiff/qm9"
 @pytest.fixture(scope="module")
 def qm9_sample():
     datasets = pytest.importorskip("datasets")
-    n = int(os.environ.get("BLUENAMER_DATASET_SAMPLE_N", "200"))
-    seed = int(os.environ.get("BLUENAMER_DATASET_SEED", "42"))
+    n = int(os.environ.get("OPENCLATURA_DATASET_SAMPLE_N", "200"))
+    seed = int(os.environ.get("OPENCLATURA_DATASET_SEED", "42"))
     try:
         ds = datasets.load_dataset(QM9_DATASET, split="train")
     except Exception as exc:  # pragma: no cover - network-dependent

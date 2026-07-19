@@ -18,7 +18,7 @@ import pandas as pd
 from datasets import load_dataset
 from tqdm import tqdm
 
-from bluenamer import DEFAULT_NAMING_ENGINE, NamingRequest
+from openclatura import DEFAULT_NAMING_ENGINE, NamingRequest
 
 # --- Configuration ---
 N_TEST = 5_000

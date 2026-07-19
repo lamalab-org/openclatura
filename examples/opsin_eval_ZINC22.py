@@ -12,8 +12,8 @@ from datasets import load_dataset
 from huggingface_hub import HfApi, hf_hub_url
 from tqdm import tqdm
 
-from bluenamer.namer import name_smiles
-from bluenamer.utils import standardize_mol
+from openclatura.namer import name_smiles
+from openclatura.utils import standardize_mol
 
 # --- Configuration ---
 ZINC22_REPO_ID = "chandar-lab/ZINC_22"

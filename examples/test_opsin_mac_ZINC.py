@@ -13,7 +13,7 @@ from datasets import load_dataset
 from tqdm import tqdm
 from utils import standardize_mol
 
-from bluenamer.namer import name_smiles
+from openclatura.namer import name_smiles
 
 # --- Configuration ---
 N_TEST = 100_000

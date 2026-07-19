@@ -1,0 +1,1668 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "name": "%alkaneStemTrivial%",
+          "value": "a"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%cyclicUnsaturableHydrocarbon%",
+          "value": "A"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%alkaneStemModifier%",
+          "value": "n"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%suffix%",
+          "value": "s"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%unsaturator%",
+          "value": "u"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%inlineSuffix%",
+          "value": "i"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%simpleSubstituent%",
+          "value": "x"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%simpleMultiplier%",
+          "value": "m"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%elidedAMultiplier%",
+          "value": "r"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%groupMultiplier%",
+          "value": "R"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%groupStemAllowingInlineSuffixes%",
+          "value": "g"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%simpleGroup%",
+          "value": "G"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%locant%",
+          "value": "l"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%hyphen%",
+          "value": "h"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%openBracket%",
+          "value": "o"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%closeBracket%",
+          "value": "c"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%acidStem%",
+          "value": "d"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%trivialRingSubstituentInlineOnly%",
+          "value": "b"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%cyclo%",
+          "value": "C"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%vonBaeyer%",
+          "value": "B"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%spiroDescriptor%",
+          "value": "S"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%heteroAtom%",
+          "value": "H"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%heteroAtomaElided%",
+          "value": "v"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%hantzschWidmanSuffix%",
+          "value": "W"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%trivialRing%",
+          "value": "z"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%fusionRing%",
+          "value": "f"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%fusionBracket%",
+          "value": "F"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%hydro%",
+          "value": "y"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%bigCapitalH%",
+          "value": "e"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%annulen%",
+          "value": "N"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%orthoMetaPara%",
+          "value": "O"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%stereochemistryBracket%",
+          "value": "E"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%unbrackettedStereochem%",
+          "value": "t"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%heteroStem%",
+          "value": "p"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%o%",
+          "value": "Y"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%e%",
+          "value": "Z"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%inlineChargeSuffix%",
+          "value": "I"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%suffixableSubstituent%",
+          "value": "X"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%hwHeteroAtom%",
+          "value": "D"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%optionalOpenBracket%",
+          "value": "T"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%optionalCloseBracket%",
+          "value": "U"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%hwAneCompatible%",
+          "value": "j"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%hwIneCompatible%",
+          "value": "J"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%hwAne%",
+          "value": "k"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%hwIne%",
+          "value": "K"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%ringAssemblyMultiplier%",
+          "value": "P"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%colonSeperatedLocant%",
+          "value": "L"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%vonBaeyerMultiplier%",
+          "value": "M"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%structuralOpenBracket%",
+          "value": "q"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%structuralCloseBracket%",
+          "value": "Q"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%repeatableInlineSuffix%",
+          "value": "w"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%FR2hydrocarbonComponent%",
+          "value": "V"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%lambdaConvention%",
+          "value": "\u00c7"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%replacementInfix%",
+          "value": "\u00fc"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%endOfSubstituent%",
+          "value": "\u00e9"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%endOfMainGroup%",
+          "value": "\u00e2"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%interSubstituentHyphen%",
+          "value": "\u00e4"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%ane%",
+          "value": "\u00e0"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%suffixesThatCanBeModifiedByAPrefix%",
+          "value": "\u00e5"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%comma%",
+          "value": "\u00e7"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%groupStemAllowingAllSuffixes%",
+          "value": "\u00ea"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%aminoAcidEndsInIne%",
+          "value": "\u00eb"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%aminoAcidEndsInAn%",
+          "value": "\u00e8"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%aminoAcidEndsInIc%",
+          "value": "\u00ef"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%ine%",
+          "value": "\u00ee"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%suffixPrefix%",
+          "value": "\u00ec"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%multipleFusor%",
+          "value": "\u00c4"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%benzo%",
+          "value": "\u00c5"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%locantThatNeedsBrackets%",
+          "value": "\u00c9"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%basicFunctionalClass%",
+          "value": "\u00e6"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%multiplyableFunctionalClass%",
+          "value": "\u00c6"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%monovalentFunctionalGroup%",
+          "value": "\u00f4"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%divalentFunctionalGroup%",
+          "value": "\u00f6"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%standaloneMonovalentFunctionalGroup%",
+          "value": "\u00f2"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%endOfFunctionalGroup%",
+          "value": "\u00fb"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%functionalModifier%",
+          "value": "\u00f9"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%infixableInlineSuffix%",
+          "value": "\u00ff"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%monoNuclearNonCarbonAcid%",
+          "value": "\u00d6"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%anhydrideFunctionalGroup%",
+          "value": "\u00dc"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%alphaBetaStereochemLocant%",
+          "value": "\u00a2"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%implicitIc%",
+          "value": "\u00a3"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%aminoAcidYl%",
+          "value": "\u00a5"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%oMeaningYl%",
+          "value": "\u20a7"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%nonCarbonAcidNoAcyl%",
+          "value": "\u0192"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%simpleCyclicGroup%",
+          "value": "\u00e1"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%acetalClass%",
+          "value": "\u00ed"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%chalcogenReplacement%",
+          "value": "\u00f3"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%perhydro%",
+          "value": "\u00fa"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%chalcogenAcid%",
+          "value": "\u00f1"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%ylamine%",
+          "value": "\u00d1"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%lightRotation%",
+          "value": "\u00aa"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%symPolycylicSpiro%",
+          "value": "\u00ba"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%dispiroter%",
+          "value": "\u00bf"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%spiro%",
+          "value": "\u2310"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%a%",
+          "value": "\u00ac"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%spiroLocant%",
+          "value": "\u00bd"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%relativeCisTrans%",
+          "value": "\u00bc"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%fusionRingAcceptsFrontLocants%",
+          "value": "\u00a1"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%trivialRingSubstituentAnySuffix%",
+          "value": "\u00ab"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%elementaryAtom%",
+          "value": "\u00bb"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%chargeOrOxidationNumberSpecifier%",
+          "value": "\u2591"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%alkaneStemUnits%",
+          "value": "\u2592"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%alkaneStemTens%",
+          "value": "\u2593"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%alkaneStemHundreds%",
+          "value": "\u2502"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%alkaneStemThousands%",
+          "value": "\u2524"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%bridgeFormingO%",
+          "value": "\u2561"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%naturalProductRequiresUnsaturator%",
+          "value": "\u2562"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%mono%",
+          "value": "\u2556"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%nitrogenHeteroStem%",
+          "value": "\u2555"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%ylene%",
+          "value": "\u2563"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%simpleGroupClass%",
+          "value": "\u2551"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%amineMeaningNitrilo%",
+          "value": "\u2557"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%spiroOldMethod%",
+          "value": "\u255d"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%inlineSuffixAllowingPrefixes%",
+          "value": "\u255c"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%dlStereochemistry%",
+          "value": "\u255b"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%subtractivePrefix%",
+          "value": "\u2510"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%canBeDlPrefixedSimpleGroup%",
+          "value": "\u2514"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%trivialRingSubstituent%",
+          "value": "\u2534"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%carbohydrateConfigurationalPrefix%",
+          "value": "\u252c"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%carbohydrateStem%",
+          "value": "\u251c"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%carbohydrateRingSize%",
+          "value": "\u2500"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%carbohydrateChain%",
+          "value": "\u253c"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%epoxy%",
+          "value": "\u00e3"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%multiplier%",
+          "value": "((%simpleMultiplier%|%elidedAMultiplier%|%groupMultiplier%)%hyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%multiplierNotGroup%",
+          "value": "((%simpleMultiplier%|%elidedAMultiplier%)%hyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%multiplierNoElidedA%",
+          "value": "((%simpleMultiplier%|%groupMultiplier%)%hyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%simpleMultiplierGroup%",
+          "value": "(%simpleMultiplier%%hyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%stereochemistry%",
+          "value": "(%stereochemistryBracket%|%locant%?%unbrackettedStereochem%(%comma%%locant%?%unbrackettedStereochem%)*%hyphen%?|%lightRotation%|%alphaBetaStereochemLocant%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%optLocantGroupNoOMP%",
+          "value": "(%hyphen%?%locant%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%optLocantGroup%",
+          "value": "(%hyphen%?(%locant%|%orthoMetaPara%)?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%locantGroup%",
+          "value": "(%hyphen%?(%locant%|%orthoMetaPara%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%newLocantGroupNoStartingHyphen%",
+          "value": "(%locant%|%orthoMetaPara%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%bracketedLocant%",
+          "value": "(%optionalOpenBracket%%locantThatNeedsBrackets%%optionalCloseBracket%%hyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%infixReplacement%",
+          "value": "(%multiplier%?%replacementInfix%(%o%?%multiplier%?%replacementInfix%)*%o%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%infixedInlineSuffix%",
+          "value": "(%o%?%infixReplacement%%infixableInlineSuffix%|%structuralOpenBracket%%infixReplacement%%infixableInlineSuffix%%structuralCloseBracket%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%infixedPrefixedInlineSuffix%",
+          "value": "(%suffixPrefix%%infixReplacement%%inlineSuffixAllowingPrefixes%|%optionalOpenBracket%%suffixPrefix%%infixReplacement%%inlineSuffixAllowingPrefixes%%optionalCloseBracket%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%unlocantedInlineSuffixGroup%",
+          "value": "(%multiplierNoElidedA%?(%infixedInlineSuffix%|%inlineSuffix%|%optionalOpenBracket%%inlineSuffix%%optionalCloseBracket%|%infixedPrefixedInlineSuffix%|(%o%?%infixReplacement%)?%suffixPrefix%%inlineSuffixAllowingPrefixes%|%optionalOpenBracket%(%o%?%infixReplacement%)?%suffixPrefix%%inlineSuffixAllowingPrefixes%%optionalCloseBracket%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%inlineSuffixGroup%",
+          "value": "(%hyphen%?(%newLocantGroupNoStartingHyphen%|%alphaBetaStereochemLocant%)?%unlocantedInlineSuffixGroup%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%repeatableInlineSuffixGroup%",
+          "value": "(%hyphen%?(%newLocantGroupNoStartingHyphen%|%alphaBetaStereochemLocant%)?%simpleMultiplierGroup%?%repeatableInlineSuffix%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%inlineChargeGroup%",
+          "value": "(%optLocantGroup%%multiplier%?%inlineChargeSuffix%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%inlineEndings%",
+          "value": "(%inlineChargeGroup%*%inlineSuffixGroup%%repeatableInlineSuffixGroup%*)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%unsaturation%",
+          "value": "(%optLocantGroupNoOMP%?%multiplier%?%unsaturator%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%unsaturationBlock%",
+          "value": "((%hyphen%?%ane%|%unsaturation%)%unsaturation%*)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%heteroReplacement%",
+          "value": "((%newLocantGroupNoStartingHyphen%?%multiplierNotGroup%|(%locant%?|%lambdaConvention%)%multiplierNotGroup%?)%heteroAtom%%hyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%hydroGroup%",
+          "value": "((%locant%?%multiplier%%hydro%|%perhydro%)%hyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%subtractivePrefixGroup%",
+          "value": "(%locant%?%multiplier%?%subtractivePrefix%%hyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%suffixes%",
+          "value": "(%suffixesThatCanBeModifiedByAPrefix%|%suffix%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%infixedSuffix%",
+          "value": "((%o%?%infixReplacement%%suffixes%)|(%structuralOpenBracket%%infixReplacement%%suffixes%%structuralCloseBracket%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%infixedPrefixedSuffix%",
+          "value": "(%suffixPrefix%%infixReplacement%%suffixesThatCanBeModifiedByAPrefix%|%optionalOpenBracket%%suffixPrefix%%infixReplacement%%suffixesThatCanBeModifiedByAPrefix%%optionalCloseBracket%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%rootSuffix%",
+          "value": "(%suffix%|%o%?%suffixesThatCanBeModifiedByAPrefix%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%unlocantedSuffixGroup%",
+          "value": "(%multiplier%?(%infixedSuffix%|%rootSuffix%|(%o%?%infixReplacement%)?(%suffixPrefix%%suffixesThatCanBeModifiedByAPrefix%|%infixedPrefixedSuffix%))|%multiplier%%optionalOpenBracket%%rootSuffix%%optionalCloseBracket%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%suffixGroup%",
+          "value": "(%hyphen%?(%relativeCisTrans%|%newLocantGroupNoStartingHyphen%|%alphaBetaStereochemLocant%)?%unlocantedSuffixGroup%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%rootEnding%",
+          "value": "(%inlineChargeGroup%*%suffixGroup%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%locantOpenBracket%",
+          "value": "(%stereochemistry%*%newLocantGroupNoStartingHyphen%{0,2}%stereochemistry%*%multiplier%?%openBracket%%hyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%alkaneStemSystematic%",
+          "value": "((%alkaneStemUnits%%a%?)?(%alkaneStemTens%%a%?)?(%alkaneStemHundreds%%a%?)?%alkaneStemThousands%|(%alkaneStemUnits%%a%?)?(%alkaneStemTens%%a%?)?%alkaneStemHundreds%|(%alkaneStemUnits%%a%?)?%alkaneStemTens%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%alkaneStem%",
+          "value": "(%alkaneStemSystematic%|%alkaneStemTrivial%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%dlStereochemistryPrefix%",
+          "value": "(%dlStereochemistry%%lightRotation%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%fusedRingBridges%",
+          "value": "(%newLocantGroupNoStartingHyphen%?%alkaneStem%%ane%%bridgeFormingO%%hyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%epoxyNonDetachableBridge%",
+          "value": "(%newLocantGroupNoStartingHyphen%?%epoxy%%hyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%ring_CanStartWithHydro_NonDetachableFeatures%",
+          "value": "(%hydroGroup%*((%bigCapitalH%|%lambdaConvention%|%heteroReplacement%|%fusedRingBridges%|%subtractivePrefixGroup%)%epoxyNonDetachableBridge%?)*)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%ringNonDetachableFeatures%",
+          "value": "(((%bigCapitalH%|%lambdaConvention%|%heteroReplacement%|%fusedRingBridges%)%epoxyNonDetachableBridge%?)*%newLocantGroupNoStartingHyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%acyclicNonDetachableFeatures%",
+          "value": "(%heteroReplacement%*%lambdaConvention%?%newLocantGroupNoStartingHyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%heteroChain%",
+          "value": "((%multiplierNotGroup%%heteroStem%%unsaturationBlock%)|(%heteroStem%%hyphen%?%ane%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%alternatingHeteroChain%",
+          "value": "(%multiplierNotGroup%(%heteroAtom%|%heteroAtomaElided%){2,}%unsaturationBlock%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%straightChainGroups%",
+          "value": "(%heteroChain%|%alternatingHeteroChain%|%alkaneStem%%a%?%unsaturationBlock%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%chainGroup%",
+          "value": "(%heteroChain%|%alternatingHeteroChain%|%alkaneStemModifier%?%alkaneStem%%a%?%unsaturationBlock%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%nitrogenChainSubstituent%",
+          "value": "(((%multiplierNotGroup%%nitrogenHeteroStem%%unsaturationBlock%)|(%nitrogenHeteroStem%%hyphen%?%ane%))%oMeaningYl%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%alkYlene%",
+          "value": "((%alkaneStemSystematic%%unsaturationBlock%?|%alkaneStemTrivial%%unsaturationBlock%)%optLocantGroupNoOMP%%ylene%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%chainSubstituent%",
+          "value": "(%chainGroup%%inlineEndings%|%alkaneStemModifier%?%alkaneStem%(%optLocantGroup%|%a%%locantGroup%)%unlocantedInlineSuffixGroup%%repeatableInlineSuffixGroup%*|%nitrogenChainSubstituent%|%alkYlene%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%aminoMonoAcid%",
+          "value": "(%dlStereochemistryPrefix%?(%aminoAcidEndsInIne%%ine%|%aminoAcidEndsInAn%%ane%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%aminoAcidOptionalIne%",
+          "value": "(%dlStereochemistryPrefix%?(%aminoAcidEndsInIne%%ine%?|%aminoAcidEndsInAn%%ane%?|%aminoAcidEndsInIc%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%aminoAcidGroup%",
+          "value": "(%aminoMonoAcid%%implicitIc%%inlineChargeSuffix%?|(%aminoMonoAcid%|%dlStereochemistryPrefix%?%aminoAcidEndsInIc%)(%infixedSuffix%|%rootSuffix%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%aminoAcidLocantedYl%",
+          "value": "((%aminoMonoAcid%%implicitIc%|%dlStereochemistryPrefix%?%aminoAcidEndsInIc%%rootSuffix%)%hyphen%?%locant%%aminoAcidYl%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%aminoAcidRadicalOnN%",
+          "value": "((%aminoMonoAcid%|%dlStereochemistryPrefix%?%aminoAcidEndsInIc%)%implicitIc%%oMeaningYl%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%aminoAcidSubstituent%",
+          "value": "(%aminoAcidLocantedYl%|%aminoAcidRadicalOnN%|%aminoAcidOptionalIne%(%infixedInlineSuffix%|%inlineSuffix%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%systematicAcyclicCarbohydrate%",
+          "value": "((%dlStereochemistryPrefix%?%carbohydrateConfigurationalPrefix%%hyphen%?)+%carbohydrateChain%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%nonCarbonAcidGroup%",
+          "value": "((%monoNuclearNonCarbonAcid%|%nonCarbonAcidNoAcyl%)(%infixedSuffix%|%rootSuffix%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%chalcogenAcidGroup%",
+          "value": "(%chalcogenAcid%(%infixedSuffix%|%o%?%rootSuffix%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%nonCarbonAcidSubstituent%",
+          "value": "(%monoNuclearNonCarbonAcid%(%infixedInlineSuffix%|%inlineSuffix%)|%chalcogenAcid%(%infixedInlineSuffix%|%inlineSuffix%|%o%%infixableInlineSuffix%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%acidGroup%",
+          "value": "(%acidStem%(%infixedSuffix%|%o%?%rootSuffix%)|%aminoAcidGroup%|%nonCarbonAcidGroup%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%acidSubstituent%",
+          "value": "(%acidStem%(%infixedInlineSuffix%|%inlineSuffix%|%o%%infixableInlineSuffix%)|%aminoAcidSubstituent%|%nonCarbonAcidSubstituent%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%simpleSubstituents%",
+          "value": "(%simpleSubstituent%|%suffixableSubstituent%%inlineSuffixGroup%%repeatableInlineSuffixGroup%*)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%simpleGroups%",
+          "value": "(%simpleGroup%|%dlStereochemistryPrefix%?%canBeDlPrefixedSimpleGroup%|%systematicAcyclicCarbohydrate%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%semiTrivialFusedRing%",
+          "value": "(%vonBaeyerMultiplier%%FR2hydrocarbonComponent%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%vonBaeyerSystem%",
+          "value": "(%vonBaeyerMultiplier%%vonBaeyer%(%alkaneStem%%a%?%unsaturationBlock%|%heteroChain%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%cycloChain%",
+          "value": "(%cyclo%%straightChainGroups%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%cycloChainSubstituent%",
+          "value": "(%cyclo%%alkaneStem%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%spiroSystem%",
+          "value": "(%simpleMultiplierGroup%?%spiroDescriptor%%alkaneStem%%a%?%unsaturationBlock%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%hantzschWidmanRing%",
+          "value": "((%newLocantGroupNoStartingHyphen%|%bracketedLocant%)?((%multiplierNotGroup%?%hwHeteroAtom%)*((%multiplierNotGroup%?%hwAneCompatible%)%hwAne%)|(((%multiplierNotGroup%?%hwHeteroAtom%){2,}|(%multiplierNotGroup%?%hwIneCompatible%))%hwIne%)|((%multiplierNotGroup%?%hwHeteroAtom%)+%hantzschWidmanSuffix%)))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%fusionComponent%",
+          "value": "(%fusionRing%|(%locantThatNeedsBrackets%|%bracketedLocant%)?%fusionRingAcceptsFrontLocants%|%benzo%|%cycloChainSubstituent%%a%?|%annulen%%o%|%semiTrivialFusedRing%%o%|%hantzschWidmanRing%%o%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%cyclicUnsaturableHydrocarbonGroup%",
+          "value": "(%cyclicUnsaturableHydrocarbon%%a%?%unsaturationBlock%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%naturalProductGroup%",
+          "value": "(%naturalProductRequiresUnsaturator%%a%?%unsaturationBlock%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%trivialRingSubstituentGroup%",
+          "value": "(%bracketedLocant%?%trivialRingSubstituentAnySuffix%%suffixGroup%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%trivialRingSubstituentSub%",
+          "value": "(%bracketedLocant%?(%trivialRingSubstituentAnySuffix%|%trivialRingSubstituentInlineOnly%)%inlineSuffixGroup%|%trivialRingSubstituent%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%vonBaeyerSystemSubstituent%",
+          "value": "(%vonBaeyerMultiplier%%vonBaeyer%%alkaneStem%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%spiroSystemSubstituent%",
+          "value": "(%simpleMultiplierGroup%?%spiroDescriptor%%alkaneStem%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%conjunctiveSideChainRoot%",
+          "value": "(%hyphen%?(%locant%|%alphaBetaStereochemLocant%)?%multiplier%?(%alkaneStem%%hyphen%?(%ane%%suffixGroup%|%ane%?%ylamine%)|%optionalOpenBracket%%alkaneStem%%hyphen%?%ane%?%ylamine%%optionalCloseBracket%|%acidStem%(%infixedSuffix%|%o%?%rootSuffix%)))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%conjunctiveSideChainInline%",
+          "value": "(%multiplier%?(%acidStem%(%infixedInlineSuffix%|%inlineSuffix%|%o%%infixableInlineSuffix%)))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%cyclicSugar%",
+          "value": "(%dlStereochemistryPrefix%?%carbohydrateStem%%carbohydrateRingSize%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%benzoComponent%",
+          "value": "((%bracketedLocant%|%locant%)%benzo%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%simpleComponent%",
+          "value": "(%fusionComponent%%hyphen%?%fusionBracket%?%hyphen%?|%benzoComponent%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%multipliedComponent%",
+          "value": "(%multiplier%(%fusionComponent%%hyphen%?%multipleFusor%?%hyphen%?|%benzoComponent%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%multipliedParent%",
+          "value": "(%fusionComponent%%hyphen%?%multipleFusor%?%hyphen%?%multiplier%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%fusedRingSystemFromTrivialRingSubstituent%",
+          "value": "((%simpleComponent%|%multipliedComponent%|%multipliedParent%)+%trivialRingSubstituentSub%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%ringGroup%",
+          "value": "((%semiTrivialFusedRing%|%hantzschWidmanRing%|%annulen%|(%locant%|%bracketedLocant%)?%trivialRing%)%e%?|%vonBaeyerSystem%|%spiroSystem%|%trivialRingSubstituentGroup%|%cycloChain%|%cyclicUnsaturableHydrocarbonGroup%|%naturalProductGroup%|%cyclicSugar%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%irregularRingSubstituentStem%",
+          "value": "(%vonBaeyerSystemSubstituent%|%cycloChainSubstituent%|%spiroSystemSubstituent%|%cyclicUnsaturableHydrocarbon%%a%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%ringSubstituent%",
+          "value": "((%ringGroup%|%irregularRingSubstituentStem%)(%inlineEndings%|%conjunctiveSideChainInline%)|%trivialRingSubstituentSub%|%fusedRingSystemFromTrivialRingSubstituent%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%fusedRingSystem%",
+          "value": "((%simpleComponent%|%multipliedComponent%|%multipliedParent%)+(%ringGroup%|%simpleCyclicGroup%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%polycyclicSpiroOldMethod%",
+          "value": "(%ringNonDetachableFeatures%(%ringGroup%|%fusedRingSystem%)%inlineChargeGroup%*(%hyphen%?%locant%?%spiroOldMethod%%locant%?(%ring_CanStartWithHydro_NonDetachableFeatures%(%ringGroup%|%fusedRingSystem%)%inlineChargeGroup%*|%optionalOpenBracket%%locant%?%ring_CanStartWithHydro_NonDetachableFeatures%(%ringGroup%|%fusedRingSystem%)%inlineChargeGroup%*%optionalCloseBracket%))+)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%vonBaeyerForSpiro%",
+          "value": "(%structuralOpenBracket%%vonBaeyerMultiplier%%vonBaeyer%(%alkaneStem%|%multiplier%%heteroStem%)%ane%%structuralCloseBracket%%unsaturation%+)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%polycyclicSpiroIdenticalComponents%",
+          "value": "((%symPolycylicSpiro%|%dispiroter%)((%ringGroup%|%fusedRingSystem%)|%structuralOpenBracket%%ring_CanStartWithHydro_NonDetachableFeatures%(%ringGroup%|%fusedRingSystem%)%structuralCloseBracket%|%vonBaeyerForSpiro%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%polycyclicSpiroContents%",
+          "value": "(%ring_CanStartWithHydro_NonDetachableFeatures%(%ringGroup%|%fusedRingSystem%)(%hyphen%?%spiroLocant%((%ring_CanStartWithHydro_NonDetachableFeatures%(%ringGroup%|%fusedRingSystem%))|(%optionalOpenBracket%%ring_CanStartWithHydro_NonDetachableFeatures%(%ringGroup%|%fusedRingSystem%)%optionalCloseBracket%)))+)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%polycyclicSpiro%",
+          "value": "(%simpleMultiplier%?%spiro%%structuralOpenBracket%%polycyclicSpiroContents%%structuralCloseBracket%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%polycyclicSpiroGroup%",
+          "value": "(%polycyclicSpiroIdenticalComponents%|%polycyclicSpiro%|%polycyclicSpiroOldMethod%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%ringAssemblyConjunctive%",
+          "value": "(%ring_CanStartWithHydro_NonDetachableFeatures%?(%ringGroup%|%simpleCyclicGroup%|%fusedRingSystem%)%rootEnding%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%ringAssemblyAdditive%",
+          "value": "(%ring_CanStartWithHydro_NonDetachableFeatures%?(%trivialRingSubstituentSub%|%fusedRingSystemFromTrivialRingSubstituent%|%irregularRingSubstituentStem%%optLocantGroupNoOMP%%repeatableInlineSuffix%|(%ringGroup%|%fusedRingSystem%)%inlineChargeGroup%*%optLocantGroupNoOMP%%repeatableInlineSuffix%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%ringAssemblyRing%",
+          "value": "(%ringAssemblyConjunctive%|%ringAssemblyAdditive%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%locantForRingAssembly%",
+          "value": "(%colonSeperatedLocant%|%newLocantGroupNoStartingHyphen%|%optionalOpenBracket%(%colonSeperatedLocant%|%locant%)%optionalCloseBracket%%hyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%ringAssembly%",
+          "value": "(%locantForRingAssembly%?%ringAssemblyMultiplier%%hyphen%?(%ringAssemblyRing%|%structuralOpenBracket%%ringAssemblyRing%%structuralCloseBracket%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%allRingSubstituents%",
+          "value": "(%ringSubstituent%|((%ringAssembly%|%structuralOpenBracket%%ringAssembly%%structuralCloseBracket%)|%fusedRingSystem%|%polycyclicSpiroGroup%)(%inlineEndings%|%conjunctiveSideChainInline%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%allOtherSubstituents%",
+          "value": "(%simpleSubstituents%|%chainSubstituent%|%acidSubstituent%|(%groupStemAllowingInlineSuffixes%|%groupStemAllowingAllSuffixes%)%e%?%inlineEndings%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%subsituentBody%",
+          "value": "(%ringNonDetachableFeatures%%allRingSubstituents%|%acyclicNonDetachableFeatures%%allOtherSubstituents%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%amineMeaningNitriloSubstituent%",
+          "value": "(%openBracket%*%multiplier%%openBracket%*%amineMeaningNitrilo%%closeBracket%*%interSubstituentHyphen%?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%substituent%",
+          "value": "((%locantOpenBracket%*%newLocantGroupNoStartingHyphen%?%stereochemistry%*(%relativeCisTrans%|%newLocantGroupNoStartingHyphen%)?(%multiplier%|%groupMultiplier%%simpleMultiplier%)?(%subsituentBody%%closeBracket%*%interSubstituentHyphen%?|%hydroGroup%)|%amineMeaningNitriloSubstituent%)%endOfSubstituent%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%allRingGroups%",
+          "value": "((%ringGroup%|%ringAssembly%|%structuralOpenBracket%%ringAssembly%%structuralCloseBracket%|%fusedRingSystem%|%polycyclicSpiroGroup%)(%rootEnding%|%conjunctiveSideChainRoot%)|%simpleCyclicGroup%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%allOtherSuffixableGroups%",
+          "value": "((%groupStemAllowingAllSuffixes%%e%?|%chainGroup%)%rootEnding%|%acidGroup%|%groupStemAllowingInlineSuffixes%%e%?%inlineChargeGroup%*)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%mainGroupBody%",
+          "value": "(%ringNonDetachableFeatures%%allRingGroups%|%acyclicNonDetachableFeatures%(%allOtherSuffixableGroups%|%simpleGroups%|%elementaryAtom%%chargeOrOxidationNumberSpecifier%?))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%mainGroupHead%",
+          "value": "(%openBracket%?%multiplier%?%openBracket%?%stereochemistry%*(%newLocantGroupNoStartingHyphen%%mono%?)?)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%mainGroupTail%",
+          "value": "(%closeBracket%*%endOfMainGroup%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%mainGroup%",
+          "value": "(%mainGroupHead%%mainGroupBody%%mainGroupTail%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%mainGroupThatRequiresSubstituent%",
+          "value": "(%mainGroupHead%(%chalcogenAcidGroup%|%simpleGroupClass%)%mainGroupTail%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%anhydride%",
+          "value": "((%locant%|%colonSeperatedLocant%)?%multiplier%?(%anhydrideFunctionalGroup%|%openBracket%%anhydrideFunctionalGroup%%closeBracket%))"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%acetal%",
+          "value": "(%simpleMultiplier%?%chalcogenReplacement%{0,2}%acetalClass%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%functionalClass%",
+          "value": "(%locant%?%simpleMultiplierGroup%?%multiplyableFunctionalClass%%closeBracket%?|%acetal%|%anhydride%|%basicFunctionalClass%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%functionalGroup%",
+          "value": "(%multiplier%?(%monovalentFunctionalGroup%|%standaloneMonovalentFunctionalGroup%)|%divalentFunctionalGroup%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%functionalTerm%",
+          "value": "((%functionalClass%|%functionalGroup%|%functionalModifier%)%endOfFunctionalGroup%)"
+        },
+        "tag": "regex"
+      },
+      {
+        "attributes": {
+          "name": "%chemical%",
+          "value": "((%functionalModifier%%endOfFunctionalGroup%)?(%substituent%+%functionalTerm%?|(%substituent%*%mainGroup%|%substituent%+%mainGroupThatRequiresSubstituent%)(%hyphen%?%functionalTerm%)?)|%hyphen%?%functionalTerm%)"
+        },
+        "tag": "regex"
+      }
+    ],
+    "tag": "regexes"
+  },
+  "source_xml_file": "regexes.xml"
+}

@@ -1,0 +1,1003 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "symbol": "s",
+          "tagname": "suffix",
+          "type": "root"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "amine"
+            },
+            "tag": "token",
+            "text": "amine"
+          },
+          {
+            "attributes": {
+              "value": "amine"
+            },
+            "tag": "token",
+            "text": "amin"
+          },
+          {
+            "attributes": {
+              "value": "aminide"
+            },
+            "tag": "token",
+            "text": "aminide"
+          },
+          {
+            "attributes": {
+              "value": "aminide"
+            },
+            "tag": "token",
+            "text": "aminid"
+          },
+          {
+            "attributes": {
+              "value": "aminium"
+            },
+            "tag": "token",
+            "text": "aminium"
+          },
+          {
+            "attributes": {
+              "value": "aminylium"
+            },
+            "tag": "token",
+            "text": "aminylium"
+          },
+          {
+            "attributes": {
+              "value": "carbonylium"
+            },
+            "tag": "token",
+            "text": "carbonylium"
+          },
+          {
+            "attributes": {
+              "value": "carboxylate"
+            },
+            "tag": "token",
+            "text": "carboxylate"
+          },
+          {
+            "attributes": {
+              "value": "carboxylate"
+            },
+            "tag": "token",
+            "text": "carboxylat"
+          },
+          {
+            "attributes": {
+              "value": "carboxylic"
+            },
+            "tag": "token",
+            "text": "carboxylic"
+          },
+          {
+            "attributes": {
+              "value": "carboxylic"
+            },
+            "tag": "token",
+            "text": "carboxylicacid"
+          },
+          {
+            "attributes": {
+              "value": "carboxylic"
+            },
+            "tag": "token",
+            "text": "carboxylic acid"
+          },
+          {
+            "attributes": {
+              "value": "carboxylite"
+            },
+            "tag": "token",
+            "text": "carboxylite"
+          },
+          {
+            "attributes": {
+              "value": "carboxylite"
+            },
+            "tag": "token",
+            "text": "carboxylit"
+          },
+          {
+            "attributes": {
+              "value": "diazonium"
+            },
+            "tag": "token",
+            "text": "diazonium"
+          },
+          {
+            "attributes": {
+              "value": "imine"
+            },
+            "tag": "token",
+            "text": "imine"
+          },
+          {
+            "attributes": {
+              "value": "imine"
+            },
+            "tag": "token",
+            "text": "imin"
+          },
+          {
+            "attributes": {
+              "value": "iminide"
+            },
+            "tag": "token",
+            "text": "iminide"
+          },
+          {
+            "attributes": {
+              "value": "iminide"
+            },
+            "tag": "token",
+            "text": "iminid"
+          },
+          {
+            "attributes": {
+              "value": "iminium"
+            },
+            "tag": "token",
+            "text": "iminium"
+          },
+          {
+            "attributes": {
+              "value": "iminylium"
+            },
+            "tag": "token",
+            "text": "iminylium"
+          },
+          {
+            "attributes": {
+              "additionalValue": "one",
+              "value": "one"
+            },
+            "tag": "token",
+            "text": "quinone"
+          },
+          {
+            "attributes": {
+              "additionalValue": "one",
+              "value": "one"
+            },
+            "tag": "token",
+            "text": "quinon"
+          },
+          {
+            "attributes": {
+              "value": "ol"
+            },
+            "tag": "token",
+            "text": "ol"
+          },
+          {
+            "attributes": {
+              "value": "olate"
+            },
+            "tag": "token",
+            "text": "olate"
+          },
+          {
+            "attributes": {
+              "value": "olate"
+            },
+            "tag": "token",
+            "text": "olat"
+          },
+          {
+            "attributes": {
+              "value": "one"
+            },
+            "tag": "token",
+            "text": "one"
+          },
+          {
+            "attributes": {
+              "value": "one"
+            },
+            "tag": "token",
+            "text": "on"
+          },
+          {
+            "attributes": {
+              "value": "selone"
+            },
+            "tag": "token",
+            "text": "selone"
+          },
+          {
+            "attributes": {
+              "value": "selone"
+            },
+            "tag": "token",
+            "text": "selon"
+          },
+          {
+            "attributes": {
+              "value": "selenenic"
+            },
+            "tag": "token",
+            "text": "selenenic"
+          },
+          {
+            "attributes": {
+              "value": "selenenic"
+            },
+            "tag": "token",
+            "text": "selenenicacid"
+          },
+          {
+            "attributes": {
+              "value": "selenenic"
+            },
+            "tag": "token",
+            "text": "selenenic acid"
+          },
+          {
+            "attributes": {
+              "value": "sulfenoselenoic"
+            },
+            "tag": "token",
+            "text": "sulfenoselenoic"
+          },
+          {
+            "attributes": {
+              "value": "sulfenoselenoic"
+            },
+            "tag": "token",
+            "text": "sulfenoselenoicacid"
+          },
+          {
+            "attributes": {
+              "value": "sulfenoselenoic"
+            },
+            "tag": "token",
+            "text": "sulfenoselenoic acid"
+          },
+          {
+            "attributes": {
+              "value": "sulfenothioic"
+            },
+            "tag": "token",
+            "text": "sulfenothioic"
+          },
+          {
+            "attributes": {
+              "value": "sulfenothioic"
+            },
+            "tag": "token",
+            "text": "sulfenothioicacid"
+          },
+          {
+            "attributes": {
+              "value": "sulfenothioic"
+            },
+            "tag": "token",
+            "text": "sulfenothioic acid"
+          },
+          {
+            "attributes": {
+              "value": "sulfenamide"
+            },
+            "tag": "token",
+            "text": "sulfenamide"
+          },
+          {
+            "attributes": {
+              "value": "sulfenamide"
+            },
+            "tag": "token",
+            "text": "sulfenamid"
+          },
+          {
+            "attributes": {
+              "value": "sulfenic"
+            },
+            "tag": "token",
+            "text": "sulfenic"
+          },
+          {
+            "attributes": {
+              "value": "sulfenic"
+            },
+            "tag": "token",
+            "text": "sulfenicacid"
+          },
+          {
+            "attributes": {
+              "value": "sulfenic"
+            },
+            "tag": "token",
+            "text": "sulfenic acid"
+          },
+          {
+            "attributes": {
+              "value": "tellone"
+            },
+            "tag": "token",
+            "text": "tellone"
+          },
+          {
+            "attributes": {
+              "value": "tellone"
+            },
+            "tag": "token",
+            "text": "tellon"
+          },
+          {
+            "attributes": {
+              "value": "tellurenic"
+            },
+            "tag": "token",
+            "text": "tellurenic"
+          },
+          {
+            "attributes": {
+              "value": "tellurenic"
+            },
+            "tag": "token",
+            "text": "tellurenicacid"
+          },
+          {
+            "attributes": {
+              "value": "tellurenic"
+            },
+            "tag": "token",
+            "text": "tellurenic acid"
+          },
+          {
+            "attributes": {
+              "value": "arsonous"
+            },
+            "tag": "token",
+            "text": "arsonous"
+          },
+          {
+            "attributes": {
+              "value": "arsonous"
+            },
+            "tag": "token",
+            "text": "arsonousacid"
+          },
+          {
+            "attributes": {
+              "value": "arsonous"
+            },
+            "tag": "token",
+            "text": "arsonous acid"
+          },
+          {
+            "attributes": {
+              "value": "azonic"
+            },
+            "tag": "token",
+            "text": "azonic"
+          },
+          {
+            "attributes": {
+              "value": "azonic"
+            },
+            "tag": "token",
+            "text": "azonicacid"
+          },
+          {
+            "attributes": {
+              "value": "azonic"
+            },
+            "tag": "token",
+            "text": "azonic acid"
+          },
+          {
+            "attributes": {
+              "value": "azonate"
+            },
+            "tag": "token",
+            "text": "azonate"
+          },
+          {
+            "attributes": {
+              "value": "azonate"
+            },
+            "tag": "token",
+            "text": "azonat"
+          },
+          {
+            "attributes": {
+              "value": "azonous"
+            },
+            "tag": "token",
+            "text": "azonous"
+          },
+          {
+            "attributes": {
+              "value": "azonous"
+            },
+            "tag": "token",
+            "text": "azonousacid"
+          },
+          {
+            "attributes": {
+              "value": "azonous"
+            },
+            "tag": "token",
+            "text": "azonous acid"
+          },
+          {
+            "attributes": {
+              "value": "boronate"
+            },
+            "tag": "token",
+            "text": "boronate"
+          },
+          {
+            "attributes": {
+              "value": "boronate"
+            },
+            "tag": "token",
+            "text": "boronat"
+          },
+          {
+            "attributes": {
+              "value": "boronic"
+            },
+            "tag": "token",
+            "text": "boronic"
+          },
+          {
+            "attributes": {
+              "value": "boronic"
+            },
+            "tag": "token",
+            "text": "boronicacid"
+          },
+          {
+            "attributes": {
+              "value": "boronic"
+            },
+            "tag": "token",
+            "text": "boronic acid"
+          },
+          {
+            "attributes": {
+              "value": "carbamic"
+            },
+            "tag": "token",
+            "text": "carbamic"
+          },
+          {
+            "attributes": {
+              "value": "carbamic"
+            },
+            "tag": "token",
+            "text": "carbamicacid"
+          },
+          {
+            "attributes": {
+              "value": "carbamic"
+            },
+            "tag": "token",
+            "text": "carbamic acid"
+          },
+          {
+            "attributes": {
+              "value": "phosphonous"
+            },
+            "tag": "token",
+            "text": "phosphonous"
+          },
+          {
+            "attributes": {
+              "value": "phosphonous"
+            },
+            "tag": "token",
+            "text": "phosphonousacid"
+          },
+          {
+            "attributes": {
+              "value": "phosphonous"
+            },
+            "tag": "token",
+            "text": "phosphonous acid"
+          },
+          {
+            "attributes": {
+              "value": "stibonous"
+            },
+            "tag": "token",
+            "text": "stibonous"
+          },
+          {
+            "attributes": {
+              "value": "stibonous"
+            },
+            "tag": "token",
+            "text": "stibonousacid"
+          },
+          {
+            "attributes": {
+              "value": "stibonous"
+            },
+            "tag": "token",
+            "text": "stibonous acid"
+          },
+          {
+            "attributes": {
+              "value": "sulfamic"
+            },
+            "tag": "token",
+            "text": "sulfamic"
+          },
+          {
+            "attributes": {
+              "value": "sulfamic"
+            },
+            "tag": "token",
+            "text": "sulfamicacid"
+          },
+          {
+            "attributes": {
+              "value": "sulfamic"
+            },
+            "tag": "token",
+            "text": "sulfamic acid"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "terminal",
+          "symbol": "s",
+          "tagname": "suffix",
+          "type": "root"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "al"
+            },
+            "tag": "token",
+            "text": "al"
+          },
+          {
+            "attributes": {
+              "additionalValue": "aldehyde",
+              "value": "ic"
+            },
+            "tag": "token",
+            "text": "aldehydic"
+          },
+          {
+            "attributes": {
+              "additionalValue": "aldehyde",
+              "value": "ic"
+            },
+            "tag": "token",
+            "text": "aldehydicacid"
+          },
+          {
+            "attributes": {
+              "additionalValue": "aldehyde",
+              "value": "ic"
+            },
+            "tag": "token",
+            "text": "aldehydic acid"
+          },
+          {
+            "attributes": {
+              "value": "aldoxime"
+            },
+            "tag": "token",
+            "text": "aldoxime"
+          },
+          {
+            "attributes": {
+              "value": "aldoxime"
+            },
+            "tag": "token",
+            "text": "aldoxim"
+          },
+          {
+            "attributes": {
+              "additionalValue": "amide",
+              "value": "ate"
+            },
+            "tag": "token",
+            "text": "amate"
+          },
+          {
+            "attributes": {
+              "additionalValue": "amide",
+              "value": "ate"
+            },
+            "tag": "token",
+            "text": "amat"
+          },
+          {
+            "attributes": {
+              "additionalValue": "amide",
+              "value": "ic"
+            },
+            "tag": "token",
+            "text": "amic"
+          },
+          {
+            "attributes": {
+              "additionalValue": "amide",
+              "value": "ic"
+            },
+            "tag": "token",
+            "text": "amicacid"
+          },
+          {
+            "attributes": {
+              "additionalValue": "amide",
+              "value": "ic"
+            },
+            "tag": "token",
+            "text": "amic acid"
+          },
+          {
+            "attributes": {
+              "additionalValue": "anilide",
+              "value": "ic"
+            },
+            "tag": "token",
+            "text": "anilic"
+          },
+          {
+            "attributes": {
+              "additionalValue": "anilide",
+              "value": "ic"
+            },
+            "tag": "token",
+            "text": "anilicacid"
+          },
+          {
+            "attributes": {
+              "additionalValue": "anilide",
+              "value": "ic"
+            },
+            "tag": "token",
+            "text": "anilic acid"
+          },
+          {
+            "attributes": {
+              "additionalValue": "aldehyde",
+              "value": "amide"
+            },
+            "tag": "token",
+            "text": "imide"
+          },
+          {
+            "attributes": {
+              "additionalValue": "aldehyde",
+              "value": "amide"
+            },
+            "tag": "token",
+            "text": "imid"
+          },
+          {
+            "attributes": {
+              "additionalValue": "aldehyde",
+              "value": "amidylium"
+            },
+            "tag": "token",
+            "text": "imidylium"
+          },
+          {
+            "attributes": {
+              "additionalValue": "aldehyde",
+              "value": "amidium"
+            },
+            "tag": "token",
+            "text": "imidium"
+          },
+          {
+            "attributes": {
+              "value": "ite"
+            },
+            "tag": "token",
+            "text": "ite"
+          },
+          {
+            "attributes": {
+              "value": "ite"
+            },
+            "tag": "token",
+            "text": "it"
+          },
+          {
+            "attributes": {
+              "value": "onaphthone"
+            },
+            "tag": "token",
+            "text": "onaphthone"
+          },
+          {
+            "attributes": {
+              "value": "onaphthone"
+            },
+            "tag": "token",
+            "text": "onaphthon"
+          },
+          {
+            "attributes": {
+              "value": "onaphthone"
+            },
+            "tag": "token",
+            "text": "naphthone"
+          },
+          {
+            "attributes": {
+              "value": "onaphthone"
+            },
+            "tag": "token",
+            "text": "naphthon"
+          },
+          {
+            "attributes": {
+              "value": "ophenone"
+            },
+            "tag": "token",
+            "text": "ophenone"
+          },
+          {
+            "attributes": {
+              "value": "ophenone"
+            },
+            "tag": "token",
+            "text": "ophenon"
+          },
+          {
+            "attributes": {
+              "value": "ophenone"
+            },
+            "tag": "token",
+            "text": "phenone"
+          },
+          {
+            "attributes": {
+              "value": "ophenone"
+            },
+            "tag": "token",
+            "text": "phenon"
+          },
+          {
+            "attributes": {
+              "value": "ous"
+            },
+            "tag": "token",
+            "text": "ous"
+          },
+          {
+            "attributes": {
+              "value": "ous"
+            },
+            "tag": "token",
+            "text": "ousacid"
+          },
+          {
+            "attributes": {
+              "value": "ous"
+            },
+            "tag": "token",
+            "text": "ous acid"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "terminal",
+          "symbol": "\u00e5",
+          "tagname": "suffix",
+          "type": "root"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "aldehyde"
+            },
+            "tag": "token",
+            "text": "aldehyde"
+          },
+          {
+            "attributes": {
+              "value": "aldehyde"
+            },
+            "tag": "token",
+            "text": "aldehyd"
+          },
+          {
+            "attributes": {
+              "value": "amide"
+            },
+            "tag": "token",
+            "text": "amide"
+          },
+          {
+            "attributes": {
+              "value": "amide"
+            },
+            "tag": "token",
+            "text": "amid"
+          },
+          {
+            "attributes": {
+              "value": "amidylium"
+            },
+            "tag": "token",
+            "text": "amidylium"
+          },
+          {
+            "attributes": {
+              "value": "amidium"
+            },
+            "tag": "token",
+            "text": "amidium"
+          },
+          {
+            "attributes": {
+              "value": "anilide"
+            },
+            "tag": "token",
+            "text": "anilide"
+          },
+          {
+            "attributes": {
+              "value": "anilide"
+            },
+            "tag": "token",
+            "text": "anilid"
+          },
+          {
+            "attributes": {
+              "value": "amidine"
+            },
+            "tag": "token",
+            "text": "amidine"
+          },
+          {
+            "attributes": {
+              "value": "amidine"
+            },
+            "tag": "token",
+            "text": "amidin"
+          },
+          {
+            "attributes": {
+              "value": "amidinium"
+            },
+            "tag": "token",
+            "text": "amidinium"
+          },
+          {
+            "attributes": {
+              "value": "ate"
+            },
+            "tag": "token",
+            "text": "ate"
+          },
+          {
+            "attributes": {
+              "value": "ate"
+            },
+            "tag": "token",
+            "text": "at"
+          },
+          {
+            "attributes": {
+              "value": "hydrazide"
+            },
+            "tag": "token",
+            "text": "hydrazide"
+          },
+          {
+            "attributes": {
+              "value": "hydrazide"
+            },
+            "tag": "token",
+            "text": "hydrazid"
+          },
+          {
+            "attributes": {
+              "value": "hydroxamic"
+            },
+            "tag": "token",
+            "text": "hydroxamic"
+          },
+          {
+            "attributes": {
+              "value": "hydroxamic"
+            },
+            "tag": "token",
+            "text": "hydroxamicacid"
+          },
+          {
+            "attributes": {
+              "value": "hydroxamic"
+            },
+            "tag": "token",
+            "text": "hydroxamic acid"
+          },
+          {
+            "attributes": {
+              "value": "hydroxamate"
+            },
+            "tag": "token",
+            "text": "hydroxamate"
+          },
+          {
+            "attributes": {
+              "value": "hydroxamate"
+            },
+            "tag": "token",
+            "text": "hydroxamat"
+          },
+          {
+            "attributes": {
+              "value": "ic"
+            },
+            "tag": "token",
+            "text": "ic"
+          },
+          {
+            "attributes": {
+              "value": "ic"
+            },
+            "tag": "token",
+            "text": "icacid"
+          },
+          {
+            "attributes": {
+              "value": "ic"
+            },
+            "tag": "token",
+            "text": "ic acid"
+          },
+          {
+            "attributes": {
+              "value": "nitrile"
+            },
+            "tag": "token",
+            "text": "nitrile"
+          },
+          {
+            "attributes": {
+              "value": "nitrile"
+            },
+            "tag": "token",
+            "text": "nitril"
+          },
+          {
+            "attributes": {
+              "value": "nitrilium"
+            },
+            "tag": "token",
+            "text": "nitrilium"
+          },
+          {
+            "attributes": {
+              "value": "acylium"
+            },
+            "tag": "token",
+            "text": "ylium"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "suffixes.xml"
+}

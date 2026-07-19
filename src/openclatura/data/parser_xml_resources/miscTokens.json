@@ -1,0 +1,808 @@
+{
+  "format": "openclatura.parser_xml_resource.v1",
+  "root": {
+    "children": [
+      {
+        "attributes": {
+          "symbol": "V",
+          "tagname": "hydrocarbonFusedRingSystem"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "polyacene"
+            },
+            "tag": "token",
+            "text": "cen"
+          },
+          {
+            "attributes": {
+              "value": "polyalene"
+            },
+            "tag": "token",
+            "text": "len"
+          },
+          {
+            "attributes": {
+              "value": "polyaphene"
+            },
+            "tag": "token",
+            "text": "phen"
+          },
+          {
+            "attributes": {
+              "value": "polyphenylene"
+            },
+            "tag": "token",
+            "text": "phenylen"
+          },
+          {
+            "attributes": {
+              "value": "polynaphthylene"
+            },
+            "tag": "token",
+            "text": "naphthylen"
+          },
+          {
+            "attributes": {
+              "value": "polyhelicene"
+            },
+            "tag": "token",
+            "text": "helicen"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "C",
+          "tagname": "cyclo"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "cyclo"
+            },
+            "tag": "token",
+            "text": "cyclo"
+          },
+          {
+            "attributes": {
+              "value": "cyclo"
+            },
+            "tag": "token",
+            "text": "cyclo-"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "y",
+          "tagname": "hydro"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "dehydro"
+            },
+            "tag": "token",
+            "text": "dehydro"
+          },
+          {
+            "attributes": {
+              "value": "hydro"
+            },
+            "tag": "token",
+            "text": "hydro"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u00fa",
+          "tagname": "hydro"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "perhydro"
+            },
+            "tag": "token",
+            "text": "perhydro"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "t",
+          "tagname": "stereoChemistry",
+          "type": "cisOrTrans"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "cis"
+            },
+            "tag": "token",
+            "text": "cis"
+          },
+          {
+            "attributes": {
+              "value": "trans"
+            },
+            "tag": "token",
+            "text": "trans"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u00ee",
+          "tagname": "ine"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "ine"
+            },
+            "tag": "token",
+            "text": "ine"
+          },
+          {
+            "attributes": {
+              "value": "ine"
+            },
+            "tag": "token",
+            "text": "in"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "multiRadicalSubstituent",
+          "symbol": "\u00f3",
+          "tagname": "group",
+          "type": "substituent"
+        },
+        "children": [
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "S"
+            },
+            "tag": "token",
+            "text": "thio"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[SeH2]"
+            },
+            "tag": "token",
+            "text": "seleno"
+          },
+          {
+            "attributes": {
+              "acceptsAdditiveBonds": "yes",
+              "labels": "none",
+              "outIDs": "1,1",
+              "usableAsAJoiner": "yes",
+              "valType": "SMILES",
+              "value": "[TeH2]"
+            },
+            "tag": "token",
+            "text": "telluro"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u00d1",
+          "tagname": "suffix",
+          "type": "root"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "amine"
+            },
+            "tag": "token",
+            "text": "ylamine"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u00ba",
+          "tagname": "polyCyclicSpiro"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "spirobi"
+            },
+            "tag": "token",
+            "text": "spirobi"
+          },
+          {
+            "attributes": {
+              "value": "spirobi"
+            },
+            "tag": "token",
+            "text": "spirobi-"
+          },
+          {
+            "attributes": {
+              "value": "spiroter"
+            },
+            "tag": "token",
+            "text": "spiroter"
+          },
+          {
+            "attributes": {
+              "value": "spiroter"
+            },
+            "tag": "token",
+            "text": "spiroter-"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u2310",
+          "tagname": "polyCyclicSpiro"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "spiro"
+            },
+            "tag": "token",
+            "text": "spiro"
+          },
+          {
+            "attributes": {
+              "value": "spiro"
+            },
+            "tag": "token",
+            "text": "spiro-"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u255d",
+          "tagname": "polyCyclicSpiro"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "spiroOldMethod"
+            },
+            "tag": "token",
+            "text": "spiro"
+          },
+          {
+            "attributes": {
+              "value": "spiroOldMethod"
+            },
+            "tag": "token",
+            "text": "spiro-"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u255b",
+          "tagname": "dlStereochemistry"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "d"
+            },
+            "tag": "token",
+            "text": "d-"
+          },
+          {
+            "attributes": {
+              "value": "l"
+            },
+            "tag": "token",
+            "text": "l-"
+          },
+          {
+            "attributes": {
+              "value": "dl"
+            },
+            "tag": "token",
+            "text": "dl-"
+          },
+          {
+            "attributes": {
+              "value": "ds"
+            },
+            "tag": "token",
+            "text": "ds-"
+          },
+          {
+            "attributes": {
+              "value": "dg"
+            },
+            "tag": "token",
+            "text": "dg-"
+          },
+          {
+            "attributes": {
+              "value": "ls"
+            },
+            "tag": "token",
+            "text": "ls-"
+          },
+          {
+            "attributes": {
+              "value": "lg"
+            },
+            "tag": "token",
+            "text": "lg-"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u2510",
+          "tagname": "subtractivePrefix"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "O"
+            },
+            "tag": "token",
+            "text": "deoxy"
+          },
+          {
+            "attributes": {
+              "value": "O"
+            },
+            "tag": "token",
+            "text": "desoxy"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "x",
+          "tagname": "subtractivePrefix"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "O"
+            },
+            "tag": "token",
+            "text": "deoxy"
+          },
+          {
+            "attributes": {
+              "value": "O"
+            },
+            "tag": "token",
+            "text": "desoxy"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "ignoreWhenWritingXML": "yes",
+          "symbol": "h",
+          "tagname": "NA"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "-"
+            },
+            "tag": "token",
+            "text": "-"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u00e4",
+          "tagname": "hyphen"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "-"
+            },
+            "tag": "token",
+            "text": "-"
+          },
+          {
+            "attributes": {
+              "value": ","
+            },
+            "tag": "token",
+            "text": ","
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "o",
+          "tagname": "openbracket"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "("
+            },
+            "tag": "token",
+            "text": "("
+          },
+          {
+            "attributes": {
+              "value": "["
+            },
+            "tag": "token",
+            "text": "["
+          },
+          {
+            "attributes": {
+              "value": "{"
+            },
+            "tag": "token",
+            "text": "{"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "c",
+          "tagname": "closebracket"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": ")"
+            },
+            "tag": "token",
+            "text": ")"
+          },
+          {
+            "attributes": {
+              "value": "]"
+            },
+            "tag": "token",
+            "text": "]"
+          },
+          {
+            "attributes": {
+              "value": "}"
+            },
+            "tag": "token",
+            "text": "}"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "ignoreWhenWritingXML": "yes",
+          "symbol": "T",
+          "tagname": "NA"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "("
+            },
+            "tag": "token",
+            "text": "("
+          },
+          {
+            "attributes": {
+              "value": "["
+            },
+            "tag": "token",
+            "text": "["
+          },
+          {
+            "attributes": {
+              "value": "{"
+            },
+            "tag": "token",
+            "text": "{"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "ignoreWhenWritingXML": "yes",
+          "symbol": "U",
+          "tagname": "NA"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": ")"
+            },
+            "tag": "token",
+            "text": ")"
+          },
+          {
+            "attributes": {
+              "value": "]"
+            },
+            "tag": "token",
+            "text": "]"
+          },
+          {
+            "attributes": {
+              "value": "}"
+            },
+            "tag": "token",
+            "text": "}"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "q",
+          "tagname": "structuralOpenBracket"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "("
+            },
+            "tag": "token",
+            "text": "("
+          },
+          {
+            "attributes": {
+              "value": "["
+            },
+            "tag": "token",
+            "text": "["
+          },
+          {
+            "attributes": {
+              "value": "{"
+            },
+            "tag": "token",
+            "text": "{"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "Q",
+          "tagname": "structuralCloseBracket"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": ")"
+            },
+            "tag": "token",
+            "text": ")"
+          },
+          {
+            "attributes": {
+              "value": "]"
+            },
+            "tag": "token",
+            "text": "]"
+          },
+          {
+            "attributes": {
+              "value": "}"
+            },
+            "tag": "token",
+            "text": "}"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "ignoreWhenWritingXML": "yes",
+          "symbol": "\u00ac",
+          "tagname": "NA"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "a"
+            },
+            "tag": "token",
+            "text": "a"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "ignoreWhenWritingXML": "yes",
+          "symbol": "Z",
+          "tagname": "NA"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "e"
+            },
+            "tag": "token",
+            "text": "e"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "ignoreWhenWritingXML": "yes",
+          "symbol": "Y",
+          "tagname": "NA"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "o"
+            },
+            "tag": "token",
+            "text": "o"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u2561",
+          "tagname": "bridgeFormingO"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "o"
+            },
+            "tag": "token",
+            "text": "o"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "ignoreWhenWritingXML": "yes",
+          "symbol": "\u00e7",
+          "tagname": "NA"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": ","
+            },
+            "tag": "token",
+            "text": ","
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "subType": "terminal",
+          "symbol": "\u00a3",
+          "tagname": "suffix",
+          "type": "root"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "ic"
+            },
+            "tag": "token"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "symbol": "\u20a7",
+          "tagname": "suffix",
+          "type": "inline"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "oMeaningYl"
+            },
+            "tag": "token",
+            "text": "o"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "ignoreWhenWritingXML": "yes",
+          "symbol": "\u00e9",
+          "tagname": "NA"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "endOfSubstituent"
+            },
+            "tag": "token"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "ignoreWhenWritingXML": "yes",
+          "symbol": "\u00e2",
+          "tagname": "NA"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "endOfMainGroup"
+            },
+            "tag": "token"
+          }
+        ],
+        "tag": "tokenList"
+      },
+      {
+        "attributes": {
+          "ignoreWhenWritingXML": "yes",
+          "symbol": "\u00fb",
+          "tagname": "NA"
+        },
+        "children": [
+          {
+            "attributes": {
+              "value": "endOfFunctionalGroup"
+            },
+            "tag": "token"
+          }
+        ],
+        "tag": "tokenList"
+      }
+    ],
+    "tag": "tokenLists"
+  },
+  "source_xml_file": "miscTokens.xml"
+}
