@@ -8,199 +8,30 @@ keyed by locants and graph structure, not by SMILES or SMARTS strings.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cache, lru_cache
 from typing import Any
 
+from .assembly_parts import RetainedParentMetadata
 from .molecule import Molecule
 from .naming_data import load_json_table
 from .nomenclature import RULES
 
 ALLOWED_BOND_CLASSES = {"single", "double", "aromatic", "mancude", "fusion"}
 
-NAPHTHALENOID_10_TEMPLATE = {
-    "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
-    "bonds": [
-        {"locants": ["1", "2"]},
-        {"locants": ["2", "3"]},
-        {"locants": ["3", "4"]},
-        {"locants": ["4", "4a"]},
-        {"locants": ["4a", "8a"], "bond_class": "fusion"},
-        {"locants": ["8a", "1"]},
-        {"locants": ["4a", "5"]},
-        {"locants": ["5", "6"]},
-        {"locants": ["6", "7"]},
-        {"locants": ["7", "8"]},
-        {"locants": ["8", "8a"]},
-    ],
-    "rings": [
-        ["1", "2", "3", "4", "4a", "8a"],
-        ["4a", "5", "6", "7", "8", "8a"],
-    ],
-    "fusion_atoms": ["4a", "8a"],
-    "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
-}
 
+@lru_cache(maxsize=1)
+def retained_fused_base_templates() -> dict[str, dict[str, Any]]:
+    """Return the shared retained-fused skeletons owned by the template table."""
 
-def _shared_graph_template(
-    locants: list[str],
-    bonds: list[tuple[str, str]],
-    fusion_atoms: list[str],
-    mancude_double_bonds: int,
-) -> dict:
-    return {
-        "locants": locants,
-        "bonds": [
-            {
-                "locants": [left, right],
-                **({"bond_class": "fusion"} if left in fusion_atoms and right in fusion_atoms else {}),
-            }
-            for left, right in bonds
-        ],
-        "fusion_atoms": fusion_atoms,
-        "peripheral_atoms": locants,
-        "mancude_double_bonds": mancude_double_bonds,
-    }
-
-
-LINEAR_TRICYCLIC_14_TEMPLATE = _shared_graph_template(
-    ["1", "2", "3", "4", "4a", "5", "5a", "6", "7", "8", "9", "9a", "10", "10a"],
-    [
-        ("1", "2"),
-        ("2", "3"),
-        ("3", "4"),
-        ("4", "4a"),
-        ("4a", "5"),
-        ("5", "5a"),
-        ("5a", "6"),
-        ("6", "7"),
-        ("7", "8"),
-        ("8", "9"),
-        ("9", "9a"),
-        ("5a", "9a"),
-        ("9a", "10"),
-        ("10", "10a"),
-        ("10a", "1"),
-        ("4a", "10a"),
-    ],
-    ["4a", "5a", "9a", "10a"],
-    7,
-)
-
-PHENANTHRENOID_14_TEMPLATE = _shared_graph_template(
-    ["1", "2", "3", "4", "4a", "5", "6", "6a", "7", "8", "9", "10", "10a", "10b"],
-    [
-        ("1", "2"),
-        ("2", "3"),
-        ("3", "4"),
-        ("4", "4a"),
-        ("4a", "5"),
-        ("5", "6"),
-        ("6", "6a"),
-        ("6a", "7"),
-        ("7", "8"),
-        ("8", "9"),
-        ("9", "10"),
-        ("10", "10a"),
-        ("6a", "10a"),
-        ("10a", "10b"),
-        ("10b", "1"),
-        ("4a", "10b"),
-    ],
-    ["4a", "6a", "10a", "10b"],
-    7,
-)
-
-ACRIDINOID_14_TEMPLATE = _shared_graph_template(
-    ["1", "2", "3", "4", "4a", "10", "10a", "5", "6", "7", "8", "8a", "9", "9a"],
-    [
-        ("1", "2"),
-        ("2", "3"),
-        ("3", "4"),
-        ("4", "4a"),
-        ("4a", "10"),
-        ("10", "10a"),
-        ("10a", "5"),
-        ("5", "6"),
-        ("6", "7"),
-        ("7", "8"),
-        ("8", "8a"),
-        ("10a", "8a"),
-        ("8a", "9"),
-        ("9", "9a"),
-        ("9a", "1"),
-        ("4a", "9a"),
-    ],
-    ["4a", "10a", "8a", "9a"],
-    7,
-)
-
-CARBAZOLOID_13_TEMPLATE = _shared_graph_template(
-    ["1", "2", "3", "4", "4a", "4b", "5", "6", "7", "8", "8a", "9", "9a"],
-    [
-        ("1", "2"),
-        ("2", "3"),
-        ("3", "4"),
-        ("4", "4a"),
-        ("4a", "4b"),
-        ("4b", "5"),
-        ("5", "6"),
-        ("6", "7"),
-        ("7", "8"),
-        ("8", "8a"),
-        ("4b", "8a"),
-        ("8a", "9"),
-        ("9", "9a"),
-        ("9a", "1"),
-        ("4a", "9a"),
-    ],
-    ["4a", "4b", "8a", "9a"],
-    6,
-)
-
-PURINOID_9_TEMPLATE = _shared_graph_template(
-    ["1", "2", "3", "4", "9", "8", "7", "5", "6"],
-    [
-        ("1", "2"),
-        ("2", "3"),
-        ("3", "4"),
-        ("4", "9"),
-        ("9", "8"),
-        ("8", "7"),
-        ("7", "5"),
-        ("5", "4"),
-        ("5", "6"),
-        ("6", "1"),
-    ],
-    ["4", "5"],
-    4,
-)
-
-INDAZOLOID_9_TEMPLATE = _shared_graph_template(
-    ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"],
-    [
-        ("1", "2"),
-        ("2", "3"),
-        ("3", "3a"),
-        ("3a", "4"),
-        ("4", "5"),
-        ("5", "6"),
-        ("6", "7"),
-        ("7", "7a"),
-        ("7a", "1"),
-        ("3a", "7a"),
-    ],
-    ["3a", "7a"],
-    4,
-)
-
-RETAINED_FUSED_BASE_TEMPLATES = {
-    "naphthalenoid_10": NAPHTHALENOID_10_TEMPLATE,
-    "linear_tricyclic_14": LINEAR_TRICYCLIC_14_TEMPLATE,
-    "phenanthrenoid_14": PHENANTHRENOID_14_TEMPLATE,
-    "acridinoid_14": ACRIDINOID_14_TEMPLATE,
-    "carbazoloid_13": CARBAZOLOID_13_TEMPLATE,
-    "purinoid_9": PURINOID_9_TEMPLATE,
-    "indazoloid_9": INDAZOLOID_9_TEMPLATE,
-}
+    raw_templates = load_json_table("retained_fused_graph_templates.json").get("base_templates", {})
+    if not isinstance(raw_templates, dict):
+        raise ValueError("retained fused base_templates must be a mapping")
+    templates: dict[str, dict[str, Any]] = {}
+    for name, template in raw_templates.items():
+        if not isinstance(template, dict):
+            raise ValueError(f"Retained fused base template {name!r} must be a mapping.")
+        templates[str(name)] = dict(template)
+    return templates
 
 
 @dataclass(frozen=True)
@@ -257,6 +88,7 @@ class RetainedFusedTemplateMatch:
     trace: tuple[str, ...] = ()
 
 
+@lru_cache(maxsize=2)
 def retained_fused_graph_templates(*, include_disabled: bool = False) -> tuple[RetainedFusedGraphTemplate, ...]:
     """Return graph-template retained fused parent rows from the rule registry."""
 
@@ -273,6 +105,26 @@ def retained_fused_graph_templates(*, include_disabled: bool = False) -> tuple[R
         if include_disabled or template.enabled:
             templates.append(template)
     return tuple(templates)
+
+
+@cache
+def retained_parent_metadata(parent_name: str) -> RetainedParentMetadata | None:
+    """Return graph-template metadata for a retained parent spelling."""
+
+    for template in retained_fused_graph_templates(include_disabled=True):
+        spellings = {template.name, *template.aliases}
+        spellings.update(
+            f"{locant}H-{template.name}"
+            for locant in template.default_indicated_h
+            if not template.name.startswith(f"{locant}H-")
+        )
+        if parent_name in spellings:
+            return RetainedParentMetadata(
+                default_indicated_h=template.default_indicated_h,
+                fusion_locants=template.fusion_atoms,
+                derivative_stem=template.derivative_stem,
+            )
+    return None
 
 
 def pending_retained_fused_parent_names() -> tuple[str, ...]:
@@ -513,7 +365,7 @@ def _expand_template_data(template_data: dict[str, Any]) -> dict[str, Any]:
     if base_name is None:
         expanded = dict(template_data)
         return _expand_locant_atom_shorthand(expanded)
-    base_template = RETAINED_FUSED_BASE_TEMPLATES.get(str(base_name))
+    base_template = retained_fused_base_templates().get(str(base_name))
     if base_template is None:
         raise ValueError(f"Unknown retained fused base template {base_name!r}.")
 

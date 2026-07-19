@@ -270,22 +270,29 @@ def _post_process_name(name: str) -> str:
 
 
 def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
+    additive_hydrogens = [
+        locant
+        for operation in parts.hydro_operations
+        if operation.operation_kind == "additive_hydrogen"
+        for locant in operation.locants
+    ]
     indicated_hydrogens = [
         locant
         for operation in parts.hydro_operations
         if operation.operation_kind == "indicated_hydrogen"
         for locant in operation.locants
     ] or parts.indicated_hydrogens
-    if not indicated_hydrogens:
+    if not indicated_hydrogens and not additive_hydrogens:
         return core_name
     if positive_parent_n_charges(parts):
         return core_name
-    indicated_hydrogens = sorted(set(indicated_hydrogens), key=parse_locant)
-    has_carbon_h = any(parts.parent_atom_symbols_by_locant.get(locant) == "C" for locant in indicated_hydrogens)
-    if has_carbon_h and len(indicated_hydrogens) > 1:
-        return f"{','.join(indicated_hydrogens)}-{format_multiplier('hydro', len(indicated_hydrogens))}{core_name}"
-    ih_str = ",".join(indicated_hydrogens) + "H-"
-    return ih_str + core_name
+    if indicated_hydrogens:
+        indicated_hydrogens = sorted(set(indicated_hydrogens), key=parse_locant)
+        core_name = ",".join(indicated_hydrogens) + "H-" + core_name
+    if additive_hydrogens:
+        additive_hydrogens = sorted(set(additive_hydrogens), key=parse_locant)
+        core_name = f"{','.join(additive_hydrogens)}-{format_multiplier('hydro', len(additive_hydrogens))}{core_name}"
+    return core_name
 
 
 def _add_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:

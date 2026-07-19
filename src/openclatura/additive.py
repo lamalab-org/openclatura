@@ -1,7 +1,6 @@
 """Explicit additive/replacement feature collection for selected parents."""
 
 from .assembly_parts import AssemblyParts, SubstituentItem
-from .grammar_snapshot_data import retained_fused_token
 from .molecule import Molecule
 from .name_operations import HydroOperation
 from .namer_config import INDICATED_H_RETAINED_NAMES
@@ -15,8 +14,10 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     if parts.retained_name == "tetrazole" and any(mol.atoms[idx].charge for idx in numbered_path):
         return
     oxo_derivative = parts.principal_group is not None and parts.principal_group.key == "ketone"
-    retained_token = retained_fused_token(parts.retained_name)
-    default_indicated_h = set(retained_token.default_indicated_h) if retained_token is not None else set()
+    metadata = parts.retained_parent_metadata
+    default_indicated_h = set(metadata.default_indicated_h) if metadata is not None else set()
+    fusion_locants = set(metadata.fusion_locants) if metadata is not None else set()
+    candidates: list[tuple[str, int]] = []
     for idx in numbered_path:
         atom = mol.atoms[idx]
         locant = str(get_loc(idx))
@@ -24,7 +25,7 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         # derivatives, not additional indicated-H sites.  Carbon-bound H is
         # emitted only where the retained parent plan declares it (9H-xanthene,
         # indene, fluorene, and similar parent hydrides).
-        if retained_token is not None and default_indicated_h and atom.is_carbon and locant not in default_indicated_h:
+        if metadata is not None and default_indicated_h and atom.is_carbon and locant not in default_indicated_h:
             continue
         if oxo_derivative:
             if atom.explicit_h_count + atom.total_h_count <= 0:
@@ -45,24 +46,45 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         if atom.symbol in ["N", "C"]:
             ring_bonds = [mol.get_bond(idx, n) for n in mol.get_neighbors(idx) if n in numbered_path]
             fusion_carbon_h = (
-                retained_token is not None
+                metadata is not None
                 and not default_indicated_h
                 and atom.is_carbon
+                and locant in fusion_locants
                 and len(ring_bonds) == 3
                 and atom.explicit_h_count + atom.total_h_count > 0
             )
             if sum(b.order for b in ring_bonds) == 2 or fusion_carbon_h:
-                locant = str(get_loc(idx))
-                parts.indicated_hydrogens.append(locant)
-                parts.hydro_operations.append(
-                    HydroOperation(
-                        key="indicated_hydrogen",
-                        reason="Retained unsaturated parent requires indicated-hydrogen locant.",
-                        locants=(locant,),
-                        atom_ids=(idx,),
-                        operation_kind="indicated_hydrogen",
-                    )
-                )
+                candidates.append((locant, idx))
+
+    # A hydrogenated fusion carbon changes the retained-parent hydride state.
+    # It is expressed together with the other affected locants as one additive
+    # hydro operation (for example 1,4-dihydropurine), not as indicated H.
+    additive_hydrogen = any(
+        mol.atoms[atom_idx].is_carbon and locant in fusion_locants for locant, atom_idx in candidates
+    )
+    if additive_hydrogen and len(candidates) > 1:
+        parts.hydro_operations.append(
+            HydroOperation(
+                key="additive_hydrogen",
+                reason="Retained parent requires an additive hydrogen prefix.",
+                locants=tuple(locant for locant, _ in candidates),
+                atom_ids=tuple(atom_idx for _, atom_idx in candidates),
+                operation_kind="additive_hydrogen",
+            )
+        )
+        return
+
+    for locant, atom_idx in candidates:
+        parts.indicated_hydrogens.append(locant)
+        parts.hydro_operations.append(
+            HydroOperation(
+                key="indicated_hydrogen",
+                reason="Retained unsaturated parent requires indicated-hydrogen locant.",
+                locants=(locant,),
+                atom_ids=(atom_idx,),
+                operation_kind="indicated_hydrogen",
+            )
+        )
 
 
 def add_replacement_prefixes(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:

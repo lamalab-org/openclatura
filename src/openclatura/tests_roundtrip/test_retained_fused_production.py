@@ -56,15 +56,6 @@ OXO_CASES = (
     ("xanthen-9-one", "xanthen-9-one"),
 )
 
-OXO_STEMS = {
-    "phenazine": "phenazin",
-    "acridine": "acridin",
-    "9H-carbazole": "9H-carbazol",
-    "purine": "purin",
-    "1H-indazole": "1H-indazol",
-    "9H-xanthene": "xanthen",
-}
-
 _CML_NS = {"cml": "http://www.xml-cml.org/schema"}
 _COMBINATION_SAMPLE_SIZE = 100
 _COMBINATION_SAMPLE_SEED = 42
@@ -134,6 +125,7 @@ def parent_cml_rows() -> list[str]:
 @pytest.fixture(scope="module")
 def valid_oxo_rows(parent_cml_rows) -> list[OxoProbe]:
     candidates: list[OxoProbe] = []
+    templates = {template.name: template for template in retained_fused_graph_templates(include_disabled=True)}
     for (parent, _), cml in zip(PARENT_CASES, parent_cml_rows, strict=True):
         elements, _, hydrogenated = _cml_plan(cml)
         carbon_locants = tuple(
@@ -142,7 +134,9 @@ def valid_oxo_rows(parent_cml_rows) -> list[OxoProbe]:
                 key=lambda value: int(value),
             )
         )
-        stem = OXO_STEMS.get(parent, parent.replace("phenanthroline", "phenanthrolin"))
+        template_name = parent.removeprefix("1H-").removeprefix("7H-").removeprefix("9H-")
+        stem = templates[template_name].derivative_stem
+        assert stem is not None
         root = "phenanthrol" if "phenanthroline" in parent else stem.removeprefix("1H-").removeprefix("9H-")
         candidates.extend(
             OxoProbe(parent, f"{stem}-{locant}-one", root, (locant,), carbon_locants, "") for locant in carbon_locants
@@ -185,6 +179,27 @@ def _substituted_derivative_name(base_name: str, substituents: tuple[tuple[str, 
         prefix_parts.append(f"{','.join(locants)}-{multiplier}{substituent}")
     separator = "-" if base_name[0].isdigit() else ""
     return f"{'-'.join(prefix_parts)}{separator}{base_name}"
+
+
+def _stratified_combination_sample(
+    candidates: list[tuple[str, str, str, str]],
+) -> list[tuple[str, str, str, str]]:
+    """Select a seeded sample covering every retained parent and probe class."""
+
+    rng = Random(_COMBINATION_SAMPLE_SEED)
+    shuffled = list(dict.fromkeys(candidates))
+    rng.shuffle(shuffled)
+    selected: list[tuple[str, str, str, str]] = []
+
+    for parent in sorted({row[2] for row in candidates}):
+        selected.append(next(row for row in shuffled if row[2] == parent))
+    for probe_class in sorted({row[3] for row in candidates}):
+        if not any(row[3] == probe_class for row in selected):
+            selected.append(next(row for row in shuffled if row[3] == probe_class))
+
+    selected_set = set(selected)
+    selected.extend(row for row in shuffled if row not in selected_set)
+    return selected[:_COMBINATION_SAMPLE_SIZE]
 
 
 @pytest.mark.opsin
@@ -270,12 +285,27 @@ def test_oxo_dione_amino_methyl_combinations_preserve_hydride_state(valid_oxo_ro
         # were observed there in the PubChem regression corpus.
         representative_rows.extend(parent_rows if parent == "purine" else [mono_rows[0], dione_rows[0]])
 
-    candidate_names: list[tuple[str, str]] = []
+    candidate_names: list[tuple[str, str, str, str]] = []
     for probe in representative_rows:
+        derivative_class = "mono" if len(probe.occupied_locants) == 1 else "dione"
         free_locants = tuple(locant for locant in probe.carbon_locants if locant not in probe.occupied_locants)
         for locant in free_locants:
-            candidate_names.append((_substituted_derivative_name(probe.name, ((locant, "amino"),)), probe.root))
-            candidate_names.append((_substituted_derivative_name(probe.name, ((locant, "methyl"),)), probe.root))
+            candidate_names.append(
+                (
+                    _substituted_derivative_name(probe.name, ((locant, "amino"),)),
+                    probe.root,
+                    probe.parent,
+                    f"{derivative_class}:amino",
+                )
+            )
+            candidate_names.append(
+                (
+                    _substituted_derivative_name(probe.name, ((locant, "methyl"),)),
+                    probe.root,
+                    probe.parent,
+                    f"{derivative_class}:methyl",
+                )
+            )
 
         # Pair substitutions are the important hydride-state stressor. Apply
         # every pair to mono-oxo representatives; diones retain complete
@@ -283,19 +313,45 @@ def test_oxo_dione_amino_methyl_combinations_preserve_hydride_state(valid_oxo_ro
         if len(probe.occupied_locants) == 1:
             for left, right in combinations(free_locants, 2):
                 candidate_names.append(
-                    (_substituted_derivative_name(probe.name, ((left, "amino"), (right, "amino"))), probe.root)
+                    (
+                        _substituted_derivative_name(probe.name, ((left, "amino"), (right, "amino"))),
+                        probe.root,
+                        probe.parent,
+                        "mono:diamino",
+                    )
                 )
                 candidate_names.append(
-                    (_substituted_derivative_name(probe.name, ((left, "amino"), (right, "methyl"))), probe.root)
+                    (
+                        _substituted_derivative_name(probe.name, ((left, "amino"), (right, "methyl"))),
+                        probe.root,
+                        probe.parent,
+                        "mono:amino_methyl",
+                    )
                 )
                 candidate_names.append(
-                    (_substituted_derivative_name(probe.name, ((left, "methyl"), (right, "amino"))), probe.root)
+                    (
+                        _substituted_derivative_name(probe.name, ((left, "methyl"), (right, "amino"))),
+                        probe.root,
+                        probe.parent,
+                        "mono:amino_methyl",
+                    )
                 )
 
-    candidate_names = Random(_COMBINATION_SAMPLE_SEED).sample(candidate_names, k=_COMBINATION_SAMPLE_SIZE)
-    candidate_smiles = _opsin([name for name, _ in candidate_names])
+    candidate_names = _stratified_combination_sample(candidate_names)
+    assert {row[2] for row in candidate_names} == {parent for parent, _ in PARENT_CASES}
+    assert {row[3] for row in candidate_names} == {
+        "mono:amino",
+        "mono:methyl",
+        "mono:diamino",
+        "mono:amino_methyl",
+        "dione:amino",
+        "dione:methyl",
+    }
+    candidate_smiles = _opsin([name for name, _, _, _ in candidate_names])
     valid_rows = [
-        (name, root, smiles) for (name, root), smiles in zip(candidate_names, candidate_smiles, strict=True) if smiles
+        (name, root, smiles)
+        for (name, root, _, _), smiles in zip(candidate_names, candidate_smiles, strict=True)
+        if smiles
     ]
     assert len(valid_rows) == _COMBINATION_SAMPLE_SIZE
 

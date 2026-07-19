@@ -537,7 +537,9 @@ def name_component(
         subst_mapping,
     )
     if retained_fused is not None:
-        state.retained_name, state.locant_maps = retained_fused
+        state.retained_name = retained_fused.name
+        state.locant_maps = retained_fused.locant_maps
+        state.retained_parent_metadata = retained_fused.metadata
     if (
         state.retained_name
         and state.locant_maps is None
@@ -553,6 +555,7 @@ def name_component(
         subst_mapping,
         state.locant_maps,
         state.retained_name,
+        state.retained_parent_metadata,
     )
     numbered_path = parent_plan.numbered_path
     locant_map = parent_plan.locant_map

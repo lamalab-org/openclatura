@@ -139,6 +139,7 @@ from openclatura.retained_fused_templates import (
     match_retained_fused_template,
     match_retained_fused_templates,
     pending_retained_fused_parent_names,
+    retained_fused_base_templates,
     retained_fused_graph_templates,
     retained_fused_template_from_data,
     template_molecule,
@@ -979,6 +980,17 @@ def test_indicated_hydrogen_prefix_uses_hydro_operation_binding():
         assert tokens[text]["confidence"] == "derived"
         assert tokens[text]["ownership"] == "exact"
         assert tokens[text]["binding_key"] == "hydro:indicated_hydrogen"
+
+
+def test_retained_fusion_hydride_is_a_typed_additive_hydrogen_operation():
+    analysis = analyze_smiles("NC1=NC2N=C(N)NC(=O)C2=N1")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    hydro_binding = next(binding for binding in assembly.data["name_atom_bindings"] if binding["stage"] == "hydro")
+
+    assert analysis.name == "2,8-diamino-1,4-dihydropurin-6-one"
+    assert hydro_binding["role"] == "additive_hydrogen"
+    assert hydro_binding["term"] == "hydro"
+    assert hydro_binding["locants"] == ["1", "4"]
 
 
 def test_n_substituent_locant_survives_retained_suffix_postprocessing():
@@ -2946,6 +2958,14 @@ def _naphthalene_graph_template_row() -> dict:
             "numbering_policy": "retained_template",
         },
     }
+
+
+def test_retained_fused_base_skeletons_are_loaded_from_the_graph_template_table():
+    base_templates = retained_fused_base_templates()
+
+    assert {"naphthalenoid_10", "linear_tricyclic_14", "purinoid_9", "indazoloid_9"} <= set(base_templates)
+    assert base_templates["purinoid_9"]["fusion_atoms"] == ["4", "5"]
+    assert base_templates["purinoid_9"]["mancude_double_bonds"] == 4
 
 
 def test_retained_fused_graph_template_schema_validates_locant_graphs():

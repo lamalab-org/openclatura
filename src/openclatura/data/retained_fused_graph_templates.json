@@ -1,5 +1,103 @@
 {
   "bluebook_rule": "P-25 retained fused parent templates. Rows are locant-keyed graph templates, not SMILES/SMARTS keys.",
+  "base_templates": {
+    "naphthalenoid_10": {
+      "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+      "bonds": [
+        {"locants": ["1", "2"]}, {"locants": ["2", "3"]},
+        {"locants": ["3", "4"]}, {"locants": ["4", "4a"]},
+        {"locants": ["4a", "8a"], "bond_class": "fusion"}, {"locants": ["8a", "1"]},
+        {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
+        {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+      ],
+      "rings": [["1", "2", "3", "4", "4a", "8a"], ["4a", "5", "6", "7", "8", "8a"]],
+      "fusion_atoms": ["4a", "8a"],
+      "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+    },
+    "linear_tricyclic_14": {
+      "locants": ["1", "2", "3", "4", "4a", "5", "5a", "6", "7", "8", "9", "9a", "10", "10a"],
+      "bonds": [
+        {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+        {"locants": ["4", "4a"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "5a"]},
+        {"locants": ["5a", "6"]}, {"locants": ["6", "7"]}, {"locants": ["7", "8"]},
+        {"locants": ["8", "9"]}, {"locants": ["9", "9a"]},
+        {"locants": ["5a", "9a"], "bond_class": "fusion"}, {"locants": ["9a", "10"]},
+        {"locants": ["10", "10a"]}, {"locants": ["10a", "1"]},
+        {"locants": ["4a", "10a"], "bond_class": "fusion"}
+      ],
+      "fusion_atoms": ["4a", "5a", "9a", "10a"],
+      "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "5a", "6", "7", "8", "9", "9a", "10", "10a"],
+      "mancude_double_bonds": 7
+    },
+    "phenanthrenoid_14": {
+      "locants": ["1", "2", "3", "4", "4a", "5", "6", "6a", "7", "8", "9", "10", "10a", "10b"],
+      "bonds": [
+        {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+        {"locants": ["4", "4a"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
+        {"locants": ["6", "6a"]}, {"locants": ["6a", "7"]}, {"locants": ["7", "8"]},
+        {"locants": ["8", "9"]}, {"locants": ["9", "10"]}, {"locants": ["10", "10a"]},
+        {"locants": ["6a", "10a"], "bond_class": "fusion"}, {"locants": ["10a", "10b"]},
+        {"locants": ["10b", "1"]}, {"locants": ["4a", "10b"], "bond_class": "fusion"}
+      ],
+      "fusion_atoms": ["4a", "6a", "10a", "10b"],
+      "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "6a", "7", "8", "9", "10", "10a", "10b"],
+      "mancude_double_bonds": 7
+    },
+    "acridinoid_14": {
+      "locants": ["1", "2", "3", "4", "4a", "10", "10a", "5", "6", "7", "8", "8a", "9", "9a"],
+      "bonds": [
+        {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+        {"locants": ["4", "4a"]}, {"locants": ["4a", "10"]}, {"locants": ["10", "10a"]},
+        {"locants": ["10a", "5"]}, {"locants": ["5", "6"]}, {"locants": ["6", "7"]},
+        {"locants": ["7", "8"]}, {"locants": ["8", "8a"]},
+        {"locants": ["10a", "8a"], "bond_class": "fusion"}, {"locants": ["8a", "9"]},
+        {"locants": ["9", "9a"]}, {"locants": ["9a", "1"]},
+        {"locants": ["4a", "9a"], "bond_class": "fusion"}
+      ],
+      "fusion_atoms": ["4a", "10a", "8a", "9a"],
+      "peripheral_atoms": ["1", "2", "3", "4", "4a", "10", "10a", "5", "6", "7", "8", "8a", "9", "9a"],
+      "mancude_double_bonds": 7
+    },
+    "carbazoloid_13": {
+      "locants": ["1", "2", "3", "4", "4a", "4b", "5", "6", "7", "8", "8a", "9", "9a"],
+      "bonds": [
+        {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+        {"locants": ["4", "4a"]}, {"locants": ["4a", "4b"], "bond_class": "fusion"},
+        {"locants": ["4b", "5"]}, {"locants": ["5", "6"]}, {"locants": ["6", "7"]},
+        {"locants": ["7", "8"]}, {"locants": ["8", "8a"]},
+        {"locants": ["4b", "8a"], "bond_class": "fusion"}, {"locants": ["8a", "9"]},
+        {"locants": ["9", "9a"]}, {"locants": ["9a", "1"]},
+        {"locants": ["4a", "9a"], "bond_class": "fusion"}
+      ],
+      "fusion_atoms": ["4a", "4b", "8a", "9a"],
+      "peripheral_atoms": ["1", "2", "3", "4", "4a", "4b", "5", "6", "7", "8", "8a", "9", "9a"],
+      "mancude_double_bonds": 6
+    },
+    "purinoid_9": {
+      "locants": ["1", "2", "3", "4", "9", "8", "7", "5", "6"],
+      "bonds": [
+        {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
+        {"locants": ["4", "9"]}, {"locants": ["9", "8"]}, {"locants": ["8", "7"]},
+        {"locants": ["7", "5"]}, {"locants": ["5", "4"], "bond_class": "fusion"},
+        {"locants": ["5", "6"]}, {"locants": ["6", "1"]}
+      ],
+      "fusion_atoms": ["4", "5"],
+      "peripheral_atoms": ["1", "2", "3", "4", "9", "8", "7", "5", "6"],
+      "mancude_double_bonds": 4
+    },
+    "indazoloid_9": {
+      "locants": ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"],
+      "bonds": [
+        {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "3a"]},
+        {"locants": ["3a", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "6"]},
+        {"locants": ["6", "7"]}, {"locants": ["7", "7a"]}, {"locants": ["7a", "1"]},
+        {"locants": ["3a", "7a"], "bond_class": "fusion"}
+      ],
+      "fusion_atoms": ["3a", "7a"],
+      "peripheral_atoms": ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"],
+      "mancude_double_bonds": 4
+    }
+  },
   "pending_parents": [
     {"name": "pleiadene", "pin": false, "priority": 100, "attached_prefix": "pleiadeno"},
     {"name": "phenanthridine", "pin": true, "priority": 5},

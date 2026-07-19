@@ -9,7 +9,9 @@ OPSIN-verified grammar classes.
 
 from __future__ import annotations
 
-from .assembly_parts import SubstituentItem
+from dataclasses import dataclass
+
+from .assembly_parts import RetainedParentMetadata, SubstituentItem
 from .grammar_snapshot_data import retained_fused_derivative_gate
 from .molecule import Molecule
 from .perception import PerceivedGroup
@@ -22,6 +24,15 @@ ALLOWED_GROUP_KEYS = _DERIVATIVE_GATE.allowed_group_keys
 ALLOWED_SUBSTITUENT_NAMES = _DERIVATIVE_GATE.allowed_substituent_names
 
 
+@dataclass(frozen=True)
+class ProductionRetainedFusedParent:
+    """A matched retained parent and the template metadata needed downstream."""
+
+    name: str
+    locant_maps: list[dict[int, str]]
+    metadata: RetainedParentMetadata
+
+
 def production_retained_fused_parent(
     mol: Molecule,
     parent_path: list[int],
@@ -29,7 +40,7 @@ def production_retained_fused_parent(
     perceived_groups: list[PerceivedGroup],
     principal_key: str | None,
     substituent_mapping: dict[int, list[SubstituentItem]],
-) -> tuple[str, list[dict[int, str]]] | None:
+) -> ProductionRetainedFusedParent | None:
     """Return retained fused parent data only for verified derivative classes."""
 
     parent_atoms = set(parent_path)
@@ -73,7 +84,16 @@ def production_retained_fused_parent(
     ]
     if not maps:
         return None
-    return parent_name, maps
+    template = matches[0].template
+    return ProductionRetainedFusedParent(
+        name=parent_name,
+        locant_maps=maps,
+        metadata=RetainedParentMetadata(
+            default_indicated_h=template.default_indicated_h,
+            fusion_locants=template.fusion_atoms,
+            derivative_stem=template.derivative_stem,
+        ),
+    )
 
 
 def _neutral_component(mol: Molecule, atoms: set[int]) -> bool:
