@@ -20,14 +20,12 @@ def scoped_small_ring_stereo_features(
     lower-case descriptors.
     """
 
-    # OPSIN currently treats mixed local R/S + lower-case r/s descriptor groups
-    # inside substituent scopes as ordinary absolute stereochemistry and often
-    # cannot attach the locants to the named fragment. Until a grammar-backed
-    # relative-stereo renderer exists for these scopes, prefer the generic
-    # cis/trans fallback in parent_pipeline._add_relative_ring_stereo.
-    if parts.is_substituent:
-        return []
-
+    # Note: OPSIN (through 2.9.0) cannot parse mixed local R/S + lower-case
+    # r/s descriptor groups inside substituent scopes — its CIP engine does
+    # not rank the symmetry-related ring branches (Rule 5). The descriptors
+    # are emitted anyway: the name must carry all drawn stereochemistry, and
+    # OPSIN round-trip verification degrades to an explicit skipped status
+    # for this class rather than capping name completeness.
     if not parts.is_substituent or not parts.is_ring or parts.is_bicycle or parts.is_spiro or parts.is_polycycle:
         return []
     if not 3 <= len(numbered_path) <= 7:
@@ -43,18 +41,25 @@ def scoped_small_ring_stereo_features(
     if any(not locants[atom_idx].isdigit() for atom_idx in numbered_path):
         return []
 
-    local_cip = _assign_local_cip_with_locant_labels(mol, numbered_path, locants, raw_atoms)
-    if set(local_cip) != set(raw_atoms):
-        return []
+    # The full-molecule rdCIPLabeler codes (stored at parse time) already
+    # apply Rule 5 through remote centers, giving the correct case per
+    # center: uppercase R/S for reflection-variant ones, lowercase r/s for
+    # pseudoasymmetric ones. The earlier locant-isotope symmetry breaker
+    # produced local descriptors that disagreed with full CIP treatment.
+    cip = {atom_idx: mol.atoms[atom_idx].cip_code for atom_idx in raw_atoms}
+    if any(code not in {"R", "S", "r", "s"} for code in cip.values()):
+        local_cip = _assign_local_cip_with_locant_labels(mol, numbered_path, locants, raw_atoms)
+        if set(local_cip) != set(raw_atoms):
+            return []
+        attachment_locant = str(parts.attachment_locant)
+        cip = {
+            atom_idx: (code if str(locants[atom_idx]) == attachment_locant else code.lower())
+            for atom_idx, code in local_cip.items()
+        }
 
-    attachment_locant = str(parts.attachment_locant)
     features: list[tuple[str, str]] = []
     for atom_idx in sorted(raw_atoms, key=lambda idx: int(locants[idx])):
-        locant = locants[atom_idx]
-        descriptor = local_cip[atom_idx]
-        if locant != attachment_locant:
-            descriptor = descriptor.lower()
-        features.append((locant, descriptor))
+        features.append((locants[atom_idx], cip[atom_idx]))
     return features
 
 

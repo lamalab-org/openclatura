@@ -58,6 +58,7 @@ def read_smiles(smiles: str) -> Molecule:
             charge=atom.GetFormalCharge(),
             stereo=stereo,
             raw_stereo=raw_stereo,
+            cip_code=atom.GetProp("_CIPCode") if atom.HasProp("_CIPCode") else None,
             is_aromatic=atom_metadata[atom.GetIdx()]["is_aromatic"],
             explicit_h_count=atom_metadata[atom.GetIdx()]["explicit_h_count"],
             total_h_count=atom_metadata[atom.GetIdx()]["total_h_count"],
