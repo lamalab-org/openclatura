@@ -26,6 +26,7 @@ from .principal_groups import (
     filter_component_groups_to_parent,
     partition_principal_and_prefix_groups,
 )
+from .reconstruction_audit import audit_component_reconstruction
 from .retained_fused_production import production_retained_fused_parent
 from .special_cases import (
     single_atom_component_name,
@@ -33,7 +34,6 @@ from .special_cases import (
     try_name_anhydride_component_result,
 )
 from .spiro_assembly import SpiroAssembly
-from .reconstruction_audit import audit_component_reconstruction
 from .stereo_audit import audit_stereochemistry
 from .subgraph_tools import (
     add_indicated_hydrogens,
