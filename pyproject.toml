@@ -66,6 +66,13 @@ Issues = "https://github.com/lamalab-org/openclatura/issues"
 [project.scripts]
 openclatura = "openclatura.cli:main"
 
+[tool.hatch.build]
+exclude = [
+    "/examples",
+    "/evaluations",
+    "/eval_failures",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/openclatura"]
 
