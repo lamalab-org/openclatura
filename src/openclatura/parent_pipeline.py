@@ -1,12 +1,13 @@
 """Shared parent planning steps for component and subgraph naming."""
 
-from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem
+from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem, RetainedParentMetadata
 from .molecule import Molecule
 from .name_bindings import ensure_name_atom_binding_tokens
 from .namer_config import RETAINED_RING_ELEMENTS
 from .naming_context import NamingIntent, ParentAssemblyPlan
 from .numbering import choose_parent_numbering
 from .parent_selection import ParentSelection
+from .retained_fused_templates import retained_parent_metadata as graph_retained_parent_metadata
 from .ring_renderer import is_von_baeyer_descriptor
 from .rules import retained
 from .small_ring_stereo import scoped_small_ring_stereo_features
@@ -39,6 +40,7 @@ def build_parent_assembly_plan(
     substituent_mapping: dict[int, list],
     locant_maps,
     retained_name: str | None,
+    retained_parent_metadata: RetainedParentMetadata | None = None,
 ) -> ParentAssemblyPlan:
     """Number a selected parent and create base assembly parts."""
 
@@ -73,6 +75,7 @@ def build_parent_assembly_plan(
         retained_name,
         selection,
         intent,
+        retained_parent_metadata,
     )
     return ParentAssemblyPlan(numbered_path=numbered_path, locant_map=locant_map, get_loc=get_loc, parts=parts)
 
@@ -88,9 +91,12 @@ def build_parent_parts(
     retained_name: str | None,
     selection: ParentSelection,
     intent: NamingIntent,
+    retained_parent_metadata: RetainedParentMetadata | None = None,
 ) -> AssemblyParts:
     """Create shared parent assembly parts for a naming intent."""
 
+    if retained_parent_metadata is None and retained_name is not None:
+        retained_parent_metadata = graph_retained_parent_metadata(retained_name)
     assembly_overrides = {}
     if intent.is_substituent:
         if intent.root_atom is None:
@@ -115,6 +121,7 @@ def build_parent_parts(
         spiro_xy=(selection.xyz[0], selection.xyz[1]) if selection.is_spiro else (0, 0),
         polycycle_descriptor=selection.polycycle_descriptor,
         retained_name=retained_name,
+        retained_parent_metadata=retained_parent_metadata,
         parent_atom_ids=set(numbered_path),
         parent_bond_ids=bond_ids_within(mol, set(numbered_path)),
         **assembly_overrides,

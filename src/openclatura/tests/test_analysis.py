@@ -139,8 +139,10 @@ from openclatura.retained_fused_templates import (
     match_retained_fused_template,
     match_retained_fused_templates,
     pending_retained_fused_parent_names,
+    retained_fused_base_templates,
     retained_fused_graph_templates,
     retained_fused_template_from_data,
+    retained_parent_metadata,
     template_molecule,
 )
 from openclatura.retained_specs import retained_parent_spec
@@ -981,6 +983,17 @@ def test_indicated_hydrogen_prefix_uses_hydro_operation_binding():
         assert tokens[text]["binding_key"] == "hydro:indicated_hydrogen"
 
 
+def test_retained_fusion_hydride_is_a_typed_additive_hydrogen_operation():
+    analysis = analyze_smiles("NC1=NC2N=C(N)NC(=O)C2=N1")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    hydro_binding = next(binding for binding in assembly.data["name_atom_bindings"] if binding["stage"] == "hydro")
+
+    assert analysis.name == "2,8-diamino-1,4-dihydropurin-6-one"
+    assert hydro_binding["role"] == "additive_hydrogen"
+    assert hydro_binding["term"] == "hydro"
+    assert hydro_binding["locants"] == ["1", "4"]
+
+
 def test_n_substituent_locant_survives_retained_suffix_postprocessing():
     analysis = analyze_smiles("CNC(C)=O")
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
@@ -1191,19 +1204,16 @@ def test_repeated_grouped_locants_use_following_structural_scope():
     assert by_start[("aza", text.index("aza"))].atom_ids == frozenset({1, 3, 8, 11})
 
 
-def test_parenthesized_unsaturation_locants_bind_to_double_bond_endpoints():
+def test_caffeine_uses_the_retained_purine_dione_parent():
     analysis = analyze_smiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)C")
-    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
-    tokens = {(token["text"], token["start"]): token for token in assembly.data["name_token_spans"]}
-    name = analysis.name
 
-    assert analysis.name == "2,4,7-trimethyl-2,4,7,9-tetraazabicyclo[4.3.0]nona-1(6),8-diene-3,5-dione"
-    assert tokens[("1", name.index("1(6)"))]["atoms"] == [4]
-    assert tokens[("1", name.index("1(6)"))]["bonds"] == [5]
-    assert tokens[("6", name.index("6),8"))]["atoms"] == [5]
-    assert tokens[("6", name.index("6),8"))]["bonds"] == [5]
-    assert tokens[("8", name.index("8-diene"))]["atoms"] == [2]
-    assert tokens[("8", name.index("8-diene"))]["bonds"] == [3]
+    assert analysis.name == "1,3,7-trimethylpurine-2,6-dione"
+
+
+def test_purinone_fusion_carbon_hydrogen_uses_a_dihydro_prefix():
+    generated = name_smiles("NC1=NC2N=C(N)NC(=O)C2=N1")
+
+    assert generated == "2,8-diamino-1,4-dihydropurin-6-one"
 
 
 def test_nested_hydroxyphenyl_propan_yl_tokens_keep_local_scopes():
@@ -2951,6 +2961,48 @@ def _naphthalene_graph_template_row() -> dict:
     }
 
 
+def test_retained_fused_base_skeletons_are_loaded_from_the_graph_template_table():
+    base_templates = retained_fused_base_templates()
+
+    assert {"naphthalenoid_10", "linear_tricyclic_14", "purinoid_9", "indazoloid_9"} <= set(base_templates)
+    assert base_templates["purinoid_9"]["fusion_atoms"] == ["4", "5"]
+    assert base_templates["purinoid_9"]["mancude_double_bonds"] == 4
+
+
+def test_no_bare_retained_alias_infers_a_canonical_hydride_tautomer():
+    templates = retained_fused_graph_templates(include_disabled=True)
+    bare_hydride_aliases = {
+        alias
+        for template in templates
+        if template.default_indicated_h
+        for alias in template.aliases
+        if "H-" not in alias
+    }
+
+    # This registry-wide invariant automatically covers future retained
+    # hydrides whose bare alias omits the tautomer-defining H locant.
+    assert {"phenalene", "perimidine", "isoindole", "indole"} <= bare_hydride_aliases
+    assert all(retained_parent_metadata(alias) is None for alias in bare_hydride_aliases)
+
+    exact_hydride_templates = [template for template in templates if "H-" in template.name]
+    assert exact_hydride_templates
+    for template in exact_hydride_templates:
+        metadata = retained_parent_metadata(template.name)
+        assert metadata is not None
+        assert metadata.default_indicated_h == template.default_indicated_h
+
+
+def test_indicated_hydrogen_follows_graph_tautomer_but_not_hydrogen_free_spiro_carbon():
+    cases = {
+        "c1ccc2c(c1)CN=C2C1=NCc2ccccc21": "3-(3H-isoindol-1-yl)-1H-isoindole",
+        "O=C(OCCNC1=NCc2ccccc21)c1ccccc1": "2-((3H-isoindol-1-yl)amino)ethyl benzoate",
+        "FN1CCC2(C=Nc3ccccc32)CC1": "1'-fluorospiro[indole-3,4'-piperidine]",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
 def test_retained_fused_graph_template_schema_validates_locant_graphs():
     template = retained_fused_template_from_data(_naphthalene_graph_template_row())
 
@@ -3013,6 +3065,24 @@ def test_retained_fused_graph_template_data_file_validates_guarded_core_entries(
         "2H-isoindole",
         "indolizine",
         "1H-indole",
+        "phenazine",
+        "1,4-phenanthroline",
+        "1,5-phenanthroline",
+        "1,6-phenanthroline",
+        "1,7-phenanthroline",
+        "1,8-phenanthroline",
+        "1,9-phenanthroline",
+        "1,10-phenanthroline",
+        "2,7-phenanthroline",
+        "2,8-phenanthroline",
+        "3,5-phenanthroline",
+        "3,6-phenanthroline",
+        "4,5-phenanthroline",
+        "acridine",
+        "carbazole",
+        "purine",
+        "indazole",
+        "xanthene",
     } <= set(by_name)
     enabled_names = {template.name for template in retained_fused_graph_templates()}
     assert not (
@@ -3057,6 +3127,24 @@ def test_retained_fused_graph_template_data_file_validates_guarded_core_entries(
         "quinoxaline",
         "cinnoline",
         "phthalazine",
+        "phenazine",
+        "1,4-phenanthroline",
+        "1,5-phenanthroline",
+        "1,6-phenanthroline",
+        "1,7-phenanthroline",
+        "1,8-phenanthroline",
+        "1,9-phenanthroline",
+        "1,10-phenanthroline",
+        "2,7-phenanthroline",
+        "2,8-phenanthroline",
+        "3,5-phenanthroline",
+        "3,6-phenanthroline",
+        "4,5-phenanthroline",
+        "acridine",
+        "carbazole",
+        "purine",
+        "indazole",
+        "xanthene",
     }
     assert by_name["1H-indole"].default_indicated_h == ("1",)
     assert by_name["quinoline"].atom_by_locant["1"].symbol == "N"

@@ -71,7 +71,9 @@
       "isoindole",
       "indazole",
       "benzimidazole",
+      "carbazole",
       "purine",
+      "xanthene",
       "indene",
       "fluorene"
     ]
