@@ -100,9 +100,8 @@ jobs:
       packages: write
     uses: ./.github/workflows/docker-image.yml
     secrets: inherit
-
   paper-evaluations:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/tests'
+    if: github.event_name == 'pull_request' && github.base_ref == 'tests'
     needs: [lint, test, rdkit-compat]
     runs-on: ubuntu-latest
     timeout-minutes: 60
