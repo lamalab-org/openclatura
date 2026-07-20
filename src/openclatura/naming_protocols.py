@@ -59,8 +59,3 @@ class RecursiveSubgraphNamer(Protocol):
         return_tree: Literal[True],
         decision_trace: DecisionTrace | None = None,
     ) -> tuple[str, dict | None]: ...
-
-
-# Domain aliases keep call sites readable while sharing one source of truth.
-SubgraphNamer = RecursiveSubgraphNamer
-BranchNamer = RecursiveSubgraphNamer

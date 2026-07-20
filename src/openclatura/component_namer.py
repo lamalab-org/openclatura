@@ -16,7 +16,7 @@ from .name_assembly import NameAssemblyResult, assert_final_name_assembly, token
 from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
 from .naming_context import ComponentNamingState, NamingIntent
-from .naming_protocols import SubgraphNamer
+from .naming_protocols import RecursiveSubgraphNamer
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
 from .parent_selection import select_principal_parent
 from .principal_groups import (
@@ -77,7 +77,7 @@ def collect_component_branch_substituents(
     base_exclude: set[int],
     sub_exclude: set[int],
     *,
-    name_subgraph: SubgraphNamer,
+    name_subgraph: RecursiveSubgraphNamer,
     name_spiro_subgraph: SpiroSubgraphNamer,
     emit_metadata: bool = True,
 ) -> None:
@@ -242,7 +242,7 @@ def name_component(
     return_trace: bool = False,
     return_tree: bool = False,
     decision_trace: DecisionTrace | None = None,
-    name_subgraph: SubgraphNamer,
+    name_subgraph: RecursiveSubgraphNamer,
     name_spiro_subgraph: SpiroSubgraphNamer,
     assemble_parent_name: ParentAssembler,
     token_debug: bool = False,

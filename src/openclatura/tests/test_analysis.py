@@ -104,7 +104,6 @@ from openclatura.namer import (
 )
 from openclatura.naming_audit import UnnamedAtomError, assert_component_fully_named, audit_charge_pair_templates
 from openclatura.naming_data import DATA_DIR, load_json_table, namer_rules
-from openclatura.naming_protocols import BranchNamer, RecursiveSubgraphNamer, SubgraphNamer
 from openclatura.nitrogen_roles import (
     acid_derived_hydrazone_roles,
     azine_roles,
@@ -276,11 +275,6 @@ def test_substituent_suffix_metadata_is_emitted_by_assembly_parts():
         "is_double_attach": False,
         "is_triple_attach": False,
     }
-
-
-def test_recursive_namer_roles_share_one_callable_protocol():
-    assert BranchNamer is RecursiveSubgraphNamer
-    assert SubgraphNamer is RecursiveSubgraphNamer
 
 
 def test_tree_builders_share_schema_without_mutable_defaults():

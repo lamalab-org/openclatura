@@ -8,7 +8,7 @@ from .assembly_parts import NameAtomBinding, NameTokenBinding
 from .charge_pair_roles import charge_pair_roles
 from .formatting import format_counted_prefixes, format_multiplier, oxy_prefix_from_branch, strip_outer_parentheses
 from .molecule import Molecule
-from .naming_protocols import BranchNamer
+from .naming_protocols import RecursiveSubgraphNamer
 from .nitrogen_roles import azine_roles
 from .nomenclature import RULES
 from .oxoacid_roles import CentralOxoRole, OxoLigandRole, central_oxo_roles
@@ -95,7 +95,7 @@ def single_atom_component_name(mol: Molecule, component_atoms: set[int]) -> str:
 def structural_replacement_parent_name(
     mol: Molecule,
     component_atoms: set[int],
-    branch_namer: BranchNamer | None = None,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> str:
     """Return a replacement-parent hydride name from graph-derived specs."""
 
@@ -106,7 +106,7 @@ def structural_replacement_parent_name(
 def structural_replacement_parent_result(
     mol: Molecule,
     component_atoms: set[int],
-    branch_namer: BranchNamer | None = None,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> SpecialComponentName | None:
     """Return a graph-bound replacement-parent hydride name result."""
 
@@ -391,7 +391,7 @@ def _lambda_ring_unsaturation_suffix(mol: Molecule, path: list[int]) -> str:
 def simple_azine_parent_name(
     mol: Molecule,
     component_atoms: set[int],
-    branch_namer: BranchNamer | None = None,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> str:
     """Name simple acyclic ketazines/aldazines from a graph C=N-N=C role."""
 
@@ -439,7 +439,7 @@ def simple_azine_parent_name(
 def phosphane_borane_zwitterion_name(
     mol: Molecule,
     component_atoms: set[int],
-    branch_namer: BranchNamer | None = None,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> str:
     """Name graph-proven B(-)(H)3-P(+) zwitterions as boranuide parents."""
 
@@ -450,7 +450,7 @@ def phosphane_borane_zwitterion_name(
 def phosphane_borane_zwitterion_result(
     mol: Molecule,
     component_atoms: set[int],
-    branch_namer: BranchNamer | None = None,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> SpecialComponentName | None:
     """Name graph-proven B(-)(H)3-P(+) zwitterions with bound ligands and charges."""
 
@@ -856,7 +856,7 @@ def _hydrazone_stereo_prefix(mol: Molecule, carbon: int, nitrogen: int, parent_n
 def sulfonium_ylide_name(
     mol: Molecule,
     component_atoms: set[int],
-    branch_namer: BranchNamer | None = None,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> str:
     """Name graph-proven sulfonium/carbanion ylides as full components."""
 
@@ -951,7 +951,7 @@ def sulfonium_ylide_name(
 def sulfonium_ylide_result(
     mol: Molecule,
     component_atoms: set[int],
-    branch_namer: BranchNamer | None = None,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> SpecialComponentName | None:
     """Return a typed sulfonium ylide result for the graph-proven renderer."""
 
@@ -1025,7 +1025,7 @@ def _linear_alkyl_carbanion_parent_name(mol: Molecule, carbon_atoms: set[int], r
 def hydroxyurea_parent_name(
     mol: Molecule,
     component_atoms: set[int],
-    branch_namer: BranchNamer | None = None,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> str:
     """Name graph-proven N-hydroxyureas without carbamic-acid fallback wording."""
 
@@ -1036,7 +1036,7 @@ def hydroxyurea_parent_name(
 def hydroxyurea_parent_result(
     mol: Molecule,
     component_atoms: set[int],
-    branch_namer: BranchNamer | None = None,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> SpecialComponentName | None:
     """Name graph-proven N-hydroxyureas with core/hydroxy/ligand bindings."""
 
@@ -1163,7 +1163,7 @@ def _urea_n_ligand_names(
     component_atoms: set[int],
     nitrogen: int,
     core_atoms: set[int],
-    branch_namer: BranchNamer | None,
+    branch_namer: RecursiveSubgraphNamer | None,
 ) -> list[tuple[set[int], str]] | None:
     ligands = []
     for root in mol.get_neighbors(nitrogen):
@@ -1254,7 +1254,7 @@ def oxoacid_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialCo
 def oxoacid_ester_name(
     mol: Molecule,
     component_atoms: set[int],
-    branch_namer: BranchNamer | None = None,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> str:
     """Name organic esters of data-backed oxoacid parent hydrides."""
 
@@ -1265,7 +1265,7 @@ def oxoacid_ester_name(
 def oxoacid_ester_result(
     mol: Molecule,
     component_atoms: set[int],
-    branch_namer: BranchNamer | None = None,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> SpecialComponentName | None:
     """Name organic esters with separate modifier and central-oxo suffix bindings."""
 
@@ -1328,7 +1328,7 @@ def _peroxy_oxoacid_ester_name(
     component_atoms: set[int],
     role: CentralOxoRole,
     suffix: str,
-    branch_namer: BranchNamer | None,
+    branch_namer: RecursiveSubgraphNamer | None,
 ) -> str:
     result = _peroxy_oxoacid_ester_result(mol, component_atoms, role, suffix, branch_namer)
     return result.name if result is not None else ""
@@ -1339,7 +1339,7 @@ def _peroxy_oxoacid_ester_result(
     component_atoms: set[int],
     role: CentralOxoRole,
     suffix: str,
-    branch_namer: BranchNamer | None,
+    branch_namer: RecursiveSubgraphNamer | None,
 ) -> SpecialComponentName | None:
     peroxy_ligands = [ligand for ligand in role.ligands if ligand.role == OxoLigandRole.PEROXY]
     if len(peroxy_ligands) != 1 or not suffix:
@@ -1478,7 +1478,7 @@ def _ester_modifier_name(
     root: int,
     ester_oxygen: int,
     acid_atoms: set[int],
-    branch_namer: BranchNamer | None,
+    branch_namer: RecursiveSubgraphNamer | None,
 ) -> str:
     if branch_namer is not None:
         name = branch_namer(mol, root, set(mol.atoms) - component_atoms | acid_atoms, upstream_atom=ester_oxygen)

@@ -5,7 +5,7 @@ from .formatting import strip_outer_parentheses
 from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
 from .molecule import DecisionTrace, Molecule
-from .naming_protocols import BranchNamer
+from .naming_protocols import RecursiveSubgraphNamer
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .subgraph_tools import subgraph_component
@@ -19,7 +19,7 @@ def add_component_front_modifiers(
     perceived_groups: list[PerceivedGroup],
     principal_key: str | None,
     sub_exclude: set[int],
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> None:
     """Add ester/sulfonate front modifiers such as the alcohol component name."""
 
@@ -64,7 +64,7 @@ def add_component_n_substituents(
     numbered_path: list[int],
     get_loc,
     sub_exclude: set[int],
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> None:
     """Add N-substituent prefixes and N/N' locants for principal groups."""
 
@@ -183,7 +183,7 @@ def _nitrogen_substituent_name(
     nitrogen: int,
     substituent: int,
     sub_exclude: set[int],
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
     decision_trace: DecisionTrace | None = None,
 ) -> tuple[str, list, dict | None]:
     """Render graph-bound N-substituents on principal nitrogen groups."""

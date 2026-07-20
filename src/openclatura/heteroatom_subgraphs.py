@@ -19,7 +19,7 @@ from .namer_config import (
     SIMPLE_SELANYL_PREFIXES,
     SIMPLE_SULFANYL_PREFIXES,
 )
-from .naming_protocols import BranchNamer
+from .naming_protocols import RecursiveSubgraphNamer
 from .nitrogen_roles import terminal_n3_substituent_role
 from .nomenclature import RULES
 from .oxoacid_roles import OxoLigandRole, central_oxo_substituent_role
@@ -72,7 +72,7 @@ def _single_imino_n_substituent_name(
     mol: Molecule,
     nitrogen: int,
     exclude_atoms: set[int],
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     roots = [
         neighbor
@@ -148,7 +148,7 @@ def name_branch_or_none(
     branch_idx: int | None,
     exclude_atoms: set[int],
     upstream_atom: int,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     if branch_idx is None:
         return ""
@@ -163,7 +163,7 @@ def name_carbonyl_like_fragment(
     exclude_atoms: set[int],
     branch_suffix: str,
     fallback: str,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
     amino_base: str | None = None,
     wrap_result: bool = False,
 ) -> str:
@@ -281,7 +281,7 @@ def name_oxygen_subgraph(
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
@@ -342,7 +342,7 @@ def name_nitrogen_subgraph(
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     upstream_order = upstream_bond_order(mol, start_idx, upstream_atom)
     is_double = upstream_order == 2
@@ -431,7 +431,7 @@ def _sulfur_imide_branch_name(
     sulfur: int,
     exclude_atoms: set[int],
     s_oxygens: list[int],
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     """Render an N=S(=O)n branch without collapsing it to sulfo-amino acid wording."""
 
@@ -534,7 +534,7 @@ def name_sulfur_subgraph(
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
     s_oxygens = central_oxo_substituent_excluded_ligand_atoms(mol, start_idx, exclude_atoms)
@@ -642,7 +642,7 @@ def name_chalcogen_subgraph(
     simple_prefixes: set[str],
     element_suffix: str,
     oxo_prefix: str,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
     oxo_ligands = central_oxo_substituent_excluded_ligand_atoms(mol, start_idx, exclude_atoms)
@@ -697,7 +697,7 @@ def name_phosphorus_subgraph(
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     upstream_order = upstream_bond_order(mol, start_idx, upstream_atom)
     multiple_bond_suffix = {2: "idene", 3: "idyne"}.get(upstream_order, "")
@@ -724,7 +724,7 @@ def name_group_13_14_subgraph(
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
     base_suffix = unsubstituted_prefix(mol.atoms[start_idx].symbol) or (
@@ -743,7 +743,7 @@ def name_halogen_subgraph(
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     symbol = mol.atoms[start_idx].symbol
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
@@ -759,7 +759,7 @@ def name_heteroatom_subgraph(
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str | None:
     """Name supported heteroatom-starting recursive fragments."""
 
