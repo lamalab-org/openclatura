@@ -344,8 +344,7 @@ def test_nested_stereochemical_substituent_keeps_semantic_boundary():
     smiles = "CC1=CCCC[C@@H]1C(NCCCn1ccnc1)c1nnnn1C1CCCC1"
 
     assert name_smiles(smiles) == (
-        "N-((1-cyclopentyl-1H-tetrazol-5-yl)((1S)-2-methylcyclohex-2-en-1-yl)methyl)-"
-        "3-(1H-imidazol-1-yl)propan-1-amine"
+        "N-((1-cyclopentyl-1H-tetrazol-5-yl)((1S)-2-methylcyclohex-2-en-1-yl)methyl)-3-(1H-imidazol-1-yl)propan-1-amine"
     )
 
 
