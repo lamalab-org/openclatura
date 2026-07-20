@@ -385,7 +385,7 @@ def build_shortcut_tree_node(
     name: str,
     atom_ids,
     bond_ids=None,
-    decisions=None,
+    nested_decisions=None,
     name_atom_bindings: list[dict] | None = None,
     name_token_spans: list[dict] | None = None,
 ) -> dict:
@@ -401,7 +401,7 @@ def build_shortcut_tree_node(
         name=name,
         atom_ids=atom_ids,
         bond_ids=bond_ids,
-        nested_decisions=decisions,
+        nested_decisions=nested_decisions,
         metadata=metadata,
     )
 
