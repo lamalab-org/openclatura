@@ -11,17 +11,14 @@ def test_human_descriptor_uses_parent_metadata_without_token_spans():
     assert isinstance(d, HumanDescription)
     text = str(d)
     assert "9-membered bicyclic [4.3.0] heteroskeleton" in text
-    assert "nitrogen at positions 2 (atom id" in text
-    assert "4 (atom id" in text
+    assert "retained purine parent" in text
+    assert "nitrogen at positions 1 (atom id" in text
+    assert "3 (atom id" in text
     assert "7 (atom id" in text
     assert "9 (atom id" in text
-    assert "double bond between position 1 (atom id" in text
-    assert "and position 6 (atom id" in text
-    assert "double bond between position 8 (atom id" in text
-    assert "and position 9 (atom id" in text
-    assert "oxo groups at positions 3 (atom id" in text
-    assert "5 (atom id" in text
-    assert "methyl groups at positions 2 (atom id" in text
+    assert "oxo groups at positions 2 (atom id" in text
+    assert "6 (atom id" in text
+    assert "methyl groups at positions 1 (atom id" in text
     assert "token" not in text.lower()
     assert "span" not in text.lower()
 

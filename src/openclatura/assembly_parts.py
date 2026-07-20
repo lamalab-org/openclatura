@@ -80,6 +80,15 @@ class NameAtomBinding:
     emitted_tokens: tuple[NameTokenBinding, ...] = ()
 
 
+@dataclass(frozen=True)
+class RetainedParentMetadata:
+    """Naming metadata carried from a matched retained-parent template."""
+
+    default_indicated_h: tuple[str, ...] = ()
+    fusion_locants: tuple[str, ...] = ()
+    derivative_stem: str | None = None
+
+
 @dataclass
 class AssemblyParts:
     parent_length: int
@@ -96,6 +105,7 @@ class AssemblyParts:
     is_triple_attach: bool = False
     attachment_locant: int | str = 1
     retained_name: str | None = None
+    retained_parent_metadata: RetainedParentMetadata | None = None
     front_modifiers: list[str] = field(default_factory=list)
     front_modifier_atom_ids: set[int] = field(default_factory=set)
     front_modifier_charge_atom_ids: set[int] = field(default_factory=set)

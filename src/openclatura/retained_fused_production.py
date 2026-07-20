@@ -9,17 +9,28 @@ OPSIN-verified grammar classes.
 
 from __future__ import annotations
 
-from .assembly_parts import SubstituentItem
+from dataclasses import dataclass
+
+from .assembly_parts import RetainedParentMetadata, SubstituentItem
 from .grammar_snapshot_data import retained_fused_derivative_gate
 from .molecule import Molecule
 from .perception import PerceivedGroup
-from .retained_fused_templates import match_retained_fused_templates
+from .retained_fused_templates import RetainedFusedTemplateMatch, match_retained_fused_templates
 
 _DERIVATIVE_GATE = retained_fused_derivative_gate()
 PRODUCTION_RETAINED_FUSED_PARENTS = _DERIVATIVE_GATE.production_parent_names
 ALLOWED_PRINCIPAL_KEYS = _DERIVATIVE_GATE.allowed_principal_keys
 ALLOWED_GROUP_KEYS = _DERIVATIVE_GATE.allowed_group_keys
 ALLOWED_SUBSTITUENT_NAMES = _DERIVATIVE_GATE.allowed_substituent_names
+
+
+@dataclass(frozen=True)
+class ProductionRetainedFusedParent:
+    """A matched retained parent and the template metadata needed downstream."""
+
+    name: str
+    locant_maps: list[dict[int, str]]
+    metadata: RetainedParentMetadata
 
 
 def production_retained_fused_parent(
@@ -29,7 +40,7 @@ def production_retained_fused_parent(
     perceived_groups: list[PerceivedGroup],
     principal_key: str | None,
     substituent_mapping: dict[int, list[SubstituentItem]],
-) -> tuple[str, list[dict[int, str]]] | None:
+) -> ProductionRetainedFusedParent | None:
     """Return retained fused parent data only for verified derivative classes."""
 
     parent_atoms = set(parent_path)
@@ -51,8 +62,15 @@ def production_retained_fused_parent(
 
     matches = [
         match
-        for match in match_retained_fused_templates(mol, parent_atoms, include_disabled=True)
-        if match.template.name in PRODUCTION_RETAINED_FUSED_PARENTS and match.template.derivative_production_enabled
+        for match in match_retained_fused_templates(
+            mol,
+            parent_atoms,
+            include_disabled=True,
+            allow_nonaromatic=principal_key == "ketone",
+        )
+        if match.template.name in PRODUCTION_RETAINED_FUSED_PARENTS
+        and match.template.derivative_production_enabled
+        and (principal_key != "ketone" or _has_mancude_unsaturation(mol, parent_atoms, match))
     ]
     if not matches:
         return None
@@ -66,11 +84,48 @@ def production_retained_fused_parent(
     ]
     if not maps:
         return None
-    return parent_name, maps
+    template = matches[0].template
+    return ProductionRetainedFusedParent(
+        name=parent_name,
+        locant_maps=maps,
+        metadata=RetainedParentMetadata(
+            default_indicated_h=template.default_indicated_h,
+            fusion_locants=template.fusion_atoms,
+            derivative_stem=template.derivative_stem,
+        ),
+    )
 
 
 def _neutral_component(mol: Molecule, atoms: set[int]) -> bool:
     return all(mol.atoms[atom].charge == 0 for atom in atoms)
+
+
+def _has_mancude_unsaturation(
+    mol: Molecule,
+    parent_atoms: set[int],
+    match: RetainedFusedTemplateMatch,
+) -> bool:
+    """Reject hydro derivatives that merely share an oxo-parent topology."""
+
+    expected_double_bonds = match.template.mancude_double_bonds
+    if expected_double_bonds is None:
+        return False
+    nonaromatic_parent_carbonyls = sum(
+        atom_template.symbol == "C"
+        and not atom_template.aromatic
+        and any(
+            neighbor not in parent_atoms
+            and mol.atoms[neighbor].symbol == "O"
+            and (bond := mol.get_bond(match.locant_to_atom[atom_template.locant], neighbor)) is not None
+            and bond.order == 2
+            for neighbor in mol.get_neighbors(match.locant_to_atom[atom_template.locant])
+        )
+        for atom_template in match.template.atoms
+    )
+    actual_double_bonds = sum(
+        bond.order == 2 and (bond.u in parent_atoms or bond.v in parent_atoms) for bond in mol.bonds.values()
+    )
+    return actual_double_bonds >= expected_double_bonds + nonaromatic_parent_carbonyls
 
 
 def _neutral_retained_parent(mol: Molecule, atoms: set[int]) -> bool:

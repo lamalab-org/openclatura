@@ -4,6 +4,7 @@ import re
 
 from .assembly_parent import parent_stem_and_terminal
 from .assembly_parts import AssemblyParts, NameAtomBinding, NameTokenBinding
+from .formatting import format_multiplier
 from .nomenclature import RULES
 from .principal_suffixes import render_principal_suffix
 from .rules import bonds, stems
@@ -36,13 +37,13 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
             )
         )
     for operation in parts.hydro_operations:
-        if operation.operation_kind != "indicated_hydrogen":
+        if operation.operation_kind not in {"indicated_hydrogen", "additive_hydrogen"}:
             continue
         bindings.append(
             NameAtomBinding(
                 stage="hydro",
                 role=operation.operation_kind,
-                term="indicated hydrogen",
+                term="indicated hydrogen" if operation.operation_kind == "indicated_hydrogen" else "hydro",
                 atom_ids=set(operation.atom_ids),
                 locants=tuple(str(locant) for locant in operation.locants),
                 emitted_tokens=_hydro_operation_tokens(operation),
@@ -479,9 +480,10 @@ def _hydro_operation_tokens(operation) -> tuple[NameTokenBinding, ...]:
                 locants=locants,
             )
         )
+    hydro_text = "H" if operation.operation_kind == "indicated_hydrogen" else format_multiplier("hydro", len(locants))
     tokens.append(
         NameTokenBinding(
-            text="H",
+            text=hydro_text,
             token_kind="hydro",
             source="default_binding",
             grammar_role=operation.operation_kind,
