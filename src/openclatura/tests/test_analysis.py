@@ -305,6 +305,27 @@ def test_methane_is_named_without_parent_selection_fallback():
     assert name_smiles("C") == "methane"
 
 
+def test_single_unlocanted_stereochemical_substituent_omits_optional_outer_parentheses():
+    smiles = "C1(CCCCC1)[C@H]1CC(CCC1)C1=CC=CC=C1"
+
+    assert name_smiles(smiles) == "(3R)-3-cyclohexylcyclohexylbenzene"
+
+
+def test_locanted_stereochemical_substituent_keeps_disambiguating_parentheses():
+    parts = AssemblyParts(
+        parent_length=6,
+        is_ring=True,
+        retained_name="benzene",
+        parent_atom_symbols_by_locant={str(locant): "C" for locant in range(1, 7)},
+        substituents=[
+            SubstituentItem(name="((3R)-3-cyclohexylcyclohexyl)", locants=["1"]),
+            SubstituentItem(name="methyl", locants=["4"]),
+        ],
+    )
+
+    assert assemble_name(parts) == "1-((3R)-3-cyclohexylcyclohexyl)-4-methylbenzene"
+
+
 def test_hydrogen_cyanide_absorbed_nitrile_name_passes_final_audit():
     assert name_smiles("C#N") == "hydrogen cyanide"
 

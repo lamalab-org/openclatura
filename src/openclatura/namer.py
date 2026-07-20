@@ -981,6 +981,11 @@ def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
         and not name.startswith("tricyclo")
     ):
         return name
+    # The stereodescriptor already establishes the fragment's leading
+    # boundary. Its parent will add protective parentheses if the attachment
+    # is locanted, repeated, or otherwise ambiguous.
+    if parts.stereo_features:
+        return name
     return f"({name})"
 
 
