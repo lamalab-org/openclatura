@@ -195,7 +195,9 @@ def _unsaturation_locant_pair(parts: AssemblyParts, locant: str) -> tuple[str, s
         candidates = []
         if locant.isdigit():
             candidates.append(tuple(sorted((locant, str(int(locant) + 1)))))
-        candidates.extend(pair for pair in parts.parent_bond_orders_by_locants if pair[0] == locant or pair[1] == locant)
+        candidates.extend(
+            pair for pair in parts.parent_bond_orders_by_locants if pair[0] == locant or pair[1] == locant
+        )
     for pair in candidates:
         if pair in parts.parent_bond_orders_by_locants:
             return pair
@@ -228,7 +230,9 @@ def _check_attachment_locants(mol: Molecule, parts: AssemblyParts, atom_to_locan
                 if neighbor in parts.parent_atom_ids and neighbor not in item.atom_ids:
                     actual.append(atom_to_locant.get(neighbor, "?"))
         if actual and sorted(actual) != sorted(str(locant) for locant in item.locants):
-            issues.append(f"substituent {item.name!r} claims locants {sorted(item.locants)} but attaches at {sorted(actual)}")
+            issues.append(
+                f"substituent {item.name!r} claims locants {sorted(item.locants)} but attaches at {sorted(actual)}"
+            )
     return issues
 
 
