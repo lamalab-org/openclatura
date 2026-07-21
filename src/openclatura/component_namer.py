@@ -26,6 +26,7 @@ from .principal_groups import (
     filter_component_groups_to_parent,
     partition_principal_and_prefix_groups,
 )
+from .reconstruction_audit import audit_component_reconstruction
 from .retained_fused_production import production_retained_fused_parent
 from .special_cases import (
     single_atom_component_name,
@@ -611,6 +612,9 @@ def name_component(
 
     refresh_name_atom_bindings(parts)
     parts.stereo_audit_issues = list(audit_stereochemistry(mol, parts).issues)
+    reconstruction = audit_component_reconstruction(mol, parts)
+    parts.reconstruction_audit_status = reconstruction.status
+    parts.reconstruction_audit_issues = list(reconstruction.issues)
     assert_component_fully_named(mol, state.component_atoms, parts, "<component>")
     name = assemble_parent_name(mol, parts, numbered_path, get_loc, emit_metadata=emit_metadata)
     if emit_metadata:
@@ -629,6 +633,10 @@ def name_component(
             "substituent_count": len(parts.substituents),
             "unsaturation_count": len(parts.unsaturations),
             "stereo_audit_issues": parts.stereo_audit_issues,
+            "reconstruction_audit": {
+                "status": parts.reconstruction_audit_status,
+                "issues": parts.reconstruction_audit_issues,
+            },
             "name_atom_bindings": binding_trace_data(parts.name_atom_bindings, include_emitted_tokens=token_debug),
             "name_token_spans": parts.name_token_spans if token_debug else [],
             "name_rewrite_history": parts.name_rewrite_history,

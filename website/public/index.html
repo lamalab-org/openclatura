@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>openclatura — draw a molecule, get its IUPAC name</title>
+<meta name="description" content="Draw a molecule and openclatura names it using deterministic IUPAC Blue Book rules. No LLM in the loop.">
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --border: #e2e5ea;
+    --text: #1a2233;
+    --muted: #5c6675;
+    --accent: #1a56db;
+    --accent-soft: #e8effc;
+    --err: #b42318;
+    --err-soft: #fdeceb;
+    --chip: #eef1f5;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1420;
+      --surface: #171e2e;
+      --border: #2a3450;
+      --text: #e8ecf4;
+      --muted: #97a1b5;
+      --accent: #6d9cff;
+      --accent-soft: #1d2a47;
+      --err: #ff8177;
+      --err-soft: #3a1d1c;
+      --chip: #222c44;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+  header {
+    max-width: 86rem;
+    margin: 0 auto;
+    padding: 1.6rem 1.25rem 1.1rem;
+  }
+  .header-row {
+    display: flex;
+    align-items: baseline;
+    gap: .6rem;
+    flex-wrap: wrap;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 1.45rem;
+    letter-spacing: -.01em;
+  }
+  header h1 span { color: var(--accent); }
+  .version-tag {
+    font-family: var(--mono);
+    font-size: .74rem;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: .08rem .45rem;
+  }
+  .version-tag:empty { display: none; }
+  header p {
+    margin: .3rem 0 0;
+    max-width: 46rem;
+    color: var(--muted);
+    font-size: .92rem;
+  }
+  main {
+    max-width: 86rem;
+    margin: 0 auto;
+    padding: 0 1.25rem 3rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(20rem, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+  }
+  @media (max-width: 66rem) { main { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1rem 1.1rem 1.1rem;
+  }
+  .card h2 {
+    margin: 0 0 .8rem;
+    padding-bottom: .45rem;
+    border-bottom: 1px solid var(--border);
+    font-size: .76rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--muted);
+  }
+  .editor-shell {
+    position: relative;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    background: #fff; /* Ketcher is light-only */
+    height: min(72vh, 620px);
+    min-height: 480px;
+  }
+  #ketcher-frame {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+  }
+  #editor-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    background: #fff;
+    color: #5c6675;
+    font-size: .95rem;
+    z-index: 2;
+    transition: opacity .25s;
+  }
+  .examples {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .45rem;
+    margin-top: .8rem;
+    align-items: center;
+  }
+  .examples .label { font-size: .8rem; color: var(--muted); margin-right: .15rem; }
+  .examples button {
+    border: 1px solid var(--border);
+    background: var(--chip);
+    color: var(--text);
+    padding: .28rem .7rem;
+    font-size: .82rem;
+    font-family: var(--mono);
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .examples button:hover { border-color: var(--accent); color: var(--accent); }
+  .smiles-row {
+    margin-top: .8rem;
+    font-family: var(--mono);
+    font-size: .82rem;
+    color: var(--muted);
+    word-break: break-all;
+    overflow-x: auto;
+  }
+  #result-name {
+    font-size: 1.4rem;
+    font-weight: 650;
+    letter-spacing: -.01em;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    min-height: 2.2rem;
+    margin: .1rem 0 .4rem;
+    line-height: 1.3;
+  }
+  #result-name.long { font-size: 1.05rem; font-family: var(--mono); font-weight: 600; }
+  #result-name.placeholder { color: var(--muted); font-weight: 400; font-size: 1rem; }
+  #result-name.error { color: var(--err); font-size: 1rem; font-weight: 500; }
+  .status {
+    font-size: .82rem;
+    color: var(--muted);
+    min-height: 1.2rem;
+  }
+  .spinner {
+    display: inline-block;
+    width: .8em; height: .8em;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    vertical-align: -0.1em;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .75rem; }
+  .chips span {
+    font-family: var(--mono);
+    font-size: .74rem;
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: .18rem .5rem;
+    cursor: default;
+  }
+  .actions { display: flex; gap: .55rem; margin-top: 1rem; flex-wrap: wrap; }
+  .actions button {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    padding: .42rem .95rem;
+    font-size: .87rem;
+    cursor: pointer;
+  }
+  .actions button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .actions button:disabled { opacity: .45; cursor: not-allowed; }
+  #explain {
+    margin-top: 1rem;
+    border-top: 1px solid var(--border);
+    padding-top: .9rem;
+    font-size: .9rem;
+    display: none;
+  }
+  #explain p { margin: 0 0 .6rem; overflow-wrap: anywhere; }
+  #explain .mol-depict {
+    background: #fff; /* RDKit SVG is light-only */
+    border: 1px solid var(--border);
+    padding: .4rem;
+    margin: 0 0 .8rem;
+  }
+  #explain .mol-depict svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  #explain .mol-caption {
+    font-size: .76rem;
+    color: var(--muted);
+    margin: .35rem 0 0;
+    text-align: center;
+  }
+  #explain .phase {
+    font-family: var(--mono);
+    font-size: .72rem;
+    color: var(--accent);
+    margin-right: .45rem;
+  }
+  #explain ul { margin: .4rem 0 0; padding-left: 1.1rem; }
+  #explain li { margin-bottom: .35rem; color: var(--muted); }
+  .verify-toggle {
+    display: flex;
+    align-items: baseline;
+    gap: .45rem;
+    margin-top: .9rem;
+    font-size: .85rem;
+    cursor: pointer;
+    user-select: none;
+  }
+  .verify-toggle .hint { color: var(--muted); font-size: .78rem; }
+  .verify-badge {
+    display: none;
+    width: fit-content;
+    font-size: .8rem;
+    padding: .2rem .7rem;
+    margin: .1rem 0 .35rem;
+  }
+  .verify-badge.ok { display: block; background: #e6f6ee; color: #0e7a4d; }
+  .verify-badge.bad { display: block; background: var(--err-soft); color: var(--err); }
+  .verify-badge.warn { display: block; background: var(--chip); color: var(--muted); }
+  @media (prefers-color-scheme: dark) {
+    .verify-badge.ok { background: #143526; color: #4cc38a; }
+  }
+  .errbox {
+    background: var(--err-soft);
+    color: var(--err);
+    padding: .55rem .8rem;
+    font-size: .85rem;
+    margin-top: .6rem;
+    display: none;
+    word-break: break-word;
+  }
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: .82rem;
+    padding: 0 1rem 2.5rem;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <h1><span>openclatura</span> molecule namer</h1>
+    <span class="version-tag" id="app-version" title="openclatura package version"></span>
+  </div>
+  <p>Draw a molecule below and it is named with deterministic IUPAC Blue Book (2013) rules.</p>
+</header>
+
+<main>
+  <section class="card">
+    <h2>Draw</h2>
+    <div class="editor-shell">
+      <div id="editor-loading"><span class="spinner"></span> Loading structure editor…</div>
+      <iframe id="ketcher-frame" src="/ketcher/index.html" title="Ketcher structure editor"></iframe>
+    </div>
+    <div class="examples" id="examples">
+      <span class="label">Try:</span>
+      <button data-smiles="CC(=O)Oc1ccccc1C(=O)O">aspirin</button>
+      <button data-smiles="CN1C=NC2=C1C(=O)N(C(=O)N2C)C">caffeine</button>
+      <button data-smiles="CC(=O)Nc1ccc(O)cc1">paracetamol</button>
+      <button data-smiles="C1CCC2(CC1)OCCO2">a spiro ketal</button>
+      <button data-smiles="c1ccc2ncccc2c1">quinoline</button>
+    </div>
+    <div class="smiles-row">SMILES: <span id="smiles-out">—</span></div>
+  </section>
+
+  <section class="card">
+    <h2>IUPAC name</h2>
+    <div id="result-name" class="placeholder">Draw a structure to name it.</div>
+    <div class="verify-badge" id="verify-badge"></div>
+    <div class="status" id="status"></div>
+    <div class="errbox" id="errbox"></div>
+    <div class="chips" id="rules"></div>
+    <div class="actions">
+      <button class="primary" id="btn-copy" disabled>Copy name</button>
+      <button id="btn-explain" disabled>Explain this name</button>
+    </div>
+    <label class="verify-toggle">
+      <input type="checkbox" id="opsin-toggle" checked>
+      Verify with OPSIN <span class="hint">— parse the name back to a structure (py2opsin) and compare with your drawing</span>
+    </label>
+    <div id="explain"></div>
+  </section>
+</main>
+
+<footer>
+  Powered by <a href="https://github.com/lamalab-org/iupac-name-generator">openclatura</a>,
+  an open nomenclature framework · Editor: <a href="https://lifescience.opensource.epam.com/ketcher/">Ketcher</a> (EPAM, Apache-2.0) · MIT licensed
+</footer>
+
+<script>
+  var ketcher = null;
+  var debounceTimer = null;
+  var currentSmiles = "";
+  var currentName = "";
+  var requestSeq = 0;
+
+  var el = function (id) { return document.getElementById(id); };
+
+  // Warm the naming backend (cold start + OPSIN JVM boot) while Ketcher
+  // is still loading, so the first real request hits a warm instance.
+  fetch("/api/warmup").catch(function () {});
+
+  // The vendored Ketcher demo app sets `window.ketcher` inside the iframe
+  // once the editor (and its in-browser Indigo engine) is initialized.
+  (function waitForKetcher() {
+    var frame = el("ketcher-frame");
+    var tries = 0;
+    var timer = setInterval(function () {
+      tries += 1;
+      var k = null;
+      try { k = frame.contentWindow && frame.contentWindow.ketcher; } catch (e) { /* not ready */ }
+      if (k) {
+        clearInterval(timer);
+        ketcher = k;
+        el("editor-loading").style.opacity = "0";
+        setTimeout(function () { el("editor-loading").style.display = "none"; }, 300);
+        ketcher.editor.subscribe("change", function () {
+          clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(nameCurrent, 600);
+        });
+      } else if (tries > 300) { // ~60 s
+        clearInterval(timer);
+        el("editor-loading").innerHTML = "Failed to load the structure editor. Reload to retry.";
+      }
+    }, 200);
+  })();
+
+  function setStatus(html) { el("status").innerHTML = html; }
+
+  function resetResult(placeholder) {
+    currentName = "";
+    el("result-name").textContent = placeholder;
+    el("result-name").className = "placeholder";
+    el("verify-badge").className = "verify-badge";
+    el("rules").innerHTML = "";
+    el("errbox").style.display = "none";
+    el("explain").style.display = "none";
+    el("explain").innerHTML = "";
+    el("btn-copy").disabled = true;
+    el("btn-explain").disabled = true;
+    setStatus("");
+  }
+
+  function showError(msg) {
+    var box = el("errbox");
+    box.textContent = msg;
+    box.style.display = "block";
+  }
+
+  function nameCurrent() {
+    if (!ketcher) return;
+    ketcher.getSmiles().then(function (smiles) {
+      smiles = (smiles || "").trim();
+      el("smiles-out").textContent = smiles || "—";
+      if (!smiles) {
+        currentSmiles = "";
+        resetResult("Draw a structure to name it.");
+        return;
+      }
+      if (smiles === currentSmiles && currentName) return;
+      currentSmiles = smiles;
+      requestName(smiles);
+    }).catch(function () {
+      // Incomplete structures (e.g. mid-drag) can fail SMILES export; ignore.
+    });
+  }
+
+  function requestName(smiles) {
+    var seq = ++requestSeq;
+    resetResult("");
+    setStatus('<span class="spinner"></span> naming…');
+
+    var verify = el("opsin-toggle").checked;
+    if (verify) setStatus('<span class="spinner"></span> naming + OPSIN round-trip…');
+
+    fetch("/api/name", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ smiles: smiles, include_trace: true, verify_opsin: verify })
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error("API error (HTTP " + r.status + ")");
+        return r.json();
+      })
+      .then(function (data) {
+        if (seq !== requestSeq) return; // a newer request superseded this one
+        setStatus("");
+        if (data.ok && data.name) {
+          currentName = data.name;
+          el("result-name").textContent = data.name;
+          el("result-name").className = data.name.length > 50 ? "long" : "";
+          el("btn-copy").disabled = false;
+          el("btn-explain").disabled = false;
+          renderOpsin(data.opsin_check);
+          var chips = el("rules");
+          chips.innerHTML = "";
+          var hints = (data.rule_hints || []).join("\n");
+          (data.rules_hit || []).forEach(function (rule) {
+            var s = document.createElement("span");
+            s.textContent = rule;
+            s.title = hints || "IUPAC Blue Book rule " + rule;
+            chips.appendChild(s);
+          });
+        } else {
+          el("result-name").textContent = "Could not name this structure.";
+          el("result-name").className = "error";
+          showError(data.error || "The naming engine returned no name for this molecule.");
+        }
+      })
+      .catch(function (e) {
+        if (seq !== requestSeq) return;
+        setStatus("");
+        el("result-name").textContent = "Request failed.";
+        el("result-name").className = "error";
+        showError(e.message);
+      });
+  }
+
+  function renderOpsin(check) {
+    var badge = el("verify-badge");
+    badge.className = "verify-badge";
+    badge.title = "";
+    if (!check) return;
+    if (check.status === "matched") {
+      badge.className = "verify-badge ok";
+      badge.textContent = "✓ OPSIN round-trip: structure matched";
+      badge.title = "OPSIN parsed the name back to " + (check.opsin_smiles || "");
+    } else if (check.status === "mismatched") {
+      badge.className = "verify-badge bad";
+      badge.textContent = "✗ OPSIN round-trip: structure mismatch";
+      badge.title = "OPSIN parsed the name to " + (check.opsin_smiles || "?") +
+                    " which differs from the drawn structure.";
+    } else if (check.status === "name_unparseable") {
+      badge.className = "verify-badge bad";
+      badge.textContent = "✗ OPSIN could not parse this name";
+    } else {
+      badge.className = "verify-badge warn";
+      badge.textContent = "OPSIN verification unavailable (" + check.status + ")";
+    }
+  }
+
+  el("opsin-toggle").addEventListener("change", function () {
+    if (currentSmiles) requestName(currentSmiles);
+  });
+
+  el("btn-copy").addEventListener("click", function () {
+    if (!currentName) return;
+    navigator.clipboard.writeText(currentName).then(function () {
+      setStatus("Copied to clipboard.");
+      setTimeout(function () { setStatus(""); }, 1500);
+    });
+  });
+
+  el("btn-explain").addEventListener("click", function () {
+    var target = el("explain");
+    if (target.style.display === "block") {
+      target.style.display = "none";
+      return;
+    }
+    var btn = el("btn-explain");
+    btn.disabled = true;
+    setStatus('<span class="spinner"></span> explaining…');
+    var describeReq = fetch("/api/describe", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ smiles: currentSmiles })
+    }).then(function (r) {
+      if (!r.ok) throw new Error("API error (HTTP " + r.status + ")");
+      return r.json();
+    });
+    // Depiction is best-effort: the explanation still renders without it.
+    var depictReq = fetch("/api/depict", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ smiles: currentSmiles })
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+    Promise.all([describeReq, depictReq])
+      .then(function (results) {
+        var d = results[0];
+        var depict = results[1];
+        setStatus("");
+        btn.disabled = false;
+        target.innerHTML = "";
+        if (depict && depict.ok && depict.svg) {
+          var fig = document.createElement("figure");
+          fig.className = "mol-depict";
+          fig.innerHTML = depict.svg;
+          var cap = document.createElement("figcaption");
+          cap.className = "mol-caption";
+          cap.textContent = "Drawn structure with the atom ids referenced below.";
+          fig.appendChild(cap);
+          target.appendChild(fig);
+        }
+        (d.paragraphs || []).forEach(function (p) {
+          var node = document.createElement("p");
+          node.textContent = p.replace(/\*\*/g, "");
+          target.appendChild(node);
+        });
+        if (d.components && d.components.length) {
+          var list = document.createElement("ul");
+          d.components.forEach(function (c) {
+            var li = document.createElement("li");
+            var phase = document.createElement("span");
+            phase.className = "phase";
+            phase.textContent = c.phase;
+            li.appendChild(phase);
+            li.appendChild(document.createTextNode(c.text.replace(/\*\*/g, "")));
+            list.appendChild(li);
+          });
+          target.appendChild(list);
+        }
+        target.style.display = "block";
+      })
+      .catch(function (e) {
+        setStatus("");
+        btn.disabled = false;
+        showError(e.message);
+      });
+  });
+
+  fetch("/api/healthz")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (d && d.version) el("app-version").textContent = "v" + d.version;
+    })
+    .catch(function () { /* version tag stays hidden */ });
+
+  el("examples").addEventListener("click", function (ev) {
+    var smiles = ev.target && ev.target.getAttribute("data-smiles");
+    if (smiles && ketcher) {
+      ketcher.setMolecule(smiles).then(function () {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(nameCurrent, 300);
+      });
+    }
+  });
+</script>
+</body>
+</html>

@@ -13,6 +13,7 @@ class Atom:
     isotope: int | None = None
     stereo: str | None = None  # 'R' or 'S'
     raw_stereo: str | None = None  # RDKit tetrahedral tag when CIP is unavailable: 'CW' or 'CCW'
+    cip_code: str | None = None  # full-molecule rdCIPLabeler code ('R'/'S'/'r'/'s'), also set on dependent centers
     is_aromatic: bool = False
     explicit_h_count: int = 0
     total_h_count: int = 0
@@ -179,6 +180,7 @@ class Molecule:
         stereo: str | None = None,
         *,
         raw_stereo: str | None = None,
+        cip_code: str | None = None,
         is_aromatic: bool = False,
         explicit_h_count: int = 0,
         total_h_count: int = 0,
@@ -193,6 +195,7 @@ class Molecule:
             charge=charge,
             stereo=stereo,
             raw_stereo=raw_stereo,
+            cip_code=cip_code,
             is_aromatic=is_aromatic,
             explicit_h_count=explicit_h_count,
             total_h_count=total_h_count,
