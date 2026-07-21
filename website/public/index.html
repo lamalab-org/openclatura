@@ -164,6 +164,7 @@
     line-height: 1.3;
   }
   #result-name.long { font-size: 1.05rem; font-family: var(--mono); font-weight: 600; }
+  #result-name.stale { opacity: .4; transition: opacity .15s; }
   #result-name.placeholder { color: var(--muted); font-weight: 400; font-size: 1rem; }
   #result-name.error { color: var(--err); font-size: 1rem; font-weight: 500; }
   .status {
@@ -334,12 +335,15 @@
   var currentName = "";
   var requestSeq = 0;
 
-  // How long the drawing must sit still before it is named. Long enough
-  // that pauses mid-structure (reaching for the next bond) don't trigger
-  // a request for a half-drawn molecule; example chips are already
-  // complete structures, so they use a shorter wait.
-  var EDIT_DEBOUNCE_MS = 1500;
+  // How long the drawing must sit still before it is named. Example chips
+  // load complete structures, so they use a shorter wait.
+  var EDIT_DEBOUNCE_MS = 900;
   var EXAMPLE_DEBOUNCE_MS = 300;
+  // A structure that can't be named is usually just unfinished, so hold the
+  // failure back this long: any further edit cancels it, and only a drawing
+  // the user has actually stopped touching reports an error.
+  var FAILURE_GRACE_MS = 2000;
+  var failureTimer = null;
 
   var el = function (id) { return document.getElementById(id); };
 
@@ -363,7 +367,7 @@
         setTimeout(function () { el("editor-loading").style.display = "none"; }, 300);
         ketcher.editor.subscribe("change", function () {
           clearTimeout(debounceTimer);
-          setStatus("waiting for you to finish drawing…");
+          clearTimeout(failureTimer); // still drawing: a pending failure is moot
           debounceTimer = setTimeout(nameCurrent, EDIT_DEBOUNCE_MS);
         });
       } else if (tries > 300) { // ~60 s
@@ -376,6 +380,7 @@
   function setStatus(html) { el("status").innerHTML = html; }
 
   function resetResult(placeholder) {
+    clearTimeout(failureTimer);
     currentName = "";
     el("result-name").textContent = placeholder;
     el("result-name").className = "placeholder";
@@ -417,9 +422,36 @@
     });
   }
 
+  // Report a naming failure, but only once the drawing has settled: any edit
+  // (or a newer request) cancels it, so half-drawn structures stay quiet.
+  function scheduleFailure(seq, msg) {
+    clearTimeout(failureTimer);
+    failureTimer = setTimeout(function () {
+      if (seq !== requestSeq) return;
+      currentName = "";
+      el("result-name").textContent = "Could not name this structure.";
+      el("result-name").className = "error";
+      el("verify-badge").className = "verify-badge";
+      el("rules").innerHTML = "";
+      el("btn-copy").disabled = true;
+      el("btn-explain").disabled = true;
+      showError(msg);
+    }, FAILURE_GRACE_MS);
+  }
+
   function requestName(smiles) {
     var seq = ++requestSeq;
-    resetResult("");
+    clearTimeout(failureTimer);
+    el("errbox").style.display = "none";
+    el("explain").style.display = "none";
+    el("explain").innerHTML = "";
+    // Keep the previous name on screen, dimmed, instead of blanking the panel.
+    if (currentName) {
+      el("result-name").classList.add("stale");
+    } else {
+      el("result-name").textContent = "";
+      el("result-name").className = "placeholder";
+    }
     setStatus('<span class="spinner"></span> naming…');
 
     var verify = el("opsin-toggle").checked;
@@ -454,17 +486,13 @@
             chips.appendChild(s);
           });
         } else {
-          el("result-name").textContent = "Could not name this structure.";
-          el("result-name").className = "error";
-          showError(data.error || "The naming engine returned no name for this molecule.");
+          scheduleFailure(seq, data.error || "The naming engine returned no name for this molecule.");
         }
       })
       .catch(function (e) {
         if (seq !== requestSeq) return;
         setStatus("");
-        el("result-name").textContent = "Request failed.";
-        el("result-name").className = "error";
-        showError(e.message);
+        scheduleFailure(seq, e.message);
       });
   }
 
