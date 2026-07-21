@@ -334,6 +334,13 @@
   var currentName = "";
   var requestSeq = 0;
 
+  // How long the drawing must sit still before it is named. Long enough
+  // that pauses mid-structure (reaching for the next bond) don't trigger
+  // a request for a half-drawn molecule; example chips are already
+  // complete structures, so they use a shorter wait.
+  var EDIT_DEBOUNCE_MS = 1500;
+  var EXAMPLE_DEBOUNCE_MS = 300;
+
   var el = function (id) { return document.getElementById(id); };
 
   // Warm the naming backend (cold start + OPSIN JVM boot) while Ketcher
@@ -356,7 +363,8 @@
         setTimeout(function () { el("editor-loading").style.display = "none"; }, 300);
         ketcher.editor.subscribe("change", function () {
           clearTimeout(debounceTimer);
-          debounceTimer = setTimeout(nameCurrent, 600);
+          setStatus("waiting for you to finish drawing…");
+          debounceTimer = setTimeout(nameCurrent, EDIT_DEBOUNCE_MS);
         });
       } else if (tries > 300) { // ~60 s
         clearInterval(timer);
@@ -397,11 +405,15 @@
         resetResult("Draw a structure to name it.");
         return;
       }
-      if (smiles === currentSmiles && currentName) return;
+      if (smiles === currentSmiles && currentName) {
+        setStatus(""); // edit didn't change the structure (moved/selected an atom)
+        return;
+      }
       currentSmiles = smiles;
       requestName(smiles);
     }).catch(function () {
       // Incomplete structures (e.g. mid-drag) can fail SMILES export; ignore.
+      setStatus("");
     });
   }
 
@@ -571,7 +583,7 @@
     if (smiles && ketcher) {
       ketcher.setMolecule(smiles).then(function () {
         clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(nameCurrent, 300);
+        debounceTimer = setTimeout(nameCurrent, EXAMPLE_DEBOUNCE_MS);
       });
     }
   });
