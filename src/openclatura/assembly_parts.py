@@ -130,5 +130,3 @@ class AssemblyParts:
     name_token_spans: list[dict] = field(default_factory=list)
     name_rewrite_history: list[dict] = field(default_factory=list)
     stereo_audit_issues: list[str] = field(default_factory=list)
-    reconstruction_audit_status: str | None = None
-    reconstruction_audit_issues: list[str] = field(default_factory=list)

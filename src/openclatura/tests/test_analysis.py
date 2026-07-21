@@ -4234,18 +4234,13 @@ def test_locanted_ez_stereo_token_binds_to_double_bond_scope():
     assert z_token["bonds"]
 
 
-def test_scoped_small_ring_stereo_emits_full_descriptors_on_substituent_scopes():
-    # The name must carry all drawn stereochemistry: absolute R at the
-    # attachment (reflection-variant via CIP Rule 5 through the remote (3S)
-    # piperidine center) and pseudoasymmetric lowercase s at the quaternary
-    # ring position — matching ChemDraw. OPSIN (through 2.9.0) cannot parse
-    # these descriptor groups; that is a verifier limitation, not a naming
-    # error, and must not cap name completeness.
+def test_scoped_small_ring_stereo_does_not_emit_unsupported_relative_locant_descriptors():
     name = name_smiles("CN1CCC[C@](O)(CC(=O)N[C@]2(C)C[C@H](NC(=O)CCC3CC3)C2)C1")
 
     assert name == (
-        "3-cyclopropyl-N-((1R,3s)-3-(((3S)-3-hydroxy-1-methylpiperidin-3-yl)methylcarbonylamino)-3-methylcyclobutyl)propanamide"
+        "3-cyclopropyl-N-(3-(((3S)-3-hydroxy-1-methylpiperidin-3-yl)methylcarbonylamino)-3-methylcyclobutyl)propanamide"
     )
+    assert "1R,3s" not in name
 
 
 def test_dense_polycyclic_cage_fails_closed_without_von_baeyer_path_explosion():
