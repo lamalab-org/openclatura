@@ -16,6 +16,7 @@ start; its ``bin`` is prepended to ``PATH`` before openclatura checks
 ``shutil.which("java")``.
 """
 
+import ctypes
 import importlib.metadata
 import os
 import re
@@ -26,6 +27,40 @@ from pathlib import Path
 
 _JRE_TARBALL = Path(__file__).parent / "jre.tar.gz"
 _JRE_DIR = Path(tempfile.gettempdir()) / "openclatura-jre"
+_XLIBS_TARBALL = Path(__file__).parent / "xlibs.tar.gz"
+_XLIBS_DIR = Path(tempfile.gettempdir()) / "openclatura-xlibs"
+
+# rdkit.Chem.Draw dlopens a bundled libcairo that expects these X11 libs,
+# which the Vercel runtime image lacks. Preloading them (dependency order,
+# RTLD_GLOBAL) makes the later dlopen resolve against the loaded sonames.
+_XLIBS_ORDER = (
+    "libmd.so.0",
+    "libbsd.so.0",
+    "libXau.so.6",
+    "libXdmcp.so.6",
+    "libxcb.so.1",
+    "libX11.so.6",
+    "libXext.so.6",
+    "libXrender.so.1",
+)
+
+
+def _preload_xlibs() -> None:
+    if not _XLIBS_TARBALL.exists():
+        return
+    if not (_XLIBS_DIR / _XLIBS_ORDER[-1]).exists():
+        staging = Path(tempfile.mkdtemp(dir=tempfile.gettempdir()))
+        with tarfile.open(_XLIBS_TARBALL) as tar:
+            tar.extractall(staging)
+        try:
+            staging.rename(_XLIBS_DIR)
+        except OSError:  # concurrent cold start already extracted it
+            shutil.rmtree(staging, ignore_errors=True)
+    for soname in _XLIBS_ORDER:
+        try:
+            ctypes.CDLL(str(_XLIBS_DIR / soname), mode=ctypes.RTLD_GLOBAL)
+        except OSError:
+            pass  # already provided by the system, or depiction stays off
 
 
 def _ensure_java() -> None:
@@ -54,7 +89,14 @@ os.chdir(tempfile.gettempdir())
 from fastapi import FastAPI  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 from rdkit import Chem  # noqa: E402
-from rdkit.Chem.Draw import rdMolDraw2D  # noqa: E402
+
+# Depiction is optional: never let a missing native lib break the whole API.
+_preload_xlibs()
+try:
+    from rdkit.Chem.Draw import rdMolDraw2D
+except ImportError as exc:
+    rdMolDraw2D = None
+    _DRAW_IMPORT_ERROR = str(exc)
 
 from openclatura.web.app import create_app  # noqa: E402
 
@@ -88,6 +130,8 @@ def depict(req: DepictRequest) -> dict:
     The indices match the atom ids reported by ``/api/describe``
     (both are plain RDKit atom indices of ``MolFromSmiles(smiles)``).
     """
+    if rdMolDraw2D is None:
+        return {"ok": False, "error": f"Depiction unavailable: {_DRAW_IMPORT_ERROR}"}
     mol = Chem.MolFromSmiles(req.smiles)
     if mol is None:
         return {"ok": False, "error": "RDKit could not parse the SMILES."}
