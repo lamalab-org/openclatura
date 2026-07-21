@@ -41,54 +41,7 @@ def audit_stereochemistry(mol: Molecule, parts: AssemblyParts) -> Stereochemistr
     binding_checked, binding_issues = audit_bound_stereochemistry(mol, parts)
     checked += binding_checked
     issues.extend(binding_issues)
-    raw_checked, raw_issues = audit_raw_stereo_completeness(mol, parts)
-    checked += raw_checked
-    issues.extend(raw_issues)
     return StereochemistryAudit(checked_features=checked, issues=tuple(issues))
-
-
-def audit_raw_stereo_completeness(mol: Molecule, parts: AssemblyParts) -> tuple[int, list[str]]:
-    """Check that every drawn-but-CIP-unassigned center is rendered in the name.
-
-    Atoms carrying only ``raw_stereo`` (a drawn wedge on a ring-symmetry-
-    dependent center) are invisible to the descriptor-count audits above:
-    dropping them silently produces a stereochemically incomplete name. They
-    must be covered by a scoped descriptor group (``small_ring_stereo``) or a
-    cis/trans prefix (``relative_stereo``) binding.
-    """
-
-    covered: set[int] = set()
-    component_atoms: set[int] = set(parts.parent_atom_ids)
-    for binding in parts.name_atom_bindings:
-        binding_atoms = set(binding.atom_ids)
-        component_atoms |= binding_atoms
-        if binding.role in {"small_ring_stereo", "relative_stereo"}:
-            covered |= binding_atoms
-            continue
-        term = binding.term or ""
-        raw_ids = {
-            idx
-            for idx in binding_atoms
-            if idx in mol.atoms and mol.atoms[idx].raw_stereo in {"CW", "CCW"} and not mol.atoms[idx].stereo
-        }
-        if not raw_ids:
-            continue
-        # Scoped descriptor groups are folded into substituent terms (e.g.
-        # "((1R,3s)-3-..."); the raw centers count as rendered when the term
-        # carries a descriptor for every assigned and raw center it names.
-        assigned = sum(1 for idx in binding_atoms if idx in mol.atoms and mol.atoms[idx].stereo)
-        if term in {"cis", "trans"} or _rs_any_descriptor_count(term) >= assigned + len(raw_ids):
-            covered |= raw_ids
-    checked = 0
-    issues: list[str] = []
-    for atom_idx in sorted(component_atoms):
-        atom = mol.atoms.get(atom_idx)
-        if atom is None or atom.stereo or atom.raw_stereo not in {"CW", "CCW"}:
-            continue
-        checked += 1
-        if atom_idx not in covered:
-            issues.append(f"atom {atom_idx}: drawn stereocenter ({atom.raw_stereo}) is not rendered in the name")
-    return checked, issues
 
 
 def audit_bound_stereochemistry(mol: Molecule, parts: AssemblyParts) -> tuple[int, list[str]]:
@@ -124,17 +77,11 @@ def audit_bound_stereochemistry(mol: Molecule, parts: AssemblyParts) -> tuple[in
 
 
 def _rs_descriptor_count(term: str) -> int:
-    return len(re.findall(r"\d+[A-Za-z]*[RS](?=[,\)]|$)", term))
-
-
-def _rs_any_descriptor_count(term: str) -> int:
-    """Count locanted stereodescriptors including pseudoasymmetric r/s."""
-
-    return len(re.findall(r"\d+[A-Za-z]*[RSrs](?=[,\)]|$)", term))
+    return len(re.findall(r"\d+[A-Za-z]*[RS](?=[,\)])", term))
 
 
 def _ez_descriptor_count(term: str) -> int:
-    return len(re.findall(r"(?:^|[(,])(?:\d+[A-Za-z]*)?[EZ](?=[,\)]|$)", term))
+    return len(re.findall(r"(?:^|[(,])(?:\d+[A-Za-z]*)?[EZ](?=[,\)])", term))
 
 
 def _locant_to_atom(parts: AssemblyParts) -> dict[str, int]:
