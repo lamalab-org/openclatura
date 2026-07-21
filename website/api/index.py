@@ -111,14 +111,75 @@ from openclatura.web.app import create_app  # noqa: E402
 app = FastAPI()
 
 # ---------------------------------------------------------------------------
-# Result cache (Upstash Redis over REST). Naming is deterministic per package
-# version, so results are cached under the canonical SMILES + request flags,
-# scoped by version. Fully optional: without credentials every request just
-# computes, and any cache error falls back to computing.
+# Result cache. Naming is deterministic per package version, so results are
+# cached under the canonical SMILES + request flags, scoped by version.
+# Backends, first configured wins:
+#   1. S3-compatible object store (CACHE_S3_*; AWS_* accepted locally, but the
+#      AWS_* names are reserved on Vercel where Lambda injects its own).
+#      Expiry comes from a bucket lifecycle rule, not per-request TTL.
+#   2. Upstash Redis over REST (KV_REST_API_* / UPSTASH_REDIS_REST_*).
+# Fully optional: without credentials every request just computes, and any
+# cache error falls back to computing.
 # ---------------------------------------------------------------------------
 _CACHE_URL = (os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL") or "").rstrip("/")
 _CACHE_TOKEN = os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN") or ""
 _CACHE_TTL_SECONDS = 90 * 24 * 3600
+
+_S3_ENDPOINT = (os.environ.get("CACHE_S3_ENDPOINT") or os.environ.get("AWS_ENDPOINT_URL") or "").rstrip("/")
+_S3_BUCKET = os.environ.get("CACHE_S3_BUCKET", "")
+_S3_ACCESS = os.environ.get("CACHE_S3_ACCESS_KEY") or os.environ.get("AWS_ACCESS_KEY_ID") or ""
+_S3_SECRET = os.environ.get("CACHE_S3_SECRET_KEY") or os.environ.get("AWS_SECRET_ACCESS_KEY") or ""
+_S3_REGION = os.environ.get("CACHE_S3_REGION", "us-east-1")
+_S3_ENABLED = bool(_S3_ENDPOINT and _S3_BUCKET and _S3_ACCESS and _S3_SECRET)
+
+
+def _s3_request(method: str, key: str, body: bytes = b"", timeout: float = 2.0) -> tuple[int, bytes]:
+    """Minimal SigV4-signed path-style S3 request (stdlib only)."""
+    import datetime
+    import hmac
+
+    path = f"/{_S3_BUCKET}/{key}"
+    host = urllib.parse.urlparse(_S3_ENDPOINT).netloc
+    now = datetime.datetime.now(datetime.timezone.utc)
+    amz_date = now.strftime("%Y%m%dT%H%M%SZ")
+    datestamp = now.strftime("%Y%m%d")
+    payload_hash = hashlib.sha256(body).hexdigest()
+    headers = {"host": host, "x-amz-content-sha256": payload_hash, "x-amz-date": amz_date}
+    signed = ";".join(sorted(headers))
+    canonical = "\n".join(
+        [
+            method,
+            urllib.parse.quote(path),
+            "",
+            "".join(f"{k}:{headers[k]}\n" for k in sorted(headers)),
+            signed,
+            payload_hash,
+        ]
+    )
+    scope = f"{datestamp}/{_S3_REGION}/s3/aws4_request"
+    to_sign = "\n".join(["AWS4-HMAC-SHA256", amz_date, scope, hashlib.sha256(canonical.encode()).hexdigest()])
+    k = f"AWS4{_S3_SECRET}".encode()
+    for part in (datestamp, _S3_REGION, "s3", "aws4_request"):
+        k = hmac.new(k, part.encode(), hashlib.sha256).digest()
+    signature = hmac.new(k, to_sign.encode(), hashlib.sha256).hexdigest()
+    req = urllib.request.Request(
+        _S3_ENDPOINT + urllib.parse.quote(path),
+        data=body if method == "PUT" else None,
+        method=method,
+        headers={
+            "x-amz-content-sha256": payload_hash,
+            "x-amz-date": amz_date,
+            "Authorization": f"AWS4-HMAC-SHA256 Credential={_S3_ACCESS}/{scope}, "
+            f"SignedHeaders={signed}, Signature={signature}",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.status, resp.read()
+    except urllib.error.HTTPError as exc:
+        return exc.code, b""
+    except Exception:
+        return 0, b""
 
 
 def _pkg_version() -> str:
@@ -134,11 +195,21 @@ def _cache_key(kind: str, smiles: str, flags: str = "") -> str | None:
         return None
     canonical = Chem.MolToSmiles(mol)
     digest = hashlib.sha256(canonical.encode()).hexdigest()[:32]
-    return f"{kind}:{_pkg_version()}:{flags}:{digest}"
+    return f"{kind}/{_pkg_version()}/{flags or '-'}/{digest}.json"
 
 
 def _cache_get(key: str | None) -> dict | None:
-    if not key or not _CACHE_URL:
+    if not key:
+        return None
+    if _S3_ENABLED:
+        status, body = _s3_request("GET", key)
+        if status != 200:
+            return None
+        try:
+            return json.loads(body)
+        except Exception:
+            return None
+    if not _CACHE_URL:
         return None
     req = urllib.request.Request(
         f"{_CACHE_URL}/get/{urllib.parse.quote(key, safe='')}",
@@ -153,7 +224,12 @@ def _cache_get(key: str | None) -> dict | None:
 
 
 def _cache_set(key: str | None, value: dict) -> None:
-    if not key or not _CACHE_URL:
+    if not key:
+        return
+    if _S3_ENABLED:
+        _s3_request("PUT", key, body=json.dumps(value).encode(), timeout=3.0)
+        return
+    if not _CACHE_URL:
         return
     req = urllib.request.Request(
         f"{_CACHE_URL}/set/{urllib.parse.quote(key, safe='')}?EX={_CACHE_TTL_SECONDS}",
