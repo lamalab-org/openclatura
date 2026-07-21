@@ -26,6 +26,7 @@ from openclatura.assembly_parts import (
     NameTokenBinding,
     ParentChargeItem,
     PrincipalGroupItem,
+    RenderedSubstituentName,
     SubstituentItem,
     UnsaturationItem,
 )
@@ -173,7 +174,13 @@ from openclatura.token_grammar import (
     is_locant_token,
     lexical_token_spans,
 )
-from openclatura.trace_helpers import add_substituent_trace, assembly_substituent_tree, assembly_trace_segments
+from openclatura.trace_helpers import (
+    add_substituent_trace,
+    assembly_substituent_tree,
+    assembly_trace_segments,
+    build_naming_tree_node,
+    build_shortcut_tree_node,
+)
 from openclatura.von_baeyer import _classify_secondary_bridges, find_von_baeyer_candidates
 
 
@@ -271,8 +278,74 @@ def test_substituent_suffix_metadata_is_emitted_by_assembly_parts():
     }
 
 
+def test_tree_builders_share_schema_without_mutable_defaults():
+    assembled = build_naming_tree_node(kind="fragment", name="ethyl", atom_ids={2, 1}, bond_ids={7})
+    nested_decisions = [{"decision": "shortcut selected"}]
+    shortcut = build_shortcut_tree_node(
+        kind="component",
+        name="methane",
+        atom_ids={0},
+        nested_decisions=nested_decisions,
+    )
+
+    common_keys = {
+        "kind",
+        "name",
+        "atoms",
+        "bonds",
+        "parent",
+        "principal_group",
+        "substituents",
+        "replacement_prefixes",
+        "unsaturations",
+        "trace_segments",
+        "nested_decisions",
+    }
+    assert common_keys <= assembled.keys()
+    assert common_keys <= shortcut.keys()
+    assert assembled["atoms"] == [1, 2]
+    assert shortcut["nested_decisions"] == nested_decisions
+    assembled["substituents"].append({"name": "methyl"})
+    assert shortcut["substituents"] == []
+
+
 def test_methane_is_named_without_parent_selection_fallback():
     assert name_smiles("C") == "methane"
+
+
+def test_single_unlocanted_stereochemical_substituent_omits_optional_outer_parentheses():
+    smiles = "C1(CCCCC1)[C@H]1CC(CCC1)C1=CC=CC=C1"
+
+    assert name_smiles(smiles) == "(3R)-3-cyclohexylcyclohexylbenzene"
+
+
+def test_locanted_stereochemical_substituent_keeps_disambiguating_parentheses():
+    parts = AssemblyParts(
+        parent_length=6,
+        is_ring=True,
+        retained_name="benzene",
+        parent_atom_symbols_by_locant={str(locant): "C" for locant in range(1, 7)},
+        substituents=[
+            SubstituentItem(
+                name=RenderedSubstituentName(
+                    "((3R)-3-cyclohexylcyclohexyl)",
+                    outer_parentheses_optional=True,
+                ),
+                locants=["1"],
+            ),
+            SubstituentItem(name="methyl", locants=["4"]),
+        ],
+    )
+
+    assert assemble_name(parts) == "1-((3R)-3-cyclohexylcyclohexyl)-4-methylbenzene"
+
+
+def test_nested_stereochemical_substituent_keeps_semantic_boundary():
+    smiles = "CC1=CCCC[C@@H]1C(NCCCn1ccnc1)c1nnnn1C1CCCC1"
+
+    assert name_smiles(smiles) == (
+        "N-((1-cyclopentyl-1H-tetrazol-5-yl)((1S)-2-methylcyclohex-2-en-1-yl)methyl)-3-(1H-imidazol-1-yl)propan-1-amine"
+    )
 
 
 def test_hydrogen_cyanide_absorbed_nitrile_name_passes_final_audit():

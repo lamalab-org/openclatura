@@ -27,6 +27,17 @@ class NameTokenBinding:
     right_context: str = ""
 
 
+class RenderedSubstituentName(str):
+    """A rendered substituent carrying construction-time boundary metadata."""
+
+    outer_parentheses_optional: bool
+
+    def __new__(cls, value: str, *, outer_parentheses_optional: bool = False):
+        rendered = super().__new__(cls, value)
+        rendered.outer_parentheses_optional = outer_parentheses_optional
+        return rendered
+
+
 @dataclass
 class SubstituentItem:
     name: str

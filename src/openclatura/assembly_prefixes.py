@@ -3,7 +3,7 @@
 import re
 
 from .assembly_charge import inferred_ionic_retained_parent, single_charged_replacement_locants
-from .assembly_parts import AssemblyParts, SubstituentItem
+from .assembly_parts import AssemblyParts, RenderedSubstituentName, SubstituentItem
 from .assembly_utils import is_fully_enclosed, needs_hyphen, parse_locant
 from .formatting import is_complex_prefix
 from .nomenclature import RULES
@@ -156,19 +156,41 @@ def format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:
         mult = (multipliers.complex_(count) if is_complex else multipliers.basic(count)) if count > 1 else ""
         loc_str = substituent_locant_string(parts, locs, len(grouped), spiro_subs)
 
-        name_to_use = name
-        if is_complex and not is_fully_enclosed(name):
+        name_to_use = _omit_optional_outer_parentheses(parts, name, count, loc_str, len(grouped))
+        if is_complex and not is_fully_enclosed(name_to_use):
             if count > 1 or loc_str:
-                name_to_use = f"({name})"
-        elif not loc_str and len(grouped) > 1 and not is_fully_enclosed(name):
+                name_to_use = f"({name_to_use})"
+        elif not loc_str and len(grouped) > 1 and not is_fully_enclosed(name_to_use):
             if name not in ["fluoro", "chloro", "bromo", "iodo"]:
-                name_to_use = f"({name})"
+                name_to_use = f"({name_to_use})"
         prefix_parts.append(f"{loc_str}-{mult}{name_to_use}" if loc_str else f"{mult}{name_to_use}")
 
     prefix_str = prefix_parts[0]
     for part in prefix_parts[1:]:
         prefix_str += f"-{part}" if needs_hyphen(prefix_str, part) else part
     return prefix_str
+
+
+def _omit_optional_outer_parentheses(
+    parts: AssemblyParts,
+    name: str,
+    count: int,
+    locant_text: str,
+    grouped_count: int,
+) -> str:
+    """Unwrap a directly rendered fragment when its parent boundary is clear."""
+
+    if (
+        parts.is_substituent
+        or count != 1
+        or locant_text
+        or grouped_count != 1
+        or not isinstance(name, RenderedSubstituentName)
+        or not name.outer_parentheses_optional
+        or not is_fully_enclosed(name)
+    ):
+        return name
+    return name[1:-1]
 
 
 def format_replacement_prefixes(parts: AssemblyParts) -> str:

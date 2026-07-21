@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass, field
 
 from .assembler import assemble_name_raw, post_process_rewrite_rules
-from .assembly_parts import AssemblyParts, SubstituentItem
+from .assembly_parts import AssemblyParts, RenderedSubstituentName, SubstituentItem
 from .assembly_spiro import extract_spiro_side_prefixes
 from .chains import find_ring_systems, get_cyclic_atoms
 from .component_namer import name_component as _name_component_impl
@@ -51,7 +51,11 @@ from .trace_helpers import (
 from .trace_helpers import (
     bond_ids_within as _bond_ids_within,
 )
-from .trace_helpers import decision_trace_data, trace_decision
+from .trace_helpers import (
+    build_shortcut_tree_node,
+    decision_trace_data,
+    trace_decision,
+)
 
 
 @dataclass
@@ -980,6 +984,20 @@ def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
     return f"({name})"
 
 
+def _mark_optional_substituent_boundary(name: str, parts: AssemblyParts, finalize_subgraph: bool) -> str:
+    """Preserve whether construction made a subgraph boundary optional.
+
+    This marker is applied after all name rewrites, since those rewrites return
+    ordinary strings. String composition in a higher recursive layer then
+    intentionally drops the marker, retaining parentheses needed to delimit a
+    compound substituent.
+    """
+
+    if finalize_subgraph and parts.stereo_features:
+        return RenderedSubstituentName(name, outer_parentheses_optional=True)
+    return name
+
+
 def _assemble_parent_name(
     mol: Molecule,
     parts: AssemblyParts,
@@ -1021,7 +1039,7 @@ def _assemble_parent_name(
                 name = rewrite[1](name)
             else:
                 name = rewrite.rewrite(name)
-        return name
+        return _mark_optional_substituent_boundary(name, parts, finalize_subgraph)
     result = NameAssemblyResult.from_rewrite_pipeline(name, parts.name_atom_bindings, rewrites=tuple(rewrites))
     parts.name_atom_bindings = list(result.bindings)
     parts.name_token_spans = token_span_trace_data(result)
@@ -1063,7 +1081,7 @@ def _assemble_parent_name(
         }
         for operation in result.rewrite_history
     ]
-    return result.text
+    return _mark_optional_substituent_boundary(result.text, parts, finalize_subgraph)
 
 
 def _simple_rooted_carbanion_substituent_name(
@@ -1338,19 +1356,13 @@ def _shortcut_substituent_tree(
 ) -> dict:
     """Return a minimal recursive tree node for shortcut substituent names."""
 
-    node = {
-        "kind": "substituent",
-        "name": name,
-        "atoms": sorted(component),
-        "bonds": sorted(_bond_ids_within(mol, component)),
-        "parent": None,
-        "principal_group": None,
-        "substituents": [],
-        "replacement_prefixes": [],
-        "unsaturations": [],
-        "trace_segments": [],
-        "nested_decisions": decision_trace_data(decision_trace),
-    }
+    node = build_shortcut_tree_node(
+        kind="substituent",
+        name=name,
+        atom_ids=component,
+        bond_ids=_bond_ids_within(mol, component),
+        nested_decisions=decision_trace_data(decision_trace),
+    )
     if direct_prefix is not None:
         node["functional_prefix"] = {
             "kind": "functional_prefix",

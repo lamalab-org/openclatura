@@ -9,13 +9,13 @@ from .assembly_parts import NameTokenBinding, SubstituentItem
 from .formatting import format_counted_prefixes, is_complex_prefix, oxy_prefix_from_branch, strip_outer_parentheses
 from .group_atom_roles import amide_nitrogen, ester_or_peroxy_single_oxygen
 from .molecule import Molecule
+from .naming_protocols import RecursiveSubgraphNamer
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .rules import multipliers
 from .subgraph_tools import subgraph_component
 from .trace_helpers import bond_ids_within
 
-BranchNamer = Callable[..., str]
 PrefixHandler = Callable[["PrefixContext", PerceivedGroup], str]
 
 
@@ -24,11 +24,15 @@ class PrefixContext:
     mol: Molecule
     parent_path: list[int]
     sub_exclude: set[int]
-    branch_namer: BranchNamer
+    branch_namer: RecursiveSubgraphNamer
 
 
 def ester_prefix_from_group(
-    mol: Molecule, group: PerceivedGroup, sub_exclude: set[int], suffix_text: str, branch_namer: BranchNamer
+    mol: Molecule,
+    group: PerceivedGroup,
+    sub_exclude: set[int],
+    suffix_text: str,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     """Return an alkoxycarbonyl or alkoxysulfonyl-style prefix."""
 
@@ -45,7 +49,7 @@ def ester_prefix_from_group(
 
 
 def amide_prefix_from_group(
-    mol: Molecule, group: PerceivedGroup, sub_exclude: set[int], branch_namer: BranchNamer
+    mol: Molecule, group: PerceivedGroup, sub_exclude: set[int], branch_namer: RecursiveSubgraphNamer
 ) -> str:
     """Return carbamoyl or carbamothioyl prefix text for an amide-like group."""
 
@@ -201,7 +205,7 @@ def collect_component_prefix_substituents(
     prefix_groups: list[PerceivedGroup],
     parent_path: list[int],
     sub_exclude: set[int],
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> tuple[dict[int, list[SubstituentItem]], set[int]]:
     """Collect characteristic groups cited as prefixes on the component parent."""
 
