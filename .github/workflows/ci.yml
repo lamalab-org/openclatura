@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, refactor_namer]
+    branches: [main, refactor_namer, tests]
   pull_request:
     branches: ["**"]
 
@@ -94,30 +94,64 @@ jobs:
         run: pytest -m golden -v --no-header -rA
 
   docker:
+    needs: [lint, test, rdkit-compat]
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/docker-image.yml
+    secrets: inherit
+  paper-evaluations:
+    if: github.event_name == 'pull_request' && github.base_ref == 'tests'
+    needs: [lint, test, rdkit-compat]
     runs-on: ubuntu-latest
-    needs: [lint]
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        shard:
+          - qm9/qm9_all
+          - pubchem/pubchem_seed5_100000
+          - pubchem/pubchem_seed17_100000
+          - pubchem/pubchem_seed42_100000
+          - pubchem/pubchem_seed63_100000
+          - pubchem/pubchem_seed87_100000
+          - zinc22/zinc22_seed5_100000
+          - zinc22/zinc22_seed17_100000
+          - zinc22/zinc22_seed42_100000
+          - zinc22/zinc22_seed63_100000
+          - zinc22/zinc22_seed87_100000
+
     steps:
       - uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
-
-      - name: Build image
-        uses: docker/build-push-action@v6
+      - uses: actions/setup-python@v5
         with:
-          context: .
-          push: false
-          load: true
-          tags: openclatura:ci
+          python-version: "3.12"
+          cache: pip
 
-      - name: Smoke-test the image
+      - name: Set up JDK for changed-name OPSIN checks
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install OpenClatura and regression dependencies
         run: |
-          docker run -d --name openclatura-ci -p 8000:8000 openclatura:ci
-          for i in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:8000/healthz > /tmp/health.json; then
-              cat /tmp/health.json
-              exit 0
-            fi
-            sleep 2
-          done
-          docker logs openclatura-ci
-          exit 1
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Compare against the paper evaluation
+        run: |
+          python evaluations/check_regression.py \
+            "evaluations/results/${{ matrix.shard }}_openclatura.jsonl" \
+            --processes auto \
+            --report "regression-reports/${{ strategy.job-index }}.json"
+
+      - name: Upload discrepancy report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evaluation-regression-${{ strategy.job-index }}
+          path: regression-reports/*.json
+          if-no-files-found: error

@@ -538,7 +538,9 @@ def name_component(
         subst_mapping,
     )
     if retained_fused is not None:
-        state.retained_name, state.locant_maps = retained_fused
+        state.retained_name = retained_fused.name
+        state.locant_maps = retained_fused.locant_maps
+        state.retained_parent_metadata = retained_fused.metadata
     if (
         state.retained_name
         and state.locant_maps is None
@@ -554,6 +556,7 @@ def name_component(
         subst_mapping,
         state.locant_maps,
         state.retained_name,
+        state.retained_parent_metadata,
     )
     numbered_path = parent_plan.numbered_path
     locant_map = parent_plan.locant_map
@@ -573,7 +576,6 @@ def name_component(
     )
     parts = parent_plan.parts
     emit_bond_stereo(mol, parts, numbered_path, get_loc, state.base_exclude)
-    add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
     add_component_front_modifiers(
         mol, parts, state.perceived_groups, state.principal_key, state.sub_exclude, name_subgraph
     )
@@ -605,6 +607,7 @@ def name_component(
         numbered_path,
         get_loc,
     )
+    add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
     add_component_substituents(parts, subst_mapping, numbered_path, get_loc)
 
     refresh_name_atom_bindings(parts)
