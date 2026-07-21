@@ -17,13 +17,17 @@ start; its ``bin`` is prepended to ``PATH`` before openclatura checks
 """
 
 import ctypes
+import hashlib
 import importlib.metadata
+import json
 import os
 import re
 import shutil
 import tarfile
 import tempfile
 import threading
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 _JRE_TARBALL = Path(__file__).parent / "jre.tar.gz"
@@ -100,10 +104,67 @@ except ImportError as exc:
     rdMolDraw2D = None
     _DRAW_IMPORT_ERROR = str(exc)
 
+from openclatura import describe  # noqa: E402
 from openclatura import name as name_one  # noqa: E402
 from openclatura.web.app import create_app  # noqa: E402
 
 app = FastAPI()
+
+# ---------------------------------------------------------------------------
+# Result cache (Upstash Redis over REST). Naming is deterministic per package
+# version, so results are cached under the canonical SMILES + request flags,
+# scoped by version. Fully optional: without credentials every request just
+# computes, and any cache error falls back to computing.
+# ---------------------------------------------------------------------------
+_CACHE_URL = (os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL") or "").rstrip("/")
+_CACHE_TOKEN = os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN") or ""
+_CACHE_TTL_SECONDS = 90 * 24 * 3600
+
+
+def _pkg_version() -> str:
+    try:
+        return importlib.metadata.version("openclatura")
+    except importlib.metadata.PackageNotFoundError:
+        return "unknown"
+
+
+def _cache_key(kind: str, smiles: str, flags: str = "") -> str | None:
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return None
+    canonical = Chem.MolToSmiles(mol)
+    digest = hashlib.sha256(canonical.encode()).hexdigest()[:32]
+    return f"{kind}:{_pkg_version()}:{flags}:{digest}"
+
+
+def _cache_get(key: str | None) -> dict | None:
+    if not key or not _CACHE_URL:
+        return None
+    req = urllib.request.Request(
+        f"{_CACHE_URL}/get/{urllib.parse.quote(key, safe='')}",
+        headers={"Authorization": f"Bearer {_CACHE_TOKEN}"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            raw = json.load(resp).get("result")
+        return json.loads(raw) if raw else None
+    except Exception:
+        return None
+
+
+def _cache_set(key: str | None, value: dict) -> None:
+    if not key or not _CACHE_URL:
+        return
+    req = urllib.request.Request(
+        f"{_CACHE_URL}/set/{urllib.parse.quote(key, safe='')}?EX={_CACHE_TTL_SECONDS}",
+        data=json.dumps(value).encode(),
+        headers={"Authorization": f"Bearer {_CACHE_TOKEN}"},
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(req, timeout=2).read()
+    except Exception:
+        pass
 
 # py2opsin writes a fixed-name temp file in the CWD, so concurrent
 # requests in one warm process corrupt each other's OPSIN round-trip.
@@ -118,24 +179,57 @@ class NameRequest(BaseModel):
     token_debug: bool = False
 
 
+def _name_cacheable(payload: dict, verify: bool) -> bool:
+    if not payload.get("ok"):
+        return False
+    if verify:
+        status = (payload.get("opsin_check") or {}).get("status")
+        return status in ("matched", "mismatched", "name_unparseable")
+    return True
+
+
 @app.post("/api/name")
 def name_endpoint(req: NameRequest) -> dict:
-    """Shadows the mounted app's /name to make OPSIN verification safe
-    under in-process request concurrency."""
+    """Shadows the mounted app's /name: adds result caching and makes
+    OPSIN verification safe under in-process request concurrency."""
+    flags = f"t{int(req.include_trace)}v{int(req.verify_opsin)}d{int(req.token_debug)}"
+    key = _cache_key("name", req.smiles, flags)
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
     if not req.verify_opsin:
         result = name_one(req.smiles, include_trace=req.include_trace, token_debug=req.token_debug)
-        return result.to_dict(include_trace=req.include_trace)
-    with _OPSIN_LOCK:
-        for attempt in (1, 2):
-            result = name_one(
-                req.smiles,
-                include_trace=req.include_trace,
-                verify_opsin=True,
-                token_debug=req.token_debug,
-            )
-            if result.opsin_check is None or result.opsin_check.status != "error":
-                break
-    return result.to_dict(include_trace=req.include_trace)
+    else:
+        with _OPSIN_LOCK:
+            for attempt in (1, 2):
+                result = name_one(
+                    req.smiles,
+                    include_trace=req.include_trace,
+                    verify_opsin=True,
+                    token_debug=req.token_debug,
+                )
+                if result.opsin_check is None or result.opsin_check.status != "error":
+                    break
+    payload = result.to_dict(include_trace=req.include_trace)
+    if _name_cacheable(payload, req.verify_opsin):
+        _cache_set(key, payload)
+    return payload
+
+
+class DescribeRequest(BaseModel):
+    smiles: str
+
+
+@app.post("/api/describe")
+def describe_endpoint(req: DescribeRequest) -> dict:
+    """Shadows the mounted app's /describe to add result caching."""
+    key = _cache_key("desc", req.smiles)
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+    payload = describe(req.smiles).to_dict()
+    _cache_set(key, payload)
+    return payload
 
 
 @app.get("/api/healthz")
@@ -167,6 +261,10 @@ def depict(req: DepictRequest) -> dict:
     """
     if rdMolDraw2D is None:
         return {"ok": False, "error": f"Depiction unavailable: {_DRAW_IMPORT_ERROR}"}
+    key = _cache_key("depict", req.smiles, f"{req.width}x{req.height}")
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
     mol = Chem.MolFromSmiles(req.smiles)
     if mol is None:
         return {"ok": False, "error": "RDKit could not parse the SMILES."}
@@ -179,7 +277,9 @@ def depict(req: DepictRequest) -> dict:
     svg = drawer.GetDrawingText()
     # Drop the XML declaration so the SVG can be injected via innerHTML.
     svg = re.sub(r"^\s*<\?xml[^>]*\?>\s*", "", svg)
-    return {"ok": True, "svg": svg}
+    payload = {"ok": True, "svg": svg}
+    _cache_set(key, payload)
+    return payload
 
 
 app.mount("/api", create_app())
