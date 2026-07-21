@@ -29,6 +29,7 @@ import subprocess
 import tarfile
 import tempfile
 import threading
+import time
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -416,6 +417,25 @@ def describe_endpoint(req: DescribeRequest) -> dict:
     payload = describe(req.smiles).to_dict()
     _cache_set(key, payload)
     return payload
+
+
+@app.get("/api/warmup")
+def warmup() -> dict:
+    """Boot the OPSIN JVM and prime the naming engine.
+
+    The frontend calls this fire-and-forget while the Ketcher editor is
+    still loading, so the cold start and JVM boot overlap with editor
+    init instead of delaying the first real naming request.
+    """
+    t0 = time.time()
+    with _OPSIN_LOCK:
+        opsin_ready = _OPSIN_DAEMON.parse("methane") is not None
+    try:
+        name_one("C")
+        engine_ready = True
+    except Exception:
+        engine_ready = False
+    return {"ok": True, "opsin": opsin_ready, "engine": engine_ready, "seconds": round(time.time() - t0, 2)}
 
 
 @app.get("/api/healthz")

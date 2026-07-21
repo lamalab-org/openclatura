@@ -334,6 +334,10 @@
 
   var el = function (id) { return document.getElementById(id); };
 
+  // Warm the naming backend (cold start + OPSIN JVM boot) while Ketcher
+  // is still loading, so the first real request hits a warm instance.
+  fetch("/api/warmup").catch(function () {});
+
   // The vendored Ketcher demo app sets `window.ketcher` inside the iframe
   // once the editor (and its in-browser Indigo engine) is initialized.
   (function waitForKetcher() {
