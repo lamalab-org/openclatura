@@ -23,6 +23,7 @@ import re
 import shutil
 import tarfile
 import tempfile
+import threading
 from pathlib import Path
 
 _JRE_TARBALL = Path(__file__).parent / "jre.tar.gz"
@@ -99,9 +100,42 @@ except ImportError as exc:
     rdMolDraw2D = None
     _DRAW_IMPORT_ERROR = str(exc)
 
+from openclatura import name as name_one  # noqa: E402
 from openclatura.web.app import create_app  # noqa: E402
 
 app = FastAPI()
+
+# py2opsin writes a fixed-name temp file in the CWD, so concurrent
+# requests in one warm process corrupt each other's OPSIN round-trip.
+# Serialize the verify path (and retry once for residual flakes).
+_OPSIN_LOCK = threading.Lock()
+
+
+class NameRequest(BaseModel):
+    smiles: str
+    include_trace: bool = False
+    verify_opsin: bool = False
+    token_debug: bool = False
+
+
+@app.post("/api/name")
+def name_endpoint(req: NameRequest) -> dict:
+    """Shadows the mounted app's /name to make OPSIN verification safe
+    under in-process request concurrency."""
+    if not req.verify_opsin:
+        result = name_one(req.smiles, include_trace=req.include_trace, token_debug=req.token_debug)
+        return result.to_dict(include_trace=req.include_trace)
+    with _OPSIN_LOCK:
+        for attempt in (1, 2):
+            result = name_one(
+                req.smiles,
+                include_trace=req.include_trace,
+                verify_opsin=True,
+                token_debug=req.token_debug,
+            )
+            if result.opsin_check is None or result.opsin_check.status != "error":
+                break
+    return result.to_dict(include_trace=req.include_trace)
 
 
 @app.get("/api/healthz")
