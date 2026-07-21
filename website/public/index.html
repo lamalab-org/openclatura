@@ -17,6 +17,7 @@
     --err: #b42318;
     --err-soft: #fdeceb;
     --chip: #eef1f5;
+    --editor-bg: #ffffff; /* matches Ketcher's own themed canvas */
     --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
@@ -31,6 +32,7 @@
       --err: #ff8177;
       --err-soft: #3a1d1c;
       --chip: #222c44;
+      --editor-bg: #1c1f2b;
     }
   }
   * { box-sizing: border-box; }
@@ -101,7 +103,7 @@
     position: relative;
     border: 1px solid var(--border);
     overflow: hidden;
-    background: #fff; /* Ketcher is light-only */
+    background: var(--editor-bg);
     height: min(72vh, 620px);
     min-height: 480px;
   }
@@ -118,8 +120,8 @@
     align-items: center;
     justify-content: center;
     gap: .5rem;
-    background: #fff;
-    color: #5c6675;
+    background: var(--editor-bg);
+    color: var(--muted);
     font-size: .95rem;
     z-index: 2;
     transition: opacity .25s;
