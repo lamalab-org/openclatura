@@ -93,6 +93,27 @@ results = name_many(
 [r.name for r in results if r.ok]
 ```
 
+### Naming an existing RDKit molecule
+
+If you already hold an `rdkit.Chem.rdchem.Mol` — from an SD file, a reaction,
+or an earlier step in a pipeline — skip the SMILES round-trip:
+
+```python
+from rdkit import Chem
+from openclatura import name_rdkit_mol, name_mol, name_many
+
+for mol in Chem.SDMolSupplier("compounds.sdf"):
+    if mol is not None:
+        print(name_rdkit_mol(mol))          # -> 'benzoic acid'
+
+name_mol(mol)                                # typed NamingResult, as `name`
+name_many([mol, "CCO"])                      # batches take either form
+```
+
+The input molecule is never modified, explicit hydrogens (as SD files usually
+carry them) are handled, and `name_rdkit_mol_with_trace` / `analyze_rdkit_mol`
+mirror their SMILES counterparts.
+
 For the full decision trace (one `TraceStep` per phase: parse, perception,
 parent selection, numbering, assembly, …):
 
