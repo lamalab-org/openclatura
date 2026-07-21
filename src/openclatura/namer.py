@@ -1744,3 +1744,26 @@ def name_smiles(smiles: str) -> str:
     """
 
     return DEFAULT_NAMING_ENGINE.name_smiles(smiles)
+
+
+def name_rdkit_mol(rdkit_mol) -> str:
+    """Return an IUPAC-style name for an existing ``rdkit.Chem.rdchem.Mol``.
+
+    Equivalent to :func:`name_smiles` without the SMILES round-trip, for
+    callers that already hold an RDKit molecule (for example from an SD file).
+    The input molecule is not modified.
+    """
+
+    return DEFAULT_NAMING_ENGINE.name_rdkit_mol(rdkit_mol)
+
+
+def name_rdkit_mol_with_trace(rdkit_mol) -> tuple[str, list[dict]]:
+    """RDKit-molecule counterpart of :func:`name_smiles_with_trace`."""
+
+    return DEFAULT_NAMING_ENGINE.name_rdkit_mol_with_trace(rdkit_mol)
+
+
+def analyze_rdkit_mol(rdkit_mol, *, token_debug: bool = False) -> NameAnalysis:
+    """RDKit-molecule counterpart of :func:`analyze_smiles`."""
+
+    return DEFAULT_NAMING_ENGINE.analyze_rdkit_mol(rdkit_mol, token_debug=token_debug)
