@@ -17,12 +17,15 @@ start; its ``bin`` is prepended to ``PATH`` before openclatura checks
 """
 
 import ctypes
+import dataclasses
 import hashlib
 import importlib.metadata
 import json
 import os
 import re
+import select
 import shutil
+import subprocess
 import tarfile
 import tempfile
 import threading
@@ -248,6 +251,106 @@ def _cache_set(key: str | None, value: dict) -> None:
 _OPSIN_LOCK = threading.Lock()
 
 
+class _OpsinDaemon:
+    """Long-lived OPSIN CLI process, one per instance.
+
+    Spawning a JVM per verification costs ~1.5 s; OPSIN's CLI streams
+    names line-by-line (empty output line = unparseable), so one warm
+    JVM answers in milliseconds. Access is serialized by _OPSIN_LOCK.
+    On any protocol hiccup the process is killed and the caller falls
+    back to the one-shot py2opsin path.
+    """
+
+    def __init__(self) -> None:
+        self._proc: subprocess.Popen | None = None
+
+    @staticmethod
+    def _jar_path() -> str | None:
+        try:
+            import py2opsin
+        except ImportError:
+            return None
+        jars = sorted(Path(py2opsin.__file__).parent.glob("opsin-cli-*.jar"))
+        return str(jars[-1]) if jars else None
+
+    def _ensure(self) -> bool:
+        if self._proc is not None and self._proc.poll() is None:
+            return True
+        jar = self._jar_path()
+        if jar is None or not shutil.which("java"):
+            return False
+        self._proc = subprocess.Popen(
+            ["java", "-jar", jar, "-osmi"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            bufsize=1,
+        )
+        return True
+
+    def parse(self, name: str, timeout: float = 15.0) -> str | None:
+        """SMILES for ``name``, "" if OPSIN can't parse it, None if the
+        daemon is unavailable (caller should fall back)."""
+        if "\n" in name or "\r" in name or not self._ensure():
+            return None
+        proc = self._proc
+        try:
+            proc.stdin.write(name + "\n")
+            proc.stdin.flush()
+            ready, _, _ = select.select([proc.stdout], [], [], timeout)
+            if not ready:
+                raise TimeoutError(f"OPSIN gave no answer within {timeout}s")
+            line = proc.stdout.readline()
+            if line == "":
+                raise EOFError("OPSIN process closed stdout")
+            return line.rstrip("\n")
+        except Exception:
+            try:
+                proc.kill()
+            except Exception:
+                pass
+            self._proc = None
+            return None
+
+
+_OPSIN_DAEMON = _OpsinDaemon()
+
+
+def _opsin_check_via_daemon(name: str, smiles: str):
+    """Mirror openclatura.opsin_verify.verify_with_opsin, but decode the
+    name through the persistent JVM. Returns None to request fallback."""
+    from openclatura.opsin_verify import OpsinCheck
+    from openclatura.resonance_compare import canonical_smiles, equivalent_smiles
+    from openclatura.utils import standardize_mol
+
+    if not name:
+        return OpsinCheck(status="name_empty", name=name)
+    decoded = _OPSIN_DAEMON.parse(name)
+    if decoded is None:
+        return None
+    canonical_original = standardize_mol(smiles)
+    if decoded == "":
+        return OpsinCheck(status="name_unparseable", name=name, canonical_original=canonical_original)
+    canonical_roundtrip = canonical_smiles(decoded)
+    if canonical_original is None or canonical_roundtrip is None:
+        return OpsinCheck(
+            status="error",
+            name=name,
+            canonical_original=canonical_original,
+            opsin_smiles=decoded,
+            canonical_roundtrip=canonical_roundtrip,
+            error_message="Failed to standardize SMILES for comparison.",
+        )
+    return OpsinCheck(
+        status="matched" if equivalent_smiles(smiles, decoded) else "mismatched",
+        name=name,
+        canonical_original=canonical_original,
+        opsin_smiles=decoded,
+        canonical_roundtrip=canonical_roundtrip,
+    )
+
+
 class NameRequest(BaseModel):
     smiles: str
     include_trace: bool = False
@@ -277,15 +380,22 @@ def name_endpoint(req: NameRequest) -> dict:
         result = name_one(req.smiles, include_trace=req.include_trace, token_debug=req.token_debug)
     else:
         with _OPSIN_LOCK:
-            for attempt in (1, 2):
-                result = name_one(
-                    req.smiles,
-                    include_trace=req.include_trace,
-                    verify_opsin=True,
-                    token_debug=req.token_debug,
-                )
-                if result.opsin_check is None or result.opsin_check.status != "error":
-                    break
+            # include_trace=True mirrors the engine's verify branch, which
+            # always analyzes; to_dict() below trims it when not requested.
+            result = name_one(req.smiles, include_trace=True, token_debug=req.token_debug)
+            check = None if result.error else _opsin_check_via_daemon(result.name, req.smiles)
+            if check is not None:
+                result = dataclasses.replace(result, opsin_check=check)
+            else:
+                for attempt in (1, 2):
+                    result = name_one(
+                        req.smiles,
+                        include_trace=req.include_trace,
+                        verify_opsin=True,
+                        token_debug=req.token_debug,
+                    )
+                    if result.opsin_check is None or result.opsin_check.status != "error":
+                        break
     payload = result.to_dict(include_trace=req.include_trace)
     if _name_cacheable(payload, req.verify_opsin):
         _cache_set(key, payload)
