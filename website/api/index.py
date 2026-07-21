@@ -34,6 +34,7 @@ _XLIBS_DIR = Path(tempfile.gettempdir()) / "openclatura-xlibs"
 # which the Vercel runtime image lacks. Preloading them (dependency order,
 # RTLD_GLOBAL) makes the later dlopen resolve against the loaded sonames.
 _XLIBS_ORDER = (
+    "libexpat.so.1",
     "libmd.so.0",
     "libbsd.so.0",
     "libXau.so.6",
