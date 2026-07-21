@@ -16,7 +16,9 @@ start; its ``bin`` is prepended to ``PATH`` before openclatura checks
 ``shutil.which("java")``.
 """
 
+import importlib.metadata
 import os
+import re
 import shutil
 import tarfile
 import tempfile
@@ -50,8 +52,55 @@ _ensure_java()
 os.chdir(tempfile.gettempdir())
 
 from fastapi import FastAPI  # noqa: E402
+from pydantic import BaseModel, Field  # noqa: E402
+from rdkit import Chem  # noqa: E402
+from rdkit.Chem.Draw import rdMolDraw2D  # noqa: E402
 
 from openclatura.web.app import create_app  # noqa: E402
 
 app = FastAPI()
+
+
+@app.get("/api/healthz")
+def healthz() -> dict:
+    """Report the installed distribution version.
+
+    Shadows the mounted app's healthz: released wheels up to 0.1.4 ship a
+    stale hardcoded ``openclatura.__version__``.
+    """
+    try:
+        version = importlib.metadata.version("openclatura")
+    except importlib.metadata.PackageNotFoundError:
+        version = "unknown"
+    return {"ok": True, "version": version}
+
+
+class DepictRequest(BaseModel):
+    smiles: str
+    width: int = Field(440, ge=100, le=1200)
+    height: int = Field(360, ge=100, le=1200)
+
+
+@app.post("/api/depict")
+def depict(req: DepictRequest) -> dict:
+    """Render the molecule as SVG with RDKit atom indices annotated.
+
+    The indices match the atom ids reported by ``/api/describe``
+    (both are plain RDKit atom indices of ``MolFromSmiles(smiles)``).
+    """
+    mol = Chem.MolFromSmiles(req.smiles)
+    if mol is None:
+        return {"ok": False, "error": "RDKit could not parse the SMILES."}
+    drawer = rdMolDraw2D.MolDraw2DSVG(req.width, req.height)
+    opts = drawer.drawOptions()
+    opts.addAtomIndices = True
+    opts.annotationFontScale = 0.7
+    rdMolDraw2D.PrepareAndDrawMolecule(drawer, mol)
+    drawer.FinishDrawing()
+    svg = drawer.GetDrawingText()
+    # Drop the XML declaration so the SVG can be injected via innerHTML.
+    svg = re.sub(r"^\s*<\?xml[^>]*\?>\s*", "", svg)
+    return {"ok": True, "svg": svg}
+
+
 app.mount("/api", create_app())

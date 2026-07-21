@@ -42,20 +42,35 @@
     line-height: 1.55;
   }
   header {
-    padding: 2rem 1.5rem 1.2rem;
-    text-align: center;
+    max-width: 86rem;
+    margin: 0 auto;
+    padding: 1.6rem 1.25rem 1.1rem;
+  }
+  .header-row {
+    display: flex;
+    align-items: baseline;
+    gap: .6rem;
+    flex-wrap: wrap;
   }
   header h1 {
-    margin: 0 0 .35rem;
-    font-size: 1.9rem;
-    letter-spacing: -.02em;
+    margin: 0;
+    font-size: 1.45rem;
+    letter-spacing: -.01em;
   }
   header h1 span { color: var(--accent); }
+  .version-tag {
+    font-family: var(--mono);
+    font-size: .74rem;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: .08rem .45rem;
+  }
+  .version-tag:empty { display: none; }
   header p {
-    margin: 0 auto;
+    margin: .3rem 0 0;
     max-width: 46rem;
     color: var(--muted);
-    font-size: .95rem;
+    font-size: .92rem;
   }
   main {
     max-width: 86rem;
@@ -70,22 +85,21 @@
   .card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 14px;
     padding: 1rem 1.1rem 1.1rem;
-    box-shadow: 0 1px 3px rgba(15, 25, 50, .05);
   }
   .card h2 {
-    margin: 0 0 .7rem;
-    font-size: .78rem;
+    margin: 0 0 .8rem;
+    padding-bottom: .45rem;
+    border-bottom: 1px solid var(--border);
+    font-size: .76rem;
     font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: .08em;
+    letter-spacing: .09em;
     color: var(--muted);
   }
   .editor-shell {
     position: relative;
     border: 1px solid var(--border);
-    border-radius: 10px;
     overflow: hidden;
     background: #fff; /* Ketcher is light-only */
     height: min(72vh, 620px);
@@ -122,9 +136,9 @@
     border: 1px solid var(--border);
     background: var(--chip);
     color: var(--text);
-    border-radius: 999px;
-    padding: .28rem .8rem;
+    padding: .28rem .7rem;
     font-size: .82rem;
+    font-family: var(--mono);
     cursor: pointer;
     transition: border-color .15s, color .15s;
   }
@@ -138,13 +152,16 @@
     overflow-x: auto;
   }
   #result-name {
-    font-size: 1.45rem;
+    font-size: 1.4rem;
     font-weight: 650;
     letter-spacing: -.01em;
+    overflow-wrap: anywhere;
     word-break: break-word;
     min-height: 2.2rem;
     margin: .1rem 0 .4rem;
+    line-height: 1.3;
   }
+  #result-name.long { font-size: 1.05rem; font-family: var(--mono); font-weight: 600; }
   #result-name.placeholder { color: var(--muted); font-weight: 400; font-size: 1rem; }
   #result-name.error { color: var(--err); font-size: 1rem; font-weight: 500; }
   .status {
@@ -168,7 +185,6 @@
     font-size: .74rem;
     background: var(--accent-soft);
     color: var(--accent);
-    border-radius: 6px;
     padding: .18rem .5rem;
     cursor: default;
   }
@@ -177,7 +193,6 @@
     border: 1px solid var(--border);
     background: var(--surface);
     color: var(--text);
-    border-radius: 8px;
     padding: .42rem .95rem;
     font-size: .87rem;
     cursor: pointer;
@@ -195,7 +210,20 @@
     font-size: .9rem;
     display: none;
   }
-  #explain p { margin: 0 0 .6rem; }
+  #explain p { margin: 0 0 .6rem; overflow-wrap: anywhere; }
+  #explain .mol-depict {
+    background: #fff; /* RDKit SVG is light-only */
+    border: 1px solid var(--border);
+    padding: .4rem;
+    margin: 0 0 .8rem;
+  }
+  #explain .mol-depict svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  #explain .mol-caption {
+    font-size: .76rem;
+    color: var(--muted);
+    margin: .35rem 0 0;
+    text-align: center;
+  }
   #explain .phase {
     font-family: var(--mono);
     font-size: .72rem;
@@ -218,7 +246,6 @@
     display: none;
     width: fit-content;
     font-size: .8rem;
-    border-radius: 999px;
     padding: .2rem .7rem;
     margin: .1rem 0 .35rem;
   }
@@ -231,7 +258,6 @@
   .errbox {
     background: var(--err-soft);
     color: var(--err);
-    border-radius: 8px;
     padding: .55rem .8rem;
     font-size: .85rem;
     margin-top: .6rem;
@@ -250,7 +276,10 @@
 <body>
 
 <header>
-  <h1><span>openclatura</span> molecule namer</h1>
+  <div class="header-row">
+    <h1><span>openclatura</span> molecule namer</h1>
+    <span class="version-tag" id="app-version" title="openclatura package version"></span>
+  </div>
   <p>Draw a molecule below and it is named with deterministic IUPAC Blue Book (2013) rules.</p>
 </header>
 
@@ -284,7 +313,7 @@
       <button id="btn-explain" disabled>Explain this name</button>
     </div>
     <label class="verify-toggle">
-      <input type="checkbox" id="opsin-toggle">
+      <input type="checkbox" id="opsin-toggle" checked>
       Verify with OPSIN <span class="hint">— parse the name back to a structure (py2opsin) and compare with your drawing</span>
     </label>
     <div id="explain"></div>
@@ -393,7 +422,7 @@
         if (data.ok && data.name) {
           currentName = data.name;
           el("result-name").textContent = data.name;
-          el("result-name").className = "";
+          el("result-name").className = data.name.length > 50 ? "long" : "";
           el("btn-copy").disabled = false;
           el("btn-explain").disabled = false;
           renderOpsin(data.opsin_check);
@@ -465,19 +494,38 @@
     var btn = el("btn-explain");
     btn.disabled = true;
     setStatus('<span class="spinner"></span> explaining…');
-    fetch("/api/describe", {
+    var describeReq = fetch("/api/describe", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ smiles: currentSmiles })
-    })
-      .then(function (r) {
-        if (!r.ok) throw new Error("API error (HTTP " + r.status + ")");
-        return r.json();
-      })
-      .then(function (d) {
+    }).then(function (r) {
+      if (!r.ok) throw new Error("API error (HTTP " + r.status + ")");
+      return r.json();
+    });
+    // Depiction is best-effort: the explanation still renders without it.
+    var depictReq = fetch("/api/depict", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ smiles: currentSmiles })
+    }).then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; });
+    Promise.all([describeReq, depictReq])
+      .then(function (results) {
+        var d = results[0];
+        var depict = results[1];
         setStatus("");
         btn.disabled = false;
         target.innerHTML = "";
+        if (depict && depict.ok && depict.svg) {
+          var fig = document.createElement("figure");
+          fig.className = "mol-depict";
+          fig.innerHTML = depict.svg;
+          var cap = document.createElement("figcaption");
+          cap.className = "mol-caption";
+          cap.textContent = "Drawn structure with the atom ids referenced below.";
+          fig.appendChild(cap);
+          target.appendChild(fig);
+        }
         (d.paragraphs || []).forEach(function (p) {
           var node = document.createElement("p");
           node.textContent = p.replace(/\*\*/g, "");
@@ -491,7 +539,7 @@
             phase.className = "phase";
             phase.textContent = c.phase;
             li.appendChild(phase);
-            li.appendChild(document.createTextNode(c.text));
+            li.appendChild(document.createTextNode(c.text.replace(/\*\*/g, "")));
             list.appendChild(li);
           });
           target.appendChild(list);
@@ -504,6 +552,13 @@
         showError(e.message);
       });
   });
+
+  fetch("/api/healthz")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (d && d.version) el("app-version").textContent = "v" + d.version;
+    })
+    .catch(function () { /* version tag stays hidden */ });
 
   el("examples").addEventListener("click", function (ev) {
     var smiles = ev.target && ev.target.getAttribute("data-smiles");

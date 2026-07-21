@@ -1,2 +1,2 @@
-openclatura[web] @ git+https://github.com/lamalab-org/openclatura.git@dev
+openclatura[web]==0.1.4
 py2opsin>=1.2
