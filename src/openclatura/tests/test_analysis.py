@@ -174,6 +174,7 @@ from openclatura.token_grammar import (
     lexical_token_spans,
 )
 from openclatura.trace_helpers import (
+    NamingTreeMetadata,
     add_substituent_trace,
     assembly_substituent_tree,
     assembly_trace_segments,
@@ -314,6 +315,31 @@ def test_tree_builder_rejects_unknown_or_invariant_metadata_fields():
 
     with pytest.raises(ValueError, match="cannot replace invariant fields"):
         build_naming_tree_node(kind="component", name="methane", metadata={"name": "other"})
+
+
+def test_tree_builder_accepts_and_merges_all_supported_metadata_fields():
+    metadata: NamingTreeMetadata = {
+        "name_atom_bindings": [{"text": "methane", "atoms": [0]}],
+        "name_token_spans": [{"text": "methane", "start": 0, "end": 7}],
+        "stereo_features": [{"descriptor": "R", "atom": 0}],
+        "indicated_hydrogens": ["1H"],
+        "hydro_operations": [{"kind": "added_hydrogen", "atom": 0}],
+        "parent_charges": [{"locant": "1", "charge": 1}],
+    }
+
+    node = build_naming_tree_node(
+        kind="component",
+        name="methane",
+        atom_ids={2, 0},
+        bond_ids={4},
+        metadata=metadata,
+    )
+
+    assert node["kind"] == "component"
+    assert node["name"] == "methane"
+    assert node["atoms"] == [0, 2]
+    assert node["bonds"] == [4]
+    assert metadata.items() <= node.items()
 
 
 def test_methane_is_named_without_parent_selection_fallback():
