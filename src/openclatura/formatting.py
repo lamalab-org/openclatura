@@ -2,6 +2,7 @@
 
 import re
 
+from .assembly_parts import RenderedSubstituentName, rendered_substituent_text
 from .namer_config import ALKYL_OXY_PREFIXES
 from .rules import multipliers, stems
 
@@ -22,9 +23,10 @@ def is_fully_enclosed(s: str) -> bool:
     return depth == 0
 
 
-def strip_outer_parentheses(name: str) -> str:
+def strip_outer_parentheses(name: str | RenderedSubstituentName) -> str:
     """Remove one balanced outer parenthesis pair from a fragment."""
 
+    name = rendered_substituent_text(name)
     if name.startswith("(") and name.endswith(")"):
         return name[1:-1]
     return name

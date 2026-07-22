@@ -2,6 +2,7 @@
 
 from typing import Literal, Protocol, overload
 
+from .assembly_parts import RenderedSubstituentText
 from .molecule import DecisionTrace, Molecule
 
 
@@ -14,12 +15,12 @@ class RecursiveSubgraphNamer(Protocol):
         mol: Molecule,
         start_idx: int,
         exclude_atoms: set[int],
-        upstream_atom: int | None = None,
         *,
+        upstream_atom: int | None = None,
         return_trace: Literal[False] = False,
         return_tree: Literal[False] = False,
         decision_trace: DecisionTrace | None = None,
-    ) -> str: ...
+    ) -> RenderedSubstituentText: ...
 
     @overload
     def __call__(
@@ -27,12 +28,12 @@ class RecursiveSubgraphNamer(Protocol):
         mol: Molecule,
         start_idx: int,
         exclude_atoms: set[int],
-        upstream_atom: int | None = None,
         *,
+        upstream_atom: int | None = None,
         return_trace: Literal[True],
         return_tree: Literal[False] = False,
         decision_trace: DecisionTrace | None = None,
-    ) -> tuple[str, list[dict]]: ...
+    ) -> tuple[RenderedSubstituentText, list[dict]]: ...
 
     @overload
     def __call__(
@@ -40,12 +41,12 @@ class RecursiveSubgraphNamer(Protocol):
         mol: Molecule,
         start_idx: int,
         exclude_atoms: set[int],
-        upstream_atom: int | None = None,
         *,
+        upstream_atom: int | None = None,
         return_trace: Literal[True],
         return_tree: Literal[True],
         decision_trace: DecisionTrace | None = None,
-    ) -> tuple[str, list[dict], dict | None]: ...
+    ) -> tuple[RenderedSubstituentText, list[dict], dict | None]: ...
 
     @overload
     def __call__(
@@ -53,9 +54,9 @@ class RecursiveSubgraphNamer(Protocol):
         mol: Molecule,
         start_idx: int,
         exclude_atoms: set[int],
-        upstream_atom: int | None = None,
         *,
+        upstream_atom: int | None = None,
         return_trace: Literal[False] = False,
         return_tree: Literal[True],
         decision_trace: DecisionTrace | None = None,
-    ) -> tuple[str, dict | None]: ...
+    ) -> tuple[RenderedSubstituentText, dict | None]: ...

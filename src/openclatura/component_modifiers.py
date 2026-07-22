@@ -1,6 +1,6 @@
 """Data-driven component modifiers attached after parent numbering."""
 
-from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem
+from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem, split_rendered_substituent_name
 from .formatting import strip_outer_parentheses
 from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
@@ -119,10 +119,12 @@ def add_component_n_substituents(
                         bond_ids_within(mol, {single_n, n_sub}),
                     )
                     if _use_hydrazone_suffix_modifier(parts, principal_key):
+                        branch_text, outer_parentheses_optional = split_rendered_substituent_name(branch_name)
                         parts.principal_suffix_modifiers.append(
                             SubstituentItem(
-                                branch_name,
+                                branch_text,
                                 [],
+                                outer_parentheses_optional=outer_parentheses_optional,
                                 atom_ids=branch_atoms,
                                 bond_ids=bond_ids_within(mol, branch_atoms | {single_n}),
                                 charge_atom_ids=_charged_atoms(mol, branch_atoms),

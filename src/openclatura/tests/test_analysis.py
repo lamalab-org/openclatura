@@ -26,7 +26,6 @@ from openclatura.assembly_parts import (
     NameTokenBinding,
     ParentChargeItem,
     PrincipalGroupItem,
-    RenderedSubstituentName,
     SubstituentItem,
     UnsaturationItem,
 )
@@ -309,6 +308,14 @@ def test_tree_builders_share_schema_without_mutable_defaults():
     assert shortcut["substituents"] == []
 
 
+def test_tree_builder_rejects_unknown_or_invariant_metadata_fields():
+    with pytest.raises(ValueError, match="Unknown tree metadata fields"):
+        build_naming_tree_node(kind="component", name="methane", metadata={"unexpected": []})
+
+    with pytest.raises(ValueError, match="cannot replace invariant fields"):
+        build_naming_tree_node(kind="component", name="methane", metadata={"name": "other"})
+
+
 def test_methane_is_named_without_parent_selection_fallback():
     assert name_smiles("C") == "methane"
 
@@ -327,17 +334,32 @@ def test_locanted_stereochemical_substituent_keeps_disambiguating_parentheses():
         parent_atom_symbols_by_locant={str(locant): "C" for locant in range(1, 7)},
         substituents=[
             SubstituentItem(
-                name=RenderedSubstituentName(
-                    "((3R)-3-cyclohexylcyclohexyl)",
-                    outer_parentheses_optional=True,
-                ),
+                name="((3R)-3-cyclohexylcyclohexyl)",
                 locants=["1"],
+                outer_parentheses_optional=True,
             ),
             SubstituentItem(name="methyl", locants=["4"]),
         ],
     )
 
     assert assemble_name(parts) == "1-((3R)-3-cyclohexylcyclohexyl)-4-methylbenzene"
+
+
+def test_stereochemical_substituent_reused_as_substituent_preserves_optional_outer_parentheses():
+    parts = AssemblyParts(
+        parent_length=2,
+        is_substituent=True,
+        parent_atom_symbols_by_locant={str(locant): "C" for locant in range(1, 3)},
+        substituents=[
+            SubstituentItem(
+                name="((3R)-3-cyclohexylcyclohexyl)",
+                locants=["1"],
+                outer_parentheses_optional=True,
+            )
+        ],
+    )
+
+    assert assemble_name(parts) == "1-((3R)-3-cyclohexylcyclohexyl)ethyl"
 
 
 def test_nested_stereochemical_substituent_keeps_semantic_boundary():
