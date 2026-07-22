@@ -1,14 +1,35 @@
 """Trace and explainability helpers for generated names."""
 
 from dataclasses import replace
+from typing import TypedDict
 
-from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem
+from .assembly_parts import (
+    AssemblyParts,
+    NameTokenBinding,
+    RenderedSubstituentName,
+    SubstituentItem,
+    split_rendered_substituent_name,
+)
 from .formatting import strip_outer_parentheses
 from .molecule import DecisionTrace, Molecule, TracePhase
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .principal_suffixes import principal_suffix_terms
 from .rules import bonds, multipliers, stems
+
+
+class NamingTreeMetadata(TypedDict, total=False):
+    """Optional, non-invariant fields supported by naming-tree nodes."""
+
+    name_atom_bindings: list[dict]
+    name_token_spans: list[dict]
+    stereo_features: list[dict]
+    indicated_hydrogens: list[str]
+    hydro_operations: list[dict]
+    parent_charges: list[dict]
+
+
+NAMING_TREE_METADATA_FIELDS = frozenset(NamingTreeMetadata.__annotations__)
 
 
 def decision_trace_data(trace: DecisionTrace | list | tuple | None) -> list[dict]:
@@ -84,7 +105,7 @@ def bond_ids_within(mol: Molecule, atom_ids: set[int]) -> set[int]:
 
 def add_substituent_trace(
     parts: AssemblyParts,
-    name: str,
+    name: str | RenderedSubstituentName,
     locant: str,
     atom_ids=None,
     bond_ids=None,
@@ -94,9 +115,13 @@ def add_substituent_trace(
     emitted_tokens: tuple[NameTokenBinding, ...] = (),
     substituent_tree=None,
     spiro=None,
+    outer_parentheses_optional: bool | None = None,
 ) -> None:
     """Append or merge a substituent while preserving trace atom/bond IDs."""
 
+    name, rendered_boundary_optional = split_rendered_substituent_name(name)
+    if outer_parentheses_optional is None:
+        outer_parentheses_optional = rendered_boundary_optional
     atom_ids = set(atom_ids or ())
     bond_ids = set(bond_ids or ())
     charge_atom_ids = set(charge_atom_ids or ())
@@ -104,7 +129,16 @@ def add_substituent_trace(
     nested_decisions = list(nested_decisions or ())
     if spiro is not None:
         spiro = replace(spiro, parent_locant=str(locant))
-    existing = next((s for s in parts.substituents if s.name == name and s.spiro == spiro), None)
+    existing = next(
+        (
+            item
+            for item in parts.substituents
+            if item.name == name
+            and item.spiro == spiro
+            and item.outer_parentheses_optional == outer_parentheses_optional
+        ),
+        None,
+    )
     if existing:
         existing.locants.append(locant)
         existing.atom_ids.update(atom_ids)
@@ -124,6 +158,7 @@ def add_substituent_trace(
             SubstituentItem(
                 name=name,
                 locants=[locant],
+                outer_parentheses_optional=outer_parentheses_optional,
                 atom_ids=atom_ids,
                 bond_ids=bond_ids,
                 charge_atom_ids=charge_atom_ids,
@@ -354,7 +389,7 @@ def build_naming_tree_node(
     unsaturations=None,
     trace_segments=None,
     nested_decisions=None,
-    metadata: dict | None = None,
+    metadata: NamingTreeMetadata | None = None,
 ) -> dict:
     """Build the invariant portion of every component/substituent tree node."""
 
@@ -375,6 +410,9 @@ def build_naming_tree_node(
         overlapping_keys = node.keys() & metadata.keys()
         if overlapping_keys:
             raise ValueError(f"Tree metadata cannot replace invariant fields: {sorted(overlapping_keys)}")
+        unknown_keys = metadata.keys() - NAMING_TREE_METADATA_FIELDS
+        if unknown_keys:
+            raise ValueError(f"Unknown tree metadata fields: {sorted(unknown_keys)}")
         node.update(metadata)
     return node
 
@@ -391,7 +429,7 @@ def build_shortcut_tree_node(
 ) -> dict:
     """Build a schema-complete tree node for a shortcut-rendered name."""
 
-    metadata = {}
+    metadata: NamingTreeMetadata = {}
     if name_atom_bindings is not None:
         metadata["name_atom_bindings"] = list(name_atom_bindings)
     if name_token_spans is not None:

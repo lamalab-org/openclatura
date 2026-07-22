@@ -5,7 +5,7 @@ from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from .assembly_parts import NameTokenBinding, SubstituentItem
+from .assembly_parts import NameTokenBinding, SubstituentItem, rendered_substituent_text
 from .formatting import format_counted_prefixes, is_complex_prefix, oxy_prefix_from_branch, strip_outer_parentheses
 from .group_atom_roles import amide_nitrogen, ester_or_peroxy_single_oxygen
 from .molecule import Molecule
@@ -45,6 +45,7 @@ def ester_prefix_from_group(
     branch_name = branch_namer(mol, r_group_c, sub_exclude | {single_o}, upstream_atom=single_o)
     if not branch_name:
         return ""
+    branch_name = rendered_substituent_text(branch_name)
     return f"({oxy_prefix_from_branch(branch_name)}{suffix_text})"
 
 
@@ -62,7 +63,10 @@ def amide_prefix_from_group(
         return ""
     if not n_subs:
         return base
-    sub_names = [branch_namer(mol, x, sub_exclude | {single_n}, upstream_atom=single_n) for x in n_subs]
+    sub_names = [
+        rendered_substituent_text(branch_namer(mol, x, sub_exclude | {single_n}, upstream_atom=single_n))
+        for x in n_subs
+    ]
     return f"({format_counted_prefixes(sub_names)}{base})"
 
 
@@ -87,7 +91,14 @@ def iminium_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str
     if not n_subs:
         return "iminio"
     sub_names = [
-        context.branch_namer(context.mol, n_sub, context.sub_exclude | {iminium_n}, upstream_atom=iminium_n)
+        rendered_substituent_text(
+            context.branch_namer(
+                context.mol,
+                n_sub,
+                context.sub_exclude | {iminium_n},
+                upstream_atom=iminium_n,
+            )
+        )
         for n_sub in n_subs
     ]
     return f"({format_counted_prefixes(sub_names)}iminio)"

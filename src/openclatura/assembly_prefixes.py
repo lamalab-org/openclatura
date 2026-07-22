@@ -3,7 +3,7 @@
 import re
 
 from .assembly_charge import inferred_ionic_retained_parent, single_charged_replacement_locants
-from .assembly_parts import AssemblyParts, RenderedSubstituentName, SubstituentItem
+from .assembly_parts import AssemblyParts, SubstituentItem
 from .assembly_utils import is_fully_enclosed, needs_hyphen, parse_locant
 from .formatting import is_complex_prefix
 from .nomenclature import RULES
@@ -148,6 +148,7 @@ def format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:
     prefix_parts = []
     for name in sorted(grouped.keys(), key=substituent_sort_key):
         items = grouped[name]
+        outer_parentheses_optional = all(item.outer_parentheses_optional for item in items)
         locs = sorted([loc for item in items for loc in item.locants], key=parse_locant)
         attachments_per_group = 2 if ("diyl" in name and "ylidene" not in name) else 1
         count_raw = len(locs) if locs else len(items)
@@ -156,7 +157,14 @@ def format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:
         mult = (multipliers.complex_(count) if is_complex else multipliers.basic(count)) if count > 1 else ""
         loc_str = substituent_locant_string(parts, locs, len(grouped), spiro_subs)
 
-        name_to_use = _omit_optional_outer_parentheses(parts, name, count, loc_str, len(grouped))
+        name_to_use = _omit_optional_outer_parentheses(
+            parts,
+            name,
+            count,
+            loc_str,
+            len(grouped),
+            outer_parentheses_optional=outer_parentheses_optional,
+        )
         if is_complex and not is_fully_enclosed(name_to_use):
             if count > 1 or loc_str:
                 name_to_use = f"({name_to_use})"
@@ -177,6 +185,8 @@ def _omit_optional_outer_parentheses(
     count: int,
     locant_text: str,
     grouped_count: int,
+    *,
+    outer_parentheses_optional: bool,
 ) -> str:
     """Unwrap a directly rendered fragment when its parent boundary is clear."""
 
@@ -185,8 +195,7 @@ def _omit_optional_outer_parentheses(
         or count != 1
         or locant_text
         or grouped_count != 1
-        or not isinstance(name, RenderedSubstituentName)
-        or not name.outer_parentheses_optional
+        or not outer_parentheses_optional
         or not is_fully_enclosed(name)
     ):
         return name

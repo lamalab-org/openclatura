@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 
-from .assembly_parts import AssemblyParts, NameAtomBinding, SubstituentItem
+from .assembly_parts import AssemblyParts, NameAtomBinding, SubstituentItem, split_rendered_substituent_name
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
 from .component_group_rules import (
     exclude_nonparent_group_atoms,
@@ -132,6 +132,7 @@ def collect_component_branch_substituents(
                     )
                     branch_trace = []
                     branch_tree = None
+                branch_name, outer_parentheses_optional = split_rendered_substituent_name(branch_name)
                 if branch_name:
                     branch_exclude = sub_exclude | main_set
                     branch_atoms = subgraph_component(mol, n_idx, branch_exclude)
@@ -139,6 +140,7 @@ def collect_component_branch_substituents(
                         SubstituentItem(
                             name=branch_name,
                             locants=[],
+                            outer_parentheses_optional=outer_parentheses_optional,
                             atom_ids=branch_atoms,
                             bond_ids=bond_ids_within(mol, branch_atoms | {c_idx}),
                             charge_atom_ids=_charged_atoms(mol, branch_atoms),
@@ -183,6 +185,7 @@ def add_component_substituents(
                     item.emitted_tokens,
                     substituent_tree=item.substituent_tree,
                     spiro=item.spiro,
+                    outer_parentheses_optional=item.outer_parentheses_optional,
                 )
 
 
