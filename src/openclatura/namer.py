@@ -447,9 +447,7 @@ def _spiro_side_ring_branch_prefixes(
                 continue
             branch = _name_heteroaromatic_branch_substituent(mol, neighbor, atom_idx, allowed_branch_atoms)
             if not branch:
-                branch = rendered_substituent_text(
-                    name_subgraph(mol, neighbor, branch_exclude, upstream_atom=atom_idx)
-                )
+                branch = rendered_substituent_text(name_subgraph(mol, neighbor, branch_exclude, upstream_atom=atom_idx))
             if branch:
                 side_prefixes.append(f"{locant_map[atom_idx]}'-{format_multiplier(branch, 1, safe_enclose=True)}")
     return side_prefixes
@@ -728,9 +726,7 @@ def _retained_n_ring_spiro_assembly(mol: Molecule, c_idx: int, sub_comp: set[int
         for neighbor in sorted(mol.get_neighbors(atom_idx)):
             if neighbor not in allowed_branch_atoms:
                 continue
-            branch = rendered_substituent_text(
-                name_subgraph(mol, neighbor, branch_exclude, upstream_atom=atom_idx)
-            )
+            branch = rendered_substituent_text(name_subgraph(mol, neighbor, branch_exclude, upstream_atom=atom_idx))
             if branch:
                 side_prefixes.append(f"{locant_map[atom_idx]}'-{branch}")
 
