@@ -14,8 +14,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .graph_io import get_connected_components, read_smiles
-from .molecule import DecisionTrace, NameAnalysis, TracePhase
+from .graph_io import get_connected_components, read_rdkit_mol, read_smiles
+from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
 from .namer_config import SALT_METAL_NAMES
 from .operations import infer_operations
 from .opsin_verify import OpsinCheck, verify_with_opsin
@@ -61,12 +61,18 @@ class NamingRequest:
     the generated name back through OPSIN and compares the canonical
     SMILES to the input.  Verification is graceful when py2opsin or Java
     are missing (see :class:`openclatura.opsin_verify.OpsinCheck`).
+
+    Structures arrive either as ``smiles`` or as an already-parsed
+    ``rdkit_mol`` (``rdkit.Chem.rdchem.Mol``); when a molecule is given, a
+    SMILES is only generated if something downstream actually needs one, so
+    callers holding an RDKit molecule or an SD record pay no round-trip cost.
     """
 
-    smiles: str
+    smiles: str = ""
     include_trace: bool = False
     verify_opsin: bool = False
     token_debug: bool = False
+    rdkit_mol: Any | None = None
 
 
 @dataclass(frozen=True)
@@ -150,6 +156,25 @@ class NamingEngine:
 
         return self.name(smiles)
 
+    def name_rdkit_mol(self, rdkit_mol: Any) -> str:
+        """Return the generated name for an existing ``rdkit.Chem.rdchem.Mol``."""
+
+        return self.run(NamingRequest(rdkit_mol=rdkit_mol)).name
+
+    def name_rdkit_mol_with_trace(self, rdkit_mol: Any) -> tuple[str, list[dict]]:
+        """Return the generated name and assembly trace for an RDKit molecule."""
+
+        result = self.run(NamingRequest(rdkit_mol=rdkit_mol, include_trace=True))
+        return result.name, result.trace_segments
+
+    def analyze_rdkit_mol(self, rdkit_mol: Any, *, token_debug: bool = False) -> NameAnalysis:
+        """Return the full explainable naming analysis for an RDKit molecule."""
+
+        result = self.run(NamingRequest(rdkit_mol=rdkit_mol, include_trace=True, token_debug=token_debug))
+        if result.analysis is None:
+            return NameAnalysis(result.name, result.trace_segments, result.decisions, result.substituent_tree)
+        return result.analysis
+
     def name_with_trace(self, smiles: str) -> tuple[str, list[dict]]:
         """Return the generated name and assembly trace segments."""
 
@@ -183,12 +208,13 @@ class NamingEngine:
         """
 
         try:
+            mol, smiles = self._prepare_input(request)
             if request.include_trace or request.verify_opsin:
-                analysis = self._analyze(request.smiles, token_debug=request.token_debug)
+                analysis = self._analyze(mol, smiles=smiles, token_debug=request.token_debug)
                 rules, hints = _extract_rules_hit(analysis.trace_segments)
                 result = NamingResult(
                     name=analysis.name,
-                    smiles=request.smiles,
+                    smiles=smiles,
                     trace_segments=analysis.trace_segments,
                     substituent_tree=analysis.substituent_tree,
                     decisions=analysis.decisions,
@@ -197,19 +223,19 @@ class NamingEngine:
                     rule_hints=hints,
                 )
             else:
-                result = NamingResult(name=self._name(request.smiles), smiles=request.smiles)
+                result = NamingResult(name=self._name(mol), smiles=smiles)
         except Exception as exc:  # noqa: BLE001 - intentionally permissive boundary
             return NamingResult(name="", smiles=request.smiles, error=f"{type(exc).__name__}: {exc}")
 
         if request.verify_opsin:
-            check = verify_with_opsin(result.name, request.smiles)
+            check = verify_with_opsin(result.name, result.smiles)
             result = replace(result, opsin_check=check)
 
         return result
 
     def name_many(
         self,
-        smiles_iter: Iterable[str],
+        smiles_iter: Iterable[str | Any],
         *,
         include_trace: bool = False,
         verify_opsin: bool = False,
@@ -217,7 +243,7 @@ class NamingEngine:
         processes: int | None | str = 1,
         chunksize: int = 64,
     ) -> list[NamingResult]:
-        """Name a batch of SMILES, optionally in parallel.
+        """Name a batch of SMILES (or RDKit molecules), optionally in parallel.
 
         ``processes=1`` runs in the current process (good default for
         notebooks and short scripts). ``processes=None`` uses all CPU
@@ -232,14 +258,14 @@ class NamingEngine:
         if processes == 1:
             return [
                 self.run(
-                    NamingRequest(
-                        smiles=s,
+                    _request_for(
+                        item,
                         include_trace=include_trace,
                         verify_opsin=verify_opsin,
                         token_debug=token_debug,
                     )
                 )
-                for s in smiles_list
+                for item in smiles_list
             ]
 
         worker_count = processes if processes is not None else os.cpu_count() or 1
@@ -252,8 +278,25 @@ class NamingEngine:
             chunksize=chunksize,
         )
 
-    def _name(self, smiles: str) -> str:
-        mol = read_smiles(smiles)
+    @staticmethod
+    def _prepare_input(request: NamingRequest) -> tuple[Molecule, str]:
+        """Build the internal graph from whichever input the request carries.
+
+        For RDKit input the SMILES stays empty unless it is needed (OPSIN
+        verification), so the common case never pays for ``MolToSmiles``.
+        """
+
+        if request.rdkit_mol is None:
+            return read_smiles(request.smiles), request.smiles
+
+        smiles = request.smiles
+        if not smiles and request.verify_opsin:
+            from rdkit import Chem
+
+            smiles = Chem.MolToSmiles(request.rdkit_mol)
+        return read_rdkit_mol(request.rdkit_mol), smiles
+
+    def _name(self, mol: Molecule) -> str:
         if not mol.atoms:
             return ""
 
@@ -265,9 +308,8 @@ class NamingEngine:
         names.sort(key=self._component_sort_key)
         return " ".join(names)
 
-    def _analyze(self, smiles: str, *, token_debug: bool = False) -> NameAnalysis:
+    def _analyze(self, mol: Molecule, *, smiles: str = "", token_debug: bool = False) -> NameAnalysis:
         decisions = DecisionTrace()
-        mol = read_smiles(smiles)
         trace_decision(
             decisions,
             TracePhase.PARSE,
@@ -345,15 +387,33 @@ DEFAULT_NAMING_ENGINE = NamingEngine()
 # --- multiprocessing helpers ---------------------------------------------
 
 
-def _name_one_for_worker(args: tuple[str, bool, bool, bool]) -> NamingResult:
-    smiles, include_trace, verify_opsin, token_debug = args
+def _request_for(
+    item: str | Any,
+    *,
+    include_trace: bool,
+    verify_opsin: bool,
+    token_debug: bool,
+) -> NamingRequest:
+    """Build a request from a batch item, which may be a SMILES or an RDKit molecule."""
+
+    kwargs: dict[str, Any] = {"smiles": item} if isinstance(item, str) else {"rdkit_mol": item}
+    return NamingRequest(
+        include_trace=include_trace,
+        verify_opsin=verify_opsin,
+        token_debug=token_debug,
+        **kwargs,
+    )
+
+
+def _name_one_for_worker(args: tuple[str | Any, bool, bool, bool]) -> NamingResult:
+    item, include_trace, verify_opsin, token_debug = args
     return DEFAULT_NAMING_ENGINE.run(
-        NamingRequest(smiles=smiles, include_trace=include_trace, verify_opsin=verify_opsin, token_debug=token_debug)
+        _request_for(item, include_trace=include_trace, verify_opsin=verify_opsin, token_debug=token_debug)
     )
 
 
 def _run_parallel(
-    smiles_list: list[str],
+    smiles_list: list[str | Any],
     *,
     include_trace: bool,
     verify_opsin: bool,
