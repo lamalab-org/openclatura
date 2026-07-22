@@ -12,37 +12,16 @@ from enum import StrEnum
 from functools import lru_cache
 
 from .grammar_snapshot_data import RetainedFusedToken, retained_fused_token, retained_fused_token_status
+from .graph_queries import edges_within_atoms
 from .molecule import Molecule
 from .naming_data import load_json_table
-from .polycycle_topology import RingSystemTopology, edges_within_atoms, ring_system_topology
+from .polycycle_topology import RingSystemTopology, ring_system_topology
 from .retained_fused_templates import (
     RetainedFusedGraphTemplate,
     RetainedFusedTemplateMatch,
     match_retained_fused_templates,
     retained_fused_graph_templates,
 )
-
-HETEROATOM_SENIORITY = {
-    "F": 1,
-    "Cl": 2,
-    "Br": 3,
-    "I": 4,
-    "O": 5,
-    "S": 6,
-    "Se": 7,
-    "Te": 8,
-    "N": 9,
-    "P": 10,
-    "As": 11,
-    "Sb": 12,
-    "Bi": 13,
-    "Si": 14,
-    "Ge": 15,
-    "Sn": 16,
-    "Pb": 17,
-    "B": 18,
-}
-
 
 PARENT_COMPONENT_HETEROATOM_SENIORITY = {
     "N": 1,
@@ -64,6 +43,32 @@ PARENT_COMPONENT_HETEROATOM_SENIORITY = {
     "Pb": 17,
     "B": 18,
 }
+
+
+def _fused_component_seniority_key(
+    *,
+    ring_count: int,
+    ring_sizes: tuple[int, ...],
+    heteroatom_symbols: tuple[str, ...],
+    heteroatom_count: int,
+    heteroatom_variety: int,
+    senior_heteroatom_rank: int,
+    retained_priority: int,
+    name: str,
+) -> tuple[int, int, tuple[int, ...], int, int, int, tuple[int, ...], int, str]:
+    """Return the shared P-22 fused-component seniority ordering key."""
+
+    return (
+        0 if heteroatom_count else 1,
+        -ring_count,
+        tuple(-size for size in ring_sizes),
+        -heteroatom_count,
+        -heteroatom_variety,
+        senior_heteroatom_rank,
+        tuple(PARENT_COMPONENT_HETEROATOM_SENIORITY.get(symbol, 10_000) for symbol in heteroatom_symbols),
+        retained_priority,
+        name,
+    )
 
 
 class RingTopologyRouteKind(StrEnum):
@@ -121,16 +126,15 @@ class FusedComponentCandidate:
 
     @property
     def seniority_key(self) -> tuple[int, int, tuple[int, ...], int, int, int, tuple[int, ...], int, str]:
-        return (
-            0 if self.heteroatom_count else 1,
-            -self.ring_count,
-            tuple(-size for size in self.ring_size_vector),
-            -self.heteroatom_count,
-            -self.heteroatom_variety,
-            self.senior_heteroatom_rank,
-            tuple(PARENT_COMPONENT_HETEROATOM_SENIORITY.get(symbol, 10_000) for symbol in self.heteroatom_symbols),
-            self.priority,
-            self.name,
+        return _fused_component_seniority_key(
+            ring_count=self.ring_count,
+            ring_sizes=self.ring_size_vector,
+            heteroatom_symbols=self.heteroatom_symbols,
+            heteroatom_count=self.heteroatom_count,
+            heteroatom_variety=self.heteroatom_variety,
+            senior_heteroatom_rank=self.senior_heteroatom_rank,
+            retained_priority=self.priority,
+            name=self.name,
         )
 
 
@@ -159,16 +163,15 @@ class FusedComponentRegistryEntry:
 
     @property
     def parent_component_key(self) -> tuple[int, int, tuple[int, ...], int, int, int, tuple[int, ...], int, str]:
-        return (
-            0 if self.heteroatom_count else 1,
-            -self.ring_count,
-            tuple(-size for size in self.ring_size_sequence),
-            -self.heteroatom_count,
-            -self.heteroatom_variety,
-            self.senior_heteroatom_rank,
-            tuple(PARENT_COMPONENT_HETEROATOM_SENIORITY.get(symbol, 10_000) for symbol in self.heteroatom_symbols),
-            self.retained_seniority_rank,
-            self.accepted_name,
+        return _fused_component_seniority_key(
+            ring_count=self.ring_count,
+            ring_sizes=self.ring_size_sequence,
+            heteroatom_symbols=self.heteroatom_symbols,
+            heteroatom_count=self.heteroatom_count,
+            heteroatom_variety=self.heteroatom_variety,
+            senior_heteroatom_rank=self.senior_heteroatom_rank,
+            retained_priority=self.retained_seniority_rank,
+            name=self.accepted_name,
         )
 
 

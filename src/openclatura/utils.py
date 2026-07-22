@@ -30,7 +30,6 @@ suppress_noisy_eval_warnings()
 normalizer = rdMolStandardize.Normalizer()
 reionizer = rdMolStandardize.Reionizer()
 uncharger = rdMolStandardize.Uncharger()
-fragment_chooser = rdMolStandardize.LargestFragmentChooser()
 tautomer_enum = rdMolStandardize.TautomerEnumerator()
 
 # Bounds repeated parse/canonicalize/serialize passes while seeking a stable

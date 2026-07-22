@@ -1,12 +1,12 @@
 """Principal characteristic-group selection and suffix assembly."""
 
 from .assembly_parts import AssemblyParts, PrincipalGroupItem
+from .graph_queries import bond_ids_within
 from .group_atom_roles import hydrazone_characteristic_carbon
 from .locants import parse_locant
 from .molecule import Molecule
 from .nomenclature import RULES
 from .perception import PerceivedGroup, perceive_groups
-from .trace_helpers import bond_ids_within
 
 
 def component_groups(mol: Molecule, component_atoms: set[int]) -> list[PerceivedGroup]:

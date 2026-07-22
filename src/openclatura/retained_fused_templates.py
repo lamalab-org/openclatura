@@ -88,6 +88,16 @@ class RetainedFusedTemplateMatch:
     trace: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class _PreparedRetainedFusedTemplate:
+    """Cached graph constraints used by every match of one template."""
+
+    atom_by_locant: dict[str, RetainedFusedAtomTemplate]
+    degrees: dict[str, int]
+    neighbors: dict[str, set[str]]
+    locants_by_constraint: tuple[str, ...]
+
+
 @lru_cache(maxsize=2)
 def retained_fused_graph_templates(*, include_disabled: bool = False) -> tuple[RetainedFusedGraphTemplate, ...]:
     """Return graph-template retained fused parent rows from the rule registry."""
@@ -154,42 +164,11 @@ def match_retained_fused_template(
     the numbering layer.
     """
 
-    validate_retained_fused_template(template)
-    atom_set = set(atom_indices)
-    if len(atom_set) != len(template.atoms):
-        return None
-
-    atom_by_locant = template.atom_by_locant
-    template_degrees = _template_degrees(template)
-    molecule_degrees = {
-        atom_idx: sum(1 for neighbor in mol.get_neighbors(atom_idx) if neighbor in atom_set) for atom_idx in atom_set
-    }
-    template_neighbors = _template_neighbors(template)
-    locants_by_constraint = sorted(
-        template.locants,
-        key=lambda locant: (
-            -template_degrees[locant],
-            atom_by_locant[locant].symbol == "C",
-            locant,
-        ),
-    )
-    candidates = {
-        locant: [
-            atom_idx
-            for atom_idx in atom_set
-            if _atom_matches_template(mol, atom_idx, atom_by_locant[locant], allow_nonaromatic=allow_nonaromatic)
-            and molecule_degrees[atom_idx] == template_degrees[locant]
-        ]
-        for locant in template.locants
-    }
-    if any(not values for values in candidates.values()):
-        return None
-
-    assignments = _match_locants_backtracking(
+    atom_set, assignments = _retained_fused_assignments(
         mol,
-        locants_by_constraint,
-        candidates,
-        template_neighbors,
+        atom_indices,
+        template,
+        allow_nonaromatic=allow_nonaromatic,
     )
     if not assignments:
         return None
@@ -205,39 +184,82 @@ def _match_all_retained_fused_template(
     *,
     allow_nonaromatic: bool = False,
 ) -> list[RetainedFusedTemplateMatch]:
-    validate_retained_fused_template(template)
+    atom_set, assignments = _retained_fused_assignments(
+        mol,
+        atom_indices,
+        template,
+        allow_nonaromatic=allow_nonaromatic,
+    )
+    return [_template_match_from_assignment(template, atom_set, assignment) for assignment in assignments]
+
+
+def _retained_fused_assignments(
+    mol: Molecule,
+    atom_indices: set[int] | list[int] | tuple[int, ...],
+    template: RetainedFusedGraphTemplate,
+    *,
+    allow_nonaromatic: bool,
+) -> tuple[set[int], list[dict[str, int]]]:
+    """Return candidate assignments in the matcher's stable search order."""
+
+    prepared = _prepare_retained_fused_template(template)
     atom_set = set(atom_indices)
     if len(atom_set) != len(template.atoms):
-        return []
+        return atom_set, []
 
-    atom_by_locant = template.atom_by_locant
-    template_degrees = _template_degrees(template)
     molecule_degrees = {
         atom_idx: sum(1 for neighbor in mol.get_neighbors(atom_idx) if neighbor in atom_set) for atom_idx in atom_set
     }
-    template_neighbors = _template_neighbors(template)
-    locants_by_constraint = sorted(
-        template.locants,
-        key=lambda locant: (
-            -template_degrees[locant],
-            atom_by_locant[locant].symbol == "C",
-            locant,
-        ),
-    )
     candidates = {
         locant: [
             atom_idx
             for atom_idx in atom_set
-            if _atom_matches_template(mol, atom_idx, atom_by_locant[locant], allow_nonaromatic=allow_nonaromatic)
-            and molecule_degrees[atom_idx] == template_degrees[locant]
+            if _atom_matches_template(
+                mol,
+                atom_idx,
+                prepared.atom_by_locant[locant],
+                allow_nonaromatic=allow_nonaromatic,
+            )
+            and molecule_degrees[atom_idx] == prepared.degrees[locant]
         ]
         for locant in template.locants
     }
     if any(not values for values in candidates.values()):
-        return []
+        return atom_set, []
 
-    assignments = _match_locants_backtracking(mol, locants_by_constraint, candidates, template_neighbors)
-    return [_template_match_from_assignment(template, atom_set, assignment) for assignment in assignments]
+    assignments = _match_locants_backtracking(
+        mol,
+        list(prepared.locants_by_constraint),
+        candidates,
+        prepared.neighbors,
+    )
+    return atom_set, assignments
+
+
+@lru_cache(maxsize=128)
+def _prepare_retained_fused_template(template: RetainedFusedGraphTemplate) -> _PreparedRetainedFusedTemplate:
+    """Validate and cache immutable matching constraints for a template."""
+
+    validate_retained_fused_template(template)
+    atom_by_locant = template.atom_by_locant
+    degrees = _template_degrees(template)
+    neighbors = _template_neighbors(template)
+    locants_by_constraint = tuple(
+        sorted(
+            template.locants,
+            key=lambda locant: (
+                -degrees[locant],
+                atom_by_locant[locant].symbol == "C",
+                locant,
+            ),
+        )
+    )
+    return _PreparedRetainedFusedTemplate(
+        atom_by_locant=atom_by_locant,
+        degrees=degrees,
+        neighbors=neighbors,
+        locants_by_constraint=locants_by_constraint,
+    )
 
 
 def _template_match_from_assignment(

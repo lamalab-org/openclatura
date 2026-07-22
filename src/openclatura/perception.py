@@ -4,8 +4,9 @@ from dataclasses import dataclass, field
 
 from .chains import get_cyclic_atoms
 from .functional_groups import PERCEPTION_DETECTORS, PERCEPTION_SPECS, PerceptionDetectorSpec, metadata_for_group
+from .graph_queries import bond_ids_within
 from .molecule import AtomBinding, BondBinding, FunctionalGroupMetadata, Molecule
-from .nitrogen_roles import nitrogen_chain_roles
+from .nitrogen_roles import amidinohydrazone_tail_atoms, has_non_h_multiple_bond_neighbor, nitrogen_chain_roles
 
 
 @dataclass
@@ -487,8 +488,8 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                 if len(n_neighbors) > 0:
                     n2 = n_neighbors[0]
                     if mol.get_bond(atom.idx, n2).order == 1:
-                        amidino_tail_atoms = _amidinohydrazone_tail_atoms(mol, n2, {atom.idx})
-                        if _has_non_h_multiple_bond_neighbor(mol, n2, {atom.idx}) and not amidino_tail_atoms:
+                        amidino_tail_atoms = amidinohydrazone_tail_atoms(mol, n2, {atom.idx})
+                        if has_non_h_multiple_bond_neighbor(mol, n2, {atom.idx}) and not amidino_tail_atoms:
                             continue
                         if n2 not in cyclic_atoms:
                             ring_neighbors = [n for n in mol.get_neighbors(double_c) if n in cyclic_atoms]
@@ -547,7 +548,7 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                         c_att_bond is not None
                         and c_att_bond.order == 1
                         and mol.get_bond(atom.idx, n2).order == 1
-                        and not _has_non_h_multiple_bond_neighbor(mol, n2, {atom.idx})
+                        and not has_non_h_multiple_bond_neighbor(mol, n2, {atom.idx})
                     ):
                         if n2 not in cyclic_atoms:
                             groups.append(
@@ -679,56 +680,11 @@ def _bond_bindings_for_group(mol: Molecule, group: PerceivedGroup) -> tuple[Bond
 
     characteristic_atoms = set(group.atoms_involved)
     full_atoms = group.atom_ids
-    characteristic_bonds = _bond_ids_within(mol, characteristic_atoms)
-    full_bonds = _bond_ids_within(mol, full_atoms)
+    characteristic_bonds = bond_ids_within(mol, characteristic_atoms)
+    full_bonds = bond_ids_within(mol, full_atoms)
     attachment_bonds = full_bonds - characteristic_bonds
     return (
         BondBinding("characteristic_group", tuple(sorted(characteristic_bonds))),
         BondBinding("attachment", tuple(sorted(attachment_bonds))),
         BondBinding("full_group", tuple(sorted(full_bonds))),
     )
-
-
-def _bond_ids_within(mol: Molecule, atom_ids: set[int]) -> set[int]:
-    """Return IDs for bonds whose endpoints are both in atom_ids."""
-
-    bond_ids = set()
-    for atom_idx in atom_ids:
-        for neighbor_idx in mol.get_neighbors(atom_idx):
-            if neighbor_idx in atom_ids and atom_idx < neighbor_idx:
-                bond = mol.get_bond(atom_idx, neighbor_idx)
-                if bond is not None:
-                    bond_ids.add(bond.idx)
-    return bond_ids
-
-
-def _has_non_h_multiple_bond_neighbor(mol: Molecule, atom_idx: int, allowed: set[int]) -> bool:
-    for neighbor in mol.get_neighbors(atom_idx):
-        if neighbor in allowed or mol.atoms[neighbor].symbol == "H":
-            continue
-        bond = mol.get_bond(atom_idx, neighbor)
-        if bond is not None and bond.order != 1:
-            return True
-    return False
-
-
-def _amidinohydrazone_tail_atoms(mol: Molecule, hydrazone_terminal_n: int, allowed: set[int]) -> set[int]:
-    """Return atoms for an N-C(=N)-N amidino tail attached to a hydrazone N."""
-
-    for carbon in mol.get_neighbors(hydrazone_terminal_n):
-        if carbon in allowed or not mol.atoms[carbon].is_carbon:
-            continue
-        n_c_bond = mol.get_bond(hydrazone_terminal_n, carbon)
-        if n_c_bond is None or n_c_bond.order != 2:
-            continue
-        terminal_ns = [
-            neighbor
-            for neighbor in mol.get_neighbors(carbon)
-            if neighbor != hydrazone_terminal_n
-            and mol.atoms[neighbor].symbol == "N"
-            and (bond := mol.get_bond(carbon, neighbor)) is not None
-            and bond.order == 1
-        ]
-        if len(terminal_ns) == 2:
-            return {carbon, *terminal_ns}
-    return set()

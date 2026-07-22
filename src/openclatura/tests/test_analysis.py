@@ -173,6 +173,7 @@ from openclatura.token_grammar import (
     is_locant_binding_token,
     is_locant_token,
     lexical_token_spans,
+    normalize_name_text,
 )
 from openclatura.trace_helpers import (
     add_substituent_trace,
@@ -188,6 +189,10 @@ def analyze_smiles(smiles: str):
     """Test helper: token-binding assertions need explicit token-debug traces."""
 
     return _analyze_smiles(smiles, token_debug=True)
+
+
+def test_normalize_name_text_uses_binding_comparison_form():
+    assert normalize_name_text(" (3R)-Cyclohexyl Benzene ") == "3r-cyclohexylbenzene"
 
 
 def test_name_smiles_stays_plain_fast_api():

@@ -11,6 +11,7 @@ from .component_group_rules import (
 )
 from .component_modifiers import add_component_front_modifiers, add_component_n_substituents
 from .functional_prefixes import collect_component_prefix_substituents
+from .graph_queries import bond_ids_within, charged_atom_ids
 from .molecule import DecisionTrace, Molecule, TracePhase
 from .name_assembly import NameAssemblyResult, assert_final_name_assembly, token_span_trace_data
 from .name_bindings import binding_trace_data, refresh_name_atom_bindings
@@ -47,7 +48,6 @@ from .trace_helpers import (
     add_substituent_trace,
     assembly_substituent_tree,
     assembly_trace_segments,
-    bond_ids_within,
     build_shortcut_tree_node,
     decision_trace_data,
     functional_group_trace_data,
@@ -103,7 +103,7 @@ def collect_component_branch_substituents(
                     locants=[],
                     atom_ids=sub_comp - {c_idx},
                     bond_ids=bond_ids_within(mol, sub_comp),
-                    charge_atom_ids=_charged_atoms(mol, sub_comp - {c_idx}),
+                    charge_atom_ids=charged_atom_ids(mol, sub_comp - {c_idx}),
                     spiro=name_spiro_subgraph(mol, c_idx, sub_comp),
                 )
             )
@@ -141,7 +141,7 @@ def collect_component_branch_substituents(
                             locants=[],
                             atom_ids=branch_atoms,
                             bond_ids=bond_ids_within(mol, branch_atoms | {c_idx}),
-                            charge_atom_ids=_charged_atoms(mol, branch_atoms),
+                            charge_atom_ids=charged_atom_ids(mol, branch_atoms),
                             emitted_tokens=(
                                 graph_bound_substituent_tokens(
                                     mol,
@@ -186,12 +186,6 @@ def add_component_substituents(
                 )
 
 
-def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
-    """Return formally charged atoms from an already named graph fragment."""
-
-    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
-
-
 def _shortcut_component_result(
     mol: Molecule,
     component_atoms: set[int],
@@ -218,7 +212,7 @@ def _shortcut_component_result(
                 term=name,
                 atom_ids=set(component_atoms),
                 bond_ids=bond_ids_within(mol, component_atoms),
-                charge_atom_ids=_charged_atoms(mol, component_atoms),
+                charge_atom_ids=charged_atom_ids(mol, component_atoms),
             )
         ]
     )

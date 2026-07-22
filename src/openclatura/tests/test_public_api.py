@@ -222,6 +222,41 @@ def test_engine_run_with_verify_opsin_skips_gracefully_without_opsin(monkeypatch
     assert result.verified is False
 
 
+def test_engine_run_with_opsin_only_uses_fast_naming_path(monkeypatch):
+    import openclatura.engine as engine_module
+
+    engine = NamingEngine()
+    calls = []
+
+    def fast_name(smiles):
+        calls.append(("name", smiles))
+        return "ethanol"
+
+    def unexpected_analysis(*args, **kwargs):
+        pytest.fail("OPSIN-only verification must not build trace analysis")
+
+    def verify(generated_name, smiles):
+        calls.append(("verify", generated_name, smiles))
+        return OpsinCheck(status="matched", name=generated_name)
+
+    monkeypatch.setattr(engine, "_name", fast_name)
+    monkeypatch.setattr(engine, "_analyze", unexpected_analysis)
+    monkeypatch.setattr(engine_module, "verify_with_opsin", verify)
+
+    result = engine.run(NamingRequest(smiles="CCO", verify_opsin=True))
+
+    assert calls == [("name", "CCO"), ("verify", "ethanol", "CCO")]
+    assert result.name == "ethanol"
+    assert result.smiles == "CCO"
+    assert result.opsin_check == OpsinCheck(status="matched", name="ethanol")
+    assert result.analysis is None
+    assert result.trace_segments == []
+    assert result.substituent_tree == []
+    assert result.decisions == []
+    assert result.rules_hit == ()
+    assert result.rule_hints == ()
+
+
 def test_engine_run_with_verify_opsin_skips_gracefully_without_java(monkeypatch):
     import openclatura.opsin_verify as ov
 

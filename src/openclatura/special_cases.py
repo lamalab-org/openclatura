@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from .assembly_parts import NameAtomBinding, NameTokenBinding
 from .charge_pair_roles import charge_pair_roles
 from .formatting import format_counted_prefixes, format_multiplier, oxy_prefix_from_branch, strip_outer_parentheses
+from .graph_queries import bond_ids_within, charged_atom_ids, component_atoms_until_blocked
 from .molecule import Molecule
 from .naming_protocols import RecursiveSubgraphNamer
 from .nitrogen_roles import azine_roles
@@ -37,21 +38,6 @@ class SpecialComponentName:
     bindings: tuple[NameAtomBinding, ...]
 
 
-def _bond_ids_within_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
-    bond_ids = set()
-    for atom_idx in atom_ids:
-        for neighbor_idx in mol.get_neighbors(atom_idx):
-            if neighbor_idx in atom_ids and atom_idx < neighbor_idx:
-                bond = mol.get_bond(atom_idx, neighbor_idx)
-                if bond:
-                    bond_ids.add(bond.idx)
-    return bond_ids
-
-
-def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
-    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
-
-
 def _component_name_result(
     mol: Molecule,
     component_atoms: set[int],
@@ -69,8 +55,8 @@ def _component_name_result(
                 role=role,
                 term=name,
                 atom_ids=set(component_atoms),
-                bond_ids=_bond_ids_within_atoms(mol, component_atoms),
-                charge_atom_ids=_charged_atoms(mol, component_atoms),
+                bond_ids=bond_ids_within(mol, component_atoms),
+                charge_atom_ids=charged_atom_ids(mol, component_atoms),
             ),
         )
     return SpecialComponentName(name=name, role=role, bindings=bindings)
@@ -151,7 +137,7 @@ def biphenyl_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialC
     left_root, right_root, bridge_bond = inter_ring_bonds[0]
     ring_components = []
     for root, blocked in ((left_root, right_root), (right_root, left_root)):
-        atoms = _component_atoms_until_blocked(mol, component_atoms, root, {blocked})
+        atoms = component_atoms_until_blocked(mol, component_atoms, root, {blocked})
         if len(atoms) != 6:
             return None
         ring_path = _ordered_simple_ring(mol, atoms)
@@ -167,7 +153,7 @@ def biphenyl_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialC
             role="biphenyl_parent",
             term="biphenyl",
             atom_ids=set(component_atoms),
-            bond_ids=_bond_ids_within_atoms(mol, component_atoms),
+            bond_ids=bond_ids_within(mol, component_atoms),
             locants=("1", "1'"),
             emitted_tokens=(
                 NameTokenBinding(
@@ -199,7 +185,7 @@ def biphenyl_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialC
                     grammar_role="biphenyl_parent",
                     binding_key="shortcut:biphenyl_parent",
                     atom_ids=set(component_atoms),
-                    bond_ids=_bond_ids_within_atoms(mol, component_atoms),
+                    bond_ids=bond_ids_within(mol, component_atoms),
                     render_order=2,
                 ),
             ),
@@ -209,7 +195,7 @@ def biphenyl_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialC
             role="biphenyl_ring",
             term="phenyl",
             atom_ids=ring_components[0],
-            bond_ids=_bond_ids_within_atoms(mol, ring_components[0]),
+            bond_ids=bond_ids_within(mol, ring_components[0]),
             locants=("1",),
         ),
         NameAtomBinding(
@@ -217,7 +203,7 @@ def biphenyl_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialC
             role="biphenyl_ring",
             term="phenyl",
             atom_ids=ring_components[1],
-            bond_ids=_bond_ids_within_atoms(mol, ring_components[1]),
+            bond_ids=bond_ids_within(mol, ring_components[1]),
             locants=("1'",),
         ),
         NameAtomBinding(
@@ -472,7 +458,7 @@ def phosphane_borane_zwitterion_result(
     ligands: list[tuple[str, set[int]]] = []
     core_atoms = {phosphorus, boron}
     for root in ligand_roots:
-        ligand_atoms = _component_atoms_until_blocked(mol, component_atoms, root, core_atoms)
+        ligand_atoms = component_atoms_until_blocked(mol, component_atoms, root, core_atoms)
         if not ligand_atoms or ligand_atoms & ligand_atoms_seen:
             return None
         ligand_atoms_seen.update(ligand_atoms)
@@ -498,7 +484,7 @@ def phosphane_borane_zwitterion_result(
             role="phosphane_borane_ligand",
             term=ligand_name,
             atom_ids=set(ligand_atoms),
-            bond_ids=_bond_ids_within_atoms(mol, ligand_atoms),
+            bond_ids=bond_ids_within(mol, ligand_atoms),
         )
         for ligand_name, ligand_atoms in ligands
     ) + (
@@ -507,7 +493,7 @@ def phosphane_borane_zwitterion_result(
             role="phosphane_borane_zwitterion_core",
             term="phosphaniumyl boranuide",
             atom_ids=core_atoms,
-            bond_ids=_bond_ids_within_atoms(mol, core_atoms),
+            bond_ids=bond_ids_within(mol, core_atoms),
             charge_atom_ids={phosphorus, boron},
         ),
     )
@@ -527,18 +513,6 @@ def _carbonyl_equivalent_side_name(
         or _simple_ring_ylidene_side_name(mol, side_atoms, carbonyl_carbon, as_ylidene=as_ylidene)
         or _simple_carbonyl_side_name(mol, side_atoms, carbonyl_carbon, as_ylidene=as_ylidene)
     )
-
-
-def _double_bonded_carbon(mol: Molecule, nitrogen: int, blocked: set[int]) -> int | None:
-    candidates = [
-        n
-        for n in mol.get_neighbors(nitrogen)
-        if n not in blocked
-        and mol.atoms[n].is_carbon
-        and (bond := mol.get_bond(nitrogen, n)) is not None
-        and bond.order == 2
-    ]
-    return candidates[0] if len(candidates) == 1 else None
 
 
 def _simple_carbonyl_side_name(mol: Molecule, side_atoms: set[int], carbonyl_carbon: int, *, as_ylidene: bool) -> str:
@@ -918,7 +892,7 @@ def sulfonium_ylide_name(
         root = ylide_sub_roots[0]
         ylide_sub_root = root
         blocked = {sulfur, ylide_carbon} | sulfur_ligand_atoms
-        ylide_sub_atoms = _component_atoms_until_blocked(mol, component_atoms, root, blocked)
+        ylide_sub_atoms = component_atoms_until_blocked(mol, component_atoms, root, blocked)
         if not ylide_sub_atoms or ylide_sub_atoms & sulfur_ligand_atoms:
             return ""
         if branch_namer is not None:
@@ -966,7 +940,7 @@ def sulfonium_ylide_result(
             role="sulfonium_ylide",
             term=name,
             atom_ids=set(component_atoms),
-            bond_ids=_bond_ids_within_atoms(mol, component_atoms),
+            bond_ids=bond_ids_within(mol, component_atoms),
             charge_atom_ids=sulfurs | carbanions,
         ),
     )
@@ -1120,7 +1094,7 @@ def hydroxyurea_parent_result(
                 role="urea_n_ligand",
                 term=ligand_name,
                 atom_ids=set(ligand_atoms),
-                bond_ids=_bond_ids_within_atoms(mol, set(ligand_atoms)),
+                bond_ids=bond_ids_within(mol, set(ligand_atoms)),
                 locants=("N",),
             )
         )
@@ -1131,7 +1105,7 @@ def hydroxyurea_parent_result(
                 role="urea_n_prime_ligand",
                 term=ligand_name,
                 atom_ids=set(ligand_atoms),
-                bond_ids=_bond_ids_within_atoms(mol, set(ligand_atoms)),
+                bond_ids=bond_ids_within(mol, set(ligand_atoms)),
                 locants=("N'",),
             )
         )
@@ -1143,7 +1117,7 @@ def hydroxyurea_parent_result(
                 role="hydroxyurea_hydroxy",
                 term="hydroxy",
                 atom_ids=hydroxy_atoms,
-                bond_ids=_bond_ids_within_atoms(mol, hydroxy_atoms),
+                bond_ids=bond_ids_within(mol, hydroxy_atoms),
                 locants=("N'",),
             ),
             NameAtomBinding(
@@ -1151,7 +1125,7 @@ def hydroxyurea_parent_result(
                 role="urea_core",
                 term="urea",
                 atom_ids={carbonyl, carbonyl_oxygen, *nitrogens},
-                bond_ids=_bond_ids_within_atoms(mol, {carbonyl, carbonyl_oxygen, *nitrogens}),
+                bond_ids=bond_ids_within(mol, {carbonyl, carbonyl_oxygen, *nitrogens}),
             ),
         ]
     )
@@ -1173,7 +1147,7 @@ def _urea_n_ligand_names(
             continue
         if not mol.atoms[root].is_carbon:
             return None
-        ligand_atoms = _component_atoms_until_blocked(mol, component_atoms, root, core_atoms)
+        ligand_atoms = component_atoms_until_blocked(mol, component_atoms, root, core_atoms)
         if not ligand_atoms:
             return None
         if any(not mol.atoms[atom_idx].is_carbon for atom_idx in ligand_atoms):
@@ -1197,29 +1171,6 @@ def _urea_n_ligand_names(
             return None
         ligands.append((ligand_atoms, name))
     return sorted(ligands, key=lambda item: item[1])
-
-
-def _component_atoms_until_blocked(
-    mol: Molecule,
-    component_atoms: set[int],
-    root: int,
-    blocked: set[int],
-) -> set[int]:
-    atoms = set()
-    queue = [root]
-    while queue:
-        atom_idx = queue.pop(0)
-        if atom_idx in atoms:
-            continue
-        if atom_idx not in component_atoms or atom_idx in blocked:
-            return set()
-        atoms.add(atom_idx)
-        for neighbor in mol.get_neighbors(atom_idx):
-            if neighbor in blocked:
-                continue
-            if neighbor in component_atoms:
-                queue.append(neighbor)
-    return atoms
 
 
 def oxoacid_parent_name(mol: Molecule, component_atoms: set[int]) -> str:
@@ -1314,24 +1265,13 @@ def oxoacid_ester_result(
                 role="oxoacid_ester_modifier",
                 term=ester_name,
                 atom_ids=ester_component_atoms,
-                bond_ids=_bond_ids_within_atoms(mol, ester_component_atoms),
-                charge_atom_ids=_charged_atoms(mol, ester_component_atoms),
+                bond_ids=bond_ids_within(mol, ester_component_atoms),
+                charge_atom_ids=charged_atom_ids(mol, ester_component_atoms),
             ),
             *_central_oxo_role_bindings(mol, role, suffix, "oxoacid_ester_suffix"),
         )
         matches.append(_component_name_result(mol, component_atoms, name, "oxoacid_ester", bindings=bindings))
     return matches[0] if len(matches) == 1 else None
-
-
-def _peroxy_oxoacid_ester_name(
-    mol: Molecule,
-    component_atoms: set[int],
-    role: CentralOxoRole,
-    suffix: str,
-    branch_namer: RecursiveSubgraphNamer | None,
-) -> str:
-    result = _peroxy_oxoacid_ester_result(mol, component_atoms, role, suffix, branch_namer)
-    return result.name if result is not None else ""
 
 
 def _peroxy_oxoacid_ester_result(
@@ -1377,15 +1317,15 @@ def _peroxy_oxoacid_ester_result(
             role="oxoacid_ester_modifier",
             term=modifier,
             atom_ids=modifier_atoms,
-            bond_ids=_bond_ids_within_atoms(mol, modifier_atoms),
-            charge_atom_ids=_charged_atoms(mol, modifier_atoms),
+            bond_ids=bond_ids_within(mol, modifier_atoms),
+            charge_atom_ids=charged_atom_ids(mol, modifier_atoms),
         ),
         NameAtomBinding(
             stage="shortcut",
             role="peroxy_bridge",
             term="peroxy",
             atom_ids=peroxy_atoms,
-            bond_ids=_bond_ids_within_atoms(mol, peroxy_atoms),
+            bond_ids=bond_ids_within(mol, peroxy_atoms),
         ),
         *_central_oxo_role_bindings(mol, role, suffix, "oxoacid_ester_suffix"),
     )
@@ -1408,8 +1348,8 @@ def _central_oxo_role_bindings(
             role=parent_role,
             term=term,
             atom_ids=core_atoms,
-            bond_ids=_bond_ids_within_atoms(mol, core_atoms),
-            charge_atom_ids=_charged_atoms(mol, core_atoms),
+            bond_ids=bond_ids_within(mol, core_atoms),
+            charge_atom_ids=charged_atom_ids(mol, core_atoms),
         )
     ]
     for ligand in role.ligands:
@@ -1422,7 +1362,7 @@ def _central_oxo_role_bindings(
                 role=f"oxoacid_ligand_{ligand.role.value}",
                 term=f"oxoacid_ligand_{ligand.role.value}",
                 atom_ids=ligand_atoms,
-                bond_ids=_bond_ids_within_atoms(mol, ligand_atoms),
+                bond_ids=bond_ids_within(mol, ligand_atoms),
                 charge_atom_ids={ligand.oxygen} if mol.atoms[ligand.oxygen].charge else set(),
             )
         )
@@ -1489,32 +1429,6 @@ def _ester_modifier_name(
     return _alkyl_ligand_name(mol, component_atoms, root, ester_oxygen)
 
 
-def _oxoacid_oxygen_counts(mol: Molecule, central: int, oxygen_neighbors: list[int]) -> tuple[int, int]:
-    role = central_oxo_roles(mol, {central, *oxygen_neighbors})
-    if len(role) == 1:
-        return role[0].spec_counts()
-    return 0, 0
-
-
-def _is_charge_normalized_halogen_oxo_ligand(
-    mol: Molecule,
-    central_symbol: str,
-    central: int,
-    oxygen: int,
-) -> bool:
-    """Return true for RDKit-normalized X(+)-O(-) oxo ligands on halogen oxoacids."""
-
-    if central_symbol not in {"Cl", "Br", "I"}:
-        return False
-    bond = mol.get_bond(central, oxygen)
-    return (
-        bond is not None
-        and bond.order == 1
-        and mol.atoms[oxygen].charge < 0
-        and sum(1 for _ in mol.get_neighbors(oxygen)) == 1
-    )
-
-
 def _matching_oxoacid_spec(central_symbol: str, single_o: int, double_o: int, charge: int) -> dict | None:
     for spec in RULES.components.replacement_parent_oxoacid_specs:
         if spec["central"] != central_symbol:
@@ -1578,14 +1492,14 @@ def organophosphinic_acid_result(mol: Molecule, component_atoms: set[int]) -> Sp
             role="organophosphinic_ligand",
             term=alkyl,
             atom_ids=ligand_atoms,
-            bond_ids=_bond_ids_within_atoms(mol, ligand_atoms),
+            bond_ids=bond_ids_within(mol, ligand_atoms),
         ),
         NameAtomBinding(
             stage="shortcut",
             role="organophosphinic_acid_core",
             term="phosphinic acid",
             atom_ids=core_atoms,
-            bond_ids=_bond_ids_within_atoms(mol, core_atoms),
+            bond_ids=bond_ids_within(mol, core_atoms),
         ),
     )
     return _component_name_result(mol, component_atoms, name, "organophosphinic_acid", bindings=bindings)
@@ -1636,7 +1550,7 @@ def sulfoxide_parent_result(mol: Molecule, component_atoms: set[int]) -> Special
                 role="sulfoxide_ligand",
                 term=ligands[0],
                 atom_ids=left_atoms | right_atoms,
-                bond_ids=_bond_ids_within_atoms(mol, left_atoms | right_atoms),
+                bond_ids=bond_ids_within(mol, left_atoms | right_atoms),
             ),
         )
     else:
@@ -1648,7 +1562,7 @@ def sulfoxide_parent_result(mol: Molecule, component_atoms: set[int]) -> Special
                 role="sulfoxide_ligand",
                 term=ligand,
                 atom_ids=set(atoms),
-                bond_ids=_bond_ids_within_atoms(mol, set(atoms)),
+                bond_ids=bond_ids_within(mol, set(atoms)),
             )
             for ligand, atoms in ordered
         )
@@ -1658,8 +1572,8 @@ def sulfoxide_parent_result(mol: Molecule, component_atoms: set[int]) -> Special
         role="sulfoxide_core",
         term="sulfoxide",
         atom_ids=core_atoms,
-        bond_ids=_bond_ids_within_atoms(mol, core_atoms),
-        charge_atom_ids=_charged_atoms(mol, core_atoms),
+        bond_ids=bond_ids_within(mol, core_atoms),
+        charge_atom_ids=charged_atom_ids(mol, core_atoms),
     )
     return _component_name_result(
         mol, component_atoms, name, "sulfoxide_parent", bindings=ligand_bindings + (core_binding,)
@@ -1809,10 +1723,6 @@ def _alkyl_branch_prefixes(
     return "".join(parts)
 
 
-def _carbon_degree(mol: Molecule, carbon_atoms: set[int], atom_idx: int) -> int:
-    return sum(1 for neighbor in mol.get_neighbors(atom_idx) if neighbor in carbon_atoms)
-
-
 def homonuclear_chain_parent_name(mol: Molecule, component_atoms: set[int]) -> str:
     result = homonuclear_chain_parent_result(mol, component_atoms)
     return result.name if result is not None else ""
@@ -1871,7 +1781,7 @@ def homonuclear_chain_parent_result(mol: Molecule, component_atoms: set[int]) ->
         role="homonuclear_chain_parent",
         term=parent,
         atom_ids=set(chain),
-        bond_ids=_bond_ids_within_atoms(mol, set(chain)),
+        bond_ids=bond_ids_within(mol, set(chain)),
     )
     return _component_name_result(
         mol,
@@ -1910,7 +1820,7 @@ def simple_central_parent_hydride_result(mol: Molecule, component_atoms: set[int
         if not ligand:
             return None
         ligand_names.append(ligand)
-        ligand_atoms = _component_atoms_until_blocked(mol, component_atoms, neighbor, {central})
+        ligand_atoms = component_atoms_until_blocked(mol, component_atoms, neighbor, {central})
         ligand_atoms = ligand_atoms or {neighbor}
         bond = mol.get_bond(central, neighbor)
         ligand_bindings.append(
@@ -2183,7 +2093,7 @@ def try_name_anhydride_component_result(
                 {
                     "name": anhydride_half_name(mol, carbon, bridge_o, component_namer),
                     "atoms": half_atoms,
-                    "bonds": _bond_ids_within_atoms(mol, half_atoms),
+                    "bonds": bond_ids_within(mol, half_atoms),
                 }
             )
 

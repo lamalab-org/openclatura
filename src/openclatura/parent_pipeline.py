@@ -1,6 +1,7 @@
 """Shared parent planning steps for component and subgraph naming."""
 
 from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem, RetainedParentMetadata
+from .graph_queries import bond_ids_within, bond_order
 from .molecule import Molecule
 from .name_bindings import ensure_name_atom_binding_tokens
 from .namer_config import RETAINED_RING_ELEMENTS
@@ -12,7 +13,6 @@ from .ring_renderer import is_von_baeyer_descriptor
 from .rules import retained
 from .small_ring_stereo import scoped_small_ring_stereo_features
 from .subgraph_tools import subgraph_locant_getter
-from .trace_helpers import bond_ids_within
 
 
 def resolve_retained_parent(
@@ -48,7 +48,7 @@ def build_parent_assembly_plan(
         locant_maps is None
         and selection.ring_parent is not None
         and selection.ring_parent.numbering_candidates
-        and _is_von_baeyer_descriptor(selection.ring_parent.descriptor)
+        and is_von_baeyer_descriptor(selection.ring_parent.descriptor)
     ):
         audited_maps = [
             numbering.locant_map for numbering in selection.ring_parent.numbering_candidates if numbering.audit_ok
@@ -80,10 +80,6 @@ def build_parent_assembly_plan(
     return ParentAssemblyPlan(numbered_path=numbered_path, locant_map=locant_map, get_loc=get_loc, parts=parts)
 
 
-def _is_von_baeyer_descriptor(descriptor: str | None) -> bool:
-    return is_von_baeyer_descriptor(descriptor)
-
-
 def build_parent_parts(
     mol: Molecule,
     numbered_path: list[int],
@@ -101,7 +97,7 @@ def build_parent_parts(
     if intent.is_substituent:
         if intent.root_atom is None:
             raise ValueError("Subgraph naming intent requires a root atom.")
-        upstream_order = _upstream_bond_order(mol, intent.root_atom, intent.upstream_atom)
+        upstream_order = bond_order(mol, intent.root_atom, intent.upstream_atom)
         assembly_overrides.update(
             {
                 "is_substituent": True,
@@ -209,10 +205,3 @@ def _add_relative_ring_stereo(mol: Molecule, parts: AssemblyParts, numbered_path
             )
         )
     )
-
-
-def _upstream_bond_order(mol: Molecule, start_idx: int, upstream_atom: int | None) -> int:
-    if upstream_atom is None:
-        return 0
-    bond = mol.get_bond(start_idx, upstream_atom)
-    return bond.order if bond else 0

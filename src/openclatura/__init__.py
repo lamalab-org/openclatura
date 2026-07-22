@@ -59,9 +59,6 @@ def name_many(
 ) -> list[NamingResult]:
     """Batch convenience wrapper around :meth:`NamingEngine.name_many`."""
 
-    if processes == "auto":
-        processes = None
-
     return DEFAULT_NAMING_ENGINE.name_many(
         smiles_iter,
         include_trace=include_trace,

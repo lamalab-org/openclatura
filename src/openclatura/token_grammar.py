@@ -63,6 +63,12 @@ def binding_term_tokens(text: str) -> tuple[str, ...]:
     return lexical_tokens(text)
 
 
+def normalize_name_text(text: str) -> str:
+    """Return the comparison form used for rendered names and binding terms."""
+
+    return text.lower().replace(" ", "").replace("(", "").replace(")", "")
+
+
 def locant_tokens_in_text(text: str) -> tuple[str, ...]:
     """Return locant-like tokens visible in ``text``."""
 

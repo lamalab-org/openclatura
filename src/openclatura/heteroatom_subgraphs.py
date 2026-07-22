@@ -8,6 +8,7 @@ from .formatting import (
     oxy_prefix_from_branch,
     strip_outer_parentheses,
 )
+from .graph_queries import bond_order
 from .heteroatom_substituent_specs import central_oxo_substituent_prefix, unsubstituted_prefix
 from .heterocumulene_roles import nitrogen_heterocumulene_role
 from .hypervalent_roles import HypervalentCenterRole, HypervalentLigandRole, hypervalent_center_role
@@ -27,10 +28,9 @@ from .rules import multipliers
 
 
 def upstream_bond_order(mol: Molecule, start_idx: int, upstream_atom: int | None) -> int:
-    if upstream_atom is None:
-        return 0
-    bond = mol.get_bond(start_idx, upstream_atom)
-    return bond.order if bond else 0
+    """Compatibility wrapper for the shared graph bond-order query."""
+
+    return bond_order(mol, start_idx, upstream_atom)
 
 
 def subgraph_neighbors(
@@ -283,7 +283,7 @@ def name_oxygen_subgraph(
     upstream_atom: int | None,
     branch_namer: RecursiveSubgraphNamer,
 ) -> str:
-    is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
+    is_double = bond_order(mol, start_idx, upstream_atom) == 2
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
     start_atom = mol.atoms[start_idx]
     if not next_atoms:
@@ -344,7 +344,7 @@ def name_nitrogen_subgraph(
     upstream_atom: int | None,
     branch_namer: RecursiveSubgraphNamer,
 ) -> str:
-    upstream_order = upstream_bond_order(mol, start_idx, upstream_atom)
+    upstream_order = bond_order(mol, start_idx, upstream_atom)
     is_double = upstream_order == 2
     is_triple = upstream_order == 3
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
@@ -536,7 +536,7 @@ def name_sulfur_subgraph(
     upstream_atom: int | None,
     branch_namer: RecursiveSubgraphNamer,
 ) -> str:
-    is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
+    is_double = bond_order(mol, start_idx, upstream_atom) == 2
     s_oxygens = central_oxo_substituent_excluded_ligand_atoms(mol, start_idx, exclude_atoms)
     s_nitrogens = [n for n in double_bonded_neighbors(mol, start_idx, "N") if n != upstream_atom]
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom, s_oxygens + s_nitrogens)
@@ -644,7 +644,7 @@ def name_chalcogen_subgraph(
     oxo_prefix: str,
     branch_namer: RecursiveSubgraphNamer,
 ) -> str:
-    is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
+    is_double = bond_order(mol, start_idx, upstream_atom) == 2
     oxo_ligands = central_oxo_substituent_excluded_ligand_atoms(mol, start_idx, exclude_atoms)
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom, oxo_ligands)
     stereo_prefix_text = stereo_prefix(mol.atoms[start_idx])
@@ -699,7 +699,7 @@ def name_phosphorus_subgraph(
     upstream_atom: int | None,
     branch_namer: RecursiveSubgraphNamer,
 ) -> str:
-    upstream_order = upstream_bond_order(mol, start_idx, upstream_atom)
+    upstream_order = bond_order(mol, start_idx, upstream_atom)
     multiple_bond_suffix = {2: "idene", 3: "idyne"}.get(upstream_order, "")
     p_oxygens = central_oxo_substituent_excluded_ligand_atoms(mol, start_idx, exclude_atoms)
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom, p_oxygens)
@@ -726,7 +726,7 @@ def name_group_13_14_subgraph(
     upstream_atom: int | None,
     branch_namer: RecursiveSubgraphNamer,
 ) -> str:
-    is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
+    is_double = bond_order(mol, start_idx, upstream_atom) == 2
     base_suffix = unsubstituted_prefix(mol.atoms[start_idx].symbol) or (
         "silyl" if mol.atoms[start_idx].symbol == "Si" else "boryl"
     )

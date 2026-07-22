@@ -183,7 +183,7 @@ class NamingEngine:
         """
 
         try:
-            if request.include_trace or request.verify_opsin:
+            if request.include_trace:
                 analysis = self._analyze(request.smiles, token_debug=request.token_debug)
                 rules, hints = _extract_rules_hit(analysis.trace_segments)
                 result = NamingResult(

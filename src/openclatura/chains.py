@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 
+from .graph_queries import edges_within_atoms
 from .molecule import Molecule
 from .polycycle_topology import (
     bicyclo_proof,
@@ -730,7 +731,7 @@ def merge_polyspiro_ring_systems(mol: Molecule, systems: list[RingSystem]) -> li
         union_atoms = set()
         for group_idx in group_indexes:
             union_atoms |= systems[group_idx].atoms
-        union_edges = _edges_within_atoms(mol, union_atoms)
+        union_edges = edges_within_atoms(mol, union_atoms)
         if not _has_multiple_spiro_centers(union_atoms, union_edges):
             result.extend(systems[group_idx] for group_idx in sorted(group_indexes))
             continue
@@ -861,18 +862,6 @@ def _audited_ring_numberings(
     return _dedupe_ring_numberings(audited)
 
 
-def _audited_ring_paths(
-    mol: Molecule,
-    kind: str,
-    descriptor_numbers: tuple[int, ...],
-    paths: tuple[tuple[int, ...], ...] | list[tuple[int, ...]],
-    edges: frozenset[tuple[int, int]],
-) -> list[list[int]]:
-    return _dedupe_numbering_paths(
-        [list(numbering.path) for numbering in _audited_ring_numberings(mol, kind, descriptor_numbers, paths, edges)]
-    )
-
-
 def _audited_von_baeyer_numberings(
     mol: Molecule,
     descriptor: str,
@@ -885,10 +874,6 @@ def _audited_von_baeyer_numberings(
         if numbering.audit_ok:
             audited.append(numbering)
     return _dedupe_ring_numberings(audited)
-
-
-def _is_von_baeyer_descriptor(descriptor: str) -> bool:
-    return is_von_baeyer_descriptor(descriptor)
 
 
 def _dedupe_ring_numberings(numberings):
@@ -1065,15 +1050,6 @@ def _legacy_monospiro_or_bicyclo_system(
     return RingSystem(atoms=comp_nodes, is_bicycle=True, x=len(p1), y=len(p2), z=len(p3), paths=vb_paths)
 
 
-def _edges_within_atoms(mol: Molecule, atoms: set[int]) -> set[tuple[int, int]]:
-    edges = set()
-    for atom_idx in atoms:
-        for neighbor_idx in mol.get_neighbors(atom_idx):
-            if neighbor_idx in atoms and atom_idx < neighbor_idx:
-                edges.add((atom_idx, neighbor_idx))
-    return edges
-
-
 def _polyspiro_or_von_baeyer_candidate(
     mol: Molecule,
     atoms: set[int],
@@ -1084,7 +1060,7 @@ def _polyspiro_or_von_baeyer_candidate(
         descriptor, paths = dispiro
         return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
     legacy_descriptor, legacy_paths = get_von_baeyer_descriptor_and_path(atoms, edges)
-    if legacy_descriptor and _is_von_baeyer_descriptor(legacy_descriptor):
+    if legacy_descriptor and is_von_baeyer_descriptor(legacy_descriptor):
         legacy_numberings = tuple(
             _audited_von_baeyer_numberings(mol, legacy_descriptor, legacy_paths, frozenset(edges))
         )
@@ -1101,7 +1077,7 @@ def _polyspiro_or_von_baeyer_candidate(
     # von Baeyer numbering tie-breakers.
     if any(mol.atoms[atom].symbol == "Si" for atom in atoms):
         descriptor, paths = get_von_baeyer_descriptor_and_path(atoms, edges)
-        if not descriptor or not _is_von_baeyer_descriptor(descriptor):
+        if not descriptor or not is_von_baeyer_descriptor(descriptor):
             return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
         numberings = tuple(_audited_von_baeyer_numberings(mol, descriptor, paths, frozenset(edges)))
         return PolycycleDescriptorCandidate(
@@ -1128,7 +1104,7 @@ def _polyspiro_or_von_baeyer_candidate(
     descriptor, paths = legacy_descriptor, legacy_paths
     if not descriptor:
         return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
-    if not _is_von_baeyer_descriptor(descriptor):
+    if not is_von_baeyer_descriptor(descriptor):
         return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
     numberings = tuple(_audited_von_baeyer_numberings(mol, descriptor, paths, frozenset(edges)))
     return PolycycleDescriptorCandidate(
@@ -1137,13 +1113,6 @@ def _polyspiro_or_von_baeyer_candidate(
         is_von_baeyer=True,
         numberings=numberings,
     )
-
-
-def _polyspiro_descriptor_or_von_baeyer(mol: Molecule, atoms: set[int], edges: set[tuple[int, int]]):
-    """Legacy tuple wrapper for callers that have not migrated to candidates."""
-
-    candidate = _polyspiro_or_von_baeyer_candidate(mol, atoms, edges)
-    return candidate.descriptor, candidate.paths
 
 
 def _has_multiple_spiro_centers(nodes: set[int], edges: set[tuple[int, int]]) -> bool:

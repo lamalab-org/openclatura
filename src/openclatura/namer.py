@@ -10,11 +10,13 @@ from .chains import find_ring_systems, get_cyclic_atoms
 from .component_namer import name_component as _name_component_impl
 from .engine import DEFAULT_NAMING_ENGINE
 from .formatting import format_counted_prefixes, format_multiplier, strip_outer_parentheses
+from .graph_queries import bond_ids_within as _bond_ids_within
+from .graph_queries import charged_atom_ids
 from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
 from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
-from .name_assembly import NameAssemblyResult, token_span_trace_data
+from .name_assembly import NameAssemblyResult, commit_name_assembly_result
 from .naming_context import NamingIntent
 from .nomenclature import RULES
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
@@ -47,9 +49,6 @@ from .trace_helpers import (
 from .trace_helpers import assembly_substituent_tree as _assembly_substituent_tree
 from .trace_helpers import (
     assembly_trace_segments as _assembly_trace_segments,
-)
-from .trace_helpers import (
-    bond_ids_within as _bond_ids_within,
 )
 from .trace_helpers import (
     build_shortcut_tree_node,
@@ -808,13 +807,6 @@ def _number_saturated_n_ring_for_spiro(
     return min(candidates)[3]
 
 
-def _spiro_subgraph_name(mol: Molecule, c_idx: int, sub_comp: set[int]) -> str:
-    """Compatibility marker for older assembly callers."""
-
-    spiro = _spiro_subgraph_assembly(mol, c_idx, sub_comp)
-    return f"[SPIRO]-{spiro.side_locant}-{spiro.side_parent_name}"
-
-
 def _collect_subgraph_substituents(
     mol: Molecule,
     candidate_path: list[int],
@@ -845,7 +837,7 @@ def _collect_subgraph_substituents(
                         locants=[],
                         atom_ids=set(group.atoms_involved),
                         bond_ids=_bond_ids_within(mol, set(group.atoms_involved) | {group.attachment_carbon}),
-                        charge_atom_ids=_charged_atoms(mol, set(group.atoms_involved)),
+                        charge_atom_ids=charged_atom_ids(mol, set(group.atoms_involved)),
                     )
                 )
                 sub_handled_atoms.update(group.atoms_involved)
@@ -866,7 +858,7 @@ def _collect_subgraph_substituents(
                     locants=[],
                     atom_ids=sub_comp - {c_idx},
                     bond_ids=_bond_ids_within(mol, sub_comp),
-                    charge_atom_ids=_charged_atoms(mol, sub_comp - {c_idx}),
+                    charge_atom_ids=charged_atom_ids(mol, sub_comp - {c_idx}),
                     spiro=_spiro_subgraph_assembly(mol, c_idx, sub_comp),
                 )
             )
@@ -918,7 +910,7 @@ def _collect_subgraph_substituents(
                             locants=[],
                             atom_ids=branch_atoms,
                             bond_ids=_bond_ids_within(mol, branch_with_attachment),
-                            charge_atom_ids=_charged_atoms(mol, branch_atoms),
+                            charge_atom_ids=charged_atom_ids(mol, branch_atoms),
                             emitted_tokens=emitted_tokens,
                             trace_segments=branch_trace,
                             nested_decisions=decision_trace_data(branch_decisions) if emit_metadata else [],
@@ -952,12 +944,6 @@ def _add_subgraph_substituents(parts: AssemblyParts, subst_mapping: dict[int, li
                 substituent_tree=item.substituent_tree,
                 spiro=item.spiro,
             )
-
-
-def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
-    """Return formally charged atoms from an already named graph fragment."""
-
-    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
 
 
 def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
@@ -1041,46 +1027,7 @@ def _assemble_parent_name(
                 name = rewrite.rewrite(name)
         return _mark_optional_substituent_boundary(name, parts, finalize_subgraph)
     result = NameAssemblyResult.from_rewrite_pipeline(name, parts.name_atom_bindings, rewrites=tuple(rewrites))
-    parts.name_atom_bindings = list(result.bindings)
-    parts.name_token_spans = token_span_trace_data(result)
-    parts.name_rewrite_history = [
-        {
-            "name": operation.name,
-            "before": operation.before,
-            "after": operation.after,
-            "ownership": operation.ownership,
-            "source": operation.source,
-            "binding_count": operation.binding_count,
-            "changed_binding_count": operation.changed_binding_count,
-            "token_count": operation.token_count,
-            "changed_token_count": operation.changed_token_count,
-            "edits": [
-                {
-                    "before_start": edit.before_start,
-                    "before_end": edit.before_end,
-                    "after_start": edit.after_start,
-                    "after_end": edit.after_end,
-                    "before_text": edit.before_text,
-                    "after_text": edit.after_text,
-                    "segments": [
-                        {
-                            "before_start": segment.before_start,
-                            "before_end": segment.before_end,
-                            "after_start": segment.after_start,
-                            "after_end": segment.after_end,
-                            "before_text": segment.before_text,
-                            "after_text": segment.after_text,
-                            "ownership": segment.ownership,
-                            "group": segment.group,
-                        }
-                        for segment in edit.segments
-                    ],
-                }
-                for edit in operation.edits
-            ],
-        }
-        for operation in result.rewrite_history
-    ]
+    commit_name_assembly_result(parts, result)
     return _mark_optional_substituent_boundary(result.text, parts, finalize_subgraph)
 
 

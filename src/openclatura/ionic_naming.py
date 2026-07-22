@@ -213,10 +213,6 @@ def _is_unsaturated_ring_parent(mol: Molecule, parent_set: set[int]) -> bool:
     return internal_edge_count >= len(parent_set) and has_unsaturation
 
 
-def _name_has_parent_ium_locant(name: str, locant: str) -> bool:
-    return _name_has_parent_ium_locants(name, (locant,))
-
-
 def _name_has_parent_ium_locants(name: str, locants: tuple[str, ...]) -> bool:
     locant_text = ",".join(sorted(locants, key=_locant_sort_key))
     match = re.search(rf"-{re.escape(locant_text)}-ium\b", name)

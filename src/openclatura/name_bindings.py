@@ -13,6 +13,7 @@ from .token_grammar import (
     binding_term_tokens,
     is_locant_token,
     locant_tokens_in_text,
+    normalize_name_text,
 )
 
 
@@ -245,7 +246,7 @@ def postprocess_name_atom_bindings(
 ) -> list[NameAtomBinding]:
     """Apply final name post-processing to binding terms."""
 
-    final_text = _normalise_name_text(final_name or "")
+    final_text = normalize_name_text(final_name or "")
     processed = []
     for binding in bindings:
         processed_term = _contextual_postprocessed_binding_term(
@@ -1150,7 +1151,7 @@ def _dedupe_token_bindings(tokens: list[NameTokenBinding]) -> tuple[NameTokenBin
 def _data_backed_prefix_subtokens(term: str) -> tuple[str, ...]:
     """Return subtokens from registered functional-prefix spellings."""
 
-    normalised_term = _normalise_name_text(term)
+    normalised_term = normalize_name_text(term)
     if not normalised_term:
         return ()
     subtokens: list[str] = []
@@ -1159,7 +1160,7 @@ def _data_backed_prefix_subtokens(term: str) -> tuple[str, ...]:
         if not prefix:
             continue
         for token in _binding_term_tokens(prefix):
-            token_norm = _normalise_name_text(token)
+            token_norm = normalize_name_text(token)
             if token_norm and token_norm != normalised_term and token_norm in normalised_term:
                 subtokens.append(token)
     return tuple(dict.fromkeys(subtokens))
@@ -1325,11 +1326,11 @@ def _contextual_postprocessed_binding_term(
 ) -> str:
     """Map terms absorbed by contextual final-name post-processing."""
 
-    original = _normalise_name_text(original_term)
-    rewritten = _normalise_name_text(rewritten_term)
+    original = normalize_name_text(original_term)
+    rewritten = normalize_name_text(rewritten_term)
     for before, after in _contextual_postprocess_replacements():
-        normalised_before = _normalise_name_text(before)
-        normalised_after = _normalise_name_text(after)
+        normalised_before = normalize_name_text(before)
+        normalised_after = normalize_name_text(after)
         if _normalised_rendered_term_occurs(normalised_after, final_text) and (
             _contextual_match_scope(original, normalised_before, normalised_after, allow_suffix_context)
             or _contextual_match_scope(rewritten, normalised_before, normalised_after, allow_suffix_context)
@@ -1381,10 +1382,6 @@ def _contextual_postprocess_replacements() -> tuple[tuple[str, str], ...]:
     return tuple((rule.pattern, rule.replacement) for rule in RULES.postprocess.literal_replacements) + tuple(
         LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS
     )
-
-
-def _normalise_name_text(text: str) -> str:
-    return text.lower().replace(" ", "").replace("(", "").replace(")", "")
 
 
 def _replacement_charge_atom_ids(parts: AssemblyParts, item) -> set[int]:

@@ -4,7 +4,8 @@ from dataclasses import replace
 
 from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem
 from .formatting import strip_outer_parentheses
-from .molecule import DecisionTrace, Molecule, TracePhase
+from .graph_queries import bond_ids_within as bond_ids_within
+from .molecule import DecisionTrace, TracePhase
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .principal_suffixes import principal_suffix_terms
@@ -67,19 +68,6 @@ def functional_group_trace_data(groups: list[PerceivedGroup]) -> list[dict]:
         }
         for group in groups
     ]
-
-
-def bond_ids_within(mol: Molecule, atom_ids: set[int]) -> set[int]:
-    """Return bond IDs whose endpoints are both in atom_ids."""
-
-    bond_ids = set()
-    for atom_idx in atom_ids:
-        for neighbor_idx in mol.get_neighbors(atom_idx):
-            if neighbor_idx in atom_ids and atom_idx < neighbor_idx:
-                bond = mol.get_bond(atom_idx, neighbor_idx)
-                if bond:
-                    bond_ids.add(bond.idx)
-    return bond_ids
 
 
 def add_substituent_trace(

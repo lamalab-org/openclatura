@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from itertools import combinations
 
+from .graph_queries import normalize_edges
 from .molecule import Molecule
 from .polycycle_topology import RingNumbering, build_von_baeyer_numbering
 from .ring_renderer import render_von_baeyer_descriptor
@@ -50,7 +51,7 @@ def find_von_baeyer_candidates(
     """Enumerate ranked, audited von Baeyer candidates for a ring skeleton."""
 
     atom_set = frozenset(atoms)
-    edge_set = frozenset(_normalize_edges(edges))
+    edge_set = frozenset(normalize_edges(edges))
     if not _is_von_baeyer_scope(mol, atom_set, edge_set):
         return ()
 
@@ -403,15 +404,6 @@ def _component_path(
     return ()
 
 
-def _is_unbranched_component(component: set[int], edge_set: frozenset[tuple[int, int]], attachments: set[int]) -> bool:
-    allowed = component | attachments
-    for atom in component:
-        degree = sum(1 for neighbor in _neighbors(atom, edge_set) if neighbor in allowed)
-        if degree > 2:
-            return False
-    return True
-
-
 def _connected_components(atoms: set[int], edge_set: frozenset[tuple[int, int]]) -> list[set[int]]:
     components = []
     seen: set[int] = set()
@@ -452,10 +444,6 @@ def _neighbors(atom: int, edges: frozenset[tuple[int, int]]) -> set[int]:
         elif second == atom:
             neighbors.add(first)
     return neighbors
-
-
-def _normalize_edges(edges) -> set[tuple[int, int]]:
-    return {tuple(sorted((first, second))) for first, second in edges}
 
 
 def _dedupe_candidates(candidates: list[VonBaeyerCandidate]) -> list[VonBaeyerCandidate]:
