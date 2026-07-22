@@ -1,7 +1,6 @@
 """Heteroatom-starting recursive substituent naming."""
 
-from collections.abc import Callable
-
+from .assembly_parts import split_rendered_substituent_name
 from .formatting import (
     count_names,
     format_counted_prefixes,
@@ -21,12 +20,30 @@ from .namer_config import (
     SIMPLE_SELANYL_PREFIXES,
     SIMPLE_SULFANYL_PREFIXES,
 )
+from .naming_protocols import RecursiveSubgraphNamer
 from .nitrogen_roles import terminal_n3_substituent_role
 from .nomenclature import RULES
 from .oxoacid_roles import OxoLigandRole, central_oxo_substituent_role
 from .rules import multipliers
 
-BranchNamer = Callable[[Molecule, int, set[int], int | None], str]
+
+def _branch_name_text(
+    branch_namer: RecursiveSubgraphNamer,
+    mol: Molecule,
+    start_idx: int,
+    exclude_atoms: set[int],
+    upstream_atom: int,
+) -> str:
+    """Render a nested branch as text, consuming its boundary metadata."""
+
+    rendered = branch_namer(
+        mol,
+        start_idx,
+        exclude_atoms,
+        upstream_atom=upstream_atom,
+    )
+    name, _ = split_rendered_substituent_name(rendered)
+    return name
 
 
 def upstream_bond_order(mol: Molecule, start_idx: int, upstream_atom: int | None) -> int:
@@ -75,7 +92,7 @@ def _single_imino_n_substituent_name(
     mol: Molecule,
     nitrogen: int,
     exclude_atoms: set[int],
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     roots = [
         neighbor
@@ -151,11 +168,11 @@ def name_branch_or_none(
     branch_idx: int | None,
     exclude_atoms: set[int],
     upstream_atom: int,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     if branch_idx is None:
         return ""
-    return strip_outer_parentheses(branch_namer(mol, branch_idx, exclude_atoms, upstream_atom))
+    return strip_outer_parentheses(_branch_name_text(branch_namer, mol, branch_idx, exclude_atoms, upstream_atom))
 
 
 def name_carbonyl_like_fragment(
@@ -166,7 +183,7 @@ def name_carbonyl_like_fragment(
     exclude_atoms: set[int],
     branch_suffix: str,
     fallback: str,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
     amino_base: str | None = None,
     wrap_result: bool = False,
 ) -> str:
@@ -284,7 +301,7 @@ def name_oxygen_subgraph(
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
@@ -334,7 +351,7 @@ def name_oxygen_subgraph(
         branch = name_branch_or_none(mol, branch_idx, exclude_atoms | {start_idx, nxt}, nxt, branch_namer)
         return f"({branch}peroxy)" if branch else "hydroperoxy"
 
-    branch = branch_namer(mol, nxt, exclude_atoms | {start_idx}, start_idx)
+    branch = _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx)
     if branch:
         return oxy_prefix_from_branch(branch)
     return "hydroxy"
@@ -345,7 +362,7 @@ def name_nitrogen_subgraph(
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     upstream_order = upstream_bond_order(mol, start_idx, upstream_atom)
     is_double = upstream_order == 2
@@ -409,7 +426,7 @@ def name_nitrogen_subgraph(
                 if sulfur_imide:
                     branches.append(sulfur_imide)
             else:
-                branch = branch_namer(mol, nxt, exclude_atoms | {start_idx}, start_idx)
+                branch = _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx)
                 if branch:
                     branches.append(branch)
 
@@ -434,7 +451,7 @@ def _sulfur_imide_branch_name(
     sulfur: int,
     exclude_atoms: set[int],
     s_oxygens: list[int],
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     """Render an N=S(=O)n branch without collapsing it to sulfo-amino acid wording."""
 
@@ -449,7 +466,9 @@ def _sulfur_imide_branch_name(
         cyclic_name = _cyclic_sulfur_imide_ligand_name(mol, sulfur, nitrogen, next_atoms, s_oxygens)
         if cyclic_name:
             return cyclic_name
-        branches = [br for nxt in next_atoms if (br := branch_namer(mol, nxt, local_exclude, sulfur))]
+        branches = [
+            br for nxt in next_atoms if (br := _branch_name_text(branch_namer, mol, nxt, local_exclude, sulfur))
+        ]
         branches.extend(["oxo"] * len(s_oxygens))
         if not branches:
             return "sulfanylidene"
@@ -537,7 +556,7 @@ def name_sulfur_subgraph(
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
     s_oxygens = central_oxo_substituent_excluded_ligand_atoms(mol, start_idx, exclude_atoms)
@@ -571,7 +590,9 @@ def name_sulfur_subgraph(
             br
             for nxt in next_atoms
             if (
-                br := branch_namer(mol, nxt, exclude_atoms | {start_idx} | set(s_oxygens) | set(s_nitrogens), start_idx)
+                br := _branch_name_text(
+                    branch_namer, mol, nxt, exclude_atoms | {start_idx} | set(s_oxygens) | set(s_nitrogens), start_idx
+                )
             )
         ]
         branches.extend(["oxo"] * len(s_oxygens))
@@ -592,7 +613,9 @@ def name_sulfur_subgraph(
         branches = [
             br
             for nxt in next_atoms
-            if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx} | set(s_oxygens), start_idx))
+            if (
+                br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx} | set(s_oxygens), start_idx)
+            )
         ]
         branches.extend(["oxo"] * len(s_oxygens))
         return format_lambda_substituent(
@@ -606,7 +629,11 @@ def name_sulfur_subgraph(
         branches = [
             br
             for nxt in next_atoms
-            if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx} | set(s_nitrogens), start_idx))
+            if (
+                br := _branch_name_text(
+                    branch_namer, mol, nxt, exclude_atoms | {start_idx} | set(s_nitrogens), start_idx
+                )
+            )
         ]
         if len(s_nitrogens) == 1:
             branches = ["imino", *branches]
@@ -622,7 +649,7 @@ def name_sulfur_subgraph(
         return "thioxo" if is_double else f"{stereo_prefix_text}{unsubstituted_prefix('S') or 'sulfanyl'}"
 
     if len(next_atoms) == 1:
-        branch = branch_namer(mol, next_atoms[0], exclude_atoms | {start_idx}, start_idx)
+        branch = _branch_name_text(branch_namer, mol, next_atoms[0], exclude_atoms | {start_idx}, start_idx)
         if not is_double and mol.atoms[start_idx].charge > 0:
             return f"({stereo_prefix_text}{branch}sulfaniumyl)" if branch else f"{stereo_prefix_text}sulfaniumyl"
         if branch in SIMPLE_SULFANYL_PREFIXES:
@@ -631,7 +658,11 @@ def name_sulfur_subgraph(
             return format_element_substituent(stereo_prefix_text, branch, "sulfanyl", is_double=is_double)
         return f"{stereo_prefix_text}{'sulfanylidene' if is_double else 'sulfanyl'}"
 
-    branches = [br for nxt in next_atoms if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx}, start_idx))]
+    branches = [
+        br
+        for nxt in next_atoms
+        if (br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx))
+    ]
     return format_lambda_substituent(
         mol, start_idx, branches, stereo_prefix_text, "sulfanylidene" if is_double else "sulfanyl"
     )
@@ -645,7 +676,7 @@ def name_chalcogen_subgraph(
     simple_prefixes: set[str],
     element_suffix: str,
     oxo_prefix: str,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
     oxo_ligands = central_oxo_substituent_excluded_ligand_atoms(mol, start_idx, exclude_atoms)
@@ -662,7 +693,11 @@ def name_chalcogen_subgraph(
         branches = [
             br
             for nxt in next_atoms
-            if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx} | set(oxo_ligands), start_idx))
+            if (
+                br := _branch_name_text(
+                    branch_namer, mol, nxt, exclude_atoms | {start_idx} | set(oxo_ligands), start_idx
+                )
+            )
         ]
         branches.extend(["oxo"] * len(oxo_ligands))
         return format_lambda_substituent(
@@ -679,7 +714,7 @@ def name_chalcogen_subgraph(
             else f"{stereo_prefix_text}{unsubstituted_prefix(mol.atoms[start_idx].symbol) or element_suffix}"
         )
     if len(next_atoms) == 1:
-        branch = branch_namer(mol, next_atoms[0], exclude_atoms | {start_idx}, start_idx)
+        branch = _branch_name_text(branch_namer, mol, next_atoms[0], exclude_atoms | {start_idx}, start_idx)
         if branch and substituent_bonding_number(mol, start_idx) != mol.atoms[start_idx].element.standard_valence:
             return format_lambda_substituent(
                 mol, start_idx, [branch], stereo_prefix_text, element_suffix + ("idene" if is_double else "")
@@ -689,7 +724,11 @@ def name_chalcogen_subgraph(
         if branch:
             return format_element_substituent(stereo_prefix_text, branch, element_suffix, is_double=is_double)
         return f"{stereo_prefix_text}{element_suffix + ('idene' if is_double else '')}"
-    branches = [br for nxt in next_atoms if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx}, start_idx))]
+    branches = [
+        br
+        for nxt in next_atoms
+        if (br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx))
+    ]
     return format_lambda_substituent(
         mol, start_idx, branches, stereo_prefix_text, element_suffix + ("idene" if is_double else "")
     )
@@ -700,7 +739,7 @@ def name_phosphorus_subgraph(
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     upstream_order = upstream_bond_order(mol, start_idx, upstream_atom)
     multiple_bond_suffix = {2: "idene", 3: "idyne"}.get(upstream_order, "")
@@ -717,7 +756,7 @@ def name_phosphorus_subgraph(
     branches = [
         br
         for nxt in next_atoms
-        if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx} | set(p_oxygens), start_idx))
+        if (br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx} | set(p_oxygens), start_idx))
     ]
     return f"({stereo_prefix_text}{format_counted_prefixes(branches)}{suffix})"
 
@@ -727,7 +766,7 @@ def name_group_13_14_subgraph(
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
     base_suffix = unsubstituted_prefix(mol.atoms[start_idx].symbol) or (
@@ -737,7 +776,11 @@ def name_group_13_14_subgraph(
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
     if not next_atoms:
         return suffix
-    branches = [br for nxt in next_atoms if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx}, start_idx))]
+    branches = [
+        br
+        for nxt in next_atoms
+        if (br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx))
+    ]
     return f"({format_counted_prefixes(branches)}{suffix})"
 
 
@@ -746,13 +789,17 @@ def name_halogen_subgraph(
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str:
     symbol = mol.atoms[start_idx].symbol
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
     if not next_atoms:
         return HALOGEN_PREFIXES[symbol]
-    branches = [br for nxt in next_atoms if (br := branch_namer(mol, nxt, exclude_atoms | {start_idx}, start_idx))]
+    branches = [
+        br
+        for nxt in next_atoms
+        if (br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx))
+    ]
     valence = sum(mol.get_bond(start_idx, n).order for n in mol.get_neighbors(start_idx))
     return f"({format_counted_prefixes(branches)}lambda^{valence}-{HALOGEN_LAMBDA_SUFFIXES[symbol]})"
 
@@ -762,7 +809,7 @@ def name_heteroatom_subgraph(
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> str | None:
     """Name supported heteroatom-starting recursive fragments."""
 

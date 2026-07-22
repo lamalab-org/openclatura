@@ -4,7 +4,14 @@ import re
 from dataclasses import dataclass, field
 
 from .assembler import assemble_name_raw, post_process_rewrite_rules
-from .assembly_parts import AssemblyParts, SubstituentItem
+from .assembly_parts import (
+    AssemblyParts,
+    RenderedSubstituentName,
+    RenderedSubstituentText,
+    SubstituentItem,
+    rendered_substituent_text,
+    split_rendered_substituent_name,
+)
 from .assembly_spiro import extract_spiro_side_prefixes
 from .chains import find_ring_systems, get_cyclic_atoms
 from .component_namer import name_component as _name_component_impl
@@ -51,7 +58,11 @@ from .trace_helpers import (
 from .trace_helpers import (
     bond_ids_within as _bond_ids_within,
 )
-from .trace_helpers import decision_trace_data, trace_decision
+from .trace_helpers import (
+    build_shortcut_tree_node,
+    decision_trace_data,
+    trace_decision,
+)
 
 
 @dataclass
@@ -436,7 +447,7 @@ def _spiro_side_ring_branch_prefixes(
                 continue
             branch = _name_heteroaromatic_branch_substituent(mol, neighbor, atom_idx, allowed_branch_atoms)
             if not branch:
-                branch = name_subgraph(mol, neighbor, branch_exclude, upstream_atom=atom_idx)
+                branch = rendered_substituent_text(name_subgraph(mol, neighbor, branch_exclude, upstream_atom=atom_idx))
             if branch:
                 side_prefixes.append(f"{locant_map[atom_idx]}'-{format_multiplier(branch, 1, safe_enclose=True)}")
     return side_prefixes
@@ -474,7 +485,9 @@ def _name_heteroaromatic_branch_substituent(
         for neighbor in sorted(mol.get_neighbors(atom_idx)):
             if neighbor == upstream_atom or neighbor not in branch_allowed:
                 continue
-            substituent = name_subgraph(mol, neighbor, branch_exclude, upstream_atom=atom_idx)
+            substituent = rendered_substituent_text(
+                name_subgraph(mol, neighbor, branch_exclude, upstream_atom=atom_idx)
+            )
             if substituent:
                 prefix_items.append(f"{locant_map[atom_idx]}-{substituent}")
     stem = parent_name[:-1] if parent_name.endswith("e") else parent_name
@@ -713,7 +726,7 @@ def _retained_n_ring_spiro_assembly(mol: Molecule, c_idx: int, sub_comp: set[int
         for neighbor in sorted(mol.get_neighbors(atom_idx)):
             if neighbor not in allowed_branch_atoms:
                 continue
-            branch = name_subgraph(mol, neighbor, branch_exclude, upstream_atom=atom_idx)
+            branch = rendered_substituent_text(name_subgraph(mol, neighbor, branch_exclude, upstream_atom=atom_idx))
             if branch:
                 side_prefixes.append(f"{locant_map[atom_idx]}'-{branch}")
 
@@ -892,6 +905,7 @@ def _collect_subgraph_substituents(
                     )
                     branch_trace = []
                     branch_tree = None
+                branch_name, outer_parentheses_optional = split_rendered_substituent_name(branch_name)
                 if branch_name:
                     branch_atoms = _subgraph_component(mol, n_idx, branch_exclude)
                     branch_with_attachment = branch_atoms | {c_idx}
@@ -912,6 +926,7 @@ def _collect_subgraph_substituents(
                         SubstituentItem(
                             name=branch_name,
                             locants=[],
+                            outer_parentheses_optional=outer_parentheses_optional,
                             atom_ids=branch_atoms,
                             bond_ids=_bond_ids_within(mol, branch_with_attachment),
                             charge_atom_ids=_charged_atoms(mol, branch_atoms),
@@ -947,6 +962,7 @@ def _add_subgraph_substituents(parts: AssemblyParts, subst_mapping: dict[int, li
                 item.emitted_tokens,
                 substituent_tree=item.substituent_tree,
                 spiro=item.spiro,
+                outer_parentheses_optional=item.outer_parentheses_optional,
             )
 
 
@@ -980,6 +996,22 @@ def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
     return f"({name})"
 
 
+def _mark_optional_substituent_boundary(
+    name: str, parts: AssemblyParts, finalize_subgraph: bool
+) -> RenderedSubstituentText:
+    """Preserve whether construction made a subgraph boundary optional.
+
+    This marker is applied after all name rewrites, since those rewrites return
+    ordinary strings. String composition in a higher recursive layer then
+    intentionally drops the marker, retaining parentheses needed to delimit a
+    compound substituent.
+    """
+
+    if finalize_subgraph and parts.stereo_features:
+        return RenderedSubstituentName(name, outer_parentheses_optional=True)
+    return name
+
+
 def _assemble_parent_name(
     mol: Molecule,
     parts: AssemblyParts,
@@ -988,7 +1020,7 @@ def _assemble_parent_name(
     *,
     finalize_subgraph: bool = False,
     emit_metadata: bool = True,
-) -> str:
+) -> RenderedSubstituentText:
     """Assemble a parent name and apply shared post-assembly charge rules."""
 
     name = assemble_name_raw(parts)
@@ -1021,7 +1053,7 @@ def _assemble_parent_name(
                 name = rewrite[1](name)
             else:
                 name = rewrite.rewrite(name)
-        return name
+        return _mark_optional_substituent_boundary(name, parts, finalize_subgraph)
     result = NameAssemblyResult.from_rewrite_pipeline(name, parts.name_atom_bindings, rewrites=tuple(rewrites))
     parts.name_atom_bindings = list(result.bindings)
     parts.name_token_spans = token_span_trace_data(result)
@@ -1063,7 +1095,7 @@ def _assemble_parent_name(
         }
         for operation in result.rewrite_history
     ]
-    return result.text
+    return _mark_optional_substituent_boundary(result.text, parts, finalize_subgraph)
 
 
 def _simple_rooted_carbanion_substituent_name(
@@ -1104,6 +1136,7 @@ def name_subgraph(
     mol: Molecule,
     start_idx: int,
     exclude_atoms: set[int],
+    *,
     upstream_atom: int = None,
     return_trace: bool = False,
     return_tree: bool = False,
@@ -1277,7 +1310,7 @@ def name_subgraph(
         parent_selection.is_polycycle,
     )
 
-    name = _assemble_parent_name(
+    rendered_name = _assemble_parent_name(
         mol,
         parts,
         numbered_path,
@@ -1285,6 +1318,7 @@ def name_subgraph(
         finalize_subgraph=True,
         emit_metadata=emit_metadata,
     )
+    name, _ = split_rendered_substituent_name(rendered_name)
     trace_segments = _assembly_trace_segments(parts) if return_trace or return_tree else []
     if decision_trace is not None:
         trace_decision(
@@ -1302,7 +1336,7 @@ def name_subgraph(
     if return_trace:
         if return_tree:
             return (
-                name,
+                rendered_name,
                 trace_segments,
                 _assembly_substituent_tree(
                     parts,
@@ -1313,10 +1347,10 @@ def name_subgraph(
                     trace_segments=trace_segments,
                 ),
             )
-        return name, trace_segments
+        return rendered_name, trace_segments
     if return_tree:
         return (
-            name,
+            rendered_name,
             _assembly_substituent_tree(
                 parts,
                 name=name,
@@ -1326,7 +1360,7 @@ def name_subgraph(
                 trace_segments=trace_segments,
             ),
         )
-    return name
+    return rendered_name
 
 
 def _shortcut_substituent_tree(
@@ -1338,19 +1372,13 @@ def _shortcut_substituent_tree(
 ) -> dict:
     """Return a minimal recursive tree node for shortcut substituent names."""
 
-    node = {
-        "kind": "substituent",
-        "name": name,
-        "atoms": sorted(component),
-        "bonds": sorted(_bond_ids_within(mol, component)),
-        "parent": None,
-        "principal_group": None,
-        "substituents": [],
-        "replacement_prefixes": [],
-        "unsaturations": [],
-        "trace_segments": [],
-        "nested_decisions": decision_trace_data(decision_trace),
-    }
+    node = build_shortcut_tree_node(
+        kind="substituent",
+        name=name,
+        atom_ids=component,
+        bond_ids=_bond_ids_within(mol, component),
+        nested_decisions=decision_trace_data(decision_trace),
+    )
     if direct_prefix is not None:
         node["functional_prefix"] = {
             "kind": "functional_prefix",

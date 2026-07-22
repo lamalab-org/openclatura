@@ -1,14 +1,35 @@
 """Trace and explainability helpers for generated names."""
 
 from dataclasses import replace
+from typing import TypedDict
 
-from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem
+from .assembly_parts import (
+    AssemblyParts,
+    NameTokenBinding,
+    RenderedSubstituentName,
+    SubstituentItem,
+    split_rendered_substituent_name,
+)
 from .formatting import strip_outer_parentheses
 from .molecule import DecisionTrace, Molecule, TracePhase
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .principal_suffixes import principal_suffix_terms
 from .rules import bonds, multipliers, stems
+
+
+class NamingTreeMetadata(TypedDict, total=False):
+    """Optional, non-invariant fields supported by naming-tree nodes."""
+
+    name_atom_bindings: list[dict]
+    name_token_spans: list[dict]
+    stereo_features: list[dict]
+    indicated_hydrogens: list[str]
+    hydro_operations: list[dict]
+    parent_charges: list[dict]
+
+
+NAMING_TREE_METADATA_FIELDS = frozenset(NamingTreeMetadata.__annotations__)
 
 
 def decision_trace_data(trace: DecisionTrace | list | tuple | None) -> list[dict]:
@@ -84,7 +105,7 @@ def bond_ids_within(mol: Molecule, atom_ids: set[int]) -> set[int]:
 
 def add_substituent_trace(
     parts: AssemblyParts,
-    name: str,
+    name: str | RenderedSubstituentName,
     locant: str,
     atom_ids=None,
     bond_ids=None,
@@ -94,9 +115,13 @@ def add_substituent_trace(
     emitted_tokens: tuple[NameTokenBinding, ...] = (),
     substituent_tree=None,
     spiro=None,
+    outer_parentheses_optional: bool | None = None,
 ) -> None:
     """Append or merge a substituent while preserving trace atom/bond IDs."""
 
+    name, rendered_boundary_optional = split_rendered_substituent_name(name)
+    if outer_parentheses_optional is None:
+        outer_parentheses_optional = rendered_boundary_optional
     atom_ids = set(atom_ids or ())
     bond_ids = set(bond_ids or ())
     charge_atom_ids = set(charge_atom_ids or ())
@@ -104,7 +129,16 @@ def add_substituent_trace(
     nested_decisions = list(nested_decisions or ())
     if spiro is not None:
         spiro = replace(spiro, parent_locant=str(locant))
-    existing = next((s for s in parts.substituents if s.name == name and s.spiro == spiro), None)
+    existing = next(
+        (
+            item
+            for item in parts.substituents
+            if item.name == name
+            and item.spiro == spiro
+            and item.outer_parentheses_optional == outer_parentheses_optional
+        ),
+        None,
+    )
     if existing:
         existing.locants.append(locant)
         existing.atom_ids.update(atom_ids)
@@ -124,6 +158,7 @@ def add_substituent_trace(
             SubstituentItem(
                 name=name,
                 locants=[locant],
+                outer_parentheses_optional=outer_parentheses_optional,
                 atom_ids=atom_ids,
                 bond_ids=bond_ids,
                 charge_atom_ids=charge_atom_ids,
@@ -341,6 +376,74 @@ def attach_main_parent_decisions(
     return enriched
 
 
+def build_naming_tree_node(
+    *,
+    kind: str,
+    name: str,
+    atom_ids=None,
+    bond_ids=None,
+    parent=None,
+    principal_group=None,
+    substituents=None,
+    replacement_prefixes=None,
+    unsaturations=None,
+    trace_segments=None,
+    nested_decisions=None,
+    metadata: NamingTreeMetadata | None = None,
+) -> dict:
+    """Build the invariant portion of every component/substituent tree node."""
+
+    node = {
+        "kind": kind,
+        "name": name,
+        "atoms": sorted(atom_ids or ()),
+        "bonds": sorted(bond_ids or ()),
+        "parent": parent,
+        "principal_group": principal_group,
+        "substituents": list(substituents or ()),
+        "replacement_prefixes": list(replacement_prefixes or ()),
+        "unsaturations": list(unsaturations or ()),
+        "trace_segments": list(trace_segments or ()),
+        "nested_decisions": list(nested_decisions or ()),
+    }
+    if metadata:
+        overlapping_keys = node.keys() & metadata.keys()
+        if overlapping_keys:
+            raise ValueError(f"Tree metadata cannot replace invariant fields: {sorted(overlapping_keys)}")
+        unknown_keys = metadata.keys() - NAMING_TREE_METADATA_FIELDS
+        if unknown_keys:
+            raise ValueError(f"Unknown tree metadata fields: {sorted(unknown_keys)}")
+        node.update(metadata)
+    return node
+
+
+def build_shortcut_tree_node(
+    *,
+    kind: str,
+    name: str,
+    atom_ids,
+    bond_ids=None,
+    nested_decisions=None,
+    name_atom_bindings: list[dict] | None = None,
+    name_token_spans: list[dict] | None = None,
+) -> dict:
+    """Build a schema-complete tree node for a shortcut-rendered name."""
+
+    metadata: NamingTreeMetadata = {}
+    if name_atom_bindings is not None:
+        metadata["name_atom_bindings"] = list(name_atom_bindings)
+    if name_token_spans is not None:
+        metadata["name_token_spans"] = list(name_token_spans)
+    return build_naming_tree_node(
+        kind=kind,
+        name=name,
+        atom_ids=atom_ids,
+        bond_ids=bond_ids,
+        nested_decisions=nested_decisions,
+        metadata=metadata,
+    )
+
+
 def assembly_substituent_tree(
     parts: AssemblyParts,
     *,
@@ -356,16 +459,16 @@ def assembly_substituent_tree(
         trace_segments = assembly_trace_segments(parts)
     component_atoms = set(atom_ids or parts.parent_atom_ids)
     component_bonds = set(bond_ids or parts.parent_bond_ids)
-    parent_node = {
-        "kind": "fragment",
-        "name": name,
-        "atoms": sorted(component_atoms),
-        "bonds": sorted(component_bonds),
-        "parent": _parent_tree_node(parts),
-        "principal_group": _principal_group_tree_node(parts),
-        "substituents": _substituent_tree_nodes(parts.substituents),
-        "replacement_prefixes": _simple_item_tree_nodes(parts.a_prefixes, "replacement_prefix"),
-        "unsaturations": [
+    return build_naming_tree_node(
+        kind="fragment",
+        name=name,
+        atom_ids=component_atoms,
+        bond_ids=component_bonds,
+        parent=_parent_tree_node(parts),
+        principal_group=_principal_group_tree_node(parts),
+        substituents=_substituent_tree_nodes(parts.substituents),
+        replacement_prefixes=_simple_item_tree_nodes(parts.a_prefixes, "replacement_prefix"),
+        unsaturations=[
             {
                 "kind": "unsaturation",
                 "bond_key": item.bond_key,
@@ -375,33 +478,34 @@ def assembly_substituent_tree(
             }
             for item in parts.unsaturations
         ],
-        "stereo_features": [
-            {"descriptor": descriptor, "locant": locant} for descriptor, locant in parts.stereo_features
-        ],
-        "indicated_hydrogens": list(parts.indicated_hydrogens),
-        "hydro_operations": [
-            {
-                "key": operation.key,
-                "reason": operation.reason,
-                "locants": list(operation.locants),
-                "atom_ids": sorted(operation.atom_ids),
-                "operation_kind": operation.operation_kind,
-            }
-            for operation in parts.hydro_operations
-        ],
-        "parent_charges": [
-            {
-                "locant": item.locant,
-                "symbol": item.symbol,
-                "charge": item.charge,
-                "atom_id": item.atom_id,
-            }
-            for item in parts.parent_charges
-        ],
-        "trace_segments": list(trace_segments),
-        "nested_decisions": list(decisions or ()),
-    }
-    return parent_node
+        trace_segments=trace_segments,
+        nested_decisions=decisions,
+        metadata={
+            "stereo_features": [
+                {"descriptor": descriptor, "locant": locant} for descriptor, locant in parts.stereo_features
+            ],
+            "indicated_hydrogens": list(parts.indicated_hydrogens),
+            "hydro_operations": [
+                {
+                    "key": operation.key,
+                    "reason": operation.reason,
+                    "locants": list(operation.locants),
+                    "atom_ids": sorted(operation.atom_ids),
+                    "operation_kind": operation.operation_kind,
+                }
+                for operation in parts.hydro_operations
+            ],
+            "parent_charges": [
+                {
+                    "locant": item.locant,
+                    "symbol": item.symbol,
+                    "charge": item.charge,
+                    "atom_id": item.atom_id,
+                }
+                for item in parts.parent_charges
+            ],
+        },
+    )
 
 
 def _merge_substituent_tree_instances(existing: dict | None, new: dict, name: str) -> dict:
