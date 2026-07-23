@@ -167,22 +167,6 @@ def consume_fused_ion_operation(parts: AssemblyParts, candidate: FusedIonOperati
     _replace_fused_ion_bindings(parts, candidate)
 
 
-def render_fused_ion_template_name(parts: AssemblyParts) -> str | None:
-    """Render graph-certified retained fused ion names.
-
-    This is a production renderer only for generic graph operations whose
-    represented atoms are already present in ``AssemblyParts``.  It does not
-    inspect the assembled string.  New ion classes should add a graph operation
-    renderer here, then opt into template rows through the registry.
-    """
-
-    candidate = select_fused_ion_operation(parts)
-    if candidate is not None:
-        consume_fused_ion_operation(parts, candidate)
-        return candidate.rendered_name
-    return None
-
-
 def fused_ion_operation_candidates(parts: AssemblyParts) -> tuple[FusedIonOperationCandidate, ...]:
     """Return graph-derived retained fused ion operations for assembly parts."""
 

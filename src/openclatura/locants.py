@@ -1,7 +1,7 @@
 """Locant parsing and atom/bond locant helpers."""
 
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 
 from .molecule import Molecule
 
@@ -31,14 +31,6 @@ def locant_text(locant: int, display: str | None = None) -> str:
         return str(display)
     inherited_display = getattr(locant, "display", None)
     return str(locant) if inherited_display is None else str(inherited_display)
-
-
-def locant_texts(locants: Iterable[int], display_locants: Iterable[str] | None = None) -> tuple[str, ...]:
-    """Return rendered text for multiple locants."""
-
-    if display_locants is not None:
-        return tuple(str(locant) for locant in display_locants)
-    return tuple(locant_text(locant) for locant in locants)
 
 
 def coerce_display_numbering(

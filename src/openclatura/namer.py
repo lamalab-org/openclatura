@@ -818,13 +818,6 @@ def _number_saturated_n_ring_for_spiro(
     return min(candidates)[3]
 
 
-def _spiro_subgraph_name(mol: Molecule, c_idx: int, sub_comp: set[int]) -> str:
-    """Compatibility marker for older assembly callers."""
-
-    spiro = _spiro_subgraph_assembly(mol, c_idx, sub_comp)
-    return f"[SPIRO]-{spiro.side_locant}-{spiro.side_parent_name}"
-
-
 def _collect_subgraph_substituents(
     mol: Molecule,
     candidate_path: list[int],
