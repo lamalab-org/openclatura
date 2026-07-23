@@ -146,6 +146,56 @@ LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
 )
 
 
+def _balanced_group_end(name: str, start: int) -> int | None:
+    """If ``name[start]`` opens a parenthesis, return the index just past its match."""
+
+    if start >= len(name) or name[start] != "(":
+        return None
+    depth = 0
+    for i in range(start, len(name)):
+        if name[i] == "(":
+            depth += 1
+        elif name[i] == ")":
+            depth -= 1
+            if depth == 0:
+                return i + 1
+    return None
+
+
+def _oxo_group_methyl_to_carbonyl(name: str) -> str:
+    """Contract a one-carbon ``methyl`` parent bearing ``(oxo)`` and one parenthesized
+    group into ``(group)carbonyl``, for either substituent order.
+
+    Paren-aware replacement for two regexes that mis-matched the inner ``)methyl`` of a
+    group ending in a substituent methyl (e.g. heteroaryl-methyl), which corrupted names
+    like ``(oxo)(1-((thiophen-2-yl)methyl)cyclohexyl)methyl``.
+    """
+
+    def _word_char(idx: int) -> bool:
+        return idx < len(name) and (name[idx].isalnum() or name[idx] == "_")
+
+    out: list[str] = []
+    i = 0
+    while i < len(name):
+        # (oxo)(GROUP)methyl
+        if name.startswith("(oxo)", i):
+            g_end = _balanced_group_end(name, i + 5)
+            if g_end is not None and name.startswith("methyl", g_end) and not _word_char(g_end + 6):
+                out.append(name[i + 5 : g_end] + "carbonyl")
+                i = g_end + 6
+                continue
+        # (GROUP)(oxo)methyl
+        if name[i] == "(":
+            g_end = _balanced_group_end(name, i)
+            if g_end is not None and name.startswith("(oxo)methyl", g_end) and not _word_char(g_end + 11):
+                out.append(name[i:g_end] + "carbonyl")
+                i = g_end + 11
+                continue
+        out.append(name[i])
+        i += 1
+    return "".join(out)
+
+
 def _post_process_name(name: str) -> str:
     name = apply_data_postprocessing(name)
     name = ensure_stereo_descriptor_boundary(name)
@@ -170,8 +220,7 @@ def _post_process_name(name: str) -> str:
 
     name = re.sub(r"-1-formate\b", "-formate", name)
 
-    name = re.sub(r"\((.*?)\)\((?<!thi)oxo\)methyl\b", r"(\1)carbonyl", name)
-    name = re.sub(r"\((?<!thi)oxo\)\((.*?)\)methyl\b", r"(\1)carbonyl", name)
+    name = _oxo_group_methyl_to_carbonyl(name)
     name = name.replace("(oxo)methyl", "formyl")
     name = re.sub(r"(?<!thi)oxomethyl\b", "formyl", name)
     name = name.replace("thioxomethyl", "carbonothioyl")
