@@ -375,11 +375,40 @@ def _add_relative_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:
     return "".join(f"{prefix}-" for prefix in prefixes) + final_word
 
 
+def _front_modifier_sort_key(name: str) -> str:
+    """Alphanumeric ordering key: ignore the italic ``tert-``/``sec-`` prefixes."""
+
+    key = name
+    for prefix in ("tert-", "sec-"):
+        if key.startswith(prefix):
+            key = key[len(prefix) :]
+            break
+    return key.lstrip("([").lower()
+
+
 def _add_front_modifiers(parts: AssemblyParts, final_word: str) -> str:
     if not parts.front_modifiers:
         return final_word
-    counts = {}
-    for mod in parts.front_modifiers:
+    mods = parts.front_modifiers
+    locants = parts.front_modifier_locants
+    have_locants = len(locants) == len(mods) and all(loc is not None for loc in locants)
+    # Unsymmetrical polyacid esters need locants so each alkyl pairs with its own
+    # carboxyl (e.g. 1-tert-butyl 2-methyl ...dicarboxylate); a single ester or a
+    # symmetrical one keeps the simpler unlocanted (multiplied) form.
+    if have_locants and len(set(mods)) > 1:
+        by_name: dict[str, list[str]] = {}
+        for mod, loc in zip(mods, locants):
+            by_name.setdefault(mod, []).append(loc)
+        entries = []
+        for name in sorted(by_name, key=_front_modifier_sort_key):
+            group_locants = sorted(by_name[name], key=lambda loc: (len(loc), loc))
+            locant_str = ",".join(group_locants)
+            count = len(group_locants)
+            rendered = format_multiplier(name, count, safe_enclose=True) if count > 1 else name
+            entries.append(f"{locant_str}-{rendered}")
+        return f"{' '.join(entries)} {final_word}"
+    counts: dict[str, int] = {}
+    for mod in mods:
         counts[mod] = counts.get(mod, 0) + 1
     front_words = [format_multiplier(m, c, safe_enclose=True) if c > 1 else m for m, c in sorted(counts.items())]
     return f"{' '.join(front_words)} {final_word}"

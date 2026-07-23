@@ -20,6 +20,7 @@ def add_component_front_modifiers(
     principal_key: str | None,
     sub_exclude: set[int],
     branch_namer: RecursiveSubgraphNamer,
+    get_loc=None,
 ) -> None:
     """Add ester/sulfonate front modifiers such as the alcohol component name."""
 
@@ -38,6 +39,8 @@ def add_component_front_modifiers(
         if branch_name:
             modifier_atoms = subgraph_component(mol, r_group_c, sub_exclude | {single_o})
             parts.front_modifiers.append(strip_outer_parentheses(branch_name))
+            locant = str(get_loc(group.attachment_carbon)) if get_loc is not None else None
+            parts.front_modifier_locants.append(locant)
             parts.front_modifier_atom_ids.update(modifier_atoms)
             parts.front_modifier_charge_atom_ids.update(_charged_atoms(mol, modifier_atoms))
 
