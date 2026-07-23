@@ -27,6 +27,34 @@ class NameTokenBinding:
     right_context: str = ""
 
 
+@dataclass(frozen=True)
+class RenderedSubstituentName:
+    """Rendered text plus construction-time parenthesis-boundary metadata."""
+
+    text: str
+    outer_parentheses_optional: bool = False
+
+    def __str__(self) -> str:
+        return self.text
+
+
+RenderedSubstituentText = str | RenderedSubstituentName
+
+
+def split_rendered_substituent_name(name: RenderedSubstituentText) -> tuple[str, bool]:
+    """Return plain text and explicit boundary metadata for a rendered name."""
+
+    if isinstance(name, RenderedSubstituentName):
+        return name.text, name.outer_parentheses_optional
+    return name, False
+
+
+def rendered_substituent_text(name: RenderedSubstituentText) -> str:
+    """Return plain text when boundary metadata is no longer needed."""
+
+    return name.text if isinstance(name, RenderedSubstituentName) else name
+
+
 @dataclass
 class SubstituentItem:
     name: str
@@ -39,6 +67,7 @@ class SubstituentItem:
     nested_decisions: list[dict] = field(default_factory=list)
     substituent_tree: dict | None = None
     spiro: SpiroAssembly | None = None
+    outer_parentheses_optional: bool = False
 
 
 @dataclass

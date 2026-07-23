@@ -1,73 +1,16 @@
 """Data-driven component modifiers attached after parent numbering."""
 
-from typing import Literal, Protocol, overload
-
-from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem
+from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem, split_rendered_substituent_name
 from .formatting import strip_outer_parentheses
 from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
 from .molecule import DecisionTrace, Molecule
+from .naming_protocols import RecursiveSubgraphNamer
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .subgraph_tools import subgraph_component
 from .substituent_tokens import graph_bound_substituent_tokens
 from .trace_helpers import add_substituent_trace, bond_ids_within, decision_trace_data
-
-
-class BranchNamer(Protocol):
-    """Recursive branch namer with simple and traced/tree return modes."""
-
-    @overload
-    def __call__(
-        self,
-        mol: Molecule,
-        start_idx: int,
-        exclude_atoms: set[int],
-        *,
-        upstream_atom: int | None = None,
-        return_trace: Literal[False] = False,
-        return_tree: Literal[False] = False,
-        decision_trace: DecisionTrace | None = None,
-    ) -> str: ...
-
-    @overload
-    def __call__(
-        self,
-        mol: Molecule,
-        start_idx: int,
-        exclude_atoms: set[int],
-        *,
-        upstream_atom: int | None = None,
-        return_trace: Literal[True],
-        return_tree: Literal[False] = False,
-        decision_trace: DecisionTrace | None = None,
-    ) -> tuple[str, list[dict]]: ...
-
-    @overload
-    def __call__(
-        self,
-        mol: Molecule,
-        start_idx: int,
-        exclude_atoms: set[int],
-        *,
-        upstream_atom: int | None = None,
-        return_trace: Literal[True],
-        return_tree: Literal[True],
-        decision_trace: DecisionTrace | None = None,
-    ) -> tuple[str, list[dict], dict | None]: ...
-
-    @overload
-    def __call__(
-        self,
-        mol: Molecule,
-        start_idx: int,
-        exclude_atoms: set[int],
-        *,
-        upstream_atom: int | None = None,
-        return_trace: Literal[False] = False,
-        return_tree: Literal[True],
-        decision_trace: DecisionTrace | None = None,
-    ) -> tuple[str, dict | None]: ...
 
 
 def add_component_front_modifiers(
@@ -76,7 +19,7 @@ def add_component_front_modifiers(
     perceived_groups: list[PerceivedGroup],
     principal_key: str | None,
     sub_exclude: set[int],
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> None:
     """Add ester/sulfonate front modifiers such as the alcohol component name."""
 
@@ -121,7 +64,7 @@ def add_component_n_substituents(
     numbered_path: list[int],
     get_loc,
     sub_exclude: set[int],
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> None:
     """Add N-substituent prefixes and N/N' locants for principal groups."""
 
@@ -176,10 +119,12 @@ def add_component_n_substituents(
                         bond_ids_within(mol, {single_n, n_sub}),
                     )
                     if _use_hydrazone_suffix_modifier(parts, principal_key):
+                        branch_text, outer_parentheses_optional = split_rendered_substituent_name(branch_name)
                         parts.principal_suffix_modifiers.append(
                             SubstituentItem(
-                                branch_name,
+                                branch_text,
                                 [],
+                                outer_parentheses_optional=outer_parentheses_optional,
                                 atom_ids=branch_atoms,
                                 bond_ids=bond_ids_within(mol, branch_atoms | {single_n}),
                                 charge_atom_ids=_charged_atoms(mol, branch_atoms),
@@ -240,7 +185,7 @@ def _nitrogen_substituent_name(
     nitrogen: int,
     substituent: int,
     sub_exclude: set[int],
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
     decision_trace: DecisionTrace | None = None,
 ) -> tuple[str, list, dict | None]:
     """Render graph-bound N-substituents on principal nitrogen groups."""

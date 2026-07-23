@@ -16,10 +16,15 @@ from openclatura import (
     NamingRequest,
     NamingResult,
     OpsinCheck,
+    analyze_rdkit_mol,
     analyze_smiles,
     name,
     name_many,
+    name_mol,
+    name_rdkit_mol,
+    name_rdkit_mol_with_trace,
     name_smiles,
+    name_smiles_with_trace,
 )
 
 
@@ -292,3 +297,80 @@ def test_name_many_parallel_and_serial_agree(processes):
     serial = name_many(inputs, processes=1)
     other = name_many(inputs, processes=processes)
     assert [r.name for r in serial] == [r.name for r in other]
+
+
+# --- RDKit molecule input -------------------------------------------------
+
+
+def _mol(smiles: str):
+    from rdkit import Chem
+
+    return Chem.MolFromSmiles(smiles)
+
+
+def test_name_rdkit_mol_matches_name_smiles():
+    smiles = "CC(=O)Oc1ccccc1C(=O)O"
+    assert name_rdkit_mol(_mol(smiles)) == name_smiles(smiles)
+
+
+def test_name_rdkit_mol_leaves_the_callers_molecule_untouched():
+    from rdkit import Chem
+
+    smiles = "c1ccccc1C(=O)O"
+    mol = _mol(smiles)
+    name_rdkit_mol(mol)
+    # Naming kekulizes internally; the caller's aromatic molecule must survive.
+    assert Chem.MolToSmiles(mol) == Chem.MolToSmiles(_mol(smiles))
+    assert all(atom.GetIsAromatic() for atom in mol.GetAtoms() if atom.IsInRing())
+
+
+def test_name_mol_returns_naming_result_without_generating_smiles():
+    result = name_mol(_mol("CCO"))
+    assert isinstance(result, NamingResult)
+    assert result.name == "ethanol"
+    assert result.ok is True
+    # No SMILES round-trip is paid for unless something downstream needs one.
+    assert result.smiles == ""
+
+
+def test_name_mol_populates_smiles_when_opsin_verification_needs_it(monkeypatch):
+    seen = {}
+
+    def fake_verify(name_str, smiles):
+        seen["smiles"] = smiles
+        return OpsinCheck(status="skipped_no_opsin", name=name_str)
+
+    monkeypatch.setattr("openclatura.engine.verify_with_opsin", fake_verify)
+    result = name_mol(_mol("CCO"), verify_opsin=True)
+    # The molecule had no SMILES of its own, so one is derived for the check.
+    assert result.smiles == "CCO"
+    assert seen["smiles"] == "CCO"
+
+
+def test_name_rdkit_mol_reads_sd_style_molecules_with_explicit_hydrogens():
+    from rdkit import Chem
+
+    block = Chem.MolToMolBlock(Chem.AddHs(_mol("c1ccccc1C(=O)O")))
+    with_hs = Chem.MolFromMolBlock(block, removeHs=False)
+    assert name_rdkit_mol(with_hs) == "benzoic acid"
+
+    unsanitized = Chem.MolFromMolBlock(block, sanitize=False)
+    assert name_rdkit_mol(unsanitized) == "benzoic acid"
+
+
+def test_name_rdkit_mol_of_none_is_an_empty_name():
+    assert name_rdkit_mol(None) == ""
+
+
+def test_name_rdkit_mol_with_trace_and_analysis_match_the_smiles_paths():
+    smiles = "CC(=O)O"
+    mol_name, mol_trace = name_rdkit_mol_with_trace(_mol(smiles))
+    smiles_name, smiles_trace = name_smiles_with_trace(smiles)
+    assert mol_name == smiles_name
+    assert len(mol_trace) == len(smiles_trace)
+    assert analyze_rdkit_mol(_mol(smiles)).name == analyze_smiles(smiles).name
+
+
+def test_name_many_accepts_a_mix_of_smiles_and_molecules():
+    results = name_many([_mol("CCO"), "c1ccccc1", _mol("CC(=O)O")])
+    assert [r.name for r in results] == ["ethanol", "benzene", "acetic acid"]

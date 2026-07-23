@@ -1,16 +1,14 @@
 """Graph-derived emitted-token metadata for composed substituent prefixes."""
 
 import re
-from collections.abc import Callable
 
 from .assembly_parts import NameTokenBinding
 from .formatting import strip_outer_parentheses
 from .molecule import Molecule
+from .naming_protocols import RecursiveSubgraphNamer
 from .stereo_descriptors import ABSOLUTE_STEREO_DESCRIPTORS, RELATIVE_STEREO_DESCRIPTORS
 from .token_grammar import is_locant_token, lexical_token_spans, lexical_tokens
 from .trace_helpers import bond_ids_within
-
-BranchNamer = Callable[..., str]
 
 
 def graph_bound_substituent_tokens(
@@ -20,7 +18,7 @@ def graph_bound_substituent_tokens(
     term: str,
     upstream_atom: int,
     exclude_atoms: set[int],
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> tuple[NameTokenBinding, ...]:
     """Return precise token bindings for graph-composed substituent terms."""
 
@@ -102,7 +100,7 @@ def _generic_heteroatom_substituent_tokens(
     term: str,
     upstream_atom: int,
     exclude_atoms: set[int],
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> tuple[NameTokenBinding, ...]:
     """Return graph-bound tokens for non-nitrogen heteroatom-center prefixes."""
 
@@ -494,7 +492,7 @@ def _nitrogen_substituent_tokens(
     term: str,
     upstream_atom: int,
     exclude_atoms: set[int],
-    branch_namer: BranchNamer,
+    branch_namer: RecursiveSubgraphNamer,
 ) -> tuple[NameTokenBinding, ...]:
     term_text = strip_outer_parentheses(term)
     lower_term = term_text.lower()

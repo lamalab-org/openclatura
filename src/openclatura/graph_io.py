@@ -22,6 +22,62 @@ def read_smiles(smiles: str) -> Molecule:
         except Exception:
             pass
 
+    return _build_molecule(rdmol, atom_metadata)
+
+
+def read_rdkit_mol(rdmol: Chem.Mol | None, *, copy: bool = True) -> Molecule:
+    """Convert an existing RDKit molecule into the internal graph model.
+
+    Naming needs a kekulized graph, so the input is copied by default and the
+    caller's molecule is left untouched.  Pass ``copy=False`` only when the
+    molecule is a throwaway.  Molecules that were never sanitized (for example
+    ``MolFromSmiles(..., sanitize=False)`` or a partially read SD record) get
+    the minimal property-cache and ring perception the namer relies on.
+
+    Explicit hydrogens, as SD records usually carry them, are folded back into
+    implicit hydrogen counts; that renumbers the heavy atoms of such a
+    molecule, so atom indices in a trace refer to the hydrogen-suppressed
+    graph rather than to the input molecule.
+    """
+
+    if rdmol is None:
+        return Molecule()
+    if copy:
+        rdmol = Chem.Mol(rdmol)
+
+    _ensure_perception(rdmol)
+    if any(atom.GetAtomicNum() == 1 for atom in rdmol.GetAtoms()):
+        try:
+            rdmol = Chem.RemoveHs(rdmol, sanitize=False)
+            _ensure_perception(rdmol)
+        except Exception:
+            pass
+
+    atom_metadata = _atom_metadata(rdmol)
+    try:
+        Chem.Kekulize(rdmol, clearAromaticFlags=True)
+    except Exception:
+        pass
+
+    return _build_molecule(rdmol, atom_metadata)
+
+
+def _ensure_perception(rdmol: Chem.Mol) -> None:
+    """Give an externally supplied molecule the valence and ring data we need."""
+
+    try:
+        rdmol.UpdatePropertyCache(strict=False)
+    except Exception:
+        pass
+    try:
+        rdmol.GetRingInfo().NumRings()
+    except RuntimeError:
+        Chem.FastFindRings(rdmol)
+
+
+def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molecule:
+    """Populate the internal graph model from a prepared RDKit molecule."""
+
     mol = Molecule()
     if rdmol is None:
         return mol
