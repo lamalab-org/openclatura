@@ -2118,5 +2118,3 @@ def try_name_anhydride_component_result(
         )
         return AnhydrideComponentName(name=name, bindings=half_bindings + (core_binding,))
     return None
-
-
