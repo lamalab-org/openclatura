@@ -1186,7 +1186,11 @@ def _acylamino_amido_prefix(
         """True when ``carbon`` is a single-bonded carboxamide acyl on this nitrogen."""
         if not mol.atoms[carbon].is_carbon or mol.get_bond(n_idx, carbon).order != 1:
             return False
-        c_os = [nb for nb in mol.get_neighbors(carbon) if mol.atoms[nb].symbol == "O" and mol.get_bond(carbon, nb).order == 2]
+        c_os = [
+            nb
+            for nb in mol.get_neighbors(carbon)
+            if mol.atoms[nb].symbol == "O" and mol.get_bond(carbon, nb).order == 2
+        ]
         if len(c_os) != 1:
             return False
         rest = [nb for nb in mol.get_neighbors(carbon) if nb not in {n_idx, c_os[0]}]
