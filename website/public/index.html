@@ -274,6 +274,34 @@
     padding: 0 1rem 2.5rem;
   }
   footer a { color: var(--accent); text-decoration: none; }
+  .footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: .7rem;
+    margin-top: 1.1rem;
+  }
+  .footer-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    padding: .55rem 1rem;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    line-height: 1;
+    transition: background .15s, color .15s;
+  }
+  .footer-links a:hover {
+    background: var(--accent);
+    color: #fff;
+  }
+  .footer-links a svg {
+    width: 1.15em;
+    height: 1.15em;
+    flex: none;
+  }
 </style>
 </head>
 <body>
@@ -326,6 +354,16 @@
 <footer>
   Powered by <a href="https://github.com/lamalab-org/iupac-name-generator">openclatura</a>,
   an open nomenclature framework · Editor: <a href="https://lifescience.opensource.epam.com/ketcher/">Ketcher</a> (EPAM, Apache-2.0) · MIT licensed
+  <div class="footer-links">
+    <a id="report-issue" href="https://github.com/lamalab-org/iupac-name-generator/issues/new" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/><path fill-rule="evenodd" d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0ZM1.5 8a6.5 6.5 0 1 1 13 0 6.5 6.5 0 0 1-13 0Z"/></svg>
+      Report an issue
+    </a>
+    <a href="https://chemrxiv.org/doi/abs/10.26434/chemrxiv.15006114/v1" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M3 2a1 1 0 0 1 1-1h5.5L13 4.5V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2Zm6 .5V4a1 1 0 0 0 1 1h1.5L9 2.5ZM5.5 8a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5Zm0 2.5a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5Z"/></svg>
+      Read the preprint
+    </a>
+  </div>
 </footer>
 
 <script>
@@ -333,7 +371,40 @@
   var debounceTimer = null;
   var currentSmiles = "";
   var currentName = "";
+  var appVersion = "";
   var requestSeq = 0;
+
+  // Build a prefilled GitHub "new issue" URL (the new-github-issue-url pattern:
+  // owner/repo/issues/new?title=…&body=…), seeded with whatever the user has
+  // drawn so bug reports arrive with the SMILES and produced name attached.
+  var ISSUE_URL = "https://github.com/lamalab-org/iupac-name-generator/issues/new";
+  function buildIssueUrl() {
+    var title, body;
+    var version = appVersion || "unknown";
+    if (currentSmiles && currentName) {
+      title = "Incorrect name for " + currentSmiles;
+      body = "**SMILES:** `" + currentSmiles + "`\n\n"
+           + "**Name produced:** " + currentName + "\n\n"
+           + "**Expected name:** _please fill in_\n\n";
+    } else if (currentSmiles) {
+      title = "Naming failed for " + currentSmiles;
+      body = "**SMILES:** `" + currentSmiles + "`\n\n"
+           + "**Expected name:** _please fill in_\n\n"
+           + "openclatura could not produce a name for this structure.\n\n";
+    } else {
+      title = "";
+      body = "**SMILES:** _please fill in_\n\n"
+           + "**What went wrong:** _please describe_\n\n";
+    }
+    body += "---\nReported from the openclatura web demo (openclatura " + version + ").\n";
+    var params = "body=" + encodeURIComponent(body);
+    if (title) params = "title=" + encodeURIComponent(title) + "&" + params;
+    return ISSUE_URL + "?" + params;
+  }
+  function updateIssueLink() {
+    var a = el("report-issue");
+    if (a) a.href = buildIssueUrl();
+  }
 
   // How long the drawing must sit still before it is named. Example chips
   // load complete structures, so they use a shorter wait.
@@ -407,6 +478,8 @@
       el("smiles-out").textContent = smiles || "—";
       if (!smiles) {
         currentSmiles = "";
+        currentName = "";
+        updateIssueLink();
         resetResult("Draw a structure to name it.");
         return;
       }
@@ -429,6 +502,7 @@
     failureTimer = setTimeout(function () {
       if (seq !== requestSeq) return;
       currentName = "";
+      updateIssueLink();
       el("result-name").textContent = "Could not name this structure.";
       el("result-name").className = "error";
       el("verify-badge").className = "verify-badge";
@@ -471,6 +545,7 @@
         setStatus("");
         if (data.ok && data.name) {
           currentName = data.name;
+          updateIssueLink();
           el("result-name").textContent = data.name;
           el("result-name").className = data.name.length > 50 ? "long" : "";
           el("btn-copy").disabled = false;
@@ -602,7 +677,11 @@
   fetch("/api/healthz")
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) {
-      if (d && d.version) el("app-version").textContent = "v" + d.version;
+      if (d && d.version) {
+        appVersion = "v" + d.version;
+        el("app-version").textContent = appVersion;
+        updateIssueLink();
+      }
     })
     .catch(function () { /* version tag stays hidden */ });
 
