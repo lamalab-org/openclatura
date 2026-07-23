@@ -149,12 +149,28 @@ def _allowed_groups(parent_atoms: set[int], perceived_groups: list[PerceivedGrou
     return True
 
 
+def _base_substituent_name(name: str) -> str:
+    """Strip enclosing marks so the gate can list bare substituent names.
+
+    A complex substituent carries context-dependent enclosing marks in its
+    rendered ``name`` (e.g. ``(propan-2-yl)`` on one parent, ``propan-2-yl``
+    on another).  Comparing the bare base name keeps the allow-list stable
+    across attachment contexts.
+    """
+
+    name = name.strip()
+    closing = {"(": ")", "[": "]", "{": "}"}
+    while len(name) >= 2 and name[0] in closing and name[-1] == closing[name[0]]:
+        name = name[1:-1].strip()
+    return name
+
+
 def _allowed_substituents(substituent_mapping: dict[int, list[SubstituentItem]]) -> bool:
     for items in substituent_mapping.values():
         for item in items:
             if item.spiro is not None:
                 return False
-            if item.name not in ALLOWED_SUBSTITUENT_NAMES:
+            if _base_substituent_name(item.name) not in ALLOWED_SUBSTITUENT_NAMES:
                 return False
     return True
 
