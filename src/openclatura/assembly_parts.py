@@ -136,6 +136,7 @@ class AssemblyParts:
     retained_name: str | None = None
     retained_parent_metadata: RetainedParentMetadata | None = None
     front_modifiers: list[str] = field(default_factory=list)
+    front_modifier_locants: list[str | None] = field(default_factory=list)
     front_modifier_atom_ids: set[int] = field(default_factory=set)
     front_modifier_charge_atom_ids: set[int] = field(default_factory=set)
     principal_suffix_modifiers: list[SubstituentItem] = field(default_factory=list)

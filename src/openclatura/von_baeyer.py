@@ -85,15 +85,6 @@ def find_von_baeyer_candidates(
     return tuple(sorted(deduped, key=lambda candidate: candidate.rank))
 
 
-def best_von_baeyer_candidate(
-    mol: Molecule,
-    atoms: set[int] | frozenset[int],
-    edges: set[tuple[int, int]] | frozenset[tuple[int, int]],
-) -> VonBaeyerCandidate | None:
-    candidates = find_von_baeyer_candidates(mol, atoms, edges)
-    return candidates[0] if candidates else None
-
-
 def _is_von_baeyer_scope(mol: Molecule, atoms: frozenset[int], edges: frozenset[tuple[int, int]]) -> bool:
     if len(edges) - len(atoms) + 1 < 3:
         return False
@@ -401,15 +392,6 @@ def _component_path(
                     seen.add(neighbor)
                     queue.append((neighbor, path + (neighbor,)))
     return ()
-
-
-def _is_unbranched_component(component: set[int], edge_set: frozenset[tuple[int, int]], attachments: set[int]) -> bool:
-    allowed = component | attachments
-    for atom in component:
-        degree = sum(1 for neighbor in _neighbors(atom, edge_set) if neighbor in allowed)
-        if degree > 2:
-            return False
-    return True
 
 
 def _connected_components(atoms: set[int], edge_set: frozenset[tuple[int, int]]) -> list[set[int]]:

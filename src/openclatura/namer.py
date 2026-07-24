@@ -1,6 +1,7 @@
 # openclatura/api.py
 
 import re
+from collections import Counter
 from dataclasses import dataclass, field
 
 from .assembler import assemble_name_raw, post_process_rewrite_rules
@@ -16,7 +17,7 @@ from .assembly_spiro import extract_spiro_side_prefixes
 from .chains import find_ring_systems, get_cyclic_atoms
 from .component_namer import name_component as _name_component_impl
 from .engine import DEFAULT_NAMING_ENGINE
-from .formatting import format_counted_prefixes, format_multiplier, strip_outer_parentheses
+from .formatting import format_counted_prefixes, format_multiplier, is_complex_prefix, strip_outer_parentheses
 from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
@@ -817,13 +818,6 @@ def _number_saturated_n_ring_for_spiro(
     return min(candidates)[3]
 
 
-def _spiro_subgraph_name(mol: Molecule, c_idx: int, sub_comp: set[int]) -> str:
-    """Compatibility marker for older assembly callers."""
-
-    spiro = _spiro_subgraph_assembly(mol, c_idx, sub_comp)
-    return f"[SPIRO]-{spiro.side_locant}-{spiro.side_parent_name}"
-
-
 def _collect_subgraph_substituents(
     mol: Molecule,
     candidate_path: list[int],
@@ -1132,6 +1126,125 @@ def _simple_rooted_carbanion_substituent_name(
     return f"{side_stem}ylmethanidyl"
 
 
+def _carboxylic_acid_to_amido(acid_name: str) -> str | None:
+    """Convert a carboxylic-acid component name to its N-acyl (amido) substituent form."""
+
+    for ending, replacement in (("carboxylic acid", "carboxamido"), ("oic acid", "amido"), ("ic acid", "amido")):
+        if acid_name.endswith(ending):
+            return acid_name[: -len(ending)] + replacement
+    return None
+
+
+def _format_n_locant_prefix(names: list[str]) -> str:
+    """Format amide N-substituents with N-locants, e.g. 'N-methyl', 'N,N-dimethyl'."""
+
+    counts = Counter(strip_outer_parentheses(name) for name in names)
+    parts = []
+    for name in sorted(counts):
+        k = counts[name]
+        display = f"({name})" if is_complex_prefix(name) else name
+        locants = ",".join(["N"] * k)
+        if k == 1:
+            parts.append(f"{locants}-{display}")
+        else:
+            mult = multipliers.complex_(k) if is_complex_prefix(name) else multipliers.basic(k)
+            parts.append(f"{locants}-{mult}{display}")
+    return "-".join(parts)
+
+
+def _acylamino_amido_prefix(
+    mol: Molecule, n_idx: int, exclude_atoms: set[int], upstream_atom: int | None
+) -> str | None:
+    """Name an acylamino substituent ``R-C(=O)-N(R')-`` as an ``[N-R'-]<acid>amido`` prefix.
+
+    Routes the acyl through the carboxylic-acid component namer so it renders with a
+    proper substitutive amido name (acetamido, benzamido, 2-phenylacetamido,
+    2-(piperidin-4-yl)acetamido, ...) rather than the ambiguous functional-class
+    ``<sub>carbonylamino`` spelling.  N-substituents (tertiary amides) are rendered as
+    ``N-`` locanted prefixes.  Returns ``None`` for anything that is not a plain
+    carboxamide nitrogen, leaving the existing renderer in charge.
+    """
+
+    n_atom = mol.atoms[n_idx]
+    if n_atom.symbol != "N" or n_atom.charge != 0 or n_atom.is_aromatic or upstream_atom is None:
+        return None
+    up_bond = mol.get_bond(n_idx, upstream_atom)
+    if up_bond is None or up_bond.order != 1:
+        return None
+    neighbors = [nb for nb in mol.get_neighbors(n_idx) if nb not in exclude_atoms and nb != upstream_atom]
+    if not neighbors:
+        return None
+
+    def _amide_acyl(carbon: int) -> bool:
+        """True when ``carbon`` is a single-bonded carboxamide acyl on this nitrogen."""
+        if not mol.atoms[carbon].is_carbon or mol.get_bond(n_idx, carbon).order != 1:
+            return False
+        c_os = [
+            nb
+            for nb in mol.get_neighbors(carbon)
+            if mol.atoms[nb].symbol == "O" and mol.get_bond(carbon, nb).order == 2
+        ]
+        if len(c_os) != 1:
+            return False
+        rest = [nb for nb in mol.get_neighbors(carbon) if nb not in {n_idx, c_os[0]}]
+        # The acid's R group (if any) must be carbon; formyl (no R) contracts to formamido.
+        return len(rest) <= 1 and all(mol.atoms[nb].is_carbon for nb in rest)
+
+    acyl_cands = [c for c in neighbors if _amide_acyl(c)]
+    if len(acyl_cands) != 1:
+        return None
+    acyl_c = acyl_cands[0]
+    n_substituents = [nb for nb in neighbors if nb != acyl_c]
+
+    blocked = set(exclude_atoms) | {n_idx}
+    acid_atoms: set[int] = set()
+    stack = [acyl_c]
+    while stack:
+        cur = stack.pop()
+        if cur in acid_atoms or cur in blocked:
+            continue
+        acid_atoms.add(cur)
+        stack.extend(nb for nb in mol.get_neighbors(cur) if nb not in acid_atoms and nb not in blocked)
+
+    acid_mol = Molecule()
+    for idx in acid_atoms:
+        atom = mol.atoms[idx]
+        acid_mol.add_atom(
+            symbol=atom.symbol,
+            idx=idx,
+            charge=atom.charge,
+            stereo=atom.stereo,
+            raw_stereo=atom.raw_stereo,
+            is_aromatic=atom.is_aromatic,
+            explicit_h_count=atom.explicit_h_count,
+            total_h_count=atom.total_h_count,
+        )
+    for idx in acid_atoms:
+        for nb in mol.get_neighbors(idx):
+            if nb in acid_atoms and idx < nb:
+                bond = mol.get_bond(idx, nb)
+                acid_mol.add_bond(u=idx, v=nb, order=bond.order, stereo=bond.stereo, in_small_ring=bond.in_small_ring)
+    hydroxyl_idx = max(mol.atoms) + 1
+    acid_mol.add_atom(symbol="O", idx=hydroxyl_idx)
+    acid_mol.add_bond(u=acyl_c, v=hydroxyl_idx, order=1)
+
+    try:
+        acid_name = name_component(acid_mol, acid_atoms | {hydroxyl_idx}, is_substituent=False)
+    except Exception:
+        return None
+    amido = _carboxylic_acid_to_amido(str(acid_name))
+    if amido is None:
+        return None
+    if n_substituents:
+        sub_exclude = set(exclude_atoms) | {n_idx} | acid_atoms
+        sub_names = [str(name_subgraph(mol, s, sub_exclude, upstream_atom=n_idx)) for s in n_substituents]
+        if not all(sub_names):
+            return None
+        n_prefix = _format_n_locant_prefix(sub_names)
+        amido = f"{n_prefix}-{amido}" if amido[0].isdigit() else f"{n_prefix}{amido}"
+    return f"({amido})" if is_complex_prefix(amido) else amido
+
+
 def name_subgraph(
     mol: Molecule,
     start_idx: int,
@@ -1169,7 +1282,9 @@ def name_subgraph(
         )
 
     if not start_atom.is_carbon and start_idx not in cyclic_atoms_global:
-        name = name_heteroatom_subgraph(mol, start_idx, exclude_atoms, upstream_atom, name_subgraph)
+        name = _acylamino_amido_prefix(mol, start_idx, exclude_atoms, upstream_atom)
+        if name is None:
+            name = name_heteroatom_subgraph(mol, start_idx, exclude_atoms, upstream_atom, name_subgraph)
         if name is not None:
             if decision_trace is not None:
                 trace_decision(

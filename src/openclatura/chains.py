@@ -861,18 +861,6 @@ def _audited_ring_numberings(
     return _dedupe_ring_numberings(audited)
 
 
-def _audited_ring_paths(
-    mol: Molecule,
-    kind: str,
-    descriptor_numbers: tuple[int, ...],
-    paths: tuple[tuple[int, ...], ...] | list[tuple[int, ...]],
-    edges: frozenset[tuple[int, int]],
-) -> list[list[int]]:
-    return _dedupe_numbering_paths(
-        [list(numbering.path) for numbering in _audited_ring_numberings(mol, kind, descriptor_numbers, paths, edges)]
-    )
-
-
 def _audited_von_baeyer_numberings(
     mol: Molecule,
     descriptor: str,
@@ -1137,13 +1125,6 @@ def _polyspiro_or_von_baeyer_candidate(
         is_von_baeyer=True,
         numberings=numberings,
     )
-
-
-def _polyspiro_descriptor_or_von_baeyer(mol: Molecule, atoms: set[int], edges: set[tuple[int, int]]):
-    """Legacy tuple wrapper for callers that have not migrated to candidates."""
-
-    candidate = _polyspiro_or_von_baeyer_candidate(mol, atoms, edges)
-    return candidate.descriptor, candidate.paths
 
 
 def _has_multiple_spiro_centers(nodes: set[int], edges: set[tuple[int, int]]) -> bool:

@@ -523,7 +523,7 @@ def name_component(
     parts = parent_plan.parts
     emit_bond_stereo(mol, parts, numbered_path, get_loc, state.base_exclude)
     add_component_front_modifiers(
-        mol, parts, state.perceived_groups, state.principal_key, state.sub_exclude, name_subgraph
+        mol, parts, state.perceived_groups, state.principal_key, state.sub_exclude, name_subgraph, get_loc
     )
     add_component_n_substituents(
         mol,
