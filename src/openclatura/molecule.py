@@ -170,6 +170,8 @@ class Molecule:
         self.bonds: dict[int, Bond] = {}
         self._adj: dict[int, list[int]] = {}
         self._bond_lookup: dict[tuple[int, int], int] = {}
+        self._cyclic_cache: set[int] | None = None  # full-molecule ring atoms; invalidated on mutation
+        self._perception_cache: tuple | None = None  # perceived functional groups; invalidated on mutation
 
     def add_atom(
         self,
@@ -199,6 +201,8 @@ class Molecule:
         )
         self.atoms[idx] = atom
         self._adj[idx] = []
+        self._cyclic_cache = None
+        self._perception_cache = None
         return atom
 
     def add_bond(
@@ -214,7 +218,7 @@ class Molecule:
             raise ValueError("Both atoms must exist")
         if u == v:
             raise ValueError("Cannot bond an atom to itself.")
-        bond_key = tuple(sorted((u, v)))
+        bond_key = (u, v) if u < v else (v, u)
         if bond_key in self._bond_lookup:
             raise ValueError(f"Atoms {u} and {v} are already bonded.")
         if idx is None:
@@ -224,13 +228,15 @@ class Molecule:
         self._bond_lookup[bond_key] = idx
         self._adj[u].append(v)
         self._adj[v].append(u)
+        self._cyclic_cache = None
+        self._perception_cache = None
         return bond
 
     def get_neighbors(self, atom_idx: int) -> list[int]:
         return self._adj.get(atom_idx, [])
 
     def get_bond(self, u: int, v: int) -> Bond | None:
-        bond_key = tuple(sorted((u, v)))
+        bond_key = (u, v) if u < v else (v, u)
         bond_idx = self._bond_lookup.get(bond_key)
         if bond_idx is not None:
             return self.bonds[bond_idx]
