@@ -1224,7 +1224,7 @@
 {"index": 1223, "smiles": "CC(=O)NCC=O", "openclatura_iupac": "N-(2-oxoethyl)acetamide"}
 {"index": 1224, "smiles": "CC(=O)OCC=O", "openclatura_iupac": "2-oxoethyl acetate"}
 {"index": 1225, "smiles": "NC(=O)CCC=O", "openclatura_iupac": "4-oxobutanamide"}
-{"index": 1226, "smiles": "NC(=O)CNC=O", "openclatura_iupac": "2-(formamido)acetamide"}
+{"index": 1226, "smiles": "NC(=O)CNC=O", "openclatura_iupac": "2-formamidoacetamide"}
 {"index": 1227, "smiles": "NC(=O)COC=N", "openclatura_iupac": "2-(iminomethoxy)acetamide"}
 {"index": 1228, "smiles": "NC(=O)COC=O", "openclatura_iupac": "2-amino-2-oxoethyl formate"}
 {"index": 1229, "smiles": "NC(=O)NCC=O", "openclatura_iupac": "1-amino-N-(2-oxoethyl)formamide"}
@@ -1447,12 +1447,12 @@
 {"index": 1446, "smiles": "CCC(=O)OC=N", "openclatura_iupac": "iminomethyl propanoate"}
 {"index": 1447, "smiles": "CNC(=O)CC=O", "openclatura_iupac": "N-methyl-3-oxopropanamide"}
 {"index": 1448, "smiles": "CNC(=O)NC=N", "openclatura_iupac": "1-(iminomethylamino)-N-methylmethanamide"}
-{"index": 1449, "smiles": "CNC(=O)NC=O", "openclatura_iupac": "1-(formamido)-N-methylmethanamide"}
+{"index": 1449, "smiles": "CNC(=O)NC=O", "openclatura_iupac": "1-formamido-N-methylmethanamide"}
 {"index": 1450, "smiles": "CNC(=O)OC=N", "openclatura_iupac": "iminomethyl (methylamino)formate"}
 {"index": 1451, "smiles": "COC(=N)NC=O", "openclatura_iupac": "N-((imino)(methoxy)methyl)formamide"}
 {"index": 1452, "smiles": "COC(=O)CC=O", "openclatura_iupac": "methyl 3-oxopropanoate"}
 {"index": 1453, "smiles": "COC(=O)NC=N", "openclatura_iupac": "methyl (iminomethylamino)formate"}
-{"index": 1454, "smiles": "COC(=O)NC=O", "openclatura_iupac": "methyl (formamido)formate"}
+{"index": 1454, "smiles": "COC(=O)NC=O", "openclatura_iupac": "methyl 1-formamidomethanoate"}
 {"index": 1455, "smiles": "NCC(=O)NC=O", "openclatura_iupac": "2-amino-N-(formyl)acetamide"}
 {"index": 1456, "smiles": "NCC(=O)OC=N", "openclatura_iupac": "iminomethyl 2-aminoacetate"}
 {"index": 1457, "smiles": "OCC(=N)NC=O", "openclatura_iupac": "N-(2-hydroxy-1-iminoethyl)formamide"}
@@ -6320,7 +6320,7 @@
 {"index": 6319, "smiles": "CC(OC(C)=O)C=O", "openclatura_iupac": "1-oxopropan-2-yl acetate"}
 {"index": 6320, "smiles": "CC(OC(N)=O)C=O", "openclatura_iupac": "1-oxopropan-2-yl 1-aminomethanoate"}
 {"index": 6321, "smiles": "CN(CC(C)=O)C=O", "openclatura_iupac": "N-methyl-N-(2-oxopropyl)formamide"}
-{"index": 6322, "smiles": "CN(CC(N)=O)C=O", "openclatura_iupac": "2-((formyl)(methyl)amino)acetamide"}
+{"index": 6322, "smiles": "CN(CC(N)=O)C=O", "openclatura_iupac": "2-(N-methylformamido)acetamide"}
 {"index": 6323, "smiles": "CN(CC([O-])=O)C=[NH2+]", "openclatura_iupac": "2-((iminiomethyl)(methyl)amino)acetate"}
 {"index": 6324, "smiles": "NC(=O)CC(O)C=O", "openclatura_iupac": "3-hydroxy-4-oxobutanamide"}
 {"index": 6325, "smiles": "CN=C(C)NC(C)=O", "openclatura_iupac": "N-(1-(methylimino)ethyl)acetamide"}
@@ -6354,7 +6354,7 @@
 {"index": 6353, "smiles": "COC(=O)CC(C)=O", "openclatura_iupac": "methyl 3-oxobutanoate"}
 {"index": 6354, "smiles": "COC(=O)CC(N)=O", "openclatura_iupac": "methyl 2-carbamoylacetate"}
 {"index": 6355, "smiles": "COC(=O)NC(C)=N", "openclatura_iupac": "methyl ((1-iminoethyl)amino)formate"}
-{"index": 6356, "smiles": "COC(=O)NC(C)=O", "openclatura_iupac": "methyl 1-methylcarbonylaminomethanoate"}
+{"index": 6356, "smiles": "COC(=O)NC(C)=O", "openclatura_iupac": "methyl 1-acetamidomethanoate"}
 {"index": 6357, "smiles": "COC(=O)NC(N)=N", "openclatura_iupac": "methyl (((amino)(imino)methyl)amino)formate"}
 {"index": 6358, "smiles": "COC(=O)NC(N)=O", "openclatura_iupac": "methyl (carbamoylamino)formate"}
 {"index": 6359, "smiles": "NC(=N)NC(=O)CO", "openclatura_iupac": "N-((amino)(imino)methyl)-2-hydroxyacetamide"}
@@ -6673,7 +6673,7 @@
 {"index": 6672, "smiles": "CC(=O)NCCC=O", "openclatura_iupac": "N-(3-oxopropyl)acetamide"}
 {"index": 6673, "smiles": "CC(=O)OCCC=O", "openclatura_iupac": "3-oxopropyl acetate"}
 {"index": 6674, "smiles": "NC(=O)CCCC=O", "openclatura_iupac": "5-oxopentanamide"}
-{"index": 6675, "smiles": "NC(=O)CCNC=O", "openclatura_iupac": "3-(formamido)propanamide"}
+{"index": 6675, "smiles": "NC(=O)CCNC=O", "openclatura_iupac": "3-formamidopropanamide"}
 {"index": 6676, "smiles": "NC(=O)CCOC=N", "openclatura_iupac": "3-(iminomethoxy)propanamide"}
 {"index": 6677, "smiles": "NC(=O)CCOC=O", "openclatura_iupac": "3-amino-3-oxopropyl formate"}
 {"index": 6678, "smiles": "NC(=O)CNCC=O", "openclatura_iupac": "2-((2-oxoethyl)amino)acetamide"}
@@ -7028,10 +7028,10 @@
 {"index": 7027, "smiles": "N=C(NC=O)NC=O", "openclatura_iupac": "N-((formamido)(imino)methyl)formamide"}
 {"index": 7028, "smiles": "N=CNC(=O)CC=O", "openclatura_iupac": "N-(iminomethyl)-3-oxopropanamide"}
 {"index": 7029, "smiles": "N=CNC(=O)NC=N", "openclatura_iupac": "N-(iminomethyl)-1-(iminomethylamino)formamide"}
-{"index": 7030, "smiles": "N=CNC(=O)NC=O", "openclatura_iupac": "1-(formamido)-N-(iminomethyl)formamide"}
+{"index": 7030, "smiles": "N=CNC(=O)NC=O", "openclatura_iupac": "1-formamido-N-(iminomethyl)formamide"}
 {"index": 7031, "smiles": "N=CNC(=O)OC=N", "openclatura_iupac": "iminomethyl (iminomethylamino)formate"}
 {"index": 7032, "smiles": "N=COC(=O)CC=O", "openclatura_iupac": "iminomethyl 3-oxopropanoate"}
-{"index": 7033, "smiles": "N=COC(=O)NC=O", "openclatura_iupac": "iminomethyl (formamido)formate"}
+{"index": 7033, "smiles": "N=COC(=O)NC=O", "openclatura_iupac": "iminomethyl 1-formamidomethanoate"}
 {"index": 7034, "smiles": "O=CCC(=O)CC=O", "openclatura_iupac": "3-oxopentanedial"}
 {"index": 7035, "smiles": "O=CCC(=O)NC=O", "openclatura_iupac": "N-(formyl)-3-oxopropanamide"}
 {"index": 7036, "smiles": "O=CNC(=O)NC=O", "openclatura_iupac": "N-(formylcarbamoyl)formamide"}
@@ -7110,13 +7110,13 @@
 {"index": 7109, "smiles": "CCCC(=O)OC=N", "openclatura_iupac": "iminomethyl butanoate"}
 {"index": 7110, "smiles": "CCNC(=O)CC=O", "openclatura_iupac": "N-ethyl-3-oxopropanamide"}
 {"index": 7111, "smiles": "CCNC(=O)NC=N", "openclatura_iupac": "N-ethyl-1-(iminomethylamino)formamide"}
-{"index": 7112, "smiles": "CCNC(=O)NC=O", "openclatura_iupac": "N-ethyl-1-(formamido)formamide"}
+{"index": 7112, "smiles": "CCNC(=O)NC=O", "openclatura_iupac": "N-ethyl-1-formamidomethanamide"}
 {"index": 7113, "smiles": "CCNC(=O)OC=N", "openclatura_iupac": "iminomethyl (ethylamino)formate"}
 {"index": 7114, "smiles": "CCOC(=N)CC=O", "openclatura_iupac": "3-ethoxy-3-iminopropanal"}
 {"index": 7115, "smiles": "CCOC(=N)NC=O", "openclatura_iupac": "N-((ethoxy)(imino)methyl)formamide"}
 {"index": 7116, "smiles": "CCOC(=O)CC=O", "openclatura_iupac": "ethyl 3-oxopropanoate"}
 {"index": 7117, "smiles": "CCOC(=O)NC=N", "openclatura_iupac": "ethyl (iminomethylamino)formate"}
-{"index": 7118, "smiles": "CCOC(=O)NC=O", "openclatura_iupac": "ethyl (formamido)formate"}
+{"index": 7118, "smiles": "CCOC(=O)NC=O", "openclatura_iupac": "ethyl 1-formamidomethanoate"}
 {"index": 7119, "smiles": "C[NH2+]CC(=O)[CH-]C=O", "openclatura_iupac": "4-(methylammonio)-3-oxobutan-2-ide-1-al"}
 {"index": 7120, "smiles": "CNCC(=O)OC=N", "openclatura_iupac": "iminomethyl 2-(methylamino)acetate"}
 {"index": 7121, "smiles": "COCC(=N)NC=O", "openclatura_iupac": "N-(1-imino-2-methoxyethyl)formamide"}
@@ -7237,7 +7237,7 @@
 {"index": 7236, "smiles": "NC(=N)C(=O)NC=O", "openclatura_iupac": "2-amino-N-(formyl)-2-iminoacetamide"}
 {"index": 7237, "smiles": "NC(=N)C(=O)OC=N", "openclatura_iupac": "iminomethyl 2-amino-2-iminoacetate"}
 {"index": 7238, "smiles": "NC(=O)C(=N)NC=N", "openclatura_iupac": "2-imino-2-(iminomethylamino)acetamide"}
-{"index": 7239, "smiles": "NC(=O)C(=N)NC=O", "openclatura_iupac": "2-(formamido)-2-iminoacetamide"}
+{"index": 7239, "smiles": "NC(=O)C(=N)NC=O", "openclatura_iupac": "2-formamido-2-iminoacetamide"}
 {"index": 7240, "smiles": "NC(=O)C(=N)OC=O", "openclatura_iupac": "2-amino-1-imino-2-oxoethyl formate"}
 {"index": 7241, "smiles": "NC(=O)C(=O)NC=N", "openclatura_iupac": "N'-(iminomethyl)ethanediamide"}
 {"index": 7242, "smiles": "NC(=O)C(=O)NC=O", "openclatura_iupac": "N'-(formyl)ethanediamide"}
@@ -7265,7 +7265,7 @@
 {"index": 7264, "smiles": "CC(O)C(=O)OC=N", "openclatura_iupac": "iminomethyl 2-hydroxypropanoate"}
 {"index": 7265, "smiles": "CN(C)C(=O)CC=O", "openclatura_iupac": "N,N-dimethyl-3-oxopropanamide"}
 {"index": 7266, "smiles": "CN(C)C(=O)NC=N", "openclatura_iupac": "1-(iminomethylamino)-N,N-dimethylmethanamide"}
-{"index": 7267, "smiles": "CN(C)C(=O)NC=O", "openclatura_iupac": "1-(formamido)-N,N-dimethylmethanamide"}
+{"index": 7267, "smiles": "CN(C)C(=O)NC=O", "openclatura_iupac": "1-formamido-N,N-dimethylmethanamide"}
 {"index": 7268, "smiles": "CN(C)C(=O)OC=N", "openclatura_iupac": "iminomethyl (dimethylamino)formate"}
 {"index": 7269, "smiles": "CC(C)C(C)CC#C", "openclatura_iupac": "4,5-dimethylhex-1-yne"}
 {"index": 7270, "smiles": "CC(C)C(C)CC#N", "openclatura_iupac": "3,4-dimethylpentanenitrile"}
@@ -7305,7 +7305,7 @@
 {"index": 7304, "smiles": "CC(CC=O)C(N)=O", "openclatura_iupac": "2-methyl-4-oxobutanamide"}
 {"index": 7305, "smiles": "CC(NC=[NH2+])C([O-])=O", "openclatura_iupac": "2-(iminiomethylamino)propanoate"}
 {"index": 7306, "smiles": "CC(NC=O)C(C)=O", "openclatura_iupac": "N-(3-oxobutan-2-yl)formamide"}
-{"index": 7307, "smiles": "CC(NC=O)C(N)=O", "openclatura_iupac": "2-(formamido)propanamide"}
+{"index": 7307, "smiles": "CC(NC=O)C(N)=O", "openclatura_iupac": "2-formamidopropanamide"}
 {"index": 7308, "smiles": "CC(OC=N)C(C)=O", "openclatura_iupac": "3-(iminomethoxy)butan-2-one"}
 {"index": 7309, "smiles": "CC(OC=N)C(N)=O", "openclatura_iupac": "2-(iminomethoxy)propanamide"}
 {"index": 7310, "smiles": "CC(OC=O)C(C)=O", "openclatura_iupac": "3-oxobutan-2-yl formate"}
@@ -8845,12 +8845,12 @@
 {"index": 8844, "smiles": "CNC(=O)C(C)C=O", "openclatura_iupac": "2-(formyl)-N-methylpropanamide"}
 {"index": 8845, "smiles": "CNC(=O)C(O)C=O", "openclatura_iupac": "2-hydroxy-N-methyl-3-oxopropanamide"}
 {"index": 8846, "smiles": "CNC(=O)N(C)C=N", "openclatura_iupac": "1-((iminomethyl)(methyl)amino)-N-methylmethanamide"}
-{"index": 8847, "smiles": "CNC(=O)N(C)C=O", "openclatura_iupac": "1-((formyl)(methyl)amino)-N-methylmethanamide"}
+{"index": 8847, "smiles": "CNC(=O)N(C)C=O", "openclatura_iupac": "N-methyl-1-(N-methylformamido)formamide"}
 {"index": 8848, "smiles": "COC(=N)N(C)C=O", "openclatura_iupac": "N-((imino)(methoxy)methyl)-N-methylmethanamide"}
 {"index": 8849, "smiles": "COC(=O)C(C)C=O", "openclatura_iupac": "methyl 2-(formyl)propanoate"}
 {"index": 8850, "smiles": "COC(=O)C(O)C=O", "openclatura_iupac": "methyl 2-hydroxy-3-oxopropanoate"}
 {"index": 8851, "smiles": "COC(=O)N(C)C=N", "openclatura_iupac": "methyl ((iminomethyl)(methyl)amino)formate"}
-{"index": 8852, "smiles": "COC(=O)N(C)C=O", "openclatura_iupac": "methyl ((formyl)(methyl)amino)formate"}
+{"index": 8852, "smiles": "COC(=O)N(C)C=O", "openclatura_iupac": "methyl (N-methylformamido)formate"}
 {"index": 8853, "smiles": "OCC(=O)C(O)C=O", "openclatura_iupac": "2,4-dihydroxy-3-oxobutanal"}
 {"index": 8854, "smiles": "CC(CO)C(=O)C#C", "openclatura_iupac": "4-(hydroxymethyl)pent-1-yn-3-one"}
 {"index": 8855, "smiles": "CC(CO)C(=O)C#N", "openclatura_iupac": "3-(hydroxymethyl)-2-oxobutanenitrile"}
@@ -9209,13 +9209,13 @@
 {"index": 9208, "smiles": "CCC(=O)NCC=O", "openclatura_iupac": "N-(2-oxoethyl)propanamide"}
 {"index": 9209, "smiles": "CCC(=O)OCC=O", "openclatura_iupac": "2-oxoethyl propanoate"}
 {"index": 9210, "smiles": "CNC(=O)CCC=O", "openclatura_iupac": "N-methyl-4-oxobutanamide"}
-{"index": 9211, "smiles": "CNC(=O)CNC=O", "openclatura_iupac": "2-(formamido)-N-methylacetamide"}
+{"index": 9211, "smiles": "CNC(=O)CNC=O", "openclatura_iupac": "2-formamido-N-methylacetamide"}
 {"index": 9212, "smiles": "CNC(=O)COC=N", "openclatura_iupac": "2-(iminomethoxy)-N-methylacetamide"}
 {"index": 9213, "smiles": "CNC(=O)COC=O", "openclatura_iupac": "2-(methylamino)-2-oxoethyl formate"}
 {"index": 9214, "smiles": "CNC(=O)NCC=O", "openclatura_iupac": "N-methyl-1-((2-oxoethyl)amino)formamide"}
 {"index": 9215, "smiles": "CNC(=O)OCC=O", "openclatura_iupac": "2-oxoethyl (methylamino)formate"}
 {"index": 9216, "smiles": "COC(=O)CCC=O", "openclatura_iupac": "methyl 4-oxobutanoate"}
-{"index": 9217, "smiles": "COC(=O)CNC=O", "openclatura_iupac": "methyl 2-(formamido)acetate"}
+{"index": 9217, "smiles": "COC(=O)CNC=O", "openclatura_iupac": "methyl 2-formamidoacetate"}
 {"index": 9218, "smiles": "COC(=O)COC=N", "openclatura_iupac": "methyl 2-(iminomethoxy)acetate"}
 {"index": 9219, "smiles": "COC(=O)COC=O", "openclatura_iupac": "methyl 2-formyloxyacetate"}
 {"index": 9220, "smiles": "COC(=O)NCC=O", "openclatura_iupac": "methyl ((2-oxoethyl)amino)formate"}
@@ -14627,8 +14627,8 @@
 {"index": 14626, "smiles": "O=CCCCNC=O", "openclatura_iupac": "N-(4-oxobutyl)formamide"}
 {"index": 14627, "smiles": "O=CCCCOC=O", "openclatura_iupac": "4-oxobutyl formate"}
 {"index": 14628, "smiles": "O=CCCOCC=O", "openclatura_iupac": "3-((2-oxoethyl)oxy)propanal"}
-{"index": 14629, "smiles": "O=CNCCNC=O", "openclatura_iupac": "N-(2-(formamido)ethyl)formamide"}
-{"index": 14630, "smiles": "O=CNCCOC=O", "openclatura_iupac": "2-(formamido)ethyl formate"}
+{"index": 14629, "smiles": "O=CNCCNC=O", "openclatura_iupac": "N-(2-formamidoethyl)formamide"}
+{"index": 14630, "smiles": "O=CNCCOC=O", "openclatura_iupac": "2-formamidoethyl formate"}
 {"index": 14631, "smiles": "O=COCCOC=O", "openclatura_iupac": "2-formyloxyethyl formate"}
 {"index": 14632, "smiles": "CC#CC#CC#CC", "openclatura_iupac": "octa-2,4,6-triyne"}
 {"index": 14633, "smiles": "CC#CC#CCC#C", "openclatura_iupac": "octa-1,4,6-triyne"}
@@ -24470,7 +24470,7 @@
 {"index": 24469, "smiles": "N1C=NC2=CC=NC2=C1", "openclatura_iupac": "2,4,7-triazabicyclo[4.3.0]nona-1(9),2,5,7-tetraene"}
 {"index": 24470, "smiles": "N1C=NC2=CN=CC2=C1", "openclatura_iupac": "2,4,8-triazabicyclo[4.3.0]nona-1(9),2,5,7-tetraene"}
 {"index": 24471, "smiles": "N1C=NC2=NC=CC2=C1", "openclatura_iupac": "2,4,9-triazabicyclo[4.3.0]nona-1(9),2,5,7-tetraene"}
-{"index": 24472, "smiles": "N1C=NC2=NC=NC2=C1", "openclatura_iupac": "2,4,7,9-tetraazabicyclo[4.3.0]nona-1(9),2,5,7-tetraene"}
+{"index": 24472, "smiles": "N1C=NC2=NC=NC2=C1", "openclatura_iupac": "1H-purine"}
 {"index": 24473, "smiles": "O1C=CC2=CC=CC2=C1", "openclatura_iupac": "3-oxabicyclo[4.3.0]nona-1,4,6,8-tetraene"}
 {"index": 24474, "smiles": "O1C=CC2=CC=NC2=C1", "openclatura_iupac": "3-oxa-9-azabicyclo[4.3.0]nona-1,4,6,8-tetraene"}
 {"index": 24475, "smiles": "O1C=CC2=CN=CC2=C1", "openclatura_iupac": "3-oxa-8-azabicyclo[4.3.0]nona-1,4,6,8-tetraene"}
@@ -24500,10 +24500,10 @@
 {"index": 24499, "smiles": "N1C=NC2=C1C=CC=N2", "openclatura_iupac": "2,7,9-triazabicyclo[4.3.0]nona-1,3,5,8-tetraene"}
 {"index": 24500, "smiles": "N1C=NC2=C1C=CN=C2", "openclatura_iupac": "3,7,9-triazabicyclo[4.3.0]nona-1(6),2,4,8-tetraene"}
 {"index": 24501, "smiles": "N1C=NC2=C1C=NC=C2", "openclatura_iupac": "3,7,9-triazabicyclo[4.3.0]nona-1(6),2,4,7-tetraene"}
-{"index": 24502, "smiles": "N1C=NC2=C1C=NC=N2", "openclatura_iupac": "2,4,7,9-tetraazabicyclo[4.3.0]nona-1,3,5,8-tetraene"}
+{"index": 24502, "smiles": "N1C=NC2=C1C=NC=N2", "openclatura_iupac": "7H-purine"}
 {"index": 24503, "smiles": "N1C=NC2=C1N=CC=C2", "openclatura_iupac": "2,7,9-triazabicyclo[4.3.0]nona-1,3,5,7-tetraene"}
 {"index": 24504, "smiles": "N1C=NC2=C1N=CC=N2", "openclatura_iupac": "2,5,7,9-tetraazabicyclo[4.3.0]nona-1,3,5,7-tetraene"}
-{"index": 24505, "smiles": "N1C=NC2=C1N=CN=C2", "openclatura_iupac": "2,4,7,9-tetraazabicyclo[4.3.0]nona-1,3,5,7-tetraene"}
+{"index": 24505, "smiles": "N1C=NC2=C1N=CN=C2", "openclatura_iupac": "9H-purine"}
 {"index": 24506, "smiles": "O1C=CC2=C1C=CC=C2", "openclatura_iupac": "1-benzofuran"}
 {"index": 24507, "smiles": "O1C=CC2=C1C=CC=N2", "openclatura_iupac": "7-oxa-2-azabicyclo[4.3.0]nona-1,3,5,8-tetraene"}
 {"index": 24508, "smiles": "O1C=CC2=C1C=CN=C2", "openclatura_iupac": "7-oxa-3-azabicyclo[4.3.0]nona-1(6),2,4,8-tetraene"}
@@ -24534,7 +24534,7 @@
 {"index": 24533, "smiles": "N1C=NC=C2C=CN=C12", "openclatura_iupac": "2,4,9-triazabicyclo[4.3.0]nona-1(9),3,5,7-tetraene"}
 {"index": 24534, "smiles": "N1C=NC=C2C=NC=C12", "openclatura_iupac": "2,4,8-triazabicyclo[4.3.0]nona-1(9),3,5,7-tetraene"}
 {"index": 24535, "smiles": "N1C=NC=C2N=CC=C12", "openclatura_iupac": "2,4,7-triazabicyclo[4.3.0]nona-1(9),3,5,7-tetraene"}
-{"index": 24536, "smiles": "N1C=NC=C2N=CN=C12", "openclatura_iupac": "2,4,7,9-tetraazabicyclo[4.3.0]nona-1(9),3,5,7-tetraene"}
+{"index": 24536, "smiles": "N1C=NC=C2N=CN=C12", "openclatura_iupac": "3H-purine"}
 {"index": 24537, "smiles": "O1C=CC=C2C=CC=C12", "openclatura_iupac": "2-oxabicyclo[4.3.0]nona-1(9),3,5,7-tetraene"}
 {"index": 24538, "smiles": "O1C=CC=C2C=CN=C12", "openclatura_iupac": "2-oxa-9-azabicyclo[4.3.0]nona-1(9),3,5,7-tetraene"}
 {"index": 24539, "smiles": "O1C=CC=C2C=NC=C12", "openclatura_iupac": "2-oxa-8-azabicyclo[4.3.0]nona-1(9),3,5,7-tetraene"}
@@ -50870,7 +50870,7 @@
 {"index": 50869, "smiles": "O=CNC(=O)CC1CO1", "openclatura_iupac": "N-(2-(oxiran-2-yl)-acetyl)formamide"}
 {"index": 50870, "smiles": "O=CNC(=O)CN1CC1", "openclatura_iupac": "N-(2-(aziridin-1-yl)-acetyl)formamide"}
 {"index": 50871, "smiles": "O=CNC(=O)NC1CC1", "openclatura_iupac": "N-(cyclopropylcarbamoyl)formamide"}
-{"index": 50872, "smiles": "O=CNC(=O)OC1CC1", "openclatura_iupac": "cyclopropyl (formamido)formate"}
+{"index": 50872, "smiles": "O=CNC(=O)OC1CC1", "openclatura_iupac": "cyclopropyl 1-formamidomethanoate"}
 {"index": 50873, "smiles": "N=C(CC=O)OCC#C", "openclatura_iupac": "3-imino-3-((prop-2-yn-1-yl)oxy)propanal"}
 {"index": 50874, "smiles": "N=C(CC=O)OCC#N", "openclatura_iupac": "2-((1-imino-3-oxopropyl)oxy)acetonitrile"}
 {"index": 50875, "smiles": "N=C(CCC#C)NC=O", "openclatura_iupac": "N-(1-iminopent-4-yn-1-yl)formamide"}
@@ -50901,7 +50901,7 @@
 {"index": 50900, "smiles": "O=CNC(=O)CCC#N", "openclatura_iupac": "N-(4-nitrilo-butyryl)formamide"}
 {"index": 50901, "smiles": "O=CNC(=O)NCC#C", "openclatura_iupac": "N-((prop-2-yn-1-yl)carbamoyl)formamide"}
 {"index": 50902, "smiles": "O=CNC(=O)NCC#N", "openclatura_iupac": "N-((2-nitriloethyl)carbamoyl)formamide"}
-{"index": 50903, "smiles": "O=CNC(=O)OCC#C", "openclatura_iupac": "prop-2-yn-1-yl (formamido)formate"}
+{"index": 50903, "smiles": "O=CNC(=O)OCC#C", "openclatura_iupac": "prop-2-yn-1-yl 1-formamidomethanoate"}
 {"index": 50904, "smiles": "N=COC(C#C)C1CC1", "openclatura_iupac": "1-((1-cyclopropylprop-2-yn-1-yl)oxy)methanimine"}
 {"index": 50905, "smiles": "N=COC(C#C)C1CN1", "openclatura_iupac": "1-((1-(aziridin-2-yl)prop-2-yn-1-yl)oxy)methanimine"}
 {"index": 50906, "smiles": "N=COC(C#C)C1CO1", "openclatura_iupac": "1-((1-(oxiran-2-yl)prop-2-yn-1-yl)oxy)methanimine"}
@@ -51605,8 +51605,8 @@
 {"index": 51604, "smiles": "O=CCC1CN1CC=O", "openclatura_iupac": "2-(1-(2-oxoethyl)-aziridin-2-yl)ethanal"}
 {"index": 51605, "smiles": "O=CCC1NC1CC=O", "openclatura_iupac": "2-(3-(2-oxoethyl)-aziridin-2-yl)ethanal"}
 {"index": 51606, "smiles": "O=CCC1OC1CC=O", "openclatura_iupac": "2-(3-(2-oxoethyl)-oxiran-2-yl)ethanal"}
-{"index": 51607, "smiles": "O=CNC1CC1NC=O", "openclatura_iupac": "N-(2-(formamido)cyclopropyl)formamide"}
-{"index": 51608, "smiles": "O=CNC1CC1OC=O", "openclatura_iupac": "2-(formamido)cyclopropyl formate"}
+{"index": 51607, "smiles": "O=CNC1CC1NC=O", "openclatura_iupac": "N-(2-formamidocyclopropyl)formamide"}
+{"index": 51608, "smiles": "O=CNC1CC1OC=O", "openclatura_iupac": "2-formamidocyclopropyl formate"}
 {"index": 51609, "smiles": "O=COC1CC1OC=O", "openclatura_iupac": "2-formyloxycyclopropyl formate"}
 {"index": 51610, "smiles": "N=COC1CC2(CC2)C1", "openclatura_iupac": "1-((spiro[2.3]hexan-5-yl)oxy)methanimine"}
 {"index": 51611, "smiles": "N=COC1CC2(CN2)C1", "openclatura_iupac": "1-((1-azaspiro[2.3]hexan-5-yl)oxy)methanimine"}
@@ -51977,18 +51977,18 @@
 {"index": 51976, "smiles": "O=COCC(=O)CC#C", "openclatura_iupac": "2-oxopent-4-yn-1-yl formate"}
 {"index": 51977, "smiles": "O=COCC(=O)CC#N", "openclatura_iupac": "4-nitrilo-2-oxobutyl formate"}
 {"index": 51978, "smiles": "N=C(CCC=O)NC=O", "openclatura_iupac": "N-(1-imino-4-oxobutyl)formamide"}
-{"index": 51979, "smiles": "N=C(CNC=O)NC=O", "openclatura_iupac": "N-(2-(formamido)-2-iminoethyl)formamide"}
-{"index": 51980, "smiles": "N=C(COC=O)NC=O", "openclatura_iupac": "2-(formamido)-2-iminoethyl formate"}
+{"index": 51979, "smiles": "N=C(CNC=O)NC=O", "openclatura_iupac": "N-(2-formamido-2-iminoethyl)formamide"}
+{"index": 51980, "smiles": "N=C(COC=O)NC=O", "openclatura_iupac": "2-formamido-2-iminoethyl formate"}
 {"index": 51981, "smiles": "N=C(NC=O)OCC=O", "openclatura_iupac": "N-((imino)((2-oxoethyl)oxy)methyl)formamide"}
 {"index": 51982, "smiles": "N=C(NCC=O)NC=O", "openclatura_iupac": "N-((imino)((2-oxoethyl)amino)methyl)formamide"}
 {"index": 51983, "smiles": "N=CNC(=O)CCC=O", "openclatura_iupac": "N-(iminomethyl)-4-oxobutanamide"}
-{"index": 51984, "smiles": "N=CNC(=O)CNC=O", "openclatura_iupac": "2-(formamido)-N-(iminomethyl)acetamide"}
+{"index": 51984, "smiles": "N=CNC(=O)CNC=O", "openclatura_iupac": "2-formamido-N-(iminomethyl)acetamide"}
 {"index": 51985, "smiles": "N=CNC(=O)COC=N", "openclatura_iupac": "N-(iminomethyl)-2-(iminomethoxy)acetamide"}
 {"index": 51986, "smiles": "N=CNC(=O)COC=O", "openclatura_iupac": "2-(iminomethylamino)-2-oxoethyl formate"}
 {"index": 51987, "smiles": "N=CNC(=O)NCC=O", "openclatura_iupac": "N-(iminomethyl)-1-((2-oxoethyl)amino)formamide"}
 {"index": 51988, "smiles": "N=CNC(=O)OCC=O", "openclatura_iupac": "2-oxoethyl (iminomethylamino)formate"}
 {"index": 51989, "smiles": "N=COC(=O)CCC=O", "openclatura_iupac": "iminomethyl 4-oxobutanoate"}
-{"index": 51990, "smiles": "N=COC(=O)CNC=O", "openclatura_iupac": "iminomethyl 2-(formamido)acetate"}
+{"index": 51990, "smiles": "N=COC(=O)CNC=O", "openclatura_iupac": "iminomethyl 2-formamidoacetate"}
 {"index": 51991, "smiles": "N=COC(=O)COC=O", "openclatura_iupac": "iminomethyl 2-formyloxyacetate"}
 {"index": 51992, "smiles": "N=COC(=O)NCC=O", "openclatura_iupac": "iminomethyl ((2-oxoethyl)amino)formate"}
 {"index": 51993, "smiles": "N=COCC(=N)NC=O", "openclatura_iupac": "N-(1-imino-2-(iminomethoxy)ethyl)formamide"}
@@ -52000,11 +52000,11 @@
 {"index": 51999, "smiles": "O=CCCC(=O)CC=O", "openclatura_iupac": "3-oxohexanedial"}
 {"index": 52000, "smiles": "O=CCCC(=O)NC=O", "openclatura_iupac": "N-(formyl)-4-oxobutanamide"}
 {"index": 52001, "smiles": "O=CCNC(=O)CC=O", "openclatura_iupac": "3-oxo-N-(2-oxoethyl)propanamide"}
-{"index": 52002, "smiles": "O=CCNC(=O)NC=O", "openclatura_iupac": "1-(formamido)-N-(2-oxoethyl)formamide"}
+{"index": 52002, "smiles": "O=CCNC(=O)NC=O", "openclatura_iupac": "1-formamido-N-(2-oxoethyl)formamide"}
 {"index": 52003, "smiles": "O=CCOC(=O)CC=O", "openclatura_iupac": "2-oxoethyl 3-oxopropanoate"}
-{"index": 52004, "smiles": "O=CCOC(=O)NC=O", "openclatura_iupac": "2-oxoethyl (formamido)formate"}
-{"index": 52005, "smiles": "O=CNC(=O)COC=O", "openclatura_iupac": "2-(formamido)-2-oxoethyl formate"}
-{"index": 52006, "smiles": "O=CNCC(=O)NC=O", "openclatura_iupac": "N-(formyl)-2-(formamido)acetamide"}
+{"index": 52004, "smiles": "O=CCOC(=O)NC=O", "openclatura_iupac": "2-oxoethyl 1-formamidomethanoate"}
+{"index": 52005, "smiles": "O=CNC(=O)COC=O", "openclatura_iupac": "2-formamido-2-oxoethyl formate"}
+{"index": 52006, "smiles": "O=CNCC(=O)NC=O", "openclatura_iupac": "2-formamido-N-(formyl)acetamide"}
 {"index": 52007, "smiles": "[NH2+]=CNC[C-](C#N)C#N", "openclatura_iupac": "2-((iminiomethylamino)methyl)propane-2-ide-1,3-dinitrile"}
 {"index": 52008, "smiles": "N=COCC(C#C)C#C", "openclatura_iupac": "1-((2-(ethynyl)but-3-yn-1-yl)oxy)methanimine"}
 {"index": 52009, "smiles": "N=COCC(C#C)C#N", "openclatura_iupac": "2-((iminomethoxy)methyl)but-3-ynenitrile"}
@@ -52458,8 +52458,8 @@
 {"index": 52457, "smiles": "O=CCCOCCC=O", "openclatura_iupac": "3-((3-oxopropyl)oxy)propanal"}
 {"index": 52458, "smiles": "O=CCOCCNC=O", "openclatura_iupac": "N-(2-((2-oxoethyl)oxy)ethyl)formamide"}
 {"index": 52459, "smiles": "O=CCOCCOC=O", "openclatura_iupac": "2-((2-oxoethyl)oxy)ethyl formate"}
-{"index": 52460, "smiles": "O=CNCCCNC=O", "openclatura_iupac": "N-(3-(formamido)propyl)formamide"}
-{"index": 52461, "smiles": "O=CNCCCOC=O", "openclatura_iupac": "3-(formamido)propyl formate"}
+{"index": 52460, "smiles": "O=CNCCCNC=O", "openclatura_iupac": "N-(3-formamidopropyl)formamide"}
+{"index": 52461, "smiles": "O=CNCCCOC=O", "openclatura_iupac": "3-formamidopropyl formate"}
 {"index": 52462, "smiles": "O=COCCCOC=O", "openclatura_iupac": "3-formyloxypropyl formate"}
 {"index": 52463, "smiles": "CC#CC#CC#CC#C", "openclatura_iupac": "nona-1,3,5,7-tetrayne"}
 {"index": 52464, "smiles": "CC#CC#CC#CC#N", "openclatura_iupac": "octa-2,4,6-triynenitrile"}
@@ -53763,7 +53763,7 @@
 {"index": 53762, "smiles": "CC(=O)C#CCOC=N", "openclatura_iupac": "5-(iminomethoxy)pent-3-yn-2-one"}
 {"index": 53763, "smiles": "CC(=O)C#CCOC=O", "openclatura_iupac": "4-oxopent-2-yn-1-yl formate"}
 {"index": 53764, "smiles": "NC(=O)C#CCCC=O", "openclatura_iupac": "6-oxohex-2-ynamide"}
-{"index": 53765, "smiles": "NC(=O)C#CCNC=O", "openclatura_iupac": "4-(formamido)but-2-ynamide"}
+{"index": 53765, "smiles": "NC(=O)C#CCNC=O", "openclatura_iupac": "4-formamidobut-2-ynamide"}
 {"index": 53766, "smiles": "NC(=O)C#CCOC=N", "openclatura_iupac": "4-(iminomethoxy)but-2-ynamide"}
 {"index": 53767, "smiles": "NC(=O)C#CCOC=O", "openclatura_iupac": "4-amino-4-oxobut-2-yn-1-yl formate"}
 {"index": 53768, "smiles": "[O-]C(=O)C#CCNC=[NH2+]", "openclatura_iupac": "4-(iminiomethylamino)but-2-ynoate"}
@@ -53884,7 +53884,7 @@
 {"index": 53883, "smiles": "NC(=O)C(=N)NCC=O", "openclatura_iupac": "2-imino-2-((2-oxoethyl)amino)acetamide"}
 {"index": 53884, "smiles": "NC(=O)C(=N)OCC=O", "openclatura_iupac": "2-imino-2-((2-oxoethyl)oxy)acetamide"}
 {"index": 53885, "smiles": "NC(=O)C(=O)CCC=O", "openclatura_iupac": "2,5-dioxopentanamide"}
-{"index": 53886, "smiles": "NC(=O)C(=O)CNC=O", "openclatura_iupac": "3-(formamido)-2-oxopropanamide"}
+{"index": 53886, "smiles": "NC(=O)C(=O)CNC=O", "openclatura_iupac": "3-formamido-2-oxopropanamide"}
 {"index": 53887, "smiles": "NC(=O)C(=O)COC=N", "openclatura_iupac": "3-(iminomethoxy)-2-oxopropanamide"}
 {"index": 53888, "smiles": "NC(=O)C(=O)COC=O", "openclatura_iupac": "3-amino-2,3-dioxopropyl formate"}
 {"index": 53889, "smiles": "NC(=O)C(=O)NCC=O", "openclatura_iupac": "N'-(2-oxoethyl)ethanediamide"}
@@ -53978,7 +53978,7 @@
 {"index": 53977, "smiles": "CC(=O)C(C)(O)CC=O", "openclatura_iupac": "3-hydroxy-3-methyl-4-oxopentanal"}
 {"index": 53978, "smiles": "CC(C)(CC=O)C(N)=O", "openclatura_iupac": "2,2-dimethyl-4-oxobutanamide"}
 {"index": 53979, "smiles": "CC(C)(NC=[NH2+])C([O-])=O", "openclatura_iupac": "2-(iminiomethylamino)-2-methylpropanoate"}
-{"index": 53980, "smiles": "CC(C)(NC=O)C(N)=O", "openclatura_iupac": "2-(formamido)-2-methylpropanamide"}
+{"index": 53980, "smiles": "CC(C)(NC=O)C(N)=O", "openclatura_iupac": "2-formamido-2-methylpropanamide"}
 {"index": 53981, "smiles": "CC(C)(OC=N)C(N)=O", "openclatura_iupac": "2-(iminomethoxy)-2-methylpropanamide"}
 {"index": 53982, "smiles": "CC(C)(OC=O)C(N)=O", "openclatura_iupac": "2-carbamoylpropan-2-yl formate"}
 {"index": 53983, "smiles": "CC(O)(CC=O)C(N)=O", "openclatura_iupac": "2-hydroxy-2-methyl-4-oxobutanamide"}
@@ -54072,7 +54072,7 @@
 {"index": 54071, "smiles": "NC(=[NH2+])[C-](OC=O)C#N", "openclatura_iupac": "1-amino-1-iminio-3-nitrilopropan-2-ide-2-yl formate"}
 {"index": 54072, "smiles": "NC(=O)C(CC=O)C#C", "openclatura_iupac": "2-(2-oxoethyl)but-3-ynamide"}
 {"index": 54073, "smiles": "NC(=O)C(CC=O)C#N", "openclatura_iupac": "2-cyano-4-oxobutanamide"}
-{"index": 54074, "smiles": "NC(=O)C(NC=O)C#C", "openclatura_iupac": "2-(formamido)but-3-ynamide"}
+{"index": 54074, "smiles": "NC(=O)C(NC=O)C#C", "openclatura_iupac": "2-formamidobut-3-ynamide"}
 {"index": 54075, "smiles": "NC(=O)C(OC=N)C#C", "openclatura_iupac": "2-(iminomethoxy)but-3-ynamide"}
 {"index": 54076, "smiles": "NC(=O)C(OC=O)C#C", "openclatura_iupac": "1-amino-1-oxobut-3-yn-2-yl formate"}
 {"index": 54077, "smiles": "[O-]C(=O)C(NC=[NH2+])C#C", "openclatura_iupac": "2-(iminiomethylamino)but-3-ynoate"}
@@ -54084,7 +54084,7 @@
 {"index": 54083, "smiles": "CC(=O)N(CC=O)C=O", "openclatura_iupac": "N-(formyl)-N-(2-oxoethyl)acetamide"}
 {"index": 54084, "smiles": "NC(=N)N(CC=O)C=O", "openclatura_iupac": "N-((amino)(imino)methyl)-N-(2-oxoethyl)formamide"}
 {"index": 54085, "smiles": "NC(=O)C(CC=O)C=O", "openclatura_iupac": "2-(formyl)-4-oxobutanamide"}
-{"index": 54086, "smiles": "NC(=O)C(NC=O)C=O", "openclatura_iupac": "2-(formamido)-3-oxopropanamide"}
+{"index": 54086, "smiles": "NC(=O)C(NC=O)C=O", "openclatura_iupac": "2-formamido-3-oxopropanamide"}
 {"index": 54087, "smiles": "NC(=O)C(OC=N)C=O", "openclatura_iupac": "2-(iminomethoxy)-3-oxopropanamide"}
 {"index": 54088, "smiles": "NC(=O)C(OC=O)C=O", "openclatura_iupac": "1-amino-1,3-dioxopropan-2-yl formate"}
 {"index": 54089, "smiles": "NC(=O)N(CC=O)C=N", "openclatura_iupac": "1-amino-N-(iminomethyl)-N-(2-oxoethyl)formamide"}
@@ -54326,7 +54326,7 @@
 {"index": 54325, "smiles": "CC(=O)C1(CC=O)CC1", "openclatura_iupac": "2-(1-(acetyl)cyclopropyl)ethanal"}
 {"index": 54326, "smiles": "CC(=O)C1(CC=O)CN1", "openclatura_iupac": "2-(2-(acetyl)-aziridin-2-yl)ethanal"}
 {"index": 54327, "smiles": "CC(=O)C1(CC=O)CO1", "openclatura_iupac": "2-(2-(acetyl)-oxiran-2-yl)ethanal"}
-{"index": 54328, "smiles": "NC(=O)C1(CC1)NC=O", "openclatura_iupac": "1-(formamido)cyclopropanecarboxamide"}
+{"index": 54328, "smiles": "NC(=O)C1(CC1)NC=O", "openclatura_iupac": "1-formamidocyclopropanecarboxamide"}
 {"index": 54329, "smiles": "NC(=O)C1(CC1)OC=N", "openclatura_iupac": "1-(iminomethoxy)cyclopropanecarboxamide"}
 {"index": 54330, "smiles": "NC(=O)C1(CC1)OC=O", "openclatura_iupac": "1-carbamoylcyclopropyl formate"}
 {"index": 54331, "smiles": "NC(=O)C1(CC=O)CC1", "openclatura_iupac": "1-(2-oxoethyl)cyclopropanecarboxamide"}
@@ -55069,7 +55069,7 @@
 {"index": 55068, "smiles": "CC(=O)C1OC1CC=O", "openclatura_iupac": "2-(3-(acetyl)-oxiran-2-yl)ethanal"}
 {"index": 55069, "smiles": "CC(=O)N1CC1CC=O", "openclatura_iupac": "2-(1-(acetyl)-aziridin-2-yl)ethanal"}
 {"index": 55070, "smiles": "NC(=O)C1CC1CC=O", "openclatura_iupac": "2-(2-oxoethyl)cyclopropanecarboxamide"}
-{"index": 55071, "smiles": "NC(=O)C1CC1NC=O", "openclatura_iupac": "2-(formamido)cyclopropanecarboxamide"}
+{"index": 55071, "smiles": "NC(=O)C1CC1NC=O", "openclatura_iupac": "2-formamidocyclopropanecarboxamide"}
 {"index": 55072, "smiles": "NC(=O)C1CC1OC=N", "openclatura_iupac": "2-(iminomethoxy)cyclopropanecarboxamide"}
 {"index": 55073, "smiles": "NC(=O)C1CC1OC=O", "openclatura_iupac": "2-carbamoylcyclopropyl formate"}
 {"index": 55074, "smiles": "NC(=O)C1CN1CC=O", "openclatura_iupac": "1-(2-oxoethyl)-aziridine-2-carboxamide"}
@@ -55576,11 +55576,11 @@
 {"index": 55575, "smiles": "NC(=O)NC(=O)CC#N", "openclatura_iupac": "1-amino-N-(3-nitrilo-propionyl)formamide"}
 {"index": 55576, "smiles": "CC(=N)NC(=O)CC=O", "openclatura_iupac": "N-(1-iminoethyl)-3-oxopropanamide"}
 {"index": 55577, "smiles": "CC(=N)NC(=O)NC=N", "openclatura_iupac": "N-(1-iminoethyl)-1-(iminomethylamino)formamide"}
-{"index": 55578, "smiles": "CC(=N)NC(=O)NC=O", "openclatura_iupac": "1-(formamido)-N-(1-iminoethyl)formamide"}
+{"index": 55578, "smiles": "CC(=N)NC(=O)NC=O", "openclatura_iupac": "1-formamido-N-(1-iminoethyl)formamide"}
 {"index": 55579, "smiles": "CC(=N)NC(=O)OC=N", "openclatura_iupac": "iminomethyl ((1-iminoethyl)amino)formate"}
 {"index": 55580, "smiles": "CC(=N)OC(=O)CC=O", "openclatura_iupac": "1-iminoethyl 3-oxopropanoate"}
 {"index": 55581, "smiles": "CC(=N)OC(=O)NC=N", "openclatura_iupac": "1-iminoethyl (iminomethylamino)formate"}
-{"index": 55582, "smiles": "CC(=N)OC(=O)NC=O", "openclatura_iupac": "1-iminoethyl (formamido)formate"}
+{"index": 55582, "smiles": "CC(=N)OC(=O)NC=O", "openclatura_iupac": "1-iminoethyl 1-formamidomethanoate"}
 {"index": 55583, "smiles": "CC(=O)CC(=N)NC=O", "openclatura_iupac": "N-(1-imino-3-oxobutyl)formamide"}
 {"index": 55584, "smiles": "CC(=O)CC(=O)CC=O", "openclatura_iupac": "3,5-dioxohexanal"}
 {"index": 55585, "smiles": "CC(=O)CC(=O)NC=N", "openclatura_iupac": "N-(iminomethyl)-3-oxobutanamide"}
@@ -55591,12 +55591,12 @@
 {"index": 55590, "smiles": "CC(=O)NC(=O)CC=O", "openclatura_iupac": "N-(1,3-dioxopropyl)acetamide"}
 {"index": 55591, "smiles": "CC(=O)NC(=O)NC=N", "openclatura_iupac": "N-(iminomethylcarbamoyl)acetamide"}
 {"index": 55592, "smiles": "CC(=O)NC(=O)NC=O", "openclatura_iupac": "N-(formylcarbamoyl)acetamide"}
-{"index": 55593, "smiles": "CC(=O)NC(=O)OC=N", "openclatura_iupac": "iminomethyl 1-methylcarbonylaminomethanoate"}
+{"index": 55593, "smiles": "CC(=O)NC(=O)OC=N", "openclatura_iupac": "iminomethyl 1-acetamidomethanoate"}
 {"index": 55594, "smiles": "NC(=N)NC(=O)CC=O", "openclatura_iupac": "N-((amino)(imino)methyl)-3-oxopropanamide"}
 {"index": 55595, "smiles": "NC(=N)NC(=O)NC=N", "openclatura_iupac": "N-((amino)(imino)methyl)-1-(iminomethylamino)formamide"}
-{"index": 55596, "smiles": "NC(=N)NC(=O)NC=O", "openclatura_iupac": "N-((amino)(imino)methyl)-1-(formamido)formamide"}
+{"index": 55596, "smiles": "NC(=N)NC(=O)NC=O", "openclatura_iupac": "N-((amino)(imino)methyl)-1-formamidomethanamide"}
 {"index": 55597, "smiles": "NC(=N)NC(=O)OC=N", "openclatura_iupac": "iminomethyl (((amino)(imino)methyl)amino)formate"}
-{"index": 55598, "smiles": "NC(=O)CC(=N)NC=O", "openclatura_iupac": "3-(formamido)-3-iminopropanamide"}
+{"index": 55598, "smiles": "NC(=O)CC(=N)NC=O", "openclatura_iupac": "3-formamido-3-iminopropanamide"}
 {"index": 55599, "smiles": "NC(=O)CC(=O)CC=O", "openclatura_iupac": "3,5-dioxopentanamide"}
 {"index": 55600, "smiles": "NC(=O)CC(=O)NC=N", "openclatura_iupac": "N'-(iminomethyl)propanediamide"}
 {"index": 55601, "smiles": "NC(=O)CC(=O)NC=O", "openclatura_iupac": "N'-(formyl)propanediamide"}
@@ -55672,7 +55672,7 @@
 {"index": 55671, "smiles": "CC(=O)CN(C=O)C=O", "openclatura_iupac": "N-(formyl)-N-(2-oxopropyl)formamide"}
 {"index": 55672, "smiles": "NC(=O)CC(C=O)C=O", "openclatura_iupac": "3-(formyl)-4-oxobutanamide"}
 {"index": 55673, "smiles": "NC(=O)CN(C=N)C=N", "openclatura_iupac": "2-(bis(iminomethyl)amino)acetamide"}
-{"index": 55674, "smiles": "NC(=O)CN(C=N)C=O", "openclatura_iupac": "2-((iminomethyl)(formyl)amino)acetamide"}
+{"index": 55674, "smiles": "NC(=O)CN(C=N)C=O", "openclatura_iupac": "2-(N-iminomethylformamido)acetamide"}
 {"index": 55675, "smiles": "NC(=O)CN(C=O)C=O", "openclatura_iupac": "2-(N,N-diformylamino)acetamide"}
 {"index": 55676, "smiles": "[O-]C(=O)CN(C=N)C=[NH2+]", "openclatura_iupac": "2-(bis(iminiomethyl)amino)acetate"}
 {"index": 55677, "smiles": "CC(=N)OC1(C)CCC1", "openclatura_iupac": "1-((1-methylcyclobutyl)oxy)ethan-1-imine"}
@@ -56065,7 +56065,7 @@
 {"index": 56064, "smiles": "CC(=O)CN=COC=O", "openclatura_iupac": "((2-oxopropyl)imino)methyl formate"}
 {"index": 56065, "smiles": "CC(=O)NC=NCC=O", "openclatura_iupac": "N-(((2-oxoethyl)imino)methyl)acetamide"}
 {"index": 56066, "smiles": "CC(=O)OC=NCC=O", "openclatura_iupac": "((2-oxoethyl)imino)methyl acetate"}
-{"index": 56067, "smiles": "NC(=O)CN=CNC=O", "openclatura_iupac": "2-(((formamido)methylidene)amino)acetamide"}
+{"index": 56067, "smiles": "NC(=O)CN=CNC=O", "openclatura_iupac": "2-(formamidomethylideneamino)acetamide"}
 {"index": 56068, "smiles": "NC(=O)CN=COC=O", "openclatura_iupac": "((2-amino-2-oxoethyl)imino)methyl formate"}
 {"index": 56069, "smiles": "NC(=O)NC=NCC=O", "openclatura_iupac": "1-amino-N-(((2-oxoethyl)imino)methyl)formamide"}
 {"index": 56070, "smiles": "NC(=O)OC=NCC=O", "openclatura_iupac": "((2-oxoethyl)imino)methyl 1-aminomethanoate"}
@@ -56129,7 +56129,7 @@
 {"index": 56128, "smiles": "CC(=O)OCC(=O)C=O", "openclatura_iupac": "2,3-dioxopropyl acetate"}
 {"index": 56129, "smiles": "NC(=O)CCC(=O)C=O", "openclatura_iupac": "4,5-dioxopentanamide"}
 {"index": 56130, "smiles": "NC(=O)CNC(=N)C=O", "openclatura_iupac": "2-((1-imino-2-oxoethyl)amino)acetamide"}
-{"index": 56131, "smiles": "NC(=O)CNC(=O)C=O", "openclatura_iupac": "2-formylcarbonylaminoacetamide"}
+{"index": 56131, "smiles": "NC(=O)CNC(=O)C=O", "openclatura_iupac": "2-(2-oxoacetamido)acetamide"}
 {"index": 56132, "smiles": "NC(=O)COC(=N)C=O", "openclatura_iupac": "2-((1-imino-2-oxoethyl)oxy)acetamide"}
 {"index": 56133, "smiles": "NC(=O)COC(=O)C=O", "openclatura_iupac": "2-amino-2-oxoethyl 2-oxoacetate"}
 {"index": 56134, "smiles": "NC(=O)NCC(=O)C=O", "openclatura_iupac": "1-amino-N-(2,3-dioxopropyl)formamide"}
@@ -56232,7 +56232,7 @@
 {"index": 56231, "smiles": "CC(=O)C[NH2+]CC([O-])=O", "openclatura_iupac": "2-((2-oxopropyl)ammonio)acetate"}
 {"index": 56232, "smiles": "CC(=O)COCC(C)=O", "openclatura_iupac": "1-((2-oxopropyl)oxy)propan-2-one"}
 {"index": 56233, "smiles": "CC(=O)COCC(N)=O", "openclatura_iupac": "2-((2-oxopropyl)oxy)acetamide"}
-{"index": 56234, "smiles": "CC(=O)NCCC(N)=O", "openclatura_iupac": "3-methylcarbonylaminopropanamide"}
+{"index": 56234, "smiles": "CC(=O)NCCC(N)=O", "openclatura_iupac": "3-acetamidopropanamide"}
 {"index": 56235, "smiles": "CC(=O)OCCC(N)=O", "openclatura_iupac": "3-amino-3-oxopropyl acetate"}
 {"index": 56236, "smiles": "NC(=[NH2+])CCCC([O-])=O", "openclatura_iupac": "5-amino-5-iminiopentanoate"}
 {"index": 56237, "smiles": "NC(=[NH2+])CNCC([O-])=O", "openclatura_iupac": "2-((2-amino-2-iminoethyl)amino)acetate"}
@@ -56319,25 +56319,25 @@
 {"index": 56318, "smiles": "CC(=O)CCOCC=O", "openclatura_iupac": "2-((3-oxobutyl)oxy)ethanal"}
 {"index": 56319, "smiles": "CC(=O)COCCC=O", "openclatura_iupac": "3-((2-oxopropyl)oxy)propanal"}
 {"index": 56320, "smiles": "CC(=O)NCCCC=O", "openclatura_iupac": "N-(4-oxobutyl)acetamide"}
-{"index": 56321, "smiles": "CC(=O)NCCNC=O", "openclatura_iupac": "N-(2-(formamido)ethyl)acetamide"}
+{"index": 56321, "smiles": "CC(=O)NCCNC=O", "openclatura_iupac": "N-(2-formamidoethyl)acetamide"}
 {"index": 56322, "smiles": "CC(=O)NCCOC=N", "openclatura_iupac": "N-(2-(iminomethoxy)ethyl)acetamide"}
-{"index": 56323, "smiles": "CC(=O)NCCOC=O", "openclatura_iupac": "2-methylcarbonylaminoethyl formate"}
+{"index": 56323, "smiles": "CC(=O)NCCOC=O", "openclatura_iupac": "2-acetamidoethyl formate"}
 {"index": 56324, "smiles": "CC(=O)OCCCC=O", "openclatura_iupac": "4-oxobutyl acetate"}
-{"index": 56325, "smiles": "CC(=O)OCCNC=O", "openclatura_iupac": "2-(formamido)ethyl acetate"}
+{"index": 56325, "smiles": "CC(=O)OCCNC=O", "openclatura_iupac": "2-formamidoethyl acetate"}
 {"index": 56326, "smiles": "CC(=O)OCCOC=N", "openclatura_iupac": "2-(iminomethoxy)ethyl acetate"}
 {"index": 56327, "smiles": "CC(=O)OCCOC=O", "openclatura_iupac": "2-formyloxyethyl acetate"}
 {"index": 56328, "smiles": "NC(=O)CCCCC=O", "openclatura_iupac": "6-oxohexanamide"}
-{"index": 56329, "smiles": "NC(=O)CCCNC=O", "openclatura_iupac": "4-(formamido)butanamide"}
+{"index": 56329, "smiles": "NC(=O)CCCNC=O", "openclatura_iupac": "4-formamidobutanamide"}
 {"index": 56330, "smiles": "NC(=O)CCCOC=N", "openclatura_iupac": "4-(iminomethoxy)butanamide"}
 {"index": 56331, "smiles": "NC(=O)CCCOC=O", "openclatura_iupac": "4-amino-4-oxobutyl formate"}
 {"index": 56332, "smiles": "NC(=O)CCOCC=O", "openclatura_iupac": "3-((2-oxoethyl)oxy)propanamide"}
 {"index": 56333, "smiles": "NC(=O)COCCC=O", "openclatura_iupac": "2-((3-oxopropyl)oxy)acetamide"}
 {"index": 56334, "smiles": "NC(=O)NCCCC=O", "openclatura_iupac": "1-amino-N-(4-oxobutyl)formamide"}
-{"index": 56335, "smiles": "NC(=O)NCCNC=O", "openclatura_iupac": "1-amino-N-(2-(formamido)ethyl)formamide"}
+{"index": 56335, "smiles": "NC(=O)NCCNC=O", "openclatura_iupac": "1-amino-N-(2-formamidoethyl)formamide"}
 {"index": 56336, "smiles": "NC(=O)NCCOC=N", "openclatura_iupac": "1-amino-N-(2-(iminomethoxy)ethyl)formamide"}
 {"index": 56337, "smiles": "NC(=O)NCCOC=O", "openclatura_iupac": "2-(carbamoylamino)ethyl formate"}
 {"index": 56338, "smiles": "NC(=O)OCCCC=O", "openclatura_iupac": "4-oxobutyl 1-aminomethanoate"}
-{"index": 56339, "smiles": "NC(=O)OCCNC=O", "openclatura_iupac": "2-(formamido)ethyl 1-aminomethanoate"}
+{"index": 56339, "smiles": "NC(=O)OCCNC=O", "openclatura_iupac": "2-formamidoethyl 1-aminomethanoate"}
 {"index": 56340, "smiles": "NC(=O)OCCOC=N", "openclatura_iupac": "2-(iminomethoxy)ethyl 1-aminomethanoate"}
 {"index": 56341, "smiles": "NC(=O)OCCOC=O", "openclatura_iupac": "2-formyloxyethyl 1-aminomethanoate"}
 {"index": 56342, "smiles": "[O-]C(=O)CCCNC=[NH2+]", "openclatura_iupac": "4-(iminiomethylamino)butanoate"}
@@ -57874,7 +57874,7 @@
 {"index": 57873, "smiles": "CC(O)C(=O)N(C)C=O", "openclatura_iupac": "N-(formyl)-2-hydroxy-N-methylpropanamide"}
 {"index": 57874, "smiles": "CN(C)C(=O)C(O)C=O", "openclatura_iupac": "2-hydroxy-N,N-dimethyl-3-oxopropanamide"}
 {"index": 57875, "smiles": "CN(C)C(=O)N(C)C=N", "openclatura_iupac": "1-((iminomethyl)(methyl)amino)-N,N-dimethylmethanamide"}
-{"index": 57876, "smiles": "CN(C)C(=O)N(C)C=O", "openclatura_iupac": "1-((formyl)(methyl)amino)-N,N-dimethylmethanamide"}
+{"index": 57876, "smiles": "CN(C)C(=O)N(C)C=O", "openclatura_iupac": "N,N-dimethyl-1-(N-methylformamido)formamide"}
 {"index": 57877, "smiles": "CC(C)C(=O)C1(C)CC1", "openclatura_iupac": "2-methyl-1-(1-methylcyclopropyl)propan-1-one"}
 {"index": 57878, "smiles": "CC(C)C(=O)C1(C)CN1", "openclatura_iupac": "2-methyl-1-(2-methyl-aziridin-2-yl)propan-1-one"}
 {"index": 57879, "smiles": "CC(C)C(=O)C1(C)CO1", "openclatura_iupac": "2-methyl-1-(2-methyl-oxiran-2-yl)propan-1-one"}
@@ -58010,7 +58010,7 @@
 {"index": 58009, "smiles": "CC(O)C(=O)NCC=O", "openclatura_iupac": "2-hydroxy-N-(2-oxoethyl)propanamide"}
 {"index": 58010, "smiles": "CC(O)C(=O)OCC=O", "openclatura_iupac": "2-oxoethyl 2-hydroxypropanoate"}
 {"index": 58011, "smiles": "CN(C)C(=O)CCC=O", "openclatura_iupac": "N,N-dimethyl-4-oxobutanamide"}
-{"index": 58012, "smiles": "CN(C)C(=O)CNC=O", "openclatura_iupac": "2-(formamido)-N,N-dimethylacetamide"}
+{"index": 58012, "smiles": "CN(C)C(=O)CNC=O", "openclatura_iupac": "2-formamido-N,N-dimethylacetamide"}
 {"index": 58013, "smiles": "CN(C)C(=O)COC=N", "openclatura_iupac": "2-(iminomethoxy)-N,N-dimethylacetamide"}
 {"index": 58014, "smiles": "CN(C)C(=O)COC=O", "openclatura_iupac": "2-(dimethylamino)-2-oxoethyl formate"}
 {"index": 58015, "smiles": "CN(C)C(=O)NCC=O", "openclatura_iupac": "N,N-dimethyl-1-((2-oxoethyl)amino)formamide"}
@@ -59907,12 +59907,12 @@
 {"index": 59906, "smiles": "CC(C)CC(=O)OC=N", "openclatura_iupac": "iminomethyl 3-methylbutanoate"}
 {"index": 59907, "smiles": "CC(C)NC(=O)CC=O", "openclatura_iupac": "3-oxo-N-(propan-2-yl)propanamide"}
 {"index": 59908, "smiles": "CC(C)NC(=O)NC=N", "openclatura_iupac": "1-(iminomethylamino)-N-(propan-2-yl)formamide"}
-{"index": 59909, "smiles": "CC(C)NC(=O)NC=O", "openclatura_iupac": "1-(formamido)-N-(propan-2-yl)formamide"}
+{"index": 59909, "smiles": "CC(C)NC(=O)NC=O", "openclatura_iupac": "1-formamido-N-(propan-2-yl)formamide"}
 {"index": 59910, "smiles": "CC(C)NC(=O)OC=N", "openclatura_iupac": "iminomethyl ((propan-2-yl)amino)formate"}
 {"index": 59911, "smiles": "CC(C)OC(=N)NC=O", "openclatura_iupac": "N-((imino)(isopropoxy)methyl)formamide"}
 {"index": 59912, "smiles": "CC(C)OC(=O)CC=O", "openclatura_iupac": "propan-2-yl 3-oxopropanoate"}
 {"index": 59913, "smiles": "CC(C)OC(=O)NC=N", "openclatura_iupac": "propan-2-yl (iminomethylamino)formate"}
-{"index": 59914, "smiles": "CC(C)OC(=O)NC=O", "openclatura_iupac": "propan-2-yl (formamido)formate"}
+{"index": 59914, "smiles": "CC(C)OC(=O)NC=O", "openclatura_iupac": "propan-2-yl 1-formamidomethanoate"}
 {"index": 59915, "smiles": "CC(O)CC(=N)NC=O", "openclatura_iupac": "N-(3-hydroxy-1-iminobutyl)formamide"}
 {"index": 59916, "smiles": "CC(O)CC(=O)CC=O", "openclatura_iupac": "5-hydroxy-3-oxohexanal"}
 {"index": 59917, "smiles": "CC(O)CC(=O)NC=N", "openclatura_iupac": "3-hydroxy-N-(iminomethyl)butanamide"}
@@ -60720,10 +60720,10 @@
 {"index": 60719, "smiles": "CN(C=N)C(=O)C(N)=N", "openclatura_iupac": "2-amino-2-imino-N-(iminomethyl)-N-methylacetamide"}
 {"index": 60720, "smiles": "CN(C=N)C(=O)C(N)=O", "openclatura_iupac": "N-(iminomethyl)-N-methylethanediamide"}
 {"index": 60721, "smiles": "CN(C=O)C(=N)C(C)=O", "openclatura_iupac": "N-(1-imino-2-oxopropyl)-N-methylmethanamide"}
-{"index": 60722, "smiles": "CN(C=O)C(=N)C(N)=O", "openclatura_iupac": "2-((formyl)(methyl)amino)-2-iminoacetamide"}
+{"index": 60722, "smiles": "CN(C=O)C(=N)C(N)=O", "openclatura_iupac": "2-imino-2-(N-methylformamido)acetamide"}
 {"index": 60723, "smiles": "CN(C=O)C(=O)C(C)=O", "openclatura_iupac": "N-(1,2-dioxopropyl)-N-methylmethanamide"}
 {"index": 60724, "smiles": "CN(C=O)C(=O)C(N)=N", "openclatura_iupac": "N-(2-amino-2-imino-acetyl)-N-methylmethanamide"}
-{"index": 60725, "smiles": "CN(C=O)C(=O)C(N)=O", "openclatura_iupac": "2-((formyl)(methyl)amino)-2-oxoacetamide"}
+{"index": 60725, "smiles": "CN(C=O)C(=O)C(N)=O", "openclatura_iupac": "2-(N-methylformamido)-2-oxoacetamide"}
 {"index": 60726, "smiles": "NC(=N)C(=O)C(O)C=O", "openclatura_iupac": "4-amino-2-hydroxy-4-imino-3-oxobutanal"}
 {"index": 60727, "smiles": "CC(C=O)C(=O)C1CC1", "openclatura_iupac": "2-((cyclopropyl)carbonyl)propanal"}
 {"index": 60728, "smiles": "CC(C=O)C(=O)C1CN1", "openclatura_iupac": "2-((aziridin-2-yl)carbonyl)propanal"}
@@ -60762,14 +60762,14 @@
 {"index": 60761, "smiles": "CC(C=O)C(=O)OC=N", "openclatura_iupac": "iminomethyl 2-(formyl)propanoate"}
 {"index": 60762, "smiles": "CN(C=N)C(=O)CC=O", "openclatura_iupac": "N-(iminomethyl)-N-methyl-3-oxopropanamide"}
 {"index": 60763, "smiles": "CN(C=N)C(=O)NC=N", "openclatura_iupac": "N-(iminomethyl)-1-(iminomethylamino)-N-methylmethanamide"}
-{"index": 60764, "smiles": "CN(C=N)C(=O)NC=O", "openclatura_iupac": "1-(formamido)-N-(iminomethyl)-N-methylmethanamide"}
+{"index": 60764, "smiles": "CN(C=N)C(=O)NC=O", "openclatura_iupac": "1-formamido-N-(iminomethyl)-N-methylmethanamide"}
 {"index": 60765, "smiles": "CN(C=N)C(=O)OC=N", "openclatura_iupac": "iminomethyl ((iminomethyl)(methyl)amino)formate"}
 {"index": 60766, "smiles": "CN(C=O)C(=N)CC=O", "openclatura_iupac": "N-(1-imino-3-oxopropyl)-N-methylmethanamide"}
 {"index": 60767, "smiles": "CN(C=O)C(=N)NC=O", "openclatura_iupac": "N-((formamido)(imino)methyl)-N-methylmethanamide"}
 {"index": 60768, "smiles": "CN(C=O)C(=O)CC=O", "openclatura_iupac": "N-(1,3-dioxopropyl)-N-methylmethanamide"}
 {"index": 60769, "smiles": "CN(C=O)C(=O)NC=N", "openclatura_iupac": "N-(iminomethylcarbamoyl)-N-methylmethanamide"}
 {"index": 60770, "smiles": "CN(C=O)C(=O)NC=O", "openclatura_iupac": "N-(formylcarbamoyl)-N-methylmethanamide"}
-{"index": 60771, "smiles": "CN(C=O)C(=O)OC=N", "openclatura_iupac": "iminomethyl ((formyl)(methyl)amino)formate"}
+{"index": 60771, "smiles": "CN(C=O)C(=O)OC=N", "openclatura_iupac": "iminomethyl (N-methylformamido)formate"}
 {"index": 60772, "smiles": "OC(C=O)C(=N)NC=O", "openclatura_iupac": "N-(2-hydroxy-1-imino-3-oxopropyl)formamide"}
 {"index": 60773, "smiles": "OC(C=O)C(=O)CC=O", "openclatura_iupac": "2-hydroxy-3-oxopentanedial"}
 {"index": 60774, "smiles": "OC(C=O)C(=O)NC=N", "openclatura_iupac": "2-hydroxy-N-(iminomethyl)-3-oxopropanamide"}
@@ -60809,7 +60809,7 @@
 {"index": 60808, "smiles": "CC(C=O)N(C)C(N)=O", "openclatura_iupac": "1-amino-N-methyl-N-(1-oxopropan-2-yl)formamide"}
 {"index": 60809, "smiles": "CC(N(C)C=[NH2+])C([O-])=O", "openclatura_iupac": "2-((iminiomethyl)(methyl)amino)propanoate"}
 {"index": 60810, "smiles": "CC(N(C)C=O)C(C)=O", "openclatura_iupac": "N-methyl-N-(3-oxobutan-2-yl)formamide"}
-{"index": 60811, "smiles": "CC(N(C)C=O)C(N)=O", "openclatura_iupac": "2-((formyl)(methyl)amino)propanamide"}
+{"index": 60811, "smiles": "CC(N(C)C=O)C(N)=O", "openclatura_iupac": "2-(N-methylformamido)propanamide"}
 {"index": 60812, "smiles": "NC(=O)C(O)C(O)C=O", "openclatura_iupac": "2,3-dihydroxy-4-oxobutanamide"}
 {"index": 60813, "smiles": "CC(C(O)C=O)C1CC1", "openclatura_iupac": "3-cyclopropyl-2-hydroxybutanal"}
 {"index": 60814, "smiles": "CC(C(O)C=O)C1CN1", "openclatura_iupac": "3-(aziridin-2-yl)-2-hydroxybutanal"}
@@ -61416,7 +61416,7 @@
 {"index": 61415, "smiles": "CC(CC([O-])=O)C(N)=[NH2+]", "openclatura_iupac": "3-((amino)(iminio)methyl)butanoate"}
 {"index": 61416, "smiles": "CC(NC(C)=[NH2+])C([O-])=O", "openclatura_iupac": "2-((1-iminoethyl)amino)propanoate"}
 {"index": 61417, "smiles": "CC(NC(C)=O)C(C)=O", "openclatura_iupac": "N-(3-oxobutan-2-yl)acetamide"}
-{"index": 61418, "smiles": "CC(NC(C)=O)C(N)=O", "openclatura_iupac": "2-methylcarbonylaminopropanamide"}
+{"index": 61418, "smiles": "CC(NC(C)=O)C(N)=O", "openclatura_iupac": "2-acetamidopropanamide"}
 {"index": 61419, "smiles": "CC(NC(N)=[NH2+])C([O-])=O", "openclatura_iupac": "2-(((amino)(iminio)methyl)amino)propanoate"}
 {"index": 61420, "smiles": "CC(NC(N)=O)C(C)=O", "openclatura_iupac": "1-amino-N-(3-oxobutan-2-yl)formamide"}
 {"index": 61421, "smiles": "CC(NC(N)=O)C(N)=O", "openclatura_iupac": "2-(carbamoylamino)propanamide"}
@@ -61427,7 +61427,7 @@
 {"index": 61426, "smiles": "CC(OC(N)=O)C(N)=O", "openclatura_iupac": "1-amino-1-oxopropan-2-yl 1-aminomethanoate"}
 {"index": 61427, "smiles": "CN(CC(C)=O)C(C)=O", "openclatura_iupac": "N-methyl-N-(2-oxopropyl)acetamide"}
 {"index": 61428, "smiles": "CN(CC(C)=O)C(N)=O", "openclatura_iupac": "1-amino-N-methyl-N-(2-oxopropyl)formamide"}
-{"index": 61429, "smiles": "CN(CC(N)=O)C(C)=O", "openclatura_iupac": "2-((methyl)(acetyl)amino)acetamide"}
+{"index": 61429, "smiles": "CN(CC(N)=O)C(C)=O", "openclatura_iupac": "2-(N-methylacetamido)acetamide"}
 {"index": 61430, "smiles": "CN(CC(N)=O)C(N)=O", "openclatura_iupac": "2-((carbamoyl)(methyl)amino)acetamide"}
 {"index": 61431, "smiles": "CN(CC([O-])=O)C(C)=[NH2+]", "openclatura_iupac": "2-((1-iminoethyl)(methyl)amino)acetate"}
 {"index": 61432, "smiles": "CN(CC([O-])=O)C(N)=[NH2+]", "openclatura_iupac": "2-(((amino)(iminio)methyl)(methyl)amino)acetate"}
@@ -61859,7 +61859,7 @@
 {"index": 61858, "smiles": "CC(CC(C)=O)NC=O", "openclatura_iupac": "N-(4-oxopentan-2-yl)formamide"}
 {"index": 61859, "smiles": "CC(CC(C)=O)OC=N", "openclatura_iupac": "4-(iminomethoxy)pentan-2-one"}
 {"index": 61860, "smiles": "CC(CC(C)=O)OC=O", "openclatura_iupac": "4-oxopentan-2-yl formate"}
-{"index": 61861, "smiles": "CC(CC(N)=O)NC=O", "openclatura_iupac": "3-(formamido)butanamide"}
+{"index": 61861, "smiles": "CC(CC(N)=O)NC=O", "openclatura_iupac": "3-formamidobutanamide"}
 {"index": 61862, "smiles": "CC(CC(N)=O)OC=N", "openclatura_iupac": "3-(iminomethoxy)butanamide"}
 {"index": 61863, "smiles": "CC(CC(N)=O)OC=O", "openclatura_iupac": "4-amino-4-oxobutan-2-yl formate"}
 {"index": 61864, "smiles": "CC(CC([O-])=O)NC=[NH2+]", "openclatura_iupac": "3-(iminiomethylamino)butanoate"}
@@ -62025,7 +62025,7 @@
 {"index": 62024, "smiles": "CC(OCC(C)=O)C=O", "openclatura_iupac": "2-((2-oxopropyl)oxy)propanal"}
 {"index": 62025, "smiles": "CC(OCC(N)=O)C=O", "openclatura_iupac": "2-((1-oxopropan-2-yl)oxy)acetamide"}
 {"index": 62026, "smiles": "CN(CCC(C)=O)C=O", "openclatura_iupac": "N-methyl-N-(3-oxobutyl)formamide"}
-{"index": 62027, "smiles": "CN(CCC(N)=O)C=O", "openclatura_iupac": "3-((formyl)(methyl)amino)propanamide"}
+{"index": 62027, "smiles": "CN(CCC(N)=O)C=O", "openclatura_iupac": "3-(N-methylformamido)propanamide"}
 {"index": 62028, "smiles": "CN(CCC([O-])=O)C=[NH2+]", "openclatura_iupac": "3-((iminiomethyl)(methyl)amino)propanoate"}
 {"index": 62029, "smiles": "NC(=O)CCC(O)C=O", "openclatura_iupac": "4-hydroxy-5-oxopentanamide"}
 {"index": 62030, "smiles": "NC(=O)NCC(O)C=O", "openclatura_iupac": "1-amino-N-(2-hydroxy-3-oxopropyl)formamide"}
@@ -62083,7 +62083,7 @@
 {"index": 62082, "smiles": "CC(CCC=O)C(N)=O", "openclatura_iupac": "2-methyl-5-oxopentanamide"}
 {"index": 62083, "smiles": "CC(CNC=[NH2+])C([O-])=O", "openclatura_iupac": "2-((iminiomethylamino)methyl)propanoate"}
 {"index": 62084, "smiles": "CC(CNC=O)C(C)=O", "openclatura_iupac": "N-(2-methyl-3-oxobutyl)formamide"}
-{"index": 62085, "smiles": "CC(CNC=O)C(N)=O", "openclatura_iupac": "2-((formamido)methyl)propanamide"}
+{"index": 62085, "smiles": "CC(CNC=O)C(N)=O", "openclatura_iupac": "2-(formamidomethyl)propanamide"}
 {"index": 62086, "smiles": "CC(COC=N)C(C)=O", "openclatura_iupac": "3-((iminomethoxy)methyl)butan-2-one"}
 {"index": 62087, "smiles": "CC(COC=N)C(N)=O", "openclatura_iupac": "2-((iminomethoxy)methyl)propanamide"}
 {"index": 62088, "smiles": "CC(COC=O)C(C)=O", "openclatura_iupac": "2-methyl-3-oxobutyl formate"}
@@ -62096,11 +62096,11 @@
 {"index": 62095, "smiles": "CN(CCC=O)C(C)=O", "openclatura_iupac": "N-methyl-N-(3-oxopropyl)acetamide"}
 {"index": 62096, "smiles": "CN(CCC=O)C(N)=O", "openclatura_iupac": "1-amino-N-methyl-N-(3-oxopropyl)formamide"}
 {"index": 62097, "smiles": "NC(=O)C(O)CCC=O", "openclatura_iupac": "2-hydroxy-5-oxopentanamide"}
-{"index": 62098, "smiles": "NC(=O)C(O)CNC=O", "openclatura_iupac": "3-(formamido)-2-hydroxypropanamide"}
+{"index": 62098, "smiles": "NC(=O)C(O)CNC=O", "openclatura_iupac": "3-formamido-2-hydroxypropanamide"}
 {"index": 62099, "smiles": "NC(=O)C(O)COC=N", "openclatura_iupac": "2-hydroxy-3-(iminomethoxy)propanamide"}
 {"index": 62100, "smiles": "NC(=O)C(O)COC=O", "openclatura_iupac": "3-amino-2-hydroxy-3-oxopropyl formate"}
 {"index": 62101, "smiles": "NC(CNC=[NH2+])C([O-])=O", "openclatura_iupac": "2-amino-3-(iminiomethylamino)propanoate"}
-{"index": 62102, "smiles": "[NH3+]C(CNC=O)C([O-])=O", "openclatura_iupac": "2-ammonio-3-(formamido)propanoate"}
+{"index": 62102, "smiles": "[NH3+]C(CNC=O)C([O-])=O", "openclatura_iupac": "2-ammonio-3-formamidopropanoate"}
 {"index": 62103, "smiles": "[NH3+]C(COC=N)C([O-])=O", "openclatura_iupac": "2-ammonio-3-(iminomethoxy)propanoate"}
 {"index": 62104, "smiles": "[NH3+]C(COC=O)C([O-])=O", "openclatura_iupac": "2-ammonio-3-formyloxypropanoate"}
 {"index": 62105, "smiles": "OC(CNC=[NH2+])C([O-])=O", "openclatura_iupac": "2-hydroxy-3-(iminiomethylamino)propanoate"}
@@ -62157,15 +62157,15 @@
 {"index": 62156, "smiles": "CC(CCC=O)OC=N", "openclatura_iupac": "4-(iminomethoxy)pentanal"}
 {"index": 62157, "smiles": "CC(CCC=O)OC=O", "openclatura_iupac": "5-oxopentan-2-yl formate"}
 {"index": 62158, "smiles": "CC(CNC=O)CC=O", "openclatura_iupac": "N-(2-methyl-4-oxobutyl)formamide"}
-{"index": 62159, "smiles": "CC(CNC=O)NC=O", "openclatura_iupac": "N-(2-(formamido)propyl)formamide"}
+{"index": 62159, "smiles": "CC(CNC=O)NC=O", "openclatura_iupac": "N-(2-formamidopropyl)formamide"}
 {"index": 62160, "smiles": "CC(CNC=O)OC=N", "openclatura_iupac": "N-(2-(iminomethoxy)propyl)formamide"}
-{"index": 62161, "smiles": "CC(CNC=O)OC=O", "openclatura_iupac": "1-(formamido)propan-2-yl formate"}
+{"index": 62161, "smiles": "CC(CNC=O)OC=O", "openclatura_iupac": "1-formamidopropan-2-yl formate"}
 {"index": 62162, "smiles": "CC(COC=N)CC=O", "openclatura_iupac": "3-((iminomethoxy)methyl)butanal"}
 {"index": 62163, "smiles": "CC(COC=N)NC=O", "openclatura_iupac": "N-(1-(iminomethoxy)propan-2-yl)formamide"}
 {"index": 62164, "smiles": "CC(COC=N)OC=N", "openclatura_iupac": "1-((2-(iminomethoxy)propyl)oxy)methanimine"}
 {"index": 62165, "smiles": "CC(COC=N)OC=O", "openclatura_iupac": "1-(iminomethoxy)propan-2-yl formate"}
 {"index": 62166, "smiles": "CC(COC=O)CC=O", "openclatura_iupac": "2-methyl-4-oxobutyl formate"}
-{"index": 62167, "smiles": "CC(COC=O)NC=O", "openclatura_iupac": "2-(formamido)propyl formate"}
+{"index": 62167, "smiles": "CC(COC=O)NC=O", "openclatura_iupac": "2-formamidopropyl formate"}
 {"index": 62168, "smiles": "CC(COC=O)OC=N", "openclatura_iupac": "2-(iminomethoxy)propyl formate"}
 {"index": 62169, "smiles": "CC(COC=O)OC=O", "openclatura_iupac": "2-formyloxypropyl formate"}
 {"index": 62170, "smiles": "CN(CCC=O)CC=O", "openclatura_iupac": "3-((2-oxoethyl)(methyl)amino)propanal"}
@@ -62257,9 +62257,9 @@
 {"index": 62256, "smiles": "CC(COCC=O)C=O", "openclatura_iupac": "2-(((2-oxoethyl)oxy)methyl)propanal"}
 {"index": 62257, "smiles": "CC(OCCC=O)C=O", "openclatura_iupac": "2-((3-oxopropyl)oxy)propanal"}
 {"index": 62258, "smiles": "CN(CCCC=O)C=O", "openclatura_iupac": "N-methyl-N-(4-oxobutyl)formamide"}
-{"index": 62259, "smiles": "CN(CCNC=O)C=O", "openclatura_iupac": "N-(2-((formyl)(methyl)amino)ethyl)formamide"}
+{"index": 62259, "smiles": "CN(CCNC=O)C=O", "openclatura_iupac": "N-(2-(N-methylformamido)ethyl)formamide"}
 {"index": 62260, "smiles": "CN(CCOC=N)C=O", "openclatura_iupac": "N-(2-(iminomethoxy)ethyl)-N-methylmethanamide"}
-{"index": 62261, "smiles": "CN(CCOC=O)C=O", "openclatura_iupac": "2-((formyl)(methyl)amino)ethyl formate"}
+{"index": 62261, "smiles": "CN(CCOC=O)C=O", "openclatura_iupac": "2-(N-methylformamido)ethyl formate"}
 {"index": 62262, "smiles": "OC(CCCC=O)C=O", "openclatura_iupac": "2-hydroxyhexanedial"}
 {"index": 62263, "smiles": "OC(CCNC=O)C=O", "openclatura_iupac": "N-(3-hydroxy-4-oxobutyl)formamide"}
 {"index": 62264, "smiles": "OC(CCOC=N)C=O", "openclatura_iupac": "2-hydroxy-4-(iminomethoxy)butanal"}
@@ -96718,7 +96718,7 @@
 {"index": 96717, "smiles": "CN=C(NC=N)C(N)=O", "openclatura_iupac": "2-(iminomethylamino)-2-(methylimino)acetamide"}
 {"index": 96718, "smiles": "CN=C(NC=[NH2+])C([O-])=O", "openclatura_iupac": "2-(iminiomethylamino)-2-(methylimino)acetate"}
 {"index": 96719, "smiles": "CN=C(NC=O)C(C)=O", "openclatura_iupac": "N-(1-(methylimino)-2-oxopropyl)formamide"}
-{"index": 96720, "smiles": "CN=C(NC=O)C(N)=O", "openclatura_iupac": "2-(formamido)-2-(methylimino)acetamide"}
+{"index": 96720, "smiles": "CN=C(NC=O)C(N)=O", "openclatura_iupac": "2-formamido-2-(methylimino)acetamide"}
 {"index": 96721, "smiles": "CN=C(OC=O)C(C)=O", "openclatura_iupac": "1-(methylimino)-2-oxopropyl formate"}
 {"index": 96722, "smiles": "CN=C(OC=O)C(N)=N", "openclatura_iupac": "2-amino-2-imino-1-(methylimino)ethyl formate"}
 {"index": 96723, "smiles": "CN=C(OC=O)C(N)=O", "openclatura_iupac": "2-amino-1-(methylimino)-2-oxoethyl formate"}
@@ -97344,11 +97344,11 @@
 {"index": 97343, "smiles": "CN=COC(=O)CC#N", "openclatura_iupac": "(methylimino)methyl 2-cyanoacetate"}
 {"index": 97344, "smiles": "CN=CNC(=O)CC=O", "openclatura_iupac": "N-((methylimino)methyl)-3-oxopropanamide"}
 {"index": 97345, "smiles": "CN=CNC(=O)NC=N", "openclatura_iupac": "1-(iminomethylamino)-N-((methylimino)methyl)formamide"}
-{"index": 97346, "smiles": "CN=CNC(=O)NC=O", "openclatura_iupac": "1-(formamido)-N-((methylimino)methyl)formamide"}
+{"index": 97346, "smiles": "CN=CNC(=O)NC=O", "openclatura_iupac": "1-formamido-N-((methylimino)methyl)formamide"}
 {"index": 97347, "smiles": "CN=CNC(=O)OC=N", "openclatura_iupac": "iminomethyl (((methylimino)methyl)amino)formate"}
 {"index": 97348, "smiles": "CN=COC(=O)CC=O", "openclatura_iupac": "(methylimino)methyl 3-oxopropanoate"}
 {"index": 97349, "smiles": "CN=COC(=O)NC=N", "openclatura_iupac": "(methylimino)methyl (iminomethylamino)formate"}
-{"index": 97350, "smiles": "CN=COC(=O)NC=O", "openclatura_iupac": "(methylimino)methyl (formamido)formate"}
+{"index": 97350, "smiles": "CN=COC(=O)NC=O", "openclatura_iupac": "(methylimino)methyl 1-formamidomethanoate"}
 {"index": 97351, "smiles": "NC=[NH+]CC(=O)[CH-]C=O", "openclatura_iupac": "4-(aminomethylideneammonio)-3-oxobutan-2-ide-1-al"}
 {"index": 97352, "smiles": "CN=CNC(=NC)C#N", "openclatura_iupac": "2-(methylimino)-2-(((methylimino)methyl)amino)acetonitrile"}
 {"index": 97353, "smiles": "CN=CNC(C#C)C#N", "openclatura_iupac": "2-(((methylimino)methyl)amino)but-3-ynenitrile"}
@@ -98125,16 +98125,16 @@
 {"index": 98124, "smiles": "CNC(=N)C(=O)NC=O", "openclatura_iupac": "N-(formyl)-2-imino-2-(methylamino)acetamide"}
 {"index": 98125, "smiles": "CNC(=N)C(=O)OC=N", "openclatura_iupac": "iminomethyl 2-imino-2-(methylamino)acetate"}
 {"index": 98126, "smiles": "CNC(=O)C(=N)NC=N", "openclatura_iupac": "2-imino-2-(iminomethylamino)-N-methylacetamide"}
-{"index": 98127, "smiles": "CNC(=O)C(=N)NC=O", "openclatura_iupac": "2-(formamido)-2-imino-N-methylacetamide"}
+{"index": 98127, "smiles": "CNC(=O)C(=N)NC=O", "openclatura_iupac": "2-formamido-2-imino-N-methylacetamide"}
 {"index": 98128, "smiles": "CNC(=O)C(=O)NC=N", "openclatura_iupac": "N'-(iminomethyl)-N-methylethanediamide"}
 {"index": 98129, "smiles": "CNC(=O)C(=O)NC=O", "openclatura_iupac": "N'-(formyl)-N-methylethanediamide"}
 {"index": 98130, "smiles": "CNC(=O)C(=O)OC=N", "openclatura_iupac": "iminomethyl (methylcarbamoyl)formate"}
 {"index": 98131, "smiles": "COC(=O)C(=N)NC=N", "openclatura_iupac": "methyl 2-imino-2-(iminomethylamino)acetate"}
-{"index": 98132, "smiles": "COC(=O)C(=N)NC=O", "openclatura_iupac": "methyl 2-(formamido)-2-iminoacetate"}
+{"index": 98132, "smiles": "COC(=O)C(=N)NC=O", "openclatura_iupac": "methyl 2-formamido-2-iminoacetate"}
 {"index": 98133, "smiles": "COC(=O)C(=O)CC=O", "openclatura_iupac": "methyl 2,4-dioxobutanoate"}
 {"index": 98134, "smiles": "COC(=O)C(=O)NC=N", "openclatura_iupac": "methyl ((iminomethyl)carbamoyl)formate"}
 {"index": 98135, "smiles": "COC(=O)C(=O)NC=O", "openclatura_iupac": "methyl ((formyl)carbamoyl)formate"}
-{"index": 98136, "smiles": "COC(=O)C(=O)OC=N", "openclatura_iupac": "iminomethyl methyl ethanedioate"}
+{"index": 98136, "smiles": "COC(=O)C(=O)OC=N", "openclatura_iupac": "2-iminomethyl 1-methyl ethanedioate"}
 {"index": 98137, "smiles": "OCC(=O)C(=N)NC=N", "openclatura_iupac": "1-hydroxy-3-imino-3-(iminomethylamino)propan-2-one"}
 {"index": 98138, "smiles": "OCC(=O)C(=N)NC=O", "openclatura_iupac": "N-(3-hydroxy-1-imino-2-oxopropyl)formamide"}
 {"index": 98139, "smiles": "OCC(=O)C(=O)NC=N", "openclatura_iupac": "3-hydroxy-N-(iminomethyl)-2-oxopropanamide"}
@@ -98250,7 +98250,7 @@
 {"index": 98249, "smiles": "COC(=O)C(O)C(C)=O", "openclatura_iupac": "methyl 2-hydroxy-3-oxobutanoate"}
 {"index": 98250, "smiles": "COC(=O)C(O)C(N)=O", "openclatura_iupac": "methyl 2-carbamoyl-2-hydroxyacetate"}
 {"index": 98251, "smiles": "COC(=O)N(C)C(C)=N", "openclatura_iupac": "methyl ((1-iminoethyl)(methyl)amino)formate"}
-{"index": 98252, "smiles": "COC(=O)N(C)C(C)=O", "openclatura_iupac": "methyl ((methyl)(acetyl)amino)formate"}
+{"index": 98252, "smiles": "COC(=O)N(C)C(C)=O", "openclatura_iupac": "methyl (N-methylacetamido)formate"}
 {"index": 98253, "smiles": "COC(=O)N(C)C(N)=N", "openclatura_iupac": "methyl (((amino)(imino)methyl)(methyl)amino)formate"}
 {"index": 98254, "smiles": "COC(=O)N(C)C(N)=O", "openclatura_iupac": "methyl ((carbamoyl)(methyl)amino)formate"}
 {"index": 98255, "smiles": "NC(=O)C(O)C(=O)CO", "openclatura_iupac": "2,4-dihydroxy-3-oxobutanamide"}
@@ -98356,13 +98356,13 @@
 {"index": 98355, "smiles": "CCC(=O)N(C)CC=O", "openclatura_iupac": "N-methyl-N-(2-oxoethyl)propanamide"}
 {"index": 98356, "smiles": "CN(CC=O)C(=O)CO", "openclatura_iupac": "2-hydroxy-N-methyl-N-(2-oxoethyl)acetamide"}
 {"index": 98357, "smiles": "CNC(=O)C(C)CC=O", "openclatura_iupac": "2,N-dimethyl-4-oxobutanamide"}
-{"index": 98358, "smiles": "CNC(=O)C(C)NC=O", "openclatura_iupac": "2-(formamido)-N-methylpropanamide"}
+{"index": 98358, "smiles": "CNC(=O)C(C)NC=O", "openclatura_iupac": "2-formamido-N-methylpropanamide"}
 {"index": 98359, "smiles": "CNC(=O)C(C)OC=N", "openclatura_iupac": "2-(iminomethoxy)-N-methylpropanamide"}
 {"index": 98360, "smiles": "CNC(=O)C(C)OC=O", "openclatura_iupac": "1-(methylamino)-1-oxopropan-2-yl formate"}
 {"index": 98361, "smiles": "CNC(=O)C(O)CC=O", "openclatura_iupac": "2-hydroxy-N-methyl-4-oxobutanamide"}
 {"index": 98362, "smiles": "CNC(=O)N(C)CC=O", "openclatura_iupac": "N-methyl-1-((2-oxoethyl)(methyl)amino)formamide"}
 {"index": 98363, "smiles": "COC(=O)C(C)CC=O", "openclatura_iupac": "methyl 2-methyl-4-oxobutanoate"}
-{"index": 98364, "smiles": "COC(=O)C(C)NC=O", "openclatura_iupac": "methyl 2-(formamido)propanoate"}
+{"index": 98364, "smiles": "COC(=O)C(C)NC=O", "openclatura_iupac": "methyl 2-formamidopropanoate"}
 {"index": 98365, "smiles": "COC(=O)C(C)OC=N", "openclatura_iupac": "methyl 2-(iminomethoxy)propanoate"}
 {"index": 98366, "smiles": "COC(=O)C(C)OC=O", "openclatura_iupac": "methyl 2-formyloxypropanoate"}
 {"index": 98367, "smiles": "COC(=O)C(O)CC=O", "openclatura_iupac": "methyl 2-hydroxy-4-oxobutanoate"}
@@ -98380,13 +98380,13 @@
 {"index": 98379, "smiles": "CNC(=N)N(C=N)C=O", "openclatura_iupac": "N-((imino)(methylamino)methyl)-N-(iminomethyl)formamide"}
 {"index": 98380, "smiles": "CNC(=N)N(C=O)C=O", "openclatura_iupac": "N-(formyl)-N-((imino)(methylamino)methyl)formamide"}
 {"index": 98381, "smiles": "CNC(=O)N(C=N)C=N", "openclatura_iupac": "1-(bis(iminomethyl)amino)-N-methylmethanamide"}
-{"index": 98382, "smiles": "CNC(=O)N(C=N)C=O", "openclatura_iupac": "1-((iminomethyl)(formyl)amino)-N-methylmethanamide"}
+{"index": 98382, "smiles": "CNC(=O)N(C=N)C=O", "openclatura_iupac": "1-(N-iminomethylformamido)-N-methylmethanamide"}
 {"index": 98383, "smiles": "CNC(=O)N(C=O)C=O", "openclatura_iupac": "1-(N,N-diformylamino)-N-methylmethanamide"}
 {"index": 98384, "smiles": "COC(=N)N(C=N)C=N", "openclatura_iupac": "1-imino-N,N-bis(iminomethyl)-1-methoxymethanamine"}
 {"index": 98385, "smiles": "COC(=N)N(C=N)C=O", "openclatura_iupac": "N-((imino)(methoxy)methyl)-N-(iminomethyl)formamide"}
 {"index": 98386, "smiles": "COC(=N)N(C=O)C=O", "openclatura_iupac": "N-(formyl)-N-((imino)(methoxy)methyl)formamide"}
 {"index": 98387, "smiles": "COC(=O)N(C=N)C=N", "openclatura_iupac": "methyl (bis(iminomethyl)amino)formate"}
-{"index": 98388, "smiles": "COC(=O)N(C=N)C=O", "openclatura_iupac": "methyl ((iminomethyl)(formyl)amino)formate"}
+{"index": 98388, "smiles": "COC(=O)N(C=N)C=O", "openclatura_iupac": "methyl (N-iminomethylformamido)formate"}
 {"index": 98389, "smiles": "COC(=O)N(C=O)C=O", "openclatura_iupac": "methyl (N,N-diformylamino)formate"}
 {"index": 98390, "smiles": "NCC(=O)N(C=N)C=O", "openclatura_iupac": "2-amino-N-(formyl)-N-(iminomethyl)acetamide"}
 {"index": 98391, "smiles": "NCC(=O)N(C=O)C=O", "openclatura_iupac": "2-amino-N,N-bis(formyl)acetamide"}
@@ -98935,7 +98935,7 @@
 {"index": 98934, "smiles": "COC(=N)NC(=O)C#C", "openclatura_iupac": "N-((imino)(methoxy)methyl)prop-2-ynamide"}
 {"index": 98935, "smiles": "COC(=O)CC(=O)C#C", "openclatura_iupac": "methyl 3-oxopent-4-ynoate"}
 {"index": 98936, "smiles": "COC(=O)NC(=N)C#C", "openclatura_iupac": "methyl ((1-iminoprop-2-yn-1-yl)amino)formate"}
-{"index": 98937, "smiles": "COC(=O)NC(=O)C#C", "openclatura_iupac": "methyl 1-ethynylcarbonylaminomethanoate"}
+{"index": 98937, "smiles": "COC(=O)NC(=O)C#C", "openclatura_iupac": "methyl (prop-2-ynamido)formate"}
 {"index": 98938, "smiles": "[NH3+]CC(=N)[N-]C(=O)C#N", "openclatura_iupac": "N-(2-ammonio-1-iminoethyl)-1-cyanomethanamide"}
 {"index": 98939, "smiles": "[NH3+]CC(=O)[N-]C(=N)C#N", "openclatura_iupac": "2-ammonio-N-(1-imino-2-nitriloethyl)acetamide"}
 {"index": 98940, "smiles": "NCC(=O)NC(=O)C#C", "openclatura_iupac": "2-amino-N-(1-oxoprop-2-yn-1-yl)acetamide"}
@@ -98983,7 +98983,7 @@
 {"index": 98982, "smiles": "CCC(=O)NC(=O)CN", "openclatura_iupac": "N-(2-amino-acetyl)propanamide"}
 {"index": 98983, "smiles": "CCC(=O)NC(=O)CO", "openclatura_iupac": "N-(2-hydroxy-acetyl)propanamide"}
 {"index": 98984, "smiles": "CCC(=O)NC(=O)NC", "openclatura_iupac": "N-(methylcarbamoyl)propanamide"}
-{"index": 98985, "smiles": "CCC(=O)NC(=O)OC", "openclatura_iupac": "methyl 1-ethylcarbonylaminomethanoate"}
+{"index": 98985, "smiles": "CCC(=O)NC(=O)OC", "openclatura_iupac": "methyl 1-propanamidomethanoate"}
 {"index": 98986, "smiles": "CNC(=N)NC(=O)CO", "openclatura_iupac": "2-hydroxy-N-((imino)(methylamino)methyl)acetamide"}
 {"index": 98987, "smiles": "CNC(=N)NC(=O)OC", "openclatura_iupac": "methyl (((imino)(methylamino)methyl)amino)formate"}
 {"index": 98988, "smiles": "CNC(=O)CC(=N)OC", "openclatura_iupac": "3-imino-3-methoxy-N-methylpropanamide"}
@@ -99006,8 +99006,8 @@
 {"index": 99005, "smiles": "COC(=O)CC(=O)CO", "openclatura_iupac": "methyl 4-hydroxy-3-oxobutanoate"}
 {"index": 99006, "smiles": "COC(=O)CC(=O)OC", "openclatura_iupac": "dimethyl propanedioate"}
 {"index": 99007, "smiles": "COC(=O)NC(=N)CO", "openclatura_iupac": "methyl ((2-hydroxy-1-iminoethyl)amino)formate"}
-{"index": 99008, "smiles": "COC(=O)NC(=O)CN", "openclatura_iupac": "methyl 1-aminomethylcarbonylaminomethanoate"}
-{"index": 99009, "smiles": "COC(=O)NC(=O)CO", "openclatura_iupac": "methyl 1-hydroxymethylcarbonylaminomethanoate"}
+{"index": 99008, "smiles": "COC(=O)NC(=O)CN", "openclatura_iupac": "methyl (2-aminoacetamido)formate"}
+{"index": 99009, "smiles": "COC(=O)NC(=O)CO", "openclatura_iupac": "methyl (2-hydroxyacetamido)formate"}
 {"index": 99010, "smiles": "NCC(=O)NC(=O)CN", "openclatura_iupac": "2-amino-N-(2-amino-acetyl)acetamide"}
 {"index": 99011, "smiles": "NCC(=O)NC(=O)CO", "openclatura_iupac": "2-amino-N-(2-hydroxy-acetyl)acetamide"}
 {"index": 99012, "smiles": "OCC(=N)NC(=N)CO", "openclatura_iupac": "2-((2-hydroxy-1-iminoethyl)amino)-2-iminoethan-1-ol"}
@@ -99086,12 +99086,12 @@
 {"index": 99085, "smiles": "CN(CC(=O)CO)C=O", "openclatura_iupac": "N-(3-hydroxy-2-oxopropyl)-N-methylmethanamide"}
 {"index": 99086, "smiles": "CNC(=O)CC(C)C=O", "openclatura_iupac": "3-(formyl)-N-methylbutanamide"}
 {"index": 99087, "smiles": "CNC(=O)CC(O)C=O", "openclatura_iupac": "3-hydroxy-N-methyl-4-oxobutanamide"}
-{"index": 99088, "smiles": "CNC(=O)CN(C)C=O", "openclatura_iupac": "2-((formyl)(methyl)amino)-N-methylacetamide"}
+{"index": 99088, "smiles": "CNC(=O)CN(C)C=O", "openclatura_iupac": "N-methyl-2-(N-methylformamido)acetamide"}
 {"index": 99089, "smiles": "CNC(=O)NC(C)C=O", "openclatura_iupac": "N-methyl-1-((1-oxopropan-2-yl)amino)formamide"}
 {"index": 99090, "smiles": "CNC(=O)OC(C)C=O", "openclatura_iupac": "1-oxopropan-2-yl (methylamino)formate"}
 {"index": 99091, "smiles": "COC(=O)CC(C)C=O", "openclatura_iupac": "methyl 3-(formyl)butanoate"}
 {"index": 99092, "smiles": "COC(=O)CC(O)C=O", "openclatura_iupac": "methyl 3-hydroxy-4-oxobutanoate"}
-{"index": 99093, "smiles": "COC(=O)CN(C)C=O", "openclatura_iupac": "methyl 2-((formyl)(methyl)amino)acetate"}
+{"index": 99093, "smiles": "COC(=O)CN(C)C=O", "openclatura_iupac": "methyl 2-(N-methylformamido)acetate"}
 {"index": 99094, "smiles": "COC(=O)NC(C)C=O", "openclatura_iupac": "methyl ((1-oxopropan-2-yl)amino)formate"}
 {"index": 99095, "smiles": "OCC(=O)CC(O)C=O", "openclatura_iupac": "2,5-dihydroxy-4-oxopentanal"}
 {"index": 99096, "smiles": "CC1(CC(=O)CO)CC1", "openclatura_iupac": "1-hydroxy-3-(1-methylcyclopropyl)propan-2-one"}
@@ -99225,7 +99225,7 @@
 {"index": 99224, "smiles": "CNC(=[NH2+])OCC([O-])=O", "openclatura_iupac": "2-(((imino)(methylamino)methyl)oxy)acetate"}
 {"index": 99225, "smiles": "CNC(=O)CCC(C)=O", "openclatura_iupac": "N-methyl-4-oxopentanamide"}
 {"index": 99226, "smiles": "CNC(=O)CCC(N)=O", "openclatura_iupac": "N-methylbutanediamide"}
-{"index": 99227, "smiles": "CNC(=O)CNC(C)=O", "openclatura_iupac": "N-methyl-2-methylcarbonylaminoacetamide"}
+{"index": 99227, "smiles": "CNC(=O)CNC(C)=O", "openclatura_iupac": "2-acetamido-N-methylacetamide"}
 {"index": 99228, "smiles": "CNC(=O)CNC(N)=O", "openclatura_iupac": "2-(carbamoylamino)-N-methylacetamide"}
 {"index": 99229, "smiles": "CNC(=O)COC(C)=N", "openclatura_iupac": "2-((1-iminoethyl)oxy)-N-methylacetamide"}
 {"index": 99230, "smiles": "CNC(=O)COC(C)=O", "openclatura_iupac": "2-(methylamino)-2-oxoethyl acetate"}
@@ -99237,7 +99237,7 @@
 {"index": 99236, "smiles": "COC(=[NH2+])NCC([O-])=O", "openclatura_iupac": "2-(((imino)(methoxy)methyl)amino)acetate"}
 {"index": 99237, "smiles": "COC(=O)CCC(C)=O", "openclatura_iupac": "methyl 4-oxopentanoate"}
 {"index": 99238, "smiles": "COC(=O)CCC(N)=O", "openclatura_iupac": "methyl 3-carbamoylpropanoate"}
-{"index": 99239, "smiles": "COC(=O)CNC(C)=O", "openclatura_iupac": "methyl 2-methylcarbonylaminoacetate"}
+{"index": 99239, "smiles": "COC(=O)CNC(C)=O", "openclatura_iupac": "methyl 2-acetamidoacetate"}
 {"index": 99240, "smiles": "COC(=O)CNC(N)=O", "openclatura_iupac": "methyl 2-(carbamoylamino)acetate"}
 {"index": 99241, "smiles": "COC(=O)COC(C)=N", "openclatura_iupac": "methyl 2-((1-iminoethyl)oxy)acetate"}
 {"index": 99242, "smiles": "COC(=O)COC(C)=O", "openclatura_iupac": "methyl 2-(acetoxy)acetate"}
@@ -99245,12 +99245,12 @@
 {"index": 99244, "smiles": "COC(=O)NCC(C)=O", "openclatura_iupac": "methyl ((2-oxopropyl)amino)formate"}
 {"index": 99245, "smiles": "COC(=O)NCC(N)=O", "openclatura_iupac": "methyl ((2-amino-2-oxoethyl)amino)formate"}
 {"index": 99246, "smiles": "NC(=O)CCC(=O)CO", "openclatura_iupac": "5-hydroxy-4-oxopentanamide"}
-{"index": 99247, "smiles": "NC(=O)CNC(=O)CO", "openclatura_iupac": "2-hydroxymethylcarbonylaminoacetamide"}
+{"index": 99247, "smiles": "NC(=O)CNC(=O)CO", "openclatura_iupac": "2-(2-hydroxyacetamido)acetamide"}
 {"index": 99248, "smiles": "NC(=O)COC(=O)CO", "openclatura_iupac": "2-amino-2-oxoethyl 2-hydroxyacetate"}
 {"index": 99249, "smiles": "NC(=O)NCC(=O)CO", "openclatura_iupac": "1-amino-N-(3-hydroxy-2-oxopropyl)formamide"}
 {"index": 99250, "smiles": "NC(=O)OCC(=O)CO", "openclatura_iupac": "3-hydroxy-2-oxopropyl 1-aminomethanoate"}
 {"index": 99251, "smiles": "NCC(=[NH2+])NCC([O-])=O", "openclatura_iupac": "2-((2-amino-1-iminoethyl)amino)acetate"}
-{"index": 99252, "smiles": "[NH3+]CC(=O)NCC([O-])=O", "openclatura_iupac": "2-ammoniomethylcarbonylaminoacetate"}
+{"index": 99252, "smiles": "[NH3+]CC(=O)NCC([O-])=O", "openclatura_iupac": "2-(2-ammonioacetamido)acetate"}
 {"index": 99253, "smiles": "NCC(=O)OCC(N)=O", "openclatura_iupac": "2-amino-2-oxoethyl 2-aminoacetate"}
 {"index": 99254, "smiles": "OCC(=[NH2+])NCC([O-])=O", "openclatura_iupac": "2-((2-hydroxy-1-iminoethyl)amino)acetate"}
 {"index": 99255, "smiles": "CC(C)CCC(=O)CO", "openclatura_iupac": "1-hydroxy-5-methylhexan-2-one"}
@@ -99375,7 +99375,7 @@
 {"index": 99374, "smiles": "CCC(=O)NCCC=O", "openclatura_iupac": "N-(3-oxopropyl)propanamide"}
 {"index": 99375, "smiles": "CCC(=O)OCCC=O", "openclatura_iupac": "3-oxopropyl propanoate"}
 {"index": 99376, "smiles": "CNC(=O)CCCC=O", "openclatura_iupac": "N-methyl-5-oxopentanamide"}
-{"index": 99377, "smiles": "CNC(=O)CCNC=O", "openclatura_iupac": "3-(formamido)-N-methylpropanamide"}
+{"index": 99377, "smiles": "CNC(=O)CCNC=O", "openclatura_iupac": "3-formamido-N-methylpropanamide"}
 {"index": 99378, "smiles": "CNC(=O)CCOC=N", "openclatura_iupac": "3-(iminomethoxy)-N-methylpropanamide"}
 {"index": 99379, "smiles": "CNC(=O)CCOC=O", "openclatura_iupac": "3-(methylamino)-3-oxopropyl formate"}
 {"index": 99380, "smiles": "CNC(=O)CNCC=O", "openclatura_iupac": "N-methyl-2-((2-oxoethyl)amino)acetamide"}
@@ -99383,7 +99383,7 @@
 {"index": 99382, "smiles": "CNC(=O)NCCC=O", "openclatura_iupac": "N-methyl-1-((3-oxopropyl)amino)formamide"}
 {"index": 99383, "smiles": "CNC(=O)OCCC=O", "openclatura_iupac": "3-oxopropyl (methylamino)formate"}
 {"index": 99384, "smiles": "COC(=O)CCCC=O", "openclatura_iupac": "methyl 5-oxopentanoate"}
-{"index": 99385, "smiles": "COC(=O)CCNC=O", "openclatura_iupac": "methyl 3-(formamido)propanoate"}
+{"index": 99385, "smiles": "COC(=O)CCNC=O", "openclatura_iupac": "methyl 3-formamidopropanoate"}
 {"index": 99386, "smiles": "COC(=O)CCOC=N", "openclatura_iupac": "methyl 3-(iminomethoxy)propanoate"}
 {"index": 99387, "smiles": "COC(=O)CCOC=O", "openclatura_iupac": "methyl 3-formyloxypropanoate"}
 {"index": 99388, "smiles": "COC(=O)CNCC=O", "openclatura_iupac": "methyl 2-((2-oxoethyl)amino)acetate"}
@@ -100595,7 +100595,7 @@
 {"index": 100594, "smiles": "CCC(O)C(=O)OC=N", "openclatura_iupac": "iminomethyl 2-hydroxybutanoate"}
 {"index": 100595, "smiles": "CCN(C)C(=O)CC=O", "openclatura_iupac": "N-ethyl-N-methyl-3-oxopropanamide"}
 {"index": 100596, "smiles": "CCN(C)C(=O)NC=N", "openclatura_iupac": "N-ethyl-1-(iminomethylamino)-N-methylmethanamide"}
-{"index": 100597, "smiles": "CCN(C)C(=O)NC=O", "openclatura_iupac": "N-ethyl-1-(formamido)-N-methylmethanamide"}
+{"index": 100597, "smiles": "CCN(C)C(=O)NC=O", "openclatura_iupac": "N-ethyl-1-formamido-N-methylmethanamide"}
 {"index": 100598, "smiles": "CCN(C)C(=O)OC=N", "openclatura_iupac": "iminomethyl ((ethyl)(methyl)amino)formate"}
 {"index": 100599, "smiles": "CNC(C)C(=O)OC=N", "openclatura_iupac": "iminomethyl 2-(methylamino)propanoate"}
 {"index": 100600, "smiles": "COC(C)C(=N)NC=O", "openclatura_iupac": "N-(1-imino-2-methoxypropyl)formamide"}
@@ -102033,7 +102033,7 @@
 {"index": 102032, "smiles": "CCN(C=O)C(=O)CN", "openclatura_iupac": "N-(2-amino-acetyl)-N-ethylmethanamide"}
 {"index": 102033, "smiles": "CCN(C=O)C(=O)CO", "openclatura_iupac": "N-ethyl-N-(2-hydroxy-acetyl)formamide"}
 {"index": 102034, "smiles": "CCN(C=O)C(=O)NC", "openclatura_iupac": "N-ethyl-N-(methylcarbamoyl)formamide"}
-{"index": 102035, "smiles": "CCN(C=O)C(=O)OC", "openclatura_iupac": "methyl ((ethyl)(formyl)amino)formate"}
+{"index": 102035, "smiles": "CCN(C=O)C(=O)OC", "openclatura_iupac": "methyl (N-ethylformamido)formate"}
 {"index": 102036, "smiles": "CNC(=O)C(CO)C=O", "openclatura_iupac": "2-(formyl)-3-hydroxy-N-methylpropanamide"}
 {"index": 102037, "smiles": "CNC(=O)C(OC)C=O", "openclatura_iupac": "2-methoxy-N-methyl-3-oxopropanamide"}
 {"index": 102038, "smiles": "CNC(C=O)C(=N)OC", "openclatura_iupac": "3-imino-3-methoxy-2-(methylamino)propanal"}
@@ -102280,7 +102280,7 @@
 {"index": 102279, "smiles": "CCC(OC(C)=O)C=O", "openclatura_iupac": "1-oxobutan-2-yl acetate"}
 {"index": 102280, "smiles": "CCC(OC(N)=O)C=O", "openclatura_iupac": "1-oxobutan-2-yl 1-aminomethanoate"}
 {"index": 102281, "smiles": "CCN(CC(C)=O)C=O", "openclatura_iupac": "N-ethyl-N-(2-oxopropyl)formamide"}
-{"index": 102282, "smiles": "CCN(CC(N)=O)C=O", "openclatura_iupac": "2-((ethyl)(formyl)amino)acetamide"}
+{"index": 102282, "smiles": "CCN(CC(N)=O)C=O", "openclatura_iupac": "2-(N-ethylformamido)acetamide"}
 {"index": 102283, "smiles": "CCN(CC([O-])=O)C=[NH2+]", "openclatura_iupac": "2-((iminiomethyl)(ethyl)amino)acetate"}
 {"index": 102284, "smiles": "C[NH2+]C(CC([O-])=O)C=O", "openclatura_iupac": "3-(methylammonio)-4-oxobutanoate"}
 {"index": 102285, "smiles": "COC(CC(C)=O)C=O", "openclatura_iupac": "2-methoxy-4-oxopentanal"}
@@ -102777,7 +102777,7 @@
 {"index": 102776, "smiles": "CCC(CC=O)C(N)=O", "openclatura_iupac": "2-(2-oxoethyl)butanamide"}
 {"index": 102777, "smiles": "CCC(NC=[NH2+])C([O-])=O", "openclatura_iupac": "2-(iminiomethylamino)butanoate"}
 {"index": 102778, "smiles": "CCC(NC=O)C(C)=O", "openclatura_iupac": "N-(2-oxopentan-3-yl)formamide"}
-{"index": 102779, "smiles": "CCC(NC=O)C(N)=O", "openclatura_iupac": "2-(formamido)butanamide"}
+{"index": 102779, "smiles": "CCC(NC=O)C(N)=O", "openclatura_iupac": "2-formamidobutanamide"}
 {"index": 102780, "smiles": "CCC(OC=N)C(C)=O", "openclatura_iupac": "3-(iminomethoxy)pentan-2-one"}
 {"index": 102781, "smiles": "CCC(OC=N)C(N)=O", "openclatura_iupac": "2-(iminomethoxy)butanamide"}
 {"index": 102782, "smiles": "CCC(OC=O)C(C)=O", "openclatura_iupac": "2-oxopentan-3-yl formate"}
@@ -102788,10 +102788,10 @@
 {"index": 102787, "smiles": "COC(CC=O)C(C)=O", "openclatura_iupac": "3-methoxy-4-oxopentanal"}
 {"index": 102788, "smiles": "COC(CC=O)C(N)=O", "openclatura_iupac": "2-methoxy-4-oxobutanamide"}
 {"index": 102789, "smiles": "NC(=O)C(CO)CC=O", "openclatura_iupac": "2-(hydroxymethyl)-4-oxobutanamide"}
-{"index": 102790, "smiles": "NC(=O)C(CO)NC=O", "openclatura_iupac": "2-(formamido)-3-hydroxypropanamide"}
+{"index": 102790, "smiles": "NC(=O)C(CO)NC=O", "openclatura_iupac": "2-formamido-3-hydroxypropanamide"}
 {"index": 102791, "smiles": "NC(=O)C(CO)OC=N", "openclatura_iupac": "3-hydroxy-2-(iminomethoxy)propanamide"}
 {"index": 102792, "smiles": "NC(=O)C(CO)OC=O", "openclatura_iupac": "1-amino-3-hydroxy-1-oxopropan-2-yl formate"}
-{"index": 102793, "smiles": "[NH3+]CC(NC=O)C([O-])=O", "openclatura_iupac": "3-ammonio-2-(formamido)propanoate"}
+{"index": 102793, "smiles": "[NH3+]CC(NC=O)C([O-])=O", "openclatura_iupac": "3-ammonio-2-formamidopropanoate"}
 {"index": 102794, "smiles": "[NH3+]CC(OC=N)C([O-])=O", "openclatura_iupac": "3-ammonio-2-(iminomethoxy)propanoate"}
 {"index": 102795, "smiles": "[NH3+]CC(OC=O)C([O-])=O", "openclatura_iupac": "3-ammonio-2-formyloxypropanoate"}
 {"index": 102796, "smiles": "OCC(NC=[NH2+])C([O-])=O", "openclatura_iupac": "3-hydroxy-2-(iminiomethylamino)propanoate"}
@@ -117062,7 +117062,7 @@
 {"index": 117061, "smiles": "CCOC(=O)C(=O)CC", "openclatura_iupac": "ethyl 2-oxobutanoate"}
 {"index": 117062, "smiles": "CCOC(=O)C(=O)CO", "openclatura_iupac": "ethyl 3-hydroxy-2-oxopropanoate"}
 {"index": 117063, "smiles": "CCOC(=O)C(=O)NC", "openclatura_iupac": "ethyl (methylcarbamoyl)formate"}
-{"index": 117064, "smiles": "CCOC(=O)C(=O)OC", "openclatura_iupac": "ethyl methyl ethanedioate"}
+{"index": 117064, "smiles": "CCOC(=O)C(=O)OC", "openclatura_iupac": "1-ethyl 2-methyl ethanedioate"}
 {"index": 117065, "smiles": "CNC(=N)C(=O)CCO", "openclatura_iupac": "4-hydroxy-1-imino-1-(methylamino)butan-2-one"}
 {"index": 117066, "smiles": "CNC(=N)C(=O)COC", "openclatura_iupac": "1-imino-3-methoxy-1-(methylamino)propan-2-one"}
 {"index": 117067, "smiles": "CNC(=O)C(=O)CCO", "openclatura_iupac": "4-hydroxy-N-methyl-2-oxobutanamide"}
@@ -117131,14 +117131,14 @@
 {"index": 117130, "smiles": "CCNC(=O)C(C)C=O", "openclatura_iupac": "N-ethyl-2-(formyl)propanamide"}
 {"index": 117131, "smiles": "CCNC(=O)C(O)C=O", "openclatura_iupac": "N-ethyl-2-hydroxy-3-oxopropanamide"}
 {"index": 117132, "smiles": "CCNC(=O)N(C)C=N", "openclatura_iupac": "N-ethyl-1-((iminomethyl)(methyl)amino)formamide"}
-{"index": 117133, "smiles": "CCNC(=O)N(C)C=O", "openclatura_iupac": "N-ethyl-1-((formyl)(methyl)amino)formamide"}
+{"index": 117133, "smiles": "CCNC(=O)N(C)C=O", "openclatura_iupac": "N-ethyl-1-(N-methylformamido)formamide"}
 {"index": 117134, "smiles": "CCOC(=N)C(C)C=O", "openclatura_iupac": "3-ethoxy-3-imino-2-methylpropanal"}
 {"index": 117135, "smiles": "CCOC(=N)C(O)C=O", "openclatura_iupac": "3-ethoxy-2-hydroxy-3-iminopropanal"}
 {"index": 117136, "smiles": "CCOC(=N)N(C)C=O", "openclatura_iupac": "N-((ethoxy)(imino)methyl)-N-methylmethanamide"}
 {"index": 117137, "smiles": "CCOC(=O)C(C)C=O", "openclatura_iupac": "ethyl 2-(formyl)propanoate"}
 {"index": 117138, "smiles": "CCOC(=O)C(O)C=O", "openclatura_iupac": "ethyl 2-hydroxy-3-oxopropanoate"}
 {"index": 117139, "smiles": "CCOC(=O)N(C)C=N", "openclatura_iupac": "ethyl ((iminomethyl)(methyl)amino)formate"}
-{"index": 117140, "smiles": "CCOC(=O)N(C)C=O", "openclatura_iupac": "ethyl ((formyl)(methyl)amino)formate"}
+{"index": 117140, "smiles": "CCOC(=O)N(C)C=O", "openclatura_iupac": "ethyl (N-methylformamido)formate"}
 {"index": 117141, "smiles": "CN(C=N)C(=O)CCO", "openclatura_iupac": "3-hydroxy-N-(iminomethyl)-N-methylpropanamide"}
 {"index": 117142, "smiles": "CN(C=O)C(=N)CCO", "openclatura_iupac": "N-(3-hydroxy-1-iminopropyl)-N-methylmethanamide"}
 {"index": 117143, "smiles": "CN(C=O)C(=O)CCO", "openclatura_iupac": "N-(3-hydroxy-propionyl)-N-methylmethanamide"}
@@ -117306,7 +117306,7 @@
 {"index": 117305, "smiles": "CCOC(=O)CC(C)=O", "openclatura_iupac": "ethyl 3-oxobutanoate"}
 {"index": 117306, "smiles": "CCOC(=O)CC(N)=O", "openclatura_iupac": "ethyl 2-carbamoylacetate"}
 {"index": 117307, "smiles": "CCOC(=O)NC(C)=N", "openclatura_iupac": "ethyl ((1-iminoethyl)amino)formate"}
-{"index": 117308, "smiles": "CCOC(=O)NC(C)=O", "openclatura_iupac": "ethyl 1-methylcarbonylaminomethanoate"}
+{"index": 117308, "smiles": "CCOC(=O)NC(C)=O", "openclatura_iupac": "ethyl 1-acetamidomethanoate"}
 {"index": 117309, "smiles": "CCOC(=O)NC(N)=N", "openclatura_iupac": "ethyl (((amino)(imino)methyl)amino)formate"}
 {"index": 117310, "smiles": "CCOC(=O)NC(N)=O", "openclatura_iupac": "ethyl (carbamoylamino)formate"}
 {"index": 117311, "smiles": "CNCC(=O)OC(C)=N", "openclatura_iupac": "1-iminoethyl 2-(methylamino)acetate"}
@@ -117452,7 +117452,7 @@
 {"index": 117451, "smiles": "CCCC(=O)NCC=O", "openclatura_iupac": "N-(2-oxoethyl)butanamide"}
 {"index": 117452, "smiles": "CCCC(=O)OCC=O", "openclatura_iupac": "2-oxoethyl butanoate"}
 {"index": 117453, "smiles": "CCNC(=O)CCC=O", "openclatura_iupac": "N-ethyl-4-oxobutanamide"}
-{"index": 117454, "smiles": "CCNC(=O)CNC=O", "openclatura_iupac": "N-ethyl-2-(formamido)acetamide"}
+{"index": 117454, "smiles": "CCNC(=O)CNC=O", "openclatura_iupac": "N-ethyl-2-formamidoacetamide"}
 {"index": 117455, "smiles": "CCNC(=O)COC=N", "openclatura_iupac": "N-ethyl-2-(iminomethoxy)acetamide"}
 {"index": 117456, "smiles": "CCNC(=O)COC=O", "openclatura_iupac": "2-(ethylamino)-2-oxoethyl formate"}
 {"index": 117457, "smiles": "CCNC(=O)NCC=O", "openclatura_iupac": "N-ethyl-1-((2-oxoethyl)amino)formamide"}
@@ -117463,7 +117463,7 @@
 {"index": 117462, "smiles": "CCOC(=N)COC=O", "openclatura_iupac": "2-ethoxy-2-iminoethyl formate"}
 {"index": 117463, "smiles": "CCOC(=N)OCC=O", "openclatura_iupac": "2-(((ethoxy)(imino)methyl)oxy)ethanal"}
 {"index": 117464, "smiles": "CCOC(=O)CCC=O", "openclatura_iupac": "ethyl 4-oxobutanoate"}
-{"index": 117465, "smiles": "CCOC(=O)CNC=O", "openclatura_iupac": "ethyl 2-(formamido)acetate"}
+{"index": 117465, "smiles": "CCOC(=O)CNC=O", "openclatura_iupac": "ethyl 2-formamidoacetate"}
 {"index": 117466, "smiles": "CCOC(=O)COC=N", "openclatura_iupac": "ethyl 2-(iminomethoxy)acetate"}
 {"index": 117467, "smiles": "CCOC(=O)COC=O", "openclatura_iupac": "ethyl 2-formyloxyacetate"}
 {"index": 117468, "smiles": "CCOC(=O)NCC=O", "openclatura_iupac": "ethyl ((2-oxoethyl)amino)formate"}
@@ -121692,12 +121692,12 @@
 {"index": 121691, "smiles": "CCCCC(=O)OC=N", "openclatura_iupac": "iminomethyl pentanoate"}
 {"index": 121692, "smiles": "CCCNC(=O)CC=O", "openclatura_iupac": "3-oxo-N-propylpropanamide"}
 {"index": 121693, "smiles": "CCCNC(=O)NC=N", "openclatura_iupac": "1-(iminomethylamino)-N-propylmethanamide"}
-{"index": 121694, "smiles": "CCCNC(=O)NC=O", "openclatura_iupac": "1-(formamido)-N-propylmethanamide"}
+{"index": 121694, "smiles": "CCCNC(=O)NC=O", "openclatura_iupac": "1-formamido-N-propylmethanamide"}
 {"index": 121695, "smiles": "CCCNC(=O)OC=N", "openclatura_iupac": "iminomethyl (propylamino)formate"}
 {"index": 121696, "smiles": "CCCOC(=N)NC=O", "openclatura_iupac": "N-((imino)(propoxy)methyl)formamide"}
 {"index": 121697, "smiles": "CCCOC(=O)CC=O", "openclatura_iupac": "propyl 3-oxopropanoate"}
 {"index": 121698, "smiles": "CCCOC(=O)NC=N", "openclatura_iupac": "propyl (iminomethylamino)formate"}
-{"index": 121699, "smiles": "CCCOC(=O)NC=O", "openclatura_iupac": "propyl (formamido)formate"}
+{"index": 121699, "smiles": "CCCOC(=O)NC=O", "openclatura_iupac": "propyl 1-formamidomethanoate"}
 {"index": 121700, "smiles": "CC[NH2+]CC(=O)[CH-]C=O", "openclatura_iupac": "4-(ethylammonio)-3-oxobutan-2-ide-1-al"}
 {"index": 121701, "smiles": "CCNCC(=O)OC=N", "openclatura_iupac": "iminomethyl 2-(ethylamino)acetate"}
 {"index": 121702, "smiles": "CCOCC(=N)NC=O", "openclatura_iupac": "N-(2-ethoxy-1-iminoethyl)formamide"}
@@ -121718,12 +121718,12 @@
 {"index": 121717, "smiles": "OCCNC(=N)NC=O", "openclatura_iupac": "N-(((2-hydroxyethyl)amino)(imino)methyl)formamide"}
 {"index": 121718, "smiles": "OCCNC(=O)CC=O", "openclatura_iupac": "N-(2-hydroxyethyl)-3-oxopropanamide"}
 {"index": 121719, "smiles": "OCCNC(=O)NC=N", "openclatura_iupac": "N-(2-hydroxyethyl)-1-(iminomethylamino)formamide"}
-{"index": 121720, "smiles": "OCCNC(=O)NC=O", "openclatura_iupac": "1-(formamido)-N-(2-hydroxyethyl)formamide"}
+{"index": 121720, "smiles": "OCCNC(=O)NC=O", "openclatura_iupac": "1-formamido-N-(2-hydroxyethyl)formamide"}
 {"index": 121721, "smiles": "OCCNC(=O)OC=N", "openclatura_iupac": "iminomethyl ((2-hydroxyethyl)amino)formate"}
 {"index": 121722, "smiles": "OCCOC(=N)NC=O", "openclatura_iupac": "N-((2-hydroxyethoxy)(imino)methyl)formamide"}
 {"index": 121723, "smiles": "OCCOC(=O)CC=O", "openclatura_iupac": "2-hydroxyethyl 3-oxopropanoate"}
 {"index": 121724, "smiles": "OCCOC(=O)NC=N", "openclatura_iupac": "2-hydroxyethyl (iminomethylamino)formate"}
-{"index": 121725, "smiles": "OCCOC(=O)NC=O", "openclatura_iupac": "2-hydroxyethyl (formamido)formate"}
+{"index": 121725, "smiles": "OCCOC(=O)NC=O", "openclatura_iupac": "2-hydroxyethyl 1-formamidomethanoate"}
 {"index": 121726, "smiles": "CCCC(=O)CCCO", "openclatura_iupac": "1-hydroxyheptan-4-one"}
 {"index": 121727, "smiles": "CCCC(=O)CCOC", "openclatura_iupac": "1-methoxyhexan-3-one"}
 {"index": 121728, "smiles": "CCCC(=O)COCC", "openclatura_iupac": "1-ethoxypentan-2-one"}
@@ -128960,7 +128960,7 @@
 {"index": 128959, "smiles": "N#CCOC1=NON=C1", "openclatura_iupac": "2-((1-oxa-2,5-diazacyclopenta-2,4-dien-3-yl)oxy)acetonitrile"}
 {"index": 128960, "smiles": "N#CCOC1=NON=N1", "openclatura_iupac": "2-((1-oxa-2,3,5-triazacyclopenta-2,4-dien-4-yl)oxy)acetonitrile"}
 {"index": 128961, "smiles": "N1C=C2C=CC=C2N=N1", "openclatura_iupac": "2,3,4-triazabicyclo[4.3.0]nona-1(9),2,5,7-tetraene"}
-{"index": 128962, "smiles": "N1C=C2C=CC=CC2=N1", "openclatura_iupac": "7,8-diazabicyclo[4.3.0]nona-1(9),2,4,6-tetraene"}
+{"index": 128962, "smiles": "N1C=C2C=CC=CC2=N1", "openclatura_iupac": "2H-indazole"}
 {"index": 128963, "smiles": "N1C=C2C=CC=NC2=N1", "openclatura_iupac": "2,8,9-triazabicyclo[4.3.0]nona-1(9),2,4,6-tetraene"}
 {"index": 128964, "smiles": "N1C=C2C=CN=C2N=N1", "openclatura_iupac": "2,3,4,9-tetraazabicyclo[4.3.0]nona-1(9),2,5,7-tetraene"}
 {"index": 128965, "smiles": "N1C=C2C=CN=CC2=N1", "openclatura_iupac": "3,8,9-triazabicyclo[4.3.0]nona-1(9),2,4,6-tetraene"}
