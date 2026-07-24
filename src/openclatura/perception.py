@@ -54,7 +54,24 @@ class PerceivedGroup:
         return self.metadata.seniority
 
 
-def perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
+def _copy_perceived_group(group: PerceivedGroup) -> PerceivedGroup:
+    """Copy a cached group; only ``atoms_involved`` is mutated by callers."""
+
+    return PerceivedGroup(
+        group.key,
+        group.is_principal_candidate,
+        group.attachment_carbon,
+        set(group.atoms_involved),
+        group.metadata,
+        group.atom_bindings,
+        group.bond_bindings,
+        group.decision_reasons,
+        group.variant,
+        group.role,
+    )
+
+
+def _perceive_groups_uncached(mol: Molecule) -> list[PerceivedGroup]:
     groups = []
     for detector in PERCEPTION_DETECTORS:
         groups.extend(detector(mol))
@@ -65,6 +82,23 @@ def perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
     for spec in specs:
         groups.extend(spec.detector(mol))
     return _enrich_groups(mol, groups)
+
+
+def perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
+    """Perceive functional groups, memoized per molecule graph.
+
+    Naming re-perceives the same graph roughly ten times per molecule. The result
+    depends only on the graph and the detector registries, so it is cached on the
+    molecule (invalidated on mutation) and handed back as fresh copies, matching the
+    previous contract that every call returns objects callers may mutate.
+    """
+
+    fingerprint = (len(PERCEPTION_DETECTORS), len(PERCEPTION_SPECS))
+    cached = mol._perception_cache
+    if cached is None or cached[0] != fingerprint:
+        cached = (fingerprint, _perceive_groups_uncached(mol))
+        mol._perception_cache = cached
+    return [_copy_perceived_group(group) for group in cached[1]]
 
 
 BUILTIN_PERCEPTION_SPECS = (

@@ -16,6 +16,7 @@ from typing import Any
 
 from .graph_io import get_connected_components, read_rdkit_mol, read_smiles
 from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
+from .name_assembly import set_token_span_building
 from .namer_config import SALT_METAL_NAMES
 from .operations import infer_operations
 from .opsin_verify import OpsinCheck, verify_with_opsin
@@ -207,9 +208,13 @@ class NamingEngine:
         datasets.
         """
 
+        # Token spans feed only the trace/analysis output; skip building them on the
+        # pure-name path so the common API does not pay for diagnostics it discards.
+        need_analysis = request.include_trace or request.verify_opsin
+        previous_span_building = set_token_span_building(need_analysis)
         try:
             mol, smiles = self._prepare_input(request)
-            if request.include_trace or request.verify_opsin:
+            if need_analysis:
                 analysis = self._analyze(mol, smiles=smiles, token_debug=request.token_debug)
                 rules, hints = _extract_rules_hit(analysis.trace_segments)
                 result = NamingResult(
@@ -226,6 +231,8 @@ class NamingEngine:
                 result = NamingResult(name=self._name(mol), smiles=smiles)
         except Exception as exc:  # noqa: BLE001 - intentionally permissive boundary
             return NamingResult(name="", smiles=request.smiles, error=f"{type(exc).__name__}: {exc}")
+        finally:
+            set_token_span_building(previous_span_building)
 
         if request.verify_opsin:
             check = verify_with_opsin(result.name, result.smiles)

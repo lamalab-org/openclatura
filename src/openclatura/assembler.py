@@ -145,6 +145,42 @@ LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
     ("1-thiacyclohexan-", "thian-"),
 )
 
+_LEGACY_TERT_BUTYL = {"2-methylpropan-2-yl", "1,1-dimethylethyl"}
+_LEGACY_SUBST_ALKYL_ACYL = {"ethylcarbonyl", "propylcarbonyl"}
+_LEGACY_LEADING_HYPHEN = {
+    "1-azacyclobutane",
+    "1-azacyclopentane",
+    "1-azacyclohexane",
+    "1-oxacyclopentane",
+    "1-oxacyclohexane",
+    "1-thiacyclopentane",
+    "1-thiacyclohexane",
+}
+
+
+def _compile_legacy_replacements() -> tuple[tuple[str, re.Pattern, str], ...]:
+    """Precompile the literal-replacement patterns once (they are name-independent).
+
+    Each entry keeps its literal so callers can skip the regex entirely when the literal
+    is absent -- every pattern requires it as a substring, so the sub would be a no-op.
+    """
+
+    compiled: list[tuple[str, re.Pattern, str]] = []
+    for old, new in LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS:
+        esc = re.escape(old)
+        if old in _LEGACY_TERT_BUTYL:
+            compiled.append((old, re.compile(rf"(?<![a-zA-Z0-9\-,]){esc}(?![a-zA-Z])"), new))
+        elif old in _LEGACY_SUBST_ALKYL_ACYL:
+            compiled.append((old, re.compile(rf"(?<![a-zA-Z)]){esc}(?![a-zA-Z])"), new))
+        else:
+            if old in _LEGACY_LEADING_HYPHEN:
+                compiled.append((old, re.compile(rf"-{esc}(?![a-zA-Z])"), new))
+            compiled.append((old, re.compile(rf"(?<![a-zA-Z]){esc}(?![a-zA-Z])"), new))
+    return tuple(compiled)
+
+
+_LEGACY_COMPILED_REPLACEMENTS = _compile_legacy_replacements()
+
 
 def _balanced_group_end(name: str, start: int) -> int | None:
     """If ``name[start]`` opens a parenthesis, return the index just past its match."""
@@ -251,21 +287,10 @@ def _post_process_name(name: str) -> str:
     name = re.sub(r"\b1-([a-zA-Z0-9\-\[\]\(\)\,]+?)aminomethanenitrile\b", r"\1cyanamide", name)
     name = name.replace("aminomethanenitrile", "cyanamide")
 
-    for old, new in LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS:
-        if old in ["2-methylpropan-2-yl", "1,1-dimethylethyl"]:
-            name = re.sub(rf"(?<![a-zA-Z0-9\-,]){re.escape(old)}(?![a-zA-Z])", new, name)
-        else:
-            if old in [
-                "1-azacyclobutane",
-                "1-azacyclopentane",
-                "1-azacyclohexane",
-                "1-oxacyclopentane",
-                "1-oxacyclohexane",
-                "1-thiacyclopentane",
-                "1-thiacyclohexane",
-            ]:
-                name = re.sub(rf"-{re.escape(old)}(?![a-zA-Z])", new, name)
-            name = re.sub(rf"(?<![a-zA-Z]){re.escape(old)}(?![a-zA-Z])", new, name)
+    # Substituted-alkyl acyl contractions (ethyl/propyl) renumber the chain, so their
+    # patterns exclude a leading group paren; see _compile_legacy_replacements.
+    for _literal, pattern, new in _LEGACY_COMPILED_REPLACEMENTS:
+        name = pattern.sub(new, name)
 
     name = apply_data_postprocessing(name)
 
