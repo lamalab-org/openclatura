@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "openclatura"
-version = "0.1.5"
+version = "0.2.0"
 description = "Deterministic SMILES-to-IUPAC name generator based on the IUPAC Blue Book"
 readme = "README.md"
 requires-python = ">=3.11"
