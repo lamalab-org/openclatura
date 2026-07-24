@@ -16,6 +16,7 @@ import hmac
 import os
 import re
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections import defaultdict
@@ -59,8 +60,19 @@ def s3_get(path: str, query: str) -> bytes:
             f"SignedHeaders={signed}, Signature={signature}",
         },
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return resp.read()
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode("utf-8", "replace").strip()
+        code = re.search(r"<Code>([^<]+)</Code>", body)
+        message = re.search(r"<Message>([^<]+)</Message>", body)
+        sys.exit(
+            f"S3 {exc.code} {exc.reason}: {code.group(1) if code else '?'}"
+            f" - {message.group(1) if message else body[:300] or '(empty body)'}\n"
+            f"  endpoint={ENDPOINT} bucket={BUCKET} region={REGION} "
+            f"access_key=...{ACCESS[-4:]} query={query}"
+        )
 
 
 def human(n: float) -> str:
@@ -77,7 +89,12 @@ def main() -> None:
     totals: dict[str, list[float]] = defaultdict(lambda: [0, 0.0])
     token = ""
     while True:
-        query = "list-type=2" + (f"&continuation-token={urllib.parse.quote(token, safe='')}" if token else "")
+        # SigV4 requires the canonical query string sorted by parameter name,
+        # so continuation-token has to come before list-type.
+        params = {"list-type": "2"}
+        if token:
+            params["continuation-token"] = token
+        query = "&".join(f"{k}={urllib.parse.quote(params[k], safe='')}" for k in sorted(params))
         xml = s3_get(f"/{BUCKET}", query).decode()
         for key, size in re.findall(r"<Key>([^<]+)</Key>.*?<Size>(\d+)</Size>", xml, flags=re.S):
             prefix = "/".join(key.split("/")[:2])  # e.g. name/0.1.4
