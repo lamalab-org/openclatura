@@ -92,13 +92,31 @@
     ],
     "allowed_substituent_names": [
       "methyl",
+      "ethyl",
+      "propyl",
+      "butyl",
+      "pentyl",
+      "propan-2-yl",
+      "2-methylpropyl",
+      "butan-2-yl",
+      "tert-butyl",
+      "ethenyl",
+      "ethynyl",
+      "trifluoromethyl",
       "fluoro",
       "chloro",
       "bromo",
       "iodo",
       "amino",
+      "methylamino",
+      "dimethylamino",
+      "ethylamino",
       "hydroxy",
-      "methoxy"
+      "methoxy",
+      "ethoxy",
+      "propoxy",
+      "isopropoxy",
+      "acetyl"
     ]
   },
   "retained_fused_tokens": {

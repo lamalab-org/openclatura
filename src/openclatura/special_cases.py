@@ -436,17 +436,6 @@ def simple_azine_parent_name(
     return ""
 
 
-def phosphane_borane_zwitterion_name(
-    mol: Molecule,
-    component_atoms: set[int],
-    branch_namer: RecursiveSubgraphNamer | None = None,
-) -> str:
-    """Name graph-proven B(-)(H)3-P(+) zwitterions as boranuide parents."""
-
-    result = phosphane_borane_zwitterion_result(mol, component_atoms, branch_namer)
-    return result.name if result is not None else ""
-
-
 def phosphane_borane_zwitterion_result(
     mol: Molecule,
     component_atoms: set[int],
@@ -1022,17 +1011,6 @@ def _linear_alkyl_carbanion_parent_name(mol: Molecule, carbon_atoms: set[int], r
     return len(carbon_atoms)
 
 
-def hydroxyurea_parent_name(
-    mol: Molecule,
-    component_atoms: set[int],
-    branch_namer: RecursiveSubgraphNamer | None = None,
-) -> str:
-    """Name graph-proven N-hydroxyureas without carbamic-acid fallback wording."""
-
-    result = hydroxyurea_parent_result(mol, component_atoms, branch_namer)
-    return result.name if result is not None else ""
-
-
 def hydroxyurea_parent_result(
     mol: Molecule,
     component_atoms: set[int],
@@ -1222,13 +1200,6 @@ def _component_atoms_until_blocked(
     return atoms
 
 
-def oxoacid_parent_name(mol: Molecule, component_atoms: set[int]) -> str:
-    """Match functional parent hydrides by central atom and oxygen ligand counts."""
-
-    result = oxoacid_parent_result(mol, component_atoms)
-    return result.name if result is not None else ""
-
-
 def oxoacid_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
     """Match functional parent hydrides with central-oxo role bindings."""
 
@@ -1249,17 +1220,6 @@ def oxoacid_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialCo
         name = spec["name"]
     bindings = _central_oxo_role_bindings(mol, role, name, "oxoacid_parent")
     return _component_name_result(mol, component_atoms, name, "oxoacid_parent", bindings=bindings)
-
-
-def oxoacid_ester_name(
-    mol: Molecule,
-    component_atoms: set[int],
-    branch_namer: RecursiveSubgraphNamer | None = None,
-) -> str:
-    """Name organic esters of data-backed oxoacid parent hydrides."""
-
-    result = oxoacid_ester_result(mol, component_atoms, branch_namer)
-    return result.name if result is not None else ""
 
 
 def oxoacid_ester_result(
@@ -1321,17 +1281,6 @@ def oxoacid_ester_result(
         )
         matches.append(_component_name_result(mol, component_atoms, name, "oxoacid_ester", bindings=bindings))
     return matches[0] if len(matches) == 1 else None
-
-
-def _peroxy_oxoacid_ester_name(
-    mol: Molecule,
-    component_atoms: set[int],
-    role: CentralOxoRole,
-    suffix: str,
-    branch_namer: RecursiveSubgraphNamer | None,
-) -> str:
-    result = _peroxy_oxoacid_ester_result(mol, component_atoms, role, suffix, branch_namer)
-    return result.name if result is not None else ""
 
 
 def _peroxy_oxoacid_ester_result(
@@ -1489,32 +1438,6 @@ def _ester_modifier_name(
     return _alkyl_ligand_name(mol, component_atoms, root, ester_oxygen)
 
 
-def _oxoacid_oxygen_counts(mol: Molecule, central: int, oxygen_neighbors: list[int]) -> tuple[int, int]:
-    role = central_oxo_roles(mol, {central, *oxygen_neighbors})
-    if len(role) == 1:
-        return role[0].spec_counts()
-    return 0, 0
-
-
-def _is_charge_normalized_halogen_oxo_ligand(
-    mol: Molecule,
-    central_symbol: str,
-    central: int,
-    oxygen: int,
-) -> bool:
-    """Return true for RDKit-normalized X(+)-O(-) oxo ligands on halogen oxoacids."""
-
-    if central_symbol not in {"Cl", "Br", "I"}:
-        return False
-    bond = mol.get_bond(central, oxygen)
-    return (
-        bond is not None
-        and bond.order == 1
-        and mol.atoms[oxygen].charge < 0
-        and sum(1 for _ in mol.get_neighbors(oxygen)) == 1
-    )
-
-
 def _matching_oxoacid_spec(central_symbol: str, single_o: int, double_o: int, charge: int) -> dict | None:
     for spec in RULES.components.replacement_parent_oxoacid_specs:
         if spec["central"] != central_symbol:
@@ -1530,13 +1453,6 @@ def _matching_oxoacid_spec(central_symbol: str, single_o: int, double_o: int, ch
 def _matching_oxoacid_spec_for_role(mol: Molecule, role: CentralOxoRole) -> dict | None:
     single_o, double_o = role.spec_counts()
     return _matching_oxoacid_spec(role.central_symbol, single_o, double_o, mol.atoms[role.central].charge)
-
-
-def organophosphinic_acid_name(mol: Molecule, component_atoms: set[int]) -> str:
-    """Name simple R-P(=O)(OH)H phosphinic acid parents."""
-
-    result = organophosphinic_acid_result(mol, component_atoms)
-    return result.name if result is not None else ""
 
 
 def organophosphinic_acid_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
@@ -1589,13 +1505,6 @@ def organophosphinic_acid_result(mol: Molecule, component_atoms: set[int]) -> Sp
         ),
     )
     return _component_name_result(mol, component_atoms, name, "organophosphinic_acid", bindings=bindings)
-
-
-def sulfoxide_parent_name(mol: Molecule, component_atoms: set[int]) -> str:
-    """Name simple dialkyl sulfoxides from a charged or neutral S-O graph."""
-
-    result = sulfoxide_parent_result(mol, component_atoms)
-    return result.name if result is not None else ""
 
 
 def sulfoxide_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
@@ -1809,15 +1718,6 @@ def _alkyl_branch_prefixes(
     return "".join(parts)
 
 
-def _carbon_degree(mol: Molecule, carbon_atoms: set[int], atom_idx: int) -> int:
-    return sum(1 for neighbor in mol.get_neighbors(atom_idx) if neighbor in carbon_atoms)
-
-
-def homonuclear_chain_parent_name(mol: Molecule, component_atoms: set[int]) -> str:
-    result = homonuclear_chain_parent_result(mol, component_atoms)
-    return result.name if result is not None else ""
-
-
 def homonuclear_chain_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
     """Name acyclic same-element parent hydride chains and simple ligands."""
 
@@ -1880,11 +1780,6 @@ def homonuclear_chain_parent_result(mol: Molecule, component_atoms: set[int]) ->
         "homonuclear_chain_parent",
         bindings=(parent_binding, *ligand_bindings),
     )
-
-
-def simple_central_parent_hydride_name(mol: Molecule, component_atoms: set[int]) -> str:
-    result = simple_central_parent_hydride_result(mol, component_atoms)
-    return result.name if result is not None else ""
 
 
 def simple_central_parent_hydride_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
@@ -2223,15 +2118,3 @@ def try_name_anhydride_component_result(
         )
         return AnhydrideComponentName(name=name, bindings=half_bindings + (core_binding,))
     return None
-
-
-def try_name_anhydride_component(
-    mol: Molecule,
-    perceived_groups: list[PerceivedGroup],
-    principal_key: str | None,
-    component_namer: ComponentNamer,
-) -> str:
-    """Return an anhydride component name when the component is an anhydride."""
-
-    result = try_name_anhydride_component_result(mol, perceived_groups, principal_key, component_namer)
-    return result.name if result is not None else ""

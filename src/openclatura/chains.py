@@ -403,16 +403,15 @@ def _shortest_component_path(start: int, end: int, component: set[int], adj: dic
     return [start]
 
 
-def get_cyclic_atoms(mol: Molecule, exclude_atoms: set[int] = None) -> set[int]:
-    if exclude_atoms is None:
-        exclude_atoms = set()
-    valid_nodes = {a.idx for a in mol if a.idx not in exclude_atoms and (a.is_carbon or mol.degree(a.idx) >= 2)}
-    cyclic = set()
+def _cyclic_atoms_within(mol: Molecule, valid_nodes: set[int]) -> set[int]:
+    """Atoms lying on a cycle of the subgraph induced by ``valid_nodes``."""
 
+    cyclic = set()
     for n in valid_nodes:
-        neighbors = [x for x in mol.get_neighbors(n) if x in valid_nodes]
         in_cycle = False
-        for nxt in neighbors:
+        for nxt in mol.get_neighbors(n):
+            if nxt not in valid_nodes:
+                continue
             visited = {n, nxt}
             q = [nxt]
             found = False
@@ -433,8 +432,21 @@ def get_cyclic_atoms(mol: Molecule, exclude_atoms: set[int] = None) -> set[int]:
                 break
         if in_cycle:
             cyclic.add(n)
-
     return cyclic
+
+
+def get_cyclic_atoms(mol: Molecule, exclude_atoms: set[int] = None) -> set[int]:
+    # The full-molecule ring set is computed once and cached; removing atoms can only
+    # break cycles, never create them, so it is always a superset of any excluded result.
+    if mol._cyclic_cache is None:
+        all_nodes = {a.idx for a in mol if a.is_carbon or mol.degree(a.idx) >= 2}
+        mol._cyclic_cache = _cyclic_atoms_within(mol, all_nodes)
+    if not exclude_atoms:
+        return set(mol._cyclic_cache)
+    candidates = mol._cyclic_cache - exclude_atoms
+    if not candidates:
+        return set()
+    return _cyclic_atoms_within(mol, candidates)
 
 
 def find_all_carbon_paths(mol: Molecule, exclude_atoms: set[int] = None) -> list[list[int]]:
@@ -480,7 +492,9 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
 
     if exclude_atoms is None:
         exclude_atoms = set()
-    valid_nodes = {a.idx for a in mol if a.idx not in exclude_atoms and (a.is_carbon or mol.degree(a.idx) >= 2)}
+    # Every cycle lies entirely within the ring atoms, so searching only those prunes the
+    # exhaustive DFS out of all acyclic branches without losing any cycle.
+    valid_nodes = get_cyclic_atoms(mol, exclude_atoms)
     cycles = []
 
     def dfs_cycle(curr, start, path, visited):
@@ -861,18 +875,6 @@ def _audited_ring_numberings(
     return _dedupe_ring_numberings(audited)
 
 
-def _audited_ring_paths(
-    mol: Molecule,
-    kind: str,
-    descriptor_numbers: tuple[int, ...],
-    paths: tuple[tuple[int, ...], ...] | list[tuple[int, ...]],
-    edges: frozenset[tuple[int, int]],
-) -> list[list[int]]:
-    return _dedupe_numbering_paths(
-        [list(numbering.path) for numbering in _audited_ring_numberings(mol, kind, descriptor_numbers, paths, edges)]
-    )
-
-
 def _audited_von_baeyer_numberings(
     mol: Molecule,
     descriptor: str,
@@ -1137,13 +1139,6 @@ def _polyspiro_or_von_baeyer_candidate(
         is_von_baeyer=True,
         numberings=numberings,
     )
-
-
-def _polyspiro_descriptor_or_von_baeyer(mol: Molecule, atoms: set[int], edges: set[tuple[int, int]]):
-    """Legacy tuple wrapper for callers that have not migrated to candidates."""
-
-    candidate = _polyspiro_or_von_baeyer_candidate(mol, atoms, edges)
-    return candidate.descriptor, candidate.paths
 
 
 def _has_multiple_spiro_centers(nodes: set[int], edges: set[tuple[int, int]]) -> bool:

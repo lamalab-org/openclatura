@@ -143,12 +143,3 @@ def oxoacid_role_template(mol: Molecule, role: CentralOxoRole) -> OxoacidRoleTem
         if template.matches(mol, role):
             return template
     return None
-
-
-def unsupported_oxoacid_role_template(mol: Molecule, role: CentralOxoRole) -> OxoacidRoleTemplate | None:
-    """Return an unsupported template certificate for high-risk oxo roles."""
-
-    template = oxoacid_role_template(mol, role)
-    if template is not None and template.kind == OxoacidTemplateKind.UNSUPPORTED:
-        return template
-    return None

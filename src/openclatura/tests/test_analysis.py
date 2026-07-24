@@ -801,32 +801,21 @@ def test_heteroatom_shortcut_leaf_tokens_and_tree_are_graph_local():
 
 
 def test_carbonylamino_heteroatom_shortcut_tree_does_not_invent_hydroxy_children():
+    # Acylamino substituents render as substitutive <acid>amido names; the acid is named
+    # on a temporary hydroxyl-capped fragment that must not leak a hydroxy node into the tree.
     analysis = analyze_smiles("CC(C)C[C@@H](C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CC(C)C)C(=O)O)N")
-    component = analysis.substituent_tree[0]
-    peptide_branch = next(
-        item
-        for item in component["substituents"]
-        if item["name"] == "(1S)-1-((1S)-1-amino-3-methylbutylcarbonylamino)-3-methylbutylcarbonylamino"
+    assert analysis.name == (
+        "(2S)-2-((2S)-2-((2S)-2-amino-4-methylpentanamido)-4-methylpentanamido)-4-methylpentanoic acid"
     )
-    branch_children = peptide_branch["substituents"][0]["substituents"]
-    child_names = [child["name"] for child in branch_children]
 
-    assert "hydroxy" not in child_names
-    assert "carbonyl" in child_names
-    carbonyl = next(child for child in branch_children if child["name"] == "carbonyl")
-    assert carbonyl["atoms"] == [13, 14]
-    assert carbonyl["bonds"] == [14]
-    side = next(child for child in branch_children if child["name"].endswith("methylbutyl)"))
-    assert side["parent"]["parent_length"] == 4
-    assert any(child["name"] == "methyl" for child in side["substituents"])
-    carbonylamino = next(child for child in side["substituents"] if child["name"].endswith("carbonylamino"))
-    assert carbonylamino["atoms"] == [0, 1, 2, 3, 4, 5, 6, 7, 24]
-    inner_carbonyl = carbonylamino["substituents"][0]
-    inner_side = next(child for child in inner_carbonyl["substituents"] if child["name"].endswith("methylbutyl)"))
-    amino = next(child for child in inner_side["substituents"] if child["name"] == "amino")
-    assert amino["locants"] == ["1"]
-    core = next(child for child in inner_carbonyl["substituents"] if child["name"] == "carbonyl")
-    assert core["atoms"] == [5, 6]
+    def walk(node):
+        yield node
+        for child in node.get("substituents", []):
+            yield from walk(child)
+
+    component = analysis.substituent_tree[0]
+    names = [node["name"] for sub in component["substituents"] for node in walk(sub)]
+    assert not any("hydroxy" in (name or "") for name in names)
 
 
 def test_postprocessing_rewrites_keep_token_metadata_auditable():
@@ -4355,13 +4344,21 @@ def test_locanted_ez_stereo_token_binds_to_double_bond_scope():
     assert z_token["bonds"]
 
 
-def test_scoped_small_ring_stereo_does_not_emit_unsupported_relative_locant_descriptors():
+def test_scoped_small_ring_stereo_emits_pseudoasymmetric_descriptors_for_gem_disubstituted_center():
+    # Gem-disubstituted ring center: emit local (1R,3s) and the unambiguous acetamido form.
     name = name_smiles("CN1CCC[C@](O)(CC(=O)N[C@]2(C)C[C@H](NC(=O)CCC3CC3)C2)C1")
 
     assert name == (
-        "3-cyclopropyl-N-(3-(((3S)-3-hydroxy-1-methylpiperidin-3-yl)methylcarbonylamino)-3-methylcyclobutyl)propanamide"
+        "3-cyclopropyl-N-((1R,3s)-3-(2-((3S)-3-hydroxy-1-methylpiperidin-3-yl)acetamido)-3-methylcyclobutyl)propanamide"
     )
-    assert "1R,3s" not in name
+    assert "1R,3s" in name
+    assert "methylcarbonylamino" not in name
+
+
+def test_scoped_small_ring_stereo_defers_to_cis_trans_for_mono_substituted_centers():
+    # Mono-substituted ring centers keep the cis/trans form.
+    assert name_smiles("CC(=O)N[C@H]1CC[C@@H](C)CC1") == "N-(cis-4-methylcyclohexyl)acetamide"
+    assert name_smiles("CC(=O)N[C@H]1CC[C@H](C)CC1") == "N-(trans-4-methylcyclohexyl)acetamide"
 
 
 def test_dense_polycyclic_cage_fails_closed_without_von_baeyer_path_explosion():
@@ -4484,8 +4481,8 @@ def test_pyopsin_regression_names_use_parseable_spiro_and_formamido_forms():
         "CN1CC11C2C3CC2C13": "1'-methylspiro[tricyclo[2.2.0.0^{2,5}]hexane-6,2'-aziridine]",
         "CC1CC11CC2CCC12": "2'-methylspiro[bicyclo[2.2.0]hexane-2,1'-cyclopropane]",
         "CC1NC11CC2OC12C": "1-methyl-3'-methylspiro[5-oxabicyclo[2.1.0]pentane-2,2'-aziridine]",
-        "COC(=O)CCNC=O": "methyl 3-(formamido)propanoate",
-        "N=COC(=O)CNC=O": "iminomethyl 2-(formamido)acetate",
+        "COC(=O)CCNC=O": "methyl 3-formamidopropanoate",
+        "N=COC(=O)CNC=O": "iminomethyl 2-formamidoacetate",
     }
 
     for smiles, expected in cases.items():

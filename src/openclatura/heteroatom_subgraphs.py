@@ -663,6 +663,8 @@ def name_sulfur_subgraph(
         for nxt in next_atoms
         if (br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx))
     ]
+    if not is_double and mol.atoms[start_idx].charge > 0:
+        return f"({stereo_prefix_text}{format_counted_prefixes(branches)}sulfaniumyl)"
     return format_lambda_substituent(
         mol, start_idx, branches, stereo_prefix_text, "sulfanylidene" if is_double else "sulfanyl"
     )

@@ -96,27 +96,6 @@ def apply_parent_charge_names(
     return name
 
 
-def apply_parent_ion_suffixes(
-    name: str,
-    mol: Molecule,
-    numbered_path: list[int],
-    get_loc,
-    retained_name: str | None = None,
-    allow_retained_stem_inference: bool = False,
-) -> str:
-    """Compatibility wrapper for parent charge spelling."""
-
-    return apply_parent_charge_names(
-        name,
-        mol,
-        numbered_path,
-        get_loc,
-        retained_name,
-        allow_retained_stem_inference,
-        charge_signs={1},
-    )
-
-
 def apply_anionic_parent_names(
     name: str,
     mol: Molecule,
@@ -145,12 +124,6 @@ def parent_charge_sites(mol: Molecule, numbered_path: list[int], get_loc) -> lis
             )
         )
     return sites
-
-
-def apply_fused_heteroaromatic_nitrogen_zwitterion(name: str, mol: Molecule, numbered_path: list[int], get_loc) -> str:
-    """Compatibility wrapper for the ring N-zwitterion parent stack."""
-
-    return apply_ring_parent_nitrogen_zwitterion_stack(name, mol, numbered_path, get_loc)
 
 
 def apply_ring_parent_nitrogen_zwitterion_stack(name: str, mol: Molecule, numbered_path: list[int], get_loc) -> str:
@@ -211,10 +184,6 @@ def _is_unsaturated_ring_parent(mol: Molecule, parent_set: set[int]) -> bool:
             if bond is not None and bond.order > 1:
                 has_unsaturation = True
     return internal_edge_count >= len(parent_set) and has_unsaturation
-
-
-def _name_has_parent_ium_locant(name: str, locant: str) -> bool:
-    return _name_has_parent_ium_locants(name, (locant,))
 
 
 def _name_has_parent_ium_locants(name: str, locants: tuple[str, ...]) -> bool:

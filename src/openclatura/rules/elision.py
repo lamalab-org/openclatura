@@ -116,8 +116,3 @@ def join_with_elision(*fragments: str, rule: str = "e") -> str:
 def is_vowel_start(s: str) -> bool:
     """Return True if `s` begins with a vowel (a, e, i, o, u, y)."""
     return bool(s) and s[0].lower() in VOWELS
-
-
-def is_vowel_end(s: str) -> bool:
-    """Return True if `s` ends with a vowel."""
-    return bool(s) and s[-1].lower() in VOWELS
