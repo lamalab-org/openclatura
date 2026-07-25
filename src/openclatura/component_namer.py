@@ -57,6 +57,12 @@ from .trace_helpers import (
 SpiroSubgraphNamer = Callable[[Molecule, int, set[int]], SpiroAssembly]
 ParentAssembler = Callable[..., str]
 
+# Opt-in observer invoked with (mol, component_atoms, parts) after name-atom
+# bindings are refreshed for a component.  Default ``None`` means zero overhead;
+# the OPSIN-free reconstruction self-audit installs one via
+# ``openclatura.audit.capture_component_audits``.
+COMPONENT_AUDIT_HOOK: Callable[[Molecule, set[int], object], None] | None = None
+
 
 def select_component_parent(mol: Molecule, exclude_atoms: set[int], principal_carbons: list[int]):
     """Select the parent chain or ring system for a connected component."""
@@ -558,6 +564,13 @@ def name_component(
 
     refresh_name_atom_bindings(parts)
     parts.stereo_audit_issues = list(audit_stereochemistry(mol, parts).issues)
+    if COMPONENT_AUDIT_HOOK is not None:
+        # Optional, opt-in observer for the OPSIN-free reconstruction self-audit.
+        # Guarded so a self-check can never break name generation.
+        try:
+            COMPONENT_AUDIT_HOOK(mol, set(state.component_atoms), parts)
+        except Exception:  # pragma: no cover - audit must never disrupt naming
+            pass
     assert_component_fully_named(mol, state.component_atoms, parts, "<component>")
     name = assemble_parent_name(mol, parts, numbered_path, get_loc, emit_metadata=emit_metadata)
     if emit_metadata:

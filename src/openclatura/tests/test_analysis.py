@@ -8,6 +8,7 @@ from openclatura import (
     NamingRequest,
     OperationClass,
     TracePhase,
+    graph_io,
     name_smiles,
 )
 from openclatura import (
@@ -4242,28 +4243,51 @@ def test_indicated_hydrogen_is_carried_as_hydro_operation():
     ]
 
 
-def test_stereochemistry_audit_checks_emitted_locants_against_graph_metadata():
-    mol = read_smiles("F[C@](Cl)(Br)I")
+def test_stereochemistry_audit_checks_emitted_locants_against_independent_cip():
+    # The audit verifies each emitted descriptor against the independent modern-CIP
+    # oracle (populated only while audit-CIP is enabled), never the namer's own
+    # legacy perception; a parent descriptor matching that oracle confirms.
+    graph_io.set_audit_cip_enabled(True)
+    try:
+        mol = read_smiles("F[C@](Cl)(Br)I")
+    finally:
+        graph_io.set_audit_cip_enabled(False)
     parts = AssemblyParts(parent_length=1, parent_atom_ids={1}, stereo_features=[("1", "S")])
     parts.parent_atom_ids_by_locant["1"] = 1
 
-    audit = audit_stereochemistry(mol, parts)
+    audit = audit_stereochemistry(mol, parts, {1})
 
     assert audit.ok
     assert audit.checked_features == 1
 
 
-def test_stereochemistry_audit_checks_bound_substituent_terms():
+def test_stereochemistry_audit_abstains_without_independent_cip():
+    # Without the independent oracle there is nothing sound to confirm against, so
+    # a stereocentre must block confirmation rather than be trusted on the namer's
+    # own (potentially mislabelled) legacy perception.
+    mol = read_smiles("F[C@](Cl)(Br)I")
+    parts = AssemblyParts(parent_length=1, parent_atom_ids={1}, stereo_features=[("1", "S")])
+    parts.parent_atom_ids_by_locant["1"] = 1
+
+    audit = audit_stereochemistry(mol, parts, {1})
+
+    assert not audit.ok
+    assert "no independent CIP" in audit.issues[0]
+
+
+def test_stereochemistry_audit_flags_unverified_bound_stereocentre():
+    # Stereo embedded in a multi-atom substituent term cannot be positionally
+    # mapped to the oracle, so any such stereocentre blocks confirmation.
     mol = read_smiles("F[C@](Cl)(Br)I")
     parts = AssemblyParts(parent_length=1, parent_atom_ids={0})
     parts.name_atom_bindings.append(
         NameAtomBinding(stage="prefix", role="substituent", term="chlorobromoiodomethyl", atom_ids={1, 2, 3, 4})
     )
 
-    audit = audit_stereochemistry(mol, parts)
+    audit = audit_stereochemistry(mol, parts, {0, 1, 2, 3, 4})
 
     assert not audit.ok
-    assert "0 R/S descriptors for 1 stereo atoms" in audit.issues[0]
+    assert "not independently verified" in audit.issues[0]
 
 
 def test_unassigned_ring_stereo_tags_are_preserved_as_raw_metadata():

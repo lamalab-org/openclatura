@@ -13,6 +13,7 @@ class Atom:
     isotope: int | None = None
     stereo: str | None = None  # 'R' or 'S'
     raw_stereo: str | None = None  # RDKit tetrahedral tag when CIP is unavailable: 'CW' or 'CCW'
+    cip: str | None = None  # independent modern (rdCIPLabeler) CIP label; only populated during self-audit
     is_aromatic: bool = False
     explicit_h_count: int = 0
     total_h_count: int = 0
@@ -42,6 +43,7 @@ class Bond:
     order: int = 1
     stereo: str | None = None  # 'E' or 'Z'
     in_small_ring: bool = False  # NEW: Tracks if bond is in a ring of size <= 7
+    cip: str | None = None  # independent modern (rdCIPLabeler) E/Z label; only during self-audit
 
     def get_other_atom(self, atom_idx: int) -> int:
         if atom_idx == self.u:
@@ -181,6 +183,7 @@ class Molecule:
         stereo: str | None = None,
         *,
         raw_stereo: str | None = None,
+        cip: str | None = None,
         is_aromatic: bool = False,
         explicit_h_count: int = 0,
         total_h_count: int = 0,
@@ -195,6 +198,7 @@ class Molecule:
             charge=charge,
             stereo=stereo,
             raw_stereo=raw_stereo,
+            cip=cip,
             is_aromatic=is_aromatic,
             explicit_h_count=explicit_h_count,
             total_h_count=total_h_count,
@@ -213,6 +217,7 @@ class Molecule:
         idx: int | None = None,
         stereo: str | None = None,
         in_small_ring: bool = False,
+        cip: str | None = None,
     ) -> Bond:
         if u not in self.atoms or v not in self.atoms:
             raise ValueError("Both atoms must exist")
@@ -223,7 +228,7 @@ class Molecule:
             raise ValueError(f"Atoms {u} and {v} are already bonded.")
         if idx is None:
             idx = max(self.bonds.keys(), default=0) + 1
-        bond = Bond(idx=idx, u=u, v=v, order=order, stereo=stereo, in_small_ring=in_small_ring)
+        bond = Bond(idx=idx, u=u, v=v, order=order, stereo=stereo, in_small_ring=in_small_ring, cip=cip)
         self.bonds[idx] = bond
         self._bond_lookup[bond_key] = idx
         self._adj[u].append(v)

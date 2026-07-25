@@ -1,0 +1,761 @@
+"""Recursive, structure-independent reconstruction of substituent fragments.
+
+Compositional substituent names such as ``(4-methoxyphenyl)`` or
+``((4-methoxyphenyl)methyl)`` decompose into a small set of *base* blocks
+(alkyl chains, phenyl, cycloalkyls, common heteroaryls) decorated with
+sub-substituents at locants — so we resolve them by recursion instead of
+enumerating every name.
+
+Everything here is built from the **name only** (never the input graph), so a
+fragment it produces can be compared against the input to certify a name
+without any risk of circularity — consistent with the reconstruction audit's
+soundness contract. Anything the grammar does not fully model returns ``None``
+(the caller then abstains), never a guess.
+"""
+
+from __future__ import annotations
+
+import re
+
+from rdkit import Chem
+
+from ..rules import stems as _stems
+from .von_baeyer_parse import parse_monocyclic_replacement as _parse_monocyclic_replacement
+from .von_baeyer_parse import parse_von_baeyer as _parse_von_baeyer
+
+# A numbered fragment: an editable molecule, a map from IUPAC locant -> atom
+# index, and the atom that bonds outward to whatever bears the substituent.
+Numbered = tuple[Chem.RWMol, dict[str, int], int]
+
+_MULTIPLIERS = {
+    "di": 2,
+    "tri": 3,
+    "tetra": 4,
+    "penta": 5,
+    "hexa": 6,
+    "bis": 2,
+    "tris": 3,
+    "tetrakis": 4,
+}
+
+# Leaf sub-substituents: name -> SMILES of the *added* fragment, whose first
+# atom bonds (with the encoded order) to the base atom at the stated locant.
+_LEAF_SMILES: dict[str, str] = {
+    "fluoro": "F",
+    "chloro": "Cl",
+    "bromo": "Br",
+    "iodo": "I",
+    "hydroxy": "O",
+    "oxo": "=O",
+    "thioxo": "=S",
+    "sulfanyl": "S",
+    "mercapto": "S",
+    "amino": "N",
+    "imino": "=N",
+    "nitro": "[N+](=O)[O-]",
+    "nitroso": "N=O",
+    "cyano": "C#N",
+    "azido": "N=[N+]=[N-]",
+    "methoxy": "OC",
+    "ethoxy": "OCC",
+    "propoxy": "OCCC",
+    "methylsulfanyl": "SC",
+    "ethylsulfanyl": "SCC",
+    "formyl": "C=O",
+    "carboxy": "C(=O)O",
+    "carbamoyl": "C(N)=O",
+    "acetyl": "C(C)=O",
+    "methylcarbonyl": "C(C)=O",
+    "acetyloxy": "OC(C)=O",
+    "methylcarbonyloxy": "OC(C)=O",
+    "methylcarbonylamino": "NC(C)=O",
+    "trifluoromethyl": "C(F)(F)F",
+    "hydroxymethyl": "CO",
+    "aminomethyl": "CN",
+    "methoxymethyl": "COC",
+    "cyanomethyl": "CC#N",
+    "methylsulfonyl": "S(=O)(=O)C",
+    "aminosulfonyl": "S(N)(=O)=O",
+    "sulfamoyl": "S(N)(=O)=O",
+    "sulfo": "S(=O)(=O)O",
+    "dimethylamino": "N(C)C",
+    "methylamino": "NC",
+    "hydrazinyl": "NN",
+    "hydrazino": "NN",
+    "hydroxyimino": "=NO",
+    "methylimino": "=NC",
+    "methoxyimino": "=NOC",
+    "ethoxyimino": "=NOCC",
+    "acetamido": "NC(C)=O",
+    "acetylamino": "NC(C)=O",
+    "benzamido": "NC(=O)c1ccccc1",
+    "methylcarbamoyl": "C(=O)NC",
+    "dimethylcarbamoyl": "C(=O)N(C)C",
+    "difluoromethyl": "C(F)F",
+    "methyl": "C",
+    "ethyl": "CC",
+    "propyl": "CCC",
+    "butyl": "CCCC",
+    # retained / contracted alkyl and aralkyl substituents
+    "isopropyl": "C(C)C",
+    "isobutyl": "CC(C)C",
+    "sec-butyl": "C(C)CC",
+    "tert-butyl": "C(C)(C)C",
+    "isopentyl": "CCC(C)C",
+    "isoamyl": "CCC(C)C",
+    "neopentyl": "CC(C)(C)C",
+    "tert-pentyl": "C(C)(C)CC",
+    "vinyl": "C=C",
+    "ethenyl": "C=C",
+    "allyl": "CC=C",
+    "benzyl": "Cc1ccccc1",
+    "phenethyl": "CCc1ccccc1",
+    "styryl": "C=Cc1ccccc1",
+    "benzhydryl": "C(c1ccccc1)c1ccccc1",
+    "trityl": "C(c1ccccc1)(c1ccccc1)c1ccccc1",
+    "benzoyl": "C(=O)c1ccccc1",
+    "phenoxy": "Oc1ccccc1",
+    "anilino": "Nc1ccccc1",
+    "methylidene": "=C",
+    "ethylidene": "=CC",
+}
+
+# Heteroaryl / saturated-heterocycle stems: name -> (SMILES, locant labels).
+# Labels are the IUPAC ring locants in SMILES-atom order.
+_RING_STEMS: dict[str, tuple[str, list[str]]] = {
+    "phenyl": ("c1ccccc1", ["1", "2", "3", "4", "5", "6"]),
+    "pyridine": ("n1ccccc1", ["1", "2", "3", "4", "5", "6"]),
+    "pyrimidine": ("n1cnccc1", ["1", "2", "3", "4", "5", "6"]),
+    "pyrazine": ("n1ccncc1", ["1", "2", "3", "4", "5", "6"]),
+    "pyridazine": ("n1ncccc1", ["1", "2", "3", "4", "5", "6"]),
+    "furan": ("o1cccc1", ["1", "2", "3", "4", "5"]),
+    "thiophene": ("s1cccc1", ["1", "2", "3", "4", "5"]),
+    "pyrrole": ("[nH]1cccc1", ["1", "2", "3", "4", "5"]),
+    "oxazole": ("o1cncc1", ["1", "2", "3", "4", "5"]),
+    "isoxazole": ("o1nccc1", ["1", "2", "3", "4", "5"]),
+    "thiazole": ("s1cncc1", ["1", "2", "3", "4", "5"]),
+    "isothiazole": ("s1nccc1", ["1", "2", "3", "4", "5"]),
+    "imidazole": ("[nH]1cncc1", ["1", "2", "3", "4", "5"]),
+    "pyrazole": ("[nH]1nccc1", ["1", "2", "3", "4", "5"]),
+    "naphthalene": (
+        "c1cccc2ccccc12",
+        ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+    ),
+    # five-membered, multi-heteroatom azoles (heteroatom order fixes numbering)
+    "1,2,3-triazole": ("[nH]1nncc1", ["1", "2", "3", "4", "5"]),
+    "1,2,4-triazole": ("[nH]1ncnc1", ["1", "2", "3", "4", "5"]),
+    "tetrazole": ("[nH]1nnnc1", ["1", "2", "3", "4", "5"]),
+    "1,2,4-oxadiazole": ("o1ncnc1", ["1", "2", "3", "4", "5"]),
+    "1,3,4-oxadiazole": ("o1cnnc1", ["1", "2", "3", "4", "5"]),
+    "1,2,4-thiadiazole": ("s1ncnc1", ["1", "2", "3", "4", "5"]),
+    "1,3,4-thiadiazole": ("s1cnnc1", ["1", "2", "3", "4", "5"]),
+    # benzo-fused five-membered heterocycles (labels 1,2,3,3a,4,5,6,7,7a)
+    "indole": ("[nH]1ccc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    "indazole": ("[nH]1ncc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    "benzimidazole": ("[nH]1cnc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    "benzofuran": ("o1ccc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    "1-benzofuran": ("o1ccc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    "benzothiophene": ("s1ccc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    "1-benzothiophene": ("s1ccc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    "benzothiazole": ("s1cnc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    "1,3-benzothiazole": ("s1cnc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    "benzoxazole": ("o1cnc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    "1,3-benzoxazole": ("o1cnc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    # benzo-fused six-membered heterocycles (labels 1,2,3,4,4a,5,6,7,8,8a)
+    "quinoline": ("n1cccc2ccccc21", ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]),
+    "isoquinoline": ("c1nccc2ccccc21", ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]),
+    "quinazoline": ("n1cncc2ccccc21", ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]),
+    "quinoxaline": ("n1ccnc2ccccc21", ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]),
+    # saturated / partially-saturated heterocycles (heteroatom gets locant 1)
+    "piperidine": ("N1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "piperazine": ("N1CCNCC1", ["1", "2", "3", "4", "5", "6"]),
+    "morpholine": ("O1CCNCC1", ["1", "2", "3", "4", "5", "6"]),
+    "thiomorpholine": ("S1CCNCC1", ["1", "2", "3", "4", "5", "6"]),
+    "pyrrolidine": ("N1CCCC1", ["1", "2", "3", "4", "5"]),
+    "oxolane": ("O1CCCC1", ["1", "2", "3", "4", "5"]),
+    "tetrahydrofuran": ("O1CCCC1", ["1", "2", "3", "4", "5"]),
+    "thiolane": ("S1CCCC1", ["1", "2", "3", "4", "5"]),
+    "oxane": ("O1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "tetrahydropyran": ("O1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "azetidine": ("N1CCC1", ["1", "2", "3", "4"]),
+    "oxetane": ("O1CCC1", ["1", "2", "3", "4"]),
+    "aziridine": ("N1CC1", ["1", "2", "3"]),
+    "oxirane": ("O1CC1", ["1", "2", "3"]),
+}
+
+# Retained "-o" substituent aliases -> canonical ring-yl form.
+_RING_ALIASES: dict[str, str] = {
+    "morpholino": "morpholin-4-yl",
+    "piperidino": "piperidin-1-yl",
+    "pyrrolidino": "pyrrolidin-1-yl",
+}
+
+# Base substituent names longer than a bare stem, matched as a suffix first.
+# The stem may itself carry a locant set (``1,2,4-triazol``) and the attachment
+# locant may be a ring-fusion locant (``3a``).
+_LOCANT_YL_RE = re.compile(r"^(?P<stem>[a-z0-9,\[\]-]+?)-(?P<loc>\d+[a-z]?)-yl$")
+
+# Every ring template here places its indicated hydrogen at position 1, so a
+# leading ``1H-`` matches the template and is dropped.  Any *other* indicated-H
+# position (``2H-``, ``4H-``…) is a different N-H tautomer — a distinct
+# constitution — so it is left in place, fails stem matching, and abstains.
+_INDICATED_H_RE = re.compile(r"^1H-")
+
+
+def resolve_fragment_mol(name: str) -> Chem.Mol | None:
+    """Return an RDKit mol with exactly one dummy ``*`` at the attachment point,
+    or ``None`` if the name is not fully modeled."""
+    name = _strip_outer_parens(name.strip())
+    if name in _LEAF_SMILES:
+        mol = Chem.MolFromSmiles("*" + _LEAF_SMILES[name], sanitize=False)
+        if mol is None:
+            return None
+        try:
+            Chem.SanitizeMol(mol)
+        except Exception:
+            return None
+        return mol
+    # von Baeyer fused/bridged ring substituents carry a replacement prefix that
+    # is not a graftable sub-substituent, so parse the whole unit up front. If the
+    # von Baeyer parse fails (e.g. the ring is only the inner base of ``(…-yl)oxy``
+    # or ``(…-yl)methyl``), fall through to the recursive grammar and operators.
+    if name.endswith("yl") and "cyclo[" in name:
+        vb = _parse_von_baeyer(name)
+        if vb is not None:
+            rw, _lc, attach = vb
+            dummy = rw.AddAtom(Chem.Atom(0))
+            rw.AddBond(dummy, attach, Chem.BondType.SINGLE)
+            mol = rw.GetMol()
+            try:
+                Chem.SanitizeMol(mol)
+            except Exception:
+                return None
+            return mol
+    numbered = _resolve(name)
+    if numbered is not None:
+        rw, _locants, attach = numbered
+        # Substituting at a pyrrole-type NH consumes its hydrogen.
+        attach_atom = rw.GetAtomWithIdx(attach)
+        if attach_atom.GetNumExplicitHs() > 0:
+            attach_atom.SetNumExplicitHs(attach_atom.GetNumExplicitHs() - 1)
+        dummy = rw.AddAtom(Chem.Atom(0))
+        rw.AddBond(dummy, attach, Chem.BondType.SINGLE)
+        mol = rw.GetMol()
+        try:
+            Chem.SanitizeMol(mol)
+        except Exception:
+            return None
+        return mol
+    # Compositional operators that wrap a recursively-resolved base:
+    # ``phenylsulfonyl`` = S(=O)(=O) on phenyl, ``ethylamino`` = N on ethyl, etc.
+    return _resolve_operator(name)
+
+
+# --------------------------------------------------------------------------- #
+# Compositional operators (…oxy / …amino / …sulfanyl / …sulfonyl / …carbonyl)
+# --------------------------------------------------------------------------- #
+# Two-port wrapper: SMILES with exactly two dummies — one bonds outward to the
+# parent, the other to the recursively-resolved inner substituent.
+_TWO_PORT_WRAPPERS: dict[str, str] = {
+    "sulfonyl": "*S(=O)(=O)*",
+    "sulfinyl": "*S(=O)*",
+    "sulfanyl": "*S*",
+    "carbonyl": "*C(=O)*",
+    "oxy": "*O*",
+}
+
+
+def _resolvable(name: str) -> bool:
+    return resolve_fragment_mol(name) is not None
+
+
+def _normalize_yl(stem: str) -> str:
+    """Turn a contracted operator stem back into a substituent name: ``phen`` ->
+    ``phenyl``, ``but`` -> ``butyl``; anything already ending in ``yl`` (or a
+    parenthesised group) is returned untouched."""
+    stem = stem.strip().rstrip("-")
+    if stem.endswith("yl") or stem.endswith(")"):
+        return stem
+    return stem + "yl"
+
+
+def _resolve_operator(name: str) -> Chem.Mol | None:
+    if name.endswith("carboxamido") and len(name) > len("carboxamido"):
+        frag = _resolve_carboxamido(name[: -len("carboxamido")])
+        if frag is not None:
+            return frag
+    if name.endswith("amino") and len(name) > len("amino"):
+        frag = _resolve_amino(name[: -len("amino")])
+        if frag is not None:
+            return frag
+    for suffix in sorted(_TWO_PORT_WRAPPERS, key=len, reverse=True):
+        if name.endswith(suffix) and len(name) > len(suffix):
+            stem = name[: -len(suffix)].rstrip("-")
+            # The inner may already be a full substituent name (``ethoxycarbonyl``
+            # -> ``ethoxy``) or a contracted stem needing ``yl`` (``phenoxy`` ->
+            # ``phen`` -> ``phenyl``); try both.
+            inner = resolve_fragment_mol(stem) or resolve_fragment_mol(_normalize_yl(stem))
+            if inner is None:
+                continue
+            joined = _join_two_port(_TWO_PORT_WRAPPERS[suffix], inner)
+            if joined is not None:
+                return joined
+    return None
+
+
+def _resolve_amino(rest: str) -> Chem.Mol | None:
+    """Build an ``…amino`` nitrogen bearing one or two organyl groups
+    (``ethylamino`` -> NH-ethyl, ``diethylamino`` -> N(ethyl)2)."""
+    rest = rest.strip().strip("-")
+    if not rest:
+        return None
+    count, base = 1, rest
+    for word, n in sorted(_MULTIPLIERS.items(), key=lambda kv: -len(kv[0])):
+        if rest.startswith(word) and _resolvable(rest[len(word) :]):
+            count, base = n, rest[len(word) :]
+            break
+    inner = resolve_fragment_mol(base)
+    if inner is None:
+        return None
+    rw = Chem.RWMol()
+    nitrogen = rw.AddAtom(Chem.Atom(7))
+    dummy = rw.AddAtom(Chem.Atom(0))
+    rw.AddBond(dummy, nitrogen, Chem.BondType.SINGLE)
+    for _ in range(count):
+        if not _graft_onto(rw, nitrogen, inner):
+            return None
+    mol = rw.GetMol()
+    try:
+        Chem.SanitizeMol(mol)
+    except Exception:
+        return None
+    return mol
+
+
+def _join_two_port(wrapper_smiles: str, inner: Chem.Mol) -> Chem.Mol | None:
+    wrap = Chem.MolFromSmiles(wrapper_smiles, sanitize=False)
+    if wrap is None:
+        return None
+    try:
+        Chem.SanitizeMol(wrap)
+    except Exception:
+        return None
+    dummies = [a.GetIdx() for a in wrap.GetAtoms() if a.GetAtomicNum() == 0]
+    if len(dummies) != 2:
+        return None
+    graft_dummy = dummies[1]  # dummies[0] stays as the outward (parent) port
+    port_neighbors = [n.GetIdx() for n in wrap.GetAtomWithIdx(graft_dummy).GetNeighbors()]
+    if len(port_neighbors) != 1:
+        return None
+    port = port_neighbors[0]
+    rw = Chem.RWMol()
+    old_to_new: dict[int, int] = {}
+    for atom in wrap.GetAtoms():
+        if atom.GetIdx() == graft_dummy:
+            continue
+        new_atom = Chem.Atom(atom.GetAtomicNum())
+        new_atom.SetFormalCharge(atom.GetFormalCharge())
+        old_to_new[atom.GetIdx()] = rw.AddAtom(new_atom)
+    for bond in wrap.GetBonds():
+        u, v = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if graft_dummy in (u, v):
+            continue
+        rw.AddBond(old_to_new[u], old_to_new[v], bond.GetBondType())
+    if not _graft_onto(rw, old_to_new[port], inner):
+        return None
+    mol = rw.GetMol()
+    try:
+        Chem.SanitizeMol(mol)
+    except Exception:
+        return None
+    return mol
+
+
+# --------------------------------------------------------------------------- #
+# Recursion
+# --------------------------------------------------------------------------- #
+def _resolve(name: str) -> Numbered | None:
+    name = _strip_outer_parens(name.strip())
+    if not name:
+        return None
+    name = _RING_ALIASES.get(name, name)
+    # Peel a base off the end: try every start position, longest base first, and
+    # accept the first whose remaining prefix fully parses. A wrong split fails
+    # prefix parsing and is rejected, so this backtracking stays sound.
+    for start in _base_start_positions(name):
+        base = name[start:]
+        numbered = _build_base(base)
+        if numbered is None:
+            continue
+        rw, locants, attach = numbered
+        prefix = name[:start]
+        if not prefix:
+            return rw, locants, attach
+        if _apply_prefix(rw, locants, prefix):
+            return rw, locants, attach
+    return None
+
+
+def _base_start_positions(name: str) -> list[int]:
+    """Candidate indices where the base substituent could begin: the start, and
+    every position following a depth-0 locant hyphen or a lowercase letter.
+    Earliest (longest base) first."""
+    positions = [0]
+    for i in range(1, len(name) - 1):
+        if name[i - 1] in "-)" or name[i - 1].isalpha():
+            positions.append(i)
+    return positions
+
+
+# --------------------------------------------------------------------------- #
+# Base builders
+# --------------------------------------------------------------------------- #
+def _build_base(base: str) -> Numbered | None:
+    base = _INDICATED_H_RE.sub("", base)
+    # A von Baeyer ring core (``…cyclo[…]…-N-yl``) as a decoratable base, so that
+    # front modifiers like ``7,9-dioxo`` / ``4,6-dimethyl`` can be peeled off by
+    # ``_resolve`` and grafted through the ordinary locanted-clause machinery.
+    if base.endswith("yl") and "cyclo[" in base:
+        vb = _parse_von_baeyer(base)
+        if vb is not None:
+            return vb
+    # A Hantzsch-Widman replacement monocycle core (``1-azacyclohexa-3,5-dien-3-yl``),
+    # likewise decoratable via peeled front modifiers.
+    if base.endswith("yl") and "cyclo" in base and "cyclo[" not in base:
+        mono = _parse_monocyclic_replacement(base)
+        if mono is not None:
+            return mono
+    # phenyl / heteroaryl-yl
+    if base == "phenyl":
+        return _ring_from_stem("phenyl")
+    m = _LOCANT_YL_RE.match(base)
+    if m:
+        ring = _ring_yl(m.group("stem"), m.group("loc"))
+        if ring is not None:  # else fall through: it may be a chain like propan-2-yl
+            return ring
+
+    # cycloalkyl
+    if base.startswith("cyclo") and base.endswith("yl"):
+        stem = base[len("cyclo") : -2]
+        n = _stem_length(stem)
+        if n is None or n < 3:
+            return None
+        return _carbocycle(n)
+
+    # linear alkyl
+    if base.endswith("yl"):
+        n = _stem_length(base[:-2])
+        if n is not None:
+            return _alkyl_chain(n)
+    # general acyclic chain: internal attachment and/or unsaturation
+    return _parse_chain_base(base)
+
+
+def _parse_chain_base(base: str) -> Numbered | None:
+    """Parse acyclic chain substituents like ``propan-2-yl``, ``prop-2-en-1-yl``,
+    ``but-2-yn-1-yl`` into a numbered fragment."""
+    if not base.endswith("yl"):
+        return None
+    core = base[:-2].rstrip("-")
+    stem_len = None
+    rest = None
+    for length, row in sorted(_stems.STEMS.items(), key=lambda kv: -len(kv[1].stem)):
+        if core.startswith(row.stem):
+            stem_len, rest = length, core[len(row.stem) :]
+            break
+    if stem_len is None:
+        return None
+
+    attach = "1"
+    m = re.search(r"-(\d+)$", rest)
+    if m:
+        attach = m.group(1)
+        rest = rest[: m.start()]
+    unsats: list[tuple[int, int]] = [
+        (int(loc), 2 if kind == "en" else 3) for loc, kind in re.findall(r"(\d+)-(en|yn)", rest)
+    ]
+    residue = re.sub(r"\d+-(?:en|yn)", "", rest).replace("an", "").strip("-")
+    # Unlocanted unsaturation (e.g. ``propenyl`` = prop-1-en-1-yl) defaults to
+    # a bond starting at locant 1.
+    if residue in ("en", "yn"):
+        unsats.append((1, 2 if residue == "en" else 3))
+        residue = ""
+    if residue:  # leftover tokens we did not model -> abstain
+        return None
+    if str(attach) not in {str(i) for i in range(1, stem_len + 1)}:
+        return None
+
+    rw = Chem.RWMol()
+    locants = {str(i): rw.AddAtom(Chem.Atom(6)) for i in range(1, stem_len + 1)}
+    for i in range(1, stem_len):
+        rw.AddBond(locants[str(i)], locants[str(i + 1)], Chem.BondType.SINGLE)
+    for loc, order in unsats:
+        if str(loc + 1) not in locants:
+            return None
+        bond = rw.GetBondBetweenAtoms(locants[str(loc)], locants[str(loc + 1)])
+        bond.SetBondType(Chem.BondType.DOUBLE if order == 2 else Chem.BondType.TRIPLE)
+    return rw, locants, locants[attach]
+
+
+def _stem_length(stem: str) -> int | None:
+    for length, row in _stems.STEMS.items():
+        if row.stem == stem:
+            return length
+    return None
+
+
+def _alkyl_chain(n: int) -> Numbered:
+    rw = Chem.RWMol()
+    locants: dict[str, int] = {}
+    prev = None
+    for i in range(1, n + 1):
+        idx = rw.AddAtom(Chem.Atom(6))
+        locants[str(i)] = idx
+        if prev is not None:
+            rw.AddBond(prev, idx, Chem.BondType.SINGLE)
+        prev = idx
+    return rw, locants, locants["1"]
+
+
+def _carbocycle(n: int) -> Numbered:
+    rw = Chem.RWMol()
+    locants: dict[str, int] = {}
+    idxs = []
+    for i in range(1, n + 1):
+        idx = rw.AddAtom(Chem.Atom(6))
+        locants[str(i)] = idx
+        idxs.append(idx)
+    for a, b in zip(idxs, idxs[1:]):
+        rw.AddBond(a, b, Chem.BondType.SINGLE)
+    rw.AddBond(idxs[-1], idxs[0], Chem.BondType.SINGLE)
+    return rw, locants, locants["1"]
+
+
+def _ring_from_stem(name: str) -> Numbered | None:
+    entry = _RING_STEMS.get("phenyl") if name == "phenyl" else _RING_STEMS.get(name)
+    if entry is None:
+        return None
+    smiles, labels = entry
+    return _numbered_from_smiles(smiles, labels, attach_locant="1")
+
+
+def _ring_yl(stem: str, loc: str) -> Numbered | None:
+    ring = _match_ring_stem(stem)
+    if ring is None:
+        return None
+    smiles, labels = _RING_STEMS[ring]
+    if loc not in labels:
+        return None
+    return _numbered_from_smiles(smiles, labels, attach_locant=loc)
+
+
+def _match_ring_stem(stem: str) -> str | None:
+    for ring in _RING_STEMS:
+        base = ring[:-1] if ring.endswith("e") else ring
+        if stem == base or stem == ring:
+            return ring
+    return None
+
+
+def _numbered_from_smiles(smiles: str, labels: list[str], attach_locant: str) -> Numbered | None:
+    frag = Chem.MolFromSmiles(smiles)
+    if frag is None or frag.GetNumAtoms() != len(labels):
+        return None
+    rw = Chem.RWMol(frag)
+    locants = {label: i for i, label in enumerate(labels)}
+    if attach_locant not in locants:
+        return None
+    return rw, locants, locants[attach_locant]
+
+
+# --------------------------------------------------------------------------- #
+# Prefix (sub-substituent) application
+# --------------------------------------------------------------------------- #
+_CLAUSE_RE = re.compile(r"(\d+(?:,\d+)*)-")
+
+
+def _apply_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
+    # A single leading parenthesised sub-substituent with no locant attaches at
+    # position 1, e.g. "((4-methoxyphenyl)methyl)" -> phenyl-CH2- at C1.
+    if prefix.startswith("(") and prefix.endswith(")") and _balanced(prefix[1:-1]) and "1" in locants:
+        frag = resolve_fragment_mol(prefix)
+        if frag is not None:
+            return _graft_onto(rw, locants["1"], frag)
+        return False
+    # A prefix that does not *begin* with a depth-0 locant is a single unlocanted
+    # sub-substituent binding at position 1 — either a leaf (``chloromethyl`` ->
+    # Cl on C1) or a whole ring-yl (``piperazin-1-ylmethyl`` -> piperazin-1-yl on
+    # C1, whose own ``1`` is an internal ring locant, not a base-attachment one).
+    starts = _clause_starts(prefix)
+    if (not starts or starts[0] != 0) and not prefix.startswith("("):
+        # A bare unlocanted substituent (leaf or whole ring-yl). A parenthesised
+        # lead (e.g. ``(oxo)pyrrolidin-1-yl``) is a concatenation of several
+        # sub-substituents we do not split here, so it falls through and abstains.
+        return _apply_unlocanted_prefix(rw, locants, prefix)
+    clauses = _parse_clauses(prefix)
+    if clauses is None:
+        return False
+    for locs, subname in clauses:
+        frag = resolve_fragment_mol(subname)
+        if frag is None:
+            return False
+        for loc in locs:
+            base_idx = locants.get(loc)
+            if base_idx is None:
+                return False
+            if not _graft_onto(rw, base_idx, frag):
+                return False
+    return True
+
+
+def _apply_unlocanted_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
+    if "1" not in locants:
+        return False
+    count, body = 1, prefix
+    mult = _leading_multiplier(prefix)
+    if mult is not None:
+        count, body = mult, prefix[len(_multiplier_word(mult)) :]
+    else:
+        # A multiplier over a non-leaf but resolvable base, e.g. ``diphenyl`` in
+        # ``diphenylmethyl`` -> two phenyls on C1.
+        for word, n in sorted(_MULTIPLIERS.items(), key=lambda kv: -len(kv[0])):
+            if prefix.startswith(word) and _resolvable(prefix[len(word) :]):
+                count, body = n, prefix[len(word) :]
+                break
+    frag = resolve_fragment_mol(body)
+    if frag is None:
+        return False
+    for _ in range(count):
+        if not _graft_onto(rw, locants["1"], frag):
+            return False
+    return True
+
+
+def _parse_clauses(prefix: str) -> list[tuple[list[str], str]] | None:
+    """Parse ``4-methoxy``, ``3,4-dimethoxy``, ``2-(pyrrolidin-1-yl)`` … into
+    (locants, substituent-name) pairs. Requires explicit locants, and only
+    splits on locant hyphens at parenthesis depth 0 so nested names stay
+    intact."""
+    starts = _clause_starts(prefix)
+    if not starts or starts[0] != 0:
+        return None
+    clauses: list[tuple[list[str], str]] = []
+    for i, start in enumerate(starts):
+        end = starts[i + 1] if i + 1 < len(starts) else len(prefix)
+        segment = prefix[start:end]
+        m = re.match(r"^(\d+(?:,\d+)*)-(.*)$", segment, re.DOTALL)
+        if not m:
+            return None
+        locs = m.group(1).split(",")
+        body = m.group(2).rstrip("-")  # drop the separator hyphen before the next clause
+        mult = _leading_multiplier(body)
+        if mult is not None:
+            body = body[len(_multiplier_word(mult)) :]
+            if len(locs) != mult:
+                return None
+        clauses.append((locs, body))
+    return clauses
+
+
+def _clause_starts(prefix: str) -> list[int]:
+    """Indices where a depth-0 locant group (``\\d+(,\\d+)*-``) begins."""
+    starts: list[int] = []
+    for m in re.finditer(r"\d+(?:,\d+)*-", prefix):
+        # depth at the match start
+        d = prefix[: m.start()].count("(") - prefix[: m.start()].count(")")
+        if d == 0:
+            starts.append(m.start())
+    return starts
+
+
+def _leading_multiplier(body: str) -> int | None:
+    for word, n in sorted(_MULTIPLIERS.items(), key=lambda kv: -len(kv[0])):
+        if body.startswith(word) and body[len(word) :] in _LEAF_SMILES:
+            return n
+    return None
+
+
+def _multiplier_word(n: int) -> str:
+    for word, val in _MULTIPLIERS.items():
+        if val == n:
+            return word
+    return ""
+
+
+def _graft_onto(rw: Chem.RWMol, base_idx: int, frag: Chem.Mol) -> bool:
+    dummy = next((a for a in frag.GetAtoms() if a.GetAtomicNum() == 0), None)
+    if dummy is None:
+        return False
+    frag_to_new: dict[int, int] = {}
+    for atom in frag.GetAtoms():
+        if atom.GetIdx() == dummy.GetIdx():
+            continue
+        na = Chem.Atom(atom.GetAtomicNum())
+        na.SetFormalCharge(atom.GetFormalCharge())
+        na.SetNumExplicitHs(atom.GetNumExplicitHs())
+        na.SetNoImplicit(atom.GetNoImplicit())
+        frag_to_new[atom.GetIdx()] = rw.AddAtom(na)
+    for bond in frag.GetBonds():
+        a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if dummy.GetIdx() in (a, b):
+            other = b if a == dummy.GetIdx() else a
+            _consume_hydrogen(rw.GetAtomWithIdx(base_idx), bond.GetBondType())
+            rw.AddBond(base_idx, frag_to_new[other], bond.GetBondType())
+        else:
+            rw.AddBond(frag_to_new[a], frag_to_new[b], bond.GetBondType())
+    return True
+
+
+def _consume_hydrogen(atom: Chem.Atom, bond_type: Chem.BondType) -> None:
+    """Substituting at an atom with an explicit hydrogen (e.g. a pyrrole-type NH)
+    consumes that hydrogen; implicit-H atoms are left for RDKit to rebalance."""
+    explicit = atom.GetNumExplicitHs()
+    if explicit <= 0:
+        return
+    order = 2 if bond_type == Chem.BondType.DOUBLE else 3 if bond_type == Chem.BondType.TRIPLE else 1
+    atom.SetNumExplicitHs(max(0, explicit - order))
+
+
+# A parenthesised stereo-descriptor group: only stereo characters inside, with
+# at least one CIP/EZ letter, e.g. "(1s,4s)", "(R)", "(2R,3S)", "(E)".
+_STEREO_GROUP_RE = re.compile(r"^\(([0-9RSrsEZ,\s*'\-]+)\)-")
+_STEREO_WORD_RE = re.compile(r"^(rel|rac|cis|trans|syn|anti|endo|exo|\(\+/?-\)|\(±\))-")
+
+
+def _strip_outer_parens(name: str) -> str:
+    name = name.strip()
+    changed = True
+    while changed:
+        changed = False
+        while name.startswith("(") and name.endswith(")") and _balanced(name[1:-1]):
+            name = name[1:-1].strip()
+            changed = True
+        stripped = _strip_leading_stereo(name)
+        if stripped != name:
+            name = stripped
+            changed = True
+    return name
+
+
+def _strip_leading_stereo(name: str) -> str:
+    """Remove a leading stereo-descriptor prefix. Stereo does not affect the
+    constitution fragment (it is verified separately), so dropping it is safe."""
+    m = _STEREO_GROUP_RE.match(name)
+    if m and re.search(r"[RSrsEZ]", m.group(1)):
+        return name[m.end() :].strip()
+    m = _STEREO_WORD_RE.match(name)
+    if m:
+        return name[m.end() :].strip()
+    return name
+
+
+def _balanced(s: str) -> bool:
+    depth = 0
+    for ch in s:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth < 0:
+                return False
+    return depth == 0
