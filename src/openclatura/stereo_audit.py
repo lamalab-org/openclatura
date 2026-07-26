@@ -20,7 +20,11 @@ class StereochemistryAudit:
 
 
 def audit_stereochemistry(
-    mol: Molecule, parts: AssemblyParts, component_atoms: set[int] | None = None
+    mol: Molecule,
+    parts: AssemblyParts,
+    component_atoms: set[int] | None = None,
+    pre_verified_atoms: set[int] | None = None,
+    pre_verified_bonds: set[int] | None = None,
 ) -> StereochemistryAudit:
     """Independently verify every emitted stereo descriptor, and prove that no
     stereocentre or stereo bond in the component was left unverified.
@@ -41,8 +45,10 @@ def audit_stereochemistry(
     scope = set(component_atoms) if component_atoms is not None else set(mol.atoms)
     checked = 0
     issues: list[str] = []
-    verified_atoms: set[int] = set()
-    verified_bonds: set[int] = set()
+    # Atoms already verified independently by the caller (substituent-embedded
+    # descriptors checked against the input CIP through a constitution isomorphism).
+    verified_atoms: set[int] = set(pre_verified_atoms) if pre_verified_atoms else set()
+    verified_bonds: set[int] = set(pre_verified_bonds) if pre_verified_bonds else set()
 
     # 1. Parent descriptors, positionally mapped through the parent locant map.
     for locant, descriptor in parts.stereo_features:

@@ -143,6 +143,10 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
             symbol=atom.GetSymbol(),
             idx=atom.GetIdx(),
             charge=atom.GetFormalCharge(),
+            # Isotopic labels are not expressed by the namer; recording them lets
+            # the self-audit abstain instead of confirming a name that silently
+            # dropped the label.
+            isotope=atom.GetIsotope() or None,
             stereo=stereo,
             raw_stereo=raw_stereo,
             cip=modern_cip.get(atom.GetIdx()),

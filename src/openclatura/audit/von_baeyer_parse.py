@@ -1,4 +1,4 @@
-"""Independent von Baeyer ``bicyclo[a.b.c]`` name → graph parser.
+"""Independent von Baeyer ``bicyclo[a.b.c]`` / ``spiro[a.b]`` name → graph parser.
 
 openclatura represents most fused bicyclic ring systems (including benzo-fused
 heterocycles, drawn as fully-unsaturated von Baeyer polyenes) with von Baeyer
@@ -7,8 +7,10 @@ after the substituent grammar, so this module parses the descriptor, stem,
 skeletal replacement (``oxa``/``aza``/…) and unsaturation locants back into a
 numbered ring skeleton — entirely from the name, never the input graph.
 
-Only the two-ring ``bicyclo`` case is modelled; ``spiro``/``tricyclo`` and
-anything that does not parse cleanly return ``None`` so the caller abstains.
+The two-ring ``bicyclo`` case and monospiro ``spiro[a.b]`` are modelled (both
+with skeletal replacement and unsaturation); polyspiro (``dispiro``…), bridges
+carrying their own atoms, and anything that does not parse cleanly return
+``None`` so the caller abstains.
 """
 
 from __future__ import annotations
@@ -152,6 +154,74 @@ def _build_skeleton(
     return rw, idx
 
 
+# --------------------------------------------------------------------------- #
+# Monospiro
+# --------------------------------------------------------------------------- #
+_SPIRO_RE = re.compile(r"spiro\[(\d+)\.(\d+)\]")
+# Polyspiro descriptors reuse the ``spiro[`` token with a different numbering
+# rule, so they must not be parsed as monospiro.
+_POLYSPIRO_RE = re.compile(r"(?:di|tri|tetra|penta)spiro\[")
+
+
+def parse_spiro(name: str) -> Numbered | None:
+    """Parse a full ``[replacement]spiro[a.b]stem[unsat]-<n>-yl`` substituent
+    (``2-azaspiro[3.3]heptan-2-yl``, ``5-oxaspiro[3.4]octan-7-yl``)."""
+
+    if _POLYSPIRO_RE.search(name):
+        return None
+    m = _SPIRO_RE.search(name)
+    if m is None:
+        return None
+    a, b = int(m.group(1)), int(m.group(2))
+    pre, post = name[: m.start()], name[m.end() :]
+
+    rw, locants = _build_spiro_skeleton(a, b)
+    if rw is None:
+        return None
+    if not _apply_replacement(rw, locants, pre):
+        return None
+    attach = _split_and_apply_post(rw, locants, post, a + b + 1)
+    if attach is None:
+        return None
+    return rw, locants, attach
+
+
+def build_spiro_skeleton(a: int, b: int) -> tuple[Chem.RWMol | None, dict[str, int]]:
+    """Public: build a saturated monospiro ``spiro[a.b]`` carbon skeleton with
+    numeric locant labels, for reuse by parent reconstruction."""
+    return _build_spiro_skeleton(a, b)
+
+
+def _build_spiro_skeleton(a: int, b: int) -> tuple[Chem.RWMol | None, dict[str, int]]:
+    """Number a monospiro system per P-24.2.4.1: start in the *smaller* ring at an
+    atom next to the spiro atom, go round that ring — so the spiro atom itself is
+    ``a+1`` — then continue through the larger ring back to the spiro atom.
+
+    ``spiro[3.3]heptane`` therefore closes 1-2-3-4(spiro)-1 and 4-5-6-7-4.  The
+    descriptor is written smaller-ring-first, so ``a > b`` is a name we do not
+    model rather than one we renumber."""
+
+    if a < 2 or b < a:  # each ring needs >= 3 atoms, smaller bridge cited first
+        return None, {}
+    n = a + b + 1
+    rw = Chem.RWMol()
+    idx = {str(i): rw.AddAtom(Chem.Atom(6)) for i in range(1, n + 1)}
+    spiro = a + 1
+
+    def bond(i: int, j: int) -> None:
+        rw.AddBond(idx[str(i)], idx[str(j)], Chem.BondType.SINGLE)
+
+    for i in range(1, spiro):  # 1-2-…-spiro
+        bond(i, i + 1)
+    bond(spiro, 1)  # close the smaller ring
+    prev = spiro
+    for i in range(spiro + 1, n + 1):  # spiro-…-n
+        bond(prev, i)
+        prev = i
+    bond(n, spiro)  # close the larger ring
+    return rw, idx
+
+
 def _apply_replacement(rw: Chem.RWMol, locants: dict[str, int], pre: str) -> bool:
     if not pre:
         return True
@@ -285,4 +355,10 @@ def _apply_unsaturation(rw: Chem.RWMol, locants: dict[str, int], rest: str) -> b
     return True
 
 
-__all__ = ["parse_von_baeyer", "parse_monocyclic_replacement", "build_skeleton"]
+__all__ = [
+    "parse_von_baeyer",
+    "parse_spiro",
+    "parse_monocyclic_replacement",
+    "build_skeleton",
+    "build_spiro_skeleton",
+]

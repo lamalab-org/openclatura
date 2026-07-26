@@ -41,10 +41,11 @@ from .naming import (
     component_named_atom_coverage,
 )
 from .stereo import StereochemistryAudit, audit_stereochemistry
+from .substituent_reconstruction import _NAME_CIP, resolve_fragment_mol
 from .substituent_reconstruction import _RING_STEMS as _SUBSTITUENT_RING_STEMS
-from .substituent_reconstruction import resolve_fragment_mol
 from .von_baeyer_parse import build_skeleton as _build_von_baeyer_skeleton
 from .von_baeyer_parse import build_skeleton_from_descriptor as _build_von_baeyer_from_descriptor
+from .von_baeyer_parse import build_spiro_skeleton as _build_spiro_skeleton
 
 Verdict = Literal["confirmed", "abstained", "mismatch", "error"]
 
@@ -184,6 +185,10 @@ _DIRECT_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int], ...]] = {
     "amide": (("O", 2), ("N", 1)),
     "thioamide": (("S", 2), ("N", 1)),
     "nitrile": (("N", 3),),
+    "acid_chloride": (("O", 2), ("Cl", 1)),
+    "acid_fluoride": (("O", 2), ("F", 1)),
+    "acid_bromide": (("O", 2), ("Br", 1)),
+    "acid_iodide": (("O", 2), ("I", 1)),
 }
 # Ring ("carb...") variants: a new carbon carries the same decoration.
 _EXOCYCLIC_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int], ...]] = {
@@ -192,6 +197,18 @@ _EXOCYCLIC_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int], ...]] = {
     "ring_amide": (("O", 2), ("N", 1)),
     "ring_thioamide": (("S", 2), ("N", 1)),
     "ring_nitrile": (("N", 3),),
+    "ring_acid_chloride": (("O", 2), ("Cl", 1)),
+    "ring_acid_fluoride": (("O", 2), ("F", 1)),
+    "ring_acid_bromide": (("O", 2), ("Br", 1)),
+    "ring_acid_iodide": (("O", 2), ("I", 1)),
+}
+# Oxo-acid groups whose characteristic atom is a heteroatom *hub* bonded to the
+# parent locant atom, itself decorated with the oxo/hydroxy atoms:
+# ``R-S(=O)(=O)-OH`` etc.  Value: (hub element, decoration atoms).
+_HUB_ACID_GROUPS: dict[str, tuple[str, tuple[tuple[str, int], ...]]] = {
+    "sulfonic_acid": ("S", (("O", 2), ("O", 2), ("O", 1))),
+    "sulfinic_acid": ("S", (("O", 2), ("O", 1))),
+    "phosphonic_acid": ("P", (("O", 2), ("O", 1), ("O", 1))),
 }
 
 _BOND_TYPES: dict[int, Chem.BondType] = {
@@ -223,11 +240,18 @@ def audit_component_reconstruction(mol: Molecule, parts, component_atoms: set[in
     try:
         atoms = set(component_atoms) if component_atoms is not None else set(mol.atoms)
         coverage = component_named_atom_coverage(mol, atoms, parts)
-        stereo = audit_stereochemistry(mol, parts, atoms)
         charge_pairs = audit_charge_pair_templates(mol, atoms)
 
         reference = _component_reference_smiles(mol, atoms)
-        structural_verdict, structural_reason, reconstructed = _structural_verdict(mol, atoms, parts, reference)
+        structural_verdict, structural_reason, reconstructed, rebuilt = _structural_verdict(mol, atoms, parts, reference)
+
+        # Stereo descriptors embedded in substituent terms are tagged onto the
+        # rebuilt graph; verifying them against the input's independent CIP needs
+        # the constitution to line up, so it runs after the structural rebuild.
+        verified_atoms, verified_bonds = (
+            _verify_tagged_stereo(rebuilt, mol, atoms) if rebuilt is not None else (set(), set())
+        )
+        stereo = audit_stereochemistry(mol, parts, atoms, verified_atoms, verified_bonds)
 
         # Only signals we can trust as *refutations* harden into ``mismatch``:
         #   * the independent structural reconstruction disagreed, or
@@ -268,29 +292,116 @@ def audit_component_reconstruction(mol: Molecule, parts, component_atoms: set[in
         return ReconstructionAudit(verdict="error", reason=f"{type(exc).__name__}: {exc}")
 
 
-def _structural_verdict(mol, atoms, parts, reference) -> tuple[str, str, str | None]:
-    """Return (verdict, reason, reconstructed_smiles) for the rebuild only."""
+def _structural_verdict(mol, atoms, parts, reference) -> tuple[str, str, str | None, Chem.Mol | None]:
+    """Return (verdict, reason, reconstructed_smiles, rebuilt_mol) for the rebuild."""
 
     if reference is None:
-        return "abstained", "input constitution not comparable (charge/isotope/sanitize)", None
+        return "abstained", "input constitution not comparable (charge/isotope/sanitize)", None, None
     if any(mol.atoms[a].isotope for a in atoms):
-        return "abstained", "isotopically-labelled species not modelled", None
+        return "abstained", "isotopically-labelled species not modelled", None, None
     # Net-charged (ionic) species are not modelled, but net-neutral charge
     # separation inside a group (nitro, N-oxide, azide, diazo …) is: those
     # charges are carried by the reconstructed fragment and compared like any
     # other constitution. Charged parents are still caught in _reconstruct_from_parts.
     if sum(mol.atoms[a].charge for a in atoms) != 0:
-        return "abstained", "net-charged (ionic) species not modelled", None
+        return "abstained", "net-charged (ionic) species not modelled", None, None
     try:
         rebuilt = _reconstruct_from_parts(parts)
     except _Abstain as ab:
-        return "abstained", ab.reason, None
+        return "abstained", ab.reason, None, None
     reconstructed = _canonical_constitution(rebuilt)
     if reconstructed is None:
-        return "abstained", "reconstructed graph failed sanitisation", None
+        return "abstained", "reconstructed graph failed sanitisation", None, None
     if reconstructed == reference:
-        return "confirmed", "", reconstructed
-    return "mismatch", f"reconstructed {reconstructed!r} != input {reference!r}", reconstructed
+        return "confirmed", "", reconstructed, rebuilt
+    return "mismatch", f"reconstructed {reconstructed!r} != input {reference!r}", reconstructed, rebuilt
+
+
+# --------------------------------------------------------------------------- #
+# Independent verification of name-asserted (substituent-embedded) stereo
+# --------------------------------------------------------------------------- #
+def _verify_tagged_stereo(rebuilt: Chem.Mol, mol: Molecule, atoms: set[int]) -> tuple[set[int], set[int]]:
+    """Input atom ids and bond ids whose name-asserted stereo tag agrees with the
+    input's independent CIP under *some* constitution isomorphism between the
+    rebuilt graph and the input.
+
+    The tags come from descriptors embedded in substituent terms (numbered in the
+    substituent's own locant space).  Checking them against the independent CIP
+    oracle needs a name→input mapping; the reconstruction is isomorphic to the
+    input (constitution already confirmed), so any isomorphism under which every
+    tag matches proves the name denotes the input's stereo *up to the molecule's
+    own symmetry* — sound.  Untagged or unmatched features return nothing and are
+    left for the caller to abstain on."""
+
+    try:
+        query = Chem.Mol(rebuilt)
+        Chem.SanitizeMol(query)
+    except Exception:
+        return set(), set()
+    Chem.RemoveStereochemistry(query)
+    tagged_atoms = [(a.GetIdx(), a.GetProp(_NAME_CIP)) for a in query.GetAtoms() if a.HasProp(_NAME_CIP)]
+    tagged_bonds = [
+        (b.GetBeginAtomIdx(), b.GetEndAtomIdx(), b.GetProp(_NAME_CIP))
+        for b in query.GetBonds()
+        if b.HasProp(_NAME_CIP)
+    ]
+    if not tagged_atoms and not tagged_bonds:
+        return set(), set()
+    target, rev = _input_rdmol_with_cip(mol, atoms)
+    if target is None:
+        return set(), set()
+    try:
+        matches = target.GetSubstructMatches(query, uniquify=False, maxMatches=20000)
+    except Exception:
+        return set(), set()
+    for match in matches:
+        verified_atoms: set[int] = set()
+        verified_bonds: set[int] = set()
+        ok = True
+        for qidx, descriptor in tagged_atoms:
+            input_aid = rev.get(match[qidx])
+            if input_aid is None or mol.atoms[input_aid].cip != descriptor:
+                ok = False
+                break
+            verified_atoms.add(input_aid)
+        if ok:
+            for qa, qb, descriptor in tagged_bonds:
+                ia, ib = rev.get(match[qa]), rev.get(match[qb])
+                bond = mol.get_bond(ia, ib) if ia is not None and ib is not None else None
+                if bond is None or bond.cip != descriptor:
+                    ok = False
+                    break
+                verified_bonds.add(bond.idx)
+        if ok:
+            return verified_atoms, verified_bonds
+    return set(), set()
+
+
+def _input_rdmol_with_cip(mol: Molecule, atoms: set[int]) -> tuple[Chem.Mol | None, dict[int, int]]:
+    """Build the input component as a stereo-free RDKit mol for isomorphism
+    matching, returning it plus a ``rdkit_idx -> input_atom_id`` map."""
+    rw = Chem.RWMol()
+    idx_map: dict[int, int] = {}
+    rev: dict[int, int] = {}
+    for aid in sorted(atoms):
+        atom = mol.atoms[aid]
+        rd = Chem.Atom(atom.symbol)
+        rd.SetFormalCharge(atom.charge)
+        if atom.isotope:
+            rd.SetIsotope(atom.isotope)
+        j = rw.AddAtom(rd)
+        idx_map[aid] = j
+        rev[j] = aid
+    for bond in mol.bonds.values():
+        if bond.u in idx_map and bond.v in idx_map:
+            rw.AddBond(idx_map[bond.u], idx_map[bond.v], _BOND_TYPES.get(bond.order, Chem.BondType.SINGLE))
+    m = rw.GetMol()
+    try:
+        Chem.SanitizeMol(m)
+    except Exception:
+        return None, {}
+    Chem.RemoveStereochemistry(m)
+    return m, rev
 
 
 # --------------------------------------------------------------------------- #
@@ -337,8 +448,6 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
     has_template = parts.retained_name is not None and _lookup_parent_template(parts.retained_name) is not None
     if getattr(parts, "is_substituent", False):
         raise _Abstain("substituent component (audited via recursion, not here)")
-    if parts.is_spiro and not has_template:
-        raise _Abstain("spiro parent not modelled")
     if parts.front_modifiers and not _is_ester_component(parts):
         # Front modifiers we model are ester/sulfonate esterifying groups; other
         # uses are not reconstructed.
@@ -378,6 +487,13 @@ def _build_parent(parts) -> tuple[Chem.RWMol, dict[str, int], bool]:
         rw = Chem.RWMol(frag)
         aromatic = any(a.GetIsAromatic() for a in frag.GetAtoms())
         return rw, {label: i for i, label in enumerate(labels)}, aromatic
+
+    if parts.is_spiro:
+        a, b = parts.spiro_xy
+        rw, locants = _build_spiro_skeleton(a, b)
+        if rw is None or a + b + 1 != parts.parent_length:
+            raise _Abstain(f"spiro skeleton {parts.spiro_xy} inconsistent")
+        return rw, locants, False
 
     if parts.is_bicycle:
         a, b, c = parts.bicycle_xyz
@@ -506,6 +622,16 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts) -> No
     if pg.key in _ESTER_KEYS:
         _apply_ester(rw, locants, parts)
         return
+    if pg.key in _HUB_ACID_GROUPS:
+        hub_element, decoration = _HUB_ACID_GROUPS[pg.key]
+        for locant in pg.locants:
+            base_idx = locants.get(str(locant))
+            if base_idx is None:
+                raise _Abstain(f"principal-group locant {locant} outside parent")
+            hub = rw.AddAtom(Chem.Atom(hub_element))
+            rw.AddBond(base_idx, hub, Chem.BondType.SINGLE)
+            _decorate(rw, hub, decoration)
+        return
     direct = _DIRECT_SUFFIX_GROUPS.get(pg.key)
     exocyclic = _EXOCYCLIC_SUFFIX_GROUPS.get(pg.key)
     if direct is None and exocyclic is None:
@@ -521,11 +647,15 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts) -> No
             nitrogens += _decorate(rw, carbon, exocyclic)
         else:
             nitrogens += _decorate(rw, base_idx, direct)
-    # Expose the characteristic nitrogen under the italic ``N`` locant so
-    # N-substituents (N-methyl, N,N-dimethyl…) attach. Only unambiguous when the
-    # suffix contributed exactly one nitrogen.
-    if len(nitrogens) == 1 and "N" not in locants:
-        locants["N"] = nitrogens[0]
+    # Expose the characteristic nitrogens under the italic ``N`` locants so that
+    # N-substituents (N-methyl, N,N-dimethyl, N'-ethyl…) attach.  A mono-amine is
+    # just ``N``; a di/tri-amine primes them — ``N``, ``N'``, ``N''`` — in the
+    # order their parent locants were cited (which is the order ``_decorate``
+    # produced them above), matching IUPAC's prime assignment.
+    for i, nitrogen in enumerate(nitrogens):
+        key = "N" + "'" * i
+        if key not in locants:
+            locants[key] = nitrogen
 
 
 def _apply_ester(rw: Chem.RWMol, locants: dict[str, int], parts) -> None:
@@ -605,6 +735,8 @@ def _graft(rw: Chem.RWMol, base_idx: int, frag: Chem.Mol) -> None:
         new_atom.SetFormalCharge(atom.GetFormalCharge())
         new_atom.SetNoImplicit(atom.GetNoImplicit())
         new_atom.SetNumExplicitHs(atom.GetNumExplicitHs())
+        if atom.HasProp(_NAME_CIP):  # carry the name-asserted stereo tag onto the assembled graph
+            new_atom.SetProp(_NAME_CIP, atom.GetProp(_NAME_CIP))
         frag_to_new[atom.GetIdx()] = rw.AddAtom(new_atom)
     for bond in frag.GetBonds():
         a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
@@ -612,8 +744,15 @@ def _graft(rw: Chem.RWMol, base_idx: int, frag: Chem.Mol) -> None:
             other = b if a == dummy.GetIdx() else a
             _consume_parent_hydrogen(rw.GetAtomWithIdx(base_idx), bond.GetBondType())
             rw.AddBond(base_idx, frag_to_new[other], bond.GetBondType())
+            _carry_bond_tag(bond, rw.GetBondBetweenAtoms(base_idx, frag_to_new[other]))
         else:
             rw.AddBond(frag_to_new[a], frag_to_new[b], bond.GetBondType())
+            _carry_bond_tag(bond, rw.GetBondBetweenAtoms(frag_to_new[a], frag_to_new[b]))
+
+
+def _carry_bond_tag(src: Chem.Bond, dst: Chem.Bond | None) -> None:
+    if dst is not None and src.HasProp(_NAME_CIP):
+        dst.SetProp(_NAME_CIP, src.GetProp(_NAME_CIP))
 
 
 def _consume_parent_hydrogen(atom: Chem.Atom, bond_type: Chem.BondType) -> None:

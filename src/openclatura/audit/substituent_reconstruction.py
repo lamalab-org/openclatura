@@ -21,6 +21,7 @@ from rdkit import Chem
 
 from ..rules import stems as _stems
 from .von_baeyer_parse import parse_monocyclic_replacement as _parse_monocyclic_replacement
+from .von_baeyer_parse import parse_spiro as _parse_spiro
 from .von_baeyer_parse import parse_von_baeyer as _parse_von_baeyer
 
 # A numbered fragment: an editable molecule, a map from IUPAC locant -> atom
@@ -55,6 +56,10 @@ _LEAF_SMILES: dict[str, str] = {
     "nitro": "[N+](=O)[O-]",
     "nitroso": "N=O",
     "cyano": "C#N",
+    "nitrilo": "#N",  # terminal nitrile expressed as a ≡N on the carbon it decorates
+    "isocyano": "[N+]#[C-]",
+    "isocyanato": "N=C=O",
+    "isothiocyanato": "N=C=S",
     "azido": "N=[N+]=[N-]",
     "methoxy": "OC",
     "ethoxy": "OCC",
@@ -65,6 +70,10 @@ _LEAF_SMILES: dict[str, str] = {
     "carboxy": "C(=O)O",
     "carbamoyl": "C(N)=O",
     "acetyl": "C(C)=O",
+    "propionyl": "C(=O)CC",
+    "propanoyl": "C(=O)CC",
+    "butanoyl": "C(=O)CCC",
+    "pentanoyl": "C(=O)CCCC",
     "methylcarbonyl": "C(C)=O",
     "acetyloxy": "OC(C)=O",
     "methylcarbonyloxy": "OC(C)=O",
@@ -92,6 +101,18 @@ _LEAF_SMILES: dict[str, str] = {
     "methylcarbamoyl": "C(=O)NC",
     "dimethylcarbamoyl": "C(=O)N(C)C",
     "difluoromethyl": "C(F)F",
+    # silyl / phosphoryl / boryl / thio groups
+    "trimethylsilyl": "[Si](C)(C)C",
+    "(tert-butyl)dimethylsilyl": "[Si](C)(C)C(C)(C)C",
+    "triethylsilyl": "[Si](CC)(CC)CC",
+    "dimethoxyphosphoryl": "P(=O)(OC)OC",
+    "diethoxyphosphoryl": "P(=O)(OCC)OCC",
+    "dihydroxyphosphoryl": "P(=O)(O)O",
+    "phosphono": "P(=O)(O)O",
+    "phosphanyl": "P",
+    "dihydroxyboryl": "B(O)O",
+    "carbamothioyl": "C(=S)N",
+    "diazo": "=[N+]=[N-]",
     "methyl": "C",
     "ethyl": "CC",
     "propyl": "CCC",
@@ -181,6 +202,24 @@ _RING_STEMS: dict[str, tuple[str, list[str]]] = {
     "oxetane": ("O1CCC1", ["1", "2", "3", "4"]),
     "aziridine": ("N1CC1", ["1", "2", "3"]),
     "oxirane": ("O1CC1", ["1", "2", "3"]),
+    # saturated five-membered multi-heteroatom rings (heteroatom order fixes numbering)
+    "imidazolidine": ("N1CNCC1", ["1", "2", "3", "4", "5"]),
+    "pyrazolidine": ("N1NCCC1", ["1", "2", "3", "4", "5"]),
+    "1,3-thiazolidine": ("S1CNCC1", ["1", "2", "3", "4", "5"]),
+    "1,3-oxazolidine": ("O1CNCC1", ["1", "2", "3", "4", "5"]),
+    "isothiazolidine": ("S1NCCC1", ["1", "2", "3", "4", "5"]),
+    "1,2-thiazolidine": ("S1NCCC1", ["1", "2", "3", "4", "5"]),
+    "isoxazolidine": ("O1NCCC1", ["1", "2", "3", "4", "5"]),
+    "1,2-oxazolidine": ("O1NCCC1", ["1", "2", "3", "4", "5"]),
+    # six-membered triazines
+    "1,3,5-triazine": ("n1cncnc1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,4-triazine": ("n1ncncc1", ["1", "2", "3", "4", "5", "6"]),
+    # benzo-fused carbocycle / 2,3-dihydro azole (labels 1,2,3,3a,4,5,6,7,7a)
+    "indoline": ("N1CCc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    "indane": ("C1CCc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    "indan": ("C1CCc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    # adamantane (tricyclo[3.3.1.1^{3,7}]decane); locants follow the SMILES atom order
+    "adamantane": ("C12CC3CC(CC(C1)C3)C2", ["1", "2", "3", "4", "5", "6", "7", "8", "10", "9"]),
 }
 
 # Retained "-o" substituent aliases -> canonical ring-yl form.
@@ -205,6 +244,10 @@ _INDICATED_H_RE = re.compile(r"^1H-")
 def resolve_fragment_mol(name: str) -> Chem.Mol | None:
     """Return an RDKit mol with exactly one dummy ``*`` at the attachment point,
     or ``None`` if the name is not fully modeled."""
+    # Capture the leading stereo descriptor before it is stripped, so we can tag
+    # the resolved fragment's atoms with the R/S the name asserts (verified later
+    # against the input's independent CIP).
+    stereo_map = _leading_stereo_map(name)
     name = _strip_outer_parens(name.strip())
     if name in _LEAF_SMILES:
         mol = Chem.MolFromSmiles("*" + _LEAF_SMILES[name], sanitize=False)
@@ -215,14 +258,24 @@ def resolve_fragment_mol(name: str) -> Chem.Mol | None:
         except Exception:
             return None
         return mol
-    # von Baeyer fused/bridged ring substituents carry a replacement prefix that
-    # is not a graftable sub-substituent, so parse the whole unit up front. If the
-    # von Baeyer parse fails (e.g. the ring is only the inner base of ``(…-yl)oxy``
-    # or ``(…-yl)methyl``), fall through to the recursive grammar and operators.
-    if name.endswith("yl") and "cyclo[" in name:
-        vb = _parse_von_baeyer(name)
+    # An ``…ylidene`` attaches through a *double* bond: resolve the corresponding
+    # ``…yl`` fragment and promote its single attachment bond to a double one
+    # (``phenylmethylidene`` = ``=CH-phenyl`` from ``phenylmethyl`` = benzyl,
+    # ``propan-2-ylidene`` = ``=C(CH3)2`` from ``propan-2-yl``).
+    if name.endswith("ylidene") and name not in _LEAF_SMILES:
+        base = resolve_fragment_mol(name[: -len("ylidene")] + "yl")
+        if base is not None:
+            return _promote_to_double_attachment(base)
+        return None
+    # von Baeyer / spiro ring substituents carry a replacement prefix that is not
+    # a graftable sub-substituent, so parse the whole unit up front. If the parse
+    # fails (e.g. the ring is only the inner base of ``(…-yl)oxy`` or
+    # ``(…-yl)methyl``), fall through to the recursive grammar and operators.
+    if name.endswith("yl") and ("cyclo[" in name or "spiro[" in name):
+        vb = _parse_von_baeyer(name) if "cyclo[" in name else _parse_spiro(name)
         if vb is not None:
             rw, _lc, attach = vb
+            _tag_name_stereo(rw, _lc, stereo_map)
             dummy = rw.AddAtom(Chem.Atom(0))
             rw.AddBond(dummy, attach, Chem.BondType.SINGLE)
             mol = rw.GetMol()
@@ -234,6 +287,7 @@ def resolve_fragment_mol(name: str) -> Chem.Mol | None:
     numbered = _resolve(name)
     if numbered is not None:
         rw, _locants, attach = numbered
+        _tag_name_stereo(rw, _locants, stereo_map)
         # Substituting at a pyrrole-type NH consumes its hydrogen.
         attach_atom = rw.GetAtomWithIdx(attach)
         if attach_atom.GetNumExplicitHs() > 0:
@@ -260,6 +314,7 @@ _TWO_PORT_WRAPPERS: dict[str, str] = {
     "sulfonyl": "*S(=O)(=O)*",
     "sulfinyl": "*S(=O)*",
     "sulfanyl": "*S*",
+    "selanyl": "*[Se]*",
     "carbonyl": "*C(=O)*",
     "oxy": "*O*",
 }
@@ -280,6 +335,10 @@ def _normalize_yl(stem: str) -> str:
 
 
 def _resolve_operator(name: str) -> Chem.Mol | None:
+    if name.startswith("N-") and name.endswith("amido"):
+        frag = _resolve_n_substituted_amido(name[2:])
+        if frag is not None:
+            return frag
     if name.endswith("carboxamido") and len(name) > len("carboxamido"):
         frag = _resolve_carboxamido(name[: -len("carboxamido")])
         if frag is not None:
@@ -288,6 +347,16 @@ def _resolve_operator(name: str) -> Chem.Mol | None:
         frag = _resolve_amino(name[: -len("amino")])
         if frag is not None:
             return frag
+    # ``Xcarbamoyl`` = parent-C(=O)-NH-X (an added carbonyl); ``Ximino`` = parent=N-X
+    # (attached through a double bond).
+    for suffix, wrapper in (("carbamoyl", "*C(=O)N*"), ("imino", "*=N*")):
+        if name.endswith(suffix) and len(name) > len(suffix):
+            stem = name[: -len(suffix)].rstrip("-")
+            inner = resolve_fragment_mol(stem) or resolve_fragment_mol(_normalize_yl(stem))
+            if inner is not None:
+                joined = _join_two_port(wrapper, inner)
+                if joined is not None:
+                    return joined
     for suffix in sorted(_TWO_PORT_WRAPPERS, key=len, reverse=True):
         if name.endswith(suffix) and len(name) > len(suffix):
             stem = name[: -len(suffix)].rstrip("-")
@@ -303,12 +372,143 @@ def _resolve_operator(name: str) -> Chem.Mol | None:
     return None
 
 
+def _promote_to_double_attachment(frag: Chem.Mol) -> Chem.Mol | None:
+    """Turn a ``…yl`` fragment (single ``*`` attachment) into the ``…ylidene``
+    form by promoting that attachment bond to a double bond and freeing a
+    hydrogen on the attachment atom so the valence balances."""
+
+    rw = Chem.RWMol(frag)
+    dummy = next((a for a in rw.GetAtoms() if a.GetAtomicNum() == 0), None)
+    if dummy is None:
+        return None
+    neighbors = list(dummy.GetNeighbors())
+    if len(neighbors) != 1:
+        return None
+    attach = neighbors[0]
+    bond = rw.GetBondBetweenAtoms(dummy.GetIdx(), attach.GetIdx())
+    if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+        return None
+    bond.SetBondType(Chem.BondType.DOUBLE)
+    # Freeing a bond order costs one hydrogen; drop an explicit one if the atom
+    # carries them, otherwise let RDKit re-derive the implicit count on sanitize.
+    if attach.GetNumExplicitHs() > 0:
+        attach.SetNumExplicitHs(attach.GetNumExplicitHs() - 1)
+    attach.SetNoImplicit(False)
+    mol = rw.GetMol()
+    try:
+        Chem.SanitizeMol(mol)
+    except Exception:
+        return None
+    return mol
+
+
+def _resolve_n_substituted_amido(rest: str) -> Chem.Mol | None:
+    """``N-<substituent><…amido>`` — an amide prefix whose nitrogen carries an
+    extra group: ``N-methylacetamido`` = ``parent-N(CH3)-C(=O)CH3``,
+    ``N-methylpyridine-3-carboxamido`` = ``parent-N(CH3)-C(=O)-pyridin-3-yl``.
+
+    ``rest`` is the name with the leading ``N-`` removed.  Where the italic-N
+    ligand ends is not marked, so every depth-0 split is tried and the first one
+    whose *both* halves resolve wins; a wrong split leaves an unresolvable half
+    and is rejected, keeping the guess-free contract."""
+
+    for cut in range(1, len(rest)):
+        if rest[: cut + 1].count("(") != rest[: cut + 1].count(")"):
+            continue  # never split inside a parenthesised group
+        ligand_name, amide_name = rest[:cut], rest[cut:].lstrip("-")
+        if not amide_name.endswith("amido"):
+            continue
+        ligand = resolve_fragment_mol(ligand_name)
+        if ligand is None:
+            continue
+        amide = resolve_fragment_mol(amide_name)
+        if amide is None:
+            continue
+        substituted = _substitute_attachment(amide, ligand, element=7)
+        if substituted is not None:
+            return substituted
+    return None
+
+
+def _substitute_attachment(frag: Chem.Mol, ligand: Chem.Mol, element: int | None = None) -> Chem.Mol | None:
+    """Graft ``ligand`` onto ``frag``'s own attachment atom (the one bonded to its
+    dummy), leaving the dummy in place so the result is still a one-port fragment.
+    ``element`` guards the atomic number of that atom when the caller knows it
+    (the amide nitrogen for an ``N-``-substituted amide prefix)."""
+
+    rw = Chem.RWMol(frag)
+    dummy = next((a for a in rw.GetAtoms() if a.GetAtomicNum() == 0), None)
+    if dummy is None:
+        return None
+    neighbors = list(dummy.GetNeighbors())
+    if len(neighbors) != 1:
+        return None
+    attach = neighbors[0]
+    if element is not None and attach.GetAtomicNum() != element:
+        return None
+    if not _graft_onto(rw, attach.GetIdx(), ligand):
+        return None
+    mol = rw.GetMol()
+    try:
+        Chem.SanitizeMol(mol)
+    except Exception:
+        return None
+    return mol
+
+
+def _resolve_carboxamido(stem: str) -> Chem.Mol | None:
+    """``<acyl-ring>carboxamido`` = ``parent-NH-C(=O)-<ring>``.  The ``carbox``
+    contributes an extra carbonyl carbon, so we resolve the ring as a ``-yl``
+    fragment and wrap it in ``*NC(=O)*`` (the N is the outward port to the
+    parent, the carbonyl C bonds the ring).  ``furan-2-carboxamido`` ->
+    ``NH-C(=O)-furan-2-yl``, ``cyclopropanecarboxamido`` -> ``NH-C(=O)-cyclopropyl``."""
+
+    stem = stem.rstrip("-")
+    for candidate in _acyl_ring_variants(stem):
+        inner = resolve_fragment_mol(candidate)
+        if inner is not None:
+            return _join_two_port("*NC(=O)*", inner)
+    return None
+
+
+def _acyl_ring_variants(stem: str):
+    """Yield ``-yl`` spellings of an acid ring stem: ``furan-2`` -> ``furan-2-yl``,
+    ``cyclopropane`` -> ``cyclopropyl``, ``benzene-1`` -> ``phenyl``."""
+    yield stem
+    yield _normalize_yl(stem)
+    if "-" in stem and stem.rsplit("-", 1)[1].isdigit():
+        yield stem + "-yl"  # furan-2 -> furan-2-yl
+    # ``…benzene-1`` is a substituted benzoic-acid ring: with the acyl carbon at
+    # position 1 the remaining substituent locants already read from that point,
+    # so the ``-yl`` form is the same prefixes on ``phenyl``.
+    bm = re.match(r"^(?P<pre>.*?)benzene-1$", stem)
+    if bm is not None:
+        yield bm.group("pre") + "phenyl"
+    if stem.endswith("ane"):
+        yield stem[:-3] + "yl"  # cyclopropane -> cyclopropyl
+    # A locanted ring stem keeps its terminal ``e`` in the acid name but drops it
+    # in the substituent form: ``bicyclo[3.1.0]hexane-6`` ->
+    # ``bicyclo[3.1.0]hexan-6-yl``, ``piperidine-4`` -> ``piperidin-4-yl``.
+    lm = re.match(r"^(?P<core>.*[a-z])e-(?P<loc>\d+)$", stem)
+    if lm is not None:
+        yield f"{lm.group('core')}-{lm.group('loc')}-yl"
+
+
 def _resolve_amino(rest: str) -> Chem.Mol | None:
-    """Build an ``…amino`` nitrogen bearing one or two organyl groups
-    (``ethylamino`` -> NH-ethyl, ``diethylamino`` -> N(ethyl)2)."""
+    """Build an ``…amino`` nitrogen bearing its organyl groups: ``ethylamino`` ->
+    NH-ethyl, ``diethylamino`` -> N(ethyl)2, and two *different* groups written as
+    consecutive parenthesised clauses ``(methyl)(phenyl)amino`` -> N(methyl)(phenyl)."""
     rest = rest.strip().strip("-")
     if not rest:
         return None
+
+    # Two (or more) distinct parenthesised ligands: graft each once.
+    groups = _top_level_groups(rest)
+    if len(groups) >= 2 and all(g.startswith("(") for g in groups):
+        frags = [resolve_fragment_mol(g) for g in groups]
+        if all(f is not None for f in frags):
+            return _amino_from_ligands(frags)
+
     count, base = 1, rest
     for word, n in sorted(_MULTIPLIERS.items(), key=lambda kv: -len(kv[0])):
         if rest.startswith(word) and _resolvable(rest[len(word) :]):
@@ -317,12 +517,16 @@ def _resolve_amino(rest: str) -> Chem.Mol | None:
     inner = resolve_fragment_mol(base)
     if inner is None:
         return None
+    return _amino_from_ligands([inner] * count)
+
+
+def _amino_from_ligands(frags: list[Chem.Mol]) -> Chem.Mol | None:
     rw = Chem.RWMol()
     nitrogen = rw.AddAtom(Chem.Atom(7))
     dummy = rw.AddAtom(Chem.Atom(0))
     rw.AddBond(dummy, nitrogen, Chem.BondType.SINGLE)
-    for _ in range(count):
-        if not _graft_onto(rw, nitrogen, inner):
+    for frag in frags:
+        if not _graft_onto(rw, nitrogen, frag):
             return None
     mol = rw.GetMol()
     try:
@@ -330,6 +534,33 @@ def _resolve_amino(rest: str) -> Chem.Mol | None:
     except Exception:
         return None
     return mol
+
+
+def _top_level_groups(s: str) -> list[str]:
+    """Split a string into consecutive depth-0 tokens, keeping parenthesised
+    groups intact: ``(methyl)(phenyl)`` -> ``['(methyl)', '(phenyl)']``,
+    ``methyl`` -> ``['methyl']``."""
+    groups: list[str] = []
+    depth = 0
+    cur = ""
+    for ch in s:
+        if ch == "(":
+            if depth == 0 and cur:
+                groups.append(cur)
+                cur = ""
+            depth += 1
+            cur += ch
+        elif ch == ")":
+            depth -= 1
+            cur += ch
+            if depth == 0:
+                groups.append(cur)
+                cur = ""
+        else:
+            cur += ch
+    if cur:
+        groups.append(cur)
+    return [g for g in groups if g]
 
 
 def _join_two_port(wrapper_smiles: str, inner: Chem.Mol) -> Chem.Mol | None:
@@ -396,6 +627,65 @@ def _resolve(name: str) -> Numbered | None:
     return None
 
 
+# Atom/bond property holding the R/S (or E/Z) descriptor the *name* asserts for a
+# reconstructed atom/bond, to be checked against the input's independent CIP.
+_NAME_CIP = "nStereo"
+
+
+def _leading_stereo_map(name: str) -> dict[str, str]:
+    """Extract ``{locant: descriptor}`` from a leading stereo prefix, peeling
+    outer parens/stereo-words exactly as :func:`_strip_outer_parens` does so the
+    captured locants line up with the fragment that will be built."""
+    s = name.strip()
+    result: dict[str, str] = {}
+    changed = True
+    while changed:
+        changed = False
+        while s.startswith("(") and s.endswith(")") and _balanced(s[1:-1]):
+            s = s[1:-1].strip()
+            changed = True
+        m = _STEREO_GROUP_RE.match(s)
+        if m and re.search(r"[RSrsEZ]", m.group(1)):
+            for loc, desc in re.findall(r"(\d+)([RSrsEZ])", m.group(1)):
+                result[loc] = desc
+            s = s[m.end() :].strip()
+            changed = True
+            continue
+        m2 = _STEREO_WORD_RE.match(s)
+        if m2:
+            s = s[m2.end() :].strip()
+            changed = True
+    return result
+
+
+def _tag_name_stereo(rw: Chem.RWMol, locants: dict[str, int], stereo_map: dict[str, str]) -> None:
+    """Tag the atom (R/S) or double bond (E/Z) at each mapped locant with the
+    descriptor the name asserts."""
+    for loc, desc in stereo_map.items():
+        if desc in "RSrs" and loc in locants:
+            rw.GetAtomWithIdx(locants[loc]).SetProp(_NAME_CIP, desc)
+        elif desc in "EZ" and loc in locants:
+            _tag_double_bond(rw, locants, loc, desc)
+
+
+def _tag_double_bond(rw: Chem.RWMol, locants: dict[str, int], loc: str, desc: str) -> None:
+    """Tag the ``loc``→``loc+1`` double bond (the usual chain/ring stereo bond),
+    else any acyclic double bond incident to ``loc``."""
+    a = locants.get(loc)
+    if a is None:
+        return
+    b = locants.get(str(int(loc) + 1)) if loc.isdigit() else None
+    if b is not None:
+        bond = rw.GetBondBetweenAtoms(a, b)
+        if bond is not None and bond.GetBondType() == Chem.BondType.DOUBLE:
+            bond.SetProp(_NAME_CIP, desc)
+            return
+    for bond in rw.GetAtomWithIdx(a).GetBonds():
+        if bond.GetBondType() == Chem.BondType.DOUBLE and not bond.IsInRing():
+            bond.SetProp(_NAME_CIP, desc)
+            return
+
+
 def _base_start_positions(name: str) -> list[int]:
     """Candidate indices where the base substituent could begin: the start, and
     every position following a depth-0 locant hyphen or a lowercase letter.
@@ -419,6 +709,11 @@ def _build_base(base: str) -> Numbered | None:
         vb = _parse_von_baeyer(base)
         if vb is not None:
             return vb
+    # Likewise a monospiro ring core (``2-azaspiro[3.3]heptan-2-yl``).
+    if base.endswith("yl") and "spiro[" in base:
+        sp = _parse_spiro(base)
+        if sp is not None:
+            return sp
     # A Hantzsch-Widman replacement monocycle core (``1-azacyclohexa-3,5-dien-3-yl``),
     # likewise decoratable via peeled front modifiers.
     if base.endswith("yl") and "cyclo" in base and "cyclo[" not in base:
@@ -434,6 +729,11 @@ def _build_base(base: str) -> Numbered | None:
         if ring is not None:  # else fall through: it may be a chain like propan-2-yl
             return ring
 
+    # cycloalkenyl (unsaturated carbocycle): cyclohex-1-en-1-yl, cyclohexa-1,3-dien-1-yl
+    if base.startswith("cyclo") and base.endswith("yl") and re.search(r"\d+-(?:en|yn|dien|trien)", base):
+        numbered = _cycloalkenyl_base(base)
+        if numbered is not None:
+            return numbered
     # cycloalkyl
     if base.startswith("cyclo") and base.endswith("yl"):
         stem = base[len("cyclo") : -2]
@@ -447,8 +747,112 @@ def _build_base(base: str) -> Numbered | None:
         n = _stem_length(base[:-2])
         if n is not None:
             return _alkyl_chain(n)
+    # chain acyl (``hexanoyl``, ``prop-2-enoyl``, retained ``acetyl``/``butyryl``)
+    # and chain acylamino (``propanamido``, ``prop-2-enamido``): both are
+    # decoratable bases, so front modifiers (``2,2-dimethyl`` -> pivaloyl /
+    # pivalamido) graft onto the acid carbons through the ordinary clause machinery.
+    if base.endswith("oyl") or base.endswith(_RETAINED_ACYL_YL):
+        acyl = _acyl_chain_base(base)
+        if acyl is not None:
+            return acyl
+    if base.endswith("amido"):
+        acyl = _acylamino_chain_base(base)
+        if acyl is not None:
+            return acyl
     # general acyclic chain: internal attachment and/or unsaturation
     return _parse_chain_base(base)
+
+
+# Retained acyl stems: classical acid name -> carbon count of the acyl chain
+# (the carbonyl carbon is C1). ``acet``ic = 2 C, ``propion``ic = 3, ``butyr``ic
+# = 4, ``valer``ic = 5.
+_RETAINED_ACYL_STEMS: dict[str, int] = {"acet": 2, "propion": 3, "butyr": 4, "valer": 5}
+# The ``-yl`` spellings of those stems, used to recognise a retained acyl base.
+_RETAINED_ACYL_YL = tuple(stem + "yl" for stem in _RETAINED_ACYL_STEMS)
+
+
+def _acyl_chain_skeleton(core: str) -> tuple[Chem.RWMol, dict[str, int]] | None:
+    """Build the carbon skeleton of an acyl chain from the stem the acyl suffix
+    left behind — ``hexan`` from ``hexanoyl``, ``prop-2-en`` from ``prop-2-enoyl``,
+    ``butyr`` from ``butyryl``, ``propan`` from ``propanamido`` — with C1 (the
+    carbonyl carbon) already bearing its ``=O``.  Returns the skeleton and its
+    locant map; callers decide what C1 bonds outward to."""
+
+    core = core.rstrip("-")
+    stem_len: int | None = None
+    rest: str | None = None
+    for retained, length in _RETAINED_ACYL_STEMS.items():
+        if core.startswith(retained):
+            stem_len, rest = length, core[len(retained) :]
+            break
+    if stem_len is None:
+        for length, row in sorted(_stems.STEMS.items(), key=lambda kv: -len(kv[1].stem)):
+            if core.startswith(row.stem):
+                stem_len, rest = length, core[len(row.stem) :]
+                break
+        if stem_len is None:
+            return None
+    unsats = [(int(loc), 2 if kind == "en" else 3) for loc, kind in re.findall(r"(\d+)-(en|yn)", rest)]
+    residue = re.sub(r"\d+-(?:en|yn)", "", rest).replace("an", "").strip("-")
+    if residue in ("en", "yn"):
+        unsats.append((1, 2 if residue == "en" else 3))
+        residue = ""
+    if residue:  # unmodelled leftover tokens -> abstain
+        return None
+
+    rw = Chem.RWMol()
+    locants = {str(i): rw.AddAtom(Chem.Atom(6)) for i in range(1, stem_len + 1)}
+    for i in range(1, stem_len):
+        rw.AddBond(locants[str(i)], locants[str(i + 1)], Chem.BondType.SINGLE)
+    for loc, order in unsats:
+        if str(loc + 1) not in locants:
+            return None
+        bond = rw.GetBondBetweenAtoms(locants[str(loc)], locants[str(loc + 1)])
+        bond.SetBondType(Chem.BondType.DOUBLE if order == 2 else Chem.BondType.TRIPLE)
+    oxo = rw.AddAtom(Chem.Atom(8))
+    rw.AddBond(locants["1"], oxo, Chem.BondType.DOUBLE)
+    return rw, locants
+
+
+def _acyl_chain_base(base: str) -> Numbered | None:
+    """``<alkan>oyl`` and the retained ``acetyl``/``propionyl``/``butyryl``/
+    ``valeryl`` = ``parent-C(=O)-<chain>``, attached through the carbonyl carbon
+    (``2-(4-chlorophenyl)acetyl``, ``2-ethylbutyryl``, ``prop-2-enoyl``)."""
+
+    core = base[:-3] if base.endswith("oyl") else base[:-2]
+    skeleton = _acyl_chain_skeleton(core)
+    if skeleton is None:
+        return None
+    rw, locants = skeleton
+    return rw, locants, _hide_acyl_carbon(locants)
+
+
+def _acylamino_chain_base(base: str) -> Numbered | None:
+    """``<alkanoyl>amido`` = ``parent-NH-C(=O)-<chain>`` with the chain's C1 as the
+    carbonyl carbon (``propanamido`` -> ``NH-C(=O)-CH2-CH3``).  Chain locants are
+    exposed so front modifiers graft onto the acid carbons; the attachment is the
+    amide nitrogen."""
+
+    skeleton = _acyl_chain_skeleton(base[: -len("amido")])
+    if skeleton is None:
+        return None
+    rw, locants = skeleton
+    carbonyl = _hide_acyl_carbon(locants)
+    nitrogen = rw.AddAtom(Chem.Atom(7))
+    rw.AddBond(carbonyl, nitrogen, Chem.BondType.SINGLE)
+    return rw, locants, nitrogen
+
+
+def _hide_acyl_carbon(locants: dict[str, int]) -> int:
+    """Pop C1 out of the exposed locant map and return its index.
+
+    An acyl C1 carries its ``=O``, the outward bond and the rest of the chain, so
+    nothing can substitute there.  Withdrawing it stops :func:`_apply_prefix` from
+    treating an *unlocanted* front modifier as a C1 substituent — ``phenylacetyl``
+    puts the phenyl on C2, so guessing C1 would silently reconstruct the wrong
+    graph; with C1 hidden the prefix fails to place and the audit abstains."""
+
+    return locants.pop("1")
 
 
 def _parse_chain_base(base: str) -> Numbered | None:
@@ -517,6 +921,50 @@ def _alkyl_chain(n: int) -> Numbered:
     return rw, locants, locants["1"]
 
 
+def _cycloalkenyl_base(base: str) -> Numbered | None:
+    """Parse an unsaturated carbocycle substituent (``cyclohex-1-en-1-yl``,
+    ``cyclohexa-1,3-dien-1-yl``) into a numbered ring fragment."""
+    core = base[len("cyclo") : -2].rstrip("-")
+    sm = re.match(r"^([a-z]+)", core)
+    if sm is None:
+        return None
+    stem = sm.group(1)
+    n = _stem_length(stem) or _stem_length(stem.rstrip("a"))
+    if n is None or n < 3:
+        return None
+    rest = core[sm.end() :]
+    # The attachment locant must sit at the very end (``…-1``): otherwise this is
+    # not a bare cycloalkenyl but a larger unit like ``…-1-ylsulfonyl`` whose
+    # trailing ``yl`` we would wrongly swallow, silently dropping the operator.
+    am = re.search(r"-(\d+)$", rest)
+    if am is None:
+        return None
+    attach = am.group(1)
+    rest = rest[: am.start()]
+    unsats: list[tuple[int, int]] = []
+    for m in re.finditer(r"(\d+(?:,\d+)*)-(en|dien|trien|tetraen|yn|diyn)", rest):
+        order = 3 if m.group(2).endswith("yn") else 2
+        unsats.extend((int(loc), order) for loc in m.group(1).split(","))
+    # Everything between stem and attachment must be accounted for by unsaturation.
+    if re.sub(r"(\d+(?:,\d+)*)-(?:en|dien|trien|tetraen|yn|diyn)", "", rest).strip("-"):
+        return None
+    if not unsats:
+        return None
+    rw, locants, _ = _carbocycle(n)
+    for loc, order in unsats:
+        hi = str(loc + 1) if loc < n else "1"  # last ring bond wraps back to locant 1
+        a, b = locants.get(str(loc)), locants.get(hi)
+        if a is None or b is None:
+            return None
+        bond = rw.GetBondBetweenAtoms(a, b)
+        if bond is None:
+            return None
+        bond.SetBondType(Chem.BondType.DOUBLE if order == 2 else Chem.BondType.TRIPLE)
+    if attach not in locants:
+        return None
+    return rw, locants, locants[attach]
+
+
 def _carbocycle(n: int) -> Numbered:
     rw = Chem.RWMol()
     locants: dict[str, int] = {}
@@ -582,6 +1030,18 @@ def _apply_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
         if frag is not None:
             return _graft_onto(rw, locants["1"], frag)
         return False
+    # Several *fully parenthesised* unlocanted ligands on the same atom, e.g.
+    # ``(amino)(imino)methyl`` -> C1 bears both -> amidine.  Requiring every group
+    # to be parenthesised keeps ``(oxo)pyrrolidin-1-yl`` (where ``pyrrolidin-1-yl``
+    # is unparenthesised, and the ``oxo`` decorates *it*, not C1) out of this path.
+    if prefix.startswith("(") and "1" in locants:
+        groups = _top_level_groups(prefix)
+        if len(groups) >= 2 and all(g.startswith("(") and g.endswith(")") for g in groups):
+            for group in groups:
+                frag = resolve_fragment_mol(group)
+                if frag is None or not _graft_onto(rw, locants["1"], frag):
+                    return False
+            return True
     # A prefix that does not *begin* with a depth-0 locant is a single unlocanted
     # sub-substituent binding at position 1 — either a leaf (``chloromethyl`` ->
     # Cl on C1) or a whole ring-yl (``piperazin-1-ylmethyl`` -> piperazin-1-yl on
@@ -690,20 +1150,35 @@ def _graft_onto(rw: Chem.RWMol, base_idx: int, frag: Chem.Mol) -> bool:
     for atom in frag.GetAtoms():
         if atom.GetIdx() == dummy.GetIdx():
             continue
-        na = Chem.Atom(atom.GetAtomicNum())
-        na.SetFormalCharge(atom.GetFormalCharge())
-        na.SetNumExplicitHs(atom.GetNumExplicitHs())
-        na.SetNoImplicit(atom.GetNoImplicit())
-        frag_to_new[atom.GetIdx()] = rw.AddAtom(na)
+        frag_to_new[atom.GetIdx()] = rw.AddAtom(_clone_atom(atom))
     for bond in frag.GetBonds():
         a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         if dummy.GetIdx() in (a, b):
             other = b if a == dummy.GetIdx() else a
             _consume_hydrogen(rw.GetAtomWithIdx(base_idx), bond.GetBondType())
             rw.AddBond(base_idx, frag_to_new[other], bond.GetBondType())
+            _copy_bond_stereo_tag(bond, rw.GetBondBetweenAtoms(base_idx, frag_to_new[other]))
         else:
             rw.AddBond(frag_to_new[a], frag_to_new[b], bond.GetBondType())
+            _copy_bond_stereo_tag(bond, rw.GetBondBetweenAtoms(frag_to_new[a], frag_to_new[b]))
     return True
+
+
+def _copy_bond_stereo_tag(src: Chem.Bond, dst: Chem.Bond | None) -> None:
+    if dst is not None and src.HasProp(_NAME_CIP):
+        dst.SetProp(_NAME_CIP, src.GetProp(_NAME_CIP))
+
+
+def _clone_atom(atom: Chem.Atom) -> Chem.Atom:
+    """Copy an atom's element/charge/H state and its name-asserted stereo tag, so
+    the tag survives grafting into a larger fragment."""
+    na = Chem.Atom(atom.GetAtomicNum())
+    na.SetFormalCharge(atom.GetFormalCharge())
+    na.SetNumExplicitHs(atom.GetNumExplicitHs())
+    na.SetNoImplicit(atom.GetNoImplicit())
+    if atom.HasProp(_NAME_CIP):
+        na.SetProp(_NAME_CIP, atom.GetProp(_NAME_CIP))
+    return na
 
 
 def _consume_hydrogen(atom: Chem.Atom, bond_type: Chem.BondType) -> None:
