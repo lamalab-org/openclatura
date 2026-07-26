@@ -43,7 +43,15 @@ _UNSAT_MULT = {"en": 1, "dien": 2, "trien": 3, "tetraen": 4, "pentaen": 5, "hexa
 
 _VONBAEYER_RE = re.compile(r"(?:bi|tri|tetra|penta)cyclo\[([0-9.,^{}]+)\]")
 _SECONDARY_RE = re.compile(r"(\d+)\^?\{?(\d+),(\d+)\}?")
-_REPL_RE = re.compile(r"(\d+(?:,\d+)*)-(di|tri|tetra|penta|hexa)?(" + "|".join(_REPLACEMENT_ELEMENTS) + r")")
+# A replacement clause may carry a lambda-convention valence on its locant —
+# ``1lambda^6-thia`` is still just "sulfur at position 1"; the non-standard
+# valence is realised by the ``dioxo`` prefix the caller grafts, so the
+# annotation is matched and discarded rather than being left as an unparsed
+# leftover that forces an abstention.
+_LAMBDA = r"(?:lambda\^?\{?\d+\}?)?"
+_REPL_RE = re.compile(
+    r"(\d+(?:,\d+)*)" + _LAMBDA + r"-(di|tri|tetra|penta|hexa)?(" + "|".join(_REPLACEMENT_ELEMENTS) + r")"
+)
 
 # A parsed von Baeyer descriptor: the main bicycle (a,b,c) plus zero or more
 # secondary bridges (length, bridgehead-f, bridgehead-g).

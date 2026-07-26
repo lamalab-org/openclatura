@@ -146,6 +146,24 @@ def _canonical(mol) -> str | None:
         ("(N-methyl(2S,3R)-2-fluoro-3-(trifluoromethyl)butanamido)", "*N(C)C(=O)C(F)C(C)C(F)(F)F"),
         ("(N-methyl(1R,3S,5S)-bicyclo[3.1.0]hexane-3-carboxamido)", "*N(C)C(=O)C1CC2CC2C1"),
         ("((3S)-3-(N-methyl(2S,3R)-2-fluoro-3-(trifluoromethyl)butanamido)butyl)", "*CCC(C)N(C)C(=O)C(F)C(C)C(F)(F)F"),
+        # lambda-convention valences: the annotation rides on the locant and the
+        # extra bonds come from the oxo prefixes
+        ("(1,1-dioxo-1lambda^6-thiacyclohexan-3-yl)", "*C1CCCS(=O)(=O)C1"),
+        ("(3,3-dioxo-3lambda^6-thia-7-azabicyclo[3.3.0]octan-1-yl)", "*C12CNCC1CS(=O)(=O)C2"),
+        # indicated hydrogen away from position 1 is a different N-H tautomer
+        ("(2H-tetrazol-5-yl)", "*c1nn[nH]n1"),
+        ("(1H-tetrazol-5-yl)", "*c1nnn[nH]1"),
+        ("(2H-indazol-5-yl)", "*c1ccc2n[nH]cc2c1"),
+        ("(4H-1,2,4-triazol-3-yl)", "*c1nnc[nH]1"),
+        # heteroatom hubs carrying a ligand list
+        ("((ethoxy)(methyl)phosphoryl)", "*P(=O)(OCC)C"),
+        ("(dimethyloxophosphanyl)", "*P(C)(C)=O"),
+        ("((2-(formyl)phenyl)(4-chlorophenyl)(methyl)silyl)", "*[Si](C)(c1ccc(Cl)cc1)c1ccccc1C=O"),
+        # multiplied unsaturation, whose locant count must match the multiplier
+        ("(deca-1,8-dien-1-yl)", "*C=CCCCCCC=CC"),
+        ("(nona-2,4,6,8-tetraen-1-yl)", "*CC=CC=CC=CC=C"),
+        ("(hexa-1,2,5-trien-1-yl)", "*C=C=CCC=C"),
+        ("(1-oxohexa-3,5-dien-1-yl)", "*C(=O)CC=CC=C"),
     ],
 )
 def test_resolve_fragment_grammar(name, expected):
@@ -158,8 +176,8 @@ def test_resolve_fragment_grammar(name, expected):
     "name",
     [
         "(dispiro[3.1.3.1]decan-2-yl)",  # polyspiro: a different numbering rule
-        "(dihydroxy(oxo)-lambda^5-sulfanyl)",  # lambda-convention valence, not modelled
         "(azane)",  # 'az' + 'ane' is ammonia, not a six-membered ring
+        "(deca-1,8-trien-1-yl)",  # multiplier disagrees with the cited locants
         # ``phenylacetyl`` puts the phenyl on C2, but an unlocanted prefix would
         # otherwise be placed on C1 — the acyl base withdraws C1 so this abstains
         # rather than reconstructing the wrong graph.

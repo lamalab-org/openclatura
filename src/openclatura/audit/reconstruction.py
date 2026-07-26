@@ -42,7 +42,12 @@ from .naming import (
 )
 from .stereo import StereochemistryAudit, audit_stereochemistry
 from .relative_stereo import ring_face_relation
-from .substituent_reconstruction import _NAME_CIP, _NAME_RELATIVE, resolve_fragment_mol
+from .substituent_reconstruction import (
+    _NAME_CIP,
+    _NAME_RELATIVE,
+    move_indicated_hydrogen,
+    resolve_fragment_mol,
+)
 from .substituent_reconstruction import _RING_STEMS as _SUBSTITUENT_RING_STEMS
 from .von_baeyer_parse import build_skeleton as _build_von_baeyer_skeleton
 from .von_baeyer_parse import build_skeleton_from_descriptor as _build_von_baeyer_from_descriptor
@@ -559,10 +564,11 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
         raise _Abstain("front modifiers not modelled")
     if parts.parent_charges:
         raise _Abstain("parent charges not modelled")
-    if parts.indicated_hydrogens and (not has_template or any(str(h) != "1" for h in parts.indicated_hydrogens)):
-        # Templates place their indicated H at position 1 (1H-pyrrole -> [nH]); a
-        # different position (2H-indazole, 2H-1,2,3-triazole) is another N-H
-        # tautomer — a distinct constitution — so abstain rather than mis-build.
+    if parts.indicated_hydrogens and (not has_template or len(parts.indicated_hydrogens) != 1):
+        # Templates place their indicated H at position 1 (1H-pyrrole -> [nH]).
+        # A single cited position elsewhere (2H-indazole, 9H-purine) is another
+        # N-H tautomer, which is reachable by moving that hydrogen; several at
+        # once is not modelled.
         raise _Abstain("indicated hydrogen position not modelled")
     if any(op.operation_kind == "additive_hydrogen" for op in parts.hydro_operations):
         raise _Abstain("added (hydro) hydrogen not modelled")
@@ -570,6 +576,8 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
         raise _Abstain("principal-suffix modifiers not modelled")
 
     rw, locants, aromatic_ring = _build_parent(parts)
+    if parts.indicated_hydrogens and not move_indicated_hydrogen(rw, locants, parts.indicated_hydrogens[0]):
+        raise _Abstain(f"indicated hydrogen {parts.indicated_hydrogens[0]} not placeable")
     _apply_replacements(rw, locants, parts, aromatic_ring)
     _apply_unsaturations(rw, locants, parts, aromatic_ring)
     _apply_principal_group(rw, locants, parts)
@@ -637,6 +645,9 @@ def _build_parent(parts) -> tuple[Chem.RWMol, dict[str, int], bool]:
     return rw, {str(i + 1): idxs[i] for i in range(n)}, False
 
 
+_LAMBDA_RE = re.compile(r"lambda\^?\{?\d+\}?")
+
+
 def _apply_replacements(rw: Chem.RWMol, locants: dict[str, int], parts, aromatic_ring: bool) -> None:
     for item in parts.a_prefixes:
         element = _replacement_element(item.name)
@@ -645,7 +656,10 @@ def _apply_replacements(rw: Chem.RWMol, locants: dict[str, int], parts, aromatic
         if aromatic_ring:
             raise _Abstain("replacement on a retained aromatic template not modelled")
         for locant in item.locants:
-            idx = locants.get(str(locant))
+            # ``1lambda^6`` is position 1 wearing a lambda-convention valence; the
+            # extra bonds come from the oxo prefixes grafted later, so only the
+            # position matters here.
+            idx = locants.get(_LAMBDA_RE.sub("", str(locant)))
             if idx is None:
                 raise _Abstain(f"replacement locant {locant} outside parent")
             rw.GetAtomWithIdx(idx).SetAtomicNum(Chem.Atom(element).GetAtomicNum())

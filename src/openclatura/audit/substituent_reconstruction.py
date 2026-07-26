@@ -236,10 +236,38 @@ _RING_ALIASES: dict[str, str] = {
 _LOCANT_YL_RE = re.compile(r"^(?P<stem>[a-z0-9,\[\]-]+?)-(?P<loc>\d+[a-z]?)-yl$")
 
 # Every ring template here places its indicated hydrogen at position 1, so a
-# leading ``1H-`` matches the template and is dropped.  Any *other* indicated-H
-# position (``2H-``, ``4H-``…) is a different N-H tautomer — a distinct
-# constitution — so it is left in place, fails stem matching, and abstains.
-_INDICATED_H_RE = re.compile(r"^1H-")
+# Ring stems are stored in their ``1H-`` tautomer (``pyrrole`` -> ``[nH]1cccc1``),
+# so a cited indicated hydrogen is peeled off the name here and, when it names a
+# different position (``2H-``, ``4H-``, ``9H-``), realised afterwards by moving
+# the template's N-H — those are genuinely different tautomers, so the ring must
+# be rebuilt rather than the annotation ignored.
+_INDICATED_H_RE = re.compile(r"^(\d+)H-")
+
+
+def move_indicated_hydrogen(rw: Chem.RWMol, locants: dict[str, int], position) -> bool:
+    """Relocate a ring's single pyrrole-type N-H to the cited locant.
+
+    ``False`` (so the caller abstains) when there is no unique N-H to move or the
+    destination cannot carry one — the tautomer is then outside what the stored
+    template can express."""
+
+    target = locants.get(str(position))
+    if target is None:
+        return False
+    destination = rw.GetAtomWithIdx(target)
+    if destination.GetAtomicNum() != 7:
+        return False
+    donors = [a for a in rw.GetAtoms() if a.GetAtomicNum() == 7 and a.GetNumExplicitHs() == 1]
+    if len(donors) != 1:
+        return False
+    donor = donors[0]
+    if donor.GetIdx() == target:
+        return True
+    donor.SetNumExplicitHs(0)
+    donor.SetNoImplicit(True)
+    destination.SetNumExplicitHs(1)
+    destination.SetNoImplicit(True)
+    return True
 
 
 def resolve_fragment_mol(name: str) -> Chem.Mol | None:
@@ -359,6 +387,9 @@ def _resolve_operator(name: str) -> Chem.Mol | None:
         frag = _resolve_amino(name[: -len("amino")])
         if frag is not None:
             return frag
+    frag = _resolve_liganded_hub(name)
+    if frag is not None:
+        return frag
     # ``Xcarbamoyl`` = parent-C(=O)-NH-X (an added carbonyl); ``Ximino`` = parent=N-X
     # (attached through a double bond).
     for suffix, wrapper in (("carbamoyl", "*C(=O)N*"), ("imino", "*=N*")):
@@ -546,6 +577,67 @@ def _amino_from_ligands(frags: list[Chem.Mol]) -> Chem.Mol | None:
     except Exception:
         return None
     return mol
+
+
+# Hub groups that bond outward through a heteroatom carrying its own oxo load and
+# a list of parenthesised ligands: ``(ethoxy)(methyl)phosphoryl`` is
+# ``-P(=O)(OEt)(Me)``.  Value: (element, number of ``=O``).
+_LIGANDED_HUBS: dict[str, tuple[str, int]] = {
+    "phosphoryl": ("P", 1),
+    "oxophosphanyl": ("P", 1),
+    "phosphanyl": ("P", 0),
+    "silyl": ("Si", 0),
+    "boryl": ("B", 0),
+}
+
+
+def _resolve_liganded_hub(name: str) -> Chem.Mol | None:
+    """``(A)(B)phosphoryl`` / ``(A)(B)(C)silyl`` — a heteroatom hub bonded outward
+    to the parent, carrying its oxo load plus each cited ligand.
+
+    The ligands are either a list of parenthesised clauses or a single multiplied
+    one (``dimethyloxophosphanyl`` -> two methyls); a head that is neither falls
+    through rather than being guessed at."""
+
+    for word, (element, oxo_count) in _LIGANDED_HUBS.items():
+        if not name.endswith(word) or len(name) <= len(word):
+            continue
+        head = name[: -len(word)].rstrip("-")
+        frags = _hub_ligands(head)
+        if frags is None:
+            continue
+        rw = Chem.RWMol()
+        hub = rw.AddAtom(Chem.Atom(element))
+        dummy = rw.AddAtom(Chem.Atom(0))
+        rw.AddBond(dummy, hub, Chem.BondType.SINGLE)
+        for _ in range(oxo_count):
+            oxo = rw.AddAtom(Chem.Atom(8))
+            rw.AddBond(hub, oxo, Chem.BondType.DOUBLE)
+        if not all(_graft_onto(rw, hub, frag) for frag in frags):
+            continue
+        mol = rw.GetMol()
+        try:
+            Chem.SanitizeMol(mol)
+        except Exception:
+            continue
+        return mol
+    return None
+
+
+def _hub_ligands(head: str) -> list[Chem.Mol] | None:
+    """Resolve a hub's ligand list: several parenthesised clauses, or one clause
+    under a multiplier.  ``None`` if the head is neither."""
+
+    groups = _top_level_groups(head)
+    if len(groups) >= 2 and all(g.startswith("(") and g.endswith(")") for g in groups):
+        frags = [resolve_fragment_mol(g) for g in groups]
+        return None if any(f is None for f in frags) else frags
+    for word, count in sorted(_MULTIPLIERS.items(), key=lambda kv: -len(kv[0])):
+        if head.startswith(word):
+            inner = resolve_fragment_mol(head[len(word) :])
+            if inner is not None:
+                return [inner] * count
+    return None
 
 
 def _top_level_groups(s: str) -> list[str]:
@@ -790,7 +882,17 @@ def _base_start_positions(name: str) -> list[int]:
 # Base builders
 # --------------------------------------------------------------------------- #
 def _build_base(base: str) -> Numbered | None:
-    base = _INDICATED_H_RE.sub("", base)
+    indicated = _INDICATED_H_RE.match(base)
+    if indicated is not None:
+        base = base[indicated.end() :]
+    numbered = _build_base_core(base)
+    if numbered is None or indicated is None:
+        return numbered
+    rw, locants, attach = numbered
+    return numbered if move_indicated_hydrogen(rw, locants, indicated.group(1)) else None
+
+
+def _build_base_core(base: str) -> Numbered | None:
     # A von Baeyer ring core (``…cyclo[…]…-N-yl``) as a decoratable base, so that
     # front modifiers like ``7,9-dioxo`` / ``4,6-dimethyl`` can be peeled off by
     # ``_resolve`` and grafted through the ordinary locanted-clause machinery.
@@ -887,11 +989,10 @@ def _acyl_chain_skeleton(core: str) -> tuple[Chem.RWMol, dict[str, int]] | None:
                 break
         if stem_len is None:
             return None
-    unsats = [(int(loc), 2 if kind == "en" else 3) for loc, kind in re.findall(r"(\d+)-(en|yn)", rest)]
-    residue = re.sub(r"\d+-(?:en|yn)", "", rest).replace("an", "").strip("-")
-    if residue in ("en", "yn"):
-        unsats.append((1, 2 if residue == "en" else 3))
-        residue = ""
+    parsed = _parse_unsaturation(rest)
+    if parsed is None:
+        return None
+    unsats, residue = parsed
     if residue:  # unmodelled leftover tokens -> abstain
         return None
 
@@ -950,6 +1051,46 @@ def _hide_acyl_carbon(locants: dict[str, int]) -> int:
     return locants.pop("1")
 
 
+# Multiplied unsaturation suffixes: how many locants each must cite.
+_UNSAT_COUNTS = {
+    "en": 1,
+    "dien": 2,
+    "trien": 3,
+    "tetraen": 4,
+    "pentaen": 5,
+    "yn": 1,
+    "diyn": 2,
+    "triyn": 3,
+}
+_UNSAT_RE = re.compile(r"(\d+(?:,\d+)*)-(" + "|".join(sorted(_UNSAT_COUNTS, key=len, reverse=True)) + r")")
+
+
+def _parse_unsaturation(rest: str) -> tuple[list[tuple[int, int]], str] | None:
+    """Read a chain's unsaturation clauses into ``(locant, bond order)`` pairs,
+    returning them with whatever text was left unconsumed (the caller abstains if
+    that is non-empty).
+
+    Handles the multiplied forms — ``deca-1,8-dien``, ``nona-2,4,6,8-tetraen`` —
+    by requiring the cited locant count to match the multiplier, so a malformed
+    clause is rejected instead of silently under-building the chain.  ``None``
+    means exactly that rejection."""
+
+    unsats: list[tuple[int, int]] = []
+    for match in _UNSAT_RE.finditer(rest):
+        locants = match.group(1).split(",")
+        if len(locants) != _UNSAT_COUNTS[match.group(2)]:
+            return None
+        order = 3 if match.group(2).endswith("yn") else 2
+        unsats.extend((int(locant), order) for locant in locants)
+    residue = _UNSAT_RE.sub("", rest).replace("an", "").strip("-")
+    # Unlocanted unsaturation (``propenyl`` = prop-1-en-1-yl) starts at locant 1.
+    if residue in ("en", "yn"):
+        unsats.append((1, 2 if residue == "en" else 3))
+        residue = ""
+    # The elision vowel a multiplied suffix takes (``dec`` + ``a`` + ``-1,8-dien``).
+    return unsats, residue.strip("-a")
+
+
 def _parse_chain_base(base: str) -> Numbered | None:
     """Parse acyclic chain substituents like ``propan-2-yl``, ``prop-2-en-1-yl``,
     ``but-2-yn-1-yl`` into a numbered fragment."""
@@ -970,15 +1111,10 @@ def _parse_chain_base(base: str) -> Numbered | None:
     if m:
         attach = m.group(1)
         rest = rest[: m.start()]
-    unsats: list[tuple[int, int]] = [
-        (int(loc), 2 if kind == "en" else 3) for loc, kind in re.findall(r"(\d+)-(en|yn)", rest)
-    ]
-    residue = re.sub(r"\d+-(?:en|yn)", "", rest).replace("an", "").strip("-")
-    # Unlocanted unsaturation (e.g. ``propenyl`` = prop-1-en-1-yl) defaults to
-    # a bond starting at locant 1.
-    if residue in ("en", "yn"):
-        unsats.append((1, 2 if residue == "en" else 3))
-        residue = ""
+    parsed = _parse_unsaturation(rest)
+    if parsed is None:
+        return None
+    unsats, residue = parsed
     if residue:  # leftover tokens we did not model -> abstain
         return None
     if str(attach) not in {str(i) for i in range(1, stem_len + 1)}:
