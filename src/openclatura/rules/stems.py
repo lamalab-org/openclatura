@@ -9,6 +9,7 @@ References:
 """
 
 from dataclasses import dataclass
+from functools import lru_cache
 
 
 @dataclass(frozen=True)
@@ -20,7 +21,8 @@ class Stem:
 
 # Stems 1-4 are retained (non-systematic) names.
 # Stems 5+ are derived from Greek/Latin numerical roots.
-# Coverage up to 30; extend as needed (IUPAC defines stems well beyond this).
+# Retained and established spellings through 30. Larger stems are generated
+# from the basic numerical terms in Blue Book P-14.2.1.
 STEMS: dict[int, Stem] = {
     1: Stem(1, "meth", retained=True),
     2: Stem(2, "eth", retained=True),
@@ -54,12 +56,105 @@ STEMS: dict[int, Stem] = {
     30: Stem(30, "triacont", retained=False),
 }
 
+MIN_STEM_LENGTH = 1
+MAX_STEM_LENGTH = 1000
+
+_UNITS = {
+    1: "hen",
+    2: "do",
+    3: "tri",
+    4: "tetra",
+    5: "penta",
+    6: "hexa",
+    7: "hepta",
+    8: "octa",
+    9: "nona",
+}
+
+_TENS = {
+    1: "deca",
+    2: "icosa",
+    3: "triaconta",
+    4: "tetraconta",
+    5: "pentaconta",
+    6: "hexaconta",
+    7: "heptaconta",
+    8: "octaconta",
+    9: "nonaconta",
+}
+
+_HUNDREDS = {
+    1: "hecta",
+    2: "dicta",
+    3: "tricta",
+    4: "tetracta",
+    5: "pentacta",
+    6: "hexacta",
+    7: "heptacta",
+    8: "octacta",
+    9: "nonacta",
+}
+
+
+def _validate_length(length: int) -> None:
+    if isinstance(length, bool) or not isinstance(length, int):
+        raise ValueError("Stem length must be an integer from 1 through 1000")
+    if not MIN_STEM_LENGTH <= length <= MAX_STEM_LENGTH:
+        raise ValueError("Stem length must be from 1 through 1000")
+
+
+def _under_one_hundred(value: int) -> str:
+    """Return the basic numerical term for a value from 1 through 99."""
+
+    if value == 11:
+        return "undeca"
+
+    units = value % 10
+    tens = value // 10
+    unit_term = _UNITS.get(units, "")
+    tens_term = _TENS.get(tens, "")
+
+    # The initial i of icosa is elided after a vowel (P-14.2.1.2), e.g.
+    # do + icosa -> docosa, but hen + icosa -> henicosa.
+    if unit_term and tens == 2 and unit_term[-1] in "aeiou":
+        tens_term = tens_term[1:]
+    return unit_term + tens_term
+
+
+def _numerical_term(length: int) -> str:
+    """Build the P-14.2.1 basic numerical term for ``length``."""
+
+    _validate_length(length)
+    if length == 1000:
+        return "kilia"
+
+    hundreds, remainder = divmod(length, 100)
+    parts = []
+    if remainder:
+        parts.append(_under_one_hundred(remainder))
+    if hundreds:
+        parts.append(_HUNDREDS[hundreds])
+    return "".join(parts)
+
 
 def get(length: int) -> Stem:
-    """Look up a stem by chain length. Raises KeyError if out of range."""
-    return STEMS[length]
+    """Return the chain stem for a supported skeletal-atom count."""
+
+    _validate_length(length)
+    return _get_cached(length)
+
+
+@lru_cache(maxsize=MAX_STEM_LENGTH)
+def _get_cached(length: int) -> Stem:
+    """Return a validated stem while caching generated values."""
+
+    if length in STEMS:
+        return STEMS[length]
+    numerical_term = _numerical_term(length)
+    return Stem(length, numerical_term.removesuffix("a"), retained=False)
 
 
 def stem_for(length: int) -> str:
-    """Return just the stem string for a given chain length."""
-    return STEMS[length].stem
+    """Return just the stem string for a supported chain length."""
+
+    return get(length).stem
