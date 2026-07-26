@@ -40,8 +40,8 @@ from .naming import (
     audit_charge_pair_templates,
     component_named_atom_coverage,
 )
-from .stereo import StereochemistryAudit, audit_stereochemistry
 from .relative_stereo import ring_face_relation
+from .stereo import StereochemistryAudit, audit_stereochemistry
 from .substituent_reconstruction import (
     _NAME_CIP,
     _NAME_RELATIVE,
@@ -105,7 +105,10 @@ class ReconstructionAudit:
             "unnamed_atoms": sorted(self.coverage.unnamed_atoms) if self.coverage else None,
             "stereo_issues": list(self.stereo.issues) if self.stereo else None,
             "unsupported_charge_pairs": (
-                [role.summary() if hasattr(role, "summary") else str(role) for role in self.charge_pairs.unsupported_roles]
+                [
+                    role.summary() if hasattr(role, "summary") else str(role)
+                    for role in self.charge_pairs.unsupported_roles
+                ]
                 if self.charge_pairs
                 else None
             ),
@@ -174,6 +177,7 @@ _ALL_PARENT_TEMPLATES: dict[str, tuple[str, list[str]]] = {
 def _lookup_parent_template(retained_name: str) -> tuple[str, list[str]] | None:
     return _ALL_PARENT_TEMPLATES.get(retained_name)
 
+
 # Principal characteristic groups whose structure we can rebuild with high
 # confidence.  Each entry describes atoms bonded onto the *characteristic atom*
 # as (element, bond_order) pairs.  ``exocyclic`` groups add a new carbon (bearing
@@ -235,7 +239,9 @@ class _Abstain(Exception):
 # --------------------------------------------------------------------------- #
 # Public entry point
 # --------------------------------------------------------------------------- #
-def audit_component_reconstruction(mol: Molecule, parts, component_atoms: set[int] | None = None) -> ReconstructionAudit:
+def audit_component_reconstruction(
+    mol: Molecule, parts, component_atoms: set[int] | None = None
+) -> ReconstructionAudit:
     """Audit a named component by rebuilding it from ``parts`` and comparing.
 
     ``mol`` is the internal graph, ``parts`` the assembled :class:`AssemblyParts`
@@ -249,7 +255,9 @@ def audit_component_reconstruction(mol: Molecule, parts, component_atoms: set[in
         charge_pairs = audit_charge_pair_templates(mol, atoms)
 
         reference = _component_reference_smiles(mol, atoms)
-        structural_verdict, structural_reason, reconstructed, rebuilt = _structural_verdict(mol, atoms, parts, reference)
+        structural_verdict, structural_reason, reconstructed, rebuilt = _structural_verdict(
+            mol, atoms, parts, reference
+        )
 
         # Stereo descriptors embedded in substituent terms are tagged onto the
         # rebuilt graph; verifying them against the input's independent CIP needs
@@ -352,9 +360,7 @@ def _verify_tagged_stereo(rebuilt: Chem.Mol, mol: Molecule, atoms: set[int]) -> 
     Chem.RemoveStereochemistry(query)
     tagged_atoms = [(a.GetIdx(), a.GetProp(_NAME_CIP)) for a in query.GetAtoms() if a.HasProp(_NAME_CIP)]
     tagged_bonds = [
-        (b.GetBeginAtomIdx(), b.GetEndAtomIdx(), b.GetProp(_NAME_CIP))
-        for b in query.GetBonds()
-        if b.HasProp(_NAME_CIP)
+        (b.GetBeginAtomIdx(), b.GetEndAtomIdx(), b.GetProp(_NAME_CIP)) for b in query.GetBonds() if b.HasProp(_NAME_CIP)
     ]
     relative_pairs = _relative_stereo_pairs(query)
     if not tagged_atoms and not tagged_bonds and not relative_pairs:

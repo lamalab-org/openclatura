@@ -50,6 +50,7 @@ def _naming_recursion_depth() -> int:
         frame = frame.f_back
     return depth
 
+
 # Verdict precedence when several components disagree: a single refuted or
 # unnamed component condemns the whole molecule; otherwise we can only claim
 # confirmation when every component was positively confirmed.

@@ -410,9 +410,7 @@ def _parse_hw_prefix(prefix: str) -> list[str] | None:
     return elements or None
 
 
-def _build_hw_ring(
-    size: int, elements: list[str], locants: str | None, attach: str, stem: str
-) -> Numbered | None:
+def _build_hw_ring(size: int, elements: list[str], locants: str | None, attach: str, stem: str) -> Numbered | None:
     """Place ``elements`` at the cited locants (or at position 1 for a lone
     heteroatom) around a ring of ``size`` atoms."""
 

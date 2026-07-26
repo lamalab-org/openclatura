@@ -104,7 +104,12 @@ def audit_stereochemistry(
             checked += 1
             issues.append(f"absolute_stereo:atom-{aid}: stereocentre not independently verified")
     for bond in mol.bonds.values():
-        if bond.u in scope and bond.v in scope and (bond.stereo in {"E", "Z"} or bond.cip) and bond.idx not in verified_bonds:
+        if (
+            bond.u in scope
+            and bond.v in scope
+            and (bond.stereo in {"E", "Z"} or bond.cip)
+            and bond.idx not in verified_bonds
+        ):
             checked += 1
             issues.append(f"bond_stereo:bond-{bond.idx}: stereo bond not independently verified")
 
