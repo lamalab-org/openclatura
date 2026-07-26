@@ -412,6 +412,11 @@ CONFIRMED_SMILES = [
     "C#CCCCOCCOCCC(=O)N[C@@H](C)CNC(=O)[C@H]1C[C@@H](S(C)(=O)=O)C1",  # cis-cyclobutane, via …carboxamido
     "CC[C@@H](O)CC(=O)N[C@H]1C[C@@H](C(=O)NCC(C)(C)F)C1",  # cis-cyclobutyl beside a parent (3R)
     "COC1(C(=O)N[C@H]2CC[C@H](NC(=O)[C@@H]3CCS(=O)(=O)N3)CC2)CCOCC1",  # trans-cyclohexyl
+    # …and the same word on the *parent*, which the namer binds to its two ring
+    # atoms directly rather than embedding in a substituent term
+    "O=C(O)[C@H]1C[C@@H](c2cc(Cl)cc(-c3cnc4c(F)cccc4c3)c2)C1",  # cis-cyclobutanecarboxylic acid
+    "C#CCCN(C)CC(=O)N1CCC[C@@H](N(C)C(=O)[C@H]2CC[C@H](CC)CC2)C1",  # trans-cyclohexanecarboxamide
+    "C[C@@H](C[C@@H](C)NC(=O)[C@H]1C[C@@H](O)C1)NC(=O)CCc1cn[nH]c1",  # cis, beside parent (2R,4S)
 ]
 
 # Constitution is correct but the emitted stereo descriptors disagree with the
@@ -512,6 +517,29 @@ def test_flipped_relative_stereo_word_is_not_confirmed(smiles):
             substituent.name = substituent.name.replace("trans-", "cis-")
             swapped += 1
     assert swapped == 1, f"expected exactly one cis/trans word to flip, flipped {swapped}"
+    assert audit_component_reconstruction(mol, bad, atoms).verdict != "confirmed"
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    [
+        "O=C(O)[C@H]1C[C@@H](c2cc(Cl)cc(-c3cnc4c(F)cccc4c3)c2)C1",
+        "C#CCCN(C)CC(=O)N1CCC[C@@H](N(C)C(=O)[C@H]2CC[C@H](CC)CC2)C1",
+    ],
+)
+def test_flipped_parent_relative_stereo_binding_is_not_confirmed(smiles):
+    # Same non-vacuity check for the parent-level cis/trans binding.
+    mol, atoms, parts = _capture_top_level(smiles)
+    assert audit_component_reconstruction(mol, parts, atoms).verdict == "confirmed"
+
+    bad = copy.deepcopy(parts)
+    swap = {"cis": "trans", "trans": "cis"}
+    flipped = 0
+    for i, binding in enumerate(bad.name_atom_bindings):
+        if binding.role == "relative_stereo" and binding.term in swap:
+            bad.name_atom_bindings[i] = replace(binding, term=swap[binding.term])
+            flipped += 1
+    assert flipped == 1, f"expected one relative_stereo binding, found {flipped}"
     assert audit_component_reconstruction(mol, bad, atoms).verdict != "confirmed"
 
 

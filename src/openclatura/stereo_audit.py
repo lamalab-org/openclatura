@@ -84,6 +84,17 @@ def audit_stereochemistry(
                 checked += 1
                 issue = _bond_stereo_issue(stereo_bonds[0], binding.term, descriptors[0])
                 issues.append(issue) if issue else verified_bonds.add(stereo_bonds[0].idx)
+        elif binding.role == "relative_stereo":
+            # A ``cis``/``trans`` on the parent names the two ring atoms it
+            # relates outright, so it is adjudicated straight against the input's
+            # tetrahedral parities.  (The same word *inside* a substituent term
+            # carries no binding; the reconstruction audit tags and checks those.)
+            word = binding.term.strip().lower()
+            related = sorted(a for a in binding.atom_ids if a in mol.atoms)
+            if word in {"cis", "trans"} and len(related) == 2:
+                checked += 1
+                issue = _relative_stereo_issue(mol, related[0], related[1], word)
+                issues.append(issue) if issue else verified_atoms.update(related)
 
     # 3. Soundness backstop: every real stereo feature in the component must have
     #    been positionally verified above, else we cannot confirm it.
@@ -128,6 +139,26 @@ def _bond_stereo_issue(bond, label: str, descriptor: str) -> str | None:
         return f"{label}: no independent CIP label to verify against"
     if bond.cip != descriptor:
         return f"{label}: independent bond CIP is {bond.cip!r}"
+    return None
+
+
+def _relative_stereo_issue(mol: Molecule, atom_a: int, atom_b: int, word: str) -> str | None:
+    """Verify an emitted ``cis``/``trans`` against the ring-face oracle, which
+    reads the input's own tetrahedral parities and so is independent of the
+    namer's perception."""
+
+    # Imported lazily: the audit package re-exports this module, so a top-level
+    # import of one of its siblings would close a cycle.
+    from .audit.relative_stereo import ring_face_relation
+
+    rdmol = getattr(mol, "audit_rdmol", None)
+    if rdmol is None:
+        return f"{word}: no source molecule to read ring parities from"
+    relation = ring_face_relation(rdmol, atom_a, atom_b)
+    if relation is None:
+        return f"{word}: ring face relation not determinable"
+    if relation != word:
+        return f"{word}: independent ring face relation is {relation!r}"
     return None
 
 
