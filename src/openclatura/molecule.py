@@ -174,6 +174,9 @@ class Molecule:
         self._bond_lookup: dict[tuple[int, int], int] = {}
         self._cyclic_cache: set[int] | None = None  # full-molecule ring atoms; invalidated on mutation
         self._perception_cache: tuple | None = None  # perceived functional groups; invalidated on mutation
+        # The source RDKit molecule, populated only while self-auditing so the
+        # audit can read tetrahedral parities the flattened model drops (graph_io).
+        self.audit_rdmol = None
 
     def add_atom(
         self,

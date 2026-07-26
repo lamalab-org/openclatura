@@ -41,7 +41,8 @@ from .naming import (
     component_named_atom_coverage,
 )
 from .stereo import StereochemistryAudit, audit_stereochemistry
-from .substituent_reconstruction import _NAME_CIP, resolve_fragment_mol
+from .relative_stereo import ring_face_relation
+from .substituent_reconstruction import _NAME_CIP, _NAME_RELATIVE, resolve_fragment_mol
 from .substituent_reconstruction import _RING_STEMS as _SUBSTITUENT_RING_STEMS
 from .von_baeyer_parse import build_skeleton as _build_von_baeyer_skeleton
 from .von_baeyer_parse import build_skeleton_from_descriptor as _build_von_baeyer_from_descriptor
@@ -331,7 +332,12 @@ def _verify_tagged_stereo(rebuilt: Chem.Mol, mol: Molecule, atoms: set[int]) -> 
     input (constitution already confirmed), so any isomorphism under which every
     tag matches proves the name denotes the input's stereo *up to the molecule's
     own symmetry* — sound.  Untagged or unmatched features return nothing and are
-    left for the caller to abstain on."""
+    left for the caller to abstain on.
+
+    Relative (``cis``/``trans``) tags ride along in the same pass: they are
+    adjudicated against the input's tetrahedral parities rather than its CIP
+    labels, but they bind to input atoms through the same isomorphism and must
+    hold under the same one."""
 
     try:
         query = Chem.Mol(rebuilt)
@@ -345,7 +351,8 @@ def _verify_tagged_stereo(rebuilt: Chem.Mol, mol: Molecule, atoms: set[int]) -> 
         for b in query.GetBonds()
         if b.HasProp(_NAME_CIP)
     ]
-    if not tagged_atoms and not tagged_bonds:
+    relative_pairs = _relative_stereo_pairs(query)
+    if not tagged_atoms and not tagged_bonds and not relative_pairs:
         return set(), set()
     target, rev = _input_rdmol_with_cip(mol, atoms)
     if target is None:
@@ -373,8 +380,41 @@ def _verify_tagged_stereo(rebuilt: Chem.Mol, mol: Molecule, atoms: set[int]) -> 
                     break
                 verified_bonds.add(bond.idx)
         if ok:
+            for qa, qb, word in relative_pairs:
+                ia, ib = rev.get(match[qa]), rev.get(match[qb])
+                if ia is None or ib is None or ring_face_relation(mol.audit_rdmol, ia, ib) != word:
+                    ok = False
+                    break
+                verified_atoms.update((ia, ib))
+        if ok:
             return verified_atoms, verified_bonds
     return set(), set()
+
+
+def _relative_stereo_pairs(query: Chem.Mol) -> list[tuple[int, int, str]]:
+    """The ``(atom, atom, "cis"|"trans")`` relations tagged on the rebuilt graph.
+
+    A component can carry several independent relative assertions, so the tagged
+    atoms are grouped by the ring they share rather than by the word — two
+    different ``cis`` rings would otherwise be indistinguishable.  A group that
+    is not exactly a pair is a relation we cannot pin down and is dropped, so the
+    caller abstains on those centres."""
+
+    tagged = {a.GetIdx(): a.GetProp(_NAME_RELATIVE) for a in query.GetAtoms() if a.HasProp(_NAME_RELATIVE)}
+    if not tagged:
+        return []
+    pairs: list[tuple[int, int, str]] = []
+    for ring in query.GetRingInfo().AtomRings():
+        members = sorted(a for a in ring if a in tagged)
+        if len(members) != 2:
+            continue
+        first, second = members
+        if tagged[first] != tagged[second]:
+            continue
+        if any({first, second} == {a, b} for a, b, _ in pairs):
+            continue  # a fused system reports the same pair through several rings
+        pairs.append((first, second, tagged[first]))
+    return pairs
 
 
 def _input_rdmol_with_cip(mol: Molecule, atoms: set[int]) -> tuple[Chem.Mol | None, dict[int, int]]:
@@ -432,10 +472,75 @@ def _canonical_constitution(rwmol: Chem.Mol | None) -> str | None:
     except Exception:
         return None
     Chem.RemoveStereochemistry(mol)
+    mol = _collapse_charge_separation(mol)
     try:
         return Chem.MolToSmiles(mol, canonical=True)
     except Exception:
         return None
+
+
+def _collapse_charge_separation(mol: Chem.Mol) -> Chem.Mol:
+    """Rewrite ``[X+]-[O-]`` as ``X=O`` wherever the hypervalent spelling is legal.
+
+    A sulfonyl can be drawn either way — ``S(=O)(=O)`` or ``[S+](=O)[O-]`` — and
+    which one an input uses says nothing about the structure the name has to
+    denote.  Both the input reference and the reconstruction pass through here,
+    so the two spellings converge and no longer read as a disagreement.
+
+    The rewrite is applied only when it survives sanitisation, which is what
+    keeps it honest: groups whose charge separation is *not* optional (nitro,
+    N-oxide, azide, diazo — nitrogen cannot take the extra bond) are rejected and
+    keep their charges, on both sides alike.  Genuine differences in charge,
+    element or connectivity survive untouched."""
+
+    result = mol
+    for _ in range(result.GetNumAtoms() + 1):  # each collapse removes one pair
+        for bond in result.GetBonds():
+            if bond.GetBondType() != Chem.BondType.SINGLE:
+                continue
+            begin, end = bond.GetBeginAtom(), bond.GetEndAtom()
+            if begin.GetFormalCharge() == 1 and end.GetFormalCharge() == -1:
+                positive, negative = begin, end
+            elif end.GetFormalCharge() == 1 and begin.GetFormalCharge() == -1:
+                positive, negative = end, begin
+            else:
+                continue
+            if negative.GetDegree() != 1:  # only a terminal counter-atom
+                continue
+            candidate = _promote_charge_pair(result, bond.GetIdx(), positive.GetIdx(), negative.GetIdx())
+            if candidate is not None:
+                result = candidate
+                break
+        else:
+            break
+    return result
+
+
+def _promote_charge_pair(mol: Chem.Mol, bond_idx: int, positive_idx: int, negative_idx: int) -> Chem.Mol | None:
+    """``[X+]-[Y-]`` -> ``X=Y`` with both charges cleared, or ``None`` when the
+    charge separation was not an optional spelling after all.
+
+    Two ways it can be rejected: the promoted form fails to sanitise, or
+    sanitisation *restores* the charges — RDKit's clean-up rewrites a pentavalent
+    ``N(=O)=O`` back to ``[N+](=O)[O-]``, which is precisely its way of saying
+    that nitro has no neutral spelling.  Checking the charges actually stuck is
+    also what makes this terminate."""
+
+    rw = Chem.RWMol(mol)
+    rw.GetBondWithIdx(bond_idx).SetBondType(Chem.BondType.DOUBLE)
+    for idx in (positive_idx, negative_idx):
+        atom = rw.GetAtomWithIdx(idx)
+        atom.SetFormalCharge(0)
+        atom.SetNoImplicit(False)
+        atom.SetNumExplicitHs(0)
+    candidate = rw.GetMol()
+    try:
+        Chem.SanitizeMol(candidate)
+    except Exception:
+        return None
+    if any(candidate.GetAtomWithIdx(idx).GetFormalCharge() != 0 for idx in (positive_idx, negative_idx)):
+        return None
+    return candidate
 
 
 # --------------------------------------------------------------------------- #
@@ -735,8 +840,9 @@ def _graft(rw: Chem.RWMol, base_idx: int, frag: Chem.Mol) -> None:
         new_atom.SetFormalCharge(atom.GetFormalCharge())
         new_atom.SetNoImplicit(atom.GetNoImplicit())
         new_atom.SetNumExplicitHs(atom.GetNumExplicitHs())
-        if atom.HasProp(_NAME_CIP):  # carry the name-asserted stereo tag onto the assembled graph
-            new_atom.SetProp(_NAME_CIP, atom.GetProp(_NAME_CIP))
+        for prop in (_NAME_CIP, _NAME_RELATIVE):  # carry name-asserted stereo tags onto the assembled graph
+            if atom.HasProp(prop):
+                new_atom.SetProp(prop, atom.GetProp(prop))
         frag_to_new[atom.GetIdx()] = rw.AddAtom(new_atom)
     for bond in frag.GetBonds():
         a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()

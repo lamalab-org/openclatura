@@ -244,10 +244,21 @@ _INDICATED_H_RE = re.compile(r"^1H-")
 def resolve_fragment_mol(name: str) -> Chem.Mol | None:
     """Return an RDKit mol with exactly one dummy ``*`` at the attachment point,
     or ``None`` if the name is not fully modeled."""
-    # Capture the leading stereo descriptor before it is stripped, so we can tag
-    # the resolved fragment's atoms with the R/S the name asserts (verified later
-    # against the input's independent CIP).
-    stereo_map = _leading_stereo_map(name)
+    # Capture the leading stereo descriptors before they are stripped, so we can
+    # tag the resolved fragment with what the name asserts (verified later against
+    # the input): per-locant R/S, and a whole-fragment cis/trans.
+    stereo_map, relative = _leading_stereo_map(name)
+    mol = _resolve_fragment(name, stereo_map)
+    # The relative word is tagged on the *finished* fragment: which ring it speaks
+    # about is a property of the assembled structure, and operator-wrapped names
+    # (``…carboxamido``) put that ring behind an added carbonyl, so there is no
+    # single locant map to anchor it to.
+    if mol is not None and relative is not None:
+        _tag_relative_stereo(mol, relative)
+    return mol
+
+
+def _resolve_fragment(name: str, stereo_map: dict[str, str]) -> Chem.Mol | None:
     name = _strip_outer_parens(name.strip())
     if name in _LEAF_SMILES:
         mol = Chem.MolFromSmiles("*" + _LEAF_SMILES[name], sanitize=False)
@@ -630,14 +641,29 @@ def _resolve(name: str) -> Numbered | None:
 # Atom/bond property holding the R/S (or E/Z) descriptor the *name* asserts for a
 # reconstructed atom/bond, to be checked against the input's independent CIP.
 _NAME_CIP = "nStereo"
+# Atom property marking the two ring atoms a leading ``cis``/``trans`` word
+# relates, to be checked against the input's tetrahedral parities.
+_NAME_RELATIVE = "nRelStereo"
+# Relative-configuration words we can verify.  The rest of ``_STEREO_WORD_RE``
+# (``rel``, ``rac``, ``syn``, ``endo``…) stays unverifiable and so stays peeled
+# and discarded, leaving the caller to abstain on those centres.
+_RELATIVE_WORDS = {"cis", "trans"}
 
 
-def _leading_stereo_map(name: str) -> dict[str, str]:
-    """Extract ``{locant: descriptor}`` from a leading stereo prefix, peeling
-    outer parens/stereo-words exactly as :func:`_strip_outer_parens` does so the
-    captured locants line up with the fragment that will be built."""
+def _leading_stereo_map(name: str) -> tuple[dict[str, str], str | None]:
+    """Extract ``({locant: descriptor}, relative-word)`` from a leading stereo
+    prefix, peeling outer parens/stereo-words exactly as
+    :func:`_strip_outer_parens` does so the captured locants line up with the
+    fragment that will be built.
+
+    The relative word is returned without its locants: which ring positions a
+    ``cis``/``trans`` relates is read off the built fragment instead (the two
+    ring atoms actually bearing substituents), which avoids having to reproduce
+    the namer's locant conventions to find them."""
+
     s = name.strip()
     result: dict[str, str] = {}
+    relative: str | None = None
     changed = True
     while changed:
         changed = False
@@ -653,9 +679,71 @@ def _leading_stereo_map(name: str) -> dict[str, str]:
             continue
         m2 = _STEREO_WORD_RE.match(s)
         if m2:
+            word = m2.group(1)
+            if word in _RELATIVE_WORDS:
+                # Two different relative words on one fragment would each need
+                # their own atom pair to be meaningful; we model only one.
+                if relative is not None and relative != word:
+                    return result, None
+                relative = word
             s = s[m2.end() :].strip()
             changed = True
-    return result
+    return result, relative
+
+
+def _tag_relative_stereo(mol: Chem.Mol, relative: str) -> None:
+    """Mark the two ring atoms a ``cis``/``trans`` word relates.
+
+    Which ring the word speaks about is not spelled out, so it is identified
+    structurally.  A ``cis``/``trans`` is a relation between exactly two
+    substituted ring positions, so the ring it refers to necessarily has exactly
+    two atoms bearing exactly one exocyclic substituent each (the attachment
+    dummy counting as one).  Among the rings that look like that we take:
+
+    * the one containing the attachment atom, since the word qualifies the
+      substituent's own base skeleton and that is the ring the parent hangs off;
+    * failing that (an operator-wrapped name like ``…carboxamido`` puts the ring
+      behind an added carbonyl, so the attachment is outside it) the sole
+      candidate, if there is exactly one.
+
+    Otherwise the relation stays unpinned — nothing is tagged and the caller
+    abstains rather than adjudicate the wrong ring."""
+
+    candidates = [ring for ring in mol.GetRingInfo().AtomRings() if _relative_pair(mol, ring) is not None]
+    if not candidates:
+        return
+    attach = _attachment_atom(mol)
+    anchored = [ring for ring in candidates if attach is not None and attach in ring]
+    if len(anchored) == 1:
+        ring = anchored[0]
+    elif not anchored and len(candidates) == 1:
+        ring = candidates[0]
+    else:
+        return
+    for atom_idx in _relative_pair(mol, ring):
+        mol.GetAtomWithIdx(atom_idx).SetProp(_NAME_RELATIVE, relative)
+
+
+def _attachment_atom(mol: Chem.Mol) -> int | None:
+    """The atom bonded to the fragment's dummy, i.e. what the parent bonds to."""
+
+    dummy = next((a for a in mol.GetAtoms() if a.GetAtomicNum() == 0), None)
+    if dummy is None:
+        return None
+    neighbors = list(dummy.GetNeighbors())
+    return neighbors[0].GetIdx() if len(neighbors) == 1 else None
+
+
+def _relative_pair(mol: Chem.Mol, ring: tuple[int, ...]) -> tuple[int, int] | None:
+    """The ring's two singly-substituted atoms, or ``None`` if it does not have
+    exactly two."""
+
+    marked = [
+        atom_idx
+        for atom_idx in ring
+        if sum(1 for n in mol.GetAtomWithIdx(atom_idx).GetNeighbors() if n.GetIdx() not in ring) == 1
+    ]
+    return (marked[0], marked[1]) if len(marked) == 2 else None
 
 
 def _tag_name_stereo(rw: Chem.RWMol, locants: dict[str, int], stereo_map: dict[str, str]) -> None:
@@ -1176,8 +1264,9 @@ def _clone_atom(atom: Chem.Atom) -> Chem.Atom:
     na.SetFormalCharge(atom.GetFormalCharge())
     na.SetNumExplicitHs(atom.GetNumExplicitHs())
     na.SetNoImplicit(atom.GetNoImplicit())
-    if atom.HasProp(_NAME_CIP):
-        na.SetProp(_NAME_CIP, atom.GetProp(_NAME_CIP))
+    for prop in (_NAME_CIP, _NAME_RELATIVE):
+        if atom.HasProp(prop):
+            na.SetProp(prop, atom.GetProp(prop))
     return na
 
 

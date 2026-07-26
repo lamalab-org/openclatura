@@ -133,6 +133,13 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
     # (it corrects legacy mislabels on fused/small-ring systems) and store its
     # verdict separately.  It is gated because it is pure audit overhead.
     modern_cip, modern_bond_cip = _modern_cip_labels(rdmol) if _AUDIT_CIP_ENABLED else ({}, {})
+    if _AUDIT_CIP_ENABLED:
+        # Relative ring stereo (``cis``/``trans``) is carried by tetrahedral
+        # parities, which the flattened graph model does not retain.  Keeping the
+        # source molecule — atom indices line up with ``mol.atoms`` — lets the
+        # audit read those parities straight off the input.  Audit-only, so it is
+        # gated with the rest of the audit overhead.
+        mol.audit_rdmol = Chem.Mol(rdmol)
 
     for atom in rdmol.GetAtoms():
         stereo = chiral_centers.get(atom.GetIdx())

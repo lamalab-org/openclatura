@@ -12,6 +12,7 @@ import openclatura as oc
 import openclatura.audit as audit
 import openclatura.component_namer as component_namer
 from openclatura.audit import ReconstructionAudit, audit_component_reconstruction, self_audit
+from openclatura.audit.relative_stereo import ring_face_relation
 from openclatura.audit.substituent_reconstruction import resolve_fragment_mol
 
 
@@ -154,11 +155,125 @@ def test_unresolvable_substituent_returns_none(name):
 
 
 # --------------------------------------------------------------------------- #
+# Relative ring stereo: the cis/trans oracle
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "smiles,expected",
+    [
+        # 1,3-cyclobutane and 1,3-cyclopentane
+        ("C[C@H]1C[C@@H](C)C1", "cis"),
+        ("C[C@H]1C[C@H](C)C1", "trans"),
+        ("C[C@H]1CC[C@@H](C)C1", "cis"),
+        ("C[C@H]1CC[C@H](C)C1", "trans"),
+        # 1,4-cyclohexane: a cis pair sits axial/equatorial in a chair, which is
+        # why a mean-ring-plane test gets these wrong and parity does not
+        ("C[C@H]1CC[C@@H](C)CC1", "cis"),
+        ("C[C@H]1CC[C@H](C)CC1", "trans"),
+        # 1,2-cyclohexane: cis is the meso (R,S) diastereomer
+        ("C[C@H]1CCCC[C@H]1C", "cis"),
+        ("C[C@H]1CCCC[C@@H]1C", "trans"),
+        # heteroatom substituents, and a heteroatom in the ring
+        ("N[C@H]1CC[C@@H](O)CC1", "cis"),
+        ("N[C@H]1CC[C@H](O)CC1", "trans"),
+        ("CS(=O)(=O)[C@H]1C[C@@H](N)C1", "cis"),
+        ("CS(=O)(=O)[C@H]1C[C@H](N)C1", "trans"),
+    ],
+)
+def test_ring_face_relation(smiles, expected):
+    from rdkit import Chem
+
+    mol = Chem.MolFromSmiles(smiles)
+    ring = next(r for r in mol.GetRingInfo().AtomRings())
+    pair = [
+        a
+        for a in ring
+        if sum(1 for n in mol.GetAtomWithIdx(a).GetNeighbors() if n.GetIdx() not in ring and n.GetAtomicNum() > 1)
+        == 1
+    ]
+    assert ring_face_relation(mol, pair[0], pair[1]) == expected
+
+
+def test_ring_face_relation_agrees_with_cip_on_meso():
+    # Independent cross-check of the two 1,2-dimethylcyclohexanes: the cis isomer
+    # is meso, so modern CIP labels it (R,S) and the trans one (R,R)/(S,S).
+    from rdkit import Chem
+    from rdkit.Chem import rdCIPLabeler
+
+    for smiles in ("C[C@H]1CCCC[C@H]1C", "C[C@H]1CCCC[C@@H]1C"):
+        mol = Chem.MolFromSmiles(smiles)
+        rdCIPLabeler.AssignCIPLabels(mol)
+        codes = sorted(a.GetProp("_CIPCode") for a in mol.GetAtoms() if a.HasProp("_CIPCode"))
+        ring = mol.GetRingInfo().AtomRings()[0]
+        pair = [a for a in ring if any(n.GetIdx() not in ring and n.GetAtomicNum() > 1 for n in mol.GetAtomWithIdx(a).GetNeighbors())]
+        relation = ring_face_relation(mol, pair[0], pair[1])
+        assert relation == ("cis" if codes == ["R", "S"] else "trans")
+
+
+def test_ring_face_relation_abstains_without_parity():
+    # No assigned parity -> not determinable, never a guess.
+    from rdkit import Chem
+
+    mol = Chem.MolFromSmiles("CC1CCC(C)CC1")
+    ring = mol.GetRingInfo().AtomRings()[0]
+    pair = [a for a in ring if any(n.GetIdx() not in ring and n.GetAtomicNum() > 1 for n in mol.GetAtomWithIdx(a).GetNeighbors())]
+    assert ring_face_relation(mol, pair[0], pair[1]) is None
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    [
+        "C[C@H]1C[C@@H](C)C1",
+        "N[C@H]1CC[C@@H](O)CC1",
+        "CS(=O)(=O)[C@H]1C[C@H](N)C1",
+        "COC(=O)[C@H]1CC[C@@H](CC(=O)O)CC1",
+    ],
+)
+def test_ring_face_relation_inverts_with_one_centre(smiles):
+    # Inverting exactly one centre must flip the relation; inverting both must
+    # leave it alone.  These hold for any correct face oracle, so they pin the
+    # parity arithmetic without needing external ground truth.
+    from rdkit import Chem
+
+    flip = {
+        Chem.ChiralType.CHI_TETRAHEDRAL_CW: Chem.ChiralType.CHI_TETRAHEDRAL_CCW,
+        Chem.ChiralType.CHI_TETRAHEDRAL_CCW: Chem.ChiralType.CHI_TETRAHEDRAL_CW,
+    }
+    mol = Chem.MolFromSmiles(smiles)
+    ring = mol.GetRingInfo().AtomRings()[0]
+    a, b = [
+        idx
+        for idx in ring
+        if sum(1 for n in mol.GetAtomWithIdx(idx).GetNeighbors() if n.GetIdx() not in ring and n.GetAtomicNum() > 1)
+        == 1
+    ]
+    base = ring_face_relation(mol, a, b)
+    assert base is not None
+
+    def inverted(*centres):
+        rw = Chem.RWMol(mol)
+        for centre in centres:
+            atom = rw.GetAtomWithIdx(centre)
+            atom.SetChiralTag(flip[atom.GetChiralTag()])
+        return ring_face_relation(rw.GetMol(), a, b)
+
+    assert inverted(a) != base
+    assert inverted(b) != base
+    assert inverted(a, b) == base
+
+
+# --------------------------------------------------------------------------- #
 # Helpers
 # --------------------------------------------------------------------------- #
 def _capture_top_level(smiles: str):
     """Name ``smiles`` and return (mol, component_atoms, parts) for the last
-    top-level component named (enough for these single-component fixtures)."""
+    top-level component named (enough for these single-component fixtures).
+
+    The independent-CIP oracle and the retained source molecule are audit-only
+    overhead the namer does not switch on by itself, so this enables them for the
+    duration exactly as :func:`capture_component_audits` does — without them a
+    captured component carries no stereo evidence to audit against."""
+
+    from openclatura import graph_io
 
     captured: list[tuple] = []
     original = component_namer.assert_component_fully_named
@@ -168,10 +283,13 @@ def _capture_top_level(smiles: str):
         return original(mol, atoms, parts, name)
 
     component_namer.assert_component_fully_named = spy
+    previous_cip = graph_io._AUDIT_CIP_ENABLED
+    graph_io.set_audit_cip_enabled(True)
     try:
         oc.name(smiles)
     finally:
         component_namer.assert_component_fully_named = original
+        graph_io.set_audit_cip_enabled(previous_cip)
     assert captured, f"no component captured for {smiles!r}"
     return captured[-1]
 
@@ -245,6 +363,10 @@ CONFIRMED_SMILES = [
     # net-neutral charge separation (nitro / N-oxide) reconstructs with charges
     "O=[N+]([O-])c1ccccc1",  # nitrobenzene
     "Cc1ccc([N+](=O)[O-])cc1",  # 4-nitrotoluene
+    # …while a sulfonyl written charge-separated denotes the same group as the
+    # hypervalent spelling the reconstruction builds, so it must not read as a
+    # disagreement (this refuted a correct name before the spellings converged)
+    "CC(C)CCN1CC(CN[S+](=O)([O-])c2ccccc2)C2(C1)CN(c1ccccc1)C2",
     # fused retained + von Baeyer polycyclic parents
     "c1ccc2ccccc2c1",  # naphthalene (retained fused parent)
     "C1c2ccccc2-c2ccccc21",  # fluorene (tricyclo/polycyclic parent)
@@ -285,6 +407,11 @@ CONFIRMED_SMILES = [
     "CC1=NOC2(C1)CCCC2",  # 3-methyl-1-oxa-2-azaspiro[4.4]non-2-ene
     "C1COCC11CNC1",  # 6-oxa-2-azaspiro[3.4]octane
     "O=C(O)C1CN(C(=O)C2CC3(CCC3)C2)C1",  # spiro[3.3]heptan-2-yl as a substituent
+    # relative ring stereo: the name pins the configuration with a cis/trans word
+    # rather than per-atom R/S, verified against the input's tetrahedral parities
+    "C#CCCCOCCOCCC(=O)N[C@@H](C)CNC(=O)[C@H]1C[C@@H](S(C)(=O)=O)C1",  # cis-cyclobutane, via …carboxamido
+    "CC[C@@H](O)CC(=O)N[C@H]1C[C@@H](C(=O)NCC(C)(C)F)C1",  # cis-cyclobutyl beside a parent (3R)
+    "COC1(C(=O)N[C@H]2CC[C@H](NC(=O)[C@@H]3CCS(=O)(=O)N3)CC2)CCOCC1",  # trans-cyclohexyl
 ]
 
 # Constitution is correct but the emitted stereo descriptors disagree with the
@@ -360,6 +487,34 @@ def test_dropped_substituent_is_caught():
     assert audit_component_reconstruction(mol, bad, atoms).verdict == "mismatch"
 
 
+@pytest.mark.parametrize(
+    "smiles",
+    [
+        "C#CCCCOCCOCCC(=O)N[C@@H](C)CNC(=O)[C@H]1C[C@@H](S(C)(=O)=O)C1",
+        "CC[C@@H](O)CC(=O)N[C@H]1C[C@@H](C(=O)NCC(C)(C)F)C1",
+        "COC1(C(=O)N[C@H]2CC[C@H](NC(=O)[C@@H]3CCS(=O)(=O)N3)CC2)CCOCC1",
+    ],
+)
+def test_flipped_relative_stereo_word_is_not_confirmed(smiles):
+    # Non-vacuity for the cis/trans verification: swapping the word in the name
+    # asserts the other diastereomer, which the input's parities contradict, so
+    # the audit must stop confirming.
+    mol, atoms, parts = _capture_top_level(smiles)
+    assert audit_component_reconstruction(mol, parts, atoms).verdict == "confirmed"
+
+    bad = copy.deepcopy(parts)
+    swapped = 0
+    for substituent in bad.substituents:
+        if "cis-" in substituent.name:
+            substituent.name = substituent.name.replace("cis-", "trans-")
+            swapped += 1
+        elif "trans-" in substituent.name:
+            substituent.name = substituent.name.replace("trans-", "cis-")
+            swapped += 1
+    assert swapped == 1, f"expected exactly one cis/trans word to flip, flipped {swapped}"
+    assert audit_component_reconstruction(mol, bad, atoms).verdict != "confirmed"
+
+
 def test_wrong_principal_group_is_caught():
     mol, atoms, parts = _capture_top_level("CCO")
     bad = copy.deepcopy(parts)
@@ -394,6 +549,46 @@ def test_wrong_unsaturation_locant_is_caught():
 )
 def test_ring_alkyne_named_as_saturated_ring_is_caught(smiles):
     assert self_audit(smiles).verdict == "mismatch"
+
+
+# --------------------------------------------------------------------------- #
+# Charge-separated spellings converge; obligatory charge separation does not
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "written,hypervalent",
+    [
+        ("CN[S+](=O)([O-])c1ccccc1", "CNS(=O)(=O)c1ccccc1"),  # sulfonamide
+        ("C[S+](C)[O-]", "CS(C)=O"),  # sulfoxide
+    ],
+)
+def test_optional_charge_separation_collapses(written, hypervalent):
+    from rdkit import Chem
+
+    from openclatura.audit.reconstruction import _collapse_charge_separation
+
+    def collapsed(smiles):
+        return Chem.MolToSmiles(_collapse_charge_separation(Chem.MolFromSmiles(smiles)))
+
+    assert collapsed(written) == collapsed(hypervalent)
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    [
+        "O=[N+]([O-])c1ccccc1",  # nitro: nitrogen cannot take the extra bond
+        "C[N+](C)(C)[O-]",  # N-oxide
+        "N=[N+]=[N-]",  # azide
+    ],
+)
+def test_obligatory_charge_separation_is_preserved(smiles):
+    # These have no neutral spelling, so their charges must survive — otherwise a
+    # genuine difference in charge placement could be normalised away.
+    from rdkit import Chem
+
+    from openclatura.audit.reconstruction import _collapse_charge_separation
+
+    collapsed = _collapse_charge_separation(Chem.MolFromSmiles(smiles))
+    assert any(atom.GetFormalCharge() != 0 for atom in collapsed.GetAtoms())
 
 
 # --------------------------------------------------------------------------- #

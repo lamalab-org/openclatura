@@ -9,6 +9,8 @@ external dependency (no Java, no OPSIN):
   structure-independent reconstruction of compositional substituent fragments;
 * :mod:`~openclatura.audit.naming` — atom/token coverage bookkeeping;
 * :mod:`~openclatura.audit.stereo` — stereochemistry audit;
+* :mod:`~openclatura.audit.relative_stereo` — ring ``cis``/``trans`` oracle, for
+  names that pin a configuration with a word instead of per-atom ``R``/``S``;
 * :mod:`~openclatura.audit.self_audit` — end-to-end SMILES-driven driver.
 
 Two entry points::
@@ -31,6 +33,7 @@ from .naming import (
     component_named_atom_coverage,
 )
 from .reconstruction import ReconstructionAudit, audit_component_reconstruction
+from .relative_stereo import ring_face_relation
 from .self_audit import aggregate_audits, capture_component_audits, self_audit
 from .stereo import audit_stereochemistry
 from .substituent_reconstruction import resolve_fragment_mol
@@ -46,6 +49,7 @@ __all__ = [
     "capture_component_audits",
     "aggregate_audits",
     "audit_stereochemistry",
+    "ring_face_relation",
     "resolve_fragment_mol",
     "UnnamedAtomError",
     "assert_component_fully_named",
