@@ -8,9 +8,11 @@ skeletal replacement (``oxa``/``aza``/…) and unsaturation locants back into a
 numbered ring skeleton — entirely from the name, never the input graph.
 
 The two-ring ``bicyclo`` case and monospiro ``spiro[a.b]`` are modelled (both
-with skeletal replacement and unsaturation); polyspiro (``dispiro``…), bridges
-carrying their own atoms, and anything that does not parse cleanly return
-``None`` so the caller abstains.
+with skeletal replacement and unsaturation), as are monocycles that state their
+own heteroatoms — the ``1-azacyclohexane`` replacement form and the contracted
+Hantzsch-Widman one (``1,4-dioxane``, ``azepane``).  Polyspiro (``dispiro``…),
+bridges carrying their own atoms, and anything that does not parse cleanly
+return ``None`` so the caller abstains.
 """
 
 from __future__ import annotations
@@ -323,6 +325,108 @@ def parse_monocyclic_replacement(name: str) -> Numbered | None:
     return rw, locants, locants[attach]
 
 
+# --------------------------------------------------------------------------- #
+# Hantzsch-Widman contracted monocycles
+# --------------------------------------------------------------------------- #
+# Heteroatom prefixes in their elided form — the ``-a`` is dropped before the
+# vowel of the size stem, so ``oxa`` + ``ane`` reads ``oxane``.
+_HW_ELEMENTS = {"ox": "O", "thi": "S", "az": "N", "sel": "Se", "tellur": "Te"}
+# Saturated size stems, longest first so ``olane`` is not read as ``ane``.
+# Mancude (unsaturated) rings — ``oxazole``, ``thiazole`` — keep their retained
+# spellings elsewhere; only the saturated series is generated here.
+_HW_SIZE_STEMS: tuple[tuple[str, int], ...] = (
+    ("iridine", 3),
+    ("irane", 3),
+    ("etidine", 4),
+    ("etane", 4),
+    ("olidine", 5),
+    ("olane", 5),
+    ("inane", 6),
+    ("epane", 7),
+    ("ocane", 8),
+    ("onane", 9),
+    ("ecane", 10),
+    ("ane", 6),
+)
+_HW_MULTIPLIERS = {"": 1, "di": 2, "tri": 3, "tetra": 4}
+_HW_RE = re.compile(r"^(?:(?P<locants>\d+(?:,\d+)*)-)?(?P<prefix>[a-z]+)$")
+
+
+def parse_hantzsch_widman(name: str) -> Numbered | None:
+    """Parse a contracted saturated Hantzsch-Widman monocycle substituent —
+    ``1,4-dioxan-2-yl``, ``thian-4-yl``, ``azepan-1-yl``, ``1,3-dithiolan-2-yl``.
+
+    These say their own ring size and heteroatom placement, so the ring is
+    derived from the name's morphology rather than looked up.  Names that do not
+    parse cleanly return ``None`` so the caller abstains."""
+
+    m = _MONO_ATTACH_RE.search(name)
+    if m is None:
+        return None
+    attach = m.group(1)
+    head = _HW_RE.match(name[: m.start()])
+    if head is None:
+        return None
+    for stem, size in _HW_SIZE_STEMS:
+        # ``-an-2-yl`` drops the stem's final ``e`` before the locant.
+        body = head.group("prefix")
+        for spelling in (stem, stem[:-1]):
+            if body.endswith(spelling) and len(body) > len(spelling):
+                elements = _parse_hw_prefix(body[: -len(spelling)])
+                if elements is None:
+                    break
+                return _build_hw_ring(size, elements, head.group("locants"), attach, stem)
+    return None
+
+
+def _parse_hw_prefix(prefix: str) -> list[str] | None:
+    """Expand ``diox`` -> ``["O", "O"]``, ``thiaz`` -> ``["S", "N"]``, in citation
+    order.  ``None`` if any token is not a heteroatom prefix."""
+
+    elements: list[str] = []
+    while prefix:
+        for multiplier, count in sorted(_HW_MULTIPLIERS.items(), key=lambda kv: -len(kv[0])):
+            if not prefix.startswith(multiplier):
+                continue
+            rest = prefix[len(multiplier) :]
+            for word in sorted(_HW_ELEMENTS, key=len, reverse=True):
+                if rest.startswith(word):
+                    elements.extend([_HW_ELEMENTS[word]] * count)
+                    prefix = rest[len(word) :].lstrip("a-")
+                    break
+            else:
+                continue
+            break
+        else:
+            return None
+    return elements or None
+
+
+def _build_hw_ring(
+    size: int, elements: list[str], locants: str | None, attach: str, stem: str
+) -> Numbered | None:
+    """Place ``elements`` at the cited locants (or at position 1 for a lone
+    heteroatom) around a ring of ``size`` atoms."""
+
+    if size < 3:
+        return None
+    # A six-membered ring containing nitrogen takes ``-inane``; plain ``-ane``
+    # there would be the parent hydride ``azane``, not a ring at all.
+    if "N" in elements and stem == "ane":
+        return None
+    positions = locants.split(",") if locants else ["1"]
+    if len(positions) != len(elements):
+        return None
+    rw, ring_locants = _build_monocycle(size)
+    for position, element in zip(positions, elements):
+        if position not in ring_locants:
+            return None
+        rw.GetAtomWithIdx(ring_locants[position]).SetAtomicNum(Chem.Atom(element).GetAtomicNum())
+    if attach not in ring_locants:
+        return None
+    return rw, ring_locants, ring_locants[attach]
+
+
 def _build_monocycle(n: int) -> tuple[Chem.RWMol, dict[str, int]]:
     rw = Chem.RWMol()
     idx = {str(i): rw.AddAtom(Chem.Atom(6)) for i in range(1, n + 1)}
@@ -357,6 +461,7 @@ def _apply_unsaturation(rw: Chem.RWMol, locants: dict[str, int], rest: str) -> b
 
 __all__ = [
     "parse_von_baeyer",
+    "parse_hantzsch_widman",
     "parse_spiro",
     "parse_monocyclic_replacement",
     "build_skeleton",

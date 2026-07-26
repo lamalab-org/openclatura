@@ -130,6 +130,22 @@ def _canonical(mol) -> str | None:
         ("(5-azaspiro[2.4]heptan-5-yl)", "*N1CCC2(CC2)C1"),
         ("(5,8-dioxaspiro[3.5]nonan-2-yl)", "*C1CC2(C1)COCCO2"),
         ("(2-oxaspiro[3.3]heptan-6-yl)", "*C1CC2(C1)COC2"),
+        # contracted Hantzsch-Widman monocycles, derived from the name's own
+        # morphology (ring size from the stem, heteroatoms from the prefix)
+        ("(thian-4-yl)", "*C1CCSCC1"),
+        ("(1,4-dioxan-2-yl)", "*C1COCCO1"),
+        ("(1,3-dioxolan-2-yl)", "*C1OCCO1"),
+        ("((4R)-2,2-dimethyl-1,3-dioxolan-4-yl)", "*C1COC(C)(C)O1"),
+        ("(1,4-dithian-2-yl)", "*C1CSCCS1"),
+        ("(azepan-1-yl)", "*N1CCCCCC1"),
+        ("(1,4-diazepan-1-yl)", "*N1CCCNCC1"),
+        ("(oxepan-2-yl)", "*C1CCCCCO1"),
+        ("(azocan-1-yl)", "*N1CCCCCCC1"),
+        ("(2-methyl-1,3-dioxolan-2-yl)", "*C1(C)OCCO1"),
+        # N-substituted amides whose acyl half opens with a stereo descriptor
+        ("(N-methyl(2S,3R)-2-fluoro-3-(trifluoromethyl)butanamido)", "*N(C)C(=O)C(F)C(C)C(F)(F)F"),
+        ("(N-methyl(1R,3S,5S)-bicyclo[3.1.0]hexane-3-carboxamido)", "*N(C)C(=O)C1CC2CC2C1"),
+        ("((3S)-3-(N-methyl(2S,3R)-2-fluoro-3-(trifluoromethyl)butanamido)butyl)", "*CCC(C)N(C)C(=O)C(F)C(C)C(F)(F)F"),
     ],
 )
 def test_resolve_fragment_grammar(name, expected):
@@ -142,7 +158,8 @@ def test_resolve_fragment_grammar(name, expected):
     "name",
     [
         "(dispiro[3.1.3.1]decan-2-yl)",  # polyspiro: a different numbering rule
-        "(1,4-dithian-2-yl)",  # ring stem we do not model
+        "(dihydroxy(oxo)-lambda^5-sulfanyl)",  # lambda-convention valence, not modelled
+        "(azane)",  # 'az' + 'ane' is ammonia, not a six-membered ring
         # ``phenylacetyl`` puts the phenyl on C2, but an unlocanted prefix would
         # otherwise be placed on C1 — the acyl base withdraws C1 so this abstains
         # rather than reconstructing the wrong graph.

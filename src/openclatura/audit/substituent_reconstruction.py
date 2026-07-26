@@ -20,6 +20,7 @@ import re
 from rdkit import Chem
 
 from ..rules import stems as _stems
+from .von_baeyer_parse import parse_hantzsch_widman as _parse_hantzsch_widman
 from .von_baeyer_parse import parse_monocyclic_replacement as _parse_monocyclic_replacement
 from .von_baeyer_parse import parse_spiro as _parse_spiro
 from .von_baeyer_parse import parse_von_baeyer as _parse_von_baeyer
@@ -424,7 +425,7 @@ def _resolve_n_substituted_amido(rest: str) -> Chem.Mol | None:
     and is rejected, keeping the guess-free contract."""
 
     for cut in range(1, len(rest)):
-        if rest[: cut + 1].count("(") != rest[: cut + 1].count(")"):
+        if rest[:cut].count("(") != rest[:cut].count(")"):
             continue  # never split inside a parenthesised group
         ligand_name, amide_name = rest[:cut], rest[cut:].lstrip("-")
         if not amide_name.endswith("amido"):
@@ -808,6 +809,12 @@ def _build_base(base: str) -> Numbered | None:
         mono = _parse_monocyclic_replacement(base)
         if mono is not None:
             return mono
+    # A contracted Hantzsch-Widman monocycle (``1,4-dioxan-2-yl``, ``thian-4-yl``),
+    # likewise decoratable via peeled front modifiers.
+    if base.endswith("yl"):
+        hw = _parse_hantzsch_widman(base)
+        if hw is not None:
+            return hw
     # phenyl / heteroaryl-yl
     if base == "phenyl":
         return _ring_from_stem("phenyl")
