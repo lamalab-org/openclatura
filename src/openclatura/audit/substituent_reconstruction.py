@@ -748,11 +748,44 @@ def _join_two_port(wrapper_smiles: str, inner: Chem.Mol) -> Chem.Mol | None:
 # --------------------------------------------------------------------------- #
 # Recursion
 # --------------------------------------------------------------------------- #
+# A skeletal-replacement clause: ``7-aza``, ``2,4-dioxa``, ``3lambda^6-thia``.
+_REPLACEMENT_CLAUSE_RE = re.compile(
+    r"\d+(?:,\d+)*(?:lambda\^?\{?\d+\}?)?-(?:di|tri|tetra|penta|hexa)?"
+    r"(?:oxa|aza|thia|selena|tellura|phospha|arsa|sila|germa|stanna|bora)-"
+)
+# The ring token a replacement prefix belongs to: bracketed von Baeyer/spiro, or
+# the bare ``cyclo`` of a replacement monocycle.
+_RING_DESCRIPTOR_RE = re.compile(r"(?:bi|tri|tetra|penta)?(?:cyclo|spiro)\[?")
+
+
+def _hoist_replacement_prefixes(name: str) -> str:
+    """Move skeletal-replacement clauses next to the ring token they modify.
+
+    A ring's replacement prefixes and its ordinary substituent prefixes are cited
+    in one alphanumeric sequence — ``7-methyl-7-aza-8-oxo-bicyclo[4.3.0]…`` — but
+    they are consumed by different machinery: replacement belongs to the ring
+    parser, the rest to the prefix grafting.  No single split of that sequence
+    separates them while they are interleaved, so the replacement clauses are
+    gathered and re-emitted immediately before the ring token, leaving a
+    contiguous ordinary prefix in front."""
+
+    ring = _RING_DESCRIPTOR_RE.search(name)
+    if ring is None:
+        return name
+    head, tail = name[: ring.start()], name[ring.start() :]
+    clauses = _REPLACEMENT_CLAUSE_RE.findall(head)
+    if not clauses:
+        return name
+    remainder = _REPLACEMENT_CLAUSE_RE.sub("", head)
+    return remainder + "".join(clauses) + tail
+
+
 def _resolve(name: str) -> Numbered | None:
     name = _strip_outer_parens(name.strip())
     if not name:
         return None
     name = _RING_ALIASES.get(name, name)
+    name = _hoist_replacement_prefixes(name)
     # Peel a base off the end: try every start position, longest base first, and
     # accept the first whose remaining prefix fully parses. A wrong split fails
     # prefix parsing and is rejected, so this backtracking stays sound.

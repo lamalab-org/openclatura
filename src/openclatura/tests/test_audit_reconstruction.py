@@ -177,6 +177,11 @@ def _canonical(mol) -> str | None:
         ("(bicyclo[3.3.1]nonan-3-yl)", "*C1CC2CCCC(C1)C2"),
         # cycloalkyl with an explicit attachment locant
         ("(cyclopentan-2-yl)", "*C1CCCC1"),
+        # replacement clauses interleaved with ordinary prefixes: no single split
+        # separates them, so they are hoisted next to the ring token
+        ("(7-methyl-7-aza-8-oxo-bicyclo[4.3.0]nona-1,3,5-trien-9-yl)", "*C1C(=O)N(C)c2ccccc21"),
+        ("(2-oxa-5-hydroxy-bicyclo[4.4.0]deca-1(10),6,8-trien-3-yl)", "*C1CC(O)c2ccccc2O1"),
+        ("(5,5-dimethyl-3-phenyl-1,3-diaza-4-oxo-cyclopentan-2-yl)", "*C1NC(C)(C)C(=O)N1c1ccccc1"),
     ],
 )
 def test_resolve_fragment_grammar(name, expected):
