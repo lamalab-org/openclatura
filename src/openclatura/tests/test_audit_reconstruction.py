@@ -449,6 +449,13 @@ CONFIRMED_SMILES = [
     "CC1=NOC2(C1)CCCC2",  # 3-methyl-1-oxa-2-azaspiro[4.4]non-2-ene
     "C1COCC11CNC1",  # 6-oxa-2-azaspiro[3.4]octane
     "O=C(O)C1CN(C(=O)C2CC3(CCC3)C2)C1",  # spiro[3.3]heptan-2-yl as a substituent
+    # spiro *assemblies*: two named ring systems sharing one atom, cited with
+    # primed locants for the side ring
+    "OC1CC2OC1C21CC1",  # spiro[5-oxabicyclo[2.1.1]hexane-6,1'-cyclopropane]-2-ol
+    "CC1C2C(=O)C1C21CN1",  # side ring from a retained template
+    "CC1C2(C)NC2C11CN1",
+    "C[C@H]1C(=O)[C@H]2CC[C@H]1CC21OCCO1",  # primed replacement prefixes on the side ring
+    "CC[C@H]1C(=O)[C@@]2(c3ccccc31)N(c1ccccc1)C(=O)C2(C)C",  # primed prefixes + a side suffix
     # relative ring stereo: the name pins the configuration with a cis/trans word
     # rather than per-atom R/S, verified against the input's tetrahedral parities
     "C#CCCCOCCOCCC(=O)N[C@@H](C)CNC(=O)[C@H]1C[C@@H](S(C)(=O)=O)C1",  # cis-cyclobutane, via …carboxamido
@@ -621,6 +628,26 @@ def test_flipped_parent_relative_stereo_binding_is_not_confirmed(smiles):
             flipped += 1
     assert flipped == 1, f"expected one relative_stereo binding, found {flipped}"
     assert audit_component_reconstruction(mol, bad, atoms).verdict != "confirmed"
+
+
+def test_spiro_side_that_is_not_a_ring_abstains():
+    # A spiro union joins two rings.  When the cited side resolves to a chain the
+    # name is not describing a rebuildable assembly, and inventing a structure to
+    # compare against would manufacture a disagreement — so it must abstain.
+    from rdkit import Chem
+
+    from openclatura.assembly_parts import SubstituentItem
+    from openclatura.audit.reconstruction import _Abstain, _apply_spiro_substituent
+    from openclatura.spiro_assembly import SpiroAssembly
+
+    rw = Chem.RWMol(Chem.MolFromSmiles("C1CCCCC1"))
+    item = SubstituentItem(
+        name="",
+        locants=["1"],
+        spiro=SpiroAssembly(parent_locant="1", side_locant="2", side_parent_name="propane"),
+    )
+    with pytest.raises(_Abstain):
+        _apply_spiro_substituent(rw, {"1": 0}, item)
 
 
 def test_wrong_principal_group_is_caught():

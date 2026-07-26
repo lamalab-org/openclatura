@@ -834,10 +834,90 @@ def _decorate(rw: Chem.RWMol, base_idx: int, atoms: tuple[tuple[str, int], ...])
     return nitrogens
 
 
+# Side-ring suffixes we can express as an equivalent prefix on the ring.
+_SPIRO_SUFFIX_PREFIXES = {"one": "oxo", "ol": "hydroxy", "thione": "thioxo"}
+
+
+def _spiro_side_name(spiro) -> str | None:
+    """Rewrite a spiro side ring as an ordinary ``-yl`` substituent name.
+
+    A spiro assembly cites its side ring in parent form (``cyclopentane``,
+    ``bicyclo[4.3.0]nona-1,3,5-triene``) with primed locants, so it is turned
+    into ``<prefixes><stem>-<side locant>-yl`` and handed to the substituent
+    grammar — which already knows every ring family that can appear here.  The
+    primes only distinguish the side ring's locants from the parent's and are
+    dropped; a side suffix becomes its equivalent prefix (``4'-one`` ->
+    ``4-oxo``).  ``None`` for anything outside that rewrite."""
+
+    clauses = [prefix.replace("'", "") for prefix in spiro.side_prefixes]
+    for locant, suffix in spiro.side_suffixes:
+        prefix = _SPIRO_SUFFIX_PREFIXES.get(suffix)
+        if prefix is None:
+            return None
+        clauses.append(f"{str(locant).replace(chr(39), '')}-{prefix}")
+    stem = spiro.side_parent_name
+    if stem.endswith("e"):  # ``cyclopentane`` -> ``cyclopentan-2-yl``
+        stem = stem[:-1]
+    return "-".join([*clauses, f"{stem}-{str(spiro.side_locant).replace(chr(39), '')}-yl"])
+
+
+def _fuse_spiro(rw: Chem.RWMol, base_idx: int, frag: Chem.Mol) -> None:
+    """Merge a side ring onto the parent at its spiro atom.
+
+    The rewritten side ring arrives as an ordinary fragment whose dummy sits on
+    the spiro atom.  Spiro fusion *identifies* that atom with the parent's rather
+    than bonding to it, so the spiro atom is dropped and its two ring bonds are
+    re-made from the parent atom — which then carries four ring bonds, two per
+    ring, as a spiro atom must."""
+
+    dummy = next((a for a in frag.GetAtoms() if a.GetAtomicNum() == 0), None)
+    if dummy is None or len(dummy.GetNeighbors()) != 1:
+        raise _Abstain("spiro side ring has no single attachment point")
+    shared = dummy.GetNeighbors()[0]
+    if not shared.IsInRing():
+        # A spiro union joins two *rings* at a shared atom.  A side that resolves
+        # to a chain means the name is not describing a spiro assembly we can
+        # rebuild, and fusing it anyway would invent a structure to compare
+        # against — so abstain rather than manufacture a disagreement.
+        raise _Abstain("spiro side is not a ring")
+    dropped = {dummy.GetIdx(), shared.GetIdx()}
+    frag_to_new: dict[int, int] = {}
+    for atom in frag.GetAtoms():
+        if atom.GetIdx() in dropped:
+            continue
+        new_atom = Chem.Atom(atom.GetAtomicNum())
+        new_atom.SetFormalCharge(atom.GetFormalCharge())
+        new_atom.SetNoImplicit(atom.GetNoImplicit())
+        new_atom.SetNumExplicitHs(atom.GetNumExplicitHs())
+        frag_to_new[atom.GetIdx()] = rw.AddAtom(new_atom)
+    for bond in frag.GetBonds():
+        a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if dummy.GetIdx() in (a, b):
+            continue
+        if shared.GetIdx() in (a, b):  # a ring bond of the shared atom, re-made from the parent
+            other = b if a == shared.GetIdx() else a
+            _consume_parent_hydrogen(rw.GetAtomWithIdx(base_idx), bond.GetBondType())
+            rw.AddBond(base_idx, frag_to_new[other], bond.GetBondType())
+        else:
+            rw.AddBond(frag_to_new[a], frag_to_new[b], bond.GetBondType())
+
+
+def _apply_spiro_substituent(rw: Chem.RWMol, locants: dict[str, int], item) -> None:
+    base_idx = locants.get(str(item.spiro.parent_locant))
+    if base_idx is None:
+        raise _Abstain(f"spiro locant {item.spiro.parent_locant} outside parent")
+    side_name = _spiro_side_name(item.spiro)
+    frag = resolve_fragment_mol(side_name) if side_name else None
+    if frag is None:
+        raise _Abstain(f"spiro side ring {item.spiro.side_parent_name!r} not modelled")
+    _fuse_spiro(rw, base_idx, frag)
+
+
 def _apply_substituents(rw: Chem.RWMol, locants: dict[str, int], parts) -> None:
     for item in parts.substituents:
         if item.spiro is not None:
-            raise _Abstain("spiro substituent not modelled")
+            _apply_spiro_substituent(rw, locants, item)
+            continue
         frag = resolve_fragment_mol(item.name)
         if frag is None:
             raise _Abstain(f"substituent {item.name!r} not modelled")

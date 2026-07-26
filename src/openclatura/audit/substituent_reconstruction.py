@@ -960,13 +960,24 @@ def _build_base_core(base: str) -> Numbered | None:
         numbered = _cycloalkenyl_base(base)
         if numbered is not None:
             return numbered
-    # cycloalkyl
+    # cycloalkyl, with or without an explicit attachment locant
+    # (``cyclopentyl``, ``cyclopentan-2-yl``)
     if base.startswith("cyclo") and base.endswith("yl"):
-        stem = base[len("cyclo") : -2]
-        n = _stem_length(stem)
+        core = base[len("cyclo") : -2].rstrip("-")
+        attach = "1"
+        located = re.search(r"-(\d+)$", core)
+        if located is not None:
+            attach = located.group(1)
+            core = core[: located.start()]
+        n = _stem_length(core)
+        if n is None and core.endswith("an"):
+            n = _stem_length(core[:-2])
         if n is None or n < 3:
             return None
-        return _carbocycle(n)
+        rw, locants, _ = _carbocycle(n)
+        if attach not in locants:
+            return None
+        return rw, locants, locants[attach]
 
     # linear alkyl
     if base.endswith("yl"):
