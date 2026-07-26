@@ -164,6 +164,19 @@ def _canonical(mol) -> str | None:
         ("(nona-2,4,6,8-tetraen-1-yl)", "*CC=CC=CC=CC=C"),
         ("(hexa-1,2,5-trien-1-yl)", "*C=C=CCC=C"),
         ("(1-oxohexa-3,5-dien-1-yl)", "*C(=O)CC=CC=C"),
+        # fused tricyclics, numbering validated against OPSIN
+        ("(anthracen-1-yl)", "*c1cccc2cc3ccccc3cc12"),
+        ("(anthracen-2-yl)", "*c1ccc2cc3ccccc3cc2c1"),
+        ("(anthracen-9-yl)", "*c1c2ccccc2cc2ccccc12"),
+        ("(phenanthren-1-yl)", "*c1cccc2c1ccc1ccccc12"),
+        ("(phenanthren-3-yl)", "*c1ccc2ccc3ccccc3c2c1"),
+        ("(phenanthren-9-yl)", "*c1cc2ccccc2c2ccccc12"),
+        # a bare multiplying stem that itself ends in the connective letter:
+        # ``non`` is nine carbons, not ``no``
+        ("(bicyclo[3.3.1]non-6-en-3-yl)", "*C1CC2C=CCC(C1)C2"),
+        ("(bicyclo[3.3.1]nonan-3-yl)", "*C1CC2CCCC(C1)C2"),
+        # cycloalkyl with an explicit attachment locant
+        ("(cyclopentan-2-yl)", "*C1CCCC1"),
     ],
 )
 def test_resolve_fragment_grammar(name, expected):

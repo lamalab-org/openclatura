@@ -163,6 +163,16 @@ _RING_STEMS: dict[str, tuple[str, list[str]]] = {
         "c1cccc2ccccc12",
         ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
     ),
+    # linearly and angularly fused tricyclics, whose numbering runs round the
+    # periphery from the ring furthest from the fusion
+    "anthracene": (
+        "c1cccc2cc3ccccc3cc12",
+        ["1", "2", "3", "4", "4a", "10", "10a", "5", "6", "7", "8", "8a", "9", "9a"],
+    ),
+    "phenanthrene": (
+        "c1cccc2c3ccccc3ccc12",
+        ["1", "2", "3", "4", "4a", "4b", "5", "6", "7", "8", "8a", "9", "10", "10a"],
+    ),
     # five-membered, multi-heteroatom azoles (heteroatom order fixes numbering)
     "1,2,3-triazole": ("[nH]1nncc1", ["1", "2", "3", "4", "5"]),
     "1,2,4-triazole": ("[nH]1ncnc1", ["1", "2", "3", "4", "5"]),

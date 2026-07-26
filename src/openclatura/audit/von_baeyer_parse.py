@@ -283,10 +283,19 @@ def _check_stem(stem_word: str, total: int) -> bool:
 
 
 def _stem_length(stem_word: str) -> int | None:
-    word = stem_word.rstrip("n")  # drop the saturated 'an'/'n' connective if present
-    if word.endswith("a"):
-        word = word[:-1]
-    return next((ln for ln, row in _stems.STEMS.items() if row.stem == word), None)
+    """Ring size for a multiplying stem, with or without its connective.
+
+    The candidates are tried longest-form first — ``nonan`` -> ``non``, ``nona``
+    -> ``non`` — but the bare stem is tried *before* any stripping, so a stem that
+    itself ends in the connective letter survives: ``non`` (as in
+    ``bicyclo[3.3.1]non-6-ene``) is nine carbons, not ``no``."""
+
+    candidates = (stem_word, stem_word.removesuffix("an"), stem_word.removesuffix("a"), stem_word.removesuffix("n"))
+    for word in candidates:
+        length = next((ln for ln, row in _stems.STEMS.items() if row.stem == word), None)
+        if length is not None:
+            return length
+    return None
 
 
 _MONO_ATTACH_RE = re.compile(r"-(\d+)-yl(?:idene)?$")
