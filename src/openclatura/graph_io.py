@@ -126,13 +126,15 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
 
     Chem.AssignStereochemistry(rdmol, force=True, cleanIt=True)
     chiral_centers = dict(Chem.FindMolChiralCenters(rdmol, includeUnassigned=False))
-    # The internal ``stereo`` label comes from RDKit's *legacy* CIP perception,
-    # which is also what the namer later emits.  For the self-audit we need an
-    # *independent* oracle to compare that emitted label against, so — only when
-    # auditing — we additionally run the modern ``rdCIPLabeler`` implementation
-    # (it corrects legacy mislabels on fused/small-ring systems) and store its
-    # verdict separately.  It is gated because it is pure audit overhead.
-    modern_cip, modern_bond_cip = _modern_cip_labels(rdmol) if _AUDIT_CIP_ENABLED else ({}, {})
+    # Which atoms *are* assigned stereocentres comes from RDKit's legacy
+    # perception, because the namer's choice between per-atom descriptors and a
+    # relative ``cis``/``trans`` word keys off that set.  What each centre is
+    # *called* comes from the modern ``rdCIPLabeler``, the accurate implementation
+    # of the CIP rules: legacy mislabels fused and small-ring centres, and never
+    # emits the lowercase ``r``/``s`` that pseudo-asymmetric centres require.
+    # Correcting the label without touching the set fixes the descriptors while
+    # leaving the naming decisions that depend on the set alone.
+    modern_cip, modern_bond_cip = _modern_cip_labels(rdmol)
     if _AUDIT_CIP_ENABLED:
         # Relative ring stereo (``cis``/``trans``) is carried by tetrahedral
         # parities, which the flattened graph model does not retain.  Keeping the
@@ -143,8 +145,14 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
 
     for atom in rdmol.GetAtoms():
         stereo = chiral_centers.get(atom.GetIdx())
-        if stereo and atom.GetSymbol() == "S" and atom.GetTotalDegree() == 3:
-            stereo = "R" if stereo == "S" else "S"
+        if stereo is not None:
+            accurate = modern_cip.get(atom.GetIdx())
+            if accurate is not None:
+                stereo = accurate
+            elif atom.GetSymbol() == "S" and atom.GetTotalDegree() == 3:
+                # No accurate label to defer to, so keep the namer's long-standing
+                # convention for 3-coordinate sulfur.
+                stereo = "R" if stereo == "S" else "S"
         raw_stereo = _raw_tetrahedral_stereo(atom) if not stereo else None
         mol.add_atom(
             symbol=atom.GetSymbol(),
@@ -156,7 +164,10 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
             isotope=atom.GetIsotope() or None,
             stereo=stereo,
             raw_stereo=raw_stereo,
-            cip=modern_cip.get(atom.GetIdx()),
+            # The audit's comparison field stays audit-gated: it is what the
+            # emitted descriptor is adjudicated against, and populating it outside
+            # an audit would only be dead weight.
+            cip=modern_cip.get(atom.GetIdx()) if _AUDIT_CIP_ENABLED else None,
             is_aromatic=atom_metadata[atom.GetIdx()]["is_aromatic"],
             explicit_h_count=atom_metadata[atom.GetIdx()]["explicit_h_count"],
             total_h_count=atom_metadata[atom.GetIdx()]["total_h_count"],
@@ -179,7 +190,7 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
             order=int(bond.GetBondTypeAsDouble()),
             stereo=stereo,
             in_small_ring=in_small_ring,
-            cip=modern_bond_cip.get((min(u, v), max(u, v))),
+            cip=modern_bond_cip.get((min(u, v), max(u, v))) if _AUDIT_CIP_ENABLED else None,
         )
     return mol
 

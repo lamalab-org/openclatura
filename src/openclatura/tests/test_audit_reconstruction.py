@@ -452,17 +452,11 @@ CONFIRMED_SMILES = [
     "O=C(O)[C@H]1C[C@@H](c2cc(Cl)cc(-c3cnc4c(F)cccc4c3)c2)C1",  # cis-cyclobutanecarboxylic acid
     "C#CCCN(C)CC(=O)N1CCC[C@@H](N(C)C(=O)[C@H]2CC[C@H](CC)CC2)C1",  # trans-cyclohexanecarboxamide
     "C[C@@H](C[C@@H](C)NC(=O)[C@H]1C[C@@H](O)C1)NC(=O)CCc1cn[nH]c1",  # cis, beside parent (2R,4S)
-]
-
-# Constitution is correct but the emitted stereo descriptors disagree with the
-# independent modern-CIP oracle (RDKit's legacy perception, which the namer uses,
-# mislabels these fused/small-ring centres), so the audit must NOT confirm — a
-# regression guard for the sulfur-free stereo soundness hole.
-STEREO_ABSTAIN_SMILES = [
-    "CC[C@@H]1CC1C[C@@H]1CC1C[C@H]1C[C@H]1CCCCCCCC(C)=O",  # cyclopropane-chain, one centre mislabelled
+    # Fused / small-ring centres the legacy CIP perception mislabelled; the
+    # accurate labeller names them correctly, so they now confirm
+    "CC[C@@H]1CC1C[C@@H]1CC1C[C@H]1C[C@H]1CCCCCCCC(C)=O",  # cyclopropane chain
     "CC(=O)[C@]1(C)CC[C@]2(C)CC[C@]3(C)C4=CCc5c(cc(O)c(O)c5C)[C@]4(C)CC[C@@]3(C)[C@@H]2C1",  # pentacyclic steroid
 ]
-
 
 @pytest.mark.parametrize("smiles", CONFIRMED_SMILES)
 def test_self_audit_confirms_modelled_names(smiles):
@@ -472,14 +466,57 @@ def test_self_audit_confirms_modelled_names(smiles):
     assert bool(result) is True
 
 
-@pytest.mark.parametrize("smiles", STEREO_ABSTAIN_SMILES)
-def test_self_audit_does_not_confirm_legacy_mislabelled_stereo(smiles):
-    # Soundness: the emitted descriptor comes from RDKit's legacy CIP perception;
-    # where it disagrees with the independent modern-CIP oracle the audit must
-    # abstain, never confirm (a false-confirm) — and must not refute a merely
-    # unverifiable name either (a false-mismatch).
-    result = self_audit(smiles)
-    assert result.verdict == "abstained", f"{smiles}: {result.verdict} ({result.reason})"
+@pytest.mark.parametrize(
+    "smiles",
+    [
+        # Fused and small-ring centres, where the legacy CIP perception the namer
+        # used to emit disagreed with the accurate labeller.  They now carry the
+        # correct descriptors, so they confirm — and stay here as the regression
+        # guard for that.
+        "CC[C@@H]1CC1C[C@@H]1CC1C[C@H]1C[C@H]1CCCCCCCC(C)=O",
+        "CC(=O)[C@]1(C)CC[C@]2(C)CC[C@]3(C)C4=CCc5c(cc(O)c(O)c5C)[C@]4(C)CC[C@@]3(C)[C@@H]2C1",
+        "C[C@H](N)C(=O)O",
+    ],
+)
+def test_corrupted_stereo_descriptor_is_not_confirmed(smiles):
+    # Soundness: whatever the descriptors are derived from, one that does not
+    # describe the atom it is bound to must block confirmation — never a
+    # false-confirm, and never a false-mismatch either, since a descriptor
+    # disagreement is not proof the constitution is wrong.
+    mol, atoms, parts = _capture_top_level(smiles)
+    assert audit_component_reconstruction(mol, parts, atoms).verdict == "confirmed"
+
+    swap = {"R": "S", "S": "R", "r": "s", "s": "r"}
+    bad = copy.deepcopy(parts)
+    flipped = False
+    for i, (locant, descriptor) in enumerate(bad.stereo_features):
+        if descriptor in swap:
+            bad.stereo_features[i] = (locant, swap[descriptor])
+            flipped = True
+            break
+    if not flipped:
+        for i, binding in enumerate(bad.name_atom_bindings):
+            if binding.role == "absolute_stereo" and binding.term[-1] in swap:
+                bad.name_atom_bindings[i] = replace(binding, term=binding.term[:-1] + swap[binding.term[-1]])
+                flipped = True
+                break
+    if not flipped:
+        # Descriptors embedded in a substituent term, e.g. "((2R)-butan-2-yl)".
+        import re as _re
+
+        for substituent in bad.substituents:
+            replaced, count = _re.subn(
+                r"(\d+)([RSrs])(?=[,)])",
+                lambda m: m.group(1) + swap[m.group(2)],
+                substituent.name,
+                count=1,
+            )
+            if count:
+                substituent.name = replaced
+                flipped = True
+                break
+    assert flipped, f"no stereo descriptor to corrupt for {smiles}"
+    assert audit_component_reconstruction(mol, bad, atoms).verdict == "abstained"
 
 
 # --------------------------------------------------------------------------- #
