@@ -342,7 +342,7 @@ def _resolve_fragment(name: str, stereo_map: dict[str, str]) -> Chem.Mol | None:
         return mol
     # Compositional operators that wrap a recursively-resolved base:
     # ``phenylsulfonyl`` = S(=O)(=O) on phenyl, ``ethylamino`` = N on ethyl, etc.
-    return _resolve_operator(name)
+    return _resolve_operator(name, stereo_map)
 
 
 # --------------------------------------------------------------------------- #
@@ -374,13 +374,13 @@ def _normalize_yl(stem: str) -> str:
     return stem + "yl"
 
 
-def _resolve_operator(name: str) -> Chem.Mol | None:
+def _resolve_operator(name: str, stereo_map: dict[str, str] | None = None) -> Chem.Mol | None:
     if name.startswith("N-") and name.endswith("amido"):
         frag = _resolve_n_substituted_amido(name[2:])
         if frag is not None:
             return frag
     if name.endswith("carboxamido") and len(name) > len("carboxamido"):
-        frag = _resolve_carboxamido(name[: -len("carboxamido")])
+        frag = _resolve_carboxamido(name[: -len("carboxamido")], stereo_map)
         if frag is not None:
             return frag
     if name.endswith("amino") and len(name) > len("amino"):
@@ -499,7 +499,7 @@ def _substitute_attachment(frag: Chem.Mol, ligand: Chem.Mol, element: int | None
     return mol
 
 
-def _resolve_carboxamido(stem: str) -> Chem.Mol | None:
+def _resolve_carboxamido(stem: str, stereo_map: dict[str, str] | None = None) -> Chem.Mol | None:
     """``<acyl-ring>carboxamido`` = ``parent-NH-C(=O)-<ring>``.  The ``carbox``
     contributes an extra carbonyl carbon, so we resolve the ring as a ``-yl``
     fragment and wrap it in ``*NC(=O)*`` (the N is the outward port to the
@@ -507,11 +507,25 @@ def _resolve_carboxamido(stem: str) -> Chem.Mol | None:
     ``NH-C(=O)-furan-2-yl``, ``cyclopropanecarboxamido`` -> ``NH-C(=O)-cyclopropyl``."""
 
     stem = stem.rstrip("-")
+    # The leading stereo prefix was consumed before the operator split, but its
+    # locants number the *ring*, so it is put back on the ring candidate — the
+    # recursive call then tags those centres as it would for a bare ``-yl``.
+    prefix = _stereo_prefix(stereo_map)
     for candidate in _acyl_ring_variants(stem):
-        inner = resolve_fragment_mol(candidate)
+        inner = resolve_fragment_mol(prefix + candidate) or resolve_fragment_mol(candidate)
         if inner is not None:
             return _join_two_port("*NC(=O)*", inner)
     return None
+
+
+def _stereo_prefix(stereo_map: dict[str, str] | None) -> str:
+    """Re-render a captured ``{locant: descriptor}`` map as the name prefix it
+    came from, so it can be pushed onto an inner ring name."""
+
+    if not stereo_map:
+        return ""
+    ordered = sorted(stereo_map.items(), key=lambda item: (not item[0].isdigit(), item[0].isdigit() and int(item[0])))
+    return "(" + ",".join(f"{locant}{descriptor}" for locant, descriptor in ordered) + ")-"
 
 
 def _acyl_ring_variants(stem: str):

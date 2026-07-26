@@ -135,6 +135,7 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
     # Correcting the label without touching the set fixes the descriptors while
     # leaving the naming decisions that depend on the set alone.
     modern_cip, modern_bond_cip = _modern_cip_labels(rdmol)
+    mol.accurate_cip = dict(modern_cip)
     if _AUDIT_CIP_ENABLED:
         # Relative ring stereo (``cis``/``trans``) is carried by tetrahedral
         # parities, which the flattened graph model does not retain.  Keeping the

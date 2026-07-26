@@ -222,8 +222,7 @@ def test_ring_face_relation(smiles, expected):
     pair = [
         a
         for a in ring
-        if sum(1 for n in mol.GetAtomWithIdx(a).GetNeighbors() if n.GetIdx() not in ring and n.GetAtomicNum() > 1)
-        == 1
+        if sum(1 for n in mol.GetAtomWithIdx(a).GetNeighbors() if n.GetIdx() not in ring and n.GetAtomicNum() > 1) == 1
     ]
     assert ring_face_relation(mol, pair[0], pair[1]) == expected
 
@@ -239,7 +238,11 @@ def test_ring_face_relation_agrees_with_cip_on_meso():
         rdCIPLabeler.AssignCIPLabels(mol)
         codes = sorted(a.GetProp("_CIPCode") for a in mol.GetAtoms() if a.HasProp("_CIPCode"))
         ring = mol.GetRingInfo().AtomRings()[0]
-        pair = [a for a in ring if any(n.GetIdx() not in ring and n.GetAtomicNum() > 1 for n in mol.GetAtomWithIdx(a).GetNeighbors())]
+        pair = [
+            a
+            for a in ring
+            if any(n.GetIdx() not in ring and n.GetAtomicNum() > 1 for n in mol.GetAtomWithIdx(a).GetNeighbors())
+        ]
         relation = ring_face_relation(mol, pair[0], pair[1])
         assert relation == ("cis" if codes == ["R", "S"] else "trans")
 
@@ -250,7 +253,11 @@ def test_ring_face_relation_abstains_without_parity():
 
     mol = Chem.MolFromSmiles("CC1CCC(C)CC1")
     ring = mol.GetRingInfo().AtomRings()[0]
-    pair = [a for a in ring if any(n.GetIdx() not in ring and n.GetAtomicNum() > 1 for n in mol.GetAtomWithIdx(a).GetNeighbors())]
+    pair = [
+        a
+        for a in ring
+        if any(n.GetIdx() not in ring and n.GetAtomicNum() > 1 for n in mol.GetAtomWithIdx(a).GetNeighbors())
+    ]
     assert ring_face_relation(mol, pair[0], pair[1]) is None
 
 
@@ -457,6 +464,7 @@ CONFIRMED_SMILES = [
     "CC[C@@H]1CC1C[C@@H]1CC1C[C@H]1C[C@H]1CCCCCCCC(C)=O",  # cyclopropane chain
     "CC(=O)[C@]1(C)CC[C@]2(C)CC[C@]3(C)C4=CCc5c(cc(O)c(O)c5C)[C@]4(C)CC[C@@]3(C)[C@@H]2C1",  # pentacyclic steroid
 ]
+
 
 @pytest.mark.parametrize("smiles", CONFIRMED_SMILES)
 def test_self_audit_confirms_modelled_names(smiles):

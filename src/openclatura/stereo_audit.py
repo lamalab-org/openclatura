@@ -53,7 +53,9 @@ def audit_stereochemistry(
     # 1. Parent descriptors, positionally mapped through the parent locant map.
     for locant, descriptor in parts.stereo_features:
         locant = str(locant)
-        if descriptor in {"R", "S"}:
+        # Lowercase ``r``/``s`` mark pseudo-asymmetric centres and are adjudicated
+        # exactly like the uppercase pair.
+        if descriptor in {"R", "S", "r", "s"}:
             checked += 1
             atom_idx = locant_to_atom.get(locant)
             if atom_idx is None:

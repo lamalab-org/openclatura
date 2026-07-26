@@ -157,6 +157,36 @@ def build_parent_parts(
     return parts
 
 
+def _add_accurate_ring_descriptors(mol: Molecule, parts: AssemblyParts, raw_atoms: list[int], get_loc) -> None:
+    """Emit per-atom descriptors for ring centres the legacy perception leaves
+    unassigned but the accurate labeller does name.
+
+    Every centre must carry a label, and each a numeric parent locant, or nothing
+    is emitted: a partial set would describe some of the ring's configuration and
+    silently drop the rest."""
+
+    features: list[tuple[str, str]] = []
+    for atom_idx in raw_atoms:
+        descriptor = mol.accurate_cip.get(atom_idx)
+        locant = str(get_loc(atom_idx))
+        if descriptor is None or not locant.isdigit():
+            return
+        features.append((locant, descriptor))
+    features.sort(key=lambda item: int(item[0]))
+    parts.stereo_features.extend(features)
+    parts.name_atom_bindings.append(
+        ensure_name_atom_binding_tokens(
+            NameAtomBinding(
+                stage="assembly",
+                role="small_ring_stereo",
+                term=",".join(f"{locant}{descriptor}" for locant, descriptor in features),
+                atom_ids=set(raw_atoms),
+                locants=tuple(locant for locant, _ in features),
+            )
+        )
+    )
+
+
 def _add_relative_ring_stereo(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     """Render unassigned tetrahedral ring stereo as cis/trans for simple rings."""
 
@@ -193,6 +223,11 @@ def _add_relative_ring_stereo(mol: Molecule, parts: AssemblyParts, numbered_path
         sum(1 for neighbor_idx in mol.get_neighbors(atom_idx) if neighbor_idx not in parent_set) != 1
         for atom_idx in raw_atoms
     ):
+        # ``cis``/``trans`` can only relate a pair that each bear exactly one
+        # substituent — there is no single face to speak of otherwise — so a ring
+        # position carrying two different groups gets its descriptor spelled out
+        # instead, from the accurate labeller that does assign these centres.
+        _add_accurate_ring_descriptors(mol, parts, raw_atoms, get_loc)
         return
 
     term = "cis" if first_tag == second_tag else "trans"

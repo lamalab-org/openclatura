@@ -177,6 +177,10 @@ class Molecule:
         # The source RDKit molecule, populated only while self-auditing so the
         # audit can read tetrahedral parities the flattened model drops (graph_io).
         self.audit_rdmol = None
+        # Accurate (rdCIPLabeler) atom labels, including the centres the legacy
+        # perception leaves unassigned.  Always populated: naming reads it to
+        # spell out ring centres the cis/trans fallback cannot describe.
+        self.accurate_cip: dict[int, str] = {}
 
     def add_atom(
         self,
