@@ -395,7 +395,7 @@ def _resolve_operator(name: str, stereo_map: dict[str, str] | None = None) -> Ch
     for suffix, wrapper in (("carbamoyl", "*C(=O)N*"), ("imino", "*=N*")):
         if name.endswith(suffix) and len(name) > len(suffix):
             stem = name[: -len(suffix)].rstrip("-")
-            inner = resolve_fragment_mol(stem) or resolve_fragment_mol(_normalize_yl(stem))
+            inner = _resolve_operator_inner(stem, stereo_map)
             if inner is not None:
                 joined = _join_two_port(wrapper, inner)
                 if joined is not None:
@@ -403,15 +403,30 @@ def _resolve_operator(name: str, stereo_map: dict[str, str] | None = None) -> Ch
     for suffix in sorted(_TWO_PORT_WRAPPERS, key=len, reverse=True):
         if name.endswith(suffix) and len(name) > len(suffix):
             stem = name[: -len(suffix)].rstrip("-")
-            # The inner may already be a full substituent name (``ethoxycarbonyl``
-            # -> ``ethoxy``) or a contracted stem needing ``yl`` (``phenoxy`` ->
-            # ``phen`` -> ``phenyl``); try both.
-            inner = resolve_fragment_mol(stem) or resolve_fragment_mol(_normalize_yl(stem))
+            inner = _resolve_operator_inner(stem, stereo_map)
             if inner is None:
                 continue
             joined = _join_two_port(_TWO_PORT_WRAPPERS[suffix], inner)
             if joined is not None:
                 return joined
+    return None
+
+
+def _resolve_operator_inner(stem: str, stereo_map: dict[str, str] | None) -> Chem.Mol | None:
+    """Resolve an operator's inner group.
+
+    The stem may already be a full substituent name (``ethoxycarbonyl`` ->
+    ``ethoxy``) or a contracted one needing ``yl`` (``phenoxy`` -> ``phen`` ->
+    ``phenyl``), so both are tried.  A leading stereo prefix consumed before the
+    operator split numbers this inner group, so it is pushed back on first —
+    otherwise the inner is rebuilt untagged and its descriptors go unverified."""
+
+    prefix = _stereo_prefix(stereo_map)
+    for candidate in (stem, _normalize_yl(stem)):
+        for spelling in (prefix + candidate, candidate) if prefix else (candidate,):
+            inner = resolve_fragment_mol(spelling)
+            if inner is not None:
+                return inner
     return None
 
 
