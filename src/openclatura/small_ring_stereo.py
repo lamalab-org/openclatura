@@ -51,8 +51,16 @@ def scoped_small_ring_stereo_features(
     features: list[tuple[str, str]] = []
     for atom_idx in sorted(raw_atoms, key=lambda idx: int(locants[idx])):
         locant = locants[atom_idx]
+        accurate = mol.accurate_cip.get(atom_idx)
+        if accurate is not None:
+            # The accurate labeller resolved this centre globally, so its label —
+            # already correctly cased for a pseudo-asymmetric centre — wins over
+            # the locally-derived one.
+            features.append((locant, accurate))
+            continue
         descriptor = local_cip[atom_idx]
         if locant != attachment_locant:
+            # Locally derived, so the pseudo-asymmetric casing is applied here.
             descriptor = descriptor.lower()
         features.append((locant, descriptor))
     return features
