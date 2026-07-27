@@ -479,6 +479,12 @@ CONFIRMED_SMILES = [
     "O=S(=O)(O)c1ccccc1",  # benzenesulfonic acid
     "O=C(Cl)c1ccccc1",  # benzoyl chloride
     "CCC(=O)Cl",  # propanoyl chloride
+    # hydrazones: the carbonyl oxygen replaced by =N-N
+    "CC=NN",  # acetaldehyde hydrazone
+    "CCC(C)=NN",  # butan-2-one hydrazone
+    "c1ccccc1C=NN",  # benzaldehyde hydrazone
+    "C1CCCCC1=NN",  # cyclohexanone hydrazone
+    "O=C(C)CC(C)=NN",  # 4-(hydrazono)pentan-2-one
     # monospiro parents, with skeletal replacement and unsaturation
     "C1CC2(C1)CCC2",  # spiro[3.3]heptane
     "C1CC2(CC1)CCCCC2",  # spiro[4.5]decane

@@ -221,6 +221,16 @@ _HUB_ACID_GROUPS: dict[str, tuple[str, tuple[tuple[str, int], ...]]] = {
     "phosphonic_acid": ("P", (("O", 2), ("O", 1), ("O", 1))),
 }
 
+# Suffix groups whose characteristic atoms form a short chain rather than a set
+# of atoms hung directly off the locant atom.  Value: SMILES of the added
+# fragment, whose first atom bonds to the locant atom with the encoded order.
+# ``ring_`` variants add their own carbon first, as the ``carb…`` suffixes do.
+_FRAGMENT_SUFFIX_GROUPS: dict[str, str] = {
+    "hydrazone": "=NN",
+    "aldehyde_hydrazone": "=NN",
+    "ring_aldehyde_hydrazone": "C=NN",
+}
+
 _BOND_TYPES: dict[int, Chem.BondType] = {
     1: Chem.BondType.SINGLE,
     2: Chem.BondType.DOUBLE,
@@ -756,6 +766,17 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts) -> No
             hub = rw.AddAtom(Chem.Atom(hub_element))
             rw.AddBond(base_idx, hub, Chem.BondType.SINGLE)
             _decorate(rw, hub, decoration)
+        return
+    fragment = _FRAGMENT_SUFFIX_GROUPS.get(pg.key)
+    if fragment is not None:
+        added = Chem.MolFromSmiles("*" + fragment)
+        if added is None:
+            raise _Abstain(f"principal group {pg.key!r} failed to parse")
+        for locant in pg.locants:
+            base_idx = locants.get(str(locant))
+            if base_idx is None:
+                raise _Abstain(f"principal-group locant {locant} outside parent")
+            _graft(rw, base_idx, added)
         return
     direct = _DIRECT_SUFFIX_GROUPS.get(pg.key)
     exocyclic = _EXOCYCLIC_SUFFIX_GROUPS.get(pg.key)
