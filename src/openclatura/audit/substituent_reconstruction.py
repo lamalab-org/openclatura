@@ -19,6 +19,7 @@ import re
 
 from rdkit import Chem
 
+from ..rules import multipliers as _multipliers
 from ..rules import stems as _stems
 from .von_baeyer_parse import parse_hantzsch_widman as _parse_hantzsch_widman
 from .von_baeyer_parse import parse_monocyclic_replacement as _parse_monocyclic_replacement
@@ -28,17 +29,6 @@ from .von_baeyer_parse import parse_von_baeyer as _parse_von_baeyer
 # A numbered fragment: an editable molecule, a map from IUPAC locant -> atom
 # index, and the atom that bonds outward to whatever bears the substituent.
 Numbered = tuple[Chem.RWMol, dict[str, int], int]
-
-_MULTIPLIERS = {
-    "di": 2,
-    "tri": 3,
-    "tetra": 4,
-    "penta": 5,
-    "hexa": 6,
-    "bis": 2,
-    "tris": 3,
-    "tetrakis": 4,
-}
 
 # Leaf sub-substituents: name -> SMILES of the *added* fragment, whose first
 # atom bonds (with the encoded order) to the base atom at the stated locant.
@@ -406,14 +396,21 @@ def _resolve_operator(name: str, stereo_map: dict[str, str] | None = None) -> Ch
     frag = _resolve_liganded_hub(name)
     if frag is not None:
         return frag
-    frag = _resolve_disubstituted_carbamoyl(name)
+    frag = _resolve_disubstituted_amide_hub(name)
     if frag is not None:
         return frag
-    # ``Xcarbamoyl`` = parent-C(=O)-NH-X (an added carbonyl); ``Ximino`` = parent=N-X
-    # (attached through a double bond).
-    for suffix, wrapper in (("carbamoyl", "*C(=O)N*"), ("imino", "*=N*"), ("formyl", "*C(=O)*")):
+    # ``Xcarbamoyl`` = parent-C(=O)-NH-X (an added carbonyl); ``Xsulfamoyl`` =
+    # parent-S(=O)(=O)-NH-X; ``Ximino`` = parent=N-X (attached through a double bond).
+    for suffix, wrapper in (
+        ("carbamoyl", "*C(=O)N*"),
+        ("sulfamoyl", "*S(=O)(=O)N*"),
+        ("imino", "*=N*"),
+        ("formyl", "*C(=O)*"),
+    ):
         if name.endswith(suffix) and len(name) > len(suffix):
             stem = name[: -len(suffix)].rstrip("-")
+            if suffix in _AMIDE_N_HUBS:
+                stem = _strip_n_locants(stem)
             inner = _resolve_operator_inner(stem, stereo_map)
             if inner is not None:
                 joined = _join_two_port(wrapper, inner)
@@ -600,15 +597,30 @@ def _resolve_amino(rest: str) -> Chem.Mol | None:
         if all(f is not None for f in frags):
             return _amino_from_ligands(frags)
 
-    count, base = 1, rest
-    for word, n in sorted(_MULTIPLIERS.items(), key=lambda kv: -len(kv[0])):
-        if rest.startswith(word) and _resolvable(rest[len(word) :]):
-            count, base = n, rest[len(word) :]
-            break
+    count, base = _multiplied_ligand(rest)
     inner = resolve_fragment_mol(base)
     if inner is None:
         return None
     return _amino_from_ligands([inner] * count)
+
+
+def _multiplied_ligand(rest: str) -> tuple[int, str]:
+    """Split a ligand spec into ``(count, single-ligand name)``.
+
+    A leading multiplier only counts when ``rest`` is *not itself* the name of one
+    substituent: ``diethyl`` is not a substituent, so ``diethylamino`` is two
+    ethyls, but ``diethylaminosulfonyl`` is one ligand (the ``di`` belongs to the
+    inner ``diethylamino``) and must not be read as two ``ethylaminosulfonyl``.
+    Preferring the whole-name reading keeps the multiplier bound to the innermost
+    prefix it can attach to, which is where the name put it.
+    """
+
+    if _resolvable(rest):
+        return 1, rest
+    for count, base in _multipliers.candidate_splits(rest):
+        if _resolvable(base):
+            return count, base
+    return 1, rest
 
 
 def _amino_from_ligands(frags: list[Chem.Mol]) -> Chem.Mol | None:
@@ -639,33 +651,57 @@ _LIGANDED_HUBS: dict[str, tuple[str, int]] = {
 }
 
 
-def _resolve_disubstituted_carbamoyl(name: str) -> Chem.Mol | None:
-    """``(A)(B)carbamoyl`` = ``parent-C(=O)-N(A)(B)`` — an amide whose nitrogen
-    carries two cited ligands rather than the single one the plain
-    ``<X>carbamoyl`` operator covers.  Two ligands are required, so a
-    single-ligand name still falls through to that operator."""
+# Hubs that bond outward to the parent through a core carrying an amide-type
+# nitrogen, and it is *that nitrogen* the cited ligands sit on:
+# ``(A)(B)carbamoyl`` -> ``-C(=O)N(A)(B)``, ``(A)(B)sulfamoyl`` ->
+# ``-S(=O)(=O)N(A)(B)``.  Value: (hub element, number of ``=O``).
+_AMIDE_N_HUBS: dict[str, tuple[str, int]] = {
+    "carbamoyl": ("C", 1),
+    "sulfamoyl": ("S", 2),
+}
 
-    if not name.endswith("carbamoyl") or len(name) <= len("carbamoyl"):
-        return None
-    frags = _hub_ligands(name[: -len("carbamoyl")].rstrip("-"))
-    if frags is None or len(frags) < 2:
-        return None
-    rw = Chem.RWMol()
-    carbon = rw.AddAtom(Chem.Atom(6))
-    dummy = rw.AddAtom(Chem.Atom(0))
-    rw.AddBond(dummy, carbon, Chem.BondType.SINGLE)
-    oxo = rw.AddAtom(Chem.Atom(8))
-    rw.AddBond(carbon, oxo, Chem.BondType.DOUBLE)
-    nitrogen = rw.AddAtom(Chem.Atom(7))
-    rw.AddBond(carbon, nitrogen, Chem.BondType.SINGLE)
-    if not all(_graft_onto(rw, nitrogen, frag) for frag in frags):
-        return None
-    mol = rw.GetMol()
-    try:
-        Chem.SanitizeMol(mol)
-    except Exception:
-        return None
-    return mol
+_N_LOCANT_RE = re.compile(r"^N'*(?:,N'*)*-")
+
+
+def _strip_n_locants(head: str) -> str:
+    """Drop a leading italic-``N`` locant set (``N-``, ``N,N-``, ``N,N'-``).
+
+    On an amide-nitrogen hub the ligands go on that nitrogen either way, so the
+    locant adds no placement information the rebuild needs."""
+
+    return _N_LOCANT_RE.sub("", head)
+
+
+def _resolve_disubstituted_amide_hub(name: str) -> Chem.Mol | None:
+    """``(A)(B)carbamoyl`` / ``(A)(B)sulfamoyl`` — an amide or sulfonamide whose
+    nitrogen carries two cited ligands rather than the single one the plain
+    ``<X>carbamoyl`` / ``<X>sulfamoyl`` operator covers.  Two ligands are
+    required, so a single-ligand name still falls through to that operator."""
+
+    for word, (element, oxo_count) in _AMIDE_N_HUBS.items():
+        if not name.endswith(word) or len(name) <= len(word):
+            continue
+        frags = _hub_ligands(_strip_n_locants(name[: -len(word)].rstrip("-")))
+        if frags is None or len(frags) < 2:
+            continue
+        rw = Chem.RWMol()
+        hub = rw.AddAtom(Chem.Atom(element))
+        dummy = rw.AddAtom(Chem.Atom(0))
+        rw.AddBond(dummy, hub, Chem.BondType.SINGLE)
+        for _ in range(oxo_count):
+            oxo = rw.AddAtom(Chem.Atom(8))
+            rw.AddBond(hub, oxo, Chem.BondType.DOUBLE)
+        nitrogen = rw.AddAtom(Chem.Atom(7))
+        rw.AddBond(hub, nitrogen, Chem.BondType.SINGLE)
+        if not all(_graft_onto(rw, nitrogen, frag) for frag in frags):
+            continue
+        mol = rw.GetMol()
+        try:
+            Chem.SanitizeMol(mol)
+        except Exception:
+            continue
+        return mol
+    return None
 
 
 def _resolve_liganded_hub(name: str) -> Chem.Mol | None:
@@ -709,12 +745,14 @@ def _hub_ligands(head: str) -> list[Chem.Mol] | None:
     if len(groups) >= 2 and all(g.startswith("(") and g.endswith(")") for g in groups):
         frags = [resolve_fragment_mol(g) for g in groups]
         return None if any(f is None for f in frags) else frags
-    for word, count in sorted(_MULTIPLIERS.items(), key=lambda kv: -len(kv[0])):
-        if head.startswith(word):
-            inner = resolve_fragment_mol(head[len(word) :])
-            if inner is not None:
-                return [inner] * count
-    return None
+    if len(groups) != 1 or groups[0].startswith("("):
+        # A mixed list such as ``((…)oxy)ethenyl`` is ambiguous — the leading
+        # parenthesised clause could be a sibling ligand on the hub or a modifier
+        # of what follows it — so abstain rather than pick one reading.
+        return None
+    count, base = _multiplied_ligand(head)
+    inner = resolve_fragment_mol(base)
+    return None if inner is None else [inner] * count
 
 
 def _top_level_groups(s: str) -> list[str]:
@@ -1388,6 +1426,19 @@ def _apply_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
     # list; each one must resolve on its own for the split to be accepted.
     if prefix.startswith("(") and "1" in locants:
         groups = _top_level_groups(prefix)
+        # With a trailing *unparenthesised* group the split is ambiguous, and both
+        # readings often resolve.  The leading clause's attachment bond settles it:
+        # ``(oxo)pyrrolidin-1-ylmethyl`` leads with a double-bond ligand, which can
+        # only describe C1's own bonding, so those are siblings (an acyl); a
+        # single-bond lead as in ``(2,2,2-trifluoroethyl)sulfamoylaminomethyl`` is
+        # the inner ligand of the operator that follows it, so the whole prefix is
+        # one substituent.
+        if not all(group.startswith("(") for group in groups) and not _attaches_by_double_bond(
+            resolve_fragment_mol(groups[0])
+        ):
+            whole = resolve_fragment_mol(prefix)
+            if whole is not None:
+                return _graft_onto(rw, locants["1"], whole)
         if len(groups) >= 2:
             frags = [resolve_fragment_mol(group) for group in groups]
             if all(frag is not None for frag in frags):
@@ -1421,20 +1472,31 @@ def _apply_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
     return True
 
 
+def _attaches_by_double_bond(frag: Chem.Mol | None) -> bool:
+    """Whether ``frag`` bonds to its parent through a double bond (``oxo``,
+    ``imino``, any ``…ylidene``).  ``None`` counts as ``False``: an unresolvable
+    clause tells us nothing about how it would have attached."""
+
+    if frag is None:
+        return False
+    dummy = next((a for a in frag.GetAtoms() if a.GetAtomicNum() == 0), None)
+    if dummy is None:
+        return False
+    return any(b.GetBondType() == Chem.BondType.DOUBLE for b in dummy.GetBonds())
+
+
 def _apply_unlocanted_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
     if "1" not in locants:
         return False
-    count, body = 1, prefix
-    mult = _leading_multiplier(prefix)
-    if mult is not None:
-        count, body = mult, prefix[len(_multiplier_word(mult)) :]
+    leaf = _leading_multiplier(prefix)
+    if leaf is not None:
+        count, body = leaf
     else:
-        # A multiplier over a non-leaf but resolvable base, e.g. ``diphenyl`` in
-        # ``diphenylmethyl`` -> two phenyls on C1.
-        for word, n in sorted(_MULTIPLIERS.items(), key=lambda kv: -len(kv[0])):
-            if prefix.startswith(word) and _resolvable(prefix[len(word) :]):
-                count, body = n, prefix[len(word) :]
-                break
+        # Otherwise the multiplier may belong to a group *inside* the prefix
+        # rather than counting copies of it: ``diphenylmethyl`` is two phenyls on
+        # C1, but ``dihydroxyphosphorylmethyl`` is one phosphoryl wearing two
+        # hydroxys, not two ``hydroxyphosphoryl``s.
+        count, body = _multiplied_ligand(prefix)
     frag = resolve_fragment_mol(body)
     if frag is None:
         return False
@@ -1461,10 +1523,10 @@ def _parse_clauses(prefix: str) -> list[tuple[list[str], str]] | None:
             return None
         locs = m.group(1).split(",")
         body = m.group(2).rstrip("-")  # drop the separator hyphen before the next clause
-        mult = _leading_multiplier(body)
-        if mult is not None:
-            body = body[len(_multiplier_word(mult)) :]
-            if len(locs) != mult:
+        leaf = _leading_multiplier(body)
+        if leaf is not None:
+            count, body = leaf
+            if len(locs) != count:
                 return None
         clauses.append((locs, body))
     return clauses
@@ -1481,18 +1543,17 @@ def _clause_starts(prefix: str) -> list[int]:
     return starts
 
 
-def _leading_multiplier(body: str) -> int | None:
-    for word, n in sorted(_MULTIPLIERS.items(), key=lambda kv: -len(kv[0])):
-        if body.startswith(word) and body[len(word) :] in _LEAF_SMILES:
-            return n
+def _leading_multiplier(body: str) -> tuple[int, str] | None:
+    """Split a multiplied *leaf* — ``difluoro`` -> ``(2, "fluoro")`` — else ``None``.
+
+    A leaf takes no ligands of its own, so a multiplier in front of one can only
+    be counting copies.  That makes this reading unambiguous, unlike a multiplier
+    over a compound name (see :func:`_multiplied_ligand`)."""
+
+    for count, rest in _multipliers.candidate_splits(body):
+        if rest in _LEAF_SMILES:
+            return count, rest
     return None
-
-
-def _multiplier_word(n: int) -> str:
-    for word, val in _MULTIPLIERS.items():
-        if val == n:
-            return word
-    return ""
 
 
 def _graft_onto(rw: Chem.RWMol, base_idx: int, frag: Chem.Mol) -> bool:

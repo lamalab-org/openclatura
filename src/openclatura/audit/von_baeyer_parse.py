@@ -21,25 +21,23 @@ import re
 
 from rdkit import Chem
 
+from ..rules import elements as _elements
+from ..rules import multipliers as _multipliers
 from ..rules import stems as _stems
 
 Numbered = tuple[Chem.RWMol, dict[str, int], int]
 
-_REPLACEMENT_ELEMENTS = {
-    "oxa": "O",
-    "aza": "N",
-    "thia": "S",
-    "selena": "Se",
-    "tellura": "Te",
-    "phospha": "P",
-    "arsa": "As",
-    "sila": "Si",
-    "germa": "Ge",
-    "stanna": "Sn",
-    "bora": "B",
+# Skeletal-replacement prefixes, read back off the same table the namer writes
+# them from, so the parser accepts exactly the set the namer can emit.
+_REPLACEMENT_ELEMENTS = _elements.SYMBOLS_BY_HW_STEM
+# ``en``/``yn`` unsaturation stems carry the multiplier as a *basic* prefix
+# (``dien``, ``trien``), so they are derived from the shared table rather than
+# spelled out again here.
+_UNSAT_MULT: dict[str, int] = {"en": 1, "yn": 1} | {
+    f"{mult.basic}{stem}": mult.count for mult in _multipliers.MULTIPLIERS.values() for stem in ("en", "yn")
 }
-_MULT = {"": 1, "di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6}
-_UNSAT_MULT = {"en": 1, "dien": 2, "trien": 3, "tetraen": 4, "pentaen": 5, "hexaen": 6}
+# Longest first so ``dien`` is not read as ``di`` + a stray ``en``.
+_UNSAT_ALTERNATION = "|".join(sorted(_UNSAT_MULT, key=len, reverse=True))
 
 _VONBAEYER_RE = re.compile(r"(?:bi|tri|tetra|penta)cyclo\[([0-9.,^{}]+)\]")
 _SECONDARY_RE = re.compile(r"(\d+)\^?\{?(\d+),(\d+)\}?")
@@ -49,8 +47,16 @@ _SECONDARY_RE = re.compile(r"(\d+)\^?\{?(\d+),(\d+)\}?")
 # annotation is matched and discarded rather than being left as an unparsed
 # leftover that forces an abstention.
 _LAMBDA = r"(?:lambda\^?\{?\d+\}?)?"
+_BASIC_ALTERNATION = "|".join(sorted((mult.basic for mult in _multipliers.MULTIPLIERS.values()), key=len, reverse=True))
 _REPL_RE = re.compile(
-    r"(\d+(?:,\d+)*)" + _LAMBDA + r"-(di|tri|tetra|penta|hexa)?(" + "|".join(_REPLACEMENT_ELEMENTS) + r")"
+    r"(\d+(?:,\d+)*)"
+    + _LAMBDA
+    + r"-("
+    + _BASIC_ALTERNATION
+    + r")?("
+    # longest first, so a prefix that starts another one cannot shadow it
+    + "|".join(sorted(_REPLACEMENT_ELEMENTS, key=len, reverse=True))
+    + r")"
 )
 
 # A parsed von Baeyer descriptor: the main bicycle (a,b,c) plus zero or more
@@ -251,7 +257,7 @@ def _apply_replacement(rw: Chem.RWMol, locants: dict[str, int], pre: str) -> boo
     consumed = 0
     for mm in _REPL_RE.finditer(pre):
         locs = mm.group(1).split(",")
-        mult = _MULT.get(mm.group(2) or "", 1)
+        mult = _multipliers.count_for(mm.group(2) or "") or 1
         if len(locs) != mult:
             return False
         element = _REPLACEMENT_ELEMENTS[mm.group(3)]
@@ -378,7 +384,6 @@ _HW_SIZE_STEMS: tuple[tuple[str, int], ...] = (
     ("ecane", 10),
     ("ane", 6),
 )
-_HW_MULTIPLIERS = {"": 1, "di": 2, "tri": 3, "tetra": 4}
 _HW_RE = re.compile(r"^(?:(?P<locants>\d+(?:,\d+)*)-)?(?P<prefix>[a-z]+)$")
 
 
@@ -415,10 +420,9 @@ def _parse_hw_prefix(prefix: str) -> list[str] | None:
 
     elements: list[str] = []
     while prefix:
-        for multiplier, count in sorted(_HW_MULTIPLIERS.items(), key=lambda kv: -len(kv[0])):
-            if not prefix.startswith(multiplier):
-                continue
-            rest = prefix[len(multiplier) :]
+        # Multiplied readings first (longest prefix wins), then the bare token —
+        # ``oxa`` is one oxygen, ``dioxa`` two.
+        for count, rest in (*_multipliers.candidate_splits(prefix), (1, prefix)):
             for word in sorted(_HW_ELEMENTS, key=len, reverse=True):
                 if rest.startswith(word):
                     elements.extend([_HW_ELEMENTS[word]] * count)
@@ -466,7 +470,7 @@ def _build_monocycle(n: int) -> tuple[Chem.RWMol, dict[str, int]]:
 
 def _apply_unsaturation(rw: Chem.RWMol, locants: dict[str, int], rest: str) -> bool:
     rest = rest.strip("-")
-    um = re.match(r"^([0-9(),]+)-(" + "|".join(_UNSAT_MULT) + r")e?$", rest)
+    um = re.match(r"^([0-9(),]+)-(" + _UNSAT_ALTERNATION + r")e?$", rest)
     if um is None:
         return False
     tokens = um.group(1).split(",")

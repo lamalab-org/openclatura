@@ -1,0 +1,78 @@
+"""The shared nomenclature tables are the single source of truth for the two
+directions that use them: the namer *writes* prefixes from them, and the audit's
+parsers *read* prefixes back through them.  These tests pin the inverse lookups
+to the forward ones so the two can never drift apart again — the failure mode
+being an audit that abstains on names the namer is perfectly able to emit.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from openclatura.rules import elements, multipliers
+
+
+@pytest.mark.parametrize("count", sorted(multipliers.MULTIPLIERS))
+def test_every_written_multiplier_reads_back(count: int):
+    # Both spellings the namer can emit must round-trip to the same count.
+    assert multipliers.count_for(multipliers.basic(count)) == count
+    assert multipliers.count_for(multipliers.complex_(count)) == count
+
+
+@pytest.mark.parametrize(
+    ("name", "expected"),
+    [
+        ("dimethyl", (2, "methyl")),
+        ("bis(2-chloroethyl)", (2, "(2-chloroethyl)")),
+        ("tris(hydroxymethyl)", (3, "(hydroxymethyl)")),
+        ("hexadecafluoro", (16, "fluoro")),  # longest prefix wins over ``hexa``
+        ("methyl", (1, "methyl")),  # no prefix reads as a single occurrence
+    ],
+)
+def test_split_prefix(name: str, expected: tuple[int, str]):
+    assert multipliers.split_prefix(name) == expected
+
+
+def test_candidate_splits_are_longest_first():
+    # ``tetradeca`` (14) must be offered before ``tetra`` (4), so a caller that
+    # validates the remainder sees the more specific reading first.
+    counts = [count for count, _ in multipliers.candidate_splits("tetradecafluoro")]
+    assert counts == sorted(counts, reverse=True)
+    assert counts[0] == 14
+
+
+def test_every_replacement_prefix_maps_to_its_element():
+    # The inverse table must cover exactly the elements that declare a stem, and
+    # agree with them.
+    declared = {e.hw_stem: e.symbol for e in elements.ELEMENTS.values() if e.hw_stem}
+    assert elements.SYMBOLS_BY_HW_STEM == declared
+
+
+def test_replacement_stems_are_unique():
+    stems = [e.hw_stem for e in elements.ELEMENTS.values() if e.hw_stem]
+    assert len(stems) == len(set(stems))
+
+
+def test_hw_priorities_are_unique_and_ordered_by_seniority():
+    # Skeletal-replacement seniority (P-15.4.3.2): halogens, then O, S, Se, Te,
+    # then N, P, As, Sb, Bi, then Si, Ge, Sn, Pb, then B, Al, Ga.
+    ranked = sorted(
+        (e for e in elements.ELEMENTS.values() if e.hw_priority is not None),
+        key=lambda e: e.hw_priority,
+    )
+    assert [e.symbol for e in ranked] == [
+        "F", "Cl", "Br", "I", "O", "S", "Se", "Te",
+        "N", "P", "As", "Sb", "Bi", "Si", "Ge", "Sn", "Pb", "B", "Al", "Ga",
+    ]  # fmt: skip
+    priorities = [e.hw_priority for e in ranked]
+    assert len(priorities) == len(set(priorities))
+
+
+def test_audit_parsers_share_the_canonical_tables():
+    # The audit reconstructs names independently of the namer's *bindings*, but it
+    # must speak the same vocabulary — these are the shared spelling tables, not
+    # shared inference.
+    from openclatura.audit import reconstruction, von_baeyer_parse
+
+    assert reconstruction._REPLACEMENT_ELEMENTS is elements.SYMBOLS_BY_HW_STEM
+    assert von_baeyer_parse._REPLACEMENT_ELEMENTS is elements.SYMBOLS_BY_HW_STEM

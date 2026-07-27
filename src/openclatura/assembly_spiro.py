@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from .assembly_parts import AssemblyParts
 from .nomenclature import RULES
-from .rules import elision, stems
+from .rules import elision, multipliers, stems
 from .spiro_assembly import SpiroAssembly
 
 SPIRO_SUBSTITUENT_RE = re.compile(r"^\[SPIRO\]-(\d+)-(.*)$")
@@ -186,7 +186,7 @@ def _merge_terminal_and_side_suffixes(terminal_e: str, side_suffixes: list[tuple
     if not same_suffix:
         return terminal_e + _format_side_suffixes(side_suffixes)
     locants = main_locants + [locant for locant, _ in same_suffix]
-    multiplier = {2: "di", 3: "tri", 4: "tetra"}.get(len(locants), "")
+    multiplier = multipliers.basic(len(locants)) if len(locants) > 1 else ""
     merged_suffix = f"{multiplier}{main_suffix}" if multiplier else main_suffix
     return f"-{','.join(locants)}-{merged_suffix}" + _format_side_suffixes(other_suffix)
 

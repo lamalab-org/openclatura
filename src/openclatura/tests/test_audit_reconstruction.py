@@ -198,6 +198,23 @@ def _canonical(mol) -> str | None:
         # an unlocanted ligand list that is not uniformly parenthesised
         ("((oxo)cyclopropylmethyl)", "*C(=O)C1CC1"),
         ("(formamido)", "*NC=O"),
+        # ``sulfamoyl`` carrying its ligands on the sulfonamide nitrogen, with or
+        # without the italic-N locants that name it explicitly
+        ("(methylsulfamoyl)", "*S(=O)(=O)NC"),
+        ("((2,2,2-trifluoroethyl)sulfamoyl)", "*S(=O)(=O)NCC(F)(F)F"),
+        ("(N-(2,2,2-trifluoroethyl)sulfamoyl)", "*S(=O)(=O)NCC(F)(F)F"),
+        ("((propan-2-yl)(methyl)sulfamoyl)", "*S(=O)(=O)N(C)C(C)C"),
+        ("(N,N-dimethylsulfamoyl)", "*S(=O)(=O)N(C)C"),
+        # A multiplier binds to the innermost prefix it can, not to the whole
+        # ligand: ``diethylamino`` is two ethyls on one nitrogen, so
+        # ``diethylaminosulfonyl`` is *one* ligand and not two ``ethylaminosulfonyl``.
+        ("(diethylamino)", "*N(CC)CC"),
+        ("(diethylaminosulfonyl)", "*S(=O)(=O)N(CC)CC"),
+        ("(diethylaminosulfonylamino)", "*NS(=O)(=O)N(CC)CC"),
+        ("((2,2,2-trifluoroethyl)sulfamoylaminomethyl)", "*CNS(=O)(=O)NCC(F)(F)F"),
+        # likewise on a hub: two hydroxys on one phosphoryl, not two phosphoryls
+        ("(dihydroxyphosphorylmethyl)", "*CP(=O)(O)O"),
+        ("(diphenylmethyl)", "*C(c1ccccc1)c1ccccc1"),
         # ``oxido`` is the charge-separated spelling of an oxo, so it must agree
         # with an input written either way
         ("(oxido)", "*=O"),
@@ -219,6 +236,10 @@ def test_resolve_fragment_grammar(name, expected):
         # otherwise be placed on C1 — the acyl base withdraws C1 so this abstains
         # rather than reconstructing the wrong graph.
         "(phenylacetyl)",
+        # A hub whose ligand list mixes a parenthesised clause with a bare one is
+        # ambiguous — the clause could be a second ligand on the boron or a
+        # modifier of the ethenyl — so it abstains rather than picking a reading.
+        "(((cyclohexyl)oxy)ethenylboryl)",
     ],
 )
 def test_unresolvable_substituent_returns_none(name):
@@ -485,6 +506,13 @@ CONFIRMED_SMILES = [
     "c1ccccc1C=NN",  # benzaldehyde hydrazone
     "C1CCCCC1=NN",  # cyclohexanone hydrazone
     "O=C(C)CC(C)=NN",  # 4-(hydrazono)pentan-2-one
+    # sulfamides, whose multiplied ligands sit on the sulfonamide nitrogen —
+    # ``diethylsulfamoylamino`` is one Et2N-SO2-NH- and not two ethylsulfamoyls
+    "CCN(CC)S(=O)(=O)N[C@H](CCOC1=CC=CC=C1)C(=O)O",
+    "Cc1nc(CNS(=O)(=O)NCC(F)(F)F)sc1C(=O)O",
+    "CC(C)N(C)S(=O)(=O)NCc1ccccc1C#CCCO",
+    # …and the same scope rule on a phosphoryl hub: two hydroxys, one phosphorus
+    "CC(=O)N[C@H](Cc1ccc(CP(=O)(O)O)cc1)C(=O)O",
     # monospiro parents, with skeletal replacement and unsaturation
     "C1CC2(C1)CCC2",  # spiro[3.3]heptane
     "C1CC2(CC1)CCCCC2",  # spiro[4.5]decane

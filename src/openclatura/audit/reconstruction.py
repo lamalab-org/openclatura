@@ -34,6 +34,8 @@ from typing import Literal
 from rdkit import Chem
 
 from ..molecule import Molecule
+from ..rules import elements as _elements
+from ..rules import multipliers as _multipliers
 from .naming import (
     ChargePairTemplateAudit,
     NamingCoverage,
@@ -119,27 +121,9 @@ class ReconstructionAudit:
 # Element / template tables (all name-derived, never graph-derived)
 # --------------------------------------------------------------------------- #
 
-# Replacement ("a") prefixes -> element symbol.
-_REPLACEMENT_ELEMENTS: dict[str, str] = {
-    "oxa": "O",
-    "aza": "N",
-    "thia": "S",
-    "selena": "Se",
-    "tellura": "Te",
-    "phospha": "P",
-    "arsa": "As",
-    "stiba": "Sb",
-    "bisma": "Bi",
-    "sila": "Si",
-    "germa": "Ge",
-    "stanna": "Sn",
-    "plumba": "Pb",
-    "bora": "B",
-    "alumina": "Al",
-    "galla": "Ga",
-}
-
-_REPLACEMENT_MULTIPLIERS = ("tetra", "tri", "di", "tetrakis", "tris", "bis")
+# Replacement ("a") prefixes -> element symbol, shared with the von Baeyer parser
+# and derived from the same element table the namer writes them from.
+_REPLACEMENT_ELEMENTS: dict[str, str] = _elements.SYMBOLS_BY_HW_STEM
 
 # Retained monocyclic parent rings whose IUPAC locants map straight onto the
 # atom order of the SMILES below (heteroatom = locant 1).  Only rings whose
@@ -684,9 +668,11 @@ def _apply_replacements(rw: Chem.RWMol, locants: dict[str, int], parts, aromatic
 def _replacement_element(name: str) -> str | None:
     if name in _REPLACEMENT_ELEMENTS:
         return _REPLACEMENT_ELEMENTS[name]
-    for mult in sorted(_REPLACEMENT_MULTIPLIERS, key=len, reverse=True):
-        if name.startswith(mult) and name[len(mult) :] in _REPLACEMENT_ELEMENTS:
-            return _REPLACEMENT_ELEMENTS[name[len(mult) :]]
+    # ``trioxa`` names the same element as ``oxa``; how many there are comes from
+    # the cited locants, so only the element is read back here.
+    for _count, rest in _multipliers.candidate_splits(name):
+        if rest in _REPLACEMENT_ELEMENTS:
+            return _REPLACEMENT_ELEMENTS[rest]
     return None
 
 
