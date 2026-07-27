@@ -471,10 +471,71 @@
     box.style.display = "block";
   }
 
+  // ---------------------------------------------------------------------
+  // Template previews
+  //
+  // While a ring template is active and the cursor sits on the canvas,
+  // Ketcher inserts the hovering preview into the live struct, so getSmiles()
+  // hands back a ring the user never drew. Undo makes it obvious: the placed
+  // ring goes away, the tool immediately re-previews under the cursor, and
+  // the name keeps a phantom component ("…purine-2,6-dione benzene") with
+  // nothing on screen to explain it.
+  //
+  // A free-standing preview flags its atoms `isPreview`, so they are dropped
+  // from a clone of the struct that Ketcher's own Indigo converts to SMILES —
+  // the editor itself is never touched. A preview snapped onto an existing
+  // atom is applied as a real (later reverted) action carrying no flag at
+  // all; there the drawing is simply not re-named until the cursor moves off
+  // it, which restores the struct on its own.
+  // ---------------------------------------------------------------------
+
+  var SMILES_FORMAT = "chemical/x-daylight-smiles";
+
+  function connectedPreview() {
+    var tool = ketcher.editor.tool && ketcher.editor.tool();
+    var preview = tool && tool.templatePreview;
+    return !!(preview && preview.connectedPreviewAction);
+  }
+
+  // Atom ids of what is actually drawn, or null when the struct holds no
+  // preview at all and the plain getSmiles() path will do.
+  function drawnAtoms() {
+    var ids = [];
+    var previews = 0;
+    ketcher.editor.struct().atoms.forEach(function (atom, id) {
+      if (atom.isPreview) previews += 1;
+      else ids.push(id);
+    });
+    return previews ? ids : null;
+  }
+
+  function fullSmiles() {
+    return ketcher.getSmiles().then(function (smiles) {
+      return { smiles: (smiles || "").trim() };
+    });
+  }
+
+  // Resolve the drawing to the SMILES that should be named. Anything that
+  // goes wrong here falls back to the whole structure, previews included.
+  function smilesToName() {
+    if (connectedPreview()) return Promise.resolve({ skip: true });
+    var ids = null;
+    try {
+      ids = drawnAtoms();
+    } catch (e) { /* fall through to the whole structure */ }
+    if (!ids) return fullSmiles();
+    if (!ids.length) return Promise.resolve({ smiles: "" }); // preview only
+    var clone = ketcher.editor.struct().clone(new Set(ids));
+    return ketcher.indigo.convert(clone, { outputFormat: SMILES_FORMAT })
+      .then(function (res) { return { smiles: (res && res.struct || "").trim() }; })
+      .catch(fullSmiles);
+  }
+
   function nameCurrent() {
     if (!ketcher) return;
-    ketcher.getSmiles().then(function (smiles) {
-      smiles = (smiles || "").trim();
+    smilesToName().then(function (result) {
+      if (result.skip) return; // a preview is showing; what is drawn hasn't changed
+      var smiles = result.smiles;
       el("smiles-out").textContent = smiles || "—";
       if (!smiles) {
         currentSmiles = "";
