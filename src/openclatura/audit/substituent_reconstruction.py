@@ -68,6 +68,12 @@ _LEAF_SMILES: dict[str, str] = {
     "methylsulfanyl": "SC",
     "ethylsulfanyl": "SCC",
     "formyl": "C=O",
+    "formamido": "NC=O",
+    # ``oxido`` is the charge-separated spelling of an oxo on a hub that carries
+    # the matching ``+``; modelled as the oxo itself so it agrees with an input
+    # written either way.  On a centre that cannot take the extra bond (a
+    # quaternary N-oxide) the result fails to sanitise and the caller abstains.
+    "oxido": "=O",
     "carboxy": "C(=O)O",
     "carbamoyl": "C(N)=O",
     "acetyl": "C(C)=O",
@@ -400,9 +406,12 @@ def _resolve_operator(name: str, stereo_map: dict[str, str] | None = None) -> Ch
     frag = _resolve_liganded_hub(name)
     if frag is not None:
         return frag
+    frag = _resolve_disubstituted_carbamoyl(name)
+    if frag is not None:
+        return frag
     # ``Xcarbamoyl`` = parent-C(=O)-NH-X (an added carbonyl); ``Ximino`` = parent=N-X
     # (attached through a double bond).
-    for suffix, wrapper in (("carbamoyl", "*C(=O)N*"), ("imino", "*=N*")):
+    for suffix, wrapper in (("carbamoyl", "*C(=O)N*"), ("imino", "*=N*"), ("formyl", "*C(=O)*")):
         if name.endswith(suffix) and len(name) > len(suffix):
             stem = name[: -len(suffix)].rstrip("-")
             inner = _resolve_operator_inner(stem, stereo_map)
@@ -628,6 +637,35 @@ _LIGANDED_HUBS: dict[str, tuple[str, int]] = {
     "silyl": ("Si", 0),
     "boryl": ("B", 0),
 }
+
+
+def _resolve_disubstituted_carbamoyl(name: str) -> Chem.Mol | None:
+    """``(A)(B)carbamoyl`` = ``parent-C(=O)-N(A)(B)`` — an amide whose nitrogen
+    carries two cited ligands rather than the single one the plain
+    ``<X>carbamoyl`` operator covers.  Two ligands are required, so a
+    single-ligand name still falls through to that operator."""
+
+    if not name.endswith("carbamoyl") or len(name) <= len("carbamoyl"):
+        return None
+    frags = _hub_ligands(name[: -len("carbamoyl")].rstrip("-"))
+    if frags is None or len(frags) < 2:
+        return None
+    rw = Chem.RWMol()
+    carbon = rw.AddAtom(Chem.Atom(6))
+    dummy = rw.AddAtom(Chem.Atom(0))
+    rw.AddBond(dummy, carbon, Chem.BondType.SINGLE)
+    oxo = rw.AddAtom(Chem.Atom(8))
+    rw.AddBond(carbon, oxo, Chem.BondType.DOUBLE)
+    nitrogen = rw.AddAtom(Chem.Atom(7))
+    rw.AddBond(carbon, nitrogen, Chem.BondType.SINGLE)
+    if not all(_graft_onto(rw, nitrogen, frag) for frag in frags):
+        return None
+    mol = rw.GetMol()
+    try:
+        Chem.SanitizeMol(mol)
+    except Exception:
+        return None
+    return mol
 
 
 def _resolve_liganded_hub(name: str) -> Chem.Mol | None:
@@ -1344,18 +1382,19 @@ def _apply_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
         if frag is not None:
             return _graft_onto(rw, locants["1"], frag)
         return False
-    # Several *fully parenthesised* unlocanted ligands on the same atom, e.g.
-    # ``(amino)(imino)methyl`` -> C1 bears both -> amidine.  Requiring every group
-    # to be parenthesised keeps ``(oxo)pyrrolidin-1-yl`` (where ``pyrrolidin-1-yl``
-    # is unparenthesised, and the ``oxo`` decorates *it*, not C1) out of this path.
+    # Several unlocanted ligands on the same atom, e.g. ``(amino)(imino)methyl``
+    # -> C1 bears both -> amidine, or ``(oxo)cyclopropylmethyl`` -> an acyl.  The
+    # base has already been peeled off the end, so what remains here is a ligand
+    # list; each one must resolve on its own for the split to be accepted.
     if prefix.startswith("(") and "1" in locants:
         groups = _top_level_groups(prefix)
-        if len(groups) >= 2 and all(g.startswith("(") and g.endswith(")") for g in groups):
-            for group in groups:
-                frag = resolve_fragment_mol(group)
-                if frag is None or not _graft_onto(rw, locants["1"], frag):
-                    return False
-            return True
+        if len(groups) >= 2:
+            frags = [resolve_fragment_mol(group) for group in groups]
+            if all(frag is not None for frag in frags):
+                for frag in frags:
+                    if not _graft_onto(rw, locants["1"], frag):
+                        return False
+                return True
     # A prefix that does not *begin* with a depth-0 locant is a single unlocanted
     # sub-substituent binding at position 1 — either a leaf (``chloromethyl`` ->
     # Cl on C1) or a whole ring-yl (``piperazin-1-ylmethyl`` -> piperazin-1-yl on

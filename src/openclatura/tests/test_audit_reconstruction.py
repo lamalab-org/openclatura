@@ -189,6 +189,18 @@ def _canonical(mol) -> str | None:
         ("(tricyclo[2.2.1.0^{2,6}]heptan-1-yl)", "*C12CC3CC1C2C3"),
         ("(tricyclo[5.2.1.0^{2,6}]decan-4-yl)", "*C1CC2C3CCC(C3)C2C1"),
         ("(tricyclo[9.4.0.0^{3,8}]pentadecan-1-yl)", "*C12CCCCC1CCC1CCCCC1C2"),
+        # <X>formyl is an added carbonyl, like <X>carbonyl
+        ("(phenylformyl)", "*C(=O)c1ccccc1"),
+        ("(bicyclo[2.1.0]pentan-1-ylformyl)", "*C(=O)C12CCC1C2"),
+        # a carbamoyl whose nitrogen carries two cited ligands
+        ("((azetidin-3-yl)(methyl)carbamoyl)", "*C(=O)N(C)C1CNC1"),
+        ("((cyclopropyl)(methyl)carbamoyl)", "*C(=O)N(C)C1CC1"),
+        # an unlocanted ligand list that is not uniformly parenthesised
+        ("((oxo)cyclopropylmethyl)", "*C(=O)C1CC1"),
+        ("(formamido)", "*NC=O"),
+        # ``oxido`` is the charge-separated spelling of an oxo, so it must agree
+        # with an input written either way
+        ("(oxido)", "*=O"),
     ],
 )
 def test_resolve_fragment_grammar(name, expected):
