@@ -152,15 +152,28 @@ def _build_skeleton(
             bond(prev, i)
             prev = i
         bond(prev, bh2)
-    # Secondary bridges. Length-0 bridges are a direct bond between two existing
-    # skeleton atoms (the usual fused-aromatic case). Bridges bearing their own
-    # atoms would need direction-sensitive locant numbering, so abstain on those.
+    # Secondary bridges, numbered after the main bicycle in citation order
+    # (P-23.2.5.1).  A length-0 bridge is a direct bond between two skeleton atoms
+    # (the usual fused-aromatic case); a longer one contributes its own atoms,
+    # numbered from the end attached to the *higher*-numbered bridgehead.
+    next_locant = n + 1
     for length, f, g in secondary:
-        if length != 0:
+        if f not in idx or g not in idx:
             return None, {}
-        if f not in idx or g not in idx or rw.GetBondBetweenAtoms(idx[f], idx[g]) is not None:
-            return None, {}
-        rw.AddBond(idx[f], idx[g], Chem.BondType.SINGLE)
+        if length == 0:
+            if rw.GetBondBetweenAtoms(idx[f], idx[g]) is not None:
+                return None, {}
+            rw.AddBond(idx[f], idx[g], Chem.BondType.SINGLE)
+            continue
+        high, low = (f, g) if int(f) > int(g) else (g, f)
+        previous = idx[high]
+        for _ in range(length):
+            atom = rw.AddAtom(Chem.Atom(6))
+            idx[str(next_locant)] = atom
+            rw.AddBond(previous, atom, Chem.BondType.SINGLE)
+            previous = atom
+            next_locant += 1
+        rw.AddBond(previous, idx[low], Chem.BondType.SINGLE)
     return rw, idx
 
 

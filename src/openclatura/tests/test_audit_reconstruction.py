@@ -182,6 +182,13 @@ def _canonical(mol) -> str | None:
         ("(7-methyl-7-aza-8-oxo-bicyclo[4.3.0]nona-1,3,5-trien-9-yl)", "*C1C(=O)N(C)c2ccccc21"),
         ("(2-oxa-5-hydroxy-bicyclo[4.4.0]deca-1(10),6,8-trien-3-yl)", "*C1CC(O)c2ccccc2O1"),
         ("(5,5-dimethyl-3-phenyl-1,3-diaza-4-oxo-cyclopentan-2-yl)", "*C1NC(C)(C)C(=O)N1c1ccccc1"),
+        # von Baeyer secondary bridges carrying their own atoms, numbered from the
+        # higher-numbered bridgehead.  All validated against OPSIN.
+        ("(tricyclo[3.3.1.1^{3,7}]decan-1-yl)", "*C12CC3CC(CC(C3)C1)C2"),  # adamantan-1-yl
+        ("(tricyclo[3.3.1.1^{3,7}]decan-2-yl)", "*C1C2CC3CC(C2)CC1C3"),
+        ("(tricyclo[2.2.1.0^{2,6}]heptan-1-yl)", "*C12CC3CC1C2C3"),
+        ("(tricyclo[5.2.1.0^{2,6}]decan-4-yl)", "*C1CC2C3CCC(C3)C2C1"),
+        ("(tricyclo[9.4.0.0^{3,8}]pentadecan-1-yl)", "*C12CCCCC1CCC1CCCCC1C2"),
     ],
 )
 def test_resolve_fragment_grammar(name, expected):
