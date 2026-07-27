@@ -462,24 +462,19 @@ def find_all_carbon_paths(mol: Molecule, exclude_atoms: set[int] = None) -> list
 
     all_paths = []
 
-    def collect_paths(start: int) -> None:
-        # Long unbranched backbones can exceed Python's recursion limit. Keep
-        # the existing depth-first order without using the interpreter stack.
-        stack = [(start, [start], {start})]
-        while stack:
-            current, path, visited = stack.pop()
-            neighbors = [n for n in mol.get_neighbors(current) if n in valid_nodes and n not in visited]
-            if not neighbors:
-                all_paths.append(path)
-                continue
-            for neighbor in reversed(neighbors):
-                stack.append((neighbor, path + [neighbor], visited | {neighbor}))
+    def dfs(current: int, path: list[int], visited: set[int]):
+        neighbors = [n for n in mol.get_neighbors(current) if n in valid_nodes and n not in visited]
+        if not neighbors:
+            all_paths.append(path)
+            return
+        for n in neighbors:
+            dfs(n, path + [n], visited | {n})
 
     endpoints = [n for n in valid_nodes if sum(1 for x in mol.get_neighbors(n) if x in valid_nodes) <= 1]
     start_nodes = endpoints if endpoints else valid_nodes
 
     for start in start_nodes:
-        collect_paths(start)
+        dfs(start, [start], {start})
 
     unique_paths = []
     seen = set()
