@@ -98,7 +98,8 @@ def substituted_alkoxy_prefix(branch: str) -> str | None:
 
     if "hydroxy" not in branch:
         return None
-    for stem in stems.STEMS.values():
+    for length in range(stems.MAX_STEM_LENGTH, stems.MIN_STEM_LENGTH - 1, -1):
+        stem = stems.get(length)
         terminal = f"{stem.stem}yl"
         replacement = f"{stem.stem}oxy"
         if branch.endswith(terminal):
