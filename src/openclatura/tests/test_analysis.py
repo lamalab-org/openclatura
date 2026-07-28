@@ -5489,6 +5489,16 @@ def test_terminal_chalcogen_imides_render_as_imino_prefixes():
     assert name_smiles("N=[Se]1C=CC=C1") == "1-imino-1lambda^4-selenacyclopenta-2,4-diene"
 
 
+def test_hypervalent_sulfur_ester_keeps_every_ligand():
+    # ``sulfinyloxy``/``sulfonyloxy`` name a sulfur with one further ligand; a
+    # lambda^6 sulfur has three, and used to lose two of them silently.
+    assert name_smiles("CCOS(C)=O") == "1-(methylsulfinyloxy)ethane"
+    assert (
+        name_smiles("CCCCCCOS(=O)(CCCCCC)(CCCCCC)OCCCCCC")
+        == "1-(((hexyloxy)dihexyl(oxo)-lambda^6-sulfanyl)oxy)hexane"
+    )
+
+
 def test_sulfur_imide_substituents_preserve_double_bonded_nitrogen():
     assert name_smiles("N=S(Cl)CF") == "((chloro)(imino)sulfanyl)fluoromethane"
     assert name_smiles("CSC(=O)S(C)=N") == "1-((imino)(methyl)sulfanyl)-1-(methylsulfanyl)methanone"

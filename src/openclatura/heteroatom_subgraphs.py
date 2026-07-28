@@ -80,6 +80,12 @@ def first_substituent_neighbor(mol: Molecule, center_idx: int, excluded: set[int
     return None
 
 
+def _has_at_most_one_further_ligand(mol: Molecule, center_idx: int, excluded: set[int]) -> bool:
+    """Whether ``center_idx`` keeps at most one ligand once ``excluded`` is spent."""
+
+    return len([n for n in mol.get_neighbors(center_idx) if n not in excluded]) <= 1
+
+
 def stereo_prefix(atom) -> str:
     return f"({atom.stereo})-" if atom.stereo else ""
 
@@ -315,7 +321,11 @@ def name_oxygen_subgraph(
 
     nxt = next_atoms[0]
     s_oxygens = double_bonded_neighbors(mol, nxt, "O")
-    if mol.atoms[nxt].symbol == "S" and s_oxygens:
+    if mol.atoms[nxt].symbol == "S" and s_oxygens and _has_at_most_one_further_ligand(mol, nxt, {start_idx, *s_oxygens}):
+        # ``sulfinyl``/``sulfonyl`` spell a sulfur bearing one ligand besides the
+        # oxo group and this oxygen.  A hypervalent sulfur carrying more would
+        # lose them here, so it goes to the general namer, which can reach for
+        # the lambda convention.
         branch_idx = first_substituent_neighbor(mol, nxt, {start_idx, *s_oxygens})
         branch = name_branch_or_none(
             mol,
