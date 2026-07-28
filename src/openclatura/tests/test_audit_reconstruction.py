@@ -506,6 +506,11 @@ CONFIRMED_SMILES = [
     "c1ccccc1C=NN",  # benzaldehyde hydrazone
     "C1CCCCC1=NN",  # cyclohexanone hydrazone
     "O=C(C)CC(C)=NN",  # 4-(hydrazono)pentan-2-one
+    # Sulfoxides, whose ``(R)``/``(S)`` is cited with no locant because it names
+    # the operator's own sulfur rather than a numbered position.
+    "CC[S@@](=O)CC(=O)NCCC1(CNC(=O)CN2C[C@H](C(F)(F)F)CCC2=O)CC1",
+    "Cc1nc(-c2ccccc2[S@](C)=O)ccc1C(=O)NCc1cc(F)cc(F)c1",
+    "C=CC(C)(C)CC(=O)N[C@@H](Cn1cccn1)C(=O)N1CC([S@@](C)=O)C1",
     # An ``ylidene``'s own E/Z describes the bond it attaches through, which only
     # comes into being when the ``…yl`` base is promoted — the hydrazone/oxime C=N.
     "COc1cc(/C=N/NC(=O)c2ccc(NC(=O)CC(C)C)cc2)ccc1O",  # aroylhydrazone
@@ -794,6 +799,34 @@ def test_wrong_unsaturation_locant_is_caught():
 )
 def test_ring_alkyne_named_as_saturated_ring_is_caught(smiles):
     assert self_audit(smiles).verdict == "mismatch"
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    [
+        "CC[S@@](=O)CC(=O)NCCC1(CNC(=O)CN2C[C@H](C(F)(F)F)CCC2=O)CC1",
+        "Cc1nc(-c2ccccc2[S@](C)=O)ccc1C(=O)NCc1cc(F)cc(F)c1",
+    ],
+)
+def test_corrupted_unlocanted_sulfoxide_descriptor_is_not_confirmed(smiles):
+    # The hub tag is claimed off a descriptor with no locant, so it is worth
+    # proving it still adjudicates: an inverted sulfoxide R/S must not confirm.
+    import re as _re
+
+    mol, atoms, parts = _capture_top_level(smiles)
+    assert audit_component_reconstruction(mol, parts, atoms).verdict == "confirmed"
+
+    swap = {"R": "S", "S": "R"}
+    bad = copy.deepcopy(parts)
+    flipped = False
+    for i, substituent in enumerate(bad.substituents):
+        renamed, count = _re.subn(r"\(([RS])\)-", lambda m: f"({swap[m.group(1)]})-", substituent.name, count=1)
+        if count:
+            bad.substituents[i] = replace(substituent, name=renamed)
+            flipped = True
+            break
+    assert flipped, "expected an unlocanted R/S in a substituent term to corrupt"
+    assert audit_component_reconstruction(mol, bad, atoms).verdict != "confirmed"
 
 
 @pytest.mark.parametrize(

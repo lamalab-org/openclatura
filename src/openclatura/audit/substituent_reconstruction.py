@@ -422,7 +422,7 @@ def _resolve_operator(name: str, stereo_map: dict[str, str] | None = None) -> Ch
             inner = _resolve_operator_inner(stem, stereo_map)
             if inner is None:
                 continue
-            joined = _join_two_port(_TWO_PORT_WRAPPERS[suffix], inner)
+            joined = _join_two_port(_TWO_PORT_WRAPPERS[suffix], inner, (stereo_map or {}).get(_UNLOCANTED))
             if joined is not None:
                 return joined
     return None
@@ -792,7 +792,7 @@ def _top_level_groups(s: str) -> list[str]:
     return [g for g in groups if g]
 
 
-def _join_two_port(wrapper_smiles: str, inner: Chem.Mol) -> Chem.Mol | None:
+def _join_two_port(wrapper_smiles: str, inner: Chem.Mol, hub_stereo: str | None = None) -> Chem.Mol | None:
     wrap = Chem.MolFromSmiles(wrapper_smiles, sanitize=False)
     if wrap is None:
         return None
@@ -823,6 +823,13 @@ def _join_two_port(wrapper_smiles: str, inner: Chem.Mol) -> Chem.Mol | None:
         rw.AddBond(old_to_new[u], old_to_new[v], bond.GetBondType())
     if not _graft_onto(rw, old_to_new[port], inner):
         return None
+    # An unlocanted ``(R)``/``(S)`` on an operator names the operator's own
+    # stereogenic atom — the sulfur of ``(R)-methylsulfinyl``.  There is no
+    # locant to map it through, so the wrapper identifies it: the atom the
+    # fragment bonds outward from.  A hub that is not really stereogenic simply
+    # fails to match the oracle later, so this cannot manufacture a confirmation.
+    if hub_stereo is not None:
+        rw.GetAtomWithIdx(old_to_new[port]).SetProp(_NAME_CIP, hub_stereo)
     mol = rw.GetMol()
     try:
         Chem.SanitizeMol(mol)
@@ -899,6 +906,11 @@ _NAME_RELATIVE = "nRelStereo"
 # (``rel``, ``rac``, ``syn``, ``endo``…) stays unverifiable and so stays peeled
 # and discarded, leaving the caller to abstain on those centres.
 _RELATIVE_WORDS = {"cis", "trans"}
+# Key under which a descriptor cited *without* a locant is kept — ``(R)-methyl-
+# sulfinyl`` names its operator's own stereogenic atom rather than a numbered
+# position, so there is no locant to map it through.  Not a valid locant, so the
+# locant-driven taggers pass over it and only the operator claims it.
+_UNLOCANTED = ""
 
 
 def _leading_stereo_map(name: str) -> tuple[dict[str, str], str | None]:
@@ -923,8 +935,17 @@ def _leading_stereo_map(name: str) -> tuple[dict[str, str], str | None]:
             changed = True
         m = _STEREO_GROUP_RE.match(s)
         if m and re.search(r"[RSrsEZ]", m.group(1)):
-            for loc, desc in re.findall(r"(\d+)([RSrsEZ])", m.group(1)):
+            pairs = re.findall(r"(\d+)([RSrsEZ])", m.group(1))
+            for loc, desc in pairs:
                 result[loc] = desc
+            if not pairs:
+                # No locant at all: the descriptor speaks about the fragment's
+                # own single stereogenic atom, which the operator that builds it
+                # identifies.  Only a lone R/S qualifies — anything richer is
+                # left unclaimed so the caller abstains.
+                bare = re.fullmatch(r"\s*([RSrs])\s*", m.group(1))
+                if bare:
+                    result[_UNLOCANTED] = bare.group(1)
             s = s[m.end() :].strip()
             changed = True
             continue
