@@ -758,11 +758,22 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts) -> No
         added = Chem.MolFromSmiles("*" + fragment)
         if added is None:
             raise _Abstain(f"principal group {pg.key!r} failed to parse")
+        terminal_nitrogens: list[int] = []
         for locant in pg.locants:
             base_idx = locants.get(str(locant))
             if base_idx is None:
                 raise _Abstain(f"principal-group locant {locant} outside parent")
+            first_new = rw.GetNumAtoms()
             _graft(rw, base_idx, added)
+            # A hydrazone's ``N`` locant is its *terminal* nitrogen — ``benzaldehyde
+            # N-phenylhydrazone`` is ``PhNH-N=CHPh`` — and that is the only nitrogen
+            # the graft leaves with a single neighbour.
+            terminal_nitrogens += [
+                idx
+                for idx in range(first_new, rw.GetNumAtoms())
+                if rw.GetAtomWithIdx(idx).GetAtomicNum() == 7 and rw.GetAtomWithIdx(idx).GetDegree() == 1
+            ]
+        _expose_n_locants(locants, terminal_nitrogens)
         return
     direct = _DIRECT_SUFFIX_GROUPS.get(pg.key)
     exocyclic = _EXOCYCLIC_SUFFIX_GROUPS.get(pg.key)
@@ -779,11 +790,17 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts) -> No
             nitrogens += _decorate(rw, carbon, exocyclic)
         else:
             nitrogens += _decorate(rw, base_idx, direct)
-    # Expose the characteristic nitrogens under the italic ``N`` locants so that
-    # N-substituents (N-methyl, N,N-dimethyl, N'-ethyl…) attach.  A mono-amine is
-    # just ``N``; a di/tri-amine primes them — ``N``, ``N'``, ``N''`` — in the
-    # order their parent locants were cited (which is the order ``_decorate``
-    # produced them above), matching IUPAC's prime assignment.
+    _expose_n_locants(locants, nitrogens)
+
+
+def _expose_n_locants(locants: dict[str, int], nitrogens: list[int]) -> None:
+    """Register a suffix's characteristic nitrogens under the italic ``N`` locants
+    so that N-substituents (N-methyl, N,N-dimethyl, N'-ethyl…) can attach.
+
+    A single one is just ``N``; several are primed — ``N``, ``N'``, ``N''`` — in
+    the order their parent locants were cited, matching IUPAC's prime
+    assignment."""
+
     for i, nitrogen in enumerate(nitrogens):
         key = "N" + "'" * i
         if key not in locants:

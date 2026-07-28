@@ -65,7 +65,9 @@ def audit_stereochemistry(
             issues.append(issue) if issue else verified_atoms.add(atom_idx)
         elif descriptor in {"E", "Z"}:
             checked += 1
-            bond = _parent_stereo_bond(mol, parts, locant, locant_to_atom)
+            bond = (
+                _sole_stereo_bond(mol, scope) if not locant else _parent_stereo_bond(mol, parts, locant, locant_to_atom)
+            )
             issue = _bond_stereo_issue(bond, f"{locant}{descriptor}", descriptor)
             issues.append(issue) if issue else verified_bonds.add(bond.idx)
 
@@ -120,6 +122,18 @@ def audit_stereochemistry(
 
 def _descriptors(term: str, letters: str) -> list[str]:
     return re.findall(rf"[{letters}](?=$|[,)])", term)
+
+
+def _sole_stereo_bond(mol: Molecule, scope: set[int]):
+    """The component's only stereo double bond, or ``None`` if it has none or more
+    than one.
+
+    A descriptor cited with no locant — ``(E)-N,N-diisobutyl…`` — can only be
+    naming the single stereo bond the structure has.  With several there is
+    nothing to tie it to, so the caller abstains rather than picking one."""
+
+    found = [bond for bond in mol.bonds.values() if bond.u in scope and bond.v in scope and bond.stereo in {"E", "Z"}]
+    return found[0] if len(found) == 1 else None
 
 
 def _parent_stereo_bond(mol: Molecule, parts: AssemblyParts, locant: str, locant_to_atom: dict[str, int]):
