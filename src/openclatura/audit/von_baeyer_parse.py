@@ -30,14 +30,17 @@ Numbered = tuple[Chem.RWMol, dict[str, int], int]
 # Skeletal-replacement prefixes, read back off the same table the namer writes
 # them from, so the parser accepts exactly the set the namer can emit.
 _REPLACEMENT_ELEMENTS = _elements.SYMBOLS_BY_HW_STEM
-# ``en``/``yn`` unsaturation stems carry the multiplier as a *basic* prefix
-# (``dien``, ``trien``), so they are derived from the shared table rather than
-# spelled out again here.
-_UNSAT_MULT: dict[str, int] = {"en": 1, "yn": 1} | {
-    f"{mult.basic}{stem}": mult.count for mult in _multipliers.MULTIPLIERS.values() for stem in ("en", "yn")
+# Unsaturation stems -> (how many locants it must cite, what bond to build).
+# The multiplier is the *basic* prefix (``dien``, ``triyn``), so the spellings
+# come from the shared table; the bond order rides along with each stem so an
+# added spelling cannot end up silently building the wrong bond.
+_UNSAT_STEMS: dict[str, tuple[int, Chem.BondType]] = {
+    f"{prefix}{stem}": (count, order)
+    for stem, order in (("en", Chem.BondType.DOUBLE), ("yn", Chem.BondType.TRIPLE))
+    for prefix, count in [("", 1), *((mult.basic, mult.count) for mult in _multipliers.MULTIPLIERS.values())]
 }
 # Longest first so ``dien`` is not read as ``di`` + a stray ``en``.
-_UNSAT_ALTERNATION = "|".join(sorted(_UNSAT_MULT, key=len, reverse=True))
+_UNSAT_ALTERNATION = "|".join(sorted(_UNSAT_STEMS, key=len, reverse=True))
 
 _VONBAEYER_RE = re.compile(r"(?:bi|tri|tetra|penta)cyclo\[([0-9.,^{}]+)\]")
 _SECONDARY_RE = re.compile(r"(\d+)\^?\{?(\d+),(\d+)\}?")
@@ -474,7 +477,8 @@ def _apply_unsaturation(rw: Chem.RWMol, locants: dict[str, int], rest: str) -> b
     if um is None:
         return False
     tokens = um.group(1).split(",")
-    if len(tokens) != _UNSAT_MULT[um.group(2)]:
+    count, order = _UNSAT_STEMS[um.group(2)]
+    if len(tokens) != count:
         return False
     for tok in tokens:
         pm = re.match(r"^(\d+)(?:\((\d+)\))?$", tok)
@@ -487,7 +491,7 @@ def _apply_unsaturation(rw: Chem.RWMol, locants: dict[str, int], rest: str) -> b
         bond = rw.GetBondBetweenAtoms(locants[lo], locants[hi])
         if bond is None:
             return False
-        bond.SetBondType(Chem.BondType.DOUBLE)
+        bond.SetBondType(order)
     return True
 
 

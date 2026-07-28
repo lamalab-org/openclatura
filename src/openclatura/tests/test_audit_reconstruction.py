@@ -791,6 +791,31 @@ def test_ring_alkyne_named_as_saturated_ring_is_caught(smiles):
     assert self_audit(smiles).verdict == "mismatch"
 
 
+@pytest.mark.parametrize(
+    ("smiles", "stem"),
+    [
+        ("CC(=O)N1CCC#CCC1", "yn"),  # 1-azacyclohept-4-yn-1-yl
+        ("CC(=O)N1CCC=CCC1", "en"),  # 1-azacyclohept-4-en-1-yl
+        ("C1CC#CCC1", "yn"),  # cyclohex-1-yne
+    ],
+)
+def test_ring_unsaturation_stem_builds_its_own_bond_order(smiles: str, stem: str):
+    # The unsaturation table carries a bond order per stem precisely so that
+    # adding a spelling cannot leave the builder making the wrong bond: an
+    # ``yn`` name that quietly rebuilt as a double bond would refute a correct
+    # name, which is the failure this guards.
+    from rdkit import Chem
+
+    from openclatura.audit.von_baeyer_parse import _UNSAT_STEMS
+
+    assert stem in _UNSAT_STEMS
+    assert all(
+        order == (Chem.BondType.TRIPLE if word.endswith("yn") else Chem.BondType.DOUBLE)
+        for word, (_count, order) in _UNSAT_STEMS.items()
+    )
+    assert self_audit(smiles).verdict == "confirmed"
+
+
 # --------------------------------------------------------------------------- #
 # Charge-separated spellings converge; obligatory charge separation does not
 # --------------------------------------------------------------------------- #
