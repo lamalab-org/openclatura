@@ -2079,6 +2079,29 @@ def test_nitro_perception_requires_a_hydrogen_free_nitrogen(smiles: str, is_nitr
 
 
 @pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        # The three distinct anthracene positions.  Without a locant map these
+        # were numbered in plain peripheral order, which put the meso carbons on
+        # an outer ring and produced `anthracen-11-yl` — not a position
+        # anthracene has at all.
+        ("O=C(O)Cc1ccc2cc3ccccc3cc2c1", "2-(anthracen-2-yl)acetic acid"),  # beta
+        ("O=C(O)Cc1cccc2cc3ccccc3cc12", "2-(anthracen-1-yl)acetic acid"),  # alpha
+        ("O=C(O)Cc1c2ccccc2cc2ccccc12", "2-(anthracen-9-yl)acetic acid"),  # meso
+        # …and phenanthrene's 9,10 pair, which sit on the middle ring.
+        (
+            "CNc1c(NC(=O)C=O)c2ccccc2c2ccccc12",
+            "N-(10-(methylamino)phenanthren-9-yl)-2-oxoacetamide",
+        ),
+    ],
+)
+def test_retained_tricyclic_locants(smiles: str, expected: str):
+    import openclatura as oc
+
+    assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
     ("name", "composite"),
     [
         ("cyclopropylmethyl", True),
