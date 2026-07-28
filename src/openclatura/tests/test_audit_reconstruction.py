@@ -215,6 +215,14 @@ def _canonical(mol) -> str | None:
         # likewise on a hub: two hydroxys on one phosphoryl, not two phosphoryls
         ("(dihydroxyphosphorylmethyl)", "*CP(=O)(O)O"),
         ("(diphenylmethyl)", "*C(c1ccccc1)c1ccccc1"),
+        # ``bis``/``tris`` take a parenthesised argument rather than a bare leaf.
+        # In a locanted clause the locants pin the count; on a hub the multiplier
+        # states it outright.
+        ("(3,5-bis(trifluoromethyl)phenyl)", "*c1cc(C(F)(F)F)cc(C(F)(F)F)c1"),
+        ("(2,6-bis(propan-2-yl)phenyl)", "*c1c(C(C)C)cccc1C(C)C"),
+        ("(3,5-bis(tert-butyl)-4-hydroxyphenyl)", "*c1cc(C(C)(C)C)c(O)c(C(C)(C)C)c1"),
+        ("(tris(propan-2-yl)silyl)", "*[Si](C(C)C)(C(C)C)C(C)C"),
+        ("((tris(propan-2-yl)silyl)oxy)", "*O[Si](C(C)C)(C(C)C)C(C)C"),
         # ``oxido`` is the charge-separated spelling of an oxo, so it must agree
         # with an input written either way
         ("(oxido)", "*=O"),

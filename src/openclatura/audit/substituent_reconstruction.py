@@ -755,12 +755,18 @@ def _hub_ligands(head: str) -> list[Chem.Mol] | None:
     if len(groups) >= 2 and all(g.startswith("(") and g.endswith(")") for g in groups):
         frags = [resolve_fragment_mol(g) for g in groups]
         return None if any(f is None for f in frags) else frags
+    count, base = _multiplied_ligand(head)
+    if count > 1:
+        # ``tris(propan-2-yl)`` — a bare multiplier in front of one ligand — says
+        # outright how many copies there are, so it is not the ambiguous mixed
+        # list guarded against below.
+        inner = resolve_fragment_mol(base)
+        return None if inner is None else [inner] * count
     if len(groups) != 1 or groups[0].startswith("("):
         # A mixed list such as ``((…)oxy)ethenyl`` is ambiguous — the leading
         # parenthesised clause could be a sibling ligand on the hub or a modifier
         # of what follows it — so abstain rather than pick one reading.
         return None
-    count, base = _multiplied_ligand(head)
     inner = resolve_fragment_mol(base)
     return None if inner is None else [inner] * count
 
@@ -1559,6 +1565,17 @@ def _parse_clauses(prefix: str) -> list[tuple[list[str], str]] | None:
             count, body = leaf
             if len(locs) != count:
                 return None
+        elif len(locs) > 1:
+            # Inside a locanted clause the count is already pinned by the
+            # locants, so a multiplier can be stripped whenever it agrees with
+            # them.  That is what makes the ``bis``/``tris`` spellings readable:
+            # they take a *parenthesised* argument rather than the bare leaf
+            # ``_leading_multiplier`` insists on, as in ``3,5-bis(trifluoro-
+            # methyl)phenyl``.
+            for count, rest in _multipliers.candidate_splits(body):
+                if count == len(locs) and _resolvable(rest):
+                    body = rest
+                    break
         clauses.append((locs, body))
     return clauses
 
