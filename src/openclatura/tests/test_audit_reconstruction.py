@@ -506,6 +506,11 @@ CONFIRMED_SMILES = [
     "c1ccccc1C=NN",  # benzaldehyde hydrazone
     "C1CCCCC1=NN",  # cyclohexanone hydrazone
     "O=C(C)CC(C)=NN",  # 4-(hydrazono)pentan-2-one
+    # An ``ylidene``'s own E/Z describes the bond it attaches through, which only
+    # comes into being when the ``…yl`` base is promoted — the hydrazone/oxime C=N.
+    "COc1cc(/C=N/NC(=O)c2ccc(NC(=O)CC(C)C)cc2)ccc1O",  # aroylhydrazone
+    "CCOc1ccc(/C=N/NS(=O)(=O)c2ccc3[nH]c(=O)oc3c2)cc1Cl",  # sulfonylhydrazone
+    "Cc1cccc(N(CC(=O)N/N=C\\c2cc(C)n(-c3ccc(C)c(C)c3)c2C)S(C)(=O)=O)c1",  # Z isomer
     # Exocyclic stereo bonds: the E/Z hangs off a *parent* locant but the double
     # bond leaves the skeleton, into an ``ylidene`` substituent or an ``imine``
     # suffix.  The descriptor names that bond all the same.
@@ -789,6 +794,41 @@ def test_wrong_unsaturation_locant_is_caught():
 )
 def test_ring_alkyne_named_as_saturated_ring_is_caught(smiles):
     assert self_audit(smiles).verdict == "mismatch"
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    [
+        "COc1cc(/C=N/NC(=O)c2ccc(NC(=O)CC(C)C)cc2)ccc1O",
+        "CCOc1ccc(/C=N/NS(=O)(=O)c2ccc3[nH]c(=O)oc3c2)cc1Cl",
+        "Cc1cccc(N(CC(=O)N/N=C\\c2cc(C)n(-c3ccc(C)c(C)c3)c2C)S(C)(=O)=O)c1",
+    ],
+)
+def test_corrupted_ylidene_ez_is_not_confirmed(smiles):
+    # Claiming the promoted attachment bond must not make the descriptor a
+    # rubber stamp: an ``ylidene`` E/Z that contradicts the input has to block
+    # confirmation, or the tag would be worse than not tagging at all.
+    mol, atoms, parts = _capture_top_level(smiles)
+    assert audit_component_reconstruction(mol, parts, atoms).verdict == "confirmed"
+
+    import re as _re
+
+    swap = {"E": "Z", "Z": "E"}
+    bad = copy.deepcopy(parts)
+    flipped = False
+    for i, substituent in enumerate(bad.substituents):
+        renamed, count = _re.subn(
+            r"\((\d+)([EZ])\)",
+            lambda m: f"({m.group(1)}{swap[m.group(2)]})",
+            substituent.name,
+            count=1,
+        )
+        if count:
+            bad.substituents[i] = replace(substituent, name=renamed)
+            flipped = True
+            break
+    assert flipped, "expected an E/Z inside a substituent term to corrupt"
+    assert audit_component_reconstruction(mol, bad, atoms).verdict != "confirmed"
 
 
 @pytest.mark.parametrize(

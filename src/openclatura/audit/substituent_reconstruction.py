@@ -311,7 +311,7 @@ def _resolve_fragment(name: str, stereo_map: dict[str, str]) -> Chem.Mol | None:
     if name.endswith("ylidene") and name not in _LEAF_SMILES:
         base = resolve_fragment_mol(name[: -len("ylidene")] + "yl")
         if base is not None:
-            return _promote_to_double_attachment(base)
+            return _promote_to_double_attachment(base, stereo_map)
         return None
     # von Baeyer / spiro ring substituents carry a replacement prefix that is not
     # a graftable sub-substituent, so parse the whole unit up front. If the parse
@@ -446,7 +446,7 @@ def _resolve_operator_inner(stem: str, stereo_map: dict[str, str] | None) -> Che
     return None
 
 
-def _promote_to_double_attachment(frag: Chem.Mol) -> Chem.Mol | None:
+def _promote_to_double_attachment(frag: Chem.Mol, stereo_map: dict[str, str] | None = None) -> Chem.Mol | None:
     """Turn a ``…yl`` fragment (single ``*`` attachment) into the ``…ylidene``
     form by promoting that attachment bond to a double bond and freeing a
     hydrogen on the attachment atom so the valence balances."""
@@ -463,6 +463,16 @@ def _promote_to_double_attachment(frag: Chem.Mol) -> Chem.Mol | None:
     if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
         return None
     bond.SetBondType(Chem.BondType.DOUBLE)
+    # An ``ylidene``'s own ``E``/``Z`` describes the bond it attaches *through* —
+    # the one just promoted.  The ``…yl`` base had only a single bond there, so
+    # nothing could carry the descriptor and it was dropped, leaving the
+    # hydrazone/oxime C=N unverifiable.  Claim it here, but only when the name
+    # pins exactly one such bond and the base did not already tag one, so a name
+    # that also fixes an internal double bond abstains instead of guessing which
+    # descriptor belongs to which bond.
+    descriptors = [d for d in (stereo_map or {}).values() if d in {"E", "Z"}]
+    if len(descriptors) == 1 and not any(b.HasProp(_NAME_CIP) for b in rw.GetBonds()):
+        bond.SetProp(_NAME_CIP, descriptors[0])
     # Freeing a bond order costs one hydrogen; drop an explicit one if the atom
     # carries them, otherwise let RDKit re-derive the implicit count on sanitize.
     if attach.GetNumExplicitHs() > 0:
