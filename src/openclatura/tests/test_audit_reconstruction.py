@@ -506,6 +506,13 @@ CONFIRMED_SMILES = [
     "c1ccccc1C=NN",  # benzaldehyde hydrazone
     "C1CCCCC1=NN",  # cyclohexanone hydrazone
     "O=C(C)CC(C)=NN",  # 4-(hydrazono)pentan-2-one
+    # Exocyclic stereo bonds: the E/Z hangs off a *parent* locant but the double
+    # bond leaves the skeleton, into an ``ylidene`` substituent or an ``imine``
+    # suffix.  The descriptor names that bond all the same.
+    "CCCCOc1cccc(/C=C2/SC(=Nc3ccc(F)cc3F)N(CC)C2=O)c1",  # 5-arylidene thiazolidinone
+    "COc1ccc(C2=C/C(=C\\c3ccncc3)C(=O)O2)cc1OC",  # 3-ylidene furanone
+    "O=S(=O)(O)O/N=C1/C2CC3C(C2)C13",  # ring ketimine (=N on the parent)
+    "CN1C(=O)COc2cccc(N/N=C(/C#N)C(=N)N)c21",  # exocyclic C=N on a chain parent
     # sulfamides, whose multiplied ligands sit on the sulfonamide nitrogen —
     # ``diethylsulfamoylamino`` is one Et2N-SO2-NH- and not two ethylsulfamoyls
     "CCN(CC)S(=O)(=O)N[C@H](CCOC1=CC=CC=C1)C(=O)O",
@@ -608,6 +615,33 @@ def test_corrupted_stereo_descriptor_is_not_confirmed(smiles):
 # --------------------------------------------------------------------------- #
 # Abstention: honestly declines on constructs it does not model
 # --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "smiles",
+    [
+        "CCCCOc1cccc(/C=C2/SC(=Nc3ccc(F)cc3F)N(CC)C2=O)c1",
+        "COc1ccc(C2=C/C(=C\\c3ccncc3)C(=O)O2)cc1OC",
+        "O=S(=O)(O)O/N=C1/C2CC3C(C2)C13",
+    ],
+)
+def test_corrupted_exocyclic_ez_is_not_confirmed(smiles):
+    # Resolving an exocyclic bond for a parent locant must not blunt the check:
+    # an E/Z that contradicts the independent bond-CIP oracle has to block
+    # confirmation exactly as an in-skeleton one does.
+    mol, atoms, parts = _capture_top_level(smiles)
+    assert audit_component_reconstruction(mol, parts, atoms).verdict == "confirmed"
+
+    swap = {"E": "Z", "Z": "E"}
+    bad = copy.deepcopy(parts)
+    flipped = False
+    for i, (locant, descriptor) in enumerate(bad.stereo_features):
+        if descriptor in swap:
+            bad.stereo_features[i] = (locant, swap[descriptor])
+            flipped = True
+            break
+    assert flipped, "expected a parent E/Z descriptor to corrupt"
+    assert audit_component_reconstruction(mol, bad, atoms).verdict != "confirmed"
+
+
 @pytest.mark.parametrize(
     "smiles",
     [

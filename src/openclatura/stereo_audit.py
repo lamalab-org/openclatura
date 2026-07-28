@@ -123,18 +123,32 @@ def _descriptors(term: str, letters: str) -> list[str]:
 
 
 def _parent_stereo_bond(mol: Molecule, parts: AssemblyParts, locant: str, locant_to_atom: dict[str, int]):
-    """The stereo-bearing parent double bond incident to ``locant`` (or ``None``)."""
+    """The stereo-bearing double bond the cited ``locant`` names (or ``None``).
+
+    Usually that bond lies inside the parent skeleton (``pent-3-ene``).  It can
+    also leave it: an ``ylidene`` substituent or an ``imine``/``imino`` suffix
+    doubles the parent atom out to an atom that the substituent or suffix
+    contributed, and the descriptor still hangs off the parent locant — as in
+    ``(5E)-5-benzylidene-1,3-thiazolidin-4-one``.
+
+    A parent-internal bond wins; an exocyclic one is taken only when it is the
+    sole candidate, so an atom we cannot disambiguate abstains rather than
+    adjudicating the descriptor against a bond it may not name.
+    """
+
     start_atom = locant_to_atom.get(locant)
     if start_atom is None:
         return None
     parent_atoms = parts.parent_atom_ids
+    exocyclic = []
     for neighbor in mol.get_neighbors(start_atom):
-        if neighbor not in parent_atoms:
-            continue
         bond = mol.get_bond(start_atom, neighbor)
-        if bond and bond.stereo in {"E", "Z"}:
+        if bond is None or bond.stereo not in {"E", "Z"}:
+            continue
+        if neighbor in parent_atoms:
             return bond
-    return None
+        exocyclic.append(bond)
+    return exocyclic[0] if len(exocyclic) == 1 else None
 
 
 def _bond_stereo_issue(bond, label: str, descriptor: str) -> str | None:
