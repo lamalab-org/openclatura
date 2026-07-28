@@ -122,7 +122,11 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             oxygens = [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "O"]
             adj_atoms = [n for n in mol.get_neighbors(atom.idx) if n not in oxygens]
 
-            if len(oxygens) == 2 and len(adj_atoms) == 1:
+            # A nitro nitrogen carries no hydrogen.  One that does is the azinic
+            # acid tautomer — ``[O-][NH+](O)Ph`` is N-phenylazinic acid, which
+            # differs from nitrobenzene by two hydrogens, so calling it nitro
+            # would name a different compound.
+            if len(oxygens) == 2 and len(adj_atoms) == 1 and atom.total_h_count == 0:
                 has_double_o = any(mol.get_bond(atom.idx, o).order == 2 for o in oxygens)
                 if atom.charge == 1 or has_double_o:
                     groups.append(PerceivedGroup("nitro", False, adj_atoms[0], {atom.idx} | set(oxygens)))

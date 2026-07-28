@@ -2057,6 +2057,35 @@ def _empty_branch_namer(_mol: Molecule, _start_idx: int, _exclude_atoms: set[int
     return ""
 
 
+@pytest.mark.parametrize(
+    ("smiles", "is_nitro"),
+    [
+        ("[O-][N+](=O)c1ccccc1", True),  # nitrobenzene, charge-separated
+        ("O=N(=O)c1ccccc1", True),  # …and written hypervalent
+        # The azinic acid tautomer: same two oxygens on the nitrogen, but the
+        # nitrogen carries a hydrogen.  ``[O-][NH+](O)Ph`` is N-phenylazinic acid
+        # and differs from nitrobenzene by two hydrogens, so perceiving it as
+        # nitro would name a different compound.
+        ("[O-][NH+](O)c1ccccc1", False),
+        ("C[NH+]([O-])O", False),
+    ],
+)
+def test_nitro_perception_requires_a_hydrogen_free_nitrogen(smiles: str, is_nitro: bool):
+    from openclatura.graph_io import read_smiles
+    from openclatura.perception import _builtin_perceive_groups
+
+    keys = {group.key for group in _builtin_perceive_groups(read_smiles(smiles))}
+    assert ("nitro" in keys) is is_nitro
+
+
+def test_azinic_acid_is_not_named_as_a_nitro_compound():
+    import openclatura as oc
+
+    name = oc.name("[O-][NH+](O)c1ccccc1").name
+    assert "nitro" not in name
+    assert oc.name("[O-][N+](=O)c1ccccc1").name == "nitrobenzene"
+
+
 def test_nitrogen_chain_roles_classify_azido_from_graph():
     mol = _carbon_bound_n3_graph(attachment_order=1, first_nn_order=2, second_nn_order=2)
 
