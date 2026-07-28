@@ -2078,6 +2078,18 @@ def test_nitro_perception_requires_a_hydrogen_free_nitrogen(smiles: str, is_nitr
     assert ("nitro" in keys) is is_nitro
 
 
+def test_dihydrazone_primes_its_n_locants():
+    import openclatura as oc
+
+    # One substituent on *each* of two hydrazone nitrogens is N,N'- — reading it
+    # as N,N- would put both on the same nitrogen, which is a different molecule.
+    both = oc.name("C/C(=N/NS(=O)(=O)c1ccc(C)cc1)C(=NO)/C(C)=N\\NS(=O)(=O)c1ccc(C)cc1").name
+    assert "N,N'-bis(" in both
+
+    # …while two substituents on a single hydrazone's nitrogen stay N,N-.
+    assert oc.name("CC(=NN(C)C)C").name == "N,N-dimethylpropan-2-one hydrazone"
+
+
 def test_azinic_acid_is_not_named_as_a_nitro_compound():
     import openclatura as oc
 
