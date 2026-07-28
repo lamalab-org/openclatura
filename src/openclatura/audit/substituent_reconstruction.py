@@ -51,7 +51,13 @@ _LEAF_SMILES: dict[str, str] = {
     "isocyano": "[N+]#[C-]",
     "isocyanato": "N=C=O",
     "isothiocyanato": "N=C=S",
+    # …and the ``O``/``S``-bonded pair the ``iso`` forms are distinguished from
+    "cyanato": "OC#N",
+    "thiocyanato": "SC#N",
     "azido": "N=[N+]=[N-]",
+    "hydroperoxy": "OO",
+    "diazenyl": "N=N",
+    "silyl": "[SiH3]",
     "methoxy": "OC",
     "ethoxy": "OCC",
     "propoxy": "OCCC",
@@ -248,6 +254,11 @@ _LOCANT_YL_RE = re.compile(r"^(?P<stem>[a-z0-9,\[\]-]+?)-(?P<loc>\d+[a-z]?)-yl$"
 # the template's N-H — those are genuinely different tautomers, so the ring must
 # be rebuilt rather than the annotation ignored.
 _INDICATED_H_RE = re.compile(r"^(\d+)H-")
+
+
+# Leaf prefixes longest first, so a greedy walk cannot let ``chloro`` shadow a
+# longer leaf that starts the same way.
+_LEAVES_LONGEST_FIRST: tuple[str, ...] = tuple(sorted(_LEAF_SMILES, key=len, reverse=True))
 
 
 def move_indicated_hydrogen(rw: Chem.RWMol, locants: dict[str, int], position) -> bool:
@@ -762,6 +773,18 @@ def _hub_ligands(head: str) -> list[Chem.Mol] | None:
         # list guarded against below.
         inner = resolve_fragment_mol(base)
         return None if inner is None else [inner] * count
+    if len(groups) > 1 and not groups[0].startswith("("):
+        # ``dimethyl(phenyl)`` — a multiplied *bare* ligand followed by
+        # parenthesised ones.  The bare head is read on its own and the rest are
+        # each their own clause, so nothing here is ambiguous; the mixed list the
+        # guard below rejects is the reverse order, where a parenthesised clause
+        # leads and could instead be modifying what follows it.
+        lead_count, lead_base = _multiplied_ligand(groups[0])
+        lead = resolve_fragment_mol(lead_base)
+        rest = [resolve_fragment_mol(g) for g in groups[1:]]
+        if lead is not None and all(g.startswith("(") for g in groups[1:]) and all(rest):
+            return [lead] * lead_count + rest
+        return None
     if len(groups) != 1 or groups[0].startswith("("):
         # A mixed list such as ``((…)oxy)ethenyl`` is ambiguous — the leading
         # parenthesised clause could be a sibling ligand on the hub or a modifier
@@ -1536,10 +1559,49 @@ def _apply_unlocanted_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: st
         count, body = _multiplied_ligand(prefix)
     frag = resolve_fragment_mol(body)
     if frag is None:
-        return False
+        return _apply_leaf_run(rw, locants, prefix)
     for _ in range(count):
         if not _graft_onto(rw, locants["1"], frag):
             return False
+    return True
+
+
+def _split_leaf_run(prefix: str) -> list[tuple[int, str]] | None:
+    """Split a *run* of leaf prefixes — ``chlorodifluoro`` -> one chlorine and two
+    fluorines — or ``None`` if the string is not exactly such a run.
+
+    Only leaves qualify.  A leaf takes no ligands of its own, so each piece is
+    unambiguous once matched and a greedy longest-first walk cannot strand a
+    valid parse.  Requiring the walk to consume the *whole* string is what keeps
+    a compound prefix from being shredded into fragments that merely look like
+    leaves: any leftover means the caller abstains instead.
+    """
+
+    grafts: list[tuple[int, str]] = []
+    rest = prefix
+    while rest:
+        for count, tail in (*_multipliers.candidate_splits(rest), (1, rest)):
+            leaf = next((w for w in _LEAVES_LONGEST_FIRST if tail.startswith(w)), None)
+            if leaf is not None:
+                grafts.append((count, leaf))
+                rest = tail[len(leaf) :]
+                break
+        else:
+            return None
+    return grafts or None
+
+
+def _apply_leaf_run(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
+    grafts = _split_leaf_run(prefix)
+    if grafts is None:
+        return False
+    for count, leaf in grafts:
+        frag = resolve_fragment_mol(leaf)
+        if frag is None:
+            return False
+        for _ in range(count):
+            if not _graft_onto(rw, locants["1"], frag):
+                return False
     return True
 
 

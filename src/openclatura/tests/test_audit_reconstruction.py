@@ -223,6 +223,16 @@ def _canonical(mol) -> str | None:
         ("(3,5-bis(tert-butyl)-4-hydroxyphenyl)", "*c1cc(C(C)(C)C)c(O)c(C(C)(C)C)c1"),
         ("(tris(propan-2-yl)silyl)", "*[Si](C(C)C)(C(C)C)C(C)C"),
         ("((tris(propan-2-yl)silyl)oxy)", "*O[Si](C(C)C)(C(C)C)C(C)C"),
+        # a multiplied bare ligand ahead of a parenthesised one
+        ("(dimethyl(phenyl)silyl)", "*[Si](C)(C)c1ccccc1"),
+        # a run of leaf prefixes on one atom
+        ("(chlorodifluoromethyl)", "*C(F)(F)Cl"),
+        ("(dichlorofluoromethyl)", "*C(F)(Cl)Cl"),
+        # leaves that were simply missing
+        ("hydroperoxy", "*OO"),
+        ("thiocyanato", "*SC#N"),
+        ("cyanato", "*OC#N"),
+        ("diazenyl", "*N=N"),
         # ``oxido`` is the charge-separated spelling of an oxo, so it must agree
         # with an input written either way
         ("(oxido)", "*=O"),
@@ -244,10 +254,14 @@ def test_resolve_fragment_grammar(name, expected):
         # otherwise be placed on C1 — the acyl base withdraws C1 so this abstains
         # rather than reconstructing the wrong graph.
         "(phenylacetyl)",
-        # A hub whose ligand list mixes a parenthesised clause with a bare one is
-        # ambiguous — the clause could be a second ligand on the boron or a
-        # modifier of the ethenyl — so it abstains rather than picking a reading.
+        # A hub whose ligand list *leads* with a parenthesised clause is ambiguous
+        # — the clause could be a second ligand on the boron or a modifier of the
+        # ethenyl — so it abstains rather than picking a reading.  (The reverse
+        # order, ``dimethyl(phenyl)silyl``, is not ambiguous and does resolve.)
         "(((cyclohexyl)oxy)ethenylboryl)",
+        # Not a clean run of leaves: the walk must consume the whole prefix, so a
+        # compound name cannot be shredded into leaf-looking pieces.
+        "(phenylchloromethyl)",
     ],
 )
 def test_unresolvable_substituent_returns_none(name):
