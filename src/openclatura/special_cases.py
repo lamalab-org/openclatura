@@ -5,6 +5,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .assembly_parts import NameAtomBinding, NameTokenBinding
+from .assembly_prefixes import substituent_sort_key
 from .charge_pair_roles import charge_pair_roles
 from .formatting import format_counted_prefixes, format_multiplier, oxy_prefix_from_branch, strip_outer_parentheses
 from .molecule import Molecule
@@ -1822,7 +1823,9 @@ def simple_central_parent_hydride_result(mol: Molecule, component_atoms: set[int
     prefix = _grouped_ligand_prefix(ligand_names)
     lambda_text = _lambda_text(mol, central)
     parent = f"{lambda_text}{RULES.components.mononuclear_parent_hydrides[central_symbol]}"
-    name = f"{prefix}{parent}"
+    # The hyphen belongs to the lambda prefix -- ``hexafluoro-lambda6-sulfane``
+    # -- and must not appear when the parent carries no lambda descriptor.
+    name = f"{prefix}-{parent}" if prefix and lambda_text else f"{prefix}{parent}"
     core_binding = NameAtomBinding(
         stage="shortcut",
         role="central_parent_hydride_core",
@@ -1947,12 +1950,14 @@ def _grouped_ligand_prefix(names: list[str]) -> str:
         groups[name] = groups.get(name, 0) + 1
     parts = []
     mixed_single_ligands = len(groups) > 1
-    for name in sorted(groups):
+    # Alphanumeric order ignores the italicised ``tert-``/``sec-``, so
+    # ``tert-butoxy`` files under ``b`` and precedes ``methoxy``.
+    for name in sorted(groups, key=substituent_sort_key):
         count = groups[name]
         if count == 1:
             parts.append(format_multiplier(name, 1, safe_enclose=mixed_single_ligands))
         else:
-            parts.append(f"{format_multiplier(name, count)}-")
+            parts.append(format_multiplier(name, count))
     return "".join(parts)
 
 

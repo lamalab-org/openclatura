@@ -5489,6 +5489,17 @@ def test_terminal_chalcogen_imides_render_as_imino_prefixes():
     assert name_smiles("N=[Se]1C=CC=C1") == "1-imino-1lambda^4-selenacyclopenta-2,4-diene"
 
 
+def test_group_13_14_central_atoms_have_a_parent_hydride():
+    # Sn, Pb, Ge, Al and Ga had no mononuclear parent hydride, so a component
+    # centred on one of them failed the graph-coverage check outright.
+    assert name_smiles("C[Si](C)(C)C") == "tetramethylsilane"
+    assert name_smiles("C[Ge](C)(C)C") == "tetramethylgermane"
+    assert name_smiles("C[Sn](C)(C)C") == "tetramethylstannane"
+    assert name_smiles("C[Pb](C)(C)C") == "tetramethylplumbane"
+    assert name_smiles("C[Al](C)C") == "trimethylalumane"
+    assert name_smiles("C[Ga](C)C") == "trimethylgallane"
+
+
 def test_hypervalent_sulfur_ester_keeps_every_ligand():
     # ``sulfinyloxy``/``sulfonyloxy`` name a sulfur with one further ligand; a
     # lambda^6 sulfur has three, and used to lose two of them silently.
@@ -5585,10 +5596,14 @@ def test_substituted_alkoxy_prefixes_preserve_imino_ether_connectivity():
 
 def test_central_hydride_alkoxy_ligands_are_graph_derived():
     cases = {
-        "COP(OC)OC": "trimethoxy-phosphane",
-        "CCOP(OCC)OCC": "triethoxy-phosphane",
-        "CC(C)OP(OC(C)C)OC(C)C": "triisopropoxy-phosphane",
+        # The hyphen belongs to a lambda descriptor, not to the prefix boundary,
+        # so only the last of these carries one.
+        "COP(OC)OC": "trimethoxyphosphane",
+        "CCOP(OCC)OCC": "triethoxyphosphane",
+        "CC(C)OP(OC(C)C)OC(C)C": "triisopropoxyphosphane",
         "CC(C)(C)O[PH](OC(C)(C)C)OC(C)(C)C": "tris(tert-butoxy)-lambda4-phosphane",
+        # ``tert-`` is italic, so tert-butoxy files under ``b``, before methoxy.
+        "CO[Si](OC)(OC(C)(C)C)OC(C)(C)C": "bis(tert-butoxy)dimethoxysilane",
     }
 
     for smiles, expected in cases.items():
