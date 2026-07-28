@@ -366,6 +366,36 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
     )
 
 
+def _ring_is_isolated(mol: Molecule, ring: list[int], component_atoms: set[int]) -> bool:
+    """Whether ``ring`` shares no atom with another ring of the component.
+
+    A *fused* ring passes the per-atom check the ring finder makes — its fusion
+    atoms still have exactly two neighbours inside the ring — so fusion has to be
+    tested separately: drop the ring's own bonds and see whether any two of its
+    atoms remain joined through the rest of the component.  A ring merely carried
+    as a substituent hangs off a single atom and cannot rejoin, which is what
+    keeps the heteroaromatic-branch case this guard sits in front of.
+    """
+
+    ring_set = set(ring)
+    ring_bonds = {frozenset((ring[i], ring[(i + 1) % len(ring)])) for i in range(len(ring))}
+
+    for start in ring:
+        seen, stack = {start}, [start]
+        while stack:
+            current = stack.pop()
+            for neighbor in mol.get_neighbors(current):
+                if neighbor not in component_atoms or neighbor in seen:
+                    continue
+                if frozenset((current, neighbor)) in ring_bonds:
+                    continue
+                seen.add(neighbor)
+                stack.append(neighbor)
+        if seen & (ring_set - {start}):
+            return False
+    return True
+
+
 def _simple_monocyclic_spiro_side_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> SpiroAssembly | None:
     """Name a monocyclic spiro side ring before naming its external branches."""
 
@@ -375,6 +405,8 @@ def _simple_monocyclic_spiro_side_assembly(mol: Molecule, c_idx: int, sub_comp: 
     if _ring_double_bond_count(mol, ring) != 0:
         return None
     if not all(mol.atoms[idx].symbol == "C" for idx in ring):
+        return None
+    if not _ring_is_isolated(mol, ring, sub_comp):
         return None
     if not _side_ring_has_heteroaromatic_branch(mol, ring, sub_comp):
         return None
