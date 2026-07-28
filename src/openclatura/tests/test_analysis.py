@@ -2078,6 +2078,35 @@ def test_nitro_perception_requires_a_hydrogen_free_nitrogen(smiles: str, is_nitr
     assert ("nitro" in keys) is is_nitro
 
 
+@pytest.mark.parametrize(
+    ("name", "composite"),
+    [
+        ("cyclopropylmethyl", True),
+        ("phenylmethyl", True),
+        ("methylsulfanyl", True),
+        ("methyl", False),
+        ("phenyl", False),
+        ("methylidene", False),  # one unit, despite the internal letters
+        ("methanidyl", False),
+    ],
+)
+def test_is_composite_prefix(name: str, composite: bool):
+    from openclatura.formatting import is_composite_prefix
+
+    assert is_composite_prefix(name) is composite
+
+
+def test_composite_n_substituent_is_parenthesised():
+    import openclatura as oc
+
+    # Bare, this reads equally well as a cyclopropyl on N plus a methyl on the
+    # adamantane — two different molecules — so the boundary must be marked.
+    name = oc.name("O=C(O)CN(CC1CC1)C(=O)C1C2CC3CC(C2)CC1C3").name
+    assert "N-(cyclopropylmethyl)" in name
+    # A simple N-substituent still needs no parentheses.
+    assert oc.name("CNC(C)=O").name == "N-methylacetamide"
+
+
 def test_dihydrazone_primes_its_n_locants():
     import openclatura as oc
 

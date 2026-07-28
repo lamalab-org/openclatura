@@ -17,7 +17,13 @@ from .assembly_spiro import extract_spiro_side_prefixes
 from .chains import find_ring_systems, get_cyclic_atoms
 from .component_namer import name_component as _name_component_impl
 from .engine import DEFAULT_NAMING_ENGINE
-from .formatting import format_counted_prefixes, format_multiplier, is_complex_prefix, strip_outer_parentheses
+from .formatting import (
+    format_counted_prefixes,
+    format_multiplier,
+    is_complex_prefix,
+    is_composite_prefix,
+    strip_outer_parentheses,
+)
 from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
@@ -1142,7 +1148,12 @@ def _format_n_locant_prefix(names: list[str]) -> str:
     parts = []
     for name in sorted(counts):
         k = counts[name]
-        display = f"({name})" if is_complex_prefix(name) else name
+        # An N-locant prefix runs straight into the parent name after it, so a
+        # composite one has to be enclosed or the boundary is lost:
+        # ``N-cyclopropylmethyladamantane-2-carboxamido`` reads equally well as a
+        # cyclopropyl on N plus a methyl on the adamantane.
+        enclose = is_complex_prefix(name) or is_composite_prefix(name)
+        display = f"({name})" if enclose else name
         locants = ",".join(["N"] * k)
         if k == 1:
             parts.append(f"{locants}-{display}")

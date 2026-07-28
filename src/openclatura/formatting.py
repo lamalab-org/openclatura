@@ -38,6 +38,21 @@ def is_complex_prefix(name: str) -> bool:
     return "(" in name or name[0].isdigit() or "-" in name or " " in name or _starts_with_multiplier(name)
 
 
+def is_composite_prefix(name: str) -> bool:
+    """Return true when a prefix is built from more than one substituent unit.
+
+    ``cyclopropylmethyl`` is a cyclopropyl *on* a methyl.  Written bare in front
+    of a parent it reads equally well as a ``cyclopropyl`` plus a ``methyl`` on
+    that parent — two different structures — so it needs protective parentheses.
+    A simple prefix carries its only ``yl`` at the end and needs none.
+    """
+
+    for ending in ("ylidyne", "ylidene", "yl"):
+        if name.endswith(ending):
+            return "yl" in name[: -len(ending)]
+    return "yl" in name
+
+
 def _starts_with_multiplier(name: str) -> bool:
     """Return true when a prefix already begins with a multiplicative prefix."""
 
