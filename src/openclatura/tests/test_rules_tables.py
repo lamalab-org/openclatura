@@ -116,3 +116,27 @@ def test_retained_fused_audit_templates_match_their_graph_templates():
             frozenset((labels[bond.GetBeginAtomIdx()], labels[bond.GetEndAtomIdx()])) for bond in frag.GetBonds()
         }
         assert actual_bonds == expected_bonds, f"{name}: bonds differ"
+
+
+def test_retained_parent_survives_an_arbitrary_substituent():
+    """A substituent is named by its own recursive call, so what it is cannot
+    affect whether the parent's locants are right.  A curated allow-list used to
+    decide this, and anything off it dropped the retained parent entirely."""
+
+    from openclatura import name_smiles
+
+    for substituent in ("C" * 5, "C" * 6, "C" * 12, "CC(C)CC"):
+        name = name_smiles(substituent + "c1ncc2[nH]cnc2n1")
+        assert name.endswith("-7H-purine"), name
+    assert name_smiles("c1ccc(-c2ncc3[nH]cnc3n2)cc1") == "2-phenyl-7H-purine"
+
+
+def test_uncitable_added_hydrogen_keeps_the_von_baeyer_parent():
+    """4-oxoquinoline-3-carboxamide reads as a different molecule -- the two
+    saturated positions have to be cited, and quinoline cannot cite them yet."""
+
+    from openclatura import name_smiles
+
+    name = name_smiles("N#CC[C@H](O)CNC(=O)c1c[nH]c2ccccc2c1=O")
+    assert "quinoline" not in name
+    assert "bicyclo[4.4.0]" in name
