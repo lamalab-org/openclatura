@@ -6,6 +6,7 @@ from dataclasses import dataclass
 
 from .assembly_parts import NameAtomBinding, NameTokenBinding
 from .assembly_prefixes import substituent_sort_key
+from .chains import get_cyclic_atoms
 from .charge_pair_roles import charge_pair_roles
 from .formatting import format_counted_prefixes, format_multiplier, oxy_prefix_from_branch, strip_outer_parentheses
 from .molecule import Molecule
@@ -118,6 +119,8 @@ def structural_replacement_parent_result(
         ("phosphane_borane_zwitterion", lambda: phosphane_borane_zwitterion_result(mol, component_atoms, branch_namer)),
         ("sulfonium_ylide", lambda: sulfonium_ylide_result(mol, component_atoms, branch_namer)),
         ("hydroxyurea_parent", lambda: hydroxyurea_parent_result(mol, component_atoms, branch_namer)),
+        ("sulfamic_acid", lambda: sulfamic_acid_result(mol, component_atoms, branch_namer)),
+        ("azinic_acid", lambda: azinic_acid_result(mol, component_atoms, branch_namer)),
         ("oxoacid_ester", lambda: oxoacid_ester_result(mol, component_atoms, branch_namer)),
         ("oxoacid_parent", lambda: oxoacid_parent_result(mol, component_atoms)),
         ("organophosphinic_acid", lambda: organophosphinic_acid_result(mol, component_atoms)),
@@ -1135,6 +1138,175 @@ def hydroxyurea_parent_result(
         ]
     )
     return _component_name_result(mol, component_atoms, name, "hydroxyurea_parent", bindings=tuple(bindings))
+
+
+def sulfamic_acid_result(
+    mol: Molecule,
+    component_atoms: set[int],
+    branch_namer: RecursiveSubgraphNamer | None = None,
+) -> SpecialComponentName | None:
+    """Name sulfamic acid and its N-substituted derivatives.
+
+    A sulfonic sulfur bonded to nitrogen rather than carbon has no carbon
+    skeleton to hang ``…sulfonic acid`` on, so the acid used to be demoted to a
+    ``hydroxysulfonyl`` prefix and some weaker group became the suffix.
+    ``H2N-SO3H`` is the retained functional parent, and its nitrogen carries the
+    substituents.
+    """
+
+    # A ring nitrogen keeps its ring as the parent -- 1H-imidazole-1-sulfonic
+    # acid is not a sulfamic acid whose ring has been dissolved into prefixes.
+    cyclic_atoms = get_cyclic_atoms(mol)
+    centers = []
+    for idx in component_atoms:
+        atom = mol.atoms[idx]
+        if atom.symbol != "S" or atom.charge != 0:
+            continue
+        neighbors = [n for n in mol.get_neighbors(idx) if n in component_atoms]
+        oxygens = [n for n in neighbors if mol.atoms[n].symbol == "O"]
+        nitrogens = [n for n in neighbors if mol.atoms[n].symbol == "N"]
+        if len(neighbors) != 4 or len(oxygens) != 3 or len(nitrogens) != 1:
+            continue
+        if nitrogens[0] in cyclic_atoms:
+            continue
+        double_o = [o for o in oxygens if (bond := mol.get_bond(idx, o)) is not None and bond.order == 2]
+        single_o = [o for o in oxygens if o not in double_o]
+        if len(double_o) != 2 or len(single_o) != 1:
+            continue
+        hydroxyl = single_o[0]
+        if mol.atoms[hydroxyl].charge != 0 or mol.degree(hydroxyl) != 1:
+            continue
+        centers.append((idx, nitrogens[0], oxygens))
+    if len(centers) != 1:
+        return None
+    sulfur, nitrogen, oxygens = centers[0]
+    if mol.atoms[nitrogen].charge != 0:
+        return None
+
+    core_atoms = {sulfur, nitrogen, *oxygens}
+    ligands: list[tuple[set[int], str]] = []
+    for root in mol.get_neighbors(nitrogen):
+        if root in core_atoms or root not in component_atoms or mol.atoms[root].symbol == "H":
+            continue
+        if branch_namer is None:
+            return None
+        name = branch_namer(mol, root, (set(mol.atoms) - component_atoms) | core_atoms, upstream_atom=nitrogen)
+        if isinstance(name, tuple):
+            name = name[0]
+        if not name:
+            return None
+        ligand_atoms = _component_atoms_until_blocked(mol, component_atoms, root, core_atoms)
+        if not ligand_atoms:
+            return None
+        ligands.append((set(ligand_atoms), strip_outer_parentheses(name)))
+
+    represented = set(core_atoms)
+    for ligand_atoms, _name in ligands:
+        represented.update(ligand_atoms)
+    if represented != component_atoms:
+        return None
+
+    prefix = format_counted_prefixes([name for _atoms, name in ligands]) if ligands else ""
+    name = f"{prefix}sulfamic acid"
+    bindings = [
+        NameAtomBinding(
+            stage="shortcut",
+            role="sulfamic_acid_core",
+            term="sulfamic acid",
+            atom_ids=set(core_atoms),
+            bond_ids=_bond_ids_within_atoms(mol, set(core_atoms)),
+        )
+    ]
+    bindings.extend(
+        NameAtomBinding(
+            stage="shortcut",
+            role="sulfamic_acid_n_ligand",
+            term=ligand_name,
+            atom_ids=set(ligand_atoms),
+            bond_ids=_bond_ids_within_atoms(mol, set(ligand_atoms) | {nitrogen}),
+            locants=("N",),
+        )
+        for ligand_atoms, ligand_name in ligands
+    )
+    return _component_name_result(mol, component_atoms, name, "sulfamic_acid", bindings=tuple(bindings))
+
+
+def azinic_acid_result(
+    mol: Molecule,
+    component_atoms: set[int],
+    branch_namer: RecursiveSubgraphNamer | None = None,
+) -> SpecialComponentName | None:
+    """Name azinic acid derivatives, ``HN(=O)OH`` substituted at nitrogen.
+
+    The nitrogen carries an oxido and a hydroxy oxygen, which distinguishes it
+    from a nitro group -- the two differ by a hydrogen.  Its remaining bond is
+    either single, giving ``N-phenylazinic acid``, or double, giving the
+    ylidene form.
+    """
+
+    centers = []
+    for idx in component_atoms:
+        atom = mol.atoms[idx]
+        if atom.symbol != "N" or atom.charge != 1:
+            continue
+        neighbors = [n for n in mol.get_neighbors(idx) if n in component_atoms]
+        oxygens = [n for n in neighbors if mol.atoms[n].symbol == "O"]
+        others = [n for n in neighbors if n not in oxygens]
+        if len(oxygens) != 2 or len(others) != 1:
+            continue
+        oxido = [o for o in oxygens if mol.atoms[o].charge == -1 and mol.degree(o) == 1]
+        hydroxy = [
+            o
+            for o in oxygens
+            if mol.atoms[o].charge == 0 and mol.degree(o) == 1 and mol.atoms[o].total_h_count > 0
+        ]
+        if len(oxido) != 1 or len(hydroxy) != 1:
+            continue
+        centers.append((idx, others[0], oxygens))
+    if len(centers) != 1:
+        return None
+    nitrogen, ligand_root, oxygens = centers[0]
+    bond = mol.get_bond(nitrogen, ligand_root)
+    if bond is None or bond.order not in {1, 2}:
+        return None
+    if branch_namer is None:
+        return None
+
+    core_atoms = {nitrogen, *oxygens}
+    ligand_name = branch_namer(
+        mol, ligand_root, (set(mol.atoms) - component_atoms) | core_atoms, upstream_atom=nitrogen
+    )
+    if isinstance(ligand_name, tuple):
+        ligand_name = ligand_name[0]
+    if not ligand_name:
+        return None
+    ligand_atoms = _component_atoms_until_blocked(mol, component_atoms, ligand_root, core_atoms)
+    if not ligand_atoms or set(ligand_atoms) | core_atoms != component_atoms:
+        return None
+
+    ligand_name = strip_outer_parentheses(ligand_name)
+    if bond.order == 2:
+        name = f"{format_multiplier(ligand_name, 1, safe_enclose=True)}azinic acid"
+    else:
+        name = f"N-{format_multiplier(ligand_name, 1)}azinic acid"
+    bindings = (
+        NameAtomBinding(
+            stage="shortcut",
+            role="azinic_acid_core",
+            term="azinic acid",
+            atom_ids=set(core_atoms),
+            bond_ids=_bond_ids_within_atoms(mol, set(core_atoms)),
+        ),
+        NameAtomBinding(
+            stage="shortcut",
+            role="azinic_acid_ligand",
+            term=ligand_name,
+            atom_ids=set(ligand_atoms),
+            bond_ids=_bond_ids_within_atoms(mol, set(ligand_atoms) | {nitrogen}),
+            locants=("N",),
+        ),
+    )
+    return _component_name_result(mol, component_atoms, name, "azinic_acid", bindings=bindings)
 
 
 def _urea_n_ligand_names(

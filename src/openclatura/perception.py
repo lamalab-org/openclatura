@@ -126,7 +126,17 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             # acid tautomer — ``[O-][NH+](O)Ph`` is N-phenylazinic acid, which
             # differs from nitrobenzene by two hydrogens, so calling it nitro
             # would name a different compound.
-            if len(oxygens) == 2 and len(adj_atoms) == 1 and atom.total_h_count == 0:
+            # Nor does either of its oxygens: an N-OH is the acid, so
+            # ``C=[N+]([O-])O`` is an azinic acid ylidene rather than a nitro
+            # group, and differs from it by a hydrogen.
+            hydroxyl_oxygen = any(
+                mol.atoms[o].charge == 0
+                and (bond := mol.get_bond(atom.idx, o)) is not None
+                and bond.order == 1
+                and mol.atoms[o].total_h_count > 0
+                for o in oxygens
+            )
+            if len(oxygens) == 2 and len(adj_atoms) == 1 and atom.total_h_count == 0 and not hydroxyl_oxygen:
                 has_double_o = any(mol.get_bond(atom.idx, o).order == 2 for o in oxygens)
                 if atom.charge == 1 or has_double_o:
                     groups.append(PerceivedGroup("nitro", False, adj_atoms[0], {atom.idx} | set(oxygens)))

@@ -5656,3 +5656,24 @@ def test_analysis_exposes_operation_ledger():
     assert any(operation.operation_class == OperationClass.SUBSTITUTIVE for operation in acid.operations)
     assert any(operation.detail == "principal_group_and_substituent_assembly" for operation in acid.operations)
     assert any(operation.operation_class == OperationClass.SUBTRACTIVE for operation in alkene.operations)
+
+
+def test_sulfamic_acid_is_a_functional_parent():
+    # A sulfonic sulfur bonded to nitrogen has no carbon skeleton to hang
+    # "...sulfonic acid" on, so the acid used to be demoted to a prefix.
+    assert name_smiles("NS(=O)(=O)O") == "sulfamic acid"
+    assert name_smiles("NC(=O)CNS(=O)(=O)O") == "(2-amino-2-oxoethyl)sulfamic acid"
+    assert name_smiles("CNS(=O)(=O)O") == "methylsulfamic acid"
+    assert name_smiles("c1ccccc1NS(=O)(=O)O") == "phenylsulfamic acid"
+    # A carbon-bonded sulfonic acid is untouched.
+    assert name_smiles("CS(=O)(=O)O") == "methanesulfonic acid"
+
+
+def test_azinic_acid_is_distinguished_from_a_nitro_group():
+    # Azinic acid carries a hydroxy oxygen, so it differs from nitro by a
+    # hydrogen; naming it nitro would name a different compound.
+    assert name_smiles("[O-][NH+](O)c1ccccc1") == "N-phenylazinic acid"
+    assert name_smiles("C=[N+]([O-])O") == "(methylidene)azinic acid"
+    assert name_smiles("CC=[N+]([O-])O") == "(ethylidene)azinic acid"
+    assert name_smiles("c1ccccc1[N+](=O)[O-]") == "nitrobenzene"
+    assert name_smiles("C[N+](=O)[O-]") == "nitromethane"
