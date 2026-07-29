@@ -192,6 +192,26 @@ def hydrazine_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> s
     return f"({'-'.join(prefixes)}hydrazinyl)"
 
 
+def imino_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    """Render an imino nitrogen, carrying its own substituent when it has one."""
+
+    nitrogen = next(iter(group.atoms_involved), None)
+    if nitrogen is None:
+        return "imino"
+    ligands = [
+        n
+        for n in context.mol.get_neighbors(nitrogen)
+        if n != group.attachment_carbon and context.mol.atoms[n].symbol != "H"
+    ]
+    if len(ligands) != 1:
+        return "imino"
+    branch = context.branch_namer(context.mol, ligands[0], context.sub_exclude | {nitrogen}, upstream_atom=nitrogen)
+    branch = strip_outer_parentheses(rendered_substituent_text(branch))
+    if not branch:
+        return "imino"
+    return f"({branch}imino)"
+
+
 def sulfonyl_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     return ester_prefix_from_group(context.mol, group, context.sub_exclude, "sulfonyl", context.branch_namer) or "sulfo"
 
@@ -236,6 +256,7 @@ PREFIX_HANDLERS.update({key: sulfonyl_prefix_handler for key in RULES.functional
 PREFIX_HANDLERS.update(
     {key: direct_prefix_handler for key in RULES.functional_groups.keys_with_family("direct_prefix")}
 )
+PREFIX_HANDLERS["imino_prefix"] = imino_prefix_handler
 PREFIX_HANDLERS["iminium"] = iminium_prefix_handler
 PREFIX_HANDLERS["hydrazine"] = hydrazine_prefix_handler
 

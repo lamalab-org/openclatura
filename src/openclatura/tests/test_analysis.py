@@ -1899,6 +1899,37 @@ def test_two_nitrogen_chain_uses_its_retained_name():
     assert name_smiles("CN=NC") == "1,2-dimethyldiazene"
 
 
+def test_substituted_imino_on_a_ring_centre_keeps_its_double_bond():
+    # The amine catch-all ignores bond order, so a substituted =N on a ring P
+    # or S used to become an `-amine` suffix and the double bond vanished.
+    assert name_smiles("CCC1CCCN(C)P1(=NC(C)(C)C)N(CC)CC") == (
+        "2-(tert-butylimino)-3,N,N-triethyl-1-methyl-1-aza-2lambda^5-phosphacyclohexan-2-amine"
+    )
+    assert name_smiles("Cc1ccc(S(=O)(=O)N=S2CCCC3(C2)OCCO3)cc1") == (
+        "7-(4-methylphenylsulfonylimino)-1,4-dioxa-7lambda^4-thiaspiro[4.5]decane"
+    )
+
+
+def test_substituted_imino_does_not_steal_a_senior_nitrogen():
+    # On an acyclic centre the nitrogen is still a parent candidate, and a
+    # nitrogen carrying an acyl or another nitrogen belongs to the amide or
+    # hydrazone that owns it -- claiming it would open the sulfoximine ring.
+    assert name_smiles("CP(=NC)(C)C") == "N-(trimethylphosphanylidene)methanamine"
+    assert name_smiles("C#CCC(=O)N=S1(=O)CCNCC1") == "N-(1-oxothiomorpholin-1-ylidene)but-3-ynamide"
+    assert name_smiles("NN=S1(=O)CCN(C(=O)C2CCC2)CC1") == (
+        "1-cyclobutyl-1-(1-(hydrazono)-1-oxothiomorpholin-4-yl)methanone"
+    )
+
+
+def test_sulfonimidoyl_keeps_the_ligand_beside_its_imino_nitrogen():
+    # `sulfinyl` spells a sulfur with one ligand besides the nitrogen and its
+    # oxo groups.  A sulfonimidoyl has two, and naming only the first dropped
+    # the phenyl into `iminosulfinyl`.
+    assert name_smiles("CNC(=O)NS(=N)(=O)c1ccccc1") == "N-methyl-1-(phenylsulfonimidoylamino)formamide"
+    assert name_smiles("CNS(=N)(=O)c1ccccc1") == "N-(phenylsulfonimidoyl)methanamine"
+    assert name_smiles("CNS(=O)(=O)c1ccccc1") == "N-(phenylsulfonyl)methanamine"
+
+
 def test_a_parent_chain_is_not_also_cited_as_a_prefix_on_its_own_ligand():
     # The diazene is the parent here, so the `diazenyl` prefix its atoms would
     # otherwise contribute must not be cited inside the aryl ligand as well.

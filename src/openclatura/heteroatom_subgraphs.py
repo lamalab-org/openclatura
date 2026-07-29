@@ -513,6 +513,13 @@ def _sulfur_imide_branch_name(
             format_lambda_substituent(mol, sulfur, branches, stereo_prefix_text, "sulfanylidene")
         )
 
+    # ``sulfinyl``/``sulfonyl`` spell a sulfur carrying this nitrogen, its oxo
+    # groups, and exactly one more ligand.  A sulfonimidoyl has two -- the
+    # imino nitrogen and a carbon ligand -- and naming only the first dropped
+    # the other, so N-S(=N)(=O)Ph came out as `iminosulfinyl` with the phenyl
+    # gone.  Anything larger goes to the general namer.
+    if not _has_at_most_one_further_ligand(mol, sulfur, {nitrogen, *s_oxygens}):
+        return ""
     branch_idx = first_substituent_neighbor(mol, sulfur, {nitrogen, *s_oxygens})
     branch = name_branch_or_none(mol, branch_idx, local_exclude, sulfur, branch_namer)
     if branch:

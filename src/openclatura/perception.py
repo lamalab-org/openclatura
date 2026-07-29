@@ -164,19 +164,43 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
         if atom.symbol != "N" or atom.idx in consumed or atom.idx in cyclic_atoms:
             continue
         neighbors = mol.get_neighbors(atom.idx)
-        if len(neighbors) != 1:
+        # A nitrogen double-bonded to a hypervalent centre is an imino group
+        # whether or not it also carries a substituent.  Requiring it to be
+        # terminal sent `P(=N-tBu)` to the amine catch-all below, which does
+        # not look at bond order, and the double bond vanished into a `-amine`
+        # suffix.
+        double_bonded = [
+            n for n in neighbors if (bond := mol.get_bond(atom.idx, n)) is not None and bond.order == 2
+        ]
+        if len(double_bonded) != 1:
             continue
-        center = neighbors[0]
-        bond = mol.get_bond(atom.idx, center)
-        if bond is None or bond.order != 2 or mol.atoms[center].is_carbon:
+        center = double_bonded[0]
+        if mol.atoms[center].is_carbon:
             continue
+        if any(
+            (bond := mol.get_bond(atom.idx, n)) is None or bond.order != 1 for n in neighbors if n != center
+        ):
+            continue
+        # A substituted imino only becomes a prefix on a ring centre, where the
+        # ring is the parent regardless.  On an acyclic centre the nitrogen is
+        # still a parent candidate itself -- CH3-N=P(CH3)3 is
+        # N-(trimethylphosphanylidene)methanamine -- and this must not pre-empt
+        # that competition.  A nitrogen carrying an acyl or another nitrogen
+        # belongs to a senior group of its own (an amide, a hydrazone), so
+        # claiming it here would steal it from that suffix and, for a cyclic
+        # sulfoximine, open the ring it is double-bonded into.
+        if len(neighbors) != 1 and (
+            center not in cyclic_atoms or _has_senior_nitrogen_ligand(mol, atom.idx, center)
+        ):
+            continue
+        variant = "terminal_heteroatom_imino" if len(neighbors) == 1 else "substituted_heteroatom_imino"
         groups.append(
             PerceivedGroup(
                 "imino_prefix",
                 False,
                 center,
                 {atom.idx},
-                variant="terminal_heteroatom_imino",
+                variant=variant,
                 role="chalcogen_imide",
                 decision_reasons=(f"Matched terminal N double-bonded to heteroatom {center}.",),
             )
@@ -748,6 +772,29 @@ def _bond_ids_within(mol: Molecule, atom_ids: set[int]) -> set[int]:
                 if bond is not None:
                     bond_ids.add(bond.idx)
     return bond_ids
+
+
+def _has_senior_nitrogen_ligand(mol: Molecule, nitrogen: int, center: int) -> bool:
+    """Whether an imino nitrogen's substituent binds it into a senior group.
+
+    An acyl carbon makes the nitrogen an amide's, and another nitrogen makes it
+    a hydrazone's.  Either way the nitrogen is spoken for, and citing it as an
+    ``imino`` prefix here would take it from the suffix that owns it.
+    """
+
+    for ligand in mol.get_neighbors(nitrogen):
+        if ligand == center or mol.atoms[ligand].symbol == "H":
+            continue
+        if mol.atoms[ligand].symbol == "N":
+            return True
+        if mol.atoms[ligand].is_carbon and any(
+            mol.atoms[far].symbol in {"O", "S", "N"}
+            and (bond := mol.get_bond(ligand, far)) is not None
+            and bond.order == 2
+            for far in mol.get_neighbors(ligand)
+        ):
+            return True
+    return False
 
 
 def _has_non_h_multiple_bond_neighbor(mol: Molecule, atom_idx: int, allowed: set[int]) -> bool:

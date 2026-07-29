@@ -30,6 +30,7 @@ from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names
 from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
 from .name_assembly import NameAssemblyResult, token_span_trace_data
 from .naming_context import NamingIntent
+from .functional_prefixes import PREFIX_HANDLERS, PrefixContext
 from .nomenclature import RULES
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
 from .parent_selection import select_principal_parent
@@ -856,6 +857,21 @@ def _number_saturated_n_ring_for_spiro(
     return min(candidates)[3]
 
 
+def _substituted_prefix_name(mol: Molecule, group: PerceivedGroup, sub_exclude: set[int]) -> str:
+    """Render a prefix group that carries its own substituent, or return ""."""
+
+    # Only groups perceived as carrying a substituent are re-rendered; every
+    # other prefix is already complete in the rule table, and routing those
+    # through a handler here would change names this site gets right.
+    if group.variant != "substituted_heteroatom_imino":
+        return ""
+    handler = PREFIX_HANDLERS.get(group.key)
+    if handler is None:
+        return ""
+    context = PrefixContext(mol=mol, parent_path=[], sub_exclude=sub_exclude, branch_namer=name_subgraph)
+    return handler(context, group)
+
+
 def _collect_subgraph_substituents(
     mol: Molecule,
     candidate_path: list[int],
@@ -886,6 +902,11 @@ def _collect_subgraph_substituents(
         if group.attachment_carbon in main_set and not group.is_principal_candidate:
             rule = RULES.functional_groups.by_key.get(group.key)
             name = rule.prefix if rule and rule.role == "prefix" else ""
+            # The rule table holds the bare prefix, so a group that carries its
+            # own substituent -- `(methylimino)` rather than `imino` -- loses it
+            # here unless the handler that knows how to render it is consulted.
+            if name:
+                name = _substituted_prefix_name(mol, group, sub_exclude) or name
             if name:
                 subst_mapping.setdefault(group.attachment_carbon, []).append(
                     SubstituentItem(
