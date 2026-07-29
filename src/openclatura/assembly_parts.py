@@ -116,6 +116,11 @@ class RetainedParentMetadata:
     default_indicated_h: tuple[str, ...] = ()
     fusion_locants: tuple[str, ...] = ()
     derivative_stem: str | None = None
+    # How many indicated hydrogens the mancude parent hydride itself supports.
+    # Saturated positions beyond this many are *added* hydrogen and are cited as
+    # a hydro prefix: xanthine is 3,7-dihydro-1H-purine-2,6-dione, never
+    # 1H,3H,7H-purine-2,6-dione.
+    indicated_hydrogen_count: int = 0
 
 
 @dataclass

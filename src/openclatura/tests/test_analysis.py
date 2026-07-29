@@ -1318,7 +1318,21 @@ def test_repeated_grouped_locants_use_following_structural_scope():
 def test_caffeine_uses_the_retained_purine_dione_parent():
     analysis = analyze_smiles("CN1C=NC2=C1C(=O)N(C(=O)N2C)C")
 
-    assert analysis.name == "1,3,7-trimethylpurine-2,6-dione"
+    # Purine supports one indicated hydrogen; the 2,6-dione saturates two more
+    # positions, which are added hydrogen and take a hydro prefix.  Those
+    # positions count even though all three nitrogens here carry a methyl
+    # rather than a hydrogen.
+    assert analysis.name == "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione"
+
+
+def test_purine_diones_cite_added_hydrogen_as_a_hydro_prefix():
+    assert name_smiles("O=c1[nH]c(=O)c2[nH]cnc2[nH]1") == "3,7-dihydro-1H-purine-2,6-dione"
+    assert name_smiles("Cn1c(=O)c2[nH]cnc2n(C)c1=O") == "1,3-dimethyl-3,7-dihydro-1H-purine-2,6-dione"
+    # An odd surplus cannot be spelt with a hydro prefix, so it stays indicated.
+    assert name_smiles("O=c1[nH]cnc2[nH]cnc12") == "1H,9H-purin-6-one"
+    # A parent needing no added hydrogen is unaffected.
+    assert name_smiles("c1ncc2[nH]cnc2n1") == "7H-purine"
+    assert name_smiles("Nc1ncnc2[nH]cnc12") == "9H-purin-6-amine"
 
 
 def test_purinone_fusion_carbon_hydrogen_uses_a_dihydro_prefix():

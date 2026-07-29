@@ -92,8 +92,26 @@ def production_retained_fused_parent(
             default_indicated_h=template.default_indicated_h,
             fusion_locants=template.fusion_atoms,
             derivative_stem=template.derivative_stem,
+            indicated_hydrogen_count=_indicated_hydrogen_count(template),
         ),
     )
+
+
+def _indicated_hydrogen_count(template) -> int:
+    """How many indicated hydrogens this mancude parent hydride supports.
+
+    A parent that declares its own positions (1H-indole, 9H-xanthene) supports
+    exactly that many.  Otherwise the mancude double-bond count leaves the
+    skeletal atoms it cannot pair: purine's nine atoms and four double bonds
+    leave one, which is why purine is cited as 7H- or 9H-.  A parent with
+    neither is fully mancude and supports none.
+    """
+
+    if template.default_indicated_h:
+        return len(template.default_indicated_h)
+    if template.mancude_double_bonds:
+        return len(template.atoms) - 2 * template.mancude_double_bonds
+    return 0
 
 
 def _neutral_component(mol: Molecule, atoms: set[int]) -> bool:

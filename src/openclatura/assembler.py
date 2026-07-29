@@ -362,10 +362,17 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
         return core_name
     if indicated_hydrogens:
         indicated_hydrogens = sorted(set(indicated_hydrogens), key=parse_locant)
-        core_name = ",".join(indicated_hydrogens) + "H-" + core_name
+        # Every cited position carries its own H -- ``1H,7H-purine``, not
+        # ``1,7H-purine``, which is not a readable name.
+        core_name = ",".join(f"{locant}H" for locant in indicated_hydrogens) + "-" + core_name
     if additive_hydrogens:
         additive_hydrogens = sorted(set(additive_hydrogens), key=parse_locant)
-        core_name = f"{','.join(additive_hydrogens)}-{format_multiplier('hydro', len(additive_hydrogens))}{core_name}"
+        # A locant may not butt against the prefix before it, so a hydro prefix
+        # followed by indicated hydrogen needs a separator:
+        # ``3,7-dihydro-1H-purine-2,6-dione``.
+        separator = "-" if core_name[:1].isdigit() else ""
+        hydro = format_multiplier("hydro", len(additive_hydrogens))
+        core_name = f"{','.join(additive_hydrogens)}-{hydro}{separator}{core_name}"
     return core_name
 
 

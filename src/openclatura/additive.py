@@ -1,6 +1,7 @@
 """Explicit additive/replacement feature collection for selected parents."""
 
 from .assembly_parts import AssemblyParts, SubstituentItem
+from .locants import parse_locant
 from .molecule import Molecule
 from .name_operations import HydroOperation
 from .namer_config import INDICATED_H_RETAINED_NAMES
@@ -28,7 +29,16 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         if metadata is not None and default_indicated_h and atom.is_carbon and locant not in default_indicated_h:
             continue
         if oxo_derivative:
-            if atom.explicit_h_count + atom.total_h_count <= 0:
+            # A ring nitrogen at a saturated position is a hydrogenated position
+            # of the parent hydride whether it holds the hydrogen or a
+            # substituent, so theophylline is
+            # 1,3-dimethyl-3,7-dihydro-1H-purine-2,6-dione: N1 and N3 count even
+            # though both are methylated.
+            ring_bond_order = sum(
+                bond.order for n in mol.get_neighbors(idx) if n in numbered_path and (bond := mol.get_bond(idx, n))
+            )
+            substituted_ring_nitrogen = atom.symbol == "N" and ring_bond_order == 2
+            if atom.explicit_h_count + atom.total_h_count <= 0 and not substituted_ring_nitrogen:
                 continue
             # Hydrogen introduced next to =O is implied by ``-one``/``-dione``
             # and must not become a new indicated-H locant.  Carbon is allowed
@@ -76,6 +86,28 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             )
         )
         return
+
+    # A mancude parent hydride supports a fixed number of indicated hydrogens.
+    # Saturated positions beyond that are *added* hydrogen and take a hydro
+    # prefix, so xanthine is 3,7-dihydro-1H-purine-2,6-dione rather than a run
+    # of indicated-H citations.  The lowest locants stay indicated.
+    # A hydro prefix saturates whole double bonds, so it can only absorb an even
+    # surplus.  An odd one stays as indicated hydrogen (1H,9H-purin-6-one),
+    # which is still a readable name.
+    supported = metadata.indicated_hydrogen_count if metadata is not None else len(candidates)
+    if metadata is not None and len(candidates) > supported and (len(candidates) - supported) % 2 == 0:
+        candidates.sort(key=lambda candidate: parse_locant(candidate[0]))
+        surplus = candidates[supported:]
+        candidates = candidates[:supported]
+        parts.hydro_operations.append(
+            HydroOperation(
+                key="additive_hydrogen",
+                reason="Saturation beyond the parent's indicated hydrogen is added hydrogen.",
+                locants=tuple(locant for locant, _ in surplus),
+                atom_ids=tuple(atom_idx for _, atom_idx in surplus),
+                operation_kind="additive_hydrogen",
+            )
+        )
 
     for locant, atom_idx in candidates:
         parts.indicated_hydrogens.append(locant)
