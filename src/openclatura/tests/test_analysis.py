@@ -5734,3 +5734,15 @@ def test_enclosed_prefix_keeps_its_parentheses_beside_another_substituent():
     assert name_smiles("C=Cc1ccccc1") == "ethenylbenzene"
     assert name_smiles("C=CN(C)C(C)=O") == "N-ethenyl-N-methylacetamide"
     assert name_smiles("OCc1ccccc1OCc1ccccc1") == "1-(2-benzyloxyphenyl)methanol"
+
+
+def test_charge_separated_sulfonyl_on_a_nitrogen_keeps_its_ligand():
+    # The N-branch renderer counted only oxo oxygens, so [S+](=O)[O-] looked
+    # like a sulfinyl and its remaining ligand was dropped.
+    charge_separated = name_smiles("CC(N[S+](=O)([O-])c1ccccc1)C(=O)NC")
+    assert charge_separated == "N-methyl-2-phenylsulfonylaminopropanamide"
+    assert charge_separated == name_smiles("CC(NS(=O)(=O)c1ccccc1)C(=O)NC")
+    # A three-coordinate sulfinate's charge is real and stays.
+    assert "oxidosulfinylamino" in name_smiles("COc1ccc(NS(=O)[O-])cc1[N+]1(N)C=NCC1")
+    # Sulfur imides keep their own spelling.
+    assert name_smiles("N=S(Cl)CF") == "((chloro)(imino)sulfanyl)fluoromethane"

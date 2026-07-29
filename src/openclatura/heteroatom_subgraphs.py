@@ -430,11 +430,17 @@ def name_nitrogen_subgraph(
                 )
             )
         else:
+            # Only the oxo oxygens are counted here, so a charge-separated
+            # sulfonyl -- ``[S+](=O)[O-]`` -- looks like a sulfinyl and its
+            # remaining ligand is lost.  The general namer classifies the
+            # oxido ligand too, so fall back to it whenever the imide spelling
+            # does not apply rather than dropping the branch.
             s_oxygens = double_bonded_neighbors(mol, nxt, "O")
-            if mol.atoms[nxt].symbol == "S" and s_oxygens:
+            sulfur_imide = ""
+            if mol.atoms[nxt].symbol == "S" and s_oxygens and not _has_oxido_ligand(mol, nxt):
                 sulfur_imide = _sulfur_imide_branch_name(mol, start_idx, nxt, exclude_atoms, s_oxygens, branch_namer)
-                if sulfur_imide:
-                    branches.append(sulfur_imide)
+            if sulfur_imide:
+                branches.append(sulfur_imide)
             else:
                 branch = _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx)
                 if branch:
@@ -453,6 +459,25 @@ def terminal_n3_prefix(
 
     role = terminal_n3_substituent_role(mol, start_idx, exclude_atoms, upstream_atom)
     return role.key if role is not None else ""
+
+
+def _has_oxido_ligand(mol: Molecule, atom_idx: int) -> bool:
+    """Whether ``atom_idx`` is a four-coordinate centre whose oxo is a charge pair.
+
+    Four ligands make ``[S+](=O)[O-]`` a sulfonyl written charge-separated.
+    Three make it a sulfinate, where the charge is real and must be kept.
+    """
+
+    if mol.degree(atom_idx) != 4:
+        return False
+    return any(
+        mol.atoms[neighbor].symbol == "O"
+        and mol.atoms[neighbor].charge == -1
+        and mol.degree(neighbor) == 1
+        and (bond := mol.get_bond(atom_idx, neighbor)) is not None
+        and bond.order == 1
+        for neighbor in mol.get_neighbors(atom_idx)
+    )
 
 
 def _sulfur_imide_branch_name(
