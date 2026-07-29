@@ -2,7 +2,14 @@
 
 from collections.abc import Callable
 
-from .assembly_parts import AssemblyParts, NameAtomBinding, SubstituentItem, split_rendered_substituent_name
+from .assembly_parts import (
+    AssemblyParts,
+    NameAtomBinding,
+    SubstituentItem,
+    UnsaturationItem,
+    split_rendered_substituent_name,
+)
+from .rules import elements as _elements
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
 from .component_group_rules import (
     exclude_nonparent_group_atoms,
@@ -201,6 +208,29 @@ def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
     return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
 
 
+def _chain_audit_parts(plan, component_atoms: set[int]) -> AssemblyParts:
+    """Express a homonuclear chain as a carbon chain plus skeletal replacement.
+
+    The audit already rebuilds `oxa`/`thia`/`aza` replacement onto a carbon
+    backbone, so a trisulfane is a three-atom chain with three thia positions
+    and needs no new machinery.
+    """
+
+    stem = next((k for k, v in _elements.SYMBOLS_BY_HW_STEM.items() if v == plan.element), None)
+    if stem is None:
+        raise ValueError(f"no replacement stem for {plan.element}")
+    locants = [str(i) for i in range(1, plan.length + 1)]
+    parts = AssemblyParts(parent_length=plan.length, parent_atom_ids=set(component_atoms))
+    parts.a_prefixes = [SubstituentItem(name=stem, locants=locants)]
+    parts.unsaturations = [
+        UnsaturationItem(bond_key="double" if order == 2 else "triple", locants=[str(idx + 1)])
+        for idx, order in enumerate(plan.bond_orders)
+        if order > 1
+    ]
+    parts.substituents = [SubstituentItem(name=ligand, locants=[str(locant)]) for locant, ligand in plan.ligands]
+    return parts
+
+
 def _shortcut_component_result(
     mol: Molecule,
     component_atoms: set[int],
@@ -209,11 +239,23 @@ def _shortcut_component_result(
     stage: str,
     role: str,
     bindings: list[NameAtomBinding] | tuple[NameAtomBinding, ...] | None = None,
+    audit_chain=None,
     emit_metadata: bool = True,
     token_debug: bool = False,
 ) -> tuple[str, list[dict], list[dict], list[dict]]:
     """Build audited metadata for a component shortcut name."""
 
+    if audit_chain is not None and COMPONENT_AUDIT_HOOK is not None:
+        # A shortcut returns before the usual audit point, so its name is
+        # unauditable unless the renderer hands over a plan the reconstruction
+        # can rebuild.  This runs ahead of the metadata early-return because the
+        # audited run does not ask for metadata.  Only renderers supplying a
+        # plan are offered here; the rest still abstain rather than be checked
+        # against a stub parent.
+        try:
+            COMPONENT_AUDIT_HOOK(mol, set(component_atoms), _chain_audit_parts(audit_chain, component_atoms))
+        except Exception:  # pragma: no cover - audit must never disrupt naming
+            pass
     if not emit_metadata:
         return name, [], [], []
     parts = AssemblyParts(parent_length=max(1, len(component_atoms)), parent_atom_ids=set(component_atoms))
@@ -312,6 +354,7 @@ def name_component(
             stage="shortcut",
             role=structural_parent_result.role,
             bindings=structural_parent_result.bindings,
+            audit_chain=structural_parent_result.audit_chain,
             emit_metadata=emit_metadata,
             token_debug=token_debug,
         )

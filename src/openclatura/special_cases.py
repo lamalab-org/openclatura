@@ -2,7 +2,7 @@
 
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .assembly_parts import NameAtomBinding, NameTokenBinding
 from .assembly_prefixes import substituent_sort_key
@@ -31,12 +31,26 @@ class AnhydrideComponentName:
 
 
 @dataclass(frozen=True)
+class ChainAuditPlan:
+    """A homonuclear chain parent, as the audit needs to rebuild it."""
+
+    element: str
+    length: int
+    bond_orders: tuple[int, ...]
+    ligands: tuple[tuple[int, str], ...]
+
+
+@dataclass(frozen=True)
 class SpecialComponentName:
     """A complete special component name with graph-bound renderer metadata."""
 
     name: str
     role: str
     bindings: tuple[NameAtomBinding, ...]
+    # Optional plan letting the reconstruction audit rebuild this shortcut: the
+    # backbone as a chain of ``element``, each ligand grafted at its locant.
+    # Without it a shortcut name is unauditable and can only abstain.
+    audit_chain: ChainAuditPlan | None = None
 
 
 def _bond_ids_within_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
@@ -1978,7 +1992,7 @@ def homonuclear_chain_parent_result(
 
     # Both directions describe the same chain, so the numbering rule decides
     # between them rather than the order the backbone happened to be walked in.
-    best: tuple[tuple, str, list[tuple[int, _ChainLigand]]] | None = None
+    best: tuple[tuple, str, list[tuple[int, _ChainLigand]], list[int], list[int]] | None = None
     for oriented, orders in ((chain, forward_orders), (chain[::-1], forward_orders[::-1])):
         parent = _same_element_parent_name(symbol, len(oriented), orders)
         if not parent:
@@ -1993,10 +2007,10 @@ def homonuclear_chain_parent_result(
             [locant for locant, _ligand in placed],
         )
         if best is None or key < best[0]:
-            best = (key, parent, placed)
+            best = (key, parent, placed, oriented, orders)
     if best is None:
         return None
-    _key, parent, placed = best
+    _key, parent, placed, placed_chain, oriented_orders = best
 
     prefixes = _locanted_ligand_prefix([(locant, ligand.name) for locant, ligand in placed])
     name = f"{prefixes}{parent}" if prefixes else parent
@@ -2018,12 +2032,21 @@ def homonuclear_chain_parent_result(
         )
         for locant, ligand in placed
     )
-    return _component_name_result(
+    result = _component_name_result(
         mol,
         component_atoms,
         name,
         "homonuclear_chain_parent",
         bindings=(parent_binding, *ligand_bindings),
+    )
+    return replace(
+        result,
+        audit_chain=ChainAuditPlan(
+            element=symbol,
+            length=len(chain),
+            bond_orders=tuple(oriented_orders),
+            ligands=tuple((locant, ligand.name) for locant, ligand in placed),
+        ),
     )
 
 

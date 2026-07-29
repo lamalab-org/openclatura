@@ -1899,6 +1899,36 @@ def test_two_nitrogen_chain_uses_its_retained_name():
     assert name_smiles("CN=NC") == "1,2-dimethyldiazene"
 
 
+def test_homonuclear_chain_names_are_reconstructed_by_the_audit():
+    """A shortcut returns before the usual audit point, so it must hand over a
+    plan or its name can never be checked.  Corrupting the plan must refute."""
+
+    import openclatura as oc
+    import openclatura.component_namer as cn
+    from openclatura.special_cases import ChainAuditPlan
+
+    def verdict(smiles: str) -> str:
+        return oc.name_many([smiles], verify_self=True, processes=1)[0].self_audit.verdict
+
+    assert verdict("CCSSSC") == "confirmed"
+    assert verdict("CNNC") == "confirmed"
+
+    original = cn._chain_audit_parts
+    try:
+        # A plan claiming the wrong element must not still confirm.
+        cn._chain_audit_parts = lambda plan, atoms: original(
+            ChainAuditPlan("O", plan.length, plan.bond_orders, plan.ligands), atoms
+        )
+        assert verdict("CCSSSC") == "mismatch"
+        # Nor one that puts a ligand on the wrong chain atom.
+        cn._chain_audit_parts = lambda plan, atoms: original(
+            ChainAuditPlan(plan.element, plan.length, plan.bond_orders, ((2, "ethyl"), (3, "methyl"))), atoms
+        )
+        assert verdict("CCSSSC") == "mismatch"
+    finally:
+        cn._chain_audit_parts = original
+
+
 def test_a_charge_separated_chalcogenido_is_not_a_hydride():
     # `sulfanyl` spells an S-H; a terminal [S-] on a positive centre has none,
     # so the charge-separated form must name as its neutral equivalent.
