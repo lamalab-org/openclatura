@@ -348,13 +348,19 @@ def _hydrazone_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -
         if n1_n2_bond is None or n1_n2_bond.order != 1:
             continue
         amidino_tail_atoms = _amidinohydrazone_tail_atoms(mol, n2, {n1.idx})
+        key = _hydrazone_key(mol, carbon, cyclic_atoms, amidino=bool(amidino_tail_atoms))
+        if amidino_tail_atoms and "amidino" not in key:
+            # Only aldehydes have an amidinohydrazone suffix.  Absorbing the
+            # tail into a ketone's plain hydrazone would consume the amidino
+            # atoms without ever spelling them, so leave them outside the group
+            # and let the azine renderer take the fragment instead.
+            amidino_tail_atoms = set()
         if (
             _has_non_h_multiple_bond_neighbor(mol, n2, {n1.idx})
             and not _has_terminal_imino_substituent(mol, n2, {n1.idx})
             and not amidino_tail_atoms
         ):
             continue
-        key = _hydrazone_key(mol, carbon, cyclic_atoms, amidino=bool(amidino_tail_atoms))
         attachment = _hydrazone_attachment(mol, carbon, cyclic_atoms)
         ordered_tail = tuple(sorted(amidino_tail_atoms))
         roles.append(

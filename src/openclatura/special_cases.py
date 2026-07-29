@@ -392,6 +392,25 @@ def _lambda_ring_unsaturation_suffix(mol: Molecule, path: list[int]) -> str:
     return f"{stem_joiner}-{','.join(str(locant) for locant in locants)}-{infix}"
 
 
+def _is_amidino_carbon(mol: Molecule, carbon: int, nitrogen: int) -> bool:
+    """Whether ``carbon`` is an amidino/guanidino centre, ``=C(N)(N)``."""
+
+    others = [n for n in mol.get_neighbors(carbon) if n != nitrogen]
+    return len(others) == 2 and all(
+        mol.atoms[n].symbol == "N" and (bond := mol.get_bond(carbon, n)) is not None and bond.order == 1
+        for n in others
+    )
+
+
+def _is_aldehyde_side_carbon(mol: Molecule, carbon: int, nitrogen: int) -> bool:
+    """Whether ``carbon`` carries at most one other heavy neighbour.
+
+    Such a side is an aldehyde, and its amidinohydrazone already has a suffix.
+    """
+
+    return len([n for n in mol.get_neighbors(carbon) if n != nitrogen and mol.atoms[n].symbol != "H"]) <= 1
+
+
 def simple_azine_parent_name(
     mol: Molecule,
     component_atoms: set[int],
@@ -427,6 +446,24 @@ def simple_azine_parent_name(
                 if branch_ylidene1 and branch_ylidene1.endswith("ylidene"):
                     stereo = _hydrazone_stereo_prefix(mol, c2, n2, parent2)
                     return f"{stereo}{parent2} {branch_ylidene1}hydrazone"
+            # A ketone's amidinohydrazone has no suffix to be named with -- only
+            # aldehydes do -- and an amidino carbon has no carbonyl equivalent
+            # to be the parent either.  Name the hydrazine itself instead and
+            # hang both sides on it as ylidene substituents.
+            amidino = [_is_amidino_carbon(mol, c1, n1), _is_amidino_carbon(mol, c2, n2)]
+            aldehyde = [_is_aldehyde_side_carbon(mol, c1, n1), _is_aldehyde_side_carbon(mol, c2, n2)]
+            if sum(amidino) == 1 and not any(
+                is_aldehyde and not is_amidino for is_aldehyde, is_amidino in zip(aldehyde, amidino)
+            ):
+                ylidenes = [
+                    strip_outer_parentheses(
+                        branch_namer(mol, carbon, set(mol.atoms) - component_atoms | {nitrogen}, upstream_atom=nitrogen)
+                    )
+                    for carbon, nitrogen in ((c1, n1), (c2, n2))
+                ]
+                if all(name and name.endswith("ylidene") for name in ylidenes):
+                    first, second = sorted(ylidenes, key=substituent_sort_key)
+                    return f"1-({first})-2-({second})hydrazine"
             continue
         # Prefer the longer carbonyl parent; this follows parent-size
         # preference and keeps the shorter side as the ylidene hydrazone

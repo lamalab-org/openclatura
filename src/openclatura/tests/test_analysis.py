@@ -5704,3 +5704,19 @@ def test_acyl_with_a_competing_acid_does_not_take_the_amido_rewrite():
     assert name_smiles("CC(=O)NCC(=O)O") == "2-acetamidoacetic acid"
     assert name_smiles("c1ccccc1C(=O)NCC(=O)O") == "2-benzamidoacetic acid"
     assert name_smiles("CC(N)C(=O)NCC(=O)O") == "2-(2-aminopropanamido)acetic acid"
+
+
+def test_ketone_amidinohydrazone_keeps_its_amidino_atoms():
+    # Only aldehydes have an amidinohydrazone suffix.  A ketone's plain
+    # hydrazone absorbed the amidino tail into the group without ever spelling
+    # it, so C(N)N vanished from the name.
+    assert (
+        name_smiles("CC1CC/C(=N/N=C(N)N)C1") == "1-(diaminomethylidene)-2-((1Z)-3-methylcyclopentylidene)hydrazine"
+    )
+    assert (
+        name_smiles("CC(=NN=C(N)N)c1ccc(-n2ccnc2)cc1")
+        == "1-(diaminomethylidene)-2-(1-(4-(1H-imidazol-1-yl)phenyl)ethylidene)hydrazine"
+    )
+    # An aldehyde keeps its suffix, and a senior group elsewhere still wins.
+    assert name_smiles(r"Cc1cccc(Cl)c1/C=N\N=C(N)N") == "2-chloro-6-methylbenzene-1-carbaldehyde amidinohydrazone"
+    assert name_smiles("NC(N)=NN=C(C)C") == "propan-2-one diaminomethylidenehydrazone"
