@@ -59,7 +59,7 @@
     }
   },
   "indicated_hydrogen_retained_names": {
-    "bluebook_rule": "P-14.7, P-22.2, P-25; retained heterocycle names and indicated hydrogen locants",
+    "bluebook_rule": "P-14.7, P-22.2, P-25; retained heterocycle names and indicated hydrogen locants  Phenanthrolines whose oxo derivatives cite every saturated position are included; acridine, phenazine and 1,10-phenanthroline are not, because their added hydrogen is not yet emitted and the name would be ambiguous.",
     "values": [
       "pyrrole",
       "imidazole",
@@ -75,7 +75,18 @@
       "purine",
       "xanthene",
       "indene",
-      "fluorene"
+      "fluorene",
+      "1,4-phenanthroline",
+      "1,5-phenanthroline",
+      "1,6-phenanthroline",
+      "1,7-phenanthroline",
+      "1,8-phenanthroline",
+      "1,9-phenanthroline",
+      "2,7-phenanthroline",
+      "2,8-phenanthroline",
+      "3,5-phenanthroline",
+      "3,6-phenanthroline",
+      "4,5-phenanthroline"
     ]
   },
   "single_atom_cations": {

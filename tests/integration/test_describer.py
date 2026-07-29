@@ -165,7 +165,7 @@ def test_describe_orders_main_parent_trace_before_nested_substituent_trace():
 def test_describe_explains_retained_purine_dione_parent():
     text = str(describe("CN1C=NC2=C1C(=O)N(C(=O)N2C)C"))
 
-    assert "1,3,7-trimethylpurine-2,6-dione" in text
+    assert "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione" in text
     assert "retained as purine" in text
     assert "Principal group: ketone at 2,6" in text
 
