@@ -876,6 +876,13 @@ def _collect_subgraph_substituents(
     sub_handled_atoms = set()
 
     for group in sub_perceived:
+        # The attachment carbon being on this parent is not enough: a group can
+        # hang off it and still be built from atoms this subgraph does not
+        # cover, such as the diazene that -N=N- contributes when it is the
+        # parent rather than a `diazenyl` prefix.  Citing it here spells it
+        # twice, once as the prefix and once as the parent.
+        if group.atoms_involved & sub_exclude:
+            continue
         if group.attachment_carbon in main_set and not group.is_principal_candidate:
             rule = RULES.functional_groups.by_key.get(group.key)
             name = rule.prefix if rule and rule.role == "prefix" else ""

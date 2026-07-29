@@ -125,7 +125,7 @@ def structural_replacement_parent_result(
         ("oxoacid_parent", lambda: oxoacid_parent_result(mol, component_atoms)),
         ("organophosphinic_acid", lambda: organophosphinic_acid_result(mol, component_atoms)),
         ("sulfoxide_parent", lambda: sulfoxide_parent_result(mol, component_atoms)),
-        ("homonuclear_chain_parent", lambda: homonuclear_chain_parent_result(mol, component_atoms)),
+        ("homonuclear_chain_parent", lambda: homonuclear_chain_parent_result(mol, component_atoms, branch_namer)),
         ("simple_central_parent_hydride", lambda: simple_central_parent_hydride_result(mol, component_atoms)),
     )
     for role, render in renderers:
@@ -1928,8 +1928,18 @@ def _alkyl_branch_prefixes(
     return "".join(parts)
 
 
-def homonuclear_chain_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
-    """Name acyclic same-element parent hydride chains and simple ligands."""
+def homonuclear_chain_parent_result(
+    mol: Molecule,
+    component_atoms: set[int],
+    branch_namer: RecursiveSubgraphNamer | None = None,
+) -> SpecialComponentName | None:
+    """Name acyclic same-element parent hydride chains and their ligands.
+
+    Each ligand is named by its own recursive call, so how big it is cannot
+    affect whether the chain's locants are right.  Only the backbone element
+    decides whether the chain outranks a carbon skeleton as the parent, and
+    ``ethyl`` has no more say in that than ``methyl``.
+    """
 
     backbone_symbols = {
         mol.atoms[idx].symbol
@@ -1949,32 +1959,34 @@ def homonuclear_chain_parent_result(mol: Molecule, component_atoms: set[int]) ->
     if chain is None:
         return None
     chain_set = set(chain)
-    ligand_bindings = []
-    for atom_idx in component_atoms - chain_set:
-        backbone_neighbors = [n for n in mol.get_neighbors(atom_idx) if n in chain_set]
-        if len(backbone_neighbors) != 1:
-            return None
-        bond = mol.get_bond(atom_idx, backbone_neighbors[0])
-        if bond is None or bond.order != 1:
-            return None
-        ligand_name = _terminal_ligand_name(mol, atom_idx, backbone_neighbors[0])
-        if not ligand_name:
-            return None
-        ligand_bindings.append(
-            NameAtomBinding(
-                stage="shortcut",
-                role="homonuclear_chain_ligand",
-                term=ligand_name,
-                atom_ids={atom_idx},
-                bond_ids={bond.idx},
-                locants=(str(chain.index(backbone_neighbors[0]) + 1),),
-            )
-        )
-    bond_orders = [mol.get_bond(chain[idx], chain[idx + 1]).order for idx in range(len(chain) - 1)]
-    parent = _same_element_parent_name(symbol, len(chain), bond_orders)
-    if not parent:
+    forward_orders = [mol.get_bond(chain[idx], chain[idx + 1]).order for idx in range(len(chain) - 1)]
+    ligands = _homonuclear_chain_ligands(mol, component_atoms, chain_set, branch_namer)
+    if ligands is None:
         return None
-    prefixes = _simple_chain_ligand_prefixes(mol, component_atoms, chain)
+
+    # Both directions describe the same chain, so the numbering rule decides
+    # between them rather than the order the backbone happened to be walked in.
+    best: tuple[tuple, str, list[tuple[int, _ChainLigand]]] | None = None
+    for oriented, orders in ((chain, forward_orders), (chain[::-1], forward_orders[::-1])):
+        parent = _same_element_parent_name(symbol, len(oriented), orders)
+        if not parent:
+            continue
+        placed = sorted(
+            ((oriented.index(ligand.attachment) + 1, ligand) for ligand in ligands),
+            key=lambda item: (substituent_sort_key(item[1].name), item[0]),
+        )
+        key = (
+            next((idx for idx, order in enumerate(orders) if order > 1), len(orders)),
+            sorted(locant for locant, _ligand in placed),
+            [locant for locant, _ligand in placed],
+        )
+        if best is None or key < best[0]:
+            best = (key, parent, placed)
+    if best is None:
+        return None
+    _key, parent, placed = best
+
+    prefixes = _locanted_ligand_prefix([(locant, ligand.name) for locant, ligand in placed])
     name = f"{prefixes}{parent}" if prefixes else parent
     parent_binding = NameAtomBinding(
         stage="shortcut",
@@ -1983,6 +1995,17 @@ def homonuclear_chain_parent_result(mol: Molecule, component_atoms: set[int]) ->
         atom_ids=set(chain),
         bond_ids=_bond_ids_within_atoms(mol, set(chain)),
     )
+    ligand_bindings = tuple(
+        NameAtomBinding(
+            stage="shortcut",
+            role="homonuclear_chain_ligand",
+            term=ligand.name,
+            atom_ids=set(ligand.atoms),
+            bond_ids={ligand.bond_id},
+            locants=(str(locant),),
+        )
+        for locant, ligand in placed
+    )
     return _component_name_result(
         mol,
         component_atoms,
@@ -1990,6 +2013,101 @@ def homonuclear_chain_parent_result(mol: Molecule, component_atoms: set[int]) ->
         "homonuclear_chain_parent",
         bindings=(parent_binding, *ligand_bindings),
     )
+
+
+@dataclass(frozen=True)
+class _ChainLigand:
+    """One recursively named substituent hanging off a homonuclear chain."""
+
+    attachment: int
+    name: str
+    atoms: frozenset[int]
+    bond_id: int
+
+
+def _homonuclear_chain_ligands(
+    mol: Molecule,
+    component_atoms: set[int],
+    chain_set: set[int],
+    branch_namer: RecursiveSubgraphNamer | None,
+) -> list[_ChainLigand] | None:
+    """Name every branch hanging off the chain, or give up on the whole parent.
+
+    A branch is a connected component of everything off the chain, and it has
+    to touch the chain exactly once.  A component that touches twice is a ring
+    closed through the chain -- 1,2-dithiolane, not a substituted disulfane --
+    and naming it as a substituent would open the ring and cite it twice.
+    """
+
+    ligands: list[_ChainLigand] = []
+    covered = set(chain_set)
+    for branch_atoms in _connected_branches(mol, component_atoms - chain_set):
+        links = [
+            (chain_atom, atom)
+            for atom in sorted(branch_atoms)
+            for chain_atom in sorted(mol.get_neighbors(atom))
+            if chain_atom in chain_set
+        ]
+        if len(links) != 1:
+            return None
+        attachment, root = links[0]
+        bond = mol.get_bond(attachment, root)
+        if bond is None or bond.order != 1:
+            return None
+        name = _terminal_ligand_name(mol, root, attachment)
+        if not name:
+            if branch_namer is None:
+                return None
+            rendered = branch_namer(
+                mol, root, (set(mol.atoms) - component_atoms) | chain_set, upstream_atom=attachment
+            )
+            if isinstance(rendered, tuple):
+                rendered = rendered[0]
+            if not rendered:
+                return None
+            name = str(rendered)
+        covered.update(branch_atoms)
+        ligands.append(_ChainLigand(attachment, name, frozenset(branch_atoms), bond.idx))
+    if covered != component_atoms:
+        return None
+    return ligands
+
+
+def _connected_branches(mol: Molecule, atoms: set[int]) -> list[set[int]]:
+    """Split ``atoms`` into connected components, ignoring bonds outside the set."""
+
+    branches: list[set[int]] = []
+    seen: set[int] = set()
+    for start in sorted(atoms):
+        if start in seen:
+            continue
+        branch = {start}
+        seen.add(start)
+        stack = [start]
+        while stack:
+            for neighbor in mol.get_neighbors(stack.pop()):
+                if neighbor in atoms and neighbor not in seen:
+                    seen.add(neighbor)
+                    branch.add(neighbor)
+                    stack.append(neighbor)
+        branches.append(branch)
+    return branches
+
+
+def _locanted_ligand_prefix(items: list[tuple[int, str]]) -> str:
+    """Assemble ``1-ethyl-3-methyl`` from locant/name pairs."""
+
+    locants_by_name: dict[str, list[int]] = {}
+    for locant, name in items:
+        locants_by_name.setdefault(name, []).append(locant)
+    parts = []
+    for name in sorted(locants_by_name, key=substituent_sort_key):
+        locants = sorted(locants_by_name[name])
+        text = format_multiplier(name, len(locants))
+        parts.append(f"{','.join(str(locant) for locant in locants)}-{text}")
+    # A hyphen separates one locanted prefix from the next; the last one runs
+    # straight into the parent -- ``1-ethyl-3-methyltrisulfane``.
+    return "-".join(parts)
 
 
 def simple_central_parent_hydride_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
@@ -2075,6 +2193,12 @@ def _same_element_parent_name(symbol: str, length: int, bond_orders: list[int]) 
     parent = RULES.components.mononuclear_parent_hydrides.get(symbol, "")
     if not parent or length < 2 or not parent.endswith("ane"):
         return ""
+    # ``hydrazine`` is the retained preferred name; ``diazane`` describes the
+    # same chain but is only acceptable in general nomenclature.  Longer
+    # nitrogen chains have no retained name and stay ``triazane``.
+    retained = RULES.components.retained_homonuclear_chain_names.get(f"{symbol}{length}")
+    if retained and not any(order > 1 for order in bond_orders):
+        return retained
     base = f"{multipliers.basic(length)}{parent}"
     unsaturated = [order for order in bond_orders if order > 1]
     if not unsaturated:

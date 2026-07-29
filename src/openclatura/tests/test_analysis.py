@@ -1881,6 +1881,38 @@ def test_mixed_central_hydride_ligands_are_boundary_protected():
     assert name_smiles("CCOSCl") == "(chloro)(ethoxy)sulfane"
 
 
+def test_homonuclear_chain_parent_survives_a_ligand_bigger_than_methyl():
+    # The chalcogen chain outranks a carbon skeleton whatever hangs off it, so
+    # ethyl must not push the parent back onto the carbons the way it once did.
+    assert name_smiles("CCSSSC") == "1-ethyl-3-methyltrisulfane"
+    assert name_smiles("CCSSCC") == "1,2-diethyldisulfane"
+    assert name_smiles("CC(C)SSC") == "1-methyl-2-(propan-2-yl)disulfane"
+    assert name_smiles("c1ccccc1SSc1ccccc1") == "1,2-diphenyldisulfane"
+    assert name_smiles("CCNNCC") == "1,2-diethylhydrazine"
+
+
+def test_two_nitrogen_chain_uses_its_retained_name():
+    # `diazane` describes the same chain but only `hydrazine` is preferred.
+    # Longer nitrogen chains have no retained name and keep the `azane` stem.
+    assert name_smiles("CNNC") == "1,2-dimethylhydrazine"
+    assert name_smiles("CNNNC") == "1,3-dimethyltriazane"
+    assert name_smiles("CN=NC") == "1,2-dimethyldiazene"
+
+
+def test_a_parent_chain_is_not_also_cited_as_a_prefix_on_its_own_ligand():
+    # The diazene is the parent here, so the `diazenyl` prefix its atoms would
+    # otherwise contribute must not be cited inside the aryl ligand as well.
+    assert name_smiles("c1ccccc1N=N") == "1-phenyldiazene"
+    assert name_smiles("CC(C)c1ccc(N=N)cc1") == "1-(4-(propan-2-yl)phenyl)diazene"
+
+
+def test_homonuclear_chain_parent_keeps_a_ring_closed_through_the_chain():
+    # A branch bonded to the chain twice closes a ring; naming it as a
+    # substituent would open 1,2-dithiolane and cite its carbons twice.
+    assert name_smiles("C1CCSS1") == "1,2-dithiacyclopentane"
+    assert name_smiles("N1NCCC1") == "pyrazolidine"
+
+
 def test_oxoacid_esters_use_recursive_front_modifier_namer():
     ester = _halogen_oxoacid_ester_graph("Br", charged_oxo_o=2, carbon_count=1, central_charge=2)
     calls = []

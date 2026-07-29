@@ -221,7 +221,7 @@
   },
   {
     "smiles": "CN(C)C",
-    "name": "trimethyl-azane",
+    "name": "trimethylazane",
     "category": "amine"
   },
   {
@@ -346,7 +346,7 @@
   },
   {
     "smiles": "CSC",
-    "name": "dimethyl-sulfane",
+    "name": "dimethylsulfane",
     "category": "sulfide"
   },
   {
@@ -470,7 +470,7 @@
     "category": "aromatic"
   },
   {
-    "smiles": "c1ccc2c(c1)c1ccccc1n2",
+    "smiles": "c1ccc2c(c1)[nH]c1ccccc12",
     "name": "9H-carbazole",
     "category": "heterocycle"
   },

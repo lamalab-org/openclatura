@@ -118,6 +118,12 @@
       "Bi": "bismuthane"
     }
   },
+  "retained_homonuclear_chain_names": {
+    "bluebook_rule": "P-21.1.1 retained names for homonuclear chain parent hydrides",
+    "values": {
+      "N2": "hydrazine"
+    }
+  },
   "replacement_parent_oxoacid_specs": {
     "bluebook_rule": "P-13 replacement nomenclature; functional parent hydrides described by central atom and ligand counts",
     "values": [
