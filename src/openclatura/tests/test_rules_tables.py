@@ -140,3 +140,42 @@ def test_uncitable_added_hydrogen_keeps_the_von_baeyer_parent():
     name = name_smiles("N#CC[C@H](O)CNC(=O)c1c[nH]c2ccccc2c1=O")
     assert "quinoline" not in name
     assert "bicyclo[4.4.0]" in name
+
+
+def test_oxadiazoles_and_thiadiazoles_use_their_retained_names():
+    """Replacement nomenclature spelt these out as 1-thia-3,4-diazacyclopenta-
+    2,4-diene; Hantzsch-Widman retained names cover 5-rings, so they should not."""
+
+    from openclatura import name_smiles
+
+    cases = {
+        "c1cnno1": "1,2,3-oxadiazole",
+        "c1ncno1": "1,2,4-oxadiazole",
+        "c1nonc1": "1,2,5-oxadiazole",
+        "c1nnco1": "1,3,4-oxadiazole",
+        "c1cnns1": "1,2,3-thiadiazole",
+        "c1ncns1": "1,2,4-thiadiazole",
+        "c1nsnc1": "1,2,5-thiadiazole",
+        "c1nncs1": "1,3,4-thiadiazole",
+    }
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected, smiles
+
+    # The isomers must stay distinguishable once substituted: a symmetric gap
+    # multiset cannot separate 1,2,4- from 1,3,4-, which is what the chalcogen
+    # distance criterion is for.
+    assert name_smiles("Cc1nnc(C)s1") == "2,5-dimethyl-1,3,4-thiadiazole"
+    assert name_smiles("Cc1ncns1") == "5-methyl-1,2,4-thiadiazole"
+    assert name_smiles("Cc1nnc(-c2ccccc2)o1") == "2-methyl-5-phenyl-1,3,4-oxadiazole"
+
+
+def test_audit_models_every_retained_monocycle_the_namer_emits():
+    """A retained ring the audit has no template for abstains, so enabling one
+    without the matching template silently stops it being verified."""
+
+    from openclatura.audit.reconstruction import _ALL_PARENT_TEMPLATES
+    from openclatura.nomenclature import RULES
+
+    emitted = {spec["name"] for spec in RULES.retained.monocycle_specs}
+    missing = sorted(name for name in emitted if name not in _ALL_PARENT_TEMPLATES)
+    assert missing == []

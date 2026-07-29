@@ -941,6 +941,11 @@ def _match_data_monocycle_retained(
         expected_gaps = spec.get("hetero_gap_multiset")
         if expected_gaps is not None and _hetero_gap_multiset(mol, path) != sorted(expected_gaps):
             continue
+        expected_chalcogen = spec.get("chalcogen_nitrogen_distance_multiset")
+        if expected_chalcogen is not None and _chalcogen_nitrogen_distance_multiset(mol, path) != sorted(
+            expected_chalcogen
+        ):
+            continue
         return spec["name"]
     return None
 
@@ -1028,6 +1033,21 @@ def _hetero_distance_multiset(mol: Molecule, path: list[int]) -> list[int]:
     for left, right in itertools.combinations(hetero_indices, 2):
         distance = abs(left - right)
         distances.append(min(distance, size - distance))
+    return sorted(distances)
+
+
+def _chalcogen_nitrogen_distance_multiset(mol: Molecule, path: list[int]) -> list[int]:
+    """Ring distances from each chalcogen to each nitrogen.
+
+    The gap multiset is symmetric over all heteroatoms, so it cannot tell
+    1,2,4-oxadiazole from 1,3,4-oxadiazole -- both are gaps 1,2,2.  Measuring
+    from the chalcogen separates them: 1 and 2 against 2 and 2.
+    """
+
+    size = len(path)
+    chalcogens = [idx for idx, atom_idx in enumerate(path) if mol.atoms[atom_idx].symbol in {"O", "S"}]
+    nitrogens = [idx for idx, atom_idx in enumerate(path) if mol.atoms[atom_idx].symbol == "N"]
+    distances = [min(abs(left - right), size - abs(left - right)) for left in chalcogens for right in nitrogens]
     return sorted(distances)
 
 

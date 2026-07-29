@@ -179,9 +179,13 @@ _RING_STEMS: dict[str, tuple[str, list[str]]] = {
     "1,2,3-triazole": ("[nH]1nncc1", ["1", "2", "3", "4", "5"]),
     "1,2,4-triazole": ("[nH]1ncnc1", ["1", "2", "3", "4", "5"]),
     "tetrazole": ("[nH]1nnnc1", ["1", "2", "3", "4", "5"]),
+    "1,2,3-oxadiazole": ("o1nncc1", ["1", "2", "3", "4", "5"]),
     "1,2,4-oxadiazole": ("o1ncnc1", ["1", "2", "3", "4", "5"]),
+    "1,2,5-oxadiazole": ("o1nccn1", ["1", "2", "3", "4", "5"]),
     "1,3,4-oxadiazole": ("o1cnnc1", ["1", "2", "3", "4", "5"]),
+    "1,2,3-thiadiazole": ("s1nncc1", ["1", "2", "3", "4", "5"]),
     "1,2,4-thiadiazole": ("s1ncnc1", ["1", "2", "3", "4", "5"]),
+    "1,2,5-thiadiazole": ("s1nccn1", ["1", "2", "3", "4", "5"]),
     "1,3,4-thiadiazole": ("s1cnnc1", ["1", "2", "3", "4", "5"]),
     # benzo-fused five-membered heterocycles (labels 1,2,3,3a,4,5,6,7,7a)
     "indole": ("[nH]1ccc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
@@ -226,6 +230,7 @@ _RING_STEMS: dict[str, tuple[str, list[str]]] = {
     "1,2-oxazolidine": ("O1NCCC1", ["1", "2", "3", "4", "5"]),
     # six-membered triazines
     "1,3,5-triazine": ("n1cncnc1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,3-triazine": ("n1nnccc1", ["1", "2", "3", "4", "5", "6"]),
     "1,2,4-triazine": ("n1ncncc1", ["1", "2", "3", "4", "5", "6"]),
     # benzo-fused carbocycle / 2,3-dihydro azole (labels 1,2,3,3a,4,5,6,7,7a)
     "indoline": ("N1CCc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
