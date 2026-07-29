@@ -1583,24 +1583,6 @@
         "reason": "Contract explicit locanted vinyl substituent to ethenyl."
       },
       {
-        "pattern": "(ethenyl)",
-        "replacement": "ethenyl",
-        "category": "grammar",
-        "reason": "Remove unnecessary parentheses around simple ethenyl prefix."
-      },
-      {
-        "pattern": "(benzyl)",
-        "replacement": "benzyl",
-        "category": "grammar",
-        "reason": "Remove unnecessary parentheses around simple benzyl prefix."
-      },
-      {
-        "pattern": "(benzyloxy)",
-        "replacement": "benzyloxy",
-        "category": "grammar",
-        "reason": "Remove unnecessary parentheses around simple benzyloxy prefix."
-      },
-      {
         "pattern": "eth-1-yn-1-yl",
         "replacement": "ethynyl",
         "category": "retained_alias",
@@ -1623,6 +1605,24 @@
   "postprocess_regex_replacements": {
     "bluebook_rule": "Ordered regex post-processing replacements that are safe to apply before legacy post-processing",
     "values": [
+      {
+        "pattern": "(?<![)\\w])\\(benzyloxy\\)(?!\\()",
+        "replacement": "benzyloxy",
+        "category": "grammar",
+        "reason": "Remove unnecessary parentheses around a standalone benzyloxy prefix."
+      },
+      {
+        "pattern": "(?<![)\\w])\\(benzyl\\)(?!\\()",
+        "replacement": "benzyl",
+        "category": "grammar",
+        "reason": "Remove unnecessary parentheses around a standalone benzyl prefix."
+      },
+      {
+        "pattern": "(?<![)\\w])\\(ethenyl\\)(?!\\()",
+        "replacement": "ethenyl",
+        "category": "grammar",
+        "reason": "Remove unnecessary parentheses around a standalone ethenyl prefix."
+      },
       {
         "pattern": "\\b1-(formate|formamide|formic acid|formyl|formaldehyde|formonitrile)\\b",
         "replacement": "\\1",

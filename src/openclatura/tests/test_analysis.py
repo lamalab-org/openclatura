@@ -5720,3 +5720,17 @@ def test_ketone_amidinohydrazone_keeps_its_amidino_atoms():
     # An aldehyde keeps its suffix, and a senior group elsewhere still wins.
     assert name_smiles(r"Cc1cccc(Cl)c1/C=N\N=C(N)N") == "2-chloro-6-methylbenzene-1-carbaldehyde amidinohydrazone"
     assert name_smiles("NC(N)=NN=C(C)C") == "propan-2-one diaminomethylidenehydrazone"
+
+
+def test_enclosed_prefix_keeps_its_parentheses_beside_another_substituent():
+    # A blanket "(ethenyl) -> ethenyl" replacement dropped parentheses that
+    # were not spare: next to another enclosed substituent, removing them runs
+    # the two N-substituents together into one chained prefix.
+    assert (
+        name_smiles("C=CN(c1nncs1)C(=O)CCNC(=O)OC")
+        == "methyl ((3-oxo-3-((1,3,4-thiadiazol-2-yl)(ethenyl)amino)propyl)amino)formate"
+    )
+    # A standalone prefix still loses them.
+    assert name_smiles("C=Cc1ccccc1") == "ethenylbenzene"
+    assert name_smiles("C=CN(C)C(C)=O") == "N-ethenyl-N-methylacetamide"
+    assert name_smiles("OCc1ccccc1OCc1ccccc1") == "1-(2-benzyloxyphenyl)methanol"
