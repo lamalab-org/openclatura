@@ -492,6 +492,8 @@
       "ring_carboxylic_acid",
       "ester",
       "ring_carboxylate",
+      "peroxy_ester",
+      "ring_peroxy_ester",
       "amide",
       "ring_amide",
       "thioamide",

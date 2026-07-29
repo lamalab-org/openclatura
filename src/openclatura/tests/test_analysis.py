@@ -5677,3 +5677,14 @@ def test_azinic_acid_is_distinguished_from_a_nitro_group():
     assert name_smiles("CC=[N+]([O-])O") == "(ethylidene)azinic acid"
     assert name_smiles("c1ccccc1[N+](=O)[O-]") == "nitrobenzene"
     assert name_smiles("C[N+](=O)[O-]") == "nitromethane"
+
+
+def test_peroxy_ester_prefix_keeps_both_oxygens_and_its_carbon():
+    # "oxycarbonyl" spells one single-bonded oxygen and a peroxy ester has two,
+    # and the acyl carbon was left in the parent chain as well, so the prefix
+    # was an oxygen short and a carbon long.
+    assert name_smiles("OC(=O)CCC(=O)OOC") == "3-(methylperoxycarbonyl)propanoic acid"
+    assert name_smiles("COC(=O)CCC(=O)OOC(C)(C)C") == "methyl 3-((tert-butylperoxy)carbonyl)propanoate"
+    # The plain ester and the peroxy-ester suffix are both unaffected.
+    assert name_smiles("OC(=O)CCC(=O)OC") == "3-(methoxycarbonyl)propanoic acid"
+    assert name_smiles("CC(=O)OOC(C)(C)C") == "tert-butyl ethaneperoxoate"
