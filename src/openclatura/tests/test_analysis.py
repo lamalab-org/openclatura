@@ -1908,6 +1908,31 @@ def test_a_named_spiro_component_primes_its_replacement_prefixes():
     )
 
 
+def test_every_side_ring_substituent_survives_and_is_primed():
+    # The locant pattern matched only the first prefix, so the rest were left
+    # unprimed -- and a leading E/Z descriptor made it match nothing at all,
+    # dropping an entire butyl and butylidene from the name.
+    assert name_smiles("CCC/C=C1/N(CCCC)C(=O)NC12C(=O)N(C)c1ccccc12") == (
+        "1-methyl-1'-butyl-5'-butylidene-1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2'-one-2-one"
+    )
+    assert name_smiles("C=C1N(C)C(=O)NC12C(=O)N(C)c1ccccc12") == (
+        "1-methyl-1'-methyl-5'-methylidene-1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2'-one-2-one"
+    )
+
+
+def test_a_nested_substituents_own_locants_are_not_primed():
+    """Only top-level locants position a prefix on the side ring; the ones
+    inside a nested substituent number that substituent's own skeleton."""
+
+    from openclatura.assembly_spiro import extract_spiro_side_prefixes
+
+    prefixes, parent, _suffixes = extract_spiro_side_prefixes(
+        "1-((2,6-difluoro-3-methylphenyl)methyl)piperidine"
+    )
+    assert prefixes == ["1'-((2,6-difluoro-3-methylphenyl)methyl)"]
+    assert parent == "piperidine"
+
+
 def test_a_counted_spiro_keeps_its_replacement_prefixes_unprimed():
     # spiro[4.4] numbers the whole system once, so nothing is primed -- and a
     # name holding both spiro forms must prime only the component-named one.

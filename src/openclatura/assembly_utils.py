@@ -14,6 +14,9 @@ def parse_locant(locant):
     return (2, 0.0, text)
 
 
+_STEREO_DESCRIPTOR_START = re.compile(r"\(\d+[A-Za-z']*(?:[RS]|[EZ])(?:,\d+[A-Za-z']*(?:[RS]|[EZ]))*\)")
+
+
 def needs_hyphen(left: str, right: str) -> bool:
     if not left or not right:
         return False
@@ -23,6 +26,9 @@ def needs_hyphen(left: str, right: str) -> bool:
         or right.startswith("N-")
         or right.startswith("N',")
         or right.startswith("N'-")
+        # A stereo descriptor opening the right-hand side is a separate
+        # italicised element and takes a hyphen: `1-methyl-(5'E)-1'-butyl…`.
+        or _STEREO_DESCRIPTOR_START.match(right)
     ):
         return True
     if left[-1].isdigit():

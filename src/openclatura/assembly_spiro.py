@@ -287,13 +287,52 @@ def extract_spiro_side_prefixes(side_name: str) -> tuple[list[str], str, tuple[t
         prefix_text = normalized[: -len(parent)].rstrip("-")
     elif normalized != parent and normalized.endswith(parent):
         prefix_text = normalized[: -len(parent)].rstrip("-")
-    prefix_text = re.sub(r"^\((?:\d+[A-Za-z']*[RS](?:,\d+[A-Za-z']*[RS])*)\)-?", "", prefix_text)
-    match = re.match(r"^([0-9,]+)-(.+)$", prefix_text)
-    if not match:
+    # A stereo descriptor here can be E/Z as readily as R/S.  Matching only the
+    # latter left `(5E)-` in front of the locants, the locant pattern below then
+    # failed, and every prefix was dropped -- an entire butyl and butylidene
+    # vanished from the name rather than merely losing their primes.
+    # The side ring's stereo descriptor is dropped here rather than carried.
+    # Re-emitting it inline placed it in the middle of the assembled name --
+    # `...-7-(pyrimidin-4-yl)-(3'S)-1'-methylspiro[...` -- which reads back as a
+    # different molecule.  It belongs at the front of the whole name, which this
+    # string-level renderer cannot reach, so a missing descriptor is preferred
+    # to a misplaced one.
+    prefix_text = re.sub(r"^\((?:\d+[A-Za-z']*(?:[RS]|[EZ])(?:,\d+[A-Za-z']*(?:[RS]|[EZ]))*)\)-?", "", prefix_text)
+    if not prefix_text:
         return [], _spiro_side_parent_name(parent), tuple(side_suffixes)
-    locants, substituent = match.groups()
-    primed_locants = ",".join(f"{loc}'" for loc in locants.split(","))
-    return [f"{primed_locants}-{substituent}"], _spiro_side_parent_name(parent), tuple(side_suffixes)
+    return [_prime_side_prefix_locants(prefix_text)], _spiro_side_parent_name(parent), tuple(side_suffixes)
+
+
+# Fragments that follow a digit *inside* a substituent name -- `but-2-en-1-yl`
+# -- rather than after a locant that introduces one.  Everything else beginning
+# a hyphen-separated segment after a number is a fresh prefix at that locant.
+_WITHIN_NAME_AFTER_LOCANT = ("en", "yn", "yl", "ylidene", "ylidyne", "ol", "one", "al", "amine", "oic", "carbo")
+
+
+def _prime_side_prefix_locants(prefix_text: str) -> str:
+    """Prime every locant that introduces a side-ring prefix, and only those.
+
+    The side ring is the primed component, so each of its substituent locants
+    carries a prime.  Priming only the first left the rest reading as the other
+    ring's positions.
+    """
+
+    segments = prefix_text.split("-")
+    depth = 0
+    for index, segment in enumerate(segments):
+        # Only locants at the top level position a prefix on the side ring.
+        # Inside a nested substituent -- `(2,6-difluoro-3-methylphenyl)` -- they
+        # number that substituent's own skeleton and must be left alone.
+        opening, closing = segment.count("("), segment.count(")")
+        was_nested = depth > 0
+        depth += opening - closing
+        if was_nested or depth > 0 or not re.fullmatch(r"[0-9,]+", segment):
+            continue
+        following = segments[index + 1] if index + 1 < len(segments) else ""
+        if following.startswith(_WITHIN_NAME_AFTER_LOCANT):
+            continue
+        segments[index] = ",".join(f"{locant}'" for locant in segment.split(","))
+    return "-".join(segments)
 
 
 def _extract_side_suffixes(side_name: str) -> tuple[str, list[tuple[str, str]]]:
