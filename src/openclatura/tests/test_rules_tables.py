@@ -76,3 +76,43 @@ def test_audit_parsers_share_the_canonical_tables():
 
     assert reconstruction._REPLACEMENT_ELEMENTS is elements.SYMBOLS_BY_HW_STEM
     assert von_baeyer_parse._REPLACEMENT_ELEMENTS is elements.SYMBOLS_BY_HW_STEM
+
+
+def test_audit_models_every_retained_fused_parent_the_namer_emits():
+    """The audit abstains on any retained parent it has no template for, so a
+    parent enabled for production without one silently stops being verified."""
+
+    from openclatura.audit.reconstruction import _ALL_PARENT_TEMPLATES
+    from openclatura.retained_fused_production import PRODUCTION_RETAINED_FUSED_PARENTS
+
+    missing = sorted(name for name in PRODUCTION_RETAINED_FUSED_PARENTS if name not in _ALL_PARENT_TEMPLATES)
+    assert missing == []
+
+
+def test_retained_fused_audit_templates_match_their_graph_templates():
+    """Each audit template is a hand-copied projection of the graph template the
+    namer matches against.  Rebuild the graph from the copy and compare, so the
+    two cannot drift apart."""
+
+    from rdkit import Chem
+
+    from openclatura.audit.reconstruction import _RETAINED_FUSED_PARENT_TEMPLATES
+    from openclatura.retained_fused_templates import retained_fused_graph_templates
+
+    templates = {template.name: template for template in retained_fused_graph_templates(include_disabled=True)}
+    for name, (smiles, labels) in sorted(_RETAINED_FUSED_PARENT_TEMPLATES.items()):
+        template = templates[name]
+        frag = Chem.MolFromSmiles(smiles)
+        assert frag is not None, f"{name}: template SMILES does not parse"
+        assert frag.GetNumAtoms() == len(labels), f"{name}: {len(labels)} labels for {frag.GetNumAtoms()} atoms"
+
+        by_locant = {label: index for index, label in enumerate(labels)}
+        assert by_locant.keys() == {atom.locant for atom in template.atoms}, f"{name}: locant sets differ"
+        for atom in template.atoms:
+            assert frag.GetAtomWithIdx(by_locant[atom.locant]).GetSymbol() == atom.symbol, f"{name}: {atom.locant}"
+
+        expected_bonds = {frozenset(bond.locants) for bond in template.bonds}
+        actual_bonds = {
+            frozenset((labels[bond.GetBeginAtomIdx()], labels[bond.GetEndAtomIdx()])) for bond in frag.GetBonds()
+        }
+        assert actual_bonds == expected_bonds, f"{name}: bonds differ"
