@@ -155,18 +155,59 @@ def _reprime_side_prefixes(prefixes: tuple[str, ...], prime: str) -> list[str]:
 
 
 def _prime_replacement_prefixes_for_primed_component(core_name: str, prefixes: list[str]) -> list[str]:
-    if "spiro[cyclopropane-" not in core_name:
+    """Prime replacement prefixes that describe the side ring.
+
+    The side component is always the primed one, and these prefixes are always
+    the side ring's, so the priming does not depend on which ring it happens to
+    be.  Guarding on ``spiro[cyclopropane-`` meant every other side ring kept
+    unprimed locants: spiro[indoline-3,4'-cyclopentane] carrying two ring
+    nitrogens came out as ``1,3-diaza`` and read back with the nitrogens on the
+    indoline instead.
+    """
+
+    if not _spiro_names_its_components(core_name):
         return prefixes
     return [
-        re.sub(r"^([0-9,]+)-(oxa|aza|thia)$", lambda match: f"{match.group(1)}'-{match.group(2)}", prefix)
+        re.sub(
+            r"^([0-9,]+)-((?:di|tri|tetra|penta)?(?:oxa|aza|thia|selena|tellura|phospha|sila|bora|germa|stanna))$",
+            lambda match: f"{','.join(f'{locant}' + chr(39) for locant in match.group(1).split(','))}-{match.group(2)}",
+            prefix,
+        )
         for prefix in prefixes
     ]
 
 
 def _prime_inline_replacement_prefixes_for_primed_component(core_name: str) -> str:
-    if "spiro[cyclopropane-" not in core_name:
-        return core_name
-    return re.sub(r"(^|-)([0-9,]+)-(oxa|aza|thia)spiro\[", r"\1\2'-\3spiro[", core_name)
+    """Prime a replacement prefix that ended up in front of the spiro core."""
+
+    # A name can hold both spiro forms at once, so the test has to be made
+    # against the bracket this prefix actually sits in front of rather than
+    # against the whole name: 6-azaspiro[3.3]heptane keeps unprimed locants
+    # even when a spiro[indoline-3,1'-cyclohexane] appears elsewhere in it.
+    def prime(match: re.Match) -> str:
+        if "'" not in match.group(4):
+            return match.group(0)
+        locants = ",".join(f"{locant}'" for locant in match.group(2).split(","))
+        return f"{match.group(1)}{locants}-{match.group(3)}spiro[{match.group(4)}"
+
+    return re.sub(
+        r"(^|-)([0-9,]+)-((?:di|tri|tetra|penta)?(?:oxa|aza|thia|selena|tellura|phospha|sila|bora|germa|stanna))"
+        r"spiro\[([^\]]*)",
+        prime,
+        core_name,
+    )
+
+
+def _spiro_names_its_components(core_name: str) -> bool:
+    """Whether the spiro descriptor names its rings rather than counting them.
+
+    ``spiro[indoline-3,4'-cyclopentane]`` numbers each component separately and
+    primes the second, so a side-ring replacement prefix is primed with it.
+    ``6,8-diazaspiro[4.4]nonane`` numbers the whole system once and its
+    prefixes must stay unprimed.  The prime inside the bracket tells them
+    apart."""
+
+    return bool(re.search(r"spiro\[[^\]]*'", core_name))
 
 
 def _prime_side_suffixes(suffixes: tuple[tuple[str, str], ...], prime: str) -> list[tuple[str, str]]:

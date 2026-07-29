@@ -1899,6 +1899,25 @@ def test_two_nitrogen_chain_uses_its_retained_name():
     assert name_smiles("CN=NC") == "1,2-dimethyldiazene"
 
 
+def test_a_named_spiro_component_primes_its_replacement_prefixes():
+    # The side ring is the primed component, so its heteroatom locants are
+    # primed too.  Unprimed, they read back on the other ring entirely.
+    assert name_smiles("N1CC2(C3=CC=CC=C13)NCNC2") == "1',3'-diazaspiro[indoline-3,4'-cyclopentane]"
+    assert name_smiles("O=C1NC2(CN1)c1ccccc1NC2=O") == (
+        "1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2'-one-2-one"
+    )
+
+
+def test_a_counted_spiro_keeps_its_replacement_prefixes_unprimed():
+    # spiro[4.4] numbers the whole system once, so nothing is primed -- and a
+    # name holding both spiro forms must prime only the component-named one.
+    assert name_smiles("C1CC2(CC1)NCNC2") == "6,8-diazaspiro[4.4]nonane"
+    assert name_smiles("C1CC2(CC1)OCCO2") == "6,9-dioxaspiro[4.4]nonane"
+    both = name_smiles("Cc1noc(C2CC3(C2)CN(C2CCC4(CC2)C(=O)Nc2ccccc24)C3)n1")
+    assert "6-azaspiro[3.3]heptan" in both
+    assert "spiro[indoline-3,1'-cyclohexane]" in both
+
+
 def test_homonuclear_chain_names_are_reconstructed_by_the_audit():
     """A shortcut returns before the usual audit point, so it must hand over a
     plan or its name can never be checked.  Corrupting the plan must refute."""
