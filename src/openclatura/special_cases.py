@@ -15,7 +15,7 @@ from .nitrogen_roles import azine_roles
 from .nomenclature import RULES
 from .oxoacid_roles import CentralOxoRole, OxoLigandRole, central_oxo_roles
 from .oxoacid_templates import OxoacidTemplateKind, oxoacid_role_template
-from .perception import PerceivedGroup
+from .perception import PerceivedGroup, perceive_groups
 from .retained_specs import retained_parent_spec
 from .rules import multipliers, retained, stems
 
@@ -1953,12 +1953,24 @@ def homonuclear_chain_parent_result(
     backbone = [idx for idx in component_atoms if mol.atoms[idx].symbol == symbol]
     if len(backbone) < 2:
         return None
-    if any(mol.atoms[idx].symbol not in {symbol, "C", "F", "Cl", "Br", "I"} for idx in component_atoms):
-        return None
     chain = _ordered_backbone_chain(mol, backbone)
     if chain is None:
         return None
     chain_set = set(chain)
+    # A charged backbone belongs to a different parent class -- an azoxy group,
+    # a diazonium -- that carries its charge in its own name.  Spelling
+    # N=[N+]([O-]) as a plain diazene loses that.
+    if any(mol.atoms[idx].charge for idx in chain):
+        return None
+    # A principal characteristic group decides the parent, so a ligand carrying
+    # one keeps its own skeleton as the parent and this chain becomes a prefix:
+    # OCCNN=NN is an ethanol, not a substituted tetraazene.  The chain's own
+    # atoms are perceived as amines and do not count against it.
+    if any(
+        group.is_principal_candidate and (set(group.atoms_involved) & component_atoms) - chain_set
+        for group in perceive_groups(mol)
+    ):
+        return None
     forward_orders = [mol.get_bond(chain[idx], chain[idx + 1]).order for idx in range(len(chain) - 1)]
     ligands = _homonuclear_chain_ligands(mol, component_atoms, chain_set, branch_namer)
     if ligands is None:
@@ -2052,9 +2064,19 @@ def _homonuclear_chain_ligands(
             return None
         attachment, root = links[0]
         bond = mol.get_bond(attachment, root)
-        if bond is None or bond.order != 1:
+        if bond is None or bond.order not in (1, 2):
             return None
-        name = _terminal_ligand_name(mol, root, attachment)
+        # A doubly bonded ligand is an ylidene, and only the recursive namer
+        # spells one.  Rejecting it cost the tetraazene parent its whole
+        # molecule: C=N-N=N-N fell back to a carbon skeleton that dropped the
+        # C=N bond, where the parent is `...methylidene)tetraaz-2-ene`.
+        #
+        # Only a chain longer than two takes one.  A carbon doubly bonded to a
+        # two-nitrogen chain is a diazo group or a hydrazone, both of which own
+        # their nitrogens already and say so better than this parent would.
+        if bond.order == 2 and len(chain_set) <= 2:
+            return None
+        name = "" if bond.order == 2 else _terminal_ligand_name(mol, root, attachment)
         if not name:
             if branch_namer is None:
                 return None
@@ -2066,6 +2088,8 @@ def _homonuclear_chain_ligands(
             if not rendered:
                 return None
             name = str(rendered)
+        if bond.order == 2 and not strip_outer_parentheses(name).endswith("ylidene"):
+            return None
         covered.update(branch_atoms)
         ligands.append(_ChainLigand(attachment, name, frozenset(branch_atoms), bond.idx))
     if covered != component_atoms:

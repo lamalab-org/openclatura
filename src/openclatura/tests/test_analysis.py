@@ -1899,6 +1899,33 @@ def test_two_nitrogen_chain_uses_its_retained_name():
     assert name_smiles("CN=NC") == "1,2-dimethyldiazene"
 
 
+def test_a_charge_separated_chalcogenido_is_not_a_hydride():
+    # `sulfanyl` spells an S-H; a terminal [S-] on a positive centre has none,
+    # so the charge-separated form must name as its neutral equivalent.
+    assert name_smiles("CO[P+](=S)[S-]") == name_smiles("COP(=S)=S") == "((dithioxophosphanyl)oxy)methane"
+    # An ordinary thiolate keeps its charge -- the centre beside it is neutral.
+    assert name_smiles("CC[S-]") == "ethane-1-thiolate"
+    assert name_smiles("C[N+](C)(C)CC[S-]") == "2-(trimethylammonio)ethane-1-thiolate"
+
+
+def test_tetraazene_parent_takes_an_ylidene_ligand():
+    # A doubly bonded carbon on the chain is an ylidene; rejecting it dropped
+    # the C=N bond and named a carbon skeleton instead.
+    assert name_smiles("NN=NN") == "tetraaz-2-ene"
+    assert name_smiles("C/C=N/N=NN") == "1-((1E)-ethylidene)tetraaz-2-ene"
+
+
+def test_a_short_or_charged_nitrogen_chain_leaves_its_own_group_alone():
+    # Diazo, hydrazone and azoxy each own their nitrogens and name them better
+    # than a bare chain parent would.
+    assert name_smiles("[N-]=[N+]=C1CCc2ccccc21") == "1-(diazo)indane"
+    assert name_smiles("COc1ccc(N=[N+]([O-])c2ccccc2)cc1") == (
+        "N-((4-methoxyphenyl)imino)-N-oxidobenzen-1-aminium"
+    )
+    # A principal group outside the chain keeps its own parent and suffix.
+    assert name_smiles("OCCNN=NN") == "2-(hydrazonohydrazinyl)ethanol"
+
+
 def test_substituted_imino_on_a_ring_centre_keeps_its_double_bond():
     # The amine catch-all ignores bond order, so a substituted =N on a ring P
     # or S used to become an `-amine` suffix and the double bond vanished.

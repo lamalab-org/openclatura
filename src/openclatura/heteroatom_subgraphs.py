@@ -80,6 +80,21 @@ def first_substituent_neighbor(mol: Molecule, center_idx: int, excluded: set[int
     return None
 
 
+def _is_charge_normalized_chalcogenido(mol: Molecule, center_idx: int | None, ligand_idx: int) -> bool:
+    """Whether a terminal anionic ligand is a double bond drawn charge-separated."""
+
+    if center_idx is None or mol.atoms[center_idx].charge <= 0:
+        return False
+    bond = mol.get_bond(center_idx, ligand_idx)
+    return (
+        bond is not None
+        and bond.order == 1
+        and mol.atoms[ligand_idx].charge < 0
+        and mol.degree(ligand_idx) == 1
+        and mol.atoms[ligand_idx].total_h_count == 0
+    )
+
+
 def _has_at_most_one_further_ligand(mol: Molecule, center_idx: int, excluded: set[int]) -> bool:
     """Whether ``center_idx`` keeps at most one ligand once ``excluded`` is spent."""
 
@@ -688,7 +703,14 @@ def name_sulfur_subgraph(
     if not next_atoms:
         if not is_double and mol.atoms[start_idx].charge > 0:
             return f"{stereo_prefix_text}sulfaniumyl"
-        return "thioxo" if is_double else f"{stereo_prefix_text}{unsubstituted_prefix('S') or 'sulfanyl'}"
+        # `sulfanyl` spells an S-H.  A terminal [S-] on a positively charged
+        # centre has no hydrogen -- it is the charge-separated way of drawing a
+        # double bond, exactly as [O-] on the same centre is an oxo -- so
+        # O[P+](=S)[S-] must not come out as a `(sulfanyl)(thioxo)phosphanyl`
+        # that reads back with a phosphorus hydride.
+        if is_double or _is_charge_normalized_chalcogenido(mol, upstream_atom, start_idx):
+            return "thioxo"
+        return f"{stereo_prefix_text}{unsubstituted_prefix('S') or 'sulfanyl'}"
 
     if len(next_atoms) == 1:
         branch = _branch_name_text(branch_namer, mol, next_atoms[0], exclude_atoms | {start_idx}, start_idx)
