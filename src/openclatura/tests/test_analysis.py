@@ -5688,3 +5688,19 @@ def test_peroxy_ester_prefix_keeps_both_oxygens_and_its_carbon():
     # The plain ester and the peroxy-ester suffix are both unaffected.
     assert name_smiles("OC(=O)CCC(=O)OC") == "3-(methoxycarbonyl)propanoic acid"
     assert name_smiles("CC(=O)OOC(C)(C)C") == "tert-butyl ethaneperoxoate"
+
+
+def test_acyl_with_a_competing_acid_does_not_take_the_amido_rewrite():
+    # The acyl is re-named by capping it with a hydroxyl and rewriting the acid
+    # suffix.  A glutamyl residue keeps a free side-chain acid, which outranks
+    # the cap and takes the suffix instead, so the rewrite amidated the wrong
+    # carbon: Glu-Leu came out as 2-aminopentanediamido, a diamide.
+    glu_leu = name_smiles("CC(C)CC(NC(=O)C(N)CCC(=O)O)C(=O)O")
+    assert "diamido" not in glu_leu
+    assert glu_leu == "2-(1-amino-4-hydroxy-4-oxobutylcarbonylamino)-4-methylpentanoic acid"
+
+    # An acid the chain cannot reach does not compete, so the amido spelling
+    # survives wherever it is sound.
+    assert name_smiles("CC(=O)NCC(=O)O") == "2-acetamidoacetic acid"
+    assert name_smiles("c1ccccc1C(=O)NCC(=O)O") == "2-benzamidoacetic acid"
+    assert name_smiles("CC(N)C(=O)NCC(=O)O") == "2-(2-aminopropanamido)acetic acid"

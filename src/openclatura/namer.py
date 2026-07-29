@@ -1164,9 +1164,21 @@ def _simple_rooted_carbanion_substituent_name(
     return f"{side_stem}ylmethanidyl"
 
 
+_MULTI_ACID_ENDINGS = tuple(
+    f"{multiplier}{stem}"
+    for multiplier in ("di", "tri", "tetra")
+    for stem in ("oic acid", "carboxylic acid")
+)
+
+
 def _carboxylic_acid_to_amido(acid_name: str) -> str | None:
     """Convert a carboxylic-acid component name to its N-acyl (amido) substituent form."""
 
+    # Only the acid this nitrogen replaced becomes the amide.  Rewriting the
+    # suffix of a diacid amidates both of them, which is how glutamate's free
+    # side-chain acid turned into `2-aminopentanediamido`.
+    if acid_name.endswith(_MULTI_ACID_ENDINGS):
+        return None
     for ending, replacement in (("carboxylic acid", "carboxamido"), ("oic acid", "amido"), ("ic acid", "amido")):
         if acid_name.endswith(ending):
             return acid_name[: -len(ending)] + replacement
@@ -1193,6 +1205,47 @@ def _format_n_locant_prefix(names: list[str]) -> str:
             mult = multipliers.complex_(k) if is_complex_prefix(name) else multipliers.basic(k)
             parts.append(f"{locants}-{mult}{display}")
     return "-".join(parts)
+
+
+def _is_carboxylic_acid_carbon(mol: Molecule, idx: int) -> bool:
+    """Whether ``idx`` is a carbon bearing both an oxo and a hydroxy oxygen."""
+
+    if not mol.atoms[idx].is_carbon:
+        return False
+    oxo = hydroxy = False
+    for neighbor in mol.get_neighbors(idx):
+        if mol.atoms[neighbor].symbol != "O":
+            continue
+        bond = mol.get_bond(idx, neighbor)
+        if bond is None:
+            continue
+        if bond.order == 2:
+            oxo = True
+        elif bond.order == 1 and mol.degree(neighbor) == 1:
+            hydroxy = True
+    return oxo and hydroxy
+
+
+def _competing_acid_reachable(mol: Molecule, acyl_c: int, acid_atoms: set[int]) -> bool:
+    """Whether another acid group could outrank the one at ``acyl_c``.
+
+    Only an acid the parent chain can reach competes for the suffix, and a
+    chain does not cross an ether oxygen -- an acid behind one stays a
+    substituent prefix and leaves the amido rewrite sound.
+    """
+
+    seen = {acyl_c}
+    stack = [acyl_c]
+    while stack:
+        current = stack.pop()
+        for neighbor in mol.get_neighbors(current):
+            if neighbor in seen or neighbor not in acid_atoms:
+                continue
+            if mol.atoms[neighbor].symbol == "O" and mol.degree(neighbor) > 1:
+                continue
+            seen.add(neighbor)
+            stack.append(neighbor)
+    return any(_is_carboxylic_acid_carbon(mol, idx) for idx in seen if idx != acyl_c)
 
 
 def _acylamino_amido_prefix(
@@ -1248,6 +1301,15 @@ def _acylamino_amido_prefix(
             continue
         acid_atoms.add(cur)
         stack.extend(nb for nb in mol.get_neighbors(cur) if nb not in acid_atoms and nb not in blocked)
+
+    # The acyl is re-named by capping it with a hydroxyl and rewriting the acid
+    # suffix, which only works when that hydroxyl is the acid the name is built
+    # on.  Another acid group in the fragment can outrank it and take the
+    # suffix instead, and the rewrite then amidates the wrong carbon: a
+    # glutamyl residue kept its free side-chain acid, so Glu-Leu came out as
+    # `2-aminopentanediamido` and the tripeptides transposed two residues.
+    if _competing_acid_reachable(mol, acyl_c, acid_atoms):
+        return None
 
     acid_mol = Molecule()
     for idx in acid_atoms:
