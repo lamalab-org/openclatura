@@ -4064,6 +4064,32 @@ def test_retained_fused_derivative_gate_uses_template_locants_for_opsin_safe_cla
         assert name_smiles(smiles) == expected
 
 
+def test_retained_fused_ring_keeps_its_name_as_a_substituent_prefix():
+    """A retained ring is retained wherever it lands.  The gate used to run only
+    over a *parent*, so the very same quinoline spelt as a prefix fell back to
+    von Baeyer (``2-azabicyclo[4.4.0]deca-1,3,5,7,9-pentaen-9-yl``)."""
+
+    cases = {
+        "OCc1ccc2cccnc2c1": "1-(quinolin-7-yl)methanol",
+        "OCc1ccnc2ccccc12": "1-(quinolin-4-yl)methanol",
+        "OCCc1ccc2cccnc2c1": "2-(quinolin-7-yl)ethanol",
+        "OCc1ccc2nccnc2c1": "1-(quinoxalin-6-yl)methanol",
+        "OCc1ccc2nnccc2c1": "1-(cinnolin-6-yl)methanol",
+        "OCc1ccc2ncccc2n1": "1-(1,5-naphthyridin-2-yl)methanol",
+        "OCc1ccc2[nH]c3ccccc3c2c1": "1-(9H-carbazol-3-yl)methanol",
+        "OCc1ccc2Oc3ccccc3Cc2c1": "1-(9H-xanthen-2-yl)methanol",
+        "OCc1ccc2cc3ccccc3nc2c1": "1-(acridin-3-yl)methanol",
+        # a substituted ring substituent, and one carrying a second one
+        "CPC(I)c1ccc2cccnc2c1": "7-(iodo(methylphosphanyl)methyl)quinoline",
+        "c1cc2c(nc(CPC(I)c3ccc4cccnc4c3)cc2)cc1": (
+            "2-(((iodo(quinolin-7-yl)methyl)phosphanyl)methyl)quinoline"
+        ),
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
 def test_retained_fused_graph_template_rejects_incomplete_locant_maps():
     row = _naphthalene_graph_template_row()
     row["template"]["atoms"] = row["template"]["atoms"][:-1]

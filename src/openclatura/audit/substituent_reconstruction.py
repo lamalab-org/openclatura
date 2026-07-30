@@ -247,6 +247,51 @@ _RING_STEMS: dict[str, tuple[str, list[str]]] = {
     "adamantane": ("C12CC3CC(CC(C1)C3)C2", ["1", "2", "3", "4", "5", "6", "7", "8", "10", "9"]),
 }
 
+# Retained *fused* ring systems the stems above do not cover.  The namer emits
+# each of these both as a parent (``phenazin-2-ol``) and, since it names a ring
+# substituent from the same retained table, as a ``-yl`` prefix
+# (``(phenazin-2-yl)methanol``), so one table serves both.  Each entry is a
+# hand-copied projection of the graph template the namer matches
+# against (`retained_fused_graph_templates`), so the locants below are the
+# template's own -- they are not in ascending order, and need not be: the lookup
+# pairs each label with the SMILES atom at the same position.  Parents whose
+# pyrrole-type N-H can sit on more than one nitrogen (7H-/9H-purine) carry it at
+# the first position their aliases cite; `move_indicated_hydrogen` relocates it
+# when the name asks for the other tautomer.
+# fmt: off
+_RETAINED_FUSED_RING_STEMS: dict[str, tuple[str, list[str]]] = {
+    "1,10-phenanthroline": ("c1cnc2c(c1)ccc1cccnc12", ["3", "2", "1", "10b", "4a", "4", "5", "6", "6a", "7", "8", "9", "10", "10a"]),
+    "1,4-phenanthroline": ("c1ccc2c(c1)ccc1nccnc12", ["8", "9", "10", "10a", "6a", "7", "6", "5", "4a", "4", "3", "2", "1", "10b"]),
+    "1,5-naphthyridine": ("c1cnc2cccnc2c1", ["3", "2", "1", "8a", "8", "7", "6", "5", "4a", "4"]),
+    "1,5-phenanthroline": ("c1ccc2c(c1)cnc1cccnc12", ["8", "9", "10", "10a", "6a", "7", "6", "5", "4a", "4", "3", "2", "1", "10b"]),
+    "1,6-naphthyridine": ("c1cnc2ccncc2c1", ["3", "2", "1", "8a", "8", "7", "6", "5", "4a", "4"]),
+    "1,6-phenanthroline": ("c1cnc2c(c1)cnc1ccccc12", ["3", "2", "1", "10b", "4a", "4", "5", "6", "6a", "7", "8", "9", "10", "10a"]),
+    "1,7-naphthyridine": ("c1cnc2cnccc2c1", ["3", "2", "1", "8a", "8", "7", "6", "5", "4a", "4"]),
+    "1,7-phenanthroline": ("c1cnc2c(c1)ccc1ncccc12", ["3", "2", "1", "10b", "4a", "4", "5", "6", "6a", "7", "8", "9", "10", "10a"]),
+    "1,8-naphthyridine": ("c1cnc2ncccc2c1", ["3", "2", "1", "8a", "8", "7", "6", "5", "4a", "4"]),
+    "1,8-phenanthroline": ("c1cnc2c(c1)ccc1cnccc12", ["3", "2", "1", "10b", "4a", "4", "5", "6", "6a", "7", "8", "9", "10", "10a"]),
+    "1,9-phenanthroline": ("c1cnc2c(c1)ccc1ccncc12", ["3", "2", "1", "10b", "4a", "4", "5", "6", "6a", "7", "8", "9", "10", "10a"]),
+    "2,6-naphthyridine": ("c1cc2cnccc2cn1", ["3", "4", "4a", "5", "6", "7", "8", "8a", "1", "2"]),
+    "2,7-naphthyridine": ("c1cc2ccncc2cn1", ["3", "4", "4a", "5", "6", "7", "8", "8a", "1", "2"]),
+    "2,7-phenanthroline": ("c1cnc2ccc3ccncc3c2c1", ["9", "8", "7", "6a", "6", "5", "4a", "4", "3", "2", "1", "10b", "10a", "10"]),
+    "2,8-phenanthroline": ("c1cc2c(ccc3ccncc32)cn1", ["9", "10", "10a", "6a", "6", "5", "4a", "4", "3", "2", "1", "10b", "7", "8"]),
+    "3,5-phenanthroline": ("c1ccc2c(c1)cnc1cnccc12", ["8", "9", "10", "10a", "6a", "7", "6", "5", "4a", "4", "3", "2", "1", "10b"]),
+    "3,6-phenanthroline": ("c1ccc2c(c1)ncc1cnccc12", ["8", "9", "10", "10a", "6a", "7", "6", "5", "4a", "4", "3", "2", "1", "10b"]),
+    "4,5-phenanthroline": ("c1ccc2c(c1)cnc1ncccc12", ["8", "9", "10", "10a", "6a", "7", "6", "5", "4a", "4", "3", "2", "1", "10b"]),
+    "acridine": ("c1ccc2nc3ccccc3cc2c1", ["2", "3", "4", "4a", "10", "10a", "5", "6", "7", "8", "8a", "9", "9a", "1"]),
+    "carbazole": ("c1ccc2c(c1)[nH]c1ccccc12", ["2", "3", "4", "4a", "9a", "1", "9", "8a", "8", "7", "6", "5", "4b"]),
+    "cinnoline": ("c1ccc2nnccc2c1", ["6", "7", "8", "8a", "1", "2", "3", "4", "4a", "5"]),
+    "phenazine": ("c1ccc2nc3ccccc3nc2c1", ["3", "2", "1", "10a", "10", "9a", "9", "8", "7", "6", "5a", "5", "4a", "4"]),
+    "phthalazine": ("c1ccc2cnncc2c1", ["6", "7", "8", "8a", "1", "2", "3", "4", "4a", "5"]),
+    "purine": ("c1ncc2[nH]cnc2n1", ["2", "1", "6", "5", "7", "8", "9", "4", "3"]),
+    "xanthene": ("c1ccc2c(c1)Cc1ccccc1O2", ["2", "3", "4", "4a", "9a", "1", "9", "8a", "8", "7", "6", "5", "10a", "10"]),
+}
+# fmt: on
+
+# Folded in so the ``-yl`` lookups below reach them; kept as their own table
+# because the parent side and the graph-template drift check both cite it.
+_RING_STEMS.update(_RETAINED_FUSED_RING_STEMS)
+
 # Retained "-o" substituent aliases -> canonical ring-yl form.
 _RING_ALIASES: dict[str, str] = {
     "morpholino": "morpholin-4-yl",
@@ -284,6 +329,12 @@ def move_indicated_hydrogen(rw: Chem.RWMol, locants: dict[str, int], position) -
     if target is None:
         return False
     destination = rw.GetAtomWithIdx(target)
+    if _saturated_ring_centre_is_sole(rw, destination):
+        # A mancude ring whose one saturated position is a carbon (9H-xanthene)
+        # cites that carbon, and the template already carries it there — there is
+        # no N-H to move.  Being the ring's only such centre makes the citation
+        # unambiguous: there is no second position the name could have meant.
+        return True
     if destination.GetAtomicNum() != 7:
         return False
     donors = [a for a in rw.GetAtoms() if a.GetAtomicNum() == 7 and a.GetNumExplicitHs() == 1]
@@ -297,6 +348,20 @@ def move_indicated_hydrogen(rw: Chem.RWMol, locants: dict[str, int], position) -
     destination.SetNumExplicitHs(1)
     destination.SetNoImplicit(True)
     return True
+
+
+def _saturated_ring_centre_is_sole(rw: Chem.RWMol, destination: Chem.Atom) -> bool:
+    """Whether ``destination`` is the template's only hydrogen-bearing saturated
+    ring carbon — the position an ``nH`` citation on such a ring must mean."""
+
+    if destination.GetAtomicNum() != 6 or destination.GetIsAromatic():
+        return False
+    saturated = [
+        atom
+        for atom in rw.GetAtoms()
+        if atom.GetAtomicNum() == 6 and not atom.GetIsAromatic() and atom.IsInRing() and atom.GetTotalNumHs() > 0
+    ]
+    return len(saturated) == 1 and saturated[0].GetIdx() == destination.GetIdx()
 
 
 def resolve_fragment_mol(name: str) -> Chem.Mol | None:
@@ -797,11 +862,19 @@ def _hub_ligands(head: str) -> list[Chem.Mol] | None:
         if lead is not None and all(g.startswith("(") for g in groups[1:]) and all(rest):
             return [lead] * lead_count + rest
         return None
-    if len(groups) != 1 or groups[0].startswith("("):
+    if len(groups) != 1:
         # A mixed list such as ``((…)oxy)ethenyl`` is ambiguous — the leading
         # parenthesised clause could be a sibling ligand on the hub or a modifier
         # of what follows it — so abstain rather than pick one reading.
         return None
+    if groups[0].startswith("("):
+        # One clause, enclosed and covering the whole head: nothing follows it
+        # inside the head, so it can only be the hub's single ligand —
+        # ``((iodo(quinolin-7-yl)methyl)phosphanyl)`` is that carbon on the P.
+        # The enclosure is itself the namer's mark that the ligand is complex;
+        # a simple one is spelt bare (``methylphosphanyl``) and read below.
+        inner = resolve_fragment_mol(groups[0])
+        return None if inner is None else [inner]
     inner = resolve_fragment_mol(base)
     return None if inner is None else [inner] * count
 
@@ -1609,11 +1682,36 @@ def _apply_unlocanted_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: st
         count, body = _multiplied_ligand(prefix)
     frag = resolve_fragment_mol(body)
     if frag is None:
-        return _apply_leaf_run(rw, locants, prefix)
+        return _apply_leaf_run(rw, locants, prefix) or _apply_leaf_led_sibling_run(rw, locants, prefix)
     for _ in range(count):
         if not _graft_onto(rw, locants["1"], frag):
             return False
     return True
+
+
+def _apply_leaf_led_sibling_run(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
+    """Graft a leaf run followed by parenthesised ligands, all onto position 1 —
+    ``iodo(methylphosphanyl)methyl`` is an iodine *and* a phosphanyl on the same
+    carbon.
+
+    Only a *leading* leaf run is read this way.  A leaf hosts no ligands of its
+    own, so nothing that follows it can be its argument and the pieces can only
+    be siblings; a leaf run *after* a parenthesised group is instead left to
+    :func:`_apply_prefix`, which has to weigh it against the reading where the
+    trailing text is an operator absorbing the group before it.
+    """
+
+    groups = _top_level_groups(prefix)
+    if len(groups) < 2 or groups[0].startswith("("):
+        return False
+    if not all(group.startswith("(") for group in groups[1:]):
+        return False
+    frags = [resolve_fragment_mol(group) for group in groups[1:]]
+    if any(frag is None for frag in frags):
+        return False
+    if not _apply_leaf_run(rw, locants, groups[0]):
+        return False
+    return all(_graft_onto(rw, locants["1"], frag) for frag in frags)
 
 
 def _split_leaf_run(prefix: str) -> list[tuple[int, str]] | None:

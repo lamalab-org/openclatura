@@ -40,8 +40,14 @@ def production_retained_fused_parent(
     perceived_groups: list[PerceivedGroup],
     principal_key: str | None,
     substituent_mapping: dict[int, list[SubstituentItem]],
+    attachment_atom: int | None = None,
 ) -> ProductionRetainedFusedParent | None:
-    """Return retained fused parent data only for verified derivative classes."""
+    """Return retained fused parent data only for verified derivative classes.
+
+    ``attachment_atom`` is the ring atom a substituent prefix hangs from; it is
+    a feature locant just like a substituted position, so the retained map has
+    to be able to cite it (``quinolin-7-yl``, never a fusion locant).
+    """
 
     parent_atoms = set(parent_path)
     if not _neutral_component(mol, component_atoms):
@@ -56,6 +62,8 @@ def production_retained_fused_parent(
         return None
 
     feature_atoms = set(substituent_mapping)
+    if attachment_atom is not None:
+        feature_atoms.add(attachment_atom)
     for group in perceived_groups:
         if group.attachment_carbon in parent_atoms:
             feature_atoms.add(group.attachment_carbon)

@@ -89,6 +89,23 @@ def test_audit_models_every_retained_fused_parent_the_namer_emits():
     assert missing == []
 
 
+def test_audit_models_every_retained_fused_ring_as_a_substituent():
+    """The namer names a ring substituent from the same retained table it uses for
+    a parent, so every production parent also has to resolve as a ``-yl`` prefix
+    — otherwise the audit abstains on names it used to confirm as von Baeyer."""
+
+    from openclatura.audit.substituent_reconstruction import _RING_STEMS, _match_ring_stem, _ring_yl
+    from openclatura.retained_fused_production import PRODUCTION_RETAINED_FUSED_PARENTS
+
+    for name in sorted(PRODUCTION_RETAINED_FUSED_PARENTS):
+        stem = name[:-1] if name.endswith("e") else name
+        assert _match_ring_stem(stem) == name, name
+        _smiles, labels = _RING_STEMS[name]
+        for locant in labels:
+            if locant.isdigit():
+                assert _ring_yl(stem, locant) is not None, f"{stem}-{locant}-yl"
+
+
 def test_retained_fused_audit_templates_match_their_graph_templates():
     """Each audit template is a hand-copied projection of the graph template the
     namer matches against.  Rebuild the graph from the copy and compare, so the
@@ -96,11 +113,11 @@ def test_retained_fused_audit_templates_match_their_graph_templates():
 
     from rdkit import Chem
 
-    from openclatura.audit.reconstruction import _RETAINED_FUSED_PARENT_TEMPLATES
+    from openclatura.audit.substituent_reconstruction import _RETAINED_FUSED_RING_STEMS
     from openclatura.retained_fused_templates import retained_fused_graph_templates
 
     templates = {template.name: template for template in retained_fused_graph_templates(include_disabled=True)}
-    for name, (smiles, labels) in sorted(_RETAINED_FUSED_PARENT_TEMPLATES.items()):
+    for name, (smiles, labels) in sorted(_RETAINED_FUSED_RING_STEMS.items()):
         template = templates[name]
         frag = Chem.MolFromSmiles(smiles)
         assert frag is not None, f"{name}: template SMILES does not parse"

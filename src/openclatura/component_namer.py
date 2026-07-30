@@ -9,7 +9,6 @@ from .assembly_parts import (
     UnsaturationItem,
     split_rendered_substituent_name,
 )
-from .rules import elements as _elements
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
 from .component_group_rules import (
     exclude_nonparent_group_atoms,
@@ -34,6 +33,7 @@ from .principal_groups import (
     partition_principal_and_prefix_groups,
 )
 from .retained_fused_production import production_retained_fused_parent
+from .rules import elements as _elements
 from .special_cases import (
     single_atom_component_name,
     structural_replacement_parent_result,

@@ -148,50 +148,12 @@ _PARENT_RING_TEMPLATES: dict[str, tuple[str, list[str]]] = {
     "tetrahydropyran": ("O1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
 }
 
-# Retained *fused* parents the namer can emit but the ring-stem templates do not
-# cover.  Each entry is derived from the same graph template the namer matches
-# against (`retained_fused_graph_templates`), so the locants below are the
-# template's own -- they are not in ascending order, and need not be: the lookup
-# pairs each label with the SMILES atom at the same position.  Parents whose
-# pyrrole-type N-H can sit on more than one nitrogen (7H-/9H-purine) carry it at
-# the first position their aliases cite; `move_indicated_hydrogen` relocates it
-# when the name asks for the other tautomer.
-_RETAINED_FUSED_PARENT_TEMPLATES: dict[str, tuple[str, list[str]]] = {
-    "1,10-phenanthroline": ("c1cnc2c(c1)ccc1cccnc12", ["3", "2", "1", "10b", "4a", "4", "5", "6", "6a", "7", "8", "9", "10", "10a"]),
-    "1,4-phenanthroline": ("c1ccc2c(c1)ccc1nccnc12", ["8", "9", "10", "10a", "6a", "7", "6", "5", "4a", "4", "3", "2", "1", "10b"]),
-    "1,5-naphthyridine": ("c1cnc2cccnc2c1", ["3", "2", "1", "8a", "8", "7", "6", "5", "4a", "4"]),
-    "1,5-phenanthroline": ("c1ccc2c(c1)cnc1cccnc12", ["8", "9", "10", "10a", "6a", "7", "6", "5", "4a", "4", "3", "2", "1", "10b"]),
-    "1,6-naphthyridine": ("c1cnc2ccncc2c1", ["3", "2", "1", "8a", "8", "7", "6", "5", "4a", "4"]),
-    "1,6-phenanthroline": ("c1cnc2c(c1)cnc1ccccc12", ["3", "2", "1", "10b", "4a", "4", "5", "6", "6a", "7", "8", "9", "10", "10a"]),
-    "1,7-naphthyridine": ("c1cnc2cnccc2c1", ["3", "2", "1", "8a", "8", "7", "6", "5", "4a", "4"]),
-    "1,7-phenanthroline": ("c1cnc2c(c1)ccc1ncccc12", ["3", "2", "1", "10b", "4a", "4", "5", "6", "6a", "7", "8", "9", "10", "10a"]),
-    "1,8-naphthyridine": ("c1cnc2ncccc2c1", ["3", "2", "1", "8a", "8", "7", "6", "5", "4a", "4"]),
-    "1,8-phenanthroline": ("c1cnc2c(c1)ccc1cnccc12", ["3", "2", "1", "10b", "4a", "4", "5", "6", "6a", "7", "8", "9", "10", "10a"]),
-    "1,9-phenanthroline": ("c1cnc2c(c1)ccc1ccncc12", ["3", "2", "1", "10b", "4a", "4", "5", "6", "6a", "7", "8", "9", "10", "10a"]),
-    "2,6-naphthyridine": ("c1cc2cnccc2cn1", ["3", "4", "4a", "5", "6", "7", "8", "8a", "1", "2"]),
-    "2,7-naphthyridine": ("c1cc2ccncc2cn1", ["3", "4", "4a", "5", "6", "7", "8", "8a", "1", "2"]),
-    "2,7-phenanthroline": ("c1cnc2ccc3ccncc3c2c1", ["9", "8", "7", "6a", "6", "5", "4a", "4", "3", "2", "1", "10b", "10a", "10"]),
-    "2,8-phenanthroline": ("c1cc2c(ccc3ccncc32)cn1", ["9", "10", "10a", "6a", "6", "5", "4a", "4", "3", "2", "1", "10b", "7", "8"]),
-    "3,5-phenanthroline": ("c1ccc2c(c1)cnc1cnccc12", ["8", "9", "10", "10a", "6a", "7", "6", "5", "4a", "4", "3", "2", "1", "10b"]),
-    "3,6-phenanthroline": ("c1ccc2c(c1)ncc1cnccc12", ["8", "9", "10", "10a", "6a", "7", "6", "5", "4a", "4", "3", "2", "1", "10b"]),
-    "4,5-phenanthroline": ("c1ccc2c(c1)cnc1ncccc12", ["8", "9", "10", "10a", "6a", "7", "6", "5", "4a", "4", "3", "2", "1", "10b"]),
-    "acridine": ("c1ccc2nc3ccccc3cc2c1", ["2", "3", "4", "4a", "10", "10a", "5", "6", "7", "8", "8a", "9", "9a", "1"]),
-    "carbazole": ("c1ccc2c(c1)[nH]c1ccccc12", ["2", "3", "4", "4a", "9a", "1", "9", "8a", "8", "7", "6", "5", "4b"]),
-    "cinnoline": ("c1ccc2nnccc2c1", ["6", "7", "8", "8a", "1", "2", "3", "4", "4a", "5"]),
-    "phenazine": ("c1ccc2nc3ccccc3nc2c1", ["3", "2", "1", "10a", "10", "9a", "9", "8", "7", "6", "5a", "5", "4a", "4"]),
-    "phthalazine": ("c1ccc2cnncc2c1", ["6", "7", "8", "8a", "1", "2", "3", "4", "4a", "5"]),
-    "purine": ("c1ncc2[nH]cnc2n1", ["2", "1", "6", "5", "7", "8", "9", "4", "3"]),
-    "xanthene": ("c1ccc2c(c1)Cc1ccccc1O2", ["2", "3", "4", "4a", "9a", "1", "9", "8a", "8", "7", "6", "5", "10a", "10"]),
-}
-
-
 # Retained parents reuse the (OPSIN-validated) substituent ring-stem templates —
 # same SMILES and IUPAC locant labels — so fused retained parents (naphthalene,
 # indole, quinoline, benzothiazole …) reconstruct too.  Parent-specific entries
 # win on any key overlap.
 _ALL_PARENT_TEMPLATES: dict[str, tuple[str, list[str]]] = {
     **_SUBSTITUENT_RING_STEMS,
-    **_RETAINED_FUSED_PARENT_TEMPLATES,
     **_PARENT_RING_TEMPLATES,
 }
 

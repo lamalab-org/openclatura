@@ -24,17 +24,18 @@ from .formatting import (
     is_composite_prefix,
     strip_outer_parentheses,
 )
+from .functional_prefixes import PREFIX_HANDLERS, PrefixContext
 from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
 from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
 from .name_assembly import NameAssemblyResult, token_span_trace_data
 from .naming_context import NamingIntent
-from .functional_prefixes import PREFIX_HANDLERS, PrefixContext
 from .nomenclature import RULES
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
 from .parent_selection import select_principal_parent
 from .perception import PerceivedGroup, perceive_groups
+from .retained_fused_production import production_retained_fused_parent
 from .rules import elision, multipliers, stems
 from .spiro_assembly import SpiroAssembly
 from .subgraph_tools import (
@@ -1516,6 +1517,25 @@ def name_subgraph(
         sub_exclude,
         emit_metadata=emit_metadata,
     )
+    # A retained ring is retained wherever it lands: the same gate that lets
+    # quinoline be a parent lets it be a prefix, so ``quinolin-7-yl`` is spelt
+    # out rather than falling back to the von Baeyer name of the same ring.  A
+    # substituent has no principal group, and its attachment atom is passed in
+    # as one more locant the retained map has to be able to cite.
+    retained_parent_metadata = None
+    retained_fused = production_retained_fused_parent(
+        mol,
+        parent_selection.primary_path,
+        component,
+        sub_perceived,
+        None,
+        subst_mapping,
+        attachment_atom=start_idx,
+    )
+    if retained_fused is not None:
+        retained_name_val = retained_fused.name
+        locant_maps = retained_fused.locant_maps
+        retained_parent_metadata = retained_fused.metadata
     parent_plan = build_parent_assembly_plan(
         mol,
         parent_selection,
@@ -1527,6 +1547,7 @@ def name_subgraph(
         subst_mapping,
         locant_maps,
         retained_name_val,
+        retained_parent_metadata,
     )
     numbered_path = parent_plan.numbered_path
     get_loc = parent_plan.get_loc

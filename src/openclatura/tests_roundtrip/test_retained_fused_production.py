@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import shutil
+import tempfile
 import warnings
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from itertools import combinations
+from pathlib import Path
 from random import Random
 
 import pytest
@@ -95,13 +97,18 @@ def _require_opsin() -> None:
 
 def _opsin(names: list[str], output_format: str = "SMILES") -> list[str]:
     _require_opsin()
-    # py2opsin 2.9 splits batched CML at newlines instead of at molecules.
-    # Single-name calls preserve each XML document intact.
-    if output_format == "CML":
-        return [py2opsin.py2opsin(name, output_format=output_format) for name in names]
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message=r".*OPSIN raised the following error.*", category=RuntimeWarning)
-        return list(py2opsin.py2opsin(names, output_format=output_format))
+    # py2opsin defaults its scratch file to a fixed name in the working
+    # directory, so anything else calling OPSIN at the same time reads back the
+    # wrong structures.  Every call gets its own path.
+    with tempfile.TemporaryDirectory(prefix="openclatura_opsin_") as tmpdir:
+        tmp_fpath = str(Path(tmpdir) / "input.txt")
+        # py2opsin 2.9 splits batched CML at newlines instead of at molecules.
+        # Single-name calls preserve each XML document intact.
+        if output_format == "CML":
+            return [py2opsin.py2opsin(name, output_format=output_format, tmp_fpath=tmp_fpath) for name in names]
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=r".*OPSIN raised the following error.*", category=RuntimeWarning)
+            return list(py2opsin.py2opsin(names, output_format=output_format, tmp_fpath=tmp_fpath))
 
 
 def _cml_plan(cml: str) -> tuple[dict[str, str], set[frozenset[str]], set[str]]:
