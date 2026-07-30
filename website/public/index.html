@@ -68,6 +68,103 @@
     padding: .08rem .45rem;
   }
   .version-tag:empty { display: none; }
+  /* The chip doubles as the stable/beta switcher once a channel is known. */
+  .channel-switch { position: relative; display: none; }
+  .channel-switch.on { display: inline-block; }
+  .version-tag.button {
+    background: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    line-height: 1.5;
+  }
+  .version-tag.button:hover { border-color: var(--accent); color: var(--accent); }
+  .version-tag.beta { border-color: var(--accent); color: var(--accent); }
+  .channel-menu {
+    position: absolute;
+    top: calc(100% + .3rem);
+    left: 0;
+    z-index: 30;
+    min-width: 15rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+    padding: .3rem;
+    display: none;
+  }
+  .channel-menu.open { display: block; }
+  .channel-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 0;
+    padding: .45rem .55rem;
+    font: inherit;
+    font-size: .82rem;
+    cursor: pointer;
+    color: inherit;
+  }
+  .channel-menu button:hover:not(:disabled) { background: var(--chip); }
+  .channel-menu button:disabled { cursor: default; opacity: .75; }
+  .channel-menu .sub {
+    display: block;
+    color: var(--muted);
+    font-size: .74rem;
+    margin-top: .1rem;
+  }
+  .beta-banner {
+    display: none;
+    max-width: 86rem;
+    margin: 0 auto;
+    padding: .5rem 1.25rem;
+    font-size: .8rem;
+    color: var(--accent);
+  }
+  .beta-banner.on { display: block; }
+  .beta-banner button {
+    background: none;
+    border: 0;
+    padding: 0;
+    font: inherit;
+    color: var(--muted);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  /* Unlock screen shown on the beta host until a session cookie exists. */
+  .gate-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(15, 18, 20, .55);
+    padding: 1.25rem;
+    overflow: auto;
+  }
+  .gate-backdrop.on { display: flex; align-items: center; justify-content: center; }
+  .gate {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    max-width: 27rem;
+    width: 100%;
+    padding: 1.4rem 1.5rem;
+  }
+  .gate h2 { margin: 0 0 .5rem; font-size: 1.05rem; }
+  .gate p { margin: 0 0 .9rem; color: var(--muted); font-size: .84rem; line-height: 1.55; }
+  .gate input {
+    width: 100%;
+    box-sizing: border-box;
+    font: inherit;
+    font-size: .9rem;
+    padding: .5rem .6rem;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: inherit;
+  }
+  .gate .row { display: flex; gap: .5rem; margin-top: .7rem; flex-wrap: wrap; }
+  .gate .msg { margin: .7rem 0 0; font-size: .82rem; }
+  .gate .msg.err { color: var(--err); }
   header p {
     margin: .3rem 0 0;
     max-width: 46rem;
@@ -245,6 +342,13 @@
     user-select: none;
   }
   .verify-toggle .hint { color: var(--muted); font-size: .78rem; }
+  .cache-note {
+    margin: .45rem 0 0 1.6rem;
+    color: var(--muted);
+    font-size: .76rem;
+    line-height: 1.5;
+    max-width: 48rem;
+  }
   .verify-badge {
     display: none;
     width: fit-content;
@@ -310,9 +414,35 @@
   <div class="header-row">
     <h1><span>openclatura</span> molecule namer</h1>
     <span class="version-tag" id="app-version" title="openclatura package version"></span>
+    <span class="channel-switch" id="channel-switch">
+      <button class="version-tag button" id="channel-button" aria-haspopup="true" aria-expanded="false"></button>
+      <div class="channel-menu" id="channel-menu" role="menu"></div>
+    </span>
   </div>
   <p>Draw a molecule below and it is named with deterministic IUPAC Blue Book (2013) rules.</p>
 </header>
+
+<div class="beta-banner" id="beta-banner">
+  You are on the beta build — unreleased code, expect rough edges.
+  <button id="beta-signout" type="button">Sign out</button>
+</div>
+
+<div class="gate-backdrop" id="beta-gate">
+  <form class="gate" id="beta-gate-form">
+    <h2>openclatura beta</h2>
+    <p>
+      This build runs unreleased code and is open to a small list of testers.
+      Enter your email and, if you are on the list, you'll get a sign-in link
+      that unlocks this browser for 30 days.
+    </p>
+    <input type="email" id="beta-email" placeholder="you@example.org" autocomplete="email" required>
+    <div class="row">
+      <button class="primary" id="beta-send" type="submit">Email me a link</button>
+      <button type="button" id="beta-leave">Back to the stable site</button>
+    </div>
+    <p class="msg" id="beta-msg" hidden></p>
+  </form>
+</div>
 
 <main>
   <section class="card">
@@ -347,6 +477,17 @@
       <input type="checkbox" id="opsin-toggle" checked>
       Verify with OPSIN <span class="hint">— parse the name back to a structure (py2opsin) and compare with your drawing</span>
     </label>
+    <label class="verify-toggle">
+      <input type="checkbox" id="nocache-toggle">
+      Don't cache my structures <span class="hint">— skip storing results for the molecules you draw</span>
+    </label>
+    <p class="cache-note">
+      Because naming is fully deterministic, we store each result under a hash of the
+      structure so a molecule that has already been named comes back instantly. That
+      cache exists only to make the site fast — the structures are never analysed,
+      shared, sold, or used for training, and nothing about you is stored alongside
+      them. Tick the box to opt out and your drawings will not be written to it.
+    </p>
     <div id="explain"></div>
   </section>
 </main>
@@ -595,7 +736,12 @@
     fetch("/api/name", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ smiles: smiles, include_trace: true, verify_opsin: verify })
+      body: JSON.stringify({
+        smiles: smiles,
+        include_trace: true,
+        verify_opsin: verify,
+        no_cache: noCache()
+      })
     })
       .then(function (r) {
         if (!r.ok) throw new Error("API error (HTTP " + r.status + ")");
@@ -659,6 +805,24 @@
     if (currentSmiles) requestName(currentSmiles);
   });
 
+  // Cache opt-out. Remembered locally (in this browser only) so the choice
+  // survives reloads; storage can throw in private modes, so it's best-effort.
+  var NOCACHE_KEY = "openclatura:no-cache";
+
+  function noCache() {
+    return el("nocache-toggle").checked;
+  }
+
+  try {
+    el("nocache-toggle").checked = localStorage.getItem(NOCACHE_KEY) === "1";
+  } catch (e) { /* keep the default (caching on) */ }
+
+  el("nocache-toggle").addEventListener("change", function () {
+    try {
+      localStorage.setItem(NOCACHE_KEY, noCache() ? "1" : "0");
+    } catch (e) { /* preference just won't persist */ }
+  });
+
   el("btn-copy").addEventListener("click", function () {
     if (!currentName) return;
     navigator.clipboard.writeText(currentName).then(function () {
@@ -679,7 +843,7 @@
     var describeReq = fetch("/api/describe", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ smiles: currentSmiles })
+      body: JSON.stringify({ smiles: currentSmiles, no_cache: noCache() })
     }).then(function (r) {
       if (!r.ok) throw new Error("API error (HTTP " + r.status + ")");
       return r.json();
@@ -688,7 +852,7 @@
     var depictReq = fetch("/api/depict", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ smiles: currentSmiles })
+      body: JSON.stringify({ smiles: currentSmiles, no_cache: noCache() })
     }).then(function (r) { return r.ok ? r.json() : null; })
       .catch(function () { return null; });
     Promise.all([describeReq, depictReq])
@@ -735,16 +899,184 @@
       });
   });
 
+  // ---- Release channel -----------------------------------------------------
+  // Two deployments of this page exist: stable (a PyPI release) and beta (built
+  // from a git branch, testers only). /api/healthz reports which one answered
+  // and where the other lives, and the version chip becomes the switcher.
+  function renderChannel(d) {
+    var isBeta = d.channel === "beta";
+    var label = appVersion || "unknown";
+    if (isBeta) label += " · beta" + (d.git_ref ? " (" + d.git_ref + ")" : "");
+    var button = el("channel-button");
+    button.textContent = label + " ▾";
+    button.className = "version-tag button" + (isBeta ? " beta" : "");
+    button.title = isBeta
+      ? "Running the beta build" + (d.git_ref ? " from the " + d.git_ref + " branch" : "")
+      : "Running the released openclatura " + (d.version || "");
+
+    var other = isBeta ? d.stable_url : d.beta_url;
+    var menu = el("channel-menu");
+    menu.innerHTML = "";
+
+    function addItem(title, sub, target) {
+      var item = document.createElement("button");
+      item.type = "button";
+      item.setAttribute("role", "menuitem");
+      item.appendChild(document.createTextNode(title));
+      var hint = document.createElement("span");
+      hint.className = "sub";
+      hint.textContent = sub;
+      item.appendChild(hint);
+      if (target) {
+        item.addEventListener("click", function () { window.location.href = target; });
+      } else {
+        item.disabled = true;
+      }
+      menu.appendChild(item);
+    }
+
+    addItem(
+      (isBeta ? "Stable" : "✓ Stable") + (d.channel === "stable" && d.version ? " — v" + d.version : ""),
+      "The published release.",
+      isBeta ? (other || null) : null
+    );
+    addItem(
+      (isBeta ? "✓ Beta" : "Beta") + (isBeta && d.git_ref ? " — " + d.git_ref : ""),
+      "Unreleased build, testers only.",
+      isBeta ? null : (other || null)
+    );
+
+    // With no counterpart URL configured there is nothing to switch to, so keep
+    // the plain, non-interactive version tag instead of a dead menu.
+    if (!other) {
+      el("app-version").textContent = label;
+      return;
+    }
+    el("channel-switch").classList.add("on");
+    if (isBeta) el("beta-banner").classList.add("on");
+  }
+
+  el("channel-button").addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    var menu = el("channel-menu");
+    var open = menu.classList.toggle("open");
+    el("channel-button").setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  document.addEventListener("click", function () {
+    el("channel-menu").classList.remove("open");
+    el("channel-button").setAttribute("aria-expanded", "false");
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") el("channel-menu").classList.remove("open");
+  });
+
   fetch("/api/healthz")
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) {
-      if (d && d.version) {
+      if (!d) return;
+      if (d.version) {
         appVersion = "v" + d.version;
-        el("app-version").textContent = appVersion;
         updateIssueLink();
       }
+      renderChannel(d);
+      if (d.channel === "beta") initBetaGate(d);
     })
     .catch(function () { /* version tag stays hidden */ });
+
+  // ---- Beta access ---------------------------------------------------------
+  // The beta API is gated on an email allowlist: request a link, click it, and
+  // the token in the URL is exchanged for a session cookie. The page itself is
+  // public (it gives nothing away) — only the API refuses unauthorized calls.
+  function setGateMessage(text, isError) {
+    var node = el("beta-msg");
+    node.textContent = text;
+    node.className = "msg" + (isError ? " err" : "");
+    node.hidden = !text;
+  }
+
+  function initBetaGate(health) {
+    el("beta-leave").style.display = health.stable_url ? "" : "none";
+    el("beta-leave").addEventListener("click", function () {
+      window.location.href = health.stable_url || "/";
+    });
+    var params = new URLSearchParams(window.location.search);
+    var token = params.get("beta_token");
+    if (token) {
+      // Drop the token from the URL and history before anything else can log it.
+      params.delete("beta_token");
+      var rest = params.toString();
+      window.history.replaceState({}, "", window.location.pathname + (rest ? "?" + rest : ""));
+      fetch("/api/beta/verify", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ token: token })
+      })
+        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
+        .then(function (res) {
+          if (res.ok && res.data.ok) {
+            closeGate();
+          } else {
+            openGate(res.data.error || "This link is invalid or has expired.");
+          }
+        })
+        .catch(function () { openGate("Could not verify the link. Try again."); });
+      return;
+    }
+    fetch("/api/beta/status")
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        if (d && d.authorized) return;
+        openGate(d && !d.configured ? "Beta sign-in is not configured on this deployment." : "");
+      })
+      .catch(function () { openGate(""); });
+  }
+
+  function openGate(message) {
+    el("beta-gate").classList.add("on");
+    setGateMessage(message || "", !!message);
+    el("beta-email").focus();
+  }
+
+  function closeGate() {
+    el("beta-gate").classList.remove("on");
+    setGateMessage("");
+    // The eager warmup on page load was rejected while locked; redo it now.
+    fetch("/api/warmup").catch(function () {});
+  }
+
+  el("beta-gate-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var email = el("beta-email").value.trim();
+    if (!email) return;
+    var send = el("beta-send");
+    send.disabled = true;
+    setGateMessage("Sending…");
+    fetch("/api/beta/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: email })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        send.disabled = false;
+        if (d.ok) {
+          // Deliberately identical whether or not the address is allowlisted.
+          setGateMessage("If " + email + " is on the tester list, a sign-in link is on its way. It expires in 30 minutes.");
+        } else {
+          setGateMessage(d.error || "Could not send the link.", true);
+        }
+      })
+      .catch(function () {
+        send.disabled = false;
+        setGateMessage("Could not reach the server. Try again.", true);
+      });
+  });
+
+  el("beta-signout").addEventListener("click", function () {
+    fetch("/api/beta/logout", { method: "POST" })
+      .then(function () { window.location.reload(); })
+      .catch(function () { window.location.reload(); });
+  });
 
   el("examples").addEventListener("click", function (ev) {
     var smiles = ev.target && ev.target.getAttribute("data-smiles");

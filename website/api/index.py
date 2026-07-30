@@ -6,7 +6,15 @@ so the openclatura FastAPI app is mounted under ``/api``:
 - POST /api/name      (supports ``verify_opsin`` for OPSIN round-trip)
 - POST /api/batch
 - POST /api/describe
-- GET  /api/healthz
+- GET  /api/healthz   (also reports the release channel)
+
+On the beta channel (``CHANNEL=beta``) every /api route except healthz sits
+behind an email allowlist, served by:
+
+- POST /api/beta/login   (mail a sign-in link)
+- POST /api/beta/verify  (exchange the link for a session cookie)
+- POST /api/beta/logout
+- GET  /api/beta/status
 
 The Vercel Python runtime ships no Java, which py2opsin needs for OPSIN
 verification. A jlink-minimized JRE (java.base, java.xml, java.logging,
@@ -16,6 +24,7 @@ start; its ``bin`` is prepended to ``PATH`` before openclatura checks
 ``shutil.which("java")``.
 """
 
+import base64
 import ctypes
 import dataclasses
 import hashlib
@@ -96,7 +105,8 @@ _ensure_java()
 # on Vercel only /tmp is writable.
 os.chdir(tempfile.gettempdir())
 
-from fastapi import FastAPI  # noqa: E402
+from fastapi import FastAPI, Request  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
 from pydantic import BaseModel, Field  # noqa: E402
 from rdkit import Chem  # noqa: E402
 
@@ -115,6 +125,212 @@ from openclatura.web.app import create_app  # noqa: E402
 app = FastAPI()
 
 # ---------------------------------------------------------------------------
+# Release channel.
+#
+# The openclatura version is fixed at build time by requirements.txt, so one
+# deployment serves exactly one version. Two Vercel projects share this code:
+#
+#   stable  CHANNEL unset (or "stable"), requirements.txt pins a PyPI release.
+#   beta    CHANNEL=beta, requirements.txt installs from a git ref, and the
+#           whole API is behind the email allowlist below.
+#
+# Each side advertises the other's URL via BETA_URL / STABLE_URL so the version
+# chip in the header can offer the switch. BETA_GIT_REF is display-only: a git
+# install reports the same version string as the release it branched from, so
+# the ref is what actually tells you which build you are looking at.
+# ---------------------------------------------------------------------------
+_CHANNEL = (os.environ.get("CHANNEL") or "stable").strip().lower()
+_IS_BETA = _CHANNEL == "beta"
+_BETA_URL = (os.environ.get("BETA_URL") or "").rstrip("/")
+_STABLE_URL = (os.environ.get("STABLE_URL") or "").rstrip("/")
+_BETA_GIT_REF = os.environ.get("BETA_GIT_REF") or ""
+
+# ---------------------------------------------------------------------------
+# Beta access control: an email allowlist plus emailed magic links.
+#
+# BETA_ALLOWED_EMAILS is a comma/whitespace-separated list. A visitor enters an
+# email; if it is on the list we mail a short-lived signed link, which the page
+# exchanges for a signed 30-day session cookie. No shared password exists, so
+# revoking access is just editing the env var (existing cookies die with the
+# secret if you also rotate BETA_SESSION_SECRET).
+#
+# Required on the beta project: BETA_ALLOWED_EMAILS, BETA_SESSION_SECRET,
+# RESEND_API_KEY, BETA_EMAIL_FROM. Without them beta stays locked, which is the
+# safe direction to fail.
+# ---------------------------------------------------------------------------
+_BETA_SECRET = os.environ.get("BETA_SESSION_SECRET") or ""
+_BETA_COOKIE = "openclatura_beta"
+_BETA_LINK_TTL = 30 * 60
+_BETA_SESSION_TTL = 30 * 24 * 3600
+_RESEND_KEY = os.environ.get("RESEND_API_KEY") or ""
+_BETA_EMAIL_FROM = os.environ.get("BETA_EMAIL_FROM") or ""
+
+
+def _beta_allowlist() -> set[str]:
+    raw = os.environ.get("BETA_ALLOWED_EMAILS") or ""
+    return {part.strip().lower() for part in re.split(r"[,\s]+", raw) if part.strip()}
+
+
+def _b64u(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode().rstrip("=")
+
+
+def _b64u_decode(text: str) -> bytes:
+    return base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
+
+
+def _beta_sign(purpose: str, email: str, expires_at: int) -> str:
+    """Return ``payload.signature``; the payload is readable but not forgeable."""
+    import hmac
+
+    payload = _b64u(f"{purpose}:{email}:{expires_at}".encode())
+    sig = hmac.new(_BETA_SECRET.encode(), payload.encode(), hashlib.sha256).digest()
+    return f"{payload}.{_b64u(sig)}"
+
+
+def _beta_verify(purpose: str, token: str) -> str | None:
+    """Return the email a valid, unexpired token was issued to, else None."""
+    import hmac
+
+    if not _BETA_SECRET or not token or "." not in token:
+        return None
+    payload, _, sig = token.rpartition(".")
+    expected = hmac.new(_BETA_SECRET.encode(), payload.encode(), hashlib.sha256).digest()
+    try:
+        if not hmac.compare_digest(_b64u_decode(sig), expected):
+            return None
+        got_purpose, email, expires_at = _b64u_decode(payload).decode().split(":", 2)
+    except Exception:
+        return None
+    if got_purpose != purpose or int(expires_at) < int(time.time()):
+        return None
+    # An allowlist edit revokes outstanding links and sessions immediately.
+    return email if email in _beta_allowlist() else None
+
+
+def _beta_session_email(request: Request) -> str | None:
+    return _beta_verify("session", request.cookies.get(_BETA_COOKIE, ""))
+
+
+def _send_magic_link(email: str, link: str) -> bool:
+    """Mail the sign-in link via Resend. Returns False if sending failed."""
+    if not (_RESEND_KEY and _BETA_EMAIL_FROM):
+        return False
+    body = json.dumps(
+        {
+            "from": _BETA_EMAIL_FROM,
+            "to": [email],
+            "subject": "Your openclatura beta sign-in link",
+            "text": (
+                "Open this link to unlock the openclatura beta site:\n\n"
+                f"{link}\n\n"
+                "The link is valid for 30 minutes and signs in this browser for 30 days.\n"
+                "If you did not request it, you can ignore this email."
+            ),
+        }
+    ).encode()
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=body,
+        headers={"Authorization": f"Bearer {_RESEND_KEY}", "content-type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return resp.status < 300
+    except Exception:
+        return False
+
+
+@app.middleware("http")
+async def _beta_gate(request: Request, call_next):
+    """On the beta deployment, require a session for every API route.
+
+    Applied as middleware rather than per-endpoint so it also covers the
+    openclatura app mounted at /api (e.g. /api/batch), which this module does
+    not shadow. Static assets stay public: the UI reveals nothing, and the
+    unlock screen has to be reachable.
+    """
+    path = request.url.path
+    if not _IS_BETA or not path.startswith("/api/") or path.startswith("/api/beta/") or path == "/api/healthz":
+        return await call_next(request)
+    if _beta_session_email(request) is None:
+        return JSONResponse({"ok": False, "error": "Beta access required."}, status_code=403)
+    return await call_next(request)
+
+
+class BetaLoginRequest(BaseModel):
+    email: str
+    # Where the emailed link should point; validated against this deployment's
+    # own origin so the signed token can't be redirected to another host.
+    origin: str = ""
+
+
+@app.post("/api/beta/login")
+def beta_login(req: BetaLoginRequest, request: Request) -> dict:
+    """Email a magic link if the address is allowlisted.
+
+    The response never reveals whether an address is on the list; it always
+    reports that a link was sent if one could have been.
+    """
+    if not _IS_BETA:
+        return {"ok": False, "error": "This deployment is not the beta channel."}
+    if not (_BETA_SECRET and _RESEND_KEY and _BETA_EMAIL_FROM):
+        return {"ok": False, "error": "Beta sign-in is not configured on this deployment."}
+    email = req.email.strip().lower()
+    if email in _beta_allowlist():
+        base = f"{request.url.scheme}://{request.url.netloc}"
+        token = _beta_sign("link", email, int(time.time()) + _BETA_LINK_TTL)
+        if not _send_magic_link(email, f"{base}/?beta_token={urllib.parse.quote(token)}"):
+            return {"ok": False, "error": "Could not send the email. Try again shortly."}
+    return {"ok": True, "sent": True}
+
+
+class BetaVerifyRequest(BaseModel):
+    token: str
+
+
+@app.post("/api/beta/verify")
+def beta_verify(req: BetaVerifyRequest) -> JSONResponse:
+    """Exchange a magic-link token for a session cookie."""
+    email = _beta_verify("link", req.token)
+    if email is None:
+        return JSONResponse({"ok": False, "error": "This link is invalid or has expired."}, status_code=401)
+    session = _beta_sign("session", email, int(time.time()) + _BETA_SESSION_TTL)
+    resp = JSONResponse({"ok": True, "email": email})
+    resp.set_cookie(
+        _BETA_COOKIE,
+        session,
+        max_age=_BETA_SESSION_TTL,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        path="/",
+    )
+    return resp
+
+
+@app.post("/api/beta/logout")
+def beta_logout() -> JSONResponse:
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(_BETA_COOKIE, path="/")
+    return resp
+
+
+@app.get("/api/beta/status")
+def beta_status(request: Request) -> dict:
+    """Whether this browser may use the beta API (drives the unlock screen)."""
+    email = _beta_session_email(request) if _IS_BETA else None
+    return {
+        "ok": True,
+        "channel": _CHANNEL,
+        "authorized": (not _IS_BETA) or email is not None,
+        "email": email,
+        "configured": bool(_BETA_SECRET and _RESEND_KEY and _BETA_EMAIL_FROM),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Result cache. Naming is deterministic per package version, so results are
 # cached under the canonical SMILES + request flags, scoped by version.
 # Backends, first configured wins:
@@ -124,6 +340,10 @@ app = FastAPI()
 #   2. Upstash Redis over REST (KV_REST_API_* / UPSTASH_REDIS_REST_*).
 # Fully optional: without credentials every request just computes, and any
 # cache error falls back to computing.
+#
+# Requests may set ``no_cache`` to opt out: their structure is then never
+# written to the cache. Reads still happen (serving an already-cached result
+# stores nothing new, and keeps the response fast).
 # ---------------------------------------------------------------------------
 _CACHE_URL = (os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL") or "").rstrip("/")
 _CACHE_TOKEN = os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN") or ""
@@ -194,6 +414,13 @@ def _pkg_version() -> str:
 
 
 def _cache_key(kind: str, smiles: str, flags: str = "") -> str | None:
+    # The beta channel never caches. Keys are scoped by package version, but a
+    # git install reports the version of the release its branch forked from, so
+    # beta would both collide with stable's entries and pin results to whichever
+    # commit of the branch was named first. Returning None disables get and set;
+    # beta traffic is a handful of testers, so there is nothing to gain anyway.
+    if _IS_BETA:
+        return None
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return None
@@ -357,6 +584,8 @@ class NameRequest(BaseModel):
     include_trace: bool = False
     verify_opsin: bool = False
     token_debug: bool = False
+    # Opt out of having this structure written to the result cache.
+    no_cache: bool = False
 
 
 def _name_cacheable(payload: dict, verify: bool) -> bool:
@@ -398,13 +627,14 @@ def name_endpoint(req: NameRequest) -> dict:
                     if result.opsin_check is None or result.opsin_check.status != "error":
                         break
     payload = result.to_dict(include_trace=req.include_trace)
-    if _name_cacheable(payload, req.verify_opsin):
+    if not req.no_cache and _name_cacheable(payload, req.verify_opsin):
         _cache_set(key, payload)
     return payload
 
 
 class DescribeRequest(BaseModel):
     smiles: str
+    no_cache: bool = False
 
 
 @app.post("/api/describe")
@@ -415,7 +645,8 @@ def describe_endpoint(req: DescribeRequest) -> dict:
     if cached is not None:
         return cached
     payload = describe(req.smiles).to_dict()
-    _cache_set(key, payload)
+    if not req.no_cache:
+        _cache_set(key, payload)
     return payload
 
 
@@ -449,13 +680,21 @@ def healthz() -> dict:
         version = importlib.metadata.version("openclatura")
     except importlib.metadata.PackageNotFoundError:
         version = "unknown"
-    return {"ok": True, "version": version}
+    return {
+        "ok": True,
+        "version": version,
+        "channel": _CHANNEL,
+        "git_ref": _BETA_GIT_REF,
+        "beta_url": _BETA_URL,
+        "stable_url": _STABLE_URL,
+    }
 
 
 class DepictRequest(BaseModel):
     smiles: str
     width: int = Field(440, ge=100, le=1200)
     height: int = Field(360, ge=100, le=1200)
+    no_cache: bool = False
 
 
 @app.post("/api/depict")
@@ -484,7 +723,8 @@ def depict(req: DepictRequest) -> dict:
     # Drop the XML declaration so the SVG can be injected via innerHTML.
     svg = re.sub(r"^\s*<\?xml[^>]*\?>\s*", "", svg)
     payload = {"ok": True, "svg": svg}
-    _cache_set(key, payload)
+    if not req.no_cache:
+        _cache_set(key, payload)
     return payload
 
 
