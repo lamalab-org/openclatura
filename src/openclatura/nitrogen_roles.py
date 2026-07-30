@@ -290,6 +290,13 @@ def _azido_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -> li
         n3 = n3_candidates[0]
         if _other_non_h_neighbors(mol, n3, {n2}):
             continue
+        # The contracted N3 prefixes (``hydrazinylamino`` etc.) describe a bare
+        # ``-NH-NH-NH2`` backbone with no way to spell a substituent on the middle
+        # nitrogen.  If n2 carries one, emitting the prefix would silently drop it
+        # (naming a different molecule), so decline the role and let a fuller
+        # naming path express the whole chain.
+        if _other_non_h_neighbors(mol, n2, {n_attach.idx, n3}):
+            continue
         first_bond = mol.get_bond(n_attach.idx, n2)
         second_bond = mol.get_bond(n2, n3)
         if first_bond is None or second_bond is None:

@@ -5910,3 +5910,26 @@ def test_charge_separated_sulfonyl_on_a_nitrogen_keeps_its_ligand():
     assert "oxidosulfinylamino" in name_smiles("COc1ccc(NS(=O)[O-])cc1[N+]1(N)C=NCC1")
     # Sulfur imides keep their own spelling.
     assert name_smiles("N=S(Cl)CF") == "((chloro)(imino)sulfanyl)fluoromethane"
+
+
+def test_chlorosulfate_and_sulfamate_esters_are_not_sulfonate_parents():
+    # -O-SO2-Cl / -O-SO2-NH2 have no S-C bond, so they are chlorosulfate /
+    # sulfamate esters, not sulfonates.  Perceiving them as a sulfonate hung the
+    # principal group off the chlorine and collapsed the nitrile chain to a bogus
+    # one-carbon "methanenitrile", dropping a carbon.
+    assert name_smiles("N#CCOS(=O)(=O)Cl") == "2-(chlorosulfonyloxy)acetonitrile"
+    assert name_smiles("N#CCOS(=O)(=O)N") == "2-(sulfamoyloxy)acetonitrile"
+    assert name_smiles("N#CCCOS(=O)(=O)Cl") == "3-(chlorosulfonyloxy)propionitrile"
+    # Genuine sulfonic acids/esters (S bonded to carbon) still name as sulfonates.
+    assert name_smiles("CS(=O)(=O)O") == "methanesulfonic acid"
+    assert name_smiles("c1ccccc1S(=O)(=O)O") == "benzenesulfonic acid"
+    assert name_smiles("CCS(=O)(=O)OC") == "methyl ethane-1-sulfonate"
+
+
+def test_substituted_triazane_chain_keeps_its_branch():
+    # benzene-NH-N(NH2)(naphthyl): the contracted ``hydrazinylamino`` N3 prefix
+    # cannot spell the naphthyl on the middle nitrogen, so emitting it silently
+    # dropped the naphthalene.  Declining that role names the whole chain.
+    name = name_smiles("Nc1ccc(NN(N)c2cccc3ccccc23)cc1")
+    assert "naphthalen-1-yl" in name
+    assert name == "4-(N'-amino-N'-(naphthalen-1-yl)hydrazinyl)benzen-1-amine"
