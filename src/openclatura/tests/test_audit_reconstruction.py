@@ -233,6 +233,18 @@ def _canonical(mol) -> str | None:
         ("thiocyanato", "*SC#N"),
         ("cyanato", "*OC#N"),
         ("diazenyl", "*N=N"),
+        # Triazene/triazane chains attach at N1; ``triaz-1-en-1-yl`` and its
+        # retained synonym ``aminodiazenyl`` are the same ``-N=N-NH2``.
+        ("triaz-1-en-1-yl", "*N=NN"),
+        ("aminodiazenyl", "*N=NN"),
+        ("(triaz-1-en-1-ylmethyl)", "*CN=NN"),
+        ("(aminodiazenylmethyl)", "*CN=NN"),
+        ("triaz-2-en-1-yl", "*NN=N"),
+        ("triazan-1-yl", "*NNN"),
+        # A complete ring-yl trailing an unlocanted parenthesised ligand makes the
+        # two siblings on the base carbon; the ligand must not pile onto the ring's
+        # own attachment atom (which would over-substitute it).
+        ("((4-methoxyphenyl)indan-1-ylmethyl)", "*C(c1ccc(OC)cc1)C1CCc2ccccc21"),
         # ``oxido`` is the charge-separated spelling of an oxo, so it must agree
         # with an input written either way
         ("(oxido)", "*=O"),
@@ -439,6 +451,13 @@ def test_package_exposes_expected_api():
 # Confirmation: a broad set of names the reconstructor fully models
 # --------------------------------------------------------------------------- #
 CONFIRMED_SMILES = [
+    # A complete ring-yl beside an unlocanted parenthesised aryl are siblings on
+    # the methyl carbon, not an aryl fused onto the ring's attachment atom.
+    "CNC(c1cc(F)ccc1C)C1CCc2ccccc21",
+    # Triazene substituent (-CH2-N=N-NH2 as triaz-1-en-1-ylmethyl / aminodiazenyl).
+    "COc1nc(CN=O)cc(C)c1CN=NN",
+    # Chlorosulfate ester chain named substitutively (2-(chlorosulfonyloxy)…).
+    "N#CCOS(=O)(=O)Cl",
     "C",  # methane
     "CCCCCC",  # hexane
     "CC(C)CC",  # 2-methylbutane

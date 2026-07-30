@@ -57,6 +57,13 @@ _LEAF_SMILES: dict[str, str] = {
     "azido": "N=[N+]=[N-]",
     "hydroperoxy": "OO",
     "diazenyl": "N=N",
+    # Triazene / triazane chains (N1[=/-]N2[-/=]N3), attached at N1. ``triaz-1-en-
+    # 1-yl`` and its retained synonym ``aminodiazenyl`` are the same -N=N-NH2.
+    "triaz-1-en-1-yl": "N=NN",
+    "aminodiazenyl": "N=NN",
+    "triaz-2-en-1-yl": "NN=N",
+    "triazan-1-yl": "NNN",
+    "triazanyl": "NNN",
     "silyl": "[SiH3]",
     "methoxy": "OC",
     "ethoxy": "OCC",
@@ -1502,7 +1509,16 @@ def _apply_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
             resolve_fragment_mol(groups[0])
         ):
             whole = resolve_fragment_mol(prefix)
-            if whole is not None:
+            # The ``whole`` reading is only legitimate when the trailing group is
+            # an *operator* that absorbs the leading ligand at one of its own
+            # internal sites (``(trifluoroethyl)sulfamoylamino`` -> the ethyl on
+            # the distal N).  When the trailing group is instead a complete ring-
+            # or chain-yl, an unlocanted leading ligand has nowhere legitimate to
+            # go and ``resolve_fragment_mol`` piles it onto the attachment atom
+            # itself (``(aryl)indan-1-yl`` -> aryl on indane C1).  That over-
+            # substitution of the attachment atom marks the reading as spurious,
+            # so those are siblings on the base instead.
+            if whole is not None and not _ligand_on_attachment_atom(whole, groups[-1]):
                 return _graft_onto(rw, locants["1"], whole)
         if len(groups) >= 2:
             frags = [resolve_fragment_mol(group) for group in groups]
@@ -1548,6 +1564,35 @@ def _attaches_by_double_bond(frag: Chem.Mol | None) -> bool:
     if dummy is None:
         return False
     return any(b.GetBondType() == Chem.BondType.DOUBLE for b in dummy.GetBonds())
+
+
+def _attachment_heavy_degree(frag: Chem.Mol | None) -> int | None:
+    """Heavy-atom degree of ``frag``'s attachment atom (the dummy's neighbour),
+    excluding the dummy itself, or ``None`` if there is no single such atom."""
+
+    if frag is None:
+        return None
+    idx = _attachment_atom(frag)
+    if idx is None:
+        return None
+    return sum(1 for n in frag.GetAtomWithIdx(idx).GetNeighbors() if n.GetAtomicNum() != 0)
+
+
+def _ligand_on_attachment_atom(whole: Chem.Mol, trailing: str) -> bool:
+    """Whether the leading ligand(s) in a ``whole`` reading landed on the trailing
+    group's own attachment atom rather than an internal site.
+
+    Compares the attachment atom's heavy-degree in ``whole`` against the trailing
+    group resolved on its own: a strict increase means the ligand piled onto the
+    attachment carbon (an unlocanted substitution a complete substituent cannot
+    take), so the ``whole`` reading is spurious.  An indeterminate comparison is
+    treated as *not* piled on, leaving the existing behaviour unchanged."""
+
+    bare = _attachment_heavy_degree(resolve_fragment_mol(trailing))
+    combined = _attachment_heavy_degree(whole)
+    if bare is None or combined is None:
+        return False
+    return combined > bare
 
 
 def _apply_unlocanted_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
