@@ -720,6 +720,55 @@ def test_self_audit_abstains_on_unmodelled(smiles):
 
 
 # --------------------------------------------------------------------------- #
+# Mancude parents saturated by the name: added (hydro) hydrogen and several
+# indicated hydrogens at once. The stored template is one tautomer (purine is
+# ``9H``), so these are rebuilt by re-deriving where the ring's double bonds go.
+# --------------------------------------------------------------------------- #
+@pytest.mark.parametrize(
+    "smiles,expected_name",
+    [
+        # added hydrogen, with the ring's remaining double bonds displaced by the
+        # two exocyclic ones the dione claims
+        ("CN1C=NC2=C1C(=O)N(C(=O)N2C)C", "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione"),  # caffeine
+        ("Cn1c(=O)c2[nH]cnc2n(C)c1=O", "1,3-dimethyl-3,7-dihydro-1H-purine-2,6-dione"),  # theophylline
+        ("Cn1cnc2c1c(=O)[nH]c(=O)n2C", "3,7-dimethyl-3,7-dihydro-1H-purine-2,6-dione"),  # theobromine
+        ("O=c1[nH]c(=O)c2[nH]cnc2[nH]1", "3,7-dihydro-1H-purine-2,6-dione"),  # xanthine
+        # several indicated hydrogens instead
+        ("O=c1[nH]cnc2nc[nH]c12", "1H,7H-purin-6-one"),  # hypoxanthine
+        ("Nc1nc2[nH]cnc2c(=O)[nH]1", "2-amino-1H,9H-purin-6-one"),  # guanine
+        ("O=c1[nH]c(=O)c2[nH]c(=O)[nH]c2[nH]1", "1H,3H,7H,9H-purine-2,6,8-trione"),  # uric acid
+        # a six-ring left untouched has two placements, but they are only its two
+        # Kekulé forms — one structure, so still attributable
+        (
+            "Cn1c(=O)n(C2CCCN(C(=O)c3cccs3)C2)c2ncncc21",
+            "7-methyl-9-(1-((thiophen-2-yl)carbonyl)piperidin-3-yl)-7H,9H-purin-8-one",
+        ),
+    ],
+)
+def test_self_audit_confirms_saturated_mancude_parents(smiles, expected_name):
+    result = oc.name(smiles, verify_self=True)
+    assert result.name == expected_name
+    assert result.self_audit is not None
+    assert result.self_audit.verdict == "confirmed", result.self_audit.reason
+
+
+def test_mutated_added_hydrogen_locant_is_caught():
+    """Moving a hydro locant must not still confirm: the saturation is read from
+    the name, so a wrong one has to rebuild a different molecule."""
+
+    mol, atoms, parts = _capture_top_level("CN1C=NC2=C1C(=O)N(C(=O)N2C)C")
+    assert audit_component_reconstruction(mol, parts, atoms).verdict == "confirmed"
+    bad = copy.deepcopy(parts)
+    for i, operation in enumerate(bad.hydro_operations):
+        if operation.operation_kind == "additive_hydrogen":
+            bad.hydro_operations[i] = replace(operation, locants=("3", "9"))
+            break
+    else:
+        pytest.fail("expected an additive-hydrogen operation to corrupt")
+    assert audit_component_reconstruction(mol, bad, atoms).verdict != "confirmed"
+
+
+# --------------------------------------------------------------------------- #
 # Soundness: corrupting the name provably flips the verdict to mismatch
 # --------------------------------------------------------------------------- #
 def test_mutated_substituent_identity_is_caught():

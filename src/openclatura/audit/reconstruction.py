@@ -602,25 +602,175 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
         raise _Abstain("front modifiers not modelled")
     if parts.parent_charges:
         raise _Abstain("parent charges not modelled")
-    if parts.indicated_hydrogens and (not has_template or len(parts.indicated_hydrogens) != 1):
-        # Templates place their indicated H at position 1 (1H-pyrrole -> [nH]).
-        # A single cited position elsewhere (2H-indazole, 9H-purine) is another
-        # N-H tautomer, which is reachable by moving that hydrogen; several at
-        # once is not modelled.
+    # Saturation of a mancude template comes in two spellings that mean the same
+    # thing structurally: indicated hydrogen (1H-, 9H-) and added hydrogen
+    # (3,7-dihydro-). Once more than one position is involved they interact — the
+    # ring's remaining double bonds have to move to accommodate all of them at
+    # once — so both are collected here and realised together below.
+    saturated = _saturated_locants(parts)
+    rebuild_unsaturation = has_template and (
+        len(saturated) > 1 or any(op.operation_kind == "additive_hydrogen" for op in parts.hydro_operations)
+    )
+    if saturated and not has_template:
+        raise _Abstain("saturated ring positions without a retained template")
+    if saturated and not rebuild_unsaturation and len(parts.indicated_hydrogens) != 1:
         raise _Abstain("indicated hydrogen position not modelled")
-    if any(op.operation_kind == "additive_hydrogen" for op in parts.hydro_operations):
-        raise _Abstain("added (hydro) hydrogen not modelled")
     if parts.principal_suffix_modifiers:
         raise _Abstain("principal-suffix modifiers not modelled")
 
     rw, locants, aromatic_ring = _build_parent(parts)
-    if parts.indicated_hydrogens and not move_indicated_hydrogen(rw, locants, parts.indicated_hydrogens[0]):
+    template_idxs: tuple[int, ...] = ()
+    saturated_idxs: set[int] = set()
+    if rebuild_unsaturation:
+        template_idxs, saturated_idxs = _open_mancude_template(rw, locants, saturated)
+    elif parts.indicated_hydrogens and not move_indicated_hydrogen(rw, locants, parts.indicated_hydrogens[0]):
+        # A single cited position (2H-indazole, 9H-purine) is another N-H tautomer
+        # of the stored template, reachable by moving that one hydrogen.
         raise _Abstain(f"indicated hydrogen {parts.indicated_hydrogens[0]} not placeable")
     _apply_replacements(rw, locants, parts, aromatic_ring)
     _apply_unsaturations(rw, locants, parts, aromatic_ring)
     _apply_principal_group(rw, locants, parts)
     _apply_substituents(rw, locants, parts)
+    if rebuild_unsaturation:
+        # Last, so the suffixes and substituents have already claimed the
+        # positions that carry an exocyclic double bond instead of a ring one.
+        _close_mancude_template(rw, template_idxs, saturated_idxs)
     return rw
+
+
+def _saturated_locants(parts) -> tuple[str, ...]:
+    """Every parent position the name declares saturated, in citation order.
+
+    Indicated hydrogen and added (hydro) hydrogen are one notion here: a ring
+    position carrying hydrogen that the mancude parent hydride does not have.
+    Which spelling a position got is a naming decision (the parent's supported
+    indicated-hydrogen count), not a structural difference."""
+
+    locants = [str(loc) for loc in parts.indicated_hydrogens]
+    for operation in parts.hydro_operations:
+        if operation.operation_kind == "additive_hydrogen":
+            locants += [str(loc) for loc in operation.locants]
+    return tuple(dict.fromkeys(locants))
+
+
+def _open_mancude_template(
+    rw: Chem.RWMol, locants: dict[str, int], saturated: tuple[str, ...]
+) -> tuple[tuple[int, ...], set[int]]:
+    """Strip a mancude template back to its single-bonded skeleton.
+
+    The stored template is one particular tautomer (purine is ``9H``), which is
+    the wrong starting point once the name saturates several positions: the double
+    bonds have to be placed to fit *those* positions, and where they go also
+    depends on which positions a suffix will take (``purine-2,6-dione`` puts two
+    of them outside the ring). So the ring is flattened to single bonds here and
+    :func:`_close_mancude_template` puts them back at the end.
+
+    Returns the template's atom indices and the indices of the saturated sites."""
+
+    saturated_idxs: set[int] = set()
+    for locant in saturated:
+        idx = locants.get(str(locant))
+        if idx is None:
+            raise _Abstain(f"saturated position {locant} outside parent")
+        saturated_idxs.add(idx)
+    # Only template atoms exist at this point; substituents come later.
+    template_idxs = tuple(range(rw.GetNumAtoms()))
+    for bond in rw.GetBonds():
+        bond.SetIsAromatic(False)
+        bond.SetBondType(Chem.BondType.SINGLE)
+    for idx in template_idxs:
+        atom = rw.GetAtomWithIdx(idx)
+        atom.SetIsAromatic(False)
+        # Hand hydrogen counting back to RDKit: a saturated N ends up with its
+        # N-H, and a position that later gets a double bond or a substituent
+        # loses the H again, without this code having to track either.
+        atom.SetNoImplicit(False)
+        atom.SetNumExplicitHs(0)
+    return template_idxs, saturated_idxs
+
+
+def _close_mancude_template(rw: Chem.RWMol, template_idxs: tuple[int, ...], saturated_idxs: set[int]) -> None:
+    """Put the parent's double bonds back wherever the name left room for them.
+
+    A mancude parent has the maximum number of noncumulative double bonds, so
+    every template position takes exactly one — unless the name saturated it, or a
+    suffix already gave it an exocyclic one. Placing the rest is therefore a
+    perfect matching over the positions that remain, on the ring bonds joining
+    them.
+
+    Several matchings can still describe one molecule — an untouched six-ring has
+    two, which are just its two Kekulé forms — so candidates are compared as
+    canonical structures rather than as bond assignments. Genuinely different
+    structures mean the name does not pin the tautomer down, and that is abstained
+    rather than guessed: picking one would rebuild a different molecule and report
+    a correct name as a mismatch."""
+
+    unsaturated: list[int] = []
+    for idx in template_idxs:
+        if idx in saturated_idxs:
+            continue
+        atom = rw.GetAtomWithIdx(idx)
+        if any(bond.GetBondType() != Chem.BondType.SINGLE for bond in atom.GetBonds()):
+            continue  # a suffix (=O) or an ylidene substituent already took it
+        unsaturated.append(idx)
+    if not unsaturated:
+        return
+
+    pending = frozenset(unsaturated)
+    ring_bonds = [
+        (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx(), bond.GetIdx())
+        for bond in rw.GetBonds()
+        if bond.GetBeginAtomIdx() in pending and bond.GetEndAtomIdx() in pending
+    ]
+
+    # Matching each position against its lowest-indexed free partner enumerates
+    # every perfect matching exactly once. The cap bounds the work on a large
+    # fused system; hitting it means the placement is not pinned down anyway.
+    solutions: list[tuple[int, ...]] = []
+
+    def search(remaining: frozenset[int], chosen: tuple[int, ...]) -> None:
+        if len(solutions) > _MAX_RING_BOND_PLACEMENTS:
+            return
+        if not remaining:
+            solutions.append(chosen)
+            return
+        pivot = min(remaining)
+        for begin, end, bond_idx in ring_bonds:
+            if pivot not in (begin, end):
+                continue
+            partner = end if begin == pivot else begin
+            if partner not in remaining:
+                continue
+            search(remaining - {pivot, partner}, chosen + (bond_idx,))
+
+    search(pending, ())
+    if not solutions:
+        raise _Abstain("no ring double-bond placement fits the cited saturation")
+    if len(solutions) > _MAX_RING_BOND_PLACEMENTS:
+        raise _Abstain("too many ring double-bond placements to attribute")
+
+    if len(solutions) > 1:
+        structures = {_placement_structure(rw, solution) for solution in solutions}
+        structures.discard(None)
+        if len(structures) != 1:
+            raise _Abstain("ring double-bond placement ambiguous")
+    for bond_idx in solutions[0]:
+        rw.GetBondWithIdx(bond_idx).SetBondType(Chem.BondType.DOUBLE)
+
+
+# Enough to cover the Kekulé freedom of a few untouched rings without letting a
+# large fused system enumerate matchings indefinitely.
+_MAX_RING_BOND_PLACEMENTS = 16
+
+
+def _placement_structure(rw: Chem.RWMol, solution: tuple[int, ...]) -> str | None:
+    """The molecule one candidate placement produces, canonically, or ``None`` if
+    that placement does not describe a valid structure at all."""
+
+    candidate = Chem.RWMol(rw)
+    for bond_idx in solution:
+        candidate.GetBondWithIdx(bond_idx).SetBondType(Chem.BondType.DOUBLE)
+    return _canonical_constitution(candidate.GetMol())
 
 
 def _build_parent(parts) -> tuple[Chem.RWMol, dict[str, int], bool]:
