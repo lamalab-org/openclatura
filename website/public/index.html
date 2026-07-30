@@ -114,57 +114,6 @@
     font-size: .74rem;
     margin-top: .1rem;
   }
-  .beta-banner {
-    display: none;
-    max-width: 86rem;
-    margin: 0 auto;
-    padding: .5rem 1.25rem;
-    font-size: .8rem;
-    color: var(--accent);
-  }
-  .beta-banner.on { display: block; }
-  .beta-banner button {
-    background: none;
-    border: 0;
-    padding: 0;
-    font: inherit;
-    color: var(--muted);
-    text-decoration: underline;
-    cursor: pointer;
-  }
-  /* Unlock screen shown on the beta host until a session cookie exists. */
-  .gate-backdrop {
-    display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    background: rgba(15, 18, 20, .55);
-    padding: 1.25rem;
-    overflow: auto;
-  }
-  .gate-backdrop.on { display: flex; align-items: center; justify-content: center; }
-  .gate {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    max-width: 27rem;
-    width: 100%;
-    padding: 1.4rem 1.5rem;
-  }
-  .gate h2 { margin: 0 0 .5rem; font-size: 1.05rem; }
-  .gate p { margin: 0 0 .9rem; color: var(--muted); font-size: .84rem; line-height: 1.55; }
-  .gate input {
-    width: 100%;
-    box-sizing: border-box;
-    font: inherit;
-    font-size: .9rem;
-    padding: .5rem .6rem;
-    border: 1px solid var(--border);
-    background: var(--bg);
-    color: inherit;
-  }
-  .gate .row { display: flex; gap: .5rem; margin-top: .7rem; flex-wrap: wrap; }
-  .gate .msg { margin: .7rem 0 0; font-size: .82rem; }
-  .gate .msg.err { color: var(--err); }
   header p {
     margin: .3rem 0 0;
     max-width: 46rem;
@@ -422,28 +371,6 @@
   <p>Draw a molecule below and it is named with deterministic IUPAC Blue Book (2013) rules.</p>
 </header>
 
-<div class="beta-banner" id="beta-banner">
-  You are on the beta build — unreleased code, expect rough edges.
-  <button id="beta-signout" type="button">Sign out</button>
-</div>
-
-<div class="gate-backdrop" id="beta-gate">
-  <form class="gate" id="beta-gate-form">
-    <h2>openclatura beta</h2>
-    <p>
-      This build runs unreleased code and is open to a small list of testers.
-      Enter your email and, if you are on the list, you'll get a sign-in link
-      that unlocks this browser for 30 days.
-    </p>
-    <input type="email" id="beta-email" placeholder="you@example.org" autocomplete="email" required>
-    <div class="row">
-      <button class="primary" id="beta-send" type="submit">Email me a link</button>
-      <button type="button" id="beta-leave">Back to the stable site</button>
-    </div>
-    <p class="msg" id="beta-msg" hidden></p>
-  </form>
-</div>
-
 <main>
   <section class="card">
     <h2>Draw</h2>
@@ -466,6 +393,7 @@
     <h2>IUPAC name</h2>
     <div id="result-name" class="placeholder">Draw a structure to name it.</div>
     <div class="verify-badge" id="verify-badge"></div>
+    <div class="verify-badge" id="audit-badge"></div>
     <div class="status" id="status"></div>
     <div class="errbox" id="errbox"></div>
     <div class="chips" id="rules"></div>
@@ -476,6 +404,11 @@
     <label class="verify-toggle">
       <input type="checkbox" id="opsin-toggle" checked>
       Verify with OPSIN <span class="hint">— parse the name back to a structure (py2opsin) and compare with your drawing</span>
+    </label>
+    <!-- Only shown where the engine ships openclatura.audit (the beta build). -->
+    <label class="verify-toggle" id="audit-row" hidden>
+      <input type="checkbox" id="audit-toggle" checked>
+      Self-audit <span class="hint">— rebuild the structure from the name using openclatura's own grammar, no OPSIN or Java involved</span>
     </label>
     <label class="verify-toggle">
       <input type="checkbox" id="nocache-toggle">
@@ -597,6 +530,7 @@
     el("result-name").textContent = placeholder;
     el("result-name").className = "placeholder";
     el("verify-badge").className = "verify-badge";
+    el("audit-badge").className = "verify-badge";
     el("rules").innerHTML = "";
     el("errbox").style.display = "none";
     el("explain").style.display = "none";
@@ -708,6 +642,7 @@
       el("result-name").textContent = "Could not name this structure.";
       el("result-name").className = "error";
       el("verify-badge").className = "verify-badge";
+    el("audit-badge").className = "verify-badge";
       el("rules").innerHTML = "";
       el("btn-copy").disabled = true;
       el("btn-explain").disabled = true;
@@ -731,7 +666,9 @@
     setStatus('<span class="spinner"></span> naming…');
 
     var verify = el("opsin-toggle").checked;
-    if (verify) setStatus('<span class="spinner"></span> naming + OPSIN round-trip…');
+    var audit = selfAuditWanted();
+    var checks = (verify ? ["OPSIN round-trip"] : []).concat(audit ? ["self-audit"] : []);
+    if (checks.length) setStatus('<span class="spinner"></span> naming + ' + checks.join(" + ") + "…");
 
     fetch("/api/name", {
       method: "POST",
@@ -740,6 +677,7 @@
         smiles: smiles,
         include_trace: true,
         verify_opsin: verify,
+        verify_self: audit,
         no_cache: noCache()
       })
     })
@@ -758,6 +696,7 @@
           el("btn-copy").disabled = false;
           el("btn-explain").disabled = false;
           renderOpsin(data.opsin_check);
+          renderSelfAudit(data.self_audit);
           var chips = el("rules");
           chips.innerHTML = "";
           var hints = (data.rule_hints || []).join("\n");
@@ -801,7 +740,60 @@
     }
   }
 
+  // The OPSIN-free reconstruction audit. Its verdicts are deliberately not
+  // pass/fail: "abstained" means some construct in the name isn't modelled by
+  // the reconstructor, which certifies nothing either way — so it must not read
+  // as a failure of the name.
+  function renderSelfAudit(audit) {
+    var badge = el("audit-badge");
+    badge.className = "verify-badge";
+    badge.title = "";
+    if (!audit) return;
+    var reason = audit.reason || "";
+    var extra = [];
+    if (audit.unnamed_atoms && audit.unnamed_atoms.length) {
+      extra.push("atoms left unnamed: " + audit.unnamed_atoms.join(", "));
+    }
+    if (audit.stereo_issues && audit.stereo_issues.length) {
+      extra.push("stereo: " + audit.stereo_issues.join("; "));
+    }
+    if (audit.unsupported_charge_pairs && audit.unsupported_charge_pairs.length) {
+      extra.push("charge pairs without a template: " + audit.unsupported_charge_pairs.join("; "));
+    }
+    if (audit.verdict === "confirmed") {
+      badge.className = "verify-badge ok";
+      badge.textContent = "✓ Self-audit: rebuilt from the name, matches";
+      badge.title = "openclatura's own grammar reconstructed " +
+                    (audit.reconstructed_smiles || "the structure") + " from this name.";
+    } else if (audit.verdict === "mismatch") {
+      badge.className = "verify-badge bad";
+      badge.textContent = "✗ Self-audit: rebuild disagrees with the drawing";
+      badge.title = [reason, audit.reconstructed_smiles ? "rebuilt: " + audit.reconstructed_smiles : ""]
+                      .concat(extra).filter(Boolean).join("\n");
+    } else if (audit.verdict === "abstained") {
+      badge.className = "verify-badge warn";
+      badge.textContent = "Self-audit: no verdict — " + (reason || "construct not modelled");
+      badge.title = "The reconstructor does not model part of this name, so it neither " +
+                    "confirms nor refutes it." + (extra.length ? "\n" + extra.join("\n") : "");
+    } else {
+      badge.className = "verify-badge warn";
+      badge.textContent = "Self-audit failed to run" + (reason ? " (" + reason + ")" : "");
+    }
+  }
+
+  // Whether the running engine supports the self-audit at all; set from
+  // /api/healthz, which is also what reveals the toggle.
+  var selfAuditSupported = false;
+
+  function selfAuditWanted() {
+    return selfAuditSupported && el("audit-toggle").checked;
+  }
+
   el("opsin-toggle").addEventListener("change", function () {
+    if (currentSmiles) requestName(currentSmiles);
+  });
+
+  el("audit-toggle").addEventListener("change", function () {
     if (currentSmiles) requestName(currentSmiles);
   });
 
@@ -901,8 +893,10 @@
 
   // ---- Release channel -----------------------------------------------------
   // Two deployments of this page exist: stable (a PyPI release) and beta (built
-  // from a git branch, testers only). /api/healthz reports which one answered
-  // and where the other lives, and the version chip becomes the switcher.
+  // from a git branch, on its own unlisted domain). /api/healthz reports which
+  // one answered and where the other lives; the version chip becomes the switch.
+  // Stable only offers the beta entry when BETA_URL is set on that deployment,
+  // so by default the public site never names the beta domain.
   function renderChannel(d) {
     var isBeta = d.channel === "beta";
     var label = appVersion || "unknown";
@@ -942,7 +936,7 @@
     );
     addItem(
       (isBeta ? "✓ Beta" : "Beta") + (isBeta && d.git_ref ? " — " + d.git_ref : ""),
-      "Unreleased build, testers only.",
+      "Unreleased build from a git branch.",
       isBeta ? null : (other || null)
     );
 
@@ -953,7 +947,6 @@
       return;
     }
     el("channel-switch").classList.add("on");
-    if (isBeta) el("beta-banner").classList.add("on");
   }
 
   el("channel-button").addEventListener("click", function (ev) {
@@ -978,105 +971,16 @@
         appVersion = "v" + d.version;
         updateIssueLink();
       }
+      // The self-audit ships on the beta build only, so the toggle stays hidden
+      // (and the flag unsent) wherever the engine has no support for it.
+      selfAuditSupported = !!d.self_audit;
+      if (selfAuditSupported) {
+        el("audit-row").hidden = false;
+        if (currentSmiles) requestName(currentSmiles);
+      }
       renderChannel(d);
-      if (d.channel === "beta") initBetaGate(d);
     })
     .catch(function () { /* version tag stays hidden */ });
-
-  // ---- Beta access ---------------------------------------------------------
-  // The beta API is gated on an email allowlist: request a link, click it, and
-  // the token in the URL is exchanged for a session cookie. The page itself is
-  // public (it gives nothing away) — only the API refuses unauthorized calls.
-  function setGateMessage(text, isError) {
-    var node = el("beta-msg");
-    node.textContent = text;
-    node.className = "msg" + (isError ? " err" : "");
-    node.hidden = !text;
-  }
-
-  function initBetaGate(health) {
-    el("beta-leave").style.display = health.stable_url ? "" : "none";
-    el("beta-leave").addEventListener("click", function () {
-      window.location.href = health.stable_url || "/";
-    });
-    var params = new URLSearchParams(window.location.search);
-    var token = params.get("beta_token");
-    if (token) {
-      // Drop the token from the URL and history before anything else can log it.
-      params.delete("beta_token");
-      var rest = params.toString();
-      window.history.replaceState({}, "", window.location.pathname + (rest ? "?" + rest : ""));
-      fetch("/api/beta/verify", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token: token })
-      })
-        .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, data: d }; }); })
-        .then(function (res) {
-          if (res.ok && res.data.ok) {
-            closeGate();
-          } else {
-            openGate(res.data.error || "This link is invalid or has expired.");
-          }
-        })
-        .catch(function () { openGate("Could not verify the link. Try again."); });
-      return;
-    }
-    fetch("/api/beta/status")
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) {
-        if (d && d.authorized) return;
-        openGate(d && !d.configured ? "Beta sign-in is not configured on this deployment." : "");
-      })
-      .catch(function () { openGate(""); });
-  }
-
-  function openGate(message) {
-    el("beta-gate").classList.add("on");
-    setGateMessage(message || "", !!message);
-    el("beta-email").focus();
-  }
-
-  function closeGate() {
-    el("beta-gate").classList.remove("on");
-    setGateMessage("");
-    // The eager warmup on page load was rejected while locked; redo it now.
-    fetch("/api/warmup").catch(function () {});
-  }
-
-  el("beta-gate-form").addEventListener("submit", function (ev) {
-    ev.preventDefault();
-    var email = el("beta-email").value.trim();
-    if (!email) return;
-    var send = el("beta-send");
-    send.disabled = true;
-    setGateMessage("Sending…");
-    fetch("/api/beta/login", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: email })
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        send.disabled = false;
-        if (d.ok) {
-          // Deliberately identical whether or not the address is allowlisted.
-          setGateMessage("If " + email + " is on the tester list, a sign-in link is on its way. It expires in 30 minutes.");
-        } else {
-          setGateMessage(d.error || "Could not send the link.", true);
-        }
-      })
-      .catch(function () {
-        send.disabled = false;
-        setGateMessage("Could not reach the server. Try again.", true);
-      });
-  });
-
-  el("beta-signout").addEventListener("click", function () {
-    fetch("/api/beta/logout", { method: "POST" })
-      .then(function () { window.location.reload(); })
-      .catch(function () { window.location.reload(); });
-  });
 
   el("examples").addEventListener("click", function (ev) {
     var smiles = ev.target && ev.target.getAttribute("data-smiles");
