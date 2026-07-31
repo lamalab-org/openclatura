@@ -50,6 +50,18 @@ def _canonical(mol) -> str | None:
         # multiplied non-leaf base + amide leaf
         ("(diphenylmethyl)", "*C(c1ccccc1)c1ccccc1"),
         ("benzamido", "*NC(=O)c1ccccc1"),
+        ("benzoyl", "*C(=O)c1ccccc1"),
+        # The retained ``benz`` acyl bases are decoratable ring cores, so ring
+        # substituents cite ordinary ring locants -- C1 being the ring carbon
+        # that carries the acyl.  As flat leaves these refuted nothing but could
+        # confirm nothing either, and substituted benzamides are everywhere.
+        ("(4-methylbenzamido)", "*NC(=O)c1ccc(C)cc1"),
+        ("(2-chlorobenzamido)", "*NC(=O)c1ccccc1Cl"),
+        ("(3,4-dimethoxybenzamido)", "*NC(=O)c1ccc(OC)c(OC)c1"),
+        ("(4-methylbenzoyl)", "*C(=O)c1ccc(C)cc1"),
+        ("(4-((trifluoromethyl)oxy)benzamido)", "*NC(=O)c1ccc(OC(F)(F)F)cc1"),
+        # ring substituents and an N-substituent at once
+        ("(N-methyl-3-(pyrrolidin-1-ylsulfonyl)benzamido)", "*N(C)C(=O)c1cccc(S(=O)(=O)N2CCCC2)c1"),
         # von Baeyer fused-ring substituents (validated against OPSIN)
         ("bicyclo[2.2.1]heptan-2-yl", "*C1CC2CCC1C2"),
         ("(7,9-dioxabicyclo[4.3.0]nona-1(6),2,4-trien-3-yl)", "*c1ccc2c(c1)OCO2"),
@@ -1127,3 +1139,20 @@ def test_no_false_mismatch_on_golden_corpus():
         pytest.skip("diverse_corpus.csv fixture not available")
     offenders = [s for s in smiles if self_audit(s).verdict == "mismatch"]
     assert offenders == [], f"self-audit refuted known-good names: {offenders}"
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    [
+        # Substituted benzamides -- ubiquitous in medicinal chemistry, and every
+        # one of them abstained while ``benzamido`` was a flat leaf that could
+        # not carry a ring substituent.
+        "Cc1cccc(C(=O)NC(C)C)c1NC(=O)c1ccc(OC(F)(F)F)cc1",
+        "COCCOc1cccc(C(=O)NCC(Cc2cccc(C)c2)C(=O)O)c1",
+        "O=C(Nc1ccccc1C(=O)NCc1ccccc1)c1ccc(N2CCCC2=O)cc1",
+        "CC(C)CC(=O)Nc1ccc(Cl)c(C(=O)NC2(C(=O)O)CCSCC2)c1",
+        "CCc1ccccc1NC(=O)CN(C)C(=O)c1cccc(S(=O)(=O)N2CCCC2)c1",  # also N-substituted
+    ],
+)
+def test_substituted_benzamides_reconstruct(smiles: str):
+    assert self_audit(smiles).verdict == "confirmed"

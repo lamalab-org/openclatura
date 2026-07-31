@@ -1186,6 +1186,11 @@ def _build_base(base: str) -> Numbered | None:
 
 
 def _build_base_core(base: str) -> Numbered | None:
+    # The retained ``benz`` acyl bases, before the generic ``…yl`` readings below
+    # get a chance to mis-split them.
+    benz = _benz_acyl_base(base)
+    if benz is not None:
+        return benz
     # A von Baeyer ring core (``…cyclo[…]…-N-yl``) as a decoratable base, so that
     # front modifiers like ``7,9-dioxo`` / ``4,6-dimethyl`` can be peeled off by
     # ``_resolve`` and grafted through the ordinary locanted-clause machinery.
@@ -1325,6 +1330,45 @@ def _acyl_chain_base(base: str) -> Numbered | None:
         return None
     rw, locants = skeleton
     return rw, locants, _hide_acyl_carbon(locants)
+
+
+# The retained ``benz`` acyl bases, and whether the ring's acyl carbon carries an
+# amide nitrogen beyond it (``benzamido``) or bonds outward itself (``benzoyl``).
+_BENZ_ACYL_BASES: dict[str, bool] = {"benzoyl": False, "benzamido": True}
+
+
+def _benz_acyl_base(base: str) -> Numbered | None:
+    """``benzoyl`` / ``benzamido`` — the retained benzene acyl and acylamino bases.
+
+    Both are also flat leaves, which is enough while they are bare; built here as
+    a *decoratable* ring core instead, their ring substituents graft through the
+    ordinary locanted-clause machinery.  ``4-methylbenzamido`` then reads as the
+    methyl on ring C4, C1 being the ring carbon carrying the acyl.
+
+    That C1 already holds two ring bonds and the acyl, so nothing can substitute
+    there; it is withdrawn from the exposed locant map for the same reason
+    :func:`_hide_acyl_carbon` withdraws a chain's C1.
+    """
+
+    with_nitrogen = _BENZ_ACYL_BASES.get(base)
+    if with_nitrogen is None:
+        return None
+    smiles, labels = _RING_STEMS["phenyl"]
+    numbered = _numbered_from_smiles(smiles, labels, attach_locant="1")
+    if numbered is None:
+        return None
+    rw, locants, ring_c1 = numbered
+    carbonyl = rw.AddAtom(Chem.Atom(6))
+    oxygen = rw.AddAtom(Chem.Atom(8))
+    rw.AddBond(ring_c1, carbonyl, Chem.BondType.SINGLE)
+    rw.AddBond(carbonyl, oxygen, Chem.BondType.DOUBLE)
+    attach = carbonyl
+    if with_nitrogen:
+        nitrogen = rw.AddAtom(Chem.Atom(7))
+        rw.AddBond(carbonyl, nitrogen, Chem.BondType.SINGLE)
+        attach = nitrogen
+    locants.pop("1")
+    return rw, locants, attach
 
 
 def _acylamino_chain_base(base: str) -> Numbered | None:
