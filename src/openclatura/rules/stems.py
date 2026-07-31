@@ -9,6 +9,7 @@ References:
 """
 
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 from functools import lru_cache
 from re import Pattern
@@ -162,25 +163,25 @@ def stem_for(length: int) -> str:
     return get(length).stem
 
 
-@lru_cache(maxsize=1)
-def _supported_stems() -> tuple[Stem, ...]:
-    """Return every supported stem, constructing generated values only once."""
+def _iter_supported_stems() -> Iterator[Stem]:
+    """Yield supported stems without retaining a second full collection."""
 
-    return tuple(get(length) for length in range(MIN_STEM_LENGTH, MAX_STEM_LENGTH + 1))
+    for length in range(MIN_STEM_LENGTH, MAX_STEM_LENGTH + 1):
+        yield get(length)
 
 
 @lru_cache(maxsize=1)
 def _alkyl_suffix_index() -> dict[str, Stem]:
-    """Map supported terminal alkyl text to its stem."""
+    """Lazily map supported terminal alkyl text to its stem."""
 
-    return {f"{stem.stem}yl": stem for stem in _supported_stems()}
+    return {f"{stem.stem}yl": stem for stem in _iter_supported_stems()}
 
 
 @lru_cache(maxsize=1)
 def _basic_prefix_index() -> dict[str, int]:
-    """Map supported basic numerical prefixes to skeletal-atom counts."""
+    """Lazily map supported basic numerical prefixes to atom counts."""
 
-    return {f"{stem.stem}a": stem.length for stem in _supported_stems()}
+    return {f"{stem.stem}a": stem.length for stem in _iter_supported_stems()}
 
 
 @lru_cache(maxsize=1)
@@ -192,9 +193,16 @@ def _terminal_alkyl_pattern() -> Pattern[str]:
 
 
 def terminal_stem(name: str) -> Stem | None:
-    """Return the stem represented by the longest terminal alkyl suffix."""
+    """Return the stem represented by the longest terminal alkyl suffix.
 
-    if not isinstance(name, str) or not name:
+    Reverse-search data is constructed only on the first call. An empty or
+    unrecognized string returns ``None``; a non-string input raises
+    ``ValueError`` because it cannot represent nomenclature text.
+    """
+
+    if not isinstance(name, str):
+        raise ValueError("Terminal stem name must be a string")
+    if not name:
         return None
     match = _terminal_alkyl_pattern().search(name)
     if match is None:
@@ -203,8 +211,15 @@ def terminal_stem(name: str) -> Stem | None:
 
 
 def length_for_basic_prefix(prefix: str) -> int | None:
-    """Return the skeletal-atom count represented by a basic numerical prefix."""
+    """Return the atom count represented by a basic numerical prefix.
 
-    if not isinstance(prefix, str) or not prefix:
+    Reverse-search data is constructed only on the first call. An empty or
+    unrecognized string returns ``None``; a non-string input raises
+    ``ValueError`` because it cannot represent nomenclature text.
+    """
+
+    if not isinstance(prefix, str):
+        raise ValueError("Basic numerical prefix must be a string")
+    if not prefix:
         return None
     return _basic_prefix_index().get(prefix)

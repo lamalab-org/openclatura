@@ -82,6 +82,18 @@ def test_generated_stems_are_unique():
     assert len(generated) == len(set(generated)) == 1000
 
 
+def test_forward_lookup_does_not_build_reverse_indexes():
+    stems._alkyl_suffix_index.cache_clear()
+    stems._basic_prefix_index.cache_clear()
+    stems._terminal_alkyl_pattern.cache_clear()
+
+    stems.stem_for(486)
+
+    assert stems._alkyl_suffix_index.cache_info().currsize == 0
+    assert stems._basic_prefix_index.cache_info().currsize == 0
+    assert stems._terminal_alkyl_pattern.cache_info().currsize == 0
+
+
 @pytest.mark.parametrize("length", range(1, 1001))
 def test_terminal_stem_round_trip(length):
     stem = stems.get(length)
@@ -93,10 +105,18 @@ def test_basic_prefix_round_trip(length):
     assert stems.length_for_basic_prefix(f"{stems.stem_for(length)}a") == length
 
 
-@pytest.mark.parametrize("value", [None, "", 31, "not-a-stem", "ethylated"])
-def test_reverse_stem_lookups_reject_unknown_values(value):
+@pytest.mark.parametrize("value", ["", "not-a-stem", "ethylated"])
+def test_reverse_stem_lookups_return_none_for_unknown_text(value):
     assert stems.terminal_stem(value) is None
     assert stems.length_for_basic_prefix(value) is None
+
+
+@pytest.mark.parametrize("value", [None, 31, 1.0, [], {}, True])
+def test_reverse_stem_lookups_raise_value_error_for_non_strings(value):
+    with pytest.raises(ValueError, match="must be a string"):
+        stems.terminal_stem(value)
+    with pytest.raises(ValueError, match="must be a string"):
+        stems.length_for_basic_prefix(value)
 
 
 @pytest.mark.parametrize(
