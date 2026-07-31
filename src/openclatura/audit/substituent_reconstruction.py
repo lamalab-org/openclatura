@@ -469,6 +469,9 @@ def _normalize_yl(stem: str) -> str:
 
 
 def _resolve_operator(name: str, stereo_map: dict[str, str] | None = None) -> Chem.Mol | None:
+    frag = _resolve_substituted_hydrazinyl(name)
+    if frag is not None:
+        return frag
     if name.startswith("N-") and name.endswith("amido"):
         frag = _resolve_n_substituted_amido(name[2:])
         if frag is not None:
@@ -768,6 +771,94 @@ def _strip_n_locants(head: str) -> str:
     locant adds no placement information the rebuild needs."""
 
     return _N_LOCANT_RE.sub("", head)
+
+
+# A ``hydrazinyl``'s two nitrogens, as the italic locants cite them: ``N`` is the
+# one bonded to the parent, ``N'`` the far one.
+_HYDRAZINYL_SITES: tuple[str, str] = ("N", "N'")
+
+_N_CLAUSE_RE = re.compile(r"N'*(?:,N'*)*-")
+
+
+def _resolve_substituted_hydrazinyl(name: str) -> Chem.Mol | None:
+    """``<N-locanted clauses>hydrazinyl`` -> ``parent-N(…)-N(…)``.
+
+    A single-nitrogen hub can discard its italic locants (see
+    :func:`_strip_n_locants`) because its ligands have only one place to go.  A
+    hydrazine's two nitrogens are distinguishable and the primes are what tell
+    them apart: ``N'-acetylhydrazinyl`` acylates the far nitrogen,
+    ``N-acetylhydrazinyl`` the one bonded to the parent.  Dropping the locant
+    would rebuild the wrong graph, so anything that does not parse as a clean
+    ``N``/``N'`` clause returns ``None`` and lets the audit abstain.
+    """
+
+    if not name.endswith("hydrazinyl") or len(name) == len("hydrazinyl"):
+        return None
+    clauses = _parse_n_locant_clauses(name[: -len("hydrazinyl")].rstrip("-"))
+    if clauses is None:
+        return None
+    rw = Chem.RWMol()
+    dummy = rw.AddAtom(Chem.Atom(0))
+    near = rw.AddAtom(Chem.Atom(7))
+    far = rw.AddAtom(Chem.Atom(7))
+    rw.AddBond(dummy, near, Chem.BondType.SINGLE)
+    rw.AddBond(near, far, Chem.BondType.SINGLE)
+    sites = dict(zip(_HYDRAZINYL_SITES, (near, far)))
+    for locs, subname in clauses:
+        frag = resolve_fragment_mol(subname)
+        if frag is None:
+            return None
+        for loc in locs:
+            if not _graft_onto(rw, sites[loc], frag):
+                return None
+    mol = rw.GetMol()
+    try:
+        Chem.SanitizeMol(mol)
+    except Exception:
+        return None
+    return mol
+
+
+def _parse_n_locant_clauses(head: str) -> list[tuple[list[str], str]] | None:
+    """Split ``N'-acetyl``, ``N,N'-dimethyl``, ``N',N'-dimethyl`` into
+    ``(locants, ligand-name)`` pairs, the italic-``N`` counterpart of
+    :func:`_parse_clauses`.
+
+    Splits only on locant groups at parenthesis depth 0, so an ``N`` inside a
+    parenthesised ligand stays part of that ligand."""
+
+    starts = [
+        m.start() for m in _N_CLAUSE_RE.finditer(head) if head[: m.start()].count("(") == head[: m.start()].count(")")
+    ]
+    if not starts or starts[0] != 0:
+        return None
+    clauses: list[tuple[list[str], str]] = []
+    for i, start in enumerate(starts):
+        end = starts[i + 1] if i + 1 < len(starts) else len(head)
+        m = re.match(r"^(N'*(?:,N'*)*)-(.*)$", head[start:end], re.DOTALL)
+        if m is None:
+            return None
+        locs = m.group(1).split(",")
+        if any(loc not in _HYDRAZINYL_SITES for loc in locs):
+            return None  # a third nitrogen: not a hydrazine
+        body = m.group(2).rstrip("-")
+        leaf = _leading_multiplier(body)
+        if leaf is not None:
+            count, body = leaf
+            if len(locs) != count:
+                return None
+        elif len(locs) > 1:
+            # As in :func:`_parse_clauses`: the locants already pin the count, so
+            # a ``bis``/``tris`` spelling over a parenthesised ligand is readable
+            # whenever it agrees with them.
+            for count, rest in _multipliers.candidate_splits(body):
+                if count == len(locs) and _resolvable(rest):
+                    body = rest
+                    break
+        if not body:
+            return None
+        clauses.append((locs, body))
+    return clauses
 
 
 def _resolve_disubstituted_amide_hub(name: str) -> Chem.Mol | None:

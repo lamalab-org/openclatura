@@ -62,6 +62,19 @@ def _canonical(mol) -> str | None:
         ("(4-((trifluoromethyl)oxy)benzamido)", "*NC(=O)c1ccc(OC(F)(F)F)cc1"),
         # ring substituents and an N-substituent at once
         ("(N-methyl-3-(pyrrolidin-1-ylsulfonyl)benzamido)", "*N(C)C(=O)c1cccc(S(=O)(=O)N2CCCC2)c1"),
+        # Substituted hydrazinyls: the primes place the ligand, so ``N`` (the
+        # nitrogen bonded to the parent) and ``N'`` (the far one) must not be
+        # interchangeable -- see the paired test below.
+        ("hydrazinyl", "*NN"),
+        ("(N'-methylhydrazinyl)", "*NNC"),
+        ("(N-methylhydrazinyl)", "*N(C)N"),
+        ("(N',N'-dimethylhydrazinyl)", "*NN(C)C"),
+        ("(N,N'-dimethylhydrazinyl)", "*N(C)NC"),
+        ("(N-aminohydrazinyl)", "*N(N)N"),
+        ("(N'-((furan-2-yl)carbonyl)hydrazinyl)", "*NNC(=O)c1ccco1"),
+        ("(N'-carbamothioylhydrazinyl)", "*NNC(N)=S"),
+        ("(N'-(4-ethoxyphenylsulfonyl)hydrazinyl)", "*NNS(=O)(=O)c1ccc(OCC)cc1"),
+        ("(N-(4-phenyl-oxan-4-yl)hydrazinyl)", "*N(N)C1(c2ccccc2)CCOCC1"),
         # von Baeyer fused-ring substituents (validated against OPSIN)
         ("bicyclo[2.2.1]heptan-2-yl", "*C1CC2CCC1C2"),
         ("(7,9-dioxabicyclo[4.3.0]nona-1(6),2,4-trien-3-yl)", "*c1ccc2c(c1)OCO2"),
@@ -1155,4 +1168,35 @@ def test_no_false_mismatch_on_golden_corpus():
     ],
 )
 def test_substituted_benzamides_reconstruct(smiles: str):
+    assert self_audit(smiles).verdict == "confirmed"
+
+
+def test_hydrazinyl_primes_are_not_interchangeable():
+    # The whole reason this resolver parses the italic locants instead of
+    # discarding them the way a single-nitrogen amide hub can: the two nitrogens
+    # are distinguishable, so a rebuild that ignored the prime would confirm a
+    # name describing a different molecule.
+    near = resolve_fragment_mol("(N-acetylhydrazinyl)")
+    far = resolve_fragment_mol("(N'-acetylhydrazinyl)")
+    assert near is not None and far is not None
+    assert _canonical(near) != _canonical(far)
+    # A third nitrogen is not a hydrazine, and must not be forced into one.
+    assert resolve_fragment_mol("(N''-methylhydrazinyl)") is None
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    [
+        # Acylhydrazides -- the far nitrogen carries the acyl in every one.
+        "CC(C)C(NS(=O)(=O)c1cccc(Cl)c1)C(=O)NNC(=O)c1ccco1",
+        "O=C(NNC(=O)c1cc(Cl)ccc1Cl)c1ccc(C(F)(F)F)cc1",
+        "CCOc1ccc(S(=O)(=O)NNC(=O)c2cccs2)cc1",
+        "COC(=O)C1CCCC(NNC(=O)OC(C)(C)C)C1",
+        "NC(=O)/C=C\\C(=O)NNC(N)=S",
+        # ligands on the near nitrogen instead
+        "NC(CCCCCN(N)N)c1ccc(Cl)nc1",
+        "CSCC[C@H](NS(=O)(=O)c1ccc2c(c1)OCCO2)C(=O)NN(C)C",
+    ],
+)
+def test_substituted_hydrazinyls_reconstruct(smiles: str):
     assert self_audit(smiles).verdict == "confirmed"
