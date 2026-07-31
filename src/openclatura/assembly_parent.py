@@ -90,9 +90,20 @@ def format_unsaturations(parts: AssemblyParts, stem_str: str) -> tuple[str, str]
         count = len(unsaturation.locants) or 1
         infix = bonds.unsaturation_infix(unsaturation.bond_key, count)
         base_infix = infix[1:] if infix.startswith("a") else infix
-        base_infixes.append((unsaturation, base_infix))
-    if base_infixes and not elision.is_vowel_start(base_infixes[0][1]):
-        stem_str += "a"
+        base_infixes.append((unsaturation, count, base_infix))
+    if base_infixes:
+        first_unsaturation, first_count, first_infix = base_infixes[0]
+        # The interfix ``a`` introduces a *multiplying prefix*; a lone bond cites
+        # the bare suffix and takes none (``but-2-ene``).
+        #
+        # Where there is a multiplier, eliding the ``a`` before its leading vowel
+        # needs the two vowels to actually meet.  A locant set between the stem
+        # and the multiplier keeps them apart, so the ``a`` survives:
+        # ``dodeca-1,...,11-undecaene``, not ``dodec-...``.  Only an unlocanted
+        # multiplier abuts the stem directly and elides.
+        if first_count > 1 and (first_unsaturation.locants or not elision.is_vowel_start(first_infix)):
+            stem_str += "a"
+    base_infixes = [(unsaturation, infix) for unsaturation, _count, infix in base_infixes]
     for unsaturation, base_infix in base_infixes:
         if unsaturation.locants:
             loc_str = ",".join(sorted(unsaturation.locants, key=parse_locant))

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from openclatura.rules import elements, multipliers
+from openclatura.rules import bonds, elements, multipliers
 
 
 @pytest.mark.parametrize("count", sorted(multipliers.MULTIPLIERS))
@@ -39,6 +39,46 @@ def test_candidate_splits_are_longest_first():
     counts = [count for count, _ in multipliers.candidate_splits("tetradecafluoro")]
     assert counts == sorted(counts, reverse=True)
     assert counts[0] == 14
+
+
+@pytest.mark.parametrize(
+    ("count", "expected"),
+    [
+        (1, "en"),
+        (2, "adien"),
+        (3, "atrien"),
+        (4, "atetraen"),
+        (9, "anonaen"),
+        (10, "adecaen"),
+        # Past 10 the bond module used to run out of private table and raise
+        # ``KeyError``, refusing names the multiplier table can spell perfectly
+        # well -- a long cumulene needs 14.
+        (12, "adodecaen"),
+        (14, "atetradecaen"),
+        (20, "aicosaen"),
+    ],
+)
+def test_unsaturation_infix_spans_the_whole_multiplier_table(count: int, expected: str):
+    assert bonds.unsaturation_infix("double", count) == expected
+
+
+def test_unsaturation_infix_covers_every_multiplier_for_both_bond_orders():
+    # Neither bond order may run out before the shared table does.
+    for count in multipliers.MULTIPLIERS:
+        assert bonds.unsaturation_infix("double", count).endswith("en")
+        assert bonds.unsaturation_infix("triple", count).endswith("yn")
+
+
+def test_a_single_bond_has_no_multiplicity():
+    # Saturation is not cited with a count, so asking for one is a caller bug and
+    # must say so rather than surfacing a bare lookup failure.
+    with pytest.raises(ValueError, match="not cited with a multiplicity"):
+        bonds.unsaturation_infix("single", 2)
+
+
+def test_a_count_beyond_the_table_reports_itself():
+    with pytest.raises(ValueError, match="no multiplicative prefix"):
+        bonds.unsaturation_infix("double", max(multipliers.MULTIPLIERS) + 1)
 
 
 def test_every_replacement_prefix_maps_to_its_element():

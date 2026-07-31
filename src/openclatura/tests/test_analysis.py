@@ -1903,9 +1903,7 @@ def test_a_named_spiro_component_primes_its_replacement_prefixes():
     # The side ring is the primed component, so its heteroatom locants are
     # primed too.  Unprimed, they read back on the other ring entirely.
     assert name_smiles("N1CC2(C3=CC=CC=C13)NCNC2") == "1',3'-diazaspiro[indoline-3,4'-cyclopentane]"
-    assert name_smiles("O=C1NC2(CN1)c1ccccc1NC2=O") == (
-        "1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2'-one-2-one"
-    )
+    assert name_smiles("O=C1NC2(CN1)c1ccccc1NC2=O") == ("1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2'-one-2-one")
 
 
 def test_every_side_ring_substituent_survives_and_is_primed():
@@ -1926,9 +1924,7 @@ def test_a_nested_substituents_own_locants_are_not_primed():
 
     from openclatura.assembly_spiro import extract_spiro_side_prefixes
 
-    prefixes, parent, _suffixes = extract_spiro_side_prefixes(
-        "1-((2,6-difluoro-3-methylphenyl)methyl)piperidine"
-    )
+    prefixes, parent, _suffixes = extract_spiro_side_prefixes("1-((2,6-difluoro-3-methylphenyl)methyl)piperidine")
     assert prefixes == ["1'-((2,6-difluoro-3-methylphenyl)methyl)"]
     assert parent == "piperidine"
 
@@ -1993,9 +1989,7 @@ def test_a_short_or_charged_nitrogen_chain_leaves_its_own_group_alone():
     # Diazo, hydrazone and azoxy each own their nitrogens and name them better
     # than a bare chain parent would.
     assert name_smiles("[N-]=[N+]=C1CCc2ccccc21") == "1-(diazo)indane"
-    assert name_smiles("COc1ccc(N=[N+]([O-])c2ccccc2)cc1") == (
-        "N-((4-methoxyphenyl)imino)-N-oxidobenzen-1-aminium"
-    )
+    assert name_smiles("COc1ccc(N=[N+]([O-])c2ccccc2)cc1") == ("N-((4-methoxyphenyl)imino)-N-oxidobenzen-1-aminium")
     # A principal group outside the chain keeps its own parent and suffix.
     assert name_smiles("OCCNN=NN") == "2-(hydrazonohydrazinyl)ethanol"
 
@@ -4081,9 +4075,7 @@ def test_retained_fused_ring_keeps_its_name_as_a_substituent_prefix():
         "OCc1ccc2cc3ccccc3nc2c1": "1-(acridin-3-yl)methanol",
         # a substituted ring substituent, and one carrying a second one
         "CPC(I)c1ccc2cccnc2c1": "7-(iodo(methylphosphanyl)methyl)quinoline",
-        "c1cc2c(nc(CPC(I)c3ccc4cccnc4c3)cc2)cc1": (
-            "2-(((iodo(quinolin-7-yl)methyl)phosphanyl)methyl)quinoline"
-        ),
+        "c1cc2c(nc(CPC(I)c3ccc4cccnc4c3)cc2)cc1": ("2-(((iodo(quinolin-7-yl)methyl)phosphanyl)methyl)quinoline"),
     }
 
     for smiles, expected in cases.items():
@@ -5709,8 +5701,7 @@ def test_hypervalent_sulfur_ester_keeps_every_ligand():
     # lambda^6 sulfur has three, and used to lose two of them silently.
     assert name_smiles("CCOS(C)=O") == "1-(methylsulfinyloxy)ethane"
     assert (
-        name_smiles("CCCCCCOS(=O)(CCCCCC)(CCCCCC)OCCCCCC")
-        == "1-(((hexyloxy)dihexyl(oxo)-lambda^6-sulfanyl)oxy)hexane"
+        name_smiles("CCCCCCOS(=O)(CCCCCC)(CCCCCC)OCCCCCC") == "1-(((hexyloxy)dihexyl(oxo)-lambda^6-sulfanyl)oxy)hexane"
     )
 
 
@@ -5900,9 +5891,7 @@ def test_ketone_amidinohydrazone_keeps_its_amidino_atoms():
     # Only aldehydes have an amidinohydrazone suffix.  A ketone's plain
     # hydrazone absorbed the amidino tail into the group without ever spelling
     # it, so C(N)N vanished from the name.
-    assert (
-        name_smiles("CC1CC/C(=N/N=C(N)N)C1") == "1-(diaminomethylidene)-2-((1Z)-3-methylcyclopentylidene)hydrazine"
-    )
+    assert name_smiles("CC1CC/C(=N/N=C(N)N)C1") == "1-(diaminomethylidene)-2-((1Z)-3-methylcyclopentylidene)hydrazine"
     assert (
         name_smiles("CC(=NN=C(N)N)c1ccc(-n2ccnc2)cc1")
         == "1-(diaminomethylidene)-2-(1-(4-(1H-imidazol-1-yl)phenyl)ethylidene)hydrazine"
@@ -5959,3 +5948,28 @@ def test_substituted_triazane_chain_keeps_its_branch():
     name = name_smiles("Nc1ccc(NN(N)c2cccc3ccccc23)cc1")
     assert "naphthalen-1-yl" in name
     assert name == "4-(N'-amino-N'-(naphthalen-1-yl)hydrazinyl)benzen-1-amine"
+
+
+def test_long_unsaturation_multiplicities_are_spellable():
+    # The bond table used to carry its own multiplier spellings, stopping at 10;
+    # a chain needing more raised ``KeyError`` and refused an otherwise ordinary
+    # name.  Reading the shared multiplier table instead reaches every count the
+    # rest of the namer can spell.
+    assert name_smiles("C=C=C=C=C=C=C=C=C=C=C=C=C=C=C[C@@H](Cl)[C@H](C)N") == (
+        "(2S,3R)-3-chlorooctadeca-4,5,6,7,8,9,10,11,12,13,14,15,16,17-tetradecaen-2-amine"
+    )
+    assert name_smiles("=".join("C" * 12)) == "dodeca-1,2,3,4,5,6,7,8,9,10,11-undecaene"
+
+
+def test_unsaturation_interfix_survives_a_locant_set():
+    # ``a`` elides before a vowel only when the two actually meet.  A locant set
+    # holds the stem and a vowel-initial multiplier apart, so the ``a`` stays --
+    # ``hexadeca-...-octaene``, never ``hexadec-...-octaene``.
+    assert name_smiles("C=CC=CC=CC=CC=CC=CC=CC=C") == "hexadeca-1,3,5,7,9,11,13,15-octaene"
+    assert name_smiles("C=C=C=C=C=C=C=C=C") == "nona-1,2,3,4,5,6,7,8-octaene"
+    # A consonant-initial multiplier never elided, and still does not.
+    assert name_smiles("C=CC=C") == "buta-1,3-diene"
+    assert name_smiles("C#CC#CC") == "penta-1,3-diyne"
+    # A lone bond cites the bare suffix, which takes no interfix at all.
+    assert name_smiles("CC=CC") == "but-2-ene"
+    assert name_smiles("N=S1C=CC1") == "1-imino-1lambda^4-thiacyclobut-2-ene"
