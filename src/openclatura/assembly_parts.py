@@ -144,6 +144,13 @@ class AssemblyParts:
     # *and* its ``-ol``.  The suffix must then not be rendered a second time, and
     # the parent binding owns the group's atoms.
     retained_absorbs_principal_group: bool = False
+    # Set when the whole substituent word is a retained name that spells its own
+    # branch as well as its skeleton -- ``benzyl`` is the methylene *and* the
+    # phenyl on it.  The absorbed branches are moved out of ``substituents`` so
+    # they are not also cited as prefixes, and are kept here so the parent
+    # binding can claim the atoms the retained word now names.
+    retained_substituent_name: str | None = None
+    retained_absorbed_substituents: list[SubstituentItem] = field(default_factory=list)
     retained_parent_metadata: RetainedParentMetadata | None = None
     front_modifiers: list[str] = field(default_factory=list)
     front_modifier_locants: list[str | None] = field(default_factory=list)

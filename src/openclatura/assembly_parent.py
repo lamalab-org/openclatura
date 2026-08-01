@@ -136,6 +136,59 @@ def promote_retained_functional_parent(parts: AssemblyParts) -> None:
     parts.retained_absorbs_principal_group = True
 
 
+# Retained substituent prefixes that spell a skeleton *together with* a branch
+# on it: ``benzyl`` is a methyl carrying a phenyl, ``tert-butyl`` a propan-2-yl
+# carrying a methyl.  Each row says what the skeleton must be -- chain length,
+# where it attaches, and the one branch it absorbs -- so the match is made on
+# the structure rather than on the spelling the systematic path happened to
+# produce.  Keyed by (length, attachment locant, branch name, branch locant).
+RETAINED_SUBSTITUENTS: dict[tuple[int, str, str, str], str] = {
+    (1, "1", "phenyl", "1"): "benzyl",
+    (3, "2", "methyl", "2"): "tert-butyl",
+}
+
+
+def promote_retained_substituent_name(parts: AssemblyParts) -> None:
+    """Fold a substituent's own branch into a retained prefix where one exists.
+
+    IUPAC keeps these as the preferred prefix, so they are not a cosmetic
+    rewrite of the systematic spelling: ``benzyl`` *is* the name of that group.
+    Both retained here permit substitution only on the absorbed branch's own
+    ring, which the systematic child name already carries -- so the match
+    requires the branch to be the bare ``phenyl``/``methyl``, and a substituted
+    one (``(4-chlorophenyl)methyl``) keeps the systematic form.
+
+    Only a singly attached group qualifies: ``ylidene`` and ``ylidyne`` spell
+    different attachments than the retained prefixes name.
+    """
+
+    if (
+        not parts.is_substituent
+        or parts.retained_substituent_name is not None
+        or parts.is_double_attach
+        or parts.is_triple_attach
+        or parts.is_ring
+        or parts.retained_name
+        or parts.principal_group
+        or parts.unsaturations
+        or parts.a_prefixes
+        or parts.parent_charges
+        or len(parts.substituents) != 1
+    ):
+        return
+    branch = parts.substituents[0]
+    if len(branch.locants) != 1:
+        return
+    retained = RETAINED_SUBSTITUENTS.get(
+        (parts.parent_length, str(parts.attachment_locant), branch.name, str(branch.locants[0]))
+    )
+    if retained is None:
+        return
+    parts.retained_substituent_name = retained
+    parts.retained_absorbed_substituents = [branch]
+    parts.substituents = []
+
+
 def parent_stem_and_terminal(parts: AssemblyParts) -> tuple[str, str]:
     terminal_e = bonds.PARENT_TERMINAL_VOWEL
 

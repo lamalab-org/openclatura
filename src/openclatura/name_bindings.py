@@ -33,10 +33,13 @@ def refresh_parent_binding(parts: AssemblyParts) -> None:
     if parts.retained_absorbs_principal_group and parts.principal_group is not None:
         atom_ids |= set(parts.principal_group.atom_ids)
         bond_ids |= set(parts.principal_group.bond_ids)
+    for absorbed in parts.retained_absorbed_substituents:
+        atom_ids |= set(absorbed.atom_ids)
+        bond_ids |= set(absorbed.bond_ids)
     rebuilt = NameAtomBinding(
         stage="parent",
         role="parent",
-        term=parts.retained_name or _parent_term(parts),
+        term=parts.retained_substituent_name or parts.retained_name or _parent_term(parts),
         atom_ids=atom_ids,
         bond_ids=bond_ids,
         emitted_tokens=_parent_emitted_tokens(parts),
@@ -449,6 +452,11 @@ def _parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]
         # oxygen too -- and no suffix token is emitted to carry those atoms.
         atom_ids |= set(parts.principal_group.atom_ids)
         bond_ids |= set(parts.principal_group.bond_ids)
+    for absorbed in parts.retained_absorbed_substituents:
+        # ``benzyl`` spells the phenyl too, and that branch emits no prefix
+        # token of its own for those atoms to hang off.
+        atom_ids |= set(absorbed.atom_ids)
+        bond_ids |= set(absorbed.bond_ids)
     return tuple(
         NameTokenBinding(
             text=token,
@@ -466,6 +474,8 @@ def _parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]
 
 def _parent_display_tokens(parts: AssemblyParts) -> tuple[str, ...]:
     tokens: list[str] = []
+    if parts.retained_substituent_name:
+        tokens.extend(_parent_token_variants(parts.retained_substituent_name))
     if parts.retained_name:
         tokens.extend(_parent_token_variants(parts.retained_name))
     stem_str, terminal_e = parent_stem_and_terminal(parts)

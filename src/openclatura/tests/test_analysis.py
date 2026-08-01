@@ -826,16 +826,16 @@ def test_carbonylamino_heteroatom_shortcut_tree_does_not_invent_hydroxy_children
 
 def test_postprocessing_rewrites_keep_token_metadata_auditable():
     result = NameAssemblyResult.from_raw_name(
-        "phenylmethyl",
-        [NameAtomBinding(stage="prefix", role="substituent", term="phenylmethyl", atom_ids={0, 1, 2}, bond_ids={0, 1})],
+        "phenylcarbonyl",
+        [NameAtomBinding(stage="prefix", role="substituent", term="phenylcarbonyl", atom_ids={0, 1, 2}, bond_ids={0, 1})],
         postprocess=post_process_name,
     )
 
-    assert result.text == "benzyl"
+    assert result.text == "benzoyl"
     assert result.rewrite_history[0].changed_binding_count == 1
     assert result.rewrite_history[0].changed_token_count >= 1
     assert all(token.binding_indices for token in result.token_spans)
-    assert {token.text for token in result.token_spans} == {"benzyl"}
+    assert {token.text for token in result.token_spans} == {"benzoyl"}
     assert {token.source for token in result.token_spans} == {"typed_rewrite"}
     assert {token.confidence for token in result.token_spans} == {"derived"}
     assert result.rewrite_history[0].ownership == "preserve_all"
@@ -854,29 +854,29 @@ def test_postprocessing_rewrites_bindings_to_final_emitted_direction():
 
 
 def test_postprocessing_updates_binding_terms():
-    bindings = [NameAtomBinding(stage="prefix", role="substituent", term="phenylmethyl", atom_ids={0, 1, 2})]
+    bindings = [NameAtomBinding(stage="prefix", role="substituent", term="phenylcarbonyl", atom_ids={0, 1, 2})]
 
     processed = postprocess_name_atom_bindings(bindings, post_process_name)
 
-    assert processed[0].term == "benzyl"
+    assert processed[0].term == "benzoyl"
     assert processed[0].atom_ids == {0, 1, 2}
 
 
 def test_name_assembly_result_preserves_binding_metadata_through_postprocessing():
     bindings = [
-        NameAtomBinding(stage="prefix", role="substituent", term="phenylmethyl", atom_ids={0, 1, 2}, bond_ids={0, 1})
+        NameAtomBinding(stage="prefix", role="substituent", term="phenylcarbonyl", atom_ids={0, 1, 2}, bond_ids={0, 1})
     ]
 
-    result = NameAssemblyResult.from_raw_name("phenylmethyl", bindings, postprocess=post_process_name)
+    result = NameAssemblyResult.from_raw_name("phenylcarbonyl", bindings, postprocess=post_process_name)
 
-    assert result.text == "benzyl"
-    assert result.bindings[0].term == "benzyl"
+    assert result.text == "benzoyl"
+    assert result.bindings[0].term == "benzoyl"
     assert result.bindings[0].atom_ids == {0, 1, 2}
     assert result.bindings[0].bond_ids == {0, 1}
     assert result.rewrite_history[0].changed_binding_count == 1
     assert result.rewrite_history[0].changed_token_count >= 1
     assert all(token.binding_indices for token in result.token_spans)
-    assert next(token for token in result.token_spans if token.text == "benzyl").atom_ids == frozenset({0, 1, 2})
+    assert next(token for token in result.token_spans if token.text == "benzoyl").atom_ids == frozenset({0, 1, 2})
 
 
 def test_name_assembly_result_tracks_named_rewrite_pipeline():

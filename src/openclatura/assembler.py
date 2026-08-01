@@ -12,6 +12,7 @@ from .assembly_parent import (
     parent_stem_and_terminal,
     promote_benzene_retained_name,
     promote_retained_functional_parent,
+    promote_retained_substituent_name,
 )
 from .assembly_parts import AssemblyParts
 from .assembly_prefixes import format_replacement_prefixes, format_substituent_prefixes
@@ -53,11 +54,6 @@ LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
     ("benzene-1-carbonyl", "benzoyl"),
     ("methanoyl", "formyl"),
     ("ethanoyl", "acetyl"),
-    ("2-methylpropan-2-yl", "tert-butyl"),
-    ("1,1-dimethylethyl", "tert-butyl"),
-    ("(1,1-dimethylethyl)oxy", "tert-butoxy"),
-    ("(tert-butyl)oxy", "tert-butoxy"),
-    ("tert-butyloxy", "tert-butoxy"),
     ("methylcarbonyloxy", "acetoxy"),
     ("methylcarbonyl", "acetyl"),
     ("ethylcarbonyl", "propionyl"),
@@ -90,9 +86,7 @@ LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
     ("1-oxobutyl", "butyryl"),
     ("1-oxopentyl", "pentanoyl"),
     ("1-oxohexyl", "hexanoyl"),
-    ("phenylmethyl", "benzyl"),
     ("benzylcarbonyl", "phenylacetyl"),
-    ("phenylmethoxy", "benzyloxy"),
     ("methanehydrazine", "methylhydrazine"),
     ("ethanehydrazine", "ethylhydrazine"),
     ("propanehydrazine", "propylhydrazine"),
@@ -103,7 +97,6 @@ LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
     ("iodoethanoyl", "iodoacetyl"),
 )
 
-_LEGACY_TERT_BUTYL = {"2-methylpropan-2-yl", "1,1-dimethylethyl"}
 _LEGACY_SUBST_ALKYL_ACYL = {"ethylcarbonyl", "propylcarbonyl"}
 
 
@@ -117,9 +110,7 @@ def _compile_legacy_replacements() -> tuple[tuple[str, re.Pattern, str], ...]:
     compiled: list[tuple[str, re.Pattern, str]] = []
     for old, new in LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS:
         esc = re.escape(old)
-        if old in _LEGACY_TERT_BUTYL:
-            compiled.append((old, re.compile(rf"(?<![a-zA-Z0-9\-,]){esc}(?![a-zA-Z])"), new))
-        elif old in _LEGACY_SUBST_ALKYL_ACYL:
+        if old in _LEGACY_SUBST_ALKYL_ACYL:
             compiled.append((old, re.compile(rf"(?<![a-zA-Z)]){esc}(?![a-zA-Z])"), new))
         else:
             compiled.append((old, re.compile(rf"(?<![a-zA-Z]){esc}(?![a-zA-Z])"), new))
@@ -400,11 +391,15 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
     if fused_ion_candidate is not None:
         consume_fused_ion_operation(parts, fused_ion_candidate)
 
+    # Has to run before the prefixes are formatted: it takes one of them away.
+    promote_retained_substituent_name(parts)
     spiro_subs = split_spiro_substituents(parts)
     prefix_str = format_substituent_prefixes(parts, spiro_subs)
     a_prefix_str = format_replacement_prefixes(parts)
     promote_benzene_retained_name(parts)
     promote_retained_functional_parent(parts)
+    if parts.retained_substituent_name is not None and parts.name_atom_bindings:
+        refresh_parent_binding(parts)
     if parts.retained_absorbs_principal_group and parts.name_atom_bindings:
         # Bindings are built before assembly runs, so the parent one still
         # describes the systematic spelling this promotion just replaced -- it
@@ -412,6 +407,9 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
         refresh_parent_binding(parts)
     if fused_ion_candidate is not None and fused_ion_candidate.rendered_name is not None:
         core_name = fused_ion_candidate.rendered_name
+    elif parts.retained_substituent_name is not None:
+        # The retained prefix is the whole word -- skeleton, branch and ``yl``.
+        core_name = parts.retained_substituent_name
     else:
         stem_str, terminal_e = parent_stem_and_terminal(parts)
         stem_str = apply_replacement_prefix(stem_str, a_prefix_str)
