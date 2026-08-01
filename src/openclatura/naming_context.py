@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from .assembly_parts import RetainedParentMetadata
+from .locant_sources import LocantMapSource
 from .parent_selection import ParentSelection
 from .perception import PerceivedGroup
 
@@ -49,7 +50,7 @@ class ParentAssemblyPlan:
 
     numbered_path: list[int]
     locant_map: dict[int, str] | None
-    locant_map_source: str
+    locant_map_source: LocantMapSource
     get_loc: Callable
     parts: object
 

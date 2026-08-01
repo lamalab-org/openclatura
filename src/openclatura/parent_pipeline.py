@@ -1,6 +1,7 @@
 """Shared parent planning steps for component and subgraph naming."""
 
 from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem, RetainedParentMetadata
+from .locant_sources import LocantMapSource
 from .molecule import Molecule
 from .name_bindings import ensure_name_atom_binding_tokens
 from .namer_config import RETAINED_RING_ELEMENTS
@@ -44,7 +45,7 @@ def build_parent_assembly_plan(
 ) -> ParentAssemblyPlan:
     """Number a selected parent and create base assembly parts."""
 
-    locant_map_source = "supplied" if locant_maps else "generated"
+    locant_map_source = LocantMapSource.SUPPLIED if locant_maps else LocantMapSource.GENERATED
     if (
         locant_maps is None
         and selection.ring_parent is not None
@@ -56,7 +57,7 @@ def build_parent_assembly_plan(
         ]
         locant_maps = audited_maps or None
         if locant_maps:
-            locant_map_source = "proof"
+            locant_map_source = LocantMapSource.PROOF
     numbered_path, locant_map = choose_parent_numbering(
         mol,
         selection.paths,
@@ -103,7 +104,7 @@ def build_parent_parts(
     intent: NamingIntent,
     retained_parent_metadata: RetainedParentMetadata | None = None,
     *,
-    locant_map_source: str = "generated",
+    locant_map_source: LocantMapSource = LocantMapSource.GENERATED,
 ) -> AssemblyParts:
     """Create shared parent assembly parts for a naming intent."""
 
