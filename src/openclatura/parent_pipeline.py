@@ -44,6 +44,7 @@ def build_parent_assembly_plan(
 ) -> ParentAssemblyPlan:
     """Number a selected parent and create base assembly parts."""
 
+    locant_map_source = "supplied" if locant_maps else "generated"
     if (
         locant_maps is None
         and selection.ring_parent is not None
@@ -54,6 +55,8 @@ def build_parent_assembly_plan(
             numbering.locant_map for numbering in selection.ring_parent.numbering_candidates if numbering.audit_ok
         ]
         locant_maps = audited_maps or None
+        if locant_maps:
+            locant_map_source = "proof"
     numbered_path, locant_map = choose_parent_numbering(
         mol,
         selection.paths,
@@ -76,8 +79,15 @@ def build_parent_assembly_plan(
         selection,
         intent,
         retained_parent_metadata,
+        locant_map_source=locant_map_source,
     )
-    return ParentAssemblyPlan(numbered_path=numbered_path, locant_map=locant_map, get_loc=get_loc, parts=parts)
+    return ParentAssemblyPlan(
+        numbered_path=numbered_path,
+        locant_map=locant_map,
+        locant_map_source=locant_map_source,
+        get_loc=get_loc,
+        parts=parts,
+    )
 
 
 def _is_von_baeyer_descriptor(descriptor: str | None) -> bool:
@@ -92,6 +102,8 @@ def build_parent_parts(
     selection: ParentSelection,
     intent: NamingIntent,
     retained_parent_metadata: RetainedParentMetadata | None = None,
+    *,
+    locant_map_source: str = "generated",
 ) -> AssemblyParts:
     """Create shared parent assembly parts for a naming intent."""
 
@@ -122,6 +134,7 @@ def build_parent_parts(
         polycycle_descriptor=selection.polycycle_descriptor,
         retained_name=retained_name,
         retained_parent_metadata=retained_parent_metadata,
+        locant_map_source=locant_map_source,
         parent_atom_ids=set(numbered_path),
         parent_bond_ids=bond_ids_within(mol, set(numbered_path)),
         **assembly_overrides,

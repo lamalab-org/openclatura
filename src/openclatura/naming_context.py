@@ -49,6 +49,7 @@ class ParentAssemblyPlan:
 
     numbered_path: list[int]
     locant_map: dict[int, str] | None
+    locant_map_source: str
     get_loc: Callable
     parts: object
 
