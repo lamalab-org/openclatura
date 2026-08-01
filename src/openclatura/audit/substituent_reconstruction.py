@@ -227,6 +227,7 @@ _RING_STEMS: dict[str, tuple[str, list[str]]] = {
     "oxetane": ("O1CCC1", ["1", "2", "3", "4"]),
     "aziridine": ("N1CC1", ["1", "2", "3"]),
     "oxirane": ("O1CC1", ["1", "2", "3"]),
+    "thiirane": ("S1CC1", ["1", "2", "3"]),
     # saturated five-membered multi-heteroatom rings (heteroatom order fixes numbering)
     "imidazolidine": ("N1CNCC1", ["1", "2", "3", "4", "5"]),
     "pyrazolidine": ("N1NCCC1", ["1", "2", "3", "4", "5"]),
