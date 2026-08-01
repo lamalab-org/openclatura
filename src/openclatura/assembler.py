@@ -11,6 +11,7 @@ from .assembly_parent import (
     format_substituent_tail,
     parent_stem_and_terminal,
     promote_benzene_retained_name,
+    promote_retained_functional_parent,
 )
 from .assembly_parts import AssemblyParts
 from .assembly_prefixes import format_replacement_prefixes, format_substituent_prefixes
@@ -19,7 +20,7 @@ from .assembly_utils import needs_hyphen, parse_locant
 from .formatting import ensure_stereo_descriptor_boundary, format_multiplier
 from .fused_ion_templates import consume_fused_ion_operation, select_fused_ion_operation
 from .name_assembly import NameAssemblyResult, token_span_trace_data
-from .name_bindings import refresh_name_atom_bindings
+from .name_bindings import refresh_name_atom_bindings, refresh_parent_binding
 from .name_postprocessing import (
     apply_acyl_amido_postprocessing,
     apply_connection_boundary_postprocessing,
@@ -39,17 +40,17 @@ LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
     ("hydroxymethanenitrile", "cyanic acid"),
     ("hydroxymethanoyl", "carboxy"),
     ("hydroxymethanoic anhydride", "dicarbonic acid"),
+    # Paths that do not go through the parent assembly -- a ring aldehyde
+    # rendered as a hydrazone parent, say -- still spell the systematic form,
+    # so these stay until those callers are migrated too.  After
+    # ``promote_retained_functional_parent`` the parent path never emits the
+    # systematic string, so these no longer fire for it.
     ("benzene-1-carboxylic acid", "benzoic acid"),
     ("benzene-1-carboxamide", "benzamide"),
     ("benzene-1-carboxylate", "benzoate"),
     ("benzene-1-carbonitrile", "benzonitrile"),
     ("benzene-1-carbaldehyde", "benzaldehyde"),
     ("benzene-1-carbonyl", "benzoyl"),
-    ("benzenecarboxylic acid", "benzoic acid"),
-    ("benzenecarcarboxamide", "benzamide"),
-    ("benzenecarboxylate", "benzoate"),
-    ("benzenecarcarbonitrile", "benzonitrile"),
-    ("benzenecarbaldehyde", "benzaldehyde"),
     ("methanoic acid", "formic acid"),
     ("methanamide", "formamide"),
     ("methanoate", "formate"),
@@ -465,6 +466,12 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
     prefix_str = format_substituent_prefixes(parts, spiro_subs)
     a_prefix_str = format_replacement_prefixes(parts)
     promote_benzene_retained_name(parts)
+    promote_retained_functional_parent(parts)
+    if parts.retained_absorbs_principal_group and parts.name_atom_bindings:
+        # Bindings are built before assembly runs, so the parent one still
+        # describes the systematic spelling this promotion just replaced -- it
+        # would keep claiming ``benzene`` for a name that now reads ``phenol``.
+        refresh_parent_binding(parts)
     if fused_ion_candidate is not None and fused_ion_candidate.rendered_name is not None:
         core_name = fused_ion_candidate.rendered_name
     else:

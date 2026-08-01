@@ -34,6 +34,43 @@ def promote_benzene_retained_name(parts: AssemblyParts) -> None:
                     parts.unsaturations = []
 
 
+# Retained names that spell a parent hydride *together with* its principal
+# characteristic group, keyed by the two things that make them up.  IUPAC keeps
+# these as the preferred name when the ring is substituted -- ``4-chlorophenol``,
+# ``4-chlorobenzaldehyde`` -- so they belong to the parent, not to a rewrite of
+# the finished string: only here is the locant still known to be the group's own.
+RETAINED_FUNCTIONAL_PARENTS: dict[tuple[str, str], str] = {
+    ("benzene", "alcohol"): "phenol",
+    ("benzene", "amine"): "aniline",
+    ("benzene", "ring_aldehyde"): "benzaldehyde",
+    ("benzene", "ring_carboxylic_acid"): "benzoic acid",
+    ("benzene", "ring_amide"): "benzamide",
+    ("benzene", "ring_nitrile"): "benzonitrile",
+    ("benzene", "ring_carboxylate"): "benzoate",
+}
+
+
+def promote_retained_functional_parent(parts: AssemblyParts) -> None:
+    """Fold a principal group into the retained parent name where one exists.
+
+    ``benzene`` + an ``-ol`` at ring position 1 is ``phenol``.  The group has to
+    sit at locant 1 and be the only one of its kind, since the retained name has
+    nowhere to put a locant or a multiplier -- ``benzene-1,2-diol`` keeps the
+    systematic spelling, as IUPAC intends.
+    """
+
+    group = parts.principal_group
+    if group is None or parts.is_substituent or parts.retained_absorbs_principal_group:
+        return
+    retained = RETAINED_FUNCTIONAL_PARENTS.get((parts.retained_name or "", group.key))
+    if retained is None:
+        return
+    if [str(locant) for locant in group.locants] != ["1"]:
+        return
+    parts.retained_name = retained
+    parts.retained_absorbs_principal_group = True
+
+
 def parent_stem_and_terminal(parts: AssemblyParts) -> tuple[str, str]:
     terminal_e = bonds.PARENT_TERMINAL_VOWEL
 
@@ -226,7 +263,14 @@ def format_parent_tail(parts: AssemblyParts, stem_str: str, terminal_e: str, spi
             unsat_str = bonds.get("single").saturated_suffix
         else:
             stem_str, unsat_str = format_unsaturations(parts, stem_str)
-    terminal_e, suffix_str = format_principal_suffix(parts, terminal_e, spiro_subs)
+    if parts.retained_absorbs_principal_group:
+        # The retained name already spells the group (``phenol``), so rendering
+        # the suffix again would give ``phenol-1-ol``.  ``terminal_e`` is left
+        # alone: it carries the retained name's own final vowel, which the stem
+        # split took off (``anilin`` + ``e``), and only a rendered suffix elides.
+        suffix_str = ""
+    else:
+        terminal_e, suffix_str = format_principal_suffix(parts, terminal_e, spiro_subs)
     charge_operations = parent_charge_name_operations(parts)
     if charge_operations:
         terminal_e = ""

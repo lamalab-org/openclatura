@@ -158,8 +158,26 @@ _ALL_PARENT_TEMPLATES: dict[str, tuple[str, list[str]]] = {
 }
 
 
+def _functional_parent_hydrides() -> dict[str, str]:
+    """Retained functional parent -> the parent hydride it is built on.
+
+    Read off the namer's own table rather than restated, so the two directions
+    cannot drift: whatever the namer can fold into a retained name, the audit can
+    unfold.  ``phenol`` rebuilds as the ``benzene`` template plus the ``alcohol``
+    suffix that is still recorded on the parts.
+    """
+
+    from ..assembly_parent import RETAINED_FUNCTIONAL_PARENTS
+
+    return {retained: hydride for (hydride, _group), retained in RETAINED_FUNCTIONAL_PARENTS.items()}
+
+
 def _lookup_parent_template(retained_name: str) -> tuple[str, list[str]] | None:
-    return _ALL_PARENT_TEMPLATES.get(retained_name)
+    template = _ALL_PARENT_TEMPLATES.get(retained_name)
+    if template is not None:
+        return template
+    hydride = _functional_parent_hydrides().get(retained_name)
+    return _ALL_PARENT_TEMPLATES.get(hydride) if hydride is not None else None
 
 
 # Principal characteristic groups whose structure we can rebuild with high

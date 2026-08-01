@@ -336,7 +336,11 @@ def name_oxygen_subgraph(
 
     nxt = next_atoms[0]
     s_oxygens = double_bonded_neighbors(mol, nxt, "O")
-    if mol.atoms[nxt].symbol == "S" and s_oxygens and _has_at_most_one_further_ligand(mol, nxt, {start_idx, *s_oxygens}):
+    if (
+        mol.atoms[nxt].symbol == "S"
+        and s_oxygens
+        and _has_at_most_one_further_ligand(mol, nxt, {start_idx, *s_oxygens})
+    ):
         # ``sulfinyl``/``sulfonyl`` spell a sulfur bearing one ligand besides the
         # oxo group and this oxygen.  A hypervalent sulfur carrying more would
         # lose them here, so it goes to the general namer, which can reach for

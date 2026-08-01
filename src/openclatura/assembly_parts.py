@@ -139,6 +139,11 @@ class AssemblyParts:
     is_triple_attach: bool = False
     attachment_locant: int | str = 1
     retained_name: str | None = None
+    # Set when ``retained_name`` is one of the retained names that spells the
+    # principal characteristic group as well as the ring -- ``phenol`` is benzene
+    # *and* its ``-ol``.  The suffix must then not be rendered a second time, and
+    # the parent binding owns the group's atoms.
+    retained_absorbs_principal_group: bool = False
     retained_parent_metadata: RetainedParentMetadata | None = None
     front_modifiers: list[str] = field(default_factory=list)
     front_modifier_locants: list[str | None] = field(default_factory=list)

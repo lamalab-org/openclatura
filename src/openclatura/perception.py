@@ -169,17 +169,13 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
         # terminal sent `P(=N-tBu)` to the amine catch-all below, which does
         # not look at bond order, and the double bond vanished into a `-amine`
         # suffix.
-        double_bonded = [
-            n for n in neighbors if (bond := mol.get_bond(atom.idx, n)) is not None and bond.order == 2
-        ]
+        double_bonded = [n for n in neighbors if (bond := mol.get_bond(atom.idx, n)) is not None and bond.order == 2]
         if len(double_bonded) != 1:
             continue
         center = double_bonded[0]
         if mol.atoms[center].is_carbon:
             continue
-        if any(
-            (bond := mol.get_bond(atom.idx, n)) is None or bond.order != 1 for n in neighbors if n != center
-        ):
+        if any((bond := mol.get_bond(atom.idx, n)) is None or bond.order != 1 for n in neighbors if n != center):
             continue
         # A substituted imino only becomes a prefix on a ring centre, where the
         # ring is the parent regardless.  On an acyclic centre the nitrogen is
@@ -189,9 +185,7 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
         # belongs to a senior group of its own (an amide, a hydrazone), so
         # claiming it here would steal it from that suffix and, for a cyclic
         # sulfoximine, open the ring it is double-bonded into.
-        if len(neighbors) != 1 and (
-            center not in cyclic_atoms or _has_senior_nitrogen_ligand(mol, atom.idx, center)
-        ):
+        if len(neighbors) != 1 and (center not in cyclic_atoms or _has_senior_nitrogen_ligand(mol, atom.idx, center)):
             continue
         variant = "terminal_heteroatom_imino" if len(neighbors) == 1 else "substituted_heteroatom_imino"
         groups.append(

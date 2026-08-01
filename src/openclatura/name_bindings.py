@@ -16,6 +16,37 @@ from .token_grammar import (
 )
 
 
+def refresh_parent_binding(parts: AssemblyParts) -> None:
+    """Rebuild just the parent binding, leaving every other binding untouched.
+
+    Assembly can rename the parent after the bindings were built -- folding the
+    principal group into a retained name turns ``benzene`` into ``phenol``.  Only
+    that one binding is stale, and a full refresh would discard the emitted-token
+    metadata the substituent bindings have already accumulated, so replace it in
+    place.
+    """
+
+    if not parts.parent_atom_ids:
+        return
+    atom_ids = set(parts.parent_atom_ids)
+    bond_ids = set(parts.parent_bond_ids)
+    if parts.retained_absorbs_principal_group and parts.principal_group is not None:
+        atom_ids |= set(parts.principal_group.atom_ids)
+        bond_ids |= set(parts.principal_group.bond_ids)
+    rebuilt = NameAtomBinding(
+        stage="parent",
+        role="parent",
+        term=parts.retained_name or _parent_term(parts),
+        atom_ids=atom_ids,
+        bond_ids=bond_ids,
+        emitted_tokens=_parent_emitted_tokens(parts),
+    )
+    for index, binding in enumerate(parts.name_atom_bindings):
+        if binding.stage == "parent" and binding.role == "parent":
+            parts.name_atom_bindings[index] = rebuilt
+            return
+
+
 def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
     """Populate structured bindings for the current assembly parts."""
 
@@ -26,13 +57,21 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
     ]
     bindings: list[NameAtomBinding] = []
     if parts.parent_atom_ids:
+        parent_atom_ids = set(parts.parent_atom_ids)
+        parent_bond_ids = set(parts.parent_bond_ids)
+        if parts.retained_absorbs_principal_group and parts.principal_group is not None:
+            # ``phenol`` spells the ring *and* its oxygen, so the parent term is
+            # what those atoms are named by -- the suffix binding no longer has
+            # any text of its own for the final audit to find.
+            parent_atom_ids |= set(parts.principal_group.atom_ids)
+            parent_bond_ids |= set(parts.principal_group.bond_ids)
         bindings.append(
             NameAtomBinding(
                 stage="parent",
                 role="parent",
                 term=parts.retained_name or _parent_term(parts),
-                atom_ids=set(parts.parent_atom_ids),
-                bond_ids=set(parts.parent_bond_ids),
+                atom_ids=parent_atom_ids,
+                bond_ids=parent_bond_ids,
                 emitted_tokens=_parent_emitted_tokens(parts),
             )
         )
@@ -403,6 +442,13 @@ def _operation_emitted_tokens(binding: NameAtomBinding) -> tuple[NameTokenBindin
 
 def _parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]:
     tokens = _parent_display_tokens(parts)
+    atom_ids = set(parts.parent_atom_ids)
+    bond_ids = set(parts.parent_bond_ids)
+    if parts.retained_absorbs_principal_group and parts.principal_group is not None:
+        # The word spells the group as well as the ring -- ``phenol`` is the
+        # oxygen too -- and no suffix token is emitted to carry those atoms.
+        atom_ids |= set(parts.principal_group.atom_ids)
+        bond_ids |= set(parts.principal_group.bond_ids)
     return tuple(
         NameTokenBinding(
             text=token,
@@ -410,8 +456,8 @@ def _parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]
             source="default_binding",
             grammar_role="parent",
             binding_key="parent:parent",
-            atom_ids=set(parts.parent_atom_ids),
-            bond_ids=set(parts.parent_bond_ids),
+            atom_ids=atom_ids,
+            bond_ids=bond_ids,
         )
         for token in tokens
         if token

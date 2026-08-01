@@ -1347,14 +1347,17 @@ def test_nested_hydroxyphenyl_propan_yl_tokens_keep_local_scopes():
     tokens = {(token["text"], token["start"]): token for token in assembly.data["name_token_spans"]}
     name = analysis.name
 
-    assert analysis.name == "4-(2-(4-hydroxyphenyl)propan-2-yl)benzen-1-ol"
+    assert analysis.name == "4-(2-(4-hydroxyphenyl)propan-2-yl)phenol"
     assert tokens[("2", name.index("2-(4-hydroxyphenyl"))]["atoms"] == [1]
     assert tokens[("4", name.index("4-hydroxyphenyl"))]["atoms"] == [16]
     assert tokens[("hydroxyphenyl", name.index("hydroxyphenyl"))]["atoms"] == [10, 11, 12, 13, 14, 15, 16]
     assert tokens[("prop", name.index("propan"))]["atoms"] == [0, 1, 2]
     assert tokens[("2", name.index("2-yl"))]["atoms"] == [1]
-    assert tokens[("yl", name.index("yl)benzen"))]["atoms"] == [1]
-    assert tokens[("benzen", name.index("benzen"))]["atoms"] == [3, 4, 5, 6, 7, 8]
+    assert tokens[("yl", name.index("yl)phenol"))]["atoms"] == [1]
+    # ``phenol`` is a retained name that spells the ring *and* its oxygen, so the
+    # parent token owns atom 9 too -- under the systematic ``benzen-1-ol`` the
+    # ring token covered only 3-8 and the ``ol`` suffix carried the oxygen.
+    assert tokens[("phenol", name.index("phenol"))]["atoms"] == [3, 4, 5, 6, 7, 8, 9]
 
 
 def test_oxygen_carbonyl_alkenyl_aryl_substituent_tokens_keep_local_scopes():
@@ -2343,7 +2346,7 @@ def test_terminal_thioaldehyde_on_ring_uses_carbothialdehyde_suffix():
 def test_terminal_thioaldehyde_prefix_uses_monovalent_thioformyl():
     generated = name_smiles("NC(=O)c1cccc(N)c1C=S")
 
-    assert generated == "3-amino-2-thioformylbenzene-1-carboxamide"
+    assert generated == "3-amino-2-thioformylbenzamide"
 
 
 def test_terminal_thioformyl_subgraph_is_graph_derived():
@@ -4781,7 +4784,7 @@ def test_public_api_golden_names():
         "CC(=O)O": "acetic acid",
         "C1CCCCC1": "cyclohexane",
         "[Na+].[Cl-]": "sodium chloride",
-        "c1ccccc1O": "benzen-1-ol",
+        "c1ccccc1O": "phenol",
         "CC(=O)Oc1ccccc1C(=O)O": "2-(acetoxy)benzoic acid",
     }
 
@@ -5711,7 +5714,7 @@ def test_sulfur_imide_substituents_preserve_double_bonded_nitrogen():
 
 
 def test_sulfonimidoyl_substituents_keep_imino_n_ligand():
-    assert name_smiles("CC(C)N=S(C)(=O)c1ccc(N)cc1") == "4-(N-propan-2-yl-S-methylsulfonimidoyl)benzen-1-amine"
+    assert name_smiles("CC(C)N=S(C)(=O)c1ccc(N)cc1") == "4-(N-propan-2-yl-S-methylsulfonimidoyl)aniline"
     assert name_smiles("CN=S(=O)(CC(C)N)NOC") == "1-(N-methyl-S-methoxyaminosulfonimidoyl)propan-2-amine"
 
 
@@ -5947,7 +5950,7 @@ def test_substituted_triazane_chain_keeps_its_branch():
     # dropped the naphthalene.  Declining that role names the whole chain.
     name = name_smiles("Nc1ccc(NN(N)c2cccc3ccccc23)cc1")
     assert "naphthalen-1-yl" in name
-    assert name == "4-(N'-amino-N'-(naphthalen-1-yl)hydrazinyl)benzen-1-amine"
+    assert name == "4-(N'-amino-N'-(naphthalen-1-yl)hydrazinyl)aniline"
 
 
 def test_long_unsaturation_multiplicities_are_spellable():

@@ -91,12 +91,12 @@
   },
   {
     "smiles": "c1ccc(O)cc1",
-    "name": "benzen-1-ol",
+    "name": "phenol",
     "category": "aromatic"
   },
   {
     "smiles": "c1ccc(N)cc1",
-    "name": "benzen-1-amine",
+    "name": "aniline",
     "category": "aromatic"
   },
   {

@@ -1194,9 +1194,7 @@ def _simple_rooted_carbanion_substituent_name(
 
 
 _MULTI_ACID_ENDINGS = tuple(
-    f"{multiplier}{stem}"
-    for multiplier in ("di", "tri", "tetra")
-    for stem in ("oic acid", "carboxylic acid")
+    f"{multiplier}{stem}" for multiplier in ("di", "tri", "tetra") for stem in ("oic acid", "carboxylic acid")
 )
 
 
