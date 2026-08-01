@@ -262,6 +262,14 @@ _RING_STEMS: dict[str, tuple[str, list[str]]] = {
 # when the name asks for the other tautomer.
 # fmt: off
 _RETAINED_FUSED_RING_STEMS: dict[str, tuple[str, list[str]]] = {
+    "1H-indole": ("c1ccc2[nH]ccc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "1H-perimidine": ("C1=Nc2cccc3cccc(c23)N1", ["2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b", "1"]),
+    "2H-isoindole": ("c1ccc2c[nH]cc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "acenaphthylene": ("C1=Cc2cccc3cccc1c23", ["1", "2", "2a", "3", "4", "5", "5a", "6", "7", "8", "8a", "8b"]),
+    "azulene": ("c1ccc2cccc-2cc1", ["6", "7", "8", "8a", "1", "2", "3", "3a", "4", "5"]),
+    "fluoranthene": ("c1ccc2c(c1)-c1cccc3cccc-2c13", ["9", "8", "7", "6b", "10a", "10", "10b", "1", "2", "3", "3a", "4", "5", "6", "6a", "10c"]),
+    "indolizine": ("c1ccn2cccc2c1", ["7", "6", "5", "4", "3", "2", "1", "8a", "8"]),
+    "pteridine": ("c1cnc2ncncc2n1", ["6", "7", "8", "8a", "1", "2", "3", "4", "4a", "5"]),
     "1,10-phenanthroline": ("c1cnc2c(c1)ccc1cccnc12", ["3", "2", "1", "10b", "4a", "4", "5", "6", "6a", "7", "8", "9", "10", "10a"]),
     "1,4-phenanthroline": ("c1ccc2c(c1)ccc1nccnc12", ["8", "9", "10", "10a", "6a", "7", "6", "5", "4a", "4", "3", "2", "1", "10b"]),
     "1,5-naphthyridine": ("c1cnc2cccnc2c1", ["3", "2", "1", "8a", "8", "7", "6", "5", "4a", "4"]),

@@ -3475,33 +3475,21 @@ def test_retained_fused_graph_template_data_file_validates_guarded_core_entries(
         "xanthene",
     } <= set(by_name)
     enabled_names = {template.name for template in retained_fused_graph_templates()}
-    assert not (
-        {
-            "naphthalene",
-            "quinoline",
-            "isoquinoline",
-            "1,5-naphthyridine",
-            "1,6-naphthyridine",
-            "1,7-naphthyridine",
-            "1,8-naphthyridine",
-            "2,6-naphthyridine",
-            "2,7-naphthyridine",
-            "quinazoline",
-            "quinoxaline",
-            "cinnoline",
-            "phthalazine",
-            "azulene",
-            "1H-phenalene",
-            "acenaphthylene",
-            "fluoranthene",
-            "1H-perimidine",
-            "pteridine",
-            "2H-isoindole",
-            "indolizine",
-            "1H-indole",
-        }
-        & enabled_names
-    )
+    # Enabled once each parent's derivative numbering round-tripped through
+    # OPSIN at every substitutable position.  ``1H-phenalene`` is deliberately
+    # absent: it still cites its indicated hydrogen as ``1H`` wherever the sp3
+    # carbon really is.
+    assert enabled_names == {
+        "azulene",
+        "acenaphthylene",
+        "fluoranthene",
+        "1H-perimidine",
+        "pteridine",
+        "2H-isoindole",
+        "indolizine",
+        "1H-indole",
+    }
+    assert "1H-phenalene" not in enabled_names
     production_derivative_names = {template.name for template in templates if template.derivative_production_enabled}
     assert production_derivative_names == {
         "naphthalene",
@@ -3535,6 +3523,14 @@ def test_retained_fused_graph_template_data_file_validates_guarded_core_entries(
         "purine",
         "indazole",
         "xanthene",
+        "azulene",
+        "acenaphthylene",
+        "fluoranthene",
+        "1H-perimidine",
+        "pteridine",
+        "2H-isoindole",
+        "indolizine",
+        "1H-indole",
     }
     assert by_name["1H-indole"].default_indicated_h == ("1",)
     assert by_name["quinoline"].atom_by_locant["1"].symbol == "N"
@@ -3552,7 +3548,17 @@ def test_parser_grammar_snapshot_separates_tokens_from_production_gate():
     assert "quinoline" in gate.production_parent_names
     assert retained_fused_token_status("quinoline") == "production_safe"
 
-    for parent in ("azulene", "1H-phenalene", "acenaphthylene", "fluoranthene", "pteridine"):
+    # Promoted once their derivative numbering was verified position by
+    # position against OPSIN; see the fused round-trip check.
+    for parent in ("azulene", "acenaphthylene", "fluoranthene", "pteridine", "1H-indole"):
+        assert parent in tokens
+        assert parent in gate.production_parent_names
+        assert retained_fused_token_status(parent) == "production_safe"
+
+    # Still audit-only: its indicated hydrogen is emitted as ``1H`` wherever the
+    # sp3 carbon actually sits, so ``6-methyl-1H-phenalene`` reads back with the
+    # CH2 in the wrong ring position.
+    for parent in ("1H-phenalene",):
         assert parent in tokens
         assert parent in gate.audit_only_parent_names
         assert parent not in gate.production_parent_names
@@ -3812,8 +3818,7 @@ def test_stage6_fused_component_registry_uses_templates_and_opsin_tokens():
     assert "quinoline" in quinoline.opsin_parseable_names
 
     indole = registry.by_name["1H-indole"]
-    assert indole.opsin_token_status == "audit_only"
-    assert not indole.is_allowed_as_fusion_component
+    assert indole.opsin_token_status == "production_safe"
 
 
 def test_stage6_fused_component_registry_orders_allowed_parent_candidates():
