@@ -3820,6 +3820,7 @@ def test_substituent_locants_are_omitted_when_parent_symmetry_makes_configuratio
 def test_substituent_locants_are_kept_when_same_count_has_multiple_configurations():
     assert name_smiles("Cc1cc(C)cc(C)c1") == "1,3,5-trimethylbenzene"
     assert name_smiles("Cc1c(C)c(C)c(C)cc1") == "1,2,3,4-tetramethylbenzene"
+    assert name_smiles("CC1CC1C") == "1,2-dimethylcyclopropane"
 
 
 def test_analyze_smiles_exposes_decision_trace():
