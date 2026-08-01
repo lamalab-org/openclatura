@@ -554,9 +554,16 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                 return None
 
     if total_bonds == size:
+        if size == 4 and double_bonds == 0:
+            if n_count == 1 and o_count == 0 and s_count == 0:
+                return "azetidine", None
         if size == 6 and double_bonds == 0:
             if n_count == 1 and o_count == 0 and s_count == 0:
                 return "piperidine", None
+            if o_count == 1 and n_count == 0 and s_count == 0:
+                return "oxane", None
+            if s_count == 1 and n_count == 0 and o_count == 0:
+                return "thiane", None
             if n_count == 2 and o_count == 0 and s_count == 0:
                 n_indices = [i for i in path if mol.atoms[i].symbol == "N"]
                 dist = min(

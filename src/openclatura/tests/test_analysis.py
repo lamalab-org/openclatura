@@ -594,7 +594,9 @@ def test_carbonyl_prefix_morphology_is_bound_from_renderer_data():
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
     carbonyl = next(token for token in assembly.data["name_token_spans"] if token["text"] == "carbonyl")
 
-    assert analysis.name == "1-((amino)carbonyl)-azetidin-3-one"
+    # No hyphen between a parenthesised substituent and the parent: the old
+    # spelling came from a rewrite that had to re-insert one by hand.
+    assert analysis.name == "1-((amino)carbonyl)azetidin-3-one"
     assert carbonyl["source"] in {"functional_prefix_renderer", "substituent_renderer"}
     assert carbonyl["confidence"] == "derived"
     assert carbonyl["ownership"] == "exact"

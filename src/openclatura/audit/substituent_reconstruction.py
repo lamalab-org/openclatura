@@ -221,6 +221,7 @@ _RING_STEMS: dict[str, tuple[str, list[str]]] = {
     "tetrahydrofuran": ("O1CCCC1", ["1", "2", "3", "4", "5"]),
     "thiolane": ("S1CCCC1", ["1", "2", "3", "4", "5"]),
     "oxane": ("O1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "thiane": ("S1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
     "tetrahydropyran": ("O1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
     "azetidine": ("N1CCC1", ["1", "2", "3", "4"]),
     "oxetane": ("O1CCC1", ["1", "2", "3", "4"]),

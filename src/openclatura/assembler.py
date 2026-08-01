@@ -130,33 +130,10 @@ LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
     ("chloroethanoyl", "chloroacetyl"),
     ("bromoethanoyl", "bromoacetyl"),
     ("iodoethanoyl", "iodoacetyl"),
-    ("1-azacyclobutane", "azetidine"),
-    ("1-azacyclobutan-", "azetidin-"),
-    ("1-azacyclopentane", "pyrrolidine"),
-    ("1-azacyclopentan-", "pyrrolidin-"),
-    ("1-azacyclohexane", "piperidine"),
-    ("1-azacyclohexan-", "piperidin-"),
-    ("1-oxacyclopentane", "oxolane"),
-    ("1-oxacyclopentan-", "oxolan-"),
-    ("1-oxacyclohexane", "oxane"),
-    ("1-oxacyclohexan-", "oxan-"),
-    ("1-thiacyclopentane", "thiolane"),
-    ("1-thiacyclopentan-", "thiolan-"),
-    ("1-thiacyclohexane", "thiane"),
-    ("1-thiacyclohexan-", "thian-"),
 )
 
 _LEGACY_TERT_BUTYL = {"2-methylpropan-2-yl", "1,1-dimethylethyl"}
 _LEGACY_SUBST_ALKYL_ACYL = {"ethylcarbonyl", "propylcarbonyl"}
-_LEGACY_LEADING_HYPHEN = {
-    "1-azacyclobutane",
-    "1-azacyclopentane",
-    "1-azacyclohexane",
-    "1-oxacyclopentane",
-    "1-oxacyclohexane",
-    "1-thiacyclopentane",
-    "1-thiacyclohexane",
-}
 
 
 def _compile_legacy_replacements() -> tuple[tuple[str, re.Pattern, str], ...]:
@@ -174,8 +151,6 @@ def _compile_legacy_replacements() -> tuple[tuple[str, re.Pattern, str], ...]:
         elif old in _LEGACY_SUBST_ALKYL_ACYL:
             compiled.append((old, re.compile(rf"(?<![a-zA-Z)]){esc}(?![a-zA-Z])"), new))
         else:
-            if old in _LEGACY_LEADING_HYPHEN:
-                compiled.append((old, re.compile(rf"-{esc}(?![a-zA-Z])"), new))
             compiled.append((old, re.compile(rf"(?<![a-zA-Z]){esc}(?![a-zA-Z])"), new))
     return tuple(compiled)
 
