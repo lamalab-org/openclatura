@@ -266,8 +266,8 @@ If you use Openclatura in your research, please cite the Openclatura preprint:
   year    = {2026},
   month   = jul,
   day     = {15},
-  doi     = {10.26434/chemrxiv.15006114/v1},
-  url     = {https://doi.org/10.26434/chemrxiv.15006114/v1},
+  doi     = {10.26434/chemrxiv.15006114/v2},
+  url     = {https://doi.org/10.26434/chemrxiv.15006114/v2},
   note    = {Preprint}
 }
 ```
