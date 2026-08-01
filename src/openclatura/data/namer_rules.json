@@ -259,6 +259,20 @@
         "central": "I",
         "single_o": 1,
         "double_o": 3
+      },
+      {
+        "name": "arsoric acid",
+        "ester_suffix": "arsorate",
+        "central": "As",
+        "single_o": 3,
+        "double_o": 1
+      },
+      {
+        "name": "stiboric acid",
+        "ester_suffix": "stiborate",
+        "central": "Sb",
+        "single_o": 3,
+        "double_o": 1
       }
     ]
   },
@@ -1427,6 +1441,26 @@
       "boryl": {
         "role": "prefix",
         "prefix": "boryl",
+        "needs_locant": true
+      },
+      "arsanyl": {
+        "role": "prefix",
+        "prefix": "arsanyl",
+        "needs_locant": true
+      },
+      "arsoryl": {
+        "role": "prefix",
+        "prefix": "arsoryl",
+        "needs_locant": true
+      },
+      "stibanyl": {
+        "role": "prefix",
+        "prefix": "stibanyl",
+        "needs_locant": true
+      },
+      "stiboryl": {
+        "role": "prefix",
+        "prefix": "stiboryl",
         "needs_locant": true
       }
     }

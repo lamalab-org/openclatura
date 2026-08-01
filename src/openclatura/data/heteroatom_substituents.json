@@ -1,37 +1,103 @@
 {
   "heteroatom_substituents": {
     "B": {
-      "unsubstituted_prefixes": {"0": "boryl"},
-      "ligand_prefixes": {"0": "boryl"}
+      "unsubstituted_prefixes": {
+        "0": "boryl"
+      },
+      "ligand_prefixes": {
+        "0": "boryl"
+      }
     },
     "N": {
-      "unsubstituted_prefixes": {"0": "amino"},
-      "ligand_prefixes": {"0": "amino"}
+      "unsubstituted_prefixes": {
+        "0": "amino"
+      },
+      "ligand_prefixes": {
+        "0": "amino"
+      }
     },
     "O": {
-      "unsubstituted_prefixes": {"0": "hydroxy"},
-      "ligand_prefixes": {"0": "oxy"},
+      "unsubstituted_prefixes": {
+        "0": "hydroxy"
+      },
+      "ligand_prefixes": {
+        "0": "oxy"
+      },
       "ligand_join_mode": "drop_yl"
     },
     "P": {
-      "unsubstituted_prefixes": {"0": "phosphanyl", "1": "phosphoryl"},
-      "ligand_prefixes": {"0": "phosphanyl", "1": "phosphoryl"}
+      "unsubstituted_prefixes": {
+        "0": "phosphanyl",
+        "1": "phosphoryl"
+      },
+      "ligand_prefixes": {
+        "0": "phosphanyl",
+        "1": "phosphoryl"
+      }
     },
     "S": {
-      "unsubstituted_prefixes": {"0": "sulfanyl", "1": "sulfinyl", "2": "sulfonyl"},
-      "ligand_prefixes": {"0": "sulfanyl", "1": "sulfinyl", "2": "sulfonyl"}
+      "unsubstituted_prefixes": {
+        "0": "sulfanyl",
+        "1": "sulfinyl",
+        "2": "sulfonyl"
+      },
+      "ligand_prefixes": {
+        "0": "sulfanyl",
+        "1": "sulfinyl",
+        "2": "sulfonyl"
+      }
     },
     "Se": {
-      "unsubstituted_prefixes": {"0": "selanyl", "1": "seleninyl", "2": "selenonyl"},
-      "ligand_prefixes": {"0": "selanyl", "1": "seleninyl", "2": "selenonyl"}
+      "unsubstituted_prefixes": {
+        "0": "selanyl",
+        "1": "seleninyl",
+        "2": "selenonyl"
+      },
+      "ligand_prefixes": {
+        "0": "selanyl",
+        "1": "seleninyl",
+        "2": "selenonyl"
+      }
     },
     "Te": {
-      "unsubstituted_prefixes": {"0": "tellanyl", "1": "tellurinyl", "2": "telluronyl"},
-      "ligand_prefixes": {"0": "tellanyl", "1": "tellurinyl", "2": "telluronyl"}
+      "unsubstituted_prefixes": {
+        "0": "tellanyl",
+        "1": "tellurinyl",
+        "2": "telluronyl"
+      },
+      "ligand_prefixes": {
+        "0": "tellanyl",
+        "1": "tellurinyl",
+        "2": "telluronyl"
+      }
     },
     "Si": {
-      "unsubstituted_prefixes": {"0": "silyl"},
-      "ligand_prefixes": {"0": "silyl"}
+      "unsubstituted_prefixes": {
+        "0": "silyl"
+      },
+      "ligand_prefixes": {
+        "0": "silyl"
+      }
+    },
+    "As": {
+      "unsubstituted_prefixes": {
+        "0": "arsanyl",
+        "1": "arsoryl"
+      },
+      "ligand_prefixes": {
+        "0": "arsanyl",
+        "1": "arsoryl"
+      }
+    },
+    "Sb": {
+      "unsubstituted_prefixes": {
+        "0": "stibanyl",
+        "1": "stiboryl"
+      },
+      "ligand_prefixes": {
+        "0": "stibanyl",
+        "1": "stiboryl"
+      }
     }
   },
   "central_oxo_substituent_classes": [
@@ -151,6 +217,96 @@
       "alkoxy": 0,
       "peroxy": 0,
       "prefix": "(hydroxy)dioxo-lambda^6-tellanyl"
+    },
+    {
+      "symbol": "As",
+      "oxo": 1,
+      "oxido": 0,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "oxoarsanyl"
+    },
+    {
+      "symbol": "Sb",
+      "oxo": 1,
+      "oxido": 0,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "oxostibanyl"
+    },
+    {
+      "symbol": "As",
+      "oxo": 1,
+      "oxido": 0,
+      "hydroxy": 2,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "dihydroxyarsoryl"
+    },
+    {
+      "symbol": "Sb",
+      "oxo": 1,
+      "oxido": 0,
+      "hydroxy": 2,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "dihydroxystiboryl"
+    },
+    {
+      "symbol": "As",
+      "oxo": 1,
+      "oxido": 1,
+      "hydroxy": 1,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "arsonato"
+    },
+    {
+      "symbol": "Sb",
+      "oxo": 1,
+      "oxido": 1,
+      "hydroxy": 1,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "stibonato"
+    },
+    {
+      "symbol": "As",
+      "oxo": 1,
+      "oxido": 2,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "arsonato"
+    },
+    {
+      "symbol": "Sb",
+      "oxo": 1,
+      "oxido": 2,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "stibonato"
+    },
+    {
+      "symbol": "As",
+      "oxo": 2,
+      "oxido": 0,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "dioxoarsanyl"
+    },
+    {
+      "symbol": "Sb",
+      "oxo": 2,
+      "oxido": 0,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "dioxostibanyl"
     }
   ]
 }

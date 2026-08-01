@@ -804,13 +804,21 @@ def name_chalcogen_subgraph(
     )
 
 
-def name_phosphorus_subgraph(
+def name_pnictogen_subgraph(
     mol: Molecule,
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
     branch_namer: RecursiveSubgraphNamer,
+    symbol: str = "P",
 ) -> str:
+    """Name a group-15 centre and its ligands.
+
+    Arsenic and antimony take the same shape as phosphorus -- a trivalent
+    centre, optionally oxidised, with its prefix chosen by how many oxygens it
+    carries -- so they share this path and differ only in the prefixes the
+    tables give back.
+    """
     upstream_order = upstream_bond_order(mol, start_idx, upstream_atom)
     multiple_bond_suffix = {2: "idene", 3: "idyne"}.get(upstream_order, "")
     p_oxygens = central_oxo_substituent_excluded_ligand_atoms(mol, start_idx, exclude_atoms)
@@ -818,8 +826,10 @@ def name_phosphorus_subgraph(
     stereo_prefix_text = stereo_prefix(mol.atoms[start_idx])
     suffix = (
         central_oxo_substituent_prefix_for_center(mol, start_idx, exclude_atoms)
-        or unsubstituted_prefix("P", len(p_oxygens))
-        or ("phosphoryl" if p_oxygens else "phosphanyl")
+        or unsubstituted_prefix(symbol, len(p_oxygens))
+        # More oxygens than any configured class: fall back to the element's
+        # own oxidised or plain prefix rather than leaving the centre unnamed.
+        or unsubstituted_prefix(symbol, 1 if p_oxygens else 0)
     ) + multiple_bond_suffix
     if not next_atoms:
         return f"{stereo_prefix_text}{suffix}"
@@ -900,8 +910,8 @@ def name_heteroatom_subgraph(
         return name_chalcogen_subgraph(
             mol, start_idx, exclude_atoms, upstream_atom, set(), "tellanyl", "telluroxo", branch_namer
         )
-    if symbol == "P":
-        return name_phosphorus_subgraph(mol, start_idx, exclude_atoms, upstream_atom, branch_namer)
+    if symbol in {"P", "As", "Sb"}:
+        return name_pnictogen_subgraph(mol, start_idx, exclude_atoms, upstream_atom, branch_namer, symbol)
     if symbol in {"Si", "B"}:
         return name_group_13_14_subgraph(mol, start_idx, exclude_atoms, upstream_atom, branch_namer)
     return None
