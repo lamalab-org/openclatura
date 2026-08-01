@@ -823,16 +823,16 @@ def test_carbonylamino_heteroatom_shortcut_tree_does_not_invent_hydroxy_children
 
 def test_postprocessing_rewrites_keep_token_metadata_auditable():
     result = NameAssemblyResult.from_raw_name(
-        "ethanoic acid",
-        [NameAtomBinding(stage="suffix", role="acid", term="ethanoic acid", atom_ids={0, 1, 2}, bond_ids={0, 1})],
+        "phenylmethyl",
+        [NameAtomBinding(stage="prefix", role="substituent", term="phenylmethyl", atom_ids={0, 1, 2}, bond_ids={0, 1})],
         postprocess=post_process_name,
     )
 
-    assert result.text == "acetic acid"
+    assert result.text == "benzyl"
     assert result.rewrite_history[0].changed_binding_count == 1
     assert result.rewrite_history[0].changed_token_count >= 1
     assert all(token.binding_indices for token in result.token_spans)
-    assert {token.text for token in result.token_spans} == {"acetic", "acid"}
+    assert {token.text for token in result.token_spans} == {"benzyl"}
     assert {token.source for token in result.token_spans} == {"typed_rewrite"}
     assert {token.confidence for token in result.token_spans} == {"derived"}
     assert result.rewrite_history[0].ownership == "preserve_all"
@@ -851,27 +851,29 @@ def test_postprocessing_rewrites_bindings_to_final_emitted_direction():
 
 
 def test_postprocessing_updates_binding_terms():
-    bindings = [NameAtomBinding(stage="suffix", role="acid", term="ethanoic acid", atom_ids={0, 1, 2})]
+    bindings = [NameAtomBinding(stage="prefix", role="substituent", term="phenylmethyl", atom_ids={0, 1, 2})]
 
     processed = postprocess_name_atom_bindings(bindings, post_process_name)
 
-    assert processed[0].term == "acetic acid"
+    assert processed[0].term == "benzyl"
     assert processed[0].atom_ids == {0, 1, 2}
 
 
 def test_name_assembly_result_preserves_binding_metadata_through_postprocessing():
-    bindings = [NameAtomBinding(stage="suffix", role="acid", term="ethanoic acid", atom_ids={0, 1, 2}, bond_ids={0, 1})]
+    bindings = [
+        NameAtomBinding(stage="prefix", role="substituent", term="phenylmethyl", atom_ids={0, 1, 2}, bond_ids={0, 1})
+    ]
 
-    result = NameAssemblyResult.from_raw_name("ethanoic acid", bindings, postprocess=post_process_name)
+    result = NameAssemblyResult.from_raw_name("phenylmethyl", bindings, postprocess=post_process_name)
 
-    assert result.text == "acetic acid"
-    assert result.bindings[0].term == "acetic acid"
+    assert result.text == "benzyl"
+    assert result.bindings[0].term == "benzyl"
     assert result.bindings[0].atom_ids == {0, 1, 2}
     assert result.bindings[0].bond_ids == {0, 1}
     assert result.rewrite_history[0].changed_binding_count == 1
     assert result.rewrite_history[0].changed_token_count >= 1
     assert all(token.binding_indices for token in result.token_spans)
-    assert next(token for token in result.token_spans if token.text == "acetic").atom_ids == frozenset({0, 1, 2})
+    assert next(token for token in result.token_spans if token.text == "benzyl").atom_ids == frozenset({0, 1, 2})
 
 
 def test_name_assembly_result_tracks_named_rewrite_pipeline():
@@ -1130,10 +1132,14 @@ def test_n_substituent_and_parent_suffix_morphology_tokens_have_local_scope():
     assert tokens["N"]["bonds"] == [4]
     assert tokens["N"]["source"] == "n_substituent_locant"
     assert tokens["phenyl"]["atoms"] == [4, 5, 6, 7, 8, 9]
-    assert tokens["acet"]["atoms"] == [0, 1, 2, 3]
-    assert tokens["acet"]["bonds"] == [1, 2, 3]
-    assert tokens["acet"]["source"] == "parent_suffix_gap"
+    # ``acetamide`` is a retained parent name, so the parent token spells the
+    # whole word rather than the ``acet`` stem a rewrite used to leave behind.
+    # The point of this test is unaffected: the suffix morpheme still binds only
+    # its own atoms, so hovering ``amide`` highlights the C(=O)N and not the
+    # methyl.
+    assert tokens["acetamide"]["atoms"] == [0, 1, 2, 3]
     assert tokens["amide"]["atoms"] == [1, 2, 3]
+    assert tokens["amide"]["source"] == "renderer_suffix"
 
 
 def test_mixed_numeric_and_element_locants_are_bound_individually():

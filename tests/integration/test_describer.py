@@ -156,7 +156,9 @@ def test_describe_orders_main_parent_trace_before_nested_substituent_trace():
 
     assert "The final assembled name is **N-phenylacetamide**." not in text
     assert "Component assembled as **N-phenylacetamide**" not in text
-    eth_index = text.index('contributes "eth"')
+    # ``acetamide`` is a retained parent name now, so the parent contributes the
+    # whole word instead of the ``eth`` stem the systematic spelling left.
+    eth_index = text.index('contributes "acetamide"')
     amide_index = text.index('contributes "amide"')
     benzene_index = text.index('contributes "benzene"')
     assert eth_index < amide_index < benzene_index

@@ -172,6 +172,21 @@ def _functional_parent_hydrides() -> dict[str, str]:
     return {retained: hydride for (hydride, _group), retained in RETAINED_FUNCTIONAL_PARENTS.items()}
 
 
+def _is_retained_chain_parent(retained_name: str) -> bool:
+    """Whether ``retained_name`` is one of the retained acyclic acid-family
+    parents (``acetic acid``, ``formamide``, ``succinic acid`` …).
+
+    Those name a plain carbon chain whose length the parts already record, and
+    the principal group is still on the parts, so the ordinary chain builder
+    reconstructs them -- the retained spelling changes no atom.  Read off the
+    namer's table so the two directions cannot drift.
+    """
+
+    from ..assembly_parent import RETAINED_CHAIN_PARENTS
+
+    return retained_name in set(RETAINED_CHAIN_PARENTS.values())
+
+
 def _lookup_parent_template(retained_name: str) -> tuple[str, list[str]] | None:
     template = _ALL_PARENT_TEMPLATES.get(retained_name)
     if template is not None:
@@ -757,7 +772,10 @@ def _build_parent(parts) -> tuple[Chem.RWMol, dict[str, int], bool]:
     """Return (editable mol, locant->idx, is_aromatic_template)."""
 
     # Retained parents (mono- or fused) reconstruct from their template first.
-    if parts.retained_name is not None:
+    # The retained *chain* names have no ring template and need none: they name a
+    # plain carbon chain of the length the parts already record, so they fall
+    # through to the chain builder below.
+    if parts.retained_name is not None and not _is_retained_chain_parent(parts.retained_name):
         template = _lookup_parent_template(parts.retained_name)
         if template is None:
             raise _Abstain(f"retained parent {parts.retained_name!r} not modelled")
@@ -801,7 +819,7 @@ def _build_parent(parts) -> tuple[Chem.RWMol, dict[str, int], bool]:
         rw.AddBond(idxs[-1], idxs[0], Chem.BondType.SINGLE)
         return rw, {str(i + 1): idxs[i] for i in range(n)}, False
 
-    if parts.retained_name is not None:
+    if parts.retained_name is not None and not _is_retained_chain_parent(parts.retained_name):
         raise _Abstain(f"retained acyclic parent {parts.retained_name!r} not modelled")
     n = parts.parent_length
     if n < 1:

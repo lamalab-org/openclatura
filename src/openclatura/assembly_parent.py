@@ -50,6 +50,69 @@ RETAINED_FUNCTIONAL_PARENTS: dict[tuple[str, str], str] = {
 }
 
 
+# The acyclic counterpart, keyed by chain length, the principal group, and how
+# many of that group the chain carries -- two carboxylic acids on a C4 chain is
+# succinic acid, one is butanoic.  Spelling these out per (length, group) rather
+# than as a stem substitution is deliberate: the joining vowel is irregular
+# (``acetonitrile`` but ``propionitrile``), so there is no stem to share.
+RETAINED_CHAIN_PARENTS: dict[tuple[int, str, int], str] = {
+    (1, "carboxylic_acid", 1): "formic acid",
+    (2, "carboxylic_acid", 1): "acetic acid",
+    (1, "amide", 1): "formamide",
+    (2, "amide", 1): "acetamide",
+    (2, "nitrile", 1): "acetonitrile",
+    (3, "nitrile", 1): "propionitrile",
+    (4, "nitrile", 1): "butyronitrile",
+    (1, "ester", 1): "formate",
+    (2, "ester", 1): "acetate",
+    # The anion spells the same word as the ester.
+    (1, "carboxylate", 1): "formate",
+    (2, "carboxylate", 1): "acetate",
+    (2, "carboxylic_acid", 2): "oxalic acid",
+    (3, "carboxylic_acid", 2): "malonic acid",
+    (4, "carboxylic_acid", 2): "succinic acid",
+    (5, "carboxylic_acid", 2): "glutaric acid",
+    (6, "carboxylic_acid", 2): "adipic acid",
+}
+
+
+# The retained dioic acids name the unsubstituted acid only; a substituted one
+# takes the systematic name, so tartaric acid is ``2,3-dihydroxybutanedioic
+# acid`` and never ``2,3-dihydroxysuccinic acid``.  The rest keep their retained
+# form when substituted (``chloroacetic acid``, ``N-methylformamide``).
+#
+# The rewrite this replaced was inconsistent here rather than restrictive: it
+# matched only where the character before the parent was not a letter, so
+# ``N,N-bis(iminomethyl)methanamide`` became ``…formamide`` after a bracket while
+# ``1-aminomethanamide`` did not after the ``o`` of ``amino``.  Whether a name is
+# retained now follows from the structure instead of from that coincidence.
+_UNSUBSTITUTABLE_RETAINED_CHAIN_PARENTS = frozenset(
+    {"oxalic acid", "malonic acid", "succinic acid", "glutaric acid", "adipic acid"}
+)
+
+
+def _retained_chain_parent(parts: AssemblyParts) -> str | None:
+    """The retained name for an acyclic acid-family parent, if it has one.
+
+    Declines on any unsaturation: the retained names all denote saturated
+    chains, and ``but-2-enedioic acid`` is fumaric or maleic acid, never
+    succinic.  Declines on replacement prefixes for the same reason.
+    """
+
+    group = parts.principal_group
+    if group is None or parts.is_ring or parts.unsaturations or parts.a_prefixes:
+        return None
+    locants = [str(locant) for locant in group.locants]
+    retained = RETAINED_CHAIN_PARENTS.get((parts.parent_length, group.key, len(locants)))
+    if retained is None:
+        return None
+    if parts.substituents and retained in _UNSUBSTITUTABLE_RETAINED_CHAIN_PARENTS:
+        return None
+    # One group sits at C1; two span the chain's ends.
+    expected = ["1"] if len(locants) == 1 else ["1", str(parts.parent_length)]
+    return retained if sorted(locants, key=int) == expected else None
+
+
 def promote_retained_functional_parent(parts: AssemblyParts) -> None:
     """Fold a principal group into the retained parent name where one exists.
 
@@ -63,9 +126,11 @@ def promote_retained_functional_parent(parts: AssemblyParts) -> None:
     if group is None or parts.is_substituent or parts.retained_absorbs_principal_group:
         return
     retained = RETAINED_FUNCTIONAL_PARENTS.get((parts.retained_name or "", group.key))
+    if retained is not None and [str(locant) for locant in group.locants] != ["1"]:
+        retained = None
     if retained is None:
-        return
-    if [str(locant) for locant in group.locants] != ["1"]:
+        retained = _retained_chain_parent(parts)
+    if retained is None:
         return
     parts.retained_name = retained
     parts.retained_absorbs_principal_group = True

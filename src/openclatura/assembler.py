@@ -51,17 +51,8 @@ LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
     ("benzene-1-carbonitrile", "benzonitrile"),
     ("benzene-1-carbaldehyde", "benzaldehyde"),
     ("benzene-1-carbonyl", "benzoyl"),
-    ("methanoic acid", "formic acid"),
-    ("methanamide", "formamide"),
-    ("methanoate", "formate"),
     ("methanoyl", "formyl"),
-    ("ethanoic acid", "acetic acid"),
-    ("ethanamide", "acetamide"),
-    ("ethanenitrile", "acetonitrile"),
-    ("ethanoate", "acetate"),
     ("ethanoyl", "acetyl"),
-    ("propanenitrile", "propionitrile"),
-    ("butanenitrile", "butyronitrile"),
     ("2-methylpropan-2-yl", "tert-butyl"),
     ("1,1-dimethylethyl", "tert-butyl"),
     ("(1,1-dimethylethyl)oxy", "tert-butoxy"),
@@ -106,11 +97,6 @@ LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
     ("benzene-1-sulfonic acid", "benzenesulfonic acid"),
     ("benzene-1-sulfonamide", "benzenesulfonamide"),
     ("benzene-1-thiol", "benzenethiol"),
-    ("ethanedioic acid", "oxalic acid"),
-    ("propanedioic acid", "malonic acid"),
-    ("butanedioic acid", "succinic acid"),
-    ("pentanedioic acid", "glutaric acid"),
-    ("hexanedioic acid", "adipic acid"),
     ("phenylmethyl", "benzyl"),
     ("benzylcarbonyl", "phenylacetyl"),
     ("phenylmethoxy", "benzyloxy"),
@@ -118,14 +104,6 @@ LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
     ("ethanehydrazine", "ethylhydrazine"),
     ("propanehydrazine", "propylhydrazine"),
     ("benzenehydrazine", "phenylhydrazine"),
-    ("fluoroethanoate", "fluoroacetate"),
-    ("chloroethanoate", "chloroacetate"),
-    ("bromoethanoate", "bromoacetate"),
-    ("iodoethanoate", "iodoacetate"),
-    ("fluoroethanoic acid", "fluoroacetic acid"),
-    ("chloroethanoic acid", "chloroacetic acid"),
-    ("bromoethanoic acid", "bromoacetic acid"),
-    ("iodoethanoic acid", "iodoacetic acid"),
     ("fluoroethanoyl", "fluoroacetyl"),
     ("chloroethanoyl", "chloroacetyl"),
     ("bromoethanoyl", "bromoacetyl"),
@@ -270,10 +248,9 @@ def _post_process_name(name: str) -> str:
 
     name = apply_data_postprocessing(name)
 
-    name = re.sub(r"(?<!m)ethanoic acid\b", "acetic acid", name)
-    name = re.sub(r"(?<!m)ethanamide\b", "acetamide", name)
-    name = re.sub(r"(?<!m)ethanenitrile\b", "acetonitrile", name)
-    name = re.sub(r"(?<!m)ethanoate\b", "acetate", name)
+    # ``ethanoyl`` alone: the acid/amide/nitrile/ester parents are retained names
+    # chosen during assembly now, so only the acyl *substituent* still needs a
+    # rewrite here.
     name = re.sub(r"(?<!m)ethanoyl\b", "acetyl", name)
 
     name = apply_acyl_amido_postprocessing(name)
