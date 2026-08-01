@@ -5973,3 +5973,15 @@ def test_unsaturation_interfix_survives_a_locant_set():
     # A lone bond cites the bare suffix, which takes no interfix at all.
     assert name_smiles("CC=CC") == "but-2-ene"
     assert name_smiles("N=S1C=CC1") == "1-imino-1lambda^4-thiacyclobut-2-ene"
+
+
+def test_azine_aryl_side_uses_the_retained_benzene_name():
+    # Only the *fused* retained rings carry a locant map; a retained monocycle
+    # has none, and requiring one rejected plain benzene -- so the aldehyde side
+    # of an azine fell through to ``cyclohexa-1,3,5-trien-1-carbaldehyde``.  A
+    # bare homocyclic ring is symmetric, so the attachment is position 1.
+    assert name_smiles("c1ccccc1C=NN=Cc1ccccc1") == "benzaldehyde benzylidenehydrazone"
+    assert name_smiles("CSC(N)=NN=Cc1ccccc1") == "benzaldehyde (amino)(methylsulfanyl)methylidenehydrazone"
+    # A heteroatom breaks that symmetry and genuinely needs numbering, so the
+    # shortcut must still decline rather than guess position 1.
+    assert "benzaldehyde 5-azacyclohexa" in name_smiles("c1ccncc1C=NN=Cc1ccccc1")

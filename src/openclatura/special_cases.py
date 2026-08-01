@@ -411,8 +411,7 @@ def _is_amidino_carbon(mol: Molecule, carbon: int, nitrogen: int) -> bool:
 
     others = [n for n in mol.get_neighbors(carbon) if n != nitrogen]
     return len(others) == 2 and all(
-        mol.atoms[n].symbol == "N" and (bond := mol.get_bond(carbon, n)) is not None and bond.order == 1
-        for n in others
+        mol.atoms[n].symbol == "N" and (bond := mol.get_bond(carbon, n)) is not None and bond.order == 1 for n in others
     )
 
 
@@ -649,8 +648,17 @@ def _retained_ring_carbaldehyde_side_name(
     retained_name, locant_maps = retained_match
     locant_map = _choose_retained_map_for_attachment(locant_maps, carbon_neighbors[0])
     if locant_map is None:
-        return ""
-    locant = locant_map.get(carbon_neighbors[0])
+        # A data-driven retained *monocycle* carries no locant map -- only the
+        # fused systems do -- so requiring one here rejected plain benzene, and
+        # ``benzaldehyde`` fell through to ``cyclohexa-1,3,5-trien-1-carbaldehyde``.
+        # The ring reaching this point is bare (every ring atom has exactly two
+        # ring neighbours and nothing else), so when it is homocyclic every
+        # position is equivalent by rotation and the attachment is position 1.
+        # A heteroatom breaks that symmetry and genuinely needs numbering, so
+        # those still decline.
+        locant = "1" if _is_homocyclic(mol, ring_path) else ""
+    else:
+        locant = locant_map.get(carbon_neighbors[0], "")
     if not locant:
         return ""
     if as_ylidene:
@@ -658,6 +666,13 @@ def _retained_ring_carbaldehyde_side_name(
     if retained_name == "benzene":
         return "benzaldehyde"
     return f"{retained_name}-{locant}-carbaldehyde"
+
+
+def _is_homocyclic(mol: Molecule, ring_path: list[int]) -> bool:
+    """Whether every atom of ``ring_path`` is the same element."""
+
+    symbols = {mol.atoms[idx].symbol for idx in ring_path}
+    return len(symbols) == 1
 
 
 def _ordered_simple_ring(mol: Molecule, ring_atoms: set[int]) -> list[int]:
@@ -1307,9 +1322,7 @@ def azinic_acid_result(
             continue
         oxido = [o for o in oxygens if mol.atoms[o].charge == -1 and mol.degree(o) == 1]
         hydroxy = [
-            o
-            for o in oxygens
-            if mol.atoms[o].charge == 0 and mol.degree(o) == 1 and mol.atoms[o].total_h_count > 0
+            o for o in oxygens if mol.atoms[o].charge == 0 and mol.degree(o) == 1 and mol.atoms[o].total_h_count > 0
         ]
         if len(oxido) != 1 or len(hydroxy) != 1:
             continue
@@ -2103,9 +2116,7 @@ def _homonuclear_chain_ligands(
         if not name:
             if branch_namer is None:
                 return None
-            rendered = branch_namer(
-                mol, root, (set(mol.atoms) - component_atoms) | chain_set, upstream_atom=attachment
-            )
+            rendered = branch_namer(mol, root, (set(mol.atoms) - component_atoms) | chain_set, upstream_atom=attachment)
             if isinstance(rendered, tuple):
                 rendered = rendered[0]
             if not rendered:
