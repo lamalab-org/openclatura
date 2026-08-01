@@ -267,6 +267,27 @@ def format_substituent_tail(
     return stem_str, unsat_str, terminal_e, ""
 
 
+def _sole_group_locant_is_redundant(parts: AssemblyParts) -> bool:
+    """Whether a lone group's ``1`` locant tells the reader nothing.
+
+    On a bare two-carbon chain the two positions are the same position --
+    ``ethan-1-ol`` and ``ethan-2-ol`` are one compound -- and on a bare benzene
+    every ring position is equivalent by rotation.  Either way the locant is
+    noise, which is why ``ethanol`` and ``benzenesulfonic acid`` are the names
+    actually used.
+
+    Anything that tells the positions apart brings the locant back: another
+    substituent, a replacement prefix, or unsaturation.  ``2-chloroethan-1-ol``
+    keeps its locant because C1 and C2 are no longer interchangeable.
+    """
+
+    if parts.substituents or parts.a_prefixes or parts.unsaturations:
+        return False
+    if parts.is_ring:
+        return parts.retained_name == "benzene"
+    return not parts.is_substituent and parts.parent_length == 2
+
+
 def format_principal_suffix(parts: AssemblyParts, terminal_e: str, spiro_subs) -> tuple[str, str]:
     if not parts.principal_group:
         return terminal_e, ""
@@ -286,6 +307,8 @@ def format_principal_suffix(parts: AssemblyParts, terminal_e: str, spiro_subs) -
             and not has_spiro_subs
             and not parts.retained_name
         ):
+            omit_locant = True
+        elif _sole_group_locant_is_redundant(parts):
             omit_locant = True
 
     suffix_text = render_principal_suffix(group, len(locs))

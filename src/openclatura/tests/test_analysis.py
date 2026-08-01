@@ -649,7 +649,10 @@ def test_analysis_carries_name_atom_bindings():
     token_spans = assembly_steps[-1].data["name_token_spans"]
     assert token_spans
     assert all(token["binding_indices"] for token in token_spans)
-    assert any(token["text"] == "ethanol" and token["atoms"] for token in token_spans)
+    # ``ethanol`` is assembled as stem + suffix now rather than rewritten from
+    # ``ethan-1-ol``, so each morpheme binds its own atoms instead of one blob.
+    assert any(token["text"] == "ethan" and token["atoms"] == [0, 1] for token in token_spans)
+    assert any(token["text"] == "ol" and token["atoms"] == [1, 2] for token in token_spans)
 
 
 @pytest.mark.parametrize(
@@ -1985,7 +1988,7 @@ def test_a_charge_separated_chalcogenido_is_not_a_hydride():
     # so the charge-separated form must name as its neutral equivalent.
     assert name_smiles("CO[P+](=S)[S-]") == name_smiles("COP(=S)=S") == "((dithioxophosphanyl)oxy)methane"
     # An ordinary thiolate keeps its charge -- the centre beside it is neutral.
-    assert name_smiles("CC[S-]") == "ethane-1-thiolate"
+    assert name_smiles("CC[S-]") == "ethanethiolate"
     assert name_smiles("C[N+](C)(C)CC[S-]") == "2-(trimethylammonio)ethane-1-thiolate"
 
 
@@ -2002,7 +2005,7 @@ def test_a_short_or_charged_nitrogen_chain_leaves_its_own_group_alone():
     assert name_smiles("[N-]=[N+]=C1CCc2ccccc21") == "1-(diazo)indane"
     assert name_smiles("COc1ccc(N=[N+]([O-])c2ccccc2)cc1") == ("N-((4-methoxyphenyl)imino)-N-oxidobenzen-1-aminium")
     # A principal group outside the chain keeps its own parent and suffix.
-    assert name_smiles("OCCNN=NN") == "2-(hydrazonohydrazinyl)ethanol"
+    assert name_smiles("OCCNN=NN") == "2-(hydrazonohydrazinyl)ethan-1-ol"
 
 
 def test_substituted_imino_on_a_ring_centre_keeps_its_double_bond():
@@ -4077,7 +4080,7 @@ def test_retained_fused_ring_keeps_its_name_as_a_substituent_prefix():
     cases = {
         "OCc1ccc2cccnc2c1": "1-(quinolin-7-yl)methanol",
         "OCc1ccnc2ccccc12": "1-(quinolin-4-yl)methanol",
-        "OCCc1ccc2cccnc2c1": "2-(quinolin-7-yl)ethanol",
+        "OCCc1ccc2cccnc2c1": "2-(quinolin-7-yl)ethan-1-ol",
         "OCc1ccc2nccnc2c1": "1-(quinoxalin-6-yl)methanol",
         "OCc1ccc2nnccc2c1": "1-(cinnolin-6-yl)methanol",
         "OCc1ccc2ncccc2n1": "1-(1,5-naphthyridin-2-yl)methanol",
@@ -5949,7 +5952,7 @@ def test_chlorosulfate_and_sulfamate_esters_are_not_sulfonate_parents():
     # Genuine sulfonic acids/esters (S bonded to carbon) still name as sulfonates.
     assert name_smiles("CS(=O)(=O)O") == "methanesulfonic acid"
     assert name_smiles("c1ccccc1S(=O)(=O)O") == "benzenesulfonic acid"
-    assert name_smiles("CCS(=O)(=O)OC") == "methyl ethane-1-sulfonate"
+    assert name_smiles("CCS(=O)(=O)OC") == "methyl ethanesulfonate"
 
 
 def test_substituted_triazane_chain_keeps_its_branch():
