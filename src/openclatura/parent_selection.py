@@ -31,6 +31,7 @@ class ParentSeniorityProfile:
     multiple_bond_count: int
     double_bond_count: int
     path_tiebreak: tuple[int, ...]
+    attached_prefix_count: int = 0
 
     def criterion_value(self, criterion: str):
         """Return the sortable value for one configured criterion."""
@@ -67,6 +68,15 @@ class ParentSeniorityProfile:
             return -self.multiple_bond_count
         if criterion == "double_bond_count":
             return -self.double_bond_count
+        if criterion == "attached_prefix_count":
+            # Rings only.  On a chain, "more prefixes" can be scored by cutting
+            # through a group that ought to stay contracted -- splitting a
+            # carbamoyl into an amino plus an oxo buys two extra prefixes and a
+            # worse name -- so the criterion earns its keep only where the
+            # skeleton is fixed and the count really is a count of substituents.
+            if not self.ring_parent:
+                return 0
+            return -self.attached_prefix_count
         if criterion == "path_tiebreak":
             return self.path_tiebreak
         raise KeyError(f"Unknown parent selection criterion: {criterion}")
@@ -148,6 +158,7 @@ class ParentCandidate:
             multiple_bond_count=_multiple_bond_count(mol, path, include_double=True),
             double_bond_count=_multiple_bond_count(mol, path, include_double=False),
             path_tiebreak=tuple(path),
+            attached_prefix_count=_attached_prefix_count(mol, path),
         )
         score_tuple = profile.score_tuple()
         return cls(
@@ -307,6 +318,21 @@ def select_principal_parent(
         seniority_profile=best.seniority_profile,
         score_tuple=best.score_tuple,
     )
+
+
+def _attached_prefix_count(mol: Molecule | None, path: list[int]) -> int:
+    """How many substituents this skeleton would cite as prefixes (P-44.4.1).
+
+    This is what makes the central ring of hexaphenylbenzene the parent rather
+    than one of the six outer rings: the central ring carries six prefixes, an
+    outer ring only one.  Without it the choice falls through to a tiebreak,
+    which has no reason to prefer either and so decides by input order.
+    """
+
+    if mol is None:
+        return 0
+    in_path = set(path)
+    return sum(1 for idx in path for nb in mol.get_neighbors(idx) if nb not in in_path)
 
 
 def _senior_element_vector(mol: Molecule | None, path: list[int], *, include_carbon: bool) -> tuple[int, ...]:

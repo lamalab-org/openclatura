@@ -4190,9 +4190,11 @@ def test_parent_selection_criteria_are_data_ordered():
         "chain_seniority",
         "multiple_bond_count",
         "double_bond_count",
+        "attached_prefix_count",
         "path_tiebreak",
     )
-    assert profile.score_tuple() == (-1, -1, (7,), 0, (), (-2, 0, (0, 0, 0, 0, 0, 0)), 0, 0, (0, 1))
+    # ``attached_prefix_count`` scores 0 on a chain profile: it only ranks rings.
+    assert profile.score_tuple() == (-1, -1, (7,), 0, (), (-2, 0, (0, 0, 0, 0, 0, 0)), 0, 0, 0, (0, 1))
 
 
 def test_senior_element_vector_orders_ring_and_chain_parent_profiles():
