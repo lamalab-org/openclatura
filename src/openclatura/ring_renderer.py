@@ -36,10 +36,7 @@ def von_baeyer_cycle_count(descriptor: str | None) -> int | None:
     for count, multiplier in multipliers.MULTIPLIERS.items():
         if prefix == multiplier.basic:
             return count
-    for count, stem in stems.STEMS.items():
-        if prefix == _basic_cycle_prefix(count):
-            return count
-    return None
+    return stems.length_for_basic_prefix(prefix)
 
 
 def is_von_baeyer_descriptor(descriptor: str | None) -> bool:
