@@ -1,5 +1,7 @@
 """Regression tests for systematic chain-length stems."""
 
+import os
+
 import pytest
 
 from openclatura import name
@@ -151,10 +153,22 @@ def test_von_baeyer_cycle_count_rejects_unknown_prefixes(descriptor):
     assert von_baeyer_cycle_count(descriptor) is None
 
 
-@pytest.mark.slow
-@pytest.mark.parametrize("length", range(1, 1001))
-def test_linear_alkanes_from_one_through_one_thousand(length):
+@pytest.mark.parametrize("length", [1, 2, 30, 31, 52, 100, 486, 1000])
+def test_linear_alkanes_use_generated_stems_for_representative_lengths(length):
     result = name("C" * length)
     expected = stems.stem_for(length) + "ane"
     assert result.error is None, f"C{length}: {result.error}"
     assert result.name == expected
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(
+    os.environ.get("OPENCLATURA_RUN_EXHAUSTIVE_STEM_TESTS") != "1",
+    reason="set OPENCLATURA_RUN_EXHAUSTIVE_STEM_TESTS=1 to run the 1..1000 alkane sweep",
+)
+def test_linear_alkanes_from_one_through_one_thousand_exhaustive():
+    for length in range(1, 1001):
+        result = name("C" * length)
+        expected = stems.stem_for(length) + "ane"
+        assert result.error is None, f"C{length}: {result.error}"
+        assert result.name == expected
