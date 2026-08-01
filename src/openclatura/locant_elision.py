@@ -112,10 +112,7 @@ def parent_locant_label(
 def _parent_symmetry_context(parts: AssemblyParts) -> ParentSymmetryContext:
     locants = tuple(sorted(parts.parent_atom_symbols_by_locant.keys(), key=parse_locant))
     indicated_hydrogens = frozenset(str(hydrogen) for hydrogen in parts.indicated_hydrogens)
-    labels = {
-        loc: parent_locant_label(parts, loc, indicated_hydrogens)
-        for loc in locants
-    }
+    labels = {loc: parent_locant_label(parts, loc, indicated_hydrogens) for loc in locants}
     adjacency = {
         loc: {
             other: parts.parent_bond_orders_by_locants.get(tuple(sorted((loc, other))), 0)
@@ -219,7 +216,9 @@ def _has_parent_set_automorphism_mapping(
     return search()
 
 
-def _parent_attachment_orbit(context: ParentSymmetryContext, source: str, locants: tuple[str, ...] | list[str]) -> set[str]:
+def _parent_attachment_orbit(
+    context: ParentSymmetryContext, source: str, locants: tuple[str, ...] | list[str]
+) -> set[str]:
     return {
         target
         for target in locants
