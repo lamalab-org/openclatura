@@ -554,6 +554,15 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                 return None
 
     if total_bonds == size:
+        if size == 3 and double_bonds == 0:
+            # One heteroatom in a three-ring: every carbon is equivalent, so the
+            # numbering these names imply is the only one available.
+            if n_count == 1 and o_count == 0 and s_count == 0:
+                return "aziridine", None
+            if o_count == 1 and n_count == 0 and s_count == 0:
+                return "oxirane", None
+            if s_count == 1 and n_count == 0 and o_count == 0:
+                return "thiirane", None
         if size == 4 and double_bonds == 0:
             if n_count == 1 and o_count == 0 and s_count == 0:
                 return "azetidine", None

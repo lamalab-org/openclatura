@@ -215,13 +215,6 @@ def _post_process_name(name: str) -> str:
     name = re.sub(r"(?<!thi)oxomethyl\b", "formyl", name)
     name = name.replace("thioxomethyl", "carbonothioyl")
 
-    name = name.replace("1-oxacyclopropan", "oxiran")
-    name = name.replace("1-oxacyclopropane", "oxirane")
-    name = name.replace("1-thiacyclopropan", "thiiran")
-    name = name.replace("1-thiacyclopropane", "thiirane")
-    name = name.replace("1-azacyclopropan", "aziridin")
-    name = name.replace("1-azacyclopropane", "aziridine")
-
     name = name.replace("1,3-dioxacyclopentan", "1,3-dioxolan")
     name = name.replace("1,3-dioxacyclopentane", "1,3-dioxolane")
     name = name.replace("1,3-dioxacyclohexan", "1,3-dioxan")
