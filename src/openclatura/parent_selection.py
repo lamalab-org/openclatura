@@ -1,6 +1,7 @@
 # openclatura/parent_selection.py
 from dataclasses import dataclass
 
+from .canonical_ranks import path_rank_key
 from .chains import RingSystem
 from .molecule import Molecule
 from .naming_data import values
@@ -32,6 +33,7 @@ class ParentSeniorityProfile:
     double_bond_count: int
     path_tiebreak: tuple[int, ...]
     attached_prefix_count: int = 0
+    split_acyl_count: int = 0
 
     def criterion_value(self, criterion: str):
         """Return the sortable value for one configured criterion."""
@@ -68,14 +70,9 @@ class ParentSeniorityProfile:
             return -self.multiple_bond_count
         if criterion == "double_bond_count":
             return -self.double_bond_count
+        if criterion == "split_acyl_count":
+            return self.split_acyl_count
         if criterion == "attached_prefix_count":
-            # Rings only.  On a chain, "more prefixes" can be scored by cutting
-            # through a group that ought to stay contracted -- splitting a
-            # carbamoyl into an amino plus an oxo buys two extra prefixes and a
-            # worse name -- so the criterion earns its keep only where the
-            # skeleton is fixed and the count really is a count of substituents.
-            if not self.ring_parent:
-                return 0
             return -self.attached_prefix_count
         if criterion == "path_tiebreak":
             return self.path_tiebreak
@@ -157,8 +154,12 @@ class ParentCandidate:
             senior_heteroatom_count_vector=_senior_heteroatom_count_vector(mol, path),
             multiple_bond_count=_multiple_bond_count(mol, path, include_double=True),
             double_bond_count=_multiple_bond_count(mol, path, include_double=False),
-            path_tiebreak=tuple(path),
+            # Not ``tuple(path)``: atom indices come from the input's atom
+            # order, so that tiebreak hands one structure different names
+            # depending on where its SMILES happened to start.
+            path_tiebreak=path_rank_key(mol, path),
             attached_prefix_count=_attached_prefix_count(mol, path),
+            split_acyl_count=_split_acyl_count(mol, path),
         )
         score_tuple = profile.score_tuple()
         return cls(
@@ -333,6 +334,39 @@ def _attached_prefix_count(mol: Molecule | None, path: list[int]) -> int:
         return 0
     in_path = set(path)
     return sum(1 for idx in path for nb in mol.get_neighbors(idx) if nb not in in_path)
+
+
+def _split_acyl_count(mol: Molecule | None, path: list[int]) -> int:
+    """How many acyl groups this skeleton would cut in half.
+
+    A chain that swallows the carbon of an amide, but leaves the nitrogen
+    outside, has to spell that group as separate ``oxo`` and ``amino``
+    prefixes instead of one ``carbamoyl``.  Counting prefixes alone rewards
+    exactly that -- three prefixes beat one -- so the split has to be ruled out
+    before the count is consulted, not after.
+    """
+
+    if mol is None:
+        return 0
+    in_path = set(path)
+    split = 0
+    for idx in path:
+        atom = mol.atoms[idx]
+        if atom.symbol != "C":
+            continue
+        has_oxo = any(
+            mol.atoms[nb].symbol == "O"
+            and (bond := mol.get_bond(idx, nb)) is not None
+            and bond.order == 2
+            and nb not in in_path
+            for nb in mol.get_neighbors(idx)
+        )
+        if not has_oxo:
+            continue
+        if any(mol.atoms[nb].symbol in {"N", "O", "S"} and nb not in in_path for nb in mol.get_neighbors(idx)
+               if (bond := mol.get_bond(idx, nb)) is not None and bond.order == 1):
+            split += 1
+    return split
 
 
 def _senior_element_vector(mol: Molecule | None, path: list[int], *, include_carbon: bool) -> tuple[int, ...]:

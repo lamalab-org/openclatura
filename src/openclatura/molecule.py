@@ -174,6 +174,8 @@ class Molecule:
         self._bond_lookup: dict[tuple[int, int], int] = {}
         self._cyclic_cache: set[int] | None = None  # full-molecule ring atoms; invalidated on mutation
         self._perception_cache: tuple | None = None  # perceived functional groups; invalidated on mutation
+        # Refinement-equivalence atom ranks (canonical_ranks); invalidated on mutation.
+        self._canonical_rank_cache: dict[int, int] | None = None
         # The source RDKit molecule, populated only while self-auditing so the
         # audit can read tetrahedral parities the flattened model drops (graph_io).
         self.audit_rdmol = None
@@ -216,6 +218,7 @@ class Molecule:
         self._adj[idx] = []
         self._cyclic_cache = None
         self._perception_cache = None
+        self._canonical_rank_cache = None
         return atom
 
     def add_bond(
@@ -244,6 +247,7 @@ class Molecule:
         self._adj[v].append(u)
         self._cyclic_cache = None
         self._perception_cache = None
+        self._canonical_rank_cache = None
         return bond
 
     def get_neighbors(self, atom_idx: int) -> list[int]:

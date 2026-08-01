@@ -10,6 +10,7 @@
       "chain_seniority",
       "multiple_bond_count",
       "double_bond_count",
+      "split_acyl_count",
       "attached_prefix_count",
       "path_tiebreak"
     ]
@@ -34,7 +35,8 @@
       "bicycle_parent",
       "spiro_parent",
       "path_tiebreak",
-      "attached_prefix_count"
+      "attached_prefix_count",
+      "split_acyl_count"
     ]
   },
   "numbering_criteria": {

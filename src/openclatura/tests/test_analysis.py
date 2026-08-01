@@ -4190,11 +4190,11 @@ def test_parent_selection_criteria_are_data_ordered():
         "chain_seniority",
         "multiple_bond_count",
         "double_bond_count",
+        "split_acyl_count",
         "attached_prefix_count",
         "path_tiebreak",
     )
-    # ``attached_prefix_count`` scores 0 on a chain profile: it only ranks rings.
-    assert profile.score_tuple() == (-1, -1, (7,), 0, (), (-2, 0, (0, 0, 0, 0, 0, 0)), 0, 0, 0, (0, 1))
+    assert profile.score_tuple() == (-1, -1, (7,), 0, (), (-2, 0, (0, 0, 0, 0, 0, 0)), 0, 0, 0, 0, (0, 1))
 
 
 def test_senior_element_vector_orders_ring_and_chain_parent_profiles():
@@ -4712,9 +4712,13 @@ def test_charged_ammonio_substituent_keeps_all_n_ligands_explicit():
 
 
 def test_zinc_multi_locant_cation_suffixes_render_with_multiplier():
+    # Both spellings of the substituent describe the same group and both parse
+    # back to this structure, but P-45.5 prefers the one citing more prefixes:
+    # ``3-methoxy-2,2-dimethylpropyl`` cites three to ``2-(methoxymethyl)-2-
+    # methylpropyl``'s two, on chains of equal length.
     assert (
         name_smiles("CC(C)(C[NH+]1CCC[C@@]2(C1)CC[NH2+]C2)COC")
-        == "(5R)-7-(2-(methoxymethyl)-2-methylpropyl)-2,7-diazaspiro[4.5]decan-2,7-diium"
+        == "(5R)-7-(3-methoxy-2,2-dimethylpropyl)-2,7-diazaspiro[4.5]decan-2,7-diium"
     )
 
 
