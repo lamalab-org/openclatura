@@ -63,6 +63,10 @@ class NamingRequest:
     SMILES to the input.  Verification is graceful when py2opsin or Java
     are missing (see :class:`openclatura.opsin_verify.OpsinCheck`).
 
+    ``omit_redundant_locants`` is an experimental, opt-in symmetry proof for
+    constitutional locants on simple chain and monocyclic parents. The default
+    is deliberately false to preserve the existing naming contract.
+
     Structures arrive either as ``smiles`` or as an already-parsed
     ``rdkit_mol`` (``rdkit.Chem.rdchem.Mol``); when a molecule is given, a
     SMILES is only generated if something downstream actually needs one, so
@@ -74,6 +78,7 @@ class NamingRequest:
     verify_opsin: bool = False
     verify_self: bool = False
     token_debug: bool = False
+    omit_redundant_locants: bool = False
     rdkit_mol: Any | None = None
 
 
@@ -238,7 +243,12 @@ class NamingEngine:
             with audit_cm as component_audits:
                 mol, smiles = self._prepare_input(request)
                 if need_analysis:
-                    analysis = self._analyze(mol, smiles=smiles, token_debug=request.token_debug)
+                    analysis = self._analyze(
+                        mol,
+                        smiles=smiles,
+                        token_debug=request.token_debug,
+                        omit_redundant_locants=request.omit_redundant_locants,
+                    )
                     rules, hints = _extract_rules_hit(analysis.trace_segments)
                     result = NamingResult(
                         name=analysis.name,
@@ -251,7 +261,10 @@ class NamingEngine:
                         rule_hints=hints,
                     )
                 else:
-                    result = NamingResult(name=self._name(mol), smiles=smiles)
+                    result = NamingResult(
+                        name=self._name(mol, omit_redundant_locants=request.omit_redundant_locants),
+                        smiles=smiles,
+                    )
         except Exception as exc:  # noqa: BLE001 - intentionally permissive boundary
             return NamingResult(name="", smiles=request.smiles, error=f"{type(exc).__name__}: {exc}")
         finally:
@@ -334,19 +347,30 @@ class NamingEngine:
             smiles = Chem.MolToSmiles(request.rdkit_mol)
         return read_rdkit_mol(request.rdkit_mol), smiles
 
-    def _name(self, mol: Molecule) -> str:
+    def _name(self, mol: Molecule, *, omit_redundant_locants: bool = False) -> str:
         if not mol.atoms:
             return ""
 
         names = []
         for component in get_connected_components(mol):
-            component_name = self._name_component(mol, component)
+            component_name = self._name_component(
+                mol,
+                component,
+                omit_redundant_locants=omit_redundant_locants,
+            )
             if component_name:
                 names.append((component_name, _component_charge(mol, component)))
         names.sort(key=lambda item: self._component_sort_key(*item))
         return " ".join(_multiply_identical_ions(names))
 
-    def _analyze(self, mol: Molecule, *, smiles: str = "", token_debug: bool = False) -> NameAnalysis:
+    def _analyze(
+        self,
+        mol: Molecule,
+        *,
+        smiles: str = "",
+        token_debug: bool = False,
+        omit_redundant_locants: bool = False,
+    ) -> NameAnalysis:
         decisions = DecisionTrace()
         trace_decision(
             decisions,
@@ -379,6 +403,7 @@ class NamingEngine:
                 return_tree=True,
                 decision_trace=decisions,
                 token_debug=token_debug,
+                omit_redundant_locants=omit_redundant_locants,
             )
             if component_name:
                 named_components.append((component_name, trace, tree, _component_charge(mol, component)))
