@@ -14,6 +14,17 @@ from .locant_sources import LocantMapSource
 MAX_CANDIDATE_PLACEMENTS = 10_000
 
 
+def _within_search_limit(size: int) -> bool:
+    """Return whether an exact search may proceed without exceeding its cap.
+
+    Every combinatorial search space and its realized iteration count use this
+    same inclusive limit.  Returning ``False`` always fails closed: the caller
+    retains the original locants instead of approximating symmetry.
+    """
+
+    return size <= MAX_CANDIDATE_PLACEMENTS
+
+
 @dataclass(frozen=True)
 class _FeatureGroup:
     category: str
@@ -51,8 +62,10 @@ def substituent_locant_set_is_unique(parts: AssemblyParts, locs: list[str], grou
     if len(selected) == 1 and retained_parent_attachment_is_ambiguous(parts, list(selected)):
         return False
     group = _FeatureGroup("substituent", "__simple_prefix__", selected)
-    return _supported_simple_parent(parts) and _single_attachment_positions(parts, selected) and _elision_is_safe(
-        parts, [group], (group,)
+    return (
+        _supported_simple_parent(parts)
+        and _single_attachment_positions(parts, selected)
+        and _elision_is_safe(parts, [group], (group,))
     )
 
 
@@ -174,7 +187,7 @@ def _maximum_safe_elision(parts: AssemblyParts, groups: list[_FeatureGroup]) -> 
     for size in range(len(ordered), 0, -1):
         for subset in combinations(ordered, size):
             checked += 1
-            if checked > MAX_CANDIDATE_PLACEMENTS:
+            if not _within_search_limit(checked):
                 return ()
             if _elision_is_safe(parts, groups, subset):
                 return subset
@@ -206,13 +219,13 @@ def _elision_is_safe(
     if any(not options for options in placement_options):
         return False
     candidate_count = prod(len(options) for options in placement_options)
-    if candidate_count > MAX_CANDIDATE_PLACEMENTS:
+    if not _within_search_limit(candidate_count):
         return False
 
     checked = 0
     for placements in product(*placement_options):
         checked += 1
-        if checked > MAX_CANDIDATE_PLACEMENTS:
+        if not _within_search_limit(checked):
             return False
         candidate_groups = tuple(
             _FeatureGroup(group.category, group.key, tuple(positions))
@@ -227,7 +240,7 @@ def _elision_is_safe(
 def _candidate_positions(group, locants, edges, base_nodes, base_edges):
     count = len(group.positions)
     universe = locants if group.category != "unsaturation" else edges
-    if count > len(universe) or comb(len(universe), count) > MAX_CANDIDATE_PLACEMENTS:
+    if count > len(universe) or not _within_search_limit(comb(len(universe), count)):
         return ()
     actual_signature = Counter(_position_signature(position, base_nodes, base_edges) for position in group.positions)
     return tuple(

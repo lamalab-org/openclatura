@@ -3,6 +3,7 @@
 import re
 from collections import Counter
 from dataclasses import dataclass, field
+from functools import partial
 
 from .additive import add_indicated_hydrogens as _add_indicated_hydrogens
 from .assembler import assemble_name_raw, post_process_rewrite_rules
@@ -102,6 +103,12 @@ class DirectSubgraphPrefix:
             "ligand_count": len(self.ligand_trees),
             "source": self.source,
         }
+
+
+def _subgraph_namer_with_locant_policy(omit_redundant_locants: bool):
+    """Bind request-scoped locant policy at the recursive naming entry point."""
+
+    return partial(name_subgraph, omit_redundant_locants=omit_redundant_locants)
 
 
 def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) -> DirectSubgraphPrefix | None:
@@ -852,9 +859,7 @@ def _collect_subgraph_substituents(
     subst_mapping: dict[int, list[SubstituentItem]] = {}
     sub_handled_atoms = set()
 
-    def configured_name_subgraph(*args, **kwargs):
-        kwargs.setdefault("omit_redundant_locants", omit_redundant_locants)
-        return name_subgraph(*args, **kwargs)
+    configured_name_subgraph = _subgraph_namer_with_locant_policy(omit_redundant_locants)
 
     for group in sub_perceived:
         # The attachment carbon being on this parent is not enough: the group's own
@@ -1928,9 +1933,7 @@ def name_component(
 ):
     """Name one connected component or recursive component of a molecule."""
 
-    def configured_name_subgraph(*args, **kwargs):
-        kwargs.setdefault("omit_redundant_locants", omit_redundant_locants)
-        return name_subgraph(*args, **kwargs)
+    configured_name_subgraph = _subgraph_namer_with_locant_policy(omit_redundant_locants)
 
     return _name_component_impl(
         mol,

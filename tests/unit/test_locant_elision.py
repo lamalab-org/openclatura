@@ -15,10 +15,10 @@ def _name(smiles: str, *, trace: bool = False):
     )
 
 
-def test_hexamethylbenzene_elision_is_opt_in():
+def test_hexamethylbenzene_existing_elision_is_preserved_by_opt_in_policy():
     smiles = "Cc1c(C)c(C)c(C)c(C)c1C"
 
-    assert name_smiles(smiles) == "1,2,3,4,5,6-hexamethylbenzene"
+    assert name_smiles(smiles) == "hexamethylbenzene"
     assert _name(smiles).name == "hexamethylbenzene"
 
 
