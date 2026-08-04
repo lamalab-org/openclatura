@@ -62,3 +62,48 @@ def complex_(count: int) -> str:
     Trailing underscore avoids shadowing the `complex` builtin.
     """
     return MULTIPLIERS[count].complex
+
+
+# --------------------------------------------------------------------------- #
+# Reading prefixes back off a name
+# --------------------------------------------------------------------------- #
+# The namer writes multipliers (count -> prefix); anything that *parses* a name
+# needs the inverse.  Deriving it from the same table keeps the two directions
+# from drifting apart, and means a parser accepts every prefix the namer emits.
+
+COUNTS_BY_PREFIX: dict[str, int] = {
+    prefix: mult.count for mult in MULTIPLIERS.values() for prefix in (mult.basic, mult.complex)
+}
+
+# Longest first, so ``tetradeca`` reads as 14 and not as ``tetra`` + ``deca``.
+_PREFIXES_LONGEST_FIRST: tuple[str, ...] = tuple(sorted(COUNTS_BY_PREFIX, key=len, reverse=True))
+
+
+def count_for(prefix: str) -> int | None:
+    """Count for one multiplicative prefix (``di`` and ``bis`` -> 2), else ``None``."""
+    return COUNTS_BY_PREFIX.get(prefix)
+
+
+def candidate_splits(name: str):
+    """Yield every ``(count, rest)`` reading of a leading multiplicative prefix,
+    longest prefix first.
+
+    A leading prefix is genuinely ambiguous out of context — ``triazole`` starts
+    with ``tri`` but is not three of anything — so callers that can validate
+    ``rest`` should walk these and take the first reading that checks out, rather
+    than committing to the longest match.
+    """
+
+    for prefix in _PREFIXES_LONGEST_FIRST:
+        if name.startswith(prefix):
+            yield COUNTS_BY_PREFIX[prefix], name[len(prefix) :]
+
+
+def split_prefix(name: str) -> tuple[int, str]:
+    """Split a leading multiplicative prefix off ``name`` -> ``(count, rest)``.
+
+    Falls back to ``(1, name)`` when there is no leading prefix, so an
+    unmultiplied name reads as a single occurrence.
+    """
+
+    return next(candidate_splits(name), (1, name))

@@ -1,6 +1,8 @@
 # openclatura/rules/bonds.py
 from dataclasses import dataclass
 
+from . import multipliers
+
 
 @dataclass(frozen=True)
 class BondType:
@@ -9,7 +11,6 @@ class BondType:
     saturated_suffix: str
     suffix: str
     needs_locant: bool
-    multi_infix: dict[int, str]
 
 
 BONDS: dict[str, BondType] = {
@@ -19,7 +20,6 @@ BONDS: dict[str, BondType] = {
         saturated_suffix="an",
         suffix="an",
         needs_locant=False,
-        multi_infix={},
     ),
     "double": BondType(
         key="double",
@@ -27,17 +27,6 @@ BONDS: dict[str, BondType] = {
         saturated_suffix="",
         suffix="en",
         needs_locant=True,
-        multi_infix={
-            2: "adien",
-            3: "atrien",
-            4: "atetraen",
-            5: "apentaen",
-            6: "ahexaen",
-            7: "aheptaen",
-            8: "aoctaen",
-            9: "anonaen",
-            10: "adecaen",
-        },
     ),
     "triple": BondType(
         key="triple",
@@ -45,17 +34,6 @@ BONDS: dict[str, BondType] = {
         saturated_suffix="",
         suffix="yn",
         needs_locant=True,
-        multi_infix={
-            2: "adiyn",
-            3: "atriyn",
-            4: "atetrayn",
-            5: "apentayn",
-            6: "ahexayn",
-            7: "aheptayn",
-            8: "aoctayn",
-            9: "anonayn",
-            10: "adecayn",
-        },
     ),
 }
 
@@ -67,7 +45,23 @@ def get(key: str) -> BondType:
 
 
 def unsaturation_infix(bond_key: str, count: int) -> str:
+    """The parent-stem infix citing ``count`` bonds of ``bond_key``.
+
+    One bond is just the bare suffix (``hex`` + ``en`` -> ``hex-1-ene``); several
+    take the multiplicative prefix, joined to the stem by the interfix ``a``
+    (``hexa-1,3-dien``).  The prefix is read off the shared multiplier table
+    rather than a private copy, so every count the rest of the namer can spell
+    (through ``icosa``, 20) is spellable here too -- a long cumulene like
+    ``octadeca-4,...,17-tetradecaene`` needs 14.
+    """
+
     bt = BONDS[bond_key]
     if count == 1:
         return bt.suffix
-    return bt.multi_infix[count]
+    if not bt.needs_locant:
+        raise ValueError(f"{bond_key} bonds are not cited with a multiplicity")
+    try:
+        prefix = multipliers.basic(count)
+    except KeyError:
+        raise ValueError(f"no multiplicative prefix for {count} {bond_key} bonds") from None
+    return f"a{prefix}{bt.suffix}"

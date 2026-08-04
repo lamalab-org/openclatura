@@ -13,6 +13,7 @@ class Atom:
     isotope: int | None = None
     stereo: str | None = None  # 'R' or 'S'
     raw_stereo: str | None = None  # RDKit tetrahedral tag when CIP is unavailable: 'CW' or 'CCW'
+    cip: str | None = None  # independent modern (rdCIPLabeler) CIP label; only populated during self-audit
     is_aromatic: bool = False
     explicit_h_count: int = 0
     total_h_count: int = 0
@@ -42,6 +43,7 @@ class Bond:
     order: int = 1
     stereo: str | None = None  # 'E' or 'Z'
     in_small_ring: bool = False  # NEW: Tracks if bond is in a ring of size <= 7
+    cip: str | None = None  # independent modern (rdCIPLabeler) E/Z label; only during self-audit
 
     def get_other_atom(self, atom_idx: int) -> int:
         if atom_idx == self.u:
@@ -172,6 +174,15 @@ class Molecule:
         self._bond_lookup: dict[tuple[int, int], int] = {}
         self._cyclic_cache: set[int] | None = None  # full-molecule ring atoms; invalidated on mutation
         self._perception_cache: tuple | None = None  # perceived functional groups; invalidated on mutation
+        # Refinement-equivalence atom ranks (canonical_ranks); invalidated on mutation.
+        self._canonical_rank_cache: dict[int, int] | None = None
+        # The source RDKit molecule, populated only while self-auditing so the
+        # audit can read tetrahedral parities the flattened model drops (graph_io).
+        self.audit_rdmol = None
+        # Accurate (rdCIPLabeler) atom labels, including the centres the legacy
+        # perception leaves unassigned.  Always populated: naming reads it to
+        # spell out ring centres the cis/trans fallback cannot describe.
+        self.accurate_cip: dict[int, str] = {}
 
     def add_atom(
         self,
@@ -180,7 +191,9 @@ class Molecule:
         charge: int = 0,
         stereo: str | None = None,
         *,
+        isotope: int | None = None,
         raw_stereo: str | None = None,
+        cip: str | None = None,
         is_aromatic: bool = False,
         explicit_h_count: int = 0,
         total_h_count: int = 0,
@@ -193,8 +206,10 @@ class Molecule:
             idx=idx,
             symbol=symbol,
             charge=charge,
+            isotope=isotope,
             stereo=stereo,
             raw_stereo=raw_stereo,
+            cip=cip,
             is_aromatic=is_aromatic,
             explicit_h_count=explicit_h_count,
             total_h_count=total_h_count,
@@ -203,6 +218,7 @@ class Molecule:
         self._adj[idx] = []
         self._cyclic_cache = None
         self._perception_cache = None
+        self._canonical_rank_cache = None
         return atom
 
     def add_bond(
@@ -213,6 +229,7 @@ class Molecule:
         idx: int | None = None,
         stereo: str | None = None,
         in_small_ring: bool = False,
+        cip: str | None = None,
     ) -> Bond:
         if u not in self.atoms or v not in self.atoms:
             raise ValueError("Both atoms must exist")
@@ -223,13 +240,14 @@ class Molecule:
             raise ValueError(f"Atoms {u} and {v} are already bonded.")
         if idx is None:
             idx = max(self.bonds.keys(), default=0) + 1
-        bond = Bond(idx=idx, u=u, v=v, order=order, stereo=stereo, in_small_ring=in_small_ring)
+        bond = Bond(idx=idx, u=u, v=v, order=order, stereo=stereo, in_small_ring=in_small_ring, cip=cip)
         self.bonds[idx] = bond
         self._bond_lookup[bond_key] = idx
         self._adj[u].append(v)
         self._adj[v].append(u)
         self._cyclic_cache = None
         self._perception_cache = None
+        self._canonical_rank_cache = None
         return bond
 
     def get_neighbors(self, atom_idx: int) -> list[int]:

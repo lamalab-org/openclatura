@@ -17,7 +17,14 @@ from .assembly_spiro import extract_spiro_side_prefixes
 from .chains import find_ring_systems, get_cyclic_atoms
 from .component_namer import name_component as _name_component_impl
 from .engine import DEFAULT_NAMING_ENGINE
-from .formatting import format_counted_prefixes, format_multiplier, is_complex_prefix, strip_outer_parentheses
+from .formatting import (
+    format_counted_prefixes,
+    format_multiplier,
+    is_complex_prefix,
+    is_composite_prefix,
+    strip_outer_parentheses,
+)
+from .functional_prefixes import PREFIX_HANDLERS, PrefixContext
 from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
@@ -28,6 +35,7 @@ from .nomenclature import RULES
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
 from .parent_selection import select_principal_parent
 from .perception import PerceivedGroup, perceive_groups
+from .retained_fused_production import production_retained_fused_parent
 from .rules import elision, multipliers, stems
 from .spiro_assembly import SpiroAssembly
 from .subgraph_tools import (
@@ -360,6 +368,36 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
     )
 
 
+def _ring_is_isolated(mol: Molecule, ring: list[int], component_atoms: set[int]) -> bool:
+    """Whether ``ring`` shares no atom with another ring of the component.
+
+    A *fused* ring passes the per-atom check the ring finder makes — its fusion
+    atoms still have exactly two neighbours inside the ring — so fusion has to be
+    tested separately: drop the ring's own bonds and see whether any two of its
+    atoms remain joined through the rest of the component.  A ring merely carried
+    as a substituent hangs off a single atom and cannot rejoin, which is what
+    keeps the heteroaromatic-branch case this guard sits in front of.
+    """
+
+    ring_set = set(ring)
+    ring_bonds = {frozenset((ring[i], ring[(i + 1) % len(ring)])) for i in range(len(ring))}
+
+    for start in ring:
+        seen, stack = {start}, [start]
+        while stack:
+            current = stack.pop()
+            for neighbor in mol.get_neighbors(current):
+                if neighbor not in component_atoms or neighbor in seen:
+                    continue
+                if frozenset((current, neighbor)) in ring_bonds:
+                    continue
+                seen.add(neighbor)
+                stack.append(neighbor)
+        if seen & (ring_set - {start}):
+            return False
+    return True
+
+
 def _simple_monocyclic_spiro_side_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> SpiroAssembly | None:
     """Name a monocyclic spiro side ring before naming its external branches."""
 
@@ -369,6 +407,8 @@ def _simple_monocyclic_spiro_side_assembly(mol: Molecule, c_idx: int, sub_comp: 
     if _ring_double_bond_count(mol, ring) != 0:
         return None
     if not all(mol.atoms[idx].symbol == "C" for idx in ring):
+        return None
+    if not _ring_is_isolated(mol, ring, sub_comp):
         return None
     if not _side_ring_has_heteroaromatic_branch(mol, ring, sub_comp):
         return None
@@ -818,6 +858,21 @@ def _number_saturated_n_ring_for_spiro(
     return min(candidates)[3]
 
 
+def _substituted_prefix_name(mol: Molecule, group: PerceivedGroup, sub_exclude: set[int]) -> str:
+    """Render a prefix group that carries its own substituent, or return ""."""
+
+    # Only groups perceived as carrying a substituent are re-rendered; every
+    # other prefix is already complete in the rule table, and routing those
+    # through a handler here would change names this site gets right.
+    if group.variant != "substituted_heteroatom_imino":
+        return ""
+    handler = PREFIX_HANDLERS.get(group.key)
+    if handler is None:
+        return ""
+    context = PrefixContext(mol=mol, parent_path=[], sub_exclude=sub_exclude, branch_namer=name_subgraph)
+    return handler(context, group)
+
+
 def _collect_subgraph_substituents(
     mol: Molecule,
     candidate_path: list[int],
@@ -838,9 +893,21 @@ def _collect_subgraph_substituents(
     sub_handled_atoms = set()
 
     for group in sub_perceived:
+        # The attachment carbon being on this parent is not enough: a group can
+        # hang off it and still be built from atoms this subgraph does not
+        # cover, such as the diazene that -N=N- contributes when it is the
+        # parent rather than a `diazenyl` prefix.  Citing it here spells it
+        # twice, once as the prefix and once as the parent.
+        if group.atoms_involved & sub_exclude:
+            continue
         if group.attachment_carbon in main_set and not group.is_principal_candidate:
             rule = RULES.functional_groups.by_key.get(group.key)
             name = rule.prefix if rule and rule.role == "prefix" else ""
+            # The rule table holds the bare prefix, so a group that carries its
+            # own substituent -- `(methylimino)` rather than `imino` -- loses it
+            # here unless the handler that knows how to render it is consulted.
+            if name:
+                name = _substituted_prefix_name(mol, group, sub_exclude) or name
             if name:
                 subst_mapping.setdefault(group.attachment_carbon, []).append(
                     SubstituentItem(
@@ -1126,9 +1193,19 @@ def _simple_rooted_carbanion_substituent_name(
     return f"{side_stem}ylmethanidyl"
 
 
+_MULTI_ACID_ENDINGS = tuple(
+    f"{multiplier}{stem}" for multiplier in ("di", "tri", "tetra") for stem in ("oic acid", "carboxylic acid")
+)
+
+
 def _carboxylic_acid_to_amido(acid_name: str) -> str | None:
     """Convert a carboxylic-acid component name to its N-acyl (amido) substituent form."""
 
+    # Only the acid this nitrogen replaced becomes the amide.  Rewriting the
+    # suffix of a diacid amidates both of them, which is how glutamate's free
+    # side-chain acid turned into `2-aminopentanediamido`.
+    if acid_name.endswith(_MULTI_ACID_ENDINGS):
+        return None
     for ending, replacement in (("carboxylic acid", "carboxamido"), ("oic acid", "amido"), ("ic acid", "amido")):
         if acid_name.endswith(ending):
             return acid_name[: -len(ending)] + replacement
@@ -1142,7 +1219,12 @@ def _format_n_locant_prefix(names: list[str]) -> str:
     parts = []
     for name in sorted(counts):
         k = counts[name]
-        display = f"({name})" if is_complex_prefix(name) else name
+        # An N-locant prefix runs straight into the parent name after it, so a
+        # composite one has to be enclosed or the boundary is lost:
+        # ``N-cyclopropylmethyladamantane-2-carboxamido`` reads equally well as a
+        # cyclopropyl on N plus a methyl on the adamantane.
+        enclose = is_complex_prefix(name) or is_composite_prefix(name)
+        display = f"({name})" if enclose else name
         locants = ",".join(["N"] * k)
         if k == 1:
             parts.append(f"{locants}-{display}")
@@ -1150,6 +1232,47 @@ def _format_n_locant_prefix(names: list[str]) -> str:
             mult = multipliers.complex_(k) if is_complex_prefix(name) else multipliers.basic(k)
             parts.append(f"{locants}-{mult}{display}")
     return "-".join(parts)
+
+
+def _is_carboxylic_acid_carbon(mol: Molecule, idx: int) -> bool:
+    """Whether ``idx`` is a carbon bearing both an oxo and a hydroxy oxygen."""
+
+    if not mol.atoms[idx].is_carbon:
+        return False
+    oxo = hydroxy = False
+    for neighbor in mol.get_neighbors(idx):
+        if mol.atoms[neighbor].symbol != "O":
+            continue
+        bond = mol.get_bond(idx, neighbor)
+        if bond is None:
+            continue
+        if bond.order == 2:
+            oxo = True
+        elif bond.order == 1 and mol.degree(neighbor) == 1:
+            hydroxy = True
+    return oxo and hydroxy
+
+
+def _competing_acid_reachable(mol: Molecule, acyl_c: int, acid_atoms: set[int]) -> bool:
+    """Whether another acid group could outrank the one at ``acyl_c``.
+
+    Only an acid the parent chain can reach competes for the suffix, and a
+    chain does not cross an ether oxygen -- an acid behind one stays a
+    substituent prefix and leaves the amido rewrite sound.
+    """
+
+    seen = {acyl_c}
+    stack = [acyl_c]
+    while stack:
+        current = stack.pop()
+        for neighbor in mol.get_neighbors(current):
+            if neighbor in seen or neighbor not in acid_atoms:
+                continue
+            if mol.atoms[neighbor].symbol == "O" and mol.degree(neighbor) > 1:
+                continue
+            seen.add(neighbor)
+            stack.append(neighbor)
+    return any(_is_carboxylic_acid_carbon(mol, idx) for idx in seen if idx != acyl_c)
 
 
 def _acylamino_amido_prefix(
@@ -1205,6 +1328,15 @@ def _acylamino_amido_prefix(
             continue
         acid_atoms.add(cur)
         stack.extend(nb for nb in mol.get_neighbors(cur) if nb not in acid_atoms and nb not in blocked)
+
+    # The acyl is re-named by capping it with a hydroxyl and rewriting the acid
+    # suffix, which only works when that hydroxyl is the acid the name is built
+    # on.  Another acid group in the fragment can outrank it and take the
+    # suffix instead, and the rewrite then amidates the wrong carbon: a
+    # glutamyl residue kept its free side-chain acid, so Glu-Leu came out as
+    # `2-aminopentanediamido` and the tripeptides transposed two residues.
+    if _competing_acid_reachable(mol, acyl_c, acid_atoms):
+        return None
 
     acid_mol = Molecule()
     for idx in acid_atoms:
@@ -1383,6 +1515,25 @@ def name_subgraph(
         sub_exclude,
         emit_metadata=emit_metadata,
     )
+    # A retained ring is retained wherever it lands: the same gate that lets
+    # quinoline be a parent lets it be a prefix, so ``quinolin-7-yl`` is spelt
+    # out rather than falling back to the von Baeyer name of the same ring.  A
+    # substituent has no principal group, and its attachment atom is passed in
+    # as one more locant the retained map has to be able to cite.
+    retained_parent_metadata = None
+    retained_fused = production_retained_fused_parent(
+        mol,
+        parent_selection.primary_path,
+        component,
+        sub_perceived,
+        None,
+        subst_mapping,
+        attachment_atom=start_idx,
+    )
+    if retained_fused is not None:
+        retained_name_val = retained_fused.name
+        locant_maps = retained_fused.locant_maps
+        retained_parent_metadata = retained_fused.metadata
     parent_plan = build_parent_assembly_plan(
         mol,
         parent_selection,
@@ -1394,6 +1545,7 @@ def name_subgraph(
         subst_mapping,
         locant_maps,
         retained_name_val,
+        retained_parent_metadata,
     )
     numbered_path = parent_plan.numbered_path
     get_loc = parent_plan.get_loc

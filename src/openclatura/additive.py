@@ -1,9 +1,46 @@
 """Explicit additive/replacement feature collection for selected parents."""
 
 from .assembly_parts import AssemblyParts, SubstituentItem
+from .locants import parse_locant
 from .molecule import Molecule
 from .name_operations import HydroOperation
 from .namer_config import INDICATED_H_RETAINED_NAMES
+
+
+def _saturated_ring_carbons(mol: Molecule, numbered_path: list[int], get_loc) -> set[str]:
+    """Locants of ring carbons whose ring bonds are all single and that hold H."""
+
+    found: set[str] = set()
+    for idx in numbered_path:
+        atom = mol.atoms[idx]
+        if not atom.is_carbon:
+            continue
+        ring_bonds = [
+            bond for n in mol.get_neighbors(idx) if n in numbered_path and (bond := mol.get_bond(idx, n)) is not None
+        ]
+        if not ring_bonds or sum(bond.order for bond in ring_bonds) != len(ring_bonds):
+            continue
+        if atom.explicit_h_count + atom.total_h_count > 0:
+            found.add(str(get_loc(idx)))
+    return found
+
+
+def _declared_sites_are_unambiguous(mol: Molecule, numbered_path: list[int], get_loc, declared: set[str]) -> bool:
+    """True when the declared indicated-H locants are the only place they could sit.
+
+    A declared heteroatom site is ambiguous when the ring system holds another
+    heteroatom of the same element that could carry the hydrogen instead: 1H-
+    and 2H-indazole are both real parents, so the ``1`` in 1H-indazole-3,5-dione
+    is what tells the two apart and cannot be traded for a saturated carbon.
+    """
+
+    for idx in numbered_path:
+        atom = mol.atoms[idx]
+        if str(get_loc(idx)) not in declared or atom.is_carbon:
+            continue
+        if sum(mol.atoms[other].symbol == atom.symbol for other in numbered_path) > 1:
+            return False
+    return True
 
 
 def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
@@ -16,6 +53,22 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     oxo_derivative = parts.principal_group is not None and parts.principal_group.key == "ketone"
     metadata = parts.retained_parent_metadata
     default_indicated_h = set(metadata.default_indicated_h) if metadata is not None else set()
+    # The declared locants say how many indicated hydrogens the parent hydride
+    # supports, and where they sit in the unsubstituted parent.  Where they sit
+    # in *this* molecule is a property of this molecule: 1H- and 2H-indene are
+    # different compounds.  So when the structure presents exactly as many
+    # saturated carbons as the parent supports, those are the indicated-H sites
+    # and their real locants replace the declared ones.  A different count means
+    # the extra positions are hydro derivatives, which are cited separately, and
+    # the declared locants stand.  A declared site whose element repeats in the
+    # ring system is exempt: there the locant identifies which isomer this is.
+    observed = _saturated_ring_carbons(mol, numbered_path, get_loc)
+    if (
+        default_indicated_h
+        and len(observed) == len(default_indicated_h)
+        and _declared_sites_are_unambiguous(mol, numbered_path, get_loc, default_indicated_h)
+    ):
+        default_indicated_h = observed
     fusion_locants = set(metadata.fusion_locants) if metadata is not None else set()
     candidates: list[tuple[str, int]] = []
     for idx in numbered_path:
@@ -28,7 +81,16 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         if metadata is not None and default_indicated_h and atom.is_carbon and locant not in default_indicated_h:
             continue
         if oxo_derivative:
-            if atom.explicit_h_count + atom.total_h_count <= 0:
+            # A ring nitrogen at a saturated position is a hydrogenated position
+            # of the parent hydride whether it holds the hydrogen or a
+            # substituent, so theophylline is
+            # 1,3-dimethyl-3,7-dihydro-1H-purine-2,6-dione: N1 and N3 count even
+            # though both are methylated.
+            ring_bond_order = sum(
+                bond.order for n in mol.get_neighbors(idx) if n in numbered_path and (bond := mol.get_bond(idx, n))
+            )
+            substituted_ring_nitrogen = atom.symbol == "N" and ring_bond_order == 2
+            if atom.explicit_h_count + atom.total_h_count <= 0 and not substituted_ring_nitrogen:
                 continue
             # Hydrogen introduced next to =O is implied by ``-one``/``-dione``
             # and must not become a new indicated-H locant.  Carbon is allowed
@@ -76,6 +138,28 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             )
         )
         return
+
+    # A mancude parent hydride supports a fixed number of indicated hydrogens.
+    # Saturated positions beyond that are *added* hydrogen and take a hydro
+    # prefix, so xanthine is 3,7-dihydro-1H-purine-2,6-dione rather than a run
+    # of indicated-H citations.  The lowest locants stay indicated.
+    # A hydro prefix saturates whole double bonds, so it can only absorb an even
+    # surplus.  An odd one stays as indicated hydrogen (1H,9H-purin-6-one),
+    # which is still a readable name.
+    supported = metadata.indicated_hydrogen_count if metadata is not None else len(candidates)
+    if metadata is not None and len(candidates) > supported and (len(candidates) - supported) % 2 == 0:
+        candidates.sort(key=lambda candidate: parse_locant(candidate[0]))
+        surplus = candidates[supported:]
+        candidates = candidates[:supported]
+        parts.hydro_operations.append(
+            HydroOperation(
+                key="additive_hydrogen",
+                reason="Saturation beyond the parent's indicated hydrogen is added hydrogen.",
+                locants=tuple(locant for locant, _ in surplus),
+                atom_ids=tuple(atom_idx for _, atom_idx in surplus),
+                operation_kind="additive_hydrogen",
+            )
+        )
 
     for locant, atom_idx in candidates:
         parts.indicated_hydrogens.append(locant)

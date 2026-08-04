@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import shutil
+import tempfile
 import warnings
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from itertools import combinations
+from pathlib import Path
 from random import Random
 
 import pytest
@@ -42,16 +44,33 @@ PARENT_CASES = (
     ("9H-xanthene", "9H-xanthene"),
 )
 
+# An oxo group saturates a ring position, and a mancude parent that cannot say
+# where the resulting hydrogen sits names an ambiguous molecule: `phenazin-2-one`
+# does not pin whether C1 or C3 carries it.  These three parents do not emit
+# that locant yet, so their oxo derivatives keep the von Baeyer parent, which
+# states saturation positionally and stays unambiguous.  Every name below is
+# still checked for an exact OPSIN round-trip; only the *retained root* is
+# waived here.  Removing an entry is the goal, not a permanent exemption.
+UNCITABLE_ADDED_HYDROGEN_PARENTS = frozenset({"acridine", "phenazine", "1,10-phenanthroline"})
+
+# The five von Baeyer expectations belong to UNCITABLE_ADDED_HYDROGEN_PARENTS
+# above: correct, round-trippable, but not the retained spelling.  They become
+# retained names again once those parents cite their added hydrogen.
 OXO_CASES = (
-    ("phenazin-1-one", "phenazin-1-one"),
-    ("phenazine-1,6-dione", "phenazine-1,6-dione"),
-    ("1,10-phenanthrolin-5-one", "1,10-phenanthrolin-5-one"),
-    ("1,10-phenanthroline-5,6-dione", "1,10-phenanthroline-5,6-dione"),
-    ("acridin-9-one", "acridin-9-one"),
-    ("9H-carbazol-1-one", "9H-carbazol-1-one"),
+    ("phenazin-1-one", "2,9-diazatricyclo[8.4.0.0^{3,8}]tetradeca-1,3,5,7,9,13-hexaen-11-one"),
+    ("phenazine-1,6-dione", "2,9-diazatricyclo[8.4.0.0^{3,8}]tetradeca-1(14),2,5,7,9,12-hexaene-4,11-dione"),
+    ("1,10-phenanthrolin-5-one", "3,14-diazatricyclo[8.4.0.0^{2,7}]tetradeca-1(14),2,4,6,10,12-hexaen-8-one"),
+    (
+        "1,10-phenanthroline-5,6-dione",
+        "3,14-diazatricyclo[8.4.0.0^{2,7}]tetradeca-1(14),2,4,6,10,12-hexaene-8,9-dione",
+    ),
+    ("acridin-9-one", "2-azatricyclo[8.4.0.0^{3,8}]tetradeca-1(14),3,5,7,10,12-hexaen-9-one"),
+    # OPSIN accepts ``9H-`` here, but the sp3 CH2 of the 1-one really sits at C2,
+    # so ``2H-`` is the unambiguous citation; both parse back to this structure.
+    ("9H-carbazol-1-one", "2H-carbazol-1-one"),
     ("purine-2,6-dione", "1H-purine-2,6-dione"),
     ("2,8-diamino-1,4-dihydropurin-6-one", "2,8-diamino-1,4-dihydropurin-6-one"),
-    ("1,3,7-trimethylpurine-2,6-dione", "1,3,7-trimethylpurine-2,6-dione"),
+    ("1,3,7-trimethylpurine-2,6-dione", "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione"),
     ("1H-indazol-3-one", "1H-indazol-3-one"),
     ("xanthen-9-one", "xanthen-9-one"),
 )
@@ -80,13 +99,18 @@ def _require_opsin() -> None:
 
 def _opsin(names: list[str], output_format: str = "SMILES") -> list[str]:
     _require_opsin()
-    # py2opsin 2.9 splits batched CML at newlines instead of at molecules.
-    # Single-name calls preserve each XML document intact.
-    if output_format == "CML":
-        return [py2opsin.py2opsin(name, output_format=output_format) for name in names]
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message=r".*OPSIN raised the following error.*", category=RuntimeWarning)
-        return list(py2opsin.py2opsin(names, output_format=output_format))
+    # py2opsin defaults its scratch file to a fixed name in the working
+    # directory, so anything else calling OPSIN at the same time reads back the
+    # wrong structures.  Every call gets its own path.
+    with tempfile.TemporaryDirectory(prefix="openclatura_opsin_") as tmpdir:
+        tmp_fpath = str(Path(tmpdir) / "input.txt")
+        # py2opsin 2.9 splits batched CML at newlines instead of at molecules.
+        # Single-name calls preserve each XML document intact.
+        if output_format == "CML":
+            return [py2opsin.py2opsin(name, output_format=output_format, tmp_fpath=tmp_fpath) for name in names]
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=r".*OPSIN raised the following error.*", category=RuntimeWarning)
+            return list(py2opsin.py2opsin(names, output_format=output_format, tmp_fpath=tmp_fpath))
 
 
 def _cml_plan(cml: str) -> tuple[dict[str, str], set[frozenset[str]], set[str]]:
@@ -271,7 +295,9 @@ def test_all_opsin_valid_oxo_and_dione_positions_keep_the_retained_parent(valid_
     regenerated_smiles = _opsin(generated_names)
 
     assert all(
-        row.root.lower() in generated.lower() for row, generated in zip(valid_oxo_rows, generated_names, strict=True)
+        row.root.lower() in generated.lower()
+        for row, generated in zip(valid_oxo_rows, generated_names, strict=True)
+        if row.parent not in UNCITABLE_ADDED_HYDROGEN_PARENTS
     )
     failures = [
         (row.name, generated, standardize_mol(row.smiles), standardize_mol(regenerated))
@@ -360,23 +386,27 @@ def test_oxo_dione_amino_methyl_combinations_preserve_hydride_state(valid_oxo_ro
     }
     candidate_smiles = _opsin([name for name, _, _, _ in candidate_names])
     valid_rows = [
-        (name, root, smiles)
-        for (name, root, _, _), smiles in zip(candidate_names, candidate_smiles, strict=True)
+        (name, root, parent, smiles)
+        for (name, root, parent, _), smiles in zip(candidate_names, candidate_smiles, strict=True)
         if smiles
     ]
     assert len(valid_rows) == _COMBINATION_SAMPLE_SIZE
 
-    generated_names = [result.name for result in name_many([smiles for _, _, smiles in valid_rows], processes=1)]
+    generated_names = [result.name for result in name_many([smiles for *_, smiles in valid_rows], processes=1)]
     regenerated_smiles = _opsin(generated_names)
     failures = [
         (source_name, generated, standardize_mol(source), standardize_mol(regenerated))
-        for (source_name, _, source), generated, regenerated in zip(
+        for (source_name, _, _, source), generated, regenerated in zip(
             valid_rows, generated_names, regenerated_smiles, strict=True
         )
         if not generated or standardize_mol(source) != standardize_mol(regenerated)
     ]
 
-    assert all(root.lower() in generated.lower() for (_, root, _), generated in zip(valid_rows, generated_names))
+    assert all(
+        root.lower() in generated.lower()
+        for (_, root, parent, _), generated in zip(valid_rows, generated_names)
+        if parent not in UNCITABLE_ADDED_HYDROGEN_PARENTS
+    )
     assert not failures, failures[:20]
 
 

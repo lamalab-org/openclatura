@@ -2,107 +2,892 @@
   "bluebook_rule": "P-25 retained fused parent templates. Rows are locant-keyed graph templates, not SMILES/SMARTS keys.",
   "base_templates": {
     "naphthalenoid_10": {
-      "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
-      "bonds": [
-        {"locants": ["1", "2"]}, {"locants": ["2", "3"]},
-        {"locants": ["3", "4"]}, {"locants": ["4", "4a"]},
-        {"locants": ["4a", "8a"], "bond_class": "fusion"}, {"locants": ["8a", "1"]},
-        {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
-        {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+      "locants": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "4a",
+        "5",
+        "6",
+        "7",
+        "8",
+        "8a"
       ],
-      "rings": [["1", "2", "3", "4", "4a", "8a"], ["4a", "5", "6", "7", "8", "8a"]],
-      "fusion_atoms": ["4a", "8a"],
-      "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+      "bonds": [
+        {
+          "locants": [
+            "1",
+            "2"
+          ]
+        },
+        {
+          "locants": [
+            "2",
+            "3"
+          ]
+        },
+        {
+          "locants": [
+            "3",
+            "4"
+          ]
+        },
+        {
+          "locants": [
+            "4",
+            "4a"
+          ]
+        },
+        {
+          "locants": [
+            "4a",
+            "8a"
+          ],
+          "bond_class": "fusion"
+        },
+        {
+          "locants": [
+            "8a",
+            "1"
+          ]
+        },
+        {
+          "locants": [
+            "4a",
+            "5"
+          ]
+        },
+        {
+          "locants": [
+            "5",
+            "6"
+          ]
+        },
+        {
+          "locants": [
+            "6",
+            "7"
+          ]
+        },
+        {
+          "locants": [
+            "7",
+            "8"
+          ]
+        },
+        {
+          "locants": [
+            "8",
+            "8a"
+          ]
+        }
+      ],
+      "rings": [
+        [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "8a"
+        ],
+        [
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
+      ],
+      "fusion_atoms": [
+        "4a",
+        "8a"
+      ],
+      "peripheral_atoms": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "4a",
+        "5",
+        "6",
+        "7",
+        "8",
+        "8a"
+      ]
     },
     "linear_tricyclic_14": {
-      "locants": ["1", "2", "3", "4", "4a", "5", "5a", "6", "7", "8", "9", "9a", "10", "10a"],
-      "bonds": [
-        {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-        {"locants": ["4", "4a"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "5a"]},
-        {"locants": ["5a", "6"]}, {"locants": ["6", "7"]}, {"locants": ["7", "8"]},
-        {"locants": ["8", "9"]}, {"locants": ["9", "9a"]},
-        {"locants": ["5a", "9a"], "bond_class": "fusion"}, {"locants": ["9a", "10"]},
-        {"locants": ["10", "10a"]}, {"locants": ["10a", "1"]},
-        {"locants": ["4a", "10a"], "bond_class": "fusion"}
+      "locants": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "4a",
+        "5",
+        "5a",
+        "6",
+        "7",
+        "8",
+        "9",
+        "9a",
+        "10",
+        "10a"
       ],
-      "fusion_atoms": ["4a", "5a", "9a", "10a"],
-      "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "5a", "6", "7", "8", "9", "9a", "10", "10a"],
+      "bonds": [
+        {
+          "locants": [
+            "1",
+            "2"
+          ]
+        },
+        {
+          "locants": [
+            "2",
+            "3"
+          ]
+        },
+        {
+          "locants": [
+            "3",
+            "4"
+          ]
+        },
+        {
+          "locants": [
+            "4",
+            "4a"
+          ]
+        },
+        {
+          "locants": [
+            "4a",
+            "5"
+          ]
+        },
+        {
+          "locants": [
+            "5",
+            "5a"
+          ]
+        },
+        {
+          "locants": [
+            "5a",
+            "6"
+          ]
+        },
+        {
+          "locants": [
+            "6",
+            "7"
+          ]
+        },
+        {
+          "locants": [
+            "7",
+            "8"
+          ]
+        },
+        {
+          "locants": [
+            "8",
+            "9"
+          ]
+        },
+        {
+          "locants": [
+            "9",
+            "9a"
+          ]
+        },
+        {
+          "locants": [
+            "5a",
+            "9a"
+          ],
+          "bond_class": "fusion"
+        },
+        {
+          "locants": [
+            "9a",
+            "10"
+          ]
+        },
+        {
+          "locants": [
+            "10",
+            "10a"
+          ]
+        },
+        {
+          "locants": [
+            "10a",
+            "1"
+          ]
+        },
+        {
+          "locants": [
+            "4a",
+            "10a"
+          ],
+          "bond_class": "fusion"
+        }
+      ],
+      "fusion_atoms": [
+        "4a",
+        "5a",
+        "9a",
+        "10a"
+      ],
+      "peripheral_atoms": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "4a",
+        "5",
+        "5a",
+        "6",
+        "7",
+        "8",
+        "9",
+        "9a",
+        "10",
+        "10a"
+      ],
       "mancude_double_bonds": 7
     },
     "phenanthrenoid_14": {
-      "locants": ["1", "2", "3", "4", "4a", "5", "6", "6a", "7", "8", "9", "10", "10a", "10b"],
-      "bonds": [
-        {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-        {"locants": ["4", "4a"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
-        {"locants": ["6", "6a"]}, {"locants": ["6a", "7"]}, {"locants": ["7", "8"]},
-        {"locants": ["8", "9"]}, {"locants": ["9", "10"]}, {"locants": ["10", "10a"]},
-        {"locants": ["6a", "10a"], "bond_class": "fusion"}, {"locants": ["10a", "10b"]},
-        {"locants": ["10b", "1"]}, {"locants": ["4a", "10b"], "bond_class": "fusion"}
+      "locants": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "4a",
+        "5",
+        "6",
+        "6a",
+        "7",
+        "8",
+        "9",
+        "10",
+        "10a",
+        "10b"
       ],
-      "fusion_atoms": ["4a", "6a", "10a", "10b"],
-      "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "6a", "7", "8", "9", "10", "10a", "10b"],
+      "bonds": [
+        {
+          "locants": [
+            "1",
+            "2"
+          ]
+        },
+        {
+          "locants": [
+            "2",
+            "3"
+          ]
+        },
+        {
+          "locants": [
+            "3",
+            "4"
+          ]
+        },
+        {
+          "locants": [
+            "4",
+            "4a"
+          ]
+        },
+        {
+          "locants": [
+            "4a",
+            "5"
+          ]
+        },
+        {
+          "locants": [
+            "5",
+            "6"
+          ]
+        },
+        {
+          "locants": [
+            "6",
+            "6a"
+          ]
+        },
+        {
+          "locants": [
+            "6a",
+            "7"
+          ]
+        },
+        {
+          "locants": [
+            "7",
+            "8"
+          ]
+        },
+        {
+          "locants": [
+            "8",
+            "9"
+          ]
+        },
+        {
+          "locants": [
+            "9",
+            "10"
+          ]
+        },
+        {
+          "locants": [
+            "10",
+            "10a"
+          ]
+        },
+        {
+          "locants": [
+            "6a",
+            "10a"
+          ],
+          "bond_class": "fusion"
+        },
+        {
+          "locants": [
+            "10a",
+            "10b"
+          ]
+        },
+        {
+          "locants": [
+            "10b",
+            "1"
+          ]
+        },
+        {
+          "locants": [
+            "4a",
+            "10b"
+          ],
+          "bond_class": "fusion"
+        }
+      ],
+      "fusion_atoms": [
+        "4a",
+        "6a",
+        "10a",
+        "10b"
+      ],
+      "peripheral_atoms": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "4a",
+        "5",
+        "6",
+        "6a",
+        "7",
+        "8",
+        "9",
+        "10",
+        "10a",
+        "10b"
+      ],
       "mancude_double_bonds": 7
     },
     "acridinoid_14": {
-      "locants": ["1", "2", "3", "4", "4a", "10", "10a", "5", "6", "7", "8", "8a", "9", "9a"],
-      "bonds": [
-        {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-        {"locants": ["4", "4a"]}, {"locants": ["4a", "10"]}, {"locants": ["10", "10a"]},
-        {"locants": ["10a", "5"]}, {"locants": ["5", "6"]}, {"locants": ["6", "7"]},
-        {"locants": ["7", "8"]}, {"locants": ["8", "8a"]},
-        {"locants": ["10a", "8a"], "bond_class": "fusion"}, {"locants": ["8a", "9"]},
-        {"locants": ["9", "9a"]}, {"locants": ["9a", "1"]},
-        {"locants": ["4a", "9a"], "bond_class": "fusion"}
+      "locants": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "4a",
+        "10",
+        "10a",
+        "5",
+        "6",
+        "7",
+        "8",
+        "8a",
+        "9",
+        "9a"
       ],
-      "fusion_atoms": ["4a", "10a", "8a", "9a"],
-      "peripheral_atoms": ["1", "2", "3", "4", "4a", "10", "10a", "5", "6", "7", "8", "8a", "9", "9a"],
+      "bonds": [
+        {
+          "locants": [
+            "1",
+            "2"
+          ]
+        },
+        {
+          "locants": [
+            "2",
+            "3"
+          ]
+        },
+        {
+          "locants": [
+            "3",
+            "4"
+          ]
+        },
+        {
+          "locants": [
+            "4",
+            "4a"
+          ]
+        },
+        {
+          "locants": [
+            "4a",
+            "10"
+          ]
+        },
+        {
+          "locants": [
+            "10",
+            "10a"
+          ]
+        },
+        {
+          "locants": [
+            "10a",
+            "5"
+          ]
+        },
+        {
+          "locants": [
+            "5",
+            "6"
+          ]
+        },
+        {
+          "locants": [
+            "6",
+            "7"
+          ]
+        },
+        {
+          "locants": [
+            "7",
+            "8"
+          ]
+        },
+        {
+          "locants": [
+            "8",
+            "8a"
+          ]
+        },
+        {
+          "locants": [
+            "10a",
+            "8a"
+          ],
+          "bond_class": "fusion"
+        },
+        {
+          "locants": [
+            "8a",
+            "9"
+          ]
+        },
+        {
+          "locants": [
+            "9",
+            "9a"
+          ]
+        },
+        {
+          "locants": [
+            "9a",
+            "1"
+          ]
+        },
+        {
+          "locants": [
+            "4a",
+            "9a"
+          ],
+          "bond_class": "fusion"
+        }
+      ],
+      "fusion_atoms": [
+        "4a",
+        "10a",
+        "8a",
+        "9a"
+      ],
+      "peripheral_atoms": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "4a",
+        "10",
+        "10a",
+        "5",
+        "6",
+        "7",
+        "8",
+        "8a",
+        "9",
+        "9a"
+      ],
       "mancude_double_bonds": 7
     },
     "carbazoloid_13": {
-      "locants": ["1", "2", "3", "4", "4a", "4b", "5", "6", "7", "8", "8a", "9", "9a"],
-      "bonds": [
-        {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-        {"locants": ["4", "4a"]}, {"locants": ["4a", "4b"], "bond_class": "fusion"},
-        {"locants": ["4b", "5"]}, {"locants": ["5", "6"]}, {"locants": ["6", "7"]},
-        {"locants": ["7", "8"]}, {"locants": ["8", "8a"]},
-        {"locants": ["4b", "8a"], "bond_class": "fusion"}, {"locants": ["8a", "9"]},
-        {"locants": ["9", "9a"]}, {"locants": ["9a", "1"]},
-        {"locants": ["4a", "9a"], "bond_class": "fusion"}
+      "locants": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "4a",
+        "4b",
+        "5",
+        "6",
+        "7",
+        "8",
+        "8a",
+        "9",
+        "9a"
       ],
-      "fusion_atoms": ["4a", "4b", "8a", "9a"],
-      "peripheral_atoms": ["1", "2", "3", "4", "4a", "4b", "5", "6", "7", "8", "8a", "9", "9a"],
+      "bonds": [
+        {
+          "locants": [
+            "1",
+            "2"
+          ]
+        },
+        {
+          "locants": [
+            "2",
+            "3"
+          ]
+        },
+        {
+          "locants": [
+            "3",
+            "4"
+          ]
+        },
+        {
+          "locants": [
+            "4",
+            "4a"
+          ]
+        },
+        {
+          "locants": [
+            "4a",
+            "4b"
+          ],
+          "bond_class": "fusion"
+        },
+        {
+          "locants": [
+            "4b",
+            "5"
+          ]
+        },
+        {
+          "locants": [
+            "5",
+            "6"
+          ]
+        },
+        {
+          "locants": [
+            "6",
+            "7"
+          ]
+        },
+        {
+          "locants": [
+            "7",
+            "8"
+          ]
+        },
+        {
+          "locants": [
+            "8",
+            "8a"
+          ]
+        },
+        {
+          "locants": [
+            "4b",
+            "8a"
+          ],
+          "bond_class": "fusion"
+        },
+        {
+          "locants": [
+            "8a",
+            "9"
+          ]
+        },
+        {
+          "locants": [
+            "9",
+            "9a"
+          ]
+        },
+        {
+          "locants": [
+            "9a",
+            "1"
+          ]
+        },
+        {
+          "locants": [
+            "4a",
+            "9a"
+          ],
+          "bond_class": "fusion"
+        }
+      ],
+      "fusion_atoms": [
+        "4a",
+        "4b",
+        "8a",
+        "9a"
+      ],
+      "peripheral_atoms": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "4a",
+        "4b",
+        "5",
+        "6",
+        "7",
+        "8",
+        "8a",
+        "9",
+        "9a"
+      ],
       "mancude_double_bonds": 6
     },
     "purinoid_9": {
-      "locants": ["1", "2", "3", "4", "9", "8", "7", "5", "6"],
-      "bonds": [
-        {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-        {"locants": ["4", "9"]}, {"locants": ["9", "8"]}, {"locants": ["8", "7"]},
-        {"locants": ["7", "5"]}, {"locants": ["5", "4"], "bond_class": "fusion"},
-        {"locants": ["5", "6"]}, {"locants": ["6", "1"]}
+      "locants": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "9",
+        "8",
+        "7",
+        "5",
+        "6"
       ],
-      "fusion_atoms": ["4", "5"],
-      "peripheral_atoms": ["1", "2", "3", "4", "9", "8", "7", "5", "6"],
+      "bonds": [
+        {
+          "locants": [
+            "1",
+            "2"
+          ]
+        },
+        {
+          "locants": [
+            "2",
+            "3"
+          ]
+        },
+        {
+          "locants": [
+            "3",
+            "4"
+          ]
+        },
+        {
+          "locants": [
+            "4",
+            "9"
+          ]
+        },
+        {
+          "locants": [
+            "9",
+            "8"
+          ]
+        },
+        {
+          "locants": [
+            "8",
+            "7"
+          ]
+        },
+        {
+          "locants": [
+            "7",
+            "5"
+          ]
+        },
+        {
+          "locants": [
+            "5",
+            "4"
+          ],
+          "bond_class": "fusion"
+        },
+        {
+          "locants": [
+            "5",
+            "6"
+          ]
+        },
+        {
+          "locants": [
+            "6",
+            "1"
+          ]
+        }
+      ],
+      "fusion_atoms": [
+        "4",
+        "5"
+      ],
+      "peripheral_atoms": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "9",
+        "8",
+        "7",
+        "5",
+        "6"
+      ],
       "mancude_double_bonds": 4
     },
     "indazoloid_9": {
-      "locants": ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"],
-      "bonds": [
-        {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "3a"]},
-        {"locants": ["3a", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "6"]},
-        {"locants": ["6", "7"]}, {"locants": ["7", "7a"]}, {"locants": ["7a", "1"]},
-        {"locants": ["3a", "7a"], "bond_class": "fusion"}
+      "locants": [
+        "1",
+        "2",
+        "3",
+        "3a",
+        "4",
+        "5",
+        "6",
+        "7",
+        "7a"
       ],
-      "fusion_atoms": ["3a", "7a"],
-      "peripheral_atoms": ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"],
+      "bonds": [
+        {
+          "locants": [
+            "1",
+            "2"
+          ]
+        },
+        {
+          "locants": [
+            "2",
+            "3"
+          ]
+        },
+        {
+          "locants": [
+            "3",
+            "3a"
+          ]
+        },
+        {
+          "locants": [
+            "3a",
+            "4"
+          ]
+        },
+        {
+          "locants": [
+            "4",
+            "5"
+          ]
+        },
+        {
+          "locants": [
+            "5",
+            "6"
+          ]
+        },
+        {
+          "locants": [
+            "6",
+            "7"
+          ]
+        },
+        {
+          "locants": [
+            "7",
+            "7a"
+          ]
+        },
+        {
+          "locants": [
+            "7a",
+            "1"
+          ]
+        },
+        {
+          "locants": [
+            "3a",
+            "7a"
+          ],
+          "bond_class": "fusion"
+        }
+      ],
+      "fusion_atoms": [
+        "3a",
+        "7a"
+      ],
+      "peripheral_atoms": [
+        "1",
+        "2",
+        "3",
+        "3a",
+        "4",
+        "5",
+        "6",
+        "7",
+        "7a"
+      ],
       "mancude_double_bonds": 4
     }
   },
   "pending_parents": [
-    {"name": "pleiadene", "pin": false, "priority": 100, "attached_prefix": "pleiadeno"},
-    {"name": "phenanthridine", "pin": true, "priority": 5},
-    {"name": "4H-quinolizine", "pin": true, "priority": 15, "default_indicated_h": ["4"]},
-    {"name": "1H-pyrrolizine", "pin": true, "priority": 21, "default_indicated_h": ["1"]}
+    {
+      "name": "pleiadene",
+      "pin": false,
+      "priority": 100,
+      "attached_prefix": "pleiadeno"
+    },
+    {
+      "name": "phenanthridine",
+      "pin": true,
+      "priority": 5
+    },
+    {
+      "name": "4H-quinolizine",
+      "pin": true,
+      "priority": 15,
+      "default_indicated_h": [
+        "4"
+      ]
+    },
+    {
+      "name": "1H-pyrrolizine",
+      "pin": true,
+      "priority": 21,
+      "default_indicated_h": [
+        "1"
+      ]
+    }
   ],
   "parents": [
     {
@@ -115,24 +900,155 @@
       "template": {
         "enabled": false,
         "derivative_production_enabled": true,
-        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
         "atoms": [
-          {"locant": "1"}, {"locant": "2"}, {"locant": "3"}, {"locant": "4"},
-          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6"},
-          {"locant": "7"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
         ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
-          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          }
         ],
         "rings": [
-          ["1", "2", "3", "4", "4a", "8a"],
-          ["4a", "5", "6", "7", "8", "8a"]
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
         ],
-        "fusion_atoms": ["4a", "8a"],
-        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
       }
     },
     {
@@ -145,24 +1061,156 @@
       "template": {
         "enabled": false,
         "derivative_production_enabled": true,
-        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
         "atoms": [
-          {"locant": "1", "symbol": "N"}, {"locant": "2"}, {"locant": "3"}, {"locant": "4"},
-          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6"},
-          {"locant": "7"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
         ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
-          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          }
         ],
         "rings": [
-          ["1", "2", "3", "4", "4a", "8a"],
-          ["4a", "5", "6", "7", "8", "8a"]
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
         ],
-        "fusion_atoms": ["4a", "8a"],
-        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
       }
     },
     {
@@ -175,24 +1223,156 @@
       "template": {
         "enabled": false,
         "derivative_production_enabled": true,
-        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
         "atoms": [
-          {"locant": "1"}, {"locant": "2", "symbol": "N"}, {"locant": "3"}, {"locant": "4"},
-          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6"},
-          {"locant": "7"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2",
+            "symbol": "N"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
         ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
-          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          }
         ],
         "rings": [
-          ["1", "2", "3", "4", "4a", "8a"],
-          ["4a", "5", "6", "7", "8", "8a"]
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
         ],
-        "fusion_atoms": ["4a", "8a"],
-        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
       }
     },
     {
@@ -205,24 +1385,157 @@
       "template": {
         "enabled": false,
         "derivative_production_enabled": true,
-        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
         "atoms": [
-          {"locant": "1", "symbol": "N"}, {"locant": "2"}, {"locant": "3"}, {"locant": "4"},
-          {"locant": "4a", "fusion": true}, {"locant": "5", "symbol": "N"}, {"locant": "6"},
-          {"locant": "7"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5",
+            "symbol": "N"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
         ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
-          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          }
         ],
         "rings": [
-          ["1", "2", "3", "4", "4a", "8a"],
-          ["4a", "5", "6", "7", "8", "8a"]
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
         ],
-        "fusion_atoms": ["4a", "8a"],
-        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
       }
     },
     {
@@ -235,24 +1548,157 @@
       "template": {
         "enabled": false,
         "derivative_production_enabled": true,
-        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
         "atoms": [
-          {"locant": "1", "symbol": "N"}, {"locant": "2"}, {"locant": "3"}, {"locant": "4"},
-          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6", "symbol": "N"},
-          {"locant": "7"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6",
+            "symbol": "N"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
         ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
-          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          }
         ],
         "rings": [
-          ["1", "2", "3", "4", "4a", "8a"],
-          ["4a", "5", "6", "7", "8", "8a"]
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
         ],
-        "fusion_atoms": ["4a", "8a"],
-        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
       }
     },
     {
@@ -265,24 +1711,157 @@
       "template": {
         "enabled": false,
         "derivative_production_enabled": true,
-        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
         "atoms": [
-          {"locant": "1", "symbol": "N"}, {"locant": "2"}, {"locant": "3"}, {"locant": "4"},
-          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6"},
-          {"locant": "7", "symbol": "N"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7",
+            "symbol": "N"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
         ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
-          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          }
         ],
         "rings": [
-          ["1", "2", "3", "4", "4a", "8a"],
-          ["4a", "5", "6", "7", "8", "8a"]
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
         ],
-        "fusion_atoms": ["4a", "8a"],
-        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
       }
     },
     {
@@ -295,24 +1874,157 @@
       "template": {
         "enabled": false,
         "derivative_production_enabled": true,
-        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
         "atoms": [
-          {"locant": "1", "symbol": "N"}, {"locant": "2"}, {"locant": "3"}, {"locant": "4"},
-          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6"},
-          {"locant": "7"}, {"locant": "8", "symbol": "N"}, {"locant": "8a", "fusion": true}
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8",
+            "symbol": "N"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
         ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
-          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          }
         ],
         "rings": [
-          ["1", "2", "3", "4", "4a", "8a"],
-          ["4a", "5", "6", "7", "8", "8a"]
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
         ],
-        "fusion_atoms": ["4a", "8a"],
-        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
       }
     },
     {
@@ -325,24 +2037,157 @@
       "template": {
         "enabled": false,
         "derivative_production_enabled": true,
-        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
         "atoms": [
-          {"locant": "1"}, {"locant": "2", "symbol": "N"}, {"locant": "3"}, {"locant": "4"},
-          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6", "symbol": "N"},
-          {"locant": "7"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2",
+            "symbol": "N"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6",
+            "symbol": "N"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
         ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
-          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          }
         ],
         "rings": [
-          ["1", "2", "3", "4", "4a", "8a"],
-          ["4a", "5", "6", "7", "8", "8a"]
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
         ],
-        "fusion_atoms": ["4a", "8a"],
-        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
       }
     },
     {
@@ -355,24 +2200,157 @@
       "template": {
         "enabled": false,
         "derivative_production_enabled": true,
-        "locants": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
         "atoms": [
-          {"locant": "1"}, {"locant": "2", "symbol": "N"}, {"locant": "3"}, {"locant": "4"},
-          {"locant": "4a", "fusion": true}, {"locant": "5"}, {"locant": "6"},
-          {"locant": "7", "symbol": "N"}, {"locant": "8"}, {"locant": "8a", "fusion": true}
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2",
+            "symbol": "N"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7",
+            "symbol": "N"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
         ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-          {"locants": ["4", "4a"]}, {"locants": ["4a", "8a"], "bond_class": "fusion"},
-          {"locants": ["8a", "1"]}, {"locants": ["4a", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          }
         ],
         "rings": [
-          ["1", "2", "3", "4", "4a", "8a"],
-          ["4a", "5", "6", "7", "8", "8a"]
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
         ],
-        "fusion_atoms": ["4a", "8a"],
-        "peripheral_atoms": ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
       }
     },
     {
@@ -387,8 +2365,14 @@
         "derivative_production_enabled": true,
         "base_template": "naphthalenoid_10",
         "heteroatoms": [
-          {"locant": "1", "symbol": "N"},
-          {"locant": "3", "symbol": "N"}
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          }
         ]
       }
     },
@@ -404,8 +2388,14 @@
         "derivative_production_enabled": true,
         "base_template": "naphthalenoid_10",
         "heteroatoms": [
-          {"locant": "1", "symbol": "N"},
-          {"locant": "4", "symbol": "N"}
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "4",
+            "symbol": "N"
+          }
         ]
       }
     },
@@ -421,8 +2411,14 @@
         "derivative_production_enabled": true,
         "base_template": "naphthalenoid_10",
         "heteroatoms": [
-          {"locant": "1", "symbol": "N"},
-          {"locant": "2", "symbol": "N"}
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2",
+            "symbol": "N"
+          }
         ]
       }
     },
@@ -438,8 +2434,14 @@
         "derivative_production_enabled": true,
         "base_template": "naphthalenoid_10",
         "heteroatoms": [
-          {"locant": "2", "symbol": "N"},
-          {"locant": "3", "symbol": "N"}
+          {
+            "locant": "2",
+            "symbol": "N"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          }
         ]
       }
     },
@@ -451,16 +2453,104 @@
       "derivative_stem": "azulen",
       "attached_prefix": "azuleno",
       "template": {
-        "enabled": false,
-        "derivative_production_enabled": false,
-        "locants": ["1", "2", "3", "3a", "4", "5", "6", "7", "8", "8a"],
-        "fusion_atoms": ["3a", "8a"],
-        "peripheral_atoms": ["1", "2", "3", "3a", "4", "5", "6", "7", "8", "8a"],
+        "enabled": true,
+        "derivative_production_enabled": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "fusion_atoms": [
+          "3a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "3a"]},
-          {"locants": ["3a", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "8a"]},
-          {"locants": ["8a", "1"]}, {"locants": ["8a", "3a"], "bond_class": "fusion"}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "3a"
+            ],
+            "bond_class": "fusion"
+          }
         ]
       }
     },
@@ -472,21 +2562,140 @@
       "derivative_stem": "acenaphthylen",
       "attached_prefix": "acenaphthyleno",
       "template": {
-        "enabled": false,
-        "derivative_production_enabled": false,
-        "locants": ["1", "2", "2a", "3", "4", "5", "5a", "6", "7", "8", "8a", "8b"],
-        "atom_overrides": [
-          {"locant": "1", "aromatic": false},
-          {"locant": "2", "aromatic": false}
+        "enabled": true,
+        "derivative_production_enabled": true,
+        "locants": [
+          "1",
+          "2",
+          "2a",
+          "3",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "8b"
         ],
-        "fusion_atoms": ["2a", "5a", "8a", "8b"],
-        "peripheral_atoms": ["1", "2", "2a", "3", "4", "5", "5a", "6", "7", "8", "8a", "8b"],
+        "atom_overrides": [
+          {
+            "locant": "1",
+            "aromatic": false
+          },
+          {
+            "locant": "2",
+            "aromatic": false
+          }
+        ],
+        "fusion_atoms": [
+          "2a",
+          "5a",
+          "8a",
+          "8b"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "2a",
+          "3",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "8b"
+        ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "2a"]}, {"locants": ["2a", "3"]},
-          {"locants": ["3", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "5a"]},
-          {"locants": ["5a", "6"]}, {"locants": ["6", "7"]}, {"locants": ["7", "8"]},
-          {"locants": ["8", "8a"]}, {"locants": ["8a", "1"]}, {"locants": ["8a", "8b"], "bond_class": "fusion"},
-          {"locants": ["8b", "2a"], "bond_class": "fusion"}, {"locants": ["8b", "5a"], "bond_class": "fusion"}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "2a"
+            ]
+          },
+          {
+            "locants": [
+              "2a",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "5a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "8b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8b",
+              "2a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8b",
+              "5a"
+            ],
+            "bond_class": "fusion"
+          }
         ]
       }
     },
@@ -494,29 +2703,164 @@
       "name": "1H-phenalene",
       "pin": true,
       "priority": 9,
-      "aliases": ["phenalene"],
-      "default_indicated_h": ["1"],
+      "aliases": [
+        "phenalene"
+      ],
+      "default_indicated_h": [
+        "1"
+      ],
       "derivative_stem": "1H-phenalen",
       "attached_prefix": "phenaleno",
       "template": {
         "enabled": false,
         "derivative_production_enabled": false,
-        "default_indicated_h": ["1"],
-        "locants": ["1", "2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b"],
-        "atom_overrides": [
-          {"locant": "1", "aromatic": false},
-          {"locant": "2", "aromatic": false},
-          {"locant": "3", "aromatic": false}
+        "default_indicated_h": [
+          "1"
         ],
-        "fusion_atoms": ["3a", "6a", "9a", "9b"],
-        "peripheral_atoms": ["1", "2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b"],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "9b"
+        ],
+        "atom_overrides": [
+          {
+            "locant": "1",
+            "aromatic": false
+          },
+          {
+            "locant": "2",
+            "aromatic": false
+          },
+          {
+            "locant": "3",
+            "aromatic": false
+          }
+        ],
+        "fusion_atoms": [
+          "3a",
+          "6a",
+          "9a",
+          "9b"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "9b"
+        ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "3a"]},
-          {"locants": ["3a", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "6a"]}, {"locants": ["6a", "7"]}, {"locants": ["7", "8"]},
-          {"locants": ["8", "9"]}, {"locants": ["9", "9a"]}, {"locants": ["9a", "1"]},
-          {"locants": ["9a", "9b"], "bond_class": "fusion"}, {"locants": ["9b", "6a"], "bond_class": "fusion"},
-          {"locants": ["9b", "3a"], "bond_class": "fusion"}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "9a"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "9b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "9b",
+              "6a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "9b",
+              "3a"
+            ],
+            "bond_class": "fusion"
+          }
         ]
       }
     },
@@ -528,20 +2872,173 @@
       "derivative_stem": "fluoranthen",
       "attached_prefix": "fluorantheno",
       "template": {
-        "enabled": false,
-        "derivative_production_enabled": false,
-        "locants": ["1", "2", "3", "3a", "4", "5", "6", "6a", "6b", "7", "8", "9", "10", "10a", "10b", "10c"],
-        "fusion_atoms": ["3a", "6a", "6b", "10a", "10b", "10c"],
-        "peripheral_atoms": ["1", "2", "3", "3a", "4", "5", "6", "6a", "6b", "7", "8", "9", "10", "10a", "10b", "10c"],
+        "enabled": true,
+        "derivative_production_enabled": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "6a",
+          "6b",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a",
+          "10b",
+          "10c"
+        ],
+        "fusion_atoms": [
+          "3a",
+          "6a",
+          "6b",
+          "10a",
+          "10b",
+          "10c"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "6a",
+          "6b",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a",
+          "10b",
+          "10c"
+        ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "3a"]},
-          {"locants": ["3a", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "6a"]}, {"locants": ["6a", "6b"], "bond_class": "fusion"},
-          {"locants": ["6b", "7"]}, {"locants": ["7", "8"]}, {"locants": ["8", "9"]},
-          {"locants": ["9", "10"]}, {"locants": ["10", "10a"]}, {"locants": ["10a", "6b"], "bond_class": "fusion"},
-          {"locants": ["10a", "10b"], "bond_class": "fusion"}, {"locants": ["10b", "1"]},
-          {"locants": ["10b", "10c"], "bond_class": "fusion"}, {"locants": ["10c", "3a"], "bond_class": "fusion"},
-          {"locants": ["10c", "6a"], "bond_class": "fusion"}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "6b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "6b",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "10a",
+              "6b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "10a",
+              "10b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "10b",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "10b",
+              "10c"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "10c",
+              "3a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "10c",
+              "6a"
+            ],
+            "bond_class": "fusion"
+          }
         ]
       }
     },
@@ -553,14 +3050,26 @@
       "derivative_stem": "pteridin",
       "attached_prefix": "pteridino",
       "template": {
-        "enabled": false,
-        "derivative_production_enabled": false,
+        "enabled": true,
+        "derivative_production_enabled": true,
         "base_template": "naphthalenoid_10",
         "heteroatoms": [
-          {"locant": "1", "symbol": "N"},
-          {"locant": "3", "symbol": "N"},
-          {"locant": "5", "symbol": "N"},
-          {"locant": "8", "symbol": "N"}
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          },
+          {
+            "locant": "5",
+            "symbol": "N"
+          },
+          {
+            "locant": "8",
+            "symbol": "N"
+          }
         ]
       }
     },
@@ -568,33 +3077,174 @@
       "name": "1H-perimidine",
       "pin": true,
       "priority": 3,
-      "aliases": ["perimidine"],
-      "default_indicated_h": ["1"],
+      "aliases": [
+        "perimidine"
+      ],
+      "default_indicated_h": [
+        "1"
+      ],
       "derivative_stem": "1H-perimidin",
       "attached_prefix": "perimidino",
       "template": {
-        "enabled": false,
-        "derivative_production_enabled": false,
-        "default_indicated_h": ["1"],
-        "locants": ["1", "2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b"],
+        "enabled": true,
+        "derivative_production_enabled": true,
+        "default_indicated_h": [
+          "1"
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "9b"
+        ],
         "heteroatoms": [
-          {"locant": "1", "symbol": "N"},
-          {"locant": "3", "symbol": "N"}
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          }
         ],
         "atom_overrides": [
-          {"locant": "1", "aromatic": false},
-          {"locant": "2", "aromatic": false},
-          {"locant": "3", "aromatic": false}
+          {
+            "locant": "1",
+            "aromatic": false
+          },
+          {
+            "locant": "2",
+            "aromatic": false
+          },
+          {
+            "locant": "3",
+            "aromatic": false
+          }
         ],
-        "fusion_atoms": ["3a", "6a", "9a", "9b"],
-        "peripheral_atoms": ["1", "2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b"],
+        "fusion_atoms": [
+          "3a",
+          "6a",
+          "9a",
+          "9b"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "9b"
+        ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "3a"]},
-          {"locants": ["3a", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "6a"]}, {"locants": ["6a", "7"]}, {"locants": ["7", "8"]},
-          {"locants": ["8", "9"]}, {"locants": ["9", "9a"]}, {"locants": ["9a", "1"]},
-          {"locants": ["9a", "9b"], "bond_class": "fusion"}, {"locants": ["9b", "6a"], "bond_class": "fusion"},
-          {"locants": ["9b", "3a"], "bond_class": "fusion"}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "9a"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "9b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "9b",
+              "6a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "9b",
+              "3a"
+            ],
+            "bond_class": "fusion"
+          }
         ]
       }
     },
@@ -602,25 +3252,114 @@
       "name": "2H-isoindole",
       "pin": true,
       "priority": 19,
-      "aliases": ["isoindole"],
-      "default_indicated_h": ["2"],
+      "aliases": [
+        "isoindole"
+      ],
+      "default_indicated_h": [
+        "2"
+      ],
       "derivative_stem": "2H-isoindol",
       "attached_prefix": "isoindolo",
       "template": {
-        "enabled": false,
-        "derivative_production_enabled": false,
-        "default_indicated_h": ["2"],
-        "locants": ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"],
-        "heteroatoms": [
-          {"locant": "2", "symbol": "N"}
+        "enabled": true,
+        "derivative_production_enabled": true,
+        "default_indicated_h": [
+          "2"
         ],
-        "fusion_atoms": ["3a", "7a"],
-        "peripheral_atoms": ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "2",
+            "symbol": "N"
+          }
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "3a"]},
-          {"locants": ["3a", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "7"]}, {"locants": ["7", "7a"]}, {"locants": ["7a", "3a"], "bond_class": "fusion"},
-          {"locants": ["7a", "1"]}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "3a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "7a",
+              "1"
+            ]
+          }
         ]
       }
     },
@@ -632,20 +3371,103 @@
       "derivative_stem": "indolizin",
       "attached_prefix": "indolizino",
       "template": {
-        "enabled": false,
-        "derivative_production_enabled": false,
-        "locants": ["1", "2", "3", "4", "5", "6", "7", "8", "8a"],
-        "heteroatoms": [
-          {"locant": "4", "symbol": "N"}
+        "enabled": true,
+        "derivative_production_enabled": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
         ],
-        "fusion_atoms": ["8a"],
-        "peripheral_atoms": ["1", "2", "3", "4", "5", "6", "7", "8", "8a"],
+        "heteroatoms": [
+          {
+            "locant": "4",
+            "symbol": "N"
+          }
+        ],
+        "fusion_atoms": [
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "4"]},
-          {"locants": ["4", "5"]}, {"locants": ["5", "6"]}, {"locants": ["6", "7"]},
-          {"locants": ["7", "8"]}, {"locants": ["8", "8a"]}, {"locants": ["8a", "4"], "bond_class": "fusion"},
-          {"locants": ["8a", "1"]}
-        ]
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "4"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          }
+        ],
+        "mancude_double_bonds": 4
       }
     },
     {
@@ -660,8 +3482,14 @@
         "derivative_production_enabled": true,
         "base_template": "linear_tricyclic_14",
         "heteroatoms": [
-          {"locant": "5", "symbol": "N"},
-          {"locant": "10", "symbol": "N"}
+          {
+            "locant": "5",
+            "symbol": "N"
+          },
+          {
+            "locant": "10",
+            "symbol": "N"
+          }
         ]
       }
     },
@@ -676,7 +3504,16 @@
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "phenanthrenoid_14",
-        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "4", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "4",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
@@ -690,7 +3527,16 @@
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "phenanthrenoid_14",
-        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "5", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "5",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
@@ -704,7 +3550,16 @@
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "phenanthrenoid_14",
-        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "6", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "6",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
@@ -718,7 +3573,16 @@
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "phenanthrenoid_14",
-        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "7", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "7",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
@@ -732,7 +3596,16 @@
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "phenanthrenoid_14",
-        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "8", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "8",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
@@ -746,7 +3619,16 @@
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "phenanthrenoid_14",
-        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "9", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "9",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
@@ -760,7 +3642,16 @@
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "phenanthrenoid_14",
-        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "10", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "10",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
@@ -774,7 +3665,16 @@
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "phenanthrenoid_14",
-        "heteroatoms": [{"locant": "2", "symbol": "N"}, {"locant": "7", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "2",
+            "symbol": "N"
+          },
+          {
+            "locant": "7",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
@@ -788,7 +3688,16 @@
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "phenanthrenoid_14",
-        "heteroatoms": [{"locant": "2", "symbol": "N"}, {"locant": "8", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "2",
+            "symbol": "N"
+          },
+          {
+            "locant": "8",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
@@ -802,7 +3711,16 @@
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "phenanthrenoid_14",
-        "heteroatoms": [{"locant": "3", "symbol": "N"}, {"locant": "5", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "3",
+            "symbol": "N"
+          },
+          {
+            "locant": "5",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
@@ -816,7 +3734,16 @@
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "phenanthrenoid_14",
-        "heteroatoms": [{"locant": "3", "symbol": "N"}, {"locant": "6", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "3",
+            "symbol": "N"
+          },
+          {
+            "locant": "6",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
@@ -830,7 +3757,16 @@
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "phenanthrenoid_14",
-        "heteroatoms": [{"locant": "4", "symbol": "N"}, {"locant": "5", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "4",
+            "symbol": "N"
+          },
+          {
+            "locant": "5",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
@@ -844,29 +3780,46 @@
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "acridinoid_14",
-        "heteroatoms": [{"locant": "10", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "10",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
       "name": "carbazole",
       "pin": true,
       "priority": 17,
-      "aliases": ["9H-carbazole"],
-      "default_indicated_h": ["9"],
+      "aliases": [
+        "9H-carbazole"
+      ],
+      "default_indicated_h": [
+        "9"
+      ],
       "derivative_stem": "carbazol",
       "attached_prefix": "carbazolo",
       "template": {
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "carbazoloid_13",
-        "heteroatoms": [{"locant": "9", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "9",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
       "name": "purine",
       "pin": true,
       "priority": 16,
-      "aliases": ["7H-purine", "9H-purine"],
+      "aliases": [
+        "7H-purine",
+        "9H-purine"
+      ],
       "derivative_stem": "purin",
       "attached_prefix": "purino",
       "template": {
@@ -874,8 +3827,22 @@
         "derivative_production_enabled": true,
         "base_template": "purinoid_9",
         "heteroatoms": [
-          {"locant": "1", "symbol": "N"}, {"locant": "3", "symbol": "N"},
-          {"locant": "7", "symbol": "N"}, {"locant": "9", "symbol": "N"}
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          },
+          {
+            "locant": "7",
+            "symbol": "N"
+          },
+          {
+            "locant": "9",
+            "symbol": "N"
+          }
         ]
       }
     },
@@ -883,23 +3850,41 @@
       "name": "indazole",
       "pin": true,
       "priority": 17,
-      "aliases": ["1H-indazole", "2H-indazole"],
-      "default_indicated_h": ["1"],
+      "aliases": [
+        "1H-indazole",
+        "2H-indazole"
+      ],
+      "default_indicated_h": [
+        "1"
+      ],
       "derivative_stem": "indazol",
       "attached_prefix": "indazolo",
       "template": {
         "enabled": false,
         "derivative_production_enabled": true,
         "base_template": "indazoloid_9",
-        "heteroatoms": [{"locant": "1", "symbol": "N"}, {"locant": "2", "symbol": "N"}]
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2",
+            "symbol": "N"
+          }
+        ]
       }
     },
     {
       "name": "xanthene",
       "pin": true,
       "priority": 17,
-      "aliases": ["9H-xanthene"],
-      "default_indicated_h": ["9"],
+      "aliases": [
+        "9H-xanthene"
+      ],
+      "default_indicated_h": [
+        "9"
+      ],
       "derivative_stem": "xanthen",
       "attached_prefix": "xantheno",
       "template": {
@@ -907,38 +3892,178 @@
         "derivative_production_enabled": true,
         "base_template": "acridinoid_14",
         "mancude_double_bonds": 6,
-        "heteroatoms": [{"locant": "10", "symbol": "O"}],
-        "atom_overrides": [{"locant": "9", "aromatic": false}, {"locant": "10", "aromatic": false}]
+        "heteroatoms": [
+          {
+            "locant": "10",
+            "symbol": "O"
+          }
+        ],
+        "atom_overrides": [
+          {
+            "locant": "9",
+            "aromatic": false
+          },
+          {
+            "locant": "10",
+            "aromatic": false
+          }
+        ]
       }
     },
     {
       "name": "1H-indole",
       "pin": true,
       "priority": 18,
-      "aliases": ["indole"],
-      "default_indicated_h": ["1"],
+      "aliases": [
+        "indole"
+      ],
+      "default_indicated_h": [
+        "1"
+      ],
       "derivative_stem": "1H-indol",
       "attached_prefix": "indolo",
       "template": {
-        "enabled": false,
-        "locants": ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"],
+        "enabled": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
         "atoms": [
-          {"locant": "1", "symbol": "N", "default_h": true}, {"locant": "2"}, {"locant": "3"},
-          {"locant": "3a", "fusion": true}, {"locant": "4"}, {"locant": "5"},
-          {"locant": "6"}, {"locant": "7"}, {"locant": "7a", "fusion": true}
+          {
+            "locant": "1",
+            "symbol": "N",
+            "default_h": true
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          }
         ],
         "bonds": [
-          {"locants": ["1", "2"]}, {"locants": ["2", "3"]}, {"locants": ["3", "3a"]},
-          {"locants": ["3a", "7a"], "bond_class": "fusion"}, {"locants": ["7a", "1"]},
-          {"locants": ["3a", "4"]}, {"locants": ["4", "5"]}, {"locants": ["5", "6"]},
-          {"locants": ["6", "7"]}, {"locants": ["7", "7a"]}
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "7a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "7a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "7a"
+            ]
+          }
         ],
         "rings": [
-          ["1", "2", "3", "3a", "7a"],
-          ["3a", "4", "5", "6", "7", "7a"]
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "7a"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ]
         ],
-        "fusion_atoms": ["3a", "7a"],
-        "peripheral_atoms": ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "derivative_production_enabled": true
       }
     }
   ]

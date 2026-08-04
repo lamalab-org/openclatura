@@ -122,7 +122,21 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             oxygens = [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "O"]
             adj_atoms = [n for n in mol.get_neighbors(atom.idx) if n not in oxygens]
 
-            if len(oxygens) == 2 and len(adj_atoms) == 1:
+            # A nitro nitrogen carries no hydrogen.  One that does is the azinic
+            # acid tautomer — ``[O-][NH+](O)Ph`` is N-phenylazinic acid, which
+            # differs from nitrobenzene by two hydrogens, so calling it nitro
+            # would name a different compound.
+            # Nor does either of its oxygens: an N-OH is the acid, so
+            # ``C=[N+]([O-])O`` is an azinic acid ylidene rather than a nitro
+            # group, and differs from it by a hydrogen.
+            hydroxyl_oxygen = any(
+                mol.atoms[o].charge == 0
+                and (bond := mol.get_bond(atom.idx, o)) is not None
+                and bond.order == 1
+                and mol.atoms[o].total_h_count > 0
+                for o in oxygens
+            )
+            if len(oxygens) == 2 and len(adj_atoms) == 1 and atom.total_h_count == 0 and not hydroxyl_oxygen:
                 has_double_o = any(mol.get_bond(atom.idx, o).order == 2 for o in oxygens)
                 if atom.charge == 1 or has_double_o:
                     groups.append(PerceivedGroup("nitro", False, adj_atoms[0], {atom.idx} | set(oxygens)))
@@ -150,19 +164,37 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
         if atom.symbol != "N" or atom.idx in consumed or atom.idx in cyclic_atoms:
             continue
         neighbors = mol.get_neighbors(atom.idx)
-        if len(neighbors) != 1:
+        # A nitrogen double-bonded to a hypervalent centre is an imino group
+        # whether or not it also carries a substituent.  Requiring it to be
+        # terminal sent `P(=N-tBu)` to the amine catch-all below, which does
+        # not look at bond order, and the double bond vanished into a `-amine`
+        # suffix.
+        double_bonded = [n for n in neighbors if (bond := mol.get_bond(atom.idx, n)) is not None and bond.order == 2]
+        if len(double_bonded) != 1:
             continue
-        center = neighbors[0]
-        bond = mol.get_bond(atom.idx, center)
-        if bond is None or bond.order != 2 or mol.atoms[center].is_carbon:
+        center = double_bonded[0]
+        if mol.atoms[center].is_carbon:
             continue
+        if any((bond := mol.get_bond(atom.idx, n)) is None or bond.order != 1 for n in neighbors if n != center):
+            continue
+        # A substituted imino only becomes a prefix on a ring centre, where the
+        # ring is the parent regardless.  On an acyclic centre the nitrogen is
+        # still a parent candidate itself -- CH3-N=P(CH3)3 is
+        # N-(trimethylphosphanylidene)methanamine -- and this must not pre-empt
+        # that competition.  A nitrogen carrying an acyl or another nitrogen
+        # belongs to a senior group of its own (an amide, a hydrazone), so
+        # claiming it here would steal it from that suffix and, for a cyclic
+        # sulfoximine, open the ring it is double-bonded into.
+        if len(neighbors) != 1 and (center not in cyclic_atoms or _has_senior_nitrogen_ligand(mol, atom.idx, center)):
+            continue
+        variant = "terminal_heteroatom_imino" if len(neighbors) == 1 else "substituted_heteroatom_imino"
         groups.append(
             PerceivedGroup(
                 "imino_prefix",
                 False,
                 center,
                 {atom.idx},
-                variant="terminal_heteroatom_imino",
+                variant=variant,
                 role="chalcogen_imide",
                 decision_reasons=(f"Matched terminal N double-bonded to heteroatom {center}.",),
             )
@@ -233,7 +265,14 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             adj_atoms = [n for n in mol.get_neighbors(atom.idx) if n not in oxygens]
             if len(oxygens) >= 3 and len(adj_atoms) == 1:
                 double_o_list = [o for o in oxygens if mol.get_bond(atom.idx, o).order == 2]
-                if len(double_o_list) >= 2:
+                # A sulfonate/sulfonic acid requires the sulfur to be bonded to a
+                # carbon (C-SO2-O).  When the lone non-oxygen neighbour is instead a
+                # halogen or heteroatom the sulfur centre is a chlorosulfate,
+                # sulfamate or the like — not a sulfonate — so leaving it here lets
+                # the ester/``…oxy`` prefix machinery name it and, crucially, keeps
+                # it from being chosen as a bogus principal group hung off a non-
+                # carbon "attachment carbon".
+                if len(double_o_list) >= 2 and mol.atoms[adj_atoms[0]].is_carbon:
                     c_idx = adj_atoms[0]
                     single_o_list = [o for o in oxygens if mol.get_bond(atom.idx, o).order == 1]
                     if atom.idx in cyclic_atoms and any(o in cyclic_atoms for o in single_o_list):
@@ -734,6 +773,29 @@ def _bond_ids_within(mol: Molecule, atom_ids: set[int]) -> set[int]:
                 if bond is not None:
                     bond_ids.add(bond.idx)
     return bond_ids
+
+
+def _has_senior_nitrogen_ligand(mol: Molecule, nitrogen: int, center: int) -> bool:
+    """Whether an imino nitrogen's substituent binds it into a senior group.
+
+    An acyl carbon makes the nitrogen an amide's, and another nitrogen makes it
+    a hydrazone's.  Either way the nitrogen is spoken for, and citing it as an
+    ``imino`` prefix here would take it from the suffix that owns it.
+    """
+
+    for ligand in mol.get_neighbors(nitrogen):
+        if ligand == center or mol.atoms[ligand].symbol == "H":
+            continue
+        if mol.atoms[ligand].symbol == "N":
+            return True
+        if mol.atoms[ligand].is_carbon and any(
+            mol.atoms[far].symbol in {"O", "S", "N"}
+            and (bond := mol.get_bond(ligand, far)) is not None
+            and bond.order == 2
+            for far in mol.get_neighbors(ligand)
+        ):
+            return True
+    return False
 
 
 def _has_non_h_multiple_bond_neighbor(mol: Molecule, atom_idx: int, allowed: set[int]) -> bool:

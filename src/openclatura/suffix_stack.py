@@ -120,6 +120,16 @@ def _apply_anion_suffix_rule(text: str, operation: ParentSuffixOperation, key: s
             text,
             count=1,
         )
+    if key == "mononitrile_suffix_ide":
+        # ``propanenitril-2-ide`` is not a name: a chain nitrile cites the
+        # carbanion between the stem and the suffix, as the dinitrile rule
+        # above already does -- ``propane-2-ide-1-nitrile``.
+        return re.sub(
+            r"(?P<stem>[A-Za-z0-9,\-\[\]\^\{\}]+?(?:an|en|yn)e)nitrile\b",
+            lambda match: f"{match.group('stem')}-{locant}-ide-1-nitrile",
+            text,
+            count=1,
+        )
     if key == "locanted_carbonitrile_suffix_ide":
         return re.sub(
             r"(?P<stem>[A-Za-z0-9,\-\[\]\^\{\}]+?)-(?P<suffix_locant>\d+)-carbonitrile\b",

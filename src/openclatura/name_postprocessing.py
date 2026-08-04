@@ -125,11 +125,43 @@ def apply_connection_boundary_postprocessing(name: str) -> str:
 
 
 def _qualify_n_substituted_functional_prefixes(name: str) -> str:
-    if not RULES.postprocess.n_substituted_functional_suffixes:
+    """Add the ``N-`` locant to a substituent on the nitrogen of a functional
+    prefix like ``…sulfonamido``.
+
+    Without it ``(benzyl)benzenesulfonamido`` reads equally as a benzyl on the
+    *benzene ring*, so the name is ambiguous.  The substituent may itself be
+    composite (``((4-chlorophenyl)methyl)…``), so this scans for a balanced
+    parenthesised N-substituent rather than assuming a paren-free one; a simple
+    substituent is cited bare (``N-ethyl``) and a composite one stays enclosed
+    (``N-((4-chlorophenyl)methyl)``), as an ``N-`` locant prefix requires."""
+
+    suffixes = RULES.postprocess.n_substituted_functional_suffixes
+    if not suffixes:
         return name
-    suffix_pattern = "|".join(re.escape(suffix) for suffix in RULES.postprocess.n_substituted_functional_suffixes)
-    pattern = re.compile(rf"\(\(([^()]+)\)([^()]*?(?:{suffix_pattern}))\)")
-    return pattern.sub(r"(N-\1\2)", name)
+    suffix_re = re.compile(r"(?:" + "|".join(re.escape(suffix) for suffix in suffixes) + r")$")
+    result: list[str] = []
+    i = 0
+    while i < len(name):
+        # The construct is an outer group ``(<N-substituent><acyl+suffix>)`` whose
+        # first element is a parenthesised substituent — an ``(`` directly followed
+        # by another ``(``.
+        if name[i] == "(" and i + 1 < len(name) and name[i + 1] == "(":
+            outer = _matching_close_paren(name, i)
+            nsub = _matching_close_paren(name, i + 1)
+            if outer is not None and nsub is not None and nsub < outer:
+                inner = name[i + 2 : nsub]
+                tail = name[nsub + 1 : outer]
+                # The acyl stem + suffix must be a single unparenthesised run that
+                # ends in a functional suffix; anything else (a second ligand, a
+                # trailing group) is outside what this rewrite can safely qualify.
+                if "(" not in tail and ")" not in tail and suffix_re.search(tail):
+                    display = f"({inner})" if ("(" in inner or ")" in inner) else inner
+                    result.append(f"(N-{display}{tail})")
+                    i = outer + 1
+                    continue
+        result.append(name[i])
+        i += 1
+    return "".join(result)
 
 
 def _elide_optional_one_locants(name: str) -> str:

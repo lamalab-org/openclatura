@@ -11,8 +11,10 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tempfile
 import warnings
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 from openclatura.utils import standardize_mol
@@ -133,7 +135,13 @@ def verify_with_opsin(name: str, smiles: str, standardize_smiles: bool = True) -
         canonical_original = _canonicalize(smiles)
 
     try:
-        decoded = py2opsin.py2opsin([name])
+        # py2opsin writes its input to a fixed file in the working directory
+        # unless told otherwise, so two verifications running at once overwrite
+        # each other and each can read back the *other* name's structure — a
+        # spurious mismatch, or worse a spurious match.  Give every call its own
+        # path.
+        with tempfile.TemporaryDirectory(prefix="openclatura_opsin_") as tmpdir:
+            decoded = py2opsin.py2opsin([name], tmp_fpath=str(Path(tmpdir) / "input.txt"))
     except Exception as exc:  # pragma: no cover - py2opsin internal
         return OpsinCheck(
             status="error",

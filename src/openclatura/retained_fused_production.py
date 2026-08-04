@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from .assembly_parts import RetainedParentMetadata, SubstituentItem
 from .grammar_snapshot_data import retained_fused_derivative_gate
 from .molecule import Molecule
+from .namer_config import INDICATED_H_RETAINED_NAMES
 from .perception import PerceivedGroup
 from .retained_fused_templates import RetainedFusedTemplateMatch, match_retained_fused_templates
 
@@ -21,7 +22,6 @@ _DERIVATIVE_GATE = retained_fused_derivative_gate()
 PRODUCTION_RETAINED_FUSED_PARENTS = _DERIVATIVE_GATE.production_parent_names
 ALLOWED_PRINCIPAL_KEYS = _DERIVATIVE_GATE.allowed_principal_keys
 ALLOWED_GROUP_KEYS = _DERIVATIVE_GATE.allowed_group_keys
-ALLOWED_SUBSTITUENT_NAMES = _DERIVATIVE_GATE.allowed_substituent_names
 
 
 @dataclass(frozen=True)
@@ -40,8 +40,14 @@ def production_retained_fused_parent(
     perceived_groups: list[PerceivedGroup],
     principal_key: str | None,
     substituent_mapping: dict[int, list[SubstituentItem]],
+    attachment_atom: int | None = None,
 ) -> ProductionRetainedFusedParent | None:
-    """Return retained fused parent data only for verified derivative classes."""
+    """Return retained fused parent data only for verified derivative classes.
+
+    ``attachment_atom`` is the ring atom a substituent prefix hangs from; it is
+    a feature locant just like a substituted position, so the retained map has
+    to be able to cite it (``quinolin-7-yl``, never a fusion locant).
+    """
 
     parent_atoms = set(parent_path)
     if not _neutral_component(mol, component_atoms):
@@ -56,6 +62,8 @@ def production_retained_fused_parent(
         return None
 
     feature_atoms = set(substituent_mapping)
+    if attachment_atom is not None:
+        feature_atoms.add(attachment_atom)
     for group in perceived_groups:
         if group.attachment_carbon in parent_atoms:
             feature_atoms.add(group.attachment_carbon)
@@ -85,6 +93,8 @@ def production_retained_fused_parent(
     if not maps:
         return None
     template = matches[0].template
+    if not _added_hydrogen_is_citable(mol, parent_atoms, template):
+        return None
     return ProductionRetainedFusedParent(
         name=parent_name,
         locant_maps=maps,
@@ -92,8 +102,52 @@ def production_retained_fused_parent(
             default_indicated_h=template.default_indicated_h,
             fusion_locants=template.fusion_atoms,
             derivative_stem=template.derivative_stem,
+            indicated_hydrogen_count=_indicated_hydrogen_count(template),
         ),
     )
+
+
+def _added_hydrogen_is_citable(mol: Molecule, parent_atoms: set[int], template) -> bool:
+    """Whether every saturated position of the parent can be spelt out.
+
+    A lactam such as 4-oxoquinoline-3-carboxamide saturates two ring positions
+    beyond what quinoline supports, and which two cannot be recovered from the
+    name -- OPSIN puts the hydrogen on C3 and reads a different molecule.  They
+    have to be cited, ``4-oxo-1,4-dihydroquinoline-3-carboxamide``, and only
+    parents wired into the indicated-hydrogen machinery can do that.  A parent
+    needing an uncitable added hydrogen falls back to von Baeyer, which states
+    its saturation positionally and so stays unambiguous.
+    """
+
+    saturated = 0
+    for atom in parent_atoms:
+        ring_bonds = [
+            bond
+            for neighbor in mol.get_neighbors(atom)
+            if neighbor in parent_atoms and (bond := mol.get_bond(atom, neighbor)) is not None
+        ]
+        if ring_bonds and sum(bond.order for bond in ring_bonds) == len(ring_bonds):
+            saturated += 1
+    if saturated <= _indicated_hydrogen_count(template):
+        return True
+    return template.name in INDICATED_H_RETAINED_NAMES
+
+
+def _indicated_hydrogen_count(template) -> int:
+    """How many indicated hydrogens this mancude parent hydride supports.
+
+    A parent that declares its own positions (1H-indole, 9H-xanthene) supports
+    exactly that many.  Otherwise the mancude double-bond count leaves the
+    skeletal atoms it cannot pair: purine's nine atoms and four double bonds
+    leave one, which is why purine is cited as 7H- or 9H-.  A parent with
+    neither is fully mancude and supports none.
+    """
+
+    if template.default_indicated_h:
+        return len(template.default_indicated_h)
+    if template.mancude_double_bonds:
+        return len(template.atoms) - 2 * template.mancude_double_bonds
+    return 0
 
 
 def _neutral_component(mol: Molecule, atoms: set[int]) -> bool:
@@ -149,30 +203,15 @@ def _allowed_groups(parent_atoms: set[int], perceived_groups: list[PerceivedGrou
     return True
 
 
-def _base_substituent_name(name: str) -> str:
-    """Strip enclosing marks so the gate can list bare substituent names.
+def _allowed_substituents(substituent_mapping: dict[int, list[SubstituentItem]]) -> bool:
+    """Whether the substituents on a retained parent are ones we can render.
 
-    A complex substituent carries context-dependent enclosing marks in its
-    rendered ``name`` (e.g. ``(propan-2-yl)`` on one parent, ``propan-2-yl``
-    on another).  Comparing the bare base name keeps the allow-list stable
-    across attachment contexts.
+    A substituent is named by its own recursive call, so what it *is* cannot
+    affect whether the parent's locants are right; only a spiro junction, which
+    the retained renderer cannot compose, disqualifies the parent here.
     """
 
-    name = name.strip()
-    closing = {"(": ")", "[": "]", "{": "}"}
-    while len(name) >= 2 and name[0] in closing and name[-1] == closing[name[0]]:
-        name = name[1:-1].strip()
-    return name
-
-
-def _allowed_substituents(substituent_mapping: dict[int, list[SubstituentItem]]) -> bool:
-    for items in substituent_mapping.values():
-        for item in items:
-            if item.spiro is not None:
-                return False
-            if _base_substituent_name(item.name) not in ALLOWED_SUBSTITUENT_NAMES:
-                return False
-    return True
+    return all(item.spiro is None for items in substituent_mapping.values() for item in items)
 
 
 def _feature_locants_are_substitutable(atom_to_locant: dict[int, str], feature_atoms: set[int]) -> bool:

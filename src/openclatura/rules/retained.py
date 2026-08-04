@@ -4,6 +4,78 @@ import itertools
 from openclatura.molecule import Molecule
 from openclatura.nomenclature import RULES
 
+# The Blue Book numbering of the two retained tricyclics, written in the order a
+# walk round the outside of the ring system meets them.  Every lettered position
+# is a ring-fusion atom, and the pairs below are the two bonds that close the
+# inner rings — the ones the perimeter walk does *not* use.
+_ANTHRACENE_PERIMETER = ("1", "2", "3", "4", "4a", "10", "10a", "5", "6", "7", "8", "8a", "9", "9a")
+_ANTHRACENE_CROSS_BONDS = (("4a", "9a"), ("8a", "10a"))
+_PHENANTHRENE_PERIMETER = ("1", "2", "3", "4", "4a", "4b", "5", "6", "7", "8", "8a", "9", "10", "10a")
+_PHENANTHRENE_CROSS_BONDS = (("4a", "10a"), ("4b", "8a"))
+
+
+def _hamiltonian_cycles(mol: Molecule, path_set: set[int]) -> list[list[int]]:
+    """Every cycle through all of ``path_set``, each starting at its lowest atom.
+
+    Anthracene and phenanthrene have no interior atom, so the outer perimeter is
+    one of these.  Which one it is cannot be decided here — a cycle may cut
+    through a fusion bond instead — so all of them are returned and the caller
+    settles it by checking the numbering they imply."""
+
+    atoms = sorted(path_set)
+    start, size = atoms[0], len(atoms)
+    found: list[list[int]] = []
+
+    def walk(path: list[int], seen: set[int]) -> None:
+        if len(path) == size:
+            if start in mol.get_neighbors(path[-1]):
+                found.append(list(path))
+            return
+        for nxt in mol.get_neighbors(path[-1]):
+            if nxt in path_set and nxt not in seen:
+                walk([*path, nxt], seen | {nxt})
+
+    walk([start], {start})
+    return found
+
+
+def _fused_tricyclic_locant_maps(
+    mol: Molecule,
+    path_set: set[int],
+    deg3_nodes: list[int],
+    perimeter: tuple[str, ...],
+    cross_bonds: tuple[tuple[str, str], ...],
+) -> list[dict[int, str]]:
+    """Every valid numbering of a retained tricyclic, as atom -> locant maps.
+
+    A candidate is accepted only when the lettered locants land exactly on the
+    ring-fusion atoms *and* both inner bonds the numbering implies are really
+    present.  That rejects a cycle that ran through a fusion bond, and it rejects
+    an orientation that merely happens to fit the fusion-atom count, so what
+    comes back is the full set of symmetry-equivalent numberings and nothing
+    else.  The caller picks among them by the lowest-locant rule."""
+
+    fusion = set(deg3_nodes)
+    maps: list[dict[int, str]] = []
+    seen: set[tuple[tuple[int, str], ...]] = set()
+    size = len(perimeter)
+    for cycle in _hamiltonian_cycles(mol, path_set):
+        for direction in (cycle, list(reversed(cycle))):
+            for offset in range(size):
+                rotated = direction[offset:] + direction[:offset]
+                candidate = dict(zip(rotated, perimeter))
+                lettered = {atom for atom, locant in candidate.items() if not locant.isdigit()}
+                if lettered != fusion:
+                    continue
+                by_locant = {locant: atom for atom, locant in candidate.items()}
+                if any(by_locant[u] not in mol.get_neighbors(by_locant[v]) for u, v in cross_bonds):
+                    continue
+                key = tuple(sorted(candidate.items()))
+                if key not in seen:
+                    seen.add(key)
+                    maps.append(candidate)
+    return maps
+
 
 def _find_two_rings(mol: Molecule, path: list[int], fused: list[int], path_set: set[int], small_ring_size: int):
     """Split a fused bicyclic path into its two component rings.
@@ -482,9 +554,25 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                 return None
 
     if total_bonds == size:
+        if size == 3 and double_bonds == 0:
+            # One heteroatom in a three-ring: every carbon is equivalent, so the
+            # numbering these names imply is the only one available.
+            if n_count == 1 and o_count == 0 and s_count == 0:
+                return "aziridine", None
+            if o_count == 1 and n_count == 0 and s_count == 0:
+                return "oxirane", None
+            if s_count == 1 and n_count == 0 and o_count == 0:
+                return "thiirane", None
+        if size == 4 and double_bonds == 0:
+            if n_count == 1 and o_count == 0 and s_count == 0:
+                return "azetidine", None
         if size == 6 and double_bonds == 0:
             if n_count == 1 and o_count == 0 and s_count == 0:
                 return "piperidine", None
+            if o_count == 1 and n_count == 0 and s_count == 0:
+                return "oxane", None
+            if s_count == 1 and n_count == 0 and o_count == 0:
+                return "thiane", None
             if n_count == 2 and o_count == 0 and s_count == 0:
                 n_indices = [i for i in path if mol.atoms[i].symbol == "N"]
                 dist = min(
@@ -755,10 +843,17 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
 
     if _matches_any_retained_signature(("anthracene", "phenanthrene"), sig, symbols, deg3_nodes, mol):
         deg3_edges = sum(1 for u in deg3_nodes for v in mol.get_neighbors(u) if v in deg3_nodes and u < v)
-        if _matches_retained_signature("anthracene", sig, symbols, deg3_nodes, mol, deg3_edges=deg3_edges):
-            return "anthracene", None
-        if _matches_retained_signature("phenanthrene", sig, symbols, deg3_nodes, mol, deg3_edges=deg3_edges):
-            return "phenanthrene", None
+        for name, perimeter, cross_bonds in (
+            ("anthracene", _ANTHRACENE_PERIMETER, _ANTHRACENE_CROSS_BONDS),
+            ("phenanthrene", _PHENANTHRENE_PERIMETER, _PHENANTHRENE_CROSS_BONDS),
+        ):
+            if not _matches_retained_signature(name, sig, symbols, deg3_nodes, mol, deg3_edges=deg3_edges):
+                continue
+            # Without a locant map these fell back to plain peripheral order,
+            # which numbers the meso carbons as if they were on an outer ring —
+            # ``anthracen-11-yl`` is not even a position anthracene has.
+            maps = _fused_tricyclic_locant_maps(mol, path_set, deg3_nodes, perimeter, cross_bonds)
+            return (name, maps) if maps else None
 
     if _matches_any_retained_signature(("adamantane",), sig, symbols, deg3_nodes, mol):
         if n_count == 0 and o_count == 0 and s_count == 0:
@@ -862,6 +957,11 @@ def _match_data_monocycle_retained(
         expected_gaps = spec.get("hetero_gap_multiset")
         if expected_gaps is not None and _hetero_gap_multiset(mol, path) != sorted(expected_gaps):
             continue
+        expected_chalcogen = spec.get("chalcogen_nitrogen_distance_multiset")
+        if expected_chalcogen is not None and _chalcogen_nitrogen_distance_multiset(mol, path) != sorted(
+            expected_chalcogen
+        ):
+            continue
         return spec["name"]
     return None
 
@@ -949,6 +1049,21 @@ def _hetero_distance_multiset(mol: Molecule, path: list[int]) -> list[int]:
     for left, right in itertools.combinations(hetero_indices, 2):
         distance = abs(left - right)
         distances.append(min(distance, size - distance))
+    return sorted(distances)
+
+
+def _chalcogen_nitrogen_distance_multiset(mol: Molecule, path: list[int]) -> list[int]:
+    """Ring distances from each chalcogen to each nitrogen.
+
+    The gap multiset is symmetric over all heteroatoms, so it cannot tell
+    1,2,4-oxadiazole from 1,3,4-oxadiazole -- both are gaps 1,2,2.  Measuring
+    from the chalcogen separates them: 1 and 2 against 2 and 2.
+    """
+
+    size = len(path)
+    chalcogens = [idx for idx, atom_idx in enumerate(path) if mol.atoms[atom_idx].symbol in {"O", "S"}]
+    nitrogens = [idx for idx, atom_idx in enumerate(path) if mol.atoms[atom_idx].symbol == "N"]
+    distances = [min(abs(left - right), size - abs(left - right)) for left in chalcogens for right in nitrogens]
     return sorted(distances)
 
 

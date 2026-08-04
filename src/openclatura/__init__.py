@@ -36,6 +36,7 @@ def name(
     *,
     include_trace: bool = False,
     verify_opsin: bool = False,
+    verify_self: bool = False,
     token_debug: bool = False,
 ) -> NamingResult:
     """One-shot naming with the default engine. Returns a typed ``NamingResult``.
@@ -43,7 +44,9 @@ def name(
     The bare-string ``name_smiles`` helper is preserved for backwards
     compatibility; new code should prefer ``name`` (or ``analyze``) which
     returns a structured result with rules-hit information and optional
-    OPSIN verification metadata.
+    verification metadata.  ``verify_opsin`` round-trips the name through OPSIN
+    (needs Java); ``verify_self`` runs the dependency-free reconstruction audit
+    (see ``result.self_audit`` / ``result.self_verified``).
     """
 
     return DEFAULT_NAMING_ENGINE.run(
@@ -51,6 +54,7 @@ def name(
             smiles=smiles,
             include_trace=include_trace,
             verify_opsin=verify_opsin,
+            verify_self=verify_self,
             token_debug=token_debug,
         )
     )
@@ -61,6 +65,7 @@ def name_mol(
     *,
     include_trace: bool = False,
     verify_opsin: bool = False,
+    verify_self: bool = False,
     token_debug: bool = False,
 ) -> NamingResult:
     """One-shot naming of an existing RDKit molecule. Returns a ``NamingResult``.
@@ -76,6 +81,7 @@ def name_mol(
             rdkit_mol=rdkit_mol,
             include_trace=include_trace,
             verify_opsin=verify_opsin,
+            verify_self=verify_self,
             token_debug=token_debug,
         )
     )
@@ -86,6 +92,7 @@ def name_many(
     *,
     include_trace: bool = False,
     verify_opsin: bool = False,
+    verify_self: bool = False,
     token_debug: bool = False,
     processes: int | None | str = 1,
     chunksize: int = 64,
@@ -102,6 +109,7 @@ def name_many(
         smiles_iter,
         include_trace=include_trace,
         verify_opsin=verify_opsin,
+        verify_self=verify_self,
         token_debug=token_debug,
         processes=processes,
         chunksize=chunksize,
