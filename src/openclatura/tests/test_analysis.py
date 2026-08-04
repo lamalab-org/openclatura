@@ -5446,6 +5446,10 @@ def test_ring_parent_nitrogen_zwitterion_stack_rejects_acyclic_ium_names():
 def test_connection_boundary_regression_names_keep_unambiguous_attachment():
     cases = {
         "CCN([C@H](C)CO)S(=O)(=O)c1ccccc1": "(2R)-2-(N-ethylbenzenesulfonamido)propan-1-ol",
+        # A *composite* N-substituent must also carry the N-locant, or the benzyl
+        # reads as a benzene-ring substituent — the qualifier now scans a balanced
+        # parenthesised substituent, not just a paren-free one.
+        "CC1CCN(C(=O)CN(Cc2ccc(Cl)cc2)S(=O)(=O)c2ccccc2)CC1": "2-(N-((4-chlorophenyl)methyl)benzenesulfonamido)-1-(4-methylpiperidin-1-yl)ethan-1-one",
         "Cc1[nH+]c(cn1Cc2cc(cnc2)F)C(=O)OC": "methyl 1-((5-fluoropyridin-3-yl)methyl)-2-methyl-imidazol-3-ium-4-carboxylate",
         "COc1c(cccc1)C2(CC2)C(=O)O[C@H]3C[C@H](C3)c4ccccc4": "trans-3-phenylcyclobutyl 1-(2-methoxyphenyl)cyclopropanecarboxylate",
         "CO[C@H]1C[C@H](C1)OC(=O)c2n(ncc2)C(F)F": "trans-3-methoxycyclobutyl 1-(difluoromethyl)-1H-pyrazole-5-carboxylate",
