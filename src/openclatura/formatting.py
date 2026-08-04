@@ -113,13 +113,13 @@ def substituted_alkoxy_prefix(branch: str) -> str | None:
 
     if "hydroxy" not in branch:
         return None
-    for stem in stems.STEMS.values():
-        terminal = f"{stem.stem}yl"
-        replacement = f"{stem.stem}oxy"
-        if branch.endswith(terminal):
-            prefix = branch[: -len(terminal)]
-            return f"({prefix}{replacement})" if prefix else replacement
-    return None
+    stem = stems.terminal_stem(branch)
+    if stem is None:
+        return None
+    terminal = f"{stem.stem}yl"
+    replacement = f"{stem.stem}oxy"
+    prefix = branch[: -len(terminal)]
+    return f"({prefix}{replacement})" if prefix else replacement
 
 
 def format_element_substituent(stereo_prefix: str, branch: str, suffix: str, is_double: bool = False) -> str:

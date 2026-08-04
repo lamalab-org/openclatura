@@ -8,7 +8,11 @@ References:
 - IUPAC 2013 Recommendations, P-23.2.1 (chain length names)
 """
 
+import re
+from collections.abc import Iterator
 from dataclasses import dataclass
+from functools import lru_cache
+from re import Pattern
 
 
 @dataclass(frozen=True)
@@ -20,7 +24,8 @@ class Stem:
 
 # Stems 1-4 are retained (non-systematic) names.
 # Stems 5+ are derived from Greek/Latin numerical roots.
-# Coverage up to 30; extend as needed (IUPAC defines stems well beyond this).
+# Retained and established spellings through 30. Larger stems are generated
+# from the basic numerical terms in Blue Book P-14.2.1.
 STEMS: dict[int, Stem] = {
     1: Stem(1, "meth", retained=True),
     2: Stem(2, "eth", retained=True),
@@ -54,12 +59,167 @@ STEMS: dict[int, Stem] = {
     30: Stem(30, "triacont", retained=False),
 }
 
+MIN_STEM_LENGTH = 1
+MAX_STEM_LENGTH = 1000
+
+_UNITS = {
+    1: "hen",
+    2: "do",
+    3: "tri",
+    4: "tetra",
+    5: "penta",
+    6: "hexa",
+    7: "hepta",
+    8: "octa",
+    9: "nona",
+}
+
+_TENS = {
+    1: "deca",
+    2: "icosa",
+    3: "triaconta",
+    4: "tetraconta",
+    5: "pentaconta",
+    6: "hexaconta",
+    7: "heptaconta",
+    8: "octaconta",
+    9: "nonaconta",
+}
+
+_HUNDREDS = {
+    1: "hecta",
+    2: "dicta",
+    3: "tricta",
+    4: "tetracta",
+    5: "pentacta",
+    6: "hexacta",
+    7: "heptacta",
+    8: "octacta",
+    9: "nonacta",
+}
+
+
+def _validate_length(length: int) -> None:
+    if isinstance(length, bool) or not isinstance(length, int):
+        raise ValueError("Stem length must be an integer from 1 through 1000")
+    if not MIN_STEM_LENGTH <= length <= MAX_STEM_LENGTH:
+        raise ValueError("Stem length must be from 1 through 1000")
+
+
+def _under_one_hundred(value: int) -> str:
+    """Return the basic numerical term for a value from 1 through 99."""
+
+    if value == 11:
+        return "undeca"
+
+    units = value % 10
+    tens = value // 10
+    unit_term = _UNITS.get(units, "")
+    tens_term = _TENS.get(tens, "")
+
+    # The initial i of icosa is elided after a vowel (P-14.2.1.2), e.g.
+    # do + icosa -> docosa, but hen + icosa -> henicosa.
+    if unit_term and tens == 2 and unit_term[-1] in "aeiou":
+        tens_term = tens_term[1:]
+    return unit_term + tens_term
+
+
+def _numerical_term(length: int) -> str:
+    """Build the P-14.2.1 basic numerical term for ``length``."""
+
+    _validate_length(length)
+    if length == 1000:
+        return "kilia"
+
+    hundreds, remainder = divmod(length, 100)
+    parts = []
+    if remainder:
+        parts.append(_under_one_hundred(remainder))
+    if hundreds:
+        parts.append(_HUNDREDS[hundreds])
+    return "".join(parts)
+
 
 def get(length: int) -> Stem:
-    """Look up a stem by chain length. Raises KeyError if out of range."""
-    return STEMS[length]
+    """Return the chain stem for a supported skeletal-atom count."""
+
+    _validate_length(length)
+    return _get_cached(length)
+
+
+@lru_cache(maxsize=MAX_STEM_LENGTH)
+def _get_cached(length: int) -> Stem:
+    """Return a validated stem while caching generated values."""
+
+    if length in STEMS:
+        return STEMS[length]
+    numerical_term = _numerical_term(length)
+    return Stem(length, numerical_term.removesuffix("a"), retained=False)
 
 
 def stem_for(length: int) -> str:
-    """Return just the stem string for a given chain length."""
-    return STEMS[length].stem
+    """Return just the stem string for a supported chain length."""
+
+    return get(length).stem
+
+
+def _iter_supported_stems() -> Iterator[Stem]:
+    """Yield supported stems without retaining a second full collection."""
+
+    for length in range(MIN_STEM_LENGTH, MAX_STEM_LENGTH + 1):
+        yield get(length)
+
+
+@lru_cache(maxsize=1)
+def _alkyl_suffix_index() -> dict[str, Stem]:
+    """Lazily map supported terminal alkyl text to its stem."""
+
+    return {f"{stem.stem}yl": stem for stem in _iter_supported_stems()}
+
+
+@lru_cache(maxsize=1)
+def _basic_prefix_index() -> dict[str, int]:
+    """Lazily map supported basic numerical prefixes to atom counts."""
+
+    return {f"{stem.stem}a": stem.length for stem in _iter_supported_stems()}
+
+
+@lru_cache(maxsize=1)
+def _terminal_alkyl_pattern() -> Pattern[str]:
+    """Compile a longest-first matcher for supported terminal alkyl text."""
+
+    alternatives = sorted((re.escape(suffix) for suffix in _alkyl_suffix_index()), key=len, reverse=True)
+    return re.compile(f"({'|'.join(alternatives)})$")
+
+
+def terminal_stem(name: str) -> Stem | None:
+    """Return the stem represented by the longest terminal alkyl suffix.
+
+    Reverse-search data is constructed only on the first call. An empty or
+    unrecognized string returns ``None``; a non-string input raises
+    ``ValueError`` because it cannot represent nomenclature text.
+    """
+
+    if not isinstance(name, str):
+        raise ValueError("Terminal stem name must be a string")
+    if not name:
+        return None
+    match = _terminal_alkyl_pattern().search(name)
+    if match is None:
+        return None
+    return _alkyl_suffix_index()[match.group(1)]
+
+
+def length_for_basic_prefix(prefix: str) -> int | None:
+    """Return the atom count represented by a basic numerical prefix.
+
+    Reverse-search data is constructed only on the first call. An empty or
+    unrecognized string returns ``None``; a non-string input raises
+    ``ValueError`` because it cannot represent nomenclature text.
+    """
+
+    if not isinstance(prefix, str):
+        raise ValueError("Basic numerical prefix must be a string")
+    if not prefix:
+        return None
+    return _basic_prefix_index().get(prefix)
