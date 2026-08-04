@@ -838,6 +838,20 @@ def name_pnictogen_subgraph(
         for nxt in next_atoms
         if (br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx} | set(p_oxygens), start_idx))
     ]
+    atom = mol.atoms[start_idx]
+    # ``phosphanyl`` spells a trivalent centre, so a singly bonded P carrying
+    # four ligands besides its attachment has to say so with the lambda; without
+    # it, OPSIN reads a ligand off the phosphorus and onto a carbon.  A double
+    # bond at the centre already shows the higher bonding number through its own
+    # ``oxo``/``thioxo``/``-ylidene`` wording, so those keep the plain prefix.
+    all_single = all(mol.get_bond(start_idx, n).order == 1 for n in mol.get_neighbors(start_idx))
+    if (
+        all_single
+        and not p_oxygens
+        and atom.charge == 0
+        and substituent_bonding_number(mol, start_idx) > atom.element.standard_valence
+    ):
+        return format_lambda_substituent(mol, start_idx, branches, stereo_prefix_text, suffix)
     return f"({stereo_prefix_text}{format_counted_prefixes(branches)}{suffix})"
 
 

@@ -5764,7 +5764,9 @@ def test_charge_separated_terminal_n3_renders_as_azido_role():
     cases = {
         "C=CC(=O)NN=[N+]=[N-]": "N-azidoprop-2-enamide",
         "[N-]=[N+]=Nn1cncn1": "1-azido-1H-1,2,4-triazole",
-        "CCP(CC)(CC)(CC)N=[N+]=[N-]": "1-((azido)triethylphosphanyl)ethane",
+        # Four ligands on a singly bonded P is a lambda^5 centre; `phosphanyl`
+        # on its own spells the trivalent one.
+        "CCP(CC)(CC)(CC)N=[N+]=[N-]": "1-((azido)triethyl-lambda^5-phosphanyl)ethane",
     }
 
     for smiles, expected in cases.items():

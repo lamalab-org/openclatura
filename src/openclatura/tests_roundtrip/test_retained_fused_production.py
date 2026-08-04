@@ -65,7 +65,9 @@ OXO_CASES = (
         "3,14-diazatricyclo[8.4.0.0^{2,7}]tetradeca-1(14),2,4,6,10,12-hexaene-8,9-dione",
     ),
     ("acridin-9-one", "2-azatricyclo[8.4.0.0^{3,8}]tetradeca-1(14),3,5,7,10,12-hexaen-9-one"),
-    ("9H-carbazol-1-one", "9H-carbazol-1-one"),
+    # OPSIN accepts ``9H-`` here, but the sp3 CH2 of the 1-one really sits at C2,
+    # so ``2H-`` is the unambiguous citation; both parse back to this structure.
+    ("9H-carbazol-1-one", "2H-carbazol-1-one"),
     ("purine-2,6-dione", "1H-purine-2,6-dione"),
     ("2,8-diamino-1,4-dihydropurin-6-one", "2,8-diamino-1,4-dihydropurin-6-one"),
     ("1,3,7-trimethylpurine-2,6-dione", "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione"),

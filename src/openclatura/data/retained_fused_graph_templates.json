@@ -2712,8 +2712,8 @@
       "derivative_stem": "1H-phenalen",
       "attached_prefix": "phenaleno",
       "template": {
-        "enabled": true,
-        "derivative_production_enabled": true,
+        "enabled": false,
+        "derivative_production_enabled": false,
         "default_indicated_h": [
           "1"
         ],

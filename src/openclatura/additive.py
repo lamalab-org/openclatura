@@ -25,6 +25,24 @@ def _saturated_ring_carbons(mol: Molecule, numbered_path: list[int], get_loc) ->
     return found
 
 
+def _declared_sites_are_unambiguous(mol: Molecule, numbered_path: list[int], get_loc, declared: set[str]) -> bool:
+    """True when the declared indicated-H locants are the only place they could sit.
+
+    A declared heteroatom site is ambiguous when the ring system holds another
+    heteroatom of the same element that could carry the hydrogen instead: 1H-
+    and 2H-indazole are both real parents, so the ``1`` in 1H-indazole-3,5-dione
+    is what tells the two apart and cannot be traded for a saturated carbon.
+    """
+
+    for idx in numbered_path:
+        atom = mol.atoms[idx]
+        if str(get_loc(idx)) not in declared or atom.is_carbon:
+            continue
+        if sum(mol.atoms[other].symbol == atom.symbol for other in numbered_path) > 1:
+            return False
+    return True
+
+
 def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     """Add indicated hydrogen locants for retained ring names."""
 
@@ -42,9 +60,14 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     # saturated carbons as the parent supports, those are the indicated-H sites
     # and their real locants replace the declared ones.  A different count means
     # the extra positions are hydro derivatives, which are cited separately, and
-    # the declared locants stand.
+    # the declared locants stand.  A declared site whose element repeats in the
+    # ring system is exempt: there the locant identifies which isomer this is.
     observed = _saturated_ring_carbons(mol, numbered_path, get_loc)
-    if default_indicated_h and len(observed) == len(default_indicated_h):
+    if (
+        default_indicated_h
+        and len(observed) == len(default_indicated_h)
+        and _declared_sites_are_unambiguous(mol, numbered_path, get_loc, default_indicated_h)
+    ):
         default_indicated_h = observed
     fusion_locants = set(metadata.fusion_locants) if metadata is not None else set()
     candidates: list[tuple[str, int]] = []
