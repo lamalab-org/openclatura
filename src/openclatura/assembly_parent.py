@@ -102,6 +102,12 @@ def _retained_chain_parent(parts: AssemblyParts) -> str | None:
     group = parts.principal_group
     if group is None or parts.is_ring or parts.unsaturations or parts.a_prefixes:
         return None
+    # An anionic skeletal atom cites its ``ide`` between the stem and the
+    # characteristic-group suffix, and a retained stem has nowhere to put it:
+    # ``propionitril-2-ide`` names nothing, while the systematic
+    # ``propane-2-ide-1-nitrile`` says exactly where the carbanion sits.
+    if any(charge.charge < 0 for charge in parts.parent_charges):
+        return None
     locants = [str(locant) for locant in group.locants]
     retained = RETAINED_CHAIN_PARENTS.get((parts.parent_length, group.key, len(locants)))
     if retained is None:

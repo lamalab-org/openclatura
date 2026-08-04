@@ -360,6 +360,14 @@
         "reason": "Dinitrile suffixes need the carbanion ide operation before the characteristic-group suffix."
       },
       {
+        "key": "mononitrile_suffix_ide",
+        "atom_symbols": [
+          "C"
+        ],
+        "placement": "transform",
+        "reason": "Chain nitrile suffixes need the carbanion ide operation between the stem and the suffix."
+      },
+      {
         "key": "locanted_carbonitrile_suffix_ide",
         "atom_symbols": [
           "C"

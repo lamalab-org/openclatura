@@ -5331,7 +5331,10 @@ def test_pyopsin_regression_names_preserve_zwitterionic_parent_suffix_order():
 def test_unclassified_anions_do_not_emit_terminal_locant_ide():
     cases = {
         "NC1=[NH+]C(=N)N=C[N-]1": "6-imino-1,3,5-triazacyclohexa-1,4-dien-1-ium-2-amine",
-        "NC(=[NH2+])[C-](C#C)C#N": "2-((amino)(iminio)methyl)but-3-ynenitrile",
+        # No longer unclassified: the chain-nitrile anion placement gives this
+        # carbanion a verified spelling, and the old neutral name read back as
+        # the +1 cation because it dropped the anion entirely.
+        "NC(=[NH2+])[C-](C#C)C#N": "2-((amino)(iminio)methyl)but-3-yne-2-ide-1-nitrile",
         "O=C[C-]1C2C[NH2+]C12C=O": "2-azoniabicyclo[2.1.0]pentane-1,5-dicarbaldehyde",
         "[NH3+]C1CC(=O)[N-]C1C#N": "3-ammonio-5-oxopyrrolidine-2-carbonitrile",
     }
