@@ -363,8 +363,11 @@ def _split_acyl_count(mol: Molecule | None, path: list[int]) -> int:
         )
         if not has_oxo:
             continue
-        if any(mol.atoms[nb].symbol in {"N", "O", "S"} and nb not in in_path for nb in mol.get_neighbors(idx)
-               if (bond := mol.get_bond(idx, nb)) is not None and bond.order == 1):
+        if any(
+            mol.atoms[nb].symbol in {"N", "O", "S"} and nb not in in_path
+            for nb in mol.get_neighbors(idx)
+            if (bond := mol.get_bond(idx, nb)) is not None and bond.order == 1
+        ):
             split += 1
     return split
 

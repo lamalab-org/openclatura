@@ -827,7 +827,11 @@ def test_carbonylamino_heteroatom_shortcut_tree_does_not_invent_hydroxy_children
 def test_postprocessing_rewrites_keep_token_metadata_auditable():
     result = NameAssemblyResult.from_raw_name(
         "phenylcarbonyl",
-        [NameAtomBinding(stage="prefix", role="substituent", term="phenylcarbonyl", atom_ids={0, 1, 2}, bond_ids={0, 1})],
+        [
+            NameAtomBinding(
+                stage="prefix", role="substituent", term="phenylcarbonyl", atom_ids={0, 1, 2}, bond_ids={0, 1}
+            )
+        ],
         postprocess=post_process_name,
     )
 

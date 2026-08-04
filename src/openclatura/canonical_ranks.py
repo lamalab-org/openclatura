@@ -28,9 +28,7 @@ def _initial_invariant(mol: Molecule, idx: int) -> tuple:
     """Local properties of one atom, all independent of how it was indexed."""
 
     atom = mol.atoms[idx]
-    bond_orders = sorted(
-        _order(mol, idx, neighbour) for neighbour in mol.get_neighbors(idx)
-    )
+    bond_orders = sorted(_order(mol, idx, neighbour) for neighbour in mol.get_neighbors(idx))
     return (
         atom.symbol,
         atom.charge,
