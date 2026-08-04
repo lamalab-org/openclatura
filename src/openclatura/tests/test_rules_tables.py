@@ -221,7 +221,11 @@ def test_oxadiazoles_and_thiadiazoles_use_their_retained_names():
     # The isomers must stay distinguishable once substituted: a symmetric gap
     # multiset cannot separate 1,2,4- from 1,3,4-, which is what the chalcogen
     # distance criterion is for.
-    assert name_smiles("Cc1nnc(C)s1") == "2,5-dimethyl-1,3,4-thiadiazole"
+    # C2 and C5 are the ring's only substitutable positions and are equivalent,
+    # so locant elision drops the ``2,5-``: there is nothing else the two methyls
+    # could be.  The unsymmetrical pair below still needs its locants.
+    assert name_smiles("Cc1nnc(C)s1") == "dimethyl-1,3,4-thiadiazole"
+    assert name_smiles("Cc1nnc(CC)s1") == "2-ethyl-5-methyl-1,3,4-thiadiazole"
     assert name_smiles("Cc1ncns1") == "5-methyl-1,2,4-thiadiazole"
     assert name_smiles("Cc1nnc(-c2ccccc2)o1") == "2-methyl-5-phenyl-1,3,4-oxadiazole"
 
