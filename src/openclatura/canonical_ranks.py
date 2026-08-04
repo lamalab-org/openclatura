@@ -23,6 +23,7 @@ two differ do not arise in molecular graphs of nomenclatural interest.
 
 from .molecule import Molecule
 
+
 def _initial_invariant(mol: Molecule, idx: int) -> tuple:
     """Local properties of one atom, all independent of how it was indexed."""
 
