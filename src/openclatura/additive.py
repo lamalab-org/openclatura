@@ -7,6 +7,24 @@ from .name_operations import HydroOperation
 from .namer_config import INDICATED_H_RETAINED_NAMES
 
 
+def _saturated_ring_carbons(mol: Molecule, numbered_path: list[int], get_loc) -> set[str]:
+    """Locants of ring carbons whose ring bonds are all single and that hold H."""
+
+    found: set[str] = set()
+    for idx in numbered_path:
+        atom = mol.atoms[idx]
+        if not atom.is_carbon:
+            continue
+        ring_bonds = [
+            bond for n in mol.get_neighbors(idx) if n in numbered_path and (bond := mol.get_bond(idx, n)) is not None
+        ]
+        if not ring_bonds or sum(bond.order for bond in ring_bonds) != len(ring_bonds):
+            continue
+        if atom.explicit_h_count + atom.total_h_count > 0:
+            found.add(str(get_loc(idx)))
+    return found
+
+
 def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     """Add indicated hydrogen locants for retained ring names."""
 
@@ -17,6 +35,17 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     oxo_derivative = parts.principal_group is not None and parts.principal_group.key == "ketone"
     metadata = parts.retained_parent_metadata
     default_indicated_h = set(metadata.default_indicated_h) if metadata is not None else set()
+    # The declared locants say how many indicated hydrogens the parent hydride
+    # supports, and where they sit in the unsubstituted parent.  Where they sit
+    # in *this* molecule is a property of this molecule: 1H- and 2H-indene are
+    # different compounds.  So when the structure presents exactly as many
+    # saturated carbons as the parent supports, those are the indicated-H sites
+    # and their real locants replace the declared ones.  A different count means
+    # the extra positions are hydro derivatives, which are cited separately, and
+    # the declared locants stand.
+    observed = _saturated_ring_carbons(mol, numbered_path, get_loc)
+    if default_indicated_h and len(observed) == len(default_indicated_h):
+        default_indicated_h = observed
     fusion_locants = set(metadata.fusion_locants) if metadata is not None else set()
     candidates: list[tuple[str, int]] = []
     for idx in numbered_path:

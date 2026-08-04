@@ -36,6 +36,7 @@
       "1,9-phenanthroline",
       "1H-indole",
       "1H-perimidine",
+      "1H-phenalene",
       "2,6-naphthyridine",
       "2,7-naphthyridine",
       "2,7-phenanthroline",
@@ -63,9 +64,7 @@
       "quinoxaline",
       "xanthene"
     ],
-    "audit_only_parent_names": [
-      "1H-phenalene"
-    ],
+    "audit_only_parent_names": [],
     "allowed_principal_keys": [
       null,
       "alcohol",
@@ -528,7 +527,7 @@
       "fusion_stems": [
         "phenaleno"
       ],
-      "derivative_status": "audit_only",
+      "derivative_status": "production_safe",
       "default_indicated_h": [
         "1"
       ]
