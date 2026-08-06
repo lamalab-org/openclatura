@@ -393,7 +393,6 @@
     <h2>IUPAC name</h2>
     <div id="result-name" class="placeholder">Draw a structure to name it.</div>
     <div class="verify-badge" id="verify-badge"></div>
-    <div class="verify-badge" id="audit-badge"></div>
     <div class="status" id="status"></div>
     <div class="errbox" id="errbox"></div>
     <div class="chips" id="rules"></div>
@@ -404,11 +403,6 @@
     <label class="verify-toggle">
       <input type="checkbox" id="opsin-toggle" checked>
       Verify with OPSIN <span class="hint">— parse the name back to a structure (py2opsin) and compare with your drawing</span>
-    </label>
-    <!-- Only shown where the engine ships openclatura.audit (the beta build). -->
-    <label class="verify-toggle" id="audit-row" hidden>
-      <input type="checkbox" id="audit-toggle" checked>
-      Self-audit <span class="hint">— rebuild the structure from the name using openclatura's own grammar, no OPSIN or Java involved</span>
     </label>
     <label class="verify-toggle">
       <input type="checkbox" id="nocache-toggle">
@@ -530,7 +524,6 @@
     el("result-name").textContent = placeholder;
     el("result-name").className = "placeholder";
     el("verify-badge").className = "verify-badge";
-    el("audit-badge").className = "verify-badge";
     el("rules").innerHTML = "";
     el("errbox").style.display = "none";
     el("explain").style.display = "none";
@@ -642,7 +635,6 @@
       el("result-name").textContent = "Could not name this structure.";
       el("result-name").className = "error";
       el("verify-badge").className = "verify-badge";
-    el("audit-badge").className = "verify-badge";
       el("rules").innerHTML = "";
       el("btn-copy").disabled = true;
       el("btn-explain").disabled = true;
@@ -666,9 +658,7 @@
     setStatus('<span class="spinner"></span> naming…');
 
     var verify = el("opsin-toggle").checked;
-    var audit = selfAuditWanted();
-    var checks = (verify ? ["OPSIN round-trip"] : []).concat(audit ? ["self-audit"] : []);
-    if (checks.length) setStatus('<span class="spinner"></span> naming + ' + checks.join(" + ") + "…");
+    if (verify) setStatus('<span class="spinner"></span> naming + OPSIN round-trip…');
 
     fetch("/api/name", {
       method: "POST",
@@ -677,7 +667,6 @@
         smiles: smiles,
         include_trace: true,
         verify_opsin: verify,
-        verify_self: audit,
         no_cache: noCache()
       })
     })
@@ -696,7 +685,6 @@
           el("btn-copy").disabled = false;
           el("btn-explain").disabled = false;
           renderOpsin(data.opsin_check);
-          renderSelfAudit(data.self_audit);
           var chips = el("rules");
           chips.innerHTML = "";
           var hints = (data.rule_hints || []).join("\n");
@@ -744,56 +732,7 @@
   // pass/fail: "abstained" means some construct in the name isn't modelled by
   // the reconstructor, which certifies nothing either way — so it must not read
   // as a failure of the name.
-  function renderSelfAudit(audit) {
-    var badge = el("audit-badge");
-    badge.className = "verify-badge";
-    badge.title = "";
-    if (!audit) return;
-    var reason = audit.reason || "";
-    var extra = [];
-    if (audit.unnamed_atoms && audit.unnamed_atoms.length) {
-      extra.push("atoms left unnamed: " + audit.unnamed_atoms.join(", "));
-    }
-    if (audit.stereo_issues && audit.stereo_issues.length) {
-      extra.push("stereo: " + audit.stereo_issues.join("; "));
-    }
-    if (audit.unsupported_charge_pairs && audit.unsupported_charge_pairs.length) {
-      extra.push("charge pairs without a template: " + audit.unsupported_charge_pairs.join("; "));
-    }
-    if (audit.verdict === "confirmed") {
-      badge.className = "verify-badge ok";
-      badge.textContent = "✓ Self-audit: rebuilt from the name, matches";
-      badge.title = "openclatura's own grammar reconstructed " +
-                    (audit.reconstructed_smiles || "the structure") + " from this name.";
-    } else if (audit.verdict === "mismatch") {
-      badge.className = "verify-badge bad";
-      badge.textContent = "✗ Self-audit: rebuild disagrees with the drawing";
-      badge.title = [reason, audit.reconstructed_smiles ? "rebuilt: " + audit.reconstructed_smiles : ""]
-                      .concat(extra).filter(Boolean).join("\n");
-    } else if (audit.verdict === "abstained") {
-      badge.className = "verify-badge warn";
-      badge.textContent = "Self-audit: no verdict — " + (reason || "construct not modelled");
-      badge.title = "The reconstructor does not model part of this name, so it neither " +
-                    "confirms nor refutes it." + (extra.length ? "\n" + extra.join("\n") : "");
-    } else {
-      badge.className = "verify-badge warn";
-      badge.textContent = "Self-audit failed to run" + (reason ? " (" + reason + ")" : "");
-    }
-  }
-
-  // Whether the running engine supports the self-audit at all; set from
-  // /api/healthz, which is also what reveals the toggle.
-  var selfAuditSupported = false;
-
-  function selfAuditWanted() {
-    return selfAuditSupported && el("audit-toggle").checked;
-  }
-
   el("opsin-toggle").addEventListener("change", function () {
-    if (currentSmiles) requestName(currentSmiles);
-  });
-
-  el("audit-toggle").addEventListener("change", function () {
     if (currentSmiles) requestName(currentSmiles);
   });
 
