@@ -67,10 +67,12 @@ def retained_monocycle_graph_template_names() -> frozenset[str]:
 
 
 @lru_cache(maxsize=1)
-def _templates_by_signature() -> dict[tuple[int, tuple[tuple[str, int], ...], int], tuple[RetainedMonocycleGraphTemplate, ...]]:
-    indexed: dict[tuple[int, tuple[tuple[str, int], ...], int], list[RetainedMonocycleGraphTemplate]] = {}
+def _templates_by_atom_signature() -> dict[
+    tuple[int, tuple[tuple[str, int], ...]], tuple[RetainedMonocycleGraphTemplate, ...]
+]:
+    indexed: dict[tuple[int, tuple[tuple[str, int], ...]], list[RetainedMonocycleGraphTemplate]] = {}
     for template in retained_monocycle_graph_templates():
-        indexed.setdefault(template.signature, []).append(template)
+        indexed.setdefault(template.signature[:2], []).append(template)
     return {
         signature: tuple(sorted(templates, key=lambda template: (template.priority, template.name)))
         for signature, templates in indexed.items()
@@ -84,17 +86,24 @@ def match_retained_monocycle_templates(
     """Return retained monocycle matches with every valid locant map."""
 
     atoms = set(atom_indices)
+    atom_signature = (
+        len(atoms),
+        tuple(sorted(Counter(mol.atoms[atom].symbol for atom in atoms).items())),
+    )
+    possible_templates = _templates_by_atom_signature().get(atom_signature, ())
+    if not possible_templates:
+        return ()
+    double_bonds = _double_bond_count(mol, atoms)
+    possible_templates = tuple(
+        template for template in possible_templates if len(template.double_bond_locants) == double_bonds
+    )
+    if not possible_templates:
+        return ()
     cycle = _ordered_cycle(mol, atoms)
     if cycle is None:
         return ()
-    double_bonds = _double_bond_count(mol, atoms)
-    signature = (
-        len(atoms),
-        tuple(sorted(Counter(mol.atoms[atom].symbol for atom in atoms).items())),
-        double_bonds,
-    )
     matches = []
-    for template in _templates_by_signature().get(signature, ()):
+    for template in possible_templates:
         if template.no_cumulated_double_bonds and _has_cumulated_double_bond(mol, atoms):
             continue
         maps = _matching_locant_maps(mol, cycle, template)
