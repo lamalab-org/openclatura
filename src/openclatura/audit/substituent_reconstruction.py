@@ -267,6 +267,44 @@ _RING_STEMS: dict[str, tuple[str, list[str]]] = {
 # when the name asks for the other tautomer.
 # fmt: off
 _RETAINED_FUSED_RING_STEMS: dict[str, tuple[str, list[str]]] = {
+    "imidazo[1,2-a]pyridine": ("c1ccn2ccnc2c1", ["7", "6", "5", "4", "3", "2", "1", "8a", "8"]),
+    "pyrazolo[1,5-a]pyrimidine": ("c1cnc2ccnn2c1", ["6", "5", "4", "3a", "3", "2", "1", "8", "7"]),
+    "1H-pyrrolo[2,3-b]pyridine": ("c1cnc2[nH]ccc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "thieno[2,3-b]pyridine": ("c1cnc2sccc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "thieno[3,2-b]thiophene": ("c1cc2sccc2s1", ["2", "3", "3a", "4", "5", "6", "6a", "1"]),
+    "furo[3,2-b]furan": ("c1cc2occc2o1", ["2", "3", "3a", "4", "5", "6", "6a", "1"]),
+    "pyrido[2,3-b]pyrazine": ("c1cnc2nccnc2c1", ["7", "6", "5", "4a", "4", "3", "2", "1", "8a", "8"]),
+    "4H-1-benzoselenopyran": ("C1=C[Se]c2ccccc2C1", ["3", "2", "1", "8a", "8", "7", "6", "5", "4a", "4"]),
+    "1,3-benzodioxole": ("O1COc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    "1,4-benzodioxine": ("C1=COc2ccccc2O1", ["2", "3", "4", "4a", "5", "6", "7", "8", "8a", "1"]),
+    "10H-phenothiazine": ("c1ccc2c(c1)Nc1ccccc1S2", ["2", "3", "4", "4a", "10a", "1", "10", "9a", "9", "8", "7", "6", "5a", "5"]),
+    "10H-phenoxazine": ("c1ccc2c(c1)Nc1ccccc1O2", ["2", "3", "4", "4a", "10a", "1", "10", "9a", "9", "8", "7", "6", "5a", "5"]),
+    "1H-benzotriazole": ("c1ccc2[nH]nnc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "1H-isoindole": ("C1=NCc2ccccc21", ["3", "2", "1", "7a", "7", "6", "5", "4", "3a"]),
+    "1H-phenalene": ("C1=Cc2cccc3cccc(c23)C1", ["2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b", "1"]),
+    "1H-pyrazolo[3,4-d]pyrimidine": ("c1ncc2cn[nH]c2n1", ["6", "5", "4", "3a", "3", "2", "1", "7a", "7"]),
+    "1H-pyrrolizine": ("C1=Cn2cccc2C1", ["2", "3", "4", "5", "6", "7", "7a", "1"]),
+    "2,1,3-benzothiadiazole": ("c1ccc2nsnc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "2,1,3-benzoxadiazole": ("c1ccc2nonc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "2-benzofuran": ("c1ccc2cocc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "2-benzothiophene": ("c1ccc2cscc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "2H-1-benzopyran": ("C1=Cc2ccccc2OC1", ["3", "4", "4a", "5", "6", "7", "8", "8a", "1", "2"]),
+    "2H-quinolizine": ("C1=CC2=CCC=CN2C=C1", ["8", "9", "9a", "1", "2", "3", "4", "5", "6", "7"]),
+    "3H-indole": ("C1=Nc2ccccc2C1", ["2", "1", "7a", "7", "6", "5", "4", "3a", "3"]),
+    "4H-1-benzopyran": ("C1=COc2ccccc2C1", ["3", "2", "1", "8a", "8", "7", "6", "5", "4a", "4"]),
+    "4H-quinolizine": ("C1=CCN2C=CC=CC2=C1", ["2", "3", "4", "5", "6", "7", "8", "9", "9a", "1"]),
+    "7H-pyrrolo[2,3-d]pyrimidine": ("c1ncc2cc[nH]c2n1", ["2", "3", "4", "4a", "5", "6", "7", "7a", "1"]),
+    "dibenzofuran": ("c1ccc2c(c1)oc1ccccc12", ["3", "2", "1", "9b", "4a", "4", "5", "5a", "6", "7", "8", "9", "9a"]),
+    "dibenzothiophene": ("c1ccc2c(c1)sc1ccccc12", ["3", "2", "1", "9b", "4a", "4", "5", "5a", "6", "7", "8", "9", "9a"]),
+    "naphtho[1,2-b]thiophene": ("c1ccc2c(c1)ccc1ccsc12", ["7", "8", "9", "9a", "5a", "6", "5", "4", "3a", "3", "2", "1", "9b"]),
+    "naphtho[2,3-b]furan": ("c1ccc2cc3occc3cc2c1", ["6", "7", "8", "8a", "9", "9a", "1", "2", "3", "3a", "4", "4a", "5"]),
+    "naphtho[2,3-d][1,3]oxazole": ("c1ccc2cc3ocnc3cc2c1", ["6", "7", "8", "8a", "9", "9a", "1", "2", "3", "3a", "4", "4a", "5"]),
+    "phenanthridine": ("c1ccc2c(c1)cnc1ccccc12", ["8", "9", "10", "10a", "6a", "7", "6", "5", "4a", "4", "3", "2", "1", "10b"]),
+    "1,4-benzoxazine": ("O1CC=Nc2ccccc21", ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]),
+    "1H-1,5-benzodiazepine": ("N1C=CC=Nc2ccccc21", ["1", "2", "3", "4", "5", "5a", "6", "7", "8", "9", "9a"]),
+    "1H-2-benzopyran": ("C1OC=Cc2ccccc21", ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]),
+    "3H-2-benzopyran": ("C1=c2c(cccc2)=CCO1", ["1", "8a", "4a", "5", "6", "7", "8", "4", "3", "2"]),
+    "4H-1-benzothiopyran": ("S1C=CCc2ccccc21", ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]),
     "1H-indole": ("c1ccc2[nH]ccc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
     "1H-perimidine": ("C1=Nc2cccc3cccc(c23)N1", ["2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b", "1"]),
     "2H-isoindole": ("c1ccc2c[nH]cc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
@@ -1772,7 +1810,14 @@ def _apply_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
     clauses = _parse_clauses(prefix)
     if clauses is None:
         return False
+    # Hydro first: it frees the valences the other clauses then substitute onto,
+    # so 3-oxo lands on an already-saturated C3 of 3,4-dihydro-1,4-benzoxazine.
+    hydro = [locs for locs, subname in clauses if _is_hydro(subname)]
+    if hydro and not _apply_hydro(rw, locants, [loc for locs in hydro for loc in locs]):
+        return False
     for locs, subname in clauses:
+        if _is_hydro(subname):
+            continue
         frag = resolve_fragment_mol(subname)
         if frag is None:
             return False
@@ -1782,6 +1827,29 @@ def _apply_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
                 return False
             if not _graft_onto(rw, base_idx, frag):
                 return False
+    return True
+
+
+def _is_hydro(subname: str) -> bool:
+    return subname != "hydro" and any(rest == "hydro" for _, rest in _multipliers.candidate_splits(subname))
+
+
+def _apply_hydro(rw: Chem.RWMol, locants: dict[str, int], locs: list[str]) -> bool:
+    """Saturate the cited ring positions, single-bonding every bond between them."""
+
+    idxs = {locants.get(loc) for loc in locs}
+    if None in idxs:
+        return False
+    try:
+        Chem.Kekulize(rw, clearAromaticFlags=True)
+    except Chem.KekulizeException:
+        return False
+    for idx in idxs:
+        rw.GetAtomWithIdx(idx).SetIsAromatic(False)
+    for bond in rw.GetBonds():
+        if bond.GetBeginAtomIdx() in idxs and bond.GetEndAtomIdx() in idxs:
+            bond.SetBondType(Chem.BondType.SINGLE)
+            bond.SetIsAromatic(False)
     return True
 
 

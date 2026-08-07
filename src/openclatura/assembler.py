@@ -273,8 +273,28 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
         # ``3,7-dihydro-1H-purine-2,6-dione``.
         separator = "-" if core_name[:1].isdigit() else ""
         hydro = format_multiplier("hydro", len(additive_hydrogens))
+        # Nothing is left unsaturated, so there is nothing to distinguish.
+        # The stem may already spell the indicated H, as 1H-indole does.
+        stated = parts.retained_parent_metadata.indicated_hydrogen_count if parts.retained_parent_metadata else 0
+        if len(additive_hydrogens) + max(len(indicated_hydrogens), stated) == parts.parent_length:
+            return f"{hydro}{separator}{core_name}"
         core_name = f"{','.join(additive_hydrogens)}-{hydro}{separator}{core_name}"
     return core_name
+
+
+def _move_added_hydrogen_to_suffix(parts: AssemblyParts, core_name: str, suffix_str: str) -> tuple[str, str]:
+    """P-14.7: added hydrogen follows the suffix locant -- quinolin-4(1H)-one."""
+
+    added = {locant for operation in parts.hydro_operations if operation.key == "added_hydrogen" for locant in operation.locants}
+    if not added:
+        return core_name, suffix_str
+    cite = ",".join(f"{locant}H" for locant in sorted(added, key=parse_locant))
+    if not core_name.startswith(cite + "-"):
+        return core_name, suffix_str
+    match = re.match(r"^-(\d+[a-z]?)-", suffix_str)
+    if match is None:
+        return core_name, suffix_str
+    return core_name[len(cite) + 1 :], f"-{match.group(1)}({cite})-{suffix_str[match.end() :]}"
 
 
 def _add_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:
@@ -393,6 +413,7 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
 
         core_name, terminal_e = format_spiro_core(stem_str, unsat_str, terminal_e, spiro_subs)
         core_name = _add_indicated_hydrogen_prefix(parts, core_name)
+        core_name, suffix_str = _move_added_hydrogen_to_suffix(parts, core_name, suffix_str)
         core_name += suffix_str
     parent_needs_prefix_hyphen = bool(
         prefix_str and positive_parent_n_charges(parts) and parts.retained_name and parts.indicated_hydrogens

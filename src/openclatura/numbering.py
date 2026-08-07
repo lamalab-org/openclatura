@@ -193,6 +193,10 @@ def choose_parent_numbering(
                 for priority in sorted(het_by_priority.keys())
             )
             substituent_eval = sorted([get_val(idx) for idx in set(substituent_mapping.keys()) if idx in lmap])
+            # Low locants to hydro prefixes, P-31.1.4.2.4.
+            hydro_eval = sorted(
+                get_val(idx) for idx in lmap if idx in mol.atoms and _is_saturated_ring_site(mol, idx, list(lmap))
+            )
             indicated_h_eval = sorted(
                 get_val(idx)
                 for idx in _indicated_hydrogen_like_atoms(
@@ -203,7 +207,7 @@ def choose_parent_numbering(
                 )
                 if idx in lmap
             )
-            return heteroatom_eval + (tuple(indicated_h_eval), principal_eval, substituent_eval)
+            return heteroatom_eval + (tuple(indicated_h_eval), principal_eval, hydro_eval, substituent_eval)
 
         locant_map = min(locant_maps, key=evaluate_map)
         return list(locant_map.keys()), locant_map
@@ -396,3 +400,18 @@ def _stereochemistry_sequence(mol: Molecule, oriented_path: list[int]) -> tuple[
         if stereo:
             sequence.append(0 if stereo == "R" else 1)
     return tuple(sequence)
+
+
+def _is_saturated_ring_site(mol: Molecule, atom_idx: int, ring_atoms: list[int]) -> bool:
+    """A ring position a hydro prefix would cite, read off the structure.
+
+    ``_hydro_locants`` answers the same question from the monocycle hydro plan,
+    which a fused parent has none of.
+    """
+
+    ring_bonds = [
+        bond for n in mol.get_neighbors(atom_idx) if n in ring_atoms and (bond := mol.get_bond(atom_idx, n))
+    ]
+    # Substitution does not un-saturate a position, so H count is not consulted:
+    # indane's C1 is a hydro site whether or not it carries the diazo group.
+    return bool(ring_bonds) and all(bond.order == 1 for bond in ring_bonds)

@@ -2272,36 +2272,6 @@ def _same_element_parent_name(symbol: str, length: int, bond_orders: list[int]) 
     return ""
 
 
-def _simple_chain_ligand_prefixes(mol: Molecule, component_atoms: set[int], chain: list[int]) -> str:
-    chain_set = set(chain)
-    items = []
-    for locant, atom_idx in enumerate(chain, start=1):
-        for neighbor in mol.get_neighbors(atom_idx):
-            if neighbor not in component_atoms or neighbor in chain_set:
-                continue
-            bond = mol.get_bond(atom_idx, neighbor)
-            if bond is None or bond.order != 1:
-                return ""
-            name = _terminal_ligand_name(mol, neighbor, atom_idx)
-            if not name:
-                return ""
-            items.append((locant, name))
-    if not items:
-        return ""
-    names = {}
-    locants_by_name = {}
-    for locant, name in items:
-        names[name] = name
-        locants_by_name.setdefault(name, []).append(str(locant))
-    parts = []
-    for name in sorted(names):
-        locants = ",".join(locants_by_name[name])
-        count = len(locants_by_name[name])
-        prefix = multipliers.basic(count) if count > 1 else ""
-        parts.append(f"{locants}-{prefix}{name}")
-    return "".join(parts)
-
-
 def _terminal_ligand_name(mol: Molecule, atom_idx: int, parent_idx: int) -> str:
     atom = mol.atoms[atom_idx]
     halogens = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}

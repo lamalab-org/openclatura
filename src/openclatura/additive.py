@@ -85,6 +85,7 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     fusion_locants = set(metadata.fusion_locants) if metadata is not None else set()
     candidates: list[tuple[str, int]] = []
     hydro_only: list[tuple[str, int]] = []
+    oxo_sites = {idx for idx in numbered_path if _is_oxo_ring_site(mol, idx, numbered_path)}
     for idx in numbered_path:
         atom = mol.atoms[idx]
         locant = str(get_loc(idx))
@@ -146,34 +147,51 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     # A hydrogenated fusion carbon changes the retained-parent hydride state.
     # It is expressed together with the other affected locants as one additive
     # hydro operation (for example 1,4-dihydropurine), not as indicated H.
+    supported = metadata.indicated_hydrogen_count if metadata is not None else len(candidates)
     additive_hydrogen = any(
         mol.atoms[atom_idx].is_carbon and locant in fusion_locants for locant, atom_idx in candidates
     )
     if additive_hydrogen and len(candidates) > 1:
+        # The parent keeps its own indicated hydrogen: octahydro-1H-indole.
+        # Only if what is left is still whole double bonds, else 1,4-dihydropurine.
+        pool = sorted(candidates + hydro_only, key=lambda item: parse_locant(item[0]))
+        held = supported if (len(pool) - supported) % 2 == 0 else 0
+        candidates, surplus = pool[:held], pool[held:]
         parts.hydro_operations.append(
             HydroOperation(
                 key="additive_hydrogen",
                 reason="Retained parent requires an additive hydrogen prefix.",
-                locants=tuple(locant for locant, _ in candidates),
-                atom_ids=tuple(atom_idx for _, atom_idx in candidates),
+                locants=tuple(locant for locant, _ in surplus),
+                atom_ids=tuple(atom_idx for _, atom_idx in surplus),
                 operation_kind="additive_hydrogen",
             )
         )
+        if not name_states_indicated_h:
+            for locant, atom_idx in candidates:
+                parts.indicated_hydrogens.append(locant)
+                parts.hydro_operations.append(
+                    HydroOperation(
+                        key="indicated_hydrogen",
+                        reason="Retained unsaturated parent requires indicated-hydrogen locant.",
+                        locants=(locant,),
+                        atom_ids=(atom_idx,),
+                        operation_kind="indicated_hydrogen",
+                    )
+                )
         return
 
-    # A mancude parent hydride supports a fixed number of indicated hydrogens.
-    # Saturated positions beyond that are *added* hydrogen and take a hydro
-    # prefix, so xanthine is 3,7-dihydro-1H-purine-2,6-dione rather than a run
-    # of indicated-H citations.  The lowest locants stay indicated.
-    # A hydro prefix saturates whole double bonds, so it can only absorb an even
-    # surplus.  An odd one stays as indicated hydrogen (1H,9H-purin-6-one),
-    # which is still a readable name.
-    supported = metadata.indicated_hydrogen_count if metadata is not None else len(candidates)
+    # Saturation beyond the supported indicated hydrogens takes a hydro prefix,
+    # which saturates whole bonds and so can only absorb an even surplus.
     surplus_count = len(candidates) + len(hydro_only) - supported
     if metadata is not None and surplus_count > 0 and surplus_count % 2 == 0:
         candidates.sort(key=lambda candidate: parse_locant(candidate[0]))
-        surplus = sorted(candidates[supported:] + hydro_only, key=lambda item: parse_locant(item[0]))
-        candidates = candidates[:supported]
+        if len(candidates) < supported:
+            # An indicated-H site on a heteroatom never enters `candidates`.
+            pool = sorted(candidates + hydro_only, key=lambda item: parse_locant(item[0]))
+            candidates, surplus = pool[:supported], pool[supported:]
+        else:
+            surplus = sorted(candidates[supported:] + hydro_only, key=lambda item: parse_locant(item[0]))
+            candidates = candidates[:supported]
         parts.hydro_operations.append(
             HydroOperation(
                 key="additive_hydrogen",
@@ -184,20 +202,27 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             )
         )
 
-    if name_states_indicated_h:
+    # P-14.7: a mancude parent that the -one saturates cites the extra hydrogen
+    # after the suffix locant -- quinolin-4(1H)-one, 1,3-benzoxazol-2(3H)-one.
+    added_h_needed = oxo_derivative and supported == 0 and _name_spells_no_hydrogen(parts.retained_name)
+    if name_states_indicated_h and not added_h_needed:
         return
 
     for locant, atom_idx in candidates:
         parts.indicated_hydrogens.append(locant)
         parts.hydro_operations.append(
             HydroOperation(
-                key="indicated_hydrogen",
+                key="added_hydrogen" if added_h_needed else "indicated_hydrogen",
                 reason="Retained unsaturated parent requires indicated-hydrogen locant.",
                 locants=(locant,),
                 atom_ids=(atom_idx,),
                 operation_kind="indicated_hydrogen",
             )
         )
+
+
+def _name_spells_no_hydrogen(retained_name: str | None) -> bool:
+    return bool(retained_name) and "H-" not in retained_name
 
 
 def _is_saturated_ring_site(mol: Molecule, atom_idx: int, numbered_path: list[int]) -> bool:

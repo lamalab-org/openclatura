@@ -175,19 +175,6 @@ class ParentCandidate:
             score_tuple=score_tuple,
         )
 
-    def legacy_sort_key(self) -> tuple:
-        """Return the previous max-sort key, kept for traceability."""
-
-        return (
-            self.principal_groups_count,
-            self.is_polycycle,
-            self.is_bicycle,
-            self.is_spiro,
-            self.is_ring,
-            self.length,
-        )
-
-
 @dataclass
 class ParentSelection:
     """Selected parent skeleton and its structural flags."""

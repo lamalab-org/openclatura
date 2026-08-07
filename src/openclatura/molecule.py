@@ -30,11 +30,6 @@ class Atom:
     def is_carbon(self) -> bool:
         return self.symbol == "C"
 
-    @property
-    def is_heteroatom(self) -> bool:
-        return self.symbol not in ("C", "H")
-
-
 @dataclass
 class Bond:
     idx: int
@@ -44,14 +39,6 @@ class Bond:
     stereo: str | None = None  # 'E' or 'Z'
     in_small_ring: bool = False  # NEW: Tracks if bond is in a ring of size <= 7
     cip: str | None = None  # independent modern (rdCIPLabeler) E/Z label; only during self-audit
-
-    def get_other_atom(self, atom_idx: int) -> int:
-        if atom_idx == self.u:
-            return self.v
-        if atom_idx == self.v:
-            return self.u
-        raise ValueError(f"Atom {atom_idx} is not part of bond {self.idx}")
-
 
 @dataclass(frozen=True)
 class AtomBinding:

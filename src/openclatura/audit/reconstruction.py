@@ -647,6 +647,7 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
     # ring's remaining double bonds have to move to accommodate all of them at
     # once — so both are collected here and realised together below.
     saturated = _saturated_locants(parts)
+    ring_ketone = parts.principal_group is not None and parts.principal_group.key == "ketone"
     rebuild_unsaturation = has_template and (
         len(saturated) > 1 or any(op.operation_kind == "additive_hydrogen" for op in parts.hydro_operations)
     )
@@ -658,10 +659,14 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
         raise _Abstain("principal-suffix modifiers not modelled")
 
     rw, locants, aromatic_ring = _build_parent(parts)
+    # A ring ketone saturates its position as a cited hydrogen does.
+    implied = _implied_ketone_saturation(rw, locants, parts) if ring_ketone and aromatic_ring else set()
+    rebuild_unsaturation = rebuild_unsaturation or bool(implied)
     template_idxs: tuple[int, ...] = ()
     saturated_idxs: set[int] = set()
     if rebuild_unsaturation:
         template_idxs, saturated_idxs = _open_mancude_template(rw, locants, saturated)
+        saturated_idxs |= implied
     elif parts.indicated_hydrogens and not move_indicated_hydrogen(rw, locants, parts.indicated_hydrogens[0]):
         # A single cited position (2H-indazole, 9H-purine) is another N-H tautomer
         # of the stored template, reachable by moving that one hydrogen.
@@ -728,6 +733,32 @@ def _open_mancude_template(
     return template_idxs, saturated_idxs
 
 
+_MANCUDE_SINGLE_BONDED = frozenset({8, 16, 34, 52})
+
+
+def _implied_ketone_saturation(rw: Chem.RWMol, locants: dict[str, int], parts) -> set[int]:
+    """Ring positions a ring ketone saturates without the name citing them.
+
+    ``1,3-benzoxazol-2-one`` puts =O on C2, and the hydrogen it displaces can only
+    go to N3 -- the other neighbour is the ring oxygen.  Only that unambiguous
+    case is inferred; anything else leaves the placement to the cited locants.
+    """
+
+    implied: set[int] = set()
+    for locant in parts.principal_group.locants:
+        base = locants.get(str(locant))
+        if base is None:
+            continue
+        partners = [
+            neighbor.GetIdx()
+            for neighbor in rw.GetAtomWithIdx(base).GetNeighbors()
+            if neighbor.GetAtomicNum() not in _MANCUDE_SINGLE_BONDED and neighbor.GetIdx() in locants.values()
+        ]
+        if len(partners) == 1:
+            implied.add(partners[0])
+    return implied
+
+
 def _close_mancude_template(rw: Chem.RWMol, template_idxs: tuple[int, ...], saturated_idxs: set[int]) -> None:
     """Put the parent's double bonds back wherever the name left room for them.
 
@@ -751,6 +782,8 @@ def _close_mancude_template(rw: Chem.RWMol, template_idxs: tuple[int, ...], satu
         atom = rw.GetAtomWithIdx(idx)
         if any(bond.GetBondType() != Chem.BondType.SINGLE for bond in atom.GetBonds()):
             continue  # a suffix (=O) or an ylidene substituent already took it
+        if atom.GetAtomicNum() in _MANCUDE_SINGLE_BONDED:
+            continue  # a ring chalcogen is single-bonded in every mancude parent
         unsaturated.append(idx)
     if not unsaturated:
         return
