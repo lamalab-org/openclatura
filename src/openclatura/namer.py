@@ -1500,7 +1500,7 @@ def name_subgraph(
             },
         )
 
-    retained_name_val, locant_maps = resolve_retained_parent(
+    retained_name_val, locant_maps, retained_parent_metadata = resolve_retained_parent(
         mol,
         parent_selection.primary_path,
         parent_selection.is_ring,
@@ -1520,7 +1520,6 @@ def name_subgraph(
     # out rather than falling back to the von Baeyer name of the same ring.  A
     # substituent has no principal group, and its attachment atom is passed in
     # as one more locant the retained map has to be able to cite.
-    retained_parent_metadata = None
     retained_fused = production_retained_fused_parent(
         mol,
         parent_selection.primary_path,
@@ -1534,6 +1533,10 @@ def name_subgraph(
         retained_name_val = retained_fused.name
         locant_maps = retained_fused.locant_maps
         retained_parent_metadata = retained_fused.metadata
+    elif retained_parent_metadata is not None and retained_parent_metadata.bare_parent_only:
+        retained_name_val = retained_parent_metadata.derivative_name
+        locant_maps = None
+        retained_parent_metadata = None
     parent_plan = build_parent_assembly_plan(
         mol,
         parent_selection,

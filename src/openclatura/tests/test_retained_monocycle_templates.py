@@ -72,6 +72,56 @@ def test_graph_template_locants_do_not_depend_on_atom_ids():
     assert any(mapping[40] == "1" for mapping in match.atom_to_locant_maps)
 
 
+@pytest.mark.parametrize(
+    ("symbols", "double_edges", "expected", "additive", "indicated"),
+    [
+        (("O", "C", "C", "C", "C"), {frozenset((3, 4))}, "furan", ("2", "3"), ()),
+        (("O", "C", "C", "C", "C"), {frozenset((2, 3))}, "furan", ("2", "5"), ()),
+        (("N", "C", "C", "C", "C"), {frozenset((2, 3))}, "pyrrole", ("2", "5"), ("1",)),
+        (
+            ("O", "C", "N", "C", "C"),
+            {frozenset((1, 2))},
+            "1,3-oxazole",
+            ("4", "5"),
+            (),
+        ),
+        (
+            ("O", "C", "C", "C", "C", "C"),
+            {frozenset((2, 3)), frozenset((4, 5))},
+            "pyran",
+            (),
+            ("2",),
+        ),
+        (
+            ("O", "C", "C", "C", "C", "C"),
+            {frozenset((4, 5))},
+            "pyran",
+            ("3", "4"),
+            ("2",),
+        ),
+        (
+            ("N", "C", "C", "C", "C", "C"),
+            {frozenset((3, 4))},
+            "pyridine",
+            ("1", "2", "3", "6"),
+            (),
+        ),
+    ],
+)
+def test_family_states_carry_graph_bound_hydrogen_operations(
+    symbols, double_edges, expected, additive, indicated
+):
+    atom_ids = tuple(100 + 7 * index for index in range(len(symbols)))
+    mol = _cycle_graph(symbols, double_edges=double_edges, atom_ids=atom_ids)
+
+    match = match_retained_monocycle_templates(mol, set(atom_ids))[0]
+
+    assert match.template.name == expected
+    assert match.metadata.additive_hydrogen_locants == additive
+    assert match.metadata.indicated_hydrogen_locants == indicated
+    assert all(set(mapping) == set(atom_ids) for mapping in match.atom_to_locant_maps)
+
+
 def test_graph_template_rejects_same_counts_with_wrong_bond_positions():
     mol = _cycle_graph(
         ("Se", "C", "C", "C", "C"),
@@ -96,6 +146,33 @@ def test_graph_template_rejects_same_counts_with_wrong_bond_positions():
     ],
 )
 def test_public_namer_uses_graph_backed_retained_monocycles(smiles, expected):
+    assert name_smiles(smiles) == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("C1CSCO1", "1,3-oxathiolane"),
+        ("C1CSCS1", "1,3-dithiolane"),
+        ("C1=CCNC1", "2,5-dihydro-1H-pyrrole"),
+        ("C1=COCC1", "2,3-dihydrofuran"),
+        ("C1=CCOC1", "2,5-dihydrofuran"),
+        ("C1=NCCO1", "4,5-dihydro-1,3-oxazole"),
+        ("C1=NCCS1", "4,5-dihydro-1,3-thiazole"),
+        ("C1=CCOC=C1", "2H-pyran"),
+        ("C1=COC=CC1", "4H-pyran"),
+        ("C1=CCSC=C1", "2H-thiopyran"),
+        ("C1=CSC=CC1", "4H-thiopyran"),
+        ("C1CSCCS1", "1,4-dithiane"),
+        ("C1CNCOC1", "1,3-oxazinane"),
+        ("C1CNCNC1", "hexahydropyrimidine"),
+        ("C1NCNCN1", "1,3,5-triazinane"),
+        ("C1=COCCC1", "3,4-dihydro-2H-pyran"),
+        ("C1=CCNCC1", "1,2,3,6-tetrahydropyridine"),
+        ("C1=CNCCC1", "1,2,3,4-tetrahydropyridine"),
+    ],
+)
+def test_public_namer_uses_retained_monocycle_family_states(smiles, expected):
     assert name_smiles(smiles) == expected
 
 

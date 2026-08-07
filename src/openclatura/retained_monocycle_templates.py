@@ -11,6 +11,7 @@ from collections import Counter
 from dataclasses import dataclass
 from functools import lru_cache
 
+from .assembly_parts import RetainedParentMetadata
 from .molecule import Molecule
 from .naming_data import load_json_table
 
@@ -30,6 +31,10 @@ class RetainedMonocycleGraphTemplate:
     atoms: tuple[RetainedMonocycleAtomTemplate, ...]
     double_bond_locants: tuple[tuple[str, str], ...]
     no_cumulated_double_bonds: bool = True
+    additive_hydrogen_locants: tuple[str, ...] = ()
+    indicated_hydrogen_locants: tuple[str, ...] = ()
+    bare_parent_only: bool = False
+    derivative_name: str | None = None
 
     @property
     def atom_by_locant(self) -> dict[str, RetainedMonocycleAtomTemplate]:
@@ -48,6 +53,19 @@ class RetainedMonocycleGraphTemplate:
 class RetainedMonocycleTemplateMatch:
     template: RetainedMonocycleGraphTemplate
     atom_to_locant_maps: tuple[dict[int, str], ...]
+
+    @property
+    def metadata(self) -> RetainedParentMetadata:
+        """Return graph-state metadata consumed by the shared assembler."""
+
+        return RetainedParentMetadata(
+            default_indicated_h=self.template.indicated_hydrogen_locants,
+            indicated_hydrogen_count=len(self.template.indicated_hydrogen_locants),
+            additive_hydrogen_locants=self.template.additive_hydrogen_locants,
+            indicated_hydrogen_locants=self.template.indicated_hydrogen_locants,
+            bare_parent_only=self.template.bare_parent_only,
+            derivative_name=self.template.derivative_name,
+        )
 
 
 @lru_cache(maxsize=1)
@@ -134,6 +152,10 @@ def _template_from_data(row: dict) -> RetainedMonocycleGraphTemplate:
             (str(left), str(right)) for left, right in row.get("double_bond_locants", ())
         ),
         no_cumulated_double_bonds=bool(row.get("no_cumulated_double_bonds", True)),
+        additive_hydrogen_locants=tuple(str(locant) for locant in row.get("additive_hydrogen_locants", ())),
+        indicated_hydrogen_locants=tuple(str(locant) for locant in row.get("indicated_hydrogen_locants", ())),
+        bare_parent_only=bool(row.get("bare_parent_only", False)),
+        derivative_name=(str(row["derivative_name"]) if row.get("derivative_name") is not None else None),
     )
 
 
@@ -151,6 +173,9 @@ def _validate_template(template: RetainedMonocycleGraphTemplate) -> None:
     double_edges = {frozenset(edge) for edge in template.double_bond_locants}
     if len(double_edges) != len(template.double_bond_locants) or not double_edges <= cycle_edges:
         raise ValueError(f"Retained monocycle {template.name!r} has invalid double-bond locants.")
+    operation_locants = set(template.additive_hydrogen_locants) | set(template.indicated_hydrogen_locants)
+    if not operation_locants <= set(template.locants):
+        raise ValueError(f"Retained monocycle {template.name!r} has invalid hydrogen-operation locants.")
 
 
 def _ordered_cycle(mol: Molecule, atoms: set[int]) -> tuple[int, ...] | None:

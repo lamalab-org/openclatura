@@ -868,24 +868,11 @@
       "attached_prefix": "pleiadeno"
     },
     {
-      "name": "phenanthridine",
-      "pin": true,
-      "priority": 5
-    },
-    {
       "name": "4H-quinolizine",
       "pin": true,
       "priority": 15,
       "default_indicated_h": [
         "4"
-      ]
-    },
-    {
-      "name": "1H-pyrrolizine",
-      "pin": true,
-      "priority": 21,
-      "default_indicated_h": [
-        "1"
       ]
     }
   ],

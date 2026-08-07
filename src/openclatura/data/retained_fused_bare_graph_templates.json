@@ -1,0 +1,3210 @@
+{
+  "bluebook_rule": "P-25 retained fused parent templates generated from locanted graph data; no runtime SMILES/SMARTS matching.",
+  "parents": [
+    {
+      "name": "2-benzofuran",
+      "pin": true,
+      "priority": 60,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "2",
+            "symbol": "O"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "3",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "1",
+            "aromatic"
+          ],
+          [
+            "1",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "3",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "4",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "7",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "4",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      }
+    },
+    {
+      "name": "2-benzothiophene",
+      "pin": true,
+      "priority": 61,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "2",
+            "symbol": "S"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "3",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "1",
+            "aromatic"
+          ],
+          [
+            "1",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "3",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "4",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "7",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "4",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      }
+    },
+    {
+      "name": "1,3-benzoxazole",
+      "pin": true,
+      "priority": 62,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "O"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "3",
+            "aromatic"
+          ],
+          [
+            "3",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "1",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "7",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "4",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "4",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "7",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      }
+    },
+    {
+      "name": "1,3-benzothiazole",
+      "pin": true,
+      "priority": 63,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "S"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "3",
+            "aromatic"
+          ],
+          [
+            "3",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "1",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "7",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "4",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "4",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "7",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      }
+    },
+    {
+      "name": "1H-benzotriazole",
+      "pin": true,
+      "priority": 64,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2",
+            "symbol": "N"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "3",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "1",
+            "aromatic"
+          ],
+          [
+            "1",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "3",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "4",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "7",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "4",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "default_indicated_h": [
+          "1"
+        ]
+      },
+      "default_indicated_h": [
+        "1"
+      ]
+    },
+    {
+      "name": "2,1,3-benzoxadiazole",
+      "pin": true,
+      "priority": 65,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2",
+            "symbol": "O"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "3",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "1",
+            "aromatic"
+          ],
+          [
+            "1",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "3",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "4",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "7",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "4",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      }
+    },
+    {
+      "name": "2,1,3-benzothiadiazole",
+      "pin": true,
+      "priority": 66,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2",
+            "symbol": "S"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "3",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "1",
+            "aromatic"
+          ],
+          [
+            "1",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "3",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "4",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "7",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "4",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      }
+    },
+    {
+      "name": "2H-quinolizine",
+      "pin": true,
+      "priority": 67,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "5",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a"
+        ],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "single"
+          ],
+          [
+            "2",
+            "3",
+            "single"
+          ],
+          [
+            "3",
+            "4",
+            "double"
+          ],
+          [
+            "4",
+            "5",
+            "single"
+          ],
+          [
+            "5",
+            "6",
+            "single"
+          ],
+          [
+            "6",
+            "7",
+            "double"
+          ],
+          [
+            "7",
+            "8",
+            "single"
+          ],
+          [
+            "8",
+            "9",
+            "double"
+          ],
+          [
+            "9",
+            "9a",
+            "single"
+          ],
+          [
+            "1",
+            "9a",
+            "double"
+          ],
+          [
+            "5",
+            "9a",
+            "single"
+          ]
+        ],
+        "fusion_atoms": [
+          "5",
+          "9a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a"
+        ]
+      }
+    },
+    {
+      "name": "1H-pyrrolizine",
+      "pin": true,
+      "priority": 68,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "4",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [
+          "1",
+          "2",
+          "3"
+        ],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "single"
+          ],
+          [
+            "2",
+            "3",
+            "double"
+          ],
+          [
+            "3",
+            "4",
+            "single"
+          ],
+          [
+            "4",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "1",
+            "7a",
+            "single"
+          ],
+          [
+            "4",
+            "7a",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "4",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      }
+    },
+    {
+      "name": "2,3-dihydro-1-benzofuran",
+      "pin": true,
+      "priority": 69,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "O"
+          }
+        ],
+        "nonaromatic_locants": [
+          "1",
+          "2",
+          "3"
+        ],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "single"
+          ],
+          [
+            "2",
+            "3",
+            "single"
+          ],
+          [
+            "3",
+            "3a",
+            "single"
+          ],
+          [
+            "3a",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "1",
+            "7a",
+            "single"
+          ],
+          [
+            "7",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "4",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "4",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "7",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ]
+      }
+    },
+    {
+      "name": "2H-1-benzopyran",
+      "pin": true,
+      "priority": 70,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "O"
+          }
+        ],
+        "nonaromatic_locants": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "single"
+          ],
+          [
+            "2",
+            "3",
+            "single"
+          ],
+          [
+            "3",
+            "4",
+            "double"
+          ],
+          [
+            "4",
+            "4a",
+            "single"
+          ],
+          [
+            "4a",
+            "8a",
+            "aromatic"
+          ],
+          [
+            "1",
+            "8a",
+            "single"
+          ],
+          [
+            "8",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "5",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "5",
+            "aromatic"
+          ],
+          [
+            "8a",
+            "8",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
+      }
+    },
+    {
+      "name": "4H-1-benzopyran",
+      "pin": true,
+      "priority": 71,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "O"
+          }
+        ],
+        "nonaromatic_locants": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "single"
+          ],
+          [
+            "2",
+            "3",
+            "double"
+          ],
+          [
+            "3",
+            "4",
+            "single"
+          ],
+          [
+            "4",
+            "4a",
+            "single"
+          ],
+          [
+            "4a",
+            "8a",
+            "aromatic"
+          ],
+          [
+            "1",
+            "8a",
+            "single"
+          ],
+          [
+            "8",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "5",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "5",
+            "aromatic"
+          ],
+          [
+            "8a",
+            "8",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
+      }
+    },
+    {
+      "name": "3,4-dihydro-2H-1-benzopyran",
+      "pin": true,
+      "priority": 72,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "O"
+          }
+        ],
+        "nonaromatic_locants": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "single"
+          ],
+          [
+            "2",
+            "3",
+            "single"
+          ],
+          [
+            "3",
+            "4",
+            "single"
+          ],
+          [
+            "4",
+            "4a",
+            "single"
+          ],
+          [
+            "4a",
+            "8a",
+            "aromatic"
+          ],
+          [
+            "1",
+            "8a",
+            "single"
+          ],
+          [
+            "8",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "5",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "5",
+            "aromatic"
+          ],
+          [
+            "8a",
+            "8",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
+      }
+    },
+    {
+      "name": "1,2,3,4-tetrahydroquinoline",
+      "pin": true,
+      "priority": 73,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "single"
+          ],
+          [
+            "2",
+            "3",
+            "single"
+          ],
+          [
+            "3",
+            "4",
+            "single"
+          ],
+          [
+            "4",
+            "4a",
+            "single"
+          ],
+          [
+            "4a",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "8",
+            "aromatic"
+          ],
+          [
+            "8",
+            "8a",
+            "aromatic"
+          ],
+          [
+            "1",
+            "8a",
+            "single"
+          ],
+          [
+            "4a",
+            "8a",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "default_indicated_h": [
+          "1"
+        ]
+      },
+      "default_indicated_h": [
+        "1"
+      ]
+    },
+    {
+      "name": "1,2,3,4-tetrahydroisoquinoline",
+      "pin": true,
+      "priority": 74,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "2",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "single"
+          ],
+          [
+            "2",
+            "3",
+            "single"
+          ],
+          [
+            "3",
+            "4",
+            "single"
+          ],
+          [
+            "4",
+            "4a",
+            "single"
+          ],
+          [
+            "4a",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "8",
+            "aromatic"
+          ],
+          [
+            "8",
+            "8a",
+            "aromatic"
+          ],
+          [
+            "1",
+            "8a",
+            "single"
+          ],
+          [
+            "4a",
+            "8a",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "default_indicated_h": [
+          "2"
+        ]
+      },
+      "default_indicated_h": [
+        "2"
+      ]
+    },
+    {
+      "name": "2,3-dihydro-1,4-benzodioxine",
+      "pin": true,
+      "priority": 75,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "O"
+          },
+          {
+            "locant": "4",
+            "symbol": "O"
+          }
+        ],
+        "nonaromatic_locants": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "bonds": [
+          [
+            "4",
+            "3",
+            "single"
+          ],
+          [
+            "3",
+            "2",
+            "single"
+          ],
+          [
+            "2",
+            "1",
+            "single"
+          ],
+          [
+            "1",
+            "8a",
+            "single"
+          ],
+          [
+            "8a",
+            "4a",
+            "aromatic"
+          ],
+          [
+            "4",
+            "4a",
+            "single"
+          ],
+          [
+            "5",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "8",
+            "aromatic"
+          ],
+          [
+            "8a",
+            "8",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "5",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ]
+      }
+    },
+    {
+      "name": "9,10-dihydroacridine",
+      "pin": true,
+      "priority": 76,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "9a",
+          "10",
+          "10a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "10",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [
+          "9",
+          "10"
+        ],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "3",
+            "aromatic"
+          ],
+          [
+            "3",
+            "4",
+            "aromatic"
+          ],
+          [
+            "4",
+            "4a",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "10",
+            "single"
+          ],
+          [
+            "10",
+            "10a",
+            "single"
+          ],
+          [
+            "10a",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "8",
+            "aromatic"
+          ],
+          [
+            "8",
+            "8a",
+            "aromatic"
+          ],
+          [
+            "10a",
+            "8a",
+            "aromatic"
+          ],
+          [
+            "8a",
+            "9",
+            "single"
+          ],
+          [
+            "9",
+            "9a",
+            "single"
+          ],
+          [
+            "1",
+            "9a",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "9a",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "8a",
+          "9a",
+          "10a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "9a",
+          "10",
+          "10a"
+        ],
+        "default_indicated_h": [
+          "10"
+        ]
+      },
+      "default_indicated_h": [
+        "10"
+      ]
+    },
+    {
+      "name": "phenanthridine",
+      "pin": true,
+      "priority": 77,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a",
+          "10b"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "5",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "3",
+            "aromatic"
+          ],
+          [
+            "3",
+            "4",
+            "aromatic"
+          ],
+          [
+            "4",
+            "4a",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "6a",
+            "aromatic"
+          ],
+          [
+            "6a",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "8",
+            "aromatic"
+          ],
+          [
+            "8",
+            "9",
+            "aromatic"
+          ],
+          [
+            "9",
+            "10",
+            "aromatic"
+          ],
+          [
+            "10",
+            "10a",
+            "aromatic"
+          ],
+          [
+            "6a",
+            "10a",
+            "aromatic"
+          ],
+          [
+            "10a",
+            "10b",
+            "aromatic"
+          ],
+          [
+            "1",
+            "10b",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "10b",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "6a",
+          "10a",
+          "10b"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a",
+          "10b"
+        ]
+      }
+    },
+    {
+      "name": "dibenzofuran",
+      "pin": true,
+      "priority": 78,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "9b"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "5",
+            "symbol": "O"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "5",
+            "4a",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "9b",
+            "aromatic"
+          ],
+          [
+            "9b",
+            "9a",
+            "aromatic"
+          ],
+          [
+            "9a",
+            "5a",
+            "aromatic"
+          ],
+          [
+            "5",
+            "5a",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "8",
+            "aromatic"
+          ],
+          [
+            "8",
+            "9",
+            "aromatic"
+          ],
+          [
+            "9a",
+            "9",
+            "aromatic"
+          ],
+          [
+            "5a",
+            "6",
+            "aromatic"
+          ],
+          [
+            "1",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "3",
+            "aromatic"
+          ],
+          [
+            "3",
+            "4",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "4",
+            "aromatic"
+          ],
+          [
+            "9b",
+            "1",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "5a",
+          "9a",
+          "9b"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "9b"
+        ]
+      }
+    },
+    {
+      "name": "dibenzothiophene",
+      "pin": true,
+      "priority": 79,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "9b"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "5",
+            "symbol": "S"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "5",
+            "4a",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "9b",
+            "aromatic"
+          ],
+          [
+            "9b",
+            "9a",
+            "aromatic"
+          ],
+          [
+            "9a",
+            "5a",
+            "aromatic"
+          ],
+          [
+            "5",
+            "5a",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "8",
+            "aromatic"
+          ],
+          [
+            "8",
+            "9",
+            "aromatic"
+          ],
+          [
+            "9a",
+            "9",
+            "aromatic"
+          ],
+          [
+            "5a",
+            "6",
+            "aromatic"
+          ],
+          [
+            "1",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "3",
+            "aromatic"
+          ],
+          [
+            "3",
+            "4",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "4",
+            "aromatic"
+          ],
+          [
+            "9b",
+            "1",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "5a",
+          "9a",
+          "9b"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "9b"
+        ]
+      }
+    },
+    {
+      "name": "10H-phenothiazine",
+      "pin": true,
+      "priority": 80,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "10",
+          "10a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "5",
+            "symbol": "S"
+          },
+          {
+            "locant": "10",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [
+          "5",
+          "10"
+        ],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "3",
+            "aromatic"
+          ],
+          [
+            "3",
+            "4",
+            "aromatic"
+          ],
+          [
+            "4",
+            "4a",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "5",
+            "single"
+          ],
+          [
+            "5",
+            "5a",
+            "single"
+          ],
+          [
+            "5a",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "8",
+            "aromatic"
+          ],
+          [
+            "8",
+            "9",
+            "aromatic"
+          ],
+          [
+            "9",
+            "9a",
+            "aromatic"
+          ],
+          [
+            "5a",
+            "9a",
+            "aromatic"
+          ],
+          [
+            "9a",
+            "10",
+            "single"
+          ],
+          [
+            "10",
+            "10a",
+            "single"
+          ],
+          [
+            "1",
+            "10a",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "10a",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "5a",
+          "9a",
+          "10a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "10",
+          "10a"
+        ],
+        "default_indicated_h": [
+          "10"
+        ]
+      },
+      "default_indicated_h": [
+        "10"
+      ]
+    },
+    {
+      "name": "10H-phenoxazine",
+      "pin": true,
+      "priority": 81,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "10",
+          "10a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "5",
+            "symbol": "O"
+          },
+          {
+            "locant": "10",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [
+          "5",
+          "10"
+        ],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "3",
+            "aromatic"
+          ],
+          [
+            "3",
+            "4",
+            "aromatic"
+          ],
+          [
+            "4",
+            "4a",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "5",
+            "single"
+          ],
+          [
+            "5",
+            "5a",
+            "single"
+          ],
+          [
+            "5a",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "8",
+            "aromatic"
+          ],
+          [
+            "8",
+            "9",
+            "aromatic"
+          ],
+          [
+            "9",
+            "9a",
+            "aromatic"
+          ],
+          [
+            "5a",
+            "9a",
+            "aromatic"
+          ],
+          [
+            "9a",
+            "10",
+            "single"
+          ],
+          [
+            "10",
+            "10a",
+            "single"
+          ],
+          [
+            "1",
+            "10a",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "10a",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "5a",
+          "9a",
+          "10a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "10",
+          "10a"
+        ],
+        "default_indicated_h": [
+          "10"
+        ]
+      },
+      "default_indicated_h": [
+        "10"
+      ]
+    },
+    {
+      "name": "7H-pyrrolo[2,3-d]pyrimidine",
+      "pin": true,
+      "priority": 82,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          },
+          {
+            "locant": "7",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "3",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "1",
+            "aromatic"
+          ],
+          [
+            "1",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "4a",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "4",
+            "aromatic"
+          ],
+          [
+            "3",
+            "4",
+            "aromatic"
+          ],
+          [
+            "5",
+            "6",
+            "aromatic"
+          ],
+          [
+            "7",
+            "6",
+            "aromatic"
+          ],
+          [
+            "7",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "5",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "default_indicated_h": [
+          "7"
+        ]
+      },
+      "default_indicated_h": [
+        "7"
+      ]
+    },
+    {
+      "name": "1H-pyrazolo[3,4-d]pyrimidine",
+      "pin": true,
+      "priority": 83,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2",
+            "symbol": "N"
+          },
+          {
+            "locant": "5",
+            "symbol": "N"
+          },
+          {
+            "locant": "7",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "5",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "7a",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "4",
+            "aromatic"
+          ],
+          [
+            "5",
+            "4",
+            "aromatic"
+          ],
+          [
+            "2",
+            "1",
+            "aromatic"
+          ],
+          [
+            "2",
+            "3",
+            "aromatic"
+          ],
+          [
+            "1",
+            "7a",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "3",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "default_indicated_h": [
+          "1"
+        ]
+      },
+      "default_indicated_h": [
+        "1"
+      ]
+    },
+    {
+      "name": "naphtho[2,3-b]furan",
+      "pin": true,
+      "priority": 84,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "9a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "O"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "1",
+            "9a",
+            "aromatic"
+          ],
+          [
+            "9a",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "3",
+            "aromatic"
+          ],
+          [
+            "3",
+            "2",
+            "aromatic"
+          ],
+          [
+            "1",
+            "2",
+            "aromatic"
+          ],
+          [
+            "4",
+            "4a",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "8",
+            "aromatic"
+          ],
+          [
+            "8",
+            "8a",
+            "aromatic"
+          ],
+          [
+            "9",
+            "8a",
+            "aromatic"
+          ],
+          [
+            "4a",
+            "8a",
+            "aromatic"
+          ],
+          [
+            "9",
+            "9a",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "4",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "4a",
+          "8a",
+          "9a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "9a"
+        ]
+      }
+    },
+    {
+      "name": "naphtho[1,2-b]thiophene",
+      "pin": true,
+      "priority": 85,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "9b"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "S"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "1",
+            "9b",
+            "aromatic"
+          ],
+          [
+            "9b",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "3",
+            "aromatic"
+          ],
+          [
+            "3",
+            "2",
+            "aromatic"
+          ],
+          [
+            "1",
+            "2",
+            "aromatic"
+          ],
+          [
+            "4",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "5a",
+            "aromatic"
+          ],
+          [
+            "5a",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "8",
+            "aromatic"
+          ],
+          [
+            "8",
+            "9",
+            "aromatic"
+          ],
+          [
+            "9",
+            "9a",
+            "aromatic"
+          ],
+          [
+            "5a",
+            "9a",
+            "aromatic"
+          ],
+          [
+            "9b",
+            "9a",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "4",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "5a",
+          "9a",
+          "9b"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "9b"
+        ]
+      }
+    },
+    {
+      "name": "naphtho[2,3-d][1,3]oxazole",
+      "pin": true,
+      "priority": 86,
+      "aliases": [],
+      "template": {
+        "enabled": false,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "exact_aromaticity": true,
+        "exact_bond_orders": true,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "9a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "1",
+            "symbol": "O"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          }
+        ],
+        "nonaromatic_locants": [],
+        "bonds": [
+          [
+            "1",
+            "2",
+            "aromatic"
+          ],
+          [
+            "2",
+            "3",
+            "aromatic"
+          ],
+          [
+            "3",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "3a",
+            "9a",
+            "aromatic"
+          ],
+          [
+            "1",
+            "9a",
+            "aromatic"
+          ],
+          [
+            "9",
+            "8a",
+            "aromatic"
+          ],
+          [
+            "8a",
+            "8",
+            "aromatic"
+          ],
+          [
+            "8",
+            "7",
+            "aromatic"
+          ],
+          [
+            "7",
+            "6",
+            "aromatic"
+          ],
+          [
+            "6",
+            "5",
+            "aromatic"
+          ],
+          [
+            "5",
+            "4a",
+            "aromatic"
+          ],
+          [
+            "4",
+            "4a",
+            "aromatic"
+          ],
+          [
+            "8a",
+            "4a",
+            "aromatic"
+          ],
+          [
+            "4",
+            "3a",
+            "aromatic"
+          ],
+          [
+            "9a",
+            "9",
+            "aromatic"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "4a",
+          "8a",
+          "9a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "9a"
+        ]
+      }
+    }
+  ]
+}

@@ -7,6 +7,7 @@ keyed by locants and graph structure, not by SMILES or SMARTS strings.
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from functools import cache, lru_cache
 from typing import Any
@@ -73,6 +74,8 @@ class RetainedFusedGraphTemplate:
     bare_parent_enabled: bool = False
     derivative_production_enabled: bool = False
     mancude_double_bonds: int | None = None
+    exact_aromaticity: bool = False
+    exact_bond_orders: bool = False
 
     @property
     def atom_by_locant(self) -> dict[str, RetainedFusedAtomTemplate]:
@@ -94,7 +97,11 @@ def retained_fused_graph_templates(*, include_disabled: bool = False) -> tuple[R
     """Return graph-template retained fused parent rows from the rule registry."""
 
     templates: list[RetainedFusedGraphTemplate] = []
-    for row in load_json_table("retained_fused_graph_templates.json").get("parents", ()):
+    graph_rows = (
+        *load_json_table("retained_fused_graph_templates.json").get("parents", ()),
+        *load_json_table("retained_fused_bare_graph_templates.json").get("parents", ()),
+    )
+    for row in graph_rows:
         template = retained_fused_template_from_data(row)
         if include_disabled or template.enabled:
             templates.append(template)
@@ -184,7 +191,13 @@ def match_retained_fused_template(
         locant: [
             atom_idx
             for atom_idx in atom_set
-            if _atom_matches_template(mol, atom_idx, atom_by_locant[locant], allow_nonaromatic=allow_nonaromatic)
+            if _atom_matches_template(
+                mol,
+                atom_idx,
+                atom_by_locant[locant],
+                allow_nonaromatic=allow_nonaromatic,
+                exact_aromaticity=template.exact_aromaticity,
+            )
             and molecule_degrees[atom_idx] == template_degrees[locant]
         ]
         for locant in template.locants
@@ -198,6 +211,10 @@ def match_retained_fused_template(
         candidates,
         template_neighbors,
     )
+    if template.exact_bond_orders:
+        assignments = [
+            assignment for assignment in assignments if _assignment_bond_orders_match(mol, assignment, template)
+        ]
     if not assignments:
         return None
 
@@ -235,7 +252,13 @@ def _match_all_retained_fused_template(
         locant: [
             atom_idx
             for atom_idx in atom_set
-            if _atom_matches_template(mol, atom_idx, atom_by_locant[locant], allow_nonaromatic=allow_nonaromatic)
+            if _atom_matches_template(
+                mol,
+                atom_idx,
+                atom_by_locant[locant],
+                allow_nonaromatic=allow_nonaromatic,
+                exact_aromaticity=template.exact_aromaticity,
+            )
             and molecule_degrees[atom_idx] == template_degrees[locant]
         ]
         for locant in template.locants
@@ -244,6 +267,10 @@ def _match_all_retained_fused_template(
         return []
 
     assignments = _match_locants_backtracking(mol, locants_by_constraint, candidates, template_neighbors)
+    if template.exact_bond_orders:
+        assignments = [
+            assignment for assignment in assignments if _assignment_bond_orders_match(mol, assignment, template)
+        ]
     return [_template_match_from_assignment(template, atom_set, assignment) for assignment in assignments]
 
 
@@ -273,12 +300,17 @@ def match_retained_fused_templates(
 ) -> list[RetainedFusedTemplateMatch]:
     """Return retained fused template matches ranked by retained priority."""
 
+    atom_set = set(atom_indices)
+    candidates = _retained_fused_templates_by_signature(include_disabled).get(
+        _molecule_graph_signature(mol, atom_set),
+        (),
+    )
     matches = [
         match
-        for template in retained_fused_graph_templates(include_disabled=include_disabled)
+        for template in candidates
         for match in _match_all_retained_fused_template(
             mol,
-            atom_indices,
+            atom_set,
             template,
             allow_nonaromatic=allow_nonaromatic,
         )
@@ -286,6 +318,35 @@ def match_retained_fused_templates(
     return sorted(
         matches,
         key=_retained_fused_match_rank,
+    )
+
+
+@lru_cache(maxsize=2)
+def _retained_fused_templates_by_signature(
+    include_disabled: bool,
+) -> dict[tuple, tuple[RetainedFusedGraphTemplate, ...]]:
+    indexed: dict[tuple, list[RetainedFusedGraphTemplate]] = {}
+    for template in retained_fused_graph_templates(include_disabled=include_disabled):
+        indexed.setdefault(_template_graph_signature(template), []).append(template)
+    return {signature: tuple(templates) for signature, templates in indexed.items()}
+
+
+def _template_graph_signature(template: RetainedFusedGraphTemplate) -> tuple:
+    degrees = _template_degrees(template)
+    return (
+        len(template.atoms),
+        tuple(sorted(Counter(atom.symbol for atom in template.atoms).items())),
+        tuple(sorted(degrees.values())),
+    )
+
+
+def _molecule_graph_signature(mol: Molecule, atom_set: set[int]) -> tuple:
+    return (
+        len(atom_set),
+        tuple(sorted(Counter(mol.atoms[atom].symbol for atom in atom_set).items())),
+        tuple(
+            sorted(sum(neighbor in atom_set for neighbor in mol.get_neighbors(atom)) for atom in atom_set)
+        ),
     )
 
 
@@ -362,6 +423,8 @@ def retained_fused_template_from_data(row: dict[str, Any]) -> RetainedFusedGraph
             if template_data.get("mancude_double_bonds") is not None
             else None
         ),
+        exact_aromaticity=bool(template_data.get("exact_aromaticity", False)),
+        exact_bond_orders=bool(template_data.get("exact_bond_orders", False)),
     )
     validate_retained_fused_template(template)
     return template
@@ -398,6 +461,7 @@ def _expand_locant_atom_shorthand(template_data: dict[str, Any]) -> dict[str, An
     atom_overrides = {str(item["locant"]): dict(item) for item in template_data.get("atom_overrides", ())}
     fusion_atoms = set(str(locant) for locant in expanded.get("fusion_atoms", ()))
     indicated_h = set(str(locant) for locant in expanded.get("default_indicated_h", ()))
+    nonaromatic_atoms = set(str(locant) for locant in expanded.get("nonaromatic_locants", ()))
     atoms = []
     for locant in expanded["locants"]:
         atom = {
@@ -405,6 +469,7 @@ def _expand_locant_atom_shorthand(template_data: dict[str, Any]) -> dict[str, An
             "symbol": heteroatoms.get(locant, "C"),
             "fusion": locant in fusion_atoms,
             "default_h": locant in indicated_h,
+            "aromatic": locant not in nonaromatic_atoms,
         }
         atom.update(atom_overrides.get(locant, {}))
         atoms.append(atom)
@@ -506,11 +571,14 @@ def _atom_matches_template(
     atom_template: RetainedFusedAtomTemplate,
     *,
     allow_nonaromatic: bool = False,
+    exact_aromaticity: bool = False,
 ) -> bool:
     atom = mol.atoms[atom_idx]
     if atom.symbol != atom_template.symbol:
         return False
     if atom.charge != atom_template.charge:
+        return False
+    if exact_aromaticity and atom.is_aromatic != atom_template.aromatic:
         return False
     if (
         atom_template.aromatic
@@ -521,6 +589,25 @@ def _atom_matches_template(
         return False
     if atom_template.default_h and atom.explicit_h_count + atom.total_h_count <= 0:
         return False
+    return True
+
+
+def _assignment_bond_orders_match(
+    mol: Molecule,
+    assignment: dict[str, int],
+    template: RetainedFusedGraphTemplate,
+) -> bool:
+    """Check locanted bond states while treating aromatic resonance as one class."""
+
+    for bond_template in template.bonds:
+        left, right = bond_template.locants
+        bond = mol.get_bond(assignment[left], assignment[right])
+        if bond is None:
+            return False
+        if bond_template.bond_class in {"aromatic", "mancude", "fusion"}:
+            continue
+        if bond.order != _bond_order(bond_template.bond_class):
+            return False
     return True
 
 
@@ -621,7 +708,14 @@ def _atom_template(data: dict[str, Any]) -> RetainedFusedAtomTemplate:
     )
 
 
-def _bond_template(data: dict[str, Any]) -> RetainedFusedBondTemplate:
+def _bond_template(data: Any) -> RetainedFusedBondTemplate:
+    if isinstance(data, (list, tuple)):
+        if len(data) not in {2, 3}:
+            raise ValueError("Compact retained fused bond requires two locants and an optional class.")
+        return RetainedFusedBondTemplate(
+            locants=(str(data[0]), str(data[1])),
+            bond_class=str(data[2]) if len(data) == 3 else "aromatic",
+        )
     locants = data.get("locants")
     if not isinstance(locants, (list, tuple)):
         raise ValueError("Retained fused bond template requires a locants list.")

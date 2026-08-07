@@ -46,12 +46,34 @@ def _declared_sites_are_unambiguous(mol: Molecule, numbered_path: list[int], get
 def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     """Add indicated hydrogen locants for retained ring names."""
 
+    metadata = parts.retained_parent_metadata
+    if metadata is not None and (
+        metadata.additive_hydrogen_locants or metadata.indicated_hydrogen_locants
+    ):
+        for operation_kind, locants in (
+            ("additive_hydrogen", metadata.additive_hydrogen_locants),
+            ("indicated_hydrogen", metadata.indicated_hydrogen_locants),
+        ):
+            if not locants:
+                continue
+            atom_ids = tuple(parts.parent_atom_ids_by_locant[locant] for locant in locants)
+            parts.hydro_operations.append(
+                HydroOperation(
+                    key=operation_kind,
+                    reason="Retained monocycle graph state declares this hydrogen operation.",
+                    locants=locants,
+                    atom_ids=atom_ids,
+                    operation_kind=operation_kind,
+                )
+            )
+            if operation_kind == "indicated_hydrogen":
+                parts.indicated_hydrogens.extend(locants)
+        return
     if parts.retained_name not in INDICATED_H_RETAINED_NAMES:
         return
     if parts.retained_name == "tetrazole" and any(mol.atoms[idx].charge for idx in numbered_path):
         return
     oxo_derivative = parts.principal_group is not None and parts.principal_group.key == "ketone"
-    metadata = parts.retained_parent_metadata
     default_indicated_h = set(metadata.default_indicated_h) if metadata is not None else set()
     # The declared locants say how many indicated hydrogens the parent hydride
     # supports, and where they sit in the unsubstituted parent.  Where they sit

@@ -8,8 +8,11 @@ from .namer_config import RETAINED_RING_ELEMENTS
 from .naming_context import NamingIntent, ParentAssemblyPlan
 from .numbering import choose_parent_numbering
 from .parent_selection import ParentSelection
-from .retained_monocycle_templates import retained_monocycle_graph_template_names
 from .retained_fused_templates import retained_parent_metadata as graph_retained_parent_metadata
+from .retained_monocycle_templates import (
+    match_retained_monocycle_templates,
+    retained_monocycle_graph_template_names,
+)
 from .ring_renderer import is_von_baeyer_descriptor
 from .rules import retained
 from .small_ring_stereo import scoped_small_ring_stereo_features
@@ -19,23 +22,28 @@ from .trace_helpers import bond_ids_within
 
 def resolve_retained_parent(
     mol: Molecule, path: list[int], is_ring: bool, is_bicycle: bool, is_polycycle: bool
-) -> tuple[str | None, list[dict[int, str]] | None]:
+) -> tuple[str | None, list[dict[int, str]] | None, RetainedParentMetadata | None]:
     """Return a retained parent name and locant maps when valid for a path."""
 
+    if is_ring and not is_bicycle and not is_polycycle:
+        graph_matches = match_retained_monocycle_templates(mol, path)
+        if graph_matches:
+            match = graph_matches[0]
+            return match.template.name, list(match.atom_to_locant_maps), match.metadata
     temp_retained = retained.get_retained_ring(mol, path) if is_ring else None
     if not temp_retained:
-        return None, None
+        return None, None, None
     retained_name, locant_maps = temp_retained
     if (
         retained_name not in retained_monocycle_graph_template_names()
         and any(mol.atoms[idx].symbol not in RETAINED_RING_ELEMENTS for idx in path)
     ):
-        return None, None
+        return None, None, None
     if locant_maps is None and (is_bicycle or is_polycycle):
         if all(mol.atoms[idx].symbol == "C" and mol.atoms[idx].charge == 0 for idx in path):
-            return retained_name, None
-        return None, None
-    return retained_name, locant_maps
+            return retained_name, None, None
+        return None, None, None
+    return retained_name, locant_maps, None
 
 
 def build_parent_assembly_plan(

@@ -117,7 +117,10 @@ def production_retained_fused_parent(
     if not maps:
         return None
     template = matches[0].template
-    if not _added_hydrogen_is_citable(mol, parent_atoms, template):
+    # An exact bare-parent template already names its complete hydrogenation
+    # state (for example 2,3-dihydro-1-benzofuran). Derivatives still require
+    # the shared hydro-operation layer to be able to cite every changed site.
+    if not bare_parent and not _added_hydrogen_is_citable(mol, parent_atoms, template):
         return None
     return ProductionRetainedFusedParent(
         name=parent_name,

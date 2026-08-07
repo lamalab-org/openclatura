@@ -74,6 +74,269 @@
       "locants": ["1", "2", "3", "4", "5", "6"],
       "heteroatoms": [{"locant": "1", "symbol": "B"}],
       "double_bond_locants": [["1", "6"], ["2", "3"], ["4", "5"]]
+    },
+    {
+      "name": "1,3-oxazole",
+      "priority": 20,
+      "bare_parent_only": true,
+      "derivative_name": "oxazole",
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "O"},
+        {"locant": "3", "symbol": "N"}
+      ],
+      "double_bond_locants": [["2", "3"], ["4", "5"]]
+    },
+    {
+      "name": "1,2-oxazole",
+      "priority": 21,
+      "bare_parent_only": true,
+      "derivative_name": "isoxazole",
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "O"},
+        {"locant": "2", "symbol": "N"}
+      ],
+      "double_bond_locants": [["2", "3"], ["4", "5"]]
+    },
+    {
+      "name": "1,3-thiazole",
+      "priority": 22,
+      "bare_parent_only": true,
+      "derivative_name": "thiazole",
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "S"},
+        {"locant": "3", "symbol": "N"}
+      ],
+      "double_bond_locants": [["2", "3"], ["4", "5"]]
+    },
+    {
+      "name": "1,2-thiazole",
+      "priority": 23,
+      "bare_parent_only": true,
+      "derivative_name": "isothiazole",
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "S"},
+        {"locant": "2", "symbol": "N"}
+      ],
+      "double_bond_locants": [["2", "3"], ["4", "5"]]
+    },
+    {
+      "name": "1,3-oxazolidine",
+      "priority": 24,
+      "bare_parent_only": true,
+      "derivative_name": "oxazolidine",
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "O"},
+        {"locant": "3", "symbol": "N"}
+      ],
+      "double_bond_locants": []
+    },
+    {
+      "name": "1,3-thiazolidine",
+      "priority": 25,
+      "bare_parent_only": true,
+      "derivative_name": "thiazolidine",
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "S"},
+        {"locant": "3", "symbol": "N"}
+      ],
+      "double_bond_locants": []
+    },
+    {
+      "name": "1,3-oxathiolane",
+      "priority": 30,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "O"},
+        {"locant": "3", "symbol": "S"}
+      ],
+      "double_bond_locants": []
+    },
+    {
+      "name": "1,3-dithiolane",
+      "priority": 31,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "S"},
+        {"locant": "3", "symbol": "S"}
+      ],
+      "double_bond_locants": []
+    },
+    {
+      "name": "furan",
+      "priority": 32,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [{"locant": "1", "symbol": "O"}],
+      "double_bond_locants": [["4", "5"]],
+      "additive_hydrogen_locants": ["2", "3"]
+    },
+    {
+      "name": "furan",
+      "priority": 33,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [{"locant": "1", "symbol": "O"}],
+      "double_bond_locants": [["3", "4"]],
+      "additive_hydrogen_locants": ["2", "5"]
+    },
+    {
+      "name": "pyrrole",
+      "priority": 34,
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [{"locant": "1", "symbol": "N"}],
+      "double_bond_locants": [["2", "3"]],
+      "additive_hydrogen_locants": ["4", "5"],
+      "indicated_hydrogen_locants": ["1"]
+    },
+    {
+      "name": "pyrrole",
+      "priority": 35,
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [{"locant": "1", "symbol": "N"}],
+      "double_bond_locants": [["3", "4"]],
+      "additive_hydrogen_locants": ["2", "5"],
+      "indicated_hydrogen_locants": ["1"]
+    },
+    {
+      "name": "1,3-oxazole",
+      "priority": 36,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "O"},
+        {"locant": "3", "symbol": "N"}
+      ],
+      "double_bond_locants": [["2", "3"]],
+      "additive_hydrogen_locants": ["4", "5"]
+    },
+    {
+      "name": "1,3-thiazole",
+      "priority": 37,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "S"},
+        {"locant": "3", "symbol": "N"}
+      ],
+      "double_bond_locants": [["2", "3"]],
+      "additive_hydrogen_locants": ["4", "5"]
+    },
+    {
+      "name": "pyran",
+      "priority": 38,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5", "6"],
+      "heteroatoms": [{"locant": "1", "symbol": "O"}],
+      "double_bond_locants": [["3", "4"], ["5", "6"]],
+      "indicated_hydrogen_locants": ["2"]
+    },
+    {
+      "name": "pyran",
+      "priority": 39,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5", "6"],
+      "heteroatoms": [{"locant": "1", "symbol": "O"}],
+      "double_bond_locants": [["2", "3"], ["5", "6"]],
+      "indicated_hydrogen_locants": ["4"]
+    },
+    {
+      "name": "thiopyran",
+      "priority": 40,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5", "6"],
+      "heteroatoms": [{"locant": "1", "symbol": "S"}],
+      "double_bond_locants": [["3", "4"], ["5", "6"]],
+      "indicated_hydrogen_locants": ["2"]
+    },
+    {
+      "name": "thiopyran",
+      "priority": 41,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5", "6"],
+      "heteroatoms": [{"locant": "1", "symbol": "S"}],
+      "double_bond_locants": [["2", "3"], ["5", "6"]],
+      "indicated_hydrogen_locants": ["4"]
+    },
+    {
+      "name": "1,4-dithiane",
+      "priority": 42,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5", "6"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "S"},
+        {"locant": "4", "symbol": "S"}
+      ],
+      "double_bond_locants": []
+    },
+    {
+      "name": "1,3-oxazinane",
+      "priority": 43,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5", "6"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "O"},
+        {"locant": "3", "symbol": "N"}
+      ],
+      "double_bond_locants": []
+    },
+    {
+      "name": "hexahydropyrimidine",
+      "priority": 44,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5", "6"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "N"},
+        {"locant": "3", "symbol": "N"}
+      ],
+      "double_bond_locants": []
+    },
+    {
+      "name": "1,3,5-triazinane",
+      "priority": 45,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5", "6"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "N"},
+        {"locant": "3", "symbol": "N"},
+        {"locant": "5", "symbol": "N"}
+      ],
+      "double_bond_locants": []
+    },
+    {
+      "name": "pyran",
+      "priority": 46,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5", "6"],
+      "heteroatoms": [{"locant": "1", "symbol": "O"}],
+      "double_bond_locants": [["5", "6"]],
+      "additive_hydrogen_locants": ["3", "4"],
+      "indicated_hydrogen_locants": ["2"]
+    },
+    {
+      "name": "pyridine",
+      "priority": 47,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5", "6"],
+      "heteroatoms": [{"locant": "1", "symbol": "N"}],
+      "double_bond_locants": [["4", "5"]],
+      "additive_hydrogen_locants": ["1", "2", "3", "6"]
+    },
+    {
+      "name": "pyridine",
+      "priority": 48,
+      "bare_parent_only": true,
+      "locants": ["1", "2", "3", "4", "5", "6"],
+      "heteroatoms": [{"locant": "1", "symbol": "N"}],
+      "double_bond_locants": [["5", "6"]],
+      "additive_hydrogen_locants": ["1", "2", "3", "4"]
     }
   ]
 }

@@ -479,7 +479,7 @@ def name_component(
     state.perceived_groups, state.principal_key, state.principal_carbons, state.prefix_groups = (
         filter_component_groups_to_parent(state.perceived_groups, state.parent_set, state.is_substituent)
     )
-    state.retained_name, state.locant_maps = resolve_retained_parent(
+    state.retained_name, state.locant_maps, state.retained_parent_metadata = resolve_retained_parent(
         mol,
         state.parent_path,
         state.parent_selection.is_ring,
@@ -524,6 +524,11 @@ def name_component(
         name_spiro_subgraph=name_spiro_subgraph,
         emit_metadata=emit_metadata,
     )
+    if state.retained_parent_metadata is not None and state.retained_parent_metadata.bare_parent_only:
+        if subst_mapping or state.principal_key is not None or state.perceived_groups:
+            state.retained_name = state.retained_parent_metadata.derivative_name
+            state.locant_maps = None
+            state.retained_parent_metadata = None
     retained_fused = production_retained_fused_parent(
         mol,
         state.parent_path,

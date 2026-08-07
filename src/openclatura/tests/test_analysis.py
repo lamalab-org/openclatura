@@ -583,10 +583,11 @@ def test_dihydro_locants_bind_to_parent_scope_without_broad_fallback():
     dihydro_locants = next(token for token in assembly.data["name_token_spans"] if token["text"] == "4,5")
 
     assert analysis.name == "4,5-dihydro-1H-pyrrole-3-carbaldehyde"
-    assert dihydro_locants["source"] == "dihydro_locant_fallback"
+    assert dihydro_locants["source"] == "typed_rewrite"
     assert dihydro_locants["confidence"] == "derived"
-    assert dihydro_locants["ownership"] == "locanted_hydro"
-    assert dihydro_locants["token_kind"] == "hydro"
+    assert dihydro_locants["ownership"] == "exact"
+    assert dihydro_locants["grammar_role"] == "additive_hydrogen"
+    assert dihydro_locants["atoms"] == [5, 6]
 
 
 def test_carbonyl_prefix_morphology_is_bound_from_renderer_data():
@@ -1182,11 +1183,13 @@ def test_retained_dihydro_and_indicated_h_tokens_avoid_broad_fallback():
     tokens = {token["text"]: token for token in assembly.data["name_token_spans"]}
 
     assert analysis.name == "2,5-dihydro-1H-pyrrole-2,5-dione"
-    assert tokens["dihydro"]["source"] == "grammar_token"
-    assert tokens["dihydro"]["ownership"] == "grammar_scope"
-    assert tokens["H"]["source"] == "indicated_hydrogen_fallback"
+    assert tokens["dihydro"]["source"] == "typed_rewrite"
+    assert tokens["dihydro"]["ownership"] == "exact"
+    assert tokens["dihydro"]["atoms"] == [1, 3]
+    assert tokens["H"]["source"] == "typed_rewrite"
     assert tokens["H"]["token_kind"] == "hydro"
-    assert tokens["H"]["ownership"] == "locanted_hydro"
+    assert tokens["H"]["ownership"] == "exact"
+    assert tokens["H"]["atoms"] == [2]
 
 
 def test_recursive_substituent_tree_tokens_keep_nested_scopes_local():
@@ -3716,11 +3719,9 @@ def test_requested_retained_fused_parents_are_pending_until_graph_verified():
     pending = set(pending_retained_fused_parent_names())
 
     assert {
-        "pleiadene",
-        "phenanthridine",
-        "4H-quinolizine",
-        "1H-pyrrolizine",
-    } <= pending
+            "pleiadene",
+            "4H-quinolizine",
+        } <= pending
     assert not (pending & {template.name for template in retained_fused_graph_templates(include_disabled=True)})
 
 

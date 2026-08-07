@@ -122,6 +122,13 @@ class RetainedParentMetadata:
     # a hydro prefix: xanthine is 3,7-dihydro-1H-purine-2,6-dione, never
     # 1H,3H,7H-purine-2,6-dione.
     indicated_hydrogen_count: int = 0
+    # Monocycle family states may declare hydrogenation directly from their
+    # graph template. These locants are converted to graph-bound
+    # ``HydroOperation`` objects after the final retained locant map is chosen.
+    additive_hydrogen_locants: tuple[str, ...] = ()
+    indicated_hydrogen_locants: tuple[str, ...] = ()
+    bare_parent_only: bool = False
+    derivative_name: str | None = None
 
 
 @dataclass
