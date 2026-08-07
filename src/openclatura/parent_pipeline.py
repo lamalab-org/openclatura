@@ -8,6 +8,7 @@ from .namer_config import RETAINED_RING_ELEMENTS
 from .naming_context import NamingIntent, ParentAssemblyPlan
 from .numbering import choose_parent_numbering
 from .parent_selection import ParentSelection
+from .retained_monocycle_templates import retained_monocycle_graph_template_names
 from .retained_fused_templates import retained_parent_metadata as graph_retained_parent_metadata
 from .ring_renderer import is_von_baeyer_descriptor
 from .rules import retained
@@ -25,7 +26,10 @@ def resolve_retained_parent(
     if not temp_retained:
         return None, None
     retained_name, locant_maps = temp_retained
-    if any(mol.atoms[idx].symbol not in RETAINED_RING_ELEMENTS for idx in path):
+    if (
+        retained_name not in retained_monocycle_graph_template_names()
+        and any(mol.atoms[idx].symbol not in RETAINED_RING_ELEMENTS for idx in path)
+    ):
         return None, None
     if locant_maps is None and (is_bicycle or is_polycycle):
         if all(mol.atoms[idx].symbol == "C" and mol.atoms[idx].charge == 0 for idx in path):

@@ -3,6 +3,7 @@ import itertools
 
 from openclatura.molecule import Molecule
 from openclatura.nomenclature import RULES
+from openclatura.retained_monocycle_templates import match_retained_monocycle_templates
 
 # The Blue Book numbering of the two retained tricyclics, written in the order a
 # walk round the outside of the ring system meets them.  Every lettered position
@@ -202,6 +203,11 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
     deg_counts = tuple(sorted(internal_degrees.values()))
     sig = (size, total_bonds, double_bonds, deg_counts)
     deg3_nodes = [u for u, d in internal_degrees.items() if d == 3]
+
+    graph_monocycle_matches = match_retained_monocycle_templates(mol, path)
+    if graph_monocycle_matches:
+        match = graph_monocycle_matches[0]
+        return match.template.name, list(match.atom_to_locant_maps)
 
     data_monocycle = _match_data_monocycle_retained(
         mol,

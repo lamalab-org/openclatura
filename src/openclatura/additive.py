@@ -105,7 +105,11 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 continue
             if default_indicated_h and locant not in default_indicated_h:
                 continue
-        if atom.symbol in ["N", "C"]:
+        # Nitrogen and carbon retain the established parent-hydride proxy: in
+        # oxo derivatives a substituted ring nitrogen can still identify an
+        # indicated-H position of the parent. Other elements are eligible only
+        # when this molecular graph actually places hydrogen there.
+        if atom.symbol in {"N", "C"} or atom.explicit_h_count + atom.total_h_count > 0:
             ring_bonds = [mol.get_bond(idx, n) for n in mol.get_neighbors(idx) if n in numbered_path]
             fusion_carbon_h = (
                 metadata is not None

@@ -1,0 +1,79 @@
+{
+  "bluebook_rule": "P-22 and P-25 retained monocyclic parent hydrides; locant-keyed graph templates, not SMILES/SMARTS patterns.",
+  "parents": [
+    {
+      "name": "selenophene",
+      "priority": 10,
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [{"locant": "1", "symbol": "Se"}],
+      "double_bond_locants": [["2", "3"], ["4", "5"]]
+    },
+    {
+      "name": "tellurophene",
+      "priority": 11,
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [{"locant": "1", "symbol": "Te"}],
+      "double_bond_locants": [["2", "3"], ["4", "5"]]
+    },
+    {
+      "name": "phosphole",
+      "priority": 12,
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [{"locant": "1", "symbol": "P"}],
+      "double_bond_locants": [["2", "3"], ["4", "5"]]
+    },
+    {
+      "name": "arsole",
+      "priority": 13,
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [{"locant": "1", "symbol": "As"}],
+      "double_bond_locants": [["2", "3"], ["4", "5"]]
+    },
+    {
+      "name": "borole",
+      "priority": 14,
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [{"locant": "1", "symbol": "B"}],
+      "double_bond_locants": [["2", "3"], ["4", "5"]]
+    },
+    {
+      "name": "pentazole",
+      "priority": 15,
+      "locants": ["1", "2", "3", "4", "5"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "N"},
+        {"locant": "2", "symbol": "N"},
+        {"locant": "3", "symbol": "N"},
+        {"locant": "4", "symbol": "N"},
+        {"locant": "5", "symbol": "N"}
+      ],
+      "double_bond_locants": [["2", "3"], ["4", "5"]]
+    },
+    {
+      "name": "1,2,4,5-tetrazine",
+      "priority": 16,
+      "locants": ["1", "2", "3", "4", "5", "6"],
+      "heteroatoms": [
+        {"locant": "1", "symbol": "N"},
+        {"locant": "2", "symbol": "N"},
+        {"locant": "4", "symbol": "N"},
+        {"locant": "5", "symbol": "N"}
+      ],
+      "double_bond_locants": [["1", "6"], ["2", "3"], ["4", "5"]]
+    },
+    {
+      "name": "phosphinine",
+      "priority": 17,
+      "locants": ["1", "2", "3", "4", "5", "6"],
+      "heteroatoms": [{"locant": "1", "symbol": "P"}],
+      "double_bond_locants": [["1", "6"], ["2", "3"], ["4", "5"]]
+    },
+    {
+      "name": "borinine",
+      "priority": 18,
+      "locants": ["1", "2", "3", "4", "5", "6"],
+      "heteroatoms": [{"locant": "1", "symbol": "B"}],
+      "double_bond_locants": [["1", "6"], ["2", "3"], ["4", "5"]]
+    }
+  ]
+}

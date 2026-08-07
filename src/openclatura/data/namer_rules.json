@@ -66,6 +66,8 @@
     "bluebook_rule": "P-14.7, P-22.2, P-25; retained heterocycle names and indicated hydrogen locants  Phenanthrolines whose oxo derivatives cite every saturated position are included; acridine, phenazine and 1,10-phenanthroline are not, because their added hydrogen is not yet emitted and the name would be ambiguous.",
     "values": [
       "pyrrole",
+      "phosphole",
+      "arsole",
       "imidazole",
       "pyrazole",
       "1,2,3-triazole",
