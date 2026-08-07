@@ -54,12 +54,21 @@ def production_retained_fused_parent(
         return None
     if not _neutral_retained_parent(mol, parent_atoms):
         return None
-    if principal_key not in ALLOWED_PRINCIPAL_KEYS:
-        return None
-    if not _allowed_groups(parent_atoms, perceived_groups):
-        return None
-    if not _allowed_substituents(substituent_mapping):
-        return None
+    bare_parent = _is_bare_parent_request(
+        parent_atoms,
+        component_atoms,
+        perceived_groups,
+        principal_key,
+        substituent_mapping,
+        attachment_atom,
+    )
+    if not bare_parent:
+        if principal_key not in ALLOWED_PRINCIPAL_KEYS:
+            return None
+        if not _allowed_groups(parent_atoms, perceived_groups):
+            return None
+        if not _allowed_substituents(substituent_mapping):
+            return None
 
     feature_atoms = set(substituent_mapping)
     if attachment_atom is not None:
@@ -76,8 +85,23 @@ def production_retained_fused_parent(
             include_disabled=True,
             allow_nonaromatic=principal_key == "ketone",
         )
-        if match.template.name in PRODUCTION_RETAINED_FUSED_PARENTS
-        and match.template.derivative_production_enabled
+        if (
+            (
+                bare_parent
+                and (
+                    match.template.bare_parent_enabled
+                    or (
+                        match.template.name in PRODUCTION_RETAINED_FUSED_PARENTS
+                        and match.template.derivative_production_enabled
+                    )
+                )
+            )
+            or (
+                not bare_parent
+                and match.template.name in PRODUCTION_RETAINED_FUSED_PARENTS
+                and match.template.derivative_production_enabled
+            )
+        )
         and (principal_key != "ketone" or _has_mancude_unsaturation(mol, parent_atoms, match))
     ]
     if not matches:
@@ -104,6 +128,30 @@ def production_retained_fused_parent(
             derivative_stem=template.derivative_stem,
             indicated_hydrogen_count=_indicated_hydrogen_count(template),
         ),
+    )
+
+
+def _is_bare_parent_request(
+    parent_atoms: set[int],
+    component_atoms: set[int],
+    perceived_groups: list[PerceivedGroup],
+    principal_key: str | None,
+    substituent_mapping: dict[int, list[SubstituentItem]],
+    attachment_atom: int | None,
+) -> bool:
+    """Whether a graph template names the complete, unsubstituted component.
+
+    Bare retained hydrides do not exercise derivative grammar. Keeping this
+    capability separate prevents a parser-verified parent name from silently
+    enabling every suffix, substituent, or attached-prefix combination.
+    """
+
+    return (
+        attachment_atom is None
+        and principal_key is None
+        and parent_atoms == component_atoms
+        and not substituent_mapping
+        and not any(group.attachment_carbon in parent_atoms for group in perceived_groups)
     )
 
 

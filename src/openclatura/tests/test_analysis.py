@@ -3455,8 +3455,9 @@ def test_retained_fused_graph_template_data_file_validates_guarded_core_entries(
         "acenaphthylene",
         "fluoranthene",
         "1H-perimidine",
-        "pteridine",
-        "2H-isoindole",
+            "pteridine",
+            "isoindole",
+            "2H-isoindole",
         "indolizine",
         "1H-indole",
         "phenazine",
@@ -3489,10 +3490,13 @@ def test_retained_fused_graph_template_data_file_validates_guarded_core_entries(
         "fluoranthene",
         "1H-perimidine",
         "pteridine",
+        "isoindole",
         "2H-isoindole",
         "indolizine",
         "1H-indole",
     }
+    assert by_name["isoindole"].bare_parent_enabled
+    assert not by_name["isoindole"].derivative_production_enabled
     assert "1H-phenalene" not in enabled_names
     production_derivative_names = {template.name for template in templates if template.derivative_production_enabled}
     assert production_derivative_names == {

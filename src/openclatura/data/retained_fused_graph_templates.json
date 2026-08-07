@@ -3249,6 +3249,78 @@
       }
     },
     {
+      "name": "isoindole",
+      "pin": true,
+      "priority": 18,
+      "aliases": [],
+      "derivative_stem": "isoindol",
+      "attached_prefix": "isoindolo",
+      "template": {
+        "enabled": true,
+        "bare_parent_enabled": true,
+        "derivative_production_enabled": false,
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "heteroatoms": [
+          {
+            "locant": "2",
+            "symbol": "N"
+          }
+        ],
+        "atom_overrides": [
+          {
+            "locant": "1",
+            "aromatic": false
+          },
+          {
+            "locant": "2",
+            "aromatic": false
+          },
+          {
+            "locant": "3",
+            "aromatic": false
+          }
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "bonds": [
+          {"locants": ["1", "2"]},
+          {"locants": ["2", "3"]},
+          {"locants": ["3", "3a"]},
+          {"locants": ["3a", "4"]},
+          {"locants": ["4", "5"]},
+          {"locants": ["5", "6"]},
+          {"locants": ["6", "7"]},
+          {"locants": ["7", "7a"]},
+          {"locants": ["7a", "3a"], "bond_class": "fusion"},
+          {"locants": ["7a", "1"]}
+        ],
+        "mancude_double_bonds": 4
+      }
+    },
+    {
       "name": "2H-isoindole",
       "pin": true,
       "priority": 19,

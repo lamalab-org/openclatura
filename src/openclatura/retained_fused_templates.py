@@ -70,6 +70,7 @@ class RetainedFusedGraphTemplate:
     numbering_policy: str = "retained_template"
     aromatic_equivalence_policy: str = "neutral_kekule_equivalent"
     enabled: bool = False
+    bare_parent_enabled: bool = False
     derivative_production_enabled: bool = False
     mancude_double_bonds: int | None = None
 
@@ -116,7 +117,13 @@ def retained_parent_metadata(parent_name: str) -> RetainedParentMetadata | None:
     production graph-template matches pass their metadata directly.
     """
 
-    for template in retained_fused_graph_templates(include_disabled=True):
+    templates = retained_fused_graph_templates(include_disabled=True)
+    if any(
+        parent_name in template.aliases and template.default_indicated_h
+        for template in templates
+    ):
+        return None
+    for template in templates:
         if parent_name == template.name:
             return RetainedParentMetadata(
                 default_indicated_h=template.default_indicated_h,
@@ -348,6 +355,7 @@ def retained_fused_template_from_data(row: dict[str, Any]) -> RetainedFusedGraph
         numbering_policy=str(template_data.get("numbering_policy", "retained_template")),
         aromatic_equivalence_policy=str(template_data.get("aromatic_equivalence_policy", "neutral_kekule_equivalent")),
         enabled=bool(template_data.get("enabled", row.get("template_enabled", False))),
+        bare_parent_enabled=bool(template_data.get("bare_parent_enabled", False)),
         derivative_production_enabled=bool(template_data.get("derivative_production_enabled", False)),
         mancude_double_bonds=(
             int(template_data["mancude_double_bonds"])

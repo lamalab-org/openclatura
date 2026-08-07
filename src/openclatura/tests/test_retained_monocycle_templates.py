@@ -1,7 +1,9 @@
 import pytest
 
 from openclatura import name_smiles
+from openclatura.graph_io import read_smiles
 from openclatura.molecule import Molecule
+from openclatura.retained_fused_templates import match_retained_fused_templates
 from openclatura.retained_monocycle_templates import match_retained_monocycle_templates
 
 
@@ -95,3 +97,25 @@ def test_graph_template_rejects_same_counts_with_wrong_bond_positions():
 )
 def test_public_namer_uses_graph_backed_retained_monocycles(smiles, expected):
     assert name_smiles(smiles) == expected
+
+
+def test_bare_fused_template_keeps_all_isoindole_locant_maps():
+    mol = read_smiles("C1=NCc2ccccc21")
+
+    matches = [
+        match
+        for match in match_retained_fused_templates(mol, set(mol.atoms), include_disabled=True)
+        if match.template.name == "isoindole"
+    ]
+
+    assert matches
+    assert {match.atom_to_locant[2] for match in matches} == {"1", "3"}
+
+
+def test_bare_fused_numbering_is_invariant_to_isoindole_input_order():
+    assert name_smiles("C1=NCc2ccccc21") == "1H-isoindole"
+    assert name_smiles("C1N=CC2=CC=CC=C12") == "1H-isoindole"
+
+
+def test_bare_fused_gate_does_not_enable_derivative_grammar():
+    assert name_smiles("CC1=NCc2ccccc21") == "1-methyl-3H-isoindole"
