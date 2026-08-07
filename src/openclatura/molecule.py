@@ -254,3 +254,82 @@ class Molecule:
 
     def __iter__(self) -> Iterator[Atom]:
         return iter(self.atoms.values())
+
+
+def bond_ids_within(mol: Molecule, atom_ids: set[int]) -> set[int]:
+    """Return bond IDs whose endpoints are both in atom_ids."""
+
+    bond_ids = set()
+    for atom_idx in atom_ids:
+        for neighbor_idx in mol.get_neighbors(atom_idx):
+            if neighbor_idx in atom_ids and atom_idx < neighbor_idx:
+                bond = mol.get_bond(atom_idx, neighbor_idx)
+                if bond is not None:
+                    bond_ids.add(bond.idx)
+    return bond_ids
+
+
+def edges_within_atoms(mol: Molecule, atoms: set[int]) -> set[tuple[int, int]]:
+    """Return normalized (low, high) edges whose endpoints are both in atoms."""
+
+    edges = set()
+    for atom_idx in atoms:
+        for neighbor_idx in mol.get_neighbors(atom_idx):
+            if neighbor_idx in atoms and atom_idx < neighbor_idx:
+                edges.add((atom_idx, neighbor_idx))
+    return edges
+
+
+def component_atoms_until_blocked(
+    mol: Molecule,
+    component_atoms: set[int],
+    root: int,
+    blocked: set[int],
+) -> set[int]:
+    """Flood from ``root`` inside ``component_atoms``, stopping at ``blocked``.
+
+    Returns the empty set when the walk escapes the component or reaches a
+    blocked atom, so callers can treat that as "no self-contained fragment".
+    """
+
+    atoms = set()
+    queue = [root]
+    while queue:
+        atom_idx = queue.pop(0)
+        if atom_idx in atoms:
+            continue
+        if atom_idx not in component_atoms or atom_idx in blocked:
+            return set()
+        atoms.add(atom_idx)
+        for neighbor in mol.get_neighbors(atom_idx):
+            if neighbor in blocked:
+                continue
+            if neighbor in component_atoms:
+                queue.append(neighbor)
+    return atoms
+
+
+def has_non_h_multiple_bond_neighbor(mol: Molecule, atom_idx: int, allowed: set[int]) -> bool:
+    """Whether any neighbor outside ``allowed`` binds through a multiple bond."""
+
+    for neighbor in mol.get_neighbors(atom_idx):
+        if neighbor in allowed or mol.atoms[neighbor].symbol == "H":
+            continue
+        bond = mol.get_bond(atom_idx, neighbor)
+        if bond is not None and bond.order != 1:
+            return True
+    return False
+
+
+def double_bonded_carbon(mol: Molecule, nitrogen: int, blocked: set[int]) -> int | None:
+    """Return the sole doubly bonded carbon outside ``blocked``, if unambiguous."""
+
+    candidates = [
+        n
+        for n in mol.get_neighbors(nitrogen)
+        if n not in blocked
+        and mol.atoms[n].is_carbon
+        and (bond := mol.get_bond(nitrogen, n)) is not None
+        and bond.order == 2
+    ]
+    return candidates[0] if len(candidates) == 1 else None

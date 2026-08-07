@@ -7,7 +7,7 @@ except for descriptor/audit data that can be proven from the graph.
 import re
 from dataclasses import dataclass
 
-from .molecule import Molecule
+from .molecule import Molecule, edges_within_atoms
 from .ring_renderer import render_ring_descriptor, von_baeyer_cycle_count, von_baeyer_kind
 
 
@@ -662,15 +662,6 @@ def _bicyclo_edges_from_numbering(
     return frozenset(_normalize_edges(edges))
 
 
-def edges_within_atoms(mol: Molecule, atoms: set[int]) -> set[tuple[int, int]]:
-    edges = set()
-    for atom_idx in atoms:
-        for neighbor_idx in mol.get_neighbors(atom_idx):
-            if neighbor_idx in atoms and atom_idx < neighbor_idx:
-                edges.add((atom_idx, neighbor_idx))
-    return edges
-
-
 def internal_degrees(atoms: frozenset[int], edges: frozenset[tuple[int, int]]) -> dict[int, int]:
     degrees = {atom: 0 for atom in atoms}
     for first, second in edges:
@@ -791,6 +782,18 @@ def _dedupe_paths(paths: list[tuple[int, ...]]) -> list[tuple[int, ...]]:
         seen.add(path)
         deduped.append(path)
     return deduped
+
+
+def adjacency_from_edges(
+    nodes: set[int] | frozenset[int], edges: set[tuple[int, int]] | frozenset[tuple[int, int]]
+) -> dict[int, set[int]]:
+    """Return a node -> neighbor-set map over the given edge set."""
+
+    adjacency: dict[int, set[int]] = {node: set() for node in nodes}
+    for first, second in edges:
+        adjacency[first].add(second)
+        adjacency[second].add(first)
+    return adjacency
 
 
 def adjacent_atoms(atom: int, edges: frozenset[tuple[int, int]]) -> set[int]:

@@ -14,13 +14,12 @@ from .formatting import (
     strip_outer_parentheses,
 )
 from .group_atom_roles import amide_nitrogen, ester_or_peroxy_single_oxygen
-from .molecule import Molecule
+from .molecule import Molecule, bond_ids_within
 from .naming_protocols import RecursiveSubgraphNamer
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .rules import multipliers
 from .subgraph_tools import subgraph_component
-from .trace_helpers import bond_ids_within
 
 PrefixHandler = Callable[["PrefixContext", PerceivedGroup], str]
 

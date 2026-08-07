@@ -4,7 +4,14 @@ import re
 
 
 def parse_locant(locant):
-    text = str(locant)
+    """Return a sortable representation of a locant.
+
+    Honors a ``display`` attribute when one is present, so DisplayLocant sorts
+    by what it renders as rather than by its underlying integer.
+    """
+
+    display = getattr(locant, "display", None)
+    text = str(locant) if display is None else str(display)
     match = re.match(r"^(\d+)([a-zA-Z]*)$", text.split("(")[0])
     if match:
         return (1, float(match.group(1)), match.group(2))

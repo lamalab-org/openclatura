@@ -2,8 +2,9 @@
 
 from dataclasses import dataclass, field
 
-from .molecule import Molecule
+from .molecule import Molecule, edges_within_atoms
 from .polycycle_topology import (
+    adjacency_from_edges,
     bicyclo_proof,
     build_ring_numbering,
     build_von_baeyer_numbering,
@@ -749,7 +750,7 @@ def merge_polyspiro_ring_systems(mol: Molecule, systems: list[RingSystem]) -> li
         union_atoms = set()
         for group_idx in group_indexes:
             union_atoms |= systems[group_idx].atoms
-        union_edges = _edges_within_atoms(mol, union_atoms)
+        union_edges = edges_within_atoms(mol, union_atoms)
         if not _has_multiple_spiro_centers(union_atoms, union_edges):
             result.extend(systems[group_idx] for group_idx in sorted(group_indexes))
             continue
@@ -825,7 +826,7 @@ def _proven_monospiro_or_bicyclo_system(
         legacy = _legacy_monospiro_or_bicyclo_system(
             mol,
             comp_nodes,
-            _adjacency_from_edges(comp_nodes, comp_edges),
+            adjacency_from_edges(comp_nodes, comp_edges),
         )
         legacy_paths = []
         legacy_numberings = []
@@ -919,16 +920,6 @@ def _is_plain_hydrocarbon_ring_system(
         if bond is not None and bond.order != 1:
             return False
     return True
-
-
-def _adjacency_from_edges(
-    nodes: set[int], edges: set[tuple[int, int]] | frozenset[tuple[int, int]]
-) -> dict[int, set[int]]:
-    adjacency = {node: set() for node in nodes}
-    for first, second in edges:
-        adjacency[first].add(second)
-        adjacency[second].add(first)
-    return adjacency
 
 
 def _dedupe_numbering_paths(paths: list[list[int]]) -> list[list[int]]:
@@ -1070,15 +1061,6 @@ def _legacy_monospiro_or_bicyclo_system(
         if retained_rules.recognizes_retained_ring(mol, cand):
             return RingSystem(atoms=comp_nodes, is_bicycle=True, x=len(p1), y=len(p2), z=len(p3), paths=[cand])
     return RingSystem(atoms=comp_nodes, is_bicycle=True, x=len(p1), y=len(p2), z=len(p3), paths=vb_paths)
-
-
-def _edges_within_atoms(mol: Molecule, atoms: set[int]) -> set[tuple[int, int]]:
-    edges = set()
-    for atom_idx in atoms:
-        for neighbor_idx in mol.get_neighbors(atom_idx):
-            if neighbor_idx in atoms and atom_idx < neighbor_idx:
-                edges.add((atom_idx, neighbor_idx))
-    return edges
 
 
 def _polyspiro_or_von_baeyer_candidate(

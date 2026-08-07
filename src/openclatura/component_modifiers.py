@@ -4,13 +4,13 @@ from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem, sp
 from .formatting import strip_outer_parentheses
 from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
-from .molecule import DecisionTrace, Molecule
+from .molecule import DecisionTrace, Molecule, bond_ids_within
 from .naming_protocols import RecursiveSubgraphNamer
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .subgraph_tools import subgraph_component
 from .substituent_tokens import graph_bound_substituent_tokens
-from .trace_helpers import add_substituent_trace, bond_ids_within, decision_trace_data
+from .trace_helpers import add_substituent_trace, decision_trace_data
 
 
 def add_component_front_modifiers(

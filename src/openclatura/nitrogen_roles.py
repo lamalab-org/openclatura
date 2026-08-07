@@ -7,7 +7,12 @@ graph topology, bond order, charge, and ring membership.
 
 from dataclasses import dataclass
 
-from .molecule import Molecule
+from .molecule import (
+    Molecule,
+    component_atoms_until_blocked,
+    double_bonded_carbon,
+    has_non_h_multiple_bond_neighbor,
+)
 
 
 @dataclass(frozen=True)
@@ -354,7 +359,7 @@ def _hydrazone_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -
         n1_n2_bond = mol.get_bond(n1.idx, n2)
         if n1_n2_bond is None or n1_n2_bond.order != 1:
             continue
-        amidino_tail_atoms = _amidinohydrazone_tail_atoms(mol, n2, {n1.idx})
+        amidino_tail_atoms = amidinohydrazone_tail_atoms(mol, n2, {n1.idx})
         key = _hydrazone_key(mol, carbon, cyclic_atoms, amidino=bool(amidino_tail_atoms))
         if amidino_tail_atoms and "amidino" not in key:
             # Only aldehydes have an amidinohydrazone suffix.  Absorbing the
@@ -363,7 +368,7 @@ def _hydrazone_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -
             # and let the azine renderer take the fragment instead.
             amidino_tail_atoms = set()
         if (
-            _has_non_h_multiple_bond_neighbor(mol, n2, {n1.idx})
+            has_non_h_multiple_bond_neighbor(mol, n2, {n1.idx})
             and not _has_terminal_imino_substituent(mol, n2, {n1.idx})
             and not amidino_tail_atoms
         ):
@@ -571,7 +576,7 @@ def _hydrazine_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -
         c_bond = mol.get_bond(n1.idx, c_neighbors[0])
         if c_bond is None or c_bond.order != 1:
             continue
-        if _has_non_h_multiple_bond_neighbor(mol, n2, {n1.idx}):
+        if has_non_h_multiple_bond_neighbor(mol, n2, {n1.idx}):
             continue
         roles.append(
             _make_role(
@@ -655,12 +660,12 @@ def azine_roles(mol: Molecule, component_atoms: set[int]) -> list[AzineRole]:
             n_n_bond = mol.get_bond(n1, n2)
             if n_n_bond is None or n_n_bond.order != 1:
                 continue
-            c1 = _double_bonded_carbon(mol, n1, {n2})
-            c2 = _double_bonded_carbon(mol, n2, {n1})
+            c1 = double_bonded_carbon(mol, n1, {n2})
+            c2 = double_bonded_carbon(mol, n2, {n1})
             if c1 is None or c2 is None:
                 continue
-            side1 = _component_atoms_until_blocked(mol, component_atoms, c1, {n1, n2})
-            side2 = _component_atoms_until_blocked(mol, component_atoms, c2, {n1, n2})
+            side1 = component_atoms_until_blocked(mol, component_atoms, c1, {n1, n2})
+            side2 = component_atoms_until_blocked(mol, component_atoms, c2, {n1, n2})
             if not side1 or not side2 or side1 & side2:
                 continue
             if side1 | side2 | {n1, n2} != component_atoms:
@@ -702,16 +707,6 @@ def _other_non_h_neighbors(mol: Molecule, atom_idx: int, allowed: set[int]) -> l
     return [n for n in mol.get_neighbors(atom_idx) if n not in allowed and mol.atoms[n].symbol != "H"]
 
 
-def _has_non_h_multiple_bond_neighbor(mol: Molecule, atom_idx: int, allowed: set[int]) -> bool:
-    for neighbor in mol.get_neighbors(atom_idx):
-        if neighbor in allowed or mol.atoms[neighbor].symbol == "H":
-            continue
-        bond = mol.get_bond(atom_idx, neighbor)
-        if bond is not None and bond.order != 1:
-            return True
-    return False
-
-
 def _has_terminal_imino_substituent(mol: Molecule, atom_idx: int, allowed: set[int]) -> bool:
     for neighbor in mol.get_neighbors(atom_idx):
         if neighbor in allowed or mol.atoms[neighbor].symbol not in {"C", "N"}:
@@ -725,42 +720,7 @@ def _has_terminal_imino_substituent(mol: Molecule, atom_idx: int, allowed: set[i
     return False
 
 
-def _double_bonded_carbon(mol: Molecule, nitrogen: int, blocked: set[int]) -> int | None:
-    candidates = [
-        n
-        for n in mol.get_neighbors(nitrogen)
-        if n not in blocked
-        and mol.atoms[n].is_carbon
-        and (bond := mol.get_bond(nitrogen, n)) is not None
-        and bond.order == 2
-    ]
-    return candidates[0] if len(candidates) == 1 else None
-
-
-def _component_atoms_until_blocked(
-    mol: Molecule,
-    component_atoms: set[int],
-    root: int,
-    blocked: set[int],
-) -> set[int]:
-    atoms = set()
-    queue = [root]
-    while queue:
-        atom_idx = queue.pop(0)
-        if atom_idx in atoms:
-            continue
-        if atom_idx not in component_atoms or atom_idx in blocked:
-            return set()
-        atoms.add(atom_idx)
-        for neighbor in mol.get_neighbors(atom_idx):
-            if neighbor in blocked:
-                continue
-            if neighbor in component_atoms:
-                queue.append(neighbor)
-    return atoms
-
-
-def _amidinohydrazone_tail_atoms(mol: Molecule, hydrazone_terminal_n: int, allowed: set[int]) -> set[int]:
+def amidinohydrazone_tail_atoms(mol: Molecule, hydrazone_terminal_n: int, allowed: set[int]) -> set[int]:
     """Return atoms for an N-C(=N)-N amidino tail attached to a hydrazone N."""
 
     for carbon in mol.get_neighbors(hydrazone_terminal_n):

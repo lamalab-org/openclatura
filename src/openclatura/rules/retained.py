@@ -1,4 +1,3 @@
-# openclatura/rules/retained.py
 import itertools
 
 from openclatura.hantzsch_widman import hw_spec_for_name, hw_spec_for_ring
@@ -100,7 +99,6 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                         double_bonds += 1
 
     deg_counts = tuple(sorted(internal_degrees.values()))
-    sig = (size, total_bonds, double_bonds, deg_counts)
     deg3_nodes = [u for u, d in internal_degrees.items() if d == 3]
 
     data_monocycle = _match_data_monocycle_retained(

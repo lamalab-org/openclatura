@@ -29,6 +29,7 @@ from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
 from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
+from .molecule import bond_ids_within as _bond_ids_within
 from .name_assembly import NameAssemblyResult, token_span_trace_data
 from .naming_context import NamingIntent
 from .nomenclature import RULES
@@ -63,9 +64,6 @@ from .trace_helpers import (
 from .trace_helpers import assembly_substituent_tree as _assembly_substituent_tree
 from .trace_helpers import (
     assembly_trace_segments as _assembly_trace_segments,
-)
-from .trace_helpers import (
-    bond_ids_within as _bond_ids_within,
 )
 from .trace_helpers import (
     build_shortcut_tree_node,

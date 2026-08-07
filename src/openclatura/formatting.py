@@ -3,24 +3,9 @@
 import re
 
 from .assembly_parts import RenderedSubstituentName, rendered_substituent_text
+from .assembly_utils import is_fully_enclosed as is_fully_enclosed
 from .namer_config import ALKYL_OXY_PREFIXES
 from .rules import multipliers, stems
-
-
-def is_fully_enclosed(s: str) -> bool:
-    """Return true when a name fragment is already fully parenthesized."""
-
-    if not s.startswith("(") or not s.endswith(")"):
-        return False
-    depth = 0
-    for i, c in enumerate(s):
-        if c == "(":
-            depth += 1
-        elif c == ")":
-            depth -= 1
-        if depth == 0 and i < len(s) - 1:
-            return False
-    return depth == 0
 
 
 def strip_outer_parentheses(name: str | RenderedSubstituentName) -> str:

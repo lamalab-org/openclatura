@@ -2,7 +2,7 @@
 
 from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem, RetainedParentMetadata
 from .locant_sources import LocantMapSource
-from .molecule import Molecule
+from .molecule import Molecule, bond_ids_within
 from .name_bindings import ensure_name_atom_binding_tokens
 from .namer_config import RETAINED_RING_ELEMENTS
 from .naming_context import NamingIntent, ParentAssemblyPlan
@@ -13,7 +13,6 @@ from .ring_renderer import is_von_baeyer_descriptor
 from .rules import retained
 from .small_ring_stereo import scoped_small_ring_stereo_features
 from .subgraph_tools import subgraph_locant_getter
-from .trace_helpers import bond_ids_within
 
 
 def resolve_retained_parent(
