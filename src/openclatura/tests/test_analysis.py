@@ -5703,16 +5703,18 @@ def test_parent_pipeline_uses_audited_von_baeyer_locant_maps():
     )
 
 
-def test_high_risk_polycycle_audit_fails_closed_without_proof_candidate():
+def test_high_risk_polycycle_uses_reconstructed_proof_candidate():
     result = NamingEngine().run(NamingRequest(smiles="C1Oc2c3c(c(c4c2C4)O1)C3"))
 
-    assert result.name == ""
-    assert result.error is not None
+    assert result.name == "9,11-dioxatetracyclo[3.3.3.0^{2,4}.0^{6,8}]undeca-1,4,6(8)-triene"
+    assert result.error is None
 
     mol = read_smiles("C1Oc2c3c(c(c4c2C4)O1)C3")
     rings = [system for system in find_ring_systems(mol, set()) if system.is_polycycle]
     assert rings
-    assert not any(ring.polycycle_descriptor for ring in rings)
+    assert rings[0].ring_parent is not None
+    assert rings[0].ring_parent.selected_numbering is not None
+    assert rings[0].ring_parent.selected_numbering.audit_ok
 
 
 def test_charge_separated_sulfonium_ylide_requires_single_bond():

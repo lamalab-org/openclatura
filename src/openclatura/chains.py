@@ -45,22 +45,31 @@ class PolycycleDescriptorCandidate:
         return not self.is_von_baeyer or bool(self.numberings)
 
 
-def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
+def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges, mol: Molecule | None = None):
     adj = {n: set() for n in comp_nodes}
     for u, v in comp_edges:
         adj[u].add(v)
         adj[v].add(u)
+    representation_sensitive = mol is not None and any(mol.atoms[node].is_aromatic for node in comp_nodes)
+    ranks = (
+        _ring_topology_ranks(mol, set(comp_nodes), adj)
+        if representation_sensitive
+        else {node: node for node in comp_nodes}
+    )
+
+    def node_key(node):
+        return ranks[node]
 
     cycles = []
 
     def dfs(curr, start, path, visited):
-        for n in adj[curr]:
+        for n in sorted(adj[curr], key=node_key):
             if n == start and len(path) >= 3:
                 cycles.append(path)
             elif n not in visited:
                 dfs(n, start, path + [n], visited | {n})
 
-    for n in comp_nodes:
+    for n in sorted(comp_nodes, key=node_key):
         dfs(n, n, [n], {n})
 
     if not cycles:
@@ -68,6 +77,7 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
 
     max_len = max(len(c) for c in cycles)
     largest_cycles = [c for c in cycles if len(c) == max_len]
+    largest_cycles.sort(key=lambda cycle: _canonical_cycle_rank(cycle, ranks))
 
     best_main_ring = None
     best_bridges = None
@@ -88,7 +98,7 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
 
         non_main_nodes = comp_nodes - main_ring_set
         visited_non_main = set()
-        for n in non_main_nodes:
+        for n in sorted(non_main_nodes, key=node_key):
             if n not in visited_non_main:
                 comp = []
                 q = [n]
@@ -96,14 +106,14 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
                 while q:
                     curr = q.pop(0)
                     comp.append(curr)
-                    for neighbor in adj[curr]:
+                    for neighbor in sorted(adj[curr], key=node_key):
                         if neighbor in non_main_nodes and neighbor not in visited_non_main:
                             visited_non_main.add(neighbor)
                             q.append(neighbor)
 
                 connections = []
-                for cn in sorted(comp):
-                    for neighbor in sorted(adj[cn]):
+                for cn in sorted(comp, key=node_key):
+                    for neighbor in sorted(adj[cn], key=node_key):
                         if neighbor in main_ring_set:
                             connections.append((cn, neighbor))
 
@@ -117,7 +127,13 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
         if not bridges:
             continue
 
-        bridges.sort(key=lambda b: b["length"], reverse=True)
+        bridges.sort(
+            key=lambda bridge: (
+                -bridge["length"],
+                tuple(sorted((ranks[bridge["endpoints"][0]], ranks[bridge["endpoints"][1]]))),
+                tuple(sorted(ranks[node] for node in bridge["nodes"])),
+            )
+        )
         main_bridge_len = bridges[0]["length"]
 
         if main_bridge_len > best_main_bridge_len:
@@ -168,7 +184,7 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
                 found_path = p[:-1]
                 break
             visited.add(curr)
-            for neighbor in adj[curr]:
+            for neighbor in sorted(adj[curr], key=node_key):
                 if neighbor in main_bridge["nodes"] or neighbor == ep2:
                     if neighbor not in visited:
                         q.append((neighbor, p + [neighbor]))
@@ -199,7 +215,7 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
                         found = p[:-1]
                         break
                     v2.add(curr)
-                    for nxt in adj[curr]:
+                    for nxt in sorted(adj[curr], key=node_key):
                         if nxt in br["nodes"] or nxt == b_ep2:
                             if nxt not in v2:
                                 q.append((nxt, p + [nxt]))
@@ -207,7 +223,7 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
                     if node not in visited:
                         path.append(node)
                         visited.add(node)
-        for n in comp_nodes:
+        for n in sorted(comp_nodes, key=node_key):
             if n not in visited:
                 path.append(n)
                 visited.add(n)
@@ -252,13 +268,55 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
         valid_paths = [path2]
     else:
         best_desc = desc1_str
-        # The descriptor and its superscript bridge locants are built from
-        # this source orientation.  The mirrored path can have lower
-        # heteroatom or unsaturation locants, but those locants no longer
-        # describe the emitted von Baeyer descriptor graph.
-        valid_paths = [path1]
+        # Keep both graph-equivalent orientations only when they produce the
+        # same descriptor. The reconstruction audit below rejects a mirrored
+        # path if its superscript bridge locants do not describe that graph.
+        valid_paths = [path1, path2] if representation_sensitive and desc1_str == desc2_str else [path1]
 
     return render_von_baeyer_descriptor(len(bridges), best_desc), valid_paths
+
+
+def _canonical_cycle_rank(cycle: list[int], ranks: dict[int, int]) -> tuple[int, ...]:
+    values = tuple(ranks[node] for node in cycle)
+    orientations = (values, tuple(reversed(values)))
+    return min(
+        orientation[offset:] + orientation[:offset]
+        for orientation in orientations
+        for offset in range(len(orientation))
+    )
+
+
+def _ring_topology_ranks(mol: Molecule, atoms: set[int], adjacency: dict[int, set[int]]) -> dict[int, int]:
+    """Input-form-invariant ranks for choosing a polycycle decomposition.
+
+    Bond orders and aromatic flags are deliberately absent. They are named
+    only after the parent skeleton is fixed, and RDKit may represent the same
+    fused graph with different partial aromaticity for aromatic and Kekule
+    input forms.
+    """
+
+    invariants = {
+        atom: (mol.atoms[atom].symbol, mol.atoms[atom].charge, len(adjacency[atom]))
+        for atom in atoms
+    }
+    ranks = _integer_ranks(invariants)
+    previous_class_count = len(set(ranks.values()))
+    for _ in range(len(atoms)):
+        refined = {
+            atom: (ranks[atom], tuple(sorted(ranks[neighbor] for neighbor in adjacency[atom])))
+            for atom in atoms
+        }
+        ranks = _integer_ranks(refined)
+        class_count = len(set(ranks.values()))
+        if class_count == previous_class_count:
+            break
+        previous_class_count = class_count
+    return ranks
+
+
+def _integer_ranks(invariants: dict[int, tuple]) -> dict[int, int]:
+    ordering = {value: rank for rank, value in enumerate(sorted(set(invariants.values())))}
+    return {atom: ordering[value] for atom, value in invariants.items()}
 
 
 def get_linear_dispiro_descriptor_and_paths(mol: Molecule, comp_nodes, comp_edges):
@@ -1090,7 +1148,14 @@ def _polyspiro_or_von_baeyer_candidate(
     if dispiro is not None:
         descriptor, paths = dispiro
         return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
-    legacy_descriptor, legacy_paths = get_von_baeyer_descriptor_and_path(atoms, edges)
+    legacy_descriptor, legacy_paths = get_von_baeyer_descriptor_and_path(atoms, edges, mol)
+    # Four or more rings require multiple secondary-bridge citations. The
+    # legacy walk does not prove their ordering as one unit, while the audited
+    # decomposition reconstructs the complete descriptor and locant map.
+    if len(edges) - len(atoms) + 1 >= 4 and any(mol.atoms[atom].is_aromatic for atom in atoms):
+        audited = _polycycle_candidate_from_audited_search(mol, atoms, edges)
+        if audited is not None:
+            return audited
     if legacy_descriptor and _is_von_baeyer_descriptor(legacy_descriptor):
         legacy_numberings = tuple(
             _audited_von_baeyer_numberings(mol, legacy_descriptor, legacy_paths, frozenset(edges))
@@ -1107,7 +1172,7 @@ def _polyspiro_or_von_baeyer_candidate(
     # not a real replacement heteroatom and must not participate in the new
     # von Baeyer numbering tie-breakers.
     if any(mol.atoms[atom].symbol == "Si" for atom in atoms):
-        descriptor, paths = get_von_baeyer_descriptor_and_path(atoms, edges)
+        descriptor, paths = get_von_baeyer_descriptor_and_path(atoms, edges, mol)
         if not descriptor or not _is_von_baeyer_descriptor(descriptor):
             return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
         numberings = tuple(_audited_von_baeyer_numberings(mol, descriptor, paths, frozenset(edges)))
@@ -1143,6 +1208,26 @@ def _polyspiro_or_von_baeyer_candidate(
         paths=_dedupe_numbering_paths([list(numbering.path) for numbering in numberings]),
         is_von_baeyer=True,
         numberings=numberings,
+    )
+
+
+def _polycycle_candidate_from_audited_search(
+    mol: Molecule,
+    atoms: set[int],
+    edges: set[tuple[int, int]],
+) -> PolycycleDescriptorCandidate | None:
+    audited_candidates = find_von_baeyer_candidates(mol, atoms, edges)
+    if not audited_candidates:
+        return None
+    descriptor = audited_candidates[0].descriptor
+    numberings = _dedupe_ring_numberings(
+        candidate.numbering for candidate in audited_candidates if candidate.descriptor == descriptor
+    )
+    return PolycycleDescriptorCandidate(
+        descriptor=descriptor,
+        paths=_dedupe_numbering_paths([list(numbering.path) for numbering in numberings]),
+        is_von_baeyer=True,
+        numberings=tuple(numberings),
     )
 
 
