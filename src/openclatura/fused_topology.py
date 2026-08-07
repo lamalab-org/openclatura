@@ -119,6 +119,7 @@ class FusedComponentCandidate:
     indicated_h: tuple[str, ...] = ()
     production_ready: bool = False
 
+
 @dataclass(frozen=True)
 class FusedComponentRegistryEntry:
     component_id: str

@@ -409,9 +409,7 @@ def _is_saturated_ring_site(mol: Molecule, atom_idx: int, ring_atoms: list[int])
     which a fused parent has none of.
     """
 
-    ring_bonds = [
-        bond for n in mol.get_neighbors(atom_idx) if n in ring_atoms and (bond := mol.get_bond(atom_idx, n))
-    ]
+    ring_bonds = [bond for n in mol.get_neighbors(atom_idx) if n in ring_atoms and (bond := mol.get_bond(atom_idx, n))]
     # Substitution does not un-saturate a position, so H count is not consulted:
     # indane's C1 is a hydro site whether or not it carries the diazo group.
     return bool(ring_bonds) and all(bond.order == 1 for bond in ring_bonds)

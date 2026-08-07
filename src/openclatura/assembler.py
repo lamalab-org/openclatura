@@ -285,7 +285,12 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
 def _move_added_hydrogen_to_suffix(parts: AssemblyParts, core_name: str, suffix_str: str) -> tuple[str, str]:
     """P-14.7: added hydrogen follows the suffix locant -- quinolin-4(1H)-one."""
 
-    added = {locant for operation in parts.hydro_operations if operation.key == "added_hydrogen" for locant in operation.locants}
+    added = {
+        locant
+        for operation in parts.hydro_operations
+        if operation.key == "added_hydrogen"
+        for locant in operation.locants
+    }
     if not added:
         return core_name, suffix_str
     cite = ",".join(f"{locant}H" for locant in sorted(added, key=parse_locant))

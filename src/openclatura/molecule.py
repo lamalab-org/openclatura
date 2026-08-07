@@ -30,6 +30,7 @@ class Atom:
     def is_carbon(self) -> bool:
         return self.symbol == "C"
 
+
 @dataclass
 class Bond:
     idx: int
@@ -39,6 +40,7 @@ class Bond:
     stereo: str | None = None  # 'E' or 'Z'
     in_small_ring: bool = False  # NEW: Tracks if bond is in a ring of size <= 7
     cip: str | None = None  # independent modern (rdCIPLabeler) E/Z label; only during self-audit
+
 
 @dataclass(frozen=True)
 class AtomBinding:

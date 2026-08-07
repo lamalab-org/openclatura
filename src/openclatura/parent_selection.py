@@ -175,6 +175,7 @@ class ParentCandidate:
             score_tuple=score_tuple,
         )
 
+
 @dataclass
 class ParentSelection:
     """Selected parent skeleton and its structural flags."""
