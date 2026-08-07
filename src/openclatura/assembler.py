@@ -173,41 +173,12 @@ def _oxo_group_methyl_to_carbonyl(name: str) -> str:
 def _post_process_name(name: str) -> str:
     name = apply_data_postprocessing(name)
     name = ensure_stereo_descriptor_boundary(name)
-    name = re.sub(r"(?<![a-zA-Z0-9])1-azacyclopent-2-ene(?![a-zA-Z])", "4,5-dihydro-1H-pyrrole", name)
-    name = re.sub(r"(?<![a-zA-Z0-9])1-azacyclopent-3-ene(?![a-zA-Z])", "2,5-dihydro-1H-pyrrole", name)
-    name = re.sub(
-        r"(?<![a-zA-Z0-9])1-azacyclopent-2-en-(\d+)-(yl|ylidene|ylidyne|ylidynyl)(?![a-zA-Z])",
-        r"4,5-dihydro-1H-pyrrol-\1-\2",
-        name,
-    )
-    name = re.sub(
-        r"(?<![a-zA-Z0-9])1-azacyclopent-3-en-(\d+)-(yl|ylidene|ylidyne|ylidynyl)(?![a-zA-Z])",
-        r"2,5-dihydro-1H-pyrrol-\1-\2",
-        name,
-    )
-    name = re.sub(r"(?<![a-zA-Z0-9])1-azacyclopenta-2,4-diene(?![a-zA-Z])", "1H-pyrrole", name)
-    name = re.sub(
-        r"(?<![a-zA-Z0-9])1-azacyclopenta-2,4-dien-(\d+)-(yl|ylidene|ylidyne|ylidynyl)(?![a-zA-Z])",
-        r"1H-pyrrol-\1-\2",
-        name,
-    )
-
     name = re.sub(r"-1-formate\b", "-formate", name)
 
     name = _oxo_group_methyl_to_carbonyl(name)
     name = name.replace("(oxo)methyl", "formyl")
     name = re.sub(r"(?<!thi)oxomethyl\b", "formyl", name)
     name = name.replace("thioxomethyl", "carbonothioyl")
-
-    name = name.replace("1,3-dioxacyclopentan", "1,3-dioxolan")
-    name = name.replace("1,3-dioxacyclopentane", "1,3-dioxolane")
-    name = name.replace("1,3-dioxacyclohexan", "1,3-dioxan")
-    name = name.replace("1,3-dioxacyclohexane", "1,3-dioxane")
-    name = name.replace("1,4-dioxacyclohexan", "1,4-dioxan")
-    name = name.replace("1,4-dioxacyclohexane", "1,4-dioxane")
-    name = name.replace("1,3-oxathiolan", "1,3-oxathiolan")
-    name = name.replace("1,3-oxazolidine", "oxazolidine")
-    name = name.replace("1,3-thiazolidine", "thiazolidine")
 
     name = name.replace("aminoiminomethyl", "carbamimidoyl")
     name = name.replace("amino(imino)methyl", "carbamimidoyl")

@@ -3,6 +3,7 @@
 import re
 from dataclasses import dataclass, field
 
+from .assembly_utils import needs_hyphen
 from .name_operations import ParentSuffixOperation
 from .nomenclature import RULES
 from .rules import multipliers
@@ -160,7 +161,9 @@ def _apply_ketone_to_oxo_ide(text: str, locant: str) -> str:
         stem = explicit_implicit_cation_locant(match.group("stem"))
         oxo_locant = match.group("oxo_locant")
         separator = "-" if match.start() > 0 and match.string[match.start() - 1] not in "- " else ""
-        return f"{separator}{oxo_locant}-oxo-{stem}-{locant}-ide"
+        tail = f"{stem}-{locant}-ide"
+        joint = "-" if needs_hyphen(f"{oxo_locant}-oxo", tail) else ""
+        return f"{separator}{oxo_locant}-oxo{joint}{tail}"
 
     return pattern.sub(repl, text)
 

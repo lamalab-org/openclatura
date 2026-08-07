@@ -33,6 +33,7 @@ from typing import Literal
 
 from rdkit import Chem
 
+from ..hantzsch_widman import hw_parent_template
 from ..molecule import Molecule
 from ..rules import elements as _elements
 from ..rules import multipliers as _multipliers
@@ -146,6 +147,45 @@ _PARENT_RING_TEMPLATES: dict[str, tuple[str, list[str]]] = {
     "tetrahydrofuran": ("O1CCCC1", ["1", "2", "3", "4", "5"]),
     "oxane": ("O1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
     "tetrahydropyran": ("O1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "selenophene": ("[se]1cccc1", ["1", "2", "3", "4", "5"]),
+    "tellurophene": ("[te]1cccc1", ["1", "2", "3", "4", "5"]),
+    "phosphole": ("[pH]1cccc1", ["1", "2", "3", "4", "5"]),
+    "arsole": ("[AsH]1C=CC=C1", ["1", "2", "3", "4", "5"]),
+    "borole": ("B1C=CC=C1", ["1", "2", "3", "4", "5"]),
+    "pentazole": ("[nH]1nnnn1", ["1", "2", "3", "4", "5"]),
+    "phosphinine": ("p1ccccc1", ["1", "2", "3", "4", "5", "6"]),
+    "borinine": ("B1=CC=CC=C1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,3,4-tetrazine": ("N1=NN=NC=C1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,3,5-tetrazine": ("N1=NN=CN=C1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,4,5-tetrazine": ("N1=NC=NN=C1", ["1", "2", "3", "4", "5", "6"]),
+    "pyran": ("O1CC=CC=C1", ["1", "2", "3", "4", "5", "6"]),
+    "thiopyran": ("S1CC=CC=C1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-dioxolane": ("O1OCCC1", ["1", "2", "3", "4", "5"]),
+    "1,3-dioxolane": ("O1COCC1", ["1", "2", "3", "4", "5"]),
+    "1,2-dithiolane": ("S1SCCC1", ["1", "2", "3", "4", "5"]),
+    "1,3-dithiolane": ("S1CSCC1", ["1", "2", "3", "4", "5"]),
+    "1,2-oxathiolane": ("O1SCCC1", ["1", "2", "3", "4", "5"]),
+    "1,3-oxathiolane": ("O1CSCC1", ["1", "2", "3", "4", "5"]),
+    "1,2-dioxane": ("O1OCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-dioxane": ("O1COCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,4-dioxane": ("O1CCOCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-dithiane": ("S1SCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-dithiane": ("S1CSCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,4-dithiane": ("S1CCSCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-oxathiane": ("O1SCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-oxathiane": ("O1CSCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,4-oxathiane": ("O1CCSCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-diazinane": ("N1NCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-diazinane": ("N1CNCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-oxazinane": ("O1NCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-oxazinane": ("O1CNCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-thiazinane": ("S1NCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-thiazinane": ("S1CNCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,3-triazinane": ("N1NNCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,4-triazinane": ("N1NCNCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3,5-triazinane": ("N1CNCNC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3,5-trioxane": ("O1COCOC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3,5-trithiane": ("S1CSCSC1", ["1", "2", "3", "4", "5", "6"]),
 }
 
 # Retained parents reuse the (OPSIN-validated) substituent ring-stem templates —
@@ -192,7 +232,11 @@ def _lookup_parent_template(retained_name: str) -> tuple[str, list[str]] | None:
     if template is not None:
         return template
     hydride = _functional_parent_hydrides().get(retained_name)
-    return _ALL_PARENT_TEMPLATES.get(hydride) if hydride is not None else None
+    if hydride is not None and hydride in _ALL_PARENT_TEMPLATES:
+        return _ALL_PARENT_TEMPLATES[hydride]
+    # A Hantzsch-Widman parent the namer spelled rather than looked up is in no
+    # table, so its skeleton is built from the same spec the name came from.
+    return hw_parent_template(retained_name)
 
 
 # Principal characteristic groups whose structure we can rebuild with high

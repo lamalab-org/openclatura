@@ -122,6 +122,9 @@ class RetainedParentMetadata:
     # a hydro prefix: xanthine is 3,7-dihydro-1H-purine-2,6-dione, never
     # 1H,3H,7H-purine-2,6-dione.
     indicated_hydrogen_count: int = 0
+    # Mancude bonds in the parent hydride.  Zero means a saturated parent, which
+    # has nothing to hydrogenate: piperidine is not 1,2,3,4,5,6-hexahydropyridine.
+    mancude_double_bonds: int = 0
 
 
 @dataclass

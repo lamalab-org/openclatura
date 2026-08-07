@@ -1,6 +1,7 @@
 # openclatura/rules/retained.py
 import itertools
 
+from openclatura.hantzsch_widman import hw_spec_for_name, hw_spec_for_ring
 from openclatura.molecule import Molecule
 from openclatura.nomenclature import RULES
 
@@ -214,6 +215,12 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
     if data_monocycle is not None:
         return data_monocycle, None
 
+    # Everything below counts only N, O and S, so a skeletal P, Se or B would be
+    # read as a carbon and hand back the wrong retained name.  Those rings have
+    # no retained name left to find, so they go straight to the generated one.
+    if any(symbol not in ("C", "N", "O", "S") for symbol in symbols):
+        return _generated_monocycle(mol, path, size, total_bonds, double_bonds)
+
     if _matches_any_retained_signature(
         ("naphthalene", "quinoline", "isoquinoline", "quinazoline", "quinoxaline", "cinnoline"),
         sig,
@@ -342,9 +349,9 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
             "isoindole",
             "benzofuran",
             "benzothiophene",
-            "benzothiazole",
+            "1,3-benzothiazole",
             "1,2-benzothiazole",
-            "benzoxazole",
+            "1,3-benzoxazole",
             "1,2-benzoxazole",
             "benzimidazole",
             "indazole",
@@ -385,18 +392,21 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                         locants = _retained_locants("indole")
                         return "indole", [{rot_path[i]: locants[i] for i in range(9)}]
                 else:
-                    c1 = next(
-                        v
-                        for v in n_neighbors_in_path
-                        if any(internal_degrees[w] == 3 for w in mol.get_neighbors(v) if w in path_set)
-                    )
-                    idx_c1 = path.index(c1)
-                    rot_path = path[idx_c1:] + path[:idx_c1]
-                    if rot_path[1] != n_idx:
-                        rot_path = [rot_path[0]] + rot_path[1:][::-1]
-                    if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
-                        locants = _retained_locants("isoindole")
-                        return "isoindole", [{rot_path[i]: locants[i] for i in range(9)}]
+                    # Both carbons flanking N2 touch a fusion atom, so each is a
+                    # valid C1; the caller picks 1H- or 3H- by locant.
+                    maps = []
+                    for c1 in n_neighbors_in_path:
+                        if not any(internal_degrees[w] == 3 for w in mol.get_neighbors(c1) if w in path_set):
+                            continue
+                        idx_c1 = path.index(c1)
+                        rot_path = path[idx_c1:] + path[:idx_c1]
+                        if rot_path[1] != n_idx:
+                            rot_path = [rot_path[0]] + rot_path[1:][::-1]
+                        if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
+                            locants = _retained_locants("isoindole")
+                            maps.append({rot_path[i]: locants[i] for i in range(9)})
+                    if maps:
+                        return "isoindole", maps
             if o_count == 1 and n_count == 0 and s_count == 0:
                 if "O" not in small_symbols:
                     return None
@@ -438,8 +448,8 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                         rot_path = [rot_path[0]] + rot_path[1:][::-1]
                     if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
                         if rot_path[2] == n_idx:
-                            locants = _retained_locants("benzothiazole")
-                            return "benzothiazole", [{rot_path[i]: locants[i] for i in range(9)}]
+                            locants = _retained_locants("1,3-benzothiazole")
+                            return "1,3-benzothiazole", [{rot_path[i]: locants[i] for i in range(9)}]
                         elif rot_path[1] == n_idx:
                             locants = _retained_locants("1,2-benzothiazole")
                             return "1,2-benzothiazole", [{rot_path[i]: locants[i] for i in range(9)}]
@@ -456,8 +466,8 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                         rot_path = [rot_path[0]] + rot_path[1:][::-1]
                     if internal_degrees[rot_path[3]] == 3 and internal_degrees[rot_path[8]] == 3:
                         if rot_path[2] == n_idx:
-                            locants = _retained_locants("benzoxazole")
-                            return "benzoxazole", [{rot_path[i]: locants[i] for i in range(9)}]
+                            locants = _retained_locants("1,3-benzoxazole")
+                            return "1,3-benzoxazole", [{rot_path[i]: locants[i] for i in range(9)}]
                         elif rot_path[1] == n_idx:
                             locants = _retained_locants("1,2-benzoxazole")
                             return "1,2-benzoxazole", [{rot_path[i]: locants[i] for i in range(9)}]
@@ -630,7 +640,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                 o_idx = next(i for i in path if mol.atoms[i].symbol == "O")
                 dist = min(abs(path.index(n_idx) - path.index(o_idx)), 5 - abs(path.index(n_idx) - path.index(o_idx)))
                 if dist == 1:
-                    return "isoxazolidine", None
+                    return "1,2-oxazolidine", None
                 if dist == 2:
                     return "1,3-oxazolidine", None
             if n_count == 1 and s_count == 1 and o_count == 0:
@@ -638,7 +648,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                 s_idx = next(i for i in path if mol.atoms[i].symbol == "S")
                 dist = min(abs(path.index(n_idx) - path.index(s_idx)), 5 - abs(path.index(n_idx) - path.index(s_idx)))
                 if dist == 1:
-                    return "isothiazolidine", None
+                    return "1,2-thiazolidine", None
                 if dist == 2:
                     return "1,3-thiazolidine", None
 
@@ -708,15 +718,15 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                 s_idx = next(i for i in path if mol.atoms[i].symbol == "S")
                 dist = min(abs(path.index(n_idx) - path.index(s_idx)), 5 - abs(path.index(n_idx) - path.index(s_idx)))
                 if dist == 1:
-                    return "isothiazole", None
-                return "thiazole", None
+                    return "1,2-thiazole", None
+                return "1,3-thiazole", None
             if n_count == 1 and o_count == 1 and s_count == 0:
                 n_idx = next(i for i in path if mol.atoms[i].symbol == "N")
                 o_idx = next(i for i in path if mol.atoms[i].symbol == "O")
                 dist = min(abs(path.index(n_idx) - path.index(o_idx)), 5 - abs(path.index(n_idx) - path.index(o_idx)))
                 if dist == 1:
-                    return "isoxazole", None
-                return "oxazole", None
+                    return "1,2-oxazole", None
+                return "1,3-oxazole", None
 
     if _matches_any_retained_signature(("1,2,3,4-tetrahydronaphthalene",), sig, symbols, deg3_nodes, mol):
         if (
@@ -931,6 +941,28 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
         if _matches_retained_signature(name, sig, symbols, deg3_nodes, mol):
             return name, None
 
+    # Last, so a fully saturated ring still reaches its own retained name:
+    # a partly saturated mancude heterocycle is that parent plus hydro prefixes.
+    hydro_monocycle = _match_hydro_monocycle_retained(mol, path, size, total_bonds, double_bonds, symbols)
+    if hydro_monocycle is not None:
+        return hydro_monocycle, None
+
+    # Only once every retained name has been ruled out: pyrazolidine is retained,
+    # so the ring must not be spelled 1,2-diazolidine just because it can be.
+    return _generated_monocycle(mol, path, size, total_bonds, double_bonds)
+
+
+def _generated_monocycle(
+    mol: Molecule, path: list[int], size: int, total_bonds: int, double_bonds: int
+) -> tuple[str, None] | None:
+    """The spelled-out Hantzsch-Widman parent for a monocycle, mancude or hydro."""
+
+    if total_bonds != size:
+        return None
+    for hydro in (False, True):
+        generated = _generated_monocycle_name(mol, path, double_bonds, hydro=hydro)
+        if generated is not None:
+            return generated, None
     return None
 
 
@@ -942,10 +974,40 @@ def _match_data_monocycle_retained(
     double_bonds: int,
     symbols: list[str],
 ) -> str | None:
+    return _match_monocycle_spec(mol, path, size, total_bonds, double_bonds, symbols, hydro=False)
+
+
+def _match_hydro_monocycle_retained(
+    mol: Molecule,
+    path: list[int],
+    size: int,
+    total_bonds: int,
+    double_bonds: int,
+    symbols: list[str],
+) -> str | None:
+    return _match_monocycle_spec(mol, path, size, total_bonds, double_bonds, symbols, hydro=True)
+
+
+def _match_monocycle_spec(
+    mol: Molecule,
+    path: list[int],
+    size: int,
+    total_bonds: int,
+    double_bonds: int,
+    symbols: list[str],
+    *,
+    hydro: bool,
+) -> str | None:
     if total_bonds != size:
         return None
     for spec in RULES.retained.monocycle_specs:
-        if size != spec["size"] or double_bonds != spec["double_bonds"]:
+        if size != spec["size"]:
+            continue
+        if hydro:
+            # Partly saturated heterocycles only: cyclohexene is not tetrahydrobenzene.
+            if not spec.get("symbols") or not 0 < spec["double_bonds"] - double_bonds < spec["double_bonds"]:
+                continue
+        elif double_bonds != spec["double_bonds"]:
             continue
         if spec.get("no_cumulated_double_bonds") and not _has_no_cumulated_double_bonds(mol, path):
             continue
@@ -957,13 +1019,97 @@ def _match_data_monocycle_retained(
         expected_gaps = spec.get("hetero_gap_multiset")
         if expected_gaps is not None and _hetero_gap_multiset(mol, path) != sorted(expected_gaps):
             continue
+        expected_gap_cycle = spec.get("hetero_gap_cycle")
+        if expected_gap_cycle is not None and _hetero_gap_cycle(mol, path) != list(expected_gap_cycle):
+            continue
         expected_chalcogen = spec.get("chalcogen_nitrogen_distance_multiset")
         if expected_chalcogen is not None and _chalcogen_nitrogen_distance_multiset(mol, path) != sorted(
             expected_chalcogen
         ):
             continue
+        if hydro and mancude_monocycle_hydro_plan(mol, path, spec["name"]) is None:
+            continue
         return spec["name"]
     return None
+
+
+def _generated_monocycle_name(mol: Molecule, path: list[int], double_bonds: int, *, hydro: bool) -> str | None:
+    """Fall back to a spelled-out Hantzsch-Widman parent when no table entry fits."""
+
+    spec = hw_spec_for_ring(mol, path)
+    if spec is None:
+        return None
+    if hydro:
+        if not 0 < spec["double_bonds"] - double_bonds < spec["double_bonds"]:
+            return None
+        if mancude_monocycle_hydro_plan(mol, path, spec["name"]) is None:
+            return None
+    elif double_bonds != spec["double_bonds"]:
+        return None
+    return spec["name"]
+
+
+# Single-bonded in the mancude parent itself, so never a hydro position.
+FIXED_SATURATED_RING_ELEMENTS = ("O", "S", "Se", "Te")
+
+
+def mancude_monocycle_hydro_plan(
+    mol: Molecule, path: list[int], retained_name: str | None
+) -> tuple[int, int, list[int]] | None:
+    """How a partly saturated retained mancude monocycle spells its saturation.
+
+    Returns (indicated, added, citable): the ring atoms able to carry a cited
+    hydrogen, and how many of them are the parent's own indicated hydrogen and
+    how many are added hydrogen.  Anything left over takes a hydro prefix.
+    None when the ring is not a partly saturated form of the parent.
+
+    The two kinds are counted apart because they are numbered apart: indicated
+    hydrogen outranks the principal group, added hydrogen does not.  A chalcogen
+    is single-bonded in the mancude parent already, so it is neither.  Each
+    exocyclic double bond buys one added position -- the ``(1H)`` of
+    pyridin-2(1H)-one -- which is why 1H-pyrrole-2,5-dione needs no hydro prefix.
+    """
+
+    spec = next(
+        (
+            spec
+            for spec in RULES.retained.monocycle_specs
+            if spec["name"] == retained_name and spec.get("double_bonds") and len(path) == spec["size"]
+        ),
+        None,
+    )
+    if spec is None:
+        spec = hw_spec_for_name(retained_name or "")
+        if spec is None or not spec.get("double_bonds") or len(path) != spec["size"]:
+            return None
+    parent_double_bonds = int(spec["double_bonds"])
+    if _count_double_bonds_in_ring(mol, path) >= parent_double_bonds:
+        return None
+
+    path_set = set(path)
+    exocyclic = {idx for idx in path if _has_exocyclic_double_bond(mol, idx, path_set)}
+    saturated = [idx for idx in path if idx not in exocyclic and _ring_bonds_all_single(mol, idx, path_set)]
+    fixed = [idx for idx in saturated if mol.atoms[idx].symbol in FIXED_SATURATED_RING_ELEMENTS]
+    citable = [idx for idx in saturated if idx not in fixed]
+
+    parent_saturated = len(path) - 2 * parent_double_bonds
+    indicated = min(max(parent_saturated - len(fixed), 0), len(citable))
+    added = min(len(exocyclic), len(citable) - indicated)
+    if (len(citable) - indicated - added) % 2:
+        return None
+    return indicated, added, citable
+
+
+def _has_exocyclic_double_bond(mol: Molecule, atom_idx: int, path_set: set[int]) -> bool:
+    return any(
+        neighbor not in path_set and (bond := mol.get_bond(atom_idx, neighbor)) and bond.order > 1
+        for neighbor in mol.get_neighbors(atom_idx)
+    )
+
+
+def _ring_bonds_all_single(mol: Molecule, atom_idx: int, path_set: set[int]) -> bool:
+    bonds = [bond for n in mol.get_neighbors(atom_idx) if n in path_set and (bond := mol.get_bond(atom_idx, n))]
+    return bool(bonds) and all(bond.order == 1 for bond in bonds)
 
 
 def _retained_fused_spec(name: str) -> dict | None:
@@ -1033,7 +1179,7 @@ def _degree_counts_tuple(counts: dict[str, int]) -> tuple[int, ...]:
 
 
 def _symbol_counts_match(symbols: list[str], expected: dict[str, int]) -> bool:
-    for symbol in ("N", "O", "S"):
+    for symbol in set(expected) | {symbol for symbol in symbols if symbol != "C"}:
         if symbols.count(symbol) != int(expected.get(symbol, 0)):
             return False
     hetero_count = sum(int(value) for value in expected.values())
@@ -1041,7 +1187,7 @@ def _symbol_counts_match(symbols: list[str], expected: dict[str, int]) -> bool:
 
 
 def _hetero_distance_multiset(mol: Molecule, path: list[int]) -> list[int]:
-    hetero_indices = [idx for idx, atom_idx in enumerate(path) if mol.atoms[atom_idx].symbol in {"N", "O", "S"}]
+    hetero_indices = [idx for idx, atom_idx in enumerate(path) if mol.atoms[atom_idx].symbol != "C"]
     if len(hetero_indices) < 2:
         return []
     size = len(path)
@@ -1068,14 +1214,32 @@ def _chalcogen_nitrogen_distance_multiset(mol: Molecule, path: list[int]) -> lis
 
 
 def _hetero_gap_multiset(mol: Molecule, path: list[int]) -> list[int]:
-    hetero_indices = sorted(idx for idx, atom_idx in enumerate(path) if mol.atoms[atom_idx].symbol in {"N", "O", "S"})
+    return sorted(_hetero_gaps(mol, path))
+
+
+def _hetero_gaps(mol: Molecule, path: list[int]) -> list[int]:
+    hetero_indices = sorted(idx for idx, atom_idx in enumerate(path) if mol.atoms[atom_idx].symbol != "C")
     if len(hetero_indices) < 3:
         return []
     size = len(path)
-    gaps = [
+    return [
         hetero_indices[(idx + 1) % len(hetero_indices)] - hetero_indices[idx]
         if idx + 1 < len(hetero_indices)
         else size - hetero_indices[idx] + hetero_indices[0]
         for idx in range(len(hetero_indices))
     ]
-    return sorted(gaps)
+
+
+def _hetero_gap_cycle(mol: Molecule, path: list[int]) -> list[int]:
+    """Canonical cyclic gap sequence between heteroatoms; the sorted multiset
+    cannot separate 1,2,4,5- from 1,2,3,5-tetrazine, this can."""
+
+    gaps = _hetero_gaps(mol, path)
+    if not gaps:
+        return []
+    rotations = [
+        tuple(sequence[offset:] + sequence[:offset])
+        for sequence in (gaps, gaps[::-1])
+        for offset in range(len(gaps))
+    ]
+    return list(min(rotations))

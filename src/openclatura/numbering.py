@@ -5,8 +5,9 @@ from dataclasses import dataclass
 
 from .locants import get_atom_locants, get_bond_locants, parse_locant
 from .molecule import Molecule
-from .namer_config import INDICATED_H_RETAINED_NAMES
+from .namer_config import INDICATED_H_ELEMENTS, cites_indicated_hydrogen
 from .naming_data import mapping
+from .rules.retained import mancude_monocycle_hydro_plan
 
 NUMBERING_CRITERIA = mapping("numbering_criteria")
 
@@ -25,6 +26,7 @@ class NumberingPreference:
     principal: tuple[int, ...]
     hetero_by_priority: tuple[tuple[int, ...], ...]
     indicated_hydrogen: tuple[int, ...]
+    hydro: tuple[int, ...]
     unsaturation: tuple[int, ...]
     substituent_and_unsaturation: tuple[int, ...]
     substituent_citation: tuple[int, ...]
@@ -37,6 +39,8 @@ class NumberingPreference:
             return self.hetero_by_priority
         if criterion == "indicated_hydrogen":
             return self.indicated_hydrogen
+        if criterion == "hydro":
+            return self.hydro
         if criterion == "unsaturation":
             return self.unsaturation
         if criterion == "substituent_and_unsaturation":
@@ -240,6 +244,7 @@ def _numbering_preference(
         retained_name=retained_name,
         include_all_ring_carbons=False,
     )
+    hydro = _hydro_locants(mol, oriented_path, retained_name)
     substituent_locants = get_atom_locants(oriented_path, set(substituent_mapping.keys()))
     double_bonds, triple_bonds = get_bond_locants(mol, oriented_path, is_bicycle, is_spiro, is_polycycle)
     unsaturation = () if retained_name else tuple(sorted(double_bonds + triple_bonds))
@@ -248,11 +253,32 @@ def _numbering_preference(
         principal=principal,
         hetero_by_priority=hetero_by_priority,
         indicated_hydrogen=indicated_hydrogen,
+        hydro=hydro,
         unsaturation=unsaturation,
         substituent_and_unsaturation=substituent_and_unsaturation,
         substituent_citation=_substituent_citation_locants(oriented_path, substituent_mapping),
         stereochemistry=_stereochemistry_sequence(mol, oriented_path),
     )
+
+
+def _hydro_locants(mol: Molecule, oriented_path: list[int], retained_name: str | None) -> tuple[int, ...]:
+    """Locants a hydro derivative of a retained mancude parent would cite."""
+
+    split = _mancude_hydro_split(mol, oriented_path, retained_name)
+    return () if split is None else tuple(get_atom_locants(oriented_path, split[1]))
+
+
+def _mancude_hydro_split(
+    mol: Molecule, oriented_path: list[int], retained_name: str | None
+) -> tuple[set[int], set[int]] | None:
+    """Split a hydro derivative's saturated positions into cited H and hydro."""
+
+    plan = mancude_monocycle_hydro_plan(mol, oriented_path, retained_name)
+    if plan is None:
+        return None
+    indicated, _, citable = plan
+    citable = sorted(citable, key=oriented_path.index)
+    return set(citable[:indicated]), set(citable[indicated:])
 
 
 def _heteroatom_locants_by_priority(mol: Molecule, oriented_path: list[int]) -> tuple[tuple[int, ...], ...]:
@@ -291,8 +317,11 @@ def _indicated_hydrogen_like_atoms(
     retained_name: str | None,
     include_all_ring_carbons: bool,
 ) -> set[int]:
+    split = _mancude_hydro_split(mol, oriented_path, retained_name)
+    if split is not None:
+        return split[0]
     charged_tetrazole = retained_name == "tetrazole" and any(mol.atoms[a_idx].charge for a_idx in oriented_path)
-    if retained_name not in INDICATED_H_RETAINED_NAMES and not include_all_ring_carbons:
+    if not cites_indicated_hydrogen(retained_name) and not include_all_ring_carbons:
         return set()
     if charged_tetrazole:
         return set()
@@ -324,7 +353,7 @@ def _has_indicated_hydrogen_metadata(
 
 def _has_retained_indicated_hydrogen_proxy(mol: Molecule, atom_idx: int, parent_atoms: set[int]) -> bool:
     atom = mol.atoms[atom_idx]
-    if atom.symbol not in {"C", "N"}:
+    if atom.symbol not in INDICATED_H_ELEMENTS:
         return False
     ring_bonds = [
         mol.get_bond(atom_idx, neighbor) for neighbor in mol.get_neighbors(atom_idx) if neighbor in parent_atoms

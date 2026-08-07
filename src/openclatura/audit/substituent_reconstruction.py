@@ -19,6 +19,7 @@ import re
 
 from rdkit import Chem
 
+from ..hantzsch_widman import hw_generated_names, hw_parent_template
 from ..rules import multipliers as _multipliers
 from ..rules import stems as _stems
 from .von_baeyer_parse import parse_hantzsch_widman as _parse_hantzsch_widman
@@ -163,9 +164,13 @@ _RING_STEMS: dict[str, tuple[str, list[str]]] = {
     "thiophene": ("s1cccc1", ["1", "2", "3", "4", "5"]),
     "pyrrole": ("[nH]1cccc1", ["1", "2", "3", "4", "5"]),
     "oxazole": ("o1cncc1", ["1", "2", "3", "4", "5"]),
+    "1,3-oxazole": ("o1cncc1", ["1", "2", "3", "4", "5"]),
     "isoxazole": ("o1nccc1", ["1", "2", "3", "4", "5"]),
+    "1,2-oxazole": ("o1nccc1", ["1", "2", "3", "4", "5"]),
     "thiazole": ("s1cncc1", ["1", "2", "3", "4", "5"]),
+    "1,3-thiazole": ("s1cncc1", ["1", "2", "3", "4", "5"]),
     "isothiazole": ("s1nccc1", ["1", "2", "3", "4", "5"]),
+    "1,2-thiazole": ("s1nccc1", ["1", "2", "3", "4", "5"]),
     "imidazole": ("[nH]1cncc1", ["1", "2", "3", "4", "5"]),
     "pyrazole": ("[nH]1nccc1", ["1", "2", "3", "4", "5"]),
     "naphthalene": (
@@ -1671,14 +1676,23 @@ def _ring_yl(stem: str, loc: str) -> Numbered | None:
     ring = _match_ring_stem(stem)
     if ring is None:
         return None
-    smiles, labels = _RING_STEMS[ring]
+    entry = _ring_stem_template(ring)
+    if entry is None:
+        return None
+    smiles, labels = entry
     if loc not in labels:
         return None
     return _numbered_from_smiles(smiles, labels, attach_locant=loc)
 
 
+def _ring_stem_template(ring: str) -> tuple[str, list[str]] | None:
+    """The ring's skeleton, from the table or built from its Hantzsch-Widman spec."""
+
+    return _RING_STEMS.get(ring) or hw_parent_template(ring)
+
+
 def _match_ring_stem(stem: str) -> str | None:
-    for ring in _RING_STEMS:
+    for ring in (*_RING_STEMS, *hw_generated_names()):
         base = ring[:-1] if ring.endswith("e") else ring
         if stem == base or stem == ring:
             return ring

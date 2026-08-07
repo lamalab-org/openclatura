@@ -582,11 +582,16 @@ def test_dihydro_locants_bind_to_parent_scope_without_broad_fallback():
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
     dihydro_locants = next(token for token in assembly.data["name_token_spans"] if token["text"] == "4,5")
 
+    dihydro = next(token for token in assembly.data["name_token_spans"] if token["text"] == "dihydro")
+
     assert analysis.name == "4,5-dihydro-1H-pyrrole-3-carbaldehyde"
-    assert dihydro_locants["source"] == "dihydro_locant_fallback"
+    assert dihydro_locants["source"] == "typed_rewrite"
     assert dihydro_locants["confidence"] == "derived"
-    assert dihydro_locants["ownership"] == "locanted_hydro"
-    assert dihydro_locants["token_kind"] == "hydro"
+    assert dihydro_locants["ownership"] == "exact"
+    assert dihydro_locants["token_kind"] == "locant"
+    assert dihydro_locants["atoms"] == [5, 6]
+    assert dihydro["token_kind"] == "hydro"
+    assert dihydro["atoms"] == [5, 6]
 
 
 def test_carbonyl_prefix_morphology_is_bound_from_renderer_data():
@@ -609,9 +614,9 @@ def test_unmatched_retained_parent_morphology_uses_operation_scope():
     dioxolan = next(token for token in assembly.data["name_token_spans"] if token["text"] == "dioxolan")
 
     assert analysis.name == "1,3-dioxolan-4-imine"
-    assert dioxolan["source"] == "operation_trace"
+    assert dioxolan["source"] == "typed_rewrite"
     assert dioxolan["confidence"] == "derived"
-    assert dioxolan["ownership"] == "operation_scope"
+    assert dioxolan["ownership"] == "exact"
     assert set(dioxolan["atoms"]) == {1, 2, 3, 4, 5}
 
 
@@ -1181,12 +1186,14 @@ def test_retained_dihydro_and_indicated_h_tokens_avoid_broad_fallback():
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
     tokens = {token["text"]: token for token in assembly.data["name_token_spans"]}
 
-    assert analysis.name == "2,5-dihydro-1H-pyrrole-2,5-dione"
-    assert tokens["dihydro"]["source"] == "grammar_token"
-    assert tokens["dihydro"]["ownership"] == "grammar_scope"
-    assert tokens["H"]["source"] == "indicated_hydrogen_fallback"
+    # The two saturated positions are the =O carbons, which the -dione suffix
+    # already accounts for, so only the pyrrole N is left to cite.
+    assert analysis.name == "1H-pyrrole-2,5-dione"
+    assert "dihydro" not in tokens
+    assert tokens["H"]["source"] == "typed_rewrite"
     assert tokens["H"]["token_kind"] == "hydro"
-    assert tokens["H"]["ownership"] == "locanted_hydro"
+    assert tokens["H"]["ownership"] == "exact"
+    assert tokens["H"]["atoms"] == [2]
 
 
 def test_recursive_substituent_tree_tokens_keep_nested_scopes_local():
@@ -2053,7 +2060,7 @@ def test_a_parent_chain_is_not_also_cited_as_a_prefix_on_its_own_ligand():
 def test_homonuclear_chain_parent_keeps_a_ring_closed_through_the_chain():
     # A branch bonded to the chain twice closes a ring; naming it as a
     # substituent would open 1,2-dithiolane and cite its carbons twice.
-    assert name_smiles("C1CCSS1") == "1,2-dithiacyclopentane"
+    assert name_smiles("C1CCSS1") == "1,2-dithiolane"
     assert name_smiles("N1NCCC1") == "pyrazolidine"
 
 
@@ -2378,7 +2385,7 @@ def test_terminal_thioformyl_subgraph_is_graph_derived():
 def test_thioester_is_not_perceived_as_ring_thioaldehyde():
     generated = name_smiles("CCSC(=S)C1=CCC=CN1")
 
-    assert generated == "2-((ethylsulfanyl)(thioxo)methyl)-1-azacyclohexa-2,5-diene"
+    assert generated == "2-((ethylsulfanyl)(thioxo)methyl)-1,4-dihydropyridine"
 
 
 def test_cyclic_thioamide_is_not_perceived_as_thioaldehyde():
@@ -2390,7 +2397,7 @@ def test_cyclic_thioamide_is_not_perceived_as_thioaldehyde():
 def test_cyclic_sulfone_ring_is_not_perceived_as_sulfonate_suffix():
     generated = name_smiles("C=CC(=O)NC1C(C)COS1(=O)=O")
 
-    assert generated == "N-(4-methyl-2,2-dioxo-1-oxa-2lambda^6-thiacyclopentan-3-yl)prop-2-enamide"
+    assert generated == "N-(4-methyl-2,2-dioxo-1,2-oxathiolan-3-yl)prop-2-enamide"
 
 
 def test_nitrile_oxide_is_not_rendered_as_isocyano():
@@ -2528,7 +2535,7 @@ def test_hydrazone_suffix_preserves_unlocanted_ez_stereo():
 def test_hydrazone_stereo_does_not_duplicate_unlocanted_descriptor():
     generated = name_smiles(r"C/C=N\Nc1nc2ccccc2o1")
 
-    assert generated == "(Z)-N-(benzoxazol-2-yl)acetaldehyde hydrazone"
+    assert generated == "(Z)-N-(1,3-benzoxazol-2-yl)acetaldehyde hydrazone"
 
 
 def test_hydrazone_n_substituent_uses_suffix_modifier_for_nitrogen_parent():
@@ -3368,7 +3375,7 @@ def test_no_bare_retained_alias_infers_a_canonical_hydride_tautomer():
     bare_hydride_aliases = {
         alias
         for template in templates
-        if template.default_indicated_h
+        if template.indicated_hydrogen_count
         for alias in template.aliases
         if "H-" not in alias
     }
@@ -3388,8 +3395,8 @@ def test_no_bare_retained_alias_infers_a_canonical_hydride_tautomer():
 
 def test_indicated_hydrogen_follows_graph_tautomer_but_not_hydrogen_free_spiro_carbon():
     cases = {
-        "c1ccc2c(c1)CN=C2C1=NCc2ccccc21": "3-(3H-isoindol-1-yl)-1H-isoindole",
-        "O=C(OCCNC1=NCc2ccccc21)c1ccccc1": "2-((3H-isoindol-1-yl)amino)ethyl benzoate",
+        "c1ccc2c(c1)CN=C2C1=NCc2ccccc21": "3-(1H-isoindol-3-yl)-1H-isoindole",
+        "O=C(OCCNC1=NCc2ccccc21)c1ccccc1": "2-((1H-isoindol-3-yl)amino)ethyl benzoate",
         "FN1CCC2(C=Nc3ccccc32)CC1": "1'-fluorospiro[indole-3,4'-piperidine]",
     }
 
@@ -4538,6 +4545,7 @@ def test_numbering_preference_uses_data_ordered_criteria():
         principal=(2,),
         hetero_by_priority=((1,),),
         indicated_hydrogen=(),
+        hydro=(),
         unsaturation=(3,),
         substituent_and_unsaturation=(3, 4),
         substituent_citation=(4,),
@@ -5238,10 +5246,10 @@ def test_complex_spiro_fused_systems_do_not_use_linear_dispiro_renderer():
 
 def test_pyopsin_regression_names_preserve_terminal_olate_charge():
     cases = {
-        "[NH3+]CC1=C([O-])OC=N1": "4-(ammoniomethyl)oxazol-5-olate",
+        "[NH3+]CC1=C([O-])OC=N1": "4-(ammoniomethyl)-1,3-oxazol-5-olate",
         "C[NH2+]CC1=C([O-])OC=C1": "3-((methylammonio)methyl)furan-2-olate",
         "[NH3+]CC1=C([O-])OC=C1": "3-(ammoniomethyl)furan-2-olate",
-        "C[NH2+]CC1=NOC([O-])=C1": "3-((methylammonio)methyl)isoxazol-5-olate",
+        "C[NH2+]CC1=NOC([O-])=C1": "3-((methylammonio)methyl)-1,2-oxazol-5-olate",
         "[NH3+]CC1=CC(O)=C([O-])O1": "5-(ammoniomethyl)-3-hydroxyfuran-2-olate",
     }
 
@@ -5255,8 +5263,8 @@ def test_pyopsin_regression_names_preserve_retained_ring_anions():
         "[NH3+]CC#CC1=NC=N[N-]1": "3-(1,2,4-triazol-1-ide-5-yl)prop-2-yn-1-aminium",
         "CC([NH3+])C1=CN=N[N-]1": "1-(1,2,3-triazol-1-ide-5-yl)ethan-1-aminium",
         "[NH3+]CC1=N[N-]N=N1": "1-(tetrazol-3-ide-5-yl)methanaminium",
-        "[NH3+]C[C-]1OC(=O)C=C1": "5-(ammoniomethyl)-2-oxo-1-oxacyclopent-3-en-5-ide",
-        "[NH3+]CCC1=N[N-]C(=O)O1": "5-(2-ammonioethyl)-2-oxo-1-oxa-3,4-diazacyclopent-4-en-3-ide",
+        "[NH3+]C[C-]1OC(=O)C=C1": "5-(ammoniomethyl)-2-oxofuran-5-ide",
+        "[NH3+]CCC1=N[N-]C(=O)O1": "5-(2-ammonioethyl)-2-oxo-1,3,4-oxadiazol-3-ide",
     }
 
     for smiles, expected in cases.items():
@@ -5310,7 +5318,7 @@ def test_pyopsin_regression_names_preserve_carbanion_suffix_locants():
     cases = {
         "C[NH2+]CC(=O)[CH-]C=O": "4-(methylammonio)-3-oxobutan-2-ide-1-al",
         "NC=[NH+][C-](C#N)C#N": "2-(aminomethylideneammonio)propane-2-ide-1,3-dinitrile",
-        "[NH2+]=C1O[C-](C=C1)C#N": "5-iminio-1-oxacyclopent-3-ene-2-ide-2-carbonitrile",
+        "[NH2+]=C1O[C-](C=C1)C#N": "5-iminio-2H-furan-2-ide-2-carbonitrile",
     }
 
     for smiles, expected in cases.items():
@@ -5319,8 +5327,8 @@ def test_pyopsin_regression_names_preserve_carbanion_suffix_locants():
 
 def test_pyopsin_regression_names_preserve_zwitterionic_parent_suffix_order():
     cases = {
-        "[NH3+]C1=CC(=O)NC(=O)[CH-]1": "4-ammonio-1-azacyclohex-3-ene-5-ide-2,6-dione",
-        "NC1=NC(N)=[NH+][N-]C1=N": "6-imino-1,2,4-triazacyclohexa-2,4-dien-2-ium-1-ide-3,5-diamine",
+        "[NH3+]C1=CC(=O)NC(=O)[CH-]1": "4-ammonio-1H,3H-pyridine-3-ide-2,6-dione",
+        "NC1=NC(N)=[NH+][N-]C1=N": "6-imino-1,2,4-triazin-2-ium-1-ide-3,5-diamine",
         "[NH3+][C-]1C=CC2=C1N=NO2": "2-oxa-3,4-diazabicyclo[3.3.0]octa-1(5),3,7-trien-6-ide-6-aminium",
     }
 
@@ -5330,7 +5338,7 @@ def test_pyopsin_regression_names_preserve_zwitterionic_parent_suffix_order():
 
 def test_unclassified_anions_do_not_emit_terminal_locant_ide():
     cases = {
-        "NC1=[NH+]C(=N)N=C[N-]1": "6-imino-1,3,5-triazacyclohexa-1,4-dien-1-ium-2-amine",
+        "NC1=[NH+]C(=N)N=C[N-]1": "4-imino-1,3,5-triazin-1-ide-3-ium-2-amine",
         # No longer unclassified: the chain-nitrile anion placement gives this
         # carbanion a verified spelling, and the old neutral name read back as
         # the +1 cation because it dropped the anion entirely.
@@ -5495,7 +5503,7 @@ def test_anionic_ketone_parent_names_keep_parent_descriptor_intact():
         "O=C1[CH-][NH+]2CCC2=C1": "3-oxo-1-azoniabicyclo[3.2.0]hept-4-en-2-ide",
         "O=C1C=C[NH+]2CC[C-]12": "4-oxo-1-azoniabicyclo[3.2.0]hept-2-en-5-ide",
         "O=C1[CH-]NC2=C1C[NH2+]C2": "4-oxo-2,7-diazabicyclo[3.3.0]oct-1(5)-en-7-ium-3-ide",
-        "CC(=O)[C-]1C[NH2+]CC1=O": "4-(acetyl)-3-oxo-pyrrolidin-1-ium-4-ide",
+        "CC(=O)[C-]1C[NH2+]CC1=O": "4-(acetyl)-3-oxopyrrolidin-1-ium-4-ide",
     }
 
     for smiles, expected in cases.items():
@@ -5730,7 +5738,7 @@ def test_charge_separated_diazo_hypervalent_ring_templates_do_not_use_imino_amin
 
 def test_terminal_chalcogen_imides_render_as_imino_prefixes():
     assert name_smiles("N=S1C=CC1") == "1-imino-1lambda^4-thiacyclobut-2-ene"
-    assert name_smiles("N=[Se]1C=CC=C1") == "1-imino-1lambda^4-selenacyclopenta-2,4-diene"
+    assert name_smiles("N=[Se]1C=CC=C1") == "1-iminoselenophene"
 
 
 def test_group_13_14_central_atoms_have_a_parent_hydride():
@@ -5791,7 +5799,7 @@ def test_charge_separated_terminal_n3_renders_as_azido_role():
 def test_azine_retained_and_simple_ring_sides_are_graph_bound():
     assert (
         name_smiles("C1=CC(C=NN=C2SCCS2)C=C1")
-        == "cyclopenta-2,4-dien-1-carbaldehyde 1,3-dithiacyclopentan-2-ylidenehydrazone"
+        == "cyclopenta-2,4-dien-1-carbaldehyde 1,3-dithiolan-2-ylidenehydrazone"
     )
 
 
@@ -5825,10 +5833,12 @@ def test_simple_rooted_carbanion_substituent_preserves_charge():
 
 def test_cyclic_peroxy_esters_render_as_oxo_dioxacycles():
     cases = {
-        "O=C1OOCCCCC1C1CCCCCCC1": "4-cyclooctyl-1,2-dioxacyclooctan-3-one",
+        # Ring sizes 3-10 take a Hantzsch-Widman stem; the twelve-membered ring
+        # is past that range and stays on replacement nomenclature.
+        "O=C1OOCCCCC1C1CCCCCCC1": "4-cyclooctyl-1,2-dioxocan-3-one",
         "O=C1CCCCCCC(=O)OOCC1": "1,2-dioxacyclododecane-3,10-dione",
         "Cc1ccc2c(c1)C=CC(=O)OO2": "9-methyl-2,3-dioxabicyclo[5.4.0]undeca-1(7),5,8,10-tetraen-4-one",
-        "CC(C)=CCC/C(C)=C1\\OOC1=O": "(4Z)-4-(6-methylhept-5-en-2-ylidene)-1,2-dioxacyclobutan-3-one",
+        "CC(C)=CCC/C(C)=C1\\OOC1=O": "(4Z)-4-(6-methylhept-5-en-2-ylidene)-1,2-dioxetan-3-one",
     }
 
     for smiles, expected in cases.items():

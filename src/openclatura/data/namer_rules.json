@@ -44,6 +44,7 @@
     "values": {
       "chain": [
         "principal",
+        "hydro",
         "hetero_by_priority",
         "indicated_hydrogen",
         "unsaturation",
@@ -55,6 +56,7 @@
         "hetero_by_priority",
         "indicated_hydrogen",
         "principal",
+        "hydro",
         "unsaturation",
         "substituent_and_unsaturation",
         "substituent_citation",
@@ -66,6 +68,8 @@
     "bluebook_rule": "P-14.7, P-22.2, P-25; retained heterocycle names and indicated hydrogen locants  Phenanthrolines whose oxo derivatives cite every saturated position are included; acridine, phenazine and 1,10-phenanthroline are not, because their added hydrogen is not yet emitted and the name would be ambiguous.",
     "values": [
       "pyrrole",
+      "arsole",
+      "phosphole",
       "imidazole",
       "pyrazole",
       "1,2,3-triazole",
@@ -90,7 +94,9 @@
       "2,8-phenanthroline",
       "3,5-phenanthroline",
       "3,6-phenanthroline",
-      "4,5-phenanthroline"
+      "4,5-phenanthroline",
+      "pyran",
+      "thiopyran"
     ]
   },
   "single_atom_cations": {
@@ -480,7 +486,12 @@
       "C",
       "N",
       "O",
-      "S"
+      "S",
+      "Se",
+      "Te",
+      "P",
+      "As",
+      "B"
     ]
   },
   "ring_descriptor_templates": {
@@ -1731,7 +1742,7 @@
     ]
   },
   "retained_monocycle_specs": {
-    "bluebook_rule": "P-22 and P-25; table-driven retained monocyclic parent recognition. Carbon count is inferred from ring size minus listed heteroatoms.",
+    "bluebook_rule": "P-22 and P-25; the genuinely retained monocyclic parents only. Rings whose name follows from the Hantzsch-Widman rules (azinane, 1,4-dioxane, 1,3,4-oxadiazole) are spelled by openclatura.hantzsch_widman instead of listed here. Carbon count is inferred from ring size minus listed heteroatoms.",
     "values": [
       {
         "name": "piperidine",
@@ -1785,64 +1796,22 @@
         }
       },
       {
-        "name": "oxolane",
+        "name": "pyrazolidine",
         "size": 5,
         "double_bonds": 0,
         "symbols": {
-          "O": 1
-        }
-      },
-      {
-        "name": "thiolane",
-        "size": 5,
-        "double_bonds": 0,
-        "symbols": {
-          "S": 1
-        }
-      },
-      {
-        "name": "isoxazolidine",
-        "size": 5,
-        "double_bonds": 0,
-        "symbols": {
-          "N": 1,
-          "O": 1
+          "N": 2
         },
         "hetero_distance_multiset": [
           1
         ]
       },
       {
-        "name": "1,3-oxazolidine",
+        "name": "imidazolidine",
         "size": 5,
         "double_bonds": 0,
         "symbols": {
-          "N": 1,
-          "O": 1
-        },
-        "hetero_distance_multiset": [
-          2
-        ]
-      },
-      {
-        "name": "isothiazolidine",
-        "size": 5,
-        "double_bonds": 0,
-        "symbols": {
-          "N": 1,
-          "S": 1
-        },
-        "hetero_distance_multiset": [
-          1
-        ]
-      },
-      {
-        "name": "1,3-thiazolidine",
-        "size": 5,
-        "double_bonds": 0,
-        "symbols": {
-          "N": 1,
-          "S": 1
+          "N": 2
         },
         "hetero_distance_multiset": [
           2
@@ -1901,48 +1870,6 @@
         "no_cumulated_double_bonds": true
       },
       {
-        "name": "1,2,3-triazine",
-        "size": 6,
-        "double_bonds": 3,
-        "symbols": {
-          "N": 3
-        },
-        "hetero_gap_multiset": [
-          1,
-          1,
-          4
-        ],
-        "no_cumulated_double_bonds": true
-      },
-      {
-        "name": "1,2,4-triazine",
-        "size": 6,
-        "double_bonds": 3,
-        "symbols": {
-          "N": 3
-        },
-        "hetero_gap_multiset": [
-          1,
-          2,
-          3
-        ],
-        "no_cumulated_double_bonds": true
-      },
-      {
-        "name": "1,3,5-triazine",
-        "size": 6,
-        "double_bonds": 3,
-        "symbols": {
-          "N": 3
-        },
-        "hetero_gap_multiset": [
-          2,
-          2,
-          2
-        ],
-        "no_cumulated_double_bonds": true
-      },
-      {
         "name": "furan",
         "size": 5,
         "double_bonds": 2,
@@ -1994,34 +1921,6 @@
         "no_cumulated_double_bonds": true
       },
       {
-        "name": "1,2,3-triazole",
-        "size": 5,
-        "double_bonds": 2,
-        "symbols": {
-          "N": 3
-        },
-        "hetero_gap_multiset": [
-          1,
-          1,
-          3
-        ],
-        "no_cumulated_double_bonds": true
-      },
-      {
-        "name": "1,2,4-triazole",
-        "size": 5,
-        "double_bonds": 2,
-        "symbols": {
-          "N": 3
-        },
-        "hetero_gap_multiset": [
-          1,
-          2,
-          2
-        ],
-        "no_cumulated_double_bonds": true
-      },
-      {
         "name": "tetrazole",
         "size": 5,
         "double_bonds": 2,
@@ -2031,207 +1930,48 @@
         "no_cumulated_double_bonds": true
       },
       {
-        "name": "isothiazole",
+        "name": "selenophene",
         "size": 5,
         "double_bonds": 2,
         "symbols": {
-          "N": 1,
-          "S": 1
+          "Se": 1
         },
-        "hetero_distance_multiset": [
-          1
-        ],
         "no_cumulated_double_bonds": true
       },
       {
-        "name": "thiazole",
+        "name": "tellurophene",
         "size": 5,
         "double_bonds": 2,
         "symbols": {
-          "N": 1,
-          "S": 1
+          "Te": 1
         },
-        "hetero_distance_multiset": [
-          2
-        ],
         "no_cumulated_double_bonds": true
       },
       {
-        "name": "isoxazole",
+        "name": "pentazole",
         "size": 5,
         "double_bonds": 2,
         "symbols": {
-          "N": 1,
+          "N": 5
+        },
+        "no_cumulated_double_bonds": true
+      },
+      {
+        "name": "pyran",
+        "size": 6,
+        "double_bonds": 2,
+        "symbols": {
           "O": 1
         },
-        "hetero_distance_multiset": [
-          1
-        ],
         "no_cumulated_double_bonds": true
       },
       {
-        "name": "oxazole",
-        "size": 5,
+        "name": "thiopyran",
+        "size": 6,
         "double_bonds": 2,
         "symbols": {
-          "N": 1,
-          "O": 1
-        },
-        "hetero_distance_multiset": [
-          2
-        ],
-        "no_cumulated_double_bonds": true
-      },
-      {
-        "name": "1,2,3-oxadiazole",
-        "size": 5,
-        "double_bonds": 2,
-        "symbols": {
-          "N": 2,
-          "O": 1
-        },
-        "hetero_gap_multiset": [
-          1,
-          1,
-          3
-        ],
-        "chalcogen_nitrogen_distance_multiset": [
-          1,
-          2
-        ],
-        "no_cumulated_double_bonds": true
-      },
-      {
-        "name": "1,2,4-oxadiazole",
-        "size": 5,
-        "double_bonds": 2,
-        "symbols": {
-          "N": 2,
-          "O": 1
-        },
-        "hetero_gap_multiset": [
-          1,
-          2,
-          2
-        ],
-        "chalcogen_nitrogen_distance_multiset": [
-          1,
-          2
-        ],
-        "no_cumulated_double_bonds": true
-      },
-      {
-        "name": "1,2,5-oxadiazole",
-        "size": 5,
-        "double_bonds": 2,
-        "symbols": {
-          "N": 2,
-          "O": 1
-        },
-        "hetero_gap_multiset": [
-          1,
-          1,
-          3
-        ],
-        "chalcogen_nitrogen_distance_multiset": [
-          1,
-          1
-        ],
-        "no_cumulated_double_bonds": true
-      },
-      {
-        "name": "1,3,4-oxadiazole",
-        "size": 5,
-        "double_bonds": 2,
-        "symbols": {
-          "N": 2,
-          "O": 1
-        },
-        "hetero_gap_multiset": [
-          1,
-          2,
-          2
-        ],
-        "chalcogen_nitrogen_distance_multiset": [
-          2,
-          2
-        ],
-        "no_cumulated_double_bonds": true
-      },
-      {
-        "name": "1,2,3-thiadiazole",
-        "size": 5,
-        "double_bonds": 2,
-        "symbols": {
-          "N": 2,
           "S": 1
         },
-        "hetero_gap_multiset": [
-          1,
-          1,
-          3
-        ],
-        "chalcogen_nitrogen_distance_multiset": [
-          1,
-          2
-        ],
-        "no_cumulated_double_bonds": true
-      },
-      {
-        "name": "1,2,4-thiadiazole",
-        "size": 5,
-        "double_bonds": 2,
-        "symbols": {
-          "N": 2,
-          "S": 1
-        },
-        "hetero_gap_multiset": [
-          1,
-          2,
-          2
-        ],
-        "chalcogen_nitrogen_distance_multiset": [
-          1,
-          2
-        ],
-        "no_cumulated_double_bonds": true
-      },
-      {
-        "name": "1,2,5-thiadiazole",
-        "size": 5,
-        "double_bonds": 2,
-        "symbols": {
-          "N": 2,
-          "S": 1
-        },
-        "hetero_gap_multiset": [
-          1,
-          1,
-          3
-        ],
-        "chalcogen_nitrogen_distance_multiset": [
-          1,
-          1
-        ],
-        "no_cumulated_double_bonds": true
-      },
-      {
-        "name": "1,3,4-thiadiazole",
-        "size": 5,
-        "double_bonds": 2,
-        "symbols": {
-          "N": 2,
-          "S": 1
-        },
-        "hetero_gap_multiset": [
-          1,
-          2,
-          2
-        ],
-        "chalcogen_nitrogen_distance_multiset": [
-          2,
-          2
-        ],
         "no_cumulated_double_bonds": true
       }
     ]
@@ -2514,7 +2254,7 @@
         ]
       },
       {
-        "name": "benzothiazole",
+        "name": "1,3-benzothiazole",
         "signature": {
           "size": 9,
           "total_bonds": 10,
@@ -2570,7 +2310,7 @@
         ]
       },
       {
-        "name": "benzoxazole",
+        "name": "1,3-benzoxazole",
         "signature": {
           "size": 9,
           "total_bonds": 10,

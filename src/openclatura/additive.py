@@ -4,7 +4,8 @@ from .assembly_parts import AssemblyParts, SubstituentItem
 from .locants import parse_locant
 from .molecule import Molecule
 from .name_operations import HydroOperation
-from .namer_config import INDICATED_H_RETAINED_NAMES
+from .namer_config import INDICATED_H_ELEMENTS, cites_indicated_hydrogen
+from .rules.retained import mancude_monocycle_hydro_plan
 
 
 def _saturated_ring_carbons(mol: Molecule, numbered_path: list[int], get_loc) -> set[str]:
@@ -46,12 +47,24 @@ def _declared_sites_are_unambiguous(mol: Molecule, numbered_path: list[int], get
 def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     """Add indicated hydrogen locants for retained ring names."""
 
-    if parts.retained_name not in INDICATED_H_RETAINED_NAMES:
+    plan = mancude_monocycle_hydro_plan(mol, numbered_path, parts.retained_name)
+    if plan is not None:
+        _add_monocycle_hydro(parts, plan, get_loc)
+        return
+    # A retained fused parent brings its own metadata, which is what says how
+    # many saturated positions it supports and how the surplus is cited.  Its
+    # name already spells its indicated hydrogen ("2H-1-benzopyran"), so only
+    # the surplus is emitted here -- citing it again gives "2H-2H-".
+    name_states_indicated_h = not cites_indicated_hydrogen(parts.retained_name)
+    metadata = parts.retained_parent_metadata
+    if name_states_indicated_h and metadata is None:
+        return
+    # A saturated parent has no mancude bond to hydrogenate.
+    if metadata is not None and metadata.mancude_double_bonds == 0 and name_states_indicated_h:
         return
     if parts.retained_name == "tetrazole" and any(mol.atoms[idx].charge for idx in numbered_path):
         return
     oxo_derivative = parts.principal_group is not None and parts.principal_group.key == "ketone"
-    metadata = parts.retained_parent_metadata
     default_indicated_h = set(metadata.default_indicated_h) if metadata is not None else set()
     # The declared locants say how many indicated hydrogens the parent hydride
     # supports, and where they sit in the unsubstituted parent.  Where they sit
@@ -71,14 +84,23 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         default_indicated_h = observed
     fusion_locants = set(metadata.fusion_locants) if metadata is not None else set()
     candidates: list[tuple[str, int]] = []
+    hydro_only: list[tuple[str, int]] = []
     for idx in numbered_path:
         atom = mol.atoms[idx]
         locant = str(get_loc(idx))
+        # An oxo prefix must cite its saturation; an -one/-dione suffix implies it.
+        if not oxo_derivative and metadata is not None and _is_oxo_ring_site(mol, idx, numbered_path):
+            hydro_only.append((locant, idx))
+            continue
         # Saturated carbon atoms elsewhere in a fused ring system are hydro
         # derivatives, not additional indicated-H sites.  Carbon-bound H is
         # emitted only where the retained parent plan declares it (9H-xanthene,
         # indene, fluorene, and similar parent hydrides).
         if metadata is not None and default_indicated_h and atom.is_carbon and locant not in default_indicated_h:
+            # Saturated all the same, so it is a hydro position even though it
+            # is not an indicated-H site: 2,3-dihydro-1H-indole.
+            if _is_saturated_ring_site(mol, idx, numbered_path):
+                hydro_only.append((locant, idx))
             continue
         if oxo_derivative:
             # A ring nitrogen at a saturated position is a hydrogenated position
@@ -105,7 +127,7 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 continue
             if default_indicated_h and locant not in default_indicated_h:
                 continue
-        if atom.symbol in ["N", "C"]:
+        if atom.symbol in INDICATED_H_ELEMENTS:
             ring_bonds = [mol.get_bond(idx, n) for n in mol.get_neighbors(idx) if n in numbered_path]
             fusion_carbon_h = (
                 metadata is not None
@@ -147,9 +169,10 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     # surplus.  An odd one stays as indicated hydrogen (1H,9H-purin-6-one),
     # which is still a readable name.
     supported = metadata.indicated_hydrogen_count if metadata is not None else len(candidates)
-    if metadata is not None and len(candidates) > supported and (len(candidates) - supported) % 2 == 0:
+    surplus_count = len(candidates) + len(hydro_only) - supported
+    if metadata is not None and surplus_count > 0 and surplus_count % 2 == 0:
         candidates.sort(key=lambda candidate: parse_locant(candidate[0]))
-        surplus = candidates[supported:]
+        surplus = sorted(candidates[supported:] + hydro_only, key=lambda item: parse_locant(item[0]))
         candidates = candidates[:supported]
         parts.hydro_operations.append(
             HydroOperation(
@@ -161,6 +184,9 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             )
         )
 
+    if name_states_indicated_h:
+        return
+
     for locant, atom_idx in candidates:
         parts.indicated_hydrogens.append(locant)
         parts.hydro_operations.append(
@@ -170,6 +196,63 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 locants=(locant,),
                 atom_ids=(atom_idx,),
                 operation_kind="indicated_hydrogen",
+            )
+        )
+
+
+def _is_saturated_ring_site(mol: Molecule, atom_idx: int, numbered_path: list[int]) -> bool:
+    atom = mol.atoms[atom_idx]
+    ring_bonds = [
+        bond for n in mol.get_neighbors(atom_idx) if n in numbered_path and (bond := mol.get_bond(atom_idx, n))
+    ]
+    return (
+        bool(ring_bonds)
+        and all(bond.order == 1 for bond in ring_bonds)
+        and atom.explicit_h_count + atom.total_h_count > 0
+    )
+
+
+def _is_oxo_ring_site(mol: Molecule, atom_idx: int, numbered_path: list[int]) -> bool:
+    atom = mol.atoms[atom_idx]
+    if not atom.is_carbon:
+        return False
+    ring_bonds = [
+        bond for n in mol.get_neighbors(atom_idx) if n in numbered_path and (bond := mol.get_bond(atom_idx, n))
+    ]
+    if not ring_bonds or any(bond.order != 1 for bond in ring_bonds):
+        return False
+    return any(
+        mol.atoms[n].symbol == "O" and (bond := mol.get_bond(atom_idx, n)) is not None and bond.order == 2
+        for n in mol.get_neighbors(atom_idx)
+        if n not in numbered_path
+    )
+
+
+def _add_monocycle_hydro(parts: AssemblyParts, plan: tuple[int, list[int]], get_loc) -> None:
+    """Cite a partly saturated retained monocycle's saturation."""
+
+    indicated, added, citable = plan
+    ordered = sorted(((str(get_loc(idx)), idx) for idx in citable), key=lambda item: parse_locant(item[0]))
+    for locant, atom_idx in ordered[: indicated + added]:
+        parts.indicated_hydrogens.append(locant)
+        parts.hydro_operations.append(
+            HydroOperation(
+                key="indicated_hydrogen",
+                reason="Retained unsaturated parent requires indicated-hydrogen locant.",
+                locants=(locant,),
+                atom_ids=(atom_idx,),
+                operation_kind="indicated_hydrogen",
+            )
+        )
+    hydro = ordered[indicated + added :]
+    if hydro:
+        parts.hydro_operations.append(
+            HydroOperation(
+                key="additive_hydrogen",
+                reason="Saturation beyond the retained parent is cited as a hydro prefix.",
+                locants=tuple(locant for locant, _ in hydro),
+                atom_ids=tuple(atom_idx for _, atom_idx in hydro),
+                operation_kind="additive_hydrogen",
             )
         )
 

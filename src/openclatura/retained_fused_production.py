@@ -74,7 +74,11 @@ def production_retained_fused_parent(
             mol,
             parent_atoms,
             include_disabled=True,
-            allow_nonaromatic=principal_key == "ketone",
+            # A hydro derivative saturates positions the parent holds a mancude
+            # bond at, so the skeleton has to match with them saturated.  How
+            # many may be, and whether they can be cited, is decided by
+            # _added_hydrogen_is_citable below.
+            allow_nonaromatic=True,
         )
         if match.template.name in PRODUCTION_RETAINED_FUSED_PARENTS
         and match.template.derivative_production_enabled
@@ -93,7 +97,7 @@ def production_retained_fused_parent(
     if not maps:
         return None
     template = matches[0].template
-    if not _added_hydrogen_is_citable(mol, parent_atoms, template):
+    if not _added_hydrogen_is_citable(mol, matches[0]):
         return None
     return ProductionRetainedFusedParent(
         name=parent_name,
@@ -102,12 +106,13 @@ def production_retained_fused_parent(
             default_indicated_h=template.default_indicated_h,
             fusion_locants=template.fusion_atoms,
             derivative_stem=template.derivative_stem,
-            indicated_hydrogen_count=_indicated_hydrogen_count(template),
+            indicated_hydrogen_count=template.indicated_hydrogen_count,
+            mancude_double_bonds=template.mancude_double_bonds or 0,
         ),
     )
 
 
-def _added_hydrogen_is_citable(mol: Molecule, parent_atoms: set[int], template) -> bool:
+def _added_hydrogen_is_citable(mol: Molecule, match: RetainedFusedTemplateMatch) -> bool:
     """Whether every saturated position of the parent can be spelt out.
 
     A lactam such as 4-oxoquinoline-3-carboxamide saturates two ring positions
@@ -117,37 +122,43 @@ def _added_hydrogen_is_citable(mol: Molecule, parent_atoms: set[int], template) 
     parents wired into the indicated-hydrogen machinery can do that.  A parent
     needing an uncitable added hydrogen falls back to von Baeyer, which states
     its saturation positionally and so stays unambiguous.
+
+    Only a position the parent itself holds a mancude bond at can be saturated
+    "beyond" it.  Dibenzofuran's oxygen and quinolizine's bridgehead nitrogen
+    are single-bonded in the parent hydride, so they are not added hydrogen --
+    the template records that as ``aromatic: false``.
     """
 
+    template = match.template
+    atom_by_locant = template.atom_by_locant
+    mancude_positions = 0
     saturated = 0
-    for atom in parent_atoms:
+    for atom, locant in match.atom_to_locant.items():
+        if not atom_by_locant[locant].aromatic:
+            continue
+        mancude_positions += 1
         ring_bonds = [
             bond
             for neighbor in mol.get_neighbors(atom)
-            if neighbor in parent_atoms and (bond := mol.get_bond(atom, neighbor)) is not None
+            if neighbor in match.matched_atoms and (bond := mol.get_bond(atom, neighbor)) is not None
         ]
         if ring_bonds and sum(bond.order for bond in ring_bonds) == len(ring_bonds):
             saturated += 1
-    if saturated <= _indicated_hydrogen_count(template):
+    # A fully saturated ring system is not a hydro derivative of this parent;
+    # it has its own name, and von Baeyer states its saturation positionally.
+    if saturated and saturated >= mancude_positions:
+        return False
+    # Indicated-hydrogen sites the template already marks non-mancude were not
+    # counted above, so they must not be subtracted again.
+    already_excluded = sum(1 for locant in template.default_indicated_h if not atom_by_locant[locant].aromatic)
+    surplus = saturated - (template.indicated_hydrogen_count - already_excluded)
+    if surplus <= 0:
+        return True
+    # A hydro prefix saturates whole double bonds, so an even surplus is citable
+    # as one: 1,2,3,4-tetrahydroquinoline, 4-oxo-1,4-dihydroquinoline-3-carboxamide.
+    if surplus % 2 == 0:
         return True
     return template.name in INDICATED_H_RETAINED_NAMES
-
-
-def _indicated_hydrogen_count(template) -> int:
-    """How many indicated hydrogens this mancude parent hydride supports.
-
-    A parent that declares its own positions (1H-indole, 9H-xanthene) supports
-    exactly that many.  Otherwise the mancude double-bond count leaves the
-    skeletal atoms it cannot pair: purine's nine atoms and four double bonds
-    leave one, which is why purine is cited as 7H- or 9H-.  A parent with
-    neither is fully mancude and supports none.
-    """
-
-    if template.default_indicated_h:
-        return len(template.default_indicated_h)
-    if template.mancude_double_bonds:
-        return len(template.atoms) - 2 * template.mancude_double_bonds
-    return 0
 
 
 def _neutral_component(mol: Molecule, atoms: set[int]) -> bool:
