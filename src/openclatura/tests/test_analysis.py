@@ -5798,8 +5798,7 @@ def test_charge_separated_terminal_n3_renders_as_azido_role():
 
 def test_azine_retained_and_simple_ring_sides_are_graph_bound():
     assert (
-        name_smiles("C1=CC(C=NN=C2SCCS2)C=C1")
-        == "cyclopenta-2,4-dien-1-carbaldehyde 1,3-dithiolan-2-ylidenehydrazone"
+        name_smiles("C1=CC(C=NN=C2SCCS2)C=C1") == "cyclopenta-2,4-dien-1-carbaldehyde 1,3-dithiolan-2-ylidenehydrazone"
     )
 
 

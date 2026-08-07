@@ -29,6 +29,8 @@ def cites_indicated_hydrogen(retained_name: str | None) -> bool:
 
 def _monocycle_spec(name: str) -> dict | None:
     return next((spec for spec in RULES.retained.monocycle_specs if spec["name"] == name), None)
+
+
 INDICATED_H_ELEMENTS = frozenset({"C", "N", "P", "As", "Sb", "Bi", "B", "Si", "Ge", "Sn", "Pb"})
 ALKYL_OXY_PREFIXES = RULES.heteroatoms.alkyl_oxy_prefixes
 SIMPLE_SULFANYL_PREFIXES = RULES.heteroatoms.simple_sulfanyl_prefixes

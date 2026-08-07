@@ -1238,8 +1238,6 @@ def _hetero_gap_cycle(mol: Molecule, path: list[int]) -> list[int]:
     if not gaps:
         return []
     rotations = [
-        tuple(sequence[offset:] + sequence[:offset])
-        for sequence in (gaps, gaps[::-1])
-        for offset in range(len(gaps))
+        tuple(sequence[offset:] + sequence[:offset]) for sequence in (gaps, gaps[::-1]) for offset in range(len(gaps))
     ]
     return list(min(rotations))

@@ -92,9 +92,7 @@ class RetainedFusedGraphTemplate:
 
         if self.default_indicated_h:
             return len(self.default_indicated_h)
-        return sum(
-            1 for atom in self.atoms if not atom.aromatic and atom.symbol not in FIXED_SATURATED_RING_ELEMENTS
-        )
+        return sum(1 for atom in self.atoms if not atom.aromatic and atom.symbol not in FIXED_SATURATED_RING_ELEMENTS)
 
 
 @dataclass(frozen=True)
