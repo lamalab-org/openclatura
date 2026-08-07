@@ -98,7 +98,6 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                     if bond.order == 2:
                         double_bonds += 1
 
-    deg_counts = tuple(sorted(internal_degrees.values()))
     deg3_nodes = [u for u, d in internal_degrees.items() if d == 3]
 
     data_monocycle = _match_data_monocycle_retained(
