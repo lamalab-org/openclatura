@@ -66,15 +66,7 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         return
     oxo_derivative = parts.principal_group is not None and parts.principal_group.key == "ketone"
     default_indicated_h = set(metadata.default_indicated_h) if metadata is not None else set()
-    # The declared locants say how many indicated hydrogens the parent hydride
-    # supports, and where they sit in the unsubstituted parent.  Where they sit
-    # in *this* molecule is a property of this molecule: 1H- and 2H-indene are
-    # different compounds.  So when the structure presents exactly as many
-    # saturated carbons as the parent supports, those are the indicated-H sites
-    # and their real locants replace the declared ones.  A different count means
-    # the extra positions are hydro derivatives, which are cited separately, and
-    # the declared locants stand.  A declared site whose element repeats in the
-    # ring system is exempt: there the locant identifies which isomer this is.
+
     observed = _saturated_ring_carbons(mol, numbered_path, get_loc)
     if (
         default_indicated_h
@@ -85,7 +77,7 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     fusion_locants = set(metadata.fusion_locants) if metadata is not None else set()
     candidates: list[tuple[str, int]] = []
     hydro_only: list[tuple[str, int]] = []
-    oxo_sites = {idx for idx in numbered_path if _is_oxo_ring_site(mol, idx, numbered_path)}
+
     for idx in numbered_path:
         atom = mol.atoms[idx]
         locant = str(get_loc(idx))
@@ -93,10 +85,7 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         if not oxo_derivative and metadata is not None and _is_oxo_ring_site(mol, idx, numbered_path):
             hydro_only.append((locant, idx))
             continue
-        # Saturated carbon atoms elsewhere in a fused ring system are hydro
-        # derivatives, not additional indicated-H sites.  Carbon-bound H is
-        # emitted only where the retained parent plan declares it (9H-xanthene,
-        # indene, fluorene, and similar parent hydrides).
+
         if metadata is not None and default_indicated_h and atom.is_carbon and locant not in default_indicated_h:
             # Saturated all the same, so it is a hydro position even though it
             # is not an indicated-H site: 2,3-dihydro-1H-indole.
@@ -104,21 +93,13 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 hydro_only.append((locant, idx))
             continue
         if oxo_derivative:
-            # A ring nitrogen at a saturated position is a hydrogenated position
-            # of the parent hydride whether it holds the hydrogen or a
-            # substituent, so theophylline is
-            # 1,3-dimethyl-3,7-dihydro-1H-purine-2,6-dione: N1 and N3 count even
-            # though both are methylated.
             ring_bond_order = sum(
                 bond.order for n in mol.get_neighbors(idx) if n in numbered_path and (bond := mol.get_bond(idx, n))
             )
             substituted_ring_nitrogen = atom.symbol == "N" and ring_bond_order == 2
             if atom.explicit_h_count + atom.total_h_count <= 0 and not substituted_ring_nitrogen:
                 continue
-            # Hydrogen introduced next to =O is implied by ``-one``/``-dione``
-            # and must not become a new indicated-H locant.  Carbon is allowed
-            # only when the retained parent itself declares that H locant, as
-            # in 9H-xanthene; this excludes the spurious 2H in carbazol-1-one.
+
             ring_neighbor_count = sum(neighbor in numbered_path for neighbor in mol.get_neighbors(idx))
             if (
                 atom.is_carbon
@@ -144,9 +125,6 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             if indicated_h_site or fusion_carbon_h:
                 candidates.append((locant, idx))
 
-    # A hydrogenated fusion carbon changes the retained-parent hydride state.
-    # It is expressed together with the other affected locants as one additive
-    # hydro operation (for example 1,4-dihydropurine), not as indicated H.
     supported = metadata.indicated_hydrogen_count if metadata is not None else len(candidates)
     additive_hydrogen = any(
         mol.atoms[atom_idx].is_carbon and locant in fusion_locants for locant, atom_idx in candidates

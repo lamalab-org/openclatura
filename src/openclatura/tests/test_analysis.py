@@ -1,7 +1,6 @@
 import re
 import pytest
 
-import openclatura.rules.retained as retained_rules
 from openclatura import (
     RULES,
     NamingEngine,
