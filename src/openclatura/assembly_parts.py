@@ -117,13 +117,7 @@ class RetainedParentMetadata:
     default_indicated_h: tuple[str, ...] = ()
     fusion_locants: tuple[str, ...] = ()
     derivative_stem: str | None = None
-    # How many indicated hydrogens the mancude parent hydride itself supports.
-    # Saturated positions beyond this many are *added* hydrogen and are cited as
-    # a hydro prefix: xanthine is 3,7-dihydro-1H-purine-2,6-dione, never
-    # 1H,3H,7H-purine-2,6-dione.
     indicated_hydrogen_count: int = 0
-    # Mancude bonds in the parent hydride.  Zero means a saturated parent, which
-    # has nothing to hydrogenate: piperidine is not 1,2,3,4,5,6-hexahydropyridine.
     mancude_double_bonds: int = 0
 
 
@@ -143,16 +137,7 @@ class AssemblyParts:
     is_triple_attach: bool = False
     attachment_locant: int | str = 1
     retained_name: str | None = None
-    # Set when ``retained_name`` is one of the retained names that spells the
-    # principal characteristic group as well as the ring -- ``phenol`` is benzene
-    # *and* its ``-ol``.  The suffix must then not be rendered a second time, and
-    # the parent binding owns the group's atoms.
     retained_absorbs_principal_group: bool = False
-    # Set when the whole substituent word is a retained name that spells its own
-    # branch as well as its skeleton -- ``benzyl`` is the methylene *and* the
-    # phenyl on it.  The absorbed branches are moved out of ``substituents`` so
-    # they are not also cited as prefixes, and are kept here so the parent
-    # binding can claim the atoms the retained word now names.
     retained_substituent_name: str | None = None
     retained_absorbed_substituents: list[SubstituentItem] = field(default_factory=list)
     retained_parent_metadata: RetainedParentMetadata | None = None

@@ -68,7 +68,7 @@ def production_retained_fused_parent(
         if group.attachment_carbon in parent_atoms:
             feature_atoms.add(group.attachment_carbon)
 
-    def gated(allow_nonaromatic: bool) -> list[RetainedFusedTemplateMatch]:
+    def gated(allow_nonaromatic: bool, allow_relocated_indicated_h: bool = False) -> list[RetainedFusedTemplateMatch]:
         return [
             match
             for match in match_retained_fused_templates(
@@ -76,16 +76,14 @@ def production_retained_fused_parent(
                 parent_atoms,
                 include_disabled=True,
                 allow_nonaromatic=allow_nonaromatic,
+                allow_relocated_indicated_h=allow_relocated_indicated_h,
             )
             if match.template.name in PRODUCTION_RETAINED_FUSED_PARENTS
             and match.template.derivative_production_enabled
             and (principal_key != "ketone" or _has_mancude_unsaturation(mol, parent_atoms, match))
         ]
 
-    # Relaxing aromaticity is what lets a hydro derivative match its mancude
-    # parent, but it also drops the constraint telling tautomers apart, so an
-    # exact match wins: 3H-indole must not come back as 1H-indole.
-    matches = gated(False) or gated(True)
+    matches = gated(False) or gated(True) or gated(False, True)
     if not matches:
         return None
 

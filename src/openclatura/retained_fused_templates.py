@@ -7,7 +7,7 @@ keyed by locants and graph structure, not by SMILES or SMARTS strings.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cache, lru_cache
 from typing import Any
 
@@ -183,12 +183,13 @@ def _match_all_retained_fused_template(
     template: RetainedFusedGraphTemplate,
     *,
     allow_nonaromatic: bool = False,
+    allow_relocated_indicated_h: bool = False,
 ) -> list[RetainedFusedTemplateMatch]:
     atom_set = set(atom_indices)
     if len(atom_set) != len(template.atoms):
         return []
 
-    atom_by_locant = template.atom_by_locant
+    atom_by_locant = _relocatable_atom_by_locant(template) if allow_relocated_indicated_h else template.atom_by_locant
     template_degrees = _template_degrees(template)
     molecule_degrees = {
         atom_idx: sum(1 for neighbor in mol.get_neighbors(atom_idx) if neighbor in atom_set) for atom_idx in atom_set
@@ -217,13 +218,60 @@ def _match_all_retained_fused_template(
         return []
 
     assignments = _match_locants_backtracking(mol, locants_by_constraint, candidates, template_neighbors)
-    return [_template_match_from_assignment(template, atom_set, assignment) for assignment in assignments]
+    if not allow_relocated_indicated_h:
+        return [_template_match_from_assignment(template, atom_set, assignment) for assignment in assignments]
+    relocated = [
+        (assignment, indicated_h)
+        for assignment in assignments
+        if (indicated_h := _relocated_indicated_h(mol, template, atom_set, assignment)) is not None
+    ]
+    return [
+        _template_match_from_assignment(template, atom_set, assignment, indicated_h=indicated_h)
+        for assignment, indicated_h in relocated
+    ]
+
+
+def _relocatable_atom_by_locant(template: RetainedFusedGraphTemplate) -> dict[str, RetainedFusedAtomTemplate]:
+    """The template with its declared carbon indicated-H site free to move.
+
+    Nitrogen sites stay pinned: they are what tells 1H- from 3H-.
+    """
+
+    return {
+        locant: (
+            replace(atom, saturated=False, default_h=False)
+            if locant in template.default_indicated_h and atom.symbol == "C"
+            else atom
+        )
+        for locant, atom in template.atom_by_locant.items()
+    }
+
+
+def _relocated_indicated_h(
+    mol: Molecule,
+    template: RetainedFusedGraphTemplate,
+    atom_set: set[int],
+    assignment: dict[str, int],
+) -> tuple[str, ...] | None:
+    """Where the indicated hydrogen sits here, or None for a hydro derivative."""
+
+    saturated = tuple(
+        locant
+        for locant in template.locants
+        if template.atom_by_locant[locant].symbol not in FIXED_SATURATED_RING_ELEMENTS
+        and _is_saturated_site(mol, assignment[locant], atom_set)
+    )
+    if len(saturated) != template.indicated_hydrogen_count:
+        return None
+    return saturated
 
 
 def _template_match_from_assignment(
     template: RetainedFusedGraphTemplate,
     atom_set: set[int],
     assignment: dict[str, int],
+    *,
+    indicated_h: tuple[str, ...] | None = None,
 ) -> RetainedFusedTemplateMatch:
     locant_to_atom = {locant: assignment[locant] for locant in template.locants}
     atom_to_locant = {atom_idx: locant for locant, atom_idx in locant_to_atom.items()}
@@ -232,7 +280,7 @@ def _template_match_from_assignment(
         atom_to_locant=atom_to_locant,
         locant_to_atom=locant_to_atom,
         matched_atoms=frozenset(atom_set),
-        indicated_h=template.default_indicated_h,
+        indicated_h=template.default_indicated_h if indicated_h is None else indicated_h,
         trace=(f"Matched retained fused template {template.name}.",),
     )
 
@@ -251,6 +299,7 @@ def match_retained_fused_templates(
     *,
     include_disabled: bool = False,
     allow_nonaromatic: bool = False,
+    allow_relocated_indicated_h: bool = False,
 ) -> list[RetainedFusedTemplateMatch]:
     """Return retained fused template matches ranked by retained priority."""
 
@@ -263,6 +312,7 @@ def match_retained_fused_templates(
             atom_indices,
             template,
             allow_nonaromatic=allow_nonaromatic,
+            allow_relocated_indicated_h=allow_relocated_indicated_h,
         )
     ]
     return sorted(
