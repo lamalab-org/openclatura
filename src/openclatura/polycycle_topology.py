@@ -787,8 +787,6 @@ def _dedupe_paths(paths: list[tuple[int, ...]]) -> list[tuple[int, ...]]:
 def adjacency_from_edges(
     nodes: set[int] | frozenset[int], edges: set[tuple[int, int]] | frozenset[tuple[int, int]]
 ) -> dict[int, set[int]]:
-    """Return a node -> neighbor-set map over the given edge set."""
-
     adjacency: dict[int, set[int]] = {node: set() for node in nodes}
     for first, second in edges:
         adjacency[first].add(second)

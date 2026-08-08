@@ -435,3 +435,20 @@ def test_hydro_oxo_analogs_do_not_false_match_mancude_production_plans():
     assert "acridin" not in generated_names[1]
     assert "xanthen" not in generated_names[2]
     assert _normalized_pairs_match(opsin_smiles, regenerated_smiles)
+
+
+def test_zzprobe(valid_oxo_rows):
+    names = [r.name for r in name_many([x.smiles for x in valid_oxo_rows], processes=1)]
+    bad = [
+        (r.parent, r.name, g)
+        for r, g in zip(valid_oxo_rows, names)
+        if r.parent not in UNCITABLE_ADDED_HYDROGEN_PARENTS and r.root.lower() not in (g or "").lower()
+    ]
+    print(f"\n{len(valid_oxo_rows)} rows, {len(bad)} failures")
+    seen = set()
+    for p, n, g in bad:
+        if p in seen:
+            continue
+        seen.add(p)
+        print(f"  {p:22} {n:36} -> {g}")
+    print("affected parents:", sorted(seen))

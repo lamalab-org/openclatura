@@ -20,6 +20,19 @@ def _match_fused_templates(mol: Molecule, path: list[int]) -> tuple[str, list[di
     return name, maps
 
 
+def _match_monocycle_templates(mol: Molecule, path: list[int], double_bonds: int) -> str | None:
+    """Name a monocycle from the same graph templates the fused parents use.
+
+    Templates constrain elements and connectivity but not how saturated the ring
+    is, so the count is checked here: piperidine is not 1,4-dihydropyridine.
+    """
+
+    for match in match_retained_fused_templates(mol, path, allow_nonaromatic=True):
+        if (match.template.mancude_double_bonds or 0) == double_bonds:
+            return match.template.name
+    return None
+
+
 def _is_plain_hydro_derivative(mol: Molecule, path: list[int]) -> bool:
     """Whether the saturation is only hydrogen, so a hydro prefix can state it.
 
@@ -100,16 +113,14 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
 
     deg3_nodes = [u for u, d in internal_degrees.items() if d == 3]
 
-    data_monocycle = _match_data_monocycle_retained(
-        mol,
-        path,
-        size,
-        total_bonds,
-        double_bonds,
-        symbols,
-    )
+    data_monocycle = _match_data_monocycle_retained(mol, path, size, total_bonds, double_bonds, symbols)
     if data_monocycle is not None:
         return data_monocycle, None
+
+    if total_bonds == size:
+        monocycle = _match_monocycle_templates(mol, path, double_bonds)
+        if monocycle is not None:
+            return monocycle, None
 
     if any(symbol not in ("C", "N", "O", "S") for symbol in symbols):
         return _generated_monocycle(mol, path, size, total_bonds, double_bonds)
@@ -120,171 +131,6 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
         fused = _match_fused_templates(mol, path)
         if fused is not None:
             return fused
-
-    if total_bonds == size:
-        if size == 3 and double_bonds == 0:
-            # One heteroatom in a three-ring: every carbon is equivalent, so the
-            # numbering these names imply is the only one available.
-            if n_count == 1 and o_count == 0 and s_count == 0:
-                return "aziridine", None
-            if o_count == 1 and n_count == 0 and s_count == 0:
-                return "oxirane", None
-            if s_count == 1 and n_count == 0 and o_count == 0:
-                return "thiirane", None
-        if size == 4 and double_bonds == 0:
-            if n_count == 1 and o_count == 0 and s_count == 0:
-                return "azetidine", None
-        if size == 6 and double_bonds == 0:
-            if n_count == 1 and o_count == 0 and s_count == 0:
-                return "piperidine", None
-            if o_count == 1 and n_count == 0 and s_count == 0:
-                return "oxane", None
-            if s_count == 1 and n_count == 0 and o_count == 0:
-                return "thiane", None
-            if n_count == 2 and o_count == 0 and s_count == 0:
-                n_indices = [i for i in path if mol.atoms[i].symbol == "N"]
-                dist = min(
-                    abs(path.index(n_indices[0]) - path.index(n_indices[1])),
-                    6 - abs(path.index(n_indices[0]) - path.index(n_indices[1])),
-                )
-                if dist == 3:
-                    return "piperazine", None
-            if n_count == 1 and o_count == 1 and s_count == 0:
-                n_idx = next(i for i in path if mol.atoms[i].symbol == "N")
-                o_idx = next(i for i in path if mol.atoms[i].symbol == "O")
-                dist = min(abs(path.index(n_idx) - path.index(o_idx)), 6 - abs(path.index(n_idx) - path.index(o_idx)))
-                if dist == 3:
-                    return "morpholine", None
-            if n_count == 1 and s_count == 1 and o_count == 0:
-                n_idx = next(i for i in path if mol.atoms[i].symbol == "N")
-                s_idx = next(i for i in path if mol.atoms[i].symbol == "S")
-                dist = min(abs(path.index(n_idx) - path.index(s_idx)), 6 - abs(path.index(n_idx) - path.index(s_idx)))
-                if dist == 3:
-                    return "thiomorpholine", None
-        if size == 5 and double_bonds == 0:
-            if n_count == 1 and o_count == 0 and s_count == 0:
-                return "pyrrolidine", None
-            if o_count == 1 and n_count == 0 and s_count == 0:
-                return "oxolane", None
-            if s_count == 1 and n_count == 0 and o_count == 0:
-                return "thiolane", None
-            if n_count == 2 and o_count == 0 and s_count == 0:
-                n_indices = [i for i in path if mol.atoms[i].symbol == "N"]
-                dist = min(
-                    abs(path.index(n_indices[0]) - path.index(n_indices[1])),
-                    5 - abs(path.index(n_indices[0]) - path.index(n_indices[1])),
-                )
-                if dist == 1:
-                    n1, n2 = n_indices
-                    i1, i2 = path.index(n1), path.index(n2)
-                    if (i1 + 1) % 5 == i2:
-                        rot = path[i1:] + path[:i1]
-                    else:
-                        rot = path[i2:] + path[:i2]
-                    locants = ["1", "2", "3", "4", "5"]
-                    return "pyrazolidine", [{rot[i]: locants[i] for i in range(5)}]
-                if dist == 2:
-                    n1, n2 = n_indices
-                    i1, i2 = path.index(n1), path.index(n2)
-                    forward = (i1 + 2) % 5 == i2
-                    if forward:
-                        rot = path[i1:] + path[:i1]
-                    else:
-                        rot = path[i2:] + path[:i2]
-                    locants = ["1", "2", "3", "4", "5"]
-                    return "imidazolidine", [{rot[i]: locants[i] for i in range(5)}]
-            if n_count == 1 and o_count == 1 and s_count == 0:
-                n_idx = next(i for i in path if mol.atoms[i].symbol == "N")
-                o_idx = next(i for i in path if mol.atoms[i].symbol == "O")
-                dist = min(abs(path.index(n_idx) - path.index(o_idx)), 5 - abs(path.index(n_idx) - path.index(o_idx)))
-                if dist == 1:
-                    return "1,2-oxazolidine", None
-                if dist == 2:
-                    return "1,3-oxazolidine", None
-            if n_count == 1 and s_count == 1 and o_count == 0:
-                n_idx = next(i for i in path if mol.atoms[i].symbol == "N")
-                s_idx = next(i for i in path if mol.atoms[i].symbol == "S")
-                dist = min(abs(path.index(n_idx) - path.index(s_idx)), 5 - abs(path.index(n_idx) - path.index(s_idx)))
-                if dist == 1:
-                    return "1,2-thiazolidine", None
-                if dist == 2:
-                    return "1,3-thiazolidine", None
-
-        if size == 6 and double_bonds == 3 and _has_no_cumulated_double_bonds(mol, path):
-            if n_count == 0:
-                return "benzene", None
-            if n_count == 1:
-                return "pyridine", None
-            if n_count == 2:
-                n_indices = [i for i in path if mol.atoms[i].symbol == "N"]
-                dist = min(
-                    abs(path.index(n_indices[0]) - path.index(n_indices[1])),
-                    6 - abs(path.index(n_indices[0]) - path.index(n_indices[1])),
-                )
-                if dist == 1:
-                    return "pyridazine", None
-                if dist == 2:
-                    return "pyrimidine", None
-                if dist == 3:
-                    return "pyrazine", None
-            if n_count == 3:
-                n_indices = [i for i in path if mol.atoms[i].symbol == "N"]
-                idx_sorted = sorted([path.index(i) for i in n_indices])
-                d1 = idx_sorted[1] - idx_sorted[0]
-                d2 = idx_sorted[2] - idx_sorted[1]
-                d3 = 6 - (idx_sorted[2] - idx_sorted[0])
-                dists = sorted([d1, d2, d3])
-                if dists == [1, 1, 4]:
-                    return "1,2,3-triazine", None
-                if dists == [1, 2, 3]:
-                    return "1,2,4-triazine", None
-                if dists == [2, 2, 2]:
-                    return "1,3,5-triazine", None
-                return None
-        if size == 5 and double_bonds == 2 and _has_no_cumulated_double_bonds(mol, path):
-            if o_count == 1 and n_count == 0 and s_count == 0:
-                return "furan", None
-            if s_count == 1 and n_count == 0 and o_count == 0:
-                return "thiophene", None
-            if n_count == 1 and o_count == 0 and s_count == 0:
-                return "pyrrole", None
-            if n_count == 2 and o_count == 0 and s_count == 0:
-                n_indices = [i for i in path if mol.atoms[i].symbol == "N"]
-                dist = min(
-                    abs(path.index(n_indices[0]) - path.index(n_indices[1])),
-                    5 - abs(path.index(n_indices[0]) - path.index(n_indices[1])),
-                )
-                if dist == 1:
-                    return "pyrazole", None
-                return "imidazole", None
-            if n_count == 3 and o_count == 0 and s_count == 0:
-                n_indices = [i for i in path if mol.atoms[i].symbol == "N"]
-                idx_sorted = sorted([path.index(i) for i in n_indices])
-                d1 = idx_sorted[1] - idx_sorted[0]
-                d2 = idx_sorted[2] - idx_sorted[1]
-                d3 = 5 - (idx_sorted[2] - idx_sorted[0])
-                dists = sorted([d1, d2, d3])
-                if dists == [1, 1, 3]:
-                    return "1,2,3-triazole", None
-                if dists == [1, 2, 2]:
-                    return "1,2,4-triazole", None
-                return None
-            if n_count == 4 and o_count == 0 and s_count == 0:
-                return "tetrazole", None
-            if n_count == 1 and s_count == 1 and o_count == 0:
-                n_idx = next(i for i in path if mol.atoms[i].symbol == "N")
-                s_idx = next(i for i in path if mol.atoms[i].symbol == "S")
-                dist = min(abs(path.index(n_idx) - path.index(s_idx)), 5 - abs(path.index(n_idx) - path.index(s_idx)))
-                if dist == 1:
-                    return "1,2-thiazole", None
-                return "1,3-thiazole", None
-            if n_count == 1 and o_count == 1 and s_count == 0:
-                n_idx = next(i for i in path if mol.atoms[i].symbol == "N")
-                o_idx = next(i for i in path if mol.atoms[i].symbol == "O")
-                dist = min(abs(path.index(n_idx) - path.index(o_idx)), 5 - abs(path.index(n_idx) - path.index(o_idx)))
-                if dist == 1:
-                    return "1,2-oxazole", None
-                return "1,3-oxazole", None
 
     # a partly saturated mancude heterocycle is that parent plus hydro prefixes.
     hydro_monocycle = _match_hydro_monocycle_retained(mol, path, size, total_bonds, double_bonds, symbols)
@@ -426,14 +272,31 @@ def mancude_monocycle_hydro_plan(
         spec = hw_spec_for_name(retained_name or "")
         if spec is None or not spec.get("double_bonds") or len(path) != spec["size"]:
             return None
-    parent_double_bonds = int(spec["double_bonds"])
-    if _count_double_bonds_in_ring(mol, path) >= parent_double_bonds:
+    return mancude_hydro_plan(mol, path, int(spec["double_bonds"]))
+
+
+def mancude_hydro_plan(mol: Molecule, path: list[int], parent_double_bonds: int) -> tuple[int, int, list[int]] | None:
+    """The hydro split for any mancude parent, given its double-bond count.
+
+    Shared by retained monocycles (which look the count up by name) and retained
+    fused parents (which carry it on the template as ``mancude_double_bonds``).
+    """
+
+    if parent_double_bonds <= 0 or _count_double_bonds_in_ring(mol, path) >= parent_double_bonds:
         return None
 
     path_set = set(path)
     exocyclic = {idx for idx in path if _has_exocyclic_double_bond(mol, idx, path_set)}
     saturated = [idx for idx in path if idx not in exocyclic and _ring_bonds_all_single(mol, idx, path_set)]
-    fixed = [idx for idx in saturated if mol.atoms[idx].symbol in FIXED_SATURATED_RING_ELEMENTS]
+    # A ring-degree-3 atom holding no hydrogen is a fusion/bridgehead position
+    # saturated in the parent itself -- imidazo[1,2-a]pyridine's bridgehead N --
+    # so it is fixed, not a citable hydrogen site.  Monocycles are all degree 2.
+    fixed = [
+        idx
+        for idx in saturated
+        if mol.atoms[idx].symbol in FIXED_SATURATED_RING_ELEMENTS
+        or (mol.atoms[idx].total_h_count == 0 and sum(1 for n in mol.get_neighbors(idx) if n in path_set) > 2)
+    ]
     citable = [idx for idx in saturated if idx not in fixed]
 
     parent_saturated = len(path) - 2 * parent_double_bonds

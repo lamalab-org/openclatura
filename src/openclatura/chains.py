@@ -46,6 +46,38 @@ class PolycycleDescriptorCandidate:
         return not self.is_von_baeyer or bool(self.numberings)
 
 
+def _ordered_walk(comp_adj, nodes, start: int) -> list[int]:
+    """Order nodes by walking neighbors from start until the run is exhausted."""
+
+    path = [start]
+    seen = {start}
+    curr = start
+    while len(path) < len(nodes):
+        nxt = next((x for x in comp_adj[curr] if x in nodes and x not in seen), None)
+        if nxt is None:
+            break
+        path.append(nxt)
+        seen.add(nxt)
+        curr = nxt
+    return path
+
+
+def _bridge_interior_path(adj, nodes, start: int, end: int) -> list[int]:
+    """Return the interior nodes of the shortest walk from start to end through nodes."""
+
+    queue = [(start, [])]
+    visited = set()
+    while queue:
+        curr, path = queue.pop(0)
+        if curr == end and path:
+            return path[:-1]
+        visited.add(curr)
+        for neighbor in adj[curr]:
+            if (neighbor in nodes or neighbor == end) and neighbor not in visited:
+                queue.append((neighbor, path + [neighbor]))
+    return []
+
+
 def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
     adj = {n: set() for n in comp_nodes}
     for u, v in comp_edges:
@@ -158,22 +190,7 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
         branch1 = branch1[::-1]
         branch2 = branch2[::-1]
 
-    bridge_path = []
-    if main_bridge["length"] > 0:
-        q = [(ep1, [])]
-        visited = set()
-        found_path = []
-        while q:
-            curr, p = q.pop(0)
-            if curr == ep2 and len(p) > 0:
-                found_path = p[:-1]
-                break
-            visited.add(curr)
-            for neighbor in adj[curr]:
-                if neighbor in main_bridge["nodes"] or neighbor == ep2:
-                    if neighbor not in visited:
-                        q.append((neighbor, p + [neighbor]))
-        bridge_path = found_path
+    bridge_path = _bridge_interior_path(adj, main_bridge["nodes"], ep1, ep2) if main_bridge["length"] > 0 else []
 
     path1 = []
     path1.extend(branch1)
@@ -191,19 +208,7 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
         for br in bridges[1:]:
             if br["length"] > 0:
                 b_ep1, b_ep2 = br["endpoints"]
-                q = [(b_ep1, [])]
-                v2 = set()
-                found = []
-                while q:
-                    curr, p = q.pop(0)
-                    if curr == b_ep2 and len(p) > 0:
-                        found = p[:-1]
-                        break
-                    v2.add(curr)
-                    for nxt in adj[curr]:
-                        if nxt in br["nodes"] or nxt == b_ep2:
-                            if nxt not in v2:
-                                q.append((nxt, p + [nxt]))
+                found = _bridge_interior_path(adj, br["nodes"], b_ep1, b_ep2)
                 for node in found:
                     if node not in visited:
                         path.append(node)
@@ -971,17 +976,7 @@ def _legacy_monospiro_or_bicyclo_system(
 
             endpoints = [n for n in comp if spiro_atom in comp_adj[n]]
             if len(endpoints) == 2:
-                path = [endpoints[0]]
-                curr = path[0]
-                p_set = {curr}
-                while len(path) < len(comp):
-                    next_n = next((x for x in comp_adj[curr] if x in comp and x not in p_set), None)
-                    if next_n is None:
-                        break
-                    path.append(next_n)
-                    p_set.add(next_n)
-                    curr = next_n
-                rings.append(path)
+                rings.append(_ordered_walk(comp_adj, comp, endpoints[0]))
 
         if len(rings) != 2:
             return None
@@ -1025,16 +1020,7 @@ def _legacy_monospiro_or_bicyclo_system(
         ends = [n for n in p_nodes if b1 in comp_adj[n]]
         if not ends:
             continue
-        ordered_p = [ends[0]]
-        p_set = {ordered_p[0]}
-        curr = ordered_p[0]
-        while len(ordered_p) < len(p_nodes):
-            next_n = next((x for x in comp_adj[curr] if x in p_nodes and x not in p_set), None)
-            if next_n is None:
-                break
-            ordered_p.append(next_n)
-            p_set.add(next_n)
-            curr = next_n
+        ordered_p = _ordered_walk(comp_adj, p_nodes, ends[0])
 
         if b2 not in comp_adj[ordered_p[-1]]:
             ordered_p = ordered_p[::-1]

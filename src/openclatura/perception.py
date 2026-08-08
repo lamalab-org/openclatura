@@ -119,6 +119,22 @@ BUILTIN_PERCEPTION_SPECS = (
 )
 
 
+def _closes_ring_back_to(mol: Molecule, carbon: int, hetero: int, double_o: int, cyclic_atoms: set[int]) -> bool:
+    """Whether hetero reaches carbon again through the ring, making it a lactone/lactam."""
+
+    visited = {carbon, double_o}
+    queue = [hetero]
+    while queue:
+        curr = queue.pop(0)
+        for nxt in mol.get_neighbors(curr):
+            if nxt == carbon and curr != hetero:
+                return True
+            if nxt not in visited and nxt in cyclic_atoms:
+                visited.add(nxt)
+                queue.append(nxt)
+    return False
+
+
 def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
     groups = []
     consumed = set()
@@ -454,22 +470,11 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                             )
                             consumed.update([double_o, single_o, peroxy_o])
                     else:
-                        is_lactone = False
-                        if target_carbon == atom.idx and single_o in cyclic_atoms:
-                            visited = {atom.idx, double_o}
-                            q = [single_o]
-                            while q:
-                                curr = q.pop(0)
-                                for nxt in mol.get_neighbors(curr):
-                                    if nxt == atom.idx and curr != single_o:
-                                        is_lactone = True
-                                        break
-                                    if nxt not in visited and nxt in cyclic_atoms:
-                                        visited.add(nxt)
-                                        q.append(nxt)
-                                if is_lactone:
-                                    break
-
+                        is_lactone = (
+                            target_carbon == atom.idx
+                            and single_o in cyclic_atoms
+                            and _closes_ring_back_to(mol, atom.idx, single_o, double_o, cyclic_atoms)
+                        )
                         if is_lactone:
                             groups.append(PerceivedGroup("ketone", True, target_carbon, {atom.idx, double_o}))
                             consumed.update([double_o])
@@ -483,22 +488,11 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                             groups.append(PerceivedGroup(key, True, target_carbon, {atom.idx, double_o, single_o}))
                             consumed.update([double_o, single_o])
                 elif single_n is not None:
-                    is_lactam = False
-                    if target_carbon == atom.idx and single_n in cyclic_atoms:
-                        visited = {atom.idx, double_o}
-                        q = [single_n]
-                        while q:
-                            curr = q.pop(0)
-                            for nxt in mol.get_neighbors(curr):
-                                if nxt == atom.idx and curr != single_n:
-                                    is_lactam = True
-                                    break
-                                if nxt not in visited and nxt in cyclic_atoms:
-                                    visited.add(nxt)
-                                    q.append(nxt)
-                            if is_lactam:
-                                break
-
+                    is_lactam = (
+                        target_carbon == atom.idx
+                        and single_n in cyclic_atoms
+                        and _closes_ring_back_to(mol, atom.idx, single_n, double_o, cyclic_atoms)
+                    )
                     if is_lactam:
                         groups.append(PerceivedGroup("ketone", True, target_carbon, {atom.idx, double_o}))
                         consumed.update([double_o])

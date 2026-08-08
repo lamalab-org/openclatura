@@ -173,50 +173,8 @@ def match_retained_fused_template(
     the numbering layer.
     """
 
-    validate_retained_fused_template(template)
-    atom_set = set(atom_indices)
-    if len(atom_set) != len(template.atoms):
-        return None
-
-    atom_by_locant = template.atom_by_locant
-    template_degrees = _template_degrees(template)
-    molecule_degrees = {
-        atom_idx: sum(1 for neighbor in mol.get_neighbors(atom_idx) if neighbor in atom_set) for atom_idx in atom_set
-    }
-    template_neighbors = _template_neighbors(template)
-    locants_by_constraint = sorted(
-        template.locants,
-        key=lambda locant: (
-            -template_degrees[locant],
-            atom_by_locant[locant].symbol == "C",
-            locant,
-        ),
-    )
-    candidates = {
-        locant: [
-            atom_idx
-            for atom_idx in atom_set
-            if _atom_matches_template(
-                mol, atom_idx, atom_by_locant[locant], ring_atoms=atom_set, allow_nonaromatic=allow_nonaromatic
-            )
-            and molecule_degrees[atom_idx] == template_degrees[locant]
-        ]
-        for locant in template.locants
-    }
-    if any(not values for values in candidates.values()):
-        return None
-
-    assignments = _match_locants_backtracking(
-        mol,
-        locants_by_constraint,
-        candidates,
-        template_neighbors,
-    )
-    if not assignments:
-        return None
-
-    assignment = assignments[0]
-    return _template_match_from_assignment(template, atom_set, assignment)
+    matches = _match_all_retained_fused_template(mol, atom_indices, template, allow_nonaromatic=allow_nonaromatic)
+    return matches[0] if matches else None
 
 
 def _match_all_retained_fused_template(
@@ -226,7 +184,6 @@ def _match_all_retained_fused_template(
     *,
     allow_nonaromatic: bool = False,
 ) -> list[RetainedFusedTemplateMatch]:
-    validate_retained_fused_template(template)
     atom_set = set(atom_indices)
     if len(atom_set) != len(template.atoms):
         return []
@@ -280,6 +237,14 @@ def _template_match_from_assignment(
     )
 
 
+@lru_cache(maxsize=2)
+def _templates_by_atom_count(include_disabled: bool) -> dict[int, tuple[RetainedFusedGraphTemplate, ...]]:
+    index: dict[int, list[RetainedFusedGraphTemplate]] = {}
+    for template in retained_fused_graph_templates(include_disabled=include_disabled):
+        index.setdefault(len(template.atoms), []).append(template)
+    return {size: tuple(templates) for size, templates in index.items()}
+
+
 def match_retained_fused_templates(
     mol: Molecule,
     atom_indices: set[int] | list[int] | tuple[int, ...],
@@ -289,9 +254,10 @@ def match_retained_fused_templates(
 ) -> list[RetainedFusedTemplateMatch]:
     """Return retained fused template matches ranked by retained priority."""
 
+    candidates = _templates_by_atom_count(include_disabled).get(len(set(atom_indices)), ())
     matches = [
         match
-        for template in retained_fused_graph_templates(include_disabled=include_disabled)
+        for template in candidates
         for match in _match_all_retained_fused_template(
             mol,
             atom_indices,

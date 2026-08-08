@@ -1,6 +1,7 @@
 """Shared parent planning steps for component and subgraph naming."""
 
 from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem, RetainedParentMetadata
+from .heteroatom_subgraphs import upstream_bond_order
 from .locant_sources import LocantMapSource
 from .molecule import Molecule, bond_ids_within
 from .name_bindings import ensure_name_atom_binding_tokens
@@ -113,7 +114,7 @@ def build_parent_parts(
     if intent.is_substituent:
         if intent.root_atom is None:
             raise ValueError("Subgraph naming intent requires a root atom.")
-        upstream_order = _upstream_bond_order(mol, intent.root_atom, intent.upstream_atom)
+        upstream_order = upstream_bond_order(mol, intent.root_atom, intent.upstream_atom)
         assembly_overrides.update(
             {
                 "is_substituent": True,

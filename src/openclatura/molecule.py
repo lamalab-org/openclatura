@@ -252,6 +252,31 @@ class Molecule:
     def degree(self, atom_idx: int) -> int:
         return len(self.get_neighbors(atom_idx))
 
+    def subgraph(self, atom_ids, *, symbols: dict[int, str] | None = None) -> "Molecule":
+        """Return the induced subgraph over atom_ids, keeping the original indices."""
+
+        fragment = Molecule()
+        for idx in atom_ids:
+            atom = self.atoms[idx]
+            fragment.add_atom(
+                symbol=(symbols or {}).get(idx, atom.symbol),
+                idx=idx,
+                charge=atom.charge,
+                stereo=atom.stereo,
+                raw_stereo=atom.raw_stereo,
+                is_aromatic=atom.is_aromatic,
+                explicit_h_count=atom.explicit_h_count,
+                total_h_count=atom.total_h_count,
+            )
+        for idx in atom_ids:
+            for neighbor in self.get_neighbors(idx):
+                if neighbor in atom_ids and idx < neighbor:
+                    bond = self.get_bond(idx, neighbor)
+                    fragment.add_bond(
+                        u=idx, v=neighbor, order=bond.order, stereo=bond.stereo, in_small_ring=bond.in_small_ring
+                    )
+        return fragment
+
     def __iter__(self) -> Iterator[Atom]:
         return iter(self.atoms.values())
 
@@ -270,8 +295,6 @@ def bond_ids_within(mol: Molecule, atom_ids: set[int]) -> set[int]:
 
 
 def edges_within_atoms(mol: Molecule, atoms: set[int]) -> set[tuple[int, int]]:
-    """Return normalized (low, high) edges whose endpoints are both in atoms."""
-
     edges = set()
     for atom_idx in atoms:
         for neighbor_idx in mol.get_neighbors(atom_idx):
@@ -286,12 +309,6 @@ def component_atoms_until_blocked(
     root: int,
     blocked: set[int],
 ) -> set[int]:
-    """Flood from ``root`` inside ``component_atoms``, stopping at ``blocked``.
-
-    Returns the empty set when the walk escapes the component or reaches a
-    blocked atom, so callers can treat that as "no self-contained fragment".
-    """
-
     atoms = set()
     queue = [root]
     while queue:
@@ -310,8 +327,6 @@ def component_atoms_until_blocked(
 
 
 def has_non_h_multiple_bond_neighbor(mol: Molecule, atom_idx: int, allowed: set[int]) -> bool:
-    """Whether any neighbor outside ``allowed`` binds through a multiple bond."""
-
     for neighbor in mol.get_neighbors(atom_idx):
         if neighbor in allowed or mol.atoms[neighbor].symbol == "H":
             continue
@@ -322,8 +337,6 @@ def has_non_h_multiple_bond_neighbor(mol: Molecule, atom_idx: int, allowed: set[
 
 
 def double_bonded_carbon(mol: Molecule, nitrogen: int, blocked: set[int]) -> int | None:
-    """Return the sole doubly bonded carbon outside ``blocked``, if unambiguous."""
-
     candidates = [
         n
         for n in mol.get_neighbors(nitrogen)

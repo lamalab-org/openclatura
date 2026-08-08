@@ -52,6 +52,9 @@ from .substituent_reconstruction import (
     resolve_fragment_mol,
 )
 from .substituent_reconstruction import _RING_STEMS as _SUBSTITUENT_RING_STEMS
+from .substituent_reconstruction import (
+    _consume_hydrogen as _consume_parent_hydrogen,
+)
 from .von_baeyer_parse import build_skeleton as _build_von_baeyer_skeleton
 from .von_baeyer_parse import build_skeleton_from_descriptor as _build_von_baeyer_from_descriptor
 from .von_baeyer_parse import build_spiro_skeleton as _build_spiro_skeleton
@@ -1246,16 +1249,6 @@ def _graft(rw: Chem.RWMol, base_idx: int, frag: Chem.Mol) -> None:
 def _carry_bond_tag(src: Chem.Bond, dst: Chem.Bond | None) -> None:
     if dst is not None and src.HasProp(_NAME_CIP):
         dst.SetProp(_NAME_CIP, src.GetProp(_NAME_CIP))
-
-
-def _consume_parent_hydrogen(atom: Chem.Atom, bond_type: Chem.BondType) -> None:
-    """Substituting at a ring atom carrying an explicit H (e.g. indole N1) uses
-    that hydrogen; implicit-H atoms are left for RDKit to rebalance."""
-    explicit = atom.GetNumExplicitHs()
-    if explicit <= 0:
-        return
-    order = 2 if bond_type == Chem.BondType.DOUBLE else 3 if bond_type == Chem.BondType.TRIPLE else 1
-    atom.SetNumExplicitHs(max(0, explicit - order))
 
 
 __all__ = ["ReconstructionAudit", "audit_component_reconstruction"]

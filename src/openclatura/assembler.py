@@ -20,7 +20,7 @@ from .assembly_spiro import format_spiro_core, split_spiro_substituents
 from .assembly_utils import needs_hyphen, parse_locant
 from .formatting import ensure_stereo_descriptor_boundary, format_multiplier
 from .fused_ion_templates import consume_fused_ion_operation, select_fused_ion_operation
-from .name_assembly import NameAssemblyResult, token_span_trace_data
+from .name_assembly import NameAssemblyResult, rewrite_history_trace_data, token_span_trace_data
 from .name_bindings import refresh_name_atom_bindings, refresh_parent_binding
 from .name_postprocessing import (
     apply_acyl_amido_postprocessing,
@@ -447,42 +447,5 @@ def assemble_name_result(parts: AssemblyParts) -> NameAssemblyResult:
     result = NameAssemblyResult.from_raw_name(raw_name, parts.name_atom_bindings, postprocess=post_process_name)
     parts.name_atom_bindings = list(result.bindings)
     parts.name_token_spans = token_span_trace_data(result)
-    parts.name_rewrite_history = [
-        {
-            "name": operation.name,
-            "before": operation.before,
-            "after": operation.after,
-            "ownership": operation.ownership,
-            "source": operation.source,
-            "binding_count": operation.binding_count,
-            "changed_binding_count": operation.changed_binding_count,
-            "token_count": operation.token_count,
-            "changed_token_count": operation.changed_token_count,
-            "edits": [
-                {
-                    "before_start": edit.before_start,
-                    "before_end": edit.before_end,
-                    "after_start": edit.after_start,
-                    "after_end": edit.after_end,
-                    "before_text": edit.before_text,
-                    "after_text": edit.after_text,
-                    "segments": [
-                        {
-                            "before_start": segment.before_start,
-                            "before_end": segment.before_end,
-                            "after_start": segment.after_start,
-                            "after_end": segment.after_end,
-                            "before_text": segment.before_text,
-                            "after_text": segment.after_text,
-                            "ownership": segment.ownership,
-                            "group": segment.group,
-                        }
-                        for segment in edit.segments
-                    ],
-                }
-                for edit in operation.edits
-            ],
-        }
-        for operation in result.rewrite_history
-    ]
+    parts.name_rewrite_history = rewrite_history_trace_data(result)
     return result

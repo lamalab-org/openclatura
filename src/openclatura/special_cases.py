@@ -597,6 +597,26 @@ def _simple_carbonyl_side_name(mol: Molecule, side_atoms: set[int], carbonyl_car
     return f"{stem}{unsaturation or 'an'}-{loc}-one"
 
 
+def _carbaldehyde_side_ring(mol: Molecule, side_atoms, carbonyl_carbon: int) -> tuple[set[int], int] | None:
+    """Return the side ring and its sole single-bonded attachment, if well formed."""
+
+    if carbonyl_carbon not in side_atoms or not mol.atoms[carbonyl_carbon].is_carbon:
+        return None
+    ring_atoms = set(side_atoms) - {carbonyl_carbon}
+    if len(ring_atoms) < 3:
+        return None
+    neighbors = [
+        neighbor
+        for neighbor in mol.get_neighbors(carbonyl_carbon)
+        if neighbor in ring_atoms and (bond := mol.get_bond(carbonyl_carbon, neighbor)) is not None and bond.order == 1
+    ]
+    if len(neighbors) != 1:
+        return None
+    if any(neighbor in side_atoms and neighbor not in ring_atoms for neighbor in mol.get_neighbors(carbonyl_carbon)):
+        return None
+    return ring_atoms, neighbors[0]
+
+
 def _retained_ring_carbaldehyde_side_name(
     mol: Molecule,
     side_atoms: set[int],
@@ -606,20 +626,10 @@ def _retained_ring_carbaldehyde_side_name(
 ) -> str:
     """Name Ar-CH=N sides as retained-ring carbaldehyde/ylidene roles."""
 
-    if carbonyl_carbon not in side_atoms or not mol.atoms[carbonyl_carbon].is_carbon:
+    ring = _carbaldehyde_side_ring(mol, side_atoms, carbonyl_carbon)
+    if ring is None:
         return ""
-    ring_atoms = set(side_atoms) - {carbonyl_carbon}
-    if len(ring_atoms) < 3:
-        return ""
-    carbon_neighbors = [
-        neighbor
-        for neighbor in mol.get_neighbors(carbonyl_carbon)
-        if neighbor in ring_atoms and (bond := mol.get_bond(carbonyl_carbon, neighbor)) is not None and bond.order == 1
-    ]
-    if len(carbon_neighbors) != 1:
-        return ""
-    if any(neighbor in side_atoms and neighbor not in ring_atoms for neighbor in mol.get_neighbors(carbonyl_carbon)):
-        return ""
+    ring_atoms, ring_attachment = ring
     ring_path = _ordered_simple_ring(mol, ring_atoms)
     if not ring_path:
         return ""
@@ -627,7 +637,7 @@ def _retained_ring_carbaldehyde_side_name(
     if retained_match is None:
         return ""
     retained_name, locant_maps = retained_match
-    locant_map = _choose_retained_map_for_attachment(locant_maps, carbon_neighbors[0])
+    locant_map = _choose_retained_map_for_attachment(locant_maps, ring_attachment)
     if locant_map is None:
         # A data-driven retained *monocycle* carries no locant map -- only the
         # fused systems do -- so requiring one here rejected plain benzene, and
@@ -639,7 +649,7 @@ def _retained_ring_carbaldehyde_side_name(
         # those still decline.
         locant = "1" if _is_homocyclic(mol, ring_path) else ""
     else:
-        locant = locant_map.get(carbon_neighbors[0], "")
+        locant = locant_map.get(ring_attachment, "")
     if not locant:
         return ""
     if as_ylidene:
@@ -720,21 +730,11 @@ def _simple_ring_carbaldehyde_side_name(
 ) -> str:
     """Name cycloalkenyl-CH=N sides as cyclo...carbaldehyde roles."""
 
-    if carbonyl_carbon not in side_atoms or not mol.atoms[carbonyl_carbon].is_carbon:
+    ring = _carbaldehyde_side_ring(mol, side_atoms, carbonyl_carbon)
+    if ring is None:
         return ""
-    ring_atoms = set(side_atoms) - {carbonyl_carbon}
-    if len(ring_atoms) < 3:
-        return ""
-    ring_neighbors = [
-        neighbor
-        for neighbor in mol.get_neighbors(carbonyl_carbon)
-        if neighbor in ring_atoms and (bond := mol.get_bond(carbonyl_carbon, neighbor)) is not None and bond.order == 1
-    ]
-    if len(ring_neighbors) != 1:
-        return ""
-    if any(neighbor in side_atoms and neighbor not in ring_atoms for neighbor in mol.get_neighbors(carbonyl_carbon)):
-        return ""
-    ring_path = _ordered_simple_ring_from_start(mol, ring_atoms, ring_neighbors[0])
+    ring_atoms, ring_start = ring
+    ring_path = _ordered_simple_ring_from_start(mol, ring_atoms, ring_start)
     if not ring_path:
         return ""
     ring_name = _simple_replacement_cycle_name(mol, ring_path)
@@ -2291,31 +2291,11 @@ def anhydride_half_name(mol: Molecule, start_c: int, bridge_o: int, component_na
 
     original_half_atoms = _anhydride_half_atoms(mol, start_c, bridge_o)
     half_atoms = set(original_half_atoms)
-    sub_mol = Molecule()
-    for n in half_atoms:
-        atom = mol.atoms[n]
-        sub_mol.add_atom(
-            symbol=atom.symbol,
-            idx=n,
-            charge=atom.charge,
-            stereo=atom.stereo,
-            raw_stereo=atom.raw_stereo,
-            is_aromatic=atom.is_aromatic,
-            explicit_h_count=atom.explicit_h_count,
-            total_h_count=atom.total_h_count,
-        )
+    sub_mol = mol.subgraph(half_atoms)
     oh_idx = max(mol.atoms.keys()) + 100
     sub_mol.add_atom(symbol="O", idx=oh_idx)
     sub_mol.add_bond(u=start_c, v=oh_idx, order=1)
     half_atoms.add(oh_idx)
-
-    for n in half_atoms:
-        if n == oh_idx:
-            continue
-        for nxt in mol.get_neighbors(n):
-            if nxt in half_atoms and n < nxt:
-                bond = mol.get_bond(n, nxt)
-                sub_mol.add_bond(u=n, v=nxt, order=bond.order, stereo=bond.stereo, in_small_ring=bond.in_small_ring)
 
     return component_namer(sub_mol, half_atoms).replace(" acid", "")
 

@@ -90,6 +90,30 @@ def functional_group_trace_data(groups: list[PerceivedGroup]) -> list[dict]:
     ]
 
 
+def add_substituent_traces(parts, subst_mapping, get_loc, *, only_atoms=None) -> None:
+    """Emit every collected substituent prefix, optionally limited to only_atoms."""
+
+    for c_idx, items in subst_mapping.items():
+        if only_atoms is not None and c_idx not in only_atoms:
+            continue
+        locant = get_loc(c_idx)
+        for item in items:
+            add_substituent_trace(
+                parts,
+                item.name,
+                locant,
+                item.atom_ids,
+                item.bond_ids,
+                item.charge_atom_ids,
+                item.trace_segments,
+                item.nested_decisions,
+                item.emitted_tokens,
+                substituent_tree=item.substituent_tree,
+                spiro=item.spiro,
+                outer_parentheses_optional=item.outer_parentheses_optional,
+            )
+
+
 def add_substituent_trace(
     parts: AssemblyParts,
     name: str | RenderedSubstituentName,

@@ -30,7 +30,7 @@ from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
 from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
 from .molecule import bond_ids_within as _bond_ids_within
-from .name_assembly import NameAssemblyResult, token_span_trace_data
+from .name_assembly import NameAssemblyResult, rewrite_history_trace_data, token_span_trace_data
 from .naming_context import NamingIntent
 from .nomenclature import RULES
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
@@ -59,7 +59,7 @@ from .subgraph_tools import (
 )
 from .substituent_tokens import graph_bound_substituent_tokens
 from .trace_helpers import (
-    add_substituent_trace as _add_substituent_trace,
+    add_substituent_traces as _add_substituent_traces,
 )
 from .trace_helpers import assembly_substituent_tree as _assembly_substituent_tree
 from .trace_helpers import (
@@ -314,25 +314,7 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
     if heteroaromatic_side is not None:
         return heteroaromatic_side
 
-    sub_mol = Molecule()
-    for n in sub_comp:
-        atom = mol.atoms[n]
-        symbol = "Si" if n == c_idx else atom.symbol
-        sub_mol.add_atom(
-            symbol=symbol,
-            idx=n,
-            charge=atom.charge,
-            stereo=atom.stereo,
-            raw_stereo=atom.raw_stereo,
-            is_aromatic=atom.is_aromatic,
-            explicit_h_count=atom.explicit_h_count,
-            total_h_count=atom.total_h_count,
-        )
-    for n in sub_comp:
-        for nxt in mol.get_neighbors(n):
-            if nxt in sub_comp and n < nxt:
-                bond = mol.get_bond(n, nxt)
-                sub_mol.add_bond(u=n, v=nxt, order=bond.order, stereo=bond.stereo, in_small_ring=bond.in_small_ring)
+    sub_mol = mol.subgraph(sub_comp, symbols={c_idx: "Si"})
 
     sub_name_raw = name_component(sub_mol, sub_comp, is_substituent=False)
     match = re.search(r"(?:(^|-)(\d+)-)?sil[a]?", sub_name_raw)
@@ -1006,23 +988,7 @@ def _add_subgraph_substituents(parts: AssemblyParts, subst_mapping: dict[int, li
     prefixes, and complex substituent citation.
     """
 
-    for c_idx, items in subst_mapping.items():
-        locant = get_loc(c_idx)
-        for item in items:
-            _add_substituent_trace(
-                parts,
-                item.name,
-                locant,
-                item.atom_ids,
-                item.bond_ids,
-                item.charge_atom_ids,
-                item.trace_segments,
-                item.nested_decisions,
-                item.emitted_tokens,
-                substituent_tree=item.substituent_tree,
-                spiro=item.spiro,
-                outer_parentheses_optional=item.outer_parentheses_optional,
-            )
+    _add_substituent_traces(parts, subst_mapping, get_loc)
 
 
 def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
@@ -1116,44 +1082,7 @@ def _assemble_parent_name(
     result = NameAssemblyResult.from_rewrite_pipeline(name, parts.name_atom_bindings, rewrites=tuple(rewrites))
     parts.name_atom_bindings = list(result.bindings)
     parts.name_token_spans = token_span_trace_data(result)
-    parts.name_rewrite_history = [
-        {
-            "name": operation.name,
-            "before": operation.before,
-            "after": operation.after,
-            "ownership": operation.ownership,
-            "source": operation.source,
-            "binding_count": operation.binding_count,
-            "changed_binding_count": operation.changed_binding_count,
-            "token_count": operation.token_count,
-            "changed_token_count": operation.changed_token_count,
-            "edits": [
-                {
-                    "before_start": edit.before_start,
-                    "before_end": edit.before_end,
-                    "after_start": edit.after_start,
-                    "after_end": edit.after_end,
-                    "before_text": edit.before_text,
-                    "after_text": edit.after_text,
-                    "segments": [
-                        {
-                            "before_start": segment.before_start,
-                            "before_end": segment.before_end,
-                            "after_start": segment.after_start,
-                            "after_end": segment.after_end,
-                            "before_text": segment.before_text,
-                            "after_text": segment.after_text,
-                            "ownership": segment.ownership,
-                            "group": segment.group,
-                        }
-                        for segment in edit.segments
-                    ],
-                }
-                for edit in operation.edits
-            ],
-        }
-        for operation in result.rewrite_history
-    ]
+    parts.name_rewrite_history = rewrite_history_trace_data(result)
     return _mark_optional_substituent_boundary(result.text, parts, finalize_subgraph)
 
 
@@ -1336,24 +1265,7 @@ def _acylamino_amido_prefix(
     if _competing_acid_reachable(mol, acyl_c, acid_atoms):
         return None
 
-    acid_mol = Molecule()
-    for idx in acid_atoms:
-        atom = mol.atoms[idx]
-        acid_mol.add_atom(
-            symbol=atom.symbol,
-            idx=idx,
-            charge=atom.charge,
-            stereo=atom.stereo,
-            raw_stereo=atom.raw_stereo,
-            is_aromatic=atom.is_aromatic,
-            explicit_h_count=atom.explicit_h_count,
-            total_h_count=atom.total_h_count,
-        )
-    for idx in acid_atoms:
-        for nb in mol.get_neighbors(idx):
-            if nb in acid_atoms and idx < nb:
-                bond = mol.get_bond(idx, nb)
-                acid_mol.add_bond(u=idx, v=nb, order=bond.order, stereo=bond.stereo, in_small_ring=bond.in_small_ring)
+    acid_mol = mol.subgraph(acid_atoms)
     hydroxyl_idx = max(mol.atoms) + 1
     acid_mol.add_atom(symbol="O", idx=hydroxyl_idx)
     acid_mol.add_bond(u=acyl_c, v=hydroxyl_idx, order=1)

@@ -51,7 +51,7 @@ from .subgraph_tools import (
 )
 from .substituent_tokens import graph_bound_substituent_tokens
 from .trace_helpers import (
-    add_substituent_trace,
+    add_substituent_traces,
     assembly_substituent_tree,
     assembly_trace_segments,
     build_shortcut_tree_node,
@@ -181,24 +181,7 @@ def add_component_substituents(
 ) -> None:
     """Add collected component substituents to assembly parts."""
 
-    for c_idx, items in subst_mapping.items():
-        if c_idx in numbered_path:
-            locant = get_loc(c_idx)
-            for item in items:
-                add_substituent_trace(
-                    parts,
-                    item.name,
-                    locant,
-                    item.atom_ids,
-                    item.bond_ids,
-                    item.charge_atom_ids,
-                    item.trace_segments,
-                    item.nested_decisions,
-                    item.emitted_tokens,
-                    substituent_tree=item.substituent_tree,
-                    spiro=item.spiro,
-                    outer_parentheses_optional=item.outer_parentheses_optional,
-                )
+    add_substituent_traces(parts, subst_mapping, get_loc, only_atoms=set(numbered_path))
 
 
 def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
