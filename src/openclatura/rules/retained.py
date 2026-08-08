@@ -96,9 +96,6 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
 
     internal_degrees = {u: 0 for u in path}
     symbols = [mol.atoms[idx].symbol for idx in path]
-    n_count = symbols.count("N")
-    o_count = symbols.count("O")
-    s_count = symbols.count("S")
 
     for u in path:
         for v in mol.get_neighbors(u):

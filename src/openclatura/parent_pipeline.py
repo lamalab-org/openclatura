@@ -258,10 +258,3 @@ def _add_relative_ring_stereo(mol: Molecule, parts: AssemblyParts, numbered_path
             )
         )
     )
-
-
-def _upstream_bond_order(mol: Molecule, start_idx: int, upstream_atom: int | None) -> int:
-    if upstream_atom is None:
-        return 0
-    bond = mol.get_bond(start_idx, upstream_atom)
-    return bond.order if bond else 0
