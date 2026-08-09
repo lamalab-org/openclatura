@@ -88,11 +88,17 @@ class RetainedFusedGraphTemplate:
         Declared carbon sites (9H-xanthene, 2H-pyran) when it has them, else the
         positions holding no mancude bond less the chalcogens, which are
         single-bonded anyway -- 1,4-benzodioxine's oxygens are not hydro sites.
+        A bridgehead spends all three bonds inside the rings, so it has none
+        left for a hydrogen: indolizine's N4 supports no indicated H.
         """
 
         if self.default_indicated_h:
             return len(self.default_indicated_h)
-        return sum(1 for atom in self.atoms if not atom.aromatic and atom.symbol not in FIXED_SATURATED_RING_ELEMENTS)
+        return sum(
+            1
+            for atom in self.atoms
+            if not atom.aromatic and not atom.fusion and atom.symbol not in FIXED_SATURATED_RING_ELEMENTS
+        )
 
 
 @dataclass(frozen=True)

@@ -276,7 +276,11 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
         # Nothing is left unsaturated, so there is nothing to distinguish.
         # The stem may already spell the indicated H, as 1H-indole does.
         stated = parts.retained_parent_metadata.indicated_hydrogen_count if parts.retained_parent_metadata else 0
-        if len(additive_hydrogens) + max(len(indicated_hydrogens), stated) == parts.parent_length:
+        # A spiro bracket names two rings, so a bare ``decahydro`` in front of it
+        # does not say which one it saturates.
+        if len(additive_hydrogens) + max(
+            len(indicated_hydrogens), stated
+        ) == parts.parent_length and not core_name.startswith("spiro["):
             return f"{hydro}{separator}{core_name}"
         core_name = f"{','.join(additive_hydrogens)}-{hydro}{separator}{core_name}"
     return core_name

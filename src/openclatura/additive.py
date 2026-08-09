@@ -66,6 +66,7 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         return
     oxo_derivative = parts.principal_group is not None and parts.principal_group.key == "ketone"
     default_indicated_h = set(metadata.default_indicated_h) if metadata is not None else set()
+    name_declared_indicated_h = set(default_indicated_h)
 
     observed = _saturated_ring_carbons(mol, numbered_path, get_loc)
     if (
@@ -117,10 +118,10 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 and atom.is_carbon
                 and locant in fusion_locants
                 and len(ring_bonds) == 3
-                and atom.explicit_h_count + atom.total_h_count > 0
+                and _is_saturated_ring_site(mol, idx, numbered_path)
             )
             indicated_h_site = sum(b.order for b in ring_bonds) == 2 and (
-                not atom.is_carbon or atom.explicit_h_count + atom.total_h_count > 0
+                not atom.is_carbon or _is_saturated_ring_site(mol, idx, numbered_path)
             )
             if indicated_h_site or fusion_carbon_h:
                 candidates.append((locant, idx))
@@ -163,7 +164,15 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     surplus_count = len(candidates) + len(hydro_only) - supported
     if metadata is not None and surplus_count > 0 and surplus_count % 2 == 0:
         candidates.sort(key=lambda candidate: parse_locant(candidate[0]))
-        if len(candidates) < supported:
+        declared = _declared_indicated_hydrogen_split(
+            candidates + hydro_only,
+            name_declared_indicated_h,
+            supported,
+            name_states_indicated_h=name_states_indicated_h,
+        )
+        if declared is not None:
+            candidates, surplus = declared
+        elif len(candidates) < supported:
             # An indicated-H site on a heteroatom never enters `candidates`.
             pool = sorted(candidates + hydro_only, key=lambda item: parse_locant(item[0]))
             candidates, surplus = pool[:supported], pool[supported:]
@@ -199,20 +208,49 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         )
 
 
+def _declared_indicated_hydrogen_split(
+    pool: list[tuple[str, int]],
+    default_indicated_h: set[str],
+    supported: int,
+    *,
+    name_states_indicated_h: bool,
+) -> tuple[list[tuple[str, int]], list[tuple[str, int]]] | None:
+    """Hold the sites the parent name already spells, hydro the rest.
+
+    Lowest-locant order instead cites 1H-isoindole's position 1 twice, once as
+    hydro and once as the ``1H``.
+    """
+
+    if not name_states_indicated_h or not default_indicated_h:
+        return None
+    held = [item for item in pool if item[0] in default_indicated_h]
+    if len(held) != supported:
+        return None
+    surplus = [item for item in pool if item[0] not in default_indicated_h]
+    return held, sorted(surplus, key=lambda item: parse_locant(item[0]))
+
+
 def _name_spells_no_hydrogen(retained_name: str | None) -> bool:
     return bool(retained_name) and "H-" not in retained_name
 
 
 def _is_saturated_ring_site(mol: Molecule, atom_idx: int, numbered_path: list[int]) -> bool:
-    atom = mol.atoms[atom_idx]
-    ring_bonds = [
-        bond for n in mol.get_neighbors(atom_idx) if n in numbered_path and (bond := mol.get_bond(atom_idx, n))
-    ]
-    return (
-        bool(ring_bonds)
-        and all(bond.order == 1 for bond in ring_bonds)
-        and atom.explicit_h_count + atom.total_h_count > 0
-    )
+    """A ring position a hydro prefix cites: sp3, however substituted.
+
+    2,2-dimethylchromane's C2 carries no hydrogen and is a hydro site all the
+    same, so the hydrogen count is not consulted.
+    """
+
+    ring_bonds = []
+    for neighbor in mol.get_neighbors(atom_idx):
+        bond = mol.get_bond(atom_idx, neighbor)
+        if bond is None:
+            continue
+        if neighbor in numbered_path:
+            ring_bonds.append(bond)
+        elif bond.order > 1:
+            return False
+    return bool(ring_bonds) and all(bond.order == 1 for bond in ring_bonds)
 
 
 def _is_oxo_ring_site(mol: Molecule, atom_idx: int, numbered_path: list[int]) -> bool:

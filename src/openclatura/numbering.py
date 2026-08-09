@@ -241,7 +241,11 @@ def _numbering_preference(
     retained_name: str | None,
 ) -> NumberingPreference:
     principal = tuple(get_atom_locants(oriented_path, principal_carbons))
-    hetero_by_priority = _heteroatom_locants_by_priority(mol, oriented_path)
+    hetero_by_priority = _heteroatom_locants_by_priority(
+        mol,
+        oriented_path,
+        monocycle=not (is_bicycle or is_spiro or is_polycycle),
+    )
     indicated_hydrogen = _indicated_hydrogen_like_locants(
         mol,
         oriented_path,
@@ -285,17 +289,50 @@ def _mancude_hydro_split(
     return set(citable[:indicated]), set(citable[indicated:])
 
 
-def _heteroatom_locants_by_priority(mol: Molecule, oriented_path: list[int]) -> tuple[tuple[int, ...], ...]:
+def _heteroatom_locants_by_priority(
+    mol: Molecule,
+    oriented_path: list[int],
+    *,
+    monocycle: bool = False,
+) -> tuple[tuple[int, ...], ...]:
     hetero_by_priority: dict[int, list[int]] = {}
     parent_atoms = set(oriented_path)
     for atom in mol:
         if atom.idx in parent_atoms and not atom.is_carbon:
             priority = atom.element.hw_priority or 99
             hetero_by_priority.setdefault(priority, []).append(atom.idx)
-    return tuple(
+    by_priority = tuple(
         tuple(get_atom_locants(oriented_path, set(hetero_by_priority[priority])))
         for priority in sorted(hetero_by_priority)
     )
+    if not monocycle:
+        return by_priority
+    real = {
+        priority: [idx for idx in group if idx not in mol.substituted_symbols]
+        for priority, group in hetero_by_priority.items()
+    }
+    key = _monocycle_heteroatom_key({priority: group for priority, group in real.items() if group}, oriented_path)
+    return (*key, *by_priority)
+
+
+def _monocycle_heteroatom_key(
+    hetero_by_priority: dict[int, list[int]],
+    oriented_path: list[int],
+) -> tuple[tuple[int, ...], ...]:
+    """The two criteria a Hantzsch-Widman ring settles before seniority order.
+
+    Locant 1 goes to the most senior heteroatom (S in 1,3,4-thiadiazole), then
+    the heteroatoms as a set take the lowest locants (1,4,2-dioxazole).
+    """
+
+    locants = {
+        locant: priority
+        for priority, group in hetero_by_priority.items()
+        for locant in get_atom_locants(oriented_path, set(group))
+    }
+    if not locants:
+        return ((), ())
+    return ((locants[min(locants)],), tuple(sorted(locants)))
 
 
 def _indicated_hydrogen_like_locants(

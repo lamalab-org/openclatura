@@ -49,8 +49,6 @@ OXO_CASES = (
     ("phenazine-1,6-dione", "phenazine-1,6-dione"),
     ("1,10-phenanthrolin-5-one", "1,10-phenanthrolin-5-one"),
     ("1,10-phenanthroline-5,6-dione", "1,10-phenanthroline-5,6-dione"),
-    # OPSIN accepts the bare name, but the sp3 site is N10, so citing it is the
-    # unambiguous spelling; both parse back to this structure.
     ("acridin-9-one", "acridin-9(10H)-one"),
     ("9H-carbazol-1-one", "9H-carbazol-1-one"),
     ("purine-2,6-dione", "1H-purine-2,6-dione"),
@@ -385,9 +383,7 @@ def test_oxo_dione_amino_methyl_combinations_preserve_hydride_state(valid_oxo_ro
         if not generated or standardize_mol(source) != standardize_mol(regenerated)
     ]
 
-    assert all(
-        root.lower() in generated.lower() for (_, root, _, _), generated in zip(valid_rows, generated_names)
-    )
+    assert all(root.lower() in generated.lower() for (_, root, _, _), generated in zip(valid_rows, generated_names))
     assert not failures, failures[:20]
 
 
@@ -416,4 +412,3 @@ def test_hydro_oxo_analogs_do_not_false_match_mancude_production_plans():
     assert "acridin" not in generated_names[1]
     assert "xanthen" not in generated_names[2]
     assert _normalized_pairs_match(opsin_smiles, regenerated_smiles)
-

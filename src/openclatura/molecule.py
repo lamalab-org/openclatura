@@ -163,15 +163,10 @@ class Molecule:
         self._bond_lookup: dict[tuple[int, int], int] = {}
         self._cyclic_cache: set[int] | None = None  # full-molecule ring atoms; invalidated on mutation
         self._perception_cache: tuple | None = None  # perceived functional groups; invalidated on mutation
-        # Refinement-equivalence atom ranks (canonical_ranks); invalidated on mutation.
         self._canonical_rank_cache: dict[int, int] | None = None
-        # The source RDKit molecule, populated only while self-auditing so the
-        # audit can read tetrahedral parities the flattened model drops (graph_io).
         self.audit_rdmol = None
-        # Accurate (rdCIPLabeler) atom labels, including the centres the legacy
-        # perception leaves unassigned.  Always populated: naming reads it to
-        # spell out ring centres the cis/trans fallback cannot describe.
         self.accurate_cip: dict[int, str] = {}
+        self.substituted_symbols: frozenset[int] = frozenset()
 
     def add_atom(
         self,
@@ -275,6 +270,9 @@ class Molecule:
                     fragment.add_bond(
                         u=idx, v=neighbor, order=bond.order, stereo=bond.stereo, in_small_ring=bond.in_small_ring
                     )
+        fragment.substituted_symbols = frozenset(
+            idx for idx, symbol in (symbols or {}).items() if idx in fragment.atoms and symbol != self.atoms[idx].symbol
+        )
         return fragment
 
     def __iter__(self) -> Iterator[Atom]:
