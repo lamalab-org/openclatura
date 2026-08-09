@@ -169,7 +169,7 @@ def _prime_replacement_prefixes_for_primed_component(core_name: str, prefixes: l
         return prefixes
     return [
         re.sub(
-            r"^([0-9,]+)-((?:di|tri|tetra|penta)?(?:oxa|aza|thia|selena|tellura|phospha|sila|bora|germa|stanna))$",
+            r"^([0-9,]+)-((?:di|tri|tetra|penta)?(?:oxa|aza|thia|selena|tellura|phospha|sila|bora|germa|stanna|magnesa|calca|litha|natra|potassa))$",
             lambda match: f"{','.join(f'{locant}' + chr(39) for locant in match.group(1).split(','))}-{match.group(2)}",
             prefix,
         )
@@ -191,7 +191,7 @@ def _prime_inline_replacement_prefixes_for_primed_component(core_name: str) -> s
         return f"{match.group(1)}{locants}-{match.group(3)}spiro[{match.group(4)}"
 
     return re.sub(
-        r"(^|-)([0-9,]+)-((?:di|tri|tetra|penta)?(?:oxa|aza|thia|selena|tellura|phospha|sila|bora|germa|stanna))"
+        r"(^|-)([0-9,]+)-((?:di|tri|tetra|penta)?(?:oxa|aza|thia|selena|tellura|phospha|sila|bora|germa|stanna|magnesa|calca|litha|natra|potassa))"
         r"spiro\[([^\]]*)",
         prime,
         core_name,
@@ -442,7 +442,7 @@ def _extract_polycyclic_parent(name: str) -> str | None:
         idx = name.rfind(marker)
         if idx > 0 and name[idx - 1] == "-":
             return name[idx:]
-        if idx > 0 and re.fullmatch(r"(?:[0-9,]+-)?(?:oxa|aza|thia)", name[:idx]):
+        if idx > 0 and re.fullmatch(r"(?:[0-9,]+-)?(?:oxa|aza|thia|selena|tellura|phospha|sila|bora|germa|stanna|magnesa|calca|litha|natra|potassa)", name[:idx]):
             return name[idx:]
     return None
 

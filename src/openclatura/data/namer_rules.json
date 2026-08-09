@@ -1547,7 +1547,12 @@
       "aza": 3,
       "phospha": 4,
       "sila": 5,
-      "bora": 6
+      "bora": 6,
+      "magnesa": 7,
+      "calca": 8,
+      "litha": 9,
+      "natra": 10,
+      "potassa": 11
     }
   },
   "unsaturation_order": {

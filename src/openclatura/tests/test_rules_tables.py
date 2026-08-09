@@ -103,6 +103,7 @@ def test_hw_priorities_are_unique_and_ordered_by_seniority():
     assert [e.symbol for e in ranked] == [
         "F", "Cl", "Br", "I", "O", "S", "Se", "Te",
         "N", "P", "As", "Sb", "Bi", "Si", "Ge", "Sn", "Pb", "B", "Al", "Ga",
+        "Mg", "Ca", "Li", "Na", "K",
     ]  # fmt: skip
     priorities = [e.hw_priority for e in ranked]
     assert len(priorities) == len(set(priorities))
