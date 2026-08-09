@@ -6038,5 +6038,8 @@ def test_azine_aryl_side_uses_the_retained_benzene_name():
 
 
 def test_organometallic_skeletal_replacement():
-    assert name_smiles('C1CC[Mg]C1') == '1-magnesacyclopentane'
-    assert name_smiles('C1C2OC3C#C[Mg]C#CC=3OC=2C#C[Mg]C#1') == '2,10-dioxa-6,14-dimagnesatricyclo[9.5.0.0^{3,9}]hexadeca-1(11),3(9)-dien-4,7,12,15-tetrayne'
+    assert name_smiles("C1CC[Mg]C1") == "1-magnesacyclopentane"
+    assert (
+        name_smiles("C1C2OC3C#C[Mg]C#CC=3OC=2C#C[Mg]C#1")
+        == "2,10-dioxa-6,14-dimagnesatricyclo[9.5.0.0^{3,9}]hexadeca-1(11),3(9)-dien-4,7,12,15-tetrayne"
+    )

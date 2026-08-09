@@ -442,7 +442,10 @@ def _extract_polycyclic_parent(name: str) -> str | None:
         idx = name.rfind(marker)
         if idx > 0 and name[idx - 1] == "-":
             return name[idx:]
-        if idx > 0 and re.fullmatch(r"(?:[0-9,]+-)?(?:oxa|aza|thia|selena|tellura|phospha|sila|bora|germa|stanna|magnesa|calca|litha|natra|potassa)", name[:idx]):
+        if idx > 0 and re.fullmatch(
+            r"(?:[0-9,]+-)?(?:oxa|aza|thia|selena|tellura|phospha|sila|bora|germa|stanna|magnesa|calca|litha|natra|potassa)",
+            name[:idx],
+        ):
             return name[idx:]
     return None
 
