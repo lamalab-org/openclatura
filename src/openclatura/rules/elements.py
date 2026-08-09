@@ -36,11 +36,11 @@ ELEMENTS: dict[str, Element] = {
     "I": Element("I", "iodine", 53, 1, "ioda", 4, "iodo"),
     "Pb": Element("Pb", "lead", 82, 4, "plumba", 17, "plumbyl"),
     "Bi": Element("Bi", "bismuth", 83, 3, "bisma", 13, "bismuthanyl"),
-    "Li": Element("Li", "lithium", 3, 1, None, None, None),
-    "Na": Element("Na", "sodium", 11, 1, None, None, None),
-    "K": Element("K", "potassium", 19, 1, None, None, None),
-    "Mg": Element("Mg", "magnesium", 12, 2, None, None, None),
-    "Ca": Element("Ca", "calcium", 20, 2, None, None, None),
+    "Li": Element("Li", "lithium", 3, 1, "litha", 87, None),
+    "Na": Element("Na", "sodium", 11, 1, "natra", 88, None),
+    "K": Element("K", "potassium", 19, 1, "potassa", 89, None),
+    "Mg": Element("Mg", "magnesium", 12, 2, "magnesa", 82, None),
+    "Ca": Element("Ca", "calcium", 20, 2, "calca", 83, None),
 }
 
 
