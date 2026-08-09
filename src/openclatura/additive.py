@@ -1,5 +1,7 @@
 """Explicit additive/replacement feature collection for selected parents."""
 
+import re
+
 from .assembly_parts import AssemblyParts, SubstituentItem
 from .locants import parse_locant
 from .molecule import Molecule
@@ -51,10 +53,7 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     if plan is not None:
         _add_monocycle_hydro(parts, plan, get_loc)
         return
-    # A retained fused parent brings its own metadata, which is what says how
-    # many saturated positions it supports and how the surplus is cited.  Its
-    # name already spells its indicated hydrogen ("2H-1-benzopyran"), so only
-    # the surplus is emitted here -- citing it again gives "2H-2H-".
+
     name_states_indicated_h = not cites_indicated_hydrogen(parts.retained_name)
     metadata = parts.retained_parent_metadata
     if name_states_indicated_h and metadata is None:
@@ -66,7 +65,7 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         return
     oxo_derivative = parts.principal_group is not None and parts.principal_group.key == "ketone"
     default_indicated_h = set(metadata.default_indicated_h) if metadata is not None else set()
-    name_declared_indicated_h = set(default_indicated_h)
+    name_declared_indicated_h = set(default_indicated_h) or _name_indicated_hydrogen_locants(parts.retained_name)
 
     observed = _saturated_ring_carbons(mol, numbered_path, get_loc)
     if (
@@ -189,6 +188,9 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             )
         )
 
+    if metadata is not None and oxo_derivative and not name_states_indicated_h and surplus_count % 2 == 1:
+        candidates = sorted(candidates + hydro_only, key=lambda item: parse_locant(item[0]))
+
     # P-14.7: a mancude parent that the -one saturates cites the extra hydrogen
     # after the suffix locant -- quinolin-4(1H)-one, 1,3-benzoxazol-2(3H)-one.
     added_h_needed = oxo_derivative and supported == 0 and _name_spells_no_hydrogen(parts.retained_name)
@@ -206,6 +208,20 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 operation_kind="indicated_hydrogen",
             )
         )
+
+
+def _name_indicated_hydrogen_locants(retained_name: str | None) -> set[str]:
+    """The locants a name spells for itself, for parents that declare none.
+
+    ``7H-pyrrolo[2,3-d]pyrimidine`` names its sp3 position in the stem while its
+    template leaves ``default_indicated_h`` empty; without this the hydro set
+    could take locant 7 as well and cite it twice.
+    """
+
+    if not retained_name:
+        return set()
+    match = re.match(r"(\d+[a-z]?H(?:,\d+[a-z]?H)*)-", retained_name)
+    return {locant.removesuffix("H") for locant in match.group(1).split(",")} if match else set()
 
 
 def _declared_indicated_hydrogen_split(

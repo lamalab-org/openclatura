@@ -5240,8 +5240,8 @@ def test_pyopsin_regression_names_preserve_retained_ring_anions():
         "[NH3+]CC#CC1=NC=N[N-]1": "3-(1,2,4-triazol-1-ide-5-yl)prop-2-yn-1-aminium",
         "CC([NH3+])C1=CN=N[N-]1": "1-(1,2,3-triazol-1-ide-5-yl)ethan-1-aminium",
         "[NH3+]CC1=N[N-]N=N1": "1-(tetrazol-3-ide-5-yl)methanaminium",
-        "[NH3+]C[C-]1OC(=O)C=C1": "5-(ammoniomethyl)-2-oxofuran-5-ide",
-        "[NH3+]CCC1=N[N-]C(=O)O1": "5-(2-ammonioethyl)-2-oxo-1,3,4-oxadiazol-3-ide",
+        "[NH3+]C[C-]1OC(=O)C=C1": "5-(ammoniomethyl)-2-oxo-5H-furan-5-ide",
+        "[NH3+]CCC1=N[N-]C(=O)O1": "5-(2-ammonioethyl)-2-oxo-3H-1,3,4-oxadiazol-3-ide",
     }
 
     for smiles, expected in cases.items():
@@ -5250,8 +5250,8 @@ def test_pyopsin_regression_names_preserve_retained_ring_anions():
 
 def test_pyopsin_regression_names_preserve_retained_ring_cations():
     cases = {
-        "CC(=C(C)C(=O)NCCc1[nH+]ccn1C)C": "2,3-dimethyl-N-(2-(1-methyl-imidazol-3-ium-2-yl)ethyl)but-2-enamide",
-        "CC[C@@H](C(=O)CC)Oc1[nH]c(c[nH+]1)C(=O)OC": "methyl 2-(((3S)-4-oxohexan-3-yl)oxy)-imidazol-3-ium-5-carboxylate",
+        "CC(=C(C)C(=O)NCCc1[nH+]ccn1C)C": "2,3-dimethyl-N-(2-(1-methyl-1H-imidazol-3-ium-2-yl)ethyl)but-2-enamide",
+        "CC[C@@H](C(=O)CC)Oc1[nH]c(c[nH+]1)C(=O)OC": "methyl 2-(((3S)-4-oxohexan-3-yl)oxy)-1H-imidazol-3-ium-5-carboxylate",
         "Cn1c(ccn1)C[NH+]2CCc3c(cc[nH]c3=O)C2": "8-((1-methyl-1H-pyrazol-5-yl)methyl)-3,8-diazabicyclo[4.4.0]deca-1(6),4-dien-8-ium-2-one",
     }
 
@@ -5305,7 +5305,7 @@ def test_pyopsin_regression_names_preserve_carbanion_suffix_locants():
 def test_pyopsin_regression_names_preserve_zwitterionic_parent_suffix_order():
     cases = {
         "[NH3+]C1=CC(=O)NC(=O)[CH-]1": "4-ammonio-1H,3H-pyridine-3-ide-2,6-dione",
-        "NC1=NC(N)=[NH+][N-]C1=N": "6-imino-1,2,4-triazin-2-ium-1-ide-3,5-diamine",
+        "NC1=NC(N)=[NH+][N-]C1=N": "6-imino-1H-1,2,4-triazin-2-ium-1-ide-3,5-diamine",
         "[NH3+][C-]1C=CC2=C1N=NO2": "2-oxa-3,4-diazabicyclo[3.3.0]octa-1(5),3,7-trien-6-ide-6-aminium",
     }
 
@@ -5454,7 +5454,7 @@ def test_connection_boundary_regression_names_keep_unambiguous_attachment():
         # reads as a benzene-ring substituent — the qualifier now scans a balanced
         # parenthesised substituent, not just a paren-free one.
         "CC1CCN(C(=O)CN(Cc2ccc(Cl)cc2)S(=O)(=O)c2ccccc2)CC1": "2-(N-((4-chlorophenyl)methyl)benzenesulfonamido)-1-(4-methylpiperidin-1-yl)ethan-1-one",
-        "Cc1[nH+]c(cn1Cc2cc(cnc2)F)C(=O)OC": "methyl 1-((5-fluoropyridin-3-yl)methyl)-2-methyl-imidazol-3-ium-4-carboxylate",
+        "Cc1[nH+]c(cn1Cc2cc(cnc2)F)C(=O)OC": "methyl 1-((5-fluoropyridin-3-yl)methyl)-2-methyl-1H-imidazol-3-ium-4-carboxylate",
         "COc1c(cccc1)C2(CC2)C(=O)O[C@H]3C[C@H](C3)c4ccccc4": "trans-3-phenylcyclobutyl 1-(2-methoxyphenyl)cyclopropanecarboxylate",
         "CO[C@H]1C[C@H](C1)OC(=O)c2n(ncc2)C(F)F": "trans-3-methoxycyclobutyl 1-(difluoromethyl)-1H-pyrazole-5-carboxylate",
     }

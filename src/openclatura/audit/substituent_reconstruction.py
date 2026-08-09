@@ -1096,10 +1096,6 @@ def _join_two_port(wrapper_smiles: str, inner: Chem.Mol, hub_stereo: str | None 
     return mol
 
 
-# --------------------------------------------------------------------------- #
-# Recursion
-# --------------------------------------------------------------------------- #
-# A skeletal-replacement clause: ``7-aza``, ``2,4-dioxa``, ``3lambda^6-thia``.
 _REPLACEMENT_CLAUSE_RE = re.compile(
     r"\d+(?:,\d+)*(?:lambda\^?\{?\d+\}?)?-(?:di|tri|tetra|penta|hexa)?"
     r"(?:oxa|aza|thia|selena|tellura|phospha|arsa|sila|germa|stanna|bora)-"

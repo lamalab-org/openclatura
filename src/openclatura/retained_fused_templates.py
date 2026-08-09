@@ -194,6 +194,10 @@ def _match_all_retained_fused_template(
     atom_set = set(atom_indices)
     if len(atom_set) != len(template.atoms):
         return []
+    if all(not atom.aromatic for atom in template.atoms) and any(
+        not _is_saturated_site(mol, atom_idx, atom_set) for atom_idx in atom_set
+    ):
+        return []
 
     atom_by_locant = _relocatable_atom_by_locant(template) if allow_relocated_indicated_h else template.atom_by_locant
     template_degrees = _template_degrees(template)

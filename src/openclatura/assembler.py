@@ -41,11 +41,6 @@ LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
     ("hydroxymethanenitrile", "cyanic acid"),
     ("hydroxymethanoyl", "carboxy"),
     ("hydroxymethanoic anhydride", "dicarbonic acid"),
-    # Paths that do not go through the parent assembly -- a ring aldehyde
-    # rendered as a hydrazone parent, say -- still spell the systematic form,
-    # so these stay until those callers are migrated too.  After
-    # ``promote_retained_functional_parent`` the parent path never emits the
-    # systematic string, so these no longer fire for it.
     ("benzene-1-carboxylic acid", "benzoic acid"),
     ("benzene-1-carboxamide", "benzamide"),
     ("benzene-1-carboxylate", "benzoate"),
@@ -260,30 +255,40 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
     if not indicated_hydrogens and not additive_hydrogens:
         return core_name
     if positive_parent_n_charges(parts):
-        return core_name
+        # The ium suffix states the hydrogen on its own nitrogen, but a second,
+        # neutral ring NH still has to be cited: 4-imino-1H-pyrimidin-3-ium.
+        cationic_locants = {charge.locant for charge in positive_parent_n_charges(parts)}
+        indicated_hydrogens = [locant for locant in indicated_hydrogens if locant not in cationic_locants]
+        if not additive_hydrogens and not indicated_hydrogens:
+            return core_name
     if indicated_hydrogens:
         indicated_hydrogens = sorted(set(indicated_hydrogens), key=parse_locant)
-        # Every cited position carries its own H -- ``1H,7H-purine``, not
-        # ``1,7H-purine``, which is not a readable name.
+        core_name = _drop_stem_indicated_hydrogen(core_name, indicated_hydrogens)
         core_name = ",".join(f"{locant}H" for locant in indicated_hydrogens) + "-" + core_name
     if additive_hydrogens:
         additive_hydrogens = sorted(set(additive_hydrogens), key=parse_locant)
-        # A locant may not butt against the prefix before it, so a hydro prefix
-        # followed by indicated hydrogen needs a separator:
-        # ``3,7-dihydro-1H-purine-2,6-dione``.
         separator = "-" if core_name[:1].isdigit() else ""
         hydro = format_multiplier("hydro", len(additive_hydrogens))
-        # Nothing is left unsaturated, so there is nothing to distinguish.
-        # The stem may already spell the indicated H, as 1H-indole does.
+
         stated = parts.retained_parent_metadata.indicated_hydrogen_count if parts.retained_parent_metadata else 0
-        # A spiro bracket names two rings, so a bare ``decahydro`` in front of it
-        # does not say which one it saturates.
         if len(additive_hydrogens) + max(
             len(indicated_hydrogens), stated
         ) == parts.parent_length and not core_name.startswith("spiro["):
             return f"{hydro}{separator}{core_name}"
         core_name = f"{','.join(additive_hydrogens)}-{hydro}{separator}{core_name}"
     return core_name
+
+
+def _drop_stem_indicated_hydrogen(core_name: str, indicated_hydrogens: list[str]) -> str:
+    """Drop a stem's built-in ``1H-`` when the cited set already covers it."""
+
+    match = re.match(r"^(\d+[a-z]?H(?:,\d+[a-z]?H)*)-", core_name)
+    if match is None:
+        return core_name
+    stated = {locant.removesuffix("H") for locant in match.group(1).split(",")}
+    if not stated <= set(indicated_hydrogens):
+        return core_name
+    return core_name[match.end() :]
 
 
 def _move_added_hydrogen_to_suffix(parts: AssemblyParts, core_name: str, suffix_str: str) -> tuple[str, str]:
@@ -401,9 +406,6 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
     if parts.retained_substituent_name is not None and parts.name_atom_bindings:
         refresh_parent_binding(parts)
     if parts.retained_absorbs_principal_group and parts.name_atom_bindings:
-        # Bindings are built before assembly runs, so the parent one still
-        # describes the systematic spelling this promotion just replaced -- it
-        # would keep claiming ``benzene`` for a name that now reads ``phenol``.
         refresh_parent_binding(parts)
     if fused_ion_candidate is not None and fused_ion_candidate.rendered_name is not None:
         core_name = fused_ion_candidate.rendered_name
