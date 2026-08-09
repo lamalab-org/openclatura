@@ -156,7 +156,9 @@ def test_describe_orders_main_parent_trace_before_nested_substituent_trace():
 
     assert "The final assembled name is **N-phenylacetamide**." not in text
     assert "Component assembled as **N-phenylacetamide**" not in text
-    eth_index = text.index('contributes "eth"')
+    # ``acetamide`` is a retained parent name now, so the parent contributes the
+    # whole word instead of the ``eth`` stem the systematic spelling left.
+    eth_index = text.index('contributes "acetamide"')
     amide_index = text.index('contributes "amide"')
     benzene_index = text.index('contributes "benzene"')
     assert eth_index < amide_index < benzene_index
@@ -165,7 +167,7 @@ def test_describe_orders_main_parent_trace_before_nested_substituent_trace():
 def test_describe_explains_retained_purine_dione_parent():
     text = str(describe("CN1C=NC2=C1C(=O)N(C(=O)N2C)C"))
 
-    assert "1,3,7-trimethylpurine-2,6-dione" in text
+    assert "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione" in text
     assert "retained as purine" in text
     assert "Principal group: ketone at 2,6" in text
 

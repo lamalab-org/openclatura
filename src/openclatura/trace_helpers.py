@@ -11,7 +11,7 @@ from .assembly_parts import (
     split_rendered_substituent_name,
 )
 from .formatting import strip_outer_parentheses
-from .molecule import DecisionTrace, Molecule, TracePhase
+from .molecule import DecisionTrace, TracePhase
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .principal_suffixes import principal_suffix_terms
@@ -90,17 +90,28 @@ def functional_group_trace_data(groups: list[PerceivedGroup]) -> list[dict]:
     ]
 
 
-def bond_ids_within(mol: Molecule, atom_ids: set[int]) -> set[int]:
-    """Return bond IDs whose endpoints are both in atom_ids."""
+def add_substituent_traces(parts, subst_mapping, get_loc, *, only_atoms=None) -> None:
+    """Emit every collected substituent prefix, optionally limited to only_atoms."""
 
-    bond_ids = set()
-    for atom_idx in atom_ids:
-        for neighbor_idx in mol.get_neighbors(atom_idx):
-            if neighbor_idx in atom_ids and atom_idx < neighbor_idx:
-                bond = mol.get_bond(atom_idx, neighbor_idx)
-                if bond:
-                    bond_ids.add(bond.idx)
-    return bond_ids
+    for c_idx, items in subst_mapping.items():
+        if only_atoms is not None and c_idx not in only_atoms:
+            continue
+        locant = get_loc(c_idx)
+        for item in items:
+            add_substituent_trace(
+                parts,
+                item.name,
+                locant,
+                item.atom_ids,
+                item.bond_ids,
+                item.charge_atom_ids,
+                item.trace_segments,
+                item.nested_decisions,
+                item.emitted_tokens,
+                substituent_tree=item.substituent_tree,
+                spiro=item.spiro,
+                outer_parentheses_optional=item.outer_parentheses_optional,
+            )
 
 
 def add_substituent_trace(

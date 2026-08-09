@@ -1,8 +1,8 @@
 """Locant parsing and atom/bond locant helpers."""
 
-import re
 from collections.abc import Mapping
 
+from .assembly_utils import parse_locant as parse_locant
 from .molecule import Molecule
 
 
@@ -42,19 +42,6 @@ def coerce_display_numbering(
         atom: as_display_locant(locant, display_numbering.get(atom) if display_numbering is not None else None)
         for atom, locant in numbering.items()
     }
-
-
-def parse_locant(l):
-    """Return a sortable representation of a locant string."""
-
-    s = locant_text(l)
-    match = re.match(r"^(\d+)([a-zA-Z]*)$", s.split("(")[0])
-    if match:
-        return (1, float(match.group(1)), match.group(2))
-    if any(c.isdigit() for c in s):
-        nums = re.findall(r"\d+", s)
-        return (1, float(nums[0]) if nums else 0.0, s)
-    return (2, 0.0, s)
 
 
 def get_atom_locants(oriented_path: list[int], target_indices: set[int]) -> list[int]:

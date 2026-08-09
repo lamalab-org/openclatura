@@ -4,13 +4,13 @@ from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem, sp
 from .formatting import strip_outer_parentheses
 from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
-from .molecule import DecisionTrace, Molecule
+from .molecule import DecisionTrace, Molecule, bond_ids_within
 from .naming_protocols import RecursiveSubgraphNamer
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .subgraph_tools import subgraph_component
 from .substituent_tokens import graph_bound_substituent_tokens
-from .trace_helpers import add_substituent_trace, bond_ids_within, decision_trace_data
+from .trace_helpers import add_substituent_trace, decision_trace_data
 
 
 def add_component_front_modifiers(
@@ -46,14 +46,23 @@ def add_component_front_modifiers(
 
 
 def n_substituent_locant(
-    principal_key: str, principal_group_count: int, nitrogen_count: int, nitrogen_index: int, global_index: int
+    principal_key: str,
+    principal_group_count: int,
+    nitrogen_count: int,
+    nitrogen_index: int,
+    global_index: int,
+    group_index: int = 0,
 ) -> str:
     """Return the N/N' locant prefix for a principal-group nitrogen."""
 
     if principal_key == "hydrazine":
         return "N" if nitrogen_index == 0 else "N'"
     if principal_key in RULES.functional_groups.keys_with_family("hydrazone"):
-        return "N"
+        # Only the terminal nitrogen of a hydrazone takes substituents, so the
+        # prime distinguishes one hydrazone from the next rather than one
+        # nitrogen from the next: a dihydrazone carrying a group on each is
+        # ``N,N'``, while two groups on a single hydrazone are both ``N``.
+        return "N" + "'" * group_index
     if principal_group_count == 1 and nitrogen_count == 1:
         return "N"
     return "N" + "'" * global_index
@@ -77,7 +86,7 @@ def add_component_n_substituents(
     principal_groups.sort(key=lambda g: parse_locant(get_loc(g.attachment_carbon)))
 
     n_idx_global = 0
-    for group in principal_groups:
+    for group_index, group in enumerate(principal_groups):
         c_idx = group.attachment_carbon
         nitrogens = [n for n in group.atoms_involved if mol.atoms[n].symbol == "N"]
         nitrogens.sort(key=lambda n: mol.get_bond(n, c_idx) is not None, reverse=True)
@@ -95,7 +104,7 @@ def add_component_n_substituents(
                 continue
 
             loc_prefix = n_substituent_locant(
-                principal_key, len(principal_groups), len(nitrogens), n_idx_local, n_idx_global
+                principal_key, len(principal_groups), len(nitrogens), n_idx_local, n_idx_global, group_index
             )
             for n_sub in n_substituents:
                 branch_decisions = DecisionTrace()

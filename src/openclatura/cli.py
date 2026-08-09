@@ -42,6 +42,7 @@ def _cmd_name(args: argparse.Namespace) -> int:
         args.smiles,
         include_trace=args.json or args.trace,
         verify_opsin=args.verify,
+        verify_self=args.self_audit,
         token_debug=args.token_debug,
     )
     if args.json:
@@ -57,6 +58,8 @@ def _cmd_name(args: argparse.Namespace) -> int:
                 print(f"  - {hint}", file=sys.stderr)
         if result.opsin_check is not None:
             print(f"  opsin: {result.opsin_check.status}", file=sys.stderr)
+        if result.self_audit is not None:
+            print(f"  self-audit: {result.self_audit.verdict}", file=sys.stderr)
     return 0 if result.ok else 1
 
 
@@ -67,6 +70,7 @@ def _cmd_batch(args: argparse.Namespace) -> int:
         smiles_list,
         include_trace=args.trace or args.json,
         verify_opsin=args.verify,
+        verify_self=args.self_audit,
         token_debug=args.token_debug,
         processes=processes,
         chunksize=args.chunksize,
@@ -117,6 +121,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=True,
         help="round-trip via OPSIN; use --no-verify to skip",
     )
+    p_name.add_argument(
+        "--self-audit",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="OPSIN-free reconstruction self-audit (no Java needed)",
+    )
     p_name.set_defaults(func=_cmd_name)
 
     p_batch = sub.add_parser("batch", help="Name a file of SMILES (JSONL output)")
@@ -135,6 +145,12 @@ def _build_parser() -> argparse.ArgumentParser:
         action=argparse.BooleanOptionalAction,
         default=True,
         help="round-trip via OPSIN; use --no-verify to skip",
+    )
+    p_batch.add_argument(
+        "--self-audit",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="OPSIN-free reconstruction self-audit (no Java needed)",
     )
     p_batch.add_argument(
         "--processes",

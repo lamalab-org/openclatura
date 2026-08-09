@@ -119,20 +119,6 @@ class FusedComponentCandidate:
     indicated_h: tuple[str, ...] = ()
     production_ready: bool = False
 
-    @property
-    def seniority_key(self) -> tuple[int, int, tuple[int, ...], int, int, int, tuple[int, ...], int, str]:
-        return (
-            0 if self.heteroatom_count else 1,
-            -self.ring_count,
-            tuple(-size for size in self.ring_size_vector),
-            -self.heteroatom_count,
-            -self.heteroatom_variety,
-            self.senior_heteroatom_rank,
-            tuple(PARENT_COMPONENT_HETEROATOM_SENIORITY.get(symbol, 10_000) for symbol in self.heteroatom_symbols),
-            self.priority,
-            self.name,
-        )
-
 
 @dataclass(frozen=True)
 class FusedComponentRegistryEntry:

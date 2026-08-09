@@ -4,7 +4,14 @@ import re
 
 
 def parse_locant(locant):
-    text = str(locant)
+    """Return a sortable representation of a locant.
+
+    Honors a ``display`` attribute when one is present, so DisplayLocant sorts
+    by what it renders as rather than by its underlying integer.
+    """
+
+    display = getattr(locant, "display", None)
+    text = str(locant) if display is None else str(display)
     match = re.match(r"^(\d+)([a-zA-Z]*)$", text.split("(")[0])
     if match:
         return (1, float(match.group(1)), match.group(2))
@@ -12,6 +19,9 @@ def parse_locant(locant):
         numbers = re.findall(r"\d+", text)
         return (1, float(numbers[0]) if numbers else 0.0, text)
     return (2, 0.0, text)
+
+
+_STEREO_DESCRIPTOR_START = re.compile(r"\(\d+[A-Za-z']*(?:[RS]|[EZ])(?:,\d+[A-Za-z']*(?:[RS]|[EZ]))*\)")
 
 
 def needs_hyphen(left: str, right: str) -> bool:
@@ -23,6 +33,9 @@ def needs_hyphen(left: str, right: str) -> bool:
         or right.startswith("N-")
         or right.startswith("N',")
         or right.startswith("N'-")
+        # A stereo descriptor opening the right-hand side is a separate
+        # italicised element and takes a hyphen: `1-methyl-(5'E)-1'-butyl…`.
+        or _STEREO_DESCRIPTOR_START.match(right)
     ):
         return True
     if left[-1].isdigit():

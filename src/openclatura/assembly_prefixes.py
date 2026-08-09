@@ -6,6 +6,7 @@ from .assembly_charge import inferred_ionic_retained_parent, single_charged_repl
 from .assembly_parts import AssemblyParts, SubstituentItem
 from .assembly_utils import is_fully_enclosed, needs_hyphen, parse_locant
 from .formatting import is_complex_prefix
+from .locant_elision import retained_parent_attachment_is_ambiguous, substituent_locant_set_is_unique
 from .nomenclature import RULES
 from .retained_specs import retained_parent_spec
 from .rules import multipliers
@@ -44,7 +45,7 @@ def substituent_locant_string(parts: AssemblyParts, locs: list[str], grouped_cou
     must_print_retained_locant = bool(
         retained_spec
         and retained_spec.attachment_policy.use_parent_attachment_equivalence
-        and _retained_parent_attachment_is_ambiguous(parts, locs)
+        and retained_parent_attachment_is_ambiguous(parts, locs)
     )
     simple_one_locant = (
         len(locs) == 1
@@ -61,84 +62,9 @@ def substituent_locant_string(parts: AssemblyParts, locs: list[str], grouped_cou
         and not spiro_subs
         and not must_print_retained_locant
     )
-    return "" if simple_one_locant else ",".join(map(str, locs))
-
-
-def _retained_parent_attachment_is_ambiguous(parts: AssemblyParts, locs: list[str]) -> bool:
-    """Return whether locant omission would hide a non-equivalent attachment."""
-
-    if not parts.retained_name or not parts.is_ring or parts.is_bicycle or parts.is_spiro or parts.is_polycycle:
-        return False
-    if len(locs) != 1:
-        return False
-    locant = str(locs[0])
-    if locant not in parts.parent_atom_symbols_by_locant:
-        return True
-    locants = sorted(parts.parent_atom_symbols_by_locant.keys(), key=parse_locant)
-    if len(locants) <= 1:
-        return False
-    orbit = _parent_attachment_orbit(parts, locant, locants)
-    return len(orbit) < len(locants)
-
-
-def _parent_attachment_orbit(parts: AssemblyParts, source: str, locants: list[str]) -> set[str]:
-    labels = {
-        loc: (
-            parts.parent_atom_symbols_by_locant.get(loc),
-            parts.parent_atom_charges_by_locant.get(loc, 0),
-            loc in {str(h) for h in parts.indicated_hydrogens},
-        )
-        for loc in locants
-    }
-    adjacency = {
-        loc: {
-            other: parts.parent_bond_orders_by_locants.get(tuple(sorted((loc, other))), 0)
-            for other in locants
-            if other != loc
-        }
-        for loc in locants
-    }
-    return {
-        target
-        for target in locants
-        if labels[target] == labels[source]
-        and _has_parent_automorphism_mapping(source, target, locants, labels, adjacency)
-    }
-
-
-def _has_parent_automorphism_mapping(
-    source: str, target: str, locants: list[str], labels: dict, adjacency: dict
-) -> bool:
-    mapping = {source: target}
-    used = {target}
-
-    def compatible(src: str, dst: str) -> bool:
-        if labels[src] != labels[dst]:
-            return False
-        for assigned_src, assigned_dst in mapping.items():
-            if adjacency[src].get(assigned_src, 0) != adjacency[dst].get(assigned_dst, 0):
-                return False
-        return True
-
-    def search() -> bool:
-        if len(mapping) == len(locants):
-            return True
-        src = min(
-            (loc for loc in locants if loc not in mapping),
-            key=lambda loc: sum(1 for assigned in mapping if adjacency[loc].get(assigned, 0)),
-        )
-        for dst in locants:
-            if dst in used or not compatible(src, dst):
-                continue
-            mapping[src] = dst
-            used.add(dst)
-            if search():
-                return True
-            used.remove(dst)
-            del mapping[src]
-        return False
-
-    return search()
+    if simple_one_locant or substituent_locant_set_is_unique(parts, locs, grouped_count, spiro_subs):
+        return ""
+    return ",".join(map(str, locs))
 
 
 def format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:

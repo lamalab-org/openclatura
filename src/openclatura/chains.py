@@ -2,8 +2,9 @@
 
 from dataclasses import dataclass, field
 
-from .molecule import Molecule
+from .molecule import Molecule, edges_within_atoms
 from .polycycle_topology import (
+    adjacency_from_edges,
     bicyclo_proof,
     build_ring_numbering,
     build_von_baeyer_numbering,
@@ -43,6 +44,38 @@ class PolycycleDescriptorCandidate:
     @property
     def descriptor_allowed(self) -> bool:
         return not self.is_von_baeyer or bool(self.numberings)
+
+
+def _ordered_walk(comp_adj, nodes, start: int) -> list[int]:
+    """Order nodes by walking neighbors from start until the run is exhausted."""
+
+    path = [start]
+    seen = {start}
+    curr = start
+    while len(path) < len(nodes):
+        nxt = next((x for x in comp_adj[curr] if x in nodes and x not in seen), None)
+        if nxt is None:
+            break
+        path.append(nxt)
+        seen.add(nxt)
+        curr = nxt
+    return path
+
+
+def _bridge_interior_path(adj, nodes, start: int, end: int) -> list[int]:
+    """Return the interior nodes of the shortest walk from start to end through nodes."""
+
+    queue = [(start, [])]
+    visited = set()
+    while queue:
+        curr, path = queue.pop(0)
+        if curr == end and path:
+            return path[:-1]
+        visited.add(curr)
+        for neighbor in adj[curr]:
+            if (neighbor in nodes or neighbor == end) and neighbor not in visited:
+                queue.append((neighbor, path + [neighbor]))
+    return []
 
 
 def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
@@ -157,22 +190,7 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
         branch1 = branch1[::-1]
         branch2 = branch2[::-1]
 
-    bridge_path = []
-    if main_bridge["length"] > 0:
-        q = [(ep1, [])]
-        visited = set()
-        found_path = []
-        while q:
-            curr, p = q.pop(0)
-            if curr == ep2 and len(p) > 0:
-                found_path = p[:-1]
-                break
-            visited.add(curr)
-            for neighbor in adj[curr]:
-                if neighbor in main_bridge["nodes"] or neighbor == ep2:
-                    if neighbor not in visited:
-                        q.append((neighbor, p + [neighbor]))
-        bridge_path = found_path
+    bridge_path = _bridge_interior_path(adj, main_bridge["nodes"], ep1, ep2) if main_bridge["length"] > 0 else []
 
     path1 = []
     path1.extend(branch1)
@@ -190,19 +208,7 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
         for br in bridges[1:]:
             if br["length"] > 0:
                 b_ep1, b_ep2 = br["endpoints"]
-                q = [(b_ep1, [])]
-                v2 = set()
-                found = []
-                while q:
-                    curr, p = q.pop(0)
-                    if curr == b_ep2 and len(p) > 0:
-                        found = p[:-1]
-                        break
-                    v2.add(curr)
-                    for nxt in adj[curr]:
-                        if nxt in br["nodes"] or nxt == b_ep2:
-                            if nxt not in v2:
-                                q.append((nxt, p + [nxt]))
+                found = _bridge_interior_path(adj, br["nodes"], b_ep1, b_ep2)
                 for node in found:
                     if node not in visited:
                         path.append(node)
@@ -462,19 +468,24 @@ def find_all_carbon_paths(mol: Molecule, exclude_atoms: set[int] = None) -> list
 
     all_paths = []
 
-    def dfs(current: int, path: list[int], visited: set[int]):
-        neighbors = [n for n in mol.get_neighbors(current) if n in valid_nodes and n not in visited]
-        if not neighbors:
-            all_paths.append(path)
-            return
-        for n in neighbors:
-            dfs(n, path + [n], visited | {n})
+    def collect_paths(start: int) -> None:
+        # Long unbranched backbones can exceed Python's recursion limit. Keep
+        # the existing depth-first order without using the interpreter stack.
+        stack = [(start, [start], {start})]
+        while stack:
+            current, path, visited = stack.pop()
+            neighbors = [n for n in mol.get_neighbors(current) if n in valid_nodes and n not in visited]
+            if not neighbors:
+                all_paths.append(path)
+                continue
+            for neighbor in reversed(neighbors):
+                stack.append((neighbor, path + [neighbor], visited | {neighbor}))
 
     endpoints = [n for n in valid_nodes if sum(1 for x in mol.get_neighbors(n) if x in valid_nodes) <= 1]
     start_nodes = endpoints if endpoints else valid_nodes
 
     for start in start_nodes:
-        dfs(start, [start], {start})
+        collect_paths(start)
 
     unique_paths = []
     seen = set()
@@ -744,7 +755,7 @@ def merge_polyspiro_ring_systems(mol: Molecule, systems: list[RingSystem]) -> li
         union_atoms = set()
         for group_idx in group_indexes:
             union_atoms |= systems[group_idx].atoms
-        union_edges = _edges_within_atoms(mol, union_atoms)
+        union_edges = edges_within_atoms(mol, union_atoms)
         if not _has_multiple_spiro_centers(union_atoms, union_edges):
             result.extend(systems[group_idx] for group_idx in sorted(group_indexes))
             continue
@@ -820,7 +831,7 @@ def _proven_monospiro_or_bicyclo_system(
         legacy = _legacy_monospiro_or_bicyclo_system(
             mol,
             comp_nodes,
-            _adjacency_from_edges(comp_nodes, comp_edges),
+            adjacency_from_edges(comp_nodes, comp_edges),
         )
         legacy_paths = []
         legacy_numberings = []
@@ -916,16 +927,6 @@ def _is_plain_hydrocarbon_ring_system(
     return True
 
 
-def _adjacency_from_edges(
-    nodes: set[int], edges: set[tuple[int, int]] | frozenset[tuple[int, int]]
-) -> dict[int, set[int]]:
-    adjacency = {node: set() for node in nodes}
-    for first, second in edges:
-        adjacency[first].add(second)
-        adjacency[second].add(first)
-    return adjacency
-
-
 def _dedupe_numbering_paths(paths: list[list[int]]) -> list[list[int]]:
     unique = []
     seen = set()
@@ -975,17 +976,7 @@ def _legacy_monospiro_or_bicyclo_system(
 
             endpoints = [n for n in comp if spiro_atom in comp_adj[n]]
             if len(endpoints) == 2:
-                path = [endpoints[0]]
-                curr = path[0]
-                p_set = {curr}
-                while len(path) < len(comp):
-                    next_n = next((x for x in comp_adj[curr] if x in comp and x not in p_set), None)
-                    if next_n is None:
-                        break
-                    path.append(next_n)
-                    p_set.add(next_n)
-                    curr = next_n
-                rings.append(path)
+                rings.append(_ordered_walk(comp_adj, comp, endpoints[0]))
 
         if len(rings) != 2:
             return None
@@ -1029,16 +1020,7 @@ def _legacy_monospiro_or_bicyclo_system(
         ends = [n for n in p_nodes if b1 in comp_adj[n]]
         if not ends:
             continue
-        ordered_p = [ends[0]]
-        p_set = {ordered_p[0]}
-        curr = ordered_p[0]
-        while len(ordered_p) < len(p_nodes):
-            next_n = next((x for x in comp_adj[curr] if x in p_nodes and x not in p_set), None)
-            if next_n is None:
-                break
-            ordered_p.append(next_n)
-            p_set.add(next_n)
-            curr = next_n
+        ordered_p = _ordered_walk(comp_adj, p_nodes, ends[0])
 
         if b2 not in comp_adj[ordered_p[-1]]:
             ordered_p = ordered_p[::-1]
@@ -1065,15 +1047,6 @@ def _legacy_monospiro_or_bicyclo_system(
         if retained_rules.recognizes_retained_ring(mol, cand):
             return RingSystem(atoms=comp_nodes, is_bicycle=True, x=len(p1), y=len(p2), z=len(p3), paths=[cand])
     return RingSystem(atoms=comp_nodes, is_bicycle=True, x=len(p1), y=len(p2), z=len(p3), paths=vb_paths)
-
-
-def _edges_within_atoms(mol: Molecule, atoms: set[int]) -> set[tuple[int, int]]:
-    edges = set()
-    for atom_idx in atoms:
-        for neighbor_idx in mol.get_neighbors(atom_idx):
-            if neighbor_idx in atoms and atom_idx < neighbor_idx:
-                edges.add((atom_idx, neighbor_idx))
-    return edges
 
 
 def _polyspiro_or_von_baeyer_candidate(

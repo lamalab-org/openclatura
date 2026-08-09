@@ -3,24 +3,9 @@
 import re
 
 from .assembly_parts import RenderedSubstituentName, rendered_substituent_text
+from .assembly_utils import is_fully_enclosed as is_fully_enclosed
 from .namer_config import ALKYL_OXY_PREFIXES
 from .rules import multipliers, stems
-
-
-def is_fully_enclosed(s: str) -> bool:
-    """Return true when a name fragment is already fully parenthesized."""
-
-    if not s.startswith("(") or not s.endswith(")"):
-        return False
-    depth = 0
-    for i, c in enumerate(s):
-        if c == "(":
-            depth += 1
-        elif c == ")":
-            depth -= 1
-        if depth == 0 and i < len(s) - 1:
-            return False
-    return depth == 0
 
 
 def strip_outer_parentheses(name: str | RenderedSubstituentName) -> str:
@@ -36,6 +21,21 @@ def is_complex_prefix(name: str) -> bool:
     """Return true when a substituent prefix needs protective parentheses."""
 
     return "(" in name or name[0].isdigit() or "-" in name or " " in name or _starts_with_multiplier(name)
+
+
+def is_composite_prefix(name: str) -> bool:
+    """Return true when a prefix is built from more than one substituent unit.
+
+    ``cyclopropylmethyl`` is a cyclopropyl *on* a methyl.  Written bare in front
+    of a parent it reads equally well as a ``cyclopropyl`` plus a ``methyl`` on
+    that parent — two different structures — so it needs protective parentheses.
+    A simple prefix carries its only ``yl`` at the end and needs none.
+    """
+
+    for ending in ("ylidyne", "ylidene", "yl"):
+        if name.endswith(ending):
+            return "yl" in name[: -len(ending)]
+    return "yl" in name
 
 
 def _starts_with_multiplier(name: str) -> bool:
@@ -98,13 +98,13 @@ def substituted_alkoxy_prefix(branch: str) -> str | None:
 
     if "hydroxy" not in branch:
         return None
-    for stem in stems.STEMS.values():
-        terminal = f"{stem.stem}yl"
-        replacement = f"{stem.stem}oxy"
-        if branch.endswith(terminal):
-            prefix = branch[: -len(terminal)]
-            return f"({prefix}{replacement})" if prefix else replacement
-    return None
+    stem = stems.terminal_stem(branch)
+    if stem is None:
+        return None
+    terminal = f"{stem.stem}yl"
+    replacement = f"{stem.stem}oxy"
+    prefix = branch[: -len(terminal)]
+    return f"({prefix}{replacement})" if prefix else replacement
 
 
 def format_element_substituent(stereo_prefix: str, branch: str, suffix: str, is_double: bool = False) -> str:

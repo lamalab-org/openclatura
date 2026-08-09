@@ -3,10 +3,9 @@
 from .assembly_parts import AssemblyParts, PrincipalGroupItem
 from .group_atom_roles import hydrazone_characteristic_carbon
 from .locants import parse_locant
-from .molecule import Molecule
+from .molecule import Molecule, bond_ids_within
 from .nomenclature import RULES
 from .perception import PerceivedGroup, perceive_groups
-from .trace_helpers import bond_ids_within
 
 
 def component_groups(mol: Molecule, component_atoms: set[int]) -> list[PerceivedGroup]:

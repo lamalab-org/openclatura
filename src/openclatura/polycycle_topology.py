@@ -7,7 +7,7 @@ except for descriptor/audit data that can be proven from the graph.
 import re
 from dataclasses import dataclass
 
-from .molecule import Molecule
+from .molecule import Molecule, edges_within_atoms
 from .ring_renderer import render_ring_descriptor, von_baeyer_cycle_count, von_baeyer_kind
 
 
@@ -179,12 +179,19 @@ def monospiro_proof(
             return None
     ordered_components = tuple(sorted(components, key=lambda component: (len(component), sorted(component))))
     descriptor_numbers = tuple(len(component) for component in ordered_components)
+    # Numbering starts in the smaller ring (P-24.2.1), but equal rings leave the
+    # choice open -- both orders are offered so the heteroatom rule can settle it
+    # rather than the input atom order.  2-oxaspiro[3.3]heptane, not 6-.
+    starts = [ordered_components]
+    if len(ordered_components[0]) == len(ordered_components[1]):
+        starts.append((ordered_components[1], ordered_components[0]))
     paths = []
-    first_path = _component_path_between_attachment_atoms(ordered_components[0], {spiro_atom}, edge_set)
-    second_path = _component_path_between_attachment_atoms(ordered_components[1], {spiro_atom}, edge_set)
-    for oriented_first in (first_path, tuple(reversed(first_path))):
-        for oriented_second in (second_path, tuple(reversed(second_path))):
-            paths.append(oriented_first + (spiro_atom,) + oriented_second)
+    for first, second in starts:
+        first_path = _component_path_between_attachment_atoms(first, {spiro_atom}, edge_set)
+        second_path = _component_path_between_attachment_atoms(second, {spiro_atom}, edge_set)
+        for oriented_first in (first_path, tuple(reversed(first_path))):
+            for oriented_second in (second_path, tuple(reversed(second_path))):
+                paths.append(oriented_first + (spiro_atom,) + oriented_second)
     proof = MonospiroProof(
         descriptor_numbers=(descriptor_numbers[0], descriptor_numbers[1]),
         spiro_atom=spiro_atom,
@@ -655,15 +662,6 @@ def _bicyclo_edges_from_numbering(
     return frozenset(_normalize_edges(edges))
 
 
-def edges_within_atoms(mol: Molecule, atoms: set[int]) -> set[tuple[int, int]]:
-    edges = set()
-    for atom_idx in atoms:
-        for neighbor_idx in mol.get_neighbors(atom_idx):
-            if neighbor_idx in atoms and atom_idx < neighbor_idx:
-                edges.add((atom_idx, neighbor_idx))
-    return edges
-
-
 def internal_degrees(atoms: frozenset[int], edges: frozenset[tuple[int, int]]) -> dict[int, int]:
     degrees = {atom: 0 for atom in atoms}
     for first, second in edges:
@@ -784,6 +782,16 @@ def _dedupe_paths(paths: list[tuple[int, ...]]) -> list[tuple[int, ...]]:
         seen.add(path)
         deduped.append(path)
     return deduped
+
+
+def adjacency_from_edges(
+    nodes: set[int] | frozenset[int], edges: set[tuple[int, int]] | frozenset[tuple[int, int]]
+) -> dict[int, set[int]]:
+    adjacency: dict[int, set[int]] = {node: set() for node in nodes}
+    for first, second in edges:
+        adjacency[first].add(second)
+        adjacency[second].add(first)
+    return adjacency
 
 
 def adjacent_atoms(atom: int, edges: frozenset[tuple[int, int]]) -> set[int]:

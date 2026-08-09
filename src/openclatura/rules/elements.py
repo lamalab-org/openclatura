@@ -20,22 +20,27 @@ ELEMENTS: dict[str, Element] = {
     "N": Element("N", "nitrogen", 7, 3, "aza", 9, "amino"),
     "O": Element("O", "oxygen", 8, 2, "oxa", 5, "oxy"),
     "F": Element("F", "fluorine", 9, 1, "fluora", 1, "fluoro"),
+    "Al": Element("Al", "aluminium", 13, 3, "alumina", 19, "alumanyl"),
     "Si": Element("Si", "silicon", 14, 4, "sila", 14, "silyl"),
     "P": Element("P", "phosphorus", 15, 3, "phospha", 10, "phosphanyl"),
     "S": Element("S", "sulfur", 16, 2, "thia", 6, "sulfanyl"),
     "Cl": Element("Cl", "chlorine", 17, 1, "chlora", 2, "chloro"),
+    "Ga": Element("Ga", "gallium", 31, 3, "galla", 20, "gallanyl"),
+    "Ge": Element("Ge", "germanium", 32, 4, "germa", 15, "germyl"),
     "As": Element("As", "arsenic", 33, 3, "arsa", 11, "arsanyl"),
     "Se": Element("Se", "selenium", 34, 2, "selena", 7, "selanyl"),
     "Br": Element("Br", "bromine", 35, 1, "broma", 3, "bromo"),
+    "Sn": Element("Sn", "tin", 50, 4, "stanna", 16, "stannyl"),
     "Sb": Element("Sb", "antimony", 51, 3, "stiba", 12, "stibanyl"),
     "Te": Element("Te", "tellurium", 52, 2, "tellura", 8, "tellanyl"),
     "I": Element("I", "iodine", 53, 1, "ioda", 4, "iodo"),
+    "Pb": Element("Pb", "lead", 82, 4, "plumba", 17, "plumbyl"),
     "Bi": Element("Bi", "bismuth", 83, 3, "bisma", 13, "bismuthanyl"),
-    "Li": Element("Li", "lithium", 3, 1, None, None, None),
-    "Na": Element("Na", "sodium", 11, 1, None, None, None),
-    "K": Element("K", "potassium", 19, 1, None, None, None),
-    "Mg": Element("Mg", "magnesium", 12, 2, None, None, None),
-    "Ca": Element("Ca", "calcium", 20, 2, None, None, None),
+    "Li": Element("Li", "lithium", 3, 1, "litha", 87, None),
+    "Na": Element("Na", "sodium", 11, 1, "natra", 88, None),
+    "K": Element("K", "potassium", 19, 1, "potassa", 89, None),
+    "Mg": Element("Mg", "magnesium", 12, 2, "magnesa", 82, None),
+    "Ca": Element("Ca", "calcium", 20, 2, "calca", 83, None),
 }
 
 
@@ -45,3 +50,11 @@ def get(symbol: str) -> Element:
 
 def is_known(symbol: str) -> bool:
     return symbol in ELEMENTS
+
+
+# Skeletal-replacement ("a") prefix -> element symbol: ``oxa`` is an oxygen,
+# ``aza`` a nitrogen.  The namer writes these from ``Element.hw_stem``; inverting
+# the same table is what lets a parser read back exactly what the namer can emit.
+SYMBOLS_BY_HW_STEM: dict[str, str] = {
+    element.hw_stem: element.symbol for element in ELEMENTS.values() if element.hw_stem
+}

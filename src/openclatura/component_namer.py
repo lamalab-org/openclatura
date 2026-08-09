@@ -2,7 +2,13 @@
 
 from collections.abc import Callable
 
-from .assembly_parts import AssemblyParts, NameAtomBinding, SubstituentItem, split_rendered_substituent_name
+from .assembly_parts import (
+    AssemblyParts,
+    NameAtomBinding,
+    SubstituentItem,
+    UnsaturationItem,
+    split_rendered_substituent_name,
+)
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
 from .component_group_rules import (
     exclude_nonparent_group_atoms,
@@ -11,7 +17,7 @@ from .component_group_rules import (
 )
 from .component_modifiers import add_component_front_modifiers, add_component_n_substituents
 from .functional_prefixes import collect_component_prefix_substituents
-from .molecule import DecisionTrace, Molecule, TracePhase
+from .molecule import DecisionTrace, Molecule, TracePhase, bond_ids_within
 from .name_assembly import NameAssemblyResult, assert_final_name_assembly, token_span_trace_data
 from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
@@ -27,6 +33,7 @@ from .principal_groups import (
     partition_principal_and_prefix_groups,
 )
 from .retained_fused_production import production_retained_fused_parent
+from .rules import elements as _elements
 from .special_cases import (
     single_atom_component_name,
     structural_replacement_parent_result,
@@ -44,10 +51,9 @@ from .subgraph_tools import (
 )
 from .substituent_tokens import graph_bound_substituent_tokens
 from .trace_helpers import (
-    add_substituent_trace,
+    add_substituent_traces,
     assembly_substituent_tree,
     assembly_trace_segments,
-    bond_ids_within,
     build_shortcut_tree_node,
     decision_trace_data,
     functional_group_trace_data,
@@ -56,6 +62,12 @@ from .trace_helpers import (
 
 SpiroSubgraphNamer = Callable[[Molecule, int, set[int]], SpiroAssembly]
 ParentAssembler = Callable[..., str]
+
+# Opt-in observer invoked with (mol, component_atoms, parts) after name-atom
+# bindings are refreshed for a component.  Default ``None`` means zero overhead;
+# the OPSIN-free reconstruction self-audit installs one via
+# ``openclatura.audit.capture_component_audits``.
+COMPONENT_AUDIT_HOOK: Callable[[Molecule, set[int], object], None] | None = None
 
 
 def select_component_parent(mol: Molecule, exclude_atoms: set[int], principal_carbons: list[int]):
@@ -169,30 +181,36 @@ def add_component_substituents(
 ) -> None:
     """Add collected component substituents to assembly parts."""
 
-    for c_idx, items in subst_mapping.items():
-        if c_idx in numbered_path:
-            locant = get_loc(c_idx)
-            for item in items:
-                add_substituent_trace(
-                    parts,
-                    item.name,
-                    locant,
-                    item.atom_ids,
-                    item.bond_ids,
-                    item.charge_atom_ids,
-                    item.trace_segments,
-                    item.nested_decisions,
-                    item.emitted_tokens,
-                    substituent_tree=item.substituent_tree,
-                    spiro=item.spiro,
-                    outer_parentheses_optional=item.outer_parentheses_optional,
-                )
+    add_substituent_traces(parts, subst_mapping, get_loc, only_atoms=set(numbered_path))
 
 
 def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
     """Return formally charged atoms from an already named graph fragment."""
 
     return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
+
+
+def _chain_audit_parts(plan, component_atoms: set[int]) -> AssemblyParts:
+    """Express a homonuclear chain as a carbon chain plus skeletal replacement.
+
+    The audit already rebuilds `oxa`/`thia`/`aza` replacement onto a carbon
+    backbone, so a trisulfane is a three-atom chain with three thia positions
+    and needs no new machinery.
+    """
+
+    stem = next((k for k, v in _elements.SYMBOLS_BY_HW_STEM.items() if v == plan.element), None)
+    if stem is None:
+        raise ValueError(f"no replacement stem for {plan.element}")
+    locants = [str(i) for i in range(1, plan.length + 1)]
+    parts = AssemblyParts(parent_length=plan.length, parent_atom_ids=set(component_atoms))
+    parts.a_prefixes = [SubstituentItem(name=stem, locants=locants)]
+    parts.unsaturations = [
+        UnsaturationItem(bond_key="double" if order == 2 else "triple", locants=[str(idx + 1)])
+        for idx, order in enumerate(plan.bond_orders)
+        if order > 1
+    ]
+    parts.substituents = [SubstituentItem(name=ligand, locants=[str(locant)]) for locant, ligand in plan.ligands]
+    return parts
 
 
 def _shortcut_component_result(
@@ -203,11 +221,23 @@ def _shortcut_component_result(
     stage: str,
     role: str,
     bindings: list[NameAtomBinding] | tuple[NameAtomBinding, ...] | None = None,
+    audit_chain=None,
     emit_metadata: bool = True,
     token_debug: bool = False,
 ) -> tuple[str, list[dict], list[dict], list[dict]]:
     """Build audited metadata for a component shortcut name."""
 
+    if audit_chain is not None and COMPONENT_AUDIT_HOOK is not None:
+        # A shortcut returns before the usual audit point, so its name is
+        # unauditable unless the renderer hands over a plan the reconstruction
+        # can rebuild.  This runs ahead of the metadata early-return because the
+        # audited run does not ask for metadata.  Only renderers supplying a
+        # plan are offered here; the rest still abstain rather than be checked
+        # against a stub parent.
+        try:
+            COMPONENT_AUDIT_HOOK(mol, set(component_atoms), _chain_audit_parts(audit_chain, component_atoms))
+        except Exception:  # pragma: no cover - audit must never disrupt naming
+            pass
     if not emit_metadata:
         return name, [], [], []
     parts = AssemblyParts(parent_length=max(1, len(component_atoms)), parent_atom_ids=set(component_atoms))
@@ -306,6 +336,7 @@ def name_component(
             stage="shortcut",
             role=structural_parent_result.role,
             bindings=structural_parent_result.bindings,
+            audit_chain=structural_parent_result.audit_chain,
             emit_metadata=emit_metadata,
             token_debug=token_debug,
         )
@@ -558,6 +589,13 @@ def name_component(
 
     refresh_name_atom_bindings(parts)
     parts.stereo_audit_issues = list(audit_stereochemistry(mol, parts).issues)
+    if COMPONENT_AUDIT_HOOK is not None:
+        # Optional, opt-in observer for the OPSIN-free reconstruction self-audit.
+        # Guarded so a self-check can never break name generation.
+        try:
+            COMPONENT_AUDIT_HOOK(mol, set(state.component_atoms), parts)
+        except Exception:  # pragma: no cover - audit must never disrupt naming
+            pass
     assert_component_fully_named(mol, state.component_atoms, parts, "<component>")
     name = assemble_parent_name(mol, parts, numbered_path, get_loc, emit_metadata=emit_metadata)
     if emit_metadata:

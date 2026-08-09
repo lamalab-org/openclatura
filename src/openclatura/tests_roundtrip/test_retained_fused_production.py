@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import shutil
+import tempfile
 import warnings
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from itertools import combinations
+from pathlib import Path
 from random import Random
 
 import pytest
@@ -47,12 +49,12 @@ OXO_CASES = (
     ("phenazine-1,6-dione", "phenazine-1,6-dione"),
     ("1,10-phenanthrolin-5-one", "1,10-phenanthrolin-5-one"),
     ("1,10-phenanthroline-5,6-dione", "1,10-phenanthroline-5,6-dione"),
-    ("acridin-9-one", "acridin-9-one"),
+    ("acridin-9-one", "acridin-9(10H)-one"),
     ("9H-carbazol-1-one", "9H-carbazol-1-one"),
     ("purine-2,6-dione", "1H-purine-2,6-dione"),
     ("2,8-diamino-1,4-dihydropurin-6-one", "2,8-diamino-1,4-dihydropurin-6-one"),
-    ("1,3,7-trimethylpurine-2,6-dione", "1,3,7-trimethylpurine-2,6-dione"),
-    ("1H-indazol-3-one", "1H-indazol-3-one"),
+    ("1,3,7-trimethylpurine-2,6-dione", "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione"),
+    ("1H-indazol-3-one", "1H,2H-indazol-3-one"),
     ("xanthen-9-one", "xanthen-9-one"),
 )
 
@@ -80,13 +82,18 @@ def _require_opsin() -> None:
 
 def _opsin(names: list[str], output_format: str = "SMILES") -> list[str]:
     _require_opsin()
-    # py2opsin 2.9 splits batched CML at newlines instead of at molecules.
-    # Single-name calls preserve each XML document intact.
-    if output_format == "CML":
-        return [py2opsin.py2opsin(name, output_format=output_format) for name in names]
-    with warnings.catch_warnings():
-        warnings.filterwarnings("ignore", message=r".*OPSIN raised the following error.*", category=RuntimeWarning)
-        return list(py2opsin.py2opsin(names, output_format=output_format))
+    # py2opsin defaults its scratch file to a fixed name in the working
+    # directory, so anything else calling OPSIN at the same time reads back the
+    # wrong structures.  Every call gets its own path.
+    with tempfile.TemporaryDirectory(prefix="openclatura_opsin_") as tmpdir:
+        tmp_fpath = str(Path(tmpdir) / "input.txt")
+        # py2opsin 2.9 splits batched CML at newlines instead of at molecules.
+        # Single-name calls preserve each XML document intact.
+        if output_format == "CML":
+            return [py2opsin.py2opsin(name, output_format=output_format, tmp_fpath=tmp_fpath) for name in names]
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", message=r".*OPSIN raised the following error.*", category=RuntimeWarning)
+            return list(py2opsin.py2opsin(names, output_format=output_format, tmp_fpath=tmp_fpath))
 
 
 def _cml_plan(cml: str) -> tuple[dict[str, str], set[frozenset[str]], set[str]]:
@@ -360,23 +367,23 @@ def test_oxo_dione_amino_methyl_combinations_preserve_hydride_state(valid_oxo_ro
     }
     candidate_smiles = _opsin([name for name, _, _, _ in candidate_names])
     valid_rows = [
-        (name, root, smiles)
-        for (name, root, _, _), smiles in zip(candidate_names, candidate_smiles, strict=True)
+        (name, root, parent, smiles)
+        for (name, root, parent, _), smiles in zip(candidate_names, candidate_smiles, strict=True)
         if smiles
     ]
     assert len(valid_rows) == _COMBINATION_SAMPLE_SIZE
 
-    generated_names = [result.name for result in name_many([smiles for _, _, smiles in valid_rows], processes=1)]
+    generated_names = [result.name for result in name_many([smiles for *_, smiles in valid_rows], processes=1)]
     regenerated_smiles = _opsin(generated_names)
     failures = [
         (source_name, generated, standardize_mol(source), standardize_mol(regenerated))
-        for (source_name, _, source), generated, regenerated in zip(
+        for (source_name, _, _, source), generated, regenerated in zip(
             valid_rows, generated_names, regenerated_smiles, strict=True
         )
         if not generated or standardize_mol(source) != standardize_mol(regenerated)
     ]
 
-    assert all(root.lower() in generated.lower() for (_, root, _), generated in zip(valid_rows, generated_names))
+    assert all(root.lower() in generated.lower() for (_, root, _, _), generated in zip(valid_rows, generated_names))
     assert not failures, failures[:20]
 
 

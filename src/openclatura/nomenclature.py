@@ -59,6 +59,7 @@ class ComponentRules:
     hydrazone_principal_groups: set[str]
     salt_metal_names: set[str]
     mononuclear_parent_hydrides: dict[str, str]
+    retained_homonuclear_chain_names: dict[str, str]
     replacement_parent_oxoacid_specs: tuple[dict, ...]
 
 
@@ -157,9 +158,6 @@ class FunctionalGroupRule:
 class FunctionalGroupRules:
     by_key: dict[str, FunctionalGroupRule]
 
-    def has(self, key: str) -> bool:
-        return key in self.by_key
-
     def get(self, key: str) -> FunctionalGroupRule:
         return self.by_key[key]
 
@@ -186,9 +184,6 @@ class FunctionalGroupRules:
 
     def principal_keys(self) -> set[str]:
         return {key for key, rule in self.by_key.items() if rule.role == "principal"}
-
-    def prefix_keys(self) -> set[str]:
-        return {key for key, rule in self.by_key.items() if rule.prefix}
 
     def most_senior(self, keys: list[str]) -> FunctionalGroupRule:
         principal_rules = [
@@ -425,6 +420,7 @@ def registry() -> NomenclatureRegistry:
             hydrazone_principal_groups=set(functional_group_rules.values("hydrazone_principal_groups")),
             salt_metal_names=set(simple_components.values("salt_metal_names")),
             mononuclear_parent_hydrides=simple_components.mapping("mononuclear_parent_hydrides"),
+            retained_homonuclear_chain_names=simple_components.mapping("retained_homonuclear_chain_names"),
             replacement_parent_oxoacid_specs=tuple(simple_components.values("replacement_parent_oxoacid_specs")),
         ),
         ions=IonRules(

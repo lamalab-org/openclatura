@@ -34,6 +34,167 @@ def promote_benzene_retained_name(parts: AssemblyParts) -> None:
                     parts.unsaturations = []
 
 
+# Retained names that spell a parent hydride *together with* its principal
+# characteristic group, keyed by the two things that make them up.  IUPAC keeps
+# these as the preferred name when the ring is substituted -- ``4-chlorophenol``,
+# ``4-chlorobenzaldehyde`` -- so they belong to the parent, not to a rewrite of
+# the finished string: only here is the locant still known to be the group's own.
+RETAINED_FUNCTIONAL_PARENTS: dict[tuple[str, str], str] = {
+    ("benzene", "alcohol"): "phenol",
+    ("benzene", "amine"): "aniline",
+    ("benzene", "ring_aldehyde"): "benzaldehyde",
+    ("benzene", "ring_carboxylic_acid"): "benzoic acid",
+    ("benzene", "ring_amide"): "benzamide",
+    ("benzene", "ring_nitrile"): "benzonitrile",
+    ("benzene", "ring_carboxylate"): "benzoate",
+}
+
+
+# The acyclic counterpart, keyed by chain length, the principal group, and how
+# many of that group the chain carries -- two carboxylic acids on a C4 chain is
+# succinic acid, one is butanoic.  Spelling these out per (length, group) rather
+# than as a stem substitution is deliberate: the joining vowel is irregular
+# (``acetonitrile`` but ``propionitrile``), so there is no stem to share.
+RETAINED_CHAIN_PARENTS: dict[tuple[int, str, int], str] = {
+    (1, "carboxylic_acid", 1): "formic acid",
+    (2, "carboxylic_acid", 1): "acetic acid",
+    (1, "amide", 1): "formamide",
+    (2, "amide", 1): "acetamide",
+    (2, "nitrile", 1): "acetonitrile",
+    (3, "nitrile", 1): "propionitrile",
+    (4, "nitrile", 1): "butyronitrile",
+    (1, "ester", 1): "formate",
+    (2, "ester", 1): "acetate",
+    # The anion spells the same word as the ester.
+    (1, "carboxylate", 1): "formate",
+    (2, "carboxylate", 1): "acetate",
+    (2, "carboxylic_acid", 2): "oxalic acid",
+    (3, "carboxylic_acid", 2): "malonic acid",
+    (4, "carboxylic_acid", 2): "succinic acid",
+    (5, "carboxylic_acid", 2): "glutaric acid",
+    (6, "carboxylic_acid", 2): "adipic acid",
+}
+
+
+# The retained dioic acids name the unsubstituted acid only; a substituted one
+# takes the systematic name, so tartaric acid is ``2,3-dihydroxybutanedioic
+# acid`` and never ``2,3-dihydroxysuccinic acid``.  The rest keep their retained
+# form when substituted (``chloroacetic acid``, ``N-methylformamide``).
+#
+# The rewrite this replaced was inconsistent here rather than restrictive: it
+# matched only where the character before the parent was not a letter, so
+# ``N,N-bis(iminomethyl)methanamide`` became ``…formamide`` after a bracket while
+# ``1-aminomethanamide`` did not after the ``o`` of ``amino``.  Whether a name is
+# retained now follows from the structure instead of from that coincidence.
+_UNSUBSTITUTABLE_RETAINED_CHAIN_PARENTS = frozenset(
+    {"oxalic acid", "malonic acid", "succinic acid", "glutaric acid", "adipic acid"}
+)
+
+
+def _retained_chain_parent(parts: AssemblyParts) -> str | None:
+    """The retained name for an acyclic acid-family parent, if it has one.
+
+    Declines on any unsaturation: the retained names all denote saturated
+    chains, and ``but-2-enedioic acid`` is fumaric or maleic acid, never
+    succinic.  Declines on replacement prefixes for the same reason.
+    """
+
+    group = parts.principal_group
+    if group is None or parts.is_ring or parts.unsaturations or parts.a_prefixes:
+        return None
+    # An anionic skeletal atom cites its ``ide`` between the stem and the
+    # characteristic-group suffix, and a retained stem has nowhere to put it:
+    # ``propionitril-2-ide`` names nothing, while the systematic
+    # ``propane-2-ide-1-nitrile`` says exactly where the carbanion sits.
+    if any(charge.charge < 0 for charge in parts.parent_charges):
+        return None
+    locants = [str(locant) for locant in group.locants]
+    retained = RETAINED_CHAIN_PARENTS.get((parts.parent_length, group.key, len(locants)))
+    if retained is None:
+        return None
+    if parts.substituents and retained in _UNSUBSTITUTABLE_RETAINED_CHAIN_PARENTS:
+        return None
+    # One group sits at C1; two span the chain's ends.
+    expected = ["1"] if len(locants) == 1 else ["1", str(parts.parent_length)]
+    return retained if sorted(locants, key=int) == expected else None
+
+
+def promote_retained_functional_parent(parts: AssemblyParts) -> None:
+    """Fold a principal group into the retained parent name where one exists.
+
+    ``benzene`` + an ``-ol`` at ring position 1 is ``phenol``.  The group has to
+    sit at locant 1 and be the only one of its kind, since the retained name has
+    nowhere to put a locant or a multiplier -- ``benzene-1,2-diol`` keeps the
+    systematic spelling, as IUPAC intends.
+    """
+
+    group = parts.principal_group
+    if group is None or parts.is_substituent or parts.retained_absorbs_principal_group:
+        return
+    retained = RETAINED_FUNCTIONAL_PARENTS.get((parts.retained_name or "", group.key))
+    if retained is not None and [str(locant) for locant in group.locants] != ["1"]:
+        retained = None
+    if retained is None:
+        retained = _retained_chain_parent(parts)
+    if retained is None:
+        return
+    parts.retained_name = retained
+    parts.retained_absorbs_principal_group = True
+
+
+# Retained substituent prefixes that spell a skeleton *together with* a branch
+# on it: ``benzyl`` is a methyl carrying a phenyl, ``tert-butyl`` a propan-2-yl
+# carrying a methyl.  Each row says what the skeleton must be -- chain length,
+# where it attaches, and the one branch it absorbs -- so the match is made on
+# the structure rather than on the spelling the systematic path happened to
+# produce.  Keyed by (length, attachment locant, branch name, branch locant).
+RETAINED_SUBSTITUENTS: dict[tuple[int, str, str, str], str] = {
+    (1, "1", "phenyl", "1"): "benzyl",
+    (3, "2", "methyl", "2"): "tert-butyl",
+}
+
+
+def promote_retained_substituent_name(parts: AssemblyParts) -> None:
+    """Fold a substituent's own branch into a retained prefix where one exists.
+
+    IUPAC keeps these as the preferred prefix, so they are not a cosmetic
+    rewrite of the systematic spelling: ``benzyl`` *is* the name of that group.
+    Both retained here permit substitution only on the absorbed branch's own
+    ring, which the systematic child name already carries -- so the match
+    requires the branch to be the bare ``phenyl``/``methyl``, and a substituted
+    one (``(4-chlorophenyl)methyl``) keeps the systematic form.
+
+    Only a singly attached group qualifies: ``ylidene`` and ``ylidyne`` spell
+    different attachments than the retained prefixes name.
+    """
+
+    if (
+        not parts.is_substituent
+        or parts.retained_substituent_name is not None
+        or parts.is_double_attach
+        or parts.is_triple_attach
+        or parts.is_ring
+        or parts.retained_name
+        or parts.principal_group
+        or parts.unsaturations
+        or parts.a_prefixes
+        or parts.parent_charges
+        or len(parts.substituents) != 1
+    ):
+        return
+    branch = parts.substituents[0]
+    if len(branch.locants) != 1:
+        return
+    retained = RETAINED_SUBSTITUENTS.get(
+        (parts.parent_length, str(parts.attachment_locant), branch.name, str(branch.locants[0]))
+    )
+    if retained is None:
+        return
+    parts.retained_substituent_name = retained
+    parts.retained_absorbed_substituents = [branch]
+    parts.substituents = []
+
+
 def parent_stem_and_terminal(parts: AssemblyParts) -> tuple[str, str]:
     terminal_e = bonds.PARENT_TERMINAL_VOWEL
 
@@ -90,9 +251,20 @@ def format_unsaturations(parts: AssemblyParts, stem_str: str) -> tuple[str, str]
         count = len(unsaturation.locants) or 1
         infix = bonds.unsaturation_infix(unsaturation.bond_key, count)
         base_infix = infix[1:] if infix.startswith("a") else infix
-        base_infixes.append((unsaturation, base_infix))
-    if base_infixes and not elision.is_vowel_start(base_infixes[0][1]):
-        stem_str += "a"
+        base_infixes.append((unsaturation, count, base_infix))
+    if base_infixes:
+        first_unsaturation, first_count, first_infix = base_infixes[0]
+        # The interfix ``a`` introduces a *multiplying prefix*; a lone bond cites
+        # the bare suffix and takes none (``but-2-ene``).
+        #
+        # Where there is a multiplier, eliding the ``a`` before its leading vowel
+        # needs the two vowels to actually meet.  A locant set between the stem
+        # and the multiplier keeps them apart, so the ``a`` survives:
+        # ``dodeca-1,...,11-undecaene``, not ``dodec-...``.  Only an unlocanted
+        # multiplier abuts the stem directly and elides.
+        if first_count > 1 and (first_unsaturation.locants or not elision.is_vowel_start(first_infix)):
+            stem_str += "a"
+    base_infixes = [(unsaturation, infix) for unsaturation, _count, infix in base_infixes]
     for unsaturation, base_infix in base_infixes:
         if unsaturation.locants:
             loc_str = ",".join(sorted(unsaturation.locants, key=parse_locant))
@@ -154,6 +326,27 @@ def format_substituent_tail(
     return stem_str, unsat_str, terminal_e, ""
 
 
+def _sole_group_locant_is_redundant(parts: AssemblyParts) -> bool:
+    """Whether a lone group's ``1`` locant tells the reader nothing.
+
+    On a bare two-carbon chain the two positions are the same position --
+    ``ethan-1-ol`` and ``ethan-2-ol`` are one compound -- and on a bare benzene
+    every ring position is equivalent by rotation.  Either way the locant is
+    noise, which is why ``ethanol`` and ``benzenesulfonic acid`` are the names
+    actually used.
+
+    Anything that tells the positions apart brings the locant back: another
+    substituent, a replacement prefix, or unsaturation.  ``2-chloroethan-1-ol``
+    keeps its locant because C1 and C2 are no longer interchangeable.
+    """
+
+    if parts.substituents or parts.a_prefixes or parts.unsaturations:
+        return False
+    if parts.is_ring:
+        return parts.retained_name == "benzene"
+    return not parts.is_substituent and parts.parent_length == 2
+
+
 def format_principal_suffix(parts: AssemblyParts, terminal_e: str, spiro_subs) -> tuple[str, str]:
     if not parts.principal_group:
         return terminal_e, ""
@@ -173,6 +366,8 @@ def format_principal_suffix(parts: AssemblyParts, terminal_e: str, spiro_subs) -
             and not has_spiro_subs
             and not parts.retained_name
         ):
+            omit_locant = True
+        elif _sole_group_locant_is_redundant(parts):
             omit_locant = True
 
     suffix_text = render_principal_suffix(group, len(locs))
@@ -215,7 +410,14 @@ def format_parent_tail(parts: AssemblyParts, stem_str: str, terminal_e: str, spi
             unsat_str = bonds.get("single").saturated_suffix
         else:
             stem_str, unsat_str = format_unsaturations(parts, stem_str)
-    terminal_e, suffix_str = format_principal_suffix(parts, terminal_e, spiro_subs)
+    if parts.retained_absorbs_principal_group:
+        # The retained name already spells the group (``phenol``), so rendering
+        # the suffix again would give ``phenol-1-ol``.  ``terminal_e`` is left
+        # alone: it carries the retained name's own final vowel, which the stem
+        # split took off (``anilin`` + ``e``), and only a rendered suffix elides.
+        suffix_str = ""
+    else:
+        terminal_e, suffix_str = format_principal_suffix(parts, terminal_e, spiro_subs)
     charge_operations = parent_charge_name_operations(parts)
     if charge_operations:
         terminal_e = ""
