@@ -19,6 +19,7 @@ import re
 
 from rdkit import Chem
 
+from ..hantzsch_widman import hw_generated_names, hw_parent_template
 from ..rules import multipliers as _multipliers
 from ..rules import stems as _stems
 from .von_baeyer_parse import parse_hantzsch_widman as _parse_hantzsch_widman
@@ -163,9 +164,13 @@ _RING_STEMS: dict[str, tuple[str, list[str]]] = {
     "thiophene": ("s1cccc1", ["1", "2", "3", "4", "5"]),
     "pyrrole": ("[nH]1cccc1", ["1", "2", "3", "4", "5"]),
     "oxazole": ("o1cncc1", ["1", "2", "3", "4", "5"]),
+    "1,3-oxazole": ("o1cncc1", ["1", "2", "3", "4", "5"]),
     "isoxazole": ("o1nccc1", ["1", "2", "3", "4", "5"]),
+    "1,2-oxazole": ("o1nccc1", ["1", "2", "3", "4", "5"]),
     "thiazole": ("s1cncc1", ["1", "2", "3", "4", "5"]),
+    "1,3-thiazole": ("s1cncc1", ["1", "2", "3", "4", "5"]),
     "isothiazole": ("s1nccc1", ["1", "2", "3", "4", "5"]),
+    "1,2-thiazole": ("s1nccc1", ["1", "2", "3", "4", "5"]),
     "imidazole": ("[nH]1cncc1", ["1", "2", "3", "4", "5"]),
     "pyrazole": ("[nH]1nccc1", ["1", "2", "3", "4", "5"]),
     "naphthalene": (
@@ -262,6 +267,44 @@ _RING_STEMS: dict[str, tuple[str, list[str]]] = {
 # when the name asks for the other tautomer.
 # fmt: off
 _RETAINED_FUSED_RING_STEMS: dict[str, tuple[str, list[str]]] = {
+    "imidazo[1,2-a]pyridine": ("c1ccn2ccnc2c1", ["7", "6", "5", "4", "3", "2", "1", "8a", "8"]),
+    "pyrazolo[1,5-a]pyrimidine": ("c1cnc2ccnn2c1", ["6", "5", "4", "3a", "3", "2", "1", "8", "7"]),
+    "1H-pyrrolo[2,3-b]pyridine": ("c1cnc2[nH]ccc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "thieno[2,3-b]pyridine": ("c1cnc2sccc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "thieno[3,2-b]thiophene": ("c1cc2sccc2s1", ["2", "3", "3a", "4", "5", "6", "6a", "1"]),
+    "furo[3,2-b]furan": ("c1cc2occc2o1", ["2", "3", "3a", "4", "5", "6", "6a", "1"]),
+    "pyrido[2,3-b]pyrazine": ("c1cnc2nccnc2c1", ["7", "6", "5", "4a", "4", "3", "2", "1", "8a", "8"]),
+    "4H-1-benzoselenopyran": ("C1=C[Se]c2ccccc2C1", ["3", "2", "1", "8a", "8", "7", "6", "5", "4a", "4"]),
+    "1,3-benzodioxole": ("O1COc2ccccc21", ["1", "2", "3", "3a", "4", "5", "6", "7", "7a"]),
+    "1,4-benzodioxine": ("C1=COc2ccccc2O1", ["2", "3", "4", "4a", "5", "6", "7", "8", "8a", "1"]),
+    "10H-phenothiazine": ("c1ccc2c(c1)Nc1ccccc1S2", ["2", "3", "4", "4a", "10a", "1", "10", "9a", "9", "8", "7", "6", "5a", "5"]),
+    "10H-phenoxazine": ("c1ccc2c(c1)Nc1ccccc1O2", ["2", "3", "4", "4a", "10a", "1", "10", "9a", "9", "8", "7", "6", "5a", "5"]),
+    "1H-benzotriazole": ("c1ccc2[nH]nnc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "1H-isoindole": ("C1=NCc2ccccc21", ["3", "2", "1", "7a", "7", "6", "5", "4", "3a"]),
+    "1H-phenalene": ("C1=Cc2cccc3cccc(c23)C1", ["2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b", "1"]),
+    "1H-pyrazolo[3,4-d]pyrimidine": ("c1ncc2cn[nH]c2n1", ["6", "5", "4", "3a", "3", "2", "1", "7a", "7"]),
+    "1H-pyrrolizine": ("C1=Cn2cccc2C1", ["2", "3", "4", "5", "6", "7", "7a", "1"]),
+    "2,1,3-benzothiadiazole": ("c1ccc2nsnc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "2,1,3-benzoxadiazole": ("c1ccc2nonc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "2-benzofuran": ("c1ccc2cocc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "2-benzothiophene": ("c1ccc2cscc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
+    "2H-1-benzopyran": ("C1=Cc2ccccc2OC1", ["3", "4", "4a", "5", "6", "7", "8", "8a", "1", "2"]),
+    "2H-quinolizine": ("C1=CC2=CCC=CN2C=C1", ["8", "9", "9a", "1", "2", "3", "4", "5", "6", "7"]),
+    "3H-indole": ("C1=Nc2ccccc2C1", ["2", "1", "7a", "7", "6", "5", "4", "3a", "3"]),
+    "4H-1-benzopyran": ("C1=COc2ccccc2C1", ["3", "2", "1", "8a", "8", "7", "6", "5", "4a", "4"]),
+    "4H-quinolizine": ("C1=CCN2C=CC=CC2=C1", ["2", "3", "4", "5", "6", "7", "8", "9", "9a", "1"]),
+    "7H-pyrrolo[2,3-d]pyrimidine": ("c1ncc2cc[nH]c2n1", ["2", "3", "4", "4a", "5", "6", "7", "7a", "1"]),
+    "dibenzofuran": ("c1ccc2c(c1)oc1ccccc12", ["3", "2", "1", "9b", "4a", "4", "5", "5a", "6", "7", "8", "9", "9a"]),
+    "dibenzothiophene": ("c1ccc2c(c1)sc1ccccc12", ["3", "2", "1", "9b", "4a", "4", "5", "5a", "6", "7", "8", "9", "9a"]),
+    "naphtho[1,2-b]thiophene": ("c1ccc2c(c1)ccc1ccsc12", ["7", "8", "9", "9a", "5a", "6", "5", "4", "3a", "3", "2", "1", "9b"]),
+    "naphtho[2,3-b]furan": ("c1ccc2cc3occc3cc2c1", ["6", "7", "8", "8a", "9", "9a", "1", "2", "3", "3a", "4", "4a", "5"]),
+    "naphtho[2,3-d][1,3]oxazole": ("c1ccc2cc3ocnc3cc2c1", ["6", "7", "8", "8a", "9", "9a", "1", "2", "3", "3a", "4", "4a", "5"]),
+    "phenanthridine": ("c1ccc2c(c1)cnc1ccccc12", ["8", "9", "10", "10a", "6a", "7", "6", "5", "4a", "4", "3", "2", "1", "10b"]),
+    "1,4-benzoxazine": ("O1CC=Nc2ccccc21", ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]),
+    "1H-1,5-benzodiazepine": ("N1C=CC=Nc2ccccc21", ["1", "2", "3", "4", "5", "5a", "6", "7", "8", "9", "9a"]),
+    "1H-2-benzopyran": ("C1OC=Cc2ccccc21", ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]),
+    "3H-2-benzopyran": ("C1=c2c(cccc2)=CCO1", ["1", "8a", "4a", "5", "6", "7", "8", "4", "3", "2"]),
+    "4H-1-benzothiopyran": ("S1C=CCc2ccccc21", ["1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a"]),
     "1H-indole": ("c1ccc2[nH]ccc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
     "1H-perimidine": ("C1=Nc2cccc3cccc(c23)N1", ["2", "3", "3a", "4", "5", "6", "6a", "7", "8", "9", "9a", "9b", "1"]),
     "2H-isoindole": ("c1ccc2c[nH]cc2c1", ["5", "6", "7", "7a", "1", "2", "3", "3a", "4"]),
@@ -1053,10 +1096,6 @@ def _join_two_port(wrapper_smiles: str, inner: Chem.Mol, hub_stereo: str | None 
     return mol
 
 
-# --------------------------------------------------------------------------- #
-# Recursion
-# --------------------------------------------------------------------------- #
-# A skeletal-replacement clause: ``7-aza``, ``2,4-dioxa``, ``3lambda^6-thia``.
 _REPLACEMENT_CLAUSE_RE = re.compile(
     r"\d+(?:,\d+)*(?:lambda\^?\{?\d+\}?)?-(?:di|tri|tetra|penta|hexa)?"
     r"(?:oxa|aza|thia|selena|tellura|phospha|arsa|sila|germa|stanna|bora|magnesa|calca|litha|natra|potassa)-"
@@ -1671,14 +1710,23 @@ def _ring_yl(stem: str, loc: str) -> Numbered | None:
     ring = _match_ring_stem(stem)
     if ring is None:
         return None
-    smiles, labels = _RING_STEMS[ring]
+    entry = _ring_stem_template(ring)
+    if entry is None:
+        return None
+    smiles, labels = entry
     if loc not in labels:
         return None
     return _numbered_from_smiles(smiles, labels, attach_locant=loc)
 
 
+def _ring_stem_template(ring: str) -> tuple[str, list[str]] | None:
+    """The ring's skeleton, from the table or built from its Hantzsch-Widman spec."""
+
+    return _RING_STEMS.get(ring) or hw_parent_template(ring)
+
+
 def _match_ring_stem(stem: str) -> str | None:
-    for ring in _RING_STEMS:
+    for ring in (*_RING_STEMS, *hw_generated_names()):
         base = ring[:-1] if ring.endswith("e") else ring
         if stem == base or stem == ring:
             return ring
@@ -1758,7 +1806,14 @@ def _apply_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
     clauses = _parse_clauses(prefix)
     if clauses is None:
         return False
+    # Hydro first: it frees the valences the other clauses then substitute onto,
+    # so 3-oxo lands on an already-saturated C3 of 3,4-dihydro-1,4-benzoxazine.
+    hydro = [locs for locs, subname in clauses if _is_hydro(subname)]
+    if hydro and not _apply_hydro(rw, locants, [loc for locs in hydro for loc in locs]):
+        return False
     for locs, subname in clauses:
+        if _is_hydro(subname):
+            continue
         frag = resolve_fragment_mol(subname)
         if frag is None:
             return False
@@ -1768,6 +1823,29 @@ def _apply_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
                 return False
             if not _graft_onto(rw, base_idx, frag):
                 return False
+    return True
+
+
+def _is_hydro(subname: str) -> bool:
+    return subname != "hydro" and any(rest == "hydro" for _, rest in _multipliers.candidate_splits(subname))
+
+
+def _apply_hydro(rw: Chem.RWMol, locants: dict[str, int], locs: list[str]) -> bool:
+    """Saturate the cited ring positions, single-bonding every bond between them."""
+
+    idxs = {locants.get(loc) for loc in locs}
+    if None in idxs:
+        return False
+    try:
+        Chem.Kekulize(rw, clearAromaticFlags=True)
+    except Chem.KekulizeException:
+        return False
+    for idx in idxs:
+        rw.GetAtomWithIdx(idx).SetIsAromatic(False)
+    for bond in rw.GetBonds():
+        if bond.GetBeginAtomIdx() in idxs and bond.GetEndAtomIdx() in idxs:
+            bond.SetBondType(Chem.BondType.SINGLE)
+            bond.SetIsAromatic(False)
     return True
 
 

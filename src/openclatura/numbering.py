@@ -5,8 +5,9 @@ from dataclasses import dataclass
 
 from .locants import get_atom_locants, get_bond_locants, parse_locant
 from .molecule import Molecule
-from .namer_config import INDICATED_H_RETAINED_NAMES
+from .namer_config import INDICATED_H_ELEMENTS, cites_indicated_hydrogen
 from .naming_data import mapping
+from .rules.retained import mancude_monocycle_hydro_plan
 
 NUMBERING_CRITERIA = mapping("numbering_criteria")
 
@@ -25,6 +26,7 @@ class NumberingPreference:
     principal: tuple[int, ...]
     hetero_by_priority: tuple[tuple[int, ...], ...]
     indicated_hydrogen: tuple[int, ...]
+    hydro: tuple[int, ...]
     unsaturation: tuple[int, ...]
     substituent_and_unsaturation: tuple[int, ...]
     substituent_citation: tuple[int, ...]
@@ -37,6 +39,8 @@ class NumberingPreference:
             return self.hetero_by_priority
         if criterion == "indicated_hydrogen":
             return self.indicated_hydrogen
+        if criterion == "hydro":
+            return self.hydro
         if criterion == "unsaturation":
             return self.unsaturation
         if criterion == "substituent_and_unsaturation":
@@ -189,6 +193,10 @@ def choose_parent_numbering(
                 for priority in sorted(het_by_priority.keys())
             )
             substituent_eval = sorted([get_val(idx) for idx in set(substituent_mapping.keys()) if idx in lmap])
+            # Low locants to hydro prefixes, P-31.1.4.2.4.
+            hydro_eval = sorted(
+                get_val(idx) for idx in lmap if idx in mol.atoms and _is_saturated_ring_site(mol, idx, list(lmap))
+            )
             indicated_h_eval = sorted(
                 get_val(idx)
                 for idx in _indicated_hydrogen_like_atoms(
@@ -199,7 +207,7 @@ def choose_parent_numbering(
                 )
                 if idx in lmap
             )
-            return heteroatom_eval + (tuple(indicated_h_eval), principal_eval, substituent_eval)
+            return heteroatom_eval + (tuple(indicated_h_eval), principal_eval, hydro_eval, substituent_eval)
 
         locant_map = min(locant_maps, key=evaluate_map)
         return list(locant_map.keys()), locant_map
@@ -233,13 +241,18 @@ def _numbering_preference(
     retained_name: str | None,
 ) -> NumberingPreference:
     principal = tuple(get_atom_locants(oriented_path, principal_carbons))
-    hetero_by_priority = _heteroatom_locants_by_priority(mol, oriented_path)
+    hetero_by_priority = _heteroatom_locants_by_priority(
+        mol,
+        oriented_path,
+        monocycle=not (is_bicycle or is_spiro or is_polycycle),
+    )
     indicated_hydrogen = _indicated_hydrogen_like_locants(
         mol,
         oriented_path,
         retained_name=retained_name,
         include_all_ring_carbons=False,
     )
+    hydro = _hydro_locants(mol, oriented_path, retained_name)
     substituent_locants = get_atom_locants(oriented_path, set(substituent_mapping.keys()))
     double_bonds, triple_bonds = get_bond_locants(mol, oriented_path, is_bicycle, is_spiro, is_polycycle)
     unsaturation = () if retained_name else tuple(sorted(double_bonds + triple_bonds))
@@ -248,6 +261,7 @@ def _numbering_preference(
         principal=principal,
         hetero_by_priority=hetero_by_priority,
         indicated_hydrogen=indicated_hydrogen,
+        hydro=hydro,
         unsaturation=unsaturation,
         substituent_and_unsaturation=substituent_and_unsaturation,
         substituent_citation=_substituent_citation_locants(oriented_path, substituent_mapping),
@@ -255,17 +269,70 @@ def _numbering_preference(
     )
 
 
-def _heteroatom_locants_by_priority(mol: Molecule, oriented_path: list[int]) -> tuple[tuple[int, ...], ...]:
+def _hydro_locants(mol: Molecule, oriented_path: list[int], retained_name: str | None) -> tuple[int, ...]:
+    """Locants a hydro derivative of a retained mancude parent would cite."""
+
+    split = _mancude_hydro_split(mol, oriented_path, retained_name)
+    return () if split is None else tuple(get_atom_locants(oriented_path, split[1]))
+
+
+def _mancude_hydro_split(
+    mol: Molecule, oriented_path: list[int], retained_name: str | None
+) -> tuple[set[int], set[int]] | None:
+    """Split a hydro derivative's saturated positions into cited H and hydro."""
+
+    plan = mancude_monocycle_hydro_plan(mol, oriented_path, retained_name)
+    if plan is None:
+        return None
+    indicated, _, citable = plan
+    citable = sorted(citable, key=oriented_path.index)
+    return set(citable[:indicated]), set(citable[indicated:])
+
+
+def _heteroatom_locants_by_priority(
+    mol: Molecule,
+    oriented_path: list[int],
+    *,
+    monocycle: bool = False,
+) -> tuple[tuple[int, ...], ...]:
     hetero_by_priority: dict[int, list[int]] = {}
     parent_atoms = set(oriented_path)
     for atom in mol:
         if atom.idx in parent_atoms and not atom.is_carbon:
             priority = atom.element.hw_priority or 99
             hetero_by_priority.setdefault(priority, []).append(atom.idx)
-    return tuple(
+    by_priority = tuple(
         tuple(get_atom_locants(oriented_path, set(hetero_by_priority[priority])))
         for priority in sorted(hetero_by_priority)
     )
+    if not monocycle:
+        return by_priority
+    real = {
+        priority: [idx for idx in group if idx not in mol.substituted_symbols]
+        for priority, group in hetero_by_priority.items()
+    }
+    key = _monocycle_heteroatom_key({priority: group for priority, group in real.items() if group}, oriented_path)
+    return (*key, *by_priority)
+
+
+def _monocycle_heteroatom_key(
+    hetero_by_priority: dict[int, list[int]],
+    oriented_path: list[int],
+) -> tuple[tuple[int, ...], ...]:
+    """The two criteria a Hantzsch-Widman ring settles before seniority order.
+
+    Locant 1 goes to the most senior heteroatom (S in 1,3,4-thiadiazole), then
+    the heteroatoms as a set take the lowest locants (1,4,2-dioxazole).
+    """
+
+    locants = {
+        locant: priority
+        for priority, group in hetero_by_priority.items()
+        for locant in get_atom_locants(oriented_path, set(group))
+    }
+    if not locants:
+        return ((), ())
+    return ((locants[min(locants)],), tuple(sorted(locants)))
 
 
 def _indicated_hydrogen_like_locants(
@@ -291,8 +358,11 @@ def _indicated_hydrogen_like_atoms(
     retained_name: str | None,
     include_all_ring_carbons: bool,
 ) -> set[int]:
+    split = _mancude_hydro_split(mol, oriented_path, retained_name)
+    if split is not None:
+        return split[0]
     charged_tetrazole = retained_name == "tetrazole" and any(mol.atoms[a_idx].charge for a_idx in oriented_path)
-    if retained_name not in INDICATED_H_RETAINED_NAMES and not include_all_ring_carbons:
+    if not cites_indicated_hydrogen(retained_name) and not include_all_ring_carbons:
         return set()
     if charged_tetrazole:
         return set()
@@ -324,7 +394,7 @@ def _has_indicated_hydrogen_metadata(
 
 def _has_retained_indicated_hydrogen_proxy(mol: Molecule, atom_idx: int, parent_atoms: set[int]) -> bool:
     atom = mol.atoms[atom_idx]
-    if atom.symbol not in {"C", "N"}:
+    if atom.symbol not in INDICATED_H_ELEMENTS:
         return False
     ring_bonds = [
         mol.get_bond(atom_idx, neighbor) for neighbor in mol.get_neighbors(atom_idx) if neighbor in parent_atoms
@@ -367,3 +437,16 @@ def _stereochemistry_sequence(mol: Molecule, oriented_path: list[int]) -> tuple[
         if stereo:
             sequence.append(0 if stereo == "R" else 1)
     return tuple(sequence)
+
+
+def _is_saturated_ring_site(mol: Molecule, atom_idx: int, ring_atoms: list[int]) -> bool:
+    """A ring position a hydro prefix would cite, read off the structure.
+
+    ``_hydro_locants`` answers the same question from the monocycle hydro plan,
+    which a fused parent has none of.
+    """
+
+    ring_bonds = [bond for n in mol.get_neighbors(atom_idx) if n in ring_atoms and (bond := mol.get_bond(atom_idx, n))]
+    # Substitution does not un-saturate a position, so H count is not consulted:
+    # indane's C1 is a hydro site whether or not it carries the diazo group.
+    return bool(ring_bonds) and all(bond.order == 1 for bond in ring_bonds)

@@ -367,8 +367,15 @@ def parent_suffix_operations(negative_locants: dict[str, set[str]]) -> list[Pare
 def _replace_stem_with_ide(name: str, neutral_stem: str, charged_stem: str, anion_locant: str) -> str:
     escaped = re.escape(neutral_stem)
     charged_stem = charged_stem[:-1] if charged_stem.endswith("e") else charged_stem
-    pattern = re.compile(rf"(?<![A-Za-z0-9])(?:\d+H-)?{escaped}e?(?!-\d+-ide)")
-    return pattern.sub(f"{charged_stem}-{anion_locant}-ide", name)
+    pattern = re.compile(rf"(?<![A-Za-z0-9])(?P<indicated>(?:\d+H,)*\d+H-)?{escaped}e?(?!-\d+-ide)")
+
+    def repl(match: re.Match) -> str:
+        indicated = match.group("indicated") or ""
+        kept = [token for token in indicated[:-1].split(",") if token and token[:-1] != anion_locant]
+        prefix = f"{','.join(kept)}-" if kept else ""
+        return f"{prefix}{charged_stem}-{anion_locant}-ide"
+
+    return pattern.sub(repl, name)
 
 
 def retained_stem(retained_name: str | None) -> str:

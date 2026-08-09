@@ -20,7 +20,7 @@ from .assembly_spiro import format_spiro_core, split_spiro_substituents
 from .assembly_utils import needs_hyphen, parse_locant
 from .formatting import ensure_stereo_descriptor_boundary, format_multiplier
 from .fused_ion_templates import consume_fused_ion_operation, select_fused_ion_operation
-from .name_assembly import NameAssemblyResult, token_span_trace_data
+from .name_assembly import NameAssemblyResult, rewrite_history_trace_data, token_span_trace_data
 from .name_bindings import refresh_name_atom_bindings, refresh_parent_binding
 from .name_postprocessing import (
     apply_acyl_amido_postprocessing,
@@ -41,11 +41,6 @@ LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
     ("hydroxymethanenitrile", "cyanic acid"),
     ("hydroxymethanoyl", "carboxy"),
     ("hydroxymethanoic anhydride", "dicarbonic acid"),
-    # Paths that do not go through the parent assembly -- a ring aldehyde
-    # rendered as a hydrazone parent, say -- still spell the systematic form,
-    # so these stay until those callers are migrated too.  After
-    # ``promote_retained_functional_parent`` the parent path never emits the
-    # systematic string, so these no longer fire for it.
     ("benzene-1-carboxylic acid", "benzoic acid"),
     ("benzene-1-carboxamide", "benzamide"),
     ("benzene-1-carboxylate", "benzoate"),
@@ -173,41 +168,12 @@ def _oxo_group_methyl_to_carbonyl(name: str) -> str:
 def _post_process_name(name: str) -> str:
     name = apply_data_postprocessing(name)
     name = ensure_stereo_descriptor_boundary(name)
-    name = re.sub(r"(?<![a-zA-Z0-9])1-azacyclopent-2-ene(?![a-zA-Z])", "4,5-dihydro-1H-pyrrole", name)
-    name = re.sub(r"(?<![a-zA-Z0-9])1-azacyclopent-3-ene(?![a-zA-Z])", "2,5-dihydro-1H-pyrrole", name)
-    name = re.sub(
-        r"(?<![a-zA-Z0-9])1-azacyclopent-2-en-(\d+)-(yl|ylidene|ylidyne|ylidynyl)(?![a-zA-Z])",
-        r"4,5-dihydro-1H-pyrrol-\1-\2",
-        name,
-    )
-    name = re.sub(
-        r"(?<![a-zA-Z0-9])1-azacyclopent-3-en-(\d+)-(yl|ylidene|ylidyne|ylidynyl)(?![a-zA-Z])",
-        r"2,5-dihydro-1H-pyrrol-\1-\2",
-        name,
-    )
-    name = re.sub(r"(?<![a-zA-Z0-9])1-azacyclopenta-2,4-diene(?![a-zA-Z])", "1H-pyrrole", name)
-    name = re.sub(
-        r"(?<![a-zA-Z0-9])1-azacyclopenta-2,4-dien-(\d+)-(yl|ylidene|ylidyne|ylidynyl)(?![a-zA-Z])",
-        r"1H-pyrrol-\1-\2",
-        name,
-    )
-
     name = re.sub(r"-1-formate\b", "-formate", name)
 
     name = _oxo_group_methyl_to_carbonyl(name)
     name = name.replace("(oxo)methyl", "formyl")
     name = re.sub(r"(?<!thi)oxomethyl\b", "formyl", name)
     name = name.replace("thioxomethyl", "carbonothioyl")
-
-    name = name.replace("1,3-dioxacyclopentan", "1,3-dioxolan")
-    name = name.replace("1,3-dioxacyclopentane", "1,3-dioxolane")
-    name = name.replace("1,3-dioxacyclohexan", "1,3-dioxan")
-    name = name.replace("1,3-dioxacyclohexane", "1,3-dioxane")
-    name = name.replace("1,4-dioxacyclohexan", "1,4-dioxan")
-    name = name.replace("1,4-dioxacyclohexane", "1,4-dioxane")
-    name = name.replace("1,3-oxathiolan", "1,3-oxathiolan")
-    name = name.replace("1,3-oxazolidine", "oxazolidine")
-    name = name.replace("1,3-thiazolidine", "thiazolidine")
 
     name = name.replace("aminoiminomethyl", "carbamimidoyl")
     name = name.replace("amino(imino)methyl", "carbamimidoyl")
@@ -289,21 +255,60 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
     if not indicated_hydrogens and not additive_hydrogens:
         return core_name
     if positive_parent_n_charges(parts):
-        return core_name
+        # The ium suffix states the hydrogen on its own nitrogen, but a second,
+        # neutral ring NH still has to be cited: 4-imino-1H-pyrimidin-3-ium.
+        cationic_locants = {charge.locant for charge in positive_parent_n_charges(parts)}
+        indicated_hydrogens = [locant for locant in indicated_hydrogens if locant not in cationic_locants]
+        if not additive_hydrogens and not indicated_hydrogens:
+            return core_name
     if indicated_hydrogens:
         indicated_hydrogens = sorted(set(indicated_hydrogens), key=parse_locant)
-        # Every cited position carries its own H -- ``1H,7H-purine``, not
-        # ``1,7H-purine``, which is not a readable name.
+        core_name = _drop_stem_indicated_hydrogen(core_name, indicated_hydrogens)
         core_name = ",".join(f"{locant}H" for locant in indicated_hydrogens) + "-" + core_name
     if additive_hydrogens:
         additive_hydrogens = sorted(set(additive_hydrogens), key=parse_locant)
-        # A locant may not butt against the prefix before it, so a hydro prefix
-        # followed by indicated hydrogen needs a separator:
-        # ``3,7-dihydro-1H-purine-2,6-dione``.
         separator = "-" if core_name[:1].isdigit() else ""
         hydro = format_multiplier("hydro", len(additive_hydrogens))
+
+        stated = parts.retained_parent_metadata.indicated_hydrogen_count if parts.retained_parent_metadata else 0
+        if len(additive_hydrogens) + max(
+            len(indicated_hydrogens), stated
+        ) == parts.parent_length and not core_name.startswith("spiro["):
+            return f"{hydro}{separator}{core_name}"
         core_name = f"{','.join(additive_hydrogens)}-{hydro}{separator}{core_name}"
     return core_name
+
+
+def _drop_stem_indicated_hydrogen(core_name: str, indicated_hydrogens: list[str]) -> str:
+    """Drop a stem's built-in ``1H-`` when the cited set already covers it."""
+
+    match = re.match(r"^(\d+[a-z]?H(?:,\d+[a-z]?H)*)-", core_name)
+    if match is None:
+        return core_name
+    stated = {locant.removesuffix("H") for locant in match.group(1).split(",")}
+    if not stated <= set(indicated_hydrogens):
+        return core_name
+    return core_name[match.end() :]
+
+
+def _move_added_hydrogen_to_suffix(parts: AssemblyParts, core_name: str, suffix_str: str) -> tuple[str, str]:
+    """P-14.7: added hydrogen follows the suffix locant -- quinolin-4(1H)-one."""
+
+    added = {
+        locant
+        for operation in parts.hydro_operations
+        if operation.key == "added_hydrogen"
+        for locant in operation.locants
+    }
+    if not added:
+        return core_name, suffix_str
+    cite = ",".join(f"{locant}H" for locant in sorted(added, key=parse_locant))
+    if not core_name.startswith(cite + "-"):
+        return core_name, suffix_str
+    match = re.match(r"^-(\d+[a-z]?)-", suffix_str)
+    if match is None:
+        return core_name, suffix_str
+    return core_name[len(cite) + 1 :], f"-{match.group(1)}({cite})-{suffix_str[match.end() :]}"
 
 
 def _add_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:
@@ -401,9 +406,6 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
     if parts.retained_substituent_name is not None and parts.name_atom_bindings:
         refresh_parent_binding(parts)
     if parts.retained_absorbs_principal_group and parts.name_atom_bindings:
-        # Bindings are built before assembly runs, so the parent one still
-        # describes the systematic spelling this promotion just replaced -- it
-        # would keep claiming ``benzene`` for a name that now reads ``phenol``.
         refresh_parent_binding(parts)
     if fused_ion_candidate is not None and fused_ion_candidate.rendered_name is not None:
         core_name = fused_ion_candidate.rendered_name
@@ -422,6 +424,7 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
 
         core_name, terminal_e = format_spiro_core(stem_str, unsat_str, terminal_e, spiro_subs)
         core_name = _add_indicated_hydrogen_prefix(parts, core_name)
+        core_name, suffix_str = _move_added_hydrogen_to_suffix(parts, core_name, suffix_str)
         core_name += suffix_str
     parent_needs_prefix_hyphen = bool(
         prefix_str and positive_parent_n_charges(parts) and parts.retained_name and parts.indicated_hydrogens
@@ -450,42 +453,5 @@ def assemble_name_result(parts: AssemblyParts) -> NameAssemblyResult:
     result = NameAssemblyResult.from_raw_name(raw_name, parts.name_atom_bindings, postprocess=post_process_name)
     parts.name_atom_bindings = list(result.bindings)
     parts.name_token_spans = token_span_trace_data(result)
-    parts.name_rewrite_history = [
-        {
-            "name": operation.name,
-            "before": operation.before,
-            "after": operation.after,
-            "ownership": operation.ownership,
-            "source": operation.source,
-            "binding_count": operation.binding_count,
-            "changed_binding_count": operation.changed_binding_count,
-            "token_count": operation.token_count,
-            "changed_token_count": operation.changed_token_count,
-            "edits": [
-                {
-                    "before_start": edit.before_start,
-                    "before_end": edit.before_end,
-                    "after_start": edit.after_start,
-                    "after_end": edit.after_end,
-                    "before_text": edit.before_text,
-                    "after_text": edit.after_text,
-                    "segments": [
-                        {
-                            "before_start": segment.before_start,
-                            "before_end": segment.before_end,
-                            "after_start": segment.after_start,
-                            "after_end": segment.after_end,
-                            "before_text": segment.before_text,
-                            "after_text": segment.after_text,
-                            "ownership": segment.ownership,
-                            "group": segment.group,
-                        }
-                        for segment in edit.segments
-                    ],
-                }
-                for edit in operation.edits
-            ],
-        }
-        for operation in result.rewrite_history
-    ]
+    parts.name_rewrite_history = rewrite_history_trace_data(result)
     return result

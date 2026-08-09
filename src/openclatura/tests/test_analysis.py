@@ -1,6 +1,7 @@
+import re
+
 import pytest
 
-import openclatura.rules.retained as retained_rules
 from openclatura import (
     RULES,
     NamingEngine,
@@ -582,11 +583,16 @@ def test_dihydro_locants_bind_to_parent_scope_without_broad_fallback():
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
     dihydro_locants = next(token for token in assembly.data["name_token_spans"] if token["text"] == "4,5")
 
+    dihydro = next(token for token in assembly.data["name_token_spans"] if token["text"] == "dihydro")
+
     assert analysis.name == "4,5-dihydro-1H-pyrrole-3-carbaldehyde"
-    assert dihydro_locants["source"] == "dihydro_locant_fallback"
+    assert dihydro_locants["source"] == "typed_rewrite"
     assert dihydro_locants["confidence"] == "derived"
-    assert dihydro_locants["ownership"] == "locanted_hydro"
-    assert dihydro_locants["token_kind"] == "hydro"
+    assert dihydro_locants["ownership"] == "exact"
+    assert dihydro_locants["token_kind"] == "locant"
+    assert dihydro_locants["atoms"] == [5, 6]
+    assert dihydro["token_kind"] == "hydro"
+    assert dihydro["atoms"] == [5, 6]
 
 
 def test_carbonyl_prefix_morphology_is_bound_from_renderer_data():
@@ -609,9 +615,9 @@ def test_unmatched_retained_parent_morphology_uses_operation_scope():
     dioxolan = next(token for token in assembly.data["name_token_spans"] if token["text"] == "dioxolan")
 
     assert analysis.name == "1,3-dioxolan-4-imine"
-    assert dioxolan["source"] == "operation_trace"
+    assert dioxolan["source"] == "typed_rewrite"
     assert dioxolan["confidence"] == "derived"
-    assert dioxolan["ownership"] == "operation_scope"
+    assert dioxolan["ownership"] == "exact"
     assert set(dioxolan["atoms"]) == {1, 2, 3, 4, 5}
 
 
@@ -1181,12 +1187,14 @@ def test_retained_dihydro_and_indicated_h_tokens_avoid_broad_fallback():
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
     tokens = {token["text"]: token for token in assembly.data["name_token_spans"]}
 
-    assert analysis.name == "2,5-dihydro-1H-pyrrole-2,5-dione"
-    assert tokens["dihydro"]["source"] == "grammar_token"
-    assert tokens["dihydro"]["ownership"] == "grammar_scope"
-    assert tokens["H"]["source"] == "indicated_hydrogen_fallback"
+    # The two saturated positions are the =O carbons, which the -dione suffix
+    # already accounts for, so only the pyrrole N is left to cite.
+    assert analysis.name == "1H-pyrrole-2,5-dione"
+    assert "dihydro" not in tokens
+    assert tokens["H"]["source"] == "typed_rewrite"
     assert tokens["H"]["token_kind"] == "hydro"
-    assert tokens["H"]["ownership"] == "locanted_hydro"
+    assert tokens["H"]["ownership"] == "exact"
+    assert tokens["H"]["atoms"] == [2]
 
 
 def test_recursive_substituent_tree_tokens_keep_nested_scopes_local():
@@ -1950,10 +1958,11 @@ def test_a_nested_substituents_own_locants_are_not_primed():
 def test_a_counted_spiro_keeps_its_replacement_prefixes_unprimed():
     # spiro[4.4] numbers the whole system once, so nothing is primed -- and a
     # name holding both spiro forms must prime only the component-named one.
-    assert name_smiles("C1CC2(CC1)NCNC2") == "6,8-diazaspiro[4.4]nonane"
-    assert name_smiles("C1CC2(CC1)OCCO2") == "6,9-dioxaspiro[4.4]nonane"
+    # Equal rings let the heteroatoms pick which one is numbered first.
+    assert name_smiles("C1CC2(CC1)NCNC2") == "1,3-diazaspiro[4.4]nonane"
+    assert name_smiles("C1CC2(CC1)OCCO2") == "1,4-dioxaspiro[4.4]nonane"
     both = name_smiles("Cc1noc(C2CC3(C2)CN(C2CCC4(CC2)C(=O)Nc2ccccc24)C3)n1")
-    assert "6-azaspiro[3.3]heptan" in both
+    assert "2-azaspiro[3.3]heptan" in both
     assert "spiro[indoline-3,1'-cyclohexane]" in both
 
 
@@ -2053,7 +2062,7 @@ def test_a_parent_chain_is_not_also_cited_as_a_prefix_on_its_own_ligand():
 def test_homonuclear_chain_parent_keeps_a_ring_closed_through_the_chain():
     # A branch bonded to the chain twice closes a ring; naming it as a
     # substituent would open 1,2-dithiolane and cite its carbons twice.
-    assert name_smiles("C1CCSS1") == "1,2-dithiacyclopentane"
+    assert name_smiles("C1CCSS1") == "1,2-dithiolane"
     assert name_smiles("N1NCCC1") == "pyrazolidine"
 
 
@@ -2378,7 +2387,7 @@ def test_terminal_thioformyl_subgraph_is_graph_derived():
 def test_thioester_is_not_perceived_as_ring_thioaldehyde():
     generated = name_smiles("CCSC(=S)C1=CCC=CN1")
 
-    assert generated == "2-((ethylsulfanyl)(thioxo)methyl)-1-azacyclohexa-2,5-diene"
+    assert generated == "2-((ethylsulfanyl)(thioxo)methyl)-1,4-dihydropyridine"
 
 
 def test_cyclic_thioamide_is_not_perceived_as_thioaldehyde():
@@ -2390,7 +2399,7 @@ def test_cyclic_thioamide_is_not_perceived_as_thioaldehyde():
 def test_cyclic_sulfone_ring_is_not_perceived_as_sulfonate_suffix():
     generated = name_smiles("C=CC(=O)NC1C(C)COS1(=O)=O")
 
-    assert generated == "N-(4-methyl-2,2-dioxo-1-oxa-2lambda^6-thiacyclopentan-3-yl)prop-2-enamide"
+    assert generated == "N-(4-methyl-2,2-dioxo-1,2-oxathiolan-3-yl)prop-2-enamide"
 
 
 def test_nitrile_oxide_is_not_rendered_as_isocyano():
@@ -2528,7 +2537,7 @@ def test_hydrazone_suffix_preserves_unlocanted_ez_stereo():
 def test_hydrazone_stereo_does_not_duplicate_unlocanted_descriptor():
     generated = name_smiles(r"C/C=N\Nc1nc2ccccc2o1")
 
-    assert generated == "(Z)-N-(benzoxazol-2-yl)acetaldehyde hydrazone"
+    assert generated == "(Z)-N-(1,3-benzoxazol-2-yl)acetaldehyde hydrazone"
 
 
 def test_hydrazone_n_substituent_uses_suffix_modifier_for_nitrogen_parent():
@@ -3287,7 +3296,7 @@ def test_fused_and_polycyclic_retained_signatures_are_data_driven():
 
     cases = {
         "c1ccc2ccccc2c1": "naphthalene",
-        "c1ccc2[nH]ccc2c1": "indole",
+        "c1ccc2[nH]ccc2c1": "1H-indole",
         "C1C2CC3CC1CC(C2)C3": "adamantane",
         "C12C3C4C1C5C2C3C45": "cubane",
     }
@@ -3368,7 +3377,7 @@ def test_no_bare_retained_alias_infers_a_canonical_hydride_tautomer():
     bare_hydride_aliases = {
         alias
         for template in templates
-        if template.default_indicated_h
+        if template.indicated_hydrogen_count
         for alias in template.aliases
         if "H-" not in alias
     }
@@ -3388,9 +3397,9 @@ def test_no_bare_retained_alias_infers_a_canonical_hydride_tautomer():
 
 def test_indicated_hydrogen_follows_graph_tautomer_but_not_hydrogen_free_spiro_carbon():
     cases = {
-        "c1ccc2c(c1)CN=C2C1=NCc2ccccc21": "3-(3H-isoindol-1-yl)-1H-isoindole",
-        "O=C(OCCNC1=NCc2ccccc21)c1ccccc1": "2-((3H-isoindol-1-yl)amino)ethyl benzoate",
-        "FN1CCC2(C=Nc3ccccc32)CC1": "1'-fluorospiro[indole-3,4'-piperidine]",
+        "c1ccc2c(c1)CN=C2C1=NCc2ccccc21": "3-(1H-isoindol-3-yl)-1H-isoindole",
+        "O=C(OCCNC1=NCc2ccccc21)c1ccccc1": "2-((1H-isoindol-3-yl)amino)ethyl benzoate",
+        "FN1CCC2(C=Nc3ccccc32)CC1": "1'-fluorospiro[3H-indole-3,4'-piperidine]",
     }
 
     for smiles, expected in cases.items():
@@ -3478,65 +3487,16 @@ def test_retained_fused_graph_template_data_file_validates_guarded_core_entries(
         "indazole",
         "xanthene",
     } <= set(by_name)
+    # Every template in the file is enabled for matching and for derivative
+    # production; a parent is added only once its numbering has round-tripped
+    # through OPSIN at each substitutable position, so there is no half state.
     enabled_names = {template.name for template in retained_fused_graph_templates()}
-    # Enabled once each parent's derivative numbering round-tripped through
-    # OPSIN at every substitutable position.  ``1H-phenalene`` is deliberately
-    # absent: it still cites its indicated hydrogen as ``1H`` wherever the sp3
-    # carbon really is.
-    assert enabled_names == {
-        "azulene",
-        "acenaphthylene",
-        "fluoranthene",
-        "1H-perimidine",
-        "pteridine",
-        "2H-isoindole",
-        "indolizine",
-        "1H-indole",
-    }
-    assert "1H-phenalene" not in enabled_names
-    production_derivative_names = {template.name for template in templates if template.derivative_production_enabled}
-    assert production_derivative_names == {
-        "naphthalene",
-        "quinoline",
-        "isoquinoline",
-        "1,5-naphthyridine",
-        "1,6-naphthyridine",
-        "1,7-naphthyridine",
-        "1,8-naphthyridine",
-        "2,6-naphthyridine",
-        "2,7-naphthyridine",
-        "quinazoline",
-        "quinoxaline",
-        "cinnoline",
-        "phthalazine",
-        "phenazine",
-        "1,4-phenanthroline",
-        "1,5-phenanthroline",
-        "1,6-phenanthroline",
-        "1,7-phenanthroline",
-        "1,8-phenanthroline",
-        "1,9-phenanthroline",
-        "1,10-phenanthroline",
-        "2,7-phenanthroline",
-        "2,8-phenanthroline",
-        "3,5-phenanthroline",
-        "3,6-phenanthroline",
-        "4,5-phenanthroline",
-        "acridine",
-        "carbazole",
-        "purine",
-        "indazole",
-        "xanthene",
-        "azulene",
-        "acenaphthylene",
-        "fluoranthene",
-        "1H-perimidine",
-        "pteridine",
-        "2H-isoindole",
-        "indolizine",
-        "1H-indole",
-    }
-    assert by_name["1H-indole"].default_indicated_h == ("1",)
+    assert enabled_names == set(by_name)
+    assert {template.name for template in templates if template.derivative_production_enabled} == set(by_name)
+    # Only a carbon site is declared: pinning a heteroatom one would fix a single
+    # tautomer, so 1H-indole's NH is left to be found from the structure.
+    assert by_name["3H-indole"].default_indicated_h == ("3",)
+    assert by_name["1H-indole"].default_indicated_h == ()
     assert by_name["quinoline"].atom_by_locant["1"].symbol == "N"
     assert by_name["isoquinoline"].atom_by_locant["2"].symbol == "N"
 
@@ -3559,13 +3519,12 @@ def test_parser_grammar_snapshot_separates_tokens_from_production_gate():
         assert parent in gate.production_parent_names
         assert retained_fused_token_status(parent) == "production_safe"
 
-    # Still audit-only: its indicated hydrogen is emitted as ``1H`` wherever the
-    # sp3 carbon actually sits, so ``6-methyl-1H-phenalene`` reads back with the
-    # CH2 in the wrong ring position.
-    for parent in ("1H-phenalene",):
-        assert parent in tokens
-        assert parent in gate.audit_only_parent_names
-        assert parent not in gate.production_parent_names
+    # The two lists partition the tokens, so a parent is never both gated out of
+    # production and advertised as production-safe.
+    assert not (gate.audit_only_parent_names & gate.production_parent_names)
+    assert gate.audit_only_parent_names | gate.production_parent_names == set(tokens)
+    for parent in gate.audit_only_parent_names:
+        assert retained_fused_token_status(parent) == "audit_only"
         assert retained_fused_token_status(parent) == "audit_only"
 
 
@@ -3613,10 +3572,20 @@ def test_parser_grammar_tokens_cover_retained_fused_template_stems():
         if token is None:
             continue
         derivative_stems = {template.derivative_stem}
-        if len(template.derivative_stem) > 3 and template.derivative_stem[1:3] == "H-":
-            derivative_stems.add(template.derivative_stem[3:])
+        # The token may or may not carry the indicated-H prefix, and the locant
+        # is not always one digit: ``10H-phenothiazin`` -> ``phenothiazin``.
+        bare = re.match(r"^\d+H-(.+)$", template.derivative_stem)
+        if bare is not None:
+            derivative_stems.add(bare.group(1))
         assert derivative_stems & set(token.parent_stems)
-        assert template.attached_prefix in token.fusion_stems
+        # A fusion name is not itself an attachable component, so those parents
+        # carry no prefix and must offer no fusion stem either.
+        if template.attached_prefix is None:
+            assert token.fusion_stems == ()
+        else:
+            assert template.attached_prefix in token.fusion_stems
+        # The template declares only carbon indicated-H sites; a heteroatom one
+        # is left to the structure, so the token may cite more than the template.
         if template.default_indicated_h:
             assert template.default_indicated_h == token.default_indicated_h
         if token.derivative_status == "production_safe":
@@ -3711,31 +3680,47 @@ def test_retained_fused_template_matching_is_charge_exact():
 def test_requested_retained_fused_parents_are_pending_until_graph_verified():
     pending = set(pending_retained_fused_parent_names())
 
-    assert {
-        "pleiadene",
-        "phenanthridine",
-        "4H-quinolizine",
-        "1H-pyrrolizine",
-    } <= pending
+    assert "pleiadene" in pending
+    # A pending parent has no template yet, so the two lists cannot overlap --
+    # that is what stops a requested name being matched before it is verified.
     assert not (pending & {template.name for template in retained_fused_graph_templates(include_disabled=True)})
 
 
-def test_fused_topology_route_keeps_disabled_retained_templates_out_of_production():
+def test_fused_topology_route_reports_the_same_retained_match_to_namer_and_audit():
+    """Every template is production-enabled, so relaxing the gate for the audit
+    must not change what matched -- only a disabled template could differ."""
+
     mol = read_smiles("c1ccc2ccccc2c1")
     ring = find_ring_systems(mol)[0]
 
     live_route = classify_ring_topology_route(mol, set(ring.atoms))
     audit_route = classify_ring_topology_route(mol, set(ring.atoms), include_disabled_retained=True)
 
-    assert live_route.kind == RingTopologyRouteKind.SYSTEMATIC_FUSED
-    assert live_route.production_ready is False
-    assert audit_route.kind == RingTopologyRouteKind.RETAINED_FUSED
-    assert audit_route.production_ready is False
-    assert audit_route.retained_matches[0].template.name == "naphthalene"
+    for route in (live_route, audit_route):
+        assert route.kind == RingTopologyRouteKind.RETAINED_FUSED
+        assert route.production_ready is True
+        assert route.retained_matches[0].template.name == "naphthalene"
 
 
-def test_general_retained_ring_recognizer_does_not_call_fused_template_matcher():
-    assert not hasattr(retained_rules, "match_retained_fused_templates")
+def test_general_retained_ring_recognizer_uses_templates_only_for_fused_systems():
+    """The graph templates hold monocycles too, and those must not intercept.
+
+    A monocycle routed through the template table loses its hydro and elision
+    handling: 1,4-dihydropyridine comes back as piperidine, and
+    2,5-dimethyl-1,3,4-thiadiazole stops eliding its locants.
+    """
+
+    cases = {
+        "C1=CNC=CC1": "pyridine",
+        "C1CCNCC1": "piperidine",
+        "c1ccc2ccccc2c1": "naphthalene",
+        "c1ccc2[nH]ccc2c1": "1H-indole",
+    }
+
+    for smiles, expected in cases.items():
+        mol = read_smiles(smiles)
+        ring = find_ring_systems(mol)[0]
+        assert get_retained_ring(mol, list(ring.atoms))[0] == expected, smiles
 
 
 def test_fused_component_and_numbering_candidates_are_graph_bound():
@@ -3749,7 +3734,7 @@ def test_fused_component_and_numbering_candidates_are_graph_bound():
 
     assert component.name == "quinoline"
     assert component.source == "retained_fused_template"
-    assert component.production_ready is False
+    assert component.production_ready is True
     assert component.heteroatom_symbols == ("N",)
     assert numbering.audit_ok
     assert set(numbering.atom_to_locant) == set(ring.atoms)
@@ -3831,7 +3816,6 @@ def test_stage6_fused_component_registry_orders_allowed_parent_candidates():
 
     assert candidates
     assert all(candidate.is_allowed_as_fusion_component for candidate in candidates)
-    assert "1H-indole" not in {candidate.accepted_name for candidate in candidates}
     assert candidates == tuple(sorted(candidates, key=lambda candidate: candidate.parent_component_key))
 
 
@@ -3840,7 +3824,7 @@ def test_plain_fused_parent_does_not_create_bridged_fused_candidate():
     ring = find_ring_systems(mol)[0]
     route = classify_ring_topology_route(mol, set(ring.atoms))
 
-    assert route.kind == RingTopologyRouteKind.SYSTEMATIC_FUSED
+    assert route.kind == RingTopologyRouteKind.RETAINED_FUSED
     assert bridged_fused_candidates(mol, route) == ()
 
 
@@ -4538,6 +4522,7 @@ def test_numbering_preference_uses_data_ordered_criteria():
         principal=(2,),
         hetero_by_priority=((1,),),
         indicated_hydrogen=(),
+        hydro=(),
         unsaturation=(3,),
         substituent_and_unsaturation=(3, 4),
         substituent_citation=(4,),
@@ -4854,8 +4839,8 @@ def test_pyopsin_regression_names_preserve_positive_nitrogen_charge():
         "[O-]C(=O)C1[NH2+]CC2CC12": "3-azoniabicyclo[3.1.0]hexane-2-carboxylate",
         "CC(C)(C)/C=C/C(=O)N1CCC[C@@H]2[C@H]1C[NH2+]C2": "(2E)-1-((1S,6S)-2,8-diazabicyclo[4.3.0]nonan-8-ium-2-yl)-4,4-dimethylpent-2-en-1-one",
         "C[C@H]1C[NH+](CCN1c2[nH]c3ccccc3n2)C": "2-((2S)-2,4-dimethylpiperazin-4-ium-1-yl)-1H-benzimidazole",
-        "Cc1cn2c(cccc2[nH+]1)c3cccc(c3F)C[NH+]4CCCCC4": "2-(2-fluoro-3-(piperidinium-1-ylmethyl)phenyl)-8-methyl-1,7-diazabicyclo[4.3.0]nona-2,4,6,8-tetraen-7-ium",
-        "Cc1cn2c(cccc2[nH+]1)c3ccc(cc3F)N4CCCCC4": "2-(2-fluoro-4-(piperidin-1-yl)phenyl)-8-methyl-1,7-diazabicyclo[4.3.0]nona-2,4,6,8-tetraen-7-ium",
+        "Cc1cn2c(cccc2[nH+]1)c3cccc(c3F)C[NH+]4CCCCC4": "5-(2-fluoro-3-(piperidinium-1-ylmethyl)phenyl)-2-methylimidazo[1,2-a]pyridin-1-ium",
+        "Cc1cn2c(cccc2[nH+]1)c3ccc(cc3F)N4CCCCC4": "5-(2-fluoro-4-(piperidin-1-yl)phenyl)-2-methylimidazo[1,2-a]pyridin-1-ium",
         "C[C@@H]1CC[C@H](C[NH2+]1)N2C[C@@H](C[C@H]2C)F": "(2R,5R)-5-((2R,4R)-4-fluoro-2-methylpyrrolidin-1-yl)-2-methylpiperidinium",
     }
 
@@ -5238,10 +5223,10 @@ def test_complex_spiro_fused_systems_do_not_use_linear_dispiro_renderer():
 
 def test_pyopsin_regression_names_preserve_terminal_olate_charge():
     cases = {
-        "[NH3+]CC1=C([O-])OC=N1": "4-(ammoniomethyl)oxazol-5-olate",
+        "[NH3+]CC1=C([O-])OC=N1": "4-(ammoniomethyl)-1,3-oxazol-5-olate",
         "C[NH2+]CC1=C([O-])OC=C1": "3-((methylammonio)methyl)furan-2-olate",
         "[NH3+]CC1=C([O-])OC=C1": "3-(ammoniomethyl)furan-2-olate",
-        "C[NH2+]CC1=NOC([O-])=C1": "3-((methylammonio)methyl)isoxazol-5-olate",
+        "C[NH2+]CC1=NOC([O-])=C1": "3-((methylammonio)methyl)-1,2-oxazol-5-olate",
         "[NH3+]CC1=CC(O)=C([O-])O1": "5-(ammoniomethyl)-3-hydroxyfuran-2-olate",
     }
 
@@ -5255,8 +5240,8 @@ def test_pyopsin_regression_names_preserve_retained_ring_anions():
         "[NH3+]CC#CC1=NC=N[N-]1": "3-(1,2,4-triazol-1-ide-5-yl)prop-2-yn-1-aminium",
         "CC([NH3+])C1=CN=N[N-]1": "1-(1,2,3-triazol-1-ide-5-yl)ethan-1-aminium",
         "[NH3+]CC1=N[N-]N=N1": "1-(tetrazol-3-ide-5-yl)methanaminium",
-        "[NH3+]C[C-]1OC(=O)C=C1": "5-(ammoniomethyl)-2-oxo-1-oxacyclopent-3-en-5-ide",
-        "[NH3+]CCC1=N[N-]C(=O)O1": "5-(2-ammonioethyl)-2-oxo-1-oxa-3,4-diazacyclopent-4-en-3-ide",
+        "[NH3+]C[C-]1OC(=O)C=C1": "5-(ammoniomethyl)-2-oxo-5H-furan-5-ide",
+        "[NH3+]CCC1=N[N-]C(=O)O1": "5-(2-ammonioethyl)-2-oxo-3H-1,3,4-oxadiazol-3-ide",
     }
 
     for smiles, expected in cases.items():
@@ -5265,8 +5250,8 @@ def test_pyopsin_regression_names_preserve_retained_ring_anions():
 
 def test_pyopsin_regression_names_preserve_retained_ring_cations():
     cases = {
-        "CC(=C(C)C(=O)NCCc1[nH+]ccn1C)C": "2,3-dimethyl-N-(2-(1-methyl-imidazol-3-ium-2-yl)ethyl)but-2-enamide",
-        "CC[C@@H](C(=O)CC)Oc1[nH]c(c[nH+]1)C(=O)OC": "methyl 2-(((3S)-4-oxohexan-3-yl)oxy)-imidazol-3-ium-5-carboxylate",
+        "CC(=C(C)C(=O)NCCc1[nH+]ccn1C)C": "2,3-dimethyl-N-(2-(1-methyl-1H-imidazol-3-ium-2-yl)ethyl)but-2-enamide",
+        "CC[C@@H](C(=O)CC)Oc1[nH]c(c[nH+]1)C(=O)OC": "methyl 2-(((3S)-4-oxohexan-3-yl)oxy)-1H-imidazol-3-ium-5-carboxylate",
         "Cn1c(ccn1)C[NH+]2CCc3c(cc[nH]c3=O)C2": "8-((1-methyl-1H-pyrazol-5-yl)methyl)-3,8-diazabicyclo[4.4.0]deca-1(6),4-dien-8-ium-2-one",
     }
 
@@ -5310,7 +5295,7 @@ def test_pyopsin_regression_names_preserve_carbanion_suffix_locants():
     cases = {
         "C[NH2+]CC(=O)[CH-]C=O": "4-(methylammonio)-3-oxobutan-2-ide-1-al",
         "NC=[NH+][C-](C#N)C#N": "2-(aminomethylideneammonio)propane-2-ide-1,3-dinitrile",
-        "[NH2+]=C1O[C-](C=C1)C#N": "5-iminio-1-oxacyclopent-3-ene-2-ide-2-carbonitrile",
+        "[NH2+]=C1O[C-](C=C1)C#N": "5-iminio-2H-furan-2-ide-2-carbonitrile",
     }
 
     for smiles, expected in cases.items():
@@ -5319,8 +5304,8 @@ def test_pyopsin_regression_names_preserve_carbanion_suffix_locants():
 
 def test_pyopsin_regression_names_preserve_zwitterionic_parent_suffix_order():
     cases = {
-        "[NH3+]C1=CC(=O)NC(=O)[CH-]1": "4-ammonio-1-azacyclohex-3-ene-5-ide-2,6-dione",
-        "NC1=NC(N)=[NH+][N-]C1=N": "6-imino-1,2,4-triazacyclohexa-2,4-dien-2-ium-1-ide-3,5-diamine",
+        "[NH3+]C1=CC(=O)NC(=O)[CH-]1": "4-ammonio-1H,3H-pyridine-3-ide-2,6-dione",
+        "NC1=NC(N)=[NH+][N-]C1=N": "6-imino-1H-1,2,4-triazin-2-ium-1-ide-3,5-diamine",
         "[NH3+][C-]1C=CC2=C1N=NO2": "2-oxa-3,4-diazabicyclo[3.3.0]octa-1(5),3,7-trien-6-ide-6-aminium",
     }
 
@@ -5330,7 +5315,7 @@ def test_pyopsin_regression_names_preserve_zwitterionic_parent_suffix_order():
 
 def test_unclassified_anions_do_not_emit_terminal_locant_ide():
     cases = {
-        "NC1=[NH+]C(=N)N=C[N-]1": "6-imino-1,3,5-triazacyclohexa-1,4-dien-1-ium-2-amine",
+        "NC1=[NH+]C(=N)N=C[N-]1": "4-imino-1,3,5-triazin-1-ide-3-ium-2-amine",
         # No longer unclassified: the chain-nitrile anion placement gives this
         # carbanion a verified spelling, and the old neutral name read back as
         # the +1 cation because it dropped the anion entirely.
@@ -5469,7 +5454,7 @@ def test_connection_boundary_regression_names_keep_unambiguous_attachment():
         # reads as a benzene-ring substituent — the qualifier now scans a balanced
         # parenthesised substituent, not just a paren-free one.
         "CC1CCN(C(=O)CN(Cc2ccc(Cl)cc2)S(=O)(=O)c2ccccc2)CC1": "2-(N-((4-chlorophenyl)methyl)benzenesulfonamido)-1-(4-methylpiperidin-1-yl)ethan-1-one",
-        "Cc1[nH+]c(cn1Cc2cc(cnc2)F)C(=O)OC": "methyl 1-((5-fluoropyridin-3-yl)methyl)-2-methyl-imidazol-3-ium-4-carboxylate",
+        "Cc1[nH+]c(cn1Cc2cc(cnc2)F)C(=O)OC": "methyl 1-((5-fluoropyridin-3-yl)methyl)-2-methyl-1H-imidazol-3-ium-4-carboxylate",
         "COc1c(cccc1)C2(CC2)C(=O)O[C@H]3C[C@H](C3)c4ccccc4": "trans-3-phenylcyclobutyl 1-(2-methoxyphenyl)cyclopropanecarboxylate",
         "CO[C@H]1C[C@H](C1)OC(=O)c2n(ncc2)C(F)F": "trans-3-methoxycyclobutyl 1-(difluoromethyl)-1H-pyrazole-5-carboxylate",
     }
@@ -5495,7 +5480,7 @@ def test_anionic_ketone_parent_names_keep_parent_descriptor_intact():
         "O=C1[CH-][NH+]2CCC2=C1": "3-oxo-1-azoniabicyclo[3.2.0]hept-4-en-2-ide",
         "O=C1C=C[NH+]2CC[C-]12": "4-oxo-1-azoniabicyclo[3.2.0]hept-2-en-5-ide",
         "O=C1[CH-]NC2=C1C[NH2+]C2": "4-oxo-2,7-diazabicyclo[3.3.0]oct-1(5)-en-7-ium-3-ide",
-        "CC(=O)[C-]1C[NH2+]CC1=O": "4-(acetyl)-3-oxo-pyrrolidin-1-ium-4-ide",
+        "CC(=O)[C-]1C[NH2+]CC1=O": "4-(acetyl)-3-oxopyrrolidin-1-ium-4-ide",
     }
 
     for smiles, expected in cases.items():
@@ -5730,7 +5715,7 @@ def test_charge_separated_diazo_hypervalent_ring_templates_do_not_use_imino_amin
 
 def test_terminal_chalcogen_imides_render_as_imino_prefixes():
     assert name_smiles("N=S1C=CC1") == "1-imino-1lambda^4-thiacyclobut-2-ene"
-    assert name_smiles("N=[Se]1C=CC=C1") == "1-imino-1lambda^4-selenacyclopenta-2,4-diene"
+    assert name_smiles("N=[Se]1C=CC=C1") == "1-iminoselenophene"
 
 
 def test_group_13_14_central_atoms_have_a_parent_hydride():
@@ -5790,8 +5775,7 @@ def test_charge_separated_terminal_n3_renders_as_azido_role():
 
 def test_azine_retained_and_simple_ring_sides_are_graph_bound():
     assert (
-        name_smiles("C1=CC(C=NN=C2SCCS2)C=C1")
-        == "cyclopenta-2,4-dien-1-carbaldehyde 1,3-dithiacyclopentan-2-ylidenehydrazone"
+        name_smiles("C1=CC(C=NN=C2SCCS2)C=C1") == "cyclopenta-2,4-dien-1-carbaldehyde 1,3-dithiolan-2-ylidenehydrazone"
     )
 
 
@@ -5802,7 +5786,7 @@ def test_charged_sulfur_substituent_preserves_sulfanium_center():
 def test_positive_oxygen_parent_charge_uses_ium_suffix():
     cases = {
         "[O-]c1c[o+]co1": "1,3-dioxacyclopenta-1,4-dien-1-ium-4-olate",
-        "[O-][o+]1ccc(=S)c2ccccc21": "2-oxido-5-thioxo-2-oxabicyclo[4.4.0]deca-1(10),3,6,8-tetraen-2-ium",
+        "[O-][o+]1ccc(=S)c2ccccc21": "1-oxido-4-thioxo-4H-1-benzopyran-1-ium",
     }
     for smiles, expected in cases.items():
         assert name_smiles(smiles) == expected
@@ -5825,10 +5809,12 @@ def test_simple_rooted_carbanion_substituent_preserves_charge():
 
 def test_cyclic_peroxy_esters_render_as_oxo_dioxacycles():
     cases = {
-        "O=C1OOCCCCC1C1CCCCCCC1": "4-cyclooctyl-1,2-dioxacyclooctan-3-one",
+        # Ring sizes 3-10 take a Hantzsch-Widman stem; the twelve-membered ring
+        # is past that range and stays on replacement nomenclature.
+        "O=C1OOCCCCC1C1CCCCCCC1": "4-cyclooctyl-1,2-dioxocan-3-one",
         "O=C1CCCCCCC(=O)OOCC1": "1,2-dioxacyclododecane-3,10-dione",
         "Cc1ccc2c(c1)C=CC(=O)OO2": "9-methyl-2,3-dioxabicyclo[5.4.0]undeca-1(7),5,8,10-tetraen-4-one",
-        "CC(C)=CCC/C(C)=C1\\OOC1=O": "(4Z)-4-(6-methylhept-5-en-2-ylidene)-1,2-dioxacyclobutan-3-one",
+        "CC(C)=CCC/C(C)=C1\\OOC1=O": "(4Z)-4-(6-methylhept-5-en-2-ylidene)-1,2-dioxetan-3-one",
     }
 
     for smiles, expected in cases.items():

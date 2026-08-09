@@ -1024,7 +1024,7 @@ def test_corrupted_ylidene_ez_is_not_confirmed(smiles):
     ("smiles", "stem"),
     [
         ("CC(=O)N1CCC#CCC1", "yn"),  # 1-azacyclohept-4-yn-1-yl
-        ("CC(=O)N1CCC=CCC1", "en"),  # 1-azacyclohept-4-en-1-yl
+        ("C1CCC=CCC1", "en"),  # cyclohept-1-ene
         ("C1CC#CCC1", "yn"),  # cyclohex-1-yne
     ],
 )

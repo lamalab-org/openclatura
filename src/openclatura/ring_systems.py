@@ -28,11 +28,6 @@ class RingSystemFragment:
 
         return self.old_to_new[global_atom]
 
-    def global_atoms(self, local_atoms: list[int] | tuple[int, ...] | set[int]) -> tuple[int, ...]:
-        """Map fragment-local atom indices to original molecule atom indices."""
-
-        return tuple(self.new_to_old[atom_idx] for atom_idx in local_atoms)
-
     def global_numbering(self, local_numbering: dict[int, int]) -> dict[int, int]:
         """Map a fragment-local numbering dictionary back to original atom IDs."""
 

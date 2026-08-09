@@ -17,7 +17,7 @@ from .component_group_rules import (
 )
 from .component_modifiers import add_component_front_modifiers, add_component_n_substituents
 from .functional_prefixes import collect_component_prefix_substituents
-from .molecule import DecisionTrace, Molecule, TracePhase
+from .molecule import DecisionTrace, Molecule, TracePhase, bond_ids_within
 from .name_assembly import NameAssemblyResult, assert_final_name_assembly, token_span_trace_data
 from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
@@ -51,10 +51,9 @@ from .subgraph_tools import (
 )
 from .substituent_tokens import graph_bound_substituent_tokens
 from .trace_helpers import (
-    add_substituent_trace,
+    add_substituent_traces,
     assembly_substituent_tree,
     assembly_trace_segments,
-    bond_ids_within,
     build_shortcut_tree_node,
     decision_trace_data,
     functional_group_trace_data,
@@ -182,24 +181,7 @@ def add_component_substituents(
 ) -> None:
     """Add collected component substituents to assembly parts."""
 
-    for c_idx, items in subst_mapping.items():
-        if c_idx in numbered_path:
-            locant = get_loc(c_idx)
-            for item in items:
-                add_substituent_trace(
-                    parts,
-                    item.name,
-                    locant,
-                    item.atom_ids,
-                    item.bond_ids,
-                    item.charge_atom_ids,
-                    item.trace_segments,
-                    item.nested_decisions,
-                    item.emitted_tokens,
-                    substituent_tree=item.substituent_tree,
-                    spiro=item.spiro,
-                    outer_parentheses_optional=item.outer_parentheses_optional,
-                )
+    add_substituent_traces(parts, subst_mapping, get_loc, only_atoms=set(numbered_path))
 
 
 def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:

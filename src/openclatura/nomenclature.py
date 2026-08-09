@@ -158,9 +158,6 @@ class FunctionalGroupRule:
 class FunctionalGroupRules:
     by_key: dict[str, FunctionalGroupRule]
 
-    def has(self, key: str) -> bool:
-        return key in self.by_key
-
     def get(self, key: str) -> FunctionalGroupRule:
         return self.by_key[key]
 
@@ -187,9 +184,6 @@ class FunctionalGroupRules:
 
     def principal_keys(self) -> set[str]:
         return {key for key, rule in self.by_key.items() if rule.role == "principal"}
-
-    def prefix_keys(self) -> set[str]:
-        return {key for key, rule in self.by_key.items() if rule.prefix}
 
     def most_senior(self, keys: list[str]) -> FunctionalGroupRule:
         principal_rules = [

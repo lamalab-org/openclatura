@@ -33,6 +33,7 @@ from typing import Literal
 
 from rdkit import Chem
 
+from ..hantzsch_widman import hw_parent_template
 from ..molecule import Molecule
 from ..rules import elements as _elements
 from ..rules import multipliers as _multipliers
@@ -51,6 +52,9 @@ from .substituent_reconstruction import (
     resolve_fragment_mol,
 )
 from .substituent_reconstruction import _RING_STEMS as _SUBSTITUENT_RING_STEMS
+from .substituent_reconstruction import (
+    _consume_hydrogen as _consume_parent_hydrogen,
+)
 from .von_baeyer_parse import build_skeleton as _build_von_baeyer_skeleton
 from .von_baeyer_parse import build_skeleton_from_descriptor as _build_von_baeyer_from_descriptor
 from .von_baeyer_parse import build_spiro_skeleton as _build_spiro_skeleton
@@ -146,6 +150,45 @@ _PARENT_RING_TEMPLATES: dict[str, tuple[str, list[str]]] = {
     "tetrahydrofuran": ("O1CCCC1", ["1", "2", "3", "4", "5"]),
     "oxane": ("O1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
     "tetrahydropyran": ("O1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "selenophene": ("[se]1cccc1", ["1", "2", "3", "4", "5"]),
+    "tellurophene": ("[te]1cccc1", ["1", "2", "3", "4", "5"]),
+    "phosphole": ("[pH]1cccc1", ["1", "2", "3", "4", "5"]),
+    "arsole": ("[AsH]1C=CC=C1", ["1", "2", "3", "4", "5"]),
+    "borole": ("B1C=CC=C1", ["1", "2", "3", "4", "5"]),
+    "pentazole": ("[nH]1nnnn1", ["1", "2", "3", "4", "5"]),
+    "phosphinine": ("p1ccccc1", ["1", "2", "3", "4", "5", "6"]),
+    "borinine": ("B1=CC=CC=C1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,3,4-tetrazine": ("N1=NN=NC=C1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,3,5-tetrazine": ("N1=NN=CN=C1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,4,5-tetrazine": ("N1=NC=NN=C1", ["1", "2", "3", "4", "5", "6"]),
+    "pyran": ("O1CC=CC=C1", ["1", "2", "3", "4", "5", "6"]),
+    "thiopyran": ("S1CC=CC=C1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-dioxolane": ("O1OCCC1", ["1", "2", "3", "4", "5"]),
+    "1,3-dioxolane": ("O1COCC1", ["1", "2", "3", "4", "5"]),
+    "1,2-dithiolane": ("S1SCCC1", ["1", "2", "3", "4", "5"]),
+    "1,3-dithiolane": ("S1CSCC1", ["1", "2", "3", "4", "5"]),
+    "1,2-oxathiolane": ("O1SCCC1", ["1", "2", "3", "4", "5"]),
+    "1,3-oxathiolane": ("O1CSCC1", ["1", "2", "3", "4", "5"]),
+    "1,2-dioxane": ("O1OCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-dioxane": ("O1COCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,4-dioxane": ("O1CCOCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-dithiane": ("S1SCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-dithiane": ("S1CSCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,4-dithiane": ("S1CCSCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-oxathiane": ("O1SCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-oxathiane": ("O1CSCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,4-oxathiane": ("O1CCSCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-diazinane": ("N1NCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-diazinane": ("N1CNCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-oxazinane": ("O1NCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-oxazinane": ("O1CNCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-thiazinane": ("S1NCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-thiazinane": ("S1CNCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,3-triazinane": ("N1NNCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,4-triazinane": ("N1NCNCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3,5-triazinane": ("N1CNCNC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3,5-trioxane": ("O1COCOC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3,5-trithiane": ("S1CSCSC1", ["1", "2", "3", "4", "5", "6"]),
 }
 
 # Retained parents reuse the (OPSIN-validated) substituent ring-stem templates —
@@ -192,7 +235,11 @@ def _lookup_parent_template(retained_name: str) -> tuple[str, list[str]] | None:
     if template is not None:
         return template
     hydride = _functional_parent_hydrides().get(retained_name)
-    return _ALL_PARENT_TEMPLATES.get(hydride) if hydride is not None else None
+    if hydride is not None and hydride in _ALL_PARENT_TEMPLATES:
+        return _ALL_PARENT_TEMPLATES[hydride]
+    # A Hantzsch-Widman parent the namer spelled rather than looked up is in no
+    # table, so its skeleton is built from the same spec the name came from.
+    return hw_parent_template(retained_name)
 
 
 # Principal characteristic groups whose structure we can rebuild with high
@@ -603,6 +650,7 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
     # ring's remaining double bonds have to move to accommodate all of them at
     # once — so both are collected here and realised together below.
     saturated = _saturated_locants(parts)
+    ring_ketone = parts.principal_group is not None and parts.principal_group.key == "ketone"
     rebuild_unsaturation = has_template and (
         len(saturated) > 1 or any(op.operation_kind == "additive_hydrogen" for op in parts.hydro_operations)
     )
@@ -614,10 +662,14 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
         raise _Abstain("principal-suffix modifiers not modelled")
 
     rw, locants, aromatic_ring = _build_parent(parts)
+    # A ring ketone saturates its position as a cited hydrogen does.
+    implied = _implied_ketone_saturation(rw, locants, parts) if ring_ketone and aromatic_ring else set()
+    rebuild_unsaturation = rebuild_unsaturation or bool(implied)
     template_idxs: tuple[int, ...] = ()
     saturated_idxs: set[int] = set()
     if rebuild_unsaturation:
         template_idxs, saturated_idxs = _open_mancude_template(rw, locants, saturated)
+        saturated_idxs |= implied
     elif parts.indicated_hydrogens and not move_indicated_hydrogen(rw, locants, parts.indicated_hydrogens[0]):
         # A single cited position (2H-indazole, 9H-purine) is another N-H tautomer
         # of the stored template, reachable by moving that one hydrogen.
@@ -684,6 +736,32 @@ def _open_mancude_template(
     return template_idxs, saturated_idxs
 
 
+_MANCUDE_SINGLE_BONDED = frozenset({8, 16, 34, 52})
+
+
+def _implied_ketone_saturation(rw: Chem.RWMol, locants: dict[str, int], parts) -> set[int]:
+    """Ring positions a ring ketone saturates without the name citing them.
+
+    ``1,3-benzoxazol-2-one`` puts =O on C2, and the hydrogen it displaces can only
+    go to N3 -- the other neighbour is the ring oxygen.  Only that unambiguous
+    case is inferred; anything else leaves the placement to the cited locants.
+    """
+
+    implied: set[int] = set()
+    for locant in parts.principal_group.locants:
+        base = locants.get(str(locant))
+        if base is None:
+            continue
+        partners = [
+            neighbor.GetIdx()
+            for neighbor in rw.GetAtomWithIdx(base).GetNeighbors()
+            if neighbor.GetAtomicNum() not in _MANCUDE_SINGLE_BONDED and neighbor.GetIdx() in locants.values()
+        ]
+        if len(partners) == 1:
+            implied.add(partners[0])
+    return implied
+
+
 def _close_mancude_template(rw: Chem.RWMol, template_idxs: tuple[int, ...], saturated_idxs: set[int]) -> None:
     """Put the parent's double bonds back wherever the name left room for them.
 
@@ -707,6 +785,8 @@ def _close_mancude_template(rw: Chem.RWMol, template_idxs: tuple[int, ...], satu
         atom = rw.GetAtomWithIdx(idx)
         if any(bond.GetBondType() != Chem.BondType.SINGLE for bond in atom.GetBonds()):
             continue  # a suffix (=O) or an ylidene substituent already took it
+        if atom.GetAtomicNum() in _MANCUDE_SINGLE_BONDED:
+            continue  # a ring chalcogen is single-bonded in every mancude parent
         unsaturated.append(idx)
     if not unsaturated:
         return
@@ -1169,16 +1249,6 @@ def _graft(rw: Chem.RWMol, base_idx: int, frag: Chem.Mol) -> None:
 def _carry_bond_tag(src: Chem.Bond, dst: Chem.Bond | None) -> None:
     if dst is not None and src.HasProp(_NAME_CIP):
         dst.SetProp(_NAME_CIP, src.GetProp(_NAME_CIP))
-
-
-def _consume_parent_hydrogen(atom: Chem.Atom, bond_type: Chem.BondType) -> None:
-    """Substituting at a ring atom carrying an explicit H (e.g. indole N1) uses
-    that hydrogen; implicit-H atoms are left for RDKit to rebalance."""
-    explicit = atom.GetNumExplicitHs()
-    if explicit <= 0:
-        return
-    order = 2 if bond_type == Chem.BondType.DOUBLE else 3 if bond_type == Chem.BondType.TRIPLE else 1
-    atom.SetNumExplicitHs(max(0, explicit - order))
 
 
 __all__ = ["ReconstructionAudit", "audit_component_reconstruction"]

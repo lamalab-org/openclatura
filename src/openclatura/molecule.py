@@ -30,10 +30,6 @@ class Atom:
     def is_carbon(self) -> bool:
         return self.symbol == "C"
 
-    @property
-    def is_heteroatom(self) -> bool:
-        return self.symbol not in ("C", "H")
-
 
 @dataclass
 class Bond:
@@ -44,13 +40,6 @@ class Bond:
     stereo: str | None = None  # 'E' or 'Z'
     in_small_ring: bool = False  # NEW: Tracks if bond is in a ring of size <= 7
     cip: str | None = None  # independent modern (rdCIPLabeler) E/Z label; only during self-audit
-
-    def get_other_atom(self, atom_idx: int) -> int:
-        if atom_idx == self.u:
-            return self.v
-        if atom_idx == self.v:
-            return self.u
-        raise ValueError(f"Atom {atom_idx} is not part of bond {self.idx}")
 
 
 @dataclass(frozen=True)
@@ -174,15 +163,10 @@ class Molecule:
         self._bond_lookup: dict[tuple[int, int], int] = {}
         self._cyclic_cache: set[int] | None = None  # full-molecule ring atoms; invalidated on mutation
         self._perception_cache: tuple | None = None  # perceived functional groups; invalidated on mutation
-        # Refinement-equivalence atom ranks (canonical_ranks); invalidated on mutation.
         self._canonical_rank_cache: dict[int, int] | None = None
-        # The source RDKit molecule, populated only while self-auditing so the
-        # audit can read tetrahedral parities the flattened model drops (graph_io).
         self.audit_rdmol = None
-        # Accurate (rdCIPLabeler) atom labels, including the centres the legacy
-        # perception leaves unassigned.  Always populated: naming reads it to
-        # spell out ring centres the cis/trans fallback cannot describe.
         self.accurate_cip: dict[int, str] = {}
+        self.substituted_symbols: frozenset[int] = frozenset()
 
     def add_atom(
         self,
@@ -263,5 +247,100 @@ class Molecule:
     def degree(self, atom_idx: int) -> int:
         return len(self.get_neighbors(atom_idx))
 
+    def subgraph(self, atom_ids, *, symbols: dict[int, str] | None = None) -> "Molecule":
+        """Return the induced subgraph over atom_ids, keeping the original indices."""
+
+        fragment = Molecule()
+        for idx in atom_ids:
+            atom = self.atoms[idx]
+            fragment.add_atom(
+                symbol=(symbols or {}).get(idx, atom.symbol),
+                idx=idx,
+                charge=atom.charge,
+                stereo=atom.stereo,
+                raw_stereo=atom.raw_stereo,
+                is_aromatic=atom.is_aromatic,
+                explicit_h_count=atom.explicit_h_count,
+                total_h_count=atom.total_h_count,
+            )
+        for idx in atom_ids:
+            for neighbor in self.get_neighbors(idx):
+                if neighbor in atom_ids and idx < neighbor:
+                    bond = self.get_bond(idx, neighbor)
+                    fragment.add_bond(
+                        u=idx, v=neighbor, order=bond.order, stereo=bond.stereo, in_small_ring=bond.in_small_ring
+                    )
+        fragment.substituted_symbols = frozenset(
+            idx for idx, symbol in (symbols or {}).items() if idx in fragment.atoms and symbol != self.atoms[idx].symbol
+        )
+        return fragment
+
     def __iter__(self) -> Iterator[Atom]:
         return iter(self.atoms.values())
+
+
+def bond_ids_within(mol: Molecule, atom_ids: set[int]) -> set[int]:
+    """Return bond IDs whose endpoints are both in atom_ids."""
+
+    bond_ids = set()
+    for atom_idx in atom_ids:
+        for neighbor_idx in mol.get_neighbors(atom_idx):
+            if neighbor_idx in atom_ids and atom_idx < neighbor_idx:
+                bond = mol.get_bond(atom_idx, neighbor_idx)
+                if bond is not None:
+                    bond_ids.add(bond.idx)
+    return bond_ids
+
+
+def edges_within_atoms(mol: Molecule, atoms: set[int]) -> set[tuple[int, int]]:
+    edges = set()
+    for atom_idx in atoms:
+        for neighbor_idx in mol.get_neighbors(atom_idx):
+            if neighbor_idx in atoms and atom_idx < neighbor_idx:
+                edges.add((atom_idx, neighbor_idx))
+    return edges
+
+
+def component_atoms_until_blocked(
+    mol: Molecule,
+    component_atoms: set[int],
+    root: int,
+    blocked: set[int],
+) -> set[int]:
+    atoms = set()
+    queue = [root]
+    while queue:
+        atom_idx = queue.pop(0)
+        if atom_idx in atoms:
+            continue
+        if atom_idx not in component_atoms or atom_idx in blocked:
+            return set()
+        atoms.add(atom_idx)
+        for neighbor in mol.get_neighbors(atom_idx):
+            if neighbor in blocked:
+                continue
+            if neighbor in component_atoms:
+                queue.append(neighbor)
+    return atoms
+
+
+def has_non_h_multiple_bond_neighbor(mol: Molecule, atom_idx: int, allowed: set[int]) -> bool:
+    for neighbor in mol.get_neighbors(atom_idx):
+        if neighbor in allowed or mol.atoms[neighbor].symbol == "H":
+            continue
+        bond = mol.get_bond(atom_idx, neighbor)
+        if bond is not None and bond.order != 1:
+            return True
+    return False
+
+
+def double_bonded_carbon(mol: Molecule, nitrogen: int, blocked: set[int]) -> int | None:
+    candidates = [
+        n
+        for n in mol.get_neighbors(nitrogen)
+        if n not in blocked
+        and mol.atoms[n].is_carbon
+        and (bond := mol.get_bond(nitrogen, n)) is not None
+        and bond.order == 2
+    ]
+    return candidates[0] if len(candidates) == 1 else None
