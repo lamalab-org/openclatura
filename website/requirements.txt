@@ -1,2 +1,2 @@
-openclatura[web]==0.2.0
+openclatura[web]==0.1.4
 py2opsin>=1.2

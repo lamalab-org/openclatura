@@ -156,7 +156,9 @@ def test_describe_orders_main_parent_trace_before_nested_substituent_trace():
 
     assert "The final assembled name is **N-phenylacetamide**." not in text
     assert "Component assembled as **N-phenylacetamide**" not in text
-    eth_index = text.index('contributes "eth"')
+    # ``acetamide`` is a retained parent name now, so the parent contributes the
+    # whole word instead of the ``eth`` stem the systematic spelling left.
+    eth_index = text.index('contributes "acetamide"')
     amide_index = text.index('contributes "amide"')
     benzene_index = text.index('contributes "benzene"')
     assert eth_index < amide_index < benzene_index
@@ -165,7 +167,7 @@ def test_describe_orders_main_parent_trace_before_nested_substituent_trace():
 def test_describe_explains_retained_purine_dione_parent():
     text = str(describe("CN1C=NC2=C1C(=O)N(C(=O)N2C)C"))
 
-    assert "1,3,7-trimethylpurine-2,6-dione" in text
+    assert "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione" in text
     assert "retained as purine" in text
     assert "Principal group: ketone at 2,6" in text
 
@@ -189,9 +191,11 @@ def test_describe_renders_heteroatom_shortcut_ligand_tree():
 
 
 def test_describe_carbonylamino_shortcut_does_not_render_carbonyl_oxygen_as_hydroxy():
-    text = str(describe("CC(C)C[C@@H](C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CC(C)C)C(=O)O)N"))
+    d = describe("CC(C)C[C@@H](C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CC(C)C)C(=O)O)N")
+    text = str(d)
 
-    assert "Substituent: carbonyl covers 2 atoms and 1 bond" in text
-    assert "Substituent at 1: (1S)-1-amino-3-methylbutylcarbonylamino covers 9 atoms and 8 bonds" in text
-    assert "Substituent: (1S)-1-amino-3-methylbutylcarbonyl covers 8 atoms and 7 bonds" in text
-    assert "Substituent: hydroxy covers 1 atom and 1 bond" not in text
+    # The acyl-amino chain is named as amido linkages, not the old carbonylamino shortcut.
+    assert d.name == "(2S)-2-((2S)-2-((2S)-2-amino-4-methylpentanamido)-4-methylpentanamido)-4-methylpentanoic acid"
+    assert "carbonylamino" not in text
+    # The carbonyl oxygen is part of the amido linkage, never rendered as a hydroxy substituent.
+    assert "Substituent: hydroxy" not in text

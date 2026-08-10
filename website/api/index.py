@@ -3,11 +3,10 @@
 Vercel passes the original request path (``/api/...``) to the ASGI app,
 so the openclatura FastAPI app is mounted under ``/api``:
 
-- POST /api/name      (``verify_opsin`` for the OPSIN round-trip, ``verify_self``
-                      for the OPSIN-free reconstruction audit; both may run)
+- POST /api/name      (supports ``verify_opsin`` for OPSIN round-trip)
 - POST /api/batch
 - POST /api/describe
-- GET  /api/healthz   (also reports the release channel)
+- GET  /api/healthz
 
 The Vercel Python runtime ships no Java, which py2opsin needs for OPSIN
 verification. A jlink-minimized JRE (java.base, java.xml, java.logging,
@@ -21,7 +20,6 @@ import ctypes
 import dataclasses
 import hashlib
 import importlib.metadata
-import inspect
 import json
 import os
 import re
@@ -117,31 +115,6 @@ from openclatura.web.app import create_app  # noqa: E402
 app = FastAPI()
 
 # ---------------------------------------------------------------------------
-# Release channel.
-#
-# The openclatura version is fixed at build time by requirements.txt, so one
-# deployment serves exactly one version. Two Vercel projects share this code:
-#
-#   stable  CHANNEL unset (or "stable"), requirements.txt pins a PyPI release.
-#   beta    CHANNEL=beta, requirements.txt installs from a git ref, and the
-#           deployment lives on its own separate domain.
-#
-# There is no authentication on beta. Its only protection is that the domain is
-# not advertised: leave BETA_URL unset on stable and the public site never links
-# to or names it. Anyone given the URL can use it.
-#
-# STABLE_URL lets beta offer the switch back, and BETA_URL (if you do set it)
-# lets stable offer the switch forward. BETA_GIT_REF is display-only: a git
-# install reports the same version string as the release it branched from, so
-# the ref is what actually tells you which build you are looking at.
-# ---------------------------------------------------------------------------
-_CHANNEL = (os.environ.get("CHANNEL") or "stable").strip().lower()
-_IS_BETA = _CHANNEL == "beta"
-_BETA_URL = (os.environ.get("BETA_URL") or "").rstrip("/")
-_STABLE_URL = (os.environ.get("STABLE_URL") or "").rstrip("/")
-_BETA_GIT_REF = os.environ.get("BETA_GIT_REF") or ""
-
-# ---------------------------------------------------------------------------
 # Result cache. Naming is deterministic per package version, so results are
 # cached under the canonical SMILES + request flags, scoped by version.
 # Backends, first configured wins:
@@ -151,10 +124,6 @@ _BETA_GIT_REF = os.environ.get("BETA_GIT_REF") or ""
 #   2. Upstash Redis over REST (KV_REST_API_* / UPSTASH_REDIS_REST_*).
 # Fully optional: without credentials every request just computes, and any
 # cache error falls back to computing.
-#
-# Requests may set ``no_cache`` to opt out: their structure is then never
-# written to the cache. Reads still happen (serving an already-cached result
-# stores nothing new, and keeps the response fast).
 # ---------------------------------------------------------------------------
 _CACHE_URL = (os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL") or "").rstrip("/")
 _CACHE_TOKEN = os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN") or ""
@@ -225,13 +194,6 @@ def _pkg_version() -> str:
 
 
 def _cache_key(kind: str, smiles: str, flags: str = "") -> str | None:
-    # The beta channel never caches. Keys are scoped by package version, but a
-    # git install reports the version of the release its branch forked from, so
-    # beta would both collide with stable's entries and pin results to whichever
-    # commit of the branch was named first. Returning None disables get and set;
-    # beta traffic is a handful of testers, so there is nothing to gain anyway.
-    if _IS_BETA:
-        return None
     mol = Chem.MolFromSmiles(smiles)
     if mol is None:
         return None
@@ -390,29 +352,15 @@ def _opsin_check_via_daemon(name: str, smiles: str):
     )
 
 
-# The OPSIN-free reconstruction audit (``verify_self``) only exists on branches
-# that ship openclatura.audit — currently the beta channel. Feature-detect rather
-# than key off CHANNEL, so passing the flag can never raise TypeError on stable.
-_SELF_AUDIT_AVAILABLE = "verify_self" in inspect.signature(name_one).parameters
-
-
 class NameRequest(BaseModel):
     smiles: str
     include_trace: bool = False
     verify_opsin: bool = False
-    # Rebuild the molecule from its own name using openclatura's grammar and
-    # compare (no Java, no OPSIN). Ignored where the engine lacks support.
-    verify_self: bool = False
     token_debug: bool = False
-    # Opt out of having this structure written to the result cache.
-    no_cache: bool = False
 
 
 def _name_cacheable(payload: dict, verify: bool) -> bool:
     if not payload.get("ok"):
-        return False
-    # A self-audit that blew up is a transient result, not a verdict to keep.
-    if (payload.get("self_audit") or {}).get("verdict") == "error":
         return False
     if verify:
         status = (payload.get("opsin_check") or {}).get("status")
@@ -423,34 +371,19 @@ def _name_cacheable(payload: dict, verify: bool) -> bool:
 @app.post("/api/name")
 def name_endpoint(req: NameRequest) -> dict:
     """Shadows the mounted app's /name: adds result caching and makes
-    OPSIN verification safe under in-process request concurrency.
-
-    Both checks can run on one request. They are independent: OPSIN parses the
-    name with a third-party parser, the self-audit rebuilds it with our own
-    grammar, so agreement between them is worth more than either alone.
-    """
-    want_self = req.verify_self and _SELF_AUDIT_AVAILABLE
-    # The self-audit hooks component naming from the inside, so it has to be
-    # requested on the naming call itself — it cannot be bolted on afterwards
-    # the way the OPSIN round-trip can.
-    self_kwargs = {"verify_self": True} if want_self else {}
-    flags = f"t{int(req.include_trace)}v{int(req.verify_opsin)}s{int(want_self)}d{int(req.token_debug)}"
+    OPSIN verification safe under in-process request concurrency."""
+    flags = f"t{int(req.include_trace)}v{int(req.verify_opsin)}d{int(req.token_debug)}"
     key = _cache_key("name", req.smiles, flags)
     cached = _cache_get(key)
     if cached is not None:
         return cached
     if not req.verify_opsin:
-        result = name_one(
-            req.smiles,
-            include_trace=req.include_trace,
-            token_debug=req.token_debug,
-            **self_kwargs,
-        )
+        result = name_one(req.smiles, include_trace=req.include_trace, token_debug=req.token_debug)
     else:
         with _OPSIN_LOCK:
             # include_trace=True mirrors the engine's verify branch, which
             # always analyzes; to_dict() below trims it when not requested.
-            result = name_one(req.smiles, include_trace=True, token_debug=req.token_debug, **self_kwargs)
+            result = name_one(req.smiles, include_trace=True, token_debug=req.token_debug)
             check = None if result.error else _opsin_check_via_daemon(result.name, req.smiles)
             if check is not None:
                 result = dataclasses.replace(result, opsin_check=check)
@@ -461,19 +394,17 @@ def name_endpoint(req: NameRequest) -> dict:
                         include_trace=req.include_trace,
                         verify_opsin=True,
                         token_debug=req.token_debug,
-                        **self_kwargs,
                     )
                     if result.opsin_check is None or result.opsin_check.status != "error":
                         break
     payload = result.to_dict(include_trace=req.include_trace)
-    if not req.no_cache and _name_cacheable(payload, req.verify_opsin):
+    if _name_cacheable(payload, req.verify_opsin):
         _cache_set(key, payload)
     return payload
 
 
 class DescribeRequest(BaseModel):
     smiles: str
-    no_cache: bool = False
 
 
 @app.post("/api/describe")
@@ -484,8 +415,7 @@ def describe_endpoint(req: DescribeRequest) -> dict:
     if cached is not None:
         return cached
     payload = describe(req.smiles).to_dict()
-    if not req.no_cache:
-        _cache_set(key, payload)
+    _cache_set(key, payload)
     return payload
 
 
@@ -519,22 +449,13 @@ def healthz() -> dict:
         version = importlib.metadata.version("openclatura")
     except importlib.metadata.PackageNotFoundError:
         version = "unknown"
-    return {
-        "ok": True,
-        "version": version,
-        "channel": _CHANNEL,
-        "git_ref": _BETA_GIT_REF,
-        "self_audit": _SELF_AUDIT_AVAILABLE,
-        "beta_url": _BETA_URL,
-        "stable_url": _STABLE_URL,
-    }
+    return {"ok": True, "version": version}
 
 
 class DepictRequest(BaseModel):
     smiles: str
     width: int = Field(440, ge=100, le=1200)
     height: int = Field(360, ge=100, le=1200)
-    no_cache: bool = False
 
 
 @app.post("/api/depict")
@@ -563,8 +484,7 @@ def depict(req: DepictRequest) -> dict:
     # Drop the XML declaration so the SVG can be injected via innerHTML.
     svg = re.sub(r"^\s*<\?xml[^>]*\?>\s*", "", svg)
     payload = {"ok": True, "svg": svg}
-    if not req.no_cache:
-        _cache_set(key, payload)
+    _cache_set(key, payload)
     return payload
 
 

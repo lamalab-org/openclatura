@@ -96,27 +96,6 @@ def apply_parent_charge_names(
     return name
 
 
-def apply_parent_ion_suffixes(
-    name: str,
-    mol: Molecule,
-    numbered_path: list[int],
-    get_loc,
-    retained_name: str | None = None,
-    allow_retained_stem_inference: bool = False,
-) -> str:
-    """Compatibility wrapper for parent charge spelling."""
-
-    return apply_parent_charge_names(
-        name,
-        mol,
-        numbered_path,
-        get_loc,
-        retained_name,
-        allow_retained_stem_inference,
-        charge_signs={1},
-    )
-
-
 def apply_anionic_parent_names(
     name: str,
     mol: Molecule,
@@ -145,12 +124,6 @@ def parent_charge_sites(mol: Molecule, numbered_path: list[int], get_loc) -> lis
             )
         )
     return sites
-
-
-def apply_fused_heteroaromatic_nitrogen_zwitterion(name: str, mol: Molecule, numbered_path: list[int], get_loc) -> str:
-    """Compatibility wrapper for the ring N-zwitterion parent stack."""
-
-    return apply_ring_parent_nitrogen_zwitterion_stack(name, mol, numbered_path, get_loc)
 
 
 def apply_ring_parent_nitrogen_zwitterion_stack(name: str, mol: Molecule, numbered_path: list[int], get_loc) -> str:
@@ -211,10 +184,6 @@ def _is_unsaturated_ring_parent(mol: Molecule, parent_set: set[int]) -> bool:
             if bond is not None and bond.order > 1:
                 has_unsaturation = True
     return internal_edge_count >= len(parent_set) and has_unsaturation
-
-
-def _name_has_parent_ium_locant(name: str, locant: str) -> bool:
-    return _name_has_parent_ium_locants(name, (locant,))
 
 
 def _name_has_parent_ium_locants(name: str, locants: tuple[str, ...]) -> bool:
@@ -398,8 +367,15 @@ def parent_suffix_operations(negative_locants: dict[str, set[str]]) -> list[Pare
 def _replace_stem_with_ide(name: str, neutral_stem: str, charged_stem: str, anion_locant: str) -> str:
     escaped = re.escape(neutral_stem)
     charged_stem = charged_stem[:-1] if charged_stem.endswith("e") else charged_stem
-    pattern = re.compile(rf"(?<![A-Za-z0-9])(?:\d+H-)?{escaped}e?(?!-\d+-ide)")
-    return pattern.sub(f"{charged_stem}-{anion_locant}-ide", name)
+    pattern = re.compile(rf"(?<![A-Za-z0-9])(?P<indicated>(?:\d+H,)*\d+H-)?{escaped}e?(?!-\d+-ide)")
+
+    def repl(match: re.Match) -> str:
+        indicated = match.group("indicated") or ""
+        kept = [token for token in indicated[:-1].split(",") if token and token[:-1] != anion_locant]
+        prefix = f"{','.join(kept)}-" if kept else ""
+        return f"{prefix}{charged_stem}-{anion_locant}-ide"
+
+    return pattern.sub(repl, name)
 
 
 def retained_stem(retained_name: str | None) -> str:
@@ -470,6 +446,11 @@ def apply_nitrile_suffix_ide(name: str, negative_locants: dict[str, set[str]]) -
     updated = place_anion_suffix_operations(
         updated,
         parent_suffix_operations(negative_locants),
+        rule_keys={"mononitrile_suffix_ide"},
+    )
+    updated = place_anion_suffix_operations(
+        updated,
+        parent_suffix_operations(negative_locants),
         rule_keys={"locanted_carbonitrile_suffix_ide"},
     )
     return place_anion_suffix_operations(
@@ -533,7 +514,10 @@ def apply_terminal_parent_ide(name: str, negative_locants: dict[str, set[str]]) 
 
 
 INVALID_LOCANT_IDE_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"-\d+-ide\b(?!-\d+-ium)"),
+    # An anion locant is grammatical where a further suffix follows it -- the
+    # ``ium`` of a zwitterion, or a nitrile the anion was placed in front of --
+    # and ungrammatical where it trails the word.
+    re.compile(r"-\d+-ide\b(?!-(?:\d[\d,]*-)?(?:ium|nitrile|dinitrile|carbonitrile))"),
     re.compile(r"yl\)-\d+-ide\b"),
     re.compile(r"carbonitrile-\d+-ide\b"),
     re.compile(r"carbaldehyde-\d+-ide\b"),
@@ -613,9 +597,29 @@ def apply_cationic_imino_names(name: str, mol: Molecule) -> str:
         return name
     if has_cationic_imidamide:
         name = normalize_cationic_methylideneammonio_substituents(name)
+    # The two rewrites below cannot tell which ``imino`` in the string is the
+    # cationic one, so they are safe only while every C=N in the molecule is
+    # cationic.  A neutral imine alongside a cationic one used to be promoted
+    # too: NC(=[NH2+])[C-](OC=N)C#N called its neutral formimidate an
+    # ``iminiomethoxy``, inventing a second cation the structure does not have.
+    if _has_neutral_imine(mol):
+        return name
     name = name.replace("(imino)methyl", "(iminio)methyl")
     name = name.replace("iminomethyl", "iminiomethyl")
     return name
+
+
+def _has_neutral_imine(mol: Molecule) -> bool:
+    """Whether any uncharged nitrogen is doubly bonded to carbon."""
+
+    for atom_idx, atom in mol.atoms.items():
+        if atom.symbol != "N" or atom.charge != 0:
+            continue
+        for neighbor in mol.get_neighbors(atom_idx):
+            bond = mol.get_bond(atom_idx, neighbor)
+            if bond and bond.order == 2 and mol.atoms[neighbor].is_carbon:
+                return True
+    return False
 
 
 def apply_cationic_imino_parent_prefixes(name: str, mol: Molecule, numbered_path: list[int], get_loc) -> str:

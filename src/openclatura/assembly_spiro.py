@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from .assembly_parts import AssemblyParts
 from .nomenclature import RULES
-from .rules import elision, stems
+from .rules import elision, multipliers, stems
 from .spiro_assembly import SpiroAssembly
 
 SPIRO_SUBSTITUENT_RE = re.compile(r"^\[SPIRO\]-(\d+)-(.*)$")
@@ -155,18 +155,59 @@ def _reprime_side_prefixes(prefixes: tuple[str, ...], prime: str) -> list[str]:
 
 
 def _prime_replacement_prefixes_for_primed_component(core_name: str, prefixes: list[str]) -> list[str]:
-    if "spiro[cyclopropane-" not in core_name:
+    """Prime replacement prefixes that describe the side ring.
+
+    The side component is always the primed one, and these prefixes are always
+    the side ring's, so the priming does not depend on which ring it happens to
+    be.  Guarding on ``spiro[cyclopropane-`` meant every other side ring kept
+    unprimed locants: spiro[indoline-3,4'-cyclopentane] carrying two ring
+    nitrogens came out as ``1,3-diaza`` and read back with the nitrogens on the
+    indoline instead.
+    """
+
+    if not _spiro_names_its_components(core_name):
         return prefixes
     return [
-        re.sub(r"^([0-9,]+)-(oxa|aza|thia)$", lambda match: f"{match.group(1)}'-{match.group(2)}", prefix)
+        re.sub(
+            r"^([0-9,]+)-((?:di|tri|tetra|penta)?(?:oxa|aza|thia|selena|tellura|phospha|sila|bora|germa|stanna|magnesa|calca|litha|natra|potassa))$",
+            lambda match: f"{','.join(f'{locant}' + chr(39) for locant in match.group(1).split(','))}-{match.group(2)}",
+            prefix,
+        )
         for prefix in prefixes
     ]
 
 
 def _prime_inline_replacement_prefixes_for_primed_component(core_name: str) -> str:
-    if "spiro[cyclopropane-" not in core_name:
-        return core_name
-    return re.sub(r"(^|-)([0-9,]+)-(oxa|aza|thia)spiro\[", r"\1\2'-\3spiro[", core_name)
+    """Prime a replacement prefix that ended up in front of the spiro core."""
+
+    # A name can hold both spiro forms at once, so the test has to be made
+    # against the bracket this prefix actually sits in front of rather than
+    # against the whole name: 6-azaspiro[3.3]heptane keeps unprimed locants
+    # even when a spiro[indoline-3,1'-cyclohexane] appears elsewhere in it.
+    def prime(match: re.Match) -> str:
+        if "'" not in match.group(4):
+            return match.group(0)
+        locants = ",".join(f"{locant}'" for locant in match.group(2).split(","))
+        return f"{match.group(1)}{locants}-{match.group(3)}spiro[{match.group(4)}"
+
+    return re.sub(
+        r"(^|-)([0-9,]+)-((?:di|tri|tetra|penta)?(?:oxa|aza|thia|selena|tellura|phospha|sila|bora|germa|stanna|magnesa|calca|litha|natra|potassa))"
+        r"spiro\[([^\]]*)",
+        prime,
+        core_name,
+    )
+
+
+def _spiro_names_its_components(core_name: str) -> bool:
+    """Whether the spiro descriptor names its rings rather than counting them.
+
+    ``spiro[indoline-3,4'-cyclopentane]`` numbers each component separately and
+    primes the second, so a side-ring replacement prefix is primed with it.
+    ``6,8-diazaspiro[4.4]nonane`` numbers the whole system once and its
+    prefixes must stay unprimed.  The prime inside the bracket tells them
+    apart."""
+
+    return bool(re.search(r"spiro\[[^\]]*'", core_name))
 
 
 def _prime_side_suffixes(suffixes: tuple[tuple[str, str], ...], prime: str) -> list[tuple[str, str]]:
@@ -186,7 +227,7 @@ def _merge_terminal_and_side_suffixes(terminal_e: str, side_suffixes: list[tuple
     if not same_suffix:
         return terminal_e + _format_side_suffixes(side_suffixes)
     locants = main_locants + [locant for locant, _ in same_suffix]
-    multiplier = {2: "di", 3: "tri", 4: "tetra"}.get(len(locants), "")
+    multiplier = multipliers.basic(len(locants)) if len(locants) > 1 else ""
     merged_suffix = f"{multiplier}{main_suffix}" if multiplier else main_suffix
     return f"-{','.join(locants)}-{merged_suffix}" + _format_side_suffixes(other_suffix)
 
@@ -211,8 +252,8 @@ def extract_spiro_side_prefixes(side_name: str) -> tuple[list[str], str, tuple[t
         *_retained_n_ring_parent_names(),
         "indoline",
         "indane",
-        "benzoxazole",
-        "benzothiazole",
+        "1,3-benzoxazole",
+        "1,3-benzothiazole",
         "benzimidazole",
         "benzene",
         "tetracyclo",
@@ -246,13 +287,52 @@ def extract_spiro_side_prefixes(side_name: str) -> tuple[list[str], str, tuple[t
         prefix_text = normalized[: -len(parent)].rstrip("-")
     elif normalized != parent and normalized.endswith(parent):
         prefix_text = normalized[: -len(parent)].rstrip("-")
-    prefix_text = re.sub(r"^\((?:\d+[A-Za-z']*[RS](?:,\d+[A-Za-z']*[RS])*)\)-?", "", prefix_text)
-    match = re.match(r"^([0-9,]+)-(.+)$", prefix_text)
-    if not match:
+    # A stereo descriptor here can be E/Z as readily as R/S.  Matching only the
+    # latter left `(5E)-` in front of the locants, the locant pattern below then
+    # failed, and every prefix was dropped -- an entire butyl and butylidene
+    # vanished from the name rather than merely losing their primes.
+    # The side ring's stereo descriptor is dropped here rather than carried.
+    # Re-emitting it inline placed it in the middle of the assembled name --
+    # `...-7-(pyrimidin-4-yl)-(3'S)-1'-methylspiro[...` -- which reads back as a
+    # different molecule.  It belongs at the front of the whole name, which this
+    # string-level renderer cannot reach, so a missing descriptor is preferred
+    # to a misplaced one.
+    prefix_text = re.sub(r"^\((?:\d+[A-Za-z']*(?:[RS]|[EZ])(?:,\d+[A-Za-z']*(?:[RS]|[EZ]))*)\)-?", "", prefix_text)
+    if not prefix_text:
         return [], _spiro_side_parent_name(parent), tuple(side_suffixes)
-    locants, substituent = match.groups()
-    primed_locants = ",".join(f"{loc}'" for loc in locants.split(","))
-    return [f"{primed_locants}-{substituent}"], _spiro_side_parent_name(parent), tuple(side_suffixes)
+    return [_prime_side_prefix_locants(prefix_text)], _spiro_side_parent_name(parent), tuple(side_suffixes)
+
+
+# Fragments that follow a digit *inside* a substituent name -- `but-2-en-1-yl`
+# -- rather than after a locant that introduces one.  Everything else beginning
+# a hyphen-separated segment after a number is a fresh prefix at that locant.
+_WITHIN_NAME_AFTER_LOCANT = ("en", "yn", "yl", "ylidene", "ylidyne", "ol", "one", "al", "amine", "oic", "carbo")
+
+
+def _prime_side_prefix_locants(prefix_text: str) -> str:
+    """Prime every locant that introduces a side-ring prefix, and only those.
+
+    The side ring is the primed component, so each of its substituent locants
+    carries a prime.  Priming only the first left the rest reading as the other
+    ring's positions.
+    """
+
+    segments = prefix_text.split("-")
+    depth = 0
+    for index, segment in enumerate(segments):
+        # Only locants at the top level position a prefix on the side ring.
+        # Inside a nested substituent -- `(2,6-difluoro-3-methylphenyl)` -- they
+        # number that substituent's own skeleton and must be left alone.
+        opening, closing = segment.count("("), segment.count(")")
+        was_nested = depth > 0
+        depth += opening - closing
+        if was_nested or depth > 0 or not re.fullmatch(r"[0-9,]+", segment):
+            continue
+        following = segments[index + 1] if index + 1 < len(segments) else ""
+        if following.startswith(_WITHIN_NAME_AFTER_LOCANT):
+            continue
+        segments[index] = ",".join(f"{locant}'" for locant in segment.split(","))
+    return "-".join(segments)
 
 
 def _extract_side_suffixes(side_name: str) -> tuple[str, list[tuple[str, str]]]:
@@ -362,7 +442,10 @@ def _extract_polycyclic_parent(name: str) -> str | None:
         idx = name.rfind(marker)
         if idx > 0 and name[idx - 1] == "-":
             return name[idx:]
-        if idx > 0 and re.fullmatch(r"(?:[0-9,]+-)?(?:oxa|aza|thia)", name[:idx]):
+        if idx > 0 and re.fullmatch(
+            r"(?:[0-9,]+-)?(?:oxa|aza|thia|selena|tellura|phospha|sila|bora|germa|stanna|magnesa|calca|litha|natra|potassa)",
+            name[:idx],
+        ):
             return name[idx:]
     return None
 

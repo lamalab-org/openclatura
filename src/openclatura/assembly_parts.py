@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 
+from .locant_sources import LocantMapSource
 from .name_operations import HydroOperation
 from .spiro_assembly import SpiroAssembly
 
@@ -116,6 +117,8 @@ class RetainedParentMetadata:
     default_indicated_h: tuple[str, ...] = ()
     fusion_locants: tuple[str, ...] = ()
     derivative_stem: str | None = None
+    indicated_hydrogen_count: int = 0
+    mancude_double_bonds: int = 0
 
 
 @dataclass
@@ -134,8 +137,12 @@ class AssemblyParts:
     is_triple_attach: bool = False
     attachment_locant: int | str = 1
     retained_name: str | None = None
+    retained_absorbs_principal_group: bool = False
+    retained_substituent_name: str | None = None
+    retained_absorbed_substituents: list[SubstituentItem] = field(default_factory=list)
     retained_parent_metadata: RetainedParentMetadata | None = None
     front_modifiers: list[str] = field(default_factory=list)
+    front_modifier_locants: list[str | None] = field(default_factory=list)
     front_modifier_atom_ids: set[int] = field(default_factory=set)
     front_modifier_charge_atom_ids: set[int] = field(default_factory=set)
     principal_suffix_modifiers: list[SubstituentItem] = field(default_factory=list)
@@ -155,6 +162,7 @@ class AssemblyParts:
     parent_atom_charges_by_locant: dict[str, int] = field(default_factory=dict)
     parent_bond_orders_by_locants: dict[tuple[str, str], int] = field(default_factory=dict)
     parent_bond_ids_by_locants: dict[tuple[str, str], int] = field(default_factory=dict)
+    locant_map_source: LocantMapSource = LocantMapSource.GENERATED
     name_atom_bindings: list[NameAtomBinding] = field(default_factory=list)
     name_token_spans: list[dict] = field(default_factory=list)
     name_rewrite_history: list[dict] = field(default_factory=list)

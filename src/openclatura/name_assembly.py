@@ -12,6 +12,20 @@ from .name_bindings import ensure_name_atom_binding_tokens, postprocess_name_ato
 from .stereo_descriptors import is_searchable_stereo_token
 from .token_grammar import is_locant_binding_token, lexical_token_spans
 
+# Token spans map name characters back to atoms for the trace/describe output only; the
+# final name string never depends on them. The engine disables their construction on the
+# pure-name path (no trace requested), which skips ~10% of naming work.
+_BUILD_TOKEN_SPANS = True
+
+
+def set_token_span_building(enabled: bool) -> bool:
+    """Toggle token-span construction; returns the previous setting for restoration."""
+
+    global _BUILD_TOKEN_SPANS
+    previous = _BUILD_TOKEN_SPANS
+    _BUILD_TOKEN_SPANS = enabled
+    return previous
+
 
 @dataclass(frozen=True)
 class GraphRole:
@@ -318,9 +332,10 @@ class NameAssemblyResult:
     ) -> NameAssemblyResult:
         """Build a final result by applying named rewrites to text and bindings."""
 
+        build_spans = _BUILD_TOKEN_SPANS
         text = raw_text
         binding_tuple = _ensure_emitted_token_bindings(tuple(bindings))
-        token_spans = build_name_token_spans(text, binding_tuple)
+        token_spans = build_name_token_spans(text, binding_tuple) if build_spans else ()
         history: list[NameRewriteOperation] = []
         for raw_rule in rewrites:
             rule = _coerce_rewrite_rule(raw_rule)
@@ -330,12 +345,14 @@ class NameAssemblyResult:
                 binding_tuple,
                 rule=rule,
             )
-            if operation.edits:
-                token_spans = _rewrite_token_spans(before_text, text, token_spans, operation.edits)
-            elif before_text != text:
-                token_spans = build_name_token_spans(text, binding_tuple)
+            if build_spans:
+                if operation.edits:
+                    token_spans = _rewrite_token_spans(before_text, text, token_spans, operation.edits)
+                elif before_text != text:
+                    token_spans = build_name_token_spans(text, binding_tuple)
             history.append(operation)
-        token_spans = _complete_token_spans(text, binding_tuple, token_spans)
+        if build_spans:
+            token_spans = _complete_token_spans(text, binding_tuple, token_spans)
         return cls(
             raw_text=raw_text,
             text=text,
@@ -362,7 +379,7 @@ class NameAssemblyResult:
             fragments=tuple(NameFragment.from_binding(binding) for binding in binding_tuple),
             bindings=binding_tuple,
             rewrite_history=rewrite_history,
-            token_spans=build_name_token_spans(text, binding_tuple),
+            token_spans=build_name_token_spans(text, binding_tuple) if _BUILD_TOKEN_SPANS else (),
         )
 
 
@@ -881,6 +898,49 @@ def token_span_trace_data(result: NameAssemblyResult) -> list[dict]:
             "binding_key": token.binding_key,
         }
         for token in result.token_spans
+    ]
+
+
+def rewrite_history_trace_data(result: NameAssemblyResult) -> list[dict]:
+    """Return JSON-friendly post-processing rewrite history with its edit spans."""
+
+    return [
+        {
+            "name": operation.name,
+            "before": operation.before,
+            "after": operation.after,
+            "ownership": operation.ownership,
+            "source": operation.source,
+            "binding_count": operation.binding_count,
+            "changed_binding_count": operation.changed_binding_count,
+            "token_count": operation.token_count,
+            "changed_token_count": operation.changed_token_count,
+            "edits": [
+                {
+                    "before_start": edit.before_start,
+                    "before_end": edit.before_end,
+                    "after_start": edit.after_start,
+                    "after_end": edit.after_end,
+                    "before_text": edit.before_text,
+                    "after_text": edit.after_text,
+                    "segments": [
+                        {
+                            "before_start": segment.before_start,
+                            "before_end": segment.before_end,
+                            "after_start": segment.after_start,
+                            "after_end": segment.after_end,
+                            "before_text": segment.before_text,
+                            "after_text": segment.after_text,
+                            "ownership": segment.ownership,
+                            "group": segment.group,
+                        }
+                        for segment in edit.segments
+                    ],
+                }
+                for edit in operation.edits
+            ],
+        }
+        for operation in result.rewrite_history
     ]
 
 

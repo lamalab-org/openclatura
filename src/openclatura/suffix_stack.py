@@ -3,6 +3,7 @@
 import re
 from dataclasses import dataclass, field
 
+from .assembly_utils import needs_hyphen
 from .name_operations import ParentSuffixOperation
 from .nomenclature import RULES
 from .rules import multipliers
@@ -120,6 +121,16 @@ def _apply_anion_suffix_rule(text: str, operation: ParentSuffixOperation, key: s
             text,
             count=1,
         )
+    if key == "mononitrile_suffix_ide":
+        # ``propanenitril-2-ide`` is not a name: a chain nitrile cites the
+        # carbanion between the stem and the suffix, as the dinitrile rule
+        # above already does -- ``propane-2-ide-1-nitrile``.
+        return re.sub(
+            r"(?P<stem>[A-Za-z0-9,\-\[\]\^\{\}]+?(?:an|en|yn)e)nitrile\b",
+            lambda match: f"{match.group('stem')}-{locant}-ide-1-nitrile",
+            text,
+            count=1,
+        )
     if key == "locanted_carbonitrile_suffix_ide":
         return re.sub(
             r"(?P<stem>[A-Za-z0-9,\-\[\]\^\{\}]+?)-(?P<suffix_locant>\d+)-carbonitrile\b",
@@ -141,7 +152,7 @@ def _apply_anion_suffix_rule(text: str, operation: ParentSuffixOperation, key: s
 
 def _apply_ketone_to_oxo_ide(text: str, locant: str) -> str:
     pattern = re.compile(
-        r"(?<![A-Za-z0-9])(?:\d+H-)?"
+        r"(?<![A-Za-z0-9])(?P<indicated>(?:\d+H-)?)"
         r"(?P<stem>[A-Za-z0-9,\[\]\^\{\}](?:[A-Za-z0-9,\-\[\]\^\{\}\.']|\(\d+\))*?)"
         r"-(?P<oxo_locant>\d+)-one(?![A-Za-z])"
     )
@@ -150,7 +161,9 @@ def _apply_ketone_to_oxo_ide(text: str, locant: str) -> str:
         stem = explicit_implicit_cation_locant(match.group("stem"))
         oxo_locant = match.group("oxo_locant")
         separator = "-" if match.start() > 0 and match.string[match.start() - 1] not in "- " else ""
-        return f"{separator}{oxo_locant}-oxo-{stem}-{locant}-ide"
+        tail = f"{match.group('indicated')}{stem}-{locant}-ide"
+        joint = "-" if needs_hyphen(f"{oxo_locant}-oxo", tail) else ""
+        return f"{separator}{oxo_locant}-oxo{joint}{tail}"
 
     return pattern.sub(repl, text)
 

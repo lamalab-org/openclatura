@@ -93,7 +93,7 @@ O=C1NCCC1,gamma-butyrolactam,lactam
 O=C1CCCC1,cyclopentanone,ketone
 O=C1CCC=CC1,cyclohexenone,enone
 c1ccc(-c2ccccc2)cc1,biphenyl,aromatic
-c1ccc2c(c1)c1ccccc1n2,carbazole,heterocycle
+c1ccc2c(c1)[nH]c1ccccc12,carbazole,heterocycle
 CC(=O)OC1CCCCC1,cyclohexyl_acetate,ester
 CCCCCC,hexane,alkane
 CC(C)(C)CC,2_2-dimethylbutane,alkane

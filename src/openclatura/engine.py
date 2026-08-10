@@ -16,6 +16,7 @@ from typing import Any
 
 from .graph_io import get_connected_components, read_rdkit_mol, read_smiles
 from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
+from .name_assembly import set_token_span_building
 from .namer_config import SALT_METAL_NAMES
 from .operations import infer_operations
 from .opsin_verify import OpsinCheck, verify_with_opsin
@@ -71,6 +72,7 @@ class NamingRequest:
     smiles: str = ""
     include_trace: bool = False
     verify_opsin: bool = False
+    verify_self: bool = False
     token_debug: bool = False
     rdkit_mol: Any | None = None
 
@@ -96,6 +98,7 @@ class NamingResult:
     rules_hit: tuple[str, ...] = ()
     rule_hints: tuple[str, ...] = ()
     opsin_check: OpsinCheck | None = None
+    self_audit: Any | None = None
 
     @property
     def ok(self) -> bool:
@@ -108,6 +111,12 @@ class NamingResult:
         """``True`` when an OPSIN round-trip was requested and matched."""
 
         return self.opsin_check is not None and self.opsin_check.ok
+
+    @property
+    def self_verified(self) -> bool:
+        """``True`` when the OPSIN-free reconstruction self-audit confirmed the name."""
+
+        return self.self_audit is not None and self.self_audit.ok
 
     def __str__(self) -> str:
         return self.name
@@ -134,6 +143,8 @@ class NamingResult:
             payload["substituent_tree"] = self.substituent_tree
         if self.opsin_check is not None:
             payload["opsin_check"] = self.opsin_check.to_dict()
+        if self.self_audit is not None:
+            payload["self_audit"] = self.self_audit.to_dict()
         return payload
 
 
@@ -207,29 +218,53 @@ class NamingEngine:
         datasets.
         """
 
+        # Token spans feed only the trace/analysis output; skip building them on the
+        # pure-name path so the common API does not pay for diagnostics it discards.
+        need_analysis = request.include_trace or request.verify_opsin
+        previous_span_building = set_token_span_building(need_analysis)
+
+        # The OPSIN-free self-audit rebuilds each component from its name while it
+        # is being generated, so its capture hook must wrap the naming call.
+        if request.verify_self:
+            from .audit import capture_component_audits
+
+            audit_cm = capture_component_audits()
+        else:
+            from contextlib import nullcontext
+
+            audit_cm = nullcontext([])
+
         try:
-            mol, smiles = self._prepare_input(request)
-            if request.include_trace or request.verify_opsin:
-                analysis = self._analyze(mol, smiles=smiles, token_debug=request.token_debug)
-                rules, hints = _extract_rules_hit(analysis.trace_segments)
-                result = NamingResult(
-                    name=analysis.name,
-                    smiles=smiles,
-                    trace_segments=analysis.trace_segments,
-                    substituent_tree=analysis.substituent_tree,
-                    decisions=analysis.decisions,
-                    analysis=analysis,
-                    rules_hit=rules,
-                    rule_hints=hints,
-                )
-            else:
-                result = NamingResult(name=self._name(mol), smiles=smiles)
+            with audit_cm as component_audits:
+                mol, smiles = self._prepare_input(request)
+                if need_analysis:
+                    analysis = self._analyze(mol, smiles=smiles, token_debug=request.token_debug)
+                    rules, hints = _extract_rules_hit(analysis.trace_segments)
+                    result = NamingResult(
+                        name=analysis.name,
+                        smiles=smiles,
+                        trace_segments=analysis.trace_segments,
+                        substituent_tree=analysis.substituent_tree,
+                        decisions=analysis.decisions,
+                        analysis=analysis,
+                        rules_hit=rules,
+                        rule_hints=hints,
+                    )
+                else:
+                    result = NamingResult(name=self._name(mol), smiles=smiles)
         except Exception as exc:  # noqa: BLE001 - intentionally permissive boundary
             return NamingResult(name="", smiles=request.smiles, error=f"{type(exc).__name__}: {exc}")
+        finally:
+            set_token_span_building(previous_span_building)
 
         if request.verify_opsin:
             check = verify_with_opsin(result.name, result.smiles)
             result = replace(result, opsin_check=check)
+
+        if request.verify_self:
+            from .audit import aggregate_audits
+
+            result = replace(result, self_audit=aggregate_audits(list(component_audits)))
 
         return result
 
@@ -239,6 +274,7 @@ class NamingEngine:
         *,
         include_trace: bool = False,
         verify_opsin: bool = False,
+        verify_self: bool = False,
         token_debug: bool = False,
         processes: int | None | str = 1,
         chunksize: int = 64,
@@ -262,6 +298,7 @@ class NamingEngine:
                         item,
                         include_trace=include_trace,
                         verify_opsin=verify_opsin,
+                        verify_self=verify_self,
                         token_debug=token_debug,
                     )
                 )
@@ -273,6 +310,7 @@ class NamingEngine:
             smiles_list,
             include_trace=include_trace,
             verify_opsin=verify_opsin,
+            verify_self=verify_self,
             token_debug=token_debug,
             processes=worker_count,
             chunksize=chunksize,
@@ -392,6 +430,7 @@ def _request_for(
     *,
     include_trace: bool,
     verify_opsin: bool,
+    verify_self: bool = False,
     token_debug: bool,
 ) -> NamingRequest:
     """Build a request from a batch item, which may be a SMILES or an RDKit molecule."""
@@ -400,15 +439,22 @@ def _request_for(
     return NamingRequest(
         include_trace=include_trace,
         verify_opsin=verify_opsin,
+        verify_self=verify_self,
         token_debug=token_debug,
         **kwargs,
     )
 
 
-def _name_one_for_worker(args: tuple[str | Any, bool, bool, bool]) -> NamingResult:
-    item, include_trace, verify_opsin, token_debug = args
+def _name_one_for_worker(args: tuple[str | Any, bool, bool, bool, bool]) -> NamingResult:
+    item, include_trace, verify_opsin, verify_self, token_debug = args
     return DEFAULT_NAMING_ENGINE.run(
-        _request_for(item, include_trace=include_trace, verify_opsin=verify_opsin, token_debug=token_debug)
+        _request_for(
+            item,
+            include_trace=include_trace,
+            verify_opsin=verify_opsin,
+            verify_self=verify_self,
+            token_debug=token_debug,
+        )
     )
 
 
@@ -417,6 +463,7 @@ def _run_parallel(
     *,
     include_trace: bool,
     verify_opsin: bool,
+    verify_self: bool = False,
     token_debug: bool,
     processes: int,
     chunksize: int,
@@ -424,6 +471,6 @@ def _run_parallel(
     # Imported lazily so the simple `import openclatura` path stays light.
     from concurrent.futures import ProcessPoolExecutor
 
-    payload = [(s, include_trace, verify_opsin, token_debug) for s in smiles_list]
+    payload = [(s, include_trace, verify_opsin, verify_self, token_debug) for s in smiles_list]
     with ProcessPoolExecutor(max_workers=processes) as ex:
         return list(ex.map(_name_one_for_worker, payload, chunksize=chunksize))

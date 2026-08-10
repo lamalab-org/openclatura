@@ -1,8 +1,8 @@
 """Locant parsing and atom/bond locant helpers."""
 
-import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 
+from .assembly_utils import parse_locant as parse_locant
 from .molecule import Molecule
 
 
@@ -33,14 +33,6 @@ def locant_text(locant: int, display: str | None = None) -> str:
     return str(locant) if inherited_display is None else str(inherited_display)
 
 
-def locant_texts(locants: Iterable[int], display_locants: Iterable[str] | None = None) -> tuple[str, ...]:
-    """Return rendered text for multiple locants."""
-
-    if display_locants is not None:
-        return tuple(str(locant) for locant in display_locants)
-    return tuple(locant_text(locant) for locant in locants)
-
-
 def coerce_display_numbering(
     numbering: Mapping[int, int], display_numbering: Mapping[int, str] | None = None
 ) -> dict[int, DisplayLocant]:
@@ -50,19 +42,6 @@ def coerce_display_numbering(
         atom: as_display_locant(locant, display_numbering.get(atom) if display_numbering is not None else None)
         for atom, locant in numbering.items()
     }
-
-
-def parse_locant(l):
-    """Return a sortable representation of a locant string."""
-
-    s = locant_text(l)
-    match = re.match(r"^(\d+)([a-zA-Z]*)$", s.split("(")[0])
-    if match:
-        return (1, float(match.group(1)), match.group(2))
-    if any(c.isdigit() for c in s):
-        nums = re.findall(r"\d+", s)
-        return (1, float(nums[0]) if nums else 0.0, s)
-    return (2, 0.0, s)
 
 
 def get_atom_locants(oriented_path: list[int], target_indices: set[int]) -> list[int]:

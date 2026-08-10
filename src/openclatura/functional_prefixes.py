@@ -6,15 +6,20 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .assembly_parts import NameTokenBinding, SubstituentItem, rendered_substituent_text
-from .formatting import format_counted_prefixes, is_complex_prefix, oxy_prefix_from_branch, strip_outer_parentheses
+from .formatting import (
+    format_counted_prefixes,
+    format_multiplier,
+    is_complex_prefix,
+    oxy_prefix_from_branch,
+    strip_outer_parentheses,
+)
 from .group_atom_roles import amide_nitrogen, ester_or_peroxy_single_oxygen
-from .molecule import Molecule
+from .molecule import Molecule, bond_ids_within
 from .naming_protocols import RecursiveSubgraphNamer
 from .nomenclature import RULES
 from .perception import PerceivedGroup
 from .rules import multipliers
 from .subgraph_tools import subgraph_component
-from .trace_helpers import bond_ids_within
 
 PrefixHandler = Callable[["PrefixContext", PerceivedGroup], str]
 
@@ -70,7 +75,35 @@ def amide_prefix_from_group(
     return f"({format_counted_prefixes(sub_names)}{base})"
 
 
+def peroxy_ester_prefix_from_group(
+    mol: Molecule,
+    group: PerceivedGroup,
+    sub_exclude: set[int],
+    branch_namer: RecursiveSubgraphNamer,
+) -> str:
+    """Return a ``…peroxycarbonyl`` prefix for a peroxy ester.
+
+    ``oxycarbonyl`` spells one single-bonded oxygen, and a peroxy ester has
+    two, so ``-C(=O)-O-O-tBu`` came out as ``tert-butoxycarbonyl`` -- an oxygen
+    short, and a carbon long once the parent absorbed the acyl carbon anyway.
+    """
+
+    single_o = ester_or_peroxy_single_oxygen(mol, group)
+    if single_o is None:
+        return ""
+    r_group_c = next((n for n in mol.get_neighbors(single_o) if n not in group.atoms_involved), None)
+    if r_group_c is None:
+        return ""
+    branch_name = branch_namer(mol, r_group_c, sub_exclude | {single_o}, upstream_atom=single_o)
+    if not branch_name:
+        return ""
+    branch_name = strip_outer_parentheses(rendered_substituent_text(branch_name))
+    return f"({format_multiplier(branch_name, 1)}peroxycarbonyl)"
+
+
 def ester_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    if group.key in RULES.prefixes.peroxy_ester_groups:
+        return peroxy_ester_prefix_from_group(context.mol, group, context.sub_exclude, context.branch_namer)
     return ester_prefix_from_group(context.mol, group, context.sub_exclude, "carbonyl", context.branch_namer)
 
 
@@ -158,6 +191,26 @@ def hydrazine_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> s
     return f"({'-'.join(prefixes)}hydrazinyl)"
 
 
+def imino_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    """Render an imino nitrogen, carrying its own substituent when it has one."""
+
+    nitrogen = next(iter(group.atoms_involved), None)
+    if nitrogen is None:
+        return "imino"
+    ligands = [
+        n
+        for n in context.mol.get_neighbors(nitrogen)
+        if n != group.attachment_carbon and context.mol.atoms[n].symbol != "H"
+    ]
+    if len(ligands) != 1:
+        return "imino"
+    branch = context.branch_namer(context.mol, ligands[0], context.sub_exclude | {nitrogen}, upstream_atom=nitrogen)
+    branch = strip_outer_parentheses(rendered_substituent_text(branch))
+    if not branch:
+        return "imino"
+    return f"({branch}imino)"
+
+
 def sulfonyl_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     return ester_prefix_from_group(context.mol, group, context.sub_exclude, "sulfonyl", context.branch_namer) or "sulfo"
 
@@ -202,6 +255,7 @@ PREFIX_HANDLERS.update({key: sulfonyl_prefix_handler for key in RULES.functional
 PREFIX_HANDLERS.update(
     {key: direct_prefix_handler for key in RULES.functional_groups.keys_with_family("direct_prefix")}
 )
+PREFIX_HANDLERS["imino_prefix"] = imino_prefix_handler
 PREFIX_HANDLERS["iminium"] = iminium_prefix_handler
 PREFIX_HANDLERS["hydrazine"] = hydrazine_prefix_handler
 

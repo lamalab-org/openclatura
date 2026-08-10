@@ -4,6 +4,46 @@ from rdkit import Chem
 
 from .molecule import Molecule
 
+# When True, ``_build_molecule`` also computes independent modern-CIP labels for
+# the self-audit.  Toggled on only for the duration of an audited naming run
+# (see ``openclatura.audit.self_audit.capture_component_audits``) so that
+# ordinary naming pays no extra CIP-perception cost.
+_AUDIT_CIP_ENABLED = False
+
+
+def set_audit_cip_enabled(enabled: bool) -> None:
+    global _AUDIT_CIP_ENABLED
+    _AUDIT_CIP_ENABLED = enabled
+
+
+def _modern_cip_labels(rdmol: Chem.Mol) -> tuple[dict[int, str], dict[tuple[int, int], str]]:
+    """Independent CIP labels from RDKit's modern ``rdCIPLabeler`` (the accurate
+    implementation): a map of atom index → R/S label and a map of
+    frozenset-like ``(u, v)`` atom-pair → E/Z label.  Independent of the legacy
+    perception the namer emits, so it can adjudicate emitted descriptors."""
+
+    has_atom_stereo = any(a.GetChiralTag() != Chem.rdchem.ChiralType.CHI_UNSPECIFIED for a in rdmol.GetAtoms())
+    has_bond_stereo = any(b.GetStereo() != Chem.rdchem.BondStereo.STEREONONE for b in rdmol.GetBonds())
+    if not (has_atom_stereo or has_bond_stereo):
+        return {}, {}
+    try:
+        from rdkit.Chem import rdCIPLabeler
+
+        work = Chem.Mol(rdmol)
+        rdCIPLabeler.AssignCIPLabels(work)
+    except Exception:
+        return {}, {}
+    atom_labels: dict[int, str] = {}
+    for atom in work.GetAtoms():
+        if atom.HasProp("_CIPCode"):
+            atom_labels[atom.GetIdx()] = atom.GetProp("_CIPCode")
+    bond_labels: dict[tuple[int, int], str] = {}
+    for bond in work.GetBonds():
+        if bond.HasProp("_CIPCode"):
+            key = (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())
+            bond_labels[(min(key), max(key))] = bond.GetProp("_CIPCode")
+    return atom_labels, bond_labels
+
 
 def read_smiles(smiles: str) -> Molecule:
     """Parse a SMILES string into the internal graph model."""
@@ -86,18 +126,49 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
 
     Chem.AssignStereochemistry(rdmol, force=True, cleanIt=True)
     chiral_centers = dict(Chem.FindMolChiralCenters(rdmol, includeUnassigned=False))
+    # Which atoms *are* assigned stereocentres comes from RDKit's legacy
+    # perception, because the namer's choice between per-atom descriptors and a
+    # relative ``cis``/``trans`` word keys off that set.  What each centre is
+    # *called* comes from the modern ``rdCIPLabeler``, the accurate implementation
+    # of the CIP rules: legacy mislabels fused and small-ring centres, and never
+    # emits the lowercase ``r``/``s`` that pseudo-asymmetric centres require.
+    # Correcting the label without touching the set fixes the descriptors while
+    # leaving the naming decisions that depend on the set alone.
+    modern_cip, modern_bond_cip = _modern_cip_labels(rdmol)
+    mol.accurate_cip = dict(modern_cip)
+    if _AUDIT_CIP_ENABLED:
+        # Relative ring stereo (``cis``/``trans``) is carried by tetrahedral
+        # parities, which the flattened graph model does not retain.  Keeping the
+        # source molecule — atom indices line up with ``mol.atoms`` — lets the
+        # audit read those parities straight off the input.  Audit-only, so it is
+        # gated with the rest of the audit overhead.
+        mol.audit_rdmol = Chem.Mol(rdmol)
 
     for atom in rdmol.GetAtoms():
         stereo = chiral_centers.get(atom.GetIdx())
-        if stereo and atom.GetSymbol() == "S" and atom.GetTotalDegree() == 3:
-            stereo = "R" if stereo == "S" else "S"
+        if stereo is not None:
+            accurate = modern_cip.get(atom.GetIdx())
+            if accurate is not None:
+                stereo = accurate
+            elif atom.GetSymbol() == "S" and atom.GetTotalDegree() == 3:
+                # No accurate label to defer to, so keep the namer's long-standing
+                # convention for 3-coordinate sulfur.
+                stereo = "R" if stereo == "S" else "S"
         raw_stereo = _raw_tetrahedral_stereo(atom) if not stereo else None
         mol.add_atom(
             symbol=atom.GetSymbol(),
             idx=atom.GetIdx(),
             charge=atom.GetFormalCharge(),
+            # Isotopic labels are not expressed by the namer; recording them lets
+            # the self-audit abstain instead of confirming a name that silently
+            # dropped the label.
+            isotope=atom.GetIsotope() or None,
             stereo=stereo,
             raw_stereo=raw_stereo,
+            # The audit's comparison field stays audit-gated: it is what the
+            # emitted descriptor is adjudicated against, and populating it outside
+            # an audit would only be dead weight.
+            cip=modern_cip.get(atom.GetIdx()) if _AUDIT_CIP_ENABLED else None,
             is_aromatic=atom_metadata[atom.GetIdx()]["is_aromatic"],
             explicit_h_count=atom_metadata[atom.GetIdx()]["explicit_h_count"],
             total_h_count=atom_metadata[atom.GetIdx()]["total_h_count"],
@@ -113,12 +184,14 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
 
         in_small_ring = any(bond.IsInRingSize(i) for i in range(3, 8))
 
+        u, v = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
         mol.add_bond(
-            u=bond.GetBeginAtomIdx(),
-            v=bond.GetEndAtomIdx(),
+            u=u,
+            v=v,
             order=int(bond.GetBondTypeAsDouble()),
             stereo=stereo,
             in_small_ring=in_small_ring,
+            cip=modern_bond_cip.get((min(u, v), max(u, v))) if _AUDIT_CIP_ENABLED else None,
         )
     return mol
 

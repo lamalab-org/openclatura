@@ -91,12 +91,12 @@
   },
   {
     "smiles": "c1ccc(O)cc1",
-    "name": "benzen-1-ol",
+    "name": "phenol",
     "category": "aromatic"
   },
   {
     "smiles": "c1ccc(N)cc1",
-    "name": "benzen-1-amine",
+    "name": "aniline",
     "category": "aromatic"
   },
   {
@@ -221,7 +221,7 @@
   },
   {
     "smiles": "CN(C)C",
-    "name": "trimethyl-azane",
+    "name": "trimethylazane",
     "category": "amine"
   },
   {
@@ -346,7 +346,7 @@
   },
   {
     "smiles": "CSC",
-    "name": "dimethyl-sulfane",
+    "name": "dimethylsulfane",
     "category": "sulfide"
   },
   {
@@ -446,7 +446,7 @@
   },
   {
     "smiles": "O=C1OCC1",
-    "name": "1-oxacyclobutan-2-one",
+    "name": "oxetan-2-one",
     "category": "lactone"
   },
   {
@@ -470,7 +470,7 @@
     "category": "aromatic"
   },
   {
-    "smiles": "c1ccc2c(c1)c1ccccc1n2",
+    "smiles": "c1ccc2c(c1)[nH]c1ccccc12",
     "name": "9H-carbazole",
     "category": "heterocycle"
   },
@@ -511,7 +511,7 @@
   },
   {
     "smiles": "NC(=O)N",
-    "name": "1-aminomethanamide",
+    "name": "1-aminoformamide",
     "category": "amide"
   },
   {

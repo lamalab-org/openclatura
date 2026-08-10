@@ -7,6 +7,9 @@
 Built on top of RDKit, the package walks the molecular graph, detects functional groups and ring systems, selects the principal parent, assigns locants, and constructs the corresponding substitutive IUPAC name. Every step is recorded in an inspectable
 decision trace so the *why* of a name is recoverable, not just the *what*.
 
+Systematic backbone stems are supported for chains and rings containing from 1
+through 1000 skeletal atoms, following IUPAC Blue Book P-14.2.1.
+
 > **Status:** beta. The naming engine handles a broad slice of organic
 > structures (alkanes/alkenes/alkynes, common functional groups, simple
 > heterocycles, fused/spiro/bridged systems, retained names from the Blue
@@ -263,8 +266,8 @@ If you use Openclatura in your research, please cite the Openclatura preprint:
   year    = {2026},
   month   = jul,
   day     = {15},
-  doi     = {10.26434/chemrxiv.15006114/v1},
-  url     = {https://doi.org/10.26434/chemrxiv.15006114/v1},
+  doi     = {10.26434/chemrxiv.15006114/v2},
+  url     = {https://doi.org/10.26434/chemrxiv.15006114/v2},
   note    = {Preprint}
 }
 ```

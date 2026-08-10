@@ -4,9 +4,34 @@ New code should import ``RULES`` from :mod:`openclatura.nomenclature`.
 These names remain for existing modules and external imports.
 """
 
+from .hantzsch_widman import hw_spec_for_name, spec_cites_indicated_hydrogen
 from .nomenclature import RULES
 
 INDICATED_H_RETAINED_NAMES = RULES.retained.indicated_hydrogen_names
+
+
+def cites_indicated_hydrogen(retained_name: str | None) -> bool:
+    """Whether a parent name spells its own indicated hydrogen ("1H-azepine").
+
+    For a monocycle this follows from the ring's shape, so it is worked out
+    rather than looked up -- a generated parent is in no list.  Fused parents
+    keep the declared set; their indicated hydrogen is not a size-and-count
+    matter.
+    """
+
+    if retained_name is None:
+        return False
+    spec = hw_spec_for_name(retained_name) or _monocycle_spec(retained_name)
+    if spec is not None:
+        return spec_cites_indicated_hydrogen(spec)
+    return retained_name in INDICATED_H_RETAINED_NAMES
+
+
+def _monocycle_spec(name: str) -> dict | None:
+    return next((spec for spec in RULES.retained.monocycle_specs if spec["name"] == name), None)
+
+
+INDICATED_H_ELEMENTS = frozenset({"C", "N", "P", "As", "Sb", "Bi", "B", "Si", "Ge", "Sn", "Pb"})
 ALKYL_OXY_PREFIXES = RULES.heteroatoms.alkyl_oxy_prefixes
 SIMPLE_SULFANYL_PREFIXES = RULES.heteroatoms.simple_sulfanyl_prefixes
 SIMPLE_SELANYL_PREFIXES = RULES.heteroatoms.simple_selanyl_prefixes

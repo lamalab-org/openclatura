@@ -7,7 +7,7 @@ keyed by locants and graph structure, not by SMILES or SMARTS strings.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cache, lru_cache
 from typing import Any
 
@@ -17,6 +17,9 @@ from .naming_data import load_json_table
 from .nomenclature import RULES
 
 ALLOWED_BOND_CLASSES = {"single", "double", "aromatic", "mancude", "fusion"}
+
+# Single-bonded in every mancude parent, so never indicated-hydrogen capacity.
+FIXED_SATURATED_RING_ELEMENTS = frozenset({"O", "S", "Se", "Te"})
 
 
 @lru_cache(maxsize=1)
@@ -42,6 +45,7 @@ class RetainedFusedAtomTemplate:
     aromatic: bool = True
     fusion: bool = False
     default_h: bool = False
+    saturated: bool = False
     interior: bool = False
 
 
@@ -76,6 +80,25 @@ class RetainedFusedGraphTemplate:
     @property
     def atom_by_locant(self) -> dict[str, RetainedFusedAtomTemplate]:
         return {atom.locant: atom for atom in self.atoms}
+
+    @property
+    def indicated_hydrogen_count(self) -> int:
+        """Indicated hydrogens this parent hydride supports.
+
+        Declared carbon sites (9H-xanthene, 2H-pyran) when it has them, else the
+        positions holding no mancude bond less the chalcogens, which are
+        single-bonded anyway -- 1,4-benzodioxine's oxygens are not hydro sites.
+        A bridgehead spends all three bonds inside the rings, so it has none
+        left for a hydrogen: indolizine's N4 supports no indicated H.
+        """
+
+        if self.default_indicated_h:
+            return len(self.default_indicated_h)
+        return sum(
+            1
+            for atom in self.atoms
+            if not atom.aromatic and not atom.fusion and atom.symbol not in FIXED_SATURATED_RING_ELEMENTS
+        )
 
 
 @dataclass(frozen=True)
@@ -122,6 +145,8 @@ def retained_parent_metadata(parent_name: str) -> RetainedParentMetadata | None:
                 default_indicated_h=template.default_indicated_h,
                 fusion_locants=template.fusion_atoms,
                 derivative_stem=template.derivative_stem,
+                indicated_hydrogen_count=template.indicated_hydrogen_count,
+                mancude_double_bonds=template.mancude_double_bonds or 0,
             )
     return None
 
@@ -154,48 +179,8 @@ def match_retained_fused_template(
     the numbering layer.
     """
 
-    validate_retained_fused_template(template)
-    atom_set = set(atom_indices)
-    if len(atom_set) != len(template.atoms):
-        return None
-
-    atom_by_locant = template.atom_by_locant
-    template_degrees = _template_degrees(template)
-    molecule_degrees = {
-        atom_idx: sum(1 for neighbor in mol.get_neighbors(atom_idx) if neighbor in atom_set) for atom_idx in atom_set
-    }
-    template_neighbors = _template_neighbors(template)
-    locants_by_constraint = sorted(
-        template.locants,
-        key=lambda locant: (
-            -template_degrees[locant],
-            atom_by_locant[locant].symbol == "C",
-            locant,
-        ),
-    )
-    candidates = {
-        locant: [
-            atom_idx
-            for atom_idx in atom_set
-            if _atom_matches_template(mol, atom_idx, atom_by_locant[locant], allow_nonaromatic=allow_nonaromatic)
-            and molecule_degrees[atom_idx] == template_degrees[locant]
-        ]
-        for locant in template.locants
-    }
-    if any(not values for values in candidates.values()):
-        return None
-
-    assignments = _match_locants_backtracking(
-        mol,
-        locants_by_constraint,
-        candidates,
-        template_neighbors,
-    )
-    if not assignments:
-        return None
-
-    assignment = assignments[0]
-    return _template_match_from_assignment(template, atom_set, assignment)
+    matches = _match_all_retained_fused_template(mol, atom_indices, template, allow_nonaromatic=allow_nonaromatic)
+    return matches[0] if matches else None
 
 
 def _match_all_retained_fused_template(
@@ -204,13 +189,17 @@ def _match_all_retained_fused_template(
     template: RetainedFusedGraphTemplate,
     *,
     allow_nonaromatic: bool = False,
+    allow_relocated_indicated_h: bool = False,
 ) -> list[RetainedFusedTemplateMatch]:
-    validate_retained_fused_template(template)
     atom_set = set(atom_indices)
     if len(atom_set) != len(template.atoms):
         return []
+    if all(not atom.aromatic for atom in template.atoms) and any(
+        not _is_saturated_site(mol, atom_idx, atom_set) for atom_idx in atom_set
+    ):
+        return []
 
-    atom_by_locant = template.atom_by_locant
+    atom_by_locant = _relocatable_atom_by_locant(template) if allow_relocated_indicated_h else template.atom_by_locant
     template_degrees = _template_degrees(template)
     molecule_degrees = {
         atom_idx: sum(1 for neighbor in mol.get_neighbors(atom_idx) if neighbor in atom_set) for atom_idx in atom_set
@@ -228,7 +217,9 @@ def _match_all_retained_fused_template(
         locant: [
             atom_idx
             for atom_idx in atom_set
-            if _atom_matches_template(mol, atom_idx, atom_by_locant[locant], allow_nonaromatic=allow_nonaromatic)
+            if _atom_matches_template(
+                mol, atom_idx, atom_by_locant[locant], ring_atoms=atom_set, allow_nonaromatic=allow_nonaromatic
+            )
             and molecule_degrees[atom_idx] == template_degrees[locant]
         ]
         for locant in template.locants
@@ -237,13 +228,60 @@ def _match_all_retained_fused_template(
         return []
 
     assignments = _match_locants_backtracking(mol, locants_by_constraint, candidates, template_neighbors)
-    return [_template_match_from_assignment(template, atom_set, assignment) for assignment in assignments]
+    if not allow_relocated_indicated_h:
+        return [_template_match_from_assignment(template, atom_set, assignment) for assignment in assignments]
+    relocated = [
+        (assignment, indicated_h)
+        for assignment in assignments
+        if (indicated_h := _relocated_indicated_h(mol, template, atom_set, assignment)) is not None
+    ]
+    return [
+        _template_match_from_assignment(template, atom_set, assignment, indicated_h=indicated_h)
+        for assignment, indicated_h in relocated
+    ]
+
+
+def _relocatable_atom_by_locant(template: RetainedFusedGraphTemplate) -> dict[str, RetainedFusedAtomTemplate]:
+    """The template with its declared carbon indicated-H site free to move.
+
+    Nitrogen sites stay pinned: they are what tells 1H- from 3H-.
+    """
+
+    return {
+        locant: (
+            replace(atom, saturated=False, default_h=False)
+            if locant in template.default_indicated_h and atom.symbol == "C"
+            else atom
+        )
+        for locant, atom in template.atom_by_locant.items()
+    }
+
+
+def _relocated_indicated_h(
+    mol: Molecule,
+    template: RetainedFusedGraphTemplate,
+    atom_set: set[int],
+    assignment: dict[str, int],
+) -> tuple[str, ...] | None:
+    """Where the indicated hydrogen sits here, or None for a hydro derivative."""
+
+    saturated = tuple(
+        locant
+        for locant in template.locants
+        if template.atom_by_locant[locant].symbol not in FIXED_SATURATED_RING_ELEMENTS
+        and _is_saturated_site(mol, assignment[locant], atom_set)
+    )
+    if len(saturated) != template.indicated_hydrogen_count:
+        return None
+    return saturated
 
 
 def _template_match_from_assignment(
     template: RetainedFusedGraphTemplate,
     atom_set: set[int],
     assignment: dict[str, int],
+    *,
+    indicated_h: tuple[str, ...] | None = None,
 ) -> RetainedFusedTemplateMatch:
     locant_to_atom = {locant: assignment[locant] for locant in template.locants}
     atom_to_locant = {atom_idx: locant for locant, atom_idx in locant_to_atom.items()}
@@ -252,9 +290,17 @@ def _template_match_from_assignment(
         atom_to_locant=atom_to_locant,
         locant_to_atom=locant_to_atom,
         matched_atoms=frozenset(atom_set),
-        indicated_h=template.default_indicated_h,
+        indicated_h=template.default_indicated_h if indicated_h is None else indicated_h,
         trace=(f"Matched retained fused template {template.name}.",),
     )
+
+
+@lru_cache(maxsize=2)
+def _templates_by_atom_count(include_disabled: bool) -> dict[int, tuple[RetainedFusedGraphTemplate, ...]]:
+    index: dict[int, list[RetainedFusedGraphTemplate]] = {}
+    for template in retained_fused_graph_templates(include_disabled=include_disabled):
+        index.setdefault(len(template.atoms), []).append(template)
+    return {size: tuple(templates) for size, templates in index.items()}
 
 
 def match_retained_fused_templates(
@@ -263,17 +309,20 @@ def match_retained_fused_templates(
     *,
     include_disabled: bool = False,
     allow_nonaromatic: bool = False,
+    allow_relocated_indicated_h: bool = False,
 ) -> list[RetainedFusedTemplateMatch]:
     """Return retained fused template matches ranked by retained priority."""
 
+    candidates = _templates_by_atom_count(include_disabled).get(len(set(atom_indices)), ())
     matches = [
         match
-        for template in retained_fused_graph_templates(include_disabled=include_disabled)
+        for template in candidates
         for match in _match_all_retained_fused_template(
             mol,
             atom_indices,
             template,
             allow_nonaromatic=allow_nonaromatic,
+            allow_relocated_indicated_h=allow_relocated_indicated_h,
         )
     ]
     return sorted(
@@ -497,23 +546,41 @@ def _atom_matches_template(
     atom_idx: int,
     atom_template: RetainedFusedAtomTemplate,
     *,
+    ring_atoms: frozenset[int] | set[int] | None = None,
     allow_nonaromatic: bool = False,
 ) -> bool:
     atom = mol.atoms[atom_idx]
     if atom.symbol != atom_template.symbol:
         return False
-    if atom.charge != atom_template.charge:
+    # Imidazolium is imidazole's ring; the ionic layer names the charge.
+    if atom_template.charge and atom.charge != atom_template.charge:
         return False
+
+    # Read as bond order, not RDKit aromaticity, so Kekule input matches too.
     if (
         atom_template.aromatic
         and not atom.is_aromatic
+        and _is_saturated_site(mol, atom_idx, ring_atoms)
         and not allow_nonaromatic
         and not _is_retained_oxo_site(mol, atom_idx)
     ):
         return False
     if atom_template.default_h and atom.explicit_h_count + atom.total_h_count <= 0:
         return False
+    # Tells 2H- from 4H-1-benzopyran: the position must really be saturated.
+    if atom_template.saturated and not _is_saturated_site(mol, atom_idx, ring_atoms):
+        return False
     return True
+
+
+def _is_saturated_site(mol: Molecule, atom_idx: int, ring_atoms=None) -> bool:
+    """No multiple bond inside the ring; an exocyclic =O does not unsaturate."""
+
+    return all(
+        bond.order == 1
+        for neighbor in mol.get_neighbors(atom_idx)
+        if (ring_atoms is None or neighbor in ring_atoms) and (bond := mol.get_bond(atom_idx, neighbor)) is not None
+    )
 
 
 def _is_retained_oxo_site(mol: Molecule, atom_idx: int) -> bool:
@@ -609,6 +676,7 @@ def _atom_template(data: dict[str, Any]) -> RetainedFusedAtomTemplate:
         aromatic=bool(data.get("aromatic", True)),
         fusion=bool(data.get("fusion", False)),
         default_h=bool(data.get("default_h", False)),
+        saturated=bool(data.get("saturated", False)),
         interior=bool(data.get("interior", False)),
     )
 

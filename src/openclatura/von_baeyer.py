@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from itertools import combinations
 
 from .molecule import Molecule
-from .polycycle_topology import RingNumbering, build_von_baeyer_numbering
+from .polycycle_topology import RingNumbering, adjacency_from_edges, adjacent_atoms, build_von_baeyer_numbering
 from .ring_renderer import render_von_baeyer_descriptor
 
 MAX_AUDITED_VON_BAEYER_RINGS = 8
@@ -54,7 +54,7 @@ def find_von_baeyer_candidates(
     if not _is_von_baeyer_scope(mol, atom_set, edge_set):
         return ()
 
-    adjacency = _adjacency(atom_set, edge_set)
+    adjacency = adjacency_from_edges(atom_set, edge_set)
     ring_count = len(edge_set) - len(atom_set) + 1
     bridgeheads = tuple(sorted(atom for atom in atom_set if len(adjacency[atom]) >= 3))
     if ring_count > MAX_AUDITED_VON_BAEYER_RINGS or len(bridgeheads) > MAX_AUDITED_BRIDGEHEADS:
@@ -85,21 +85,12 @@ def find_von_baeyer_candidates(
     return tuple(sorted(deduped, key=lambda candidate: candidate.rank))
 
 
-def best_von_baeyer_candidate(
-    mol: Molecule,
-    atoms: set[int] | frozenset[int],
-    edges: set[tuple[int, int]] | frozenset[tuple[int, int]],
-) -> VonBaeyerCandidate | None:
-    candidates = find_von_baeyer_candidates(mol, atoms, edges)
-    return candidates[0] if candidates else None
-
-
 def _is_von_baeyer_scope(mol: Molecule, atoms: frozenset[int], edges: frozenset[tuple[int, int]]) -> bool:
     if len(edges) - len(atoms) + 1 < 3:
         return False
     if any(mol.atoms[atom].is_aromatic for atom in atoms):
         return False
-    adjacency = _adjacency(atoms, edges)
+    adjacency = adjacency_from_edges(atoms, edges)
     # Free spiro centers are routed through the spiro/dispiro engine.  A
     # bridged von Baeyer bridgehead may also have degree >= 4, so only reject
     # articulation-style spiro centers here.
@@ -396,20 +387,11 @@ def _component_path(
             current, path = queue.pop(0)
             if current in ends:
                 return path
-            for neighbor in sorted(_neighbors(current, edge_set)):
+            for neighbor in sorted(adjacent_atoms(current, edge_set)):
                 if neighbor in component and neighbor not in seen:
                     seen.add(neighbor)
                     queue.append((neighbor, path + (neighbor,)))
     return ()
-
-
-def _is_unbranched_component(component: set[int], edge_set: frozenset[tuple[int, int]], attachments: set[int]) -> bool:
-    allowed = component | attachments
-    for atom in component:
-        degree = sum(1 for neighbor in _neighbors(atom, edge_set) if neighbor in allowed)
-        if degree > 2:
-            return False
-    return True
 
 
 def _connected_components(atoms: set[int], edge_set: frozenset[tuple[int, int]]) -> list[set[int]]:
@@ -424,7 +406,7 @@ def _connected_components(atoms: set[int], edge_set: frozenset[tuple[int, int]])
         while queue:
             current = queue.pop(0)
             component.add(current)
-            for neighbor in sorted(_neighbors(current, edge_set)):
+            for neighbor in sorted(adjacent_atoms(current, edge_set)):
                 if neighbor in atoms and neighbor not in seen:
                     seen.add(neighbor)
                     queue.append(neighbor)
@@ -434,24 +416,6 @@ def _connected_components(atoms: set[int], edge_set: frozenset[tuple[int, int]])
 
 def _path_edges(path: tuple[int, ...]) -> frozenset[tuple[int, int]]:
     return frozenset(tuple(sorted((first, second))) for first, second in zip(path, path[1:]))
-
-
-def _adjacency(atoms: frozenset[int], edges: frozenset[tuple[int, int]]) -> dict[int, set[int]]:
-    adjacency = {atom: set() for atom in atoms}
-    for first, second in edges:
-        adjacency[first].add(second)
-        adjacency[second].add(first)
-    return adjacency
-
-
-def _neighbors(atom: int, edges: frozenset[tuple[int, int]]) -> set[int]:
-    neighbors = set()
-    for first, second in edges:
-        if first == atom:
-            neighbors.add(second)
-        elif second == atom:
-            neighbors.add(first)
-    return neighbors
 
 
 def _normalize_edges(edges) -> set[tuple[int, int]]:
