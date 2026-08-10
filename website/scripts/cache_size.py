@@ -16,6 +16,7 @@ import hmac
 import os
 import re
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections import defaultdict
@@ -27,7 +28,12 @@ BUCKET = os.environ.get("CACHE_S3_BUCKET", "openclatura-cache")
 REGION = os.environ.get("CACHE_S3_REGION", "us-east-1")
 
 
-def s3_get(path: str, query: str) -> bytes:
+def s3_get(path: str, params: dict[str, str]) -> bytes:
+    # SigV4 requires the canonical query string sorted by key and URL-encoded;
+    # reuse the same string for the request URL so the two always match.
+    query = "&".join(
+        f"{urllib.parse.quote(k, safe='')}={urllib.parse.quote(v, safe='')}" for k, v in sorted(params.items())
+    )
     host = urllib.parse.urlparse(ENDPOINT).netloc
     now = datetime.datetime.now(datetime.timezone.utc)
     amz_date, datestamp = now.strftime("%Y%m%dT%H%M%SZ"), now.strftime("%Y%m%d")
@@ -59,8 +65,12 @@ def s3_get(path: str, query: str) -> bytes:
             f"SignedHeaders={signed}, Signature={signature}",
         },
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return resp.read()
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        sys.exit(f"S3 request failed: HTTP {exc.code}\n{body}")
 
 
 def human(n: float) -> str:
@@ -77,8 +87,10 @@ def main() -> None:
     totals: dict[str, list[float]] = defaultdict(lambda: [0, 0.0])
     token = ""
     while True:
-        query = "list-type=2" + (f"&continuation-token={urllib.parse.quote(token, safe='')}" if token else "")
-        xml = s3_get(f"/{BUCKET}", query).decode()
+        params = {"list-type": "2"}
+        if token:
+            params["continuation-token"] = token
+        xml = s3_get(f"/{BUCKET}", params).decode()
         for key, size in re.findall(r"<Key>([^<]+)</Key>.*?<Size>(\d+)</Size>", xml, flags=re.S):
             prefix = "/".join(key.split("/")[:2])  # e.g. name/0.1.4
             totals[prefix][0] += 1

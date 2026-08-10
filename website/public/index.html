@@ -68,6 +68,52 @@
     padding: .08rem .45rem;
   }
   .version-tag:empty { display: none; }
+  /* The chip doubles as the stable/beta switcher once a channel is known. */
+  .channel-switch { position: relative; display: none; }
+  .channel-switch.on { display: inline-block; }
+  .version-tag.button {
+    background: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    line-height: 1.5;
+  }
+  .version-tag.button:hover { border-color: var(--accent); color: var(--accent); }
+  .version-tag.beta { border-color: var(--accent); color: var(--accent); }
+  .channel-menu {
+    position: absolute;
+    top: calc(100% + .3rem);
+    left: 0;
+    z-index: 30;
+    min-width: 15rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+    padding: .3rem;
+    display: none;
+  }
+  .channel-menu.open { display: block; }
+  .channel-menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: 0;
+    padding: .45rem .55rem;
+    font: inherit;
+    font-size: .82rem;
+    cursor: pointer;
+    color: inherit;
+  }
+  .channel-menu button:hover:not(:disabled) { background: var(--chip); }
+  .channel-menu button:disabled { cursor: default; opacity: .75; }
+  .channel-menu .sub {
+    display: block;
+    color: var(--muted);
+    font-size: .74rem;
+    margin-top: .1rem;
+  }
   header p {
     margin: .3rem 0 0;
     max-width: 46rem;
@@ -245,6 +291,13 @@
     user-select: none;
   }
   .verify-toggle .hint { color: var(--muted); font-size: .78rem; }
+  .cache-note {
+    margin: .45rem 0 0 1.6rem;
+    color: var(--muted);
+    font-size: .76rem;
+    line-height: 1.5;
+    max-width: 48rem;
+  }
   .verify-badge {
     display: none;
     width: fit-content;
@@ -274,6 +327,34 @@
     padding: 0 1rem 2.5rem;
   }
   footer a { color: var(--accent); text-decoration: none; }
+  .footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: .7rem;
+    margin-top: 1.1rem;
+  }
+  .footer-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    padding: .55rem 1rem;
+    border: 1px solid var(--accent);
+    border-radius: 999px;
+    line-height: 1;
+    transition: background .15s, color .15s;
+  }
+  .footer-links a:hover {
+    background: var(--accent);
+    color: #fff;
+  }
+  .footer-links a svg {
+    width: 1.15em;
+    height: 1.15em;
+    flex: none;
+  }
 </style>
 </head>
 <body>
@@ -282,6 +363,10 @@
   <div class="header-row">
     <h1><span>openclatura</span> molecule namer</h1>
     <span class="version-tag" id="app-version" title="openclatura package version"></span>
+    <span class="channel-switch" id="channel-switch">
+      <button class="version-tag button" id="channel-button" aria-haspopup="true" aria-expanded="false"></button>
+      <div class="channel-menu" id="channel-menu" role="menu"></div>
+    </span>
   </div>
   <p>Draw a molecule below and it is named with deterministic IUPAC Blue Book (2013) rules.</p>
 </header>
@@ -319,6 +404,17 @@
       <input type="checkbox" id="opsin-toggle" checked>
       Verify with OPSIN <span class="hint">— parse the name back to a structure (py2opsin) and compare with your drawing</span>
     </label>
+    <label class="verify-toggle">
+      <input type="checkbox" id="nocache-toggle">
+      Don't cache my structures <span class="hint">— skip storing results for the molecules you draw</span>
+    </label>
+    <p class="cache-note">
+      Because naming is fully deterministic, we store each result under a hash of the
+      structure so a molecule that has already been named comes back instantly. That
+      cache exists only to make the site fast — the structures are never analysed,
+      shared, sold, or used for training, and nothing about you is stored alongside
+      them. Tick the box to opt out and your drawings will not be written to it.
+    </p>
     <div id="explain"></div>
   </section>
 </main>
@@ -326,6 +422,16 @@
 <footer>
   Powered by <a href="https://github.com/lamalab-org/iupac-name-generator">openclatura</a>,
   an open nomenclature framework · Editor: <a href="https://lifescience.opensource.epam.com/ketcher/">Ketcher</a> (EPAM, Apache-2.0) · MIT licensed
+  <div class="footer-links">
+    <a id="report-issue" href="https://github.com/lamalab-org/iupac-name-generator/issues/new" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Z"/><path fill-rule="evenodd" d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0ZM1.5 8a6.5 6.5 0 1 1 13 0 6.5 6.5 0 0 1-13 0Z"/></svg>
+      Report an issue
+    </a>
+    <a href="https://chemrxiv.org/doi/abs/10.26434/chemrxiv.15006114/v1" target="_blank" rel="noopener">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M3 2a1 1 0 0 1 1-1h5.5L13 4.5V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2Zm6 .5V4a1 1 0 0 0 1 1h1.5L9 2.5ZM5.5 8a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5Zm0 2.5a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1h-5Z"/></svg>
+      Read the preprint
+    </a>
+  </div>
 </footer>
 
 <script>
@@ -333,7 +439,40 @@
   var debounceTimer = null;
   var currentSmiles = "";
   var currentName = "";
+  var appVersion = "";
   var requestSeq = 0;
+
+  // Build a prefilled GitHub "new issue" URL (the new-github-issue-url pattern:
+  // owner/repo/issues/new?title=…&body=…), seeded with whatever the user has
+  // drawn so bug reports arrive with the SMILES and produced name attached.
+  var ISSUE_URL = "https://github.com/lamalab-org/iupac-name-generator/issues/new";
+  function buildIssueUrl() {
+    var title, body;
+    var version = appVersion || "unknown";
+    if (currentSmiles && currentName) {
+      title = "Incorrect name for " + currentSmiles;
+      body = "**SMILES:** `" + currentSmiles + "`\n\n"
+           + "**Name produced:** " + currentName + "\n\n"
+           + "**Expected name:** _please fill in_\n\n";
+    } else if (currentSmiles) {
+      title = "Naming failed for " + currentSmiles;
+      body = "**SMILES:** `" + currentSmiles + "`\n\n"
+           + "**Expected name:** _please fill in_\n\n"
+           + "openclatura could not produce a name for this structure.\n\n";
+    } else {
+      title = "";
+      body = "**SMILES:** _please fill in_\n\n"
+           + "**What went wrong:** _please describe_\n\n";
+    }
+    body += "---\nReported from the openclatura web demo (openclatura " + version + ").\n";
+    var params = "body=" + encodeURIComponent(body);
+    if (title) params = "title=" + encodeURIComponent(title) + "&" + params;
+    return ISSUE_URL + "?" + params;
+  }
+  function updateIssueLink() {
+    var a = el("report-issue");
+    if (a) a.href = buildIssueUrl();
+  }
 
   // How long the drawing must sit still before it is named. Example chips
   // load complete structures, so they use a shorter wait.
@@ -400,13 +539,76 @@
     box.style.display = "block";
   }
 
+  // ---------------------------------------------------------------------
+  // Template previews
+  //
+  // While a ring template is active and the cursor sits on the canvas,
+  // Ketcher inserts the hovering preview into the live struct, so getSmiles()
+  // hands back a ring the user never drew. Undo makes it obvious: the placed
+  // ring goes away, the tool immediately re-previews under the cursor, and
+  // the name keeps a phantom component ("…purine-2,6-dione benzene") with
+  // nothing on screen to explain it.
+  //
+  // A free-standing preview flags its atoms `isPreview`, so they are dropped
+  // from a clone of the struct that Ketcher's own Indigo converts to SMILES —
+  // the editor itself is never touched. A preview snapped onto an existing
+  // atom is applied as a real (later reverted) action carrying no flag at
+  // all; there the drawing is simply not re-named until the cursor moves off
+  // it, which restores the struct on its own.
+  // ---------------------------------------------------------------------
+
+  var SMILES_FORMAT = "chemical/x-daylight-smiles";
+
+  function connectedPreview() {
+    var tool = ketcher.editor.tool && ketcher.editor.tool();
+    var preview = tool && tool.templatePreview;
+    return !!(preview && preview.connectedPreviewAction);
+  }
+
+  // Atom ids of what is actually drawn, or null when the struct holds no
+  // preview at all and the plain getSmiles() path will do.
+  function drawnAtoms() {
+    var ids = [];
+    var previews = 0;
+    ketcher.editor.struct().atoms.forEach(function (atom, id) {
+      if (atom.isPreview) previews += 1;
+      else ids.push(id);
+    });
+    return previews ? ids : null;
+  }
+
+  function fullSmiles() {
+    return ketcher.getSmiles().then(function (smiles) {
+      return { smiles: (smiles || "").trim() };
+    });
+  }
+
+  // Resolve the drawing to the SMILES that should be named. Anything that
+  // goes wrong here falls back to the whole structure, previews included.
+  function smilesToName() {
+    if (connectedPreview()) return Promise.resolve({ skip: true });
+    var ids = null;
+    try {
+      ids = drawnAtoms();
+    } catch (e) { /* fall through to the whole structure */ }
+    if (!ids) return fullSmiles();
+    if (!ids.length) return Promise.resolve({ smiles: "" }); // preview only
+    var clone = ketcher.editor.struct().clone(new Set(ids));
+    return ketcher.indigo.convert(clone, { outputFormat: SMILES_FORMAT })
+      .then(function (res) { return { smiles: (res && res.struct || "").trim() }; })
+      .catch(fullSmiles);
+  }
+
   function nameCurrent() {
     if (!ketcher) return;
-    ketcher.getSmiles().then(function (smiles) {
-      smiles = (smiles || "").trim();
+    smilesToName().then(function (result) {
+      if (result.skip) return; // a preview is showing; what is drawn hasn't changed
+      var smiles = result.smiles;
       el("smiles-out").textContent = smiles || "—";
       if (!smiles) {
         currentSmiles = "";
+        currentName = "";
+        updateIssueLink();
         resetResult("Draw a structure to name it.");
         return;
       }
@@ -429,6 +631,7 @@
     failureTimer = setTimeout(function () {
       if (seq !== requestSeq) return;
       currentName = "";
+      updateIssueLink();
       el("result-name").textContent = "Could not name this structure.";
       el("result-name").className = "error";
       el("verify-badge").className = "verify-badge";
@@ -460,7 +663,12 @@
     fetch("/api/name", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ smiles: smiles, include_trace: true, verify_opsin: verify })
+      body: JSON.stringify({
+        smiles: smiles,
+        include_trace: true,
+        verify_opsin: verify,
+        no_cache: noCache()
+      })
     })
       .then(function (r) {
         if (!r.ok) throw new Error("API error (HTTP " + r.status + ")");
@@ -471,6 +679,7 @@
         setStatus("");
         if (data.ok && data.name) {
           currentName = data.name;
+          updateIssueLink();
           el("result-name").textContent = data.name;
           el("result-name").className = data.name.length > 50 ? "long" : "";
           el("btn-copy").disabled = false;
@@ -519,8 +728,30 @@
     }
   }
 
+  // The OPSIN-free reconstruction audit. Its verdicts are deliberately not
+  // pass/fail: "abstained" means some construct in the name isn't modelled by
+  // the reconstructor, which certifies nothing either way — so it must not read
+  // as a failure of the name.
   el("opsin-toggle").addEventListener("change", function () {
     if (currentSmiles) requestName(currentSmiles);
+  });
+
+  // Cache opt-out. Remembered locally (in this browser only) so the choice
+  // survives reloads; storage can throw in private modes, so it's best-effort.
+  var NOCACHE_KEY = "openclatura:no-cache";
+
+  function noCache() {
+    return el("nocache-toggle").checked;
+  }
+
+  try {
+    el("nocache-toggle").checked = localStorage.getItem(NOCACHE_KEY) === "1";
+  } catch (e) { /* keep the default (caching on) */ }
+
+  el("nocache-toggle").addEventListener("change", function () {
+    try {
+      localStorage.setItem(NOCACHE_KEY, noCache() ? "1" : "0");
+    } catch (e) { /* preference just won't persist */ }
   });
 
   el("btn-copy").addEventListener("click", function () {
@@ -543,7 +774,7 @@
     var describeReq = fetch("/api/describe", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ smiles: currentSmiles })
+      body: JSON.stringify({ smiles: currentSmiles, no_cache: noCache() })
     }).then(function (r) {
       if (!r.ok) throw new Error("API error (HTTP " + r.status + ")");
       return r.json();
@@ -552,7 +783,7 @@
     var depictReq = fetch("/api/depict", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ smiles: currentSmiles })
+      body: JSON.stringify({ smiles: currentSmiles, no_cache: noCache() })
     }).then(function (r) { return r.ok ? r.json() : null; })
       .catch(function () { return null; });
     Promise.all([describeReq, depictReq])
@@ -599,10 +830,94 @@
       });
   });
 
+  // ---- Release channel -----------------------------------------------------
+  // Two deployments of this page exist: stable (a PyPI release) and beta (built
+  // from a git branch, on its own unlisted domain). /api/healthz reports which
+  // one answered and where the other lives; the version chip becomes the switch.
+  // Stable only offers the beta entry when BETA_URL is set on that deployment,
+  // so by default the public site never names the beta domain.
+  function renderChannel(d) {
+    var isBeta = d.channel === "beta";
+    var label = appVersion || "unknown";
+    if (isBeta) label += " · beta" + (d.git_ref ? " (" + d.git_ref + ")" : "");
+    var button = el("channel-button");
+    button.textContent = label + " ▾";
+    button.className = "version-tag button" + (isBeta ? " beta" : "");
+    button.title = isBeta
+      ? "Running the beta build" + (d.git_ref ? " from the " + d.git_ref + " branch" : "")
+      : "Running the released openclatura " + (d.version || "");
+
+    var other = isBeta ? d.stable_url : d.beta_url;
+    var menu = el("channel-menu");
+    menu.innerHTML = "";
+
+    function addItem(title, sub, target) {
+      var item = document.createElement("button");
+      item.type = "button";
+      item.setAttribute("role", "menuitem");
+      item.appendChild(document.createTextNode(title));
+      var hint = document.createElement("span");
+      hint.className = "sub";
+      hint.textContent = sub;
+      item.appendChild(hint);
+      if (target) {
+        item.addEventListener("click", function () { window.location.href = target; });
+      } else {
+        item.disabled = true;
+      }
+      menu.appendChild(item);
+    }
+
+    addItem(
+      (isBeta ? "Stable" : "✓ Stable") + (d.channel === "stable" && d.version ? " — v" + d.version : ""),
+      "The published release.",
+      isBeta ? (other || null) : null
+    );
+    addItem(
+      (isBeta ? "✓ Beta" : "Beta") + (isBeta && d.git_ref ? " — " + d.git_ref : ""),
+      "Unreleased build from a git branch.",
+      isBeta ? null : (other || null)
+    );
+
+    // With no counterpart URL configured there is nothing to switch to, so keep
+    // the plain, non-interactive version tag instead of a dead menu.
+    if (!other) {
+      el("app-version").textContent = label;
+      return;
+    }
+    el("channel-switch").classList.add("on");
+  }
+
+  el("channel-button").addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    var menu = el("channel-menu");
+    var open = menu.classList.toggle("open");
+    el("channel-button").setAttribute("aria-expanded", open ? "true" : "false");
+  });
+  document.addEventListener("click", function () {
+    el("channel-menu").classList.remove("open");
+    el("channel-button").setAttribute("aria-expanded", "false");
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key === "Escape") el("channel-menu").classList.remove("open");
+  });
+
   fetch("/api/healthz")
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (d) {
-      if (d && d.version) el("app-version").textContent = "v" + d.version;
+      if (!d) return;
+      if (d.version) {
+        appVersion = "v" + d.version;
+        updateIssueLink();
+      }
+      // The self-audit ships on the beta build only, so the toggle stays hidden
+      // (and the flag unsent) wherever the engine has no support for it.
+      selfAuditSupported = !!d.self_audit;
+      if (selfAuditSupported) {
+        el("audit-row").hidden = false;
+        if (currentSmiles) requestName(currentSmiles);
+      }
+      renderChannel(d);
     })
     .catch(function () { /* version tag stays hidden */ });
 
