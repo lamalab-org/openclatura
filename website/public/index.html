@@ -229,7 +229,7 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
   .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .75rem; }
-  .chips span {
+  .chips span, .chips a {
     font-family: var(--mono);
     font-size: .74rem;
     background: var(--accent-soft);
@@ -237,6 +237,8 @@
     padding: .18rem .5rem;
     cursor: default;
   }
+  .chips a { cursor: pointer; text-decoration: none; }
+  .chips a:hover, .chips a:focus-visible { text-decoration: underline; }
   .actions { display: flex; gap: .55rem; margin-top: 1rem; flex-wrap: wrap; }
   .actions button {
     border: 1px solid var(--border);
@@ -518,6 +520,31 @@
 
   function setStatus(html) { el("status").innerHTML = html; }
 
+  // Map a Blue Book rule id (P-66.1.2.4) onto the online HTML edition at
+  // iupac.qmul.ac.uk. The anchor is the rule number with the dots removed and
+  // every part after the first zero-padded to two digits ("66010204"); the
+  // page is the chapter, with chapter 6 split across P6.html (P-60..P-65) and
+  // P6a.html (P-66..P-69).
+  function blueBookUrl(rule) {
+    var m = /^P-(\d+(?:\.\d+)*)$/.exec(rule);
+    if (!m) return "";
+    var parts = m[1].split(".");
+    var head = parts[0];
+    var anchor = head;
+    for (var i = 1; i < parts.length; i++) {
+      anchor += parts[i].length < 2 ? "0" + parts[i] : parts[i];
+    }
+    var page;
+    if (head.length >= 3) page = head.slice(0, 2) === "10" ? "P10" : "";
+    else if (head.length === 2) {
+      var chapter = head.charAt(0);
+      if (chapter === "6") page = head <= "65" ? "P6" : "P6a";
+      else page = "P" + chapter;
+    } else page = "P" + head;
+    if (!page) return "";
+    return "https://iupac.qmul.ac.uk/BlueBook/" + page + ".html#" + anchor;
+  }
+
   function resetResult(placeholder) {
     clearTimeout(failureTimer);
     currentName = "";
@@ -689,9 +716,16 @@
           chips.innerHTML = "";
           var hints = (data.rule_hints || []).join("\n");
           (data.rules_hit || []).forEach(function (rule) {
-            var s = document.createElement("span");
+            var href = blueBookUrl(rule);
+            var s = document.createElement(href ? "a" : "span");
             s.textContent = rule;
             s.title = hints || "IUPAC Blue Book rule " + rule;
+            if (href) {
+              s.href = href;
+              s.target = "_blank";
+              s.rel = "noopener";
+              s.title += "\nOpen " + rule + " in the online Blue Book";
+            }
             chips.appendChild(s);
           });
         } else {
