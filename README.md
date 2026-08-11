@@ -9,7 +9,7 @@
 [![CI](https://github.com/lamalab-org/openclatura/actions/workflows/ci.yml/badge.svg)](https://github.com/lamalab-org/openclatura/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-![openclatura demo](openclatura-demo.gif)
+![openclatura demo](assets/openclatura-demo.gif)
 
 </div>
 
@@ -40,8 +40,8 @@ Round-trip accuracy against public datasets (details and rerun instructions in
 | dataset  | coverage |
 | -------- | -------- |
 | QM9      | 100 %    |
-| PubChem  | 99.4 %   |
-| ZINC22   | 97.5 %   |
+| PubChem  | 99.3 %   |
+| ZINC22   | 97.4 %   |
 
 The package is in **beta**. Naming is solid across common organic chemistry;
 exotic corners of the Blue Book — and stereodescriptor edge cases — are still
