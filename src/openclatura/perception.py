@@ -17,12 +17,8 @@ from .nitrogen_roles import amidinohydrazone_tail_atoms, nitrogen_chain_roles
 
 @dataclass
 class PerceivedGroup:
-    """Functional-group perception result bound to graph atoms and metadata.
-
-    The first four fields are the legacy contract used throughout namer.py.
-    The remaining fields make the object self-describing: rule metadata,
-    atom-role bindings, bond-role bindings, and short reasons explaining why
-    the detector emitted the group.
+    """
+    Functional-group perception result bound to graph atoms and metadata.
     """
 
     key: str
@@ -132,6 +128,30 @@ def _closes_ring_back_to(mol: Molecule, carbon: int, hetero: int, double_o: int,
             if nxt not in visited and nxt in cyclic_atoms:
                 visited.add(nxt)
                 queue.append(nxt)
+    return False
+
+
+def _shares_component_with_anion(mol: Molecule, idx: int) -> bool:
+    """True when a negatively charged atom sits in the same connected component.
+
+    Cations outrank every neutral characteristic group (P-41), but a zwitterion
+    is named the other way round -- the anionic centre takes the suffix and the
+    cation stays a prefix, which is what makes betaine
+    ``2-(trimethylammonio)acetate`` rather than an ``...aminium``.  A separate
+    counter-ion component is not a zwitterion, so the search stops at the
+    component boundary.
+    """
+
+    seen = {idx}
+    stack = [idx]
+    while stack:
+        current = stack.pop()
+        if mol.atoms[current].charge < 0:
+            return True
+        for neighbor in mol.get_neighbors(current):
+            if neighbor not in seen:
+                seen.add(neighbor)
+                stack.append(neighbor)
     return False
 
 
@@ -596,15 +616,18 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                             consumed.update(hydrazone_atoms)
                         else:
                             key = "iminium" if atom.charge > 0 else "imine"
-                            groups.append(PerceivedGroup(key, True, double_c, {atom.idx}))
+                            principal = key != "iminium" or not _shares_component_with_anion(mol, atom.idx)
+                            groups.append(PerceivedGroup(key, principal, double_c, {atom.idx}))
                             consumed.update([atom.idx])
                     else:
                         key = "iminium" if atom.charge > 0 else "imine"
-                        groups.append(PerceivedGroup(key, True, double_c, {atom.idx}))
+                        principal = key != "iminium" or not _shares_component_with_anion(mol, atom.idx)
+                        groups.append(PerceivedGroup(key, principal, double_c, {atom.idx}))
                         consumed.update([atom.idx])
                 else:
                     key = "iminium" if atom.charge > 0 else "imine"
-                    groups.append(PerceivedGroup(key, True, double_c, {atom.idx}))
+                    principal = key != "iminium" or not _shares_component_with_anion(mol, atom.idx)
+                    groups.append(PerceivedGroup(key, principal, double_c, {atom.idx}))
                     consumed.update([atom.idx])
 
     for atom in mol:
@@ -686,8 +709,9 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             adj_atoms = mol.get_neighbors(atom.idx)
             if len(adj_atoms) > 0:
                 key = "aminium" if atom.charge > 0 else "amine"
+                principal = key != "aminium" or not _shares_component_with_anion(mol, atom.idx)
                 for c in adj_atoms:
-                    groups.append(PerceivedGroup(key, True, c, {atom.idx}))
+                    groups.append(PerceivedGroup(key, principal, c, {atom.idx}))
                 consumed.add(atom.idx)
 
     for atom in mol:
@@ -766,11 +790,8 @@ def _bond_bindings_for_group(mol: Molecule, group: PerceivedGroup) -> tuple[Bond
 
 
 def _has_senior_nitrogen_ligand(mol: Molecule, nitrogen: int, center: int) -> bool:
-    """Whether an imino nitrogen's substituent binds it into a senior group.
-
-    An acyl carbon makes the nitrogen an amide's, and another nitrogen makes it
-    a hydrazone's.  Either way the nitrogen is spoken for, and citing it as an
-    ``imino`` prefix here would take it from the suffix that owns it.
+    """
+    Whether an imino nitrogen's substituent binds it into a senior group.
     """
 
     for ligand in mol.get_neighbors(nitrogen):
