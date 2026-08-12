@@ -12759,6 +12759,181 @@
       }
     },
     {
+      "name": "2H-1-benzothiopyran",
+      "pin": true,
+      "priority": 40,
+      "aliases": [
+        "2H-thiochromene"
+      ],
+      "attached_prefix": "thiochromeno",
+      "derivative_stem": "1-benzothiopyran",
+      "default_indicated_h": [
+        "2"
+      ],
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "S",
+            "aromatic": false
+          },
+          {
+            "locant": "2",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "1",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [
+          "2"
+        ],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
       "name": "3H-2-benzopyran",
       "pin": true,
       "priority": 40,

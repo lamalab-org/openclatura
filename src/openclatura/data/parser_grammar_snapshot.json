@@ -66,6 +66,7 @@
       "2-benzothiophene",
       "2H-1,3-benzoxazine",
       "2H-1-benzopyran",
+      "2H-1-benzothiopyran",
       "2H-2,3-benzodiazepine",
       "2H-isoindole",
       "2H-quinolizine",
@@ -747,6 +748,21 @@
       "fusion_stems": [
         "chromeno"
       ],
+      "default_indicated_h": [
+        "2"
+      ]
+    },
+    "2H-1-benzothiopyran": {
+      "parent_stems": [
+        "1-benzothiopyran"
+      ],
+      "substituent_stems": [
+        "1-benzothiopyran"
+      ],
+      "fusion_stems": [
+        "thiochromeno"
+      ],
+      "derivative_status": "production_safe",
       "default_indicated_h": [
         "2"
       ]
