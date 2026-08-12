@@ -38,6 +38,26 @@ def _respell_indicated_hydrogen(retained_name: str, sites: set[str]) -> str:
     return f"{spelled}-{retained_name[match.end() :]}"
 
 
+def _exocyclic_double_bond_site(mol: Molecule, atom_idx: int, numbered_path: list[int]) -> bool:
+    """
+    A ring carbon held sp2 only by a double bond leaving the ring.
+    """
+
+    atom = mol.atoms[atom_idx]
+    if not atom.is_carbon:
+        return False
+    ring_bonds = [
+        bond for n in mol.get_neighbors(atom_idx) if n in numbered_path and (bond := mol.get_bond(atom_idx, n))
+    ]
+    if not ring_bonds or any(bond.order != 1 for bond in ring_bonds):
+        return False
+    return any(
+        (bond := mol.get_bond(atom_idx, n)) is not None and bond.order == 2
+        for n in mol.get_neighbors(atom_idx)
+        if n not in numbered_path
+    )
+
+
 def _declared_sites_are_unambiguous(mol: Molecule, numbered_path: list[int], get_loc, declared: set[str]) -> bool:
     """
     True when the declared indicated-H locants are the only place they could sit.
@@ -82,8 +102,7 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         and _declared_sites_are_unambiguous(mol, numbered_path, get_loc, default_indicated_h)
     ):
         default_indicated_h = observed
-    # The name spells its indicated hydrogen as text; keep that text in step with
-    # where the hydrogen actually sits.
+
     if parts.retained_name and default_indicated_h:
         cited = _name_indicated_hydrogen_locants(parts.retained_name)
         if cited and cited != default_indicated_h and len(cited) == len(default_indicated_h):
@@ -101,8 +120,6 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             continue
 
         if metadata is not None and default_indicated_h and atom.is_carbon and locant not in default_indicated_h:
-            # Saturated all the same, so it is a hydro position even though it
-            # is not an indicated-H site: 2,3-dihydro-1H-indole.
             if _is_saturated_ring_site(mol, idx, numbered_path):
                 hydro_only.append((locant, idx))
             continue
@@ -139,7 +156,9 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 and _is_saturated_ring_site(mol, idx, numbered_path)
             )
             indicated_h_site = sum(b.order for b in ring_bonds) == 2 and (
-                not atom.is_carbon or _is_saturated_ring_site(mol, idx, numbered_path)
+                not atom.is_carbon
+                or _is_saturated_ring_site(mol, idx, numbered_path)
+                or (locant in default_indicated_h and _exocyclic_double_bond_site(mol, idx, numbered_path))
             )
             if indicated_h_site or fusion_carbon_h:
                 candidates.append((locant, idx))
@@ -149,8 +168,6 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         mol.atoms[atom_idx].is_carbon and locant in fusion_locants for locant, atom_idx in candidates
     )
     if additive_hydrogen and len(candidates) > 1:
-        # The parent keeps its own indicated hydrogen: octahydro-1H-indole.
-        # Only if what is left is still whole double bonds, else 1,4-dihydropurine.
         pool = sorted(candidates + hydro_only, key=lambda item: parse_locant(item[0]))
         held = supported if (len(pool) - supported) % 2 == 0 else 0
         candidates, surplus = pool[:held], pool[held:]

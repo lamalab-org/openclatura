@@ -24142,8 +24142,7 @@
         "mancude_double_bonds": 4,
         "enabled": true,
         "derivative_production_enabled": true
-      },
-      "indicated_hydrogen_name": "indene"
+      }
     },
     {
       "name": "indoline",

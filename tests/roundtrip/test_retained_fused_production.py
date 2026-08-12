@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 import tempfile
 import warnings
@@ -432,3 +433,61 @@ def test_pyrrolo_2_3_b_indole_names_the_retained_parent_not_von_baeyer():
         "methyl 7-chloro-4-methoxy-3,3a-dihydro-1H-pyrrolo[2,3-b]indole-1-carboxylate",
     ]
     assert _normalized_pairs_match(opsin_smiles, _opsin(generated_names))
+
+
+VON_BAEYER = re.compile(r"^(bicyclo|tricyclo|tetracyclo|pentacyclo|spiro)")
+
+EXPECTED_RETAINED_RINGS = (
+    "1H-indene", "indane", "9H-fluorene", "1H-indole", "3H-indole", "isoindole",
+    "carbazole", "xanthene", "acridine", "indolizine", "quinoline", "isoquinoline",
+    "naphthalene", "anthracene", "phenanthrene", "azulene", "indoline", "chromane",
+    "2H-chromene", "4H-chromene", "coumarin", "1H-benzimidazole", "benzothiazole",
+    "benzoxazole", "1H-purine", "pteridine", "phthalazine", "cinnoline", "quinoxaline",
+    "quinazoline", "9H-thioxanthene", "9H-xanthene", "1H-pyrrolizine", "4H-quinolizine",
+    "adamantane", "cubane", "pentalene", "heptalene", "biphenylene", "acenaphthylene",
+    "fluoranthene", "1H-phenalene", "phenothiazine", "phenoxazine", "dibenzofuran",
+    "dibenzothiophene", "thianthrene", "phenoxathiine", "1H-indazole", "2H-indazole",
+    "1H-benzotriazole", "1H-inden-1-one",
+)
+
+
+@pytest.mark.opsin
+def test_every_retained_template_names_itself_and_roundtrips():
+    """Each registered parent must still name itself, not fall to von Baeyer.
+
+    Derived from the template file, so a parent that stops matching -- a
+    numbering change, a tautomer gate, a stem edit -- fails here immediately.
+    """
+
+    names = [template.name for template in retained_fused_graph_templates()]
+    parent_smiles = _opsin(names)
+    assert all(parent_smiles), "OPSIN could not parse every registered parent name"
+
+    generated = [result.name for result in name_many(parent_smiles, processes=1)]
+    fell_back = {name: made for name, made in zip(names, generated) if made and VON_BAEYER.match(made)}
+    assert fell_back == {}
+
+    # The name has to describe the same structure, not merely avoid von Baeyer:
+    # a misplaced indicated hydrogen names a different (hydro) compound.
+    roundtrip = _opsin(list(generated))
+    mismatched = {
+        name: made
+        for name, made, original, back in zip(names, generated, parent_smiles, roundtrip)
+        if not back or standardize_mol(back) != standardize_mol(original)
+    }
+    assert mismatched == {}
+
+
+@pytest.mark.opsin
+def test_expected_retained_rings_are_registered():
+    """A ring the namer should know must not come back as von Baeyer."""
+
+    parent_smiles = _opsin(list(EXPECTED_RETAINED_RINGS))
+    unparsed = [name for name, smiles in zip(EXPECTED_RETAINED_RINGS, parent_smiles) if not smiles]
+    assert unparsed == [], "OPSIN could not parse these probe names"
+
+    generated = [result.name for result in name_many(parent_smiles, processes=1)]
+    fell_back = {
+        name: made for name, made in zip(EXPECTED_RETAINED_RINGS, generated) if made and VON_BAEYER.match(made)
+    }
+    assert fell_back == {}

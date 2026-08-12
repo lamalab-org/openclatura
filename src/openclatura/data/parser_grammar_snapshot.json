@@ -46,6 +46,7 @@
       "1H-2-benzopyran",
       "1H-benzo[7]annulene",
       "1H-benzotriazole",
+      "1H-indene",
       "1H-indole",
       "1H-isoindole",
       "1H-perimidine",
@@ -152,9 +153,7 @@
       "triphenylene",
       "xanthene"
     ],
-    "audit_only_parent_names": [
-      "1H-indene"
-    ],
+    "audit_only_parent_names": [],
     "allowed_principal_keys": [
       null,
       "alcohol",
@@ -512,7 +511,7 @@
       "fusion_stems": [
         "indeno"
       ],
-      "derivative_status": "audit_only",
+      "derivative_status": "production_safe",
       "default_indicated_h": [
         "1"
       ]
