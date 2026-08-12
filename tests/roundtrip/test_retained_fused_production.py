@@ -56,7 +56,7 @@ OXO_CASES = (
     ("2,8-diamino-1,4-dihydropurin-6-one", "2,8-diamino-1,4-dihydropurin-6-one"),
     ("1,3,7-trimethylpurine-2,6-dione", "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione"),
     ("1H-indazol-3-one", "1H,2H-indazol-3-one"),
-    ("xanthen-9-one", "xanthen-9-one"),
+    ("xanthen-9-one", "9H-xanthen-9-one"),
 )
 
 _CML_NS = {"cml": "http://www.xml-cml.org/schema"}

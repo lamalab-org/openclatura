@@ -724,8 +724,10 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             adj_atoms = mol.get_neighbors(atom.idx)
             if len(adj_atoms) > 0:
                 key = "aminium" if atom.charge > 0 else "amine"
+
+                principal = key != "aminium" or all(mol.get_bond(atom.idx, n).order == 1 for n in adj_atoms)
                 for c in adj_atoms:
-                    groups.append(PerceivedGroup(key, True, c, {atom.idx}))
+                    groups.append(PerceivedGroup(key, principal, c, {atom.idx}))
                 consumed.add(atom.idx)
 
     for atom in mol:

@@ -22,6 +22,16 @@ IONIC_PARENT_SUFFIX_PATTERN = (
 )
 
 
+INVALID_LOCANT_IDE_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"-\d+-ide\b(?!-(?:\d[\d,]*-)?(?:\w*ium|nitrile|dinitrile|carbonitrile))"),
+    re.compile(r"yl\)-\d+-ide\b"),
+    re.compile(r"carbonitrile-\d+-ide\b"),
+    re.compile(r"carbaldehyde-\d+-ide\b"),
+    re.compile(r"amide-\d+-ide\b"),
+    re.compile(r"nitrile-\d+-ide\b"),
+)
+
+
 @dataclass(frozen=True)
 class ParentChargeSite:
     """A charged atom that belongs to the numbered parent."""
@@ -502,28 +512,11 @@ def apply_substituent_parent_yl_ide(name: str, negative_locants: dict[str, set[s
 
 
 def apply_terminal_parent_ide(name: str, negative_locants: dict[str, set[str]]) -> str:
-    """Do not append unclassified locant-ide suffixes.
-
-    Generic terminal ``-<locant>-ide`` emission is not grammar-safe: it can land
-    after suffixes, substituent phrases, or parent words whose anion grammar is
-    class-specific.  Keep the parseable neutral/zwitterionic spelling until a
-    dedicated anion class installs a verified template.
+    """
+    Do not append unclassified locant-ide suffixes.
     """
 
     return name
-
-
-INVALID_LOCANT_IDE_PATTERNS: tuple[re.Pattern[str], ...] = (
-    # An anion locant is grammatical where a further suffix follows it -- the
-    # ``ium`` of a zwitterion, or a nitrile the anion was placed in front of --
-    # and ungrammatical where it trails the word.
-    re.compile(r"-\d+-ide\b(?!-(?:\d[\d,]*-)?(?:ium|nitrile|dinitrile|carbonitrile))"),
-    re.compile(r"yl\)-\d+-ide\b"),
-    re.compile(r"carbonitrile-\d+-ide\b"),
-    re.compile(r"carbaldehyde-\d+-ide\b"),
-    re.compile(r"amide-\d+-ide\b"),
-    re.compile(r"nitrile-\d+-ide\b"),
-)
 
 
 def contains_invalid_locant_ide(name: str) -> bool:
@@ -533,13 +526,8 @@ def contains_invalid_locant_ide(name: str) -> bool:
 
 
 def apply_terminal_characteristic_suffix_ide(name: str, negative_locants: dict[str, set[str]]) -> str:
-    """Place parent ``-ide`` before terminal suffixes that cannot follow it.
-
-    OPSIN accepts suffix stacks such as ``...ene-5-ide-2,6-dione`` and
-    ``...-6-ide-6-aminium``.  Appending ``-ide`` after those suffixes describes
-    an unparsable suffix-on-suffix stack, so this rule inserts the anion
-    operation at the parent/suffix boundary using the graph-backed anion
-    locant.
+    """
+    Place parent ``-ide`` before terminal suffixes that cannot follow it.
     """
 
     return place_anion_suffix_operations(
@@ -597,11 +585,7 @@ def apply_cationic_imino_names(name: str, mol: Molecule) -> str:
         return name
     if has_cationic_imidamide:
         name = normalize_cationic_methylideneammonio_substituents(name)
-    # The two rewrites below cannot tell which ``imino`` in the string is the
-    # cationic one, so they are safe only while every C=N in the molecule is
-    # cationic.  A neutral imine alongside a cationic one used to be promoted
-    # too: NC(=[NH2+])[C-](OC=N)C#N called its neutral formimidate an
-    # ``iminiomethoxy``, inventing a second cation the structure does not have.
+
     if _has_neutral_imine(mol):
         return name
     name = name.replace("(imino)methyl", "(iminio)methyl")
@@ -651,12 +635,8 @@ def carbon_has_two_hetero_substituents(mol: Molecule, carbon_idx: int, imino_n_i
 
 
 def normalize_cationic_methylideneammonio_substituents(name: str) -> str:
-    """Bind imidamide/imino-ether cation charge to the exocyclic N atom.
-
-    ``((amino)(alkoxy)methylideneammonio)`` is parsed by OPSIN with the
-    positive charge on the substituent heteroatom.  The ``N-(...)ammonio`` form
-    preserves a graph pattern where the cationic nitrogen is double-bonded to
-    the central carbon.
+    """
+    Bind imidamide/imino-ether cation charge to the exocyclic N atom.
     """
 
     pattern = re.compile(

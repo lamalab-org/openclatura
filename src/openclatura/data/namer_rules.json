@@ -359,7 +359,7 @@
         "atom_symbols": [
           "*"
         ],
-        "suffix_pattern": "-(?:\\d+(?:,\\d+)*)-(?:dione|diamine|aminium)$",
+        "suffix_pattern": "-(?:\\d+(?:,\\d+)*)-(?:dione|diamine|aminium|iminium|diazonium)$",
         "placement": "before_suffix",
         "reason": "Parent anion suffixes must precede terminal characteristic suffix stacks."
       }

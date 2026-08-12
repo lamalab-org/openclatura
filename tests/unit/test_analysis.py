@@ -2022,10 +2022,10 @@ def test_tetraazene_parent_takes_an_ylidene_ligand():
 
 
 def test_a_short_or_charged_nitrogen_chain_leaves_its_own_group_alone():
-    # Diazo, hydrazone and azoxy each own their nitrogens and name them better
-    # than a bare chain parent would.
+    # Diazo and hydrazone each own their nitrogens and name them better than a
+    # bare chain parent would; an azoxy is the chain itself plus an oxide.
     assert name_smiles("[N-]=[N+]=C1CCc2ccccc21") == "1-(diazo)indane"
-    assert name_smiles("COc1ccc(N=[N+]([O-])c2ccccc2)cc1") == ("N-((4-methoxyphenyl)imino)-N-oxidobenzen-1-aminium")
+    assert name_smiles("COc1ccc(N=[N+]([O-])c2ccccc2)cc1") == "2-(4-methoxyphenyl)-1-phenyldiazene 1-oxide"
     # A principal group outside the chain keeps its own parent and suffix.
     assert name_smiles("OCCNN=NN") == "2-(hydrazonohydrazinyl)ethan-1-ol"
 
@@ -5251,8 +5251,8 @@ def test_pyopsin_regression_names_preserve_retained_ring_anions():
         "[NH3+]CC#CC1=NC=N[N-]1": "3-(1,2,4-triazol-1-ide-5-yl)prop-2-yn-1-aminium",
         "CC([NH3+])C1=CN=N[N-]1": "1-(1,2,3-triazol-1-ide-5-yl)ethan-1-aminium",
         "[NH3+]CC1=N[N-]N=N1": "1-(tetrazol-3-ide-5-yl)methanaminium",
-        "[NH3+]C[C-]1OC(=O)C=C1": "5-(ammoniomethyl)-2-oxo-5H-furan-5-ide",
-        "[NH3+]CCC1=N[N-]C(=O)O1": "5-(2-ammonioethyl)-2-oxo-3H-1,3,4-oxadiazol-3-ide",
+        "[NH3+]C[C-]1OC(=O)C=C1": "1-(5-oxo-2H-furan-2-ide-2-yl)methanaminium",
+        "[NH3+]CCC1=N[N-]C(=O)O1": "2-(5-oxo-1,3,4-oxadiazol-4-ide-2-yl)ethan-1-aminium",
     }
 
     for smiles, expected in cases.items():
@@ -5292,10 +5292,11 @@ def test_pyopsin_regression_names_preserve_anionic_carbamoylamino_and_thio_charg
 
 
 def test_pyopsin_regression_names_keep_formate_esters_principal():
+    # Unless a cation outranks the ester, as in the third case.
     cases = {
         "O=COCC#N": "2-nitriloethyl formate",
         "O=COCCC#N": "3-nitrilopropyl formate",
-        "NC(=[NH2+])[C-](OC=O)C#N": "1-amino-1-iminio-3-nitrilopropan-2-ide-2-yl formate",
+        "NC(=[NH2+])[C-](OC=O)C#N": "1-amino-2-cyano-2-formyloxyethan-2-ide-1-iminium",
     }
 
     for smiles, expected in cases.items():
@@ -5304,9 +5305,9 @@ def test_pyopsin_regression_names_keep_formate_esters_principal():
 
 def test_pyopsin_regression_names_preserve_carbanion_suffix_locants():
     cases = {
-        "C[NH2+]CC(=O)[CH-]C=O": "4-(methylammonio)-3-oxobutan-2-ide-1-al",
-        "NC=[NH+][C-](C#N)C#N": "2-(aminomethylideneammonio)propane-2-ide-1,3-dinitrile",
-        "[NH2+]=C1O[C-](C=C1)C#N": "5-iminio-2H-furan-2-ide-2-carbonitrile",
+        "C[NH2+]CC(=O)[CH-]C=O": "N-methyl-2,4-dioxobutan-3-ide-1-aminium",
+        "NC=[NH+][C-](C#N)C#N": "1-amino-N-(1,3-dinitrilopropan-2-ide-2-yl)methaniminium",
+        "[NH2+]=C1O[C-](C=C1)C#N": "5-cyano-5H-furan-5-ide-2-iminium",
     }
 
     for smiles, expected in cases.items():
@@ -5315,7 +5316,7 @@ def test_pyopsin_regression_names_preserve_carbanion_suffix_locants():
 
 def test_pyopsin_regression_names_preserve_zwitterionic_parent_suffix_order():
     cases = {
-        "[NH3+]C1=CC(=O)NC(=O)[CH-]1": "4-ammonio-1H,3H-pyridine-3-ide-2,6-dione",
+        "[NH3+]C1=CC(=O)NC(=O)[CH-]1": "2,6-dioxo-1H,3H-pyridin-3-ide-4-aminium",
         "NC1=NC(N)=[NH+][N-]C1=N": "6-imino-1H-1,2,4-triazin-2-ium-1-ide-3,5-diamine",
         "[NH3+][C-]1C=CC2=C1N=NO2": "2-oxa-3,4-diazabicyclo[3.3.0]octa-1(5),3,7-trien-6-ide-6-aminium",
     }
@@ -5327,12 +5328,9 @@ def test_pyopsin_regression_names_preserve_zwitterionic_parent_suffix_order():
 def test_unclassified_anions_do_not_emit_terminal_locant_ide():
     cases = {
         "NC1=[NH+]C(=N)N=C[N-]1": "4-imino-1,3,5-triazin-1-ide-3-ium-2-amine",
-        # No longer unclassified: the chain-nitrile anion placement gives this
-        # carbanion a verified spelling, and the old neutral name read back as
-        # the +1 cation because it dropped the anion entirely.
-        "NC(=[NH2+])[C-](C#C)C#N": "2-((amino)(iminio)methyl)but-3-yne-2-ide-1-nitrile",
+        "NC(=[NH2+])[C-](C#C)C#N": "1-amino-2-cyanobut-3-yn-2-ide-1-iminium",
         "O=C[C-]1C2C[NH2+]C12C=O": "2-azoniabicyclo[2.1.0]pentane-1,5-dicarbaldehyde",
-        "[NH3+]C1CC(=O)[N-]C1C#N": "3-ammonio-5-oxopyrrolidine-2-carbonitrile",
+        "[NH3+]C1CC(=O)[N-]C1C#N": "2-cyano-5-oxopyrrolidin-1-ide-3-aminium",
     }
 
     for smiles, expected in cases.items():
@@ -5377,10 +5375,10 @@ def test_multiplied_formylamino_names_use_n_locants_not_diformamido():
 
 def test_pyopsin_regression_names_preserve_cationic_imino_charge():
     cases = {
-        "NC(=[NH2+])C1=C(O)N=N[N-]1": "5-((amino)(iminio)methyl)-1,2,3-triazol-1-ide-4-ol",
-        "CNC(=[NH2+])C(CO)=N[O-]": "3-iminio-3-(methylamino)-2-(oxidoimino)propan-1-ol",
-        "NC(=[NH2+])C(CC#C)=N[O-]": "1-iminio-2-(oxidoimino)pent-4-yn-1-amine",
-        "C[NH+]=C(N)C(CO)=N[O-]": "3-amino-3-(methyliminio)-2-(oxidoimino)propan-1-ol",
+        "NC(=[NH2+])C1=C(O)N=N[N-]1": "1-amino-1-(4-hydroxy-1,2,3-triazol-1-ide-5-yl)methaniminium",
+        "CNC(=[NH2+])C(CO)=N[O-]": "3-hydroxy-1-(methylamino)-2-(oxidoimino)propan-1-iminium",
+        "NC(=[NH2+])C(CC#C)=N[O-]": "1-amino-2-(oxidoimino)pent-4-yn-1-iminium",
+        "C[NH+]=C(N)C(CO)=N[O-]": "1-amino-3-hydroxy-N-methyl-2-(oxidoimino)propan-1-iminium",
         "CC(CC([O-])=O)NC=[NH2+]": "3-(iminiomethylamino)butanoate",
         "CN(CC([O-])=O)C=[NH2+]": "2-((iminiomethyl)(methyl)amino)acetate",
         "[O-]C(=O)C(=[NH2+])NC1CC1": "2-(cyclopropylamino)-2-iminioacetate",
@@ -5788,6 +5786,59 @@ def test_azine_retained_and_simple_ring_sides_are_graph_bound():
     assert (
         name_smiles("C1=CC(C=NN=C2SCCS2)C=C1") == "cyclopenta-2,4-dien-1-carbaldehyde 1,3-dithiolan-2-ylidenehydrazone"
     )
+
+
+def test_a_cation_outranks_the_neutral_characteristic_groups():
+    # Cations are the senior class (P-41), so the ketone, the lactone and the
+    # acid all fall back to prefixes and the nitrogen takes the suffix.
+    cases = {
+        "[NH3+]CCCC(C)C(C)=O": "4-methyl-5-oxohexan-1-aminium",
+        "O=C(O)CC[NH3+]": "2-carboxyethan-1-aminium",
+        "C[N+](C)(C)CCO": "2-hydroxy-N,N,N-trimethylethan-1-aminium",
+        "CCCC1CCC(CC1)[NH+](C)Cc2ccc3c(c2)oc(=O)o3": (
+            "N-methyl-N-((2-oxo-1,3-benzodioxol-5-yl)methyl)-4-propylcyclohexanaminium"
+        ),
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_a_zwitterion_keeps_the_anion_as_the_suffix():
+    cases = {
+        "C[N+](C)(C)CC(=O)[O-]": "2-(trimethylammonio)acetate",
+        "[NH3+]CC(=O)[O-]": "2-ammonioacetate",
+        "[NH3+]CCCC(C)C(=O)[O-]": "5-ammonio-2-methylpentanoate",
+        "C[N+](C)(C)CC[S-]": "2-(trimethylammonio)ethane-1-thiolate",
+        "[NH4+].[Cl-]": "azane chloride",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_a_carbon_bound_dinitrogen_cation_is_a_diazonium_suffix():
+    cases = {
+        "c1ccccc1[N+]#N": "benzenediazonium",
+        "c1ccccc1[N+]#N.[Cl-]": "benzenediazonium chloride",
+        "CC[N+]#N": "ethanediazonium",
+        "[N+](#N)c1ccc(cc1)C(=O)O": "4-carboxybenzene-1-diazonium",
+        "[N+](#N)c1ccc(cc1)[O-]": "4-(diazonio)benzen-1-olate",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_an_azoxy_chain_is_a_diazene_oxide():
+    cases = {
+        "c1ccccc1N=[N+]([O-])c1ccccc1": "1,2-diphenyldiazene 1-oxide",
+        "C[N+]([O-])=NC": "1,2-dimethyldiazene 1-oxide",
+        "CN=NC": "1,2-dimethyldiazene",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
 
 
 def test_charged_sulfur_substituent_preserves_sulfanium_center():
