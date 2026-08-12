@@ -186,14 +186,11 @@ def _post_process_name(name: str) -> str:
 
     # Substituted-alkyl acyl contractions (ethyl/propyl) renumber the chain, so their
     # patterns exclude a leading group paren; see _compile_legacy_replacements.
-    for _literal, pattern, new in _LEGACY_COMPILED_REPLACEMENTS:
+    for _, pattern, new in _LEGACY_COMPILED_REPLACEMENTS:
         name = pattern.sub(new, name)
 
     name = apply_data_postprocessing(name)
 
-    # ``ethanoyl`` alone: the acid/amide/nitrile/ester parents are retained names
-    # chosen during assembly now, so only the acyl *substituent* still needs a
-    # rewrite here.
     name = re.sub(r"(?<!m)ethanoyl\b", "acetyl", name)
 
     name = apply_acyl_amido_postprocessing(name)
@@ -280,13 +277,12 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
 
 
 def _drop_stem_indicated_hydrogen(core_name: str, indicated_hydrogens: list[str]) -> str:
-    """Drop a stem's built-in ``1H-`` when the cited set already covers it."""
+    """
+    Drop a stem's built-in ``1H-``; the cited set replaces it.
+    """
 
     match = re.match(r"^(\d+[a-z]?H(?:,\d+[a-z]?H)*)-", core_name)
     if match is None:
-        return core_name
-    stated = {locant.removesuffix("H") for locant in match.group(1).split(",")}
-    if not stated <= set(indicated_hydrogens):
         return core_name
     return core_name[match.end() :]
 
@@ -359,9 +355,7 @@ def _add_front_modifiers(parts: AssemblyParts, final_word: str) -> str:
     mods = parts.front_modifiers
     locants = parts.front_modifier_locants
     have_locants = len(locants) == len(mods) and all(loc is not None for loc in locants)
-    # Unsymmetrical polyacid esters need locants so each alkyl pairs with its own
-    # carboxyl (e.g. 1-tert-butyl 2-methyl ...dicarboxylate); a single ester or a
-    # symmetrical one keeps the simpler unlocanted (multiplied) form.
+
     if have_locants and len(set(mods)) > 1:
         by_name: dict[str, list[str]] = {}
         for mod, loc in zip(mods, locants):

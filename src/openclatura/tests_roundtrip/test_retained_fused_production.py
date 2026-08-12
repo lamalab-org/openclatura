@@ -412,3 +412,23 @@ def test_hydro_oxo_analogs_do_not_false_match_mancude_production_plans():
     assert "acridin" not in generated_names[1]
     assert "xanthen" not in generated_names[2]
     assert _normalized_pairs_match(opsin_smiles, regenerated_smiles)
+
+
+@pytest.mark.opsin
+def test_pyrrolo_2_3_b_indole_names_the_retained_parent_not_von_baeyer():
+    """Issue #78: the pyrrolindoline core was falling back to von Baeyer."""
+
+    opsin_names = [
+        "1H-pyrrolo[2,3-b]indole",
+        "3,3a-dihydro-1H-pyrrolo[2,3-b]indole",
+        "methyl 7-chloro-4-methoxy-3,3a-dihydropyrrolo[2,3-b]indole-1(2H)-carboxylate",
+    ]
+    opsin_smiles = _opsin(opsin_names)
+    generated_names = [result.name for result in name_many(opsin_smiles, processes=1)]
+
+    assert generated_names == [
+        "1H,8H-pyrrolo[2,3-b]indole",
+        "3,3a-dihydro-1H-pyrrolo[2,3-b]indole",
+        "methyl 7-chloro-4-methoxy-3,3a-dihydro-1H-pyrrolo[2,3-b]indole-1-carboxylate",
+    ]
+    assert _normalized_pairs_match(opsin_smiles, _opsin(generated_names))

@@ -229,7 +229,18 @@ def _match_all_retained_fused_template(
 
     assignments = _match_locants_backtracking(mol, locants_by_constraint, candidates, template_neighbors)
     if not allow_relocated_indicated_h:
-        return [_template_match_from_assignment(template, atom_set, assignment) for assignment in assignments]
+        derive = not template.default_indicated_h and template.indicated_hydrogen_count > 0
+        return [
+            _template_match_from_assignment(
+                template,
+                atom_set,
+                assignment,
+                indicated_h=(
+                    _relocated_indicated_h(mol, template, atom_set, assignment, strict=True) if derive else None
+                ),
+            )
+            for assignment in assignments
+        ]
     relocated = [
         (assignment, indicated_h)
         for assignment in assignments
@@ -242,19 +253,25 @@ def _match_all_retained_fused_template(
 
 
 def _relocatable_atom_by_locant(template: RetainedFusedGraphTemplate) -> dict[str, RetainedFusedAtomTemplate]:
-    """The template with its declared carbon indicated-H site free to move.
+    """The template with its indicated-H site free to move."""
 
-    Nitrogen sites stay pinned: they are what tells 1H- from 3H-.
-    """
-
-    return {
-        locant: (
-            replace(atom, saturated=False, default_h=False)
-            if locant in template.default_indicated_h and atom.symbol == "C"
-            else atom
-        )
-        for locant, atom in template.atom_by_locant.items()
+    movable = {
+        atom.symbol
+        for atom in template.atoms
+        if not atom.aromatic
+        and not atom.fusion
+        and atom.symbol != "C"
+        and atom.symbol not in FIXED_SATURATED_RING_ELEMENTS
     }
+    relocatable: dict[str, RetainedFusedAtomTemplate] = {}
+    for locant, atom in template.atom_by_locant.items():
+        if locant in template.default_indicated_h and atom.symbol == "C":
+            relocatable[locant] = replace(atom, saturated=False, default_h=False)
+        elif atom.symbol in movable and not atom.fusion:
+            relocatable[locant] = replace(atom, aromatic=False, default_h=False)
+        else:
+            relocatable[locant] = atom
+    return relocatable
 
 
 def _relocated_indicated_h(
@@ -262,8 +279,10 @@ def _relocated_indicated_h(
     template: RetainedFusedGraphTemplate,
     atom_set: set[int],
     assignment: dict[str, int],
+    *,
+    strict: bool = False,
 ) -> tuple[str, ...] | None:
-    """Where the indicated hydrogen sits here, or None for a hydro derivative."""
+    """Where the indicated hydrogen sits here, or None if the ring is too unsaturated."""
 
     saturated = tuple(
         locant
@@ -271,9 +290,13 @@ def _relocated_indicated_h(
         if template.atom_by_locant[locant].symbol not in FIXED_SATURATED_RING_ELEMENTS
         and _is_saturated_site(mol, assignment[locant], atom_set)
     )
-    if len(saturated) != template.indicated_hydrogen_count:
+    needed = template.indicated_hydrogen_count
+    if len(saturated) < needed:
         return None
-    return saturated
+    movable = [locant for locant in saturated if not _is_retained_oxo_site(mol, assignment[locant])]
+    if len(movable) < needed or (strict and len(movable) != needed):
+        return None
+    return tuple(sorted(movable, key=_locant_sort_key)[:needed])
 
 
 def _template_match_from_assignment(
@@ -565,12 +588,27 @@ def _atom_matches_template(
         and not _is_retained_oxo_site(mol, atom_idx)
     ):
         return False
+    if _cumulated_ring_site(mol, atom_idx, ring_atoms):
+        return False
     if atom_template.default_h and atom.explicit_h_count + atom.total_h_count <= 0:
         return False
     # Tells 2H- from 4H-1-benzopyran: the position must really be saturated.
     if atom_template.saturated and not _is_saturated_site(mol, atom_idx, ring_atoms):
         return False
     return True
+
+
+def _cumulated_ring_site(mol: Molecule, atom_idx: int, ring_atoms=None) -> bool:
+    """Whether the atom carries two ring double bonds, as in a cumulated triene."""
+
+    doubles = sum(
+        1
+        for neighbor in mol.get_neighbors(atom_idx)
+        if (ring_atoms is None or neighbor in ring_atoms)
+        and (bond := mol.get_bond(atom_idx, neighbor)) is not None
+        and bond.order == 2
+    )
+    return doubles > 1
 
 
 def _is_saturated_site(mol: Molecule, atom_idx: int, ring_atoms=None) -> bool:

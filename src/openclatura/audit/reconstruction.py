@@ -62,6 +62,75 @@ from .von_baeyer_parse import build_spiro_skeleton as _build_spiro_skeleton
 Verdict = Literal["confirmed", "abstained", "mismatch", "error"]
 
 
+_STEM_INDICATED_H_RE = re.compile(r"^(\d+[a-z]?)H(?:,(\d+[a-z]?)H)*-")
+
+
+_REPLACEMENT_ELEMENTS: dict[str, str] = _elements.SYMBOLS_BY_HW_STEM
+
+_PARENT_RING_TEMPLATES: dict[str, tuple[str, list[str]]] = {
+    "benzene": ("c1ccccc1", ["1", "2", "3", "4", "5", "6"]),
+    "pyridine": ("n1ccccc1", ["1", "2", "3", "4", "5", "6"]),
+    "pyrazine": ("n1ccncc1", ["1", "2", "3", "4", "5", "6"]),
+    "pyrimidine": ("n1cnccc1", ["1", "2", "3", "4", "5", "6"]),
+    "pyridazine": ("n1ncccc1", ["1", "2", "3", "4", "5", "6"]),
+    "furan": ("o1cccc1", ["1", "2", "3", "4", "5"]),
+    "thiophene": ("s1cccc1", ["1", "2", "3", "4", "5"]),
+    "pyrrole": ("[nH]1cccc1", ["1", "2", "3", "4", "5"]),
+    "piperidine": ("N1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "piperazine": ("N1CCNCC1", ["1", "2", "3", "4", "5", "6"]),
+    "morpholine": ("O1CCNCC1", ["1", "2", "3", "4", "5", "6"]),
+    "pyrrolidine": ("N1CCCC1", ["1", "2", "3", "4", "5"]),
+    "oxolane": ("O1CCCC1", ["1", "2", "3", "4", "5"]),
+    "tetrahydrofuran": ("O1CCCC1", ["1", "2", "3", "4", "5"]),
+    "oxane": ("O1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "tetrahydropyran": ("O1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "selenophene": ("[se]1cccc1", ["1", "2", "3", "4", "5"]),
+    "tellurophene": ("[te]1cccc1", ["1", "2", "3", "4", "5"]),
+    "phosphole": ("[pH]1cccc1", ["1", "2", "3", "4", "5"]),
+    "arsole": ("[AsH]1C=CC=C1", ["1", "2", "3", "4", "5"]),
+    "borole": ("B1C=CC=C1", ["1", "2", "3", "4", "5"]),
+    "pentazole": ("[nH]1nnnn1", ["1", "2", "3", "4", "5"]),
+    "phosphinine": ("p1ccccc1", ["1", "2", "3", "4", "5", "6"]),
+    "borinine": ("B1=CC=CC=C1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,3,4-tetrazine": ("N1=NN=NC=C1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,3,5-tetrazine": ("N1=NN=CN=C1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,4,5-tetrazine": ("N1=NC=NN=C1", ["1", "2", "3", "4", "5", "6"]),
+    "pyran": ("O1CC=CC=C1", ["1", "2", "3", "4", "5", "6"]),
+    "thiopyran": ("S1CC=CC=C1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-dioxolane": ("O1OCCC1", ["1", "2", "3", "4", "5"]),
+    "1,3-dioxolane": ("O1COCC1", ["1", "2", "3", "4", "5"]),
+    "1,2-dithiolane": ("S1SCCC1", ["1", "2", "3", "4", "5"]),
+    "1,3-dithiolane": ("S1CSCC1", ["1", "2", "3", "4", "5"]),
+    "1,2-oxathiolane": ("O1SCCC1", ["1", "2", "3", "4", "5"]),
+    "1,3-oxathiolane": ("O1CSCC1", ["1", "2", "3", "4", "5"]),
+    "1,2-dioxane": ("O1OCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-dioxane": ("O1COCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,4-dioxane": ("O1CCOCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-dithiane": ("S1SCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-dithiane": ("S1CSCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,4-dithiane": ("S1CCSCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-oxathiane": ("O1SCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-oxathiane": ("O1CSCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,4-oxathiane": ("O1CCSCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-diazinane": ("N1NCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-diazinane": ("N1CNCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-oxazinane": ("O1NCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-oxazinane": ("O1CNCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2-thiazinane": ("S1NCCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3-thiazinane": ("S1CNCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,3-triazinane": ("N1NNCCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,2,4-triazinane": ("N1NCNCC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3,5-triazinane": ("N1CNCNC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3,5-trioxane": ("O1COCOC1", ["1", "2", "3", "4", "5", "6"]),
+    "1,3,5-trithiane": ("S1CSCSC1", ["1", "2", "3", "4", "5", "6"]),
+}
+
+_ALL_PARENT_TEMPLATES: dict[str, tuple[str, list[str]]] = {
+    **_SUBSTITUENT_RING_STEMS,
+    **_PARENT_RING_TEMPLATES,
+}
+
+
 @dataclass(frozen=True)
 class ReconstructionAudit:
     """Outcome of rebuilding a component from its name and comparing to input.
@@ -121,86 +190,6 @@ class ReconstructionAudit:
         }
 
 
-# --------------------------------------------------------------------------- #
-# Element / template tables (all name-derived, never graph-derived)
-# --------------------------------------------------------------------------- #
-
-# Replacement ("a") prefixes -> element symbol, shared with the von Baeyer parser
-# and derived from the same element table the namer writes them from.
-_REPLACEMENT_ELEMENTS: dict[str, str] = _elements.SYMBOLS_BY_HW_STEM
-
-# Retained monocyclic parent rings whose IUPAC locants map straight onto the
-# atom order of the SMILES below (heteroatom = locant 1).  Only rings whose
-# numbering is unambiguous under this convention are listed; anything else
-# abstains rather than risk a mislabelled locant.
-_PARENT_RING_TEMPLATES: dict[str, tuple[str, list[str]]] = {
-    "benzene": ("c1ccccc1", ["1", "2", "3", "4", "5", "6"]),
-    "pyridine": ("n1ccccc1", ["1", "2", "3", "4", "5", "6"]),
-    "pyrazine": ("n1ccncc1", ["1", "2", "3", "4", "5", "6"]),
-    "pyrimidine": ("n1cnccc1", ["1", "2", "3", "4", "5", "6"]),
-    "pyridazine": ("n1ncccc1", ["1", "2", "3", "4", "5", "6"]),
-    "furan": ("o1cccc1", ["1", "2", "3", "4", "5"]),
-    "thiophene": ("s1cccc1", ["1", "2", "3", "4", "5"]),
-    "pyrrole": ("[nH]1cccc1", ["1", "2", "3", "4", "5"]),
-    "piperidine": ("N1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "piperazine": ("N1CCNCC1", ["1", "2", "3", "4", "5", "6"]),
-    "morpholine": ("O1CCNCC1", ["1", "2", "3", "4", "5", "6"]),
-    "pyrrolidine": ("N1CCCC1", ["1", "2", "3", "4", "5"]),
-    "oxolane": ("O1CCCC1", ["1", "2", "3", "4", "5"]),
-    "tetrahydrofuran": ("O1CCCC1", ["1", "2", "3", "4", "5"]),
-    "oxane": ("O1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "tetrahydropyran": ("O1CCCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "selenophene": ("[se]1cccc1", ["1", "2", "3", "4", "5"]),
-    "tellurophene": ("[te]1cccc1", ["1", "2", "3", "4", "5"]),
-    "phosphole": ("[pH]1cccc1", ["1", "2", "3", "4", "5"]),
-    "arsole": ("[AsH]1C=CC=C1", ["1", "2", "3", "4", "5"]),
-    "borole": ("B1C=CC=C1", ["1", "2", "3", "4", "5"]),
-    "pentazole": ("[nH]1nnnn1", ["1", "2", "3", "4", "5"]),
-    "phosphinine": ("p1ccccc1", ["1", "2", "3", "4", "5", "6"]),
-    "borinine": ("B1=CC=CC=C1", ["1", "2", "3", "4", "5", "6"]),
-    "1,2,3,4-tetrazine": ("N1=NN=NC=C1", ["1", "2", "3", "4", "5", "6"]),
-    "1,2,3,5-tetrazine": ("N1=NN=CN=C1", ["1", "2", "3", "4", "5", "6"]),
-    "1,2,4,5-tetrazine": ("N1=NC=NN=C1", ["1", "2", "3", "4", "5", "6"]),
-    "pyran": ("O1CC=CC=C1", ["1", "2", "3", "4", "5", "6"]),
-    "thiopyran": ("S1CC=CC=C1", ["1", "2", "3", "4", "5", "6"]),
-    "1,2-dioxolane": ("O1OCCC1", ["1", "2", "3", "4", "5"]),
-    "1,3-dioxolane": ("O1COCC1", ["1", "2", "3", "4", "5"]),
-    "1,2-dithiolane": ("S1SCCC1", ["1", "2", "3", "4", "5"]),
-    "1,3-dithiolane": ("S1CSCC1", ["1", "2", "3", "4", "5"]),
-    "1,2-oxathiolane": ("O1SCCC1", ["1", "2", "3", "4", "5"]),
-    "1,3-oxathiolane": ("O1CSCC1", ["1", "2", "3", "4", "5"]),
-    "1,2-dioxane": ("O1OCCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,3-dioxane": ("O1COCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,4-dioxane": ("O1CCOCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,2-dithiane": ("S1SCCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,3-dithiane": ("S1CSCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,4-dithiane": ("S1CCSCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,2-oxathiane": ("O1SCCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,3-oxathiane": ("O1CSCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,4-oxathiane": ("O1CCSCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,2-diazinane": ("N1NCCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,3-diazinane": ("N1CNCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,2-oxazinane": ("O1NCCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,3-oxazinane": ("O1CNCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,2-thiazinane": ("S1NCCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,3-thiazinane": ("S1CNCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,2,3-triazinane": ("N1NNCCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,2,4-triazinane": ("N1NCNCC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,3,5-triazinane": ("N1CNCNC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,3,5-trioxane": ("O1COCOC1", ["1", "2", "3", "4", "5", "6"]),
-    "1,3,5-trithiane": ("S1CSCSC1", ["1", "2", "3", "4", "5", "6"]),
-}
-
-# Retained parents reuse the (OPSIN-validated) substituent ring-stem templates —
-# same SMILES and IUPAC locant labels — so fused retained parents (naphthalene,
-# indole, quinoline, benzothiazole …) reconstruct too.  Parent-specific entries
-# win on any key overlap.
-_ALL_PARENT_TEMPLATES: dict[str, tuple[str, list[str]]] = {
-    **_SUBSTITUENT_RING_STEMS,
-    **_PARENT_RING_TEMPLATES,
-}
-
-
 def _functional_parent_hydrides() -> dict[str, str]:
     """Retained functional parent -> the parent hydride it is built on.
 
@@ -237,16 +226,9 @@ def _lookup_parent_template(retained_name: str) -> tuple[str, list[str]] | None:
     hydride = _functional_parent_hydrides().get(retained_name)
     if hydride is not None and hydride in _ALL_PARENT_TEMPLATES:
         return _ALL_PARENT_TEMPLATES[hydride]
-    # A Hantzsch-Widman parent the namer spelled rather than looked up is in no
-    # table, so its skeleton is built from the same spec the name came from.
     return hw_parent_template(retained_name)
 
 
-# Principal characteristic groups whose structure we can rebuild with high
-# confidence.  Each entry describes atoms bonded onto the *characteristic atom*
-# as (element, bond_order) pairs.  ``exocyclic`` groups add a new carbon (bearing
-# those atoms) attached to the parent locant atom; direct groups decorate the
-# parent locant atom itself.  Every other key abstains.
 _DIRECT_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int], ...]] = {
     "alcohol": (("O", 1),),
     "thiol": (("S", 1),),
@@ -264,7 +246,6 @@ _DIRECT_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int], ...]] = {
     "acid_bromide": (("O", 2), ("Br", 1)),
     "acid_iodide": (("O", 2), ("I", 1)),
 }
-# Ring ("carb...") variants: a new carbon carries the same decoration.
 _EXOCYCLIC_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int], ...]] = {
     "ring_aldehyde": (("O", 2),),
     "ring_carboxylic_acid": (("O", 2), ("O", 1)),
@@ -276,19 +257,12 @@ _EXOCYCLIC_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int], ...]] = {
     "ring_acid_bromide": (("O", 2), ("Br", 1)),
     "ring_acid_iodide": (("O", 2), ("I", 1)),
 }
-# Oxo-acid groups whose characteristic atom is a heteroatom *hub* bonded to the
-# parent locant atom, itself decorated with the oxo/hydroxy atoms:
-# ``R-S(=O)(=O)-OH`` etc.  Value: (hub element, decoration atoms).
 _HUB_ACID_GROUPS: dict[str, tuple[str, tuple[tuple[str, int], ...]]] = {
     "sulfonic_acid": ("S", (("O", 2), ("O", 2), ("O", 1))),
     "sulfinic_acid": ("S", (("O", 2), ("O", 1))),
     "phosphonic_acid": ("P", (("O", 2), ("O", 1), ("O", 1))),
 }
 
-# Suffix groups whose characteristic atoms form a short chain rather than a set
-# of atoms hung directly off the locant atom.  Value: SMILES of the added
-# fragment, whose first atom bonds to the locant atom with the encoded order.
-# ``ring_`` variants add their own carbon first, as the ``carb…`` suffixes do.
 _FRAGMENT_SUFFIX_GROUPS: dict[str, str] = {
     "hydrazone": "=NN",
     "aldehyde_hydrazone": "=NN",
@@ -310,9 +284,6 @@ class _Abstain(Exception):
         self.reason = reason
 
 
-# --------------------------------------------------------------------------- #
-# Public entry point
-# --------------------------------------------------------------------------- #
 def audit_component_reconstruction(
     mol: Molecule, parts, component_atoms: set[int] | None = None
 ) -> ReconstructionAudit:
@@ -333,20 +304,11 @@ def audit_component_reconstruction(
             mol, atoms, parts, reference
         )
 
-        # Stereo descriptors embedded in substituent terms are tagged onto the
-        # rebuilt graph; verifying them against the input's independent CIP needs
-        # the constitution to line up, so it runs after the structural rebuild.
         verified_atoms, verified_bonds = (
             _verify_tagged_stereo(rebuilt, mol, atoms) if rebuilt is not None else (set(), set())
         )
         stereo = audit_stereochemistry(mol, parts, atoms, verified_atoms, verified_bonds)
 
-        # Only signals we can trust as *refutations* harden into ``mismatch``:
-        #   * the independent structural reconstruction disagreed, or
-        #   * the name provably left graph atoms unnamed.
-        # Stereo problems, and anything the reconstruction could not model, only
-        # *block confirmation* (they downgrade to ``abstained``) — never claim a
-        # name is wrong on evidence too weak to prove it.
         hard_reasons: list[str] = []
         if structural_verdict == "mismatch":
             hard_reasons.append(structural_reason)
@@ -387,10 +349,6 @@ def _structural_verdict(mol, atoms, parts, reference) -> tuple[str, str, str | N
         return "abstained", "input constitution not comparable (charge/isotope/sanitize)", None, None
     if any(mol.atoms[a].isotope for a in atoms):
         return "abstained", "isotopically-labelled species not modelled", None, None
-    # Net-charged (ionic) species are not modelled, but net-neutral charge
-    # separation inside a group (nitro, N-oxide, azide, diazo …) is: those
-    # charges are carried by the reconstructed fragment and compared like any
-    # other constitution. Charged parents are still caught in _reconstruct_from_parts.
     if sum(mol.atoms[a].charge for a in atoms) != 0:
         return "abstained", "net-charged (ionic) species not modelled", None, None
     try:
@@ -405,9 +363,6 @@ def _structural_verdict(mol, atoms, parts, reference) -> tuple[str, str, str | N
     return "mismatch", f"reconstructed {reconstructed!r} != input {reference!r}", reconstructed, rebuilt
 
 
-# --------------------------------------------------------------------------- #
-# Independent verification of name-asserted (substituent-embedded) stereo
-# --------------------------------------------------------------------------- #
 def _verify_tagged_stereo(rebuilt: Chem.Mol, mol: Molecule, atoms: set[int]) -> tuple[set[int], set[int]]:
     """Input atom ids and bond ids whose name-asserted stereo tag agrees with the
     input's independent CIP under *some* constitution isomorphism between the
@@ -529,9 +484,6 @@ def _input_rdmol_with_cip(mol: Molecule, atoms: set[int]) -> tuple[Chem.Mol | No
     return m, rev
 
 
-# --------------------------------------------------------------------------- #
-# Reference: the input component as canonical, stereo-free SMILES
-# --------------------------------------------------------------------------- #
 def _component_reference_smiles(mol: Molecule, atoms: set[int]) -> str | None:
     rw = Chem.RWMol()
     idx_map: dict[int, int] = {}
@@ -628,9 +580,6 @@ def _promote_charge_pair(mol: Chem.Mol, bond_idx: int, positive_idx: int, negati
     return candidate
 
 
-# --------------------------------------------------------------------------- #
-# Reconstruction from name-level parts
-# --------------------------------------------------------------------------- #
 def _reconstruct_from_parts(parts) -> Chem.RWMol:
     """Rebuild the component skeleton from ``parts``; raise ``_Abstain`` if any
     construct is not modelled."""
@@ -639,16 +588,9 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
     if getattr(parts, "is_substituent", False):
         raise _Abstain("substituent component (audited via recursion, not here)")
     if parts.front_modifiers and not _is_ester_component(parts):
-        # Front modifiers we model are ester/sulfonate esterifying groups; other
-        # uses are not reconstructed.
         raise _Abstain("front modifiers not modelled")
     if parts.parent_charges:
         raise _Abstain("parent charges not modelled")
-    # Saturation of a mancude template comes in two spellings that mean the same
-    # thing structurally: indicated hydrogen (1H-, 9H-) and added hydrogen
-    # (3,7-dihydro-). Once more than one position is involved they interact — the
-    # ring's remaining double bonds have to move to accommodate all of them at
-    # once — so both are collected here and realised together below.
     saturated = _saturated_locants(parts)
     ring_ketone = parts.principal_group is not None and parts.principal_group.key == "ketone"
     rebuild_unsaturation = has_template and (
@@ -662,7 +604,6 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
         raise _Abstain("principal-suffix modifiers not modelled")
 
     rw, locants, aromatic_ring = _build_parent(parts)
-    # A ring ketone saturates its position as a cited hydrogen does.
     implied = _implied_ketone_saturation(rw, locants, parts) if ring_ketone and aromatic_ring else set()
     rebuild_unsaturation = rebuild_unsaturation or bool(implied)
     template_idxs: tuple[int, ...] = ()
@@ -671,16 +612,12 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
         template_idxs, saturated_idxs = _open_mancude_template(rw, locants, saturated)
         saturated_idxs |= implied
     elif parts.indicated_hydrogens and not move_indicated_hydrogen(rw, locants, parts.indicated_hydrogens[0]):
-        # A single cited position (2H-indazole, 9H-purine) is another N-H tautomer
-        # of the stored template, reachable by moving that one hydrogen.
         raise _Abstain(f"indicated hydrogen {parts.indicated_hydrogens[0]} not placeable")
     _apply_replacements(rw, locants, parts, aromatic_ring)
     _apply_unsaturations(rw, locants, parts, aromatic_ring)
     _apply_principal_group(rw, locants, parts)
     _apply_substituents(rw, locants, parts)
     if rebuild_unsaturation:
-        # Last, so the suffixes and substituents have already claimed the
-        # positions that carry an exocyclic double bond instead of a ring one.
         _close_mancude_template(rw, template_idxs, saturated_idxs)
     return rw
 
@@ -694,10 +631,26 @@ def _saturated_locants(parts) -> tuple[str, ...]:
     indicated-hydrogen count), not a structural difference."""
 
     locants = [str(loc) for loc in parts.indicated_hydrogens]
-    for operation in parts.hydro_operations:
-        if operation.operation_kind == "additive_hydrogen":
-            locants += [str(loc) for loc in operation.locants]
-    return tuple(dict.fromkeys(locants))
+    added = [
+        str(loc)
+        for operation in parts.hydro_operations
+        if operation.operation_kind == "additive_hydrogen"
+        for loc in operation.locants
+    ]
+    if added and not locants:
+        locants = _stem_indicated_hydrogen_locants(parts.retained_name)
+    return tuple(dict.fromkeys(locants + added))
+
+
+def _stem_indicated_hydrogen_locants(retained_name: str | None) -> list[str]:
+    """The indicated-hydrogen locants a parent stem spells for itself."""
+
+    if not retained_name:
+        return []
+    match = _STEM_INDICATED_H_RE.match(retained_name)
+    if match is None:
+        return []
+    return [token.removesuffix("H") for token in match.group(0).rstrip("-").split(",")]
 
 
 def _open_mancude_template(
@@ -720,7 +673,6 @@ def _open_mancude_template(
         if idx is None:
             raise _Abstain(f"saturated position {locant} outside parent")
         saturated_idxs.add(idx)
-    # Only template atoms exist at this point; substituents come later.
     template_idxs = tuple(range(rw.GetNumAtoms()))
     for bond in rw.GetBonds():
         bond.SetIsAromatic(False)
@@ -728,9 +680,6 @@ def _open_mancude_template(
     for idx in template_idxs:
         atom = rw.GetAtomWithIdx(idx)
         atom.SetIsAromatic(False)
-        # Hand hydrogen counting back to RDKit: a saturated N ends up with its
-        # N-H, and a position that later gets a double bond or a substituent
-        # loses the H again, without this code having to track either.
         atom.SetNoImplicit(False)
         atom.SetNumExplicitHs(0)
     return template_idxs, saturated_idxs
@@ -798,9 +747,6 @@ def _close_mancude_template(rw: Chem.RWMol, template_idxs: tuple[int, ...], satu
         if bond.GetBeginAtomIdx() in pending and bond.GetEndAtomIdx() in pending
     ]
 
-    # Matching each position against its lowest-indexed free partner enumerates
-    # every perfect matching exactly once. The cap bounds the work on a large
-    # fused system; hitting it means the placement is not pinned down anyway.
     solutions: list[tuple[int, ...]] = []
 
     def search(remaining: frozenset[int], chosen: tuple[int, ...]) -> None:
@@ -833,8 +779,6 @@ def _close_mancude_template(rw: Chem.RWMol, template_idxs: tuple[int, ...], satu
         rw.GetBondWithIdx(bond_idx).SetBondType(Chem.BondType.DOUBLE)
 
 
-# Enough to cover the Kekulé freedom of a few untouched rings without letting a
-# large fused system enumerate matchings indefinitely.
 _MAX_RING_BOND_PLACEMENTS = 16
 
 
@@ -851,10 +795,6 @@ def _placement_structure(rw: Chem.RWMol, solution: tuple[int, ...]) -> str | Non
 def _build_parent(parts) -> tuple[Chem.RWMol, dict[str, int], bool]:
     """Return (editable mol, locant->idx, is_aromatic_template)."""
 
-    # Retained parents (mono- or fused) reconstruct from their template first.
-    # The retained *chain* names have no ring template and need none: they name a
-    # plain carbon chain of the length the parts already record, so they fall
-    # through to the chain builder below.
     if parts.retained_name is not None and not _is_retained_chain_parent(parts.retained_name):
         template = _lookup_parent_template(parts.retained_name)
         if template is None:
@@ -888,7 +828,6 @@ def _build_parent(parts) -> tuple[Chem.RWMol, dict[str, int], bool]:
         return rw, locants, False
 
     if parts.is_ring:
-        # plain carbocycle
         n = parts.parent_length
         if n < 3:
             raise _Abstain("degenerate ring size")
@@ -922,9 +861,6 @@ def _apply_replacements(rw: Chem.RWMol, locants: dict[str, int], parts, aromatic
         if aromatic_ring:
             raise _Abstain("replacement on a retained aromatic template not modelled")
         for locant in item.locants:
-            # ``1lambda^6`` is position 1 wearing a lambda-convention valence; the
-            # extra bonds come from the oxo prefixes grafted later, so only the
-            # position matters here.
             idx = locants.get(_LAMBDA_RE.sub("", str(locant)))
             if idx is None:
                 raise _Abstain(f"replacement locant {locant} outside parent")
@@ -934,8 +870,6 @@ def _apply_replacements(rw: Chem.RWMol, locants: dict[str, int], parts, aromatic
 def _replacement_element(name: str) -> str | None:
     if name in _REPLACEMENT_ELEMENTS:
         return _REPLACEMENT_ELEMENTS[name]
-    # ``trioxa`` names the same element as ``oxa``; how many there are comes from
-    # the cited locants, so only the element is read back here.
     for _count, rest in _multipliers.candidate_splits(name):
         if rest in _REPLACEMENT_ELEMENTS:
             return _REPLACEMENT_ELEMENTS[rest]
@@ -984,11 +918,6 @@ def _next_locant_idx(locants: dict[str, int], locant: str, is_ring: bool) -> int
     return None
 
 
-# Ester-type principal groups: an esterifying group (the "ethyl" of "ethyl
-# benzoate") is carried as a front modifier and closes the acid as -O-R.
-#   direct    : acid carbon is in-chain    -> C(=O)-O-R at the locant atom
-#   exocyclic : acid carbon is added        -> ring-C(=O)-O-R
-#   sulfonate : exocyclic S(=O)(=O)-O-R
 _ESTER_DIRECT = {"ester", "carboxylate"}
 _ESTER_EXOCYCLIC = {"ring_carboxylate"}
 _ESTER_SULFONATE = {"sulfonate"}
@@ -1031,9 +960,6 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts) -> No
                 raise _Abstain(f"principal-group locant {locant} outside parent")
             first_new = rw.GetNumAtoms()
             _graft(rw, base_idx, added)
-            # A hydrazone's ``N`` locant is its *terminal* nitrogen — ``benzaldehyde
-            # N-phenylhydrazone`` is ``PhNH-N=CHPh`` — and that is the only nitrogen
-            # the graft leaves with a single neighbour.
             terminal_nitrogens += [
                 idx
                 for idx in range(first_new, rw.GetNumAtoms())
@@ -1124,7 +1050,6 @@ def _decorate(rw: Chem.RWMol, base_idx: int, atoms: tuple[tuple[str, int], ...])
     return nitrogens
 
 
-# Side-ring suffixes we can express as an equivalent prefix on the ring.
 _SPIRO_SUFFIX_PREFIXES = {"one": "oxo", "ol": "hydroxy", "thione": "thioxo"}
 
 
@@ -1165,10 +1090,6 @@ def _fuse_spiro(rw: Chem.RWMol, base_idx: int, frag: Chem.Mol) -> None:
         raise _Abstain("spiro side ring has no single attachment point")
     shared = dummy.GetNeighbors()[0]
     if not shared.IsInRing():
-        # A spiro union joins two *rings* at a shared atom.  A side that resolves
-        # to a chain means the name is not describing a spiro assembly we can
-        # rebuild, and fusing it anyway would invent a structure to compare
-        # against — so abstain rather than manufacture a disagreement.
         raise _Abstain("spiro side is not a ring")
     dropped = {dummy.GetIdx(), shared.GetIdx()}
     frag_to_new: dict[int, int] = {}

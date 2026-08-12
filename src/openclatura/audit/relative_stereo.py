@@ -48,7 +48,6 @@ def ring_face_relation(rdmol: Chem.Mol, atom_a: int, atom_b: int) -> str | None:
         substituent = _sole_exocyclic_substituent(mol, atom_idx, ring)
         if substituent is None:
             return None
-        # One fixed traversal direction, shared by both centres.
         predecessor = ring[(position[atom_idx] - 1) % size]
         successor = ring[(position[atom_idx] + 1) % size]
         parity = _face_parity(mol.GetAtomWithIdx(atom_idx), predecessor, successor, substituent)

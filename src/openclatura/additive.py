@@ -54,8 +54,10 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         _add_monocycle_hydro(parts, plan, get_loc)
         return
 
-    name_states_indicated_h = not cites_indicated_hydrogen(parts.retained_name)
     metadata = parts.retained_parent_metadata
+    name_states_indicated_h = not cites_indicated_hydrogen(parts.retained_name) and not (
+        metadata is not None and metadata.relocated_indicated_h
+    )
     if name_states_indicated_h and metadata is None:
         return
     # A saturated parent has no mancude bond to hydrogenate.

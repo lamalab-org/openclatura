@@ -608,9 +608,11 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                     consumed.update([atom.idx])
 
     for atom in mol:
-        if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
+        if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms and not atom.charge:
             c_neighbors = [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].is_carbon]
-            n_neighbors = [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "N"]
+            n_neighbors = [
+                n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "N" and not mol.atoms[n].charge
+            ]
 
             if len(n_neighbors) > 0:
                 n2 = n_neighbors[0]
