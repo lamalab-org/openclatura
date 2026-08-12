@@ -294,6 +294,8 @@ def _relocated_indicated_h(
     if len(saturated) < needed:
         return None
     movable = [locant for locant in saturated if not _is_retained_oxo_site(mol, assignment[locant])]
+    # A ring oxo carbon is itself an sp3 site, so it needs no cited hydrogen.
+    needed = max(0, needed - (len(saturated) - len(movable)))
     if len(movable) < needed or (strict and len(movable) != needed):
         return None
     return tuple(sorted(movable, key=_locant_sort_key)[:needed])
