@@ -2443,7 +2443,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,4-phenanthroline"
     },
     {
       "name": "1,5-phenanthroline",
@@ -2673,7 +2674,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,5-phenanthroline"
     },
     {
       "name": "1,6-phenanthroline",
@@ -2903,7 +2905,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,6-phenanthroline"
     },
     {
       "name": "1,7-phenanthroline",
@@ -3133,7 +3136,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,7-phenanthroline"
     },
     {
       "name": "1,8-phenanthroline",
@@ -3363,7 +3367,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,8-phenanthroline"
     },
     {
       "name": "1,9-phenanthroline",
@@ -3593,7 +3598,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,9-phenanthroline"
     },
     {
       "name": "2,7-phenanthroline",
@@ -3823,7 +3829,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "2,7-phenanthroline"
     },
     {
       "name": "2,8-phenanthroline",
@@ -4053,7 +4060,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "2,8-phenanthroline"
     },
     {
       "name": "3,5-phenanthroline",
@@ -4283,7 +4291,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "3,5-phenanthroline"
     },
     {
       "name": "3,6-phenanthroline",
@@ -4513,7 +4522,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "3,6-phenanthroline"
     },
     {
       "name": "4,5-phenanthroline",
@@ -4743,7 +4753,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "4,5-phenanthroline"
     },
     {
       "name": "acridine",
@@ -8232,7 +8243,8 @@
         "mancude_double_bonds": 4,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "purine"
     },
     {
       "name": "carbazole",
@@ -8452,7 +8464,8 @@
         "mancude_double_bonds": 6,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "carbazole"
     },
     {
       "name": "indazole",
@@ -8610,7 +8623,8 @@
         "mancude_double_bonds": 4,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "indazole"
     },
     {
       "name": "xanthene",
@@ -8848,7 +8862,8 @@
         "mancude_double_bonds": 6,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "xanthene"
     },
     {
       "name": "1H-indole",
@@ -9004,7 +9019,8 @@
         "mancude_double_bonds": 4,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "indole"
     },
     {
       "name": "1H-isoindole",
@@ -9164,7 +9180,8 @@
         "mancude_double_bonds": 4,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "isoindole"
     },
     {
       "name": "3H-indole",
@@ -9783,7 +9800,8 @@
         "mancude_double_bonds": 3,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1H-pyrrolizine"
     },
     {
       "name": "1-benzofuran",
@@ -16610,7 +16628,8 @@
         "mancude_double_bonds": 2,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,2,3-triazole"
     },
     {
       "name": "1,2,4,5-tetrazine",
@@ -17202,7 +17221,8 @@
         "mancude_double_bonds": 2,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,2,4-triazole"
     },
     {
       "name": "1,2,5-oxadiazole",
@@ -22063,7 +22083,8 @@
         "mancude_double_bonds": 2,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "arsole"
     },
     {
       "name": "azetidine",
@@ -22467,7 +22488,8 @@
         "mancude_double_bonds": 4,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "benzimidazole"
     },
     {
       "name": "borinine",
@@ -23962,6 +23984,168 @@
       }
     },
     {
+      "name": "1H-indene",
+      "pin": true,
+      "priority": 273,
+      "aliases": [
+        "indene"
+      ],
+      "attached_prefix": "indeno",
+      "derivative_stem": "1H-inden",
+      "default_indicated_h": [
+        "1"
+      ],
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "7a"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "7a"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [
+          "1"
+        ],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      },
+      "indicated_hydrogen_name": "indene"
+    },
+    {
       "name": "indoline",
       "pin": true,
       "priority": 274,
@@ -25367,7 +25551,8 @@
         "mancude_double_bonds": 2,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "phosphole"
     },
     {
       "name": "piperazine",
@@ -31494,7 +31679,8 @@
         "mancude_double_bonds": 6,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "fluorene"
     },
     {
       "name": "pentalene",

@@ -1,5 +1,3 @@
-"""Explicit additive/replacement feature collection for selected parents."""
-
 import re
 
 from .assembly_parts import AssemblyParts, SubstituentItem
@@ -23,18 +21,26 @@ def _saturated_ring_carbons(mol: Molecule, numbered_path: list[int], get_loc) ->
         ]
         if not ring_bonds or sum(bond.order for bond in ring_bonds) != len(ring_bonds):
             continue
-        if atom.explicit_h_count + atom.total_h_count > 0:
+        if atom.explicit_h_count + atom.total_h_count > 0 or _is_oxo_ring_site(mol, idx, numbered_path):
             found.add(str(get_loc(idx)))
     return found
 
 
-def _declared_sites_are_unambiguous(mol: Molecule, numbered_path: list[int], get_loc, declared: set[str]) -> bool:
-    """True when the declared indicated-H locants are the only place they could sit.
+def _respell_indicated_hydrogen(retained_name: str, sites: set[str]) -> str:
+    """
+    Rewrite the indicated-hydrogen locants a retained name spells for itself.
+    """
 
-    A declared heteroatom site is ambiguous when the ring system holds another
-    heteroatom of the same element that could carry the hydrogen instead: 1H-
-    and 2H-indazole are both real parents, so the ``1`` in 1H-indazole-3,5-dione
-    is what tells the two apart and cannot be traded for a saturated carbon.
+    match = re.match(r"(\d+[a-z]?H(?:,\d+[a-z]?H)*)-", retained_name)
+    if match is None:
+        return retained_name
+    spelled = ",".join(f"{locant}H" for locant in sorted(sites, key=parse_locant))
+    return f"{spelled}-{retained_name[match.end() :]}"
+
+
+def _declared_sites_are_unambiguous(mol: Molecule, numbered_path: list[int], get_loc, declared: set[str]) -> bool:
+    """
+    True when the declared indicated-H locants are the only place they could sit.
     """
 
     for idx in numbered_path:
@@ -76,6 +82,12 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         and _declared_sites_are_unambiguous(mol, numbered_path, get_loc, default_indicated_h)
     ):
         default_indicated_h = observed
+    # The name spells its indicated hydrogen as text; keep that text in step with
+    # where the hydrogen actually sits.
+    if parts.retained_name and default_indicated_h:
+        cited = _name_indicated_hydrogen_locants(parts.retained_name)
+        if cited and cited != default_indicated_h and len(cited) == len(default_indicated_h):
+            parts.retained_name = _respell_indicated_hydrogen(parts.retained_name, default_indicated_h)
     fusion_locants = set(metadata.fusion_locants) if metadata is not None else set()
     candidates: list[tuple[str, int]] = []
     hydro_only: list[tuple[str, int]] = []
@@ -99,7 +111,12 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 bond.order for n in mol.get_neighbors(idx) if n in numbered_path and (bond := mol.get_bond(idx, n))
             )
             substituted_ring_nitrogen = atom.symbol == "N" and ring_bond_order == 2
-            if atom.explicit_h_count + atom.total_h_count <= 0 and not substituted_ring_nitrogen:
+            oxo_indicated_site = locant in default_indicated_h and _is_oxo_ring_site(mol, idx, numbered_path)
+            if (
+                atom.explicit_h_count + atom.total_h_count <= 0
+                and not substituted_ring_nitrogen
+                and not oxo_indicated_site
+            ):
                 continue
 
             ring_neighbor_count = sum(neighbor in numbered_path for neighbor in mol.get_neighbors(idx))
@@ -160,8 +177,6 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 )
         return
 
-    # Saturation beyond the supported indicated hydrogens takes a hydro prefix,
-    # which saturates whole bonds and so can only absorb an even surplus.
     surplus_count = len(candidates) + len(hydro_only) - supported
     if metadata is not None and surplus_count > 0 and surplus_count % 2 == 0:
         candidates.sort(key=lambda candidate: parse_locant(candidate[0]))

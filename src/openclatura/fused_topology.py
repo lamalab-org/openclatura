@@ -13,7 +13,6 @@ from functools import lru_cache
 
 from .grammar_snapshot_data import RetainedFusedToken, retained_fused_token, retained_fused_token_status
 from .molecule import Molecule
-from .naming_data import load_json_table
 from .polycycle_topology import RingSystemTopology, edges_within_atoms, ring_system_topology
 from .retained_fused_templates import (
     RetainedFusedGraphTemplate,
@@ -73,12 +72,6 @@ class RingTopologyRouteKind(StrEnum):
     SPIRO = "spiro"
     VON_BAEYER = "von_baeyer"
     UNSUPPORTED = "unsupported"
-
-
-@dataclass(frozen=True)
-class FusedEmissionExampleSet:
-    name_policy: str
-    stages: dict[str, tuple[str, ...]]
 
 
 @dataclass(frozen=True)
@@ -385,17 +378,6 @@ def _opsin_parseable_names(template: RetainedFusedGraphTemplate) -> tuple[str, .
             seen.add(name)
             names.append(name)
     return tuple(names)
-
-
-@lru_cache(maxsize=1)
-def fused_emission_examples() -> FusedEmissionExampleSet:
-    """Return generic OPSIN grammar target examples for Stage 6-10."""
-
-    raw = load_json_table("fused_emission_examples.json")
-    return FusedEmissionExampleSet(
-        name_policy=str(raw["name_policy"]),
-        stages={str(stage): tuple(str(name) for name in names) for stage, names in raw.get("stages", {}).items()},
-    )
 
 
 def fused_parent_side_letters(template: RetainedFusedGraphTemplate) -> tuple[tuple[str, tuple[str, str]], ...]:

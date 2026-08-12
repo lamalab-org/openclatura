@@ -122,7 +122,7 @@ def _validate_snapshot(snapshot: dict[str, Any]) -> None:
     source = snapshot.get("source", {})
     if source.get("resource_root") or source.get("external_resource_path"):
         raise ValueError("local grammar snapshot must not reference an external resource path")
-    if source.get("resource_json_dir") != "parser_xml_resources":
+    if source.get("resource_json_dir") != "tests/data/parser_xml_resources":
         raise ValueError("local grammar snapshot must point at owned parser_xml_resources JSON data")
 
     charge_suffixes = snapshot["charge_suffixes"]

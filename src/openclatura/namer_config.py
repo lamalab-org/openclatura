@@ -1,7 +1,21 @@
 from .hantzsch_widman import hw_spec_for_name, spec_cites_indicated_hydrogen
+from .naming_data import load_json_table
 from .nomenclature import RULES
 
-INDICATED_H_RETAINED_NAMES = RULES.retained.indicated_hydrogen_names
+
+def _indicated_h_retained_names() -> frozenset[str]:
+    """
+    Retained parents that carry an indicated hydrogen, read off the templates.
+    """
+
+    return frozenset(
+        row["indicated_hydrogen_name"]
+        for row in load_json_table("retained_fused_graph_templates.json").get("parents", ())
+        if "indicated_hydrogen_name" in row
+    )
+
+
+INDICATED_H_RETAINED_NAMES = _indicated_h_retained_names()
 
 
 def cites_indicated_hydrogen(retained_name: str | None) -> bool:

@@ -2,7 +2,7 @@
   "source": {
     "name": "Openclatura parser grammar snapshot",
     "format": "openclatura.parser_grammar_snapshot.v1",
-    "resource_json_dir": "parser_xml_resources",
+    "resource_json_dir": "tests/data/parser_xml_resources",
     "files": [
       "arylGroups.xml",
       "arylSubstituents.xml",
@@ -11,7 +11,7 @@
       "nonCarboxylicAcids.xml",
       "hwHeteroAtoms.xml"
     ],
-    "note": "This checked-in JSON is the runtime grammar source. Runtime code does not import external parser internals or read external resource directories."
+    "note": "This checked-in JSON is the runtime grammar source. Runtime code does not import external parser internals or read external resource directories. The derivation inputs live under tests/data/parser_xml_resources and are not shipped with the package."
   },
   "retained_fused_derivative_gate": {
     "source_files": [
@@ -152,7 +152,9 @@
       "triphenylene",
       "xanthene"
     ],
-    "audit_only_parent_names": [],
+    "audit_only_parent_names": [
+      "1H-indene"
+    ],
     "allowed_principal_keys": [
       null,
       "alcohol",
@@ -496,6 +498,21 @@
       "fusion_stems": [
         "benzotriazolo"
       ],
+      "default_indicated_h": [
+        "1"
+      ]
+    },
+    "1H-indene": {
+      "parent_stems": [
+        "1H-inden"
+      ],
+      "substituent_stems": [
+        "1H-inden"
+      ],
+      "fusion_stems": [
+        "indeno"
+      ],
+      "derivative_status": "audit_only",
       "default_indicated_h": [
         "1"
       ]
