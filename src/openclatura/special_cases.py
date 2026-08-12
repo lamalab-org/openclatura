@@ -1921,22 +1921,22 @@ def homonuclear_chain_parent_result(
     if chain is None:
         return None
     chain_set = set(chain)
-    # A charged backbone belongs to a different parent class -- an azoxy group,
-    # a diazonium -- that carries its charge in its own name.  Spelling
-    # N=[N+]([O-]) as a plain diazene loses that.
-    if any(mol.atoms[idx].charge for idx in chain):
+    oxide_oxygens = _chain_oxide_oxygens(mol, chain, component_atoms)
+
+    if any(mol.atoms[idx].charge for idx in chain) and oxide_oxygens is None:
         return None
-    # A principal characteristic group decides the parent, so a ligand carrying
-    # one keeps its own skeleton as the parent and this chain becomes a prefix:
-    # OCCNN=NN is an ethanol, not a substituted tetraazene.  The chain's own
-    # atoms are perceived as amines and do not count against it.
+    oxide_oxygens = oxide_oxygens or {}
+    # The oxide oxygens belong to the parent, not to a branch hanging off it.
+    oxide_atoms = set(oxide_oxygens.values())
+    ligand_atoms = component_atoms - oxide_atoms
+
     if any(
-        group.is_principal_candidate and (set(group.atoms_involved) & component_atoms) - chain_set
+        group.is_principal_candidate and (set(group.atoms_involved) & ligand_atoms) - chain_set
         for group in perceive_groups(mol)
     ):
         return None
     forward_orders = [mol.get_bond(chain[idx], chain[idx + 1]).order for idx in range(len(chain) - 1)]
-    ligands = _homonuclear_chain_ligands(mol, component_atoms, chain_set, branch_namer)
+    ligands = _homonuclear_chain_ligands(mol, ligand_atoms, chain_set, branch_namer)
     if ligands is None:
         return None
 
@@ -1951,8 +1951,11 @@ def homonuclear_chain_parent_result(
             ((oriented.index(ligand.attachment) + 1, ligand) for ligand in ligands),
             key=lambda item: (substituent_sort_key(item[1].name), item[0]),
         )
+        oxide_locants = sorted(oriented.index(idx) + 1 for idx in oxide_oxygens)
         key = (
             next((idx for idx, order in enumerate(orders) if order > 1), len(orders)),
+            # Oxides are cited before the detachable prefixes.
+            oxide_locants,
             sorted(locant for locant, _ligand in placed),
             [locant for locant, _ligand in placed],
         )
@@ -1964,12 +1967,13 @@ def homonuclear_chain_parent_result(
 
     prefixes = _locanted_ligand_prefix([(locant, ligand.name) for locant, ligand in placed])
     name = f"{prefixes}{parent}" if prefixes else parent
+    name = _with_chain_oxide_suffix(name, placed_chain, oxide_oxygens)
     parent_binding = NameAtomBinding(
         stage="shortcut",
         role="homonuclear_chain_parent",
         term=parent,
-        atom_ids=set(chain),
-        bond_ids=bond_ids_within(mol, set(chain)),
+        atom_ids=set(chain) | oxide_atoms,
+        bond_ids=bond_ids_within(mol, set(chain) | oxide_atoms),
     )
     ligand_bindings = tuple(
         NameAtomBinding(
@@ -2162,6 +2166,41 @@ def simple_central_parent_hydride_result(mol: Molecule, component_atoms: set[int
         "simple_central_parent_hydride",
         bindings=(core_binding, *ligand_bindings),
     )
+
+
+def _chain_oxide_oxygens(mol: Molecule, chain: list[int], component_atoms: set[int]) -> dict[int, int] | None:
+    """Map each chain atom carrying a charge-separated oxide to its oxygen."""
+
+    oxides: dict[int, int] = {}
+    for idx in chain:
+        atom = mol.atoms[idx]
+        if not atom.charge:
+            continue
+        if atom.charge != 1:
+            return None
+        oxygens = [
+            n
+            for n in mol.get_neighbors(idx)
+            if n in component_atoms
+            and mol.atoms[n].symbol == "O"
+            and mol.atoms[n].charge == -1
+            and mol.degree(n) == 1
+            and mol.get_bond(idx, n).order == 1
+        ]
+        if len(oxygens) != 1:
+            return None
+        oxides[idx] = oxygens[0]
+    return oxides or None
+
+
+def _with_chain_oxide_suffix(name: str, chain: list[int], oxide_oxygens: dict[int, int]) -> str:
+    """Append the functional-class oxide term to a homonuclear chain name."""
+
+    if not oxide_oxygens:
+        return name
+    locants = sorted(chain.index(idx) + 1 for idx in oxide_oxygens)
+    multiplier = multipliers.basic(len(locants)) if len(locants) > 1 else ""
+    return f"{name} {','.join(str(locant) for locant in locants)}-{multiplier}oxide"
 
 
 def _ordered_backbone_chain(mol: Molecule, atoms: list[int]) -> list[int] | None:

@@ -84,7 +84,7 @@ def _perceive_groups_uncached(mol: Molecule) -> list[PerceivedGroup]:
         specs = BUILTIN_PERCEPTION_SPECS
     for spec in specs:
         groups.extend(spec.detector(mol))
-    return _enrich_groups(mol, groups)
+    return _enrich_groups(mol, _demote_zwitterion_cations(mol, groups))
 
 
 def perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
@@ -131,28 +131,46 @@ def _closes_ring_back_to(mol: Molecule, carbon: int, hetero: int, double_o: int,
     return False
 
 
-def _shares_component_with_anion(mol: Molecule, idx: int) -> bool:
-    """True when a negatively charged atom sits in the same connected component.
+CATIONIC_SUFFIX_GROUP_KEYS = frozenset({"aminium", "iminium", "diazonio"})
+ANIONIC_SUFFIX_GROUP_KEYS = frozenset({"olate", "thiolate", "carboxylate", "ring_carboxylate", "sulfonate"})
 
-    Cations outrank every neutral characteristic group (P-41), but a zwitterion
-    is named the other way round -- the anionic centre takes the suffix and the
-    cation stays a prefix, which is what makes betaine
-    ``2-(trimethylammonio)acetate`` rather than an ``...aminium``.  A separate
-    counter-ion component is not a zwitterion, so the search stops at the
-    component boundary.
-    """
+
+def _connected_component(mol: Molecule, idx: int) -> set[int]:
+    """Return the atoms reachable from ``idx``."""
 
     seen = {idx}
     stack = [idx]
     while stack:
         current = stack.pop()
-        if mol.atoms[current].charge < 0:
-            return True
         for neighbor in mol.get_neighbors(current):
             if neighbor not in seen:
                 seen.add(neighbor)
                 stack.append(neighbor)
-    return False
+    return seen
+
+
+def _demote_zwitterion_cations(mol: Molecule, groups: list[PerceivedGroup]) -> list[PerceivedGroup]:
+    """Keep a cationic group out of the suffix slot when it shares a zwitterion.
+
+    A lone cation outranks every neutral group (P-41) and takes the suffix, but
+    in a zwitterion the anion keeps it and the cation is cited as a prefix:
+    betaine is 2-(trimethylammonio)acetate.  Skeletal ``-ide`` centres are not
+    characteristic groups, and a counter-ion is a separate component.
+    """
+
+    cations = [group for group in groups if group.key in CATIONIC_SUFFIX_GROUP_KEYS]
+    if not cations:
+        return groups
+    anion_atoms = {group.attachment_carbon for group in groups if group.key in ANIONIC_SUFFIX_GROUP_KEYS}
+    if not anion_atoms:
+        return groups
+    for cation in cations:
+        if not cation.is_principal_candidate:
+            continue
+        component = _connected_component(mol, cation.attachment_carbon)
+        if anion_atoms & component:
+            cation.is_principal_candidate = False
+    return groups
 
 
 def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
@@ -616,18 +634,15 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                             consumed.update(hydrazone_atoms)
                         else:
                             key = "iminium" if atom.charge > 0 else "imine"
-                            principal = key != "iminium" or not _shares_component_with_anion(mol, atom.idx)
-                            groups.append(PerceivedGroup(key, principal, double_c, {atom.idx}))
+                            groups.append(PerceivedGroup(key, True, double_c, {atom.idx}))
                             consumed.update([atom.idx])
                     else:
                         key = "iminium" if atom.charge > 0 else "imine"
-                        principal = key != "iminium" or not _shares_component_with_anion(mol, atom.idx)
-                        groups.append(PerceivedGroup(key, principal, double_c, {atom.idx}))
+                        groups.append(PerceivedGroup(key, True, double_c, {atom.idx}))
                         consumed.update([atom.idx])
                 else:
                     key = "iminium" if atom.charge > 0 else "imine"
-                    principal = key != "iminium" or not _shares_component_with_anion(mol, atom.idx)
-                    groups.append(PerceivedGroup(key, principal, double_c, {atom.idx}))
+                    groups.append(PerceivedGroup(key, True, double_c, {atom.idx}))
                     consumed.update([atom.idx])
 
     for atom in mol:
@@ -709,9 +724,8 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             adj_atoms = mol.get_neighbors(atom.idx)
             if len(adj_atoms) > 0:
                 key = "aminium" if atom.charge > 0 else "amine"
-                principal = key != "aminium" or not _shares_component_with_anion(mol, atom.idx)
                 for c in adj_atoms:
-                    groups.append(PerceivedGroup(key, principal, c, {atom.idx}))
+                    groups.append(PerceivedGroup(key, True, c, {atom.idx}))
                 consumed.add(atom.idx)
 
     for atom in mol:

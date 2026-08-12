@@ -1365,8 +1365,11 @@
         "needs_locant": true
       },
       "diazonio": {
-        "role": "prefix",
+        "role": "principal",
         "prefix": "diazonio",
+        "suffix": "diazonium",
+        "seniority": 4,
+        "suffix_with_locant": true,
         "needs_locant": true
       },
       "isocyano": {

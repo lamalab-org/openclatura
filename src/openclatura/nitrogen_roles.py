@@ -255,7 +255,7 @@ def _diazo_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -> li
                 _make_role(
                     mol,
                     key=template.key,
-                    is_principal_candidate=False,
+                    is_principal_candidate=template.key == "diazonio",
                     attachment_atom=carbon.idx,
                     atom_ids=frozenset({n1, n2}),
                     variant=template.variant,
