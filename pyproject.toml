@@ -73,6 +73,8 @@ exclude = [
     "/evaluations",
     "/eval_failures",
     "/tests",
+    "/uv.lock",
+    "/website",
 ]
 
 [tool.hatch.build.targets.wheel]
