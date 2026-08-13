@@ -130,6 +130,10 @@ def _described_atoms(node: dict[str, Any]) -> set[int]:
     for child in _iter_child_nodes(node):
         described |= {int(atom) for atom in child.get("atoms") or ()}
         described |= _described_atoms(child)
+    for modifier in node.get("front_modifiers") or ():
+        if isinstance(modifier, dict):
+            described |= {int(atom) for atom in modifier.get("atoms") or ()}
+            described |= _described_atoms(modifier)
     return described
 
 
@@ -240,6 +244,10 @@ def _describe_node(node: dict[str, Any], mol: Molecule, *, subject: str, depth: 
     if substituent_sentence:
         sentences.append(substituent_sentence)
 
+    modifier_sentence = _front_modifier_sentence(node)
+    if modifier_sentence:
+        sentences.append(modifier_sentence)
+
     lines = [_indent(sentence, depth) for sentence in sentences]
     for child in _iter_child_nodes(node):
         if not _should_expand_child(child):
@@ -248,7 +256,30 @@ def _describe_node(node: dict[str, Any], mol: Molecule, *, subject: str, depth: 
         rendered = _describe_node(child, mol, subject=child_subject, depth=depth + 1)
         if rendered:
             lines.append(rendered)
+    for modifier in node.get("front_modifiers") or ():
+        if not isinstance(modifier, dict) or not _should_expand_child(modifier):
+            continue
+        rendered = _describe_node(
+            modifier, mol, subject=f"The {modifier.get('name') or 'ester'} group", depth=depth + 1
+        )
+        if rendered:
+            lines.append(rendered)
     return "\n".join(lines)
+
+
+def _front_modifier_sentence(node: dict[str, Any]) -> str:
+    """Name the second component of an ester or sulfonate.
+
+    It is not a substituent on the parent — it is the other half the name is
+    built from ("methyl" in "methyl acetate"), so it gets its own sentence
+    rather than being listed among the things attached to the skeleton.
+    """
+    modifiers = [item for item in node.get("front_modifiers") or () if isinstance(item, dict)]
+    names = [str(item.get("name")) for item in modifiers if item.get("name")]
+    if not names:
+        return ""
+    phrases = [f"{_article_for(name)} {name} group" for name in names]
+    return "The acid part of this ester is paired with " + _join_phrases(phrases) + "."
 
 
 def _indent(sentence: str, depth: int) -> str:
@@ -518,9 +549,15 @@ def _parent_substituent_label(parent: dict[str, Any]) -> str:
     length = parent.get("parent_length")
     if isinstance(length, int) and length > 0 and not retained:
         try:
-            return stems.stem_for(length) + suffix_text
+            stem = stems.stem_for(length)
         except KeyError:
             return ""
+
+        if parent.get("is_bicycle") or parent.get("is_spiro") or parent.get("is_polycycle"):
+            return ""
+        if parent.get("is_ring"):
+            return "cyclo" + stem + suffix_text
+        return stem + suffix_text
     if retained:
         return f"{retained}-derived"
     return ""
@@ -535,6 +572,10 @@ def _graph_substituent_label(child: dict[str, Any], mol: Molecule) -> str:
     if len(own_atoms) == 1 and symbols:
         symbol = symbols[0]
         has_nested_ligand = bool(list(_iter_child_nodes(child)))
+        # A doubly-bonded oxygen is an oxo group; only a singly-bonded one is
+        # hydroxy. Calling =O "hydroxy" invents a hydrogen that is not there.
+        if symbol == "O" and not has_nested_ligand and _is_doubly_bonded(mol, own_atoms):
+            return "oxo"
         return {
             "N": "amino",
             "O": "oxy" if has_nested_ligand else "hydroxy",
@@ -551,6 +592,19 @@ def _graph_substituent_label(child: dict[str, Any], mol: Molecule) -> str:
     if "C" in symbol_set and "O" in symbol_set and _has_double_bond_between(mol, own_atoms, "C", "O"):
         return "carbonyl"
     return ""
+
+
+def _is_doubly_bonded(mol: Molecule, atom_ids: set[int]) -> bool:
+    """Does a lone atom of this fragment attach by a double bond?"""
+
+    for atom_idx in atom_ids:
+        for neighbor in mol.get_neighbors(atom_idx):
+            if neighbor in atom_ids:
+                continue
+            bond = mol.get_bond(atom_idx, neighbor)
+            if bond is not None and bond.order == 2:
+                return True
+    return False
 
 
 def _local_role_atoms(child: dict[str, Any]) -> set[int]:

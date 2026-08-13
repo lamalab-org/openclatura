@@ -116,16 +116,46 @@ def test_deeper_levels_reuse_the_subject_as_a_pronoun():
 
 
 def test_reports_atoms_the_naming_metadata_does_not_describe():
-    """An ester's alcohol half is absent from the tree; say so, don't drop it."""
-    d = describe_human("CC(=O)Oc1ccccc1C(=O)C1CC1")
+    """A shortcut-rendered component carries no structural metadata at all.
+
+    ``dimethylsulfane`` is named by a renderer that bypasses the assembly
+    pipeline, so its tree node has no parent, no principal group and no
+    substituents. There is nothing to describe, and the description says so
+    rather than silently emitting only the name.
+    """
+    d = describe_human("CSC")
 
     coverage = [p for p in d.paragraphs if p.startswith("This description covers")]
     assert coverage, f"expected a coverage note: {d.paragraphs}"
-    assert "4 of the 15 atoms" in coverage[0]
-    assert "remaining 11" in coverage[0]
+    assert "0 of the 3 atoms" in coverage[0]
+
+
+def test_describes_the_alcohol_half_of_an_ester():
+    """The second component of an ester is named and decomposed, not dropped.
+
+    Only the rendered text of a front modifier used to be kept, so eleven of
+    these fifteen atoms — the entire phenyl half — were absent from the tree
+    and therefore from the prose.
+    """
+    d = describe_human("CC(=O)Oc1ccccc1C(=O)C1CC1")
+    text = str(d)
+
+    assert "The acid part of this ester is paired with a 2-((cyclopropyl)carbonyl)phenyl group." in text
+    # ...and it is broken down, not just named.
+    assert "retained benzene parent" in text
+    assert "a cyclopropyl group" in text
+    assert not [p for p in d.paragraphs if p.startswith("This description covers")]
+
+
+def test_ring_and_double_bonded_substituents_are_named_correctly():
+    """A 3-ring is cyclopropyl, not propyl; a doubly-bonded O is oxo, not hydroxy."""
+    text = str(describe_human("CC(=O)Oc1ccccc1C(=O)C1CC1"))
+
+    assert "a cyclopropyl group" in text and "a propyl group" not in text
+    assert "an oxo group" in text and "a hydroxy group" not in text
 
 
 def test_no_coverage_note_when_the_whole_structure_is_described():
-    for smiles in ("CCO", "CC(=O)Oc1ccccc1C(=O)O", "CN1C=NC2=C1C(=O)N(C(=O)N2C)C"):
+    for smiles in ("CCO", "CC(=O)Oc1ccccc1C(=O)O", "CN1C=NC2=C1C(=O)N(C(=O)N2C)C", "CC(=O)OC", "CCOC(=O)C"):
         d = describe_human(smiles)
         assert not [p for p in d.paragraphs if p.startswith("This description covers")], smiles

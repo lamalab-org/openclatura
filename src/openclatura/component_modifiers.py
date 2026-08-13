@@ -35,14 +35,36 @@ def add_component_front_modifiers(
         r_group_c = next((n for n in mol.get_neighbors(single_o) if n not in group.atoms_involved), None)
         if r_group_c is None:
             continue
-        branch_name = branch_namer(mol, r_group_c, sub_exclude | {single_o}, upstream_atom=single_o)
+        branch_exclude = sub_exclude | {single_o}
+
+        branch_name, branch_trace, branch_tree = branch_namer(
+            mol,
+            r_group_c,
+            branch_exclude,
+            upstream_atom=single_o,
+            return_trace=True,
+            return_tree=True,
+        )
         if branch_name:
-            modifier_atoms = subgraph_component(mol, r_group_c, sub_exclude | {single_o})
+            modifier_atoms = subgraph_component(mol, r_group_c, branch_exclude)
+            modifier_bonds = bond_ids_within(mol, modifier_atoms | {single_o})
+            modifier_charges = _charged_atoms(mol, modifier_atoms)
             parts.front_modifiers.append(strip_outer_parentheses(branch_name))
             locant = str(get_loc(group.attachment_carbon)) if get_loc is not None else None
             parts.front_modifier_locants.append(locant)
             parts.front_modifier_atom_ids.update(modifier_atoms)
-            parts.front_modifier_charge_atom_ids.update(_charged_atoms(mol, modifier_atoms))
+            parts.front_modifier_charge_atom_ids.update(modifier_charges)
+            parts.front_modifier_items.append(
+                SubstituentItem(
+                    name=strip_outer_parentheses(branch_name),
+                    locants=[locant] if locant else [],
+                    atom_ids=set(modifier_atoms),
+                    bond_ids=modifier_bonds,
+                    charge_atom_ids=modifier_charges,
+                    trace_segments=list(branch_trace or ()),
+                    substituent_tree=branch_tree,
+                )
+            )
 
 
 def n_substituent_locant(

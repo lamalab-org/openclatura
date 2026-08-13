@@ -27,6 +27,7 @@ class NamingTreeMetadata(TypedDict, total=False):
     indicated_hydrogens: list[str]
     hydro_operations: list[dict]
     parent_charges: list[dict]
+    front_modifiers: list[dict]
 
 
 NAMING_TREE_METADATA_FIELDS = frozenset(NamingTreeMetadata.__annotations__)
@@ -492,6 +493,7 @@ def assembly_substituent_tree(
         trace_segments=trace_segments,
         nested_decisions=decisions,
         metadata={
+            "front_modifiers": _front_modifier_tree_nodes(parts.front_modifier_items),
             "stereo_features": [
                 {"descriptor": descriptor, "locant": locant} for descriptor, locant in parts.stereo_features
             ],
@@ -591,6 +593,31 @@ def _principal_group_tree_node(parts: AssemblyParts) -> dict | None:
         "bonds": sorted(parts.principal_group.bond_ids),
         "charge_atoms": sorted(parts.principal_group.charge_atom_ids),
     }
+
+
+def _front_modifier_tree_nodes(items: list[SubstituentItem]) -> list[dict]:
+    """Tree nodes for the alcohol half of an ester or sulfonate.
+
+    ``substituent_tree`` carries the modifier's own decomposition when the
+    recursive namer produced one, so "2-((cyclopropyl)carbonyl)phenyl acetate"
+    reports the phenyl ring and its acyl branch rather than eleven atoms nobody
+    accounts for.
+    """
+    nodes = []
+    for item in items:
+        node = dict(item.substituent_tree) if item.substituent_tree else {}
+        node.update(
+            {
+                "kind": "front_modifier",
+                "name": item.name,
+                "locants": list(item.locants),
+                "atoms": sorted(item.atom_ids),
+                "bonds": sorted(item.bond_ids),
+                "charge_atoms": sorted(item.charge_atom_ids),
+            }
+        )
+        nodes.append(node)
+    return nodes
 
 
 def _simple_item_tree_nodes(items: list[SubstituentItem], kind: str) -> list[dict]:
