@@ -1956,9 +1956,7 @@ def test_a_nested_substituents_own_locants_are_not_primed():
 
     from openclatura.assembly_spiro import extract_spiro_side_prefixes
 
-    prefixes, parent, _, _ = extract_spiro_side_prefixes(
-        "1-((2,6-difluoro-3-methylphenyl)methyl)piperidine"
-    )
+    prefixes, parent, _, _ = extract_spiro_side_prefixes("1-((2,6-difluoro-3-methylphenyl)methyl)piperidine")
     assert prefixes == ["1'-((2,6-difluoro-3-methylphenyl)methyl)"]
     assert parent == "piperidine"
 
