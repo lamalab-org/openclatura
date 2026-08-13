@@ -20,25 +20,6 @@ UNSATURATION_ORDER = RULES.assembly.unsaturation_order
 AMBIGUOUS_CONNECTION_SUBSTITUENT_STEMS = RULES.assembly.ambiguous_connection_substituent_stems
 
 
-def promote_benzene_retained_name(parts: AssemblyParts) -> None:
-    if parts.is_ring and not parts.is_bicycle and not parts.is_spiro and parts.parent_length == 6:
-        if (
-            len(parts.unsaturations) == 1
-            and parts.unsaturations[0].bond_key == "double"
-            and len(parts.unsaturations[0].locants) == 3
-        ):
-            locs = sorted([parse_locant(l)[1] for l in parts.unsaturations[0].locants])
-            if locs == [1.0, 3.0, 5.0]:
-                if not parts.a_prefixes:
-                    parts.retained_name = "benzene"
-                    parts.unsaturations = []
-
-
-# Retained names that spell a parent hydride *together with* its principal
-# characteristic group, keyed by the two things that make them up.  IUPAC keeps
-# these as the preferred name when the ring is substituted -- ``4-chlorophenol``,
-# ``4-chlorobenzaldehyde`` -- so they belong to the parent, not to a rewrite of
-# the finished string: only here is the locant still known to be the group's own.
 RETAINED_FUNCTIONAL_PARENTS: dict[tuple[str, str], str] = {
     ("benzene", "alcohol"): "phenol",
     ("benzene", "amine"): "aniline",
@@ -50,11 +31,6 @@ RETAINED_FUNCTIONAL_PARENTS: dict[tuple[str, str], str] = {
 }
 
 
-# The acyclic counterpart, keyed by chain length, the principal group, and how
-# many of that group the chain carries -- two carboxylic acids on a C4 chain is
-# succinic acid, one is butanoic.  Spelling these out per (length, group) rather
-# than as a stem substitution is deliberate: the joining vowel is irregular
-# (``acetonitrile`` but ``propionitrile``), so there is no stem to share.
 RETAINED_CHAIN_PARENTS: dict[tuple[int, str, int], str] = {
     (1, "carboxylic_acid", 1): "formic acid",
     (2, "carboxylic_acid", 1): "acetic acid",
@@ -76,19 +52,29 @@ RETAINED_CHAIN_PARENTS: dict[tuple[int, str, int], str] = {
 }
 
 
-# The retained dioic acids name the unsubstituted acid only; a substituted one
-# takes the systematic name, so tartaric acid is ``2,3-dihydroxybutanedioic
-# acid`` and never ``2,3-dihydroxysuccinic acid``.  The rest keep their retained
-# form when substituted (``chloroacetic acid``, ``N-methylformamide``).
-#
-# The rewrite this replaced was inconsistent here rather than restrictive: it
-# matched only where the character before the parent was not a letter, so
-# ``N,N-bis(iminomethyl)methanamide`` became ``…formamide`` after a bracket while
-# ``1-aminomethanamide`` did not after the ``o`` of ``amino``.  Whether a name is
-# retained now follows from the structure instead of from that coincidence.
 _UNSUBSTITUTABLE_RETAINED_CHAIN_PARENTS = frozenset(
     {"oxalic acid", "malonic acid", "succinic acid", "glutaric acid", "adipic acid"}
 )
+
+
+RETAINED_SUBSTITUENTS: dict[tuple[int, str, str, str], str] = {
+    (1, "1", "phenyl", "1"): "benzyl",
+    (3, "2", "methyl", "2"): "tert-butyl",
+}
+
+
+def promote_benzene_retained_name(parts: AssemblyParts) -> None:
+    if parts.is_ring and not parts.is_bicycle and not parts.is_spiro and parts.parent_length == 6:
+        if (
+            len(parts.unsaturations) == 1
+            and parts.unsaturations[0].bond_key == "double"
+            and len(parts.unsaturations[0].locants) == 3
+        ):
+            locs = sorted([parse_locant(l)[1] for l in parts.unsaturations[0].locants])
+            if locs == [1.0, 3.0, 5.0]:
+                if not parts.a_prefixes:
+                    parts.retained_name = "benzene"
+                    parts.unsaturations = []
 
 
 def _retained_chain_parent(parts: AssemblyParts) -> str | None:
@@ -140,18 +126,6 @@ def promote_retained_functional_parent(parts: AssemblyParts) -> None:
         return
     parts.retained_name = retained
     parts.retained_absorbs_principal_group = True
-
-
-# Retained substituent prefixes that spell a skeleton *together with* a branch
-# on it: ``benzyl`` is a methyl carrying a phenyl, ``tert-butyl`` a propan-2-yl
-# carrying a methyl.  Each row says what the skeleton must be -- chain length,
-# where it attaches, and the one branch it absorbs -- so the match is made on
-# the structure rather than on the spelling the systematic path happened to
-# produce.  Keyed by (length, attachment locant, branch name, branch locant).
-RETAINED_SUBSTITUENTS: dict[tuple[int, str, str, str], str] = {
-    (1, "1", "phenyl", "1"): "benzyl",
-    (3, "2", "methyl", "2"): "tert-butyl",
-}
 
 
 def promote_retained_substituent_name(parts: AssemblyParts) -> None:
@@ -327,17 +301,8 @@ def format_substituent_tail(
 
 
 def _sole_group_locant_is_redundant(parts: AssemblyParts) -> bool:
-    """Whether a lone group's ``1`` locant tells the reader nothing.
-
-    On a bare two-carbon chain the two positions are the same position --
-    ``ethan-1-ol`` and ``ethan-2-ol`` are one compound -- and on a bare benzene
-    every ring position is equivalent by rotation.  Either way the locant is
-    noise, which is why ``ethanol`` and ``benzenesulfonic acid`` are the names
-    actually used.
-
-    Anything that tells the positions apart brings the locant back: another
-    substituent, a replacement prefix, or unsaturation.  ``2-chloroethan-1-ol``
-    keeps its locant because C1 and C2 are no longer interchangeable.
+    """
+    Whether a lone group's ``1`` locant tells the reader nothing.
     """
 
     if parts.substituents or parts.a_prefixes or parts.unsaturations:
@@ -355,19 +320,19 @@ def format_principal_suffix(parts: AssemblyParts, terminal_e: str, spiro_subs) -
     has_spiro_subs = bool(spiro_subs)
     omit_locant = parts.parent_length == 1
     if not omit_locant and len(locs) == 1 and str(locs[0]) == "1":
-        if not group.suffix_with_locant:
-            omit_locant = True
-        elif (
-            parts.is_ring
-            and not parts.unsaturations
-            and not parts.is_bicycle
-            and not parts.is_spiro
-            and not parts.is_polycycle
-            and not has_spiro_subs
-            and not parts.retained_name
+        if (
+            not group.suffix_with_locant
+            or (
+                parts.is_ring
+                and not parts.unsaturations
+                and not parts.is_bicycle
+                and not parts.is_spiro
+                and not parts.is_polycycle
+                and not has_spiro_subs
+                and not parts.retained_name
+            )
+            or _sole_group_locant_is_redundant(parts)
         ):
-            omit_locant = True
-        elif _sole_group_locant_is_redundant(parts):
             omit_locant = True
 
     suffix_text = render_principal_suffix(group, len(locs))

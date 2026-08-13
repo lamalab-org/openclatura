@@ -75,6 +75,7 @@ class RetainedFusedGraphTemplate:
     aromatic_equivalence_policy: str = "neutral_kekule_equivalent"
     enabled: bool = False
     derivative_production_enabled: bool = False
+    implied_stereo: bool = False
     mancude_double_bonds: int | None = None
 
     @property
@@ -183,6 +184,24 @@ def match_retained_fused_template(
     return matches[0] if matches else None
 
 
+def _ring_fusion_stereo_is_assigned(mol: Molecule, atom_set: set[int]) -> bool:
+    """Whether every ring-fusion centre of a matched skeleton has a configuration.
+
+    A steroid name carries the configuration of its ring fusions, so spelling a
+    structure that leaves them open as ``gonane`` asserts stereochemistry the
+    structure does not have.  Those fall back to the von Baeyer name.
+    """
+
+    for atom_idx in atom_set:
+        atom = mol.atoms[atom_idx]
+        ring_neighbors = sum(1 for neighbor in mol.get_neighbors(atom_idx) if neighbor in atom_set)
+        if ring_neighbors < 3:
+            continue
+        if atom.stereo is None and atom.raw_stereo is None:
+            return False
+    return True
+
+
 def _match_all_retained_fused_template(
     mol: Molecule,
     atom_indices: set[int] | list[int] | tuple[int, ...],
@@ -197,6 +216,8 @@ def _match_all_retained_fused_template(
     if all(not atom.aromatic for atom in template.atoms) and any(
         not _is_saturated_site(mol, atom_idx, atom_set) for atom_idx in atom_set
     ):
+        return []
+    if template.implied_stereo and not _ring_fusion_stereo_is_assigned(mol, atom_set):
         return []
 
     atom_by_locant = _relocatable_atom_by_locant(template) if allow_relocated_indicated_h else template.atom_by_locant
@@ -423,6 +444,7 @@ def retained_fused_template_from_data(row: dict[str, Any]) -> RetainedFusedGraph
         numbering_policy=str(template_data.get("numbering_policy", "retained_template")),
         aromatic_equivalence_policy=str(template_data.get("aromatic_equivalence_policy", "neutral_kekule_equivalent")),
         enabled=bool(template_data.get("enabled", row.get("template_enabled", False))),
+        implied_stereo=bool(template_data.get("implied_stereo", False)),
         derivative_production_enabled=bool(template_data.get("derivative_production_enabled", False)),
         mancude_double_bonds=(
             int(template_data["mancude_double_bonds"])
@@ -551,7 +573,7 @@ def template_molecule(template: RetainedFusedGraphTemplate) -> Molecule:
 
 
 def _template_degrees(template: RetainedFusedGraphTemplate) -> dict[str, int]:
-    degrees = {locant: 0 for locant in template.locants}
+    degrees = dict.fromkeys(template.locants, 0)
     for bond in template.bonds:
         degrees[bond.locants[0]] += 1
         degrees[bond.locants[1]] += 1

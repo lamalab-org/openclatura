@@ -691,9 +691,7 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                     bond = mol.get_bond(atom.idx, c_idx)
                     if bond.order == 2:
                         if mol.atoms[c_idx].is_carbon:
-                            if c_idx in cyclic_atoms:
-                                groups.append(PerceivedGroup("ketone", True, c_idx, {atom.idx}))
-                            elif len(mol.get_neighbors(c_idx)) >= 3:
+                            if c_idx in cyclic_atoms or len(mol.get_neighbors(c_idx)) >= 3:
                                 groups.append(PerceivedGroup("ketone", True, c_idx, {atom.idx}))
                             else:
                                 ring_neighbors = [n for n in mol.get_neighbors(c_idx) if n in cyclic_atoms]

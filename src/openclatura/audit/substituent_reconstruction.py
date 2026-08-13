@@ -1594,10 +1594,7 @@ def _apply_hydro(rw: Chem.RWMol, locants: dict[str, int], locs: list[str]) -> bo
             continue
         if bond.GetBondType() == Chem.BondType.DOUBLE and (begin in idxs) != (end in idxs):
             orphans.append(end if begin in idxs else begin)
-        if begin in idxs and end in idxs:
-            bond.SetBondType(Chem.BondType.SINGLE)
-            bond.SetIsAromatic(False)
-        elif bond.GetBondType() == Chem.BondType.DOUBLE:
+        if begin in idxs and end in idxs or bond.GetBondType() == Chem.BondType.DOUBLE:
             bond.SetBondType(Chem.BondType.SINGLE)
             bond.SetIsAromatic(False)
     return _rematch_orphaned_double_bonds(rw, idxs, orphans)

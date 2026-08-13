@@ -12,6 +12,10 @@ SPIRO_SUBSTITUENT_RE = re.compile(r"^\[SPIRO\]-(\d+)-(.*)$")
 AMBIGUOUS_CONNECTION_SUBSTITUENT_STEMS = RULES.assembly.ambiguous_connection_substituent_stems
 
 
+_SIDE_STEREO_RE = re.compile(r"^\((?P<body>\d+[A-Za-z']*(?:[RS]|[EZ])(?:,\d+[A-Za-z']*(?:[RS]|[EZ]))*)\)-?")
+_SIDE_STEREO_TERM_RE = re.compile(r"^(?P<locant>\d+[a-z']*)(?P<descriptor>[RSEZ])$")
+
+
 def split_spiro_substituents(parts: AssemblyParts) -> list[SpiroAssembly]:
     spiro_subs = []
     normal_subs = []
@@ -21,7 +25,7 @@ def split_spiro_substituents(parts: AssemblyParts) -> list[SpiroAssembly]:
             continue
         match = SPIRO_SUBSTITUENT_RE.match(sub.name)
         if match:
-            side_prefixes, side_parent_name, side_suffixes = extract_spiro_side_prefixes(match.group(2))
+            side_prefixes, side_parent_name, side_suffixes, side_stereo = extract_spiro_side_prefixes(match.group(2))
             spiro_subs.append(
                 _normalize_spiro_assembly(
                     SpiroAssembly(
@@ -30,20 +34,30 @@ def split_spiro_substituents(parts: AssemblyParts) -> list[SpiroAssembly]:
                         side_parent_name=side_parent_name,
                         side_prefixes=tuple(side_prefixes),
                         side_suffixes=tuple(side_suffixes),
+                        side_stereo=side_stereo,
                     )
                 )
             )
         else:
             normal_subs.append(sub)
     parts.substituents = normal_subs
+    # The side component's descriptors belong in the whole name's leading
+    # stereo group; only the assembler can put them there.
+    for spiro in spiro_subs:
+        # The spiro atom itself is cited once, at its parent locant; the side
+        # component's own descriptor for it would name the same centre twice.
+        junction = f"{spiro.side_locant}'"
+        for feature in spiro.side_stereo:
+            if feature[0] != junction and feature not in parts.stereo_features:
+                parts.stereo_features.append(feature)
     return spiro_subs
 
 
 def _normalize_spiro_assembly(spiro: SpiroAssembly) -> SpiroAssembly:
     """Extract side-component prefixes/suffixes before spiro rendering."""
 
-    side_prefixes, side_parent_name, side_suffixes = extract_spiro_side_prefixes(spiro.side_parent_name)
-    if not side_prefixes and side_parent_name == spiro.side_parent_name and not side_suffixes:
+    side_prefixes, side_parent_name, side_suffixes, side_stereo = extract_spiro_side_prefixes(spiro.side_parent_name)
+    if not side_prefixes and side_parent_name == spiro.side_parent_name and not side_suffixes and not side_stereo:
         return spiro
     return SpiroAssembly(
         parent_locant=spiro.parent_locant,
@@ -51,6 +65,7 @@ def _normalize_spiro_assembly(spiro: SpiroAssembly) -> SpiroAssembly:
         side_parent_name=side_parent_name,
         side_prefixes=tuple(spiro.side_prefixes) + tuple(side_prefixes),
         side_suffixes=tuple(spiro.side_suffixes) + tuple(side_suffixes),
+        side_stereo=tuple(spiro.side_stereo) + tuple(side_stereo),
     )
 
 
@@ -68,7 +83,9 @@ def format_spiro_core(
         s_name = spiro.side_parent_name
         side_prefixes.extend(spiro.side_prefixes)
         side_suffixes.extend(_prime_side_suffixes(spiro.side_suffixes, "'"))
-        extracted_prefixes, extracted_parent, extracted_suffixes = extract_spiro_side_prefixes(s_name)
+        extracted_prefixes, extracted_parent, extracted_suffixes, _extracted_stereo = extract_spiro_side_prefixes(
+            s_name
+        )
         if extracted_prefixes or extracted_parent != s_name or extracted_suffixes:
             side_prefixes.extend(extracted_prefixes)
             side_suffixes.extend(_prime_side_suffixes(extracted_suffixes, "'"))
@@ -79,6 +96,7 @@ def format_spiro_core(
                 side_parent_name=s_name,
                 side_prefixes=spiro.side_prefixes,
                 side_suffixes=spiro.side_suffixes,
+                side_stereo=spiro.side_stereo,
             )
         if core_name.startswith("spiro["):
             # A second spiro operation needs full dispiro numbering.  Do not
@@ -236,8 +254,14 @@ def _format_side_suffixes(side_suffixes: list[tuple[str, str]]) -> str:
     return "".join(f"-{locant}-{suffix}" for locant, suffix in side_suffixes)
 
 
-def extract_spiro_side_prefixes(side_name: str) -> tuple[list[str], str, tuple[tuple[str, str], ...]]:
-    """Move simple side-ring substituents to primed spiro prefixes."""
+def extract_spiro_side_prefixes(
+    side_name: str,
+) -> tuple[list[str], str, tuple[tuple[str, str], ...], tuple[tuple[str, str], ...]]:
+    """Move simple side-ring substituents to primed spiro prefixes.
+
+    Returns the primed prefixes, the side parent name, its suffixes, and the
+    stereo features the side component contributes to the whole name.
+    """
 
     side_name = side_name.strip()
     if side_name.startswith("(") and side_name.endswith(")"):
@@ -283,24 +307,38 @@ def extract_spiro_side_prefixes(side_name: str) -> tuple[list[str], str, tuple[t
     if parent is None:
         parent = next((candidate for candidate in parent_names if normalized.endswith(candidate)), None)
         if parent is None:
-            return [], normalized, tuple(side_suffixes)
+            return [], normalized, tuple(side_suffixes), ()
         prefix_text = normalized[: -len(parent)].rstrip("-")
     elif normalized != parent and normalized.endswith(parent):
         prefix_text = normalized[: -len(parent)].rstrip("-")
-    # A stereo descriptor here can be E/Z as readily as R/S.  Matching only the
-    # latter left `(5E)-` in front of the locants, the locant pattern below then
-    # failed, and every prefix was dropped -- an entire butyl and butylidene
-    # vanished from the name rather than merely losing their primes.
-    # The side ring's stereo descriptor is dropped here rather than carried.
-    # Re-emitting it inline placed it in the middle of the assembled name --
-    # `...-7-(pyrimidin-4-yl)-(3'S)-1'-methylspiro[...` -- which reads back as a
-    # different molecule.  It belongs at the front of the whole name, which this
-    # string-level renderer cannot reach, so a missing descriptor is preferred
-    # to a misplaced one.
-    prefix_text = re.sub(r"^\((?:\d+[A-Za-z']*(?:[RS]|[EZ])(?:,\d+[A-Za-z']*(?:[RS]|[EZ]))*)\)-?", "", prefix_text)
+
+    prefix_text, side_stereo = _extract_side_stereo(prefix_text)
     if not prefix_text:
-        return [], _spiro_side_parent_name(parent), tuple(side_suffixes)
-    return [_prime_side_prefix_locants(prefix_text)], _spiro_side_parent_name(parent), tuple(side_suffixes)
+        return [], _spiro_side_parent_name(parent), tuple(side_suffixes), side_stereo
+    return (
+        [_prime_side_prefix_locants(prefix_text)],
+        _spiro_side_parent_name(parent),
+        tuple(side_suffixes),
+        side_stereo,
+    )
+
+
+def _extract_side_stereo(prefix_text: str) -> tuple[str, tuple[tuple[str, str], ...]]:
+    """Split a leading side-component stereo descriptor off its prefixes."""
+
+    match = _SIDE_STEREO_RE.match(prefix_text)
+    if match is None:
+        return prefix_text, ()
+    features = []
+    for term in match.group("body").split(","):
+        term_match = _SIDE_STEREO_TERM_RE.match(term)
+        if term_match is None:
+            # An unrecognised term would be dropped silently otherwise; keeping
+            # the descriptor out of the name is better than misplacing it.
+            return prefix_text[match.end() :], ()
+        locant = term_match.group("locant")
+        features.append((f"{locant}'" if not locant.endswith("'") else locant, term_match.group("descriptor")))
+    return prefix_text[match.end() :], tuple(features)
 
 
 # Fragments that follow a digit *inside* a substituent name -- `but-2-en-1-yl`

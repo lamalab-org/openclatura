@@ -319,13 +319,14 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
     sub_name_raw = name_component(sub_mol, sub_comp, is_substituent=False)
     match = re.search(r"(?:(^|-)(\d+)-)?sil[a]?", sub_name_raw)
     if not match:
-        side_prefixes, side_parent_name, side_suffixes = extract_spiro_side_prefixes(sub_name_raw)
+        side_prefixes, side_parent_name, side_suffixes, side_stereo = extract_spiro_side_prefixes(sub_name_raw)
         return SpiroAssembly(
             parent_locant="",
             side_locant="1",
             side_parent_name=side_parent_name,
             side_prefixes=tuple(side_prefixes),
             side_suffixes=tuple(side_suffixes),
+            side_stereo=side_stereo,
         )
 
     loc = match.group(2) if match.group(2) else "1"
@@ -338,13 +339,14 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
     sub_name_clean = sub_name_clean.replace("-cyclo", "cyclo")
     if not sub_name_clean:
         raise ValueError("spiro side component marker removal left no named parent")
-    side_prefixes, side_parent_name, side_suffixes = extract_spiro_side_prefixes(sub_name_clean)
+    side_prefixes, side_parent_name, side_suffixes, side_stereo = extract_spiro_side_prefixes(sub_name_clean)
     return SpiroAssembly(
         parent_locant="",
         side_locant=loc,
         side_parent_name=side_parent_name,
         side_prefixes=tuple(side_prefixes),
         side_suffixes=tuple(side_suffixes),
+        side_stereo=side_stereo,
     )
 
 

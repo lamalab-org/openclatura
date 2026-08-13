@@ -2170,8 +2170,10 @@ def test_central_oxo_substituent_class_falls_back_when_unconfigured():
 
     assert role is not None
     assert central_oxo_substituent_prefix(role) is None
+    # The fallback cites no ligand, so it takes the substitutable
+    # ``phosphinoyl`` form rather than the trivalent ``phosphoryl`` hub.
     assert name_heteroatom_subgraph(mol, 1, exclude_atoms={0}, upstream_atom=0, branch_namer=_empty_branch_namer) == (
-        "phosphoryl"
+        "phosphinoyl"
     )
 
 
@@ -5788,9 +5790,33 @@ def test_azine_retained_and_simple_ring_sides_are_graph_bound():
     )
 
 
+def test_a_spiro_side_component_keeps_its_stereo_descriptors():
+    cases = {
+        "O=C1Nc2ccccc2[C@@]12CCN(C)[C@H]2C": "(2'S,3R)-1',2'-dimethylspiro[indoline-3,3'-pyrrolidine]-2-one",
+        "CC[C@@H]1CCC[C@]2(CC[C@@H]3C[C@@H]3CO2)C1": (
+            "(1S,3'R,4S,7R)-3'-ethylspiro[3-oxabicyclo[5.1.0]octane-4,1'-cyclohexane]"
+        ),
+        "C[C@H]1CC[C@]2(C1)CCCCC2": "(2S)-2-methylspiro[4.5]decane",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_an_oxidised_pnictogen_prefix_cites_two_ligands_or_says_inoyl():
+    cases = {
+        "CCOP(=O)c1ccccc1": "(ethoxyphosphinoyl)benzene",
+        "FCCCP(=O)O": "1-fluoro-3-(hydroxyphosphinoyl)propane",
+        "CCP(=O)(O)CC": "1-((ethyl)(hydroxy)phosphoryl)ethane",
+        "CO[P+]([O-])(OC)c1ccccc1": "(dimethoxyphosphoryl)benzene",
+        "CCP(=O)([O-])CCC": "1-(ethyloxido(oxo)phosphanyl)propane",
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
 def test_a_cation_outranks_the_neutral_characteristic_groups():
-    # Cations are the senior class (P-41), so the ketone, the lactone and the
-    # acid all fall back to prefixes and the nitrogen takes the suffix.
     cases = {
         "[NH3+]CCCC(C)C(C)=O": "4-methyl-5-oxohexan-1-aminium",
         "O=C(O)CC[NH3+]": "2-carboxyethan-1-aminium",

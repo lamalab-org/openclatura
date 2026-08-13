@@ -23627,7 +23627,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": null,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "implied_stereo": true
       }
     },
     {
