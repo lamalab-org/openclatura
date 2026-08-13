@@ -14,6 +14,7 @@ from typing import Any
 from rdkit import Chem
 
 from .engine import DEFAULT_NAMING_ENGINE, NamingRequest, NamingResult
+from .formatting import strip_outer_parentheses
 from .graph_io import read_smiles
 from .molecule import Molecule
 from .rules import stems
@@ -530,11 +531,26 @@ def _display_substituent_name(child: dict[str, Any], mol: Molecule) -> str:
 
     parent = child.get("parent") if isinstance(child.get("parent"), dict) else {}
     parent_label = _parent_substituent_label(parent)
+    # "methyl", "ethyl" and friends are built from the skeleton length alone, so
+    # they assert a saturated carbon chain. A doubly-bonded oxygen on that
+    # skeleton makes it an acyl instead, and the cyclopropylcarbonyl of
+    # "2-((cyclopropyl)carbonyl)phenyl acetate" was reporting as "a methyl
+    # group". Drop the claim and let the graph label or the node's own name
+    # describe it.
+    if parent_label and not parent.get("retained_name") and _has_oxo_child(child, mol):
+        parent_label = ""
     if parent_label:
         return parent_label
     graph_label = _graph_substituent_label(child, mol)
     if graph_label:
         return graph_label
+    # A node whose children tile it completely has no local role to read off the
+    # graph, so its own rendered name is the only honest label left. It is a
+    # local fragment name ("methylcarbonyl"), not the assembled substituent
+    # name, which is why this does not undo the local-naming rule above.
+    own_name = strip_outer_parentheses(str(child.get("name") or "")).strip()
+    if own_name:
+        return own_name
     return _readable_key(str(child.get("kind") or "substituent"))
 
 
@@ -594,6 +610,19 @@ def _graph_substituent_label(child: dict[str, Any], mol: Molecule) -> str:
     return ""
 
 
+def _has_oxo_child(child: dict[str, Any], mol: Molecule) -> bool:
+    """Does this fragment carry a doubly-bonded oxygen of its own?"""
+
+    for nested in _iter_child_nodes(child):
+        atoms = {int(atom) for atom in nested.get("atoms") or ()}
+        if len(atoms) != 1:
+            continue
+        only = next(iter(atoms))
+        if mol.atoms.get(only) is not None and mol.atoms[only].symbol == "O" and _is_doubly_bonded(mol, atoms):
+            return True
+    return False
+
+
 def _is_doubly_bonded(mol: Molecule, atom_ids: set[int]) -> bool:
     """Does a lone atom of this fragment attach by a double bond?"""
 
@@ -612,8 +641,13 @@ def _local_role_atoms(child: dict[str, Any]) -> set[int]:
     nested_atoms: set[int] = set()
     for nested in _iter_child_nodes(child):
         nested_atoms.update(int(atom) for atom in nested.get("atoms") or ())
-    local = atoms - nested_atoms
-    return local or atoms
+    # Deliberately not ``local or atoms``. An empty result means the node holds
+    # no atoms of its own — its children tile it completely — and describing it
+    # from all of its atoms then hands it the role of one of those children:
+    # "methylcarbonyl" (an acetyl) came back labelled "carbonyl", so aspirin's
+    # branch read "The carbonyl substituent carries a methyl group and a
+    # carbonyl group". An empty set lets the caller fall back to the node's name.
+    return atoms - nested_atoms
 
 
 def _has_double_bond_between(mol: Molecule, atom_ids: set[int], symbol_a: str, symbol_b: str) -> bool:

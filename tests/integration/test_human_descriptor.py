@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+
 from openclatura import HumanDescription, describe_human
 
 
@@ -153,6 +155,35 @@ def test_ring_and_double_bonded_substituents_are_named_correctly():
 
     assert "a cyclopropyl group" in text and "a propyl group" not in text
     assert "an oxo group" in text and "a hydroxy group" not in text
+
+
+def test_composite_fragment_is_not_labelled_as_one_of_its_own_parts():
+    """A node its children tile completely must not borrow a child's role.
+
+    Aspirin's acetyl ("methylcarbonyl") holds no atoms of its own, so the graph
+    label was derived from all of them and came back "carbonyl" — the role of
+    one of its two children. The branch then read "The carbonyl substituent
+    carries a methyl group and a carbonyl group".
+    """
+    lines = _body(describe_human("CC(=O)Oc1ccccc1C(=O)O"))
+
+    for line in lines:
+        match = re.match(r"\s*The (\S+) substituent.*carries (.*)\.$", line)
+        if match:
+            assert f"{match.group(1)} group" not in match.group(2), f"self-referential: {line}"
+    assert any("methylcarbonyl" in line for line in lines), lines
+
+
+def test_acyl_carbon_is_not_called_an_alkyl_group():
+    """"methyl" asserts a saturated CH3; a carbon bearing =O is an acyl.
+
+    The cyclopropylcarbonyl of this ester has a one-carbon skeleton, so the
+    stem-derived label called it "a methyl group".
+    """
+    text = str(describe_human("CC(=O)Oc1ccccc1C(=O)C1CC1"))
+
+    assert "carbonyl" in text
+    assert "a methyl group" not in text
 
 
 def test_no_coverage_note_when_the_whole_structure_is_described():
