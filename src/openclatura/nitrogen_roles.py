@@ -255,7 +255,7 @@ def _diazo_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -> li
                 _make_role(
                     mol,
                     key=template.key,
-                    is_principal_candidate=False,
+                    is_principal_candidate=template.key == "diazonio",
                     attachment_atom=carbon.idx,
                     atom_ids=frozenset({n1, n2}),
                     variant=template.variant,
@@ -557,12 +557,12 @@ def _hydrazone_attachment(mol: Molecule, carbon: int, cyclic_atoms: set[int]) ->
 def _hydrazine_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -> list[NitrogenChainRole]:
     roles = []
     for n1 in mol:
-        if n1.symbol != "N" or n1.idx in cyclic_atoms or n1.idx in blocked:
+        if n1.symbol != "N" or n1.idx in cyclic_atoms or n1.idx in blocked or n1.charge:
             continue
         n2_candidates = [
             n
             for n in mol.get_neighbors(n1.idx)
-            if n not in blocked and n not in cyclic_atoms and mol.atoms[n].symbol == "N"
+            if n not in blocked and n not in cyclic_atoms and mol.atoms[n].symbol == "N" and not mol.atoms[n].charge
         ]
         if len(n2_candidates) != 1:
             continue

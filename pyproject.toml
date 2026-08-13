@@ -71,6 +71,7 @@ exclude = [
     "/examples",
     "/evaluations",
     "/eval_failures",
+    "/tests",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -104,11 +105,7 @@ line-ending = "auto"
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-testpaths = [
-    "tests",
-    "src/openclatura/tests",
-    "src/openclatura/tests_roundtrip",
-]
+testpaths = ["tests"]
 addopts = [
     "-ra",
     "--strict-markers",
@@ -126,7 +123,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = ["openclatura"]
-omit = ["*/tests/*", "*/tests_roundtrip/*"]
+omit = ["tests/*"]
 
 [tool.coverage.report]
 exclude_lines = [

@@ -1,14 +1,3 @@
-"""Production gate for OPSIN-compatible retained fused derivatives.
-
-The graph-template matcher can recognize many retained fused cores, but a core
-match alone is not enough to safely name derivatives.  This module enables a
-small neutral aromatic derivative set only after substituents and principal
-groups have been collected, so the retained locant map is used only for
-OPSIN-verified grammar classes.
-"""
-
-from __future__ import annotations
-
 from dataclasses import dataclass
 
 from .assembly_parts import RetainedParentMetadata, SubstituentItem
@@ -83,7 +72,7 @@ def production_retained_fused_parent(
             and (principal_key != "ketone" or _has_mancude_unsaturation(mol, parent_atoms, match))
         ]
 
-    matches = gated(False) or gated(True) or gated(False, True)
+    matches = gated(False) or gated(True) or gated(False, True) or gated(True, True)
     if not matches:
         return None
 
@@ -103,30 +92,19 @@ def production_retained_fused_parent(
         name=parent_name,
         locant_maps=maps,
         metadata=RetainedParentMetadata(
-            default_indicated_h=template.default_indicated_h,
+            default_indicated_h=matches[0].indicated_h,
             fusion_locants=template.fusion_atoms,
             derivative_stem=template.derivative_stem,
             indicated_hydrogen_count=template.indicated_hydrogen_count,
             mancude_double_bonds=template.mancude_double_bonds or 0,
+            relocated_indicated_h=matches[0].indicated_h != template.default_indicated_h,
         ),
     )
 
 
 def _added_hydrogen_is_citable(mol: Molecule, match: RetainedFusedTemplateMatch) -> bool:
-    """Whether every saturated position of the parent can be spelt out.
-
-    A lactam such as 4-oxoquinoline-3-carboxamide saturates two ring positions
-    beyond what quinoline supports, and which two cannot be recovered from the
-    name -- OPSIN puts the hydrogen on C3 and reads a different molecule.  They
-    have to be cited, ``4-oxo-1,4-dihydroquinoline-3-carboxamide``, and only
-    parents wired into the indicated-hydrogen machinery can do that.  A parent
-    needing an uncitable added hydrogen falls back to von Baeyer, which states
-    its saturation positionally and so stays unambiguous.
-
-    Only a position the parent itself holds a mancude bond at can be saturated
-    "beyond" it.  Dibenzofuran's oxygen and quinolizine's bridgehead nitrogen
-    are single-bonded in the parent hydride, so they are not added hydrogen --
-    the template records that as ``aromatic: false``.
+    """
+    Whether every saturated position of the parent can be spelt out.
     """
 
     template = match.template
@@ -144,18 +122,13 @@ def _added_hydrogen_is_citable(mol: Molecule, match: RetainedFusedTemplateMatch)
         ]
         if ring_bonds and sum(bond.order for bond in ring_bonds) == len(ring_bonds):
             saturated += 1
-    # A fully saturated ring system is not a hydro derivative of this parent;
-    # it has its own name, and von Baeyer states its saturation positionally.
+
     if saturated and saturated >= mancude_positions:
         return False
-    # Indicated-hydrogen sites the template already marks non-mancude were not
-    # counted above, so they must not be subtracted again.
-    already_excluded = sum(1 for locant in template.default_indicated_h if not atom_by_locant[locant].aromatic)
+    already_excluded = sum(1 for locant in match.indicated_h if not atom_by_locant[locant].aromatic)
     surplus = saturated - (template.indicated_hydrogen_count - already_excluded)
     if surplus <= 0:
         return True
-    # A hydro prefix saturates whole double bonds, so an even surplus is citable
-    # as one: 1,2,3,4-tetrahydroquinoline, 4-oxo-1,4-dihydroquinoline-3-carboxamide.
     if surplus % 2 == 0:
         return True
     return template.name in INDICATED_H_RETAINED_NAMES

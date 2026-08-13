@@ -663,7 +663,7 @@ def _bicyclo_edges_from_numbering(
 
 
 def internal_degrees(atoms: frozenset[int], edges: frozenset[tuple[int, int]]) -> dict[int, int]:
-    degrees = {atom: 0 for atom in atoms}
+    degrees = dict.fromkeys(atoms, 0)
     for first, second in edges:
         degrees[first] += 1
         degrees[second] += 1

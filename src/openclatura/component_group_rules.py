@@ -19,17 +19,17 @@ AtomSelector = Callable[[Molecule, PerceivedGroup], int | None]
 
 NONPARENT_ATOM_SELECTORS: dict[str, AtomSelector] = {"anhydride": bridge_oxygen}
 NONPARENT_ATOM_SELECTORS.update(
-    {
-        key: ester_single_oxygen
-        for key in RULES.functional_groups.keys_with_family("ester_like")
-        - RULES.functional_groups.keys_with_family("peroxy_ester")
-    }
+    dict.fromkeys(
+        RULES.functional_groups.keys_with_family("ester_like")
+        - RULES.functional_groups.keys_with_family("peroxy_ester"),
+        ester_single_oxygen,
+    )
 )
 NONPARENT_ATOM_SELECTORS.update(
-    {key: peroxy_ester_single_oxygen for key in RULES.functional_groups.keys_with_family("peroxy_ester")}
+    dict.fromkeys(RULES.functional_groups.keys_with_family("peroxy_ester"), peroxy_ester_single_oxygen)
 )
-NONPARENT_ATOM_SELECTORS.update({key: sulfonyl_sulfur for key in RULES.functional_groups.keys_with_family("sulfonyl")})
-NONPARENT_ATOM_SELECTORS.update({key: amide_nitrogen for key in RULES.functional_groups.keys_with_family("amide_like")})
+NONPARENT_ATOM_SELECTORS.update(dict.fromkeys(RULES.functional_groups.keys_with_family("sulfonyl"), sulfonyl_sulfur))
+NONPARENT_ATOM_SELECTORS.update(dict.fromkeys(RULES.functional_groups.keys_with_family("amide_like"), amide_nitrogen))
 
 
 def retarget_external_carbonyl_groups(

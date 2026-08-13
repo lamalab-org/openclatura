@@ -13,7 +13,6 @@ from .naming_data import grouped_namer_rules
 
 @dataclass(frozen=True)
 class RetainedNameRules:
-    indicated_hydrogen_names: set[str]
     ring_elements: set[str]
     substituent_stems: dict[str, tuple[str, str]]
     monocycle_specs: tuple[dict, ...]
@@ -380,7 +379,6 @@ def registry() -> NomenclatureRegistry:
     assembly_grammar = groups["assembly_grammar"]
     return NomenclatureRegistry(
         retained=RetainedNameRules(
-            indicated_hydrogen_names=set(retained.values("indicated_hydrogen_retained_names")),
             ring_elements=set(retained.values("retained_ring_elements")),
             substituent_stems=_group_tuple_mapping("retained_parents", "retained_substituent_stems"),
             monocycle_specs=tuple(retained.values("retained_monocycle_specs")),

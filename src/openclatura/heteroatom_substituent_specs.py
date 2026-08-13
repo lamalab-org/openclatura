@@ -13,6 +13,7 @@ class HeteroatomSubstituentSpec:
 
     unsubstituted_prefixes: dict[int, str]
     ligand_prefixes: dict[int, str]
+    ligand_deficient_prefixes: dict[int, str] | None = None
     ligand_join_mode: str = "concat"
 
 
@@ -47,6 +48,10 @@ def heteroatom_substituent_specs() -> dict[str, HeteroatomSubstituentSpec]:
         symbol: HeteroatomSubstituentSpec(
             unsubstituted_prefixes={int(count): prefix for count, prefix in spec["unsubstituted_prefixes"].items()},
             ligand_prefixes={int(count): prefix for count, prefix in spec["ligand_prefixes"].items()},
+            ligand_deficient_prefixes={
+                int(count): prefix for count, prefix in spec.get("ligand_deficient_prefixes", {}).items()
+            }
+            or None,
             ligand_join_mode=spec.get("ligand_join_mode", "concat"),
         )
         for symbol, spec in data.items()
@@ -91,6 +96,17 @@ def unsubstituted_prefix(symbol: str, oxo_count: int = 0) -> str | None:
 
     spec = spec_for_symbol(symbol)
     return None if spec is None else spec.unsubstituted_prefixes.get(oxo_count)
+
+
+def ligand_deficient_prefix(symbol: str, oxo_count: int) -> str | None:
+    """
+    Return the prefix for an oxidised centre carrying too few ligands.
+    """
+
+    spec = spec_for_symbol(symbol)
+    if spec is None or spec.ligand_deficient_prefixes is None:
+        return None
+    return spec.ligand_deficient_prefixes.get(oxo_count)
 
 
 def ligand_prefix(symbol: str, ligand_name: str, oxo_count: int = 0) -> str | None:
