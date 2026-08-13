@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-08-14
+
+### Changed
+
+- Excluded the hosted website bundle, bundled Java runtime, and local lockfile
+  from source distributions, reducing the archive size substantially.
+
+### Fixed
+
+- Replaced repository-relative README links with absolute GitHub URLs so the
+  demo image and documentation links render correctly on PyPI.
+
 ## [0.3.0] - 2026-08-13
 
 ### Added
@@ -142,7 +154,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial deterministic IUPAC name generation from molecular structures.
 
-[Unreleased]: https://github.com/lamalab-org/openclatura/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/lamalab-org/openclatura/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/lamalab-org/openclatura/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/lamalab-org/openclatura/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/lamalab-org/openclatura/compare/db7d1d4...7ed75cb
 [0.2.0]: https://github.com/lamalab-org/openclatura/compare/8fe914e...db7d1d4
