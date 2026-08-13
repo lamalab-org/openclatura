@@ -714,7 +714,51 @@ def _teach_tokens(name: str, spans: list, mol) -> list[dict]:
         taken |= positions
         tokens.append(token)
     tokens.sort(key=lambda t: (t["start"], t["end"]))
-    return _merge_unresolved(name, tokens)
+    return _narrow_scope_heads(_merge_unresolved(name, tokens), mol)
+
+
+def _narrow_scope_heads(tokens: list[dict], mol) -> list[dict]:
+    """Trim a catch-all token down to the atoms its own word denotes.
+
+    A token kind outside the known grammar is the engine saying it could not
+    place the word, and its fallback is to bind the whole enclosing scope. So in
+    "1-(3-((2-ethylphenyl)amino)phenyl)ethan-1-one" the final "phenyl" came back
+    owning all fifteen atoms of the substituent — both rings, the NH and the
+    ethyl — when it names only the ring the rest hangs off.
+
+    That word is the head of the substituent name, and a head denotes what is
+    left once its modifiers are accounted for, so subtracting the atoms of the
+    tokens nested inside it recovers exactly the ring.
+
+    Restricted to catch-all kinds on purpose: a parent legitimately contains its
+    own suffix ("benzoic" spans the ring *and* the acid carbon it shares with
+    "acid"), and subtracting there would eat the attachment atom.
+    """
+    for token in tokens:
+        if token["role"] != _GENERIC_ROLE:
+            continue
+        own = set(token["atoms"])
+        if not own:
+            continue
+        nested: set[int] = set()
+        for other in tokens:
+            # A locant points at a position rather than naming a constituent, so
+            # its atoms are not a part to subtract. They are also the least
+            # reliable bindings: the "2" of "2-ethylphenyl" here comes back
+            # owning a carbon of the *other* ring, which would otherwise punch a
+            # hole in the ring this head denotes.
+            if other is token or other["kind"] == "locant":
+                continue
+            other_atoms = set(other["atoms"])
+            if other_atoms and other_atoms < own:
+                nested |= other_atoms
+        remaining = own - nested
+        # Everything subtracted means the word adds nothing of its own; keep the
+        # original binding rather than highlight nothing at all.
+        if remaining and remaining != own:
+            token["atoms"] = sorted(remaining)
+            token["bonds"] = _enclosed_bonds(mol, token["atoms"])
+    return tokens
 
 
 def _merge_unresolved(name: str, tokens: list[dict]) -> list[dict]:
