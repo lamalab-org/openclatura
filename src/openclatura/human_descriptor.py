@@ -72,7 +72,65 @@ def describe_human(smiles: str, verify_opsin: bool = False) -> HumanDescription:
         if description:
             paragraphs.append(description)
 
+    gap = _coverage_gap(result.substituent_tree, mol)
+    if gap:
+        paragraphs.append(gap)
+
     return HumanDescription(smiles=smiles, name=result.name, paragraphs=tuple(paragraphs), result=result)
+
+
+def _coverage_gap(trees: list[dict[str, Any]], mol: Molecule) -> str:
+    """Report atoms the prose never accounted for, instead of dropping them.
+
+    The description can only say what the naming metadata carries, and that is
+    not always the whole molecule: for an ester such as
+    "2-((cyclopropyl)carbonyl)phenyl acetate" the tree holds the acetate parent
+    and the ester group and nothing at all for the alcohol half, so eleven of
+    fifteen atoms have no metadata to describe. Silently omitting most of a
+    structure is the worst of the options — saying so keeps the description
+    honest and makes the engine-side gap visible rather than invisible.
+    """
+    if not trees:
+        return ""
+    described: set[int] = set()
+    for node in trees:
+        described |= _described_atoms(node)
+    total = {idx for idx in mol.atoms}
+    missing = total - described
+    if not missing:
+        return ""
+    return (
+        f"This description covers {len(described)} of the {len(total)} atoms; "
+        f"the naming metadata does not describe the remaining {len(missing)}."
+    )
+
+
+def _described_atoms(node: dict[str, Any]) -> set[int]:
+    """Atoms the rendered sentences actually spoke about.
+
+    Deliberately not ``node['atoms']``: a component node claims every atom it
+    spans, including parts no sentence mentions, which would report full
+    coverage for exactly the cases this is meant to catch.
+    """
+    if not isinstance(node, dict):
+        return set()
+    described: set[int] = set()
+    parent = node.get("parent")
+    if isinstance(parent, dict):
+        described |= {int(atom) for atom in parent.get("atoms") or ()}
+    for key in ("principal_group", "functional_prefix"):
+        item = node.get(key)
+        if isinstance(item, dict):
+            described |= {int(atom) for atom in item.get("atoms") or ()}
+    for item in node.get("replacement_prefixes") or ():
+        if isinstance(item, dict):
+            described |= {int(atom) for atom in item.get("atoms") or item.get("atom_ids") or ()}
+    # A child is named as a whole even when it is not expanded, so all of its
+    # atoms count as described.
+    for child in _iter_child_nodes(node):
+        described |= {int(atom) for atom in child.get("atoms") or ()}
+        described |= _described_atoms(child)
+    return described
 
 
 def _processed_smiles_sentence(smiles: str) -> str:
@@ -139,6 +197,19 @@ def _next_smiles_atom_token(smiles: str, pos: int) -> tuple[str | None, int]:
 
 
 def _describe_node(node: dict[str, Any], mol: Molecule, *, subject: str, depth: int) -> str:
+    """Render one node and everything below it, one sentence per line.
+
+    Every line states whose framework it is talking about. That is the whole
+    point of ``subject``: a node deeper in the tree describes a substituent, and
+    saying "Attached to this framework ..." there reads as another substituent
+    on the principal parent. Before, a node carrying no parent metadata dropped
+    its subject entirely, so aspirin's acetoxy branch rendered as three
+    unanchored "Attached to this framework ..." lines that all appeared to hang
+    off the benzene ring.
+
+    Depth also indents, so the nesting survives even where two levels happen to
+    describe similarly named groups.
+    """
     sentences: list[str] = []
     parent = node.get("parent") or {}
     parent_sentence = _parent_sentence(subject, parent)
@@ -161,22 +232,27 @@ def _describe_node(node: dict[str, Any], mol: Molecule, *, subject: str, depth: 
     if charge_sentence:
         sentences.append(charge_sentence)
 
-    substituent_sentence = _substituent_summary_sentence(node, mol)
+    # Once a parent sentence has named the subject, "It carries ..." is enough;
+    # otherwise this sentence is where the subject gets introduced at all.
+    substituent_sentence = _substituent_summary_sentence(
+        node, mol, subject=subject, depth=depth, subject_introduced=bool(parent_sentence)
+    )
     if substituent_sentence:
         sentences.append(substituent_sentence)
 
-    child_sentences: list[str] = []
+    lines = [_indent(sentence, depth) for sentence in sentences]
     for child in _iter_child_nodes(node):
         if not _should_expand_child(child):
             continue
         child_subject = _child_subject(child, parent, mol)
         rendered = _describe_node(child, mol, subject=child_subject, depth=depth + 1)
         if rendered:
-            child_sentences.append(rendered)
+            lines.append(rendered)
+    return "\n".join(lines)
 
-    if child_sentences:
-        sentences.extend(child_sentences)
-    return "\n".join(sentences)
+
+def _indent(sentence: str, depth: int) -> str:
+    return "  " * depth + sentence
 
 
 def _parent_sentence(subject: str, parent: dict[str, Any]) -> str:
@@ -326,7 +402,14 @@ def _charge_sentence(node: dict[str, Any]) -> str:
     return "The parent carries " + _join_phrases(phrases) + "."
 
 
-def _substituent_summary_sentence(node: dict[str, Any], mol: Molecule) -> str:
+def _substituent_summary_sentence(
+    node: dict[str, Any],
+    mol: Molecule,
+    *,
+    subject: str = "",
+    depth: int = 0,
+    subject_introduced: bool = False,
+) -> str:
     children = list(_iter_child_nodes(node, recurse_group_instances=False))
     if not children:
         return ""
@@ -342,8 +425,14 @@ def _substituent_summary_sentence(node: dict[str, Any], mol: Molecule) -> str:
             phrases.append(f"{display_name} at {_positions(locants, node.get('parent') or {})}")
         else:
             phrases.append(display_name)
-    verb = "are" if has_plural or len(phrases) > 1 else "is"
-    return f"Attached to this framework {verb} " + _join_phrases(phrases) + "."
+    listed = _join_phrases(phrases)
+    if depth == 0:
+        verb = "are" if has_plural or len(phrases) > 1 else "is"
+        return f"Attached to this framework {verb} {listed}."
+    # Below the top level "this framework" would read as the principal parent,
+    # so the substituent has to name itself.
+    holder = "It" if subject_introduced else subject
+    return f"{holder} carries {listed}."
 
 
 def _iter_child_nodes(node: dict[str, Any], *, recurse_group_instances: bool = True):
