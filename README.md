@@ -1,19 +1,51 @@
+<div align="center">
+
 # openclatura
 
-**Open Nomenclature Framework**
+**SMILES in, IUPAC name out — deterministically, and with the reasoning attached.**
 
-`openclatura` is a deterministic SMILES-to-IUPAC name generator inspired by the IUPAC Blue Book 2013 recommendations.
+[![PyPI](https://img.shields.io/pypi/v/openclatura.svg)](https://pypi.org/project/openclatura/)
+[![Python](https://img.shields.io/pypi/pyversions/openclatura.svg)](https://pypi.org/project/openclatura/)
+[![CI](https://github.com/lamalab-org/openclatura/actions/workflows/ci.yml/badge.svg)](https://github.com/lamalab-org/openclatura/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Built on top of RDKit, the package walks the molecular graph, detects functional groups and ring systems, selects the principal parent, assigns locants, and constructs the corresponding substitutive IUPAC name. Every step is recorded in an inspectable
-decision trace so the *why* of a name is recoverable, not just the *what*.
+![openclatura demo](assets/openclatura-demo.gif)
 
-Systematic backbone stems are supported for chains and rings containing from 1
-through 1000 skeletal atoms, following IUPAC Blue Book P-14.2.1.
+</div>
 
-> **Status:** beta. The naming engine handles a broad slice of organic
-> structures (alkanes/alkenes/alkynes, common functional groups, simple
-> heterocycles, fused/spiro/bridged systems, retained names from the Blue
-> Book). PubChem/QM9/ZINC22 coverage is 99/97/100 %; see `evaluations/` .
+`openclatura` names molecules the way the IUPAC Blue Book (2013) says to. It
+walks the RDKit molecular graph, perceives functional groups and ring systems,
+picks the principal parent, numbers it, and assembles the substitutive name.
+
+There is no model and no lookup table: the same structure always yields the same
+name, and every choice along the way is recorded in a decision trace, so the
+*why* of a name is recoverable and not just the *what*.
+
+**What that buys you**
+
+- **Auditable.** Each name carries the Blue Book rules it hit (`P-44`, `P-61`, …)
+  and a step-by-step trace of parse → perception → parent → numbering → assembly.
+- **Broad.** Chains and rings from 1 to 1000 skeletal atoms (P-14.2.1), plus
+  fused, spiro and bridged systems, and the Blue Book's retained names.
+- **Verifiable.** Optional round-trip through [OPSIN](https://github.com/dan2097/opsin):
+  parse the generated name back to a structure and compare.
+- **Explainable.** `describe()` renders the trace as prose — useful for teaching
+  material and for building (SMILES, name, description) datasets.
+
+### Coverage
+
+Round-trip accuracy against public datasets (details and rerun instructions in
+[`evaluations/`](evaluations/)):
+
+| dataset  | coverage |
+| -------- | -------- |
+| QM9      | 100 %    |
+| PubChem  | 99.3 %   |
+| ZINC22   | 97.4 %   |
+
+The package is in **beta**. Naming is solid across common organic chemistry;
+exotic corners of the Blue Book — and stereodescriptor edge cases — are still
+being filled in. Bug reports are very welcome.
 
 ## Install
 
@@ -127,7 +159,8 @@ analysis = analyze_smiles("CC(=O)Nc1ccccc1")
 for step in analysis.decisions:
     print(step.phase, step.decision, step.reason)
 ```
-### CLI
+
+## CLI
 
 ```bash
 openclatura name "CC(=O)Nc1ccccc1"            # → N-phenylacetamide
@@ -155,12 +188,15 @@ Other possible skipped statuses include `skipped_no_opsin` when `py2opsin` is
 not installed. Install `openclatura[opsin]` and Java 8+ for full CLI
 verification.
 
-### Natural-language description (`describe`)
+## Explaining a name
 
-`openclatura.describe(smiles)` walks the same trace and renders a
-deterministic, multi-paragraph explanation of how the name is built.
-Useful for explainability views and for generating (SMILES, name,
-description) training tuples:
+Two renderers turn the same decision trace into prose. Both are deterministic —
+same input, same output, no LLM in the loop.
+
+### `describe` — rule-by-rule
+
+A multi-paragraph account of how the name was built, keyed to the Blue Book
+rules that fired:
 
 ```python
 from openclatura import describe
@@ -171,19 +207,20 @@ d.rules_hit         # ('P-44', 'P-45', 'P-41', 'P-61', 'P-67')
 d.components[0]     # DescribedComponent(phase='parse', text='RDKit parsed ...')
 ```
 
-Same input → same output. No LLM in the loop.
+### `describe_human` — how a chemist would say it
 
-## Human-like description
+The same information, phrased the way a person would explain the structure at a
+whiteboard, with every position tied back to an atom index in the SMILES:
 
-Openclatura can generate uncanny human-like descriptions of molecules.
 ```python
-
 from openclatura import describe_human
 
-d = describe_human("CN1C=NC2=C1C(=O)N(C(=O)N2C)C")
+d = describe_human("CN1C=NC2=C1C(=O)N(C(=O)N2C)C")   # caffeine
 print(d.text)
+```
 
-""" Input SMILES: CN1C=NC2=C1C(=O)N(C(=O)N2C)C
+```text
+Input SMILES: CN1C=NC2=C1C(=O)N(C(=O)N2C)C
 Processed SMILES: Cn1cnc2c1c(=O)n(C)c(=O)n2C
 Atom ids in that SMILES: C{0}n{1}1c{2}n{3}c{4}2c{5}1c{6}(=O{7})n{8}(C{13})c{9}(=O{10})n{11}2C{12}
 
@@ -192,8 +229,7 @@ The molecule is named 1,3,7-trimethylpurine-2,6-dione.
 The molecule is built around the retained purine parent, 9-membered bicyclic [4.3.0] heteroskeleton.
 Within that parent framework, there is nitrogen at positions 1 (atom id 8), 3 (atom id 11), 7 (atom id 1), and 9 (atom id 3).
 The principal characteristic feature is oxo groups at positions 2 (atom id 9) and 6 (atom id 6).
-Attached to this framework are methyl groups at positions 1 (atom id 8), 3 (atom id 11), and 7 (atom id 1). """
-
+Attached to this framework are methyl groups at positions 1 (atom id 8), 3 (atom id 11), and 7 (atom id 1).
 ```
 
 ## Development

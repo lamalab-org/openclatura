@@ -9,7 +9,11 @@ from .formatting import (
     oxy_prefix_from_branch,
     strip_outer_parentheses,
 )
-from .heteroatom_substituent_specs import central_oxo_substituent_prefix, unsubstituted_prefix
+from .heteroatom_substituent_specs import (
+    central_oxo_substituent_prefix,
+    ligand_deficient_prefix,
+    unsubstituted_prefix,
+)
 from .heterocumulene_roles import nitrogen_heterocumulene_role
 from .hypervalent_roles import HypervalentCenterRole, HypervalentLigandRole, hypervalent_center_role
 from .ionic_naming import ammonio_prefix
@@ -824,8 +828,18 @@ def name_pnictogen_subgraph(
     p_oxygens = central_oxo_substituent_excluded_ligand_atoms(mol, start_idx, exclude_atoms)
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom, p_oxygens)
     stereo_prefix_text = stereo_prefix(mol.atoms[start_idx])
+    named_class = central_oxo_substituent_prefix_for_center(mol, start_idx, exclude_atoms)
+    # ``phosphoryl`` is the trivalent P(=O) hub and only spells a group citing
+    # two ligands; with fewer, the substitutable ``phosphinoyl`` form is read
+    # back correctly instead of binding the open valences to the parent.
+    deficient = None if named_class else ligand_deficient_prefix(symbol, len(p_oxygens) or 0)
+    if deficient is None and not named_class and p_oxygens:
+        deficient = ligand_deficient_prefix(symbol, 1)
+    if deficient is not None and len(next_atoms) >= 2:
+        deficient = None
     suffix = (
-        central_oxo_substituent_prefix_for_center(mol, start_idx, exclude_atoms)
+        named_class
+        or deficient
         or unsubstituted_prefix(symbol, len(p_oxygens))
         # More oxygens than any configured class: fall back to the element's
         # own oxidised or plain prefix rather than leaving the centre unnamed.

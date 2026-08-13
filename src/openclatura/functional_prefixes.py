@@ -234,8 +234,8 @@ def fallback_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> st
 
 
 PREFIX_HANDLERS: dict[str, PrefixHandler] = {}
-PREFIX_HANDLERS.update({key: ester_prefix_handler for key in RULES.functional_groups.keys_with_family("ester_like")})
-PREFIX_HANDLERS.update({key: amide_prefix_handler for key in RULES.functional_groups.keys_with_family("amide_like")})
+PREFIX_HANDLERS.update(dict.fromkeys(RULES.functional_groups.keys_with_family("ester_like"), ester_prefix_handler))
+PREFIX_HANDLERS.update(dict.fromkeys(RULES.functional_groups.keys_with_family("amide_like"), amide_prefix_handler))
 PREFIX_HANDLERS.update(
     {key: static_prefix_handler("carboxy") for key in RULES.functional_groups.keys_with_family("carboxy_prefix")}
 )
@@ -243,7 +243,7 @@ PREFIX_HANDLERS.update(
     {key: static_prefix_handler("cyano") for key in RULES.functional_groups.keys_with_family("cyano_prefix")}
 )
 PREFIX_HANDLERS.update(
-    {key: acid_halide_prefix_handler for key in RULES.functional_groups.keys_with_family("acid_halide")}
+    dict.fromkeys(RULES.functional_groups.keys_with_family("acid_halide"), acid_halide_prefix_handler)
 )
 PREFIX_HANDLERS.update(
     {
@@ -251,10 +251,8 @@ PREFIX_HANDLERS.update(
         for key in RULES.functional_groups.keys_with_family("peroxy_acid")
     }
 )
-PREFIX_HANDLERS.update({key: sulfonyl_prefix_handler for key in RULES.functional_groups.keys_with_family("sulfonyl")})
-PREFIX_HANDLERS.update(
-    {key: direct_prefix_handler for key in RULES.functional_groups.keys_with_family("direct_prefix")}
-)
+PREFIX_HANDLERS.update(dict.fromkeys(RULES.functional_groups.keys_with_family("sulfonyl"), sulfonyl_prefix_handler))
+PREFIX_HANDLERS.update(dict.fromkeys(RULES.functional_groups.keys_with_family("direct_prefix"), direct_prefix_handler))
 PREFIX_HANDLERS["imino_prefix"] = imino_prefix_handler
 PREFIX_HANDLERS["iminium"] = iminium_prefix_handler
 PREFIX_HANDLERS["hydrazine"] = hydrazine_prefix_handler

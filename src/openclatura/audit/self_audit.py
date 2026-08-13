@@ -51,9 +51,6 @@ def _naming_recursion_depth() -> int:
     return depth
 
 
-# Verdict precedence when several components disagree: a single refuted or
-# unnamed component condemns the whole molecule; otherwise we can only claim
-# confirmation when every component was positively confirmed.
 _PRECEDENCE = {"error": 3, "mismatch": 2, "abstained": 1, "confirmed": 0}
 
 
@@ -79,8 +76,6 @@ def capture_component_audits():
 
     previous = cn.COMPONENT_AUDIT_HOOK
     cn.COMPONENT_AUDIT_HOOK = hook
-    # Independent modern-CIP labelling is audit-only overhead; enable it for the
-    # duration of the block so the stereo gate has an oracle to verify against.
     previous_cip = graph_io._AUDIT_CIP_ENABLED
     graph_io.set_audit_cip_enabled(True)
     try:

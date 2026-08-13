@@ -33,6 +33,9 @@
       "ligand_prefixes": {
         "0": "phosphanyl",
         "1": "phosphoryl"
+      },
+      "ligand_deficient_prefixes": {
+        "1": "phosphinoyl"
       }
     },
     "S": {
@@ -87,6 +90,9 @@
       "ligand_prefixes": {
         "0": "arsanyl",
         "1": "arsoryl"
+      },
+      "ligand_deficient_prefixes": {
+        "1": "arsinoyl"
       }
     },
     "Sb": {
@@ -97,6 +103,9 @@
       "ligand_prefixes": {
         "0": "stibanyl",
         "1": "stiboryl"
+      },
+      "ligand_deficient_prefixes": {
+        "1": "stibinoyl"
       }
     }
   },
@@ -307,6 +316,33 @@
       "alkoxy": 0,
       "peroxy": 0,
       "prefix": "dioxostibanyl"
+    },
+    {
+      "symbol": "P",
+      "oxo": 1,
+      "oxido": 1,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "oxido(oxo)phosphanyl"
+    },
+    {
+      "symbol": "As",
+      "oxo": 1,
+      "oxido": 1,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "oxido(oxo)arsanyl"
+    },
+    {
+      "symbol": "Sb",
+      "oxo": 1,
+      "oxido": 1,
+      "hydroxy": 0,
+      "alkoxy": 0,
+      "peroxy": 0,
+      "prefix": "oxido(oxo)stibanyl"
     }
   ]
 }

@@ -17,12 +17,8 @@ from .nitrogen_roles import amidinohydrazone_tail_atoms, nitrogen_chain_roles
 
 @dataclass
 class PerceivedGroup:
-    """Functional-group perception result bound to graph atoms and metadata.
-
-    The first four fields are the legacy contract used throughout namer.py.
-    The remaining fields make the object self-describing: rule metadata,
-    atom-role bindings, bond-role bindings, and short reasons explaining why
-    the detector emitted the group.
+    """
+    Functional-group perception result bound to graph atoms and metadata.
     """
 
     key: str
@@ -88,7 +84,7 @@ def _perceive_groups_uncached(mol: Molecule) -> list[PerceivedGroup]:
         specs = BUILTIN_PERCEPTION_SPECS
     for spec in specs:
         groups.extend(spec.detector(mol))
-    return _enrich_groups(mol, groups)
+    return _enrich_groups(mol, _demote_zwitterion_cations(mol, groups))
 
 
 def perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
@@ -133,6 +129,48 @@ def _closes_ring_back_to(mol: Molecule, carbon: int, hetero: int, double_o: int,
                 visited.add(nxt)
                 queue.append(nxt)
     return False
+
+
+CATIONIC_SUFFIX_GROUP_KEYS = frozenset({"aminium", "iminium", "diazonio"})
+ANIONIC_SUFFIX_GROUP_KEYS = frozenset({"olate", "thiolate", "carboxylate", "ring_carboxylate", "sulfonate"})
+
+
+def _connected_component(mol: Molecule, idx: int) -> set[int]:
+    """Return the atoms reachable from ``idx``."""
+
+    seen = {idx}
+    stack = [idx]
+    while stack:
+        current = stack.pop()
+        for neighbor in mol.get_neighbors(current):
+            if neighbor not in seen:
+                seen.add(neighbor)
+                stack.append(neighbor)
+    return seen
+
+
+def _demote_zwitterion_cations(mol: Molecule, groups: list[PerceivedGroup]) -> list[PerceivedGroup]:
+    """Keep a cationic group out of the suffix slot when it shares a zwitterion.
+
+    A lone cation outranks every neutral group (P-41) and takes the suffix, but
+    in a zwitterion the anion keeps it and the cation is cited as a prefix:
+    betaine is 2-(trimethylammonio)acetate.  Skeletal ``-ide`` centres are not
+    characteristic groups, and a counter-ion is a separate component.
+    """
+
+    cations = [group for group in groups if group.key in CATIONIC_SUFFIX_GROUP_KEYS]
+    if not cations:
+        return groups
+    anion_atoms = {group.attachment_carbon for group in groups if group.key in ANIONIC_SUFFIX_GROUP_KEYS}
+    if not anion_atoms:
+        return groups
+    for cation in cations:
+        if not cation.is_principal_candidate:
+            continue
+        component = _connected_component(mol, cation.attachment_carbon)
+        if anion_atoms & component:
+            cation.is_principal_candidate = False
+    return groups
 
 
 def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
@@ -608,9 +646,11 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                     consumed.update([atom.idx])
 
     for atom in mol:
-        if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
+        if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms and not atom.charge:
             c_neighbors = [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].is_carbon]
-            n_neighbors = [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "N"]
+            n_neighbors = [
+                n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "N" and not mol.atoms[n].charge
+            ]
 
             if len(n_neighbors) > 0:
                 n2 = n_neighbors[0]
@@ -651,9 +691,7 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                     bond = mol.get_bond(atom.idx, c_idx)
                     if bond.order == 2:
                         if mol.atoms[c_idx].is_carbon:
-                            if c_idx in cyclic_atoms:
-                                groups.append(PerceivedGroup("ketone", True, c_idx, {atom.idx}))
-                            elif len(mol.get_neighbors(c_idx)) >= 3:
+                            if c_idx in cyclic_atoms or len(mol.get_neighbors(c_idx)) >= 3:
                                 groups.append(PerceivedGroup("ketone", True, c_idx, {atom.idx}))
                             else:
                                 ring_neighbors = [n for n in mol.get_neighbors(c_idx) if n in cyclic_atoms]
@@ -684,8 +722,10 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             adj_atoms = mol.get_neighbors(atom.idx)
             if len(adj_atoms) > 0:
                 key = "aminium" if atom.charge > 0 else "amine"
+
+                principal = key != "aminium" or all(mol.get_bond(atom.idx, n).order == 1 for n in adj_atoms)
                 for c in adj_atoms:
-                    groups.append(PerceivedGroup(key, True, c, {atom.idx}))
+                    groups.append(PerceivedGroup(key, principal, c, {atom.idx}))
                 consumed.add(atom.idx)
 
     for atom in mol:
@@ -764,11 +804,8 @@ def _bond_bindings_for_group(mol: Molecule, group: PerceivedGroup) -> tuple[Bond
 
 
 def _has_senior_nitrogen_ligand(mol: Molecule, nitrogen: int, center: int) -> bool:
-    """Whether an imino nitrogen's substituent binds it into a senior group.
-
-    An acyl carbon makes the nitrogen an amide's, and another nitrogen makes it
-    a hydrazone's.  Either way the nitrogen is spoken for, and citing it as an
-    ``imino`` prefix here would take it from the suffix that owns it.
+    """
+    Whether an imino nitrogen's substituent binds it into a senior group.
     """
 
     for ligand in mol.get_neighbors(nitrogen):

@@ -1115,7 +1115,7 @@ def _polyspiro_or_von_baeyer_candidate(
 
 
 def _has_multiple_spiro_centers(nodes: set[int], edges: set[tuple[int, int]]) -> bool:
-    degrees = {node: 0 for node in nodes}
+    degrees = dict.fromkeys(nodes, 0)
     for u, v in edges:
         degrees[u] += 1
         degrees[v] += 1

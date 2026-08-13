@@ -22,6 +22,7 @@ from .oxoacid_templates import OxoacidTemplateKind, oxoacid_role_template
 from .perception import PerceivedGroup, perceive_groups
 from .retained_specs import retained_parent_spec
 from .rules import multipliers, retained, stems
+from .subgraph_tools import subgraph_component
 
 ComponentNamer = Callable[..., str]
 
@@ -131,6 +132,7 @@ def structural_replacement_parent_result(
         ("oxoacid_ester", lambda: oxoacid_ester_result(mol, component_atoms, branch_namer)),
         ("oxoacid_parent", lambda: oxoacid_parent_result(mol, component_atoms)),
         ("organophosphinic_acid", lambda: organophosphinic_acid_result(mol, component_atoms)),
+        ("organophosphonic_acid", lambda: organophosphonic_acid_result(mol, component_atoms, branch_namer)),
         ("sulfoxide_parent", lambda: sulfoxide_parent_result(mol, component_atoms)),
         ("homonuclear_chain_parent", lambda: homonuclear_chain_parent_result(mol, component_atoms, branch_namer)),
         ("simple_central_parent_hydride", lambda: simple_central_parent_hydride_result(mol, component_atoms)),
@@ -1681,6 +1683,144 @@ def organophosphinic_acid_result(mol: Molecule, component_atoms: set[int]) -> Sp
     return _component_name_result(mol, component_atoms, name, "organophosphinic_acid", bindings=bindings)
 
 
+def organophosphonic_acid_result(
+    mol: Molecule,
+    component_atoms: set[int],
+    branch_namer: RecursiveSubgraphNamer | None = None,
+) -> SpecialComponentName | None:
+    """Name R-P(=O)(OH)2 phosphonic acids and their esters.
+
+    Phosphonic acid is a functional parent, so the carbon ligand is a prefix on
+    it -- phenylphosphonic acid, dimethyl phenylphosphonate -- rather than the
+    acid being a suffix on a carbon parent.
+    """
+
+    phosphorus = [idx for idx in component_atoms if mol.atoms[idx].symbol == "P"]
+    if len(phosphorus) != 1:
+        return None
+    central = phosphorus[0]
+    if mol.atoms[central].total_h_count:
+        return None
+    # A cyclic phosphonate is a ring parent; naming it here would open the ring.
+    if central in get_cyclic_atoms(mol):
+        return None
+    # A configured phosphorus needs a descriptor this spelling cannot carry.
+    if mol.atoms[central].stereo or mol.atoms[central].raw_stereo:
+        return None
+    # Phosphonic acid only names the component when nothing outranks it; an
+    # amide or an acid keeps the parent and leaves the phosphorus a prefix.
+    if any(
+        group.is_principal_candidate and group.attachment_carbon in component_atoms
+        for group in perceive_groups(mol)
+        if not (set(group.atoms_involved) | {group.attachment_carbon}) & {central}
+    ):
+        return None
+    double_oxygen = []
+    hydroxy_oxygen = []
+    ester_oxygen = []
+    carbon_roots = []
+    for neighbor in mol.get_neighbors(central):
+        if neighbor not in component_atoms:
+            return None
+        symbol = mol.atoms[neighbor].symbol
+        bond = mol.get_bond(central, neighbor)
+        charge = mol.atoms[neighbor].charge
+        if symbol == "O" and bond and bond.order == 2:
+            double_oxygen.append(neighbor)
+        elif symbol == "O" and bond and bond.order == 1 and charge == -1 and mol.degree(neighbor) == 1:
+            # A charge-separated P(+)-O(-) is the same centre as P=O.
+            double_oxygen.append(neighbor)
+        elif symbol == "O" and bond and bond.order == 1 and charge == 0 and mol.degree(neighbor) == 1:
+            hydroxy_oxygen.append(neighbor)
+        elif symbol == "O" and bond and bond.order == 1 and charge == 0 and mol.degree(neighbor) == 2:
+            ester_oxygen.append(neighbor)
+        elif symbol == "C" and bond and bond.order == 1:
+            carbon_roots.append(neighbor)
+        else:
+            return None
+    if len(double_oxygen) != 1 or len(carbon_roots) != 1:
+        return None
+    if len(hydroxy_oxygen) + len(ester_oxygen) != 2:
+        return None
+    charge = mol.atoms[central].charge
+    if charge and not (charge == 1 and any(mol.atoms[o].charge == -1 for o in double_oxygen)):
+        return None
+
+    acid_atoms = {central, *double_oxygen, *hydroxy_oxygen, *ester_oxygen}
+    ligand = _phosphorus_ligand_name(mol, component_atoms, carbon_roots[0], central, acid_atoms, branch_namer)
+    if not ligand:
+        return None
+    modifiers = []
+    for oxygen in ester_oxygen:
+        root = next((n for n in mol.get_neighbors(oxygen) if n != central), None)
+        if root is None:
+            return None
+        modifier = _ester_modifier_name(mol, component_atoms, root, oxygen, acid_atoms, branch_namer)
+        if not modifier:
+            return None
+        modifiers.append(modifier)
+
+    ligand_atoms = _carbon_ligand_atoms(mol, component_atoms, carbon_roots[0], central) or (
+        subgraph_component(mol, carbon_roots[0], (set(mol.atoms) - component_atoms) | {central})
+    )
+    if not modifiers:
+        name = f"{ligand}phosphonic acid"
+        core_term = "phosphonic acid"
+    else:
+        counts: dict[str, int] = {}
+        for modifier in modifiers:
+            counts[modifier] = counts.get(modifier, 0) + 1
+        words = [
+            format_multiplier(modifier, count, safe_enclose=True) if count > 1 else modifier
+            for modifier, count in sorted(counts.items())
+        ]
+        if hydroxy_oxygen:
+            words.append(
+                "hydrogen" if len(hydroxy_oxygen) == 1 else f"{multipliers.basic(len(hydroxy_oxygen))}hydrogen"
+            )
+        core_term = "phosphonate"
+        name = f"{' '.join(words)} {ligand}phosphonate"
+    core_atoms = {central, *double_oxygen, *hydroxy_oxygen}
+    bindings = (
+        NameAtomBinding(
+            stage="shortcut",
+            role="organophosphonic_ligand",
+            term=ligand,
+            atom_ids=set(ligand_atoms),
+            bond_ids=bond_ids_within(mol, set(ligand_atoms)),
+        ),
+        NameAtomBinding(
+            stage="shortcut",
+            role="organophosphonic_acid_core",
+            term=core_term,
+            atom_ids=core_atoms,
+            bond_ids=bond_ids_within(mol, core_atoms),
+        ),
+    )
+    return _component_name_result(mol, component_atoms, name, "organophosphonic_acid", bindings=bindings)
+
+
+def _phosphorus_ligand_name(
+    mol: Molecule,
+    component_atoms: set[int],
+    root: int,
+    central: int,
+    acid_atoms: set[int],
+    branch_namer: RecursiveSubgraphNamer | None,
+) -> str:
+    """Name the carbon ligand of a phosphorus functional parent."""
+
+    alkyl = _alkyl_ligand_name(mol, component_atoms, root, central)
+    if alkyl:
+        return alkyl
+    if branch_namer is None:
+        return ""
+    name = branch_namer(mol, root, (set(mol.atoms) - component_atoms) | acid_atoms, upstream_atom=central)
+    if isinstance(name, tuple):
+        name = name[0]
+    return strip_outer_parentheses(name) if name else ""
+
+
 def sulfoxide_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
     """Name simple dialkyl sulfoxides with ligand/core/stereo bindings."""
 
@@ -1905,38 +2045,27 @@ def homonuclear_chain_parent_result(
     ``ethyl`` has no more say in that than ``methyl``.
     """
 
-    backbone_symbols = {
-        mol.atoms[idx].symbol
-        for idx in component_atoms
-        if mol.atoms[idx].symbol in RULES.components.mononuclear_parent_hydrides
-        and mol.atoms[idx].symbol not in {"O", "F", "Cl", "Br", "I"}
-    }
-    if len(backbone_symbols) != 1:
+    backbone = _homonuclear_backbone(mol, component_atoms)
+    if backbone is None:
         return None
-    symbol = next(iter(backbone_symbols))
-    backbone = [idx for idx in component_atoms if mol.atoms[idx].symbol == symbol]
-    if len(backbone) < 2:
-        return None
-    chain = _ordered_backbone_chain(mol, backbone)
-    if chain is None:
-        return None
+    symbol, chain = backbone
     chain_set = set(chain)
-    # A charged backbone belongs to a different parent class -- an azoxy group,
-    # a diazonium -- that carries its charge in its own name.  Spelling
-    # N=[N+]([O-]) as a plain diazene loses that.
-    if any(mol.atoms[idx].charge for idx in chain):
+    oxide_oxygens = _chain_oxide_oxygens(mol, chain, component_atoms)
+
+    if any(mol.atoms[idx].charge for idx in chain) and oxide_oxygens is None:
         return None
-    # A principal characteristic group decides the parent, so a ligand carrying
-    # one keeps its own skeleton as the parent and this chain becomes a prefix:
-    # OCCNN=NN is an ethanol, not a substituted tetraazene.  The chain's own
-    # atoms are perceived as amines and do not count against it.
+    oxide_oxygens = oxide_oxygens or {}
+    # The oxide oxygens belong to the parent, not to a branch hanging off it.
+    oxide_atoms = set(oxide_oxygens.values())
+    ligand_atoms = component_atoms - oxide_atoms
+
     if any(
-        group.is_principal_candidate and (set(group.atoms_involved) & component_atoms) - chain_set
+        group.is_principal_candidate and (set(group.atoms_involved) & ligand_atoms) - chain_set
         for group in perceive_groups(mol)
     ):
         return None
     forward_orders = [mol.get_bond(chain[idx], chain[idx + 1]).order for idx in range(len(chain) - 1)]
-    ligands = _homonuclear_chain_ligands(mol, component_atoms, chain_set, branch_namer)
+    ligands = _homonuclear_chain_ligands(mol, ligand_atoms, chain_set, branch_namer)
     if ligands is None:
         return None
 
@@ -1951,8 +2080,11 @@ def homonuclear_chain_parent_result(
             ((oriented.index(ligand.attachment) + 1, ligand) for ligand in ligands),
             key=lambda item: (substituent_sort_key(item[1].name), item[0]),
         )
+        oxide_locants = sorted(oriented.index(idx) + 1 for idx in oxide_oxygens)
         key = (
             next((idx for idx, order in enumerate(orders) if order > 1), len(orders)),
+            # Oxides are cited before the detachable prefixes.
+            oxide_locants,
             sorted(locant for locant, _ligand in placed),
             [locant for locant, _ligand in placed],
         )
@@ -1964,12 +2096,13 @@ def homonuclear_chain_parent_result(
 
     prefixes = _locanted_ligand_prefix([(locant, ligand.name) for locant, ligand in placed])
     name = f"{prefixes}{parent}" if prefixes else parent
+    name = _with_chain_oxide_suffix(name, placed_chain, oxide_oxygens)
     parent_binding = NameAtomBinding(
         stage="shortcut",
         role="homonuclear_chain_parent",
         term=parent,
-        atom_ids=set(chain),
-        bond_ids=bond_ids_within(mol, set(chain)),
+        atom_ids=set(chain) | oxide_atoms,
+        bond_ids=bond_ids_within(mol, set(chain) | oxide_atoms),
     )
     ligand_bindings = tuple(
         NameAtomBinding(
@@ -2039,14 +2172,7 @@ def _homonuclear_chain_ligands(
         bond = mol.get_bond(attachment, root)
         if bond is None or bond.order not in (1, 2):
             return None
-        # A doubly bonded ligand is an ylidene, and only the recursive namer
-        # spells one.  Rejecting it cost the tetraazene parent its whole
-        # molecule: C=N-N=N-N fell back to a carbon skeleton that dropped the
-        # C=N bond, where the parent is `...methylidene)tetraaz-2-ene`.
-        #
-        # Only a chain longer than two takes one.  A carbon doubly bonded to a
-        # two-nitrogen chain is a diazo group or a hydrazone, both of which own
-        # their nitrogens already and say so better than this parent would.
+
         if bond.order == 2 and len(chain_set) <= 2:
             return None
         name = "" if bond.order == 2 else _terminal_ligand_name(mol, root, attachment)
@@ -2100,8 +2226,6 @@ def _locanted_ligand_prefix(items: list[tuple[int, str]]) -> str:
         locants = sorted(locants_by_name[name])
         text = format_multiplier(name, len(locants))
         parts.append(f"{','.join(str(locant) for locant in locants)}-{text}")
-    # A hyphen separates one locanted prefix from the next; the last one runs
-    # straight into the parent -- ``1-ethyl-3-methyltrisulfane``.
     return "-".join(parts)
 
 
@@ -2145,8 +2269,7 @@ def simple_central_parent_hydride_result(mol: Molecule, component_atoms: set[int
     prefix = _grouped_ligand_prefix(ligand_names)
     lambda_text = _lambda_text(mol, central)
     parent = f"{lambda_text}{RULES.components.mononuclear_parent_hydrides[central_symbol]}"
-    # The hyphen belongs to the lambda prefix -- ``hexafluoro-lambda6-sulfane``
-    # -- and must not appear when the parent carries no lambda descriptor.
+
     name = f"{prefix}-{parent}" if prefix and lambda_text else f"{prefix}{parent}"
     core_binding = NameAtomBinding(
         stage="shortcut",
@@ -2162,6 +2285,108 @@ def simple_central_parent_hydride_result(mol: Molecule, component_atoms: set[int
         "simple_central_parent_hydride",
         bindings=(core_binding, *ligand_bindings),
     )
+
+
+def _homonuclear_backbone(mol: Molecule, component_atoms: set[int]) -> tuple[str, list[int]] | None:
+    """
+    Return the parent-hydride element and its ordered backbone chain.
+    """
+
+    backbone_symbols = {
+        mol.atoms[idx].symbol
+        for idx in component_atoms
+        if mol.atoms[idx].symbol in RULES.components.mononuclear_parent_hydrides
+        and mol.atoms[idx].symbol not in {"O", "F", "Cl", "Br", "I"}
+    }
+    if len(backbone_symbols) == 1:
+        symbol = next(iter(backbone_symbols))
+        backbone = [idx for idx in component_atoms if mol.atoms[idx].symbol == symbol]
+        chain = _ordered_backbone_chain(mol, backbone) if len(backbone) >= 2 else None
+        if chain is not None:
+            return symbol, chain
+
+    return _oxide_backbone(mol, component_atoms)
+
+
+def _oxide_backbone(mol: Molecule, component_atoms: set[int]) -> tuple[str, list[int]] | None:
+    """
+    Return the backbone chain around a lone charge-separated oxide centre.
+    """
+
+    centres = [
+        idx
+        for idx in component_atoms
+        if mol.atoms[idx].symbol in RULES.components.mononuclear_parent_hydrides
+        and mol.atoms[idx].symbol not in {"O", "F", "Cl", "Br", "I"}
+        and mol.atoms[idx].charge == 1
+        and _chain_oxide_oxygens(mol, [idx], component_atoms)
+    ]
+    if len(centres) != 1:
+        return None
+    centre = centres[0]
+    symbol = mol.atoms[centre].symbol
+    backbone = _connected_same_element_atoms(mol, centre, component_atoms)
+    if len(backbone) < 2:
+        return None
+    chain = _ordered_backbone_chain(mol, backbone)
+    return None if chain is None else (symbol, chain)
+
+
+def _connected_same_element_atoms(mol: Molecule, idx: int, component_atoms: set[int]) -> list[int]:
+    """
+    Return the atoms of ``idx``'s element reachable through that element.
+    """
+
+    symbol = mol.atoms[idx].symbol
+    seen = {idx}
+    stack = [idx]
+    while stack:
+        current = stack.pop()
+        for neighbor in mol.get_neighbors(current):
+            if neighbor in seen or neighbor not in component_atoms:
+                continue
+            if mol.atoms[neighbor].symbol != symbol:
+                continue
+            seen.add(neighbor)
+            stack.append(neighbor)
+    return sorted(seen)
+
+
+def _chain_oxide_oxygens(mol: Molecule, chain: list[int], component_atoms: set[int]) -> dict[int, int] | None:
+    """
+    Map each chain atom carrying a charge-separated oxide to its oxygen.
+    """
+
+    oxides: dict[int, int] = {}
+    for idx in chain:
+        atom = mol.atoms[idx]
+        if not atom.charge:
+            continue
+        if atom.charge != 1:
+            return None
+        oxygens = [
+            n
+            for n in mol.get_neighbors(idx)
+            if n in component_atoms
+            and mol.atoms[n].symbol == "O"
+            and mol.atoms[n].charge == -1
+            and mol.degree(n) == 1
+            and mol.get_bond(idx, n).order == 1
+        ]
+        if len(oxygens) != 1:
+            return None
+        oxides[idx] = oxygens[0]
+    return oxides or None
+
+
+def _with_chain_oxide_suffix(name: str, chain: list[int], oxide_oxygens: dict[int, int]) -> str:
+    """Append the functional-class oxide term to a homonuclear chain name."""
+
+    if not oxide_oxygens:
+        return name
+    locants = sorted(chain.index(idx) + 1 for idx in oxide_oxygens)
+    multiplier = multipliers.basic(len(locants)) if len(locants) > 1 else ""
+    return f"{name} {','.join(str(locant) for locant in locants)}-{multiplier}oxide"
 
 
 def _ordered_backbone_chain(mol: Molecule, atoms: list[int]) -> list[int] | None:
@@ -2248,8 +2473,7 @@ def _grouped_ligand_prefix(names: list[str]) -> str:
         groups[name] = groups.get(name, 0) + 1
     parts = []
     mixed_single_ligands = len(groups) > 1
-    # Alphanumeric order ignores the italicised ``tert-``/``sec-``, so
-    # ``tert-butoxy`` files under ``b`` and precedes ``methoxy``.
+
     for name in sorted(groups, key=substituent_sort_key):
         count = groups[name]
         if count == 1:
@@ -2272,7 +2496,9 @@ def _lambda_text(mol: Molecule, atom_idx: int) -> str:
 
 
 def _anhydride_half_atoms(mol: Molecule, start_c: int, bridge_o: int) -> set[int]:
-    """Return original atoms belonging to one acid half of an anhydride."""
+    """
+    Return original atoms belonging to one acid half of an anhydride.
+    """
 
     half_atoms = set()
     queue = [start_c]

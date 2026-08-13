@@ -10,3 +10,6 @@ class SpiroAssembly:
     side_parent_name: str
     side_prefixes: tuple[str, ...] = ()
     side_suffixes: tuple[tuple[str, str], ...] = ()
+    # (primed locant, descriptor) pairs the side component contributes to the
+    # whole name's leading stereo group.
+    side_stereo: tuple[tuple[str, str], ...] = ()

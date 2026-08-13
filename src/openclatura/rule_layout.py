@@ -49,7 +49,6 @@ RULE_GROUPS: tuple[RuleGroupSpec, ...] = (
     RuleGroupSpec(
         key="retained_parents",
         sections=(
-            "indicated_hydrogen_retained_names",
             "retained_ring_elements",
             "retained_substituent_stems",
             "retained_monocycle_specs",

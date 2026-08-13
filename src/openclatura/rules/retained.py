@@ -94,7 +94,7 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
     total_bonds = 0
     seen_bonds = set()
 
-    internal_degrees = {u: 0 for u in path}
+    internal_degrees = dict.fromkeys(path, 0)
     symbols = [mol.atoms[idx].symbol for idx in path]
 
     for u in path:
