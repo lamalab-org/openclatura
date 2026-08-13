@@ -12,6 +12,8 @@ from .assembly_utils import parse_locant
 from .locant_sources import LocantMapSource
 
 MAX_CANDIDATE_PLACEMENTS = 10_000
+MAX_AUTOMORPHISM_CANDIDATES = 12
+ParentLocantLabel = tuple[str, int, bool]
 
 
 def _within_search_limit(size: int) -> bool:
@@ -37,8 +39,18 @@ class _FeatureGroup:
         return {"substituent": 0, "unsaturation": 1, "suffix": 2}[self.category]
 
 
+@dataclass(frozen=True)
+class ParentSymmetryContext:
+    """Parent graph data reused during one default locant-elision decision."""
+
+    locants: tuple[str, ...]
+    indicated_hydrogens: frozenset[str]
+    labels: dict[str, ParentLocantLabel | None]
+    adjacency: dict[str, dict[str, int]]
+
+
 def substituent_locant_set_is_unique(parts: AssemblyParts, locs: list[str], grouped_count: int, spiro_subs) -> bool:
-    """Preserve the target branch's conventional simple-prefix omission proof."""
+    """Return whether parent symmetry makes these substituent locants redundant."""
 
     if (
         not locs
@@ -55,18 +67,27 @@ def substituent_locant_set_is_unique(parts: AssemblyParts, locs: list[str], grou
     ):
         return False
     selected = tuple(str(locant) for locant in locs)
-    if len(set(selected)) != len(selected) or not all(locant.isdigit() for locant in selected):
+    if len(set(selected)) != len(selected):
         return False
     if len(selected) == 1 and not parts.is_ring:
         return False
     if len(selected) == 1 and retained_parent_attachment_is_ambiguous(parts, list(selected)):
         return False
-    group = _FeatureGroup("substituent", "__simple_prefix__", selected)
-    return (
-        _supported_simple_parent(parts)
-        and _single_attachment_positions(parts, selected)
-        and _elision_is_safe(parts, [group], (group,))
-    )
+    if not all(locant.isdigit() for locant in selected):
+        return False
+    if not parts.parent_atom_symbols_by_locant or not parts.parent_bond_orders_by_locants:
+        return False
+    context = _parent_symmetry_context(parts)
+    selected_labels = {parent_locant_label(parts, locant, context.indicated_hydrogens) for locant in selected}
+    if None in selected_labels or len(selected_labels) != 1:
+        return False
+    selected_label = next(iter(selected_labels))
+    candidates = [locant for locant in context.locants if context.labels[locant] == selected_label]
+    if not set(selected).issubset(candidates) or len(selected) > len(candidates):
+        return False
+    if not _candidate_positions_are_single_attachment_sites(context, candidates):
+        return False
+    return _all_same_sized_substituent_sets_are_equivalent(context, set(selected), candidates)
 
 
 def retained_parent_attachment_is_ambiguous(parts: AssemblyParts, locs: list[str]) -> bool:
@@ -76,29 +97,115 @@ def retained_parent_attachment_is_ambiguous(parts: AssemblyParts, locs: list[str
         return False
     if len(locs) != 1:
         return False
-    source = str(locs[0])
-    locants = tuple(sorted(parts.parent_atom_symbols_by_locant, key=parse_locant))
-    if source not in locants:
+    locant = str(locs[0])
+    if locant not in parts.parent_atom_symbols_by_locant:
         return True
-    edges = tuple(sorted((_edge(pair) for pair in parts.parent_bond_orders_by_locants), key=_edge_sort_key))
-    base_nodes = _base_node_labels(parts, locants)
-    base_edges = {_edge(edge): order for edge, order in parts.parent_bond_orders_by_locants.items()}
-    source_group = _FeatureGroup("substituent", "__attachment__", (source,))
-    source_nodes, source_edges = _decorated_labels(base_nodes, base_edges, (source_group,))
-    for target in locants:
-        target_group = _FeatureGroup("substituent", "__attachment__", (target,))
-        target_nodes, target_edges = _decorated_labels(base_nodes, base_edges, (target_group,))
-        if not _isomorphic(locants, edges, source_nodes, source_edges, target_nodes, target_edges):
+    context = _parent_symmetry_context(parts)
+    if len(context.locants) <= 1:
+        return False
+    return len(_parent_attachment_orbit(context, locant, context.locants)) < len(context.locants)
+
+
+def parent_locant_label(
+    parts: AssemblyParts, locant: str, indicated_hydrogens: frozenset[str] | None = None
+) -> ParentLocantLabel | None:
+    symbol = parts.parent_atom_symbols_by_locant.get(locant)
+    if symbol is None:
+        return None
+    if indicated_hydrogens is None:
+        indicated_hydrogens = frozenset(str(hydrogen) for hydrogen in parts.indicated_hydrogens)
+    return (symbol, parts.parent_atom_charges_by_locant.get(locant, 0), locant in indicated_hydrogens)
+
+
+def _parent_symmetry_context(parts: AssemblyParts) -> ParentSymmetryContext:
+    locants = tuple(sorted(parts.parent_atom_symbols_by_locant, key=parse_locant))
+    indicated_hydrogens = frozenset(str(hydrogen) for hydrogen in parts.indicated_hydrogens)
+    labels = {locant: parent_locant_label(parts, locant, indicated_hydrogens) for locant in locants}
+    adjacency = {
+        locant: {
+            other: parts.parent_bond_orders_by_locants.get(tuple(sorted((locant, other))), 0)
+            for other in locants
+            if other != locant
+        }
+        for locant in locants
+    }
+    return ParentSymmetryContext(locants, indicated_hydrogens, labels, adjacency)
+
+
+def _all_same_sized_substituent_sets_are_equivalent(
+    context: ParentSymmetryContext, selected: set[str], candidates: list[str]
+) -> bool:
+    k, n = len(selected), len(candidates)
+    if k == n:
+        return True
+    if k == 1:
+        return len(_parent_attachment_orbit(context, next(iter(selected)), candidates)) == n
+    if k == n - 1:
+        omitted = next(locant for locant in candidates if locant not in selected)
+        return len(_parent_attachment_orbit(context, omitted, candidates)) == n
+    if n > MAX_AUTOMORPHISM_CANDIDATES:
+        return False
+    return all(
+        _has_parent_set_automorphism_mapping(selected, set(target), context) for target in combinations(candidates, k)
+    )
+
+
+def _candidate_positions_are_single_attachment_sites(context: ParentSymmetryContext, candidates: list[str]) -> bool:
+    return all(sum(context.adjacency[locant].values()) >= 3 for locant in candidates)
+
+
+def _has_parent_set_automorphism_mapping(
+    source_set: set[str], target_set: set[str], context: ParentSymmetryContext
+) -> bool:
+    if len(source_set) != len(target_set):
+        return False
+    mapping: dict[str, str] = {}
+    used: set[str] = set()
+
+    def compatible(source: str, target: str) -> bool:
+        return (
+            context.labels[source] == context.labels[target]
+            and (source in source_set) == (target in target_set)
+            and all(
+                context.adjacency[source].get(other, 0) == context.adjacency[target].get(mapped, 0)
+                for other, mapped in mapping.items()
+            )
+        )
+
+    def search() -> bool:
+        if len(mapping) == len(context.locants):
             return True
-    return False
+        source = min(
+            (locant for locant in context.locants if locant not in mapping),
+            key=lambda locant: (
+                locant not in source_set,
+                -sum(1 for assigned in mapping if context.adjacency[locant].get(assigned, 0)),
+                parse_locant(locant),
+            ),
+        )
+        for target in context.locants:
+            if target in used or not compatible(source, target):
+                continue
+            mapping[source] = target
+            used.add(target)
+            if search():
+                return True
+            used.remove(target)
+            del mapping[source]
+        return False
+
+    return search()
 
 
-def _single_attachment_positions(parts: AssemblyParts, locants: tuple[str, ...]) -> bool:
-    """Reject omission where geminal and distributed placements could collide."""
-
-    adjacency = _adjacency(parts, set(parts.parent_atom_symbols_by_locant))
-    edge_orders = {_edge(edge): order for edge, order in parts.parent_bond_orders_by_locants.items()}
-    return all(sum(edge_orders[_edge((locant, other))] for other in adjacency[locant]) >= 3 for locant in locants)
+def _parent_attachment_orbit(
+    context: ParentSymmetryContext, source: str, locants: tuple[str, ...] | list[str]
+) -> set[str]:
+    return {
+        target
+        for target in locants
+        if context.labels[target] == context.labels[source]
+        and _has_parent_set_automorphism_mapping({source}, {target}, context)
+    }
 
 
 def apply_redundant_locant_elision(parts: AssemblyParts) -> None:
