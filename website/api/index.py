@@ -105,12 +105,18 @@ from rdkit import Chem  # noqa: E402
 # Depiction is optional: never let a missing native lib break the whole API.
 _preload_xlibs()
 try:
+    from rdkit.Chem import rdDepictor
     from rdkit.Chem.Draw import rdMolDraw2D
+
+    # CoordGen lays rings out the way a chemist would draw them, which is what
+    # makes the depictions look hand-drawn rather than machine-generated.
+    rdDepictor.SetPreferCoordGen(True)
 except ImportError as exc:
     rdMolDraw2D = None
     _DRAW_IMPORT_ERROR = str(exc)
 
 from openclatura import describe  # noqa: E402
+from openclatura import describe_human  # noqa: E402
 from openclatura import name as name_one  # noqa: E402
 from openclatura.web.app import create_app  # noqa: E402
 
@@ -566,6 +572,411 @@ def depict(req: DepictRequest) -> dict:
     if not req.no_cache:
         _cache_set(key, payload)
     return payload
+
+
+# ---------------------------------------------------------------------------
+# /api/teach — everything the teaching page needs, in one round trip.
+#
+# It differs from /api/describe in what it is allowed to say. The teaching page
+# explains a name to someone learning nomenclature, so nothing about how the
+# software works may leak into it: no SMILES, no RDKit, no atom indices, no
+# verification, no caching. Positions are IUPAC locants, and the structure is
+# drawn with those locants rather than the arbitrary input numbering.
+# ---------------------------------------------------------------------------
+
+# What each name token is doing, in the reader's terms rather than the
+# grammar's. Unlisted kinds fall back to no gloss at all rather than to a
+# vague one.
+_TOKEN_ROLES = {
+    "parent": "the parent hydride — the skeleton the rest of the name hangs off",
+    "suffix": "the ending for the principal characteristic group",
+    "prefix": "a substituent named as a prefix",
+    "replacement": "a replacement prefix, naming an atom that stands in for carbon",
+    "locant": "a locant — it says which numbered position the next piece sits on",
+    "multiplier": "a multiplying prefix, counting identical pieces",
+    "hydro": "added hydrogen on the skeleton",
+    "unsaturation": "a double or triple bond in the skeleton",
+    "stereo": "a stereodescriptor, fixing the three-dimensional arrangement",
+    "charge": "an electric charge carried by the skeleton",
+}
+
+# Kinds not listed above are the engine's catch-alls, and they differ between
+# releases, so they get a gloss that is true of every token rather than a guess
+# at the grammar. The highlight still shows what the piece refers to. Every role
+# is a noun phrase: the page renders them as `"<token>" is <role>.`
+_GENERIC_ROLE = "the part of the name that describes the highlighted atoms"
+
+# What a run of tokens that all resolved to the same atoms gets merged into.
+# See _merge_unresolved.
+_MERGED_ROLE = "the part of the name that names the highlighted group as a whole"
+
+# Multiplying prefixes arrive tagged "grammar", alongside the commas and
+# brackets, so the one piece of that group worth explaining is matched by text.
+_MULTIPLIERS = {
+    "di", "tri", "tetra", "penta", "hexa", "hepta", "octa", "nona", "deca",
+    "undeca", "dodeca", "bis", "tris", "tetrakis", "pentakis", "hexakis",
+}
+_MULTIPLIER_ROLE = "a multiplying prefix, counting how many identical pieces there are"
+
+# Machine detail describe_human() interleaves with its prose. The locants are
+# the teaching content; the raw atom ids are the implementation showing through.
+_ATOM_ID_NOISE = re.compile(r"\s*\(atom ids?\s*[\d,\s]+\)")
+
+
+def _iupac_locants(tree: list) -> dict[int, str]:
+    """Map atom id -> IUPAC locant for the parent of each top-level component.
+
+    Only the parents get numbered. Substituents carry their own local numbering
+    that would collide with the parent's on a single drawing, and it is the
+    parent numbering that the locants in the name refer to.
+    """
+    locants: dict[int, str] = {}
+    for node in tree or []:
+        if not isinstance(node, dict):
+            continue
+        parent = node.get("parent")
+        if not isinstance(parent, dict):
+            continue
+        for locant, atom_id in (parent.get("atom_ids_by_locant") or {}).items():
+            if isinstance(atom_id, int) and atom_id not in locants:
+                locants[atom_id] = str(locant)
+    return locants
+
+
+def _enclosed_bonds(mol, atoms: list[int]) -> list[int]:
+    """RDKit bond indices with both ends inside ``atoms``.
+
+    The spans carry bond ids too, but they are openclatura's own: ``add_bond``
+    auto-numbers from 1 while RDKit numbers from 0, so using them directly
+    highlights the wrong bond (the "amide" of 3-methylbutanamide lit up the
+    methyl branch). Atom ids do agree between the two, and re-deriving the
+    bonds from them keeps the drawing independent of either numbering.
+    """
+    if mol is None:
+        return []
+    inside = set(atoms)
+    return [
+        bond.GetIdx()
+        for bond in mol.GetBonds()
+        if bond.GetBeginAtomIdx() in inside and bond.GetEndAtomIdx() in inside
+    ]
+
+
+def _teach_tokens(name: str, spans: list, mol) -> list[dict]:
+    """Trim the token spans to the ones that genuinely index into ``name``.
+
+    Three filters, because the page lays the tokens out along the name itself:
+
+    - Span offsets are assigned per named component, so on a multi-component
+      name they need not line up with the assembled string. A span whose slice
+      doesn't reproduce its own text would highlight the wrong letters.
+    - Pure punctuation (the commas between locants) is name grammar, not a
+      piece to hover.
+    - Stems are emitted at several lengths for the same parent ("but", "buta",
+      "butan"). Longest-first greedy keeps the fullest form and leaves the
+      remaining tokens non-overlapping, which is what a linear layout needs.
+    """
+    candidates = []
+    for span in spans or []:
+        if not isinstance(span, dict):
+            continue
+        start, end, text = span.get("start"), span.get("end"), span.get("text")
+        if not isinstance(start, int) or not isinstance(end, int) or not text:
+            continue
+        if name[start:end] != text or not any(ch.isalnum() for ch in text):
+            continue
+        kind = str(span.get("token_kind") or "")
+        role = _TOKEN_ROLES.get(kind, "")
+        if not role and text.lower() in _MULTIPLIERS:
+            role = _MULTIPLIER_ROLE
+        if not role:
+            role = _GENERIC_ROLE
+        atoms = [a for a in span.get("atoms") or [] if isinstance(a, int)]
+        candidates.append(
+            {
+                "text": text,
+                "start": start,
+                "end": end,
+                "kind": kind,
+                "role": role,
+                "atoms": atoms,
+                "bonds": _enclosed_bonds(mol, atoms),
+                "locants": [str(locant) for locant in span.get("locants") or []],
+            }
+        )
+
+    tokens: list[dict] = []
+    taken: set[int] = set()
+    for token in sorted(candidates, key=lambda t: (t["start"] - t["end"], t["start"])):
+        positions = set(range(token["start"], token["end"]))
+        if positions & taken:
+            continue
+        taken |= positions
+        tokens.append(token)
+    tokens.sort(key=lambda t: (t["start"], t["end"]))
+    return _merge_unresolved(name, tokens)
+
+
+def _merge_unresolved(name: str, tokens: list[dict]) -> list[dict]:
+    """Collapse neighbouring tokens that all resolved to the same atoms.
+
+    When the engine cannot bind a substituent's words individually it falls back
+    to one binding covering the whole scope, then splits that into a token per
+    word — so in "2-((cyclopropyl)carbonyl)phenyl acetate" each of "2",
+    "cyclopropyl", "carbonyl" and "phenyl" came back owning the entire
+    substituent. Highlighting them separately tells the reader "phenyl means all
+    of this", which is false, and four identical highlights teach nothing
+    besides. Merged into one piece spanning the combined text, the claim is true
+    again: that stretch of the name does name that group.
+
+    The run must also agree on ``kind``, which is what separates the fallback
+    from the many legitimate cases of neighbours sharing atoms: a locant and the
+    prefix it positions both own the methyl carbon in "3-methyl", as do "tri"
+    and "methyl", or "2,6" and "dione" — different roles pointing at one group,
+    each correctly bound, and each worth hovering on its own.
+    """
+    merged: list[dict] = []
+    run: list[dict] = []
+
+    def flush() -> None:
+        if not run:
+            return
+        if len(run) == 1:
+            merged.append(run[0])
+        else:
+            start, end = run[0]["start"], run[-1]["end"]
+            merged.append(
+                {
+                    "text": name[start:end],
+                    "start": start,
+                    "end": end,
+                    "kind": "group",
+                    "role": _MERGED_ROLE,
+                    "atoms": run[0]["atoms"],
+                    "bonds": run[0]["bonds"],
+                    "locants": [],
+                }
+            )
+        run.clear()
+
+    for token in tokens:
+        joins = bool(run) and token["atoms"] == run[-1]["atoms"] and token["kind"] == run[-1]["kind"]
+        if not joins:
+            flush()
+        run.append(token)
+    flush()
+    return merged
+
+
+def _teach_steps(smiles: str) -> list[str]:
+    """Plain-language sentences about how the name is built.
+
+    ``describe_human`` already renders the substituent tree as prose; its first
+    paragraph is the SMILES echo, which is exactly what this page must not show.
+    """
+    human = describe_human(smiles)
+    steps: list[str] = []
+    for paragraph in human.paragraphs[1:]:
+        if paragraph.startswith(("Input SMILES", "Processed SMILES")):
+            continue
+        for line in paragraph.splitlines():
+            line = _ATOM_ID_NOISE.sub("", line).strip()
+            # The "named X" line duplicates the name shown above it.
+            if line and not line.startswith("The molecule is named "):
+                steps.append(line)
+    return steps
+
+
+# Drawing style, ported from AdrianM0/smiles-hover so structures here look like
+# the ones that extension renders. Two ideas do most of the work:
+#
+#  - the canvas is sized from the layout at a fixed number of pixels per bond,
+#    rather than being a fixed box the structure is stretched to fill. RDKit
+#    fits the molecule to whatever canvas it is given and scales bond width with
+#    it, so the canvas *is* the drawing scale; holding it fixed keeps line
+#    weight and label size in proportion from ethanol up to a fused polycycle.
+#  - the result is then cropped to the ink, because RDKit preserves aspect and
+#    leaves the remainder as blank bands.
+#
+# Atom colours follow the extension's "chemdraw" preset: muted, print-like.
+_CHEMDRAW_PALETTE = {
+    1: (0.4, 0.4, 0.4),  # H
+    5: (0.9, 0.55, 0.3),  # B
+    6: (0.1, 0.1, 0.1),  # C
+    7: (0.15, 0.3, 0.85),  # N
+    8: (0.85, 0.15, 0.15),  # O
+    9: (0.2, 0.65, 0.3),  # F
+    15: (0.95, 0.55, 0.1),  # P
+    16: (0.85, 0.7, 0.1),  # S
+    17: (0.2, 0.65, 0.3),  # Cl
+    35: (0.55, 0.2, 0.1),  # Br
+    53: (0.55, 0.1, 0.65),  # I
+}
+
+_PX_PER_BOND = 96  # a bond is one unit long; tuned on caffeine
+_MIN_SIDE = 0.9  # so a flat or single-atom layout isn't drawn as a sliver
+_CANVAS_BOUNDS = (120, 90, 820, 620)  # min w, min h, max w, max h
+
+
+def _canvas_for(mol, base_width: int, base_height: int) -> tuple[int, int]:
+    """Size the canvas to the 2D layout, at a fixed scale."""
+    conformer = mol.GetConformer()
+    xs = [conformer.GetAtomPosition(i).x for i in range(mol.GetNumAtoms())]
+    ys = [conformer.GetAtomPosition(i).y for i in range(mol.GetNumAtoms())]
+    if not xs:
+        return base_width, base_height
+    # The requested width/height stay meaningful: they scale the whole drawing.
+    unit = _PX_PER_BOND * ((base_width * base_height) / (500 * 350)) ** 0.5
+    min_w, min_h, max_w, max_h = _CANVAS_BOUNDS
+    # No margin added: RDKit fills whatever it is given, so extra room only
+    # magnifies the drawing again. Its own `padding` reserves the edge.
+    side = lambda extent, lo, hi: int(round(min(hi, max(lo, max(extent, _MIN_SIDE) * unit))))  # noqa: E731
+    return side(max(xs) - min(xs), min_w, max_w), side(max(ys) - min(ys), min_h, max_h)
+
+
+def _crop_to_ink(svg: str, margin: int = 12) -> tuple[str, float, float]:
+    """Move the viewBox onto the drawn extent; return it with the crop offset.
+
+    Only the viewBox moves, so the drawing is untouched and the atom draw
+    coordinates stay valid — the page's highlight overlay lives inside the same
+    SVG and is translated along with everything else.
+    """
+    xs: list[float] = []
+    ys: list[float] = []
+    # Drawn elements only: the background rect spans the whole canvas.
+    for element in re.findall(r"<(?:path|ellipse|line|text)[^>]*>", svg):
+        for x, y in re.findall(r"(-?\d+\.?\d*)[, ](-?\d+\.?\d*)", element):
+            xs.append(float(x))
+            ys.append(float(y))
+    if not xs or max(xs) <= min(xs) or max(ys) <= min(ys):
+        return svg, 0.0, 0.0
+
+    x0 = max(0.0, min(xs) - margin)
+    y0 = max(0.0, min(ys) - margin)
+    w = round(max(xs) - x0 + margin)
+    h = round(max(ys) - y0 + margin)
+    svg = re.sub(r"\bwidth='[\d.]+px'", f"width='{w}px'", svg, count=1)
+    svg = re.sub(r"\bheight='[\d.]+px'", f"height='{h}px'", svg, count=1)
+    svg = re.sub(r"\bviewBox='[^']*'", f"viewBox='{x0:.1f} {y0:.1f} {w} {h}'", svg, count=1)
+    # The background rect covers the original canvas, which a tight drawing can
+    # spill past — leaving the margin transparent. Move it onto the crop.
+    svg = re.sub(
+        r"(<rect[^>]*?)width='[\d.]+' height='[\d.]+' x='[-\d.]+' y='[-\d.]+'",
+        rf"\g<1>width='{w}' height='{h}' x='{x0:.1f}' y='{y0:.1f}'",
+        svg,
+        count=1,
+    )
+    return svg, x0, y0
+
+
+def _teach_depiction(smiles: str, locants: dict[int, str], width: int, height: int) -> dict:
+    """Draw the structure annotated with IUPAC locants, plus atom coordinates.
+
+    The coordinates let the page overlay its own highlight markers: RDKit emits
+    ``atom-N``/``bond-N`` classes, but an unlabelled carbon has no glyph to
+    recolour, so hovering a name token could not light it up otherwise.
+    """
+    if rdMolDraw2D is None:
+        return {"ok": False, "error": f"Depiction unavailable: {_DRAW_IMPORT_ERROR}"}
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return {"ok": False, "error": "The structure could not be read."}
+
+    # Lay the molecule out first: the layout is what the canvas is sized from.
+    mol = rdMolDraw2D.PrepareMolForDrawing(mol)
+    # Preparation only ever appends atoms, so the ids the name binds to survive.
+    for atom_id, locant in locants.items():
+        if atom_id < mol.GetNumAtoms():
+            mol.GetAtomWithIdx(atom_id).SetProp("atomNote", locant)
+
+    canvas_width, canvas_height = _canvas_for(mol, width, height)
+    drawer = rdMolDraw2D.MolDraw2DSVG(canvas_width, canvas_height)
+    opts = drawer.drawOptions()
+    opts.explicitMethyl = True
+    opts.multipleBondOffset = 0.18
+    # Bolder than the print defaults, so the structure holds up on screen.
+    opts.bondLineWidth = 2
+    opts.scaleBondWidth = True
+    # No fixed font size: it collides labels on anything dense. Scale instead,
+    # with a floor that stays readable.
+    opts.minFontSize = 12
+    opts.maxFontSize = 22
+    opts.annotationFontScale = 0.75
+    opts.additionalAtomLabelPadding = 0.1
+    opts.padding = 0.1
+    opts.clearBackground = True
+    opts.setBackgroundColour((1.0, 1.0, 1.0, 1.0))
+    opts.updateAtomPalette(_CHEMDRAW_PALETTE)
+    drawer.DrawMolecule(mol)
+    drawer.FinishDrawing()
+
+    coords = {}
+    for atom in mol.GetAtoms():
+        point = drawer.GetDrawCoords(atom.GetIdx())
+        coords[str(atom.GetIdx())] = [round(point.x, 2), round(point.y, 2)]
+
+    svg = re.sub(r"^\s*<\?xml[^>]*\?>\s*", "", drawer.GetDrawingText())
+    svg, _, _ = _crop_to_ink(svg)
+    return {"ok": True, "svg": svg, "coords": coords, "bond_px": _drawn_bond_length(mol, coords)}
+
+
+def _drawn_bond_length(mol, coords: dict[str, list[float]]) -> float:
+    """Median bond length in drawing pixels.
+
+    The canvas is sized per molecule, so it is the only scale the page can size
+    its highlight markers against — a fixed radius that suits caffeine swallows
+    ethanol whole.
+    """
+    lengths = []
+    for bond in mol.GetBonds():
+        a = coords.get(str(bond.GetBeginAtomIdx()))
+        b = coords.get(str(bond.GetEndAtomIdx()))
+        if a and b:
+            lengths.append(((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5)
+    if not lengths:
+        return float(_PX_PER_BOND)
+    lengths.sort()
+    return round(lengths[len(lengths) // 2], 2)
+
+
+class TeachRequest(BaseModel):
+    smiles: str
+    width: int = Field(480, ge=100, le=1200)
+    height: int = Field(380, ge=100, le=1200)
+    no_cache: bool = False
+
+
+@app.post("/api/teach")
+def teach(req: TeachRequest) -> dict:
+    """Name a structure and explain the name, for openclatura.org/teach."""
+    key = _cache_key("teach", req.smiles, f"{req.width}x{req.height}")
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+
+    # describe() rather than name(): the token spans are scattered through the
+    # trace and the substituent tree, and the describer is what collects them
+    # into one flat, de-duplicated, name-ordered list.
+    payload = describe(req.smiles, token_debug=True).to_dict()
+    name = payload.get("name")
+    if not name:
+        # Deliberately not surfacing the engine's error text: it is written for
+        # developers, and this page has no developer audience.
+        return {"ok": False, "error": "This structure could not be named yet."}
+
+    locants = _iupac_locants(payload.get("substituent_tree") or [])
+    tokens = _teach_tokens(name, payload.get("token_spans") or [], Chem.MolFromSmiles(req.smiles))
+    out = {
+        "ok": True,
+        "name": name,
+        "tokens": tokens,
+        "steps": _teach_steps(req.smiles),
+        "depiction": _teach_depiction(req.smiles, locants, req.width, req.height),
+        "locants": {str(atom): locant for atom, locant in locants.items()},
+    }
+    if not req.no_cache:
+        _cache_set(key, out)
+    return out
 
 
 app.mount("/api", create_app())
