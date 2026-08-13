@@ -37,11 +37,9 @@ name, and every choice along the way is recorded in a decision trace, so the
 Round-trip accuracy against public datasets (details and rerun instructions in
 [`evaluations/`](evaluations/)):
 
-| dataset  | coverage |
-| -------- | -------- |
-| QM9      | 100 %    |
-| PubChem  | 99.3 %   |
-| ZINC22   | 97.4 %   |
+| dataset  | QM9   | PubChem | ZINC22 |
+| -------- | ----- | ------- | ------ |
+| coverage | 100 % | 99.3 %  | 97.4 % |
 
 The package is in **beta**. Naming is solid across common organic chemistry;
 exotic corners of the Blue Book — and stereodescriptor edge cases — are still
