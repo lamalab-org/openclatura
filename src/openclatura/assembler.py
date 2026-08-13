@@ -416,7 +416,7 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
         else:
             stem_str, unsat_str, terminal_e, suffix_str = format_parent_tail(parts, stem_str, terminal_e, spiro_subs)
 
-        core_name, terminal_e = format_spiro_core(stem_str, unsat_str, terminal_e, spiro_subs)
+        core_name, terminal_e, suffix_str = format_spiro_core(stem_str, unsat_str, terminal_e, spiro_subs, suffix_str)
         core_name = _add_indicated_hydrogen_prefix(parts, core_name)
         core_name, suffix_str = _move_added_hydrogen_to_suffix(parts, core_name, suffix_str)
         core_name += suffix_str

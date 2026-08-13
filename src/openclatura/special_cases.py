@@ -21,8 +21,8 @@ from .oxoacid_roles import CentralOxoRole, OxoLigandRole, central_oxo_roles
 from .oxoacid_templates import OxoacidTemplateKind, oxoacid_role_template
 from .perception import PerceivedGroup, perceive_groups
 from .retained_specs import retained_parent_spec
-from .subgraph_tools import subgraph_component
 from .rules import multipliers, retained, stems
+from .subgraph_tools import subgraph_component
 
 ComponentNamer = Callable[..., str]
 

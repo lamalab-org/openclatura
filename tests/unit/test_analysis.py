@@ -1938,18 +1938,15 @@ def test_a_named_spiro_component_primes_its_replacement_prefixes():
     # The side ring is the primed component, so its heteroatom locants are
     # primed too.  Unprimed, they read back on the other ring entirely.
     assert name_smiles("N1CC2(C3=CC=CC=C13)NCNC2") == "1',3'-diazaspiro[indoline-3,4'-cyclopentane]"
-    assert name_smiles("O=C1NC2(CN1)c1ccccc1NC2=O") == ("1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2'-one-2-one")
+    assert name_smiles("O=C1NC2(CN1)c1ccccc1NC2=O") == "1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2,2'-dione"
 
 
 def test_every_side_ring_substituent_survives_and_is_primed():
-    # The locant pattern matched only the first prefix, so the rest were left
-    # unprimed -- and a leading E/Z descriptor made it match nothing at all,
-    # dropping an entire butyl and butylidene from the name.
     assert name_smiles("CCC/C=C1/N(CCCC)C(=O)NC12C(=O)N(C)c1ccccc12") == (
-        "1-methyl-1'-butyl-5'-butylidene-1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2'-one-2-one"
+        "(5'E)-1'-butyl-5'-butylidene-1-methyl-1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2,2'-dione"
     )
     assert name_smiles("C=C1N(C)C(=O)NC12C(=O)N(C)c1ccccc12") == (
-        "1-methyl-1'-methyl-5'-methylidene-1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2'-one-2-one"
+        "1,1'-dimethyl-5'-methylidene-1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2,2'-dione"
     )
 
 
@@ -1959,15 +1956,14 @@ def test_a_nested_substituents_own_locants_are_not_primed():
 
     from openclatura.assembly_spiro import extract_spiro_side_prefixes
 
-    prefixes, parent, _suffixes = extract_spiro_side_prefixes("1-((2,6-difluoro-3-methylphenyl)methyl)piperidine")
+    prefixes, parent, _, _ = extract_spiro_side_prefixes(
+        "1-((2,6-difluoro-3-methylphenyl)methyl)piperidine"
+    )
     assert prefixes == ["1'-((2,6-difluoro-3-methylphenyl)methyl)"]
     assert parent == "piperidine"
 
 
 def test_a_counted_spiro_keeps_its_replacement_prefixes_unprimed():
-    # spiro[4.4] numbers the whole system once, so nothing is primed -- and a
-    # name holding both spiro forms must prime only the component-named one.
-    # Equal rings let the heteroatoms pick which one is numbered first.
     assert name_smiles("C1CC2(CC1)NCNC2") == "1,3-diazaspiro[4.4]nonane"
     assert name_smiles("C1CC2(CC1)OCCO2") == "1,4-dioxaspiro[4.4]nonane"
     both = name_smiles("Cc1noc(C2CC3(C2)CN(C2CCC4(CC2)C(=O)Nc2ccccc24)C3)n1")
@@ -2291,10 +2287,6 @@ def test_nitro_perception_requires_a_hydrogen_free_nitrogen(smiles: str, is_nitr
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [
-        # The three distinct anthracene positions.  Without a locant map these
-        # were numbered in plain peripheral order, which put the meso carbons on
-        # an outer ring and produced `anthracen-11-yl` — not a position
-        # anthracene has at all.
         ("O=C(O)Cc1ccc2cc3ccccc3cc2c1", "2-(anthracen-2-yl)acetic acid"),  # beta
         ("O=C(O)Cc1cccc2cc3ccccc3cc12", "2-(anthracen-1-yl)acetic acid"),  # alpha
         ("O=C(O)Cc1c2ccccc2cc2ccccc12", "2-(anthracen-9-yl)acetic acid"),  # meso
@@ -2332,8 +2324,6 @@ def test_is_composite_prefix(name: str, composite: bool):
 def test_composite_n_substituent_is_parenthesised():
     import openclatura as oc
 
-    # Bare, this reads equally well as a cyclopropyl on N plus a methyl on the
-    # adamantane — two different molecules — so the boundary must be marked.
     name = oc.name("O=C(O)CN(CC1CC1)C(=O)C1C2CC3CC(C2)CC1C3").name
     assert "N-(cyclopropylmethyl)" in name
     # A simple N-substituent still needs no parentheses.
@@ -3214,8 +3204,8 @@ def test_spiro_marker_is_converted_to_structural_assembly_item():
 
     spiro_subs = split_spiro_substituents(parts)
 
-    assert spiro_subs == [SpiroAssembly("1", "2", "aziridine", ("3'-methyl",))]
-    assert parts.substituents == []
+    assert spiro_subs == [SpiroAssembly("1", "2", "aziridine")]
+    assert parts.substituents == [SubstituentItem(name="methyl", locants=["3'"])]
 
 
 def test_structural_spiro_substituent_bypasses_marker_text():
@@ -3232,14 +3222,15 @@ def test_structural_spiro_substituent_bypasses_marker_text():
 
     spiro_subs = split_spiro_substituents(parts)
 
-    assert spiro_subs == [SpiroAssembly("1", "2", "aziridine", ("3'-methyl",))]
-    assert parts.substituents == []
+    assert spiro_subs == [SpiroAssembly("1", "2", "aziridine")]
+    assert parts.substituents == [SubstituentItem(name="methyl", locants=["3'"])]
 
 
 def test_spiro_side_retained_ionic_ring_locants_are_registry_derived():
     assert extract_spiro_side_prefixes("1-((4-chlorophenyl)methyl)piperidinium") == (
         ["1'-((4-chlorophenyl)methyl)"],
         "piperidin-1-ium",
+        (),
         (),
     )
     assert _spiro_side_locant(SpiroAssembly("3", "1", "piperidin-1-ium")) == "4"
@@ -4832,7 +4823,7 @@ def test_pyopsin_regression_names_use_parseable_spiro_and_formamido_forms():
     cases = {
         "CN1CC11C2C3CC2C13": "1'-methylspiro[tricyclo[2.2.0.0^{2,5}]hexane-6,2'-aziridine]",
         "CC1CC11CC2CCC12": "2'-methylspiro[bicyclo[2.2.0]hexane-2,1'-cyclopropane]",
-        "CC1NC11CC2OC12C": "1-methyl-3'-methylspiro[5-oxabicyclo[2.1.0]pentane-2,2'-aziridine]",
+        "CC1NC11CC2OC12C": "1,3'-dimethylspiro[5-oxabicyclo[2.1.0]pentane-2,2'-aziridine]",
         "COC(=O)CCNC=O": "methyl 3-formamidopropanoate",
         "N=COC(=O)CNC=O": "iminomethyl 2-formamidoacetate",
     }
@@ -4983,12 +4974,12 @@ def test_spiro_substituent_radicals_keep_attachment_locants():
 
 
 def test_spiro_side_parents_are_normalized_without_nested_or_parenthesized_polycycles():
-    prefixes, parent, suffixes = extract_spiro_side_prefixes("1-methyl-bicyclo[1.1.1]pentane")
+    prefixes, parent, suffixes, _stereo = extract_spiro_side_prefixes("1-methyl-bicyclo[1.1.1]pentane")
     assert prefixes == ["1'-methyl"]
     assert parent == "bicyclo[1.1.1]pentane"
     assert suffixes == ()
 
-    core, _ = format_spiro_core(
+    core, _, _suffix = format_spiro_core(
         "cyclopropan",
         "",
         "e",
@@ -5072,7 +5063,7 @@ def test_spiro_side_hantzsch_widman_branch_requires_aromatic_ring_metadata():
 
 def test_mixed_spiro_bicyclo_side_suffixes_and_replacement_locants_are_component_scoped():
     cases = {
-        "OC1CC11C2CC1(O)C2": "spiro[bicyclo[1.1.1]pentane-2,1'-cyclopropane]-2'-ol-1-ol",
+        "OC1CC11C2CC1(O)C2": "spiro[bicyclo[1.1.1]pentane-2,1'-cyclopropane]-1,2'-diol",
         "OC1CC11C2CC1C2=O": "spiro[bicyclo[1.1.1]pentane-4,1'-cyclopropane]-2'-ol-2-one",
         "CC12CC(O1)C21CC1O": "1'-methyl-2'-oxaspiro[cyclopropane-2,4'-bicyclo[1.1.1]pentane]-1-ol",
         "CC12CN(C1)C21CC1O": "3'-methyl-1'-azaspiro[cyclopropane-2,2'-bicyclo[1.1.1]pentane]-1-ol",
@@ -5808,7 +5799,7 @@ def test_an_oxidised_pnictogen_prefix_cites_two_ligands_or_says_inoyl():
         "CCOP(=O)c1ccccc1": "(ethoxyphosphinoyl)benzene",
         "FCCCP(=O)O": "1-fluoro-3-(hydroxyphosphinoyl)propane",
         "CCP(=O)(O)CC": "1-((ethyl)(hydroxy)phosphoryl)ethane",
-        "CO[P+]([O-])(OC)c1ccccc1": "(dimethoxyphosphoryl)benzene",
+        "CO[P+]([O-])(OC)c1ccccc1": "dimethyl phenylphosphonate",
         "CCP(=O)([O-])CCC": "1-(ethyloxido(oxo)phosphanyl)propane",
     }
 
