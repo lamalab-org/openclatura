@@ -283,6 +283,9 @@ curl -X POST localhost:8000/describe -H 'content-type: application/json' \
 
 OpenAPI docs are served at `http://localhost:8000/docs`.
 
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## License
 
