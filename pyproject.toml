@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "openclatura"
-version = "0.2.1"
+version = "0.3.1"
 description = "Deterministic SMILES-to-IUPAC name generator based on the IUPAC Blue Book"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -62,6 +62,7 @@ dev = [
 Homepage = "https://github.com/lamalab-org/openclatura"
 Repository = "https://github.com/lamalab-org/openclatura"
 Issues = "https://github.com/lamalab-org/openclatura/issues"
+Changelog = "https://github.com/lamalab-org/openclatura/blob/main/CHANGELOG.md"
 
 [project.scripts]
 openclatura = "openclatura.cli:main"
@@ -71,6 +72,9 @@ exclude = [
     "/examples",
     "/evaluations",
     "/eval_failures",
+    "/tests",
+    "/uv.lock",
+    "/website",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -104,11 +108,7 @@ line-ending = "auto"
 
 [tool.pytest.ini_options]
 minversion = "7.0"
-testpaths = [
-    "tests",
-    "src/openclatura/tests",
-    "src/openclatura/tests_roundtrip",
-]
+testpaths = ["tests"]
 addopts = [
     "-ra",
     "--strict-markers",
@@ -126,7 +126,7 @@ filterwarnings = [
 
 [tool.coverage.run]
 source = ["openclatura"]
-omit = ["*/tests/*", "*/tests_roundtrip/*"]
+omit = ["tests/*"]
 
 [tool.coverage.report]
 exclude_lines = [

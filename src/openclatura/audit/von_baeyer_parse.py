@@ -27,28 +27,16 @@ from ..rules import stems as _stems
 
 Numbered = tuple[Chem.RWMol, dict[str, int], int]
 
-# Skeletal-replacement prefixes, read back off the same table the namer writes
-# them from, so the parser accepts exactly the set the namer can emit.
 _REPLACEMENT_ELEMENTS = _elements.SYMBOLS_BY_HW_STEM
-# Unsaturation stems -> (how many locants it must cite, what bond to build).
-# The multiplier is the *basic* prefix (``dien``, ``triyn``), so the spellings
-# come from the shared table; the bond order rides along with each stem so an
-# added spelling cannot end up silently building the wrong bond.
 _UNSAT_STEMS: dict[str, tuple[int, Chem.BondType]] = {
     f"{prefix}{stem}": (count, order)
     for stem, order in (("en", Chem.BondType.DOUBLE), ("yn", Chem.BondType.TRIPLE))
     for prefix, count in [("", 1), *((mult.basic, mult.count) for mult in _multipliers.MULTIPLIERS.values())]
 }
-# Longest first so ``dien`` is not read as ``di`` + a stray ``en``.
 _UNSAT_ALTERNATION = "|".join(sorted(_UNSAT_STEMS, key=len, reverse=True))
 
 _VONBAEYER_RE = re.compile(r"(?:bi|tri|tetra|penta)cyclo\[([0-9.,^{}]+)\]")
 _SECONDARY_RE = re.compile(r"(\d+)\^?\{?(\d+),(\d+)\}?")
-# A replacement clause may carry a lambda-convention valence on its locant —
-# ``1lambda^6-thia`` is still just "sulfur at position 1"; the non-standard
-# valence is realised by the ``dioxo`` prefix the caller grafts, so the
-# annotation is matched and discarded rather than being left as an unparsed
-# leftover that forces an abstention.
 _LAMBDA = r"(?:lambda\^?\{?\d+\}?)?"
 _BASIC_ALTERNATION = "|".join(sorted((mult.basic for mult in _multipliers.MULTIPLIERS.values()), key=len, reverse=True))
 _REPL_RE = re.compile(
@@ -57,13 +45,10 @@ _REPL_RE = re.compile(
     + r"-("
     + _BASIC_ALTERNATION
     + r")?("
-    # longest first, so a prefix that starts another one cannot shadow it
     + "|".join(sorted(_REPLACEMENT_ELEMENTS, key=len, reverse=True))
     + r")"
 )
 
-# A parsed von Baeyer descriptor: the main bicycle (a,b,c) plus zero or more
-# secondary bridges (length, bridgehead-f, bridgehead-g).
 Descriptor = tuple[int, int, int, list[tuple[int, str, str]]]
 
 
@@ -143,16 +128,13 @@ def _build_skeleton(
         rw.AddBond(idx[str(i)], idx[str(j)], Chem.BondType.SINGLE)
 
     bh1, bh2 = 1, a + 2
-    # main bridge: 1-2-...-(a+1)-(a+2)
     for i in range(1, a + 2):
         bond(i, i + 1)
-    # second bridge: (a+2)-(a+3)-...-(a+b+2)-1
     prev = bh2
     for i in range(a + 3, a + b + 3):
         bond(prev, i)
         prev = i
     bond(prev, bh1)
-    # third bridge
     if c == 0:
         bond(bh1, bh2)
     else:
@@ -161,10 +143,6 @@ def _build_skeleton(
             bond(prev, i)
             prev = i
         bond(prev, bh2)
-    # Secondary bridges, numbered after the main bicycle in citation order
-    # (P-23.2.5.1).  A length-0 bridge is a direct bond between two skeleton atoms
-    # (the usual fused-aromatic case); a longer one contributes its own atoms,
-    # numbered from the end attached to the *higher*-numbered bridgehead.
     next_locant = n + 1
     for length, f, g in secondary:
         if f not in idx or g not in idx:
@@ -186,12 +164,7 @@ def _build_skeleton(
     return rw, idx
 
 
-# --------------------------------------------------------------------------- #
-# Monospiro
-# --------------------------------------------------------------------------- #
 _SPIRO_RE = re.compile(r"spiro\[(\d+)\.(\d+)\]")
-# Polyspiro descriptors reuse the ``spiro[`` token with a different numbering
-# rule, so they must not be parsed as monospiro.
 _POLYSPIRO_RE = re.compile(r"(?:di|tri|tetra|penta)spiro\[")
 
 
@@ -269,13 +242,11 @@ def _apply_replacement(rw: Chem.RWMol, locants: dict[str, int], pre: str) -> boo
                 return False
             rw.GetAtomWithIdx(locants[loc]).SetAtomicNum(Chem.Atom(element).GetAtomicNum())
         consumed += mm.end() - mm.start()
-    # Anything in the prefix we did not consume (odd connectives excluded) -> abstain.
     leftover = _REPL_RE.sub("", pre).replace("-", "")
     return leftover == ""
 
 
 def _split_and_apply_post(rw: Chem.RWMol, locants: dict[str, int], post: str, total: int) -> int | None:
-    # attachment
     ym = re.search(r"-(\d+)-yl(?:idene)?$", post)
     if ym is None:
         return None
@@ -284,7 +255,6 @@ def _split_and_apply_post(rw: Chem.RWMol, locants: dict[str, int], post: str, to
     if attach not in locants:
         return None
 
-    # stem
     sm = re.match(r"^([a-z]+?)(?=$|-|\d)", core)
     if sm is None:
         return None
@@ -293,7 +263,6 @@ def _split_and_apply_post(rw: Chem.RWMol, locants: dict[str, int], post: str, to
     if not _check_stem(stem_word, total):
         return None
 
-    # unsaturation: "-1(6),2,4-trien" style, appearing before the attachment
     if rest:
         if not _apply_unsaturation(rw, locants, rest):
             return None
@@ -343,8 +312,6 @@ def parse_monocyclic_replacement(name: str) -> Numbered | None:
     pre, sep, rest = name[: m.start()].partition("cyclo")
     if not sep:
         return None
-    # A monocyclic *replacement* name must carry at least one replacement clause;
-    # without one it is an ordinary carbocycle handled elsewhere.
     if _REPL_RE.search(pre) is None:
         return None
     sm = re.match(r"^[a-z]+", rest)
@@ -364,15 +331,7 @@ def parse_monocyclic_replacement(name: str) -> Numbered | None:
     return rw, locants, locants[attach]
 
 
-# --------------------------------------------------------------------------- #
-# Hantzsch-Widman contracted monocycles
-# --------------------------------------------------------------------------- #
-# Heteroatom prefixes in their elided form — the ``-a`` is dropped before the
-# vowel of the size stem, so ``oxa`` + ``ane`` reads ``oxane``.
 _HW_ELEMENTS = {"ox": "O", "thi": "S", "az": "N", "sel": "Se", "tellur": "Te"}
-# Saturated size stems, longest first so ``olane`` is not read as ``ane``.
-# Mancude (unsaturated) rings — ``oxazole``, ``thiazole`` — keep their retained
-# spellings elsewhere; only the saturated series is generated here.
 _HW_SIZE_STEMS: tuple[tuple[str, int], ...] = (
     ("iridine", 3),
     ("irane", 3),
@@ -406,7 +365,6 @@ def parse_hantzsch_widman(name: str) -> Numbered | None:
     if head is None:
         return None
     for stem, size in _HW_SIZE_STEMS:
-        # ``-an-2-yl`` drops the stem's final ``e`` before the locant.
         body = head.group("prefix")
         for spelling in (stem, stem[:-1]):
             if body.endswith(spelling) and len(body) > len(spelling):
@@ -423,8 +381,6 @@ def _parse_hw_prefix(prefix: str) -> list[str] | None:
 
     elements: list[str] = []
     while prefix:
-        # Multiplied readings first (longest prefix wins), then the bare token —
-        # ``oxa`` is one oxygen, ``dioxa`` two.
         for count, rest in (*_multipliers.candidate_splits(prefix), (1, prefix)):
             for word in sorted(_HW_ELEMENTS, key=len, reverse=True):
                 if rest.startswith(word):
@@ -445,8 +401,6 @@ def _build_hw_ring(size: int, elements: list[str], locants: str | None, attach: 
 
     if size < 3:
         return None
-    # A six-membered ring containing nitrogen takes ``-inane``; plain ``-ane``
-    # there would be the parent hydride ``azane``, not a ring at all.
     if "N" in elements and stem == "ane":
         return None
     positions = locants.split(",") if locants else ["1"]

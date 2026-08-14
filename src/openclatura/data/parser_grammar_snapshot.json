@@ -2,7 +2,7 @@
   "source": {
     "name": "Openclatura parser grammar snapshot",
     "format": "openclatura.parser_grammar_snapshot.v1",
-    "resource_json_dir": "parser_xml_resources",
+    "resource_json_dir": "tests/data/parser_xml_resources",
     "files": [
       "arylGroups.xml",
       "arylSubstituents.xml",
@@ -11,7 +11,7 @@
       "nonCarboxylicAcids.xml",
       "hwHeteroAtoms.xml"
     ],
-    "note": "This checked-in JSON is the runtime grammar source. Runtime code does not import external parser internals or read external resource directories."
+    "note": "This checked-in JSON is the runtime grammar source. Runtime code does not import external parser internals or read external resource directories. The derivation inputs live under tests/data/parser_xml_resources and are not shipped with the package."
   },
   "retained_fused_derivative_gate": {
     "source_files": [
@@ -41,16 +41,22 @@
       "1-benzothiophene",
       "10H-phenothiazine",
       "10H-phenoxazine",
+      "1H-1,4-benzodiazepine",
       "1H-1,5-benzodiazepine",
       "1H-2-benzopyran",
+      "1H-benzo[7]annulene",
       "1H-benzotriazole",
+      "1H-indene",
       "1H-indole",
       "1H-isoindole",
       "1H-perimidine",
       "1H-phenalene",
       "1H-pyrazolo[3,4-d]pyrimidine",
+      "1H-pyrazolo[4,3-c]pyridine",
       "1H-pyrrolizine",
+      "1H-pyrrolo[2,3-b]indole",
       "1H-pyrrolo[2,3-b]pyridine",
+      "1H-pyrrolo[3,2-b]pyridine",
       "2,1,3-benzothiadiazole",
       "2,1,3-benzoxadiazole",
       "2,6-naphthyridine",
@@ -59,7 +65,10 @@
       "2,8-phenanthroline",
       "2-benzofuran",
       "2-benzothiophene",
+      "2H-1,3-benzoxazine",
       "2H-1-benzopyran",
+      "2H-1-benzothiopyran",
+      "2H-2,3-benzodiazepine",
       "2H-isoindole",
       "2H-quinolizine",
       "3,5-phenanthroline",
@@ -67,40 +76,81 @@
       "3H-2-benzopyran",
       "3H-indole",
       "4,5-phenanthroline",
+      "4H-1,3-benzodioxine",
+      "4H-1,4-benzothiazine",
       "4H-1-benzopyran",
       "4H-1-benzoselenopyran",
       "4H-1-benzothiopyran",
+      "4H-3,1-benzoxazine",
+      "4H-pyrido[1,2-a]pyrimidine",
       "4H-quinolizine",
+      "5H-cyclopenta[b]pyridine",
+      "5H-dibenzo[a,d][7]annulene",
       "7H-pyrrolo[2,3-d]pyrimidine",
+      "9H-fluorene",
+      "9H-pyrido[3,4-b]indole",
+      "[1,2,4]triazolo[1,5-a]pyrimidine",
+      "[1,2,4]triazolo[4,3-a]pyrazine",
+      "[1,2,4]triazolo[4,3-a]pyridine",
+      "aceanthrylene",
       "acenaphthylene",
+      "acephenanthrylene",
       "acridine",
+      "as-indacene",
       "azulene",
+      "biphenylene",
       "carbazole",
+      "chrysene",
       "cinnoline",
+      "coronene",
       "dibenzofuran",
       "dibenzothiophene",
       "fluoranthene",
+      "furo[2,3-d]pyrimidine",
       "furo[3,2-b]furan",
+      "furo[3,2-b]pyridine",
+      "furo[3,2-d]pyrimidine",
+      "heptalene",
+      "imidazo[1,2-a]pyrazine",
       "imidazo[1,2-a]pyridine",
+      "imidazo[1,2-a]pyrimidine",
+      "imidazo[1,2-b]pyridazine",
+      "imidazo[1,2-c]pyrimidine",
       "indazole",
       "indolizine",
       "isoquinoline",
+      "isoxazolo[5,4-b]pyridine",
+      "naphthacene",
       "naphthalene",
       "naphtho[1,2-b]thiophene",
       "naphtho[2,3-b]furan",
       "naphtho[2,3-d][1,3]oxazole",
+      "pentalene",
+      "perylene",
       "phenanthridine",
       "phenazine",
+      "phenoxathiine",
       "phthalazine",
+      "picene",
       "pteridine",
       "purine",
+      "pyrazolo[1,5-a]pyridine",
       "pyrazolo[1,5-a]pyrimidine",
       "pyrido[2,3-b]pyrazine",
+      "pyrido[3,4-b]pyrazine",
+      "pyrrolo[1,2-a]pyrazine",
       "quinazoline",
       "quinoline",
       "quinoxaline",
+      "s-indacene",
+      "thianthrene",
+      "thiazolo[4,5-d]pyrimidine",
+      "thiazolo[5,4-b]pyridine",
       "thieno[2,3-b]pyridine",
+      "thieno[2,3-d]pyrimidine",
       "thieno[3,2-b]thiophene",
+      "thieno[3,2-d]pyrimidine",
+      "triphenylene",
       "xanthene"
     ],
     "audit_only_parent_names": [],
@@ -386,6 +436,16 @@
         "10"
       ]
     },
+    "1H-1,4-benzodiazepine": {
+      "parent_stems": [
+        "1,4-benzodiazepin"
+      ],
+      "substituent_stems": [
+        "1,4-benzodiazepin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
     "1H-1,5-benzodiazepine": {
       "parent_stems": [
         "1,5-benzodiazepin"
@@ -413,6 +473,19 @@
         "1"
       ]
     },
+    "1H-benzo[7]annulene": {
+      "parent_stems": [
+        "benzo[7]annulen"
+      ],
+      "substituent_stems": [
+        "benzo[7]annulen"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe",
+      "default_indicated_h": [
+        "1"
+      ]
+    },
     "1H-benzotriazole": {
       "parent_stems": [
         "benzotriazol"
@@ -424,6 +497,21 @@
       "fusion_stems": [
         "benzotriazolo"
       ],
+      "default_indicated_h": [
+        "1"
+      ]
+    },
+    "1H-indene": {
+      "parent_stems": [
+        "1H-inden"
+      ],
+      "substituent_stems": [
+        "1H-inden"
+      ],
+      "fusion_stems": [
+        "indeno"
+      ],
+      "derivative_status": "production_safe",
       "default_indicated_h": [
         "1"
       ]
@@ -501,6 +589,16 @@
         "1"
       ]
     },
+    "1H-pyrazolo[4,3-c]pyridine": {
+      "parent_stems": [
+        "pyrazolo[4,3-c]pyridin"
+      ],
+      "substituent_stems": [
+        "pyrazolo[4,3-c]pyridin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
     "1H-pyrrolizine": {
       "parent_stems": [
         "pyrrolizin"
@@ -516,12 +614,32 @@
         "1"
       ]
     },
+    "1H-pyrrolo[2,3-b]indole": {
+      "parent_stems": [
+        "pyrrolo[2,3-b]indol"
+      ],
+      "substituent_stems": [
+        "pyrrolo[2,3-b]indol"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
     "1H-pyrrolo[2,3-b]pyridine": {
       "parent_stems": [
         "1H-pyrrolo[2,3-b]pyridin"
       ],
       "substituent_stems": [
         "1H-pyrrolo[2,3-b]pyridin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "1H-pyrrolo[3,2-b]pyridine": {
+      "parent_stems": [
+        "pyrrolo[3,2-b]pyridin"
+      ],
+      "substituent_stems": [
+        "pyrrolo[3,2-b]pyridin"
       ],
       "fusion_stems": [],
       "derivative_status": "production_safe"
@@ -622,6 +740,19 @@
         "isobenzothieno"
       ]
     },
+    "2H-1,3-benzoxazine": {
+      "parent_stems": [
+        "1,3-benzoxazin"
+      ],
+      "substituent_stems": [
+        "1,3-benzoxazin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe",
+      "default_indicated_h": [
+        "2"
+      ]
+    },
     "2H-1-benzopyran": {
       "parent_stems": [
         "1-benzopyran"
@@ -636,6 +767,31 @@
       "default_indicated_h": [
         "2"
       ]
+    },
+    "2H-1-benzothiopyran": {
+      "parent_stems": [
+        "1-benzothiopyran"
+      ],
+      "substituent_stems": [
+        "1-benzothiopyran"
+      ],
+      "fusion_stems": [
+        "thiochromeno"
+      ],
+      "derivative_status": "production_safe",
+      "default_indicated_h": [
+        "2"
+      ]
+    },
+    "2H-2,3-benzodiazepine": {
+      "parent_stems": [
+        "2,3-benzodiazepin"
+      ],
+      "substituent_stems": [
+        "2,3-benzodiazepin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
     },
     "2H-isoindole": {
       "parent_stems": [
@@ -733,6 +889,30 @@
       ],
       "derivative_status": "production_safe"
     },
+    "4H-1,3-benzodioxine": {
+      "parent_stems": [
+        "1,3-benzodioxin"
+      ],
+      "substituent_stems": [
+        "1,3-benzodioxin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe",
+      "default_indicated_h": [
+        "2",
+        "4"
+      ]
+    },
+    "4H-1,4-benzothiazine": {
+      "parent_stems": [
+        "1,4-benzothiazin"
+      ],
+      "substituent_stems": [
+        "1,4-benzothiazin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
     "4H-1-benzopyran": {
       "parent_stems": [
         "1-benzopyran"
@@ -778,6 +958,32 @@
         "4"
       ]
     },
+    "4H-3,1-benzoxazine": {
+      "parent_stems": [
+        "3,1-benzoxazin"
+      ],
+      "substituent_stems": [
+        "3,1-benzoxazin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe",
+      "default_indicated_h": [
+        "4"
+      ]
+    },
+    "4H-pyrido[1,2-a]pyrimidine": {
+      "parent_stems": [
+        "pyrido[1,2-a]pyrimidin"
+      ],
+      "substituent_stems": [
+        "pyrido[1,2-a]pyrimidin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe",
+      "default_indicated_h": [
+        "4"
+      ]
+    },
     "4H-quinolizine": {
       "parent_stems": [
         "quinolizin"
@@ -793,6 +999,32 @@
         "4"
       ]
     },
+    "5H-cyclopenta[b]pyridine": {
+      "parent_stems": [
+        "cyclopenta[b]pyridin"
+      ],
+      "substituent_stems": [
+        "cyclopenta[b]pyridin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe",
+      "default_indicated_h": [
+        "5"
+      ]
+    },
+    "5H-dibenzo[a,d][7]annulene": {
+      "parent_stems": [
+        "dibenzo[a,d][7]annulen"
+      ],
+      "substituent_stems": [
+        "dibenzo[a,d][7]annulen"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe",
+      "default_indicated_h": [
+        "5"
+      ]
+    },
     "7H-pyrrolo[2,3-d]pyrimidine": {
       "parent_stems": [
         "pyrrolo[2,3-d]pyrimidin"
@@ -804,6 +1036,71 @@
       "default_indicated_h": [
         "7"
       ]
+    },
+    "9H-fluorene": {
+      "parent_stems": [
+        "fluoren"
+      ],
+      "substituent_stems": [
+        "fluoren"
+      ],
+      "fusion_stems": [
+        "fluoreno"
+      ],
+      "derivative_status": "production_safe",
+      "default_indicated_h": [
+        "9"
+      ]
+    },
+    "9H-pyrido[3,4-b]indole": {
+      "parent_stems": [
+        "pyrido[3,4-b]indol"
+      ],
+      "substituent_stems": [
+        "pyrido[3,4-b]indol"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "[1,2,4]triazolo[1,5-a]pyrimidine": {
+      "parent_stems": [
+        "[1,2,4]triazolo[1,5-a]pyrimidin"
+      ],
+      "substituent_stems": [
+        "[1,2,4]triazolo[1,5-a]pyrimidin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "[1,2,4]triazolo[4,3-a]pyrazine": {
+      "parent_stems": [
+        "[1,2,4]triazolo[4,3-a]pyrazin"
+      ],
+      "substituent_stems": [
+        "[1,2,4]triazolo[4,3-a]pyrazin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "[1,2,4]triazolo[4,3-a]pyridine": {
+      "parent_stems": [
+        "[1,2,4]triazolo[4,3-a]pyridin"
+      ],
+      "substituent_stems": [
+        "[1,2,4]triazolo[4,3-a]pyridin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "aceanthrylene": {
+      "parent_stems": [
+        "aceanthrylen"
+      ],
+      "substituent_stems": [
+        "aceanthrylen"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
     },
     "acenaphthylene": {
       "parent_stems": [
@@ -819,6 +1116,16 @@
       ],
       "derivative_status": "production_safe"
     },
+    "acephenanthrylene": {
+      "parent_stems": [
+        "acephenanthrylen"
+      ],
+      "substituent_stems": [
+        "acephenanthrylen"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
     "acridine": {
       "parent_stems": [
         "acridin"
@@ -831,6 +1138,16 @@
       ],
       "derivative_status": "production_safe"
     },
+    "as-indacene": {
+      "parent_stems": [
+        "as-indacen"
+      ],
+      "substituent_stems": [
+        "as-indacen"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
     "azulene": {
       "parent_stems": [
         "azulen"
@@ -841,6 +1158,18 @@
       ],
       "fusion_stems": [
         "azuleno"
+      ],
+      "derivative_status": "production_safe"
+    },
+    "biphenylene": {
+      "parent_stems": [
+        "biphenylen"
+      ],
+      "substituent_stems": [
+        "biphenylen"
+      ],
+      "fusion_stems": [
+        "biphenyleno"
       ],
       "derivative_status": "production_safe"
     },
@@ -859,6 +1188,18 @@
         "9"
       ]
     },
+    "chrysene": {
+      "parent_stems": [
+        "chrysen"
+      ],
+      "substituent_stems": [
+        "chrysen"
+      ],
+      "fusion_stems": [
+        "chryseno"
+      ],
+      "derivative_status": "production_safe"
+    },
     "cinnoline": {
       "parent_stems": [
         "cinnolin"
@@ -868,6 +1209,18 @@
       ],
       "fusion_stems": [
         "cinnolino"
+      ],
+      "derivative_status": "production_safe"
+    },
+    "coronene": {
+      "parent_stems": [
+        "coronen"
+      ],
+      "substituent_stems": [
+        "coronen"
+      ],
+      "fusion_stems": [
+        "coroneno"
       ],
       "derivative_status": "production_safe"
     },
@@ -907,6 +1260,16 @@
       ],
       "derivative_status": "production_safe"
     },
+    "furo[2,3-d]pyrimidine": {
+      "parent_stems": [
+        "furo[2,3-d]pyrimidin"
+      ],
+      "substituent_stems": [
+        "furo[2,3-d]pyrimidin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
     "furo[3,2-b]furan": {
       "parent_stems": [
         "furo[3,2-b]furan"
@@ -917,12 +1280,84 @@
       "fusion_stems": [],
       "derivative_status": "production_safe"
     },
+    "furo[3,2-b]pyridine": {
+      "parent_stems": [
+        "furo[3,2-b]pyridin"
+      ],
+      "substituent_stems": [
+        "furo[3,2-b]pyridin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "furo[3,2-d]pyrimidine": {
+      "parent_stems": [
+        "furo[3,2-d]pyrimidin"
+      ],
+      "substituent_stems": [
+        "furo[3,2-d]pyrimidin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "heptalene": {
+      "parent_stems": [
+        "heptalen"
+      ],
+      "substituent_stems": [
+        "heptalen"
+      ],
+      "fusion_stems": [
+        "heptaleno"
+      ],
+      "derivative_status": "production_safe"
+    },
+    "imidazo[1,2-a]pyrazine": {
+      "parent_stems": [
+        "imidazo[1,2-a]pyrazin"
+      ],
+      "substituent_stems": [
+        "imidazo[1,2-a]pyrazin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
     "imidazo[1,2-a]pyridine": {
       "parent_stems": [
         "imidazo[1,2-a]pyridin"
       ],
       "substituent_stems": [
         "imidazo[1,2-a]pyridin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "imidazo[1,2-a]pyrimidine": {
+      "parent_stems": [
+        "imidazo[1,2-a]pyrimidin"
+      ],
+      "substituent_stems": [
+        "imidazo[1,2-a]pyrimidin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "imidazo[1,2-b]pyridazine": {
+      "parent_stems": [
+        "imidazo[1,2-b]pyridazin"
+      ],
+      "substituent_stems": [
+        "imidazo[1,2-b]pyridazin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "imidazo[1,2-c]pyrimidine": {
+      "parent_stems": [
+        "imidazo[1,2-c]pyrimidin"
+      ],
+      "substituent_stems": [
+        "imidazo[1,2-c]pyrimidin"
       ],
       "fusion_stems": [],
       "derivative_status": "production_safe"
@@ -967,6 +1402,28 @@
       ],
       "derivative_status": "production_safe"
     },
+    "isoxazolo[5,4-b]pyridine": {
+      "parent_stems": [
+        "isoxazolo[5,4-b]pyridin"
+      ],
+      "substituent_stems": [
+        "isoxazolo[5,4-b]pyridin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "naphthacene": {
+      "parent_stems": [
+        "naphthacen"
+      ],
+      "substituent_stems": [
+        "naphthacen"
+      ],
+      "fusion_stems": [
+        "naphthaceno"
+      ],
+      "derivative_status": "production_safe"
+    },
     "naphthalene": {
       "parent_stems": [
         "naphthalen"
@@ -1008,6 +1465,30 @@
       ],
       "derivative_status": "production_safe"
     },
+    "pentalene": {
+      "parent_stems": [
+        "pentalen"
+      ],
+      "substituent_stems": [
+        "pentalen"
+      ],
+      "fusion_stems": [
+        "pentaleno"
+      ],
+      "derivative_status": "production_safe"
+    },
+    "perylene": {
+      "parent_stems": [
+        "perylen"
+      ],
+      "substituent_stems": [
+        "perylen"
+      ],
+      "fusion_stems": [
+        "peryleno"
+      ],
+      "derivative_status": "production_safe"
+    },
     "phenanthridine": {
       "parent_stems": [
         "phenanthridin"
@@ -1032,6 +1513,16 @@
       ],
       "derivative_status": "production_safe"
     },
+    "phenoxathiine": {
+      "parent_stems": [
+        "phenoxathiin"
+      ],
+      "substituent_stems": [
+        "phenoxathiin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
     "phthalazine": {
       "parent_stems": [
         "phthalazin"
@@ -1041,6 +1532,18 @@
       ],
       "fusion_stems": [
         "phthalazino"
+      ],
+      "derivative_status": "production_safe"
+    },
+    "picene": {
+      "parent_stems": [
+        "picen"
+      ],
+      "substituent_stems": [
+        "picen"
+      ],
+      "fusion_stems": [
+        "piceno"
       ],
       "derivative_status": "production_safe"
     },
@@ -1069,6 +1572,16 @@
       ],
       "derivative_status": "production_safe"
     },
+    "pyrazolo[1,5-a]pyridine": {
+      "parent_stems": [
+        "pyrazolo[1,5-a]pyridin"
+      ],
+      "substituent_stems": [
+        "pyrazolo[1,5-a]pyridin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
     "pyrazolo[1,5-a]pyrimidine": {
       "parent_stems": [
         "pyrazolo[1,5-a]pyrimidin"
@@ -1085,6 +1598,26 @@
       ],
       "substituent_stems": [
         "pyrido[2,3-b]pyrazin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "pyrido[3,4-b]pyrazine": {
+      "parent_stems": [
+        "pyrido[3,4-b]pyrazin"
+      ],
+      "substituent_stems": [
+        "pyrido[3,4-b]pyrazin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "pyrrolo[1,2-a]pyrazine": {
+      "parent_stems": [
+        "pyrrolo[1,2-a]pyrazin"
+      ],
+      "substituent_stems": [
+        "pyrrolo[1,2-a]pyrazin"
       ],
       "fusion_stems": [],
       "derivative_status": "production_safe"
@@ -1126,12 +1659,64 @@
       ],
       "derivative_status": "production_safe"
     },
+    "s-indacene": {
+      "parent_stems": [
+        "s-indacen"
+      ],
+      "substituent_stems": [
+        "s-indacen"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "thianthrene": {
+      "parent_stems": [
+        "thianthren"
+      ],
+      "substituent_stems": [
+        "thianthren"
+      ],
+      "fusion_stems": [
+        "thianthreno"
+      ],
+      "derivative_status": "production_safe"
+    },
+    "thiazolo[4,5-d]pyrimidine": {
+      "parent_stems": [
+        "thiazolo[4,5-d]pyrimidin"
+      ],
+      "substituent_stems": [
+        "thiazolo[4,5-d]pyrimidin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "thiazolo[5,4-b]pyridine": {
+      "parent_stems": [
+        "thiazolo[5,4-b]pyridin"
+      ],
+      "substituent_stems": [
+        "thiazolo[5,4-b]pyridin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
     "thieno[2,3-b]pyridine": {
       "parent_stems": [
         "thieno[2,3-b]pyridin"
       ],
       "substituent_stems": [
         "thieno[2,3-b]pyridin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "thieno[2,3-d]pyrimidine": {
+      "parent_stems": [
+        "thieno[2,3-d]pyrimidin"
+      ],
+      "substituent_stems": [
+        "thieno[2,3-d]pyrimidin"
       ],
       "fusion_stems": [],
       "derivative_status": "production_safe"
@@ -1144,6 +1729,28 @@
         "thieno[3,2-b]thiophen"
       ],
       "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "thieno[3,2-d]pyrimidine": {
+      "parent_stems": [
+        "thieno[3,2-d]pyrimidin"
+      ],
+      "substituent_stems": [
+        "thieno[3,2-d]pyrimidin"
+      ],
+      "fusion_stems": [],
+      "derivative_status": "production_safe"
+    },
+    "triphenylene": {
+      "parent_stems": [
+        "triphenylen"
+      ],
+      "substituent_stems": [
+        "triphenylen"
+      ],
+      "fusion_stems": [
+        "triphenyleno"
+      ],
       "derivative_status": "production_safe"
     },
     "xanthene": {

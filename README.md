@@ -7,9 +7,9 @@
 [![PyPI](https://img.shields.io/pypi/v/openclatura.svg)](https://pypi.org/project/openclatura/)
 [![Python](https://img.shields.io/pypi/pyversions/openclatura.svg)](https://pypi.org/project/openclatura/)
 [![CI](https://github.com/lamalab-org/openclatura/actions/workflows/ci.yml/badge.svg)](https://github.com/lamalab-org/openclatura/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/lamalab-org/openclatura/blob/main/LICENSE)
 
-![openclatura demo](assets/openclatura-demo.gif)
+![openclatura demo](https://raw.githubusercontent.com/lamalab-org/openclatura/main/assets/openclatura-demo.gif)
 
 </div>
 
@@ -35,13 +35,11 @@ name, and every choice along the way is recorded in a decision trace, so the
 ### Coverage
 
 Round-trip accuracy against public datasets (details and rerun instructions in
-[`evaluations/`](evaluations/)):
+[`evaluations/`](https://github.com/lamalab-org/openclatura/tree/main/evaluations)):
 
-| dataset  | coverage |
-| -------- | -------- |
-| QM9      | 100 %    |
-| PubChem  | 99.3 %   |
-| ZINC22   | 97.4 %   |
+| dataset  | QM9   | PubChem | ZINC22 |
+| -------- | ----- | ------- | ------ |
+| coverage | 100 % | 99.3 %  | 97.4 % |
 
 The package is in **beta**. Naming is solid across common organic chemistry;
 exotic corners of the Blue Book — and stereodescriptor edge cases — are still
@@ -285,6 +283,10 @@ curl -X POST localhost:8000/describe -H 'content-type: application/json' \
 
 OpenAPI docs are served at `http://localhost:8000/docs`.
 
+## Changelog
+
+See [CHANGELOG.md](https://github.com/lamalab-org/openclatura/blob/main/CHANGELOG.md)
+for release notes.
 
 ## License
 

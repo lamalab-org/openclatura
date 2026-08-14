@@ -509,9 +509,7 @@ def _parent_display_tokens(parts: AssemblyParts) -> tuple[str, ...]:
 
 def _parent_token_variants(token: str) -> tuple[str, ...]:
     variants = [token]
-    if token.endswith("ane"):
-        variants.extend((token[:-3], token[:-1]))
-    elif token.endswith("ene") or token.endswith("yne"):
+    if token.endswith("ane") or token.endswith("ene") or token.endswith("yne"):
         variants.extend((token[:-3], token[:-1]))
     elif token.endswith("e"):
         variants.append(token[:-1])

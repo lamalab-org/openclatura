@@ -2443,7 +2443,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,4-phenanthroline"
     },
     {
       "name": "1,5-phenanthroline",
@@ -2673,7 +2674,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,5-phenanthroline"
     },
     {
       "name": "1,6-phenanthroline",
@@ -2903,7 +2905,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,6-phenanthroline"
     },
     {
       "name": "1,7-phenanthroline",
@@ -3133,7 +3136,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,7-phenanthroline"
     },
     {
       "name": "1,8-phenanthroline",
@@ -3363,7 +3367,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,8-phenanthroline"
     },
     {
       "name": "1,9-phenanthroline",
@@ -3593,7 +3598,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,9-phenanthroline"
     },
     {
       "name": "2,7-phenanthroline",
@@ -3823,7 +3829,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "2,7-phenanthroline"
     },
     {
       "name": "2,8-phenanthroline",
@@ -4053,7 +4060,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "2,8-phenanthroline"
     },
     {
       "name": "3,5-phenanthroline",
@@ -4283,7 +4291,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "3,5-phenanthroline"
     },
     {
       "name": "3,6-phenanthroline",
@@ -4513,7 +4522,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "3,6-phenanthroline"
     },
     {
       "name": "4,5-phenanthroline",
@@ -4743,7 +4753,8 @@
         "mancude_double_bonds": 7,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "4,5-phenanthroline"
     },
     {
       "name": "acridine",
@@ -8232,7 +8243,8 @@
         "mancude_double_bonds": 4,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "purine"
     },
     {
       "name": "carbazole",
@@ -8452,7 +8464,8 @@
         "mancude_double_bonds": 6,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "carbazole"
     },
     {
       "name": "indazole",
@@ -8610,7 +8623,8 @@
         "mancude_double_bonds": 4,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "indazole"
     },
     {
       "name": "xanthene",
@@ -8848,7 +8862,8 @@
         "mancude_double_bonds": 6,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "xanthene"
     },
     {
       "name": "1H-indole",
@@ -9004,7 +9019,8 @@
         "mancude_double_bonds": 4,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "indole"
     },
     {
       "name": "1H-isoindole",
@@ -9164,7 +9180,8 @@
         "mancude_double_bonds": 4,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "isoindole"
     },
     {
       "name": "3H-indole",
@@ -9783,7 +9800,8 @@
         "mancude_double_bonds": 3,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1H-pyrrolizine"
     },
     {
       "name": "1-benzofuran",
@@ -12752,6 +12770,181 @@
         "interior_atoms": [],
         "default_indicated_h": [
           "1"
+        ],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "2H-1-benzothiopyran",
+      "pin": true,
+      "priority": 40,
+      "aliases": [
+        "2H-thiochromene"
+      ],
+      "attached_prefix": "thiochromeno",
+      "derivative_stem": "1-benzothiopyran",
+      "default_indicated_h": [
+        "2"
+      ],
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "S",
+            "aromatic": false
+          },
+          {
+            "locant": "2",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "1",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [
+          "2"
         ],
         "mancude_double_bonds": 4,
         "enabled": true,
@@ -16435,7 +16628,8 @@
         "mancude_double_bonds": 2,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,2,3-triazole"
     },
     {
       "name": "1,2,4,5-tetrazine",
@@ -17027,7 +17221,8 @@
         "mancude_double_bonds": 2,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "1,2,4-triazole"
     },
     {
       "name": "1,2,5-oxadiazole",
@@ -21888,7 +22083,8 @@
         "mancude_double_bonds": 2,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "arsole"
     },
     {
       "name": "azetidine",
@@ -22292,7 +22488,8 @@
         "mancude_double_bonds": 4,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "benzimidazole"
     },
     {
       "name": "borinine",
@@ -23430,7 +23627,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": null,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "implied_stereo": true
       }
     },
     {
@@ -23782,6 +23980,167 @@
           "3"
         ],
         "mancude_double_bonds": 3,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "1H-indene",
+      "pin": true,
+      "priority": 273,
+      "aliases": [
+        "indene"
+      ],
+      "attached_prefix": "indeno",
+      "derivative_stem": "1H-inden",
+      "default_indicated_h": [
+        "1"
+      ],
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "7a"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "7a"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [
+          "1"
+        ],
+        "mancude_double_bonds": 4,
         "enabled": true,
         "derivative_production_enabled": true
       }
@@ -25192,7 +25551,8 @@
         "mancude_double_bonds": 2,
         "enabled": true,
         "derivative_production_enabled": true
-      }
+      },
+      "indicated_hydrogen_name": "phosphole"
     },
     {
       "name": "piperazine",
@@ -27411,6 +27771,9523 @@
           "2"
         ],
         "mancude_double_bonds": 2,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "thieno[2,3-d]pyrimidine",
+      "pin": true,
+      "priority": 320,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "thieno[2,3-d]pyrimidin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7",
+            "symbol": "S",
+            "aromatic": false
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "3",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "4a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "rings": [
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ],
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "7a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "[1,2,4]triazolo[1,5-a]pyrimidine",
+      "pin": true,
+      "priority": 322,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "[1,2,4]triazolo[1,5-a]pyrimidin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4",
+            "symbol": "N"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8",
+            "symbol": "N",
+            "aromatic": false,
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "8",
+              "3a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "8"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "8"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "[1,2,4]triazolo[4,3-a]pyridine",
+      "pin": true,
+      "priority": 324,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "[1,2,4]triazolo[4,3-a]pyridin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2",
+            "symbol": "N"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4",
+            "symbol": "N",
+            "aromatic": false,
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "4",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "8a"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "8a"
+          ],
+          [
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "[1,2,4]triazolo[4,3-a]pyrazine",
+      "pin": true,
+      "priority": 325,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "[1,2,4]triazolo[4,3-a]pyrazin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2",
+            "symbol": "N"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4",
+            "symbol": "N",
+            "aromatic": false,
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7",
+            "symbol": "N"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "4",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "8a"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "8a"
+          ],
+          [
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "thieno[3,2-d]pyrimidine",
+      "pin": true,
+      "priority": 326,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "thieno[3,2-d]pyrimidin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5",
+            "symbol": "S",
+            "aromatic": false
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "3",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "4a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "4a"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "rings": [
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ],
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "7a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "imidazo[1,2-a]pyrazine",
+      "pin": true,
+      "priority": 327,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "imidazo[1,2-a]pyrazin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4",
+            "symbol": "N",
+            "aromatic": false,
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7",
+            "symbol": "N"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "4",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "8a"
+          ],
+          [
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "pyrazolo[1,5-a]pyridine",
+      "pin": true,
+      "priority": 328,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "pyrazolo[1,5-a]pyridin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8",
+            "symbol": "N",
+            "aromatic": false,
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "8",
+              "3a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "8"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "6",
+            "7",
+            "8"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "8"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "4H-pyrido[1,2-a]pyrimidine",
+      "pin": true,
+      "priority": 329,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "pyrido[1,2-a]pyrimidin",
+      "default_indicated_h": [
+        "4"
+      ],
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "5",
+            "symbol": "N",
+            "aromatic": false,
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "9a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "5",
+              "9a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "9a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "9"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "9a"
+          ],
+          [
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "9a"
+          ]
+        ],
+        "fusion_atoms": [
+          "5",
+          "9a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [
+          "4"
+        ],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "imidazo[1,2-b]pyridazine",
+      "pin": true,
+      "priority": 330,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "imidazo[1,2-b]pyridazin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4",
+            "symbol": "N",
+            "aromatic": false,
+            "fusion": true
+          },
+          {
+            "locant": "5",
+            "symbol": "N"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "5",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "8a"
+          ],
+          [
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "pyrrolo[1,2-a]pyrazine",
+      "pin": true,
+      "priority": 331,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "pyrrolo[1,2-a]pyrazin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2",
+            "symbol": "N"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5",
+            "symbol": "N",
+            "aromatic": false,
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "5",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ],
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "5",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "isoxazolo[5,4-b]pyridine",
+      "pin": true,
+      "priority": 332,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "isoxazolo[5,4-b]pyridin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "O",
+            "aromatic": false
+          },
+          {
+            "locant": "2",
+            "symbol": "N"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7",
+            "symbol": "N"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "7",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "3a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "7a"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "imidazo[1,2-a]pyrimidine",
+      "pin": true,
+      "priority": 333,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "imidazo[1,2-a]pyrimidin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4",
+            "symbol": "N",
+            "aromatic": false,
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8",
+            "symbol": "N"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "4",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "8a"
+          ],
+          [
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "furo[3,2-b]pyridine",
+      "pin": true,
+      "priority": 337,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "furo[3,2-b]pyridin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "O",
+            "aromatic": false
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4",
+            "symbol": "N"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "4",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "7a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "7a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "7a"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "7a"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "furo[2,3-d]pyrimidine",
+      "pin": true,
+      "priority": 339,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "furo[2,3-d]pyrimidin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7",
+            "symbol": "O",
+            "aromatic": false
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "3",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "4a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "rings": [
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ],
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "7a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "thiazolo[5,4-b]pyridine",
+      "pin": true,
+      "priority": 340,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "thiazolo[5,4-b]pyridin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3",
+            "symbol": "S",
+            "aromatic": false
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4",
+            "symbol": "N"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "4",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "7a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "7a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "7a"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "7a"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "thiazolo[4,5-d]pyrimidine",
+      "pin": true,
+      "priority": 341,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "thiazolo[4,5-d]pyrimidin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "S",
+            "aromatic": false
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4",
+            "symbol": "N"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6",
+            "symbol": "N"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "7a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "7a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "7a"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "7a"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "imidazo[1,2-c]pyrimidine",
+      "pin": true,
+      "priority": 342,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "imidazo[1,2-c]pyrimidin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4",
+            "symbol": "N",
+            "aromatic": false,
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6",
+            "symbol": "N"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "8a"
+          ],
+          [
+            "4",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "pyrido[3,4-b]pyrazine",
+      "pin": true,
+      "priority": 343,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "pyrido[3,4-b]pyrazin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4",
+            "symbol": "N"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6",
+            "symbol": "N"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 5,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "furo[3,2-d]pyrimidine",
+      "pin": true,
+      "priority": 344,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "furo[3,2-d]pyrimidin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5",
+            "symbol": "O",
+            "aromatic": false
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "3",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "4a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "4a"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "rings": [
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ],
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "7a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "9H-pyrido[3,4-b]indole",
+      "pin": true,
+      "priority": 346,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "pyrido[3,4-b]indol",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2",
+            "symbol": "N"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "4b",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          },
+          {
+            "locant": "9",
+            "symbol": "N",
+            "aromatic": false
+          },
+          {
+            "locant": "9a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "9",
+              "9a"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "4a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4a",
+              "4b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4b",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "4b",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "2",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "9a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "4"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "4b",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "9a"
+        ],
+        "rings": [
+          [
+            "4a",
+            "4b",
+            "8a",
+            "9",
+            "9a"
+          ],
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "9a"
+          ],
+          [
+            "4b",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "4b",
+          "8a",
+          "9a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "4b",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "9a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 6,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "1H-pyrrolo[3,2-b]pyridine",
+      "pin": true,
+      "priority": 347,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "pyrrolo[3,2-b]pyridin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N",
+            "aromatic": false
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4",
+            "symbol": "N"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "4",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "7a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "7a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "7a"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "7a"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "1H-pyrazolo[4,3-c]pyridine",
+      "pin": true,
+      "priority": 348,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "pyrazolo[4,3-c]pyridin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N",
+            "aromatic": false
+          },
+          {
+            "locant": "2",
+            "symbol": "N"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5",
+            "symbol": "N"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "5",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "7a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "7a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "7a"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "7a"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "5H-cyclopenta[b]pyridine",
+      "pin": true,
+      "priority": 349,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "cyclopenta[b]pyridin",
+      "default_indicated_h": [
+        "5"
+      ],
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "4a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "rings": [
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ],
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "7a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "7a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "7a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [
+          "5"
+        ],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "9H-fluorene",
+      "pin": true,
+      "priority": 350,
+      "aliases": [],
+      "attached_prefix": "fluoreno",
+      "derivative_stem": "fluoren",
+      "default_indicated_h": [
+        "9"
+      ],
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "4b",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          },
+          {
+            "locant": "9",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "9a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "4b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4b",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "4b",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "9a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "9a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "9a"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "4b",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "9a"
+        ],
+        "rings": [
+          [
+            "4a",
+            "4b",
+            "8a",
+            "9",
+            "9a"
+          ],
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "9a"
+          ],
+          [
+            "4b",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "4b",
+          "8a",
+          "9a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "4b",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "9a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [
+          "9"
+        ],
+        "mancude_double_bonds": 6,
+        "enabled": true,
+        "derivative_production_enabled": true
+      },
+      "indicated_hydrogen_name": "fluorene"
+    },
+    {
+      "name": "pentalene",
+      "pin": true,
+      "priority": 351,
+      "aliases": [],
+      "attached_prefix": "pentaleno",
+      "derivative_stem": "pentalen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "6a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "6a"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "6a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "6a"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "6",
+            "6a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "6a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "6a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "heptalene",
+      "pin": true,
+      "priority": 352,
+      "aliases": [],
+      "attached_prefix": "heptaleno",
+      "derivative_stem": "heptalen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "5a",
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "10a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "5a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "10a"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "5a",
+            "10a"
+          ],
+          [
+            "5a",
+            "6",
+            "7",
+            "8",
+            "9",
+            "10",
+            "10a"
+          ]
+        ],
+        "fusion_atoms": [
+          "5a",
+          "10a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 6,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "biphenylene",
+      "pin": true,
+      "priority": 353,
+      "aliases": [],
+      "attached_prefix": "biphenyleno",
+      "derivative_stem": "biphenylen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "4b",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          },
+          {
+            "locant": "8b",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "4b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4b",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "4b",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "8b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "1",
+              "8b"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8b"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "4b",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "8b"
+        ],
+        "rings": [
+          [
+            "4a",
+            "4b",
+            "8a",
+            "8b"
+          ],
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8b"
+          ],
+          [
+            "4b",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "4b",
+          "8a",
+          "8b"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "4b",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "8b"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 6,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "chrysene",
+      "pin": true,
+      "priority": 354,
+      "aliases": [],
+      "attached_prefix": "chryseno",
+      "derivative_stem": "chrysen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "4b",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "6a",
+            "fusion": true
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "10a",
+            "fusion": true
+          },
+          {
+            "locant": "10b",
+            "fusion": true
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "12"
+          },
+          {
+            "locant": "12a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "4b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4b",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "10a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "10a",
+              "10b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4b",
+              "10b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "10b",
+              "11"
+            ]
+          },
+          {
+            "locants": [
+              "11",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "12",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "12a"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "4b",
+          "5",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a",
+          "10b",
+          "11",
+          "12",
+          "12a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "12a"
+          ],
+          [
+            "4a",
+            "4b",
+            "10b",
+            "11",
+            "12",
+            "12a"
+          ],
+          [
+            "4b",
+            "5",
+            "6",
+            "6a",
+            "10a",
+            "10b"
+          ],
+          [
+            "6a",
+            "7",
+            "8",
+            "9",
+            "10",
+            "10a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "4b",
+          "6a",
+          "10a",
+          "10b",
+          "12a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "4b",
+          "5",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a",
+          "10b",
+          "11",
+          "12",
+          "12a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 9,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "naphthacene",
+      "pin": true,
+      "priority": 355,
+      "aliases": [],
+      "attached_prefix": "naphthaceno",
+      "derivative_stem": "naphthacen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "5a",
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "6a",
+            "fusion": true
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "10a",
+            "fusion": true
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "11a",
+            "fusion": true
+          },
+          {
+            "locant": "12"
+          },
+          {
+            "locant": "12a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "5a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "10a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "10a",
+              "11"
+            ]
+          },
+          {
+            "locants": [
+              "11",
+              "11a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "11a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "11a",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "12",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "12a"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a",
+          "11",
+          "11a",
+          "12",
+          "12a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "12a"
+          ],
+          [
+            "4a",
+            "5",
+            "5a",
+            "11a",
+            "12",
+            "12a"
+          ],
+          [
+            "5a",
+            "6",
+            "6a",
+            "10a",
+            "11",
+            "11a"
+          ],
+          [
+            "6a",
+            "7",
+            "8",
+            "9",
+            "10",
+            "10a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "5a",
+          "6a",
+          "10a",
+          "11a",
+          "12a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a",
+          "11",
+          "11a",
+          "12",
+          "12a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 9,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "triphenylene",
+      "pin": true,
+      "priority": 356,
+      "aliases": [],
+      "attached_prefix": "triphenyleno",
+      "derivative_stem": "triphenylen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "4b",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          },
+          {
+            "locant": "8b",
+            "fusion": true
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "12"
+          },
+          {
+            "locant": "12a",
+            "fusion": true
+          },
+          {
+            "locant": "12b",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "4b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4b",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "4b",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "8b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8b",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "11"
+            ]
+          },
+          {
+            "locants": [
+              "11",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "12",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "8b",
+              "12a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "12a",
+              "12b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "1",
+              "12b"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "12b"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "4b",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "8b",
+          "9",
+          "10",
+          "11",
+          "12",
+          "12a",
+          "12b"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "12b"
+          ],
+          [
+            "4a",
+            "4b",
+            "8a",
+            "8b",
+            "12a",
+            "12b"
+          ],
+          [
+            "4b",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ],
+          [
+            "8b",
+            "9",
+            "10",
+            "11",
+            "12",
+            "12a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "4b",
+          "8a",
+          "8b",
+          "12a",
+          "12b"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "4b",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "8b",
+          "9",
+          "10",
+          "11",
+          "12",
+          "12a",
+          "12b"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 9,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "perylene",
+      "pin": true,
+      "priority": 357,
+      "aliases": [],
+      "attached_prefix": "peryleno",
+      "derivative_stem": "perylen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "6a",
+            "fusion": true
+          },
+          {
+            "locant": "6b",
+            "fusion": true
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "9a",
+            "fusion": true
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "12"
+          },
+          {
+            "locant": "12a",
+            "fusion": true
+          },
+          {
+            "locant": "12b",
+            "fusion": true
+          },
+          {
+            "locant": "12c",
+            "fusion": true
+          },
+          {
+            "locant": "12d",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "6b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "6b",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "9a"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "11"
+            ]
+          },
+          {
+            "locants": [
+              "11",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "12",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "12a",
+              "12b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "1",
+              "12b"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "12c"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "6a",
+              "12c"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "12b",
+              "12c"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "6b",
+              "12d"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "9a",
+              "12d"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "12a",
+              "12d"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "6a",
+          "6b",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "10",
+          "11",
+          "12",
+          "12a",
+          "12b",
+          "12c",
+          "12d"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "12b",
+            "12c"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "6",
+            "6a",
+            "12c"
+          ],
+          [
+            "6a",
+            "6b",
+            "12a",
+            "12b",
+            "12c",
+            "12d"
+          ],
+          [
+            "6b",
+            "7",
+            "8",
+            "9",
+            "9a",
+            "12d"
+          ],
+          [
+            "9a",
+            "10",
+            "11",
+            "12",
+            "12a",
+            "12d"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "6a",
+          "6b",
+          "9a",
+          "12a",
+          "12b",
+          "12c",
+          "12d"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "6a",
+          "6b",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "10",
+          "11",
+          "12",
+          "12a",
+          "12b"
+        ],
+        "interior_atoms": [
+          "12c",
+          "12d"
+        ],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 10,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "picene",
+      "pin": true,
+      "priority": 358,
+      "aliases": [],
+      "attached_prefix": "piceno",
+      "derivative_stem": "picen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "6a",
+            "fusion": true
+          },
+          {
+            "locant": "6b",
+            "fusion": true
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "12"
+          },
+          {
+            "locant": "12a",
+            "fusion": true
+          },
+          {
+            "locant": "12b",
+            "fusion": true
+          },
+          {
+            "locant": "13"
+          },
+          {
+            "locant": "14"
+          },
+          {
+            "locant": "14a",
+            "fusion": true
+          },
+          {
+            "locant": "14b",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "6b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "6b",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "11"
+            ]
+          },
+          {
+            "locants": [
+              "11",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "12",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "12a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "12a",
+              "12b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "6b",
+              "12b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "12b",
+              "13"
+            ]
+          },
+          {
+            "locants": [
+              "13",
+              "14"
+            ]
+          },
+          {
+            "locants": [
+              "14",
+              "14a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "14a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "14a",
+              "14b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4a",
+              "14b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "1",
+              "14b"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "6a",
+          "6b",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "10",
+          "11",
+          "12",
+          "12a",
+          "12b",
+          "13",
+          "14",
+          "14a",
+          "14b"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "14b"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "6a",
+            "14a",
+            "14b"
+          ],
+          [
+            "6a",
+            "6b",
+            "12b",
+            "13",
+            "14",
+            "14a"
+          ],
+          [
+            "6b",
+            "7",
+            "8",
+            "8a",
+            "12a",
+            "12b"
+          ],
+          [
+            "8a",
+            "9",
+            "10",
+            "11",
+            "12",
+            "12a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "6a",
+          "6b",
+          "8a",
+          "12a",
+          "12b",
+          "14a",
+          "14b"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "6a",
+          "6b",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "10",
+          "11",
+          "12",
+          "12a",
+          "12b",
+          "13",
+          "14",
+          "14a",
+          "14b"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 11,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "coronene",
+      "pin": true,
+      "priority": 359,
+      "aliases": [],
+      "attached_prefix": "coroneno",
+      "derivative_stem": "coronen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "2a",
+            "fusion": true
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "6a",
+            "fusion": true
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "10a",
+            "fusion": true
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "12"
+          },
+          {
+            "locant": "12a",
+            "fusion": true
+          },
+          {
+            "locant": "12b",
+            "fusion": true
+          },
+          {
+            "locant": "12c",
+            "fusion": true
+          },
+          {
+            "locant": "12d",
+            "fusion": true
+          },
+          {
+            "locant": "12e",
+            "fusion": true
+          },
+          {
+            "locant": "12f",
+            "fusion": true
+          },
+          {
+            "locant": "12g",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "2a"
+            ]
+          },
+          {
+            "locants": [
+              "2a",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "10a",
+              "11"
+            ]
+          },
+          {
+            "locants": [
+              "11",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "12",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "2a",
+              "12b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "12b",
+              "12c"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4a",
+              "12c"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "12c",
+              "12d"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "6a",
+              "12d"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "12d",
+              "12e"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "12e"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "12e",
+              "12f"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "10a",
+              "12f"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "12f",
+              "12g"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "12a",
+              "12g"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "12b",
+              "12g"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "2a",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "10",
+          "10a",
+          "11",
+          "12",
+          "12a",
+          "12b",
+          "12c",
+          "12d",
+          "12e",
+          "12f",
+          "12g"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "2a",
+            "12a",
+            "12b",
+            "12g"
+          ],
+          [
+            "2a",
+            "3",
+            "4",
+            "4a",
+            "12b",
+            "12c"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "6a",
+            "12c",
+            "12d"
+          ],
+          [
+            "6a",
+            "7",
+            "8",
+            "8a",
+            "12d",
+            "12e"
+          ],
+          [
+            "8a",
+            "9",
+            "10",
+            "10a",
+            "12e",
+            "12f"
+          ],
+          [
+            "10a",
+            "11",
+            "12",
+            "12a",
+            "12f",
+            "12g"
+          ]
+        ],
+        "fusion_atoms": [
+          "2a",
+          "4a",
+          "6a",
+          "8a",
+          "10a",
+          "12a",
+          "12b",
+          "12c",
+          "12d",
+          "12e",
+          "12f",
+          "12g"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "2a",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "10",
+          "10a",
+          "11",
+          "12",
+          "12a",
+          "12b",
+          "12c",
+          "12d",
+          "12e",
+          "12f",
+          "12g"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 12,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "s-indacene",
+      "pin": true,
+      "priority": 360,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "s-indacen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "7a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "7a",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "7a",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ],
+          [
+            "3a",
+            "4",
+            "4a",
+            "7a",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "4a",
+          "7a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "7a",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 6,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "as-indacene",
+      "pin": true,
+      "priority": 361,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "as-indacen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "5a",
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          },
+          {
+            "locant": "8b",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "5a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "8a",
+              "8b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "1",
+              "8b"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "8b"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "8b"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "8b"
+          ],
+          [
+            "5a",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "5a",
+            "8a",
+            "8b"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "5a",
+          "8a",
+          "8b"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "8b"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 6,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "aceanthrylene",
+      "pin": true,
+      "priority": 362,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "aceanthrylen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "2a",
+            "fusion": true
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "5a",
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "6a",
+            "fusion": true
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "10a",
+            "fusion": true
+          },
+          {
+            "locant": "10b",
+            "fusion": true
+          },
+          {
+            "locant": "10c",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "2a"
+            ]
+          },
+          {
+            "locants": [
+              "2a",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "5a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "10a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "10a",
+              "10b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "1",
+              "10b"
+            ]
+          },
+          {
+            "locants": [
+              "10b",
+              "10c"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "2a",
+              "10c"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "5a",
+              "10c"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "2a",
+          "3",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a",
+          "10b",
+          "10c"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "2a",
+            "10b",
+            "10c"
+          ],
+          [
+            "2a",
+            "3",
+            "4",
+            "5",
+            "5a",
+            "10c"
+          ],
+          [
+            "5a",
+            "6",
+            "6a",
+            "10a",
+            "10b",
+            "10c"
+          ],
+          [
+            "6a",
+            "7",
+            "8",
+            "9",
+            "10",
+            "10a"
+          ]
+        ],
+        "fusion_atoms": [
+          "2a",
+          "5a",
+          "6a",
+          "10a",
+          "10b",
+          "10c"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "2a",
+          "3",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a",
+          "10b"
+        ],
+        "interior_atoms": [
+          "10c"
+        ],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 8,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "acephenanthrylene",
+      "pin": true,
+      "priority": 363,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "acephenanthrylen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "5a",
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "6a",
+            "fusion": true
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "10a",
+            "fusion": true
+          },
+          {
+            "locant": "10b",
+            "fusion": true
+          },
+          {
+            "locant": "10c",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "5a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "10a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "10a",
+              "10b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "1",
+              "10b"
+            ]
+          },
+          {
+            "locants": [
+              "10b",
+              "10c"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "3a",
+              "10c"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "5a",
+              "10c"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a",
+          "10b",
+          "10c"
+        ],
+        "rings": [
+          [
+            "3a",
+            "4",
+            "5",
+            "5a",
+            "10c"
+          ],
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "10b",
+            "10c"
+          ],
+          [
+            "5a",
+            "6",
+            "6a",
+            "10a",
+            "10b",
+            "10c"
+          ],
+          [
+            "6a",
+            "7",
+            "8",
+            "9",
+            "10",
+            "10a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "5a",
+          "6a",
+          "10a",
+          "10b",
+          "10c"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a",
+          "10b"
+        ],
+        "interior_atoms": [
+          "10c"
+        ],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 8,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "thianthrene",
+      "pin": true,
+      "priority": 364,
+      "aliases": [],
+      "attached_prefix": "thianthreno",
+      "derivative_stem": "thianthren",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5",
+            "symbol": "S",
+            "aromatic": false
+          },
+          {
+            "locant": "5a",
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "9a",
+            "fusion": true
+          },
+          {
+            "locant": "10",
+            "symbol": "S",
+            "aromatic": false
+          },
+          {
+            "locant": "10a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "5a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "9a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "9a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "9a",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "10a"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "10",
+          "10a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "10a"
+          ],
+          [
+            "4a",
+            "5",
+            "5a",
+            "9a",
+            "10",
+            "10a"
+          ],
+          [
+            "5a",
+            "6",
+            "7",
+            "8",
+            "9",
+            "9a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "5a",
+          "9a",
+          "10a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "10",
+          "10a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 6,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "phenoxathiine",
+      "pin": true,
+      "priority": 365,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "phenoxathiin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5",
+            "symbol": "O",
+            "aromatic": false
+          },
+          {
+            "locant": "5a",
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "9a",
+            "fusion": true
+          },
+          {
+            "locant": "10",
+            "symbol": "S",
+            "aromatic": false
+          },
+          {
+            "locant": "10a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "5a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "9a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "9a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "9a",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "10a"
+            ],
+            "bond_class": "fusion"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "10",
+          "10a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "10a"
+          ],
+          [
+            "4a",
+            "5",
+            "5a",
+            "9a",
+            "10",
+            "10a"
+          ],
+          [
+            "5a",
+            "6",
+            "7",
+            "8",
+            "9",
+            "9a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "5a",
+          "9a",
+          "10a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "10",
+          "10a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 6,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "1H-benzo[7]annulene",
+      "pin": true,
+      "priority": 366,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "benzo[7]annulen",
+      "default_indicated_h": [
+        "1"
+      ],
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "9a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "9a"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "4a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "5",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "4"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "9a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "9",
+            "9a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "9a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [
+          "1"
+        ],
+        "mancude_double_bonds": 5,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "5H-dibenzo[a,d][7]annulene",
+      "pin": true,
+      "priority": 367,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "dibenzo[a,d][7]annulen",
+      "default_indicated_h": [
+        "5"
+      ],
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "5a",
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "9a",
+            "fusion": true
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "11a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "9a",
+              "5a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "5a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "11a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "11a",
+              "11"
+            ]
+          },
+          {
+            "locants": [
+              "11",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "11a",
+              "1"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "10",
+          "11",
+          "11a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "11a"
+          ],
+          [
+            "5a",
+            "6",
+            "7",
+            "8",
+            "9",
+            "9a"
+          ],
+          [
+            "4a",
+            "5",
+            "5a",
+            "9a",
+            "10",
+            "11",
+            "11a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "5a",
+          "9a",
+          "11a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a",
+          "10",
+          "11",
+          "11a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [
+          "5"
+        ],
+        "mancude_double_bonds": 7,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "1H-1,4-benzodiazepine",
+      "pin": true,
+      "priority": 368,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "1,4-benzodiazepin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N",
+            "aromatic": false
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4",
+            "symbol": "N"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "5a",
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "9a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "5a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "9a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "1",
+              "9a"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "9"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a"
+        ],
+        "rings": [
+          [
+            "5a",
+            "6",
+            "7",
+            "8",
+            "9",
+            "9a"
+          ],
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "5a",
+            "9a"
+          ]
+        ],
+        "fusion_atoms": [
+          "5a",
+          "9a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 5,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "2H-2,3-benzodiazepine",
+      "pin": true,
+      "priority": 369,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "2,3-benzodiazepin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2",
+            "symbol": "N",
+            "aromatic": false
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "5a",
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "9a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "5a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "9a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "1",
+              "9a"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "9"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a"
+        ],
+        "rings": [
+          [
+            "5a",
+            "6",
+            "7",
+            "8",
+            "9",
+            "9a"
+          ],
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "5",
+            "5a",
+            "9a"
+          ]
+        ],
+        "fusion_atoms": [
+          "5a",
+          "9a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "9",
+          "9a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 5,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "4H-1,4-benzothiazine",
+      "pin": true,
+      "priority": 371,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "1,4-benzothiazin",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "S",
+            "aromatic": false
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4",
+            "symbol": "N",
+            "aromatic": false
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "1",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "4H-3,1-benzoxazine",
+      "pin": true,
+      "priority": 372,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "3,1-benzoxazin",
+      "default_indicated_h": [
+        "4"
+      ],
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3",
+            "symbol": "O",
+            "aromatic": false
+          },
+          {
+            "locant": "4",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "1",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [
+          "4"
+        ],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "2H-1,3-benzoxazine",
+      "pin": true,
+      "priority": 373,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "1,3-benzoxazin",
+      "default_indicated_h": [
+        "2"
+      ],
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "O",
+            "aromatic": false
+          },
+          {
+            "locant": "2",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "3",
+            "symbol": "N"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "8a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "1",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [
+          "2"
+        ],
+        "mancude_double_bonds": 4,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "4H-1,3-benzodioxine",
+      "pin": true,
+      "priority": 374,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "1,3-benzodioxin",
+      "default_indicated_h": [
+        "2",
+        "4"
+      ],
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "O",
+            "aromatic": false
+          },
+          {
+            "locant": "2",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "3",
+            "symbol": "O",
+            "aromatic": false
+          },
+          {
+            "locant": "4",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "4a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "8a"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [
+          "2",
+          "4"
+        ],
+        "mancude_double_bonds": 3,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "1H-pyrrolo[2,3-b]indole",
+      "pin": true,
+      "priority": 376,
+      "aliases": [],
+      "attached_prefix": null,
+      "derivative_stem": "pyrrolo[2,3-b]indol",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "symbol": "N",
+            "aromatic": false
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "3b",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          },
+          {
+            "locant": "8",
+            "symbol": "N",
+            "aromatic": false
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "3a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "3a",
+              "3b"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "3b",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "3b",
+              "7a"
+            ],
+            "bond_class": "fusion"
+          },
+          {
+            "locants": [
+              "3",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "3"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "3b",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a",
+          "8",
+          "8a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "8a"
+          ],
+          [
+            "3a",
+            "3b",
+            "7a",
+            "8",
+            "8a"
+          ],
+          [
+            "3b",
+            "4",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "3b",
+          "7a",
+          "8a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "3b",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a",
+          "8",
+          "8a"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 5,
         "enabled": true,
         "derivative_production_enabled": true
       }

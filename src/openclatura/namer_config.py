@@ -1,22 +1,26 @@
-"""Compatibility aliases for the central nomenclature registry.
-
-New code should import ``RULES`` from :mod:`openclatura.nomenclature`.
-These names remain for existing modules and external imports.
-"""
-
 from .hantzsch_widman import hw_spec_for_name, spec_cites_indicated_hydrogen
+from .naming_data import load_json_table
 from .nomenclature import RULES
 
-INDICATED_H_RETAINED_NAMES = RULES.retained.indicated_hydrogen_names
+
+def _indicated_h_retained_names() -> frozenset[str]:
+    """
+    Retained parents that carry an indicated hydrogen, read off the templates.
+    """
+
+    return frozenset(
+        row["indicated_hydrogen_name"]
+        for row in load_json_table("retained_fused_graph_templates.json").get("parents", ())
+        if "indicated_hydrogen_name" in row
+    )
+
+
+INDICATED_H_RETAINED_NAMES = _indicated_h_retained_names()
 
 
 def cites_indicated_hydrogen(retained_name: str | None) -> bool:
-    """Whether a parent name spells its own indicated hydrogen ("1H-azepine").
-
-    For a monocycle this follows from the ring's shape, so it is worked out
-    rather than looked up -- a generated parent is in no list.  Fused parents
-    keep the declared set; their indicated hydrogen is not a size-and-count
-    matter.
+    """
+    Whether a parent name spells its own indicated hydrogen ("1H-azepine").
     """
 
     if retained_name is None:

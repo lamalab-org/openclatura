@@ -404,9 +404,7 @@ def _multiple_bond_count(mol: Molecule | None, path: list[int], *, include_doubl
             bond = mol.get_bond(atom_idx, neighbor)
             if bond is None:
                 continue
-            if include_double and bond.order > 1:
-                count += 1
-            elif not include_double and bond.order == 2:
+            if include_double and bond.order > 1 or not include_double and bond.order == 2:
                 count += 1
     return count
 

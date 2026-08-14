@@ -119,6 +119,7 @@ class RetainedParentMetadata:
     derivative_stem: str | None = None
     indicated_hydrogen_count: int = 0
     mancude_double_bonds: int = 0
+    relocated_indicated_h: bool = False
 
 
 @dataclass
