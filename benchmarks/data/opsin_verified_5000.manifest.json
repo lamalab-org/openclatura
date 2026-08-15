@@ -8,7 +8,7 @@
   "unique_valid_candidates": 99943,
   "candidates_attempted": 6000,
   "verified_rows": 5000,
-  "corpus_sha256": "171a1811e211a6c651fb64522494bc46d4468f9159418e982ff4bbcbe326cf1e",
+  "corpus_sha256": "b2175e91ef0ee8fbadef384d42230c5969e979154141d3b2f821e30569d3b5a4",
   "distribution": {
     "heavy_atoms": {
       "10": 29,

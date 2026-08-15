@@ -119,7 +119,7 @@ def build_corpus(source: Path, output: Path, *, size: int, seed: int, batch_size
         "has_stereo",
     ]
     with output.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer = csv.DictWriter(handle, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         writer.writerows(accepted)
 
