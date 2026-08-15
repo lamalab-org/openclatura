@@ -66,3 +66,9 @@ def test_load_smiles_requires_nonempty_corpus(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="no SMILES"):
         benchmark._load_smiles(corpus)
+
+
+@pytest.mark.parametrize("value", ["0", "-1"])
+def test_repetitions_must_be_positive(value: str) -> None:
+    with pytest.raises(benchmark.argparse.ArgumentTypeError, match="at least 1"):
+        benchmark._positive_int(value)

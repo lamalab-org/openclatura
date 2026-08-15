@@ -25,6 +25,13 @@ def _load_smiles(corpus: Path) -> list[str]:
     return smiles
 
 
+def _positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed < 1:
+        raise argparse.ArgumentTypeError("must be at least 1")
+    return parsed
+
+
 def measure(corpus: Path, warmup_rows: int) -> dict[str, Any]:
     from rdkit import RDLogger
 
@@ -161,7 +168,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--corpus", required=True, type=Path)
     parser.add_argument("--base-src", type=Path)
     parser.add_argument("--head-src", type=Path)
-    parser.add_argument("--repetitions", type=int, default=3)
+    parser.add_argument("--repetitions", type=_positive_int, default=3)
     parser.add_argument("--warmup-rows", type=int, default=100)
     parser.add_argument("--threshold-percent", type=float, default=15.0)
     parser.add_argument("--minimum-absolute-seconds", type=float, default=1.0)
