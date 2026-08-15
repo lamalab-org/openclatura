@@ -1,8 +1,21 @@
+import importlib.util
 from argparse import Namespace
 from pathlib import Path
 
 import pytest
-from benchmarks import single_thread_benchmark as benchmark
+
+
+def _load_benchmark_module():
+    path = Path(__file__).parents[2] / "benchmarks" / "single_thread_benchmark.py"
+    spec = importlib.util.spec_from_file_location("openclatura_single_thread_benchmark", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"could not load benchmark module from {path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+benchmark = _load_benchmark_module()
 
 
 def _measurement(seconds: float) -> dict[str, object]:
