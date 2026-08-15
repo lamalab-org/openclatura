@@ -82,7 +82,11 @@ def _run_measurement(source_tree: Path, corpus: Path, warmup_rows: int) -> dict[
         "--warmup-rows",
         str(warmup_rows),
     ]
-    completed = subprocess.run(command, env=env, check=False, capture_output=True, text=True)
+    # `command` is an argv list and shell=False remains in effect, so path
+    # characters cannot be interpreted as shell syntax.
+    completed = subprocess.run(  # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+        command, env=env, check=False, capture_output=True, text=True
+    )
     if completed.returncode:
         raise RuntimeError(f"measurement failed for {source_tree}:\n{completed.stdout}\n{completed.stderr}".rstrip())
     return json.loads(completed.stdout)
