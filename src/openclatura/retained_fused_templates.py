@@ -580,7 +580,12 @@ def _template_match_from_assignment(
     )
 
 
-TopologyKey = tuple[int, tuple[tuple[str, int], ...], tuple[tuple[int, int], ...]]
+TopologyKey = tuple[
+    int,
+    tuple[tuple[str, int], ...],
+    tuple[tuple[int, int], ...],
+    tuple[tuple[tuple[int, int], int], ...],
+]
 
 
 @lru_cache(maxsize=2)
@@ -598,26 +603,45 @@ def _template_topology_key(template: RetainedFusedGraphTemplate) -> TopologyKey:
     return _topology_key(
         (atom.symbol for atom in template.atoms),
         (degrees[locant] for locant in template.locants),
+        ((degrees[left], degrees[right]) for left, right in (bond.locants for bond in template.bonds)),
     )
 
 
 def _molecule_topology_key(mol: Molecule, atom_set: set[int]) -> TopologyKey:
+    degrees = {
+        atom_idx: sum(neighbor in atom_set for neighbor in mol.get_neighbors(atom_idx)) for atom_idx in atom_set
+    }
     return _topology_key(
         (mol.atoms[atom_idx].symbol for atom_idx in atom_set),
-        (sum(neighbor in atom_set for neighbor in mol.get_neighbors(atom_idx)) for atom_idx in atom_set),
+        degrees.values(),
+        (
+            (degrees[atom_idx], degrees[neighbor])
+            for atom_idx in atom_set
+            for neighbor in mol.get_neighbors(atom_idx)
+            if neighbor in atom_set and atom_idx < neighbor
+        ),
     )
 
 
-def _topology_key(symbols, degrees) -> TopologyKey:
+def _topology_key(symbols, degrees, edge_degrees) -> TopologyKey:
     symbol_counts: dict[str, int] = {}
     degree_counts: dict[int, int] = {}
+    edge_degree_counts: dict[tuple[int, int], int] = {}
     size = 0
     for symbol in symbols:
         size += 1
         symbol_counts[symbol] = symbol_counts.get(symbol, 0) + 1
     for degree in degrees:
         degree_counts[degree] = degree_counts.get(degree, 0) + 1
-    return size, tuple(sorted(symbol_counts.items())), tuple(sorted(degree_counts.items()))
+    for left_degree, right_degree in edge_degrees:
+        degree_pair = tuple(sorted((left_degree, right_degree)))
+        edge_degree_counts[degree_pair] = edge_degree_counts.get(degree_pair, 0) + 1
+    return (
+        size,
+        tuple(sorted(symbol_counts.items())),
+        tuple(sorted(degree_counts.items())),
+        tuple(sorted(edge_degree_counts.items())),
+    )
 
 
 def match_retained_fused_templates(
