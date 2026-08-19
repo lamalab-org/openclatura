@@ -1,0 +1,27 @@
+{
+  "bluebook_rule": "P-25.1.2.1 higher acenes generated from the number of linearly fused six-membered rings.",
+  "acenes": {
+    "minimum_ring_count": 4,
+    "maximum_ring_count": 9,
+    "member_overrides": {
+      "4": {
+        "aliases": [
+          "naphthacene"
+        ],
+        "priority": 355,
+        "attached_prefix": "tetraceno",
+        "derivative_stem": "tetracen"
+      },
+      "5": {
+        "priority": 280,
+        "attached_prefix": "pentaceno",
+        "derivative_stem": "pentacen"
+      },
+      "6": {
+        "priority": 356,
+        "attached_prefix": "hexaceno",
+        "derivative_stem": "hexacen"
+      }
+    }
+  }
+}

@@ -22889,12 +22889,14 @@
       }
     },
     {
-      "name": "dibenzo[a,h]anthracene",
+      "name": "dibenz[a,h]anthracene",
       "pin": true,
       "priority": 267,
-      "aliases": [],
+      "aliases": [
+        "dibenzo[a,h]anthracene"
+      ],
       "attached_prefix": null,
-      "derivative_stem": "dibenzo[a,h]anthracen",
+      "derivative_stem": "dibenz[a,h]anthracen",
       "template": {
         "atoms": [
           {
@@ -32508,12 +32510,14 @@
       }
     },
     {
-      "name": "naphthacene",
+      "name": "tetracene",
       "pin": true,
       "priority": 355,
-      "aliases": [],
-      "attached_prefix": "naphthaceno",
-      "derivative_stem": "naphthacen",
+      "aliases": [
+        "naphthacene"
+      ],
+      "attached_prefix": "tetraceno",
+      "derivative_stem": "tetracen",
       "template": {
         "atoms": [
           {

@@ -164,6 +164,7 @@ class Molecule:
         self._cyclic_cache: set[int] | None = None  # full-molecule ring atoms; invalidated on mutation
         self._perception_cache: tuple | None = None  # perceived functional groups; invalidated on mutation
         self._canonical_rank_cache: dict[int, int] | None = None
+        self._retained_fused_cache: dict[tuple, tuple] = {}
         self.audit_rdmol = None
         self.accurate_cip: dict[int, str] = {}
         self.substituted_symbols: frozenset[int] = frozenset()
@@ -203,6 +204,7 @@ class Molecule:
         self._cyclic_cache = None
         self._perception_cache = None
         self._canonical_rank_cache = None
+        self._retained_fused_cache.clear()
         return atom
 
     def add_bond(
@@ -232,6 +234,7 @@ class Molecule:
         self._cyclic_cache = None
         self._perception_cache = None
         self._canonical_rank_cache = None
+        self._retained_fused_cache.clear()
         return bond
 
     def get_neighbors(self, atom_idx: int) -> list[int]:

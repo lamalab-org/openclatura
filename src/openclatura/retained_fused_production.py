@@ -57,22 +57,35 @@ def production_retained_fused_parent(
         if group.attachment_carbon in parent_atoms:
             feature_atoms.add(group.attachment_carbon)
 
-    def gated(allow_nonaromatic: bool, allow_relocated_indicated_h: bool = False) -> list[RetainedFusedTemplateMatch]:
+    def eligible(matches: list[RetainedFusedTemplateMatch]) -> list[RetainedFusedTemplateMatch]:
         return [
             match
-            for match in match_retained_fused_templates(
-                mol,
-                parent_atoms,
-                include_disabled=True,
-                allow_nonaromatic=allow_nonaromatic,
-                allow_relocated_indicated_h=allow_relocated_indicated_h,
-            )
+            for match in matches
             if match.template.name in PRODUCTION_RETAINED_FUSED_PARENTS
             and match.template.derivative_production_enabled
             and (principal_key != "ketone" or _has_mancude_unsaturation(mol, parent_atoms, match))
         ]
 
-    matches = gated(False) or gated(True) or gated(False, True) or gated(True, True)
+    strict_matches = match_retained_fused_templates(mol, parent_atoms)
+    matches = eligible(strict_matches)
+    if strict_matches and not matches:
+        # A strict enabled parent has already supplied an exact locant map.
+        # Do not replace it with a weaker hydro/tautomer match merely because
+        # the later derivative-override vocabulary has not adopted its token.
+        return None
+    matches = (
+        matches
+        or eligible(match_retained_fused_templates(mol, parent_atoms, allow_nonaromatic=True))
+        or eligible(match_retained_fused_templates(mol, parent_atoms, allow_relocated_indicated_h=True))
+        or eligible(
+            match_retained_fused_templates(
+                mol,
+                parent_atoms,
+                allow_nonaromatic=True,
+                allow_relocated_indicated_h=True,
+            )
+        )
+    )
     if not matches:
         return None
 

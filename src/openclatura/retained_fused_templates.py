@@ -15,6 +15,7 @@ from .assembly_parts import RetainedParentMetadata
 from .molecule import Molecule
 from .naming_data import load_json_table
 from .nomenclature import RULES
+from .rules import multipliers
 
 ALLOWED_BOND_CLASSES = {"single", "double", "aromatic", "mancude", "fusion"}
 
@@ -117,9 +118,15 @@ def retained_fused_graph_templates(*, include_disabled: bool = False) -> tuple[R
     """Return graph-template retained fused parent rows from the rule registry."""
 
     templates: list[RetainedFusedGraphTemplate] = []
-    for row in load_json_table("retained_fused_graph_templates.json").get("parents", ()):
+    parent_rows = list(load_json_table("retained_fused_graph_templates.json").get("parents", ()))
+    parent_rows.extend(load_json_table("retained_fused_hydrocarbon_templates.json").get("parents", ()))
+    for row in parent_rows:
         template = retained_fused_template_from_data(row)
         if include_disabled or template.enabled:
+            templates.append(template)
+    existing_names = {template.name for template in templates}
+    for template in _generated_acene_templates():
+        if template.name not in existing_names and (include_disabled or template.enabled):
             templates.append(template)
     for row in RULES.retained.fused_polycycle_specs:
         template_data = row.get("template")
@@ -129,6 +136,145 @@ def retained_fused_graph_templates(*, include_disabled: bool = False) -> tuple[R
         if include_disabled or template.enabled:
             templates.append(template)
     return tuple(templates)
+
+
+@lru_cache(maxsize=1)
+def _generated_acene_templates() -> tuple[RetainedFusedGraphTemplate, ...]:
+    """Build higher linear-acene parents from the P-25.1.2 series table.
+
+    Acenes with four or more linearly fused benzene rings share one locant-graph
+    construction.  Keeping the member names and priorities in data lets the
+    series grow without adding copied atom/bond templates or runtime structure
+    strings.  Explicit historical templates take precedence above so existing
+    audited rows, such as pentacene, remain unchanged.
+    """
+
+    series = load_json_table("retained_fused_series.json").get("acenes", {})
+    minimum = int(series.get("minimum_ring_count", 4))
+    maximum = int(series.get("maximum_ring_count", minimum))
+    overrides = {int(count): dict(values) for count, values in series.get("member_overrides", {}).items()}
+    rows = []
+    for ring_count in range(minimum, maximum + 1):
+        name = f"{multipliers.basic(ring_count)}cene"
+        rows.append({"ring_count": ring_count, "name": name, **overrides.get(ring_count, {})})
+    return tuple(_acene_template_from_data(row) for row in rows)
+
+
+def _acene_template_from_data(row: dict[str, Any]) -> RetainedFusedGraphTemplate:
+    ring_count = int(row["ring_count"])
+    if ring_count < 4:
+        raise ValueError("Generated acene templates require at least four fused rings.")
+
+    locants, edges = _higher_acene_locant_graph(ring_count)
+    fusion_atoms = tuple(locant for locant in locants if not locant.isdigit())
+    name = str(row["name"])
+    template = RetainedFusedGraphTemplate(
+        name=name,
+        pin=bool(row.get("pin", True)),
+        priority=int(row.get("priority", 1000)),
+        aliases=tuple(str(alias) for alias in row.get("aliases", ())),
+        attached_prefix=str(row.get("attached_prefix", f"{name.removesuffix('e')}o")),
+        derivative_stem=str(row.get("derivative_stem", name.removesuffix("e"))),
+        default_indicated_h=(),
+        locants=locants,
+        atoms=tuple(RetainedFusedAtomTemplate(locant=locant, fusion=locant in fusion_atoms) for locant in locants),
+        bonds=tuple(RetainedFusedBondTemplate(locants=edge) for edge in edges),
+        rings=_smallest_ring_basis(locants, edges),
+        fusion_atoms=fusion_atoms,
+        peripheral_atoms=tuple(locant for locant in locants if locant.isdigit()),
+        interior_atoms=(),
+        numbering_policy="generated_acene_series",
+        enabled=bool(row.get("enabled", True)),
+        derivative_production_enabled=bool(row.get("derivative_production_enabled", True)),
+        mancude_double_bonds=2 * ring_count + 1,
+    )
+    validate_retained_fused_template(template)
+    return template
+
+
+def _higher_acene_locant_graph(ring_count: int) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
+    """Return the standard locanted graph for tetracene and higher acenes."""
+
+    left_fusions = tuple(f"{value}a" for value in range(4, ring_count + 3))
+    right_start = ring_count + 6
+    right_fusions = tuple(f"{value}a" for value in range(right_start, 2 * ring_count + 5))
+
+    perimeter: list[str] = ["1", "2", "3", "4", left_fusions[0]]
+    for value in range(5, ring_count + 3):
+        perimeter.extend((str(value), f"{value}a"))
+    perimeter.extend(str(value) for value in range(ring_count + 3, right_start + 1))
+    perimeter.append(right_fusions[0])
+    for value in range(right_start + 1, 2 * ring_count + 5):
+        perimeter.extend((str(value), f"{value}a"))
+
+    edges = [(left, right) for left, right in zip(perimeter[:-1], perimeter[1:], strict=True)]
+    edges.append((perimeter[-1], perimeter[0]))
+    edges.extend(zip(reversed(left_fusions), right_fusions, strict=True))
+    return tuple(perimeter), tuple(edges)
+
+
+def _smallest_ring_basis(
+    locants: tuple[str, ...],
+    edges: tuple[tuple[str, str], ...],
+    *,
+    maximum_ring_size: int = 8,
+) -> tuple[tuple[str, ...], ...]:
+    """Return a deterministic short-cycle basis for a locant graph.
+
+    Retained fused parents are small and their elementary rings are normally
+    five- or six-membered.  Enumerating bounded simple cycles and selecting an
+    independent basis keeps generated registry rows self-contained without a
+    graph-library dependency.
+    """
+
+    adjacency = {locant: set() for locant in locants}
+    edge_keys = {frozenset(edge) for edge in edges}
+    for left, right in edges:
+        adjacency[left].add(right)
+        adjacency[right].add(left)
+
+    cycles: set[tuple[str, ...]] = set()
+    order = {locant: index for index, locant in enumerate(locants)}
+    for start in locants:
+        stack: list[tuple[str, tuple[str, ...], frozenset[str]]] = [(start, (start,), frozenset({start}))]
+        while stack:
+            current, path, visited = stack.pop()
+            for neighbor in adjacency[current]:
+                if neighbor == start and len(path) >= 3:
+                    cycles.add(_canonical_cycle(path, order))
+                    continue
+                if neighbor in visited or order[neighbor] < order[start] or len(path) >= maximum_ring_size:
+                    continue
+                stack.append((neighbor, (*path, neighbor), visited | {neighbor}))
+
+    edge_order = {edge: index for index, edge in enumerate(sorted(edge_keys, key=lambda item: sorted(item)))}
+    ranked = sorted(cycles, key=lambda cycle: (len(cycle), tuple(order[locant] for locant in cycle)))
+    target_rank = len(edges) - len(locants) + 1
+    pivots: dict[int, int] = {}
+    selected: list[tuple[str, ...]] = []
+    for cycle in ranked:
+        vector = 0
+        for index, left in enumerate(cycle):
+            right = cycle[(index + 1) % len(cycle)]
+            vector ^= 1 << edge_order[frozenset((left, right))]
+        reduced = vector
+        while reduced:
+            pivot = reduced.bit_length() - 1
+            if pivot not in pivots:
+                pivots[pivot] = reduced
+                selected.append(cycle)
+                break
+            reduced ^= pivots[pivot]
+        if len(selected) == target_rank:
+            return tuple(selected)
+    raise ValueError("Could not construct a complete bounded ring basis for retained fused graph.")
+
+
+def _canonical_cycle(cycle: tuple[str, ...], order: dict[str, int]) -> tuple[str, ...]:
+    rotations = []
+    for sequence in (cycle, tuple(reversed(cycle))):
+        rotations.extend(sequence[index:] + sequence[:index] for index in range(len(sequence)))
+    return min(rotations, key=lambda item: tuple(order[locant] for locant in item))
 
 
 @cache
@@ -342,12 +488,44 @@ def _template_match_from_assignment(
     )
 
 
+TopologyKey = tuple[int, tuple[tuple[str, int], ...], tuple[tuple[int, int], ...]]
+
+
 @lru_cache(maxsize=2)
-def _templates_by_atom_count(include_disabled: bool) -> dict[int, tuple[RetainedFusedGraphTemplate, ...]]:
-    index: dict[int, list[RetainedFusedGraphTemplate]] = {}
+def _templates_by_topology(include_disabled: bool) -> dict[TopologyKey, tuple[RetainedFusedGraphTemplate, ...]]:
+    """Index templates by cheap graph invariants before exact matching."""
+
+    index: dict[TopologyKey, list[RetainedFusedGraphTemplate]] = {}
     for template in retained_fused_graph_templates(include_disabled=include_disabled):
-        index.setdefault(len(template.atoms), []).append(template)
-    return {size: tuple(templates) for size, templates in index.items()}
+        index.setdefault(_template_topology_key(template), []).append(template)
+    return {key: tuple(templates) for key, templates in index.items()}
+
+
+def _template_topology_key(template: RetainedFusedGraphTemplate) -> TopologyKey:
+    degrees = _template_degrees(template)
+    return _topology_key(
+        (atom.symbol for atom in template.atoms),
+        (degrees[locant] for locant in template.locants),
+    )
+
+
+def _molecule_topology_key(mol: Molecule, atom_set: set[int]) -> TopologyKey:
+    return _topology_key(
+        (mol.atoms[atom_idx].symbol for atom_idx in atom_set),
+        (sum(neighbor in atom_set for neighbor in mol.get_neighbors(atom_idx)) for atom_idx in atom_set),
+    )
+
+
+def _topology_key(symbols, degrees) -> TopologyKey:
+    symbol_counts: dict[str, int] = {}
+    degree_counts: dict[int, int] = {}
+    size = 0
+    for symbol in symbols:
+        size += 1
+        symbol_counts[symbol] = symbol_counts.get(symbol, 0) + 1
+    for degree in degrees:
+        degree_counts[degree] = degree_counts.get(degree, 0) + 1
+    return size, tuple(sorted(symbol_counts.items())), tuple(sorted(degree_counts.items()))
 
 
 def match_retained_fused_templates(
@@ -360,22 +538,34 @@ def match_retained_fused_templates(
 ) -> list[RetainedFusedTemplateMatch]:
     """Return retained fused template matches ranked by retained priority."""
 
-    candidates = _templates_by_atom_count(include_disabled).get(len(set(atom_indices)), ())
+    atom_set = set(atom_indices)
+    cache_key = (
+        frozenset(atom_set),
+        include_disabled,
+        allow_nonaromatic,
+        allow_relocated_indicated_h,
+    )
+    cached = mol._retained_fused_cache.get(cache_key)
+    if cached is not None:
+        return list(cached)
+    candidates = _templates_by_topology(include_disabled).get(_molecule_topology_key(mol, atom_set), ())
     matches = [
         match
         for template in candidates
         for match in _match_all_retained_fused_template(
             mol,
-            atom_indices,
+            atom_set,
             template,
             allow_nonaromatic=allow_nonaromatic,
             allow_relocated_indicated_h=allow_relocated_indicated_h,
         )
     ]
-    return sorted(
+    ranked = sorted(
         matches,
         key=_retained_fused_match_rank,
     )
+    mol._retained_fused_cache[cache_key] = tuple(ranked)
+    return ranked
 
 
 def _retained_fused_match_rank(match: RetainedFusedTemplateMatch) -> tuple:
@@ -694,12 +884,28 @@ def _collect_locant_matches(
     if len(assignment) == len(locants):
         matches.append(dict(assignment))
         return
-    locant = locants[len(assignment)]
-    for atom_idx in candidates[locant]:
-        if atom_idx in used_atoms:
+
+    # Select the most constrained remaining locant after every assignment.
+    # A fixed degree-sorted order leaves long symmetric fused hydrocarbons with
+    # many disconnected partial permutations.  Dynamic frontier selection is
+    # the same exact isomorphism search, but it grows outward from established
+    # edges and rejects impossible mappings immediately.
+    options_by_locant: list[tuple[int, int, int, str, list[int]]] = []
+    for locant in locants:
+        if locant in assignment:
             continue
-        if not _is_assignment_compatible(mol, locant, atom_idx, template_neighbors, assignment):
-            continue
+        options = [
+            atom_idx
+            for atom_idx in candidates[locant]
+            if atom_idx not in used_atoms
+            and _is_assignment_compatible(mol, locant, atom_idx, template_neighbors, assignment)
+        ]
+        if not options:
+            return
+        assigned_neighbors = sum(neighbor in assignment for neighbor in template_neighbors[locant])
+        options_by_locant.append((len(options), -assigned_neighbors, -len(template_neighbors[locant]), locant, options))
+    _, _, _, locant, options = min(options_by_locant)
+    for atom_idx in options:
         assignment[locant] = atom_idx
         used_atoms.add(atom_idx)
         _collect_locant_matches(
