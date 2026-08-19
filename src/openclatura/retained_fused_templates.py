@@ -607,6 +607,12 @@ def _template_topology_key(template: RetainedFusedGraphTemplate) -> TopologyKey:
     )
 
 
+def retained_graph_template_topology_key(template: RetainedFusedGraphTemplate) -> TopologyKey:
+    """Return the shared cheap topology key for a retained graph template."""
+
+    return _template_topology_key(template)
+
+
 def _molecule_topology_key(mol: Molecule, atom_set: set[int]) -> TopologyKey:
     degrees = {
         atom_idx: sum(neighbor in atom_set for neighbor in mol.get_neighbors(atom_idx)) for atom_idx in atom_set
@@ -621,6 +627,12 @@ def _molecule_topology_key(mol: Molecule, atom_set: set[int]) -> TopologyKey:
             if neighbor in atom_set and atom_idx < neighbor
         ),
     )
+
+
+def molecule_graph_topology_key(mol: Molecule, atom_set: set[int]) -> TopologyKey:
+    """Return the shared cheap topology key for an induced molecule graph."""
+
+    return _molecule_topology_key(mol, atom_set)
 
 
 def _topology_key(symbols, degrees, edge_degrees) -> TopologyKey:

@@ -36,6 +36,7 @@ from .retained_fused_production import production_retained_fused_parent
 from .retained_name_policy import retained_parent_output_name
 from .rules import elements as _elements
 from .special_cases import (
+    retained_macrocycle_parent_result,
     single_atom_component_name,
     structural_replacement_parent_result,
     try_name_anhydride_component_result,
@@ -327,6 +328,41 @@ def name_component(
             assemble_parent_name=assemble_parent_name,
             token_debug=token_debug,
         )
+
+    retained_macrocycle = None if is_substituent else retained_macrocycle_parent_result(mol, component_atoms)
+    if retained_macrocycle is not None:
+        name, bindings, token_spans, rewrite_history = _shortcut_component_result(
+            mol,
+            component_atoms,
+            retained_macrocycle.name,
+            stage="shortcut",
+            role=retained_macrocycle.role,
+            bindings=retained_macrocycle.bindings,
+            emit_metadata=emit_metadata,
+            token_debug=token_debug,
+        )
+        trace_decision(
+            decision_trace,
+            TracePhase.PARENT_SELECTION,
+            "selected retained macrocycle parent",
+            "A topology-indexed locant graph matched the complete component to a retained macrocycle parent.",
+            atoms=component_atoms,
+            bonds=bond_ids_within(mol, component_atoms),
+            data={
+                "name": name,
+                **(retained_macrocycle.details or {}),
+                "name_atom_bindings": bindings,
+                "name_token_spans": token_spans,
+                "name_rewrite_history": rewrite_history,
+            },
+        )
+        if return_trace and return_tree:
+            return name, [], _component_shortcut_tree(name, component_atoms, bindings, token_spans)
+        if return_trace:
+            return name, []
+        if return_tree:
+            return name, _component_shortcut_tree(name, component_atoms, bindings, token_spans)
+        return name
 
     structural_parent_result = structural_replacement_parent_result(mol, component_atoms, name_subgraph)
     if structural_parent_result is not None:

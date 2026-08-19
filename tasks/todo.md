@@ -59,3 +59,31 @@
 - Strengthened topology indexing with degree-class edge counts. A five-pair
   benchmark on 171 fused structures improved from 1.804 s at `c281e33` to
   1.638 s, a 9.3% speedup despite the expanded template registry.
+
+# Retained Tetrapyrrole Macrocycles
+
+- [x] Inspect the porphyrin/porphine/corrin corpus rows and OPSIN locant graphs.
+- [x] Add a topology-indexed, graph-backed retained macrocycle registry.
+- [x] Route exact retained macrocycle parents before ordinary parent selection.
+- [x] Add alias, atom-order, metadata, negative-match, and OPSIN round-trip tests.
+- [x] Run focused corpus, full-suite, package-data, and performance verification.
+- [x] Document results and commit the implementation.
+
+## Review
+
+- Added OPSIN-locanted graph templates for `porphyrin` and `corrin`; `porphine`
+  and `21H,23H-porphine` are accepted aliases in the porphyrin template policy.
+- Runtime matching uses heavy-atom count and topology indexes before exact
+  labelled-graph isomorphism. It contains no SMILES/SMARTS or input-name keys.
+- Exact-parent matching also checks the template's mancude double-bond count,
+  preventing hydrogenated derivatives from being mislabeled as the base parent.
+- The supplied fused/retained corpus now has 175/175 OPSIN structural matches
+  and 114/115 asserted preferred strings. The remaining string disagreement is
+  the pre-existing `dibenz` versus corpus `dibenzo` spelling.
+- Macrocycle tests: 10 passed. Full suite: 3582 passed, 5 skipped, 1 xfailed;
+  the sandbox-only multiprocessing failure passed separately (2/2).
+- A 3,000-name ordinary-molecule benchmark measured no slowdown from the O(1)
+  candidate-size gate (2.471 s enabled versus 2.591 s monkeypatched out; noise
+  dominates this small negative delta).
+- The wheel contains the runtime module and JSON registry, while the offline
+  OPSIN generator remains excluded with the development scripts.
