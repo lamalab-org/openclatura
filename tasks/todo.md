@@ -27,8 +27,8 @@
 # Remaining Fused Hydrocarbon PIN Coverage
 
 - [x] Add a data-driven generated polyaphene family and graph/round-trip tests.
-- [ ] Commit the polyaphene family independently.
-- [ ] Add graph-backed templates for the remaining irregular retained PAHs and fusion parents.
+- [x] Commit the polyaphene family independently.
+- [x] Add graph-backed templates for the remaining irregular retained PAHs and fusion parents.
 - [ ] Commit the irregular PAH templates independently.
 - [ ] Add a data-backed preferred-name policy separating emitted PINs from accepted aliases.
 - [ ] Commit the retained-name/PIN policy independently.

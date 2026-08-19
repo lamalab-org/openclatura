@@ -1950,6 +1950,3188 @@
         "enabled": true,
         "derivative_production_enabled": true
       }
+    },
+    {
+      "name": "tetraphenylene",
+      "pin": true,
+      "priority": 371,
+      "aliases": [],
+      "attached_prefix": "tetraphenyleno",
+      "derivative_stem": "tetraphenylen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "4b",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          },
+          {
+            "locant": "8b",
+            "fusion": true
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "12"
+          },
+          {
+            "locant": "12a",
+            "fusion": true
+          },
+          {
+            "locant": "12b",
+            "fusion": true
+          },
+          {
+            "locant": "13"
+          },
+          {
+            "locant": "14"
+          },
+          {
+            "locant": "15"
+          },
+          {
+            "locant": "16"
+          },
+          {
+            "locant": "16a",
+            "fusion": true
+          },
+          {
+            "locant": "16b",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "4b"
+            ]
+          },
+          {
+            "locants": [
+              "4b",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "4b",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "8b"
+            ]
+          },
+          {
+            "locants": [
+              "8b",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "11"
+            ]
+          },
+          {
+            "locants": [
+              "11",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "12",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "8b",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "12a",
+              "12b"
+            ]
+          },
+          {
+            "locants": [
+              "12b",
+              "13"
+            ]
+          },
+          {
+            "locants": [
+              "13",
+              "14"
+            ]
+          },
+          {
+            "locants": [
+              "14",
+              "15"
+            ]
+          },
+          {
+            "locants": [
+              "15",
+              "16"
+            ]
+          },
+          {
+            "locants": [
+              "16",
+              "16a"
+            ]
+          },
+          {
+            "locants": [
+              "12b",
+              "16a"
+            ]
+          },
+          {
+            "locants": [
+              "16a",
+              "16b"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "16b"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "16b"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "4b",
+          "5",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "8b",
+          "9",
+          "10",
+          "11",
+          "12",
+          "12a",
+          "12b",
+          "13",
+          "14",
+          "15",
+          "16",
+          "16a",
+          "16b"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "16b"
+          ],
+          [
+            "4b",
+            "5",
+            "6",
+            "7",
+            "8",
+            "8a"
+          ],
+          [
+            "8b",
+            "9",
+            "10",
+            "11",
+            "12",
+            "12a"
+          ],
+          [
+            "12b",
+            "13",
+            "14",
+            "15",
+            "16",
+            "16a"
+          ],
+          [
+            "4a",
+            "4b",
+            "8a",
+            "8b",
+            "12a",
+            "12b",
+            "16a",
+            "16b"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "4b",
+          "8a",
+          "8b",
+          "12a",
+          "12b",
+          "16a",
+          "16b"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14",
+          "15",
+          "16"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 12,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "rubicene",
+      "pin": true,
+      "priority": 372,
+      "aliases": [],
+      "attached_prefix": "rubiceno",
+      "derivative_stem": "rubicen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "3b",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          },
+          {
+            "locant": "7b",
+            "fusion": true
+          },
+          {
+            "locant": "7c",
+            "fusion": true
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "10a",
+            "fusion": true
+          },
+          {
+            "locant": "10b",
+            "fusion": true
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "12"
+          },
+          {
+            "locant": "13"
+          },
+          {
+            "locant": "14"
+          },
+          {
+            "locant": "14a",
+            "fusion": true
+          },
+          {
+            "locant": "14b",
+            "fusion": true
+          },
+          {
+            "locant": "14c",
+            "fusion": true
+          },
+          {
+            "locant": "14d",
+            "fusion": true
+          },
+          {
+            "locant": "14e",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "3b"
+            ]
+          },
+          {
+            "locants": [
+              "3b",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "3b",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "7b"
+            ]
+          },
+          {
+            "locants": [
+              "7b",
+              "7c"
+            ]
+          },
+          {
+            "locants": [
+              "7c",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "10a",
+              "10b"
+            ]
+          },
+          {
+            "locants": [
+              "10b",
+              "11"
+            ]
+          },
+          {
+            "locants": [
+              "11",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "12",
+              "13"
+            ]
+          },
+          {
+            "locants": [
+              "13",
+              "14"
+            ]
+          },
+          {
+            "locants": [
+              "14",
+              "14a"
+            ]
+          },
+          {
+            "locants": [
+              "10b",
+              "14a"
+            ]
+          },
+          {
+            "locants": [
+              "14a",
+              "14b"
+            ]
+          },
+          {
+            "locants": [
+              "14b",
+              "14c"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "14c"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "14d"
+            ]
+          },
+          {
+            "locants": [
+              "7b",
+              "14d"
+            ]
+          },
+          {
+            "locants": [
+              "14c",
+              "14d"
+            ]
+          },
+          {
+            "locants": [
+              "7c",
+              "14e"
+            ]
+          },
+          {
+            "locants": [
+              "10a",
+              "14e"
+            ]
+          },
+          {
+            "locants": [
+              "14b",
+              "14e"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "3b",
+          "4",
+          "5",
+          "6",
+          "7",
+          "7a",
+          "7b",
+          "7c",
+          "8",
+          "9",
+          "10",
+          "10a",
+          "10b",
+          "11",
+          "12",
+          "13",
+          "14",
+          "14a",
+          "14b",
+          "14c",
+          "14d",
+          "14e"
+        ],
+        "rings": [
+          [
+            "3a",
+            "3b",
+            "7a",
+            "7b",
+            "14d"
+          ],
+          [
+            "10a",
+            "10b",
+            "14a",
+            "14b",
+            "14e"
+          ],
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "14d",
+            "14c"
+          ],
+          [
+            "3b",
+            "4",
+            "5",
+            "6",
+            "7",
+            "7a"
+          ],
+          [
+            "7b",
+            "7c",
+            "14e",
+            "14b",
+            "14c",
+            "14d"
+          ],
+          [
+            "7c",
+            "8",
+            "9",
+            "10",
+            "10a",
+            "14e"
+          ],
+          [
+            "10b",
+            "11",
+            "12",
+            "13",
+            "14",
+            "14a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "3b",
+          "7a",
+          "7b",
+          "7c",
+          "10a",
+          "10b",
+          "14a",
+          "14b",
+          "14c",
+          "14d",
+          "14e"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 13,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "trinaphthylene",
+      "pin": true,
+      "priority": 373,
+      "aliases": [],
+      "attached_prefix": "trinaphthyleno",
+      "derivative_stem": "trinaphthylen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "5a",
+            "fusion": true
+          },
+          {
+            "locant": "5b",
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "6a",
+            "fusion": true
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "10a",
+            "fusion": true
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "11a",
+            "fusion": true
+          },
+          {
+            "locant": "11b",
+            "fusion": true
+          },
+          {
+            "locant": "12"
+          },
+          {
+            "locant": "12a",
+            "fusion": true
+          },
+          {
+            "locant": "13"
+          },
+          {
+            "locant": "14"
+          },
+          {
+            "locant": "15"
+          },
+          {
+            "locant": "16"
+          },
+          {
+            "locant": "16a",
+            "fusion": true
+          },
+          {
+            "locant": "17"
+          },
+          {
+            "locant": "17a",
+            "fusion": true
+          },
+          {
+            "locant": "17b",
+            "fusion": true
+          },
+          {
+            "locant": "18"
+          },
+          {
+            "locant": "18a",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "5a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "5b"
+            ]
+          },
+          {
+            "locants": [
+              "5b",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "10a",
+              "11"
+            ]
+          },
+          {
+            "locants": [
+              "11",
+              "11a"
+            ]
+          },
+          {
+            "locants": [
+              "5b",
+              "11a"
+            ]
+          },
+          {
+            "locants": [
+              "11a",
+              "11b"
+            ]
+          },
+          {
+            "locants": [
+              "11b",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "12",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "12a",
+              "13"
+            ]
+          },
+          {
+            "locants": [
+              "13",
+              "14"
+            ]
+          },
+          {
+            "locants": [
+              "14",
+              "15"
+            ]
+          },
+          {
+            "locants": [
+              "15",
+              "16"
+            ]
+          },
+          {
+            "locants": [
+              "16",
+              "16a"
+            ]
+          },
+          {
+            "locants": [
+              "12a",
+              "16a"
+            ]
+          },
+          {
+            "locants": [
+              "16a",
+              "17"
+            ]
+          },
+          {
+            "locants": [
+              "17",
+              "17a"
+            ]
+          },
+          {
+            "locants": [
+              "11b",
+              "17a"
+            ]
+          },
+          {
+            "locants": [
+              "17a",
+              "17b"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "17b"
+            ]
+          },
+          {
+            "locants": [
+              "17b",
+              "18"
+            ]
+          },
+          {
+            "locants": [
+              "18",
+              "18a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "18a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "18a"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "5b",
+          "6",
+          "6a",
+          "7",
+          "8",
+          "9",
+          "10",
+          "10a",
+          "11",
+          "11a",
+          "11b",
+          "12",
+          "12a",
+          "13",
+          "14",
+          "15",
+          "16",
+          "16a",
+          "17",
+          "17a",
+          "17b",
+          "18",
+          "18a"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "18a"
+          ],
+          [
+            "4a",
+            "5",
+            "5a",
+            "17b",
+            "18",
+            "18a"
+          ],
+          [
+            "5a",
+            "5b",
+            "11a",
+            "11b",
+            "17a",
+            "17b"
+          ],
+          [
+            "5b",
+            "6",
+            "6a",
+            "10a",
+            "11",
+            "11a"
+          ],
+          [
+            "6a",
+            "7",
+            "8",
+            "9",
+            "10",
+            "10a"
+          ],
+          [
+            "11b",
+            "12",
+            "12a",
+            "16a",
+            "17",
+            "17a"
+          ],
+          [
+            "12a",
+            "13",
+            "14",
+            "15",
+            "16",
+            "16a"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "5a",
+          "5b",
+          "6a",
+          "10a",
+          "11a",
+          "11b",
+          "12a",
+          "16a",
+          "17a",
+          "17b",
+          "18a"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14",
+          "15",
+          "16",
+          "17",
+          "18"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 15,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "pyranthrene",
+      "pin": true,
+      "priority": 374,
+      "aliases": [],
+      "attached_prefix": "pyranthreno",
+      "derivative_stem": "pyranthren",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "4b",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "5a",
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "12"
+          },
+          {
+            "locant": "12a",
+            "fusion": true
+          },
+          {
+            "locant": "12b",
+            "fusion": true
+          },
+          {
+            "locant": "13"
+          },
+          {
+            "locant": "13a",
+            "fusion": true
+          },
+          {
+            "locant": "14"
+          },
+          {
+            "locant": "15"
+          },
+          {
+            "locant": "15a",
+            "fusion": true
+          },
+          {
+            "locant": "16"
+          },
+          {
+            "locant": "16a",
+            "fusion": true
+          },
+          {
+            "locant": "15b",
+            "fusion": true
+          },
+          {
+            "locant": "15c",
+            "fusion": true
+          },
+          {
+            "locant": "15d",
+            "fusion": true
+          },
+          {
+            "locant": "15e",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "4b"
+            ]
+          },
+          {
+            "locants": [
+              "4b",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "5a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "11"
+            ]
+          },
+          {
+            "locants": [
+              "11",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "12",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "12a",
+              "12b"
+            ]
+          },
+          {
+            "locants": [
+              "12b",
+              "13"
+            ]
+          },
+          {
+            "locants": [
+              "13",
+              "13a"
+            ]
+          },
+          {
+            "locants": [
+              "13a",
+              "14"
+            ]
+          },
+          {
+            "locants": [
+              "14",
+              "15"
+            ]
+          },
+          {
+            "locants": [
+              "15",
+              "15a"
+            ]
+          },
+          {
+            "locants": [
+              "15a",
+              "16"
+            ]
+          },
+          {
+            "locants": [
+              "16",
+              "16a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "16a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "16a"
+            ]
+          },
+          {
+            "locants": [
+              "4b",
+              "15b"
+            ]
+          },
+          {
+            "locants": [
+              "15a",
+              "15b"
+            ]
+          },
+          {
+            "locants": [
+              "15b",
+              "15c"
+            ]
+          },
+          {
+            "locants": [
+              "13a",
+              "15c"
+            ]
+          },
+          {
+            "locants": [
+              "15c",
+              "15d"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "15d"
+            ]
+          },
+          {
+            "locants": [
+              "15d",
+              "15e"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "15e"
+            ]
+          },
+          {
+            "locants": [
+              "12b",
+              "15e"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "4a",
+          "4b",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "7a",
+          "8",
+          "8a",
+          "9",
+          "10",
+          "11",
+          "12",
+          "12a",
+          "12b",
+          "13",
+          "13a",
+          "14",
+          "15",
+          "15a",
+          "16",
+          "16a",
+          "15b",
+          "15c",
+          "15d",
+          "15e"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "4",
+            "4a",
+            "16a"
+          ],
+          [
+            "4a",
+            "4b",
+            "15b",
+            "15a",
+            "16",
+            "16a"
+          ],
+          [
+            "4b",
+            "5",
+            "5a",
+            "15d",
+            "15c",
+            "15b"
+          ],
+          [
+            "5a",
+            "6",
+            "7",
+            "7a",
+            "15e",
+            "15d"
+          ],
+          [
+            "7a",
+            "8",
+            "8a",
+            "12a",
+            "12b",
+            "15e"
+          ],
+          [
+            "8a",
+            "9",
+            "10",
+            "11",
+            "12",
+            "12a"
+          ],
+          [
+            "12b",
+            "13",
+            "13a",
+            "15c",
+            "15d",
+            "15e"
+          ],
+          [
+            "13a",
+            "14",
+            "15",
+            "15a",
+            "15b",
+            "15c"
+          ]
+        ],
+        "fusion_atoms": [
+          "4a",
+          "4b",
+          "5a",
+          "7a",
+          "8a",
+          "12a",
+          "12b",
+          "13a",
+          "15a",
+          "16a",
+          "15b",
+          "15c",
+          "15d",
+          "15e"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14",
+          "15",
+          "16"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 15,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "ovalene",
+      "pin": true,
+      "priority": 375,
+      "aliases": [],
+      "attached_prefix": "ovaleno",
+      "derivative_stem": "ovalen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "2a",
+            "fusion": true
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "6a",
+            "fusion": true
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "7a",
+            "fusion": true
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "9a",
+            "fusion": true
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "11a",
+            "fusion": true
+          },
+          {
+            "locant": "12"
+          },
+          {
+            "locant": "13"
+          },
+          {
+            "locant": "13a",
+            "fusion": true
+          },
+          {
+            "locant": "14"
+          },
+          {
+            "locant": "14a",
+            "fusion": true
+          },
+          {
+            "locant": "14b",
+            "fusion": true
+          },
+          {
+            "locant": "14c",
+            "fusion": true
+          },
+          {
+            "locant": "14d",
+            "fusion": true
+          },
+          {
+            "locant": "14e",
+            "fusion": true
+          },
+          {
+            "locant": "14f",
+            "fusion": true
+          },
+          {
+            "locant": "14g",
+            "fusion": true
+          },
+          {
+            "locant": "14h",
+            "fusion": true
+          },
+          {
+            "locant": "14i",
+            "fusion": true
+          },
+          {
+            "locant": "14j",
+            "fusion": true
+          },
+          {
+            "locant": "14k",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "2a"
+            ]
+          },
+          {
+            "locants": [
+              "2a",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "7a"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "9a"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "11"
+            ]
+          },
+          {
+            "locants": [
+              "11",
+              "11a"
+            ]
+          },
+          {
+            "locants": [
+              "11a",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "12",
+              "13"
+            ]
+          },
+          {
+            "locants": [
+              "13",
+              "13a"
+            ]
+          },
+          {
+            "locants": [
+              "13a",
+              "14"
+            ]
+          },
+          {
+            "locants": [
+              "14",
+              "14a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "14a"
+            ]
+          },
+          {
+            "locants": [
+              "14a",
+              "14b"
+            ]
+          },
+          {
+            "locants": [
+              "14b",
+              "14c"
+            ]
+          },
+          {
+            "locants": [
+              "2a",
+              "14c"
+            ]
+          },
+          {
+            "locants": [
+              "14c",
+              "14d"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "14d"
+            ]
+          },
+          {
+            "locants": [
+              "14d",
+              "14e"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "14e"
+            ]
+          },
+          {
+            "locants": [
+              "14e",
+              "14f"
+            ]
+          },
+          {
+            "locants": [
+              "14f",
+              "14g"
+            ]
+          },
+          {
+            "locants": [
+              "7a",
+              "14g"
+            ]
+          },
+          {
+            "locants": [
+              "14g",
+              "14h"
+            ]
+          },
+          {
+            "locants": [
+              "9a",
+              "14h"
+            ]
+          },
+          {
+            "locants": [
+              "14h",
+              "14i"
+            ]
+          },
+          {
+            "locants": [
+              "11a",
+              "14i"
+            ]
+          },
+          {
+            "locants": [
+              "14i",
+              "14j"
+            ]
+          },
+          {
+            "locants": [
+              "13a",
+              "14j"
+            ]
+          },
+          {
+            "locants": [
+              "14j",
+              "14k"
+            ]
+          },
+          {
+            "locants": [
+              "14b",
+              "14k"
+            ]
+          },
+          {
+            "locants": [
+              "14f",
+              "14k"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "2a",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "6",
+          "6a",
+          "7",
+          "7a",
+          "8",
+          "9",
+          "9a",
+          "10",
+          "11",
+          "11a",
+          "12",
+          "13",
+          "13a",
+          "14",
+          "14a",
+          "14b",
+          "14c",
+          "14d",
+          "14e",
+          "14f",
+          "14g",
+          "14h",
+          "14i",
+          "14j",
+          "14k"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "2a",
+            "14c",
+            "14b",
+            "14a"
+          ],
+          [
+            "2a",
+            "3",
+            "4",
+            "4a",
+            "14d",
+            "14c"
+          ],
+          [
+            "4a",
+            "5",
+            "6",
+            "6a",
+            "14e",
+            "14d"
+          ],
+          [
+            "6a",
+            "7",
+            "7a",
+            "14g",
+            "14f",
+            "14e"
+          ],
+          [
+            "7a",
+            "8",
+            "9",
+            "9a",
+            "14h",
+            "14g"
+          ],
+          [
+            "9a",
+            "10",
+            "11",
+            "11a",
+            "14i",
+            "14h"
+          ],
+          [
+            "11a",
+            "12",
+            "13",
+            "13a",
+            "14j",
+            "14i"
+          ],
+          [
+            "13a",
+            "14",
+            "14a",
+            "14b",
+            "14k",
+            "14j"
+          ],
+          [
+            "14b",
+            "14c",
+            "14d",
+            "14e",
+            "14f",
+            "14k"
+          ],
+          [
+            "14f",
+            "14g",
+            "14h",
+            "14i",
+            "14j",
+            "14k"
+          ]
+        ],
+        "fusion_atoms": [
+          "2a",
+          "4a",
+          "6a",
+          "7a",
+          "9a",
+          "11a",
+          "13a",
+          "14a",
+          "14b",
+          "14c",
+          "14d",
+          "14e",
+          "14f",
+          "14g",
+          "14h",
+          "14i",
+          "14j",
+          "14k"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 16,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "benzo[e]pyrene",
+      "pin": true,
+      "priority": 376,
+      "aliases": [],
+      "attached_prefix": "benzo[e]pyreno",
+      "derivative_stem": "benzo[e]pyren",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "5a",
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          },
+          {
+            "locant": "8b",
+            "fusion": true
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "12"
+          },
+          {
+            "locant": "12a",
+            "fusion": true
+          },
+          {
+            "locant": "12b",
+            "fusion": true
+          },
+          {
+            "locant": "12c",
+            "fusion": true
+          },
+          {
+            "locant": "12d",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "3",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "12b"
+            ]
+          },
+          {
+            "locants": [
+              "12b",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "12a",
+              "8b"
+            ]
+          },
+          {
+            "locants": [
+              "8b",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "5a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "12c"
+            ]
+          },
+          {
+            "locants": [
+              "12b",
+              "12c"
+            ]
+          },
+          {
+            "locants": [
+              "12c",
+              "12d"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "12d"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "12d"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "11"
+            ]
+          },
+          {
+            "locants": [
+              "11",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "12a",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "8b",
+              "9"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "8b",
+          "9",
+          "10",
+          "11",
+          "12",
+          "12a",
+          "12b",
+          "12c",
+          "12d"
+        ],
+        "rings": [
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "12c",
+            "12b"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "5a",
+            "12d",
+            "12c"
+          ],
+          [
+            "5a",
+            "6",
+            "7",
+            "8",
+            "8a",
+            "12d"
+          ],
+          [
+            "8a",
+            "8b",
+            "12a",
+            "12b",
+            "12c",
+            "12d"
+          ],
+          [
+            "8b",
+            "9",
+            "10",
+            "11",
+            "12",
+            "12a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "5a",
+          "8a",
+          "8b",
+          "12a",
+          "12b",
+          "12c",
+          "12d"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 10,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "benzo[j]fluoranthene",
+      "pin": true,
+      "priority": 377,
+      "aliases": [],
+      "attached_prefix": "benzo[j]fluorantheno",
+      "derivative_stem": "benzo[j]fluoranthen",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "3a",
+            "fusion": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "6a",
+            "fusion": true
+          },
+          {
+            "locant": "6b",
+            "fusion": true
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "12"
+          },
+          {
+            "locant": "12a",
+            "fusion": true
+          },
+          {
+            "locant": "12b",
+            "fusion": true
+          },
+          {
+            "locant": "12c",
+            "fusion": true
+          },
+          {
+            "locant": "12d",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "6",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "4"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3a"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "3",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "1"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "12c"
+            ]
+          },
+          {
+            "locants": [
+              "12c",
+              "12b"
+            ]
+          },
+          {
+            "locants": [
+              "12b",
+              "12a"
+            ]
+          },
+          {
+            "locants": [
+              "12a",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "6b"
+            ]
+          },
+          {
+            "locants": [
+              "12b",
+              "6b"
+            ]
+          },
+          {
+            "locants": [
+              "6b",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "6a"
+            ]
+          },
+          {
+            "locants": [
+              "6a",
+              "12d"
+            ]
+          },
+          {
+            "locants": [
+              "3a",
+              "12d"
+            ]
+          },
+          {
+            "locants": [
+              "12c",
+              "12d"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "11"
+            ]
+          },
+          {
+            "locants": [
+              "11",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "12a",
+              "12"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "9"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "3a",
+          "4",
+          "5",
+          "6",
+          "6a",
+          "6b",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "10",
+          "11",
+          "12",
+          "12a",
+          "12b",
+          "12c",
+          "12d"
+        ],
+        "rings": [
+          [
+            "6a",
+            "6b",
+            "12b",
+            "12c",
+            "12d"
+          ],
+          [
+            "1",
+            "2",
+            "3",
+            "3a",
+            "12d",
+            "12c"
+          ],
+          [
+            "3a",
+            "4",
+            "5",
+            "6",
+            "6a",
+            "12d"
+          ],
+          [
+            "6b",
+            "7",
+            "8",
+            "8a",
+            "12a",
+            "12b"
+          ],
+          [
+            "8a",
+            "9",
+            "10",
+            "11",
+            "12",
+            "12a"
+          ]
+        ],
+        "fusion_atoms": [
+          "3a",
+          "6a",
+          "6b",
+          "8a",
+          "12a",
+          "12b",
+          "12c",
+          "12d"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10",
+          "11",
+          "12"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 10,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
+    },
+    {
+      "name": "cyclopenta[cd]pyrene",
+      "pin": true,
+      "priority": 378,
+      "aliases": [],
+      "attached_prefix": "cyclopenta[cd]pyreno",
+      "derivative_stem": "cyclopenta[cd]pyren",
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "2a",
+            "fusion": true
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "4a",
+            "fusion": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "5a",
+            "fusion": true
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "8a",
+            "fusion": true
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "10a",
+            "fusion": true
+          },
+          {
+            "locant": "10b",
+            "fusion": true
+          },
+          {
+            "locant": "10c",
+            "fusion": true
+          },
+          {
+            "locant": "10d",
+            "fusion": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ]
+          },
+          {
+            "locants": [
+              "2",
+              "2a"
+            ]
+          },
+          {
+            "locants": [
+              "2a",
+              "10b"
+            ]
+          },
+          {
+            "locants": [
+              "10b",
+              "4a"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "5"
+            ]
+          },
+          {
+            "locants": [
+              "5",
+              "5a"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "6"
+            ]
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ]
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ]
+          },
+          {
+            "locants": [
+              "8",
+              "8a"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "9"
+            ]
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ]
+          },
+          {
+            "locants": [
+              "10",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "1",
+              "10a"
+            ]
+          },
+          {
+            "locants": [
+              "10a",
+              "10c"
+            ]
+          },
+          {
+            "locants": [
+              "10b",
+              "10c"
+            ]
+          },
+          {
+            "locants": [
+              "10c",
+              "10d"
+            ]
+          },
+          {
+            "locants": [
+              "5a",
+              "10d"
+            ]
+          },
+          {
+            "locants": [
+              "8a",
+              "10d"
+            ]
+          },
+          {
+            "locants": [
+              "4",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "2a",
+              "3"
+            ]
+          },
+          {
+            "locants": [
+              "4a",
+              "4"
+            ]
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "2a",
+          "3",
+          "4",
+          "4a",
+          "5",
+          "5a",
+          "6",
+          "7",
+          "8",
+          "8a",
+          "9",
+          "10",
+          "10a",
+          "10b",
+          "10c",
+          "10d"
+        ],
+        "rings": [
+          [
+            "2a",
+            "3",
+            "4",
+            "4a",
+            "10b"
+          ],
+          [
+            "1",
+            "2",
+            "2a",
+            "10b",
+            "10c",
+            "10a"
+          ],
+          [
+            "4a",
+            "5",
+            "5a",
+            "10d",
+            "10c",
+            "10b"
+          ],
+          [
+            "5a",
+            "6",
+            "7",
+            "8",
+            "8a",
+            "10d"
+          ],
+          [
+            "8a",
+            "9",
+            "10",
+            "10a",
+            "10c",
+            "10d"
+          ]
+        ],
+        "fusion_atoms": [
+          "2a",
+          "4a",
+          "5a",
+          "8a",
+          "10a",
+          "10b",
+          "10c",
+          "10d"
+        ],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "10"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [],
+        "mancude_double_bonds": 9,
+        "enabled": true,
+        "derivative_production_enabled": true
+      }
     }
   ]
 }

@@ -24,6 +24,14 @@ _PARENTS = (
     ("benzo[k]fluoranthene", 364, "benzo[k]fluoranthen", "benzo[k]fluorantheno"),
     ("indeno[1,2,3-cd]pyrene", 365, "indeno[1,2,3-cd]pyren", "indeno[1,2,3-cd]pyreno"),
     ("benzo[ghi]perylene", 366, "benzo[ghi]perylen", "benzo[ghi]peryleno"),
+    ("tetraphenylene", 371, "tetraphenylen", "tetraphenyleno"),
+    ("rubicene", 372, "rubicen", "rubiceno"),
+    ("trinaphthylene", 373, "trinaphthylen", "trinaphthyleno"),
+    ("pyranthrene", 374, "pyranthren", "pyranthreno"),
+    ("ovalene", 375, "ovalen", "ovaleno"),
+    ("benzo[e]pyrene", 376, "benzo[e]pyren", "benzo[e]pyreno"),
+    ("benzo[j]fluoranthene", 377, "benzo[j]fluoranthen", "benzo[j]fluorantheno"),
+    ("cyclopenta[cd]pyrene", 378, "cyclopenta[cd]pyren", "cyclopenta[cd]pyreno"),
 )
 
 
