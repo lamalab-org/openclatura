@@ -16,6 +16,7 @@ from openclatura.retained_fused_templates import (
     _generated_polyaphene_templates,
     retained_fused_graph_templates,
 )
+from openclatura.retained_name_policy import retained_parent_name_policy
 from openclatura.utils import standardize_mol
 
 try:
@@ -152,6 +153,37 @@ def test_polyaphene_series_generates_standard_locant_graphs():
         for name in expected_sizes
     } == expected_sizes
     assert all(template.numbering_policy == "generated_polyaphene_series" for template in generated.values())
+
+
+def test_hydrogenated_parent_uses_data_backed_preferred_name():
+    policy = retained_parent_name_policy("indoline")
+    assert policy is not None
+    assert policy.preferred_name == "2,3-dihydro-1H-indole"
+    assert policy.output_name("unsubstituted_parent") == policy.preferred_name
+    assert policy.output_name("composite_parent") == "indoline"
+    assert policy.hydrogenation is not None
+    assert policy.hydrogenation.base_parent == "1H-indole"
+    assert policy.hydrogenation.hydro_locants == ("2", "3")
+    assert name_smiles("c1ccc2c(c1)CCN2") == policy.preferred_name
+
+
+def test_hydrogenated_hydrocarbon_uses_data_backed_preferred_name():
+    policy = retained_parent_name_policy("indane")
+    assert policy is not None
+    assert policy.accepted_names == ("2,3-dihydro-1H-indene", "indane", "indan")
+    assert policy.output_name("unsubstituted_parent") == "2,3-dihydro-1H-indene"
+    assert policy.output_name("composite_parent") == "indane"
+    assert name_smiles("c1ccc2c(c1)CCC2") == policy.preferred_name
+
+
+def test_retained_parent_policy_separates_preferred_name_from_accepted_spelling():
+    policy = retained_parent_name_policy("dibenz[a,h]anthracene")
+    assert policy is not None
+    assert policy.preferred_name == "dibenz[a,h]anthracene"
+    assert "dibenzo[a,h]anthracene" in policy.accepted_names
+    template = next(template for template in retained_fused_graph_templates() if template.name == policy.template_name)
+    assert template.output_name == policy.preferred_name
+    assert "dibenzo[a,h]anthracene" in template.aliases
 
 
 def _require_opsin() -> None:

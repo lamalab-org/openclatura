@@ -373,7 +373,7 @@ def _is_allowed_retained_fused_component(
 def _opsin_parseable_names(template: RetainedFusedGraphTemplate) -> tuple[str, ...]:
     seen: set[str] = set()
     names: list[str] = []
-    for name in (template.name, *template.aliases):
+    for name in (template.name, template.output_name, *template.aliases):
         if name and name not in seen:
             seen.add(name)
             names.append(name)

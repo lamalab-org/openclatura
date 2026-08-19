@@ -15,9 +15,9 @@ def _match_fused_templates(mol: Molecule, path: list[int]) -> tuple[str, list[di
         matches = match_retained_fused_templates(mol, path, allow_nonaromatic=True)
     if not matches:
         return None
-    name = matches[0].template.name
-    maps = [match.atom_to_locant for match in matches if match.template.name == name]
-    return name, maps
+    template_name = matches[0].template.name
+    maps = [match.atom_to_locant for match in matches if match.template.name == template_name]
+    return template_name, maps
 
 
 def _match_monocycle_templates(mol: Molecule, path: list[int], double_bonds: int) -> str | None:

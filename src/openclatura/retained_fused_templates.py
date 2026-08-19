@@ -15,6 +15,7 @@ from .assembly_parts import RetainedParentMetadata
 from .molecule import Molecule
 from .naming_data import load_json_table
 from .nomenclature import RULES
+from .retained_name_policy import retained_parent_name_policy
 from .rules import multipliers
 
 ALLOWED_BOND_CLASSES = {"single", "double", "aromatic", "mancude", "fusion"}
@@ -78,10 +79,15 @@ class RetainedFusedGraphTemplate:
     derivative_production_enabled: bool = False
     implied_stereo: bool = False
     mancude_double_bonds: int | None = None
+    preferred_name: str | None = None
 
     @property
     def atom_by_locant(self) -> dict[str, RetainedFusedAtomTemplate]:
         return {atom.locant: atom for atom in self.atoms}
+
+    @property
+    def output_name(self) -> str:
+        return self.preferred_name or self.name
 
     @property
     def indicated_hydrogen_count(self) -> int:
@@ -692,6 +698,7 @@ def retained_fused_template_from_data(row: dict[str, Any]) -> RetainedFusedGraph
     template_data = _expand_template_data(template_data)
 
     name = str(row["name"])
+    name_policy = retained_parent_name_policy(name)
     locants = tuple(str(locant) for locant in template_data.get("locants", row.get("locants", ())))
     atoms = tuple(_atom_template(item) for item in template_data.get("atoms", ()))
     bonds = tuple(_bond_template(item) for item in template_data.get("bonds", ()))
@@ -704,7 +711,18 @@ def retained_fused_template_from_data(row: dict[str, Any]) -> RetainedFusedGraph
         name=name,
         pin=bool(row.get("pin", template_data.get("pin", True))),
         priority=int(row.get("priority", template_data.get("priority", 1000))),
-        aliases=tuple(str(alias) for alias in row.get("aliases", template_data.get("aliases", ()))),
+        aliases=tuple(
+            dict.fromkeys(
+                (
+                    *(str(alias) for alias in row.get("aliases", template_data.get("aliases", ()))),
+                    *(
+                        alias
+                        for alias in (name_policy.accepted_aliases if name_policy is not None else ())
+                        if alias != name
+                    ),
+                )
+            )
+        ),
         attached_prefix=row.get("attached_prefix", row.get("fusion_prefix", template_data.get("attached_prefix"))),
         derivative_stem=row.get("derivative_stem", template_data.get("derivative_stem")),
         default_indicated_h=tuple(
@@ -727,6 +745,7 @@ def retained_fused_template_from_data(row: dict[str, Any]) -> RetainedFusedGraph
             if template_data.get("mancude_double_bonds") is not None
             else None
         ),
+        preferred_name=name_policy.preferred_name if name_policy is not None else None,
     )
     validate_retained_fused_template(template)
     return template

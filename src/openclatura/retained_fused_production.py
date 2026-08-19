@@ -6,6 +6,7 @@ from .molecule import Molecule
 from .namer_config import INDICATED_H_RETAINED_NAMES
 from .perception import PerceivedGroup
 from .retained_fused_templates import RetainedFusedTemplateMatch, match_retained_fused_templates
+from .retained_name_policy import retained_parent_name_policy
 
 _DERIVATIVE_GATE = retained_fused_derivative_gate()
 PRODUCTION_RETAINED_FUSED_PARENTS = _DERIVATIVE_GATE.production_parent_names
@@ -101,8 +102,15 @@ def production_retained_fused_parent(
     template = matches[0].template
     if not _added_hydrogen_is_citable(mol, matches[0]):
         return None
+    output_context = (
+        "unsubstituted_parent"
+        if attachment_atom is None and not substituent_mapping and principal_key is None
+        else "composite_parent"
+    )
+    name_policy = retained_parent_name_policy(template.name)
+    output_name = name_policy.output_name(output_context) if name_policy is not None else template.name
     return ProductionRetainedFusedParent(
-        name=parent_name,
+        name=output_name,
         locant_maps=maps,
         metadata=RetainedParentMetadata(
             default_indicated_h=matches[0].indicated_h,
