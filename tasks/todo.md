@@ -23,3 +23,17 @@
 - Supplied 175-entry fused corpus: 171/175 structurally correct and 100/115
   asserted PIN strings (the four remaining hard failures are tetrapyrroles).
 - Wheel build succeeded and includes both new runtime data files.
+
+# Remaining Fused Hydrocarbon PIN Coverage
+
+- [x] Add a data-driven generated polyaphene family and graph/round-trip tests.
+- [ ] Commit the polyaphene family independently.
+- [ ] Add graph-backed templates for the remaining irregular retained PAHs and fusion parents.
+- [ ] Commit the irregular PAH templates independently.
+- [ ] Add a data-backed preferred-name policy separating emitted PINs from accepted aliases.
+- [ ] Commit the retained-name/PIN policy independently.
+- [ ] Run focused fused-corpus, full-suite, OPSIN, and performance regression checks.
+
+## Review
+
+- Pending.

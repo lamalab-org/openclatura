@@ -11,7 +11,11 @@ import pytest
 from rdkit import Chem
 
 from openclatura import name_many, name_smiles
-from openclatura.retained_fused_templates import _generated_acene_templates, retained_fused_graph_templates
+from openclatura.retained_fused_templates import (
+    _generated_acene_templates,
+    _generated_polyaphene_templates,
+    retained_fused_graph_templates,
+)
 from openclatura.utils import standardize_mol
 
 try:
@@ -34,6 +38,10 @@ FUSED_HYDROCARBON_CASES = (
     ("tetracene", "tetracene", "c1ccc2cc3cc4ccccc4cc3cc2c1"),
     ("pentacene", "pentacene", "c1ccc2cc3cc4cc5ccccc5cc4cc3cc2c1"),
     ("hexacene", "hexacene", "c1ccc2cc3cc4cc5cc6ccccc6cc5cc4cc3cc2c1"),
+    ("pentaphene", "pentaphene", "c1ccc2cc3c(ccc4cc5ccccc5cc43)cc2c1"),
+    ("hexaphene", "hexaphene", "c1ccc2cc3cc4c(ccc5cc6ccccc6cc54)cc3cc2c1"),
+    ("heptaphene", "heptaphene", "c1ccc2cc3cc4c(ccc5cc6cc7ccccc7cc6cc54)cc3cc2c1"),
+    ("octaphene", "octaphene", "c1ccc2cc3cc4cc5c(ccc6cc7cc8ccccc8cc7cc65)cc4cc3cc2c1"),
     ("benzo[b]fluoranthene", "benzo[b]fluoranthene", "c1ccc2c(c1)-c1cccc3c1c-2cc1ccccc13"),
     ("benzo[k]fluoranthene", "benzo[k]fluoranthene", "c1ccc2cc3c(cc2c1)-c1cccc2cccc-3c12"),
     ("benzo[a]pyrene", "benzo[a]pyrene", "c1ccc2c(c1)cc1ccc3cccc4ccc2c1c34"),
@@ -57,6 +65,10 @@ NEW_TEMPLATE_NAMES = (
     "benzo[k]fluoranthene",
     "indeno[1,2,3-cd]pyrene",
     "benzo[ghi]perylene",
+    "pentaphene",
+    "hexaphene",
+    "heptaphene",
+    "octaphene",
 )
 
 
@@ -107,6 +119,23 @@ def test_higher_acene_series_generates_standard_locant_graphs():
 )
 def test_higher_acene_series_extends_without_new_graph_templates(expected_name, smiles):
     assert name_smiles(smiles) == expected_name
+
+
+def test_polyaphene_series_generates_standard_locant_graphs():
+    generated = {template.name: template for template in _generated_polyaphene_templates()}
+    expected_sizes = {
+        "pentaphene": (22, 26, 5),
+        "hexaphene": (26, 31, 6),
+        "heptaphene": (30, 36, 7),
+        "octaphene": (34, 41, 8),
+        "nonaphene": (38, 46, 9),
+        "decaphene": (42, 51, 10),
+    }
+    assert {
+        name: (len(generated[name].atoms), len(generated[name].bonds), len(generated[name].rings))
+        for name in expected_sizes
+    } == expected_sizes
+    assert all(template.numbering_policy == "generated_polyaphene_series" for template in generated.values())
 
 
 def _require_opsin() -> None:

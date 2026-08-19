@@ -125,7 +125,8 @@ def retained_fused_graph_templates(*, include_disabled: bool = False) -> tuple[R
         if include_disabled or template.enabled:
             templates.append(template)
     existing_names = {template.name for template in templates}
-    for template in _generated_acene_templates():
+    generated_templates = (*_generated_acene_templates(), *_generated_polyaphene_templates())
+    for template in generated_templates:
         if template.name not in existing_names and (include_disabled or template.enabled):
             templates.append(template)
     for row in RULES.retained.fused_polycycle_specs:
@@ -190,6 +191,91 @@ def _acene_template_from_data(row: dict[str, Any]) -> RetainedFusedGraphTemplate
     )
     validate_retained_fused_template(template)
     return template
+
+
+@lru_cache(maxsize=1)
+def _generated_polyaphene_templates() -> tuple[RetainedFusedGraphTemplate, ...]:
+    """Build the angular polyaphene series from P-25.1.2 family data.
+
+    A polyaphene member has a perimeter cycle of ``4n + 2`` atoms and
+    ``n - 1`` fusion chords.  Its angular bay moves deterministically as the
+    family grows.  The construction below emits the standard fused locants as
+    well as the topology, so derivatives can reuse the same atom-to-locant map
+    instead of treating the family as parent-name-only aliases.
+    """
+
+    series = load_json_table("retained_fused_series.json").get("polyaphenes", {})
+    minimum = int(series.get("minimum_ring_count", 5))
+    maximum = int(series.get("maximum_ring_count", minimum))
+    overrides = {int(count): dict(values) for count, values in series.get("member_overrides", {}).items()}
+    rows = []
+    for ring_count in range(minimum, maximum + 1):
+        name = f"{multipliers.basic(ring_count)}phene"
+        rows.append({"ring_count": ring_count, "name": name, **overrides.get(ring_count, {})})
+    return tuple(_polyaphene_template_from_data(row) for row in rows)
+
+
+def _polyaphene_template_from_data(row: dict[str, Any]) -> RetainedFusedGraphTemplate:
+    ring_count = int(row["ring_count"])
+    if ring_count < 4:
+        raise ValueError("Generated polyaphene templates require at least four fused rings.")
+
+    locants, edges = _polyaphene_locant_graph(ring_count)
+    fusion_atoms = tuple(locant for locant in locants if not locant.isdigit())
+    name = str(row["name"])
+    template = RetainedFusedGraphTemplate(
+        name=name,
+        pin=bool(row.get("pin", True)),
+        priority=int(row.get("priority", 1000)),
+        aliases=tuple(str(alias) for alias in row.get("aliases", ())),
+        attached_prefix=str(row.get("attached_prefix", f"{name.removesuffix('e')}o")),
+        derivative_stem=str(row.get("derivative_stem", name.removesuffix("e"))),
+        default_indicated_h=(),
+        locants=locants,
+        atoms=tuple(RetainedFusedAtomTemplate(locant=locant, fusion=locant in fusion_atoms) for locant in locants),
+        bonds=tuple(RetainedFusedBondTemplate(locants=edge) for edge in edges),
+        rings=_smallest_ring_basis(locants, edges),
+        fusion_atoms=fusion_atoms,
+        peripheral_atoms=tuple(locant for locant in locants if locant.isdigit()),
+        interior_atoms=(),
+        numbering_policy="generated_polyaphene_series",
+        enabled=bool(row.get("enabled", True)),
+        derivative_production_enabled=bool(row.get("derivative_production_enabled", True)),
+        mancude_double_bonds=2 * ring_count + 1,
+    )
+    validate_retained_fused_template(template)
+    return template
+
+
+def _polyaphene_locant_graph(ring_count: int) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
+    """Return the standard locanted graph for an angular polyaphene member."""
+
+    maximum_numeric_locant = 2 * ring_count + 4
+    omitted_first_side_fusion = (ring_count + 7) // 2
+    first_side_numbers = tuple(
+        value for value in range(4, ring_count + 4) if value != omitted_first_side_fusion
+    )
+    second_side_numbers = tuple(range(ring_count + 7, maximum_numeric_locant + 1))
+    bay_number = (3 * ring_count) // 2 + 6
+
+    locants: list[str] = []
+    for value in range(1, maximum_numeric_locant + 1):
+        locants.append(str(value))
+        if value in first_side_numbers or value in second_side_numbers:
+            locants.append(f"{value}a")
+        if value == bay_number:
+            locants.append(f"{value}b")
+
+    edges = [(left, right) for left, right in zip(locants[:-1], locants[1:], strict=True)]
+    edges.append((locants[-1], locants[0]))
+    first_side = tuple(f"{value}a" for value in reversed(first_side_numbers))
+    second_side = tuple(
+        locant
+        for locant in locants
+        if locant == f"{bay_number}b" or locant in {f"{value}a" for value in second_side_numbers}
+    )
+    edges.extend(zip(first_side, second_side, strict=True))
+    return tuple(locants), tuple(edges)
 
 
 def _higher_acene_locant_graph(ring_count: int) -> tuple[tuple[str, ...], tuple[tuple[str, str], ...]]:
