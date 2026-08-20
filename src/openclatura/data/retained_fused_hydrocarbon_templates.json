@@ -280,7 +280,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 9,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -599,7 +600,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 10,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -917,7 +919,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 10,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -1235,7 +1238,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 10,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -1591,7 +1595,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 11,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -1948,7 +1953,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 11,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -2313,7 +2319,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 12,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -2728,7 +2735,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 13,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -3189,7 +3197,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 15,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -3666,7 +3675,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 15,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -4197,7 +4207,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 16,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -4516,7 +4527,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 10,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -4834,7 +4846,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 10,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -5130,7 +5143,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 9,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     }
   ]

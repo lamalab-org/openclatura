@@ -23242,7 +23242,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 11,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -25039,7 +25040,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 11,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -32798,7 +32800,8 @@
         "default_indicated_h": [],
         "mancude_double_bonds": 9,
         "enabled": true,
-        "derivative_production_enabled": true
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {

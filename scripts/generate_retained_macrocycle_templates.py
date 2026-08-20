@@ -23,10 +23,10 @@ _PARENTS = (
 
 def _parent_row(name: str, priority: int, aliases: tuple[str, ...]) -> dict:
     root = ET.fromstring(py2opsin.py2opsin(name, output_format="CML"))
+    atoms_by_id: dict[str, dict[str, object]] = {}
     all_atoms = {
         atom.get("id", ""): atom.get("elementType", "") for atom in root.findall(".//cml:atom", _CML_NS)
     }
-    atoms_by_id: dict[str, dict[str, object]] = {}
     locants: list[str] = []
     for atom in root.findall(".//cml:atom", _CML_NS):
         locant = next(
@@ -78,10 +78,13 @@ def _parent_row(name: str, priority: int, aliases: tuple[str, ...]) -> dict:
             row["symbol"] = atom["symbol"]
         if saturated:
             row.update({"aromatic": False, "saturated": True})
-        if int(atom["hydrogen_count"]) > 0 or locant in hydrogenated:
-            row["default_h"] = True
         atom_rows.append(row)
 
+    inherent_n_h = [
+        str(atom["locant"])
+        for atom in atoms_by_id.values()
+        if atom["symbol"] == "N" and (int(atom["hydrogen_count"]) > 0 or str(atom["locant"]) in hydrogenated)
+    ]
     return {
         "name": name,
         "preferred_name": name,
@@ -105,12 +108,14 @@ def _parent_row(name: str, priority: int, aliases: tuple[str, ...]) -> dict:
             "fusion_atoms": [],
             "peripheral_atoms": locants,
             "interior_atoms": [],
-            "default_indicated_h": [],
+            "default_indicated_h": inherent_n_h,
+            "indicated_hydrogen_count": len(inherent_n_h),
             "mancude_double_bonds": sum(order == "D" for order in bond_orders.values()),
             "numbering_policy": "retained_macrocycle_template",
-            "aromatic_equivalence_policy": "neutral_kekule_equivalent",
+            "aromatic_equivalence_policy": "exact" if name == "corrin" else "neutral_kekule_equivalent",
             "enabled": True,
-            "derivative_production_enabled": False,
+            "derivative_production_enabled": True,
+            "pre_descriptor_selection": True,
         },
     }
 

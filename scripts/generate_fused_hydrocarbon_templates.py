@@ -108,6 +108,7 @@ def _parent_row(name: str, priority: int, derivative_stem: str, attached_prefix:
             "mancude_double_bonds": sum(order == "D" for order in bond_orders.values()),
             "enabled": True,
             "derivative_production_enabled": True,
+            "pre_descriptor_selection": True,
         },
     }
 

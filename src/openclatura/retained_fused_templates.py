@@ -19,6 +19,7 @@ from .retained_name_policy import retained_parent_name_policy
 from .rules import multipliers
 
 ALLOWED_BOND_CLASSES = {"single", "double", "aromatic", "mancude", "fusion"}
+ALLOWED_AROMATIC_EQUIVALENCE_POLICIES = {"neutral_kekule_equivalent", "exact"}
 
 # Single-bonded in every mancude parent, so never indicated-hydrogen capacity.
 FIXED_SATURATED_RING_ELEMENTS = frozenset({"O", "S", "Se", "Te"})
@@ -80,6 +81,8 @@ class RetainedFusedGraphTemplate:
     implied_stereo: bool = False
     mancude_double_bonds: int | None = None
     preferred_name: str | None = None
+    indicated_hydrogen_count_override: int | None = None
+    pre_descriptor_selection: bool = False
 
     @property
     def atom_by_locant(self) -> dict[str, RetainedFusedAtomTemplate]:
@@ -100,6 +103,8 @@ class RetainedFusedGraphTemplate:
         left for a hydrogen: indolizine's N4 supports no indicated H.
         """
 
+        if self.indicated_hydrogen_count_override is not None:
+            return self.indicated_hydrogen_count_override
         if self.default_indicated_h:
             return len(self.default_indicated_h)
         return sum(
@@ -194,6 +199,7 @@ def _acene_template_from_data(row: dict[str, Any]) -> RetainedFusedGraphTemplate
         enabled=bool(row.get("enabled", True)),
         derivative_production_enabled=bool(row.get("derivative_production_enabled", True)),
         mancude_double_bonds=2 * ring_count + 1,
+        pre_descriptor_selection=True,
     )
     validate_retained_fused_template(template)
     return template
@@ -248,6 +254,7 @@ def _polyaphene_template_from_data(row: dict[str, Any]) -> RetainedFusedGraphTem
         enabled=bool(row.get("enabled", True)),
         derivative_production_enabled=bool(row.get("derivative_production_enabled", True)),
         mancude_double_bonds=2 * ring_count + 1,
+        pre_descriptor_selection=True,
     )
     validate_retained_fused_template(template)
     return template
@@ -422,6 +429,30 @@ def match_retained_fused_template(
     return matches[0] if matches else None
 
 
+def match_retained_graph_template_maps(
+    mol: Molecule,
+    atom_indices: set[int] | list[int] | tuple[int, ...],
+    template: RetainedFusedGraphTemplate,
+    *,
+    allow_nonaromatic: bool = False,
+    allow_relocated_indicated_h: bool = False,
+) -> list[RetainedFusedTemplateMatch]:
+    """Return every valid locant map for one retained graph template.
+
+    Parent numbering needs all graph automorphisms so later locant criteria can
+    choose an orientation.  This public graph-level API is shared by fused
+    parents and retained macrocycles; callers do not need a second matcher.
+    """
+
+    return _match_all_retained_fused_template(
+        mol,
+        atom_indices,
+        template,
+        allow_nonaromatic=allow_nonaromatic,
+        allow_relocated_indicated_h=allow_relocated_indicated_h,
+    )
+
+
 def _ring_fusion_stereo_is_assigned(mol: Molecule, atom_set: set[int]) -> bool:
     """Whether every ring-fusion centre of a matched skeleton has a configuration.
 
@@ -464,6 +495,9 @@ def _match_all_retained_fused_template(
         atom_idx: sum(1 for neighbor in mol.get_neighbors(atom_idx) if neighbor in atom_set) for atom_idx in atom_set
     }
     template_neighbors = _template_neighbors(template)
+    template_bond_classes = {
+        frozenset(bond.locants): bond.bond_class for bond in template.bonds
+    }
     locants_by_constraint = sorted(
         template.locants,
         key=lambda locant: (
@@ -486,7 +520,14 @@ def _match_all_retained_fused_template(
     if any(not values for values in candidates.values()):
         return []
 
-    assignments = _match_locants_backtracking(mol, locants_by_constraint, candidates, template_neighbors)
+    assignments = _match_locants_backtracking(
+        mol,
+        locants_by_constraint,
+        candidates,
+        template_neighbors,
+        template_bond_classes=template_bond_classes,
+        bond_policy=template.aromatic_equivalence_policy,
+    )
     if not allow_relocated_indicated_h:
         derive = not template.default_indicated_h and template.indicated_hydrogen_count > 0
         return [
@@ -588,12 +629,17 @@ TopologyKey = tuple[
 ]
 
 
-@lru_cache(maxsize=2)
-def _templates_by_topology(include_disabled: bool) -> dict[TopologyKey, tuple[RetainedFusedGraphTemplate, ...]]:
+@lru_cache(maxsize=4)
+def _templates_by_topology(
+    include_disabled: bool,
+    pre_descriptor_only: bool = False,
+) -> dict[TopologyKey, tuple[RetainedFusedGraphTemplate, ...]]:
     """Index templates by cheap graph invariants before exact matching."""
 
     index: dict[TopologyKey, list[RetainedFusedGraphTemplate]] = {}
     for template in retained_fused_graph_templates(include_disabled=include_disabled):
+        if pre_descriptor_only and not template.pre_descriptor_selection:
+            continue
         index.setdefault(_template_topology_key(template), []).append(template)
     return {key: tuple(templates) for key, templates in index.items()}
 
@@ -663,6 +709,7 @@ def match_retained_fused_templates(
     include_disabled: bool = False,
     allow_nonaromatic: bool = False,
     allow_relocated_indicated_h: bool = False,
+    pre_descriptor_only: bool = False,
 ) -> list[RetainedFusedTemplateMatch]:
     """Return retained fused template matches ranked by retained priority."""
 
@@ -672,11 +719,14 @@ def match_retained_fused_templates(
         include_disabled,
         allow_nonaromatic,
         allow_relocated_indicated_h,
+        pre_descriptor_only,
     )
     cached = mol._retained_fused_cache.get(cache_key)
     if cached is not None:
         return list(cached)
-    candidates = _templates_by_topology(include_disabled).get(_molecule_topology_key(mol, atom_set), ())
+    candidates = _templates_by_topology(include_disabled, pre_descriptor_only).get(
+        _molecule_topology_key(mol, atom_set), ()
+    )
     matches = [
         match
         for template in candidates
@@ -782,6 +832,12 @@ def retained_fused_template_from_data(row: dict[str, Any]) -> RetainedFusedGraph
             else None
         ),
         preferred_name=name_policy.preferred_name if name_policy is not None else None,
+        indicated_hydrogen_count_override=(
+            int(template_data["indicated_hydrogen_count"])
+            if template_data.get("indicated_hydrogen_count") is not None
+            else None
+        ),
+        pre_descriptor_selection=bool(template_data.get("pre_descriptor_selection", False)),
     )
     validate_retained_fused_template(template)
     return template
@@ -845,6 +901,11 @@ def validate_retained_fused_template(template: RetainedFusedGraphTemplate) -> No
         raise ValueError(f"Retained fused template {template.name!r} has duplicate atom locants.")
     if {atom.locant for atom in template.atoms} != set(template.locants):
         raise ValueError(f"Retained fused template {template.name!r} atom locants do not match locant list.")
+    if template.aromatic_equivalence_policy not in ALLOWED_AROMATIC_EQUIVALENCE_POLICIES:
+        raise ValueError(
+            f"Unknown aromatic equivalence policy {template.aromatic_equivalence_policy!r} "
+            f"in retained fused template {template.name!r}."
+        )
 
     locant_set = set(template.locants)
     for ring in template.rings:
@@ -878,6 +939,12 @@ def validate_retained_fused_template(template: RetainedFusedGraphTemplate) -> No
         if key in seen_bonds:
             raise ValueError(f"Retained fused template {template.name!r} has duplicate bond {key!r}.")
         seen_bonds.add(key)
+    if template.aromatic_equivalence_policy == "exact" and any(
+        bond.bond_class not in {"single", "double"} for bond in template.bonds
+    ):
+        raise ValueError(
+            f"Exact retained graph template {template.name!r} must declare every edge as single or double."
+        )
 
 
 def template_molecule(template: RetainedFusedGraphTemplate) -> Molecule:
@@ -994,6 +1061,8 @@ def _match_locants_backtracking(
     candidates: dict[str, list[int]],
     template_neighbors: dict[str, set[str]],
     *,
+    template_bond_classes: dict[frozenset[str], str] | None = None,
+    bond_policy: str = "neutral_kekule_equivalent",
     max_matches: int = 256,
 ) -> list[dict[str, int]]:
     matches: list[dict[str, int]] = []
@@ -1006,6 +1075,8 @@ def _match_locants_backtracking(
         set(),
         matches,
         max_matches,
+        template_bond_classes or {},
+        bond_policy,
     )
     return sorted(matches, key=lambda assignment: tuple(assignment[locant] for locant in locants))
 
@@ -1019,6 +1090,8 @@ def _collect_locant_matches(
     used_atoms: set[int],
     matches: list[dict[str, int]],
     max_matches: int,
+    template_bond_classes: dict[frozenset[str], str],
+    bond_policy: str,
 ) -> None:
     if len(matches) >= max_matches:
         return
@@ -1039,7 +1112,15 @@ def _collect_locant_matches(
             atom_idx
             for atom_idx in candidates[locant]
             if atom_idx not in used_atoms
-            and _is_assignment_compatible(mol, locant, atom_idx, template_neighbors, assignment)
+            and _is_assignment_compatible(
+                mol,
+                locant,
+                atom_idx,
+                template_neighbors,
+                assignment,
+                template_bond_classes=template_bond_classes,
+                bond_policy=bond_policy,
+            )
         ]
         if not options:
             return
@@ -1058,6 +1139,8 @@ def _collect_locant_matches(
             used_atoms,
             matches,
             max_matches,
+            template_bond_classes,
+            bond_policy,
         )
         used_atoms.remove(atom_idx)
         del assignment[locant]
@@ -1069,12 +1152,20 @@ def _is_assignment_compatible(
     atom_idx: int,
     template_neighbors: dict[str, set[str]],
     assignment: dict[str, int],
+    *,
+    template_bond_classes: dict[frozenset[str], str],
+    bond_policy: str,
 ) -> bool:
     for assigned_locant, assigned_atom in assignment.items():
         expected_bond = assigned_locant in template_neighbors[locant]
         actual_bond = mol.get_bond(atom_idx, assigned_atom) is not None
         if expected_bond != actual_bond:
             return False
+        if expected_bond and bond_policy == "exact":
+            bond = mol.get_bond(atom_idx, assigned_atom)
+            bond_class = template_bond_classes[frozenset((locant, assigned_locant))]
+            if bond is None or bond.order != _bond_order(bond_class):
+                return False
     return True
 
 

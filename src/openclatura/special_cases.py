@@ -20,7 +20,6 @@ from .nomenclature import RULES
 from .oxoacid_roles import CentralOxoRole, OxoLigandRole, central_oxo_roles
 from .oxoacid_templates import OxoacidTemplateKind, oxoacid_role_template
 from .perception import PerceivedGroup, perceive_groups
-from .retained_macrocycle_templates import match_retained_macrocycle
 from .retained_specs import retained_parent_spec
 from .rules import multipliers, retained, stems
 from .subgraph_tools import subgraph_component
@@ -57,7 +56,6 @@ class SpecialComponentName:
     # backbone as a chain of ``element``, each ligand grafted at its locant.
     # Without it a shortcut name is unauditable and can only abstain.
     audit_chain: ChainAuditPlan | None = None
-    details: dict[str, object] | None = None
 
 
 def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
@@ -102,50 +100,6 @@ def single_atom_component_name(mol: Molecule, component_atoms: set[int]) -> str:
     if hydride_name:
         return hydride_name
     return ""
-
-
-def retained_macrocycle_parent_result(
-    mol: Molecule, component_atoms: set[int]
-) -> SpecialComponentName | None:
-    """Return an exact graph-proven retained tetrapyrrole parent."""
-
-    match = match_retained_macrocycle(mol, component_atoms)
-    if match is None:
-        return None
-    atom_ids = set(match.matched_atoms)
-    bond_ids = bond_ids_within(mol, atom_ids)
-    name = match.name
-    binding = NameAtomBinding(
-        stage="shortcut",
-        role="retained_macrocycle_parent",
-        term=name,
-        atom_ids=atom_ids,
-        bond_ids=bond_ids,
-        locants=tuple(match.template.locants),
-        emitted_tokens=(
-            NameTokenBinding(
-                text=name,
-                token_kind="parent",
-                source="retained_macrocycle_renderer",
-                grammar_role="retained_macrocycle_parent",
-                binding_key=f"retained_macrocycle:{match.template.name}",
-                atom_ids=atom_ids,
-                bond_ids=bond_ids,
-                render_order=0,
-            ),
-        ),
-    )
-    return SpecialComponentName(
-        name=name,
-        role="retained_macrocycle_parent",
-        bindings=(binding,),
-        details={
-            "template": match.template.name,
-            "aliases": list(match.template.aliases),
-            "atom_to_locant": dict(match.atom_to_locant),
-            "numbering_policy": match.template.numbering_policy,
-        },
-    )
 
 
 def structural_replacement_parent_name(

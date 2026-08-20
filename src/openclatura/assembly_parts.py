@@ -120,6 +120,7 @@ class RetainedParentMetadata:
     indicated_hydrogen_count: int = 0
     mancude_double_bonds: int = 0
     relocated_indicated_h: bool = False
+    inherent_saturated_locants: tuple[str, ...] = ()
 
 
 @dataclass

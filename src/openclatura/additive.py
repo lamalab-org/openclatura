@@ -93,9 +93,10 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         return
     oxo_derivative = parts.principal_group is not None and parts.principal_group.key == "ketone"
     default_indicated_h = set(metadata.default_indicated_h) if metadata is not None else set()
+    inherent_saturated_locants = set(metadata.inherent_saturated_locants) if metadata is not None else set()
     name_declared_indicated_h = set(default_indicated_h) or _name_indicated_hydrogen_locants(parts.retained_name)
 
-    observed = _saturated_ring_carbons(mol, numbered_path, get_loc)
+    observed = _saturated_ring_carbons(mol, numbered_path, get_loc) - inherent_saturated_locants
     if (
         default_indicated_h
         and len(observed) == len(default_indicated_h)
@@ -114,6 +115,8 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     for idx in numbered_path:
         atom = mol.atoms[idx]
         locant = str(get_loc(idx))
+        if locant in inherent_saturated_locants:
+            continue
         # An oxo prefix must cite its saturation; an -one/-dione suffix implies it.
         if not oxo_derivative and metadata is not None and _is_oxo_ring_site(mol, idx, numbered_path):
             hydro_only.append((locant, idx))

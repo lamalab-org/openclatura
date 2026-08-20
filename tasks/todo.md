@@ -87,3 +87,48 @@
   dominates this small negative delta).
 - The wheel contains the runtime module and JSON registry, while the offline
   OPSIN generator remains excluded with the development scripts.
+
+# Retained Template Derivative Audit
+
+- [x] Audit branch template architecture, matcher complexity, and production gates.
+- [x] Inventory every graph template/family introduced relative to `origin/tests`.
+- [x] Replace exact-only macrocycle shortcut routing with shared retained-parent resolution.
+- [x] Add deterministic random-sidechain derivatives for every newly added template.
+- [x] Assert the retained core name survives and von Baeyer fallback is never selected.
+- [x] Run OPSIN, focused, full-suite, and performance regression checks.
+- [x] Record findings and commit/push the implementation.
+
+## Review
+
+- Audited 29 branch-added retained graph parents: 15 explicit/generated PAH
+  parents, six acenes, six polyaphenes, porphyrin, and corrin.
+- Removed the exact-component macrocycle shortcut. Macrocycles now use the
+  ordinary retained-parent, numbering, additive-operation, substituent, and
+  assembly pipeline, so derivatives inherit the same behavior as fused PAHs.
+- Added the data-backed `pre_descriptor_selection` capability. Only retained
+  graph families that require conventional numbering before generic polycycle
+  proof generation opt in; existing retained heterocycles retain their old
+  discovery path.
+- Exposed every valid macrocycle automorphism to parent numbering instead of
+  accepting one arbitrary graph match. Matching remains topology-indexed and
+  cached on the molecule.
+- Made exact edge-order matching an explicit graph-template policy. Corrin
+  uses exact single/double edges; porphyrin retains Kekule-equivalent matching.
+  Template validation rejects incomplete exact edge specifications.
+- Added deterministic derivative property tests with one to three randomly
+  selected alkyl branches, five branch topologies, and randomized atom order.
+  The tests assert the exact selected core atom set, retained parent identity,
+  and absence of a von Baeyer descriptor.
+- Fixed an audit-discovered overreach where all retained fused saturated sites
+  were treated as inherent parent saturation; that incorrectly removed the
+  required `9H-` from xanthene. Inherent saturation now remains macrocycle
+  metadata only where the retained parent definition requires it.
+- Full suite: 3613 passed, 5 skipped, 1 xfailed. The sandbox-only two-process
+  semaphore test passed separately outside the sandbox (2/2). Round-trip suite:
+  632 passed; package OPSIN corpus gate: 106/106 matched.
+- A 3600-name mixed ordinary/ring benchmark measured 3.251 s after the change
+  versus 3.261 s at `6e71134`; no measurable performance regression.
+- Remaining architectural debt: the shared exact graph-template kernel still
+  carries fused-specific type names (`RetainedFusedGraphTemplate`) even though
+  macrocycles now reuse it. Renaming/extracting that stable kernel can be a
+  separate compatibility-focused refactor; it is not duplicated at runtime.

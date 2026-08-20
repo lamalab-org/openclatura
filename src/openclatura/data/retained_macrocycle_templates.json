@@ -16,12 +16,10 @@
             "locant": "1"
           },
           {
-            "locant": "2",
-            "default_h": true
+            "locant": "2"
           },
           {
-            "locant": "3",
-            "default_h": true
+            "locant": "3"
           },
           {
             "locant": "4"
@@ -30,23 +28,19 @@
             "locant": "21",
             "symbol": "N",
             "aromatic": false,
-            "saturated": true,
-            "default_h": true
+            "saturated": true
           },
           {
-            "locant": "5",
-            "default_h": true
+            "locant": "5"
           },
           {
             "locant": "6"
           },
           {
-            "locant": "7",
-            "default_h": true
+            "locant": "7"
           },
           {
-            "locant": "8",
-            "default_h": true
+            "locant": "8"
           },
           {
             "locant": "9"
@@ -56,19 +50,16 @@
             "symbol": "N"
           },
           {
-            "locant": "10",
-            "default_h": true
+            "locant": "10"
           },
           {
             "locant": "11"
           },
           {
-            "locant": "12",
-            "default_h": true
+            "locant": "12"
           },
           {
-            "locant": "13",
-            "default_h": true
+            "locant": "13"
           },
           {
             "locant": "14"
@@ -77,23 +68,19 @@
             "locant": "23",
             "symbol": "N",
             "aromatic": false,
-            "saturated": true,
-            "default_h": true
+            "saturated": true
           },
           {
-            "locant": "15",
-            "default_h": true
+            "locant": "15"
           },
           {
             "locant": "16"
           },
           {
-            "locant": "17",
-            "default_h": true
+            "locant": "17"
           },
           {
-            "locant": "18",
-            "default_h": true
+            "locant": "18"
           },
           {
             "locant": "19"
@@ -103,8 +90,7 @@
             "symbol": "N"
           },
           {
-            "locant": "20",
-            "default_h": true
+            "locant": "20"
           }
         ],
         "bonds": [
@@ -360,12 +346,17 @@
           "20"
         ],
         "interior_atoms": [],
-        "default_indicated_h": [],
+        "default_indicated_h": [
+          "21",
+          "23"
+        ],
+        "indicated_hydrogen_count": 2,
         "mancude_double_bonds": 11,
         "numbering_policy": "retained_macrocycle_template",
         "aromatic_equivalence_policy": "neutral_kekule_equivalent",
         "enabled": true,
-        "derivative_production_enabled": false
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     },
     {
@@ -379,20 +370,17 @@
           {
             "locant": "1",
             "aromatic": false,
-            "saturated": true,
-            "default_h": true
+            "saturated": true
           },
           {
             "locant": "2",
             "aromatic": false,
-            "saturated": true,
-            "default_h": true
+            "saturated": true
           },
           {
             "locant": "3",
             "aromatic": false,
-            "saturated": true,
-            "default_h": true
+            "saturated": true
           },
           {
             "locant": "4"
@@ -402,8 +390,7 @@
             "symbol": "N"
           },
           {
-            "locant": "5",
-            "default_h": true
+            "locant": "5"
           },
           {
             "locant": "6"
@@ -411,14 +398,12 @@
           {
             "locant": "7",
             "aromatic": false,
-            "saturated": true,
-            "default_h": true
+            "saturated": true
           },
           {
             "locant": "8",
             "aromatic": false,
-            "saturated": true,
-            "default_h": true
+            "saturated": true
           },
           {
             "locant": "9"
@@ -428,8 +413,7 @@
             "symbol": "N"
           },
           {
-            "locant": "10",
-            "default_h": true
+            "locant": "10"
           },
           {
             "locant": "11"
@@ -437,14 +421,12 @@
           {
             "locant": "12",
             "aromatic": false,
-            "saturated": true,
-            "default_h": true
+            "saturated": true
           },
           {
             "locant": "13",
             "aromatic": false,
-            "saturated": true,
-            "default_h": true
+            "saturated": true
           },
           {
             "locant": "14"
@@ -454,8 +436,7 @@
             "symbol": "N"
           },
           {
-            "locant": "15",
-            "default_h": true
+            "locant": "15"
           },
           {
             "locant": "16"
@@ -463,27 +444,23 @@
           {
             "locant": "17",
             "aromatic": false,
-            "saturated": true,
-            "default_h": true
+            "saturated": true
           },
           {
             "locant": "18",
             "aromatic": false,
-            "saturated": true,
-            "default_h": true
+            "saturated": true
           },
           {
             "locant": "19",
             "aromatic": false,
-            "saturated": true,
-            "default_h": true
+            "saturated": true
           },
           {
             "locant": "24",
             "symbol": "N",
             "aromatic": false,
-            "saturated": true,
-            "default_h": true
+            "saturated": true
           }
         ],
         "bonds": [
@@ -730,12 +707,16 @@
           "24"
         ],
         "interior_atoms": [],
-        "default_indicated_h": [],
+        "default_indicated_h": [
+          "24"
+        ],
+        "indicated_hydrogen_count": 1,
         "mancude_double_bonds": 6,
         "numbering_policy": "retained_macrocycle_template",
-        "aromatic_equivalence_policy": "neutral_kekule_equivalent",
+        "aromatic_equivalence_policy": "exact",
         "enabled": true,
-        "derivative_production_enabled": false
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
       }
     }
   ]
