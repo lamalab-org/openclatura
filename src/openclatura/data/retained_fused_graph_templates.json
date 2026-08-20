@@ -22892,9 +22892,7 @@
       "name": "dibenz[a,h]anthracene",
       "pin": true,
       "priority": 267,
-      "aliases": [
-        "dibenzo[a,h]anthracene"
-      ],
+      "aliases": [],
       "attached_prefix": null,
       "derivative_stem": "dibenz[a,h]anthracen",
       "template": {
@@ -23243,7 +23241,8 @@
         "mancude_double_bonds": 11,
         "enabled": true,
         "derivative_production_enabled": true,
-        "pre_descriptor_selection": true
+        "pre_descriptor_selection": true,
+        "derivative_audit_enabled": true
       }
     },
     {
@@ -25041,7 +25040,8 @@
         "mancude_double_bonds": 11,
         "enabled": true,
         "derivative_production_enabled": true,
-        "pre_descriptor_selection": true
+        "pre_descriptor_selection": true,
+        "derivative_audit_enabled": true
       }
     },
     {
@@ -32515,9 +32515,7 @@
       "name": "tetracene",
       "pin": true,
       "priority": 355,
-      "aliases": [
-        "naphthacene"
-      ],
+      "aliases": [],
       "attached_prefix": "tetraceno",
       "derivative_stem": "tetracen",
       "template": {
@@ -32801,7 +32799,8 @@
         "mancude_double_bonds": 9,
         "enabled": true,
         "derivative_production_enabled": true,
-        "pre_descriptor_selection": true
+        "pre_descriptor_selection": true,
+        "derivative_audit_enabled": true
       }
     },
     {

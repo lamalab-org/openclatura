@@ -4,32 +4,16 @@ from openclatura.assembly_parts import RetainedParentMetadata
 from openclatura.hantzsch_widman import hw_spec_for_name, hw_spec_for_ring
 from openclatura.molecule import Molecule
 from openclatura.nomenclature import RULES
-from openclatura.retained_fused_templates import (
-    match_retained_fused_templates,
-)
-from openclatura.retained_fused_templates import (
+from openclatura.retained_graph_templates import match_retained_graph_templates
+from openclatura.retained_graph_templates import (
     retained_parent_metadata as graph_retained_parent_metadata,
-)
-from openclatura.retained_macrocycle_templates import (
-    match_retained_macrocycles,
-    retained_macrocycle_parent_metadata,
 )
 
 
 def parent_metadata(parent_name: str) -> RetainedParentMetadata | None:
     """Return assembly metadata from the retained-parent provider registry."""
 
-    return graph_retained_parent_metadata(parent_name) or retained_macrocycle_parent_metadata(parent_name)
-
-
-def _match_retained_macrocycle(mol: Molecule, path: list[int]) -> tuple[str, list[dict[int, str]]] | None:
-    """Resolve a retained macrocycle through its conventional locant graph."""
-
-    matches = match_retained_macrocycles(mol, set(path))
-    if not matches:
-        return None
-    parent_name = matches[0].name
-    return parent_name, [match.atom_to_locant for match in matches if match.name == parent_name]
+    return graph_retained_parent_metadata(parent_name)
 
 
 def get_pre_descriptor_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[int, str]]] | None:
@@ -39,36 +23,27 @@ def get_pre_descriptor_retained_ring(mol: Molecule, path: list[int]) -> tuple[st
     Most retained rings continue through ordinary ring decomposition.
     """
 
-    macrocycle_matches = [
-        match for match in match_retained_macrocycles(mol, set(path)) if match.template.pre_descriptor_selection
-    ]
-    if macrocycle_matches:
-        parent_name = macrocycle_matches[0].name
-        return parent_name, [
-            match.atom_to_locant for match in macrocycle_matches if match.name == parent_name
-        ]
-
-    fused_matches = match_retained_fused_templates(
+    matches = match_retained_graph_templates(
         mol,
         path,
         allow_nonaromatic=True,
         pre_descriptor_only=True,
     )
-    if not fused_matches:
+    if not matches:
         return None
-    parent_name = fused_matches[0].template.name
+    parent_name = matches[0].template.name
     return parent_name, [
-        match.atom_to_locant for match in fused_matches if match.template.name == parent_name
+        match.atom_to_locant for match in matches if match.template.name == parent_name
     ]
 
 
 def _match_fused_templates(mol: Molecule, path: list[int]) -> tuple[str, list[dict[int, str]]] | None:
-    """Resolve a fused retained parent from the locant-keyed graph templates."""
+    """Resolve a retained parent from the shared locant-graph registry."""
 
     # Strict first; relaxed reaches hydro derivatives but blurs tautomers.
-    matches = match_retained_fused_templates(mol, path)
+    matches = match_retained_graph_templates(mol, path)
     if not matches and _is_plain_hydro_derivative(mol, path):
-        matches = match_retained_fused_templates(mol, path, allow_nonaromatic=True)
+        matches = match_retained_graph_templates(mol, path, allow_nonaromatic=True)
     if not matches:
         return None
     template_name = matches[0].template.name
@@ -83,7 +58,12 @@ def _match_monocycle_templates(mol: Molecule, path: list[int], double_bonds: int
     is, so the count is checked here: piperidine is not 1,4-dihydropyridine.
     """
 
-    for match in match_retained_fused_templates(mol, path, allow_nonaromatic=True):
+    for match in match_retained_graph_templates(
+        mol,
+        path,
+        allow_nonaromatic=True,
+        families=frozenset({"fused"}),
+    ):
         if (match.template.mancude_double_bonds or 0) == double_bonds:
             return match.template.name
     return None
@@ -181,9 +161,6 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
     # Fused systems only: the template table also holds monocycles, and those are
     # resolved below so a partly saturated ring still reaches its hydro name.
     if deg3_nodes:
-        macrocycle = _match_retained_macrocycle(mol, path)
-        if macrocycle is not None:
-            return macrocycle
         fused = _match_fused_templates(mol, path)
         if fused is not None:
             return fused

@@ -5,9 +5,6 @@
     "maximum_ring_count": 9,
     "member_overrides": {
       "4": {
-        "aliases": [
-          "naphthacene"
-        ],
         "priority": 355,
         "attached_prefix": "tetraceno",
         "derivative_stem": "tetracen"

@@ -5,7 +5,7 @@ from .grammar_snapshot_data import retained_fused_derivative_gate
 from .molecule import Molecule
 from .namer_config import INDICATED_H_RETAINED_NAMES
 from .perception import PerceivedGroup
-from .retained_fused_templates import RetainedFusedTemplateMatch, match_retained_fused_templates
+from .retained_fused_templates import RetainedGraphTemplateMatch, match_retained_fused_templates
 from .retained_name_policy import retained_parent_name_policy
 
 _DERIVATIVE_GATE = retained_fused_derivative_gate()
@@ -58,7 +58,7 @@ def production_retained_fused_parent(
         if group.attachment_carbon in parent_atoms:
             feature_atoms.add(group.attachment_carbon)
 
-    def eligible(matches: list[RetainedFusedTemplateMatch]) -> list[RetainedFusedTemplateMatch]:
+    def eligible(matches: list[RetainedGraphTemplateMatch]) -> list[RetainedGraphTemplateMatch]:
         return [
             match
             for match in matches
@@ -123,7 +123,7 @@ def production_retained_fused_parent(
     )
 
 
-def _added_hydrogen_is_citable(mol: Molecule, match: RetainedFusedTemplateMatch) -> bool:
+def _added_hydrogen_is_citable(mol: Molecule, match: RetainedGraphTemplateMatch) -> bool:
     """
     Whether every saturated position of the parent can be spelt out.
     """
@@ -162,7 +162,7 @@ def _neutral_component(mol: Molecule, atoms: set[int]) -> bool:
 def _has_mancude_unsaturation(
     mol: Molecule,
     parent_atoms: set[int],
-    match: RetainedFusedTemplateMatch,
+    match: RetainedGraphTemplateMatch,
 ) -> bool:
     """Reject hydro derivatives that merely share an oxo-parent topology."""
 

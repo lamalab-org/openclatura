@@ -138,13 +138,13 @@ from openclatura.polycycle_topology import (
 from openclatura.principal_suffixes import render_principal_suffix
 from openclatura.resonance_compare import equivalent_smiles
 from openclatura.retained_fused_templates import (
-    RetainedFusedGraphTemplate,
+    RetainedGraphTemplate,
     match_retained_fused_template,
     match_retained_fused_templates,
     pending_retained_fused_parent_names,
     retained_fused_base_templates,
     retained_fused_graph_templates,
-    retained_fused_template_from_data,
+    retained_graph_template_from_data,
     retained_parent_metadata,
     template_molecule,
 )
@@ -3407,9 +3407,9 @@ def test_indicated_hydrogen_follows_graph_tautomer_but_not_hydrogen_free_spiro_c
 
 
 def test_retained_fused_graph_template_schema_validates_locant_graphs():
-    template = retained_fused_template_from_data(_naphthalene_graph_template_row())
+    template = retained_graph_template_from_data(_naphthalene_graph_template_row())
 
-    assert isinstance(template, RetainedFusedGraphTemplate)
+    assert isinstance(template, RetainedGraphTemplate)
     assert template.name == "naphthalene"
     assert template.locants == ("1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a")
     assert template.fusion_atoms == ("4a", "8a")
@@ -3418,7 +3418,7 @@ def test_retained_fused_graph_template_schema_validates_locant_graphs():
 
 
 def test_retained_fused_graph_template_builds_local_graph():
-    template = retained_fused_template_from_data(_naphthalene_graph_template_row())
+    template = retained_graph_template_from_data(_naphthalene_graph_template_row())
     mol = template_molecule(template)
 
     assert len(mol.atoms) == 10
@@ -3428,7 +3428,7 @@ def test_retained_fused_graph_template_builds_local_graph():
 
 
 def test_retained_fused_graph_template_match_returns_locant_map():
-    template = retained_fused_template_from_data(_naphthalene_graph_template_row())
+    template = retained_graph_template_from_data(_naphthalene_graph_template_row())
     mol = template_molecule(template)
 
     match = match_retained_fused_template(mol, set(mol.atoms), template)
@@ -3669,10 +3669,10 @@ def test_retained_fused_template_matching_is_charge_exact():
     row = _naphthalene_graph_template_row()
     row["template"]["atoms"][0]["symbol"] = "N"
     row["template"]["atoms"][0]["charge"] = 1
-    template = retained_fused_template_from_data(row)
+    template = retained_graph_template_from_data(row)
     charged = template_molecule(template)
     neutral = template_molecule(template)
-    neutral.atoms[0].charge = 0
+    neutral.set_atom_charge(0, 0)
 
     assert match_retained_fused_template(charged, set(charged.atoms), template) is not None
     assert match_retained_fused_template(neutral, set(neutral.atoms), template) is None
@@ -4096,7 +4096,7 @@ def test_retained_fused_graph_template_rejects_incomplete_locant_maps():
     row["template"]["atoms"] = row["template"]["atoms"][:-1]
 
     with pytest.raises(ValueError, match="atom locants do not match"):
-        retained_fused_template_from_data(row)
+        retained_graph_template_from_data(row)
 
 
 def test_tetrazole_substitution_keeps_retained_parent_attachment_explicit():

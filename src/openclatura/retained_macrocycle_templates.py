@@ -8,18 +8,15 @@ small candidate bucket, followed by exact labelled-graph isomorphism.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import cache, lru_cache
+from functools import cache
 
 from .assembly_parts import RetainedParentMetadata
 from .molecule import Molecule
-from .naming_data import load_json_table
-from .retained_fused_templates import (
-    RetainedFusedGraphTemplate,
-    RetainedFusedTemplateMatch,
-    match_retained_graph_template_maps,
-    molecule_graph_topology_key,
-    retained_fused_template_from_data,
-    retained_graph_template_topology_key,
+from .retained_graph_templates import (
+    RetainedGraphTemplate,
+    RetainedGraphTemplateMatch,
+    match_retained_graph_templates,
+    retained_graph_templates,
 )
 
 
@@ -27,7 +24,7 @@ from .retained_fused_templates import (
 class RetainedMacrocycleMatch:
     """A retained macrocycle parent and its conventional locant map."""
 
-    template: RetainedFusedGraphTemplate
+    template: RetainedGraphTemplate
     atom_to_locant: dict[int, str]
     locant_to_atom: dict[str, int]
     matched_atoms: frozenset[int]
@@ -37,30 +34,10 @@ class RetainedMacrocycleMatch:
         return self.template.output_name
 
 
-@lru_cache(maxsize=1)
-def retained_macrocycle_templates() -> tuple[RetainedFusedGraphTemplate, ...]:
-    """Return validated retained macrocycle templates in policy order."""
+def retained_macrocycle_templates() -> tuple[RetainedGraphTemplate, ...]:
+    """Return the macrocycle view of the shared retained graph registry."""
 
-    rows = load_json_table("retained_macrocycle_templates.json").get("parents", ())
-    templates = tuple(retained_fused_template_from_data(dict(row)) for row in rows)
-    return tuple(sorted(templates, key=lambda template: (template.priority, template.name)))
-
-
-@lru_cache(maxsize=1)
-def _macrocycles_by_topology() -> dict[tuple, tuple[RetainedFusedGraphTemplate, ...]]:
-    """Index the small retained family before exact graph matching."""
-
-    index: dict[tuple, list[RetainedFusedGraphTemplate]] = {}
-    for template in retained_macrocycle_templates():
-        index.setdefault(retained_graph_template_topology_key(template), []).append(template)
-    return {key: tuple(values) for key, values in index.items()}
-
-
-@lru_cache(maxsize=1)
-def _macrocycle_sizes() -> frozenset[int]:
-    """Heavy-atom counts that can possibly enter macrocycle matching."""
-
-    return frozenset(len(template.atoms) for template in retained_macrocycle_templates())
+    return retained_graph_templates(families=frozenset({"macrocycle"}))
 
 
 def match_retained_macrocycle(mol: Molecule, atom_ids: set[int]) -> RetainedMacrocycleMatch | None:
@@ -74,53 +51,23 @@ def match_retained_macrocycles(mol: Molecule, atom_ids: set[int]) -> list[Retain
     """Return all conventional locant maps for the best macrocycle parent."""
 
     atom_set = set(atom_ids)
-    if len(atom_set) not in _macrocycle_sizes():
-        return []
-    cache_key = ("macrocycle", frozenset(atom_set))
-    cached = mol._retained_fused_cache.get(cache_key)
-    if cached is not None:
-        return list(cached)
-    candidates = _macrocycles_by_topology().get(molecule_graph_topology_key(mol, atom_set), ())
     has_external_attachment = any(
         neighbor not in atom_set for atom_idx in atom_set for neighbor in mol.get_neighbors(atom_idx)
     )
-    matches: list[RetainedMacrocycleMatch] = []
-    for template in candidates:
-        if not template.enabled or (has_external_attachment and not template.derivative_production_enabled):
-            continue
-        if not _mancude_bond_count_matches(mol, atom_set, template):
-            continue
-        matches.extend(
-            _macrocycle_match(match)
-            for match in match_retained_graph_template_maps(
-                mol,
-                atom_set,
-                template,
-                allow_nonaromatic=True,
-            )
-        )
-    if matches:
-        best_name = matches[0].template.name
-        matches = [match for match in matches if match.template.name == best_name]
-    mol._retained_fused_cache[cache_key] = tuple(matches)
-    return matches
-
-
-def _mancude_bond_count_matches(
-    mol: Molecule, atom_ids: set[int], template: RetainedFusedGraphTemplate
-) -> bool:
-    """Reject hydro derivatives while allowing equivalent Kekule placement."""
-
-    expected = template.mancude_double_bonds
-    if expected is None:
-        return True
-    observed = sum(
-        bond.order == 2 and bond.u in atom_ids and bond.v in atom_ids for bond in mol.bonds.values()
+    matches = match_retained_graph_templates(
+        mol,
+        atom_set,
+        allow_nonaromatic=True,
+        families=frozenset({"macrocycle"}),
     )
-    return observed == expected
+    return [
+        _macrocycle_match(match)
+        for match in matches
+        if not has_external_attachment or match.template.derivative_production_enabled
+    ]
 
 
-def _macrocycle_match(match: RetainedFusedTemplateMatch) -> RetainedMacrocycleMatch:
+def _macrocycle_match(match: RetainedGraphTemplateMatch) -> RetainedMacrocycleMatch:
     return RetainedMacrocycleMatch(
         template=match.template,
         atom_to_locant=dict(match.atom_to_locant),

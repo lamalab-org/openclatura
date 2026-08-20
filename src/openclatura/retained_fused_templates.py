@@ -1,8 +1,9 @@
-"""Graph-template model for retained fused parent names.
+"""Generic locant-graph templates for retained parent structures.
 
-The production retained-fused recognizers are still being migrated.  This
-module defines the audited data shape used by the next matcher: templates are
-keyed by locants and graph structure, not by SMILES or SMARTS strings.
+The module keeps its historical filename for import compatibility, but the
+model and matcher are shared by fused parents, macrocycles, and future retained
+graph families. Templates are keyed by locants and graph structure, never by
+SMILES or SMARTS strings.
 """
 
 from __future__ import annotations
@@ -15,11 +16,13 @@ from .assembly_parts import RetainedParentMetadata
 from .molecule import Molecule
 from .naming_data import load_json_table
 from .nomenclature import RULES
-from .retained_name_policy import retained_parent_name_policy
+from .retained_name_policy import retained_parent_name_policy, retained_parent_output_name
 from .rules import multipliers
 
 ALLOWED_BOND_CLASSES = {"single", "double", "aromatic", "mancude", "fusion"}
 ALLOWED_AROMATIC_EQUIVALENCE_POLICIES = {"neutral_kekule_equivalent", "exact"}
+ALLOWED_CHARGE_POLICIES = {"exact", "charge_layer"}
+RETAINED_GRAPH_FAMILIES = ("fused", "macrocycle")
 
 # Single-bonded in every mancude parent, so never indicated-hydrogen capacity.
 FIXED_SATURATED_RING_ELEMENTS = frozenset({"O", "S", "Se", "Te"})
@@ -41,7 +44,7 @@ def retained_fused_base_templates() -> dict[str, dict[str, Any]]:
 
 
 @dataclass(frozen=True)
-class RetainedFusedAtomTemplate:
+class RetainedGraphAtomTemplate:
     locant: str
     symbol: str = "C"
     charge: int = 0
@@ -53,13 +56,13 @@ class RetainedFusedAtomTemplate:
 
 
 @dataclass(frozen=True)
-class RetainedFusedBondTemplate:
+class RetainedGraphBondTemplate:
     locants: tuple[str, str]
     bond_class: str = "aromatic"
 
 
 @dataclass(frozen=True)
-class RetainedFusedGraphTemplate:
+class RetainedGraphTemplate:
     name: str
     pin: bool
     priority: int
@@ -68,29 +71,32 @@ class RetainedFusedGraphTemplate:
     derivative_stem: str | None
     default_indicated_h: tuple[str, ...]
     locants: tuple[str, ...]
-    atoms: tuple[RetainedFusedAtomTemplate, ...]
-    bonds: tuple[RetainedFusedBondTemplate, ...]
+    atoms: tuple[RetainedGraphAtomTemplate, ...]
+    bonds: tuple[RetainedGraphBondTemplate, ...]
     rings: tuple[tuple[str, ...], ...]
     fusion_atoms: tuple[str, ...]
     peripheral_atoms: tuple[str, ...]
     interior_atoms: tuple[str, ...]
+    family: str = "fused"
     numbering_policy: str = "retained_template"
     aromatic_equivalence_policy: str = "neutral_kekule_equivalent"
+    charge_policy: str = "charge_layer"
+    enforce_mancude_double_bonds: bool = False
     enabled: bool = False
     derivative_production_enabled: bool = False
+    derivative_audit_enabled: bool = False
     implied_stereo: bool = False
     mancude_double_bonds: int | None = None
-    preferred_name: str | None = None
     indicated_hydrogen_count_override: int | None = None
     pre_descriptor_selection: bool = False
 
     @property
-    def atom_by_locant(self) -> dict[str, RetainedFusedAtomTemplate]:
+    def atom_by_locant(self) -> dict[str, RetainedGraphAtomTemplate]:
         return {atom.locant: atom for atom in self.atoms}
 
     @property
     def output_name(self) -> str:
-        return self.preferred_name or self.name
+        return retained_parent_output_name(self.name, "unsubstituted_parent")
 
     @property
     def indicated_hydrogen_count(self) -> int:
@@ -115,8 +121,8 @@ class RetainedFusedGraphTemplate:
 
 
 @dataclass(frozen=True)
-class RetainedFusedTemplateMatch:
-    template: RetainedFusedGraphTemplate
+class RetainedGraphTemplateMatch:
+    template: RetainedGraphTemplate
     atom_to_locant: dict[int, str]
     locant_to_atom: dict[str, int]
     matched_atoms: frozenset[int]
@@ -124,44 +130,101 @@ class RetainedFusedTemplateMatch:
     trace: tuple[str, ...] = ()
 
 
-def retained_fused_graph_templates(*, include_disabled: bool = False) -> tuple[RetainedFusedGraphTemplate, ...]:
-    """Return graph-template retained fused parent rows from the rule registry."""
+# Backward-compatible type names for callers that imported the original fused
+# kernel directly. New code should use the family-neutral names above.
+RetainedFusedAtomTemplate = RetainedGraphAtomTemplate
+RetainedFusedBondTemplate = RetainedGraphBondTemplate
+RetainedFusedGraphTemplate = RetainedGraphTemplate
+RetainedFusedTemplateMatch = RetainedGraphTemplateMatch
 
-    return _retained_fused_graph_templates(include_disabled)
+
+def retained_graph_templates(
+    *,
+    include_disabled: bool = False,
+    families: frozenset[str] | None = None,
+) -> tuple[RetainedGraphTemplate, ...]:
+    """Return a lazy family view of the graph-backed retained registry."""
+
+    return _retained_graph_templates(include_disabled, families)
 
 
-@lru_cache(maxsize=2)
-def _retained_fused_graph_templates(include_disabled: bool) -> tuple[RetainedFusedGraphTemplate, ...]:
+@lru_cache(maxsize=8)
+def _retained_graph_templates(
+    include_disabled: bool,
+    families: frozenset[str] | None,
+) -> tuple[RetainedGraphTemplate, ...]:
     """Return one canonical cached registry view for an inclusion policy."""
 
     templates = [
         template
-        for template in _declared_retained_fused_graph_templates()
+        for template in _declared_retained_graph_templates(families)
         if include_disabled or template.enabled
     ]
     existing_names = {template.name for template in templates}
-    generated_templates = (*_generated_acene_templates(), *_generated_polyaphene_templates())
+    generated_templates = (
+        (*_generated_acene_templates(), *_generated_polyaphene_templates())
+        if families is None or "fused" in families
+        else ()
+    )
     for template in generated_templates:
         if template.name not in existing_names and (include_disabled or template.enabled):
             templates.append(template)
     return tuple(templates)
 
 
-@lru_cache(maxsize=1)
-def _declared_retained_fused_graph_templates() -> tuple[RetainedFusedGraphTemplate, ...]:
+@lru_cache(maxsize=4)
+def _declared_retained_graph_templates(
+    families: frozenset[str] | None,
+) -> tuple[RetainedGraphTemplate, ...]:
     """Compile data-declared templates once for all filtered registry views."""
 
-    parent_rows = list(load_json_table("retained_fused_graph_templates.json").get("parents", ()))
-    parent_rows.extend(load_json_table("retained_fused_hydrocarbon_templates.json").get("parents", ()))
-    for row in RULES.retained.fused_polycycle_specs:
-        template_data = row.get("template")
-        if template_data is not None:
-            parent_rows.append(row)
-    return tuple(retained_fused_template_from_data(row) for row in parent_rows)
+    parent_rows = []
+    if families is None or "fused" in families:
+        parent_rows.extend(load_json_table("retained_fused_graph_templates.json").get("parents", ()))
+        parent_rows.extend(
+            _with_template_family(row, "fused", derivative_audit_enabled=True, charge_policy="exact")
+            for row in load_json_table("retained_fused_hydrocarbon_templates.json").get("parents", ())
+        )
+        for row in RULES.retained.fused_polycycle_specs:
+            template_data = row.get("template")
+            if template_data is not None:
+                parent_rows.append(row)
+    if families is None or "macrocycle" in families:
+        parent_rows.extend(
+            _with_template_family(row, "macrocycle")
+            for row in load_json_table("retained_macrocycle_templates.json").get("parents", ())
+        )
+    return tuple(retained_graph_template_from_data(row) for row in parent_rows)
+
+
+def retained_fused_graph_templates(*, include_disabled: bool = False) -> tuple[RetainedGraphTemplate, ...]:
+    """Compatibility view containing only fused/monocyclic graph templates."""
+
+    return tuple(
+        template
+        for template in retained_graph_templates(
+            include_disabled=include_disabled,
+            families=frozenset({"fused"}),
+        )
+    )
+
+
+def _with_template_family(row: dict[str, Any], family: str, **defaults: object) -> dict[str, Any]:
+    copied = dict(row)
+    template_data = dict(copied.get("template", {}))
+    template_data.setdefault("family", family)
+    for key, value in defaults.items():
+        template_data.setdefault(key, value)
+    if family == "macrocycle":
+        template_data.setdefault("charge_policy", "exact")
+        template_data.setdefault("enforce_mancude_double_bonds", True)
+        template_data.setdefault("derivative_audit_enabled", True)
+    copied["template"] = template_data
+    return copied
 
 
 @lru_cache(maxsize=1)
-def _generated_acene_templates() -> tuple[RetainedFusedGraphTemplate, ...]:
+def _generated_acene_templates() -> tuple[RetainedGraphTemplate, ...]:
     """Build higher linear-acene parents from the P-25.1.2 series table.
 
     Acenes with four or more linearly fused benzene rings share one locant-graph
@@ -182,7 +245,7 @@ def _generated_acene_templates() -> tuple[RetainedFusedGraphTemplate, ...]:
     return tuple(_acene_template_from_data(row) for row in rows)
 
 
-def _acene_template_from_data(row: dict[str, Any]) -> RetainedFusedGraphTemplate:
+def _acene_template_from_data(row: dict[str, Any]) -> RetainedGraphTemplate:
     ring_count = int(row["ring_count"])
     if ring_count < 4:
         raise ValueError("Generated acene templates require at least four fused rings.")
@@ -190,7 +253,7 @@ def _acene_template_from_data(row: dict[str, Any]) -> RetainedFusedGraphTemplate
     locants, edges = _higher_acene_locant_graph(ring_count)
     fusion_atoms = tuple(locant for locant in locants if not locant.isdigit())
     name = str(row["name"])
-    template = RetainedFusedGraphTemplate(
+    template = RetainedGraphTemplate(
         name=name,
         pin=bool(row.get("pin", True)),
         priority=int(row.get("priority", 1000)),
@@ -199,15 +262,17 @@ def _acene_template_from_data(row: dict[str, Any]) -> RetainedFusedGraphTemplate
         derivative_stem=str(row.get("derivative_stem", name.removesuffix("e"))),
         default_indicated_h=(),
         locants=locants,
-        atoms=tuple(RetainedFusedAtomTemplate(locant=locant, fusion=locant in fusion_atoms) for locant in locants),
-        bonds=tuple(RetainedFusedBondTemplate(locants=edge) for edge in edges),
+        atoms=tuple(RetainedGraphAtomTemplate(locant=locant, fusion=locant in fusion_atoms) for locant in locants),
+        bonds=tuple(RetainedGraphBondTemplate(locants=edge) for edge in edges),
         rings=_smallest_ring_basis(locants, edges),
         fusion_atoms=fusion_atoms,
         peripheral_atoms=tuple(locant for locant in locants if locant.isdigit()),
         interior_atoms=(),
         numbering_policy="generated_acene_series",
+        charge_policy="exact",
         enabled=bool(row.get("enabled", True)),
         derivative_production_enabled=bool(row.get("derivative_production_enabled", True)),
+        derivative_audit_enabled=bool(row.get("derivative_audit_enabled", True)),
         mancude_double_bonds=2 * ring_count + 1,
         pre_descriptor_selection=True,
     )
@@ -216,7 +281,7 @@ def _acene_template_from_data(row: dict[str, Any]) -> RetainedFusedGraphTemplate
 
 
 @lru_cache(maxsize=1)
-def _generated_polyaphene_templates() -> tuple[RetainedFusedGraphTemplate, ...]:
+def _generated_polyaphene_templates() -> tuple[RetainedGraphTemplate, ...]:
     """Build the angular polyaphene series from P-25.1.2 family data.
 
     A polyaphene member has a perimeter cycle of ``4n + 2`` atoms and
@@ -237,7 +302,7 @@ def _generated_polyaphene_templates() -> tuple[RetainedFusedGraphTemplate, ...]:
     return tuple(_polyaphene_template_from_data(row) for row in rows)
 
 
-def _polyaphene_template_from_data(row: dict[str, Any]) -> RetainedFusedGraphTemplate:
+def _polyaphene_template_from_data(row: dict[str, Any]) -> RetainedGraphTemplate:
     ring_count = int(row["ring_count"])
     if ring_count < 4:
         raise ValueError("Generated polyaphene templates require at least four fused rings.")
@@ -245,7 +310,7 @@ def _polyaphene_template_from_data(row: dict[str, Any]) -> RetainedFusedGraphTem
     locants, edges = _polyaphene_locant_graph(ring_count)
     fusion_atoms = tuple(locant for locant in locants if not locant.isdigit())
     name = str(row["name"])
-    template = RetainedFusedGraphTemplate(
+    template = RetainedGraphTemplate(
         name=name,
         pin=bool(row.get("pin", True)),
         priority=int(row.get("priority", 1000)),
@@ -254,15 +319,17 @@ def _polyaphene_template_from_data(row: dict[str, Any]) -> RetainedFusedGraphTem
         derivative_stem=str(row.get("derivative_stem", name.removesuffix("e"))),
         default_indicated_h=(),
         locants=locants,
-        atoms=tuple(RetainedFusedAtomTemplate(locant=locant, fusion=locant in fusion_atoms) for locant in locants),
-        bonds=tuple(RetainedFusedBondTemplate(locants=edge) for edge in edges),
+        atoms=tuple(RetainedGraphAtomTemplate(locant=locant, fusion=locant in fusion_atoms) for locant in locants),
+        bonds=tuple(RetainedGraphBondTemplate(locants=edge) for edge in edges),
         rings=_smallest_ring_basis(locants, edges),
         fusion_atoms=fusion_atoms,
         peripheral_atoms=tuple(locant for locant in locants if locant.isdigit()),
         interior_atoms=(),
         numbering_policy="generated_polyaphene_series",
+        charge_policy="exact",
         enabled=bool(row.get("enabled", True)),
         derivative_production_enabled=bool(row.get("derivative_production_enabled", True)),
+        derivative_audit_enabled=bool(row.get("derivative_audit_enabled", True)),
         mancude_double_bonds=2 * ring_count + 1,
         pre_descriptor_selection=True,
     )
@@ -395,7 +462,7 @@ def retained_parent_metadata(parent_name: str) -> RetainedParentMetadata | None:
     production graph-template matches pass their metadata directly.
     """
 
-    for template in retained_fused_graph_templates(include_disabled=True):
+    for template in retained_graph_templates(include_disabled=True):
         if parent_name == template.name:
             return RetainedParentMetadata(
                 default_indicated_h=template.default_indicated_h,
@@ -403,6 +470,7 @@ def retained_parent_metadata(parent_name: str) -> RetainedParentMetadata | None:
                 derivative_stem=template.derivative_stem,
                 indicated_hydrogen_count=template.indicated_hydrogen_count,
                 mancude_double_bonds=template.mancude_double_bonds or 0,
+                inherent_saturated_locants=tuple(atom.locant for atom in template.atoms if atom.saturated),
             )
     return None
 
@@ -422,10 +490,10 @@ def pending_retained_fused_parent_names() -> tuple[str, ...]:
 def match_retained_fused_template(
     mol: Molecule,
     atom_indices: set[int] | list[int] | tuple[int, ...],
-    template: RetainedFusedGraphTemplate,
+    template: RetainedGraphTemplate,
     *,
     allow_nonaromatic: bool = False,
-) -> RetainedFusedTemplateMatch | None:
+) -> RetainedGraphTemplateMatch | None:
     """Match one retained fused graph template to a molecule atom set.
 
     It returns graph atom IDs bound to display locants and does not use SMILES
@@ -442,11 +510,11 @@ def match_retained_fused_template(
 def match_retained_graph_template_maps(
     mol: Molecule,
     atom_indices: set[int] | list[int] | tuple[int, ...],
-    template: RetainedFusedGraphTemplate,
+    template: RetainedGraphTemplate,
     *,
     allow_nonaromatic: bool = False,
     allow_relocated_indicated_h: bool = False,
-) -> list[RetainedFusedTemplateMatch]:
+) -> list[RetainedGraphTemplateMatch]:
     """Return every valid locant map for one retained graph template.
 
     Parent numbering needs all graph automorphisms so later locant criteria can
@@ -484,11 +552,11 @@ def _ring_fusion_stereo_is_assigned(mol: Molecule, atom_set: set[int]) -> bool:
 def _match_all_retained_fused_template(
     mol: Molecule,
     atom_indices: set[int] | list[int] | tuple[int, ...],
-    template: RetainedFusedGraphTemplate,
+    template: RetainedGraphTemplate,
     *,
     allow_nonaromatic: bool = False,
     allow_relocated_indicated_h: bool = False,
-) -> list[RetainedFusedTemplateMatch]:
+) -> list[RetainedGraphTemplateMatch]:
     atom_set = set(atom_indices)
     if len(atom_set) != len(template.atoms):
         return []
@@ -521,7 +589,12 @@ def _match_all_retained_fused_template(
             atom_idx
             for atom_idx in atom_set
             if _atom_matches_template(
-                mol, atom_idx, atom_by_locant[locant], ring_atoms=atom_set, allow_nonaromatic=allow_nonaromatic
+                mol,
+                atom_idx,
+                atom_by_locant[locant],
+                ring_atoms=atom_set,
+                allow_nonaromatic=allow_nonaromatic,
+                charge_policy=template.charge_policy,
             )
             and molecule_degrees[atom_idx] == template_degrees[locant]
         ]
@@ -562,7 +635,7 @@ def _match_all_retained_fused_template(
     ]
 
 
-def _relocatable_atom_by_locant(template: RetainedFusedGraphTemplate) -> dict[str, RetainedFusedAtomTemplate]:
+def _relocatable_atom_by_locant(template: RetainedGraphTemplate) -> dict[str, RetainedGraphAtomTemplate]:
     """The template with its indicated-H site free to move."""
 
     movable = {
@@ -573,7 +646,7 @@ def _relocatable_atom_by_locant(template: RetainedFusedGraphTemplate) -> dict[st
         and atom.symbol != "C"
         and atom.symbol not in FIXED_SATURATED_RING_ELEMENTS
     }
-    relocatable: dict[str, RetainedFusedAtomTemplate] = {}
+    relocatable: dict[str, RetainedGraphAtomTemplate] = {}
     for locant, atom in template.atom_by_locant.items():
         if locant in template.default_indicated_h and atom.symbol == "C":
             relocatable[locant] = replace(atom, saturated=False, default_h=False)
@@ -586,7 +659,7 @@ def _relocatable_atom_by_locant(template: RetainedFusedGraphTemplate) -> dict[st
 
 def _relocated_indicated_h(
     mol: Molecule,
-    template: RetainedFusedGraphTemplate,
+    template: RetainedGraphTemplate,
     atom_set: set[int],
     assignment: dict[str, int],
     *,
@@ -613,15 +686,15 @@ def _relocated_indicated_h(
 
 
 def _template_match_from_assignment(
-    template: RetainedFusedGraphTemplate,
+    template: RetainedGraphTemplate,
     atom_set: set[int],
     assignment: dict[str, int],
     *,
     indicated_h: tuple[str, ...] | None = None,
-) -> RetainedFusedTemplateMatch:
+) -> RetainedGraphTemplateMatch:
     locant_to_atom = {locant: assignment[locant] for locant in template.locants}
     atom_to_locant = {atom_idx: locant for locant, atom_idx in locant_to_atom.items()}
-    return RetainedFusedTemplateMatch(
+    return RetainedGraphTemplateMatch(
         template=template,
         atom_to_locant=atom_to_locant,
         locant_to_atom=locant_to_atom,
@@ -639,15 +712,16 @@ TopologyKey = tuple[
 ]
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=16)
 def _templates_by_topology(
     include_disabled: bool,
     pre_descriptor_only: bool = False,
-) -> dict[TopologyKey, tuple[RetainedFusedGraphTemplate, ...]]:
+    families: frozenset[str] | None = None,
+) -> dict[TopologyKey, tuple[RetainedGraphTemplate, ...]]:
     """Index templates by cheap graph invariants before exact matching."""
 
-    index: dict[TopologyKey, list[RetainedFusedGraphTemplate]] = {}
-    for template in retained_fused_graph_templates(include_disabled=include_disabled):
+    index: dict[TopologyKey, list[RetainedGraphTemplate]] = {}
+    for template in retained_graph_templates(include_disabled=include_disabled, families=families):
         if pre_descriptor_only and not template.pre_descriptor_selection:
             continue
         index.setdefault(_template_topology_key(template), []).append(template)
@@ -655,7 +729,7 @@ def _templates_by_topology(
 
 
 @cache
-def _template_topology_key(template: RetainedFusedGraphTemplate) -> TopologyKey:
+def _template_topology_key(template: RetainedGraphTemplate) -> TopologyKey:
     degrees = _template_degrees(template)
     return _topology_key(
         (atom.symbol for atom in template.atoms),
@@ -664,7 +738,7 @@ def _template_topology_key(template: RetainedFusedGraphTemplate) -> TopologyKey:
     )
 
 
-def retained_graph_template_topology_key(template: RetainedFusedGraphTemplate) -> TopologyKey:
+def retained_graph_template_topology_key(template: RetainedGraphTemplate) -> TopologyKey:
     """Return the shared cheap topology key for a retained graph template."""
 
     return _template_topology_key(template)
@@ -713,7 +787,7 @@ def _topology_key(symbols, degrees, edge_degrees) -> TopologyKey:
     )
 
 
-def match_retained_fused_templates(
+def match_retained_graph_templates(
     mol: Molecule,
     atom_indices: set[int] | list[int] | tuple[int, ...],
     *,
@@ -721,8 +795,27 @@ def match_retained_fused_templates(
     allow_nonaromatic: bool = False,
     allow_relocated_indicated_h: bool = False,
     pre_descriptor_only: bool = False,
-) -> list[RetainedFusedTemplateMatch]:
-    """Return retained fused template matches ranked by retained priority."""
+    families: frozenset[str] | None = None,
+) -> list[RetainedGraphTemplateMatch]:
+    """Return retained graph-template matches ranked by parent priority."""
+
+    if families is None:
+        # Family registries are topology-disjoint. Stop at the first provider
+        # with an exact match so common fused parents never initialize the much
+        # larger, unrelated macrocycle templates (and vice versa).
+        for family in RETAINED_GRAPH_FAMILIES:
+            matches = match_retained_graph_templates(
+                mol,
+                atom_indices,
+                include_disabled=include_disabled,
+                allow_nonaromatic=allow_nonaromatic,
+                allow_relocated_indicated_h=allow_relocated_indicated_h,
+                pre_descriptor_only=pre_descriptor_only,
+                families=frozenset({family}),
+            )
+            if matches:
+                return matches
+        return []
 
     atom_set = set(atom_indices)
     cache_key = (
@@ -731,16 +824,18 @@ def match_retained_fused_templates(
         allow_nonaromatic,
         allow_relocated_indicated_h,
         pre_descriptor_only,
+        families,
     )
     cached = mol._retained_fused_cache.get(cache_key)
     if cached is not None:
         return list(cached)
-    candidates = _templates_by_topology(include_disabled, pre_descriptor_only).get(
+    candidates = _templates_by_topology(include_disabled, pre_descriptor_only, families).get(
         _molecule_topology_key(mol, atom_set), ()
     )
     matches = [
         match
         for template in candidates
+        if _template_component_constraints_match(mol, atom_set, template)
         for match in _match_all_retained_fused_template(
             mol,
             atom_set,
@@ -757,7 +852,43 @@ def match_retained_fused_templates(
     return ranked
 
 
-def _retained_fused_match_rank(match: RetainedFusedTemplateMatch) -> tuple:
+def match_retained_fused_templates(
+    mol: Molecule,
+    atom_indices: set[int] | list[int] | tuple[int, ...],
+    *,
+    include_disabled: bool = False,
+    allow_nonaromatic: bool = False,
+    allow_relocated_indicated_h: bool = False,
+    pre_descriptor_only: bool = False,
+) -> list[RetainedGraphTemplateMatch]:
+    """Compatibility wrapper for the fused-parent registry view."""
+
+    return match_retained_graph_templates(
+        mol,
+        atom_indices,
+        include_disabled=include_disabled,
+        allow_nonaromatic=allow_nonaromatic,
+        allow_relocated_indicated_h=allow_relocated_indicated_h,
+        pre_descriptor_only=pre_descriptor_only,
+        families=frozenset({"fused"}),
+    )
+
+
+def _template_component_constraints_match(
+    mol: Molecule,
+    atom_set: set[int],
+    template: RetainedGraphTemplate,
+) -> bool:
+    if not template.enforce_mancude_double_bonds or template.mancude_double_bonds is None:
+        return True
+    observed = sum(
+        bond.order == 2 and bond.u in atom_set and bond.v in atom_set
+        for bond in mol.bonds.values()
+    )
+    return observed == template.mancude_double_bonds
+
+
+def _retained_fused_match_rank(match: RetainedGraphTemplateMatch) -> tuple:
     """Rank retained fused matches by retained-parent and numbering criteria."""
 
     template = match.template
@@ -786,7 +917,7 @@ def _locant_sort_key(locant: str) -> tuple[int, str]:
     return (int(digits) if digits else 10_000, suffix)
 
 
-def retained_fused_template_from_data(row: dict[str, Any]) -> RetainedFusedGraphTemplate:
+def retained_graph_template_from_data(row: dict[str, Any]) -> RetainedGraphTemplate:
     """Parse and validate one retained fused graph-template row."""
 
     template_data = row.get("template")
@@ -804,7 +935,7 @@ def retained_fused_template_from_data(row: dict[str, Any]) -> RetainedFusedGraph
     peripheral_atoms = tuple(str(locant) for locant in template_data.get("peripheral_atoms", locants))
     interior_atoms = tuple(str(locant) for locant in template_data.get("interior_atoms", ()))
 
-    template = RetainedFusedGraphTemplate(
+    template = RetainedGraphTemplate(
         name=name,
         pin=bool(row.get("pin", template_data.get("pin", True))),
         priority=int(row.get("priority", template_data.get("priority", 1000))),
@@ -832,17 +963,25 @@ def retained_fused_template_from_data(row: dict[str, Any]) -> RetainedFusedGraph
         fusion_atoms=fusion_atoms,
         peripheral_atoms=peripheral_atoms,
         interior_atoms=interior_atoms,
+        family=str(template_data.get("family", "fused")),
         numbering_policy=str(template_data.get("numbering_policy", "retained_template")),
         aromatic_equivalence_policy=str(template_data.get("aromatic_equivalence_policy", "neutral_kekule_equivalent")),
+        charge_policy=str(
+            template_data.get(
+                "charge_policy",
+                "exact" if all(atom.symbol == "C" for atom in atoms) else "charge_layer",
+            )
+        ),
+        enforce_mancude_double_bonds=bool(template_data.get("enforce_mancude_double_bonds", False)),
         enabled=bool(template_data.get("enabled", row.get("template_enabled", False))),
         implied_stereo=bool(template_data.get("implied_stereo", False)),
         derivative_production_enabled=bool(template_data.get("derivative_production_enabled", False)),
+        derivative_audit_enabled=bool(template_data.get("derivative_audit_enabled", False)),
         mancude_double_bonds=(
             int(template_data["mancude_double_bonds"])
             if template_data.get("mancude_double_bonds") is not None
             else None
         ),
-        preferred_name=name_policy.preferred_name if name_policy is not None else None,
         indicated_hydrogen_count_override=(
             int(template_data["indicated_hydrogen_count"])
             if template_data.get("indicated_hydrogen_count") is not None
@@ -852,6 +991,10 @@ def retained_fused_template_from_data(row: dict[str, Any]) -> RetainedFusedGraph
     )
     validate_retained_fused_template(template)
     return template
+
+
+# Historical parser name retained for downstream compatibility.
+retained_fused_template_from_data = retained_graph_template_from_data
 
 
 def _expand_template_data(template_data: dict[str, Any]) -> dict[str, Any]:
@@ -899,7 +1042,7 @@ def _expand_locant_atom_shorthand(template_data: dict[str, Any]) -> dict[str, An
     return expanded
 
 
-def validate_retained_fused_template(template: RetainedFusedGraphTemplate) -> None:
+def validate_retained_fused_template(template: RetainedGraphTemplate) -> None:
     """Validate internal consistency for one retained fused graph template."""
 
     if not template.name:
@@ -916,6 +1059,11 @@ def validate_retained_fused_template(template: RetainedFusedGraphTemplate) -> No
         raise ValueError(
             f"Unknown aromatic equivalence policy {template.aromatic_equivalence_policy!r} "
             f"in retained fused template {template.name!r}."
+        )
+    if template.charge_policy not in ALLOWED_CHARGE_POLICIES:
+        raise ValueError(
+            f"Retained graph template {template.name!r} has unsupported charge policy "
+            f"{template.charge_policy!r}."
         )
 
     locant_set = set(template.locants)
@@ -958,7 +1106,7 @@ def validate_retained_fused_template(template: RetainedFusedGraphTemplate) -> No
         )
 
 
-def template_molecule(template: RetainedFusedGraphTemplate) -> Molecule:
+def template_molecule(template: RetainedGraphTemplate) -> Molecule:
     """Build a local molecule graph from a retained fused template."""
 
     validate_retained_fused_template(template)
@@ -981,7 +1129,7 @@ def template_molecule(template: RetainedFusedGraphTemplate) -> Molecule:
     return mol
 
 
-def _template_degrees(template: RetainedFusedGraphTemplate) -> dict[str, int]:
+def _template_degrees(template: RetainedGraphTemplate) -> dict[str, int]:
     degrees = dict.fromkeys(template.locants, 0)
     for bond in template.bonds:
         degrees[bond.locants[0]] += 1
@@ -989,7 +1137,7 @@ def _template_degrees(template: RetainedFusedGraphTemplate) -> dict[str, int]:
     return degrees
 
 
-def _template_neighbors(template: RetainedFusedGraphTemplate) -> dict[str, set[str]]:
+def _template_neighbors(template: RetainedGraphTemplate) -> dict[str, set[str]]:
     neighbors = {locant: set() for locant in template.locants}
     for bond in template.bonds:
         a, b = bond.locants
@@ -1001,16 +1149,20 @@ def _template_neighbors(template: RetainedFusedGraphTemplate) -> dict[str, set[s
 def _atom_matches_template(
     mol: Molecule,
     atom_idx: int,
-    atom_template: RetainedFusedAtomTemplate,
+    atom_template: RetainedGraphAtomTemplate,
     *,
     ring_atoms: frozenset[int] | set[int] | None = None,
     allow_nonaromatic: bool = False,
+    charge_policy: str = "charge_layer",
 ) -> bool:
     atom = mol.atoms[atom_idx]
     if atom.symbol != atom_template.symbol:
         return False
-    # Imidazolium is imidazole's ring; the ionic layer names the charge.
-    if atom_template.charge and atom.charge != atom_template.charge:
+    # Some retained heterocycles deliberately defer charge spelling to the
+    # ionic layer. Neutral PAHs and macrocycles require exact graph charges.
+    if charge_policy == "exact" and atom.charge != atom_template.charge:
+        return False
+    if charge_policy == "charge_layer" and atom_template.charge and atom.charge != atom_template.charge:
         return False
 
     # Read as bond order, not RDKit aromaticity, so Kekule input matches too.
@@ -1180,8 +1332,8 @@ def _is_assignment_compatible(
     return True
 
 
-def _atom_template(data: dict[str, Any]) -> RetainedFusedAtomTemplate:
-    return RetainedFusedAtomTemplate(
+def _atom_template(data: dict[str, Any]) -> RetainedGraphAtomTemplate:
+    return RetainedGraphAtomTemplate(
         locant=str(data["locant"]),
         symbol=str(data.get("symbol", "C")),
         charge=int(data.get("charge", 0)),
@@ -1193,11 +1345,11 @@ def _atom_template(data: dict[str, Any]) -> RetainedFusedAtomTemplate:
     )
 
 
-def _bond_template(data: dict[str, Any]) -> RetainedFusedBondTemplate:
+def _bond_template(data: dict[str, Any]) -> RetainedGraphBondTemplate:
     locants = data.get("locants")
     if not isinstance(locants, (list, tuple)):
         raise ValueError("Retained fused bond template requires a locants list.")
-    return RetainedFusedBondTemplate(
+    return RetainedGraphBondTemplate(
         locants=(str(locants[0]), str(locants[1])),
         bond_class=str(data.get("bond_class", "aromatic")),
     )

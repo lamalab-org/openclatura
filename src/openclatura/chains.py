@@ -627,18 +627,16 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
             retained_match = retained_rules.get_pre_descriptor_retained_ring(mol, list(comp_nodes))
             retained_maps = retained_match[1] if retained_match is not None else None
             if retained_maps:
-                retained_path = sorted(comp_nodes, key=lambda atom: _retained_locant_sort_key(retained_maps[0][atom]))
+                retained_parent = RingParent.from_retained_locant_maps(
+                    atoms=comp_nodes,
+                    locant_maps=retained_maps,
+                )
                 systems.append(
                     RingSystem(
                         atoms=comp_nodes,
                         is_polycycle=True,
-                        paths=[retained_path],
-                        ring_parent=RingParent.from_paths(
-                            kind="retained_polycycle",
-                            atoms=comp_nodes,
-                            descriptor=None,
-                            paths=[retained_path],
-                        ),
+                        paths=retained_parent.paths,
+                        ring_parent=retained_parent,
                     )
                 )
                 continue
@@ -747,19 +745,6 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                     )
 
     return merge_polyspiro_ring_systems(mol, systems)
-
-
-def _retained_locant_sort_key(locant: str) -> tuple[int, str]:
-    """Sort conventional numeric/fusion locants without assuming contiguity."""
-
-    digits = ""
-    suffix = ""
-    for char in str(locant):
-        if char.isdigit() and not suffix:
-            digits += char
-        else:
-            suffix += char
-    return int(digits) if digits else 10_000, suffix
 
 
 def merge_polyspiro_ring_systems(mol: Molecule, systems: list[RingSystem]) -> list[RingSystem]:

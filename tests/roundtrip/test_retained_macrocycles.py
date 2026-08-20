@@ -87,8 +87,9 @@ def test_exact_macrocycle_bond_policy_rejects_a_rearranged_corrin_pattern():
     }
     for bond_class, new_order in (("single", 2), ("double", 1)):
         left, right = by_class[bond_class].locants
-        mol.get_bond(match.locant_to_atom[left], match.locant_to_atom[right]).order = new_order
-    mol._retained_fused_cache.clear()
+        bond = mol.get_bond(match.locant_to_atom[left], match.locant_to_atom[right])
+        assert bond is not None
+        mol.set_bond_order(bond.idx, new_order)
     assert match_retained_macrocycle(mol, set(mol.atoms)) is None
 
 

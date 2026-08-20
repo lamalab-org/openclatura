@@ -456,6 +456,19 @@ def name_component(
             "is_spiro": state.parent_selection.is_spiro,
             "is_polycycle": state.parent_selection.is_polycycle,
             "polycycle_descriptor": state.parent_selection.polycycle_descriptor,
+            "ring_parent_kind": (
+                state.parent_selection.ring_parent.kind if state.parent_selection.ring_parent is not None else None
+            ),
+            "ring_parent_proof_source": (
+                state.parent_selection.ring_parent.proof_source
+                if state.parent_selection.ring_parent is not None
+                else None
+            ),
+            "ring_parent_audit_ok": (
+                state.parent_selection.ring_parent.audit_ok
+                if state.parent_selection.ring_parent is not None
+                else None
+            ),
         },
     )
 

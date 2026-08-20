@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 
+from .formatting import format_multiplier
+from .name_operations import HydroOperation
 from .naming_data import load_json_table
 
 
@@ -13,6 +15,38 @@ class RetainedHydrogenationPolicy:
     base_parent: str
     hydro_locants: tuple[str, ...]
     indicated_hydrogen_locants: tuple[str, ...] = ()
+
+    @property
+    def operations(self) -> tuple[HydroOperation, ...]:
+        operations = []
+        if self.hydro_locants:
+            operations.append(
+                HydroOperation(
+                    key="retained_parent_hydrogenation",
+                    reason="Preferred retained parent expressed as an additive-hydrogen derivative.",
+                    locants=self.hydro_locants,
+                    operation_kind="additive_hydrogen",
+                )
+            )
+        if self.indicated_hydrogen_locants:
+            operations.append(
+                HydroOperation(
+                    key="retained_parent_indicated_hydrogen",
+                    reason="Preferred retained parent requires cited indicated hydrogen.",
+                    locants=self.indicated_hydrogen_locants,
+                    operation_kind="indicated_hydrogen",
+                )
+            )
+        return tuple(operations)
+
+    def render(self) -> str:
+        parent = self.base_parent
+        if self.indicated_hydrogen_locants:
+            cited = ",".join(f"{locant}H" for locant in self.indicated_hydrogen_locants)
+            if not parent.startswith(f"{cited}-"):
+                parent = f"{cited}-{parent}"
+        hydro = format_multiplier("hydro", len(self.hydro_locants))
+        return f"{','.join(self.hydro_locants)}-{hydro}-{parent}"
 
 
 @dataclass(frozen=True)
@@ -60,9 +94,9 @@ def retained_parent_output_name(template_name: str, context: str) -> str:
 
 def _policy_from_data(row: dict) -> RetainedParentNamePolicy:
     template_name = str(row["template_name"])
-    preferred_name = str(row["preferred_name"])
-    if not template_name or not preferred_name:
-        raise ValueError("retained parent name policy names must not be empty")
+    declared_preferred_name = str(row.get("preferred_name", ""))
+    if not template_name:
+        raise ValueError("retained parent template_name must not be empty")
     hydrogenation_data = row.get("hydrogenation")
     hydrogenation = None
     if hydrogenation_data is not None:
@@ -75,6 +109,14 @@ def _policy_from_data(row: dict) -> RetainedParentNamePolicy:
         )
         if not hydrogenation.hydro_locants:
             raise ValueError(f"hydrogenation policy for {template_name!r} has no hydro locants")
+    preferred_name = hydrogenation.render() if hydrogenation is not None else declared_preferred_name
+    if not preferred_name:
+        raise ValueError("retained parent preferred_name must not be empty")
+    if declared_preferred_name and declared_preferred_name != preferred_name:
+        raise ValueError(
+            f"retained parent policy for {template_name!r} declares {declared_preferred_name!r}, "
+            f"but its operations render {preferred_name!r}"
+        )
     return RetainedParentNamePolicy(
         template_name=template_name,
         preferred_name=preferred_name,

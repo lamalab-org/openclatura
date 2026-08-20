@@ -15,8 +15,8 @@ from .grammar_snapshot_data import RetainedFusedToken, retained_fused_token, ret
 from .molecule import Molecule
 from .polycycle_topology import RingSystemTopology, edges_within_atoms, ring_system_topology
 from .retained_fused_templates import (
-    RetainedFusedGraphTemplate,
-    RetainedFusedTemplateMatch,
+    RetainedGraphTemplate,
+    RetainedGraphTemplateMatch,
     match_retained_fused_templates,
     retained_fused_graph_templates,
 )
@@ -79,7 +79,7 @@ class RingTopologyRoute:
     kind: RingTopologyRouteKind
     atoms: frozenset[int]
     topology: RingSystemTopology
-    retained_matches: tuple[RetainedFusedTemplateMatch, ...] = ()
+    retained_matches: tuple[RetainedGraphTemplateMatch, ...] = ()
     reason: str = ""
     production_ready: bool = False
 
@@ -120,7 +120,7 @@ class FusedComponentRegistryEntry:
     fusion_prefix_name: str | None
     derivative_stem: str | None
     aliases: tuple[str, ...]
-    graph_template: RetainedFusedGraphTemplate
+    graph_template: RetainedGraphTemplate
     atom_locants: tuple[str, ...]
     fusion_side_letters: tuple[tuple[str, tuple[str, str]], ...]
     ring_count: int
@@ -271,7 +271,7 @@ def classify_ring_topology_route(
 
 def fused_component_from_retained_match(
     mol: Molecule,
-    match: RetainedFusedTemplateMatch,
+    match: RetainedGraphTemplateMatch,
 ) -> FusedComponentCandidate:
     """Project a retained fused template match into a fused component record."""
 
@@ -319,7 +319,7 @@ def fused_component_registry(*, include_disabled: bool = False) -> FusedComponen
     return FusedComponentRegistry(entries=entries)
 
 
-def _fused_component_registry_entry(template: RetainedFusedGraphTemplate) -> FusedComponentRegistryEntry:
+def _fused_component_registry_entry(template: RetainedGraphTemplate) -> FusedComponentRegistryEntry:
     token = retained_fused_token(template.name)
     ring_sizes = tuple(sorted((len(ring) for ring in template.rings), reverse=True))
     heteroatoms = tuple(atom.symbol for atom in template.atoms if atom.symbol != "C")
@@ -349,7 +349,7 @@ def _fused_component_registry_entry(template: RetainedFusedGraphTemplate) -> Fus
     )
 
 
-def _fusion_prefix_name(template: RetainedFusedGraphTemplate, token: RetainedFusedToken | None) -> str | None:
+def _fusion_prefix_name(template: RetainedGraphTemplate, token: RetainedFusedToken | None) -> str | None:
     if template.attached_prefix:
         return template.attached_prefix
     if token is not None and token.fusion_stems:
@@ -358,7 +358,7 @@ def _fusion_prefix_name(template: RetainedFusedGraphTemplate, token: RetainedFus
 
 
 def _is_allowed_retained_fused_component(
-    template: RetainedFusedGraphTemplate,
+    template: RetainedGraphTemplate,
     token_status: str | None,
 ) -> bool:
     if template.default_indicated_h:
@@ -370,7 +370,7 @@ def _is_allowed_retained_fused_component(
     return template.attached_prefix is not None
 
 
-def _opsin_parseable_names(template: RetainedFusedGraphTemplate) -> tuple[str, ...]:
+def _opsin_parseable_names(template: RetainedGraphTemplate) -> tuple[str, ...]:
     seen: set[str] = set()
     names: list[str] = []
     for name in (template.name, template.output_name, *template.aliases):
@@ -380,7 +380,7 @@ def _opsin_parseable_names(template: RetainedFusedGraphTemplate) -> tuple[str, .
     return tuple(names)
 
 
-def fused_parent_side_letters(template: RetainedFusedGraphTemplate) -> tuple[tuple[str, tuple[str, str]], ...]:
+def fused_parent_side_letters(template: RetainedGraphTemplate) -> tuple[tuple[str, tuple[str, str]], ...]:
     """Return parent-side letters around the declared fused component periphery.
 
     This is the data projection used by systematic fused descriptors:
@@ -404,7 +404,7 @@ def fused_parent_side_letters(template: RetainedFusedGraphTemplate) -> tuple[tup
     return tuple(sides)
 
 
-def fused_numbering_from_retained_match(match: RetainedFusedTemplateMatch) -> FusedNumberingCandidate:
+def fused_numbering_from_retained_match(match: RetainedGraphTemplateMatch) -> FusedNumberingCandidate:
     locant_to_atom = dict(match.locant_to_atom)
     atom_to_locant = dict(match.atom_to_locant)
     errors = []

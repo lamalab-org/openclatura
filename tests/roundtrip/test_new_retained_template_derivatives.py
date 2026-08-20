@@ -12,14 +12,15 @@ from dataclasses import dataclass
 import pytest
 from rdkit import Chem
 
-from openclatura import analyze_rdkit_mol
+from openclatura import name_mol
 from openclatura.graph_io import read_rdkit_mol
-from openclatura.retained_fused_templates import (
-    _generated_acene_templates,
-    _generated_polyaphene_templates,
-    match_retained_fused_templates,
+from openclatura.retained_graph_templates import (
+    RetainedGraphTemplate,
+    match_retained_graph_templates,
+    retained_graph_templates,
+    template_molecule,
+    validate_retained_graph_family_partition,
 )
-from openclatura.retained_macrocycle_templates import match_retained_macrocycle
 
 try:
     import py2opsin
@@ -27,40 +28,40 @@ except Exception:  # pragma: no cover - optional test dependency
     py2opsin = None
 
 
-_EXPLICIT_BRANCH_TEMPLATE_NAMES = (
-    "benz[a]anthracene",
-    "benzo[a]pyrene",
-    "benzo[b]fluoranthene",
-    "benzo[e]pyrene",
-    "benzo[ghi]perylene",
-    "benzo[j]fluoranthene",
-    "benzo[k]fluoranthene",
-    "cyclopenta[cd]pyrene",
-    "dibenz[a,h]anthracene",
-    "indeno[1,2,3-cd]pyrene",
-    "ovalene",
-    "pyranthrene",
-    "rubicene",
-    "tetraphenylene",
-    "trinaphthylene",
-)
-
-NEW_FUSED_TEMPLATE_NAMES = tuple(
-    sorted(
-        {
-            *_EXPLICIT_BRANCH_TEMPLATE_NAMES,
-            *(template.name for template in _generated_acene_templates()),
-            *(template.name for template in _generated_polyaphene_templates()),
-        }
-    )
-)
-
-MACROCYCLE_SMILES = {
-    "porphyrin": "C1=Cc2cc3ccc(cc4nc(cc5ccc(cc1n2)[nH]5)C=C4)[nH]3",
-    "corrin": "C1=C2CCC(=N2)C=C2CCC(N2)C2CCC(=N2)C=C2CCC1=N2",
-}
+AUDITED_TEMPLATES = tuple(template for template in retained_graph_templates() if template.derivative_audit_enabled)
 
 _SIDECHAIN_SHAPES = ("methyl", "ethyl", "propyl", "propan-2-yl", "butan-2-yl")
+
+
+def test_retained_graph_provider_families_have_disjoint_topology_indexes():
+    validate_retained_graph_family_partition()
+
+
+@pytest.mark.parametrize(
+    "template",
+    tuple(template for template in AUDITED_TEMPLATES if template.charge_policy == "exact"),
+    ids=lambda template: template.name,
+)
+def test_exact_charge_templates_reject_changed_parent_charge_and_invalidate_cache(template):
+    mol = template_molecule(template)
+    atom_ids = set(mol.atoms)
+    initial = match_retained_graph_templates(
+        mol,
+        atom_ids,
+        allow_nonaromatic=True,
+        families=frozenset({template.family}),
+    )
+    assert any(match.template.name == template.name for match in initial)
+
+    atom_idx = min(atom_ids)
+    mol.set_atom_charge(atom_idx, mol.atoms[atom_idx].charge + 1)
+    changed = match_retained_graph_templates(
+        mol,
+        atom_ids,
+        allow_nonaromatic=True,
+        families=frozenset({template.family}),
+    )
+    assert all(match.template.name != template.name for match in changed)
 
 
 @dataclass(frozen=True)
@@ -92,27 +93,22 @@ def _opsin(name: str) -> str:
             return py2opsin.py2opsin(name, tmp_fpath=f"{tmpdir}/input.txt")
 
 
-def _fused_fixture(parent_name: str) -> ParentDerivativeFixture:
-    molecule = Chem.MolFromSmiles(_opsin(parent_name))
+def _template_fixture(template: RetainedGraphTemplate) -> ParentDerivativeFixture:
+    molecule = Chem.MolFromSmiles(_opsin(template.output_name))
     assert molecule is not None
     internal = read_rdkit_mol(molecule)
     match = next(
         match
-        for match in match_retained_fused_templates(internal, set(internal.atoms), allow_nonaromatic=True)
-        if match.template.name == parent_name
+        for match in match_retained_graph_templates(
+            internal,
+            set(internal.atoms),
+            allow_nonaromatic=True,
+            families=frozenset({template.family}),
+        )
+        if match.template.name == template.name
     )
     assert match.template.derivative_production_enabled
-    assert match.template.pre_descriptor_selection
-    return ParentDerivativeFixture(parent_name, molecule, match.locant_to_atom)
-
-
-def _macrocycle_fixture(parent_name: str) -> ParentDerivativeFixture:
-    molecule = Chem.MolFromSmiles(MACROCYCLE_SMILES[parent_name])
-    assert molecule is not None
-    internal = read_rdkit_mol(molecule)
-    match = match_retained_macrocycle(internal, set(internal.atoms))
-    assert match is not None
-    return ParentDerivativeFixture(parent_name, molecule, match.locant_to_atom)
+    return ParentDerivativeFixture(template.name, molecule, match.locant_to_atom)
 
 
 def _substitutable_carbon_locants(fixture: ParentDerivativeFixture) -> list[str]:
@@ -179,9 +175,16 @@ def _random_derivatives(fixture: ParentDerivativeFixture, count: int = 3):
         )
 
 
-def _assert_retained_core_selected(fixture: ParentDerivativeFixture) -> None:
+def _assert_retained_core_selected(template: RetainedGraphTemplate, fixture: ParentDerivativeFixture) -> None:
     for derivative in _random_derivatives(fixture):
-        analysis = analyze_rdkit_mol(derivative.molecule)
+        analysis = name_mol(derivative.molecule, include_trace=True, verify_opsin=True)
+        assert analysis.opsin_check is not None
+        assert analysis.opsin_check.status == "matched", (
+            fixture.name,
+            derivative.attachments,
+            analysis.name,
+            analysis.opsin_check,
+        )
         retained = [step for step in analysis.decisions if step.decision == "used retained parent name"]
         assert retained, (fixture.name, derivative.attachments, analysis.name)
         assert retained[-1].data["retained_name"] == fixture.name
@@ -189,15 +192,24 @@ def _assert_retained_core_selected(fixture: ParentDerivativeFixture) -> None:
         selected = [step for step in analysis.decisions if step.decision == "selected parent skeleton"]
         assert selected, (fixture.name, derivative.attachments, analysis.name)
         assert set(selected[-1].atoms) == derivative.core_atom_ids
-        assert selected[-1].data["polycycle_descriptor"] is None
+        if template.pre_descriptor_selection:
+            assert selected[-1].data["polycycle_descriptor"] is None
+            assert selected[-1].data["ring_parent_proof_source"] == "retained_template"
+            assert selected[-1].data["ring_parent_audit_ok"] is True
 
 
 @pytest.mark.opsin
-@pytest.mark.parametrize("parent_name", NEW_FUSED_TEMPLATE_NAMES)
-def test_new_fused_templates_keep_retained_parent_for_random_sidechains(parent_name):
-    _assert_retained_core_selected(_fused_fixture(parent_name))
+@pytest.mark.parametrize("parent_name", ("tetracene", "benz[a]anthracene"))
+def test_retained_pahs_expose_audited_template_proof(parent_name):
+    template = next(template for template in AUDITED_TEMPLATES if template.name == parent_name)
+    result = name_mol(_template_fixture(template).molecule, include_trace=True)
+    selected = next(step for step in result.decisions if step.decision == "selected parent skeleton")
+    assert selected.data["ring_parent_kind"] == "retained_polycycle"
+    assert selected.data["ring_parent_proof_source"] == "retained_template"
+    assert selected.data["ring_parent_audit_ok"] is True
 
 
-@pytest.mark.parametrize("parent_name", tuple(MACROCYCLE_SMILES))
-def test_new_macrocycle_templates_keep_retained_parent_for_random_sidechains(parent_name):
-    _assert_retained_core_selected(_macrocycle_fixture(parent_name))
+@pytest.mark.opsin
+@pytest.mark.parametrize("template", AUDITED_TEMPLATES, ids=lambda template: template.name)
+def test_derivative_enabled_templates_round_trip_random_sidechains(template):
+    _assert_retained_core_selected(template, _template_fixture(template))
