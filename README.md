@@ -45,13 +45,6 @@ The package is in **beta**. Naming is solid across common organic chemistry;
 exotic corners of the Blue Book — and stereodescriptor edge cases — are still
 being filled in. Bug reports are very welcome.
 
-Retained fused-hydrocarbon coverage includes the higher linear acene series
-from tetracene through nonacene and graph-numbered PAHs such as
-benz[a]anthracene, benzo[a]pyrene, the benzo[b]/benzo[k]fluoranthenes,
-indeno[1,2,3-cd]pyrene, dibenz[a,h]anthracene, and benzo[ghi]perylene.
-Recognition uses locant-keyed molecular graphs, so aromatic/Kekule spelling and
-input atom order do not select the parent name.
-
 ## Install
 
 ```bash
