@@ -465,8 +465,7 @@ def _retained_metadata_templates_by_name() -> dict[str, RetainedGraphTemplate]:
         existing = indexed.get(output_name)
         if existing is not None and existing.name != template.name:
             raise ValueError(
-                f"Retained preferred name {output_name!r} identifies both "
-                f"{existing.name!r} and {template.name!r}."
+                f"Retained preferred name {output_name!r} identifies both {existing.name!r} and {template.name!r}."
             )
         indexed[output_name] = template
     return indexed
