@@ -132,3 +132,27 @@
   carries fused-specific type names (`RetainedFusedGraphTemplate`) even though
   macrocycles now reuse it. Renaming/extracting that stable kernel can be a
   separate compatibility-focused refactor; it is not duplicated at runtime.
+
+# Retained Registry Cold-Start Audit
+
+- [x] Measure fresh-process import and first-name latency against `5aed703`.
+- [x] Inspect cache state immediately after import.
+- [x] Profile first retained-parent registry and topology-index construction.
+- [x] Canonicalize filtered registry views over one compiled template registry.
+- [x] Re-run retained-parent correctness tests and cold-start benchmarks.
+
+## Review
+
+- Installation performs no OPSIN/CML/template generation. Offline generator
+  scripts produce the checked-in JSON files; runtime lazily parses those files
+  and constructs immutable graph-template objects.
+- Immediately after importing `openclatura`, neither the fused-template registry
+  nor its topology indexes are populated. The measured import cost is dominated
+  by Python/RDKit and is independent of retained-template matching.
+- Fresh-process naming medians after the registry cleanup were 18.933 ms for
+  `benz[a]anthracene` and 27.604 ms for porphyrin. At `5aed703`, the same values
+  were 18.934 ms and 27.457 ms. There is no measurable cold-name regression.
+- Warm-throughput results remain useful for batch naming, but are no longer the
+  sole performance evidence; cold-process and cache-construction figures are
+  recorded separately.
+- Focused retained-parent verification after the cache cleanup: 137 passed.

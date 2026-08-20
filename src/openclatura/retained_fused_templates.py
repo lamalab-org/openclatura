@@ -124,30 +124,40 @@ class RetainedFusedTemplateMatch:
     trace: tuple[str, ...] = ()
 
 
-@lru_cache(maxsize=2)
 def retained_fused_graph_templates(*, include_disabled: bool = False) -> tuple[RetainedFusedGraphTemplate, ...]:
     """Return graph-template retained fused parent rows from the rule registry."""
 
-    templates: list[RetainedFusedGraphTemplate] = []
-    parent_rows = list(load_json_table("retained_fused_graph_templates.json").get("parents", ()))
-    parent_rows.extend(load_json_table("retained_fused_hydrocarbon_templates.json").get("parents", ()))
-    for row in parent_rows:
-        template = retained_fused_template_from_data(row)
-        if include_disabled or template.enabled:
-            templates.append(template)
+    return _retained_fused_graph_templates(include_disabled)
+
+
+@lru_cache(maxsize=2)
+def _retained_fused_graph_templates(include_disabled: bool) -> tuple[RetainedFusedGraphTemplate, ...]:
+    """Return one canonical cached registry view for an inclusion policy."""
+
+    templates = [
+        template
+        for template in _declared_retained_fused_graph_templates()
+        if include_disabled or template.enabled
+    ]
     existing_names = {template.name for template in templates}
     generated_templates = (*_generated_acene_templates(), *_generated_polyaphene_templates())
     for template in generated_templates:
         if template.name not in existing_names and (include_disabled or template.enabled):
             templates.append(template)
+    return tuple(templates)
+
+
+@lru_cache(maxsize=1)
+def _declared_retained_fused_graph_templates() -> tuple[RetainedFusedGraphTemplate, ...]:
+    """Compile data-declared templates once for all filtered registry views."""
+
+    parent_rows = list(load_json_table("retained_fused_graph_templates.json").get("parents", ()))
+    parent_rows.extend(load_json_table("retained_fused_hydrocarbon_templates.json").get("parents", ()))
     for row in RULES.retained.fused_polycycle_specs:
         template_data = row.get("template")
-        if template_data is None:
-            continue
-        template = retained_fused_template_from_data(row)
-        if include_disabled or template.enabled:
-            templates.append(template)
-    return tuple(templates)
+        if template_data is not None:
+            parent_rows.append(row)
+    return tuple(retained_fused_template_from_data(row) for row in parent_rows)
 
 
 @lru_cache(maxsize=1)
@@ -644,6 +654,7 @@ def _templates_by_topology(
     return {key: tuple(templates) for key, templates in index.items()}
 
 
+@cache
 def _template_topology_key(template: RetainedFusedGraphTemplate) -> TopologyKey:
     degrees = _template_degrees(template)
     return _topology_key(
