@@ -449,26 +449,51 @@ def _canonical_cycle(cycle: tuple[str, ...], order: dict[str, int]) -> tuple[str
     return min(rotations, key=lambda item: tuple(order[locant] for locant in item))
 
 
+@lru_cache(maxsize=1)
+def _retained_metadata_templates_by_name() -> dict[str, RetainedGraphTemplate]:
+    """Index exact template and preferred-output spellings to one template.
+
+    Accepted aliases are intentionally absent.  A bare alias may omit
+    tautomer-defining indicated hydrogen, whereas a policy-selected output name
+    is an exact rendering of the matched template and must retain its metadata.
+    """
+
+    templates = retained_graph_templates(include_disabled=True)
+    indexed = {template.name: template for template in templates}
+    for template in templates:
+        output_name = template.output_name
+        existing = indexed.get(output_name)
+        if existing is not None and existing.name != template.name:
+            raise ValueError(
+                f"Retained preferred name {output_name!r} identifies both "
+                f"{existing.name!r} and {template.name!r}."
+            )
+        indexed[output_name] = template
+    return indexed
+
+
 @cache
 def retained_parent_metadata(parent_name: str) -> RetainedParentMetadata | None:
-    """Return metadata only when the spelling identifies one exact hydride.
+    """Return metadata when the spelling identifies one exact hydride.
 
     Bare aliases such as ``isoindole`` do not identify the indicated-hydrogen
     tautomer.  Those sites must be derived from the selected molecular graph;
-    production graph-template matches pass their metadata directly.
+    production graph-template matches pass their metadata directly.  Preferred
+    output spellings are safe because the output policy maps them uniquely to
+    the exact template represented by the name.
     """
 
-    for template in retained_graph_templates(include_disabled=True):
-        if parent_name == template.name:
-            return RetainedParentMetadata(
-                default_indicated_h=template.default_indicated_h,
-                fusion_locants=template.fusion_atoms,
-                derivative_stem=template.derivative_stem,
-                indicated_hydrogen_count=template.indicated_hydrogen_count,
-                mancude_double_bonds=template.mancude_double_bonds or 0,
-                inherent_saturated_locants=tuple(atom.locant for atom in template.atoms if atom.saturated),
-            )
-    return None
+    template = _retained_metadata_templates_by_name().get(parent_name)
+    if template is None:
+        return None
+    return RetainedParentMetadata(
+        default_indicated_h=template.default_indicated_h,
+        fusion_locants=template.fusion_atoms,
+        derivative_stem=template.derivative_stem,
+        indicated_hydrogen_count=template.indicated_hydrogen_count,
+        mancude_double_bonds=template.mancude_double_bonds or 0,
+        inherent_saturated_locants=tuple(atom.locant for atom in template.atoms if atom.saturated),
+    )
 
 
 def pending_retained_fused_parent_names() -> tuple[str, ...]:

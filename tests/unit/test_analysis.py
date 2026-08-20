@@ -3395,6 +3395,15 @@ def test_no_bare_retained_alias_infers_a_canonical_hydride_tautomer():
         assert metadata.default_indicated_h == template.default_indicated_h
 
 
+def test_preferred_retained_output_names_preserve_exact_template_metadata():
+    templates = {template.name: template for template in retained_fused_graph_templates(include_disabled=True)}
+
+    for template_name in ("indane", "indoline"):
+        template = templates[template_name]
+        assert template.output_name != template.name
+        assert retained_parent_metadata(template.output_name) == retained_parent_metadata(template.name)
+
+
 def test_indicated_hydrogen_follows_graph_tautomer_but_not_hydrogen_free_spiro_carbon():
     cases = {
         "c1ccc2c(c1)CN=C2C1=NCc2ccccc21": "3-(1H-isoindol-3-yl)-1H-isoindole",
