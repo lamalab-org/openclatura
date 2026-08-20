@@ -32,9 +32,7 @@ def get_pre_descriptor_retained_ring(mol: Molecule, path: list[int]) -> tuple[st
     if not matches:
         return None
     parent_name = matches[0].template.name
-    return parent_name, [
-        match.atom_to_locant for match in matches if match.template.name == parent_name
-    ]
+    return parent_name, [match.atom_to_locant for match in matches if match.template.name == parent_name]
 
 
 def _match_fused_templates(mol: Molecule, path: list[int]) -> tuple[str, list[dict[int, str]]] | None:
