@@ -156,9 +156,7 @@ def _retained_graph_templates(
     """Return one canonical cached registry view for an inclusion policy."""
 
     templates = [
-        template
-        for template in _declared_retained_graph_templates(families)
-        if include_disabled or template.enabled
+        template for template in _declared_retained_graph_templates(families) if include_disabled or template.enabled
     ]
     existing_names = {template.name for template in templates}
     generated_templates = (
@@ -342,9 +340,7 @@ def _polyaphene_locant_graph(ring_count: int) -> tuple[tuple[str, ...], tuple[tu
 
     maximum_numeric_locant = 2 * ring_count + 4
     omitted_first_side_fusion = (ring_count + 7) // 2
-    first_side_numbers = tuple(
-        value for value in range(4, ring_count + 4) if value != omitted_first_side_fusion
-    )
+    first_side_numbers = tuple(value for value in range(4, ring_count + 4) if value != omitted_first_side_fusion)
     second_side_numbers = tuple(range(ring_count + 7, maximum_numeric_locant + 1))
     bay_number = (3 * ring_count) // 2 + 6
 
@@ -573,9 +569,7 @@ def _match_all_retained_fused_template(
         atom_idx: sum(1 for neighbor in mol.get_neighbors(atom_idx) if neighbor in atom_set) for atom_idx in atom_set
     }
     template_neighbors = _template_neighbors(template)
-    template_bond_classes = {
-        frozenset(bond.locants): bond.bond_class for bond in template.bonds
-    }
+    template_bond_classes = {frozenset(bond.locants): bond.bond_class for bond in template.bonds}
     locants_by_constraint = sorted(
         template.locants,
         key=lambda locant: (
@@ -745,9 +739,7 @@ def retained_graph_template_topology_key(template: RetainedGraphTemplate) -> Top
 
 
 def _molecule_topology_key(mol: Molecule, atom_set: set[int]) -> TopologyKey:
-    degrees = {
-        atom_idx: sum(neighbor in atom_set for neighbor in mol.get_neighbors(atom_idx)) for atom_idx in atom_set
-    }
+    degrees = {atom_idx: sum(neighbor in atom_set for neighbor in mol.get_neighbors(atom_idx)) for atom_idx in atom_set}
     return _topology_key(
         (mol.atoms[atom_idx].symbol for atom_idx in atom_set),
         degrees.values(),
@@ -881,10 +873,7 @@ def _template_component_constraints_match(
 ) -> bool:
     if not template.enforce_mancude_double_bonds or template.mancude_double_bonds is None:
         return True
-    observed = sum(
-        bond.order == 2 and bond.u in atom_set and bond.v in atom_set
-        for bond in mol.bonds.values()
-    )
+    observed = sum(bond.order == 2 and bond.u in atom_set and bond.v in atom_set for bond in mol.bonds.values())
     return observed == template.mancude_double_bonds
 
 
@@ -1062,8 +1051,7 @@ def validate_retained_fused_template(template: RetainedGraphTemplate) -> None:
         )
     if template.charge_policy not in ALLOWED_CHARGE_POLICIES:
         raise ValueError(
-            f"Retained graph template {template.name!r} has unsupported charge policy "
-            f"{template.charge_policy!r}."
+            f"Retained graph template {template.name!r} has unsupported charge policy {template.charge_policy!r}."
         )
 
     locant_set = set(template.locants)

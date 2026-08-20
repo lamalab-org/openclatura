@@ -465,9 +465,7 @@ def name_component(
                 else None
             ),
             "ring_parent_audit_ok": (
-                state.parent_selection.ring_parent.audit_ok
-                if state.parent_selection.ring_parent is not None
-                else None
+                state.parent_selection.ring_parent.audit_ok if state.parent_selection.ring_parent is not None else None
             ),
         },
     )

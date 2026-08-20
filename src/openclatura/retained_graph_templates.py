@@ -42,6 +42,7 @@ def validate_retained_graph_family_partition() -> None:
             )
         owners[key] = (template.family, template.name)
 
+
 __all__ = (
     "RetainedGraphAtomTemplate",
     "RetainedGraphBondTemplate",
