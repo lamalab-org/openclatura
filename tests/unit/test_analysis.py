@@ -1131,6 +1131,42 @@ def test_retained_fusion_hydride_is_a_typed_additive_hydrogen_operation():
     assert hydro_binding["locants"] == ["1", "4"]
 
 
+def test_additive_hydrogen_capacity_excludes_inherent_retained_sites():
+    analysis = analyze_smiles("C1CC2CCCCC2C1")
+    component = analysis.substituent_tree[0]
+    operations = component["hydro_operations"]
+
+    assert analysis.name == "hexahydro-2,3-dihydro-1H-indene"
+    assert operations == [
+        {
+            "key": "additive_hydrogen",
+            "reason": "Saturation beyond the parent's indicated hydrogen is added hydrogen.",
+            "locants": ["3a", "4", "5", "6", "7", "7a"],
+            "atom_ids": [2, 3, 4, 5, 6, 7],
+            "operation_kind": "additive_hydrogen",
+        }
+    ]
+
+
+def test_additive_hydrogen_does_not_relocate_an_inherent_site():
+    analysis = analyze_smiles("CC1CN(C(F)C(F)F)c2ccc([N+](=O)[O-])cc2O1")
+    operations = analysis.substituent_tree[0]["hydro_operations"]
+
+    assert analysis.name == "2-methyl-7-nitro-4-(1,2,2-trifluoroethyl)-3,4-dihydro-1,4-benzoxazine"
+    assert [operation["locants"] for operation in operations if operation["operation_kind"] == "additive_hydrogen"] == [
+        ["3", "4"]
+    ]
+
+
+def test_relaxed_retained_topology_keeps_audited_polycycle_fallback():
+    smiles = "CCC1CCc2c(cc(OC)c3c2C(=O)c2cccc(OC)c2C3=O)C1"
+
+    assert name_smiles(smiles) == (
+        "16-ethyl-8,12-dimethoxytetracyclo[12.4.0.0^{2,11}.0^{4,9}]"
+        "octadeca-1,4,6,8,11,13-hexaene-3,10-dione"
+    )
+
+
 def test_n_substituent_locant_survives_retained_suffix_postprocessing():
     analysis = analyze_smiles("CNC(C)=O")
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")

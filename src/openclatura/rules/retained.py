@@ -26,9 +26,21 @@ def get_pre_descriptor_retained_ring(mol: Molecule, path: list[int]) -> tuple[st
     matches = match_retained_graph_templates(
         mol,
         path,
-        allow_nonaromatic=True,
         pre_descriptor_only=True,
     )
+    if not matches:
+        # Relaxed bond matching is useful for explicitly modelled macrocycle
+        # hydrides, but a fused-PAH topology match is not by itself sufficient
+        # to suppress a valid von Baeyer proof.  Oxo and hydro derivatives can
+        # share that topology while failing the later retained-parent chemistry
+        # gate; keeping them on the descriptor path preserves a safe fallback.
+        matches = match_retained_graph_templates(
+            mol,
+            path,
+            allow_nonaromatic=True,
+            pre_descriptor_only=True,
+            families=frozenset({"macrocycle"}),
+        )
     if not matches:
         return None
     parent_name = matches[0].template.name
