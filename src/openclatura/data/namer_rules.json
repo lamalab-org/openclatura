@@ -2575,7 +2575,7 @@
         "symbols": {}
       },
       {
-        "name": "dibenzo[a,h]anthracene",
+        "name": "dibenz[a,h]anthracene",
         "match_by_signature": true,
         "signature": {
           "size": 22,

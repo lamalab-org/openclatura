@@ -1,11 +1,11 @@
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 
 from .rules import elements
 
 
-@dataclass
+@dataclass(frozen=True)
 class Atom:
     idx: int
     symbol: str
@@ -31,7 +31,7 @@ class Atom:
         return self.symbol == "C"
 
 
-@dataclass
+@dataclass(frozen=True)
 class Bond:
     idx: int
     u: int
@@ -164,9 +164,18 @@ class Molecule:
         self._cyclic_cache: set[int] | None = None  # full-molecule ring atoms; invalidated on mutation
         self._perception_cache: tuple | None = None  # perceived functional groups; invalidated on mutation
         self._canonical_rank_cache: dict[int, int] | None = None
+        self._retained_fused_cache: dict[tuple, tuple] = {}
         self.audit_rdmol = None
         self.accurate_cip: dict[int, str] = {}
         self.substituted_symbols: frozenset[int] = frozenset()
+
+    def _invalidate_graph_caches(self) -> None:
+        """Invalidate every value derived from atom or bond chemistry."""
+
+        self._cyclic_cache = None
+        self._perception_cache = None
+        self._canonical_rank_cache = None
+        self._retained_fused_cache.clear()
 
     def add_atom(
         self,
@@ -200,9 +209,7 @@ class Molecule:
         )
         self.atoms[idx] = atom
         self._adj[idx] = []
-        self._cyclic_cache = None
-        self._perception_cache = None
-        self._canonical_rank_cache = None
+        self._invalidate_graph_caches()
         return atom
 
     def add_bond(
@@ -229,10 +236,38 @@ class Molecule:
         self._bond_lookup[bond_key] = idx
         self._adj[u].append(v)
         self._adj[v].append(u)
-        self._cyclic_cache = None
-        self._perception_cache = None
-        self._canonical_rank_cache = None
+        self._invalidate_graph_caches()
         return bond
+
+    def update_atom(self, atom_idx: int, **changes) -> Atom:
+        """Replace atom chemistry and invalidate all graph-derived caches."""
+
+        if atom_idx not in self.atoms:
+            raise KeyError(f"Unknown atom index: {atom_idx}")
+        if "idx" in changes:
+            raise ValueError("Atom indices cannot be changed in place.")
+        atom = replace(self.atoms[atom_idx], **changes)
+        self.atoms[atom_idx] = atom
+        self._invalidate_graph_caches()
+        return atom
+
+    def update_bond(self, bond_idx: int, **changes) -> Bond:
+        """Replace bond chemistry and invalidate all graph-derived caches."""
+
+        if bond_idx not in self.bonds:
+            raise KeyError(f"Unknown bond index: {bond_idx}")
+        if {"idx", "u", "v"} & changes.keys():
+            raise ValueError("Bond identity and endpoints cannot be changed in place.")
+        bond = replace(self.bonds[bond_idx], **changes)
+        self.bonds[bond_idx] = bond
+        self._invalidate_graph_caches()
+        return bond
+
+    def set_atom_charge(self, atom_idx: int, charge: int) -> Atom:
+        return self.update_atom(atom_idx, charge=charge)
+
+    def set_bond_order(self, bond_idx: int, order: int) -> Bond:
+        return self.update_bond(bond_idx, order=order)
 
     def get_neighbors(self, atom_idx: int) -> list[int]:
         return self._adj.get(atom_idx, [])

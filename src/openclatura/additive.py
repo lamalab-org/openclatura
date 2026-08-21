@@ -93,15 +93,16 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         return
     oxo_derivative = parts.principal_group is not None and parts.principal_group.key == "ketone"
     default_indicated_h = set(metadata.default_indicated_h) if metadata is not None else set()
+    inherent_saturated_locants = set(metadata.inherent_saturated_locants) if metadata is not None else set()
     name_declared_indicated_h = set(default_indicated_h) or _name_indicated_hydrogen_locants(parts.retained_name)
 
-    observed = _saturated_ring_carbons(mol, numbered_path, get_loc)
+    observed_saturated = _saturated_ring_carbons(mol, numbered_path, get_loc)
     if (
         default_indicated_h
-        and len(observed) == len(default_indicated_h)
+        and len(observed_saturated) == len(default_indicated_h)
         and _declared_sites_are_unambiguous(mol, numbered_path, get_loc, default_indicated_h)
     ):
-        default_indicated_h = observed
+        default_indicated_h = observed_saturated
 
     if parts.retained_name and default_indicated_h:
         cited = _name_indicated_hydrogen_locants(parts.retained_name)
@@ -114,6 +115,8 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     for idx in numbered_path:
         atom = mol.atoms[idx]
         locant = str(get_loc(idx))
+        if locant in inherent_saturated_locants:
+            continue
         # An oxo prefix must cite its saturation; an -one/-dione suffix implies it.
         if not oxo_derivative and metadata is not None and _is_oxo_ring_site(mol, idx, numbered_path):
             hydro_only.append((locant, idx))
@@ -164,6 +167,15 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 candidates.append((locant, idx))
 
     supported = metadata.indicated_hydrogen_count if metadata is not None else len(candidates)
+    if metadata is not None:
+        # Template-inherent saturated positions were removed from the observed
+        # pool above.  They must also be removed from the parent's supported-H
+        # capacity; otherwise they are counted once as part of the retained
+        # hydride and a second time when the surplus is calculated.  This is
+        # relevant to every partially saturated retained parent, not only a
+        # particular spelling (indane, benzodioxole, xanthene, ...).
+        supported -= len(default_indicated_h & inherent_saturated_locants)
+        supported = max(0, supported)
     additive_hydrogen = any(
         mol.atoms[atom_idx].is_carbon and locant in fusion_locants for locant, atom_idx in candidates
     )

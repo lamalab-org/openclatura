@@ -1,23 +1,64 @@
 import itertools
 
+from openclatura.assembly_parts import RetainedParentMetadata
 from openclatura.hantzsch_widman import hw_spec_for_name, hw_spec_for_ring
 from openclatura.molecule import Molecule
 from openclatura.nomenclature import RULES
-from openclatura.retained_fused_templates import match_retained_fused_templates
+from openclatura.retained_graph_templates import match_retained_graph_templates
+from openclatura.retained_graph_templates import (
+    retained_parent_metadata as graph_retained_parent_metadata,
+)
+
+
+def parent_metadata(parent_name: str) -> RetainedParentMetadata | None:
+    """Return assembly metadata from the retained-parent provider registry."""
+
+    return graph_retained_parent_metadata(parent_name)
+
+
+def get_pre_descriptor_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[int, str]]] | None:
+    """Resolve parents whose conventional graph must preempt descriptor discovery.
+
+    This is an explicit template capability, not a size or name special case.
+    Most retained rings continue through ordinary ring decomposition.
+    """
+
+    matches = match_retained_graph_templates(
+        mol,
+        path,
+        pre_descriptor_only=True,
+    )
+    if not matches:
+        # Relaxed bond matching is useful for explicitly modelled macrocycle
+        # hydrides, but a fused-PAH topology match is not by itself sufficient
+        # to suppress a valid von Baeyer proof.  Oxo and hydro derivatives can
+        # share that topology while failing the later retained-parent chemistry
+        # gate; keeping them on the descriptor path preserves a safe fallback.
+        matches = match_retained_graph_templates(
+            mol,
+            path,
+            allow_nonaromatic=True,
+            pre_descriptor_only=True,
+            families=frozenset({"macrocycle"}),
+        )
+    if not matches:
+        return None
+    parent_name = matches[0].template.name
+    return parent_name, [match.atom_to_locant for match in matches if match.template.name == parent_name]
 
 
 def _match_fused_templates(mol: Molecule, path: list[int]) -> tuple[str, list[dict[int, str]]] | None:
-    """Resolve a fused retained parent from the locant-keyed graph templates."""
+    """Resolve a retained parent from the shared locant-graph registry."""
 
     # Strict first; relaxed reaches hydro derivatives but blurs tautomers.
-    matches = match_retained_fused_templates(mol, path)
+    matches = match_retained_graph_templates(mol, path)
     if not matches and _is_plain_hydro_derivative(mol, path):
-        matches = match_retained_fused_templates(mol, path, allow_nonaromatic=True)
+        matches = match_retained_graph_templates(mol, path, allow_nonaromatic=True)
     if not matches:
         return None
-    name = matches[0].template.name
-    maps = [match.atom_to_locant for match in matches if match.template.name == name]
-    return name, maps
+    template_name = matches[0].template.name
+    maps = [match.atom_to_locant for match in matches if match.template.name == template_name]
+    return template_name, maps
 
 
 def _match_monocycle_templates(mol: Molecule, path: list[int], double_bonds: int) -> str | None:
@@ -27,7 +68,12 @@ def _match_monocycle_templates(mol: Molecule, path: list[int], double_bonds: int
     is, so the count is checked here: piperidine is not 1,4-dihydropyridine.
     """
 
-    for match in match_retained_fused_templates(mol, path, allow_nonaromatic=True):
+    for match in match_retained_graph_templates(
+        mol,
+        path,
+        allow_nonaromatic=True,
+        families=frozenset({"fused"}),
+    ):
         if (match.template.mancude_double_bonds or 0) == double_bonds:
             return match.template.name
     return None

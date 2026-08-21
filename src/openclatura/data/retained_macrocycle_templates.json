@@ -1,0 +1,723 @@
+{
+  "source": "Generated offline from OPSIN CML locants; runtime matching is graph-only.",
+  "parents": [
+    {
+      "name": "porphyrin",
+      "preferred_name": "porphyrin",
+      "pin": true,
+      "priority": 100,
+      "aliases": [
+        "porphine",
+        "21H,23H-porphine"
+      ],
+      "template": {
+        "atoms": [
+          {
+            "locant": "1"
+          },
+          {
+            "locant": "2"
+          },
+          {
+            "locant": "3"
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "21",
+            "symbol": "N",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7"
+          },
+          {
+            "locant": "8"
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "22",
+            "symbol": "N"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "12"
+          },
+          {
+            "locant": "13"
+          },
+          {
+            "locant": "14"
+          },
+          {
+            "locant": "23",
+            "symbol": "N",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "15"
+          },
+          {
+            "locant": "16"
+          },
+          {
+            "locant": "17"
+          },
+          {
+            "locant": "18"
+          },
+          {
+            "locant": "19"
+          },
+          {
+            "locant": "24",
+            "symbol": "N"
+          },
+          {
+            "locant": "20"
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "4",
+              "21"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "1",
+              "21"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "9",
+              "22"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "6",
+              "22"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "10",
+              "11"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "11",
+              "12"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "12",
+              "13"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "13",
+              "14"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "14",
+              "23"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "11",
+              "23"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "14",
+              "15"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "15",
+              "16"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "16",
+              "17"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "17",
+              "18"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "18",
+              "19"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "19",
+              "24"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "16",
+              "24"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "19",
+              "20"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "1",
+              "20"
+            ],
+            "bond_class": "single"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "21",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "22",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14",
+          "23",
+          "15",
+          "16",
+          "17",
+          "18",
+          "19",
+          "24",
+          "20"
+        ],
+        "rings": [],
+        "fusion_atoms": [],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "21",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "22",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14",
+          "23",
+          "15",
+          "16",
+          "17",
+          "18",
+          "19",
+          "24",
+          "20"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [
+          "21",
+          "23"
+        ],
+        "indicated_hydrogen_count": 2,
+        "mancude_double_bonds": 11,
+        "numbering_policy": "retained_macrocycle_template",
+        "aromatic_equivalence_policy": "neutral_kekule_equivalent",
+        "enabled": true,
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
+      }
+    },
+    {
+      "name": "corrin",
+      "preferred_name": "corrin",
+      "pin": true,
+      "priority": 110,
+      "aliases": [],
+      "template": {
+        "atoms": [
+          {
+            "locant": "1",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "2",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "3",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "4"
+          },
+          {
+            "locant": "21",
+            "symbol": "N"
+          },
+          {
+            "locant": "5"
+          },
+          {
+            "locant": "6"
+          },
+          {
+            "locant": "7",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "8",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "9"
+          },
+          {
+            "locant": "22",
+            "symbol": "N"
+          },
+          {
+            "locant": "10"
+          },
+          {
+            "locant": "11"
+          },
+          {
+            "locant": "12",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "13",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "14"
+          },
+          {
+            "locant": "23",
+            "symbol": "N"
+          },
+          {
+            "locant": "15"
+          },
+          {
+            "locant": "16"
+          },
+          {
+            "locant": "17",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "18",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "19",
+            "aromatic": false,
+            "saturated": true
+          },
+          {
+            "locant": "24",
+            "symbol": "N",
+            "aromatic": false,
+            "saturated": true
+          }
+        ],
+        "bonds": [
+          {
+            "locants": [
+              "1",
+              "2"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "2",
+              "3"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "3",
+              "4"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "4",
+              "21"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "1",
+              "21"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "4",
+              "5"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "5",
+              "6"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "6",
+              "7"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "7",
+              "8"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "8",
+              "9"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "9",
+              "22"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "6",
+              "22"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "9",
+              "10"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "10",
+              "11"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "11",
+              "12"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "12",
+              "13"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "13",
+              "14"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "14",
+              "23"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "11",
+              "23"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "14",
+              "15"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "15",
+              "16"
+            ],
+            "bond_class": "double"
+          },
+          {
+            "locants": [
+              "16",
+              "17"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "17",
+              "18"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "18",
+              "19"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "1",
+              "19"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "19",
+              "24"
+            ],
+            "bond_class": "single"
+          },
+          {
+            "locants": [
+              "16",
+              "24"
+            ],
+            "bond_class": "single"
+          }
+        ],
+        "locants": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "21",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "22",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14",
+          "23",
+          "15",
+          "16",
+          "17",
+          "18",
+          "19",
+          "24"
+        ],
+        "rings": [],
+        "fusion_atoms": [],
+        "peripheral_atoms": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "21",
+          "5",
+          "6",
+          "7",
+          "8",
+          "9",
+          "22",
+          "10",
+          "11",
+          "12",
+          "13",
+          "14",
+          "23",
+          "15",
+          "16",
+          "17",
+          "18",
+          "19",
+          "24"
+        ],
+        "interior_atoms": [],
+        "default_indicated_h": [
+          "24"
+        ],
+        "indicated_hydrogen_count": 1,
+        "mancude_double_bonds": 6,
+        "numbering_policy": "retained_macrocycle_template",
+        "aromatic_equivalence_policy": "exact",
+        "enabled": true,
+        "derivative_production_enabled": true,
+        "pre_descriptor_selection": true
+      }
+    }
+  ]
+}

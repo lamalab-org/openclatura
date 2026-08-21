@@ -33,6 +33,7 @@ from .principal_groups import (
     partition_principal_and_prefix_groups,
 )
 from .retained_fused_production import production_retained_fused_parent
+from .retained_name_policy import retained_parent_output_name
 from .rules import elements as _elements
 from .special_cases import (
     single_atom_component_name,
@@ -455,6 +456,17 @@ def name_component(
             "is_spiro": state.parent_selection.is_spiro,
             "is_polycycle": state.parent_selection.is_polycycle,
             "polycycle_descriptor": state.parent_selection.polycycle_descriptor,
+            "ring_parent_kind": (
+                state.parent_selection.ring_parent.kind if state.parent_selection.ring_parent is not None else None
+            ),
+            "ring_parent_proof_source": (
+                state.parent_selection.ring_parent.proof_source
+                if state.parent_selection.ring_parent is not None
+                else None
+            ),
+            "ring_parent_audit_ok": (
+                state.parent_selection.ring_parent.audit_ok if state.parent_selection.ring_parent is not None else None
+            ),
         },
     )
 
@@ -518,6 +530,13 @@ def name_component(
         state.retained_name = retained_fused.name
         state.locant_maps = retained_fused.locant_maps
         state.retained_parent_metadata = retained_fused.metadata
+    elif state.retained_name:
+        output_context = (
+            "unsubstituted_parent"
+            if not state.is_substituent and not subst_mapping and state.principal_key is None
+            else "composite_parent"
+        )
+        state.retained_name = retained_parent_output_name(state.retained_name, output_context)
     if (
         state.retained_name
         and state.locant_maps is None

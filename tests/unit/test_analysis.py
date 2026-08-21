@@ -138,13 +138,13 @@ from openclatura.polycycle_topology import (
 from openclatura.principal_suffixes import render_principal_suffix
 from openclatura.resonance_compare import equivalent_smiles
 from openclatura.retained_fused_templates import (
-    RetainedFusedGraphTemplate,
+    RetainedGraphTemplate,
     match_retained_fused_template,
     match_retained_fused_templates,
     pending_retained_fused_parent_names,
     retained_fused_base_templates,
     retained_fused_graph_templates,
-    retained_fused_template_from_data,
+    retained_graph_template_from_data,
     retained_parent_metadata,
     template_molecule,
 )
@@ -1129,6 +1129,41 @@ def test_retained_fusion_hydride_is_a_typed_additive_hydrogen_operation():
     assert hydro_binding["role"] == "additive_hydrogen"
     assert hydro_binding["term"] == "hydro"
     assert hydro_binding["locants"] == ["1", "4"]
+
+
+def test_additive_hydrogen_capacity_excludes_inherent_retained_sites():
+    analysis = analyze_smiles("C1CC2CCCCC2C1")
+    component = analysis.substituent_tree[0]
+    operations = component["hydro_operations"]
+
+    assert analysis.name == "hexahydro-2,3-dihydro-1H-indene"
+    assert operations == [
+        {
+            "key": "additive_hydrogen",
+            "reason": "Saturation beyond the parent's indicated hydrogen is added hydrogen.",
+            "locants": ["3a", "4", "5", "6", "7", "7a"],
+            "atom_ids": [2, 3, 4, 5, 6, 7],
+            "operation_kind": "additive_hydrogen",
+        }
+    ]
+
+
+def test_additive_hydrogen_does_not_relocate_an_inherent_site():
+    analysis = analyze_smiles("CC1CN(C(F)C(F)F)c2ccc([N+](=O)[O-])cc2O1")
+    operations = analysis.substituent_tree[0]["hydro_operations"]
+
+    assert analysis.name == "2-methyl-7-nitro-4-(1,2,2-trifluoroethyl)-3,4-dihydro-1,4-benzoxazine"
+    assert [operation["locants"] for operation in operations if operation["operation_kind"] == "additive_hydrogen"] == [
+        ["3", "4"]
+    ]
+
+
+def test_relaxed_retained_topology_keeps_audited_polycycle_fallback():
+    smiles = "CCC1CCc2c(cc(OC)c3c2C(=O)c2cccc(OC)c2C3=O)C1"
+
+    assert name_smiles(smiles) == (
+        "16-ethyl-8,12-dimethoxytetracyclo[12.4.0.0^{2,11}.0^{4,9}]octadeca-1,4,6,8,11,13-hexaene-3,10-dione"
+    )
 
 
 def test_n_substituent_locant_survives_retained_suffix_postprocessing():
@@ -3395,6 +3430,15 @@ def test_no_bare_retained_alias_infers_a_canonical_hydride_tautomer():
         assert metadata.default_indicated_h == template.default_indicated_h
 
 
+def test_preferred_retained_output_names_preserve_exact_template_metadata():
+    templates = {template.name: template for template in retained_fused_graph_templates(include_disabled=True)}
+
+    for template_name in ("indane", "indoline"):
+        template = templates[template_name]
+        assert template.output_name != template.name
+        assert retained_parent_metadata(template.output_name) == retained_parent_metadata(template.name)
+
+
 def test_indicated_hydrogen_follows_graph_tautomer_but_not_hydrogen_free_spiro_carbon():
     cases = {
         "c1ccc2c(c1)CN=C2C1=NCc2ccccc21": "3-(1H-isoindol-3-yl)-1H-isoindole",
@@ -3407,9 +3451,9 @@ def test_indicated_hydrogen_follows_graph_tautomer_but_not_hydrogen_free_spiro_c
 
 
 def test_retained_fused_graph_template_schema_validates_locant_graphs():
-    template = retained_fused_template_from_data(_naphthalene_graph_template_row())
+    template = retained_graph_template_from_data(_naphthalene_graph_template_row())
 
-    assert isinstance(template, RetainedFusedGraphTemplate)
+    assert isinstance(template, RetainedGraphTemplate)
     assert template.name == "naphthalene"
     assert template.locants == ("1", "2", "3", "4", "4a", "5", "6", "7", "8", "8a")
     assert template.fusion_atoms == ("4a", "8a")
@@ -3418,7 +3462,7 @@ def test_retained_fused_graph_template_schema_validates_locant_graphs():
 
 
 def test_retained_fused_graph_template_builds_local_graph():
-    template = retained_fused_template_from_data(_naphthalene_graph_template_row())
+    template = retained_graph_template_from_data(_naphthalene_graph_template_row())
     mol = template_molecule(template)
 
     assert len(mol.atoms) == 10
@@ -3428,7 +3472,7 @@ def test_retained_fused_graph_template_builds_local_graph():
 
 
 def test_retained_fused_graph_template_match_returns_locant_map():
-    template = retained_fused_template_from_data(_naphthalene_graph_template_row())
+    template = retained_graph_template_from_data(_naphthalene_graph_template_row())
     mol = template_molecule(template)
 
     match = match_retained_fused_template(mol, set(mol.atoms), template)
@@ -3669,10 +3713,10 @@ def test_retained_fused_template_matching_is_charge_exact():
     row = _naphthalene_graph_template_row()
     row["template"]["atoms"][0]["symbol"] = "N"
     row["template"]["atoms"][0]["charge"] = 1
-    template = retained_fused_template_from_data(row)
+    template = retained_graph_template_from_data(row)
     charged = template_molecule(template)
     neutral = template_molecule(template)
-    neutral.atoms[0].charge = 0
+    neutral.set_atom_charge(0, 0)
 
     assert match_retained_fused_template(charged, set(charged.atoms), template) is not None
     assert match_retained_fused_template(neutral, set(neutral.atoms), template) is None
@@ -4096,7 +4140,7 @@ def test_retained_fused_graph_template_rejects_incomplete_locant_maps():
     row["template"]["atoms"] = row["template"]["atoms"][:-1]
 
     with pytest.raises(ValueError, match="atom locants do not match"):
-        retained_fused_template_from_data(row)
+        retained_graph_template_from_data(row)
 
 
 def test_tetrazole_substitution_keeps_retained_parent_attachment_explicit():
