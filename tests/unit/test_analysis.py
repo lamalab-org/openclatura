@@ -1162,8 +1162,7 @@ def test_relaxed_retained_topology_keeps_audited_polycycle_fallback():
     smiles = "CCC1CCc2c(cc(OC)c3c2C(=O)c2cccc(OC)c2C3=O)C1"
 
     assert name_smiles(smiles) == (
-        "16-ethyl-8,12-dimethoxytetracyclo[12.4.0.0^{2,11}.0^{4,9}]"
-        "octadeca-1,4,6,8,11,13-hexaene-3,10-dione"
+        "16-ethyl-8,12-dimethoxytetracyclo[12.4.0.0^{2,11}.0^{4,9}]octadeca-1,4,6,8,11,13-hexaene-3,10-dione"
     )
 
 
