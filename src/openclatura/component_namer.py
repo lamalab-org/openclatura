@@ -275,7 +275,7 @@ def name_component(
     name_spiro_subgraph: SpiroSubgraphNamer,
     assemble_parent_name: ParentAssembler,
     token_debug: bool = False,
-    omit_redundant_locants: bool = False,
+    omit_redundant_locants: bool = True,
 ):
     """Name one connected component or recursive component of a molecule."""
 

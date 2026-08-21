@@ -850,7 +850,7 @@ def _collect_subgraph_substituents(
     sub_exclude: set[int],
     *,
     emit_metadata: bool = True,
-    omit_redundant_locants: bool = False,
+    omit_redundant_locants: bool = True,
 ) -> dict[int, list[SubstituentItem]]:
     """Collect prefixes attached to a recursive subgraph parent.
     P-14.2, P-16.5, P-44, P-61 through P-67, and P-24 for the spiro side-ring substituents."""
@@ -1289,7 +1289,7 @@ def name_subgraph(
     return_trace: bool = False,
     return_tree: bool = False,
     decision_trace: DecisionTrace | None = None,
-    omit_redundant_locants: bool = False,
+    omit_redundant_locants: bool = True,
 ):
     """Name a recursive substituent subgraph attached to the current parent (P-13.6, P-14.2, P-16.5, P-61
     through P-67).  Extendable prefix vocabularies come from ``data/namer_rules.json``."""
@@ -1929,7 +1929,7 @@ def name_component(
     return_tree: bool = False,
     decision_trace: DecisionTrace | None = None,
     token_debug: bool = False,
-    omit_redundant_locants: bool = False,
+    omit_redundant_locants: bool = True,
 ):
     """Name one connected component or recursive component of a molecule."""
 

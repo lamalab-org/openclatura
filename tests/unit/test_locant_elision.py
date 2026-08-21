@@ -1,6 +1,6 @@
-"""Opt-in constitutional locant-elision regressions."""
+"""Configurable constitutional locant-elision regressions."""
 
-from openclatura import DEFAULT_NAMING_ENGINE, NamingRequest, name_smiles
+from openclatura import DEFAULT_NAMING_ENGINE, NamingRequest, name_many, name_smiles
 from openclatura.assembly_parts import AssemblyParts, SubstituentItem
 from openclatura.locant_elision import apply_redundant_locant_elision
 
@@ -15,22 +15,37 @@ def _name(smiles: str, *, trace: bool = False):
     )
 
 
-def test_hexamethylbenzene_existing_elision_is_preserved_by_opt_in_policy():
+def _name_without_elision(smiles: str):
+    return DEFAULT_NAMING_ENGINE.run(NamingRequest(smiles=smiles, omit_redundant_locants=False))
+
+
+def test_hexamethylbenzene_existing_elision_is_preserved_by_default_policy():
     smiles = "Cc1c(C)c(C)c(C)c(C)c1C"
 
     assert name_smiles(smiles) == "hexamethylbenzene"
     assert _name(smiles).name == "hexamethylbenzene"
 
 
+def test_broader_elision_defaults_on_and_can_be_disabled():
+    assert NamingRequest().omit_redundant_locants is True
+    assert name_smiles("C1=CCCCC1") == "cyclohexene"
+    assert _name_without_elision("C1=CCCCC1").name == "cyclohex-1-ene"
+
+
+def test_batch_api_forwards_default_and_opt_out_policy():
+    assert name_many(["C1=CCCCC1"])[0].name == "cyclohexene"
+    assert name_many(["C1=CCCCC1"], omit_redundant_locants=False)[0].name == "cyclohex-1-ene"
+
+
 def test_trace_records_symmetry_proof_without_inventing_rule_id():
-    result = _name("Cc1c(C)c(C)c(C)c(C)c1C", trace=True)
+    result = _name("C1=CCCCC1", trace=True)
     assembly = [step for step in result.decisions if step.decision == "assembled component name"][-1]
 
     assert assembly.data["locant_elisions"] == [
         {
-            "category": "substituent",
-            "key": "methyl",
-            "locants": ["1", "2", "3", "4", "5", "6"],
+            "category": "unsaturation",
+            "key": "double",
+            "locants": ["1-2"],
             "reason": "placement is unique under exact parent-graph symmetry",
         }
     ]

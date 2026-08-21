@@ -242,7 +242,21 @@ def apply_redundant_locant_elision(parts: AssemblyParts) -> None:
 
 
 def _supported_simple_parent(parts: AssemblyParts) -> bool:
-    if parts.is_bicycle or parts.is_spiro or parts.is_polycycle:
+    if (
+        parts.is_substituent
+        or parts.is_bicycle
+        or parts.is_spiro
+        or parts.is_polycycle
+        or parts.stereo_features
+        or parts.relative_stereo_prefixes
+        or parts.indicated_hydrogens
+        or parts.parent_charges
+        or parts.a_prefixes
+        or parts.front_modifier_locants
+        or parts.principal_suffix_modifiers
+        or parts.hydro_operations
+        or any(parts.parent_atom_charges_by_locant.values())
+    ):
         return False
     locants = set(parts.parent_atom_symbols_by_locant)
     if not locants or any(not _is_numeric_locant(locant) for locant in locants):
@@ -265,10 +279,18 @@ def _feature_groups(parts: AssemblyParts) -> list[_FeatureGroup]:
         if locants and all(locant in parts.parent_atom_symbols_by_locant for locant in locants):
             groups.append(_FeatureGroup("substituent", name, tuple(sorted(locants, key=parse_locant))))
 
-    if parts.principal_group and parts.principal_group.locants:
+    if (
+        parts.principal_group
+        and len(parts.principal_group.locants) == 1
+        and not parts.substituents
+        and set(parts.parent_atom_symbols_by_locant.values()) == {"C"}
+    ):
         locants = tuple(str(locant) for locant in parts.principal_group.locants)
         if all(locant in parts.parent_atom_symbols_by_locant for locant in locants):
             groups.append(_FeatureGroup("suffix", parts.principal_group.key, tuple(sorted(locants, key=parse_locant))))
+
+    if parts.principal_group:
+        return groups
 
     bond_locants = {bond_id: _edge(pair) for pair, bond_id in parts.parent_bond_ids_by_locants.items()}
     by_bond_key: dict[str, list[tuple[str, str]]] = {}
@@ -289,7 +311,10 @@ def _feature_groups(parts: AssemblyParts) -> list[_FeatureGroup]:
 
 
 def _maximum_safe_elision(parts: AssemblyParts, groups: list[_FeatureGroup]) -> tuple[_FeatureGroup, ...]:
-    ordered = sorted(groups, key=lambda group: (group.priority, group.category, group.key))
+    ordered = sorted(
+        (group for group in groups if group.category != "substituent"),
+        key=lambda group: (group.priority, group.category, group.key),
+    )
     checked = 0
     for size in range(len(ordered), 0, -1):
         for subset in combinations(ordered, size):

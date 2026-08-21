@@ -171,7 +171,7 @@ class AssemblyParts:
     name_token_spans: list[dict] = field(default_factory=list)
     name_rewrite_history: list[dict] = field(default_factory=list)
     stereo_audit_issues: list[str] = field(default_factory=list)
-    omit_redundant_locants: bool = False
+    omit_redundant_locants: bool = True
     elided_substituent_locants: set[str] = field(default_factory=set)
     elided_unsaturation_locants: set[str] = field(default_factory=set)
     elide_principal_group_locants: bool = False

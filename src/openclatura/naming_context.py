@@ -27,10 +27,10 @@ class NamingIntent:
     upstream_atom: int | None = None
     fixed_start: bool = False
     is_substituent: bool = False
-    omit_redundant_locants: bool = False
+    omit_redundant_locants: bool = True
 
     @classmethod
-    def component(cls, principal_atoms, *, omit_redundant_locants: bool = False) -> "NamingIntent":
+    def component(cls, principal_atoms, *, omit_redundant_locants: bool = True) -> "NamingIntent":
         return cls(
             mode=NamingMode.COMPONENT,
             principal_atoms=tuple(principal_atoms),
@@ -44,7 +44,7 @@ class NamingIntent:
         upstream_atom: int | None,
         *,
         fixed_start: bool,
-        omit_redundant_locants: bool = False,
+        omit_redundant_locants: bool = True,
     ) -> "NamingIntent":
         return cls(
             mode=NamingMode.SUBGRAPH,
