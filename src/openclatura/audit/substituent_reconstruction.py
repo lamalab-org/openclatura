@@ -215,13 +215,8 @@ _RING_STEMS: dict[str, tuple[str, list[str]]] = {
 
 
 def _retained_fused_ring_stems() -> dict[str, tuple[str, list[str]]]:
-    """Project every retained fused graph template into the audit's ring table.
-
-    Derived rather than hand-copied: a parent registered for production but
-    missing here names correctly and then silently fails its own audit, so the
-    two cannot be allowed to drift.  ``labels`` is positionally aligned to the
-    SMILES atom order, which is how the lookups below pair them.
-    """
+    """Project every retained fused graph template into the audit's ring table, derived rather than
+    hand-copied so the two registrations cannot drift.  ``labels`` follows the SMILES atom order."""
 
     from rdkit import Chem
 
@@ -289,10 +284,7 @@ _LEAVES_LONGEST_FIRST: tuple[str, ...] = tuple(sorted(_LEAF_SMILES, key=len, rev
 
 def move_indicated_hydrogen(rw: Chem.RWMol, locants: dict[str, int], position) -> bool:
     """Relocate a ring's single pyrrole-type N-H to the cited locant.
-
-    ``False`` (so the caller abstains) when there is no unique N-H to move or the
-    destination cannot carry one — the tautomer is then outside what the stored
-    template can express."""
+    ``False`` when there is no unique N-H to move or the destination cannot carry one."""
 
     target = locants.get(str(position))
     if target is None:
@@ -401,9 +393,8 @@ def _resolvable(name: str) -> bool:
 
 
 def _normalize_yl(stem: str) -> str:
-    """Turn a contracted operator stem back into a substituent name: ``phen`` ->
-    ``phenyl``, ``but`` -> ``butyl``; anything already ending in ``yl`` (or a
-    parenthesised group) is returned untouched."""
+    """Turn a contracted operator stem back into a substituent name: ``phen`` -> ``phenyl``.
+    Anything already ending in ``yl`` (or parenthesised) is returned untouched."""
     stem = stem.strip().rstrip("-")
     if stem.endswith("yl") or stem.endswith(")"):
         return stem
@@ -465,13 +456,8 @@ def _resolve_operator(name: str, stereo_map: dict[str, str] | None = None) -> Ch
 
 
 def _resolve_operator_inner(stem: str, stereo_map: dict[str, str] | None) -> Chem.Mol | None:
-    """Resolve an operator's inner group.
-
-    The stem may already be a full substituent name (``ethoxycarbonyl`` ->
-    ``ethoxy``) or a contracted one needing ``yl`` (``phenoxy`` -> ``phen`` ->
-    ``phenyl``), so both are tried.  A leading stereo prefix consumed before the
-    operator split numbers this inner group, so it is pushed back on first —
-    otherwise the inner is rebuilt untagged and its descriptors go unverified."""
+    """Resolve an operator's inner group, tried both as a full substituent name and as a contracted one
+    needing ``yl``.  A leading stereo prefix goes back on first, or its descriptors go unverified."""
 
     prefix = _stereo_prefix(stereo_map)
     for candidate in (stem, _normalize_yl(stem)):
@@ -483,9 +469,8 @@ def _resolve_operator_inner(stem: str, stereo_map: dict[str, str] | None) -> Che
 
 
 def _promote_to_double_attachment(frag: Chem.Mol, stereo_map: dict[str, str] | None = None) -> Chem.Mol | None:
-    """Turn a ``…yl`` fragment (single ``*`` attachment) into the ``…ylidene``
-    form by promoting that attachment bond to a double bond and freeing a
-    hydrogen on the attachment atom so the valence balances."""
+    """Turn a ``...yl`` fragment (single ``*`` attachment) into the ``...ylidene`` form by promoting
+    that attachment bond to a double bond and freeing a hydrogen so the valence balances."""
 
     rw = Chem.RWMol(frag)
     dummy = next((a for a in rw.GetAtoms() if a.GetAtomicNum() == 0), None)
@@ -514,14 +499,8 @@ def _promote_to_double_attachment(frag: Chem.Mol, stereo_map: dict[str, str] | N
 
 
 def _resolve_n_substituted_amido(rest: str) -> Chem.Mol | None:
-    """``N-<substituent><…amido|…amino>`` — an amide or sulfonamide prefix whose
-    nitrogen carries an extra group: ``N-methylacetamido`` =
-    ``parent-N(CH3)-C(=O)CH3``, ``N-methyltosylamino`` = ``parent-N(CH3)-Ts``.
-
-    ``rest`` is the name with the leading ``N-`` removed.  Where the italic-N
-    ligand ends is not marked, so every depth-0 split is tried and the first one
-    whose *both* halves resolve wins; a wrong split leaves an unresolvable half
-    and is rejected, keeping the guess-free contract."""
+    """``N-<substituent><...amido|...amino>`` -- an amide or sulfonamide whose nitrogen carries an extra
+    group.  The ligand's end is unmarked, so the first depth-0 split whose *both* halves resolve wins."""
 
     for cut in range(1, len(rest)):
         if rest[:cut].count("(") != rest[:cut].count(")"):
@@ -542,10 +521,8 @@ def _resolve_n_substituted_amido(rest: str) -> Chem.Mol | None:
 
 
 def _substitute_attachment(frag: Chem.Mol, ligand: Chem.Mol, element: int | None = None) -> Chem.Mol | None:
-    """Graft ``ligand`` onto ``frag``'s own attachment atom (the one bonded to its
-    dummy), leaving the dummy in place so the result is still a one-port fragment.
-    ``element`` guards the atomic number of that atom when the caller knows it
-    (the amide nitrogen for an ``N-``-substituted amide prefix)."""
+    """Graft ``ligand`` onto ``frag``'s own attachment atom, leaving the dummy in place so the result
+    is still a one-port fragment.  ``element`` guards that atom's atomic number when the caller knows it."""
 
     rw = Chem.RWMol(frag)
     dummy = next((a for a in rw.GetAtoms() if a.GetAtomicNum() == 0), None)
@@ -568,11 +545,8 @@ def _substitute_attachment(frag: Chem.Mol, ligand: Chem.Mol, element: int | None
 
 
 def _resolve_carboxamido(stem: str, stereo_map: dict[str, str] | None = None) -> Chem.Mol | None:
-    """``<acyl-ring>carboxamido`` = ``parent-NH-C(=O)-<ring>``.  The ``carbox``
-    contributes an extra carbonyl carbon, so we resolve the ring as a ``-yl``
-    fragment and wrap it in ``*NC(=O)*`` (the N is the outward port to the
-    parent, the carbonyl C bonds the ring).  ``furan-2-carboxamido`` ->
-    ``NH-C(=O)-furan-2-yl``, ``cyclopropanecarboxamido`` -> ``NH-C(=O)-cyclopropyl``."""
+    """``<acyl-ring>carboxamido`` = ``parent-NH-C(=O)-<ring>``.  The ``carbox`` contributes an extra
+    carbonyl carbon, so the ring resolves as a ``-yl`` fragment wrapped in ``*NC(=O)*``."""
 
     stem = stem.rstrip("-")
     prefix = _stereo_prefix(stereo_map)
@@ -632,9 +606,8 @@ def _acyl_ring_variants(stem: str):
 
 
 def _resolve_amino(rest: str) -> Chem.Mol | None:
-    """Build an ``…amino`` nitrogen bearing its organyl groups: ``ethylamino`` ->
-    NH-ethyl, ``diethylamino`` -> N(ethyl)2, and two *different* groups written as
-    consecutive parenthesised clauses ``(methyl)(phenyl)amino`` -> N(methyl)(phenyl)."""
+    """Build an ``...amino`` nitrogen bearing its organyl groups: ``ethylamino``, ``diethylamino``,
+    and two different groups as consecutive clauses (``(methyl)(phenyl)amino``)."""
     rest = rest.strip().strip("-")
     if not rest:
         return None
@@ -653,15 +626,8 @@ def _resolve_amino(rest: str) -> Chem.Mol | None:
 
 
 def _multiplied_ligand(rest: str) -> tuple[int, str]:
-    """Split a ligand spec into ``(count, single-ligand name)``.
-
-    A leading multiplier only counts when ``rest`` is *not itself* the name of one
-    substituent: ``diethyl`` is not a substituent, so ``diethylamino`` is two
-    ethyls, but ``diethylaminosulfonyl`` is one ligand (the ``di`` belongs to the
-    inner ``diethylamino``) and must not be read as two ``ethylaminosulfonyl``.
-    Preferring the whole-name reading keeps the multiplier bound to the innermost
-    prefix it can attach to, which is where the name put it.
-    """
+    """Split a ligand spec into ``(count, single-ligand name)``.  A leading multiplier counts only when
+    ``rest`` is not one substituent's own name: ``diethylaminosulfonyl`` is one ligand, not two."""
 
     if _resolvable(rest):
         return 1, rest
@@ -706,9 +672,7 @@ _N_LOCANT_RE = re.compile(r"^N'*(?:,N'*)*-")
 
 def _strip_n_locants(head: str) -> str:
     """Drop a leading italic-``N`` locant set (``N-``, ``N,N-``, ``N,N'-``).
-
-    On an amide-nitrogen hub the ligands go on that nitrogen either way, so the
-    locant adds no placement information the rebuild needs."""
+    On a single-nitrogen hub the ligands go there either way, so the locant adds no placement information."""
 
     return _N_LOCANT_RE.sub("", head)
 
@@ -719,16 +683,8 @@ _N_CLAUSE_RE = re.compile(r"N'*(?:,N'*)*-")
 
 
 def _resolve_substituted_hydrazinyl(name: str) -> Chem.Mol | None:
-    """``<N-locanted clauses>hydrazinyl`` -> ``parent-N(…)-N(…)``.
-
-    A single-nitrogen hub can discard its italic locants (see
-    :func:`_strip_n_locants`) because its ligands have only one place to go.  A
-    hydrazine's two nitrogens are distinguishable and the primes are what tell
-    them apart: ``N'-acetylhydrazinyl`` acylates the far nitrogen,
-    ``N-acetylhydrazinyl`` the one bonded to the parent.  Dropping the locant
-    would rebuild the wrong graph, so anything that does not parse as a clean
-    ``N``/``N'`` clause returns ``None`` and lets the audit abstain.
-    """
+    """``<N-locanted clauses>hydrazinyl`` -> ``parent-N(...)-N(...)``.  The primes are what tell the two
+    nitrogens apart, so anything not parsing as a clean ``N``/``N'`` clause lets the audit abstain."""
 
     if not name.endswith("hydrazinyl") or len(name) == len("hydrazinyl"):
         return None
@@ -758,12 +714,8 @@ def _resolve_substituted_hydrazinyl(name: str) -> Chem.Mol | None:
 
 
 def _parse_n_locant_clauses(head: str) -> list[tuple[list[str], str]] | None:
-    """Split ``N'-acetyl``, ``N,N'-dimethyl``, ``N',N'-dimethyl`` into
-    ``(locants, ligand-name)`` pairs, the italic-``N`` counterpart of
-    :func:`_parse_clauses`.
-
-    Splits only on locant groups at parenthesis depth 0, so an ``N`` inside a
-    parenthesised ligand stays part of that ligand."""
+    """Split ``N'-acetyl``, ``N,N'-dimethyl`` ... into ``(locants, ligand-name)`` pairs, the italic-``N``
+    counterpart of :func:`_parse_clauses`.  Splits only at parenthesis depth 0."""
 
     starts = [
         m.start() for m in _N_CLAUSE_RE.finditer(head) if head[: m.start()].count("(") == head[: m.start()].count(")")
@@ -797,10 +749,8 @@ def _parse_n_locant_clauses(head: str) -> list[tuple[list[str], str]] | None:
 
 
 def _resolve_disubstituted_amide_hub(name: str) -> Chem.Mol | None:
-    """``(A)(B)carbamoyl`` / ``(A)(B)sulfamoyl`` — an amide or sulfonamide whose
-    nitrogen carries two cited ligands rather than the single one the plain
-    ``<X>carbamoyl`` / ``<X>sulfamoyl`` operator covers.  Two ligands are
-    required, so a single-ligand name still falls through to that operator."""
+    """``(A)(B)carbamoyl`` / ``(A)(B)sulfamoyl`` -- an amide or sulfonamide nitrogen carrying two cited
+    ligands.  Two are required, so a single-ligand name falls through to the plain operator."""
 
     for word, (element, oxo_count) in _AMIDE_N_HUBS.items():
         if not name.endswith(word) or len(name) <= len(word):
@@ -829,12 +779,8 @@ def _resolve_disubstituted_amide_hub(name: str) -> Chem.Mol | None:
 
 
 def _resolve_liganded_hub(name: str) -> Chem.Mol | None:
-    """``(A)(B)phosphoryl`` / ``(A)(B)(C)silyl`` — a heteroatom hub bonded outward
-    to the parent, carrying its oxo load plus each cited ligand.
-
-    The ligands are either a list of parenthesised clauses or a single multiplied
-    one (``dimethyloxophosphanyl`` -> two methyls); a head that is neither falls
-    through rather than being guessed at."""
+    """``(A)(B)phosphoryl`` / ``(A)(B)(C)silyl`` -- a heteroatom hub bonded outward to the parent, carrying
+    its oxo load plus each cited ligand, given either as clauses or as one multiplied ligand."""
 
     for word, (element, oxo_count) in _LIGANDED_HUBS.items():
         if not name.endswith(word) or len(name) <= len(word):
@@ -890,9 +836,8 @@ def _hub_ligands(head: str) -> list[Chem.Mol] | None:
 
 
 def _top_level_groups(s: str) -> list[str]:
-    """Split a string into consecutive depth-0 tokens, keeping parenthesised
-    groups intact: ``(methyl)(phenyl)`` -> ``['(methyl)', '(phenyl)']``,
-    ``methyl`` -> ``['methyl']``."""
+    """Split a string into consecutive depth-0 tokens, keeping parenthesised groups intact:
+    ``(methyl)(phenyl)`` -> ``['(methyl)', '(phenyl)']``."""
     groups: list[str] = []
     depth = 0
     cur = ""
@@ -965,15 +910,8 @@ _RING_DESCRIPTOR_RE = re.compile(r"(?:bi|tri|tetra|penta)?(?:cyclo|spiro)\[?")
 
 
 def _hoist_replacement_prefixes(name: str) -> str:
-    """Move skeletal-replacement clauses next to the ring token they modify.
-
-    A ring's replacement prefixes and its ordinary substituent prefixes are cited
-    in one alphanumeric sequence — ``7-methyl-7-aza-8-oxo-bicyclo[4.3.0]…`` — but
-    they are consumed by different machinery: replacement belongs to the ring
-    parser, the rest to the prefix grafting.  No single split of that sequence
-    separates them while they are interleaved, so the replacement clauses are
-    gathered and re-emitted immediately before the ring token, leaving a
-    contiguous ordinary prefix in front."""
+    """Move skeletal-replacement clauses next to the ring token they modify: they are cited interleaved
+    with ordinary prefixes but consumed by different machinery, which needs each run contiguous."""
 
     ring = _RING_DESCRIPTOR_RE.search(name)
     if ring is None:
@@ -1013,15 +951,8 @@ _UNLOCANTED = ""
 
 
 def _leading_stereo_map(name: str) -> tuple[dict[str, str], str | None]:
-    """Extract ``({locant: descriptor}, relative-word)`` from a leading stereo
-    prefix, peeling outer parens/stereo-words exactly as
-    :func:`_strip_outer_parens` does so the captured locants line up with the
-    fragment that will be built.
-
-    The relative word is returned without its locants: which ring positions a
-    ``cis``/``trans`` relates is read off the built fragment instead (the two
-    ring atoms actually bearing substituents), which avoids having to reproduce
-    the namer's locant conventions to find them."""
+    """Extract ``({locant: descriptor}, relative-word)`` from a leading stereo prefix, peeling parens as
+    :func:`_strip_outer_parens` does so the locants line up with the fragment that gets built."""
 
     s = name.strip()
     result: dict[str, str] = {}
@@ -1057,22 +988,8 @@ def _leading_stereo_map(name: str) -> tuple[dict[str, str], str | None]:
 
 
 def _tag_relative_stereo(mol: Chem.Mol, relative: str) -> None:
-    """Mark the two ring atoms a ``cis``/``trans`` word relates.
-
-    Which ring the word speaks about is not spelled out, so it is identified
-    structurally.  A ``cis``/``trans`` is a relation between exactly two
-    substituted ring positions, so the ring it refers to necessarily has exactly
-    two atoms bearing exactly one exocyclic substituent each (the attachment
-    dummy counting as one).  Among the rings that look like that we take:
-
-    * the one containing the attachment atom, since the word qualifies the
-      substituent's own base skeleton and that is the ring the parent hangs off;
-    * failing that (an operator-wrapped name like ``…carboxamido`` puts the ring
-      behind an added carbonyl, so the attachment is outside it) the sole
-      candidate, if there is exactly one.
-
-    Otherwise the relation stays unpinned — nothing is tagged and the caller
-    abstains rather than adjudicate the wrong ring."""
+    """Mark the two ring atoms a ``cis``/``trans`` relates, found structurally: the ring with exactly two
+    singly-substituted positions, preferring the one holding the attachment atom.  Else left unpinned."""
 
     candidates = [ring for ring in mol.GetRingInfo().AtomRings() if _relative_pair(mol, ring) is not None]
     if not candidates:
@@ -1140,9 +1057,8 @@ def _tag_double_bond(rw: Chem.RWMol, locants: dict[str, int], loc: str, desc: st
 
 
 def _base_start_positions(name: str) -> list[int]:
-    """Candidate indices where the base substituent could begin: the start, and
-    every position following a depth-0 locant hyphen or a lowercase letter.
-    Earliest (longest base) first."""
+    """Candidate indices where the base substituent could begin: the start, and every position after a
+    depth-0 locant hyphen or a lowercase letter.  Earliest (longest base) first."""
     positions = [0]
     for i in range(1, len(name) - 1):
         if name[i - 1] in "-)" or name[i - 1].isalpha():
@@ -1233,11 +1149,8 @@ _RETAINED_ACYL_YL = tuple(stem + "yl" for stem in _RETAINED_ACYL_STEMS)
 
 
 def _acyl_chain_skeleton(core: str) -> tuple[Chem.RWMol, dict[str, int]] | None:
-    """Build the carbon skeleton of an acyl chain from the stem the acyl suffix
-    left behind — ``hexan`` from ``hexanoyl``, ``prop-2-en`` from ``prop-2-enoyl``,
-    ``butyr`` from ``butyryl``, ``propan`` from ``propanamido`` — with C1 (the
-    carbonyl carbon) already bearing its ``=O``.  Returns the skeleton and its
-    locant map; callers decide what C1 bonds outward to."""
+    """Build an acyl chain's carbon skeleton from the stem its suffix left behind -- ``hexan``, ``prop-2-en``,
+    ``butyr`` -- with C1 already bearing its ``=O``.  Callers decide what C1 bonds outward to."""
 
     core = core.rstrip("-")
     stem_len: int | None = None
@@ -1275,9 +1188,8 @@ def _acyl_chain_skeleton(core: str) -> tuple[Chem.RWMol, dict[str, int]] | None:
 
 
 def _acyl_chain_base(base: str) -> Numbered | None:
-    """``<alkan>oyl`` and the retained ``acetyl``/``propionyl``/``butyryl``/
-    ``valeryl`` = ``parent-C(=O)-<chain>``, attached through the carbonyl carbon
-    (``2-(4-chlorophenyl)acetyl``, ``2-ethylbutyryl``, ``prop-2-enoyl``)."""
+    """``<alkan>oyl`` and the retained ``acetyl``/``propionyl``/``butyryl``/``valeryl`` =
+    ``parent-C(=O)-<chain>``, attached through the carbonyl carbon."""
 
     core = base[:-3] if base.endswith("oyl") else base[:-2]
     skeleton = _acyl_chain_skeleton(core)
@@ -1291,17 +1203,8 @@ _BENZ_ACYL_BASES: dict[str, bool] = {"benzoyl": False, "benzamido": True}
 
 
 def _benz_acyl_base(base: str) -> Numbered | None:
-    """``benzoyl`` / ``benzamido`` — the retained benzene acyl and acylamino bases.
-
-    Both are also flat leaves, which is enough while they are bare; built here as
-    a *decoratable* ring core instead, their ring substituents graft through the
-    ordinary locanted-clause machinery.  ``4-methylbenzamido`` then reads as the
-    methyl on ring C4, C1 being the ring carbon carrying the acyl.
-
-    That C1 already holds two ring bonds and the acyl, so nothing can substitute
-    there; it is withdrawn from the exposed locant map for the same reason
-    :func:`_hide_acyl_carbon` withdraws a chain's C1.
-    """
+    """``benzoyl`` / ``benzamido`` -- built as decoratable ring cores so their substituents graft through
+    the locanted-clause machinery.  Ring C1 carries the acyl and is withdrawn from the locant map."""
 
     with_nitrogen = _BENZ_ACYL_BASES.get(base)
     if with_nitrogen is None:
@@ -1325,10 +1228,8 @@ def _benz_acyl_base(base: str) -> Numbered | None:
 
 
 def _acylamino_chain_base(base: str) -> Numbered | None:
-    """``<alkanoyl>amido`` = ``parent-NH-C(=O)-<chain>`` with the chain's C1 as the
-    carbonyl carbon (``propanamido`` -> ``NH-C(=O)-CH2-CH3``).  Chain locants are
-    exposed so front modifiers graft onto the acid carbons; the attachment is the
-    amide nitrogen."""
+    """``<alkanoyl>amido`` = ``parent-NH-C(=O)-<chain>`` with the chain's C1 as the carbonyl carbon.
+    Chain locants are exposed for front modifiers; the attachment is the amide nitrogen."""
 
     skeleton = _acyl_chain_skeleton(base[: -len("amido")])
     if skeleton is None:
@@ -1341,13 +1242,8 @@ def _acylamino_chain_base(base: str) -> Numbered | None:
 
 
 def _hide_acyl_carbon(locants: dict[str, int]) -> int:
-    """Pop C1 out of the exposed locant map and return its index.
-
-    An acyl C1 carries its ``=O``, the outward bond and the rest of the chain, so
-    nothing can substitute there.  Withdrawing it stops :func:`_apply_prefix` from
-    treating an *unlocanted* front modifier as a C1 substituent — ``phenylacetyl``
-    puts the phenyl on C2, so guessing C1 would silently reconstruct the wrong
-    graph; with C1 hidden the prefix fails to place and the audit abstains."""
+    """Pop C1 out of the exposed locant map and return its index.  Nothing substitutes on an acyl C1, and
+    hiding it makes an unlocanted front modifier (``phenylacetyl``) fail to place instead of landing there."""
 
     return locants.pop("1")
 
@@ -1366,14 +1262,8 @@ _UNSAT_RE = re.compile(r"(\d+(?:,\d+)*)-(" + "|".join(sorted(_UNSAT_COUNTS, key=
 
 
 def _parse_unsaturation(rest: str) -> tuple[list[tuple[int, int]], str] | None:
-    """Read a chain's unsaturation clauses into ``(locant, bond order)`` pairs,
-    returning them with whatever text was left unconsumed (the caller abstains if
-    that is non-empty).
-
-    Handles the multiplied forms — ``deca-1,8-dien``, ``nona-2,4,6,8-tetraen`` —
-    by requiring the cited locant count to match the multiplier, so a malformed
-    clause is rejected instead of silently under-building the chain.  ``None``
-    means exactly that rejection."""
+    """Read a chain's unsaturation clauses into ``(locant, bond order)`` pairs plus whatever text was left
+    unconsumed.  Multiplied forms must cite as many locants as the multiplier says, else ``None``."""
 
     unsats: list[tuple[int, int]] = []
     for match in _UNSAT_RE.finditer(rest):
@@ -1665,9 +1555,8 @@ def _rematch_orphaned_double_bonds(rw: Chem.RWMol, saturated: set[int], orphans:
 
 
 def _attaches_by_double_bond(frag: Chem.Mol | None) -> bool:
-    """Whether ``frag`` bonds to its parent through a double bond (``oxo``,
-    ``imino``, any ``…ylidene``).  ``None`` counts as ``False``: an unresolvable
-    clause tells us nothing about how it would have attached."""
+    """Whether ``frag`` bonds to its parent through a double bond (``oxo``, ``imino``, any ``...ylidene``).
+    ``None`` counts as ``False``: an unresolvable clause says nothing about how it would attach."""
 
     if frag is None:
         return False
@@ -1690,14 +1579,8 @@ def _attachment_heavy_degree(frag: Chem.Mol | None) -> int | None:
 
 
 def _ligand_on_attachment_atom(whole: Chem.Mol, trailing: str) -> bool:
-    """Whether the leading ligand(s) in a ``whole`` reading landed on the trailing
-    group's own attachment atom rather than an internal site.
-
-    Compares the attachment atom's heavy-degree in ``whole`` against the trailing
-    group resolved on its own: a strict increase means the ligand piled onto the
-    attachment carbon (an unlocanted substitution a complete substituent cannot
-    take), so the ``whole`` reading is spurious.  An indeterminate comparison is
-    treated as *not* piled on, leaving the existing behaviour unchanged."""
+    """Whether the leading ligand(s) in a ``whole`` reading landed on the trailing group's own attachment
+    atom -- a substitution a complete substituent cannot take, so that reading is spurious."""
 
     bare = _attachment_heavy_degree(resolve_fragment_mol(trailing))
     combined = _attachment_heavy_degree(whole)
@@ -1724,16 +1607,8 @@ def _apply_unlocanted_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: st
 
 
 def _apply_leaf_led_sibling_run(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
-    """Graft a leaf run followed by parenthesised ligands, all onto position 1 —
-    ``iodo(methylphosphanyl)methyl`` is an iodine *and* a phosphanyl on the same
-    carbon.
-
-    Only a *leading* leaf run is read this way.  A leaf hosts no ligands of its
-    own, so nothing that follows it can be its argument and the pieces can only
-    be siblings; a leaf run *after* a parenthesised group is instead left to
-    :func:`_apply_prefix`, which has to weigh it against the reading where the
-    trailing text is an operator absorbing the group before it.
-    """
+    """Graft a leading leaf run and the parenthesised ligands after it all onto position 1.  A leaf hosts
+    no ligands, so the pieces can only be siblings; a run *after* a group goes to :func:`_apply_prefix`."""
 
     groups = _top_level_groups(prefix)
     if len(groups) < 2 or groups[0].startswith("("):
@@ -1749,15 +1624,8 @@ def _apply_leaf_led_sibling_run(rw: Chem.RWMol, locants: dict[str, int], prefix:
 
 
 def _split_leaf_run(prefix: str) -> list[tuple[int, str]] | None:
-    """Split a *run* of leaf prefixes — ``chlorodifluoro`` -> one chlorine and two
-    fluorines — or ``None`` if the string is not exactly such a run.
-
-    Only leaves qualify.  A leaf takes no ligands of its own, so each piece is
-    unambiguous once matched and a greedy longest-first walk cannot strand a
-    valid parse.  Requiring the walk to consume the *whole* string is what keeps
-    a compound prefix from being shredded into fragments that merely look like
-    leaves: any leftover means the caller abstains instead.
-    """
+    """Split a run of leaf prefixes -- ``chlorodifluoro`` -> one chlorine, two fluorines -- or ``None``.
+    The greedy walk must consume the whole string, or compound prefixes get shredded into fake leaves."""
 
     grafts: list[tuple[int, str]] = []
     rest = prefix
@@ -1788,10 +1656,8 @@ def _apply_leaf_run(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> boo
 
 
 def _parse_clauses(prefix: str) -> list[tuple[list[str], str]] | None:
-    """Parse ``4-methoxy``, ``3,4-dimethoxy``, ``2-(pyrrolidin-1-yl)`` … into
-    (locants, substituent-name) pairs. Requires explicit locants, and only
-    splits on locant hyphens at parenthesis depth 0 so nested names stay
-    intact."""
+    """Parse ``4-methoxy``, ``3,4-dimethoxy``, ``2-(pyrrolidin-1-yl)`` ... into (locants, name) pairs.
+    Requires explicit locants, and splits only at depth 0 so nested names stay intact."""
     starts = _clause_starts(prefix)
     if not starts or starts[0] != 0:
         return None
@@ -1829,11 +1695,8 @@ def _clause_starts(prefix: str) -> list[int]:
 
 
 def _leading_multiplier(body: str) -> tuple[int, str] | None:
-    """Split a multiplied *leaf* — ``difluoro`` -> ``(2, "fluoro")`` — else ``None``.
-
-    A leaf takes no ligands of its own, so a multiplier in front of one can only
-    be counting copies.  That makes this reading unambiguous, unlike a multiplier
-    over a compound name (see :func:`_multiplied_ligand`)."""
+    """Split a multiplied leaf -- ``difluoro`` -> ``(2, "fluoro")`` -- else ``None``.  A leaf takes no
+    ligands, so the multiplier can only be counting copies (unlike :func:`_multiplied_ligand`)."""
 
     for count, rest in _multipliers.candidate_splits(body):
         if rest in _LEAF_SMILES:

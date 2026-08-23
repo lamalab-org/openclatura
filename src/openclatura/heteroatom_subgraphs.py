@@ -314,13 +314,8 @@ def substituent_bonding_number(mol: Molecule, atom_idx: int) -> int:
 
 
 def _is_resonance_encoded_sulfur_ylide_center(mol: Molecule, atom_idx: int) -> bool:
-    """Return true for S(+)=C(-) ylide resonance drawings.
-
-    The parser-facing fallback for these graphs is a lambda-sulfanylidene
-    resonance name. The ylide double bond contributes to the lambda state; an
-    explicit sulfur hydrogen in the charged drawing is not part of that neutral
-    resonance form.
-    """
+    """Return true for S(+)=C(-) ylide resonance drawings, which fall back to a lambda-sulfanylidene
+    name: an explicit sulfur hydrogen in the charged drawing is not part of that neutral form."""
 
     atom = mol.atoms[atom_idx]
     if atom.symbol != "S" or atom.charge <= 0:
@@ -358,10 +353,8 @@ def name_oxygen_subgraph(
         and s_oxygens
         and _has_at_most_one_further_ligand(mol, nxt, {start_idx, *s_oxygens})
     ):
-        # ``sulfinyl``/``sulfonyl`` spell a sulfur bearing one ligand besides the
-        # oxo group and this oxygen.  A hypervalent sulfur carrying more would
-        # lose them here, so it goes to the general namer, which can reach for
-        # the lambda convention.
+        # These words spell exactly one ligand besides the oxo group and this
+        # oxygen; a hypervalent sulfur goes to the general namer instead.
         branch_idx = first_substituent_neighbor(mol, nxt, {start_idx, *s_oxygens})
         branch = name_branch_or_none(
             mol,
@@ -459,11 +452,8 @@ def name_nitrogen_subgraph(
                 )
             )
         else:
-            # Only the oxo oxygens are counted here, so a charge-separated
-            # sulfonyl -- ``[S+](=O)[O-]`` -- looks like a sulfinyl and its
-            # remaining ligand is lost.  The general namer classifies the
-            # oxido ligand too, so fall back to it whenever the imide spelling
-            # does not apply rather than dropping the branch.
+            # A charge-separated sulfonyl looks like a sulfinyl to the oxo count, so fall
+            # back to the general namer, which classifies the oxido ligand too.
             s_oxygens = double_bonded_neighbors(mol, nxt, "O")
             sulfur_imide = ""
             if mol.atoms[nxt].symbol == "S" and s_oxygens and not _has_oxido_ligand(mol, nxt):
@@ -492,10 +482,7 @@ def terminal_n3_prefix(
 
 def _has_oxido_ligand(mol: Molecule, atom_idx: int) -> bool:
     """Whether ``atom_idx`` is a four-coordinate centre whose oxo is a charge pair.
-
-    Four ligands make ``[S+](=O)[O-]`` a sulfonyl written charge-separated.
-    Three make it a sulfinate, where the charge is real and must be kept.
-    """
+    Four ligands make ``[S+](=O)[O-]`` a charge-separated sulfonyl; three make it a real sulfinate."""
 
     if mol.degree(atom_idx) != 4:
         return False
@@ -558,13 +545,8 @@ def _cyclic_sulfur_imide_ligand_name(
     ring_roots: list[int],
     oxo_atoms: list[int],
 ) -> str:
-    """Return a single cyclic S=N ligand name for simple saturated S-rings.
-
-    Hypervalent cyclic imides such as O=S1(CCC1)=N are one sulfur-containing
-    ring ligand, not two independent alkyl ligands on sulfur. This conservative
-    role only accepts a single saturated carbon path between the two sulfur
-    ring neighbors and leaves hetero/unsaturated variants to the general path.
-    """
+    """Return a single cyclic S=N ligand name for simple saturated S-rings, which are one ring ligand
+    rather than two alkyls.  Hetero and unsaturated variants are left to the general path."""
 
     if len(ring_roots) != 2:
         return ""
@@ -820,13 +802,8 @@ def name_pnictogen_subgraph(
     branch_namer: RecursiveSubgraphNamer,
     symbol: str = "P",
 ) -> str:
-    """Name a group-15 centre and its ligands.
-
-    Arsenic and antimony take the same shape as phosphorus -- a trivalent
-    centre, optionally oxidised, with its prefix chosen by how many oxygens it
-    carries -- so they share this path and differ only in the prefixes the
-    tables give back.
-    """
+    """Name a group-15 centre and its ligands.  Arsenic and antimony take phosphorus's shape and share
+    this path, differing only in the prefixes the tables give back."""
     upstream_order = upstream_bond_order(mol, start_idx, upstream_atom)
     multiple_bond_suffix = {2: "idene", 3: "idyne"}.get(upstream_order, "")
     p_oxygens = central_oxo_substituent_excluded_ligand_atoms(mol, start_idx, exclude_atoms)

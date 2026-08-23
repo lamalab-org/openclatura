@@ -17,14 +17,8 @@ from .token_grammar import (
 
 
 def refresh_parent_binding(parts: AssemblyParts) -> None:
-    """Rebuild just the parent binding, leaving every other binding untouched.
-
-    Assembly can rename the parent after the bindings were built -- folding the
-    principal group into a retained name turns ``benzene`` into ``phenol``.  Only
-    that one binding is stale, and a full refresh would discard the emitted-token
-    metadata the substituent bindings have already accumulated, so replace it in
-    place.
-    """
+    """Rebuild just the parent binding, leaving every other binding untouched: folding the principal
+    group into a retained name stales only that one, and a full refresh would discard emitted tokens."""
 
     if not parts.parent_atom_ids:
         return
@@ -63,9 +57,8 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
         parent_atom_ids = set(parts.parent_atom_ids)
         parent_bond_ids = set(parts.parent_bond_ids)
         if parts.retained_absorbs_principal_group and parts.principal_group is not None:
-            # ``phenol`` spells the ring *and* its oxygen, so the parent term is
-            # what those atoms are named by -- the suffix binding no longer has
-            # any text of its own for the final audit to find.
+            # ``phenol`` spells the ring *and* its oxygen, so the suffix binding has
+            # no text of its own left for the audit to find.
             parent_atom_ids |= set(parts.principal_group.atom_ids)
             parent_bond_ids |= set(parts.principal_group.bond_ids)
         bindings.append(
@@ -921,14 +914,8 @@ def _rendered_term_tokens(
 
 
 def _tree_substituent_emitted_tokens(item) -> tuple[NameTokenBinding, ...]:
-    """Emit precise tokens for a recursive substituent tree.
-
-    A complex substituent such as
-    ``(2-(4-fluorophenyl)-...-1H-pyrrol-1-yl)`` has one top-level graph scope
-    but many nested name pieces with narrower graph ownership. Tokenizing the
-    whole top-level phrase would make every child token inherit the full
-    substituent graph. Instead, reuse the recursive tree's local fragments.
-    """
+    """Emit precise tokens for a recursive substituent tree.  Tokenizing the whole top-level phrase would
+    make every nested piece inherit the full substituent graph, so reuse the tree's local fragments."""
 
     tree = item.substituent_tree
     if not isinstance(tree, dict):

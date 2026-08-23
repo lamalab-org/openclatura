@@ -122,14 +122,8 @@ def _acyl_amido_replacement(acyl_prefix: str) -> str:
 
 
 def _multiplies(before: str) -> bool:
-    """Whether ``before`` ends in a multiplicative prefix counting the acyl itself.
-
-    ``-amido`` spells one acyl replacing one N-H, so a nitrogen carrying several
-    keeps the ``-amino`` parent: ``diacetylamino``, ``bis(2-phenylacetyl)amino``.
-    Only a multiplier sitting directly on the acyl counts -- in
-    ``dimethylaminoacetyl`` the ``di`` multiplies the methyl, and that name
-    contracts as usual.
-    """
+    """Whether ``before`` ends in a multiplicative prefix counting the acyl itself.  ``-amido`` spells one
+    acyl, so a nitrogen carrying several keeps the ``-amino`` parent (``diacetylamino``)."""
 
     return any(
         before.endswith(mult.basic) or before.endswith(mult.complex) for mult in multipliers.MULTIPLIERS.values()
@@ -144,15 +138,8 @@ def apply_connection_boundary_postprocessing(name: str) -> str:
 
 
 def _qualify_n_substituted_functional_prefixes(name: str) -> str:
-    """Add the ``N-`` locant to a substituent on the nitrogen of a functional
-    prefix like ``…sulfonamido``.
-
-    Without it ``(benzyl)benzenesulfonamido`` reads equally as a benzyl on the
-    *benzene ring*, so the name is ambiguous.  The substituent may itself be
-    composite (``((4-chlorophenyl)methyl)…``), so this scans for a balanced
-    parenthesised N-substituent rather than assuming a paren-free one; a simple
-    substituent is cited bare (``N-ethyl``) and a composite one stays enclosed
-    (``N-((4-chlorophenyl)methyl)``), as an ``N-`` locant prefix requires."""
+    """Add the ``N-`` locant to a substituent on a functional prefix's nitrogen, without which
+    ``(benzyl)benzenesulfonamido`` reads equally as a benzyl on the ring.  It may itself be composite."""
 
     suffixes = RULES.postprocess.n_substituted_functional_suffixes
     if not suffixes:

@@ -156,11 +156,7 @@ def promote_benzene_retained_name(parts: AssemblyParts) -> None:
 
 def _retained_chain_parent(parts: AssemblyParts) -> tuple[str, SubstituentItem | None] | None:
     """The retained name for an acyclic acid-family parent, and the branch it absorbs.
-
-    Declines on any unsaturation: the retained names all denote saturated
-    chains, and ``but-2-enedioic acid`` is fumaric or maleic acid, never
-    succinic.  Declines on replacement prefixes for the same reason.
-    """
+    Declines on unsaturation or replacement prefixes; the retained names are all saturated."""
 
     group = parts.principal_group
     if group is None or parts.is_ring or parts.unsaturations or parts.a_prefixes:
@@ -266,12 +262,8 @@ def _contracted_acyl_branch_name(parts: AssemblyParts, branch: SubstituentItem) 
     if parts.parent_length != 1 or str(parts.attachment_locant) != "1":
         return None
     branch_name = strip_outer_parentheses(branch.name)
-    # The contraction turns the ending that implied the nitrogen into a word
-    # naming a substituent on it -- ``sulfonamido`` to ``sulfonylcarbamoyl``.
-    # An italic-N locant in front then reads as a substituent on that
-    # substituent's own parent hydride, so the systematic spelling stands:
-    # ``N-(4-chlorophenyl)methanesulfonylcarbamoyl`` is read back with the
-    # chlorophenyl on the methane and the nitrogen's hydrogen restored.
+    # An N-locant in front would read as a substituent on the contracted word's own
+    # parent hydride, so those keep the systematic spelling.
     if branch_name.startswith(("N-", "N,")):
         return None
     kind = substituent_attachment_kind(parts)
@@ -374,14 +366,8 @@ def format_unsaturations(parts: AssemblyParts, stem_str: str) -> tuple[str, str]
         base_infixes.append((unsaturation, count, base_infix))
     if base_infixes:
         first_unsaturation, first_count, first_infix = base_infixes[0]
-        # The interfix ``a`` introduces a *multiplying prefix*; a lone bond cites
-        # the bare suffix and takes none (``but-2-ene``).
-        #
-        # Where there is a multiplier, eliding the ``a`` before its leading vowel
-        # needs the two vowels to actually meet.  A locant set between the stem
-        # and the multiplier keeps them apart, so the ``a`` survives:
-        # ``dodeca-1,...,11-undecaene``, not ``dodec-...``.  Only an unlocanted
-        # multiplier abuts the stem directly and elides.
+        # The interfix ``a`` introduces a multiplying prefix, and elides only where the
+        # two vowels actually meet: an intervening locant set keeps the ``a``.
         if first_count > 1 and (first_unsaturation.locants or not elision.is_vowel_start(first_infix)):
             stem_str += "a"
     base_infixes = [(unsaturation, infix) for unsaturation, _count, infix in base_infixes]
@@ -475,9 +461,7 @@ def format_substituent_tail(
 
 
 def _sole_group_locant_is_redundant(parts: AssemblyParts) -> bool:
-    """
-    Whether a lone group's ``1`` locant tells the reader nothing.
-    """
+    """Whether a lone group's ``1`` locant tells the reader nothing."""
 
     if parts.substituents or parts.a_prefixes or parts.unsaturations:
         return False
@@ -550,10 +534,8 @@ def format_parent_tail(parts: AssemblyParts, stem_str: str, terminal_e: str, spi
         else:
             stem_str, unsat_str = format_unsaturations(parts, stem_str)
     if parts.retained_absorbs_principal_group:
-        # The retained name already spells the group (``phenol``), so rendering
-        # the suffix again would give ``phenol-1-ol``.  ``terminal_e`` is left
-        # alone: it carries the retained name's own final vowel, which the stem
-        # split took off (``anilin`` + ``e``), and only a rendered suffix elides.
+        # The retained name already spells the group (``phenol``).  ``terminal_e`` stays:
+        # it is the retained name's own final vowel, and only a rendered suffix elides.
         suffix_str = ""
     else:
         terminal_e, suffix_str = format_principal_suffix(parts, terminal_e, spiro_subs)

@@ -130,9 +130,7 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
 
 
 def _drop_stem_indicated_hydrogen(core_name: str, indicated_hydrogens: list[str]) -> str:
-    """
-    Drop a stem's built-in ``1H-``; the cited set replaces it.
-    """
+    """Drop a stem's built-in ``1H-``; the cited set replaces it."""
 
     match = re.match(r"^(\d+[a-z]?H(?:,\d+[a-z]?H)*)-", core_name)
     if match is None:

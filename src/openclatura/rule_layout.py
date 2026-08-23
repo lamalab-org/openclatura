@@ -1,9 +1,5 @@
-"""Grouped layout for data-backed namer rules.
-
-The JSON table is intentionally loaded through domain groups so related
-vocabulary stays discoverable even while the on-disk table remains flat for
-backward compatibility.
-"""
+"""Grouped layout for data-backed namer rules.  The flat on-disk table is loaded through domain
+groups so related vocabulary stays discoverable."""
 
 from __future__ import annotations
 

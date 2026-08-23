@@ -337,12 +337,8 @@ def _acyl_oxy_tokens(
     atom_ids: set[int],
     term_text: str,
 ) -> tuple[NameTokenBinding, ...]:
-    """Return scopes for an acyloxy prefix written as ``<acyl name>oxy``.
-
-    The carbonyl carbon is inside the acyl chain's own stem, so the acyl name
-    scopes to the whole fragment; its ``oyl`` ending is split out and bound to
-    the carbonyl, keeping a like-spelled token elsewhere off those letters.
-    """
+    """Return scopes for an acyloxy prefix written as ``<acyl name>oxy``.  The acyl name scopes to the
+    whole fragment and its ``oyl`` ending is split out and bound to the carbonyl."""
 
     acyl_ending = RULES.assembly.substituent_attachment_suffixes["acyl"]
     acyl_atoms = {carbonyl, chalcogen} | _component_within(mol, carbonyl, atom_ids - {oxygen, chalcogen})

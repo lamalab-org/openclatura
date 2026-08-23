@@ -107,10 +107,7 @@ class DirectSubgraphPrefix:
 
 def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) -> DirectSubgraphPrefix | None:
     """Return a direct functional-group prefix when the subgraph is one group.
-
-    Blue Book references: P-63 through P-67 for direct detachable prefixes such
-    as nitro, cyano, carboxy, carbamoyl, and halo-carbonyl prefixes.
-    """
+    P-63 through P-67 for direct detachable prefixes such as nitro, cyano, carboxy, carbamoyl."""
 
     if mol.atoms[start_idx].is_carbon and start_idx in component:
         terminal_sulfurs = [
@@ -243,10 +240,7 @@ def _find_acyclic_subgraph_paths(
     mol: Molecule, start_idx: int, component: set[int], cyclic_atoms: set[int], sub_exclude: set[int]
 ) -> list[list[int]]:
     """Find carbon paths available for recursive acyclic substituent naming.
-
-    Blue Book references: P-44 and P-45 for parent hydride selection in
-    substituent names.
-    """
+    P-44 and P-45 for parent hydride selection in substituent names."""
 
     valid_nodes = {n for n in component if n not in cyclic_atoms and mol.atoms[n].is_carbon and n not in sub_exclude}
     paths = []
@@ -269,10 +263,7 @@ def _find_acyclic_subgraph_paths(
 
 def _select_subgraph_parent(mol: Molecule, start_idx: int, component: set[int], sub_exclude: set[int]):
     """Select parent candidates for a recursive substituent component.
-
-    Blue Book references: P-44, P-45, P-52, and P-53 for parent selection in
-    chains, rings, fused systems, and retained parents.
-    """
+    P-44, P-45, P-52 and P-53 for chains, rings, fused systems and retained parents."""
 
     cyclic_atoms = get_cyclic_atoms(mol, sub_exclude)
     if start_idx in cyclic_atoms:
@@ -295,12 +286,8 @@ def _select_subgraph_parent(mol: Molecule, start_idx: int, component: set[int], 
 
 
 def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> SpiroAssembly:
-    """Name a side ring as structured spiro assembly data.
-
-    Blue Book references: P-24 and P-52.3; the attachment atom is temporarily
-    represented as silicon so the side ring can be named independently, then the
-    silane marker is stripped back out before assembly rendering.
-    """
+    """Name a side ring as structured spiro assembly data (P-24, P-52.3).  The attachment atom stands in
+    as silicon so the side ring names independently, and the marker is stripped before rendering."""
 
     retained_n_ring = _retained_n_ring_spiro_assembly(mol, c_idx, sub_comp)
     if retained_n_ring is not None:
@@ -351,15 +338,8 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
 
 
 def _ring_is_isolated(mol: Molecule, ring: list[int], component_atoms: set[int]) -> bool:
-    """Whether ``ring`` shares no atom with another ring of the component.
-
-    A *fused* ring passes the per-atom check the ring finder makes — its fusion
-    atoms still have exactly two neighbours inside the ring — so fusion has to be
-    tested separately: drop the ring's own bonds and see whether any two of its
-    atoms remain joined through the rest of the component.  A ring merely carried
-    as a substituent hangs off a single atom and cannot rejoin, which is what
-    keeps the heteroaromatic-branch case this guard sits in front of.
-    """
+    """Whether ``ring`` shares no atom with another ring of the component.  A fused ring passes the ring
+    finder's per-atom check, so drop the ring's bonds and see whether two of its atoms stay joined."""
 
     ring_set = set(ring)
     ring_bonds = {frozenset((ring[i], ring[(i + 1) % len(ring)])) for i in range(len(ring))}
@@ -843,9 +823,8 @@ def _number_saturated_n_ring_for_spiro(
 def _substituted_prefix_name(mol: Molecule, group: PerceivedGroup, sub_exclude: set[int]) -> str:
     """Render a prefix group that carries its own substituent, or return ""."""
 
-    # Only groups perceived as carrying a substituent are re-rendered; every
-    # other prefix is already complete in the rule table, and routing those
-    # through a handler here would change names this site gets right.
+    # Every other prefix is already complete in the rule table; routing those
+    # through a handler would change names this site gets right.
     if group.variant != "substituted_heteroatom_imino":
         return ""
     handler = PREFIX_HANDLERS.get(group.key)
@@ -864,30 +843,22 @@ def _collect_subgraph_substituents(
     emit_metadata: bool = True,
 ) -> dict[int, list[SubstituentItem]]:
     """Collect prefixes attached to a recursive subgraph parent.
-
-    Blue Book references: P-14.2, P-16.5, P-44, P-61 through P-67, and P-24
-    for multiplicative prefixes, complex prefixes, parent substituents, and
-    spiro side-ring substituents.
-    """
+    P-14.2, P-16.5, P-44, P-61 through P-67, and P-24 for the spiro side-ring substituents."""
 
     main_set = set(candidate_path)
     subst_mapping: dict[int, list[SubstituentItem]] = {}
     sub_handled_atoms = set()
 
     for group in sub_perceived:
-        # The attachment carbon being on this parent is not enough: a group can
-        # hang off it and still be built from atoms this subgraph does not
-        # cover, such as the diazene that -N=N- contributes when it is the
-        # parent rather than a `diazenyl` prefix.  Citing it here spells it
-        # twice, once as the prefix and once as the parent.
+        # The attachment carbon being on this parent is not enough: the group's own
+        # atoms may belong to the parent too, and citing it then spells it twice.
         if group.atoms_involved & sub_exclude:
             continue
         if group.attachment_carbon in main_set and not group.is_principal_candidate:
             rule = RULES.functional_groups.by_key.get(group.key)
             name = rule.prefix if rule and rule.role == "prefix" else ""
-            # The rule table holds the bare prefix, so a group that carries its
-            # own substituent -- `(methylimino)` rather than `imino` -- loses it
-            # here unless the handler that knows how to render it is consulted.
+            # The rule table holds only the bare prefix, so a substituted group --
+            # `(methylimino)` rather than `imino` -- needs its handler.
             if name:
                 name = _substituted_prefix_name(mol, group, sub_exclude) or name
             if name:
@@ -985,10 +956,7 @@ def _collect_subgraph_substituents(
 
 def _add_subgraph_substituents(parts: AssemblyParts, subst_mapping: dict[int, list[SubstituentItem]], get_loc) -> None:
     """Add collected substituent prefixes to assembly parts.
-
-    Blue Book references: P-14.2 and P-16.5 for locants, multiplicative
-    prefixes, and complex substituent citation.
-    """
+    P-14.2 and P-16.5 for locants, multiplicative prefixes and complex substituent citation."""
 
     _add_substituent_traces(parts, subst_mapping, get_loc)
 
@@ -1001,10 +969,7 @@ def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
 
 def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
     """Apply recursive-substituent wrapping rules to an assembled name.
-
-    Blue Book references: P-13.6 and P-16.5 for substituent suffix citation and
-    parentheses around complex substituent prefixes.
-    """
+    P-13.6 and P-16.5 for substituent suffix citation and parentheses around complex prefixes."""
 
     if parts.principal_group is not None and parts.principal_group.key in {"nitrile", "ring_nitrile"}:
         name = name.replace("nitrilo", "cyano")
@@ -1026,13 +991,8 @@ def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
 def _mark_optional_substituent_boundary(
     name: str, parts: AssemblyParts, finalize_subgraph: bool
 ) -> RenderedSubstituentText:
-    """Preserve whether construction made a subgraph boundary optional.
-
-    This marker is applied after all name rewrites, since those rewrites return
-    ordinary strings. String composition in a higher recursive layer then
-    intentionally drops the marker, retaining parentheses needed to delimit a
-    compound substituent.
-    """
+    """Preserve whether construction made a subgraph boundary optional.  Applied after the name rewrites,
+    which return plain strings; a higher recursive layer drops the marker and keeps the parentheses."""
 
     if finalize_subgraph and parts.stereo_features:
         return RenderedSubstituentName(name, outer_parentheses_optional=True)
@@ -1091,12 +1051,8 @@ def _assemble_parent_name(
 def _simple_rooted_carbanion_substituent_name(
     mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc
 ) -> str:
-    """Render simple C- substituent roots as methanidyl ligand names.
-
-    This is deliberately narrow: only an acyclic all-carbon substituent whose
-    charged carbon is locant 1 is converted. More complex carbanions need a
-    charge-pair role template rather than a global ``-ide`` suffix.
-    """
+    """Render simple C- substituent roots as methanidyl ligand names.  Deliberately narrow: only an
+    acyclic all-carbon substituent whose charged carbon is locant 1; anything else needs a role template."""
 
     if parts.substituents or parts.principal_group is not None or parts.unsaturations:
         return ""
@@ -1128,11 +1084,8 @@ _MULTI_ACID_ENDINGS = tuple(
 
 
 def _retained_sulfonyl_amino(acid_name: str) -> str | None:
-    """``tosylamino`` for an acid with a retained sulfonyl shorthand.
-
-    The shorthand names the whole group, so the nitrogen keeps the plain ``amino``
-    ending rather than the ``sulfonamido`` contraction the systematic name takes.
-    """
+    """``tosylamino`` for an acid with a retained sulfonyl shorthand.  The shorthand names the whole group,
+    so the nitrogen keeps the plain ``amino`` ending rather than the ``sulfonamido`` contraction."""
 
     retained = RULES.heteroatoms.retained_sulfonyl_group_acids.get(acid_name)
     return None if retained is None else f"{retained}amino"
@@ -1141,9 +1094,8 @@ def _retained_sulfonyl_amino(acid_name: str) -> str | None:
 def _acid_name_to_amido(acid_name: str) -> str | None:
     """Convert an acid component name to its N-acyl (amido) substituent form."""
 
-    # Only the acid this nitrogen replaced becomes the amide.  Rewriting the
-    # suffix of a diacid amidates both of them, which is how glutamate's free
-    # side-chain acid turned into `2-aminopentanediamido`.
+    # Only the acid this nitrogen replaced becomes the amide: rewriting a diacid
+    # suffix amidates both, turning glutamate into `2-aminopentanediamido`.
     if acid_name.endswith(_MULTI_ACID_ENDINGS):
         return None
     for ending, replacement in (
@@ -1165,10 +1117,8 @@ def _format_n_locant_prefix(names: list[str]) -> str:
     parts = []
     for name in sorted(counts):
         k = counts[name]
-        # An N-locant prefix runs straight into the parent name after it, so a
-        # composite one has to be enclosed or the boundary is lost:
-        # ``N-cyclopropylmethyladamantane-2-carboxamido`` reads equally well as a
-        # cyclopropyl on N plus a methyl on the adamantane.
+        # An N-locant prefix runs straight into the name after it, so a composite one
+        # must be enclosed or the boundary is lost.
         enclose = is_complex_prefix(name) or is_composite_prefix(name)
         display = f"({name})" if enclose else name
         locants = ",".join(["N"] * k)
@@ -1200,12 +1150,8 @@ def _is_carboxylic_acid_carbon(mol: Molecule, idx: int) -> bool:
 
 
 def _competing_acid_reachable(mol: Molecule, acyl_c: int, acid_atoms: set[int]) -> bool:
-    """Whether another acid group could outrank the one at ``acyl_c``.
-
-    Only an acid the parent chain can reach competes for the suffix, and a
-    chain does not cross an ether oxygen -- an acid behind one stays a
-    substituent prefix and leaves the amido rewrite sound.
-    """
+    """Whether another acid group could outrank the one at ``acyl_c``.  Only an acid the parent chain can
+    reach competes, and a chain does not cross an ether oxygen."""
 
     seen = {acyl_c}
     stack = [acyl_c]
@@ -1222,11 +1168,8 @@ def _competing_acid_reachable(mol: Molecule, acyl_c: int, acid_atoms: set[int]) 
 
 
 def _neutralize_charge_separated_oxo(acid_mol: Molecule, center: int) -> None:
-    """Spell a charge-separated oxo group as a double bond on the capped acid.
-
-    Only ``S(=O)(=O)`` is perceived as the sulfonic acid the amido prefix is
-    named from, so the two spellings of one sulfonyl gave two different names.
-    """
+    """Spell a charge-separated oxo group as a double bond on the capped acid: only ``S(=O)(=O)`` is
+    perceived as the sulfonic acid the amido prefix is named from."""
 
     center_atom = acid_mol.atoms[center]
     if center_atom.charge <= 0:
@@ -1247,16 +1190,8 @@ def _neutralize_charge_separated_oxo(acid_mol: Molecule, center: int) -> None:
 def _acylamino_amido_prefix(
     mol: Molecule, n_idx: int, exclude_atoms: set[int], upstream_atom: int | None
 ) -> str | None:
-    """Name an acylamino substituent ``R-CO-N(R')-`` or ``R-SO2-N(R')-`` as an
-    ``[N-R'-]<acid>amido`` prefix.
-
-    Routes the acyl through the acid component namer so it renders with a
-    proper substitutive amido name (acetamido, benzamido, benzenesulfonamido,
-    2-(piperidin-4-yl)acetamido, ...) rather than the ambiguous functional-class
-    ``<sub>carbonylamino`` spelling.  N-substituents (tertiary amides) are rendered as
-    ``N-`` locanted prefixes.  Returns ``None`` for anything that is not a plain
-    carboxamide nitrogen, leaving the existing renderer in charge.
-    """
+    """Name an acylamino substituent ``R-CO-N(R')-`` or ``R-SO2-N(R')-`` as an ``[N-R'-]<acid>amido`` prefix,
+    routed through the acid component namer rather than the ambiguous ``<sub>carbonylamino`` spelling."""
 
     n_atom = mol.atoms[n_idx]
     if n_atom.symbol != "N" or n_atom.charge != 0 or n_atom.is_aromatic or upstream_atom is None:
@@ -1270,9 +1205,7 @@ def _acylamino_amido_prefix(
 
     def _amide_acyl(center: int) -> bool:
         """True when ``center`` is a single-bonded amide or sulfonamide acyl here.
-
-        A carboxamide carbon carries one oxo; a sulfonamide sulfur carries two.
-        """
+        A carboxamide carbon carries one oxo; a sulfonamide sulfur carries two."""
         if mol.get_bond(n_idx, center).order != 1:
             return False
         # ``[S+](=O)[O-]`` spells the same sulfonyl as ``S(=O)(=O)``.
@@ -1311,12 +1244,8 @@ def _acylamino_amido_prefix(
         acid_atoms.add(cur)
         stack.extend(nb for nb in mol.get_neighbors(cur) if nb not in acid_atoms and nb not in blocked)
 
-    # The acyl is re-named by capping it with a hydroxyl and rewriting the acid
-    # suffix, which only works when that hydroxyl is the acid the name is built
-    # on.  Another acid group in the fragment can outrank it and take the
-    # suffix instead, and the rewrite then amidates the wrong carbon: a
-    # glutamyl residue kept its free side-chain acid, so Glu-Leu came out as
-    # `2-aminopentanediamido` and the tripeptides transposed two residues.
+    # The cap-and-rewrite only works when the added hydroxyl takes the suffix;
+    # another acid in the fragment can outrank it and amidate the wrong carbon.
     if _competing_acid_reachable(mol, acyl_c, acid_atoms):
         return None
 
@@ -1353,12 +1282,8 @@ def name_subgraph(
     return_tree: bool = False,
     decision_trace: DecisionTrace | None = None,
 ):
-    """Name a recursive substituent subgraph attached to the current parent.
-
-    Blue Book references: P-13.6, P-14.2, P-16.5, P-61, P-62, P-63, P-65,
-    P-66, and P-67.  Extendable prefix vocabularies are loaded from
-    ``data/namer_rules.json``.
-    """
+    """Name a recursive substituent subgraph attached to the current parent (P-13.6, P-14.2, P-16.5, P-61
+    through P-67).  Extendable prefix vocabularies come from ``data/namer_rules.json``."""
 
     emit_metadata = return_trace or return_tree or decision_trace is not None
     start_atom = mol.atoms[start_idx]
@@ -1481,11 +1406,8 @@ def name_subgraph(
         sub_exclude,
         emit_metadata=emit_metadata,
     )
-    # A retained ring is retained wherever it lands: the same gate that lets
-    # quinoline be a parent lets it be a prefix, so ``quinolin-7-yl`` is spelt
-    # out rather than falling back to the von Baeyer name of the same ring.  A
-    # substituent has no principal group, and its attachment atom is passed in
-    # as one more locant the retained map has to be able to cite.
+    # A retained ring is retained as a prefix too (``quinolin-7-yl``); a substituent
+    # has no principal group, and its attachment is one more locant to cite.
     retained_parent_metadata = None
     retained_fused = production_retained_fused_parent(
         mol,
@@ -2011,47 +1933,29 @@ def name_component(
 
 
 def name_smiles_with_trace(smiles: str) -> tuple[str, list[dict]]:
-    """Return a generated name and AssemblyParts-derived trace annotations.
-
-    Blue Book references are carried by each trace segment. This API keeps the
-    original ``name_smiles`` function unchanged while exposing atom and bond IDs
-    selected during parent, prefix, unsaturation, and suffix assembly.
-    """
+    """Return a generated name and AssemblyParts-derived trace annotations, exposing the atom and bond IDs
+    selected during parent, prefix, unsaturation and suffix assembly."""
 
     return DEFAULT_NAMING_ENGINE.name_smiles_with_trace(smiles)
 
 
 def analyze_smiles(smiles: str, *, token_debug: bool = False) -> NameAnalysis:
-    """Return a generated name with structure annotations and decision traces.
-
-    The default ``name_smiles`` path stays minimal. This analysis API turns on
-    explainability and records the major choices in the pipeline: parsing,
-    component splitting, functional-group perception, priority, parent
-    selection, numbering, and final assembly.
-    """
+    """Return a generated name with structure annotations and decision traces: parsing, component
+    splitting, group perception, priority, parent selection, numbering and assembly."""
 
     return DEFAULT_NAMING_ENGINE.analyze_smiles(smiles, token_debug=token_debug)
 
 
 def name_smiles(smiles: str) -> str:
-    """Return an IUPAC-style name for a SMILES string.
-
-    Blue Book references: P-13 for name construction, P-44/P-45 for parent
-    selection and numbering, and P-72 for ordering disconnected ionic
-    components.  Component-order metal names are data-backed in
-    ``data/namer_rules.json``.
-    """
+    """Return an IUPAC-style name for a SMILES string.  P-13 for name construction, P-44/P-45 for parent
+    selection and numbering, P-72 for ordering disconnected ionic components."""
 
     return DEFAULT_NAMING_ENGINE.name_smiles(smiles)
 
 
 def name_rdkit_mol(rdkit_mol) -> str:
-    """Return an IUPAC-style name for an existing ``rdkit.Chem.rdchem.Mol``.
-
-    Equivalent to :func:`name_smiles` without the SMILES round-trip, for
-    callers that already hold an RDKit molecule (for example from an SD file).
-    The input molecule is not modified.
-    """
+    """Return an IUPAC-style name for an existing ``rdkit.Chem.rdchem.Mol``, for callers that already hold
+    one.  Equivalent to :func:`name_smiles` without the SMILES round-trip; the input is not modified."""
 
     return DEFAULT_NAMING_ENGINE.name_rdkit_mol(rdkit_mol)
 

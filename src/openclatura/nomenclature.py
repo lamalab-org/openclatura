@@ -1,9 +1,5 @@
 """Central data registry for nomenclature lookup tables.
-
-This module is the integration point for data-backed naming vocabulary.  Code
-that needs lookup data should prefer ``RULES.<group>.<field>`` over importing
-individual module constants.
-"""
+Prefer ``RULES.<group>.<field>`` over importing individual module constants."""
 
 from dataclasses import dataclass
 from functools import lru_cache
@@ -250,11 +246,8 @@ def _multi_suffix_template(suffix: str | None, multi_suffix) -> MultiSuffixTempl
 
 
 def _suffix_multiplier_positions(suffix: str | None, multi_suffix) -> tuple[int, ...]:
-    """Return which words in a suffix phrase take multiplicative prefixes.
-
-    Built-in rows store ``multi_suffix`` as a template object.  String support
-    remains as an external compatibility path for older override data.
-    """
+    """Return which words in a suffix phrase take multiplicative prefixes.  Built-in rows store
+    ``multi_suffix`` as a template object; string support remains for older override data."""
 
     if not suffix:
         return (0,)
