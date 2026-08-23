@@ -1103,13 +1103,13 @@ def test_additive_hydrogen_capacity_excludes_inherent_retained_sites():
     component = analysis.substituent_tree[0]
     operations = component["hydro_operations"]
 
-    assert analysis.name == "hexahydro-2,3-dihydro-1H-indene"
+    assert analysis.name == "octahydro-1H-indene"
     assert operations == [
         {
             "key": "additive_hydrogen",
             "reason": "Saturation beyond the parent's indicated hydrogen is added hydrogen.",
-            "locants": ["3a", "4", "5", "6", "7", "7a"],
-            "atom_ids": [2, 3, 4, 5, 6, 7],
+            "locants": ["2", "3", "3a", "4", "5", "6", "7", "7a"],
+            "atom_ids": [0, 2, 3, 4, 5, 6, 7, 8],
             "operation_kind": "additive_hydrogen",
         }
     ]

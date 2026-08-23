@@ -7,6 +7,40 @@ from .name_operations import HydroOperation
 from .namer_config import INDICATED_H_ELEMENTS, cites_indicated_hydrogen
 from .rules.retained import mancude_monocycle_hydro_plan
 
+_STEM_HYDRO_RE = re.compile(r"^(\d+[a-z]?(?:,\d+[a-z]?)*)-(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)hydro-")
+
+
+def _fold_stem_hydro_prefix(parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
+    """Merge a preferred spelling's own hydro prefix into the added-hydrogen operation.
+
+    ``2,3-dihydro-1H-indene`` plus six more saturated positions is one
+    ``octahydro-1H-indene``, not ``hexahydro-2,3-dihydro-1H-indene``.
+    """
+
+    match = _STEM_HYDRO_RE.match(parts.retained_name or "")
+    if match is None:
+        return
+    operation = parts.hydro_operations[-1]
+    atom_by_locant = {str(get_loc(idx)): idx for idx in numbered_path}
+    stem_locants = match.group(1).split(",")
+    if any(locant not in atom_by_locant for locant in stem_locants):
+        return
+    merged = sorted(
+        {
+            **dict(zip(operation.locants, operation.atom_ids)),
+            **{loc: atom_by_locant[loc] for loc in stem_locants},
+        }.items(),
+        key=lambda item: parse_locant(item[0]),
+    )
+    parts.retained_name = parts.retained_name[match.end() :]
+    parts.hydro_operations[-1] = HydroOperation(
+        key=operation.key,
+        reason=operation.reason,
+        locants=tuple(locant for locant, _ in merged),
+        atom_ids=tuple(atom_idx for _, atom_idx in merged),
+        operation_kind=operation.operation_kind,
+    )
+
 
 def _saturated_ring_carbons(mol: Molecule, numbered_path: list[int], get_loc) -> set[str]:
     """Locants of ring carbons whose ring bonds are all single and that hold H."""
@@ -233,6 +267,7 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 operation_kind="additive_hydrogen",
             )
         )
+        _fold_stem_hydro_prefix(parts, numbered_path, get_loc)
 
     if metadata is not None and oxo_derivative and not name_states_indicated_h and surplus_count % 2 == 1:
         candidates = sorted(candidates + hydro_only, key=lambda item: parse_locant(item[0]))

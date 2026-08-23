@@ -65,6 +65,11 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
         hydro = format_multiplier("hydro", len(additive_hydrogens))
 
         stated = parts.retained_parent_metadata.indicated_hydrogen_count if parts.retained_parent_metadata else 0
+        cited = len(re.findall(r"\d+[a-z]?H(?=[,-])", core_name))
+        if cited and cited < stated:
+            # The template counts its inherent saturation, but the stem has been
+            # rewritten to its mancude parent and states only the cited H.
+            stated = cited
         if len(additive_hydrogens) + max(
             len(indicated_hydrogens), stated
         ) == parts.parent_length and not core_name.startswith("spiro["):
