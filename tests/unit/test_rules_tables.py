@@ -19,20 +19,6 @@ def test_every_written_multiplier_reads_back(count: int):
     assert multipliers.count_for(multipliers.complex_(count)) == count
 
 
-@pytest.mark.parametrize(
-    ("name", "expected"),
-    [
-        ("dimethyl", (2, "methyl")),
-        ("bis(2-chloroethyl)", (2, "(2-chloroethyl)")),
-        ("tris(hydroxymethyl)", (3, "(hydroxymethyl)")),
-        ("hexadecafluoro", (16, "fluoro")),  # longest prefix wins over ``hexa``
-        ("methyl", (1, "methyl")),  # no prefix reads as a single occurrence
-    ],
-)
-def test_split_prefix(name: str, expected: tuple[int, str]):
-    assert multipliers.split_prefix(name) == expected
-
-
 def test_candidate_splits_are_longest_first():
     # ``tetradeca`` (14) must be offered before ``tetra`` (4), so a caller that
     # validates the remainder sees the more specific reading first.

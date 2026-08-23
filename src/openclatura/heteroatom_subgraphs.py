@@ -28,7 +28,7 @@ from .naming_protocols import RecursiveSubgraphNamer
 from .nitrogen_roles import terminal_n3_substituent_role
 from .nomenclature import RULES
 from .oxoacid_roles import OxoLigandRole, central_oxo_substituent_role
-from .rules import multipliers
+from .rules import elision, multipliers
 
 
 def _branch_name_text(
@@ -119,10 +119,19 @@ def retained_sulfonyl_group(branch: str, suffix: str) -> str | None:
     return RULES.heteroatoms.retained_sulfonyl_groups.get((strip_outer_parentheses(branch), suffix))
 
 
-def sulfonyl_group_name(branch: str, suffix: str) -> str:
-    """The retained shorthand for a branch on a sulfonyl, or the systematic spelling."""
+def contracted_sulfonyl_group(branch: str, suffix: str) -> str | None:
+    """The one-word contraction for a sulfonyl ligand -- an amino ligand makes ``sulfamoyl``."""
 
-    retained = retained_sulfonyl_group(branch, suffix)
+    for ligand_ending, group_suffix, name in RULES.heteroatoms.sulfonyl_ligand_contractions:
+        if group_suffix == suffix and branch.endswith(ligand_ending):
+            return f"{branch[: -len(ligand_ending)]}{name}"
+    return None
+
+
+def sulfonyl_group_name(branch: str, suffix: str) -> str:
+    """The retained shorthand or contraction for a branch on a sulfonyl, else the systematic spelling."""
+
+    retained = retained_sulfonyl_group(branch, suffix) or contracted_sulfonyl_group(branch, suffix)
     return retained if retained is not None else f"{branch}{suffix}"
 
 
@@ -569,7 +578,7 @@ def _cyclic_sulfur_imide_ligand_name(
     if oxo_atoms:
         prefixes.append("oxo" if len(oxo_atoms) == 1 else f"{multipliers.basic(len(oxo_atoms))}oxo")
     prefix = "".join(f"1-{item}-" for item in prefixes)
-    return f"{prefix}1lambda^{valence}-{parent}-1-ylidene"
+    return f"{prefix}1lambda^{valence}-{elision.elide_terminal_e(parent, '-1-ylidene')}"
 
 
 def _simple_carbon_path_between(mol: Molecule, start: int, end: int, blocked: set[int]) -> list[int]:
@@ -664,6 +673,12 @@ def name_sulfur_subgraph(
             retained = retained_sulfonyl_group(branch, suffix)
             if retained is not None:
                 return f"{stereo_prefix_text}{retained}"
+            contracted = contracted_sulfonyl_group(branch, suffix)
+            if contracted is not None:
+                # One retained word reads bare; a ligand in front of it needs the enclosure back,
+                # or ``dimethylsulfamoyl`` reads as two methyls on the nitrogen.
+                bare = any(contracted == name for _, _, name in RULES.heteroatoms.sulfonyl_ligand_contractions)
+                return f"{stereo_prefix_text}{contracted}" if bare else f"({stereo_prefix_text}{contracted})"
             return f"({stereo_prefix_text}{branch}{suffix})"
         branches = [
             br

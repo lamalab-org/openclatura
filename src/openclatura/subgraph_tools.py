@@ -1,6 +1,5 @@
 """Shared graph-fragment helpers for parent and substituent assembly."""
 
-from .additive import add_indicated_hydrogens as _add_indicated_hydrogens
 from .additive import add_replacement_prefixes
 from .assembly_parts import AssemblyParts
 from .chains import get_cyclic_atoms
@@ -103,12 +102,6 @@ def subgraph_locant_getter(numbered_path: list[int], locant_map):
         return locant_map[idx] if locant_map else str(numbered_path.index(idx) + 1)
 
     return get_loc
-
-
-def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
-    """Add indicated hydrogen locants for retained ring names."""
-
-    _add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
 
 
 def add_parent_features(

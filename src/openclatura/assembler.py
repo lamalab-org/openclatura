@@ -19,74 +19,18 @@ from .assembly_parts import AssemblyParts
 from .assembly_prefixes import format_replacement_prefixes, format_substituent_prefixes
 from .assembly_spiro import format_spiro_core, split_spiro_substituents
 from .assembly_utils import needs_hyphen, parse_locant
-from .formatting import ensure_stereo_descriptor_boundary, format_multiplier
+from .formatting import format_multiplier
 from .fused_ion_templates import consume_fused_ion_operation, select_fused_ion_operation
 from .name_assembly import NameAssemblyResult, rewrite_history_trace_data, token_span_trace_data
 from .name_bindings import refresh_name_atom_bindings, refresh_parent_binding
-from .name_postprocessing import (
-    apply_acyl_amido_postprocessing,
-    apply_connection_boundary_postprocessing,
-    apply_data_postprocessing,
-)
+from .name_postprocessing import apply_data_postprocessing
 
 
 def _post_process_name(name: str) -> str:
     name = apply_data_postprocessing(name)
-    name = ensure_stereo_descriptor_boundary(name)
-    name = re.sub(r"-1-formate\b", "-formate", name)
-
-    name = name.replace("thioxomethyl", "carbonothioyl")
-
-    name = name.replace("aminoiminomethyl", "carbamimidoyl")
-    name = name.replace("amino(imino)methyl", "carbamimidoyl")
     name = name.replace("iminoamino", "diazenyl")
     name = name.replace("aminoimino", "hydrazono")
-
-    name = re.sub(r"\b1-\((.*?)amino\)methanenitrile\b", r"\1cyanamide", name)
-    name = re.sub(r"\b1-([a-zA-Z0-9\-\[\]\(\)\,]+?)aminomethanenitrile\b", r"\1cyanamide", name)
-    name = name.replace("aminomethanenitrile", "cyanamide")
-
-    name = apply_acyl_amido_postprocessing(name)
-
-    name = re.sub(r"\b1-methanethiol\b", "methanethiol", name)
-    name = re.sub(r"-1-methanethiol\b", "methanethiol", name)
-
-    name = re.sub(r"\b([a-z]+o)iminomethyl\b", r"\1carbonimidoyl", name)
-    name = re.sub(r"\bimino\(([a-z]+o)\)methyl\b", r"\1carbonimidoyl", name)
-    name = re.sub(r"\bimino([a-z]+o)methyl\b", r"\1carbonimidoyl", name)
-
-    name = re.sub(r"ane-(\d+(?:,\d+)*)-((?:di|tri)?yl(?:idene|idyne)?)\b", r"an-\1-\2", name)
-    name = re.sub(r"ene-(\d+(?:,\d+)*)-((?:di|tri)?yl(?:idene|idyne)?)\b", r"en-\1-\2", name)
-    name = re.sub(r"yne-(\d+(?:,\d+)*)-((?:di|tri)?yl(?:idene|idyne)?)\b", r"yn-\1-\2", name)
-
-    name = re.sub(r"one-(\d+(?:,\d+)*)-((?:di|tri)?yl(?:idene|idyne)?)\b", r"on-\1-\2", name)
-    name = name.replace("one-diyl", "on-diyl")
-    name = name.replace("one-yl", "on-yl")
-
-    name = apply_data_postprocessing(name)
-
-    name = name.replace("methan-1-one hydrazone", "formaldehyde hydrazone")
-    name = name.replace("methanone hydrazone", "formaldehyde hydrazone")
-    name = name.replace("methanal hydrazone", "formaldehyde hydrazone")
-    name = name.replace("ethanal hydrazone", "acetaldehyde hydrazone")
-
-    name = name.replace("oxo(hydroxy)aminooxy", "nitrooxy")
-    name = name.replace("(oxo(hydroxy)amino)oxy", "nitrooxy")
-    name = name.replace("(oxo)(oxido)aminooxy", "nitrooxy")
-    name = name.replace("((oxo)(oxido)amino)oxy", "nitrooxy")
-
-    name = re.sub(r"\b(amino|imino)([a-z]+oxy)methyl\b", r"\1(\2)methyl", name)
-    name = re.sub(r"\b(amino|imino)([a-z]+oxy)methylidene\b", r"\1(\2)methylidene", name)
-
-    name = re.sub(r"ane-(\d+(?:,\d+)*)-hydrazine\b", r"an-\1-ylhydrazine", name)
-    name = re.sub(r"ene-(\d+(?:,\d+)*)-hydrazine\b", r"en-\1-ylhydrazine", name)
-    name = re.sub(r"yne-(\d+(?:,\d+)*)-hydrazine\b", r"yn-\1-ylhydrazine", name)
-
-    name = re.sub(r"\b(amino|imino)\(", r"(\1)(", name)
-    name = apply_data_postprocessing(name)
-    name = apply_connection_boundary_postprocessing(name)
-
-    return name
+    return apply_data_postprocessing(name)
 
 
 def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:

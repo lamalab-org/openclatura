@@ -519,12 +519,6 @@ def apply_terminal_parent_ide(name: str, negative_locants: dict[str, set[str]]) 
     return name
 
 
-def contains_invalid_locant_ide(name: str) -> bool:
-    """Return whether a generated name contains a known-invalid locant-ide form."""
-
-    return any(pattern.search(name) for pattern in INVALID_LOCANT_IDE_PATTERNS)
-
-
 def apply_terminal_characteristic_suffix_ide(name: str, negative_locants: dict[str, set[str]]) -> str:
     """
     Place parent ``-ide`` before terminal suffixes that cannot follow it.

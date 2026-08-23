@@ -15,6 +15,20 @@ SUBSTITUENT_SORT_PREFIX_RE = re.compile(RULES.assembly.substituent_sort_prefix_p
 A_PREFIX_ORDER = RULES.assembly.replacement_prefix_order
 
 
+def _groups_offering_a_second_position() -> frozenset[str]:
+    """Suffixes carrying their own substitutable nitrogen: ``formamide`` can cite N as well as C1."""
+
+    markers = RULES.assembly.suffix_nitrogen_markers
+    return frozenset(
+        key
+        for key, rule in RULES.functional_groups.by_key.items()
+        if rule.suffix and any(marker in rule.suffix for marker in markers)
+    )
+
+
+GROUPS_OFFERING_A_SECOND_POSITION = _groups_offering_a_second_position()
+
+
 def substituent_sort_key(name: str) -> str:
     text = name.lower()
     text = re.sub(r"^[\(\[\{\)]+", "", text)
@@ -34,11 +48,13 @@ def group_substituents(substituents: list[SubstituentItem]) -> dict[str, list[Su
 
 
 def substituent_locant_string(parts: AssemblyParts, locs: list[str], grouped_count: int, spiro_subs) -> str:
+    # A one-atom parent has a single position, so a numeric locant on it says nothing -- unless the
+    # suffix brings a nitrogen of its own, which the locant is then what distinguishes it from.
     if (
         parts.parent_length == 1
         and all(str(l).isdigit() for l in locs)
-        and not parts.principal_group
         and not parts.a_prefixes
+        and (parts.principal_group is None or parts.principal_group.key not in GROUPS_OFFERING_A_SECOND_POSITION)
     ):
         return ""
     retained_spec = retained_parent_spec(parts.retained_name)

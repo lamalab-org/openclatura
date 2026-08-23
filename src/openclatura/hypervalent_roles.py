@@ -127,16 +127,6 @@ def hypervalent_center_role(
     )
 
 
-def hypervalent_center_roles(mol: Molecule, component_atoms: set[int]) -> list[HypervalentCenterRole]:
-    """Return all supported hypervalent center roles in a component."""
-
-    return [
-        role
-        for atom_id in sorted(component_atoms)
-        if (role := hypervalent_center_role(mol, component_atoms, atom_id)) is not None
-    ]
-
-
 def _classify_ligand(
     mol: Molecule,
     component_atoms: set[int],

@@ -142,16 +142,6 @@ def nitrogen_chain_roles(
     return _dedupe_roles(roles)
 
 
-def acid_derived_hydrazone_roles(
-    mol: Molecule,
-    cyclic_atoms: set[int],
-    consumed: set[int] | None = None,
-) -> list[NitrogenChainRole]:
-    """Return acid-derived hydrazone-family roles for audit/template gating."""
-
-    return _dedupe_roles(_acid_derived_hydrazone_roles(mol, cyclic_atoms, consumed or set()))
-
-
 def _role_atoms(roles: list[NitrogenChainRole]) -> set[int]:
     return {atom_idx for role in roles for atom_idx in role.atom_ids}
 
@@ -394,79 +384,6 @@ def _hydrazone_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -
                 ),
             )
         )
-    return roles
-
-
-def _acid_derived_hydrazone_roles(
-    mol: Molecule,
-    cyclic_atoms: set[int],
-    blocked: set[int],
-) -> list[NitrogenChainRole]:
-    """Classify amidrazone, imidohydrazide, and thiohydrazide graph families.
-
-    These are acid-derived C/N/S systems and must not be consumed by the
-    ordinary aldehyde/ketone hydrazone detector.
-    """
-
-    roles: list[NitrogenChainRole] = []
-    for carbon in mol:
-        if not carbon.is_carbon or carbon.idx in cyclic_atoms or carbon.idx in blocked:
-            continue
-        single_n = _single_bonded_nitrogens(mol, carbon.idx, blocked | cyclic_atoms)
-        double_n = _double_bonded_nitrogens(mol, carbon.idx, blocked | cyclic_atoms)
-        double_s = _double_bonded_atoms(mol, carbon.idx, "S", blocked | cyclic_atoms)
-
-        if len(single_n) >= 2 and len(double_n) == 1:
-            hydrazide_n = _nitrogen_with_terminal_n(mol, single_n, {carbon.idx}, blocked | cyclic_atoms)
-            amino_n = next((n for n in single_n if n != hydrazide_n), None)
-            if hydrazide_n is not None and amino_n is not None:
-                terminal_n = _terminal_nitrogen_neighbor(mol, hydrazide_n, {carbon.idx}, blocked | cyclic_atoms)
-                roles.append(
-                    _make_role(
-                        mol,
-                        key="hydrazonamide",
-                        is_principal_candidate=True,
-                        attachment_atom=carbon.idx,
-                        atom_ids=frozenset({carbon.idx, double_n[0], hydrazide_n, terminal_n, amino_n}),
-                        variant="acid_derived_amidrazone",
-                        reason=f"Matched C(=N)(N)(N-N) hydrazonamide fragment at atom {carbon.idx}.",
-                        ordered_atoms=(double_n[0], carbon.idx, hydrazide_n, terminal_n),
-                    )
-                )
-                continue
-
-        if len(single_n) == 1 and len(double_n) == 1:
-            terminal_n = _terminal_nitrogen_neighbor(mol, single_n[0], {carbon.idx}, blocked | cyclic_atoms)
-            if terminal_n is not None:
-                roles.append(
-                    _make_role(
-                        mol,
-                        key="imidohydrazide",
-                        is_principal_candidate=True,
-                        attachment_atom=carbon.idx,
-                        atom_ids=frozenset({carbon.idx, double_n[0], single_n[0], terminal_n}),
-                        variant="acid_derived_imidohydrazide",
-                        reason=f"Matched C(=N)(N-N) imidohydrazide fragment at atom {carbon.idx}.",
-                        ordered_atoms=(double_n[0], carbon.idx, single_n[0], terminal_n),
-                    )
-                )
-                continue
-
-        if len(single_n) == 1 and len(double_s) == 1:
-            terminal_n = _terminal_nitrogen_neighbor(mol, single_n[0], {carbon.idx}, blocked | cyclic_atoms)
-            if terminal_n is not None:
-                roles.append(
-                    _make_role(
-                        mol,
-                        key="thiohydrazide",
-                        is_principal_candidate=True,
-                        attachment_atom=carbon.idx,
-                        atom_ids=frozenset({carbon.idx, double_s[0], single_n[0], terminal_n}),
-                        variant="acid_derived_thiohydrazide",
-                        reason=f"Matched C(=S)(N-N) thiohydrazide fragment at atom {carbon.idx}.",
-                        ordered_atoms=(double_s[0], carbon.idx, single_n[0], terminal_n),
-                    )
-                )
     return roles
 
 

@@ -45,6 +45,7 @@ RETAINED_CHAIN_PARENTS: dict[tuple[int, str, int], str] = {
     (2, "carboxylic_acid", 1): "acetic acid",
     (1, "amide", 1): "formamide",
     (2, "amide", 1): "acetamide",
+    (1, "nitrile", 1): "hydrogen cyanide",
     (2, "nitrile", 1): "acetonitrile",
     (3, "nitrile", 1): "propionitrile",
     (4, "nitrile", 1): "butyronitrile",
@@ -118,15 +119,47 @@ def _retained_carbonyl_derivative_parents() -> dict[tuple[str, str], str]:
     return parents
 
 
+RETAINED_ALDEHYDE_CHAIN_WORDS: dict[int, str] = {1: "formaldehyde", 2: "acetaldehyde"}
+
+
+def _retained_aldehyde_derivative_chain_parents() -> dict[tuple[int, str, int], str]:
+    """``acetaldehyde hydrazone``: an aldehyde derivative keeps the retained aldehyde word."""
+
+    aldehyde_suffix = RULES.functional_groups.get("aldehyde").suffix
+    parents: dict[tuple[int, str, int], str] = {}
+    for key, rule in RULES.functional_groups.by_key.items():
+        if not rule.suffix:
+            continue
+        base_suffix, _, derivative = rule.suffix.partition(" ")
+        if base_suffix != aldehyde_suffix or not derivative:
+            continue
+        for length, word in RETAINED_ALDEHYDE_CHAIN_WORDS.items():
+            parents[(length, key, 1)] = f"{word} {derivative}"
+    return parents
+
+
 RETAINED_CHAIN_PARENTS.update(_retained_acyl_halide_parents())
+RETAINED_CHAIN_PARENTS.update(_retained_aldehyde_derivative_chain_parents())
 RETAINED_FUNCTIONAL_PARENTS.update(_retained_ring_acyl_halide_parents())
 RETAINED_FUNCTIONAL_PARENTS.update(_retained_carbonyl_derivative_parents())
 RETAINED_SUBSTITUTED_CHAIN_PARENTS: dict[tuple[int, str, int, str, str], str] = {
     (1, "nitrile", 1, "hydroxy", "1"): "cyanic acid",
     (1, "carboxylic_acid", 1, "amino", "1"): "carbamic acid",
 }
+# The branch ending is absorbed into the retained word, so whatever precedes it stays in front:
+# ``((diaminomethylidene)amino)amino`` on a nitrile is ``((diaminomethylidene)amino)cyanamide``.
+RETAINED_CHAIN_BRANCH_ENDINGS: dict[tuple[int, str, int, str, str], str] = {
+    (1, "nitrile", 1, "amino", "1"): "cyanamide",
+}
 _UNSUBSTITUTABLE_RETAINED_CHAIN_PARENTS = frozenset(
-    {"oxalic acid", "malonic acid", "succinic acid", "glutaric acid", "adipic acid"}
+    {"oxalic acid", "malonic acid", "succinic acid", "glutaric acid", "adipic acid", "hydrogen cyanide"}
+)
+# These spell their own chain, so a substituent on it has nowhere to be cited; one on the
+# derivative's nitrogen still does.
+_CARBON_UNSUBSTITUTABLE_RETAINED_CHAIN_PARENTS = frozenset(
+    f"{word} {derivative}"
+    for word in RETAINED_ALDEHYDE_CHAIN_WORDS.values()
+    for derivative in ("hydrazone", "amidinohydrazone")
 )
 RETAINED_ACYL_BRANCH_ENDINGS: dict[tuple[str, str], str] = {
     ("amino", "acyl"): "carbamoyl",
@@ -177,6 +210,10 @@ def _retained_chain_parent(parts: AssemblyParts) -> tuple[str, SubstituentItem |
         return None
     if parts.substituents and retained in _UNSUBSTITUTABLE_RETAINED_CHAIN_PARENTS:
         return None
+    if retained in _CARBON_UNSUBSTITUTABLE_RETAINED_CHAIN_PARENTS and any(
+        str(locant).isdigit() for item in parts.substituents for locant in item.locants
+    ):
+        return None
     return retained, None
 
 
@@ -190,10 +227,17 @@ def _absorbed_retained_chain_branch(
     branch = parts.substituents[0]
     if len(branch.locants) != 1:
         return None
-    retained = RETAINED_SUBSTITUTED_CHAIN_PARENTS.get(
-        (parts.parent_length, group_key, group_count, branch.name, str(branch.locants[0]))
-    )
-    return None if retained is None else (retained, branch)
+    key = (parts.parent_length, group_key, group_count, branch.name, str(branch.locants[0]))
+    retained = RETAINED_SUBSTITUTED_CHAIN_PARENTS.get(key)
+    if retained is not None:
+        return retained, branch
+    branch_name = strip_outer_parentheses(branch.name)
+    for (length, key_group, count, ending, locant), word in RETAINED_CHAIN_BRANCH_ENDINGS.items():
+        if (length, key_group, count, locant) != (parts.parent_length, group_key, group_count, str(branch.locants[0])):
+            continue
+        if branch_name.endswith(ending) and not branch_name.startswith(("N-", "N,")):
+            return f"{branch_name[: -len(ending)]}{word}", branch
+    return None
 
 
 def promote_retained_functional_parent(parts: AssemblyParts) -> None:
@@ -355,7 +399,7 @@ def apply_replacement_prefix(stem_str: str, a_prefix_str: str) -> str:
     return stem_str
 
 
-def format_unsaturations(parts: AssemblyParts, stem_str: str) -> tuple[str, str]:
+def format_unsaturations(parts: AssemblyParts, stem_str: str, *, omit_locants: bool = False) -> tuple[str, str]:
     sorted_unsats = sorted(parts.unsaturations, key=lambda u: UNSATURATION_ORDER.get(u.bond_key, 99))
     unsat_parts = []
     base_infixes = []
@@ -372,7 +416,7 @@ def format_unsaturations(parts: AssemblyParts, stem_str: str) -> tuple[str, str]
             stem_str += "a"
     base_infixes = [(unsaturation, infix) for unsaturation, _count, infix in base_infixes]
     for unsaturation, base_infix in base_infixes:
-        if unsaturation.locants:
+        if unsaturation.locants and not omit_locants:
             loc_str = ",".join(sorted(unsaturation.locants, key=parse_locant))
             unsat_parts.append(f"-{loc_str}-{base_infix}")
         else:
@@ -418,6 +462,16 @@ def always_print_substituent_locant(parts: AssemblyParts) -> bool:
     return any(stem_str.endswith(stem) for stem in AMBIGUOUS_CONNECTION_SUBSTITUENT_STEMS)
 
 
+def two_carbon_locants_are_redundant(parts: AssemblyParts) -> bool:
+    """A two-carbon substituent has one place for its bond and its attachment: ``ethenyl``, ``ethynyl``."""
+
+    if parts.is_ring or parts.parent_length != 2 or str(parts.attachment_locant) != "1":
+        return False
+    if len(parts.unsaturations) != 1:
+        return False
+    return [str(locant) for locant in parts.unsaturations[0].locants] == ["1"]
+
+
 def format_substituent_tail(
     parts: AssemblyParts, stem_str: str, terminal_e: str, spiro_subs
 ) -> tuple[str, str, str, str]:
@@ -435,6 +489,9 @@ def format_substituent_tail(
             unsat_str = "an"
         return stem_str, unsat_str, suffix_yl, ""
     always_print_locant = bool(spiro_subs) or always_print_substituent_locant(parts)
+    if not always_print_locant and two_carbon_locants_are_redundant(parts):
+        stem_str, unsat_str = format_unsaturations(parts, stem_str, omit_locants=True)
+        return stem_str, unsat_str, append_charge_suffixes_to_terminal(parts, suffix_yl), ""
     if parts.retained_name == "benzene":
         terminal_e = "yl"
     elif (

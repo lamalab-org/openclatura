@@ -4,6 +4,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
+from .additive import add_indicated_hydrogens as _add_indicated_hydrogens
 from .assembler import assemble_name_raw, post_process_rewrite_rules
 from .assembly_parts import (
     AssemblyParts,
@@ -28,7 +29,7 @@ from .functional_prefixes import PREFIX_HANDLERS, PrefixContext
 from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
-from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
+from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase, charged_atoms
 from .molecule import bond_ids_within as _bond_ids_within
 from .name_assembly import NameAssemblyResult, rewrite_history_trace_data, token_span_trace_data
 from .naming_context import NamingIntent
@@ -39,9 +40,6 @@ from .perception import PerceivedGroup, perceive_groups
 from .retained_fused_production import production_retained_fused_parent
 from .rules import elision, multipliers, stems
 from .spiro_assembly import SpiroAssembly
-from .subgraph_tools import (
-    add_indicated_hydrogens as _add_indicated_hydrogens,
-)
 from .subgraph_tools import (
     add_parent_features as _add_subgraph_parent_features,
 )
@@ -868,7 +866,7 @@ def _collect_subgraph_substituents(
                         locants=[],
                         atom_ids=set(group.atoms_involved),
                         bond_ids=_bond_ids_within(mol, set(group.atoms_involved) | {group.attachment_carbon}),
-                        charge_atom_ids=_charged_atoms(mol, set(group.atoms_involved)),
+                        charge_atom_ids=charged_atoms(mol, set(group.atoms_involved)),
                     )
                 )
                 sub_handled_atoms.update(group.atoms_involved)
@@ -889,7 +887,7 @@ def _collect_subgraph_substituents(
                     locants=[],
                     atom_ids=sub_comp - {c_idx},
                     bond_ids=_bond_ids_within(mol, sub_comp),
-                    charge_atom_ids=_charged_atoms(mol, sub_comp - {c_idx}),
+                    charge_atom_ids=charged_atoms(mol, sub_comp - {c_idx}),
                     spiro=_spiro_subgraph_assembly(mol, c_idx, sub_comp),
                 )
             )
@@ -943,7 +941,7 @@ def _collect_subgraph_substituents(
                             outer_parentheses_optional=outer_parentheses_optional,
                             atom_ids=branch_atoms,
                             bond_ids=_bond_ids_within(mol, branch_with_attachment),
-                            charge_atom_ids=_charged_atoms(mol, branch_atoms),
+                            charge_atom_ids=charged_atoms(mol, branch_atoms),
                             emitted_tokens=emitted_tokens,
                             trace_segments=branch_trace,
                             nested_decisions=decision_trace_data(branch_decisions) if emit_metadata else [],
@@ -961,12 +959,6 @@ def _add_subgraph_substituents(parts: AssemblyParts, subst_mapping: dict[int, li
     _add_substituent_traces(parts, subst_mapping, get_loc)
 
 
-def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
-    """Return formally charged atoms from an already named graph fragment."""
-
-    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
-
-
 def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
     """Apply recursive-substituent wrapping rules to an assembled name.
     P-13.6 and P-16.5 for substituent suffix citation and parentheses around complex prefixes."""
@@ -978,8 +970,10 @@ def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
     if (
         (name.endswith("yl") or name.endswith("ylidene") or name.endswith("ylidyne"))
         and not parts.substituents
-        and not parts.unsaturations
         and str(parts.attachment_locant) == "1"
+        # An unsaturation usually brings locants with it, and those need the enclosure; a simple
+        # one-word prefix that spells its bond without them (``ethenyl``) does not.
+        and (not parts.unsaturations or not (is_complex_prefix(name) or is_composite_prefix(name)))
         and not name.startswith("bicyclo")
         and not name.startswith("spiro")
         and not name.startswith("tricyclo")

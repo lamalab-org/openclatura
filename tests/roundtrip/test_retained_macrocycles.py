@@ -7,11 +7,19 @@ from rdkit import Chem
 
 from openclatura import name, name_smiles
 from openclatura.graph_io import read_smiles
-from openclatura.retained_macrocycle_templates import (
-    match_retained_macrocycle,
-    match_retained_macrocycles,
-    retained_macrocycle_templates,
-)
+from openclatura.retained_fused_templates import match_retained_graph_templates, retained_graph_templates
+
+MACROCYCLES = frozenset({"macrocycle"})
+
+
+def macrocycle_matches(mol):
+    return match_retained_graph_templates(mol, set(mol.atoms), allow_nonaromatic=True, families=MACROCYCLES)
+
+
+def macrocycle_match(mol):
+    matches = macrocycle_matches(mol)
+    return matches[0] if matches else None
+
 
 MACROCYCLE_CASES = (
     (
@@ -40,7 +48,7 @@ def test_retained_macrocycle_names_are_invariant_to_atom_order(expected_name, sm
 
 
 def test_porphyrin_aliases_are_policy_data_for_one_graph_template():
-    templates = {template.name: template for template in retained_macrocycle_templates()}
+    templates = {template.name: template for template in retained_graph_templates(families=MACROCYCLES)}
     assert set(templates) == {"porphyrin", "corrin"}
     assert templates["porphyrin"].output_name == "porphyrin"
     assert templates["porphyrin"].aliases == ("porphine", "21H,23H-porphine")
@@ -51,9 +59,9 @@ def test_porphyrin_aliases_are_policy_data_for_one_graph_template():
 @pytest.mark.parametrize(("expected_name", "smiles"), MACROCYCLE_CASES)
 def test_retained_macrocycle_match_carries_complete_conventional_locants(expected_name, smiles):
     mol = read_smiles(smiles)
-    match = match_retained_macrocycle(mol, set(mol.atoms))
+    match = macrocycle_match(mol)
     assert match is not None
-    assert match.name == expected_name
+    assert match.template.output_name == expected_name
     assert set(match.atom_to_locant) == set(mol.atoms)
     assert set(match.locant_to_atom) == set(match.template.locants)
     assert {match.template.atom_by_locant[locant].symbol for locant in ("21", "22", "23", "24")} == {"N"}
@@ -67,19 +75,19 @@ def test_similarly_sized_hydrogenated_graph_does_not_false_match_porphyrin():
     double_bond = next(bond for bond in editable.GetBonds() if bond.GetBondType() == Chem.BondType.DOUBLE)
     double_bond.SetBondType(Chem.BondType.SINGLE)
     altered = read_smiles(Chem.MolToSmiles(editable))
-    assert match_retained_macrocycle(altered, set(altered.atoms)) is None
+    assert macrocycle_match(altered) is None
 
 
 def test_macrocycle_match_exposes_all_numbering_orientations():
     mol = read_smiles(MACROCYCLE_CASES[0][1])
-    matches = match_retained_macrocycles(mol, set(mol.atoms))
+    matches = macrocycle_matches(mol)
     assert len(matches) > 1
     assert len({tuple(sorted(match.atom_to_locant.items())) for match in matches}) == len(matches)
 
 
 def test_exact_macrocycle_bond_policy_rejects_a_rearranged_corrin_pattern():
     mol = read_smiles(MACROCYCLE_CASES[1][1])
-    match = match_retained_macrocycle(mol, set(mol.atoms))
+    match = macrocycle_match(mol)
     assert match is not None
     by_class = {
         bond_class: next(bond for bond in match.template.bonds if bond.bond_class == bond_class)
@@ -90,7 +98,7 @@ def test_exact_macrocycle_bond_policy_rejects_a_rearranged_corrin_pattern():
         bond = mol.get_bond(match.locant_to_atom[left], match.locant_to_atom[right])
         assert bond is not None
         mol.set_bond_order(bond.idx, new_order)
-    assert match_retained_macrocycle(mol, set(mol.atoms)) is None
+    assert macrocycle_match(mol) is None
 
 
 @pytest.mark.parametrize(("expected_name", "smiles"), MACROCYCLE_CASES)

@@ -12,6 +12,7 @@ from .formatting import format_counted_prefixes, format_multiplier, oxy_prefix_f
 from .molecule import (
     Molecule,
     bond_ids_within,
+    charged_atoms,
     component_atoms_until_blocked,
 )
 from .naming_protocols import RecursiveSubgraphNamer
@@ -58,10 +59,6 @@ class SpecialComponentName:
     audit_chain: ChainAuditPlan | None = None
 
 
-def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
-    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
-
-
 def _component_name_result(
     mol: Molecule,
     component_atoms: set[int],
@@ -80,7 +77,7 @@ def _component_name_result(
                 term=name,
                 atom_ids=set(component_atoms),
                 bond_ids=bond_ids_within(mol, component_atoms),
-                charge_atom_ids=_charged_atoms(mol, component_atoms),
+                charge_atom_ids=charged_atoms(mol, component_atoms),
             ),
         )
     return SpecialComponentName(name=name, role=role, bindings=bindings)
@@ -1474,7 +1471,7 @@ def oxoacid_ester_result(
                 term=ester_name,
                 atom_ids=ester_component_atoms,
                 bond_ids=bond_ids_within(mol, ester_component_atoms),
-                charge_atom_ids=_charged_atoms(mol, ester_component_atoms),
+                charge_atom_ids=charged_atoms(mol, ester_component_atoms),
             ),
             *_central_oxo_role_bindings(mol, role, suffix, "oxoacid_ester_suffix"),
         )
@@ -1526,7 +1523,7 @@ def _peroxy_oxoacid_ester_result(
             term=modifier,
             atom_ids=modifier_atoms,
             bond_ids=bond_ids_within(mol, modifier_atoms),
-            charge_atom_ids=_charged_atoms(mol, modifier_atoms),
+            charge_atom_ids=charged_atoms(mol, modifier_atoms),
         ),
         NameAtomBinding(
             stage="shortcut",
@@ -1557,7 +1554,7 @@ def _central_oxo_role_bindings(
             term=term,
             atom_ids=core_atoms,
             bond_ids=bond_ids_within(mol, core_atoms),
-            charge_atom_ids=_charged_atoms(mol, core_atoms),
+            charge_atom_ids=charged_atoms(mol, core_atoms),
         )
     ]
     for ligand in role.ligands:
@@ -1882,7 +1879,7 @@ def sulfoxide_parent_result(mol: Molecule, component_atoms: set[int]) -> Special
         term="sulfoxide",
         atom_ids=core_atoms,
         bond_ids=bond_ids_within(mol, core_atoms),
-        charge_atom_ids=_charged_atoms(mol, core_atoms),
+        charge_atom_ids=charged_atoms(mol, core_atoms),
     )
     return _component_name_result(
         mol, component_atoms, name, "sulfoxide_parent", bindings=ligand_bindings + (core_binding,)

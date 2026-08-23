@@ -4,7 +4,7 @@ from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem, sp
 from .formatting import strip_outer_parentheses
 from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
-from .molecule import DecisionTrace, Molecule, bond_ids_within
+from .molecule import DecisionTrace, Molecule, bond_ids_within, charged_atoms
 from .naming_protocols import RecursiveSubgraphNamer
 from .nomenclature import RULES
 from .perception import PerceivedGroup
@@ -42,7 +42,7 @@ def add_component_front_modifiers(
             locant = str(get_loc(group.attachment_carbon)) if get_loc is not None else None
             parts.front_modifier_locants.append(locant)
             parts.front_modifier_atom_ids.update(modifier_atoms)
-            parts.front_modifier_charge_atom_ids.update(_charged_atoms(mol, modifier_atoms))
+            parts.front_modifier_charge_atom_ids.update(charged_atoms(mol, modifier_atoms))
 
 
 def n_substituent_locant(
@@ -139,7 +139,7 @@ def add_component_n_substituents(
                                 outer_parentheses_optional=outer_parentheses_optional,
                                 atom_ids=branch_atoms,
                                 bond_ids=bond_ids_within(mol, branch_atoms | {single_n}),
-                                charge_atom_ids=_charged_atoms(mol, branch_atoms),
+                                charge_atom_ids=charged_atoms(mol, branch_atoms),
                                 emitted_tokens=emitted_tokens,
                                 trace_segments=branch_trace,
                                 nested_decisions=nested_decisions,
@@ -153,19 +153,13 @@ def add_component_n_substituents(
                         loc_prefix,
                         branch_atoms,
                         bond_ids_within(mol, branch_atoms | {single_n}),
-                        _charged_atoms(mol, branch_atoms),
+                        charged_atoms(mol, branch_atoms),
                         branch_trace,
                         nested_decisions,
                         emitted_tokens,
                         substituent_tree=branch_tree,
                     )
             n_idx_global += 1
-
-
-def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
-    """Return formally charged atoms from an already named graph fragment."""
-
-    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
 
 
 def _with_n_substituent_locant_token(

@@ -1440,9 +1440,6 @@ def _numbered_from_smiles(smiles: str, labels: list[str], attach_locant: str) ->
     return rw, locants, locants[attach_locant]
 
 
-_CLAUSE_RE = re.compile(r"(\d+(?:,\d+)*)-")
-
-
 def _apply_prefix(rw: Chem.RWMol, locants: dict[str, int], prefix: str) -> bool:
     if prefix.startswith("(") and prefix.endswith(")") and _balanced(prefix[1:-1]) and "1" in locants:
         frag = resolve_fragment_mol(prefix)

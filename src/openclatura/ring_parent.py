@@ -8,12 +8,9 @@ plain paths independently.
 
 from dataclasses import dataclass
 
+from .locants import retained_locant_sort_key
 from .polycycle_topology import RingNumbering
 from .ring_renderer import is_von_baeyer_descriptor
-
-
-def _is_von_baeyer_descriptor(descriptor: str | None) -> bool:
-    return is_von_baeyer_descriptor(descriptor)
 
 
 @dataclass(frozen=True)
@@ -34,7 +31,7 @@ class RingParent:
             return [list(numbering.path) for numbering in self.numbering_candidates]
         if self.retained_locant_maps:
             return [
-                sorted(locant_map, key=lambda atom: _retained_locant_sort_key(locant_map[atom]))
+                sorted(locant_map, key=lambda atom: retained_locant_sort_key(locant_map[atom]))
                 for locant_map in self.retained_locant_maps
             ]
         return [list(path) for path in self.candidate_paths]
@@ -53,7 +50,7 @@ class RingParent:
                 for locant_map in self.retained_locant_maps
             )
         if not self.numbering_candidates:
-            return not _is_von_baeyer_descriptor(self.descriptor)
+            return not is_von_baeyer_descriptor(self.descriptor)
         return all(numbering.audit_ok for numbering in self.numbering_candidates)
 
     @classmethod
@@ -94,7 +91,7 @@ class RingParent:
         paths: list[list[int]] | tuple[tuple[int, ...], ...],
         descriptor_numbers: tuple[int, ...] = (),
     ) -> "RingParent":
-        if _is_von_baeyer_descriptor(descriptor):
+        if is_von_baeyer_descriptor(descriptor):
             raise ValueError("von Baeyer RingParent requires audited numbering candidates")
         return cls(
             kind=kind,
@@ -122,14 +119,3 @@ class RingParent:
         if not parent.audit_ok:
             raise ValueError("Retained parent locant maps must be complete bijections.")
         return parent
-
-
-def _retained_locant_sort_key(locant: str) -> tuple[int, str]:
-    digits = ""
-    suffix = ""
-    for char in str(locant):
-        if char.isdigit() and not suffix:
-            digits += char
-        else:
-            suffix += char
-    return (int(digits) if digits else 10_000, suffix)

@@ -33,17 +33,6 @@ def register_group_detector(
     return detector
 
 
-def register_perception_spec(spec: PerceptionDetectorSpec, *, prepend: bool = False) -> PerceptionDetectorSpec:
-    """Register an ordered detector spec for custom functional-group perception."""
-
-    if prepend:
-        PERCEPTION_SPECS.insert(0, spec)
-    else:
-        PERCEPTION_SPECS.append(spec)
-    PERCEPTION_SPECS.sort(key=lambda item: item.priority)
-    return spec
-
-
 def metadata_for_group(key: str) -> FunctionalGroupMetadata:
     """Return metadata for built-in, overridden, or custom groups."""
 

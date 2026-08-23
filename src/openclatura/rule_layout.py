@@ -83,6 +83,7 @@ RULE_GROUPS: tuple[RuleGroupSpec, ...] = (
             "simple_sulfanyl_prefixes",
             "simple_selanyl_prefixes",
             "retained_sulfonyl_group_names",
+            "retained_sulfonyl_ligand_contractions",
             "halogen_prefixes",
             "halogen_lambda_suffixes",
             "direct_group_prefixes",
@@ -106,7 +107,6 @@ RULE_GROUPS: tuple[RuleGroupSpec, ...] = (
             "peroxy_acid_prefix_groups",
             "sulfonyl_prefix_groups",
             "front_modifier_principal_groups",
-            "n_substituent_principal_groups",
             "hydrazone_principal_groups",
         ),
         reason="Functional-group rows and their derived behavior families are one extension surface.",
@@ -128,26 +128,16 @@ RULE_GROUPS: tuple[RuleGroupSpec, ...] = (
             "substituent_sort",
             "substituent_attachment_suffixes",
             "ambiguous_connection_substituent_stems",
-            "connection_boundary_parent_stems",
+            "suffix_nitrogen_markers",
         ),
         reason="Name assembly ordering, sorting, and connection-boundary grammar are rendering policy.",
     ),
     RuleGroupSpec(
         key="postprocessing",
-        sections=(
-            "postprocess_literal_replacements",
-            "postprocess_regex_replacements",
-            "postprocess_exact_replacements",
-            "postprocess_acyl_amido_terms",
-            "postprocess_n_substituted_functional_suffixes",
-        ),
+        sections=("postprocess_literal_replacements",),
         reason="Compatibility rewrites and postprocessing inventories need one owner.",
     ),
 )
-
-
-def rule_group_specs() -> tuple[RuleGroupSpec, ...]:
-    return RULE_GROUPS
 
 
 def rule_groups(table: dict[str, Any]) -> dict[str, RuleGroupView]:
@@ -162,7 +152,3 @@ def section_group_map() -> dict[str, str]:
                 raise ValueError(f"Rule section {section!r} is assigned to multiple groups.")
             mapping[section] = spec.key
     return mapping
-
-
-def unassigned_sections(table: dict[str, Any]) -> set[str]:
-    return set(table) - set(section_group_map())

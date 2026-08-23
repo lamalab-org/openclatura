@@ -427,6 +427,16 @@
       "phenyl"
     ]
   },
+  "retained_sulfonyl_ligand_contractions": {
+    "bluebook_rule": "P-65.3.1, P-66.1.4; a sulfonyl whose ligand ends in these words contracts to one retained word",
+    "values": [
+      {
+        "ligand_ending": "amino",
+        "suffix": "sulfonyl",
+        "name": "sulfamoyl"
+      }
+    ]
+  },
   "retained_sulfonyl_group_names": {
     "bluebook_rule": "P-65.3.1; retained shorthands for sulfonyl groups, with the acid they are named from",
     "values": [
@@ -651,24 +661,6 @@
       "ring_carboxylate",
       "peroxy_ester",
       "ring_peroxy_ester"
-    ]
-  },
-  "n_substituent_principal_groups": {
-    "bluebook_rule": "P-62, P-66; N-substitution locants for amines, amides, imines, hydrazones, and hydrazines",
-    "values": [
-      "amide",
-      "amine",
-      "ring_amide",
-      "thioamide",
-      "ring_thioamide",
-      "hydrazine",
-      "hydrazone",
-      "imine",
-      "iminium",
-      "aldehyde_hydrazone",
-      "ring_aldehyde_hydrazone",
-      "aldehyde_imine",
-      "ring_aldehyde_imine"
     ]
   },
   "hydrazone_principal_groups": {
@@ -1500,33 +1492,16 @@
       "isothiazol"
     ]
   },
-  "connection_boundary_parent_stems": {
-    "bluebook_rule": "P-13.6; parent stems that retain optional 1-locants at prefix boundaries to avoid ambiguous OPSIN attachment",
+  "suffix_nitrogen_markers": {
+    "bluebook_rule": "P-14.3.4; a suffix carrying a nitrogen -- or an acid that becomes an amido prefix -- adds a citable position, so a one-atom parent still needs its locant",
     "values": [
-      "aziridin",
-      "azetidin",
-      "pyrrolidin",
-      "piperidin",
-      "piperazin",
-      "pyrazol",
-      "imidazol",
-      "triazol",
-      "tetrazol",
-      "oxazol",
-      "isoxazol",
-      "thiazol",
-      "isothiazol",
-      "cycloprop",
-      "cyclobut",
-      "cyclopent",
-      "cyclohex",
-      "benzen",
-      "methan",
-      "ethan",
-      "propan",
-      "butan",
-      "pentan",
-      "hexan"
+      "amid",
+      "amin",
+      "imin",
+      "hydrazon",
+      "hydrazid",
+      "amidin",
+      "acid"
     ]
   },
   "replacement_prefix_order": {
@@ -1591,12 +1566,6 @@
         "reason": "Contract systematic alkyloxy spelling to retained methoxy."
       },
       {
-        "pattern": "ethyloxy",
-        "replacement": "ethoxy",
-        "category": "retained_alias",
-        "reason": "Contract systematic alkyloxy spelling to retained ethoxy."
-      },
-      {
         "pattern": "propyloxy",
         "replacement": "propoxy",
         "category": "retained_alias",
@@ -1609,130 +1578,11 @@
         "reason": "Contract systematic alkyloxy spelling to retained butoxy."
       },
       {
-        "pattern": "phenyloxy",
-        "replacement": "phenoxy",
-        "category": "retained_alias",
-        "reason": "Contract systematic aryl oxy spelling to retained phenoxy."
-      },
-      {
-        "pattern": "aminocarbonylamino",
-        "replacement": "carbamoylamino",
-        "category": "retained_alias",
-        "reason": "Use retained carbamoylamino prefix spelling."
-      },
-      {
-        "pattern": "aminocarbonyl",
-        "replacement": "carbamoyl",
-        "category": "retained_alias",
-        "reason": "Use retained carbamoyl prefix spelling."
-      },
-      {
-        "pattern": "aminosulfonyl",
-        "replacement": "sulfamoyl",
-        "category": "retained_alias",
-        "reason": "Use retained sulfamoyl prefix spelling."
-      },
-      {
-        "pattern": "formylamido",
-        "replacement": "formamido",
-        "category": "morphology",
-        "reason": "Use valid formamido morphology for formyl-amido contraction."
-      },
-      {
-        "pattern": "eth-1-en-1-yl",
-        "replacement": "ethenyl",
-        "category": "retained_alias",
-        "reason": "Contract explicit locanted vinyl substituent to ethenyl."
-      },
-      {
-        "pattern": "eth-1-enyl",
-        "replacement": "ethenyl",
-        "category": "retained_alias",
-        "reason": "Contract explicit locanted vinyl substituent to ethenyl."
-      },
-      {
-        "pattern": "eth-1-yn-1-yl",
-        "replacement": "ethynyl",
-        "category": "retained_alias",
-        "reason": "Contract explicit locanted ethynyl substituent to ethynyl."
-      },
-      {
-        "pattern": "eth-1-ynyl",
-        "replacement": "ethynyl",
-        "category": "retained_alias",
-        "reason": "Contract explicit locanted ethynyl substituent to ethynyl."
-      },
-      {
         "pattern": "aminoamino",
         "replacement": "hydrazinyl",
         "category": "retained_alias",
         "reason": "Use retained hydrazinyl prefix for aminoamino."
       }
-    ]
-  },
-  "postprocess_regex_replacements": {
-    "bluebook_rule": "Ordered regex post-processing replacements that are safe to apply before legacy post-processing",
-    "values": [
-      {
-        "pattern": "(?<![)\\w])\\(benzyloxy\\)(?!\\()",
-        "replacement": "benzyloxy",
-        "category": "grammar",
-        "reason": "Remove unnecessary parentheses around a standalone benzyloxy prefix."
-      },
-      {
-        "pattern": "(?<![)\\w])\\(benzyl\\)(?!\\()",
-        "replacement": "benzyl",
-        "category": "grammar",
-        "reason": "Remove unnecessary parentheses around a standalone benzyl prefix."
-      },
-      {
-        "pattern": "(?<![)\\w])\\(ethenyl\\)(?!\\()",
-        "replacement": "ethenyl",
-        "category": "grammar",
-        "reason": "Remove unnecessary parentheses around a standalone ethenyl prefix."
-      },
-      {
-        "pattern": "\\b1-(formate|formamide|formic acid|formyl|formaldehyde|formonitrile)\\b",
-        "replacement": "\\1",
-        "category": "grammar",
-        "reason": "Remove invalid locant on one-carbon retained functional names."
-      },
-      {
-        "pattern": "\\(1-(formate|formamide|formic acid|formyl|formaldehyde|formonitrile)\\)",
-        "replacement": "(\\1)",
-        "category": "grammar",
-        "reason": "Remove invalid locant on one-carbon retained functional names."
-      }
-    ]
-  },
-  "postprocess_exact_replacements": {
-    "bluebook_rule": "Whole-name post-processing replacements",
-    "values": [
-      {
-        "pattern": "methanenitrile",
-        "replacement": "hydrogen cyanide",
-        "category": "retained_alias",
-        "reason": "Use retained common name for whole-component spelling."
-      }
-    ]
-  },
-  "postprocess_acyl_amido_terms": {
-    "bluebook_rule": "Acyl terms converted from amino to amido forms",
-    "values": [
-      "benzoyl",
-      "acetyl",
-      "propionyl",
-      "formyl"
-    ]
-  },
-  "postprocess_n_substituted_functional_suffixes": {
-    "bluebook_rule": "P-62, P-66, P-67; functional prefix suffixes whose leading parenthesized substituent is an N-substituent, not a carbon substituent on the acid parent",
-    "values": [
-      "sulfonamido",
-      "sulfinamido",
-      "sulfamoylamino",
-      "carbamoylamino",
-      "carbamothioylamino"
     ]
   },
   "retained_monocycle_specs": {
