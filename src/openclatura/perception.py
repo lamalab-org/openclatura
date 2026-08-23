@@ -207,6 +207,28 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                     groups.append(PerceivedGroup("nitroso", False, adj_atoms[0], {atom.idx, oxygens[0]}))
                     consumed.update([atom.idx, oxygens[0]])
 
+    # P-66.3.1: acyl hydrazides outrank the hydrazine chain roles that would otherwise consume the N-N.
+    for atom in mol:
+        if not atom.is_carbon or atom.idx in consumed or atom.idx in cyclic_atoms:
+            continue
+        oxygens = [o for o in mol.get_neighbors(atom.idx) if mol.atoms[o].symbol == "O" and o not in consumed]
+        double_o = next((o for o in oxygens if mol.get_bond(atom.idx, o).order == 2 and mol.degree(o) == 1), None)
+        if double_o is None or len(oxygens) != 1:
+            continue
+        for single_n in [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "N" and n not in consumed]:
+            if mol.get_bond(atom.idx, single_n).order != 1:
+                continue
+            hydrazide_nitrogens = _hydrazide_nitrogens(mol, atom.idx, single_n, cyclic_atoms)
+            if hydrazide_nitrogens is None:
+                continue
+            ring_neighbors = [n for n in mol.get_neighbors(atom.idx) if n in cyclic_atoms]
+            target, key = atom.idx, "hydrazide"
+            if len(ring_neighbors) == 1 and mol.get_bond(atom.idx, ring_neighbors[0]).order == 1:
+                target, key = ring_neighbors[0], "ring_hydrazide"
+            groups.append(PerceivedGroup(key, True, target, {atom.idx, double_o, *hydrazide_nitrogens}))
+            consumed.update([double_o, *hydrazide_nitrogens])
+            break
+
     for role in nitrogen_chain_roles(mol, cyclic_atoms, consumed):
         groups.append(
             PerceivedGroup(
@@ -324,6 +346,12 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
         if atom.symbol == "S" and atom.idx not in consumed:
             oxygens = [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "O"]
             adj_atoms = [n for n in mol.get_neighbors(atom.idx) if n not in oxygens]
+            sulfonyl_group = _sulfonyl_derivative(mol, atom.idx, oxygens, adj_atoms, cyclic_atoms)
+            if sulfonyl_group is not None:
+                key, c_idx, hetero = sulfonyl_group
+                groups.append(PerceivedGroup(key, True, c_idx, {atom.idx, *oxygens, hetero}))
+                consumed.update([atom.idx, *oxygens, hetero])
+                continue
             if len(oxygens) >= 3 and len(adj_atoms) == 1:
                 double_o_list = [o for o in oxygens if mol.get_bond(atom.idx, o).order == 2]
                 # A sulfonate/sulfonic acid requires the sulfur to be bonded to a
@@ -377,6 +405,14 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                         )
                         consumed.update([atom.idx, double_n, double_o])
                         continue
+
+            if double_n is not None and atom.idx not in cyclic_atoms:
+                amidine = _amidine_group(mol, atom.idx, double_n, nitrogens, cyclic_atoms)
+                if amidine is not None:
+                    key, attachment, involved = amidine
+                    groups.append(PerceivedGroup(key, True, attachment, involved))
+                    consumed.update(involved - {attachment})
+                    continue
 
             triple_n = next((n for n in nitrogens if mol.get_bond(atom.idx, n).order == 3), None)
             single_o = next((o for o in oxygens if mol.get_bond(atom.idx, o).order == 1), None)
@@ -457,8 +493,11 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             single_o = next((o for o in oxygens if mol.get_bond(atom.idx, o).order == 1), None)
             single_n_candidates = [n for n in nitrogens if mol.get_bond(atom.idx, n).order == 1]
             single_n_candidates.sort(
-                key=lambda n: any(
-                    neighbor != atom.idx and mol.atoms[neighbor].symbol != "H" for neighbor in mol.get_neighbors(n)
+                key=lambda n: (
+                    n not in cyclic_atoms,
+                    any(
+                        neighbor != atom.idx and mol.atoms[neighbor].symbol != "H" for neighbor in mol.get_neighbors(n)
+                    ),
                 ),
                 reverse=True,
             )
@@ -525,22 +564,6 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                                 key = "ring_carboxylate" if is_exocyclic else "ester"
                             groups.append(PerceivedGroup(key, True, target_carbon, {atom.idx, double_o, single_o}))
                             consumed.update([double_o, single_o])
-                elif single_n is not None:
-                    is_lactam = (
-                        target_carbon == atom.idx
-                        and single_n in cyclic_atoms
-                        and _closes_ring_back_to(mol, atom.idx, single_n, double_o, cyclic_atoms)
-                    )
-                    if is_lactam:
-                        groups.append(PerceivedGroup("ketone", True, target_carbon, {atom.idx, double_o}))
-                        consumed.update([double_o])
-                    else:
-                        if single_n in cyclic_atoms:
-                            pass
-                        else:
-                            key = "ring_amide" if is_exocyclic else "amide"
-                            groups.append(PerceivedGroup(key, True, target_carbon, {atom.idx, double_o, single_n}))
-                            consumed.update([double_o, single_n])
                 elif single_x is not None:
                     sym = mol.atoms[single_x].symbol
                     if is_exocyclic:
@@ -554,16 +577,51 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                         x_map = {"F": "acid_fluoride", "Cl": "acid_chloride", "Br": "acid_bromide", "I": "acid_iodide"}
                     groups.append(PerceivedGroup(x_map[sym], True, target_carbon, {atom.idx, double_o, single_x}))
                     consumed.update([double_o, single_x])
+                elif single_n is not None:
+                    is_lactam = (
+                        target_carbon == atom.idx
+                        and single_n in cyclic_atoms
+                        and _closes_ring_back_to(mol, atom.idx, single_n, double_o, cyclic_atoms)
+                    )
+                    hydrazide_nitrogens = _hydrazide_nitrogens(mol, atom.idx, single_n, cyclic_atoms)
+                    if hydrazide_nitrogens is not None and not is_lactam:
+                        key = "ring_hydrazide" if is_exocyclic else "hydrazide"
+                        groups.append(
+                            PerceivedGroup(key, True, target_carbon, {atom.idx, double_o, *hydrazide_nitrogens})
+                        )
+                        consumed.update([double_o, *hydrazide_nitrogens])
+                        continue
+                    urea_nitrogens = _urea_nitrogens(mol, atom.idx, single_n_candidates, cyclic_atoms)
+                    if urea_nitrogens is not None:
+                        # P-66.1.6.1: urea is a retained parent; both nitrogens belong to the group.
+                        groups.append(PerceivedGroup("urea", True, atom.idx, {atom.idx, double_o, *urea_nitrogens}))
+                        consumed.update([double_o, *urea_nitrogens])
+                        continue
+                    if is_lactam:
+                        groups.append(PerceivedGroup("ketone", True, target_carbon, {atom.idx, double_o}))
+                        consumed.update([double_o])
+                    else:
+                        if single_n in cyclic_atoms:
+                            pass
+                        else:
+                            key = "ring_amide" if is_exocyclic else "amide"
+                            groups.append(PerceivedGroup(key, True, target_carbon, {atom.idx, double_o, single_n}))
+                            consumed.update([double_o, single_n])
             elif double_s is not None:
                 ring_neighbors = [n for n in mol.get_neighbors(atom.idx) if n in cyclic_atoms]
                 carbon_neighbors = [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].is_carbon]
                 non_chalcogen_neighbors = [
                     n for n in mol.get_neighbors(atom.idx) if n != double_s and mol.atoms[n].symbol != "H"
                 ]
+                thiourea_nitrogens = _urea_nitrogens(mol, atom.idx, single_n_candidates, cyclic_atoms)
+                if thiourea_nitrogens is not None:
+                    groups.append(PerceivedGroup("thiourea", True, atom.idx, {atom.idx, double_s, *thiourea_nitrogens}))
+                    consumed.update([double_s, *thiourea_nitrogens])
+                    continue
                 if single_n is not None and single_n not in cyclic_atoms:
                     target_carbon = atom.idx
                     is_exocyclic = False
-                    if atom.idx not in cyclic_atoms and len(ring_neighbors) == 1 and len(carbon_neighbors) == 1:
+                    if atom.idx not in cyclic_atoms and len(ring_neighbors) == 1 and len(carbon_neighbors) <= 1:
                         ring_neighbor = ring_neighbors[0]
                         if mol.get_bond(atom.idx, ring_neighbor).order == 1:
                             target_carbon = ring_neighbor
@@ -821,3 +879,162 @@ def _has_senior_nitrogen_ligand(mol: Molecule, nitrogen: int, center: int) -> bo
         ):
             return True
     return False
+
+
+def _urea_nitrogens(
+    mol: Molecule, carbon: int, single_n_candidates: list[int], cyclic_atoms: set[int]
+) -> tuple[int, int] | None:
+    """The two amine nitrogens of an acyclic urea/thiourea carbon, or ``None``.
+
+    Hydrazine- and hydroxylamine-bearing nitrogens are left to their own parents
+    (hydrazinecarboxamide, N-hydroxyurea), and ring nitrogens keep the ring as the
+    parent (piperidine-1-carboxamide).
+    """
+
+    if carbon in cyclic_atoms or len(single_n_candidates) != 2 or mol.degree(carbon) != 3:
+        return None
+    nitrogens = tuple(sorted(single_n_candidates))
+    for n in nitrogens:
+        atom = mol.atoms[n]
+        if n in cyclic_atoms or atom.charge:
+            return None
+        for neighbor in mol.get_neighbors(n):
+            if neighbor == carbon:
+                continue
+            if mol.atoms[neighbor].symbol in {"N", "O", "S"} and not _is_nitroso_or_nitro_nitrogen(mol, neighbor, n):
+                return None
+            if neighbor != carbon and mol.get_bond(n, neighbor).order != 1:
+                return None
+    return nitrogens
+
+
+def _is_nitroso_or_nitro_nitrogen(mol: Molecule, nitrogen: int, parent: int) -> bool:
+    """An N-nitroso / N-nitro substituent nitrogen: only oxygens besides its parent (N-nitrosoureas)."""
+
+    atom = mol.atoms[nitrogen]
+    if atom.symbol != "N" or atom.total_h_count:
+        return False
+    others = [x for x in mol.get_neighbors(nitrogen) if x != parent]
+    return bool(others) and all(mol.atoms[x].symbol == "O" and mol.degree(x) == 1 for x in others)
+
+
+_SULFONYL_HALIDE_KEYS = {
+    "F": "sulfonyl_fluoride",
+    "Cl": "sulfonyl_chloride",
+    "Br": "sulfonyl_bromide",
+    "I": "sulfonyl_iodide",
+}
+
+
+def _sulfonyl_derivative(
+    mol: Molecule, sulfur: int, oxygens: list[int], adj_atoms: list[int], cyclic_atoms: set[int]
+) -> tuple[str, int, int] | None:
+    """R-SO2-NR2 / R-SO2-X on a carbon: (group key, attachment carbon, the N or halogen)."""
+
+    if sulfur in cyclic_atoms or len(oxygens) != 2 or len(adj_atoms) != 2:
+        return None
+    if any(mol.get_bond(sulfur, o).order != 2 or mol.degree(o) != 1 for o in oxygens):
+        return None
+    carbons = [a for a in adj_atoms if mol.atoms[a].is_carbon]
+    others = [a for a in adj_atoms if not mol.atoms[a].is_carbon]
+    if len(carbons) != 1 or len(others) != 1:
+        return None
+    hetero = others[0]
+    symbol = mol.atoms[hetero].symbol
+    if mol.atoms[sulfur].charge or mol.atoms[hetero].charge:
+        return None
+    if symbol == "N":
+        if hetero in cyclic_atoms:
+            return None
+        # Sulfonyl hydrazides, hydroxamates and sulfonimides keep their own handling.
+        for neighbor in mol.get_neighbors(hetero):
+            if neighbor != sulfur and mol.atoms[neighbor].symbol in {"N", "O", "S"}:
+                return None
+            if neighbor != sulfur and mol.get_bond(hetero, neighbor).order != 1:
+                return None
+        return "sulfonamide", carbons[0], hetero
+    if symbol in _SULFONYL_HALIDE_KEYS and mol.degree(hetero) == 1:
+        return _SULFONYL_HALIDE_KEYS[symbol], carbons[0], hetero
+    return None
+
+
+def _plain_amine_nitrogen(mol: Molecule, nitrogen: int, carbon: int, cyclic_atoms: set[int]) -> bool:
+    """An acyclic, uncharged nitrogen whose other bonds are single bonds to carbon or hydrogen."""
+
+    atom = mol.atoms[nitrogen]
+    if nitrogen in cyclic_atoms or atom.charge:
+        return False
+    for neighbor in mol.get_neighbors(nitrogen):
+        if neighbor == carbon:
+            continue
+        if mol.get_bond(nitrogen, neighbor).order != 1 or not (
+            mol.atoms[neighbor].is_carbon or mol.atoms[neighbor].symbol == "H"
+        ):
+            return False
+        # An acyl or imidoyl group on the nitrogen belongs to a senior amide/amidine.
+        if any(
+            mol.get_bond(neighbor, x).order == 2 and mol.atoms[x].symbol in {"O", "S", "N"}
+            for x in mol.get_neighbors(neighbor)
+            if x != nitrogen
+        ):
+            return False
+    return True
+
+
+def _amidine_group(
+    mol: Molecule, carbon: int, double_n: int, nitrogens: list[int], cyclic_atoms: set[int]
+) -> tuple[str, int, set[int]] | None:
+    """P-66.4.1: C(=NR)NR2 is an amidine; C(=NR)(NR2)NR2 the retained parent guanidine.
+
+    Returns (group key, attachment atom, involved atoms).  The imino nitrogen may
+    carry hydroxy (amidoximes) or amino; the amine nitrogens must be plain.
+    """
+
+    if mol.atoms[double_n].charge or double_n in cyclic_atoms or mol.degree(carbon) not in (2, 3):
+        return None
+    for neighbor in mol.get_neighbors(double_n):
+        if neighbor != carbon and mol.get_bond(double_n, neighbor).order != 1:
+            return None
+        if neighbor != carbon and mol.atoms[neighbor].symbol == "N":
+            return None  # amidrazones keep their own handling
+    single_ns = [n for n in nitrogens if n != double_n and mol.get_bond(carbon, n).order == 1]
+    if not single_ns or not all(_plain_amine_nitrogen(mol, n, carbon, cyclic_atoms) for n in single_ns):
+        return None
+    others = [x for x in mol.get_neighbors(carbon) if x != double_n and x not in single_ns]
+    if len(single_ns) == 2 and not others:
+        return "guanidine", carbon, {carbon, double_n, *single_ns}
+    if len(single_ns) == 1 and not others and mol.degree(carbon) == 2:
+        return "amidine", carbon, {carbon, double_n, single_ns[0]}
+    if len(single_ns) != 1 or len(others) != 1:
+        return None
+    other = others[0]
+    if not mol.atoms[other].is_carbon:
+        return None
+    involved = {carbon, double_n, single_ns[0]}
+    if other in cyclic_atoms and mol.get_bond(carbon, other).order == 1:
+        return "ring_amidine", other, involved
+    return "amidine", carbon, involved
+
+
+def _hydrazide_nitrogens(mol: Molecule, carbon: int, single_n: int, cyclic_atoms: set[int]) -> tuple[int, int] | None:
+    """P-66.3.1: ``-C(=O)-N-N`` is a hydrazide; (acyl N, terminal N) or ``None``."""
+
+    if single_n in cyclic_atoms or mol.atoms[single_n].charge:
+        return None
+    carbon_neighbors = [x for x in mol.get_neighbors(carbon) if x != single_n and mol.atoms[x].symbol not in {"O", "H"}]
+    if any(mol.atoms[x].symbol == "N" for x in carbon_neighbors):
+        return None  # semicarbazides are ureas/hydrazinecarboxamides, not hydrazides
+    terminal = [
+        x
+        for x in mol.get_neighbors(single_n)
+        if x != carbon and mol.atoms[x].symbol == "N" and mol.get_bond(single_n, x).order == 1
+    ]
+    if len(terminal) != 1:
+        return None
+    terminal_n = terminal[0]
+    if terminal_n in cyclic_atoms or mol.atoms[terminal_n].charge:
+        return None
+    for x in mol.get_neighbors(terminal_n):
+        if x != single_n and mol.atoms[x].symbol not in {"C", "H"}:
+            return None
+    return single_n, terminal_n

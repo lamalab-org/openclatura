@@ -155,6 +155,9 @@ def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) 
 
     for group in perceive_groups(mol):
         if start_idx in group.atoms_involved and group.atoms_involved.issubset(component):
+            if group.key in {"hydrazide", "ring_hydrazide", "amidine", "ring_amidine"}:
+                # Two nitrogens with distinct locants: the prefix handler renders these.
+                continue
             if group.key in RULES.prefixes.amide_like_groups:
                 substituted = _direct_amide_subgraph_prefix(mol, group, component)
                 if substituted:

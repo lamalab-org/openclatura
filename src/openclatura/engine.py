@@ -342,9 +342,9 @@ class NamingEngine:
         for component in get_connected_components(mol):
             component_name = self._name_component(mol, component)
             if component_name:
-                names.append(component_name)
-        names.sort(key=self._component_sort_key)
-        return " ".join(names)
+                names.append((component_name, _component_charge(mol, component)))
+        names.sort(key=lambda item: self._component_sort_key(*item))
+        return " ".join(_multiply_identical_ions(names))
 
     def _analyze(self, mol: Molecule, *, smiles: str = "", token_debug: bool = False) -> NameAnalysis:
         decisions = DecisionTrace()
@@ -381,13 +381,13 @@ class NamingEngine:
                 token_debug=token_debug,
             )
             if component_name:
-                named_components.append((component_name, trace, tree))
+                named_components.append((component_name, trace, tree, _component_charge(mol, component)))
 
-        named_components.sort(key=lambda item: self._component_sort_key(item[0]))
-        final_name = " ".join(name for name, _, _ in named_components)
+        named_components.sort(key=lambda item: self._component_sort_key(item[0], item[3]))
+        final_name = " ".join(_multiply_identical_ions([(name, charge) for name, _, _, charge in named_components]))
         trace_segments = []
         substituent_tree = []
-        for _, trace, tree in named_components:
+        for _, trace, tree, _ in named_components:
             trace_segments.extend(trace)
             if tree:
                 substituent_tree.append(tree)
@@ -398,7 +398,7 @@ class NamingEngine:
             "assembled final molecule name",
             "Named components are sorted with supported salt metals first, then joined.",
             atoms=set(mol.atoms.keys()),
-            data={"name": final_name, "components": [name for name, _, _ in named_components]},
+            data={"name": final_name, "components": [name for name, _, _, _ in named_components]},
         )
         return NameAnalysis(
             name=final_name,
@@ -409,8 +409,11 @@ class NamingEngine:
         )
 
     @staticmethod
-    def _component_sort_key(name: str) -> tuple[int, str]:
-        return (0 if name in SALT_METAL_NAMES else 1, name)
+    def _component_sort_key(name: str, charge: int = 0) -> tuple[int, int, str]:
+        """P-72.3: cations are cited before anions; metals first among cations, then alphabetical."""
+
+        charge_rank = 0 if charge > 0 else (1 if charge == 0 else 2)
+        return (charge_rank, 0 if name in SALT_METAL_NAMES else 1, name)
 
     @staticmethod
     def _name_component(*args: Any, **kwargs: Any):
@@ -474,3 +477,35 @@ def _run_parallel(
     payload = [(s, include_trace, verify_opsin, verify_self, token_debug) for s in smiles_list]
     with ProcessPoolExecutor(max_workers=processes) as ex:
         return list(ex.map(_name_one_for_worker, payload, chunksize=chunksize))
+
+
+def _component_charge(mol: Molecule, component: set[int]) -> int:
+    return sum(mol.atoms[idx].charge for idx in component)
+
+
+def _multiply_identical_ions(names: list[tuple[str, int]]) -> list[str]:
+    """P-72.3.1: identical ionic components are cited once with a multiplying prefix (diammonium sulfate)."""
+
+    from .rules import multipliers
+
+    out: list[str] = []
+    index = 0
+    while index < len(names):
+        name, charge = names[index]
+        count = 1
+        while index + count < len(names) and names[index + count] == (name, charge):
+            count += 1
+        if count > 1 and charge:
+            simple = (
+                " " not in name
+                and "-" not in name
+                and (name in SALT_METAL_NAMES or not name.endswith("ium") or name == "ammonium")
+            )
+            if simple:
+                out.append(f"{multipliers.basic(count)}{name}")
+            else:
+                out.append(f"{multipliers.complex_(count)}({name})")
+        else:
+            out.extend([name] * count)
+        index += count
+    return out

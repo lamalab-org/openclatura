@@ -57,7 +57,15 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
             return core_name
     if indicated_hydrogens:
         indicated_hydrogens = sorted(set(indicated_hydrogens), key=parse_locant)
-        core_name = _drop_stem_indicated_hydrogen(core_name, indicated_hydrogens)
+        added_only = {
+            locant
+            for operation in parts.hydro_operations
+            if operation.key == "added_hydrogen"
+            for locant in operation.locants
+        } >= set(indicated_hydrogens)
+        if not added_only:
+            # Added hydrogen (cited with the suffix) leaves the stem's own indicated hydrogen in place.
+            core_name = _drop_stem_indicated_hydrogen(core_name, indicated_hydrogens)
         core_name = ",".join(f"{locant}H" for locant in indicated_hydrogens) + "-" + core_name
     if additive_hydrogens:
         additive_hydrogens = sorted(set(additive_hydrogens), key=parse_locant)
@@ -99,12 +107,17 @@ def _move_added_hydrogen_to_suffix(parts: AssemblyParts, core_name: str, suffix_
     if not added:
         return core_name, suffix_str
     cite = ",".join(f"{locant}H" for locant in sorted(added, key=parse_locant))
-    if not core_name.startswith(cite + "-"):
+    # The cited hydrogen may follow a hydro prefix: 3,4-dihydro-1H-quinoline -> 3,4-dihydroquinolin-2(1H)-one.
+    position = core_name.find(cite + "-")
+    if position < 0 or (position > 0 and not core_name[:position].endswith("hydro-")):
         return core_name, suffix_str
-    match = re.match(r"^-(\d+[a-z]?)-", suffix_str)
+    match = re.match(r"^-(\d+[a-z]?(?:,\d+[a-z]?)*)-", suffix_str)
     if match is None:
         return core_name, suffix_str
-    return core_name[len(cite) + 1 :], f"-{match.group(1)}({cite})-{suffix_str[match.end() :]}"
+    head = core_name[:position].rstrip("-") if position else ""
+    core = core_name[position + len(cite) + 1 :]
+    joiner = "-" if head and core[:1].isdigit() else ""
+    return f"{head}{joiner}{core}", f"-{match.group(1)}({cite})-{suffix_str[match.end() :]}"
 
 
 def _add_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:

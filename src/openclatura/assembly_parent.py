@@ -8,8 +8,9 @@ from .assembly_charge import (
     parent_charge_name_operations,
 )
 from .assembly_parts import AssemblyParts, SubstituentItem
+from .assembly_prefixes import substituent_sort_key
 from .assembly_utils import parse_locant
-from .formatting import strip_outer_parentheses
+from .formatting import is_complex_prefix, strip_outer_parentheses
 from .nomenclature import RULES
 from .principal_suffixes import render_principal_suffix
 from .retained_specs import retained_parent_spec
@@ -27,6 +28,7 @@ RETAINED_FUNCTIONAL_PARENTS: dict[tuple[str, str], str] = {
     ("benzene", "ring_aldehyde"): "benzaldehyde",
     ("benzene", "ring_carboxylic_acid"): "benzoic acid",
     ("benzene", "ring_amide"): "benzamide",
+    ("benzene", "ring_hydrazide"): "benzohydrazide",
     ("benzene", "ring_nitrile"): "benzonitrile",
     ("benzene", "ring_carboxylate"): "benzoate",
     ("benzene", "acyl"): "benzoyl",
@@ -44,6 +46,11 @@ RETAINED_CHAIN_PARENTS: dict[tuple[int, str, int], str] = {
     (1, "carboxylic_acid", 1): "formic acid",
     (2, "carboxylic_acid", 1): "acetic acid",
     (1, "amide", 1): "formamide",
+    (1, "hydrazide", 1): "formohydrazide",
+    (2, "hydrazide", 1): "acetohydrazide",
+    (1, "urea", 1): "urea",
+    (1, "guanidine", 1): "guanidine",
+    (1, "thiourea", 1): "thiourea",
     (2, "amide", 1): "acetamide",
     (1, "nitrile", 1): "hydrogen cyanide",
     (2, "nitrile", 1): "acetonitrile",
@@ -145,11 +152,29 @@ RETAINED_FUNCTIONAL_PARENTS.update(_retained_carbonyl_derivative_parents())
 RETAINED_SUBSTITUTED_CHAIN_PARENTS: dict[tuple[int, str, int, str, str], str] = {
     (1, "nitrile", 1, "hydroxy", "1"): "cyanic acid",
     (1, "carboxylic_acid", 1, "amino", "1"): "carbamic acid",
+    # P-66.1.6.1.2: semicarbazide is hydrazinecarboxamide.
+    (1, "amide", 1, "hydrazinyl", "1"): "hydrazinecarboxamide",
+    (1, "thioamide", 1, "hydrazinyl", "1"): "hydrazinecarbothioamide",
+    (1, "ester", 1, "hydrazinyl", "1"): "hydrazinecarboxylate",
+    (1, "carboxylic_acid", 1, "hydrazinyl", "1"): "hydrazinecarboxylic acid",
+    # P-65.2.1.2: carbamic acid and its esters and salts are retained.
+    (1, "ester", 1, "amino", "1"): "carbamate",
+    (1, "carboxylate", 1, "amino", "1"): "carbamate",
+    # P-65.5.1: acyl halides of carbamic acid.
+    (1, "acid_chloride", 1, "amino", "1"): "carbamic chloride",
+    (1, "acid_fluoride", 1, "amino", "1"): "carbamic fluoride",
+    (1, "acid_bromide", 1, "amino", "1"): "carbamic bromide",
 }
 # The branch ending is absorbed into the retained word, so whatever precedes it stays in front:
 # ``((diaminomethylidene)amino)amino`` on a nitrile is ``((diaminomethylidene)amino)cyanamide``.
 RETAINED_CHAIN_BRANCH_ENDINGS: dict[tuple[int, str, int, str, str], str] = {
     (1, "nitrile", 1, "amino", "1"): "cyanamide",
+    (1, "carboxylic_acid", 1, "amino", "1"): "carbamic acid",
+    (1, "ester", 1, "amino", "1"): "carbamate",
+    (1, "carboxylate", 1, "amino", "1"): "carbamate",
+    (1, "acid_chloride", 1, "amino", "1"): "carbamic chloride",
+    (1, "acid_fluoride", 1, "amino", "1"): "carbamic fluoride",
+    (1, "acid_bromide", 1, "amino", "1"): "carbamic bromide",
 }
 _UNSUBSTITUTABLE_RETAINED_CHAIN_PARENTS = frozenset(
     {"oxalic acid", "malonic acid", "succinic acid", "glutaric acid", "adipic acid", "hydrogen cyanide"}
@@ -257,14 +282,88 @@ def promote_retained_functional_parent(parts: AssemblyParts) -> None:
         retained, absorbed = chain_parent
     parts.retained_name = retained
     parts.retained_absorbs_principal_group = True
+    if retained == "guanidine":
+        # The guanidine C=N is cited as an unlocanted (E)/(Z); a ``1`` would point at a substituent's bond.
+        parts.stereo_features = [
+            ("" if str(locant) == "1" else locant, descriptor) for locant, descriptor in parts.stereo_features
+        ]
     if absorbed is not None:
         parts.substituents = [item for item in parts.substituents if item is not absorbed]
         parts.retained_absorbed_substituents = [*parts.retained_absorbed_substituents, absorbed]
 
 
+_SIMPLE_N_LIGANDS = frozenset(
+    {
+        "methyl",
+        "ethyl",
+        "propyl",
+        "butyl",
+        "phenyl",
+        "benzyl",
+        "hydroxy",
+        "methoxy",
+        "ethoxy",
+        "cyano",
+        "fluoro",
+        "chloro",
+        "amino",
+    }
+)
+
+
+def promote_carbamimidoyl_substituent_name(parts: AssemblyParts) -> None:
+    """P-66.4.1.1.1.4: an ``-C(=NR)NR2`` branch is carbamimidoyl, with N/N' substituents."""
+
+    if (
+        not parts.is_substituent
+        or parts.retained_substituent_name is not None
+        or parts.is_double_attach
+        or parts.is_triple_attach
+        or parts.is_ring
+        or parts.retained_name
+        or parts.principal_group
+        or parts.unsaturations
+        or parts.a_prefixes
+        or parts.parent_charges
+        or parts.parent_length != 1
+        or str(parts.attachment_locant) != "1"
+        or len(parts.substituents) != 2
+        or substituent_attachment_kind(parts) != "single"
+    ):
+        return
+    amine = imine = None
+    for item in parts.substituents:
+        text = strip_outer_parentheses(item.name)
+        if text.endswith("imino") and imine is None:
+            imine = text[: -len("imino")]
+        elif text.endswith("amino") and amine is None:
+            amine = text[: -len("amino")]
+        else:
+            return
+    if amine is None or imine is None:
+        return
+    prefixes = []
+    for ligands, locant in ((amine, "N"), (imine, "N'")):
+        if not ligands:
+            continue
+        if "(" in ligands or ligands.startswith(("N-", "N,")):
+            return
+        count = next((n for n, rest in multipliers.candidate_splits(ligands) if rest in _SIMPLE_N_LIGANDS), 1)
+        prefixes.append((ligands, f"{','.join([locant] * count)}-{ligands}"))
+    prefixes.sort(key=lambda item: substituent_sort_key(item[0]))
+    parts.retained_substituent_name = f"{'-'.join(text for _, text in prefixes)}carbamimidoyl"
+    # The C=N is the group's own bond, cited as an unlocanted (E)/(Z) in front of the word.
+    parts.stereo_features = [
+        ("" if str(locant) == "1" else locant, descriptor) for locant, descriptor in parts.stereo_features
+    ]
+    parts.retained_absorbed_substituents = [*parts.retained_absorbed_substituents, *parts.substituents]
+    parts.substituents = []
+
+
 def promote_retained_substituent_name(parts: AssemblyParts) -> None:
     """Fold a substituent's own branch into a retained prefix where one exists."""
 
+    promote_carbamimidoyl_substituent_name(parts)
     if (
         not parts.is_substituent
         or parts.retained_substituent_name is not None
@@ -520,11 +619,15 @@ def format_substituent_tail(
 def _sole_group_locant_is_redundant(parts: AssemblyParts) -> bool:
     """Whether a lone group's ``1`` locant tells the reader nothing."""
 
-    if parts.substituents or parts.a_prefixes or parts.unsaturations:
+    ring_substituents = any(
+        not str(locant).startswith(("N", "O", "S", "P")) for item in parts.substituents for locant in item.locants
+    )
+    if ring_substituents or parts.a_prefixes:
         return False
     if parts.is_ring:
-        return parts.retained_name == "benzene"
-    return not parts.is_substituent and parts.parent_length == 2
+        return not parts.unsaturations and parts.retained_name == "benzene"
+    # ``ethanol``, ``ethenol``: a two-carbon chain's sole group can only sit at C1.
+    return not parts.is_substituent and parts.parent_length == 2 and not parts.parent_charges
 
 
 def format_principal_suffix(parts: AssemblyParts, terminal_e: str, spiro_subs) -> tuple[str, str]:
@@ -574,13 +677,37 @@ def _format_principal_suffix_modifiers(parts: AssemblyParts) -> str:
         if locants:
             locant_text = f"{','.join(locants)}-"
         count = grouped[(name, locants)]
+        # A modifier carrying its own locants (N'-methyl-N-propylcarbamimidoyl) is enclosed.
+        text = f"({name})" if is_complex_prefix(name) and not name.startswith("(") else name
         if count > 1:
             repeated_locants = locants * count
             locant_text = f"{','.join(repeated_locants)}-" if repeated_locants else ""
-            rendered.append(f"{locant_text}{multipliers.basic(count)}{name}")
+            rendered.append(f"{locant_text}{multipliers.basic(count)}{text}")
         else:
-            rendered.append(f"{locant_text}{name}")
+            rendered.append(f"{locant_text}{text}")
     return "".join(rendered)
+
+
+def _parent_unsaturation_locants_are_redundant(parts: AssemblyParts) -> bool:
+    """P-31.1.4.2.4: ``ethene``, ``ethyne`` and an unsubstituted monounsaturated monocycle
+    (``cyclohexene``) have only one place for their bond."""
+
+    if len(parts.unsaturations) != 1 or len(parts.unsaturations[0].locants) != 1 or parts.a_prefixes:
+        return False
+    if not parts.is_ring:
+        # OPSIN reads ethenol/ethenamine/ethenone but not ethenal or ethenethial.
+        safe_suffixes = {"alcohol", "thiol", "amine", "ketone", "olate", "thiolate", "aminium"}
+        return parts.parent_length == 2 and (
+            parts.principal_group is None or parts.principal_group.key in safe_suffixes
+        )
+    return (
+        not parts.is_bicycle
+        and not parts.is_spiro
+        and not parts.is_polycycle
+        and not parts.substituents
+        and parts.principal_group is None
+        and not parts.parent_charges
+    )
 
 
 def format_parent_tail(parts: AssemblyParts, stem_str: str, terminal_e: str, spiro_subs) -> tuple[str, str, str, str]:
@@ -589,7 +716,9 @@ def format_parent_tail(parts: AssemblyParts, stem_str: str, terminal_e: str, spi
         if not parts.unsaturations:
             unsat_str = bonds.get("single").saturated_suffix
         else:
-            stem_str, unsat_str = format_unsaturations(parts, stem_str)
+            stem_str, unsat_str = format_unsaturations(
+                parts, stem_str, omit_locants=_parent_unsaturation_locants_are_redundant(parts) and not spiro_subs
+            )
     if parts.retained_absorbs_principal_group:
         # The retained name already spells the group (``phenol``).  ``terminal_e`` stays:
         # it is the retained name's own final vowel, and only a rendered suffix elides.

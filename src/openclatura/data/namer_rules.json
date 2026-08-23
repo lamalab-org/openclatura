@@ -234,6 +234,55 @@
         "double_o": 3
       },
       {
+        "name": "phosphorous acid",
+        "ester_suffix": "phosphite",
+        "central": "P",
+        "single_o": 3,
+        "double_o": 0
+      },
+      {
+        "name": "sulfurous acid",
+        "ester_suffix": "sulfite",
+        "central": "S",
+        "single_o": 2,
+        "double_o": 1
+      },
+      {
+        "name": "nitrous acid",
+        "ester_suffix": "nitrite",
+        "central": "N",
+        "single_o": 1,
+        "double_o": 1
+      },
+      {
+        "name": "boric acid",
+        "ester_suffix": "borate",
+        "central": "B",
+        "single_o": 3,
+        "double_o": 0
+      },
+      {
+        "name": "selenic acid",
+        "ester_suffix": "selenate",
+        "central": "Se",
+        "single_o": 2,
+        "double_o": 2
+      },
+      {
+        "name": "selenous acid",
+        "ester_suffix": "selenite",
+        "central": "Se",
+        "single_o": 2,
+        "double_o": 1
+      },
+      {
+        "name": "arsorous acid",
+        "ester_suffix": "arsorite",
+        "central": "As",
+        "single_o": 3,
+        "double_o": 0
+      },
+      {
         "name": "arsoric acid",
         "ester_suffix": "arsorate",
         "central": "As",
@@ -545,7 +594,11 @@
       "acid_bromide",
       "ring_acid_bromide",
       "acid_iodide",
-      "ring_acid_iodide"
+      "ring_acid_iodide",
+      "amidine",
+      "ring_amidine",
+      "hydrazide",
+      "ring_hydrazide"
     ]
   },
   "prefix_groups_to_skip": {
@@ -589,7 +642,10 @@
       "amide",
       "ring_amide",
       "thioamide",
-      "ring_thioamide"
+      "ring_thioamide",
+      "sulfonamide",
+      "hydrazide",
+      "ring_hydrazide"
     ]
   },
   "amide_prefix_bases": {
@@ -811,6 +867,71 @@
         "suffix_with_locant": true,
         "needs_locant": true
       },
+      "sulfonamide": {
+        "role": "principal",
+        "prefix": "sulfamoyl",
+        "suffix": "sulfonamide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 66,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "sulfonyl_fluoride": {
+        "role": "principal",
+        "prefix": "fluorosulfonyl",
+        "suffix": "sulfonyl fluoride",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 55,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "sulfonyl_chloride": {
+        "role": "principal",
+        "prefix": "chlorosulfonyl",
+        "suffix": "sulfonyl chloride",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 56,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "sulfonyl_bromide": {
+        "role": "principal",
+        "prefix": "bromosulfonyl",
+        "suffix": "sulfonyl bromide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 57,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "sulfonyl_iodide": {
+        "role": "principal",
+        "prefix": "iodosulfonyl",
+        "suffix": "sulfonyl iodide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 58,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
       "sulfonate": {
         "role": "principal",
         "prefix": "sulfonato",
@@ -967,6 +1088,32 @@
         "suffix_with_locant": false,
         "needs_locant": true
       },
+      "urea": {
+        "role": "principal",
+        "prefix": "carbamoylamino",
+        "suffix": "urea",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 60,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "thiourea": {
+        "role": "principal",
+        "prefix": "carbamothioylamino",
+        "suffix": "thiourea",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 60,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
       "ring_amide": {
         "role": "principal",
         "prefix": "carbamoyl",
@@ -978,6 +1125,71 @@
         },
         "seniority": 60,
         "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "hydrazide": {
+        "role": "principal",
+        "prefix": "hydrazinecarbonyl",
+        "suffix": "hydrazide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 68,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_hydrazide": {
+        "role": "principal",
+        "prefix": "hydrazinecarbonyl",
+        "suffix": "carbohydrazide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 68,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "amidine": {
+        "role": "principal",
+        "prefix": "carbamimidoyl",
+        "suffix": "imidamide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 69,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_amidine": {
+        "role": "principal",
+        "prefix": "carbamimidoyl",
+        "suffix": "carboximidamide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 69,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "guanidine": {
+        "role": "principal",
+        "prefix": "carbamimidoylamino",
+        "suffix": "guanidine",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 69,
+        "suffix_with_locant": false,
         "needs_locant": true
       },
       "thioamide": {

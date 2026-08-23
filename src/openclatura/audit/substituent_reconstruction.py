@@ -53,6 +53,14 @@ _LEAF_SMILES: dict[str, str] = {
     "oxido": "=O",
     "carboxy": "C(=O)O",
     "carbamoyl": "C(N)=O",
+    "carbamimidoyl": "C(N)=N",
+    "hydrazinecarbonyl": "C(=O)NN",
+    "hydrazinylcarbonyl": "C(=O)NN",
+    "carbamimidamido": "NC(N)=N",
+    "carbamimidoylamino": "NC(N)=N",
+    "guanidino": "NC(N)=N",
+    "carbamoylamino": "NC(N)=O",
+    "ureido": "NC(N)=O",
     "acetyl": "C(C)=O",
     "propionyl": "C(=O)CC",
     "propanoyl": "C(=O)CC",
@@ -425,18 +433,30 @@ def _resolve_operator(name: str, stereo_map: dict[str, str] | None = None) -> Ch
     frag = _resolve_liganded_hub(name)
     if frag is not None:
         return frag
+    frag = _resolve_carbamimidoyl(name)
+    if frag is not None:
+        return frag
+    frag = _resolve_guanidino(name)
+    if frag is not None:
+        return frag
+    frag = _resolve_hydrazinecarbonyl(name)
+    if frag is not None:
+        return frag
     frag = _resolve_disubstituted_amide_hub(name)
     if frag is not None:
         return frag
     for suffix, wrapper in (
         ("carbamoyl", "*C(=O)N*"),
         ("sulfamoyl", "*S(=O)(=O)N*"),
+        ("carbamimidoyl", "*C(=N)N*"),
         ("imino", "*=N*"),
         ("formyl", "*C(=O)*"),
     ):
         if name.endswith(suffix) and len(name) > len(suffix):
             stem = name[: -len(suffix)].rstrip("-")
-            if suffix in _AMIDE_N_HUBS:
+            if suffix == "carbamimidoyl" and "N'" in stem:
+                continue  # an N'-ligand sits on the imino nitrogen, which this wrapper cannot place
+            if suffix in _AMIDE_N_HUBS or suffix == "carbamimidoyl":
                 stem = _strip_n_locants(stem)
             inner = _resolve_operator_inner(stem, stereo_map)
             if inner is not None:
@@ -748,14 +768,143 @@ def _parse_n_locant_clauses(head: str) -> list[tuple[list[str], str]] | None:
     return clauses
 
 
+_CARBAMIMIDOYL_CLAUSE_RE = re.compile(r"^(N'?(?:,N'?)*)-(.+)$")
+
+
+def _resolve_carbamimidoyl(name: str) -> Chem.Mol | None:
+    """``N-methyl-N'-hydroxycarbamimidoyl``: ``-C(=N-R')N-R`` with ligands placed by their N/N' locants."""
+
+    if not name.endswith("carbamimidoyl") or name == "carbamimidoyl":
+        return None
+    head = name[: -len("carbamimidoyl")].rstrip("-")
+    rw = Chem.RWMol()
+    carbon = rw.AddAtom(Chem.Atom(6))
+    dummy = rw.AddAtom(Chem.Atom(0))
+    rw.AddBond(dummy, carbon, Chem.BondType.SINGLE)
+    amine = rw.AddAtom(Chem.Atom(7))
+    rw.AddBond(carbon, amine, Chem.BondType.SINGLE)
+    imino = rw.AddAtom(Chem.Atom(7))
+    rw.AddBond(carbon, imino, Chem.BondType.DOUBLE)
+    # Split the head into ``<locants>-<ligand>`` clauses: each clause starts with an N-locant set.
+    clauses = [c for c in re.split(r"-(?=N'?(?:,N'?)*-)", head) if c]
+    for clause in clauses:
+        match = _CARBAMIMIDOYL_CLAUSE_RE.match(clause)
+        if match is None:
+            return None
+        locants = match.group(1).split(",")
+        count, base = _multiplied_ligand(match.group(2))
+        if count != len(locants):
+            return None
+        frag = resolve_fragment_mol(base)
+        if frag is None:
+            return None
+        for locant in locants:
+            target = amine if locant == "N" else imino
+            if not _graft_onto(rw, target, frag):
+                return None
+    mol = rw.GetMol()
+    try:
+        Chem.SanitizeMol(mol)
+    except Exception:
+        return None
+    return mol
+
+
+_GUANIDINO_CLAUSE_RE = re.compile(r"^(\d(?:,\d)*)-(.+)$")
+
+
+def _resolve_hydrazinecarbonyl(name: str) -> Chem.Mol | None:
+    """``2-R-hydrazine-1-carbonyl``: ``-C(=O)-N1-N2`` with ligands placed by their 1/2 locants."""
+
+    suffix = "hydrazine-1-carbonyl"
+    if not name.endswith(suffix) or name == suffix:
+        return None
+    head = name[: -len(suffix)].rstrip("-")
+    rw = Chem.RWMol()
+    carbon = rw.AddAtom(Chem.Atom(6))
+    dummy = rw.AddAtom(Chem.Atom(0))
+    rw.AddBond(dummy, carbon, Chem.BondType.SINGLE)
+    oxo = rw.AddAtom(Chem.Atom(8))
+    rw.AddBond(carbon, oxo, Chem.BondType.DOUBLE)
+    n1 = rw.AddAtom(Chem.Atom(7))
+    rw.AddBond(carbon, n1, Chem.BondType.SINGLE)
+    n2 = rw.AddAtom(Chem.Atom(7))
+    rw.AddBond(n1, n2, Chem.BondType.SINGLE)
+    targets = {"1": n1, "2": n2}
+    clauses = [c for c in re.split(r"-(?=\d(?:,\d)*-)", head) if c]
+    for clause in clauses:
+        match = _GUANIDINO_CLAUSE_RE.match(clause)
+        if match is None:
+            return None
+        locants = match.group(1).split(",")
+        count, base = _multiplied_ligand(match.group(2))
+        if count != len(locants) or any(locant not in targets for locant in locants):
+            return None
+        frag = resolve_fragment_mol(base)
+        if frag is None:
+            return None
+        for locant in locants:
+            if not _graft_onto(rw, targets[locant], frag):
+                return None
+    mol = rw.GetMol()
+    try:
+        Chem.SanitizeMol(mol)
+    except Exception:
+        return None
+    return mol
+
+
+def _resolve_guanidino(name: str) -> Chem.Mol | None:
+    """``2-R-3-R'guanidino``: guanidine numbered 1 (attachment N), 2 (imino N), 3 (amine N)."""
+
+    if not name.endswith("guanidino") or name == "guanidino":
+        return None
+    head = name[: -len("guanidino")].rstrip("-")
+    rw = Chem.RWMol()
+    n1 = rw.AddAtom(Chem.Atom(7))
+    dummy = rw.AddAtom(Chem.Atom(0))
+    rw.AddBond(dummy, n1, Chem.BondType.SINGLE)
+    carbon = rw.AddAtom(Chem.Atom(6))
+    rw.AddBond(n1, carbon, Chem.BondType.SINGLE)
+    n2 = rw.AddAtom(Chem.Atom(7))
+    rw.AddBond(carbon, n2, Chem.BondType.DOUBLE)
+    n3 = rw.AddAtom(Chem.Atom(7))
+    rw.AddBond(carbon, n3, Chem.BondType.SINGLE)
+    targets = {"1": n1, "2": n2, "3": n3}
+    clauses = [c for c in re.split(r"-(?=\d(?:,\d)*-)", head) if c]
+    for clause in clauses:
+        match = _GUANIDINO_CLAUSE_RE.match(clause)
+        if match is None:
+            return None
+        locants = match.group(1).split(",")
+        count, base = _multiplied_ligand(match.group(2))
+        if count != len(locants) or any(locant not in targets for locant in locants):
+            return None
+        frag = resolve_fragment_mol(base)
+        if frag is None:
+            return None
+        for locant in locants:
+            if not _graft_onto(rw, targets[locant], frag):
+                return None
+    mol = rw.GetMol()
+    try:
+        Chem.SanitizeMol(mol)
+    except Exception:
+        return None
+    return mol
+
+
 def _resolve_disubstituted_amide_hub(name: str) -> Chem.Mol | None:
     """``(A)(B)carbamoyl`` / ``(A)(B)sulfamoyl`` -- an amide or sulfonamide nitrogen carrying two cited
     ligands.  Two are required, so a single-ligand name falls through to the plain operator."""
 
-    for word, (element, oxo_count) in _AMIDE_N_HUBS.items():
+    for word, (element, oxo_count) in {**_AMIDE_N_HUBS, "carbamimidoyl": ("C", 0)}.items():
         if not name.endswith(word) or len(name) <= len(word):
             continue
-        frags = _hub_ligands(_strip_n_locants(name[: -len(word)].rstrip("-")))
+        head = name[: -len(word)].rstrip("-")
+        if word == "carbamimidoyl" and "N'" in head:
+            continue
+        frags = _hub_ligands(_strip_n_locants(head))
         if frags is None or len(frags) < 2:
             continue
         rw = Chem.RWMol()
@@ -765,6 +914,9 @@ def _resolve_disubstituted_amide_hub(name: str) -> Chem.Mol | None:
         for _ in range(oxo_count):
             oxo = rw.AddAtom(Chem.Atom(8))
             rw.AddBond(hub, oxo, Chem.BondType.DOUBLE)
+        if word == "carbamimidoyl":
+            imino = rw.AddAtom(Chem.Atom(7))
+            rw.AddBond(hub, imino, Chem.BondType.DOUBLE)
         nitrogen = rw.AddAtom(Chem.Atom(7))
         rw.AddBond(hub, nitrogen, Chem.BondType.SINGLE)
         if not all(_graft_onto(rw, nitrogen, frag) for frag in frags):

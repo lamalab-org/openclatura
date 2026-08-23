@@ -5,6 +5,7 @@ from .formatting import (
     count_names,
     format_counted_prefixes,
     format_element_substituent,
+    format_multiplier,
     is_complex_prefix,
     oxy_prefix_from_branch,
     strip_outer_parentheses,
@@ -426,6 +427,22 @@ def name_nitrogen_subgraph(
     heterocumulene = nitrogen_heterocumulene_role(mol, start_idx, exclude_atoms, upstream_atom)
     if heterocumulene is not None:
         return heterocumulene.prefix
+    if (
+        not is_double
+        and not is_triple
+        and next_atoms
+        and mol.atoms[start_idx].total_h_count == 0
+        and all(
+            mol.atoms[nxt].symbol == "O" and mol.degree(nxt) == 1 and mol.atoms[nxt].total_h_count == 0
+            for nxt in next_atoms
+        )
+    ):
+        # N-nitroso / N-nitro on a nitrogen parent: the oxygens are the group, not ``oxoamino``.
+        orders = sorted(mol.get_bond(start_idx, nxt).order for nxt in next_atoms)
+        if orders == [2]:
+            return "nitroso"
+        if len(orders) == 2 and (mol.atoms[start_idx].charge == 1 or 2 in orders):
+            return "nitro"
     if not next_atoms:
         if is_double:
             return "imino"
@@ -436,6 +453,10 @@ def name_nitrogen_subgraph(
         if is_anion:
             return charged_heteroatom_prefix("N", -1, "single") or "azanidyl"
         return unsubstituted_prefix("N") or "amino"
+
+    guanidino = _guanidino_prefix(mol, start_idx, next_atoms, exclude_atoms, branch_namer)
+    if guanidino:
+        return guanidino
 
     branches = []
     for nxt in next_atoms:
@@ -931,3 +952,77 @@ def name_heteroatom_subgraph(
     if symbol in {"Si", "B"}:
         return name_group_13_14_subgraph(mol, start_idx, exclude_atoms, upstream_atom, branch_namer)
     return None
+
+
+def _guanidino_prefix(
+    mol: Molecule,
+    start_idx: int,
+    next_atoms: list[int],
+    exclude_atoms: set[int],
+    branch_namer: RecursiveSubgraphNamer,
+) -> str:
+    """``R-NH-C(=NR')-NR''2`` hanging off the parent by its amine nitrogen: ``guanidino``.
+
+    P-66.4.1.2.1.3 numbers guanidine 1,2,3 with the imino nitrogen at 2; the attachment nitrogen
+    is 1.  ChemDraw and OPSIN both read this form, unlike a spelled-out ``(imino)(amino)methyl)amino``.
+    """
+
+    if mol.atoms[start_idx].charge:
+        return ""
+    carbons = [
+        n
+        for n in next_atoms
+        if mol.atoms[n].is_carbon
+        and mol.degree(n) == 3
+        and mol.get_bond(start_idx, n).order == 1
+        and all(mol.atoms[x].symbol == "N" for x in mol.get_neighbors(n))
+    ]
+    if len(carbons) != 1:
+        return ""
+    carbon = carbons[0]
+    neighbors = [n for n in mol.get_neighbors(carbon) if n != start_idx]
+    if len(neighbors) != 2 or any(mol.atoms[n].charge for n in neighbors):
+        return ""
+    from .chains import get_cyclic_atoms
+
+    cyclic = get_cyclic_atoms(mol)
+    if carbon in cyclic or start_idx in cyclic or any(n in cyclic for n in neighbors):
+        return ""
+    imino = next((n for n in neighbors if mol.get_bond(carbon, n).order == 2), None)
+    amine = next((n for n in neighbors if mol.get_bond(carbon, n).order == 1), None)
+    if imino is None or amine is None or imino in exclude_atoms or amine in exclude_atoms:
+        return ""
+    # Ring nitrogens and N-N / N-O nitrogens keep the systematic spelling.
+    for nitrogen in (start_idx, imino, amine):
+        for x in mol.get_neighbors(nitrogen):
+            if x == carbon:
+                continue
+            if not mol.atoms[x].is_carbon and mol.atoms[x].symbol != "H":
+                return ""
+            if mol.get_bond(nitrogen, x).order != 1:
+                return ""
+    locants_by_name: dict[str, list[str]] = {}
+    blocked = exclude_atoms | {start_idx, carbon, imino, amine}
+    for nitrogen, locant in ((start_idx, "1"), (imino, "2"), (amine, "3")):
+        for x in mol.get_neighbors(nitrogen):
+            if x == carbon or x in exclude_atoms or mol.atoms[x].symbol == "H":
+                continue
+            if nitrogen == start_idx and x not in next_atoms:
+                continue
+            name = branch_namer(mol, x, blocked, upstream_atom=nitrogen)
+            if isinstance(name, tuple):
+                name = name[0]
+            if not name:
+                return ""
+            locants_by_name.setdefault(str(name), []).append(locant)
+    if not locants_by_name:
+        return "guanidino"
+    from .assembly_prefixes import substituent_sort_key
+
+    parts = []
+    for name in sorted(locants_by_name, key=substituent_sort_key):
+        locants = locants_by_name[name]
+        parts.append(
+            f"{','.join(locants)}-{format_multiplier(name, len(locants), safe_enclose=is_complex_prefix(name))}"
+        )
+    return f"({'-'.join(parts)}guanidino)"

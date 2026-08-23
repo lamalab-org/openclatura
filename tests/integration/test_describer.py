@@ -184,8 +184,9 @@ def test_describe_renders_oxygen_carbonyl_shortcut_substituent_tree():
 def test_describe_renders_heteroatom_shortcut_ligand_tree():
     text = str(describe("O=S(=O)(Nc1nc(cc(n1)C)C)c2ccc(N)cc2"))
 
-    assert "Substituent at N: (4-aminophenylsulfonyl)" in text
-    assert "Substituent: 4-aminophenyl covers 7 atoms and 7 bonds" in text
+    # P-66.1.1.4.1: the sulfonamide is the principal group on the benzene parent.
+    assert "Substituent at N: (4,6-dimethylpyrimidin-2-yl) covers 8 atoms and 8 bonds" in text
+    assert "Parent: ring parent with 6 atoms retained as pyrimidine" in text
     assert "Parent: ring parent with 6 atoms retained as benzene" in text
     assert "Substituent at 4: amino covers 1 atom" in text
 

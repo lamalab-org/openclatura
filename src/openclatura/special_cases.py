@@ -8,7 +8,14 @@ from .assembly_parts import NameAtomBinding, NameTokenBinding
 from .assembly_prefixes import substituent_sort_key
 from .chains import get_cyclic_atoms
 from .charge_pair_roles import charge_pair_roles
-from .formatting import format_counted_prefixes, format_multiplier, oxy_prefix_from_branch, strip_outer_parentheses
+from .formatting import (
+    count_names,
+    format_counted_prefixes,
+    format_multiplier,
+    is_complex_prefix,
+    oxy_prefix_from_branch,
+    strip_outer_parentheses,
+)
 from .molecule import (
     Molecule,
     bond_ids_within,
@@ -93,10 +100,101 @@ def single_atom_component_name(mol: Molecule, component_atoms: set[int]) -> str:
         return atom.element.name
     if atom.symbol in RULES.ions.single_atom_anions:
         return RULES.ions.single_atom_anions[atom.symbol]
+    ion_name = SINGLE_ATOM_HYDRIDE_IONS.get((atom.symbol, atom.charge, atom.total_h_count))
+    if ion_name:
+        return ion_name
+    if atom.charge == 0 and atom.symbol in RETAINED_MONONUCLEAR_HYDRIDE_NAMES:
+        # P-21.1.1.1: ammonia and water are the retained names of the unsubstituted hydrides.
+        return RETAINED_MONONUCLEAR_HYDRIDE_NAMES[atom.symbol]
     hydride_name = RULES.components.mononuclear_parent_hydrides.get(atom.symbol)
     if hydride_name:
         return hydride_name
     return ""
+
+
+RETAINED_MONONUCLEAR_HYDRIDE_NAMES = {"N": "ammonia", "O": "water"}
+
+# P-72/P-73: mononuclear hydride ions, keyed by (element, charge, hydrogen count).
+SINGLE_ATOM_HYDRIDE_IONS = {
+    ("N", 1, 4): "ammonium",
+    ("N", -1, 2): "azanide",
+    ("O", -1, 1): "hydroxide",
+    ("O", -2, 0): "oxide",
+    ("O", 1, 3): "oxonium",
+    ("S", -1, 1): "sulfanide",
+    ("S", -2, 0): "sulfide",
+    ("P", 1, 4): "phosphanium",
+    ("H", 1, 0): "hydron",
+    ("H", -1, 0): "hydride",
+    ("Se", -2, 0): "selenide",
+}
+
+# P-21.1.1.1, P-67.1.1.1, P-68.3.1.1.1: small inorganic parents with retained names, matched as whole
+# graphs -- (sorted atom symbols, sorted bonds as (symbol, symbol, order)).
+RETAINED_SMALL_INORGANIC_PARENTS: dict[tuple[tuple[tuple[str, int], ...], tuple[tuple[str, str, int], ...]], str] = {}
+
+
+def _register_small_parent(name: str, atoms: list[tuple[str, int]], bonds: list[tuple[str, str, int]]) -> None:
+    key = (tuple(sorted(atoms)), tuple(sorted((min(a, b), max(a, b), order) for a, b, order in bonds)))
+    RETAINED_SMALL_INORGANIC_PARENTS[key] = name
+
+
+for _name, _atoms, _bonds in (
+    ("hydroxylamine", [("N", 0), ("O", 0)], [("N", "O", 1)]),
+    ("hydrogen peroxide", [("O", 0), ("O", 0)], [("O", "O", 1)]),
+    ("phosphonic acid", [("O", 0)] * 3 + [("P", 0)], [("O", "P", 1), ("O", "P", 1), ("O", "P", 2)]),
+    ("phosphinic acid", [("O", 0)] * 2 + [("P", 0)], [("O", "P", 1), ("O", "P", 2)]),
+    ("sulfuric diamide", [("N", 0)] * 2 + [("O", 0)] * 2 + [("S", 0)], [("N", "S", 1)] * 2 + [("O", "S", 2)] * 2),
+    ("diphosphoric acid", [("O", 0)] * 7 + [("P", 0)] * 2, [("O", "P", 1)] * 6 + [("O", "P", 2)] * 2),
+    # P-65.2.1.3 / P-65.2.2: carbonic acid halides and the carbon oxides and sulfides.
+    ("carbon dioxide", [("C", 0), ("O", 0), ("O", 0)], [("C", "O", 2)] * 2),
+    ("carbon disulfide", [("C", 0), ("S", 0), ("S", 0)], [("C", "S", 2)] * 2),
+    ("carbonyl sulfide", [("C", 0), ("O", 0), ("S", 0)], [("C", "O", 2), ("C", "S", 2)]),
+    ("carbon monoxide", [("C", -1), ("O", 1)], [("C", "O", 3)]),
+    (
+        "carbonyl dichloride",
+        [("C", 0), ("O", 0), ("Cl", 0), ("Cl", 0)],
+        [("C", "O", 2), ("C", "Cl", 1), ("C", "Cl", 1)],
+    ),
+    ("carbonyl difluoride", [("C", 0), ("O", 0), ("F", 0), ("F", 0)], [("C", "O", 2), ("C", "F", 1), ("C", "F", 1)]),
+    ("carbonyl dibromide", [("C", 0), ("O", 0), ("Br", 0), ("Br", 0)], [("C", "O", 2), ("C", "Br", 1), ("C", "Br", 1)]),
+    ("thiocyanic acid", [("C", 0), ("N", 0), ("S", 0)], [("C", "N", 3), ("C", "S", 1)]),
+    ("isocyanic acid", [("C", 0), ("N", 0), ("O", 0)], [("C", "N", 2), ("C", "O", 2)]),
+    ("isothiocyanic acid", [("C", 0), ("N", 0), ("S", 0)], [("C", "N", 2), ("C", "S", 2)]),
+    ("cyanate", [("C", 0), ("N", 0), ("O", -1)], [("C", "N", 3), ("C", "O", 1)]),
+    ("cyanate", [("C", 0), ("N", -1), ("O", 0)], [("C", "N", 2), ("C", "O", 2)]),
+    ("thiocyanate", [("C", 0), ("N", 0), ("S", -1)], [("C", "N", 3), ("C", "S", 1)]),
+    ("thiocyanate", [("C", 0), ("N", -1), ("S", 0)], [("C", "N", 2), ("C", "S", 2)]),
+    ("cyanide", [("C", -1), ("N", 0)], [("C", "N", 3)]),
+    ("azide", [("N", -1), ("N", 1), ("N", -1)], [("N", "N", 2), ("N", "N", 2)]),
+    ("nitrate", [("N", 1), ("O", 0), ("O", -1), ("O", -1)], [("N", "O", 2), ("N", "O", 1), ("N", "O", 1)]),
+    ("nitrite", [("N", 0), ("O", 0), ("O", -1)], [("N", "O", 2), ("N", "O", 1)]),
+    ("peroxide", [("O", -1), ("O", -1)], [("O", "O", 1)]),
+):
+    _register_small_parent(_name, _atoms, _bonds)
+
+
+def _small_inorganic_signature(mol: Molecule, component_atoms: set[int]):
+    atoms = tuple(sorted((mol.atoms[idx].symbol, int(mol.atoms[idx].charge)) for idx in component_atoms))
+    bonds = []
+    for bond in mol.bonds.values():
+        if bond.u in component_atoms and bond.v in component_atoms:
+            a, b = sorted((mol.atoms[bond.u].symbol, mol.atoms[bond.v].symbol))
+            bonds.append((a, b, int(bond.order)))
+    return atoms, tuple(sorted(bonds))
+
+
+def small_inorganic_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
+    """Whole-graph retained names for the small inorganic parents (hydroxylamine, hydrogen peroxide, ...)."""
+
+    if len(component_atoms) < 2 or len(component_atoms) > 9:
+        return None
+    if any(mol.atoms[idx].total_h_count for idx in component_atoms if mol.atoms[idx].symbol == "C"):
+        return None
+    name = RETAINED_SMALL_INORGANIC_PARENTS.get(_small_inorganic_signature(mol, component_atoms))
+    if name is None:
+        return None
+    return _component_name_result(mol, component_atoms, name, "small_inorganic_parent")
 
 
 def structural_replacement_parent_name(
@@ -118,6 +216,7 @@ def structural_replacement_parent_result(
     """Return a graph-bound replacement-parent hydride name result."""
 
     renderers = (
+        ("small_inorganic_parent", lambda: small_inorganic_parent_result(mol, component_atoms)),
         ("biphenyl_parent", lambda: biphenyl_parent_result(mol, component_atoms)),
         ("diazo_lambda_heteroring_parent", lambda: diazo_lambda_heteroring_parent_name(mol, component_atoms)),
         ("simple_azine_parent", lambda: simple_azine_parent_name(mol, component_atoms, branch_namer)),
@@ -130,9 +229,13 @@ def structural_replacement_parent_result(
         ("oxoacid_parent", lambda: oxoacid_parent_result(mol, component_atoms)),
         ("organophosphinic_acid", lambda: organophosphinic_acid_result(mol, component_atoms)),
         ("organophosphonic_acid", lambda: organophosphonic_acid_result(mol, component_atoms, branch_namer)),
+        ("organoboronic_acid", lambda: organoboronic_acid_result(mol, component_atoms, branch_namer)),
         ("sulfoxide_parent", lambda: sulfoxide_parent_result(mol, component_atoms)),
         ("homonuclear_chain_parent", lambda: homonuclear_chain_parent_result(mol, component_atoms, branch_namer)),
-        ("simple_central_parent_hydride", lambda: simple_central_parent_hydride_result(mol, component_atoms)),
+        (
+            "simple_central_parent_hydride",
+            lambda: simple_central_parent_hydride_result(mol, component_atoms, branch_namer),
+        ),
     )
     for role, render in renderers:
         rendered = render()
@@ -638,14 +741,6 @@ def _retained_ring_carbaldehyde_side_name(
     retained_name, locant_maps = retained_match
     locant_map = _choose_retained_map_for_attachment(locant_maps, ring_attachment)
     if locant_map is None:
-        # A data-driven retained *monocycle* carries no locant map -- only the
-        # fused systems do -- so requiring one here rejected plain benzene, and
-        # ``benzaldehyde`` fell through to ``cyclohexa-1,3,5-trien-1-carbaldehyde``.
-        # The ring reaching this point is bare (every ring atom has exactly two
-        # ring neighbours and nothing else), so when it is homocyclic every
-        # position is equivalent by rotation and the attachment is position 1.
-        # A heteroatom breaks that symmetry and genuinely needs numbering, so
-        # those still decline.
         locant = "1" if _is_homocyclic(mol, ring_path) else ""
     else:
         locant = locant_map.get(ring_attachment, "")
@@ -1436,42 +1531,44 @@ def oxoacid_ester_result(
             if rendered is not None:
                 matches.append(rendered)
             continue
-        if role.count(OxoLigandRole.ALKOXY) != 1:
-            continue
-        ester_ligand = next(ligand for ligand in role.ligands if ligand.role == OxoLigandRole.ALKOXY)
-        if ester_ligand.attachment_atom is None:
+        ester_ligands = [ligand for ligand in role.ligands if ligand.role == OxoLigandRole.ALKOXY]
+        if not ester_ligands or any(ligand.attachment_atom is None for ligand in ester_ligands):
             continue
         if spec is None or not spec.get("ester_suffix"):
             continue
         oxoacid_atoms = {role.central, *role.oxygen_atoms}
-        ester_component_atoms = component_atoms_until_blocked(
-            mol, component_atoms, ester_ligand.attachment_atom, oxoacid_atoms
-        )
-        if not ester_component_atoms or ester_component_atoms | oxoacid_atoms != component_atoms:
-            continue
-        ester_name = _ester_modifier_name(
-            mol,
-            component_atoms,
-            ester_ligand.attachment_atom,
-            ester_ligand.oxygen,
-            oxoacid_atoms,
-            branch_namer,
-        )
-        if not ester_name:
+        ester_groups: list[tuple[str, set[int]]] = []
+        covered: set[int] = set()
+        for ligand in ester_ligands:
+            ligand_atoms = component_atoms_until_blocked(mol, component_atoms, ligand.attachment_atom, oxoacid_atoms)
+            if not ligand_atoms or ligand_atoms & covered:
+                break
+            ester_name = _ester_modifier_name(
+                mol, component_atoms, ligand.attachment_atom, ligand.oxygen, oxoacid_atoms, branch_namer
+            )
+            if not ester_name:
+                break
+            ester_groups.append((ester_name, ligand_atoms))
+            covered |= ligand_atoms
+        if len(ester_groups) != len(ester_ligands) or covered | oxoacid_atoms != component_atoms:
             continue
         suffix = _oxoacid_ester_suffix_from_template_or_spec(mol, spec, role)
         if not suffix:
             continue
+        # P-65.6.3.3: several ester groups are cited alphabetically, identical ones multiplied.
+        ester_name = _ester_modifier_phrase([name for name, _ in ester_groups])
         name = f"{ester_name} {suffix}"
-        oxoacid_atoms = {role.central, *role.oxygen_atoms}
         bindings = (
-            NameAtomBinding(
-                stage="shortcut",
-                role="oxoacid_ester_modifier",
-                term=ester_name,
-                atom_ids=ester_component_atoms,
-                bond_ids=bond_ids_within(mol, ester_component_atoms),
-                charge_atom_ids=charged_atoms(mol, ester_component_atoms),
+            *(
+                NameAtomBinding(
+                    stage="shortcut",
+                    role="oxoacid_ester_modifier",
+                    term=group_name,
+                    atom_ids=group_atoms,
+                    bond_ids=bond_ids_within(mol, group_atoms),
+                    charge_atom_ids=charged_atoms(mol, group_atoms),
+                )
+                for group_name, group_atoms in ester_groups
             ),
             *_central_oxo_role_bindings(mol, role, suffix, "oxoacid_ester_suffix"),
         )
@@ -1594,6 +1691,22 @@ def _oxoacid_ester_suffix(spec: dict, role: CentralOxoRole) -> str:
     return f"{hydrogen} {base}"
 
 
+def _ester_modifier_phrase(names: list[str]) -> str:
+    """``ethyl dimethyl``: ester modifiers cited alphabetically, identical ones multiplied, space-separated."""
+
+    counts = count_names(names)
+    words = []
+    for name in sorted(counts, key=substituent_sort_key):
+        count = counts[name]
+        if count == 1:
+            words.append(name)
+        elif is_complex_prefix(name):
+            words.append(f"{multipliers.complex_(count)}({name})")
+        else:
+            words.append(f"{multipliers.basic(count)}{name}")
+    return " ".join(words)
+
+
 def _ester_modifier_name(
     mol: Molecule,
     component_atoms: set[int],
@@ -1624,6 +1737,10 @@ def _matching_oxoacid_spec(central_symbol: str, single_o: int, double_o: int, ch
 
 
 def _matching_oxoacid_spec_for_role(mol: Molecule, role: CentralOxoRole) -> dict | None:
+    central = mol.atoms[role.central]
+    if central.total_h_count:
+        # HP(OR)3 is a lambda4-phosphane and HP(=O)(OH)2 phosphonic acid, not oxoacid derivatives.
+        return None
     single_o, double_o = role.spec_counts()
     return _matching_oxoacid_spec(role.central_symbol, single_o, double_o, mol.atoms[role.central].charge)
 
@@ -1795,6 +1912,74 @@ def organophosphonic_acid_result(
         ),
     )
     return _component_name_result(mol, component_atoms, name, "organophosphonic_acid", bindings=bindings)
+
+
+def organoboronic_acid_result(
+    mol: Molecule,
+    component_atoms: set[int],
+    branch_namer: RecursiveSubgraphNamer | None = None,
+) -> SpecialComponentName | None:
+    """P-67.1.1.1: R-B(OH)2 is a boronic acid and R2B-OH a borinic acid, the carbon a prefix."""
+
+    borons = [idx for idx in component_atoms if mol.atoms[idx].symbol == "B"]
+    if len(borons) != 1:
+        return None
+    central = borons[0]
+    if mol.atoms[central].charge or mol.atoms[central].total_h_count or central in get_cyclic_atoms(mol):
+        return None
+    if any(
+        group.is_principal_candidate and group.attachment_carbon in component_atoms
+        for group in perceive_groups(mol)
+        if not (set(group.atoms_involved) | {group.attachment_carbon}) & {central}
+    ):
+        return None
+    hydroxy_oxygen = []
+    carbon_roots = []
+    for neighbor in mol.get_neighbors(central):
+        if neighbor not in component_atoms:
+            return None
+        atom = mol.atoms[neighbor]
+        bond = mol.get_bond(central, neighbor)
+        if bond is None or bond.order != 1:
+            return None
+        if atom.symbol == "O" and atom.charge == 0 and mol.degree(neighbor) == 1:
+            hydroxy_oxygen.append(neighbor)
+        elif atom.is_carbon:
+            carbon_roots.append(neighbor)
+        else:
+            return None
+    if (len(hydroxy_oxygen), len(carbon_roots)) not in {(2, 1), (1, 2)}:
+        return None
+    acid_atoms = {central, *hydroxy_oxygen}
+    ligands = []
+    ligand_atoms: set[int] = set()
+    for root in carbon_roots:
+        ligand = _phosphorus_ligand_name(mol, component_atoms, root, central, acid_atoms, branch_namer)
+        if not ligand:
+            return None
+        ligands.append(ligand)
+        ligand_atoms |= _carbon_ligand_atoms(mol, component_atoms, root, central) or subgraph_component(
+            mol, root, (set(mol.atoms) - component_atoms) | {central}
+        )
+    word = "boronic acid" if len(carbon_roots) == 1 else "borinic acid"
+    name = f"{format_counted_prefixes(ligands)}{word}"
+    bindings = (
+        NameAtomBinding(
+            stage="shortcut",
+            role="organoboronic_ligand",
+            term=format_counted_prefixes(ligands),
+            atom_ids=set(ligand_atoms),
+            bond_ids=bond_ids_within(mol, set(ligand_atoms)),
+        ),
+        NameAtomBinding(
+            stage="shortcut",
+            role="organoboronic_acid_core",
+            term=word,
+            atom_ids=acid_atoms,
+            bond_ids=bond_ids_within(mol, acid_atoms),
+        ),
+    )
+    return _component_name_result(mol, component_atoms, name, "organoboronic_acid", bindings=bindings)
 
 
 def _phosphorus_ligand_name(
@@ -2226,8 +2411,15 @@ def _locanted_ligand_prefix(items: list[tuple[int, str]]) -> str:
     return "-".join(parts)
 
 
-def simple_central_parent_hydride_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
-    """Name simple mononuclear parent hydrides with halogen/alkoxy ligands."""
+# P-41: these parent hydrides outrank carbon rings and chains, so their hydrocarbyl
+# derivatives are named on the heteroatom: triphenylphosphane, trimethyl(phenyl)silane.
+_SENIOR_HYDRIDE_CENTRES = frozenset({"P", "As", "Sb", "Bi", "Si", "Ge", "Sn", "Pb", "B", "Al", "Ga", "In", "Tl"})
+
+
+def simple_central_parent_hydride_result(
+    mol: Molecule, component_atoms: set[int], branch_namer: RecursiveSubgraphNamer | None = None
+) -> SpecialComponentName | None:
+    """Name simple mononuclear parent hydrides with halogen/alkoxy/hydrocarbyl ligands."""
 
     central_candidates = [
         idx
@@ -2240,12 +2432,52 @@ def simple_central_parent_hydride_result(mol: Molecule, component_atoms: set[int
         return None
     central = central_candidates[0]
     central_symbol = mol.atoms[central].symbol
+    charge_separated_oxide = (
+        mol.atoms[central].charge == 1
+        and central_symbol in {"P", "As", "Sb"}
+        and any(
+            mol.atoms[n].symbol == "O" and mol.atoms[n].charge == -1 and mol.degree(n) == 1
+            for n in mol.get_neighbors(central)
+        )
+    )
+    onium = (
+        mol.atoms[central].charge == 1
+        and central_symbol in _SENIOR_HYDRIDE_CENTRES
+        and not charge_separated_oxide
+        and mol.atoms[central].total_h_count == 0
+        and all(mol.atoms[n].is_carbon for n in mol.get_neighbors(central))
+    )
+    if mol.atoms[central].charge and not charge_separated_oxide and not onium:
+        # A charged nitrogen centre is an -ium/-ide parent named on its carbon (methanaminium).
+        return None
+    hydrocarbyl_allowed = (
+        branch_namer is not None
+        and central_symbol in _SENIOR_HYDRIDE_CENTRES
+        and not _has_principal_group(mol, component_atoms)
+    )
     ligand_names = []
     ligand_bindings = []
+    oxide_oxygen = None
     for neighbor in mol.get_neighbors(central):
         if neighbor not in component_atoms:
             continue
+        bond = mol.get_bond(central, neighbor)
+        if (
+            hydrocarbyl_allowed
+            and oxide_oxygen is None
+            and central_symbol in {"P", "As", "Sb"}
+            and mol.atoms[central].total_h_count == 0
+            and mol.atoms[neighbor].symbol == "O"
+            and mol.degree(neighbor) == 1
+            and bond is not None
+            and (bond.order == 2 or (bond.order == 1 and mol.atoms[neighbor].charge == -1))
+        ):
+            # R3P=O is a phosphane oxide (P-68.3.2.3), its ligands cited on the phosphane.
+            oxide_oxygen = neighbor
+            continue
         ligand = _central_ligand_name(mol, component_atoms, central, neighbor)
+        if not ligand and hydrocarbyl_allowed and mol.atoms[neighbor].is_carbon:
+            ligand = _hydrocarbyl_ligand_name(mol, component_atoms, central, neighbor, branch_namer)
         if not ligand:
             return None
         ligand_names.append(ligand)
@@ -2264,16 +2496,23 @@ def simple_central_parent_hydride_result(mol: Molecule, component_atoms: set[int
     if not ligand_names:
         return None
     prefix = _grouped_ligand_prefix(ligand_names)
-    lambda_text = _lambda_text(mol, central)
+    lambda_text = "" if (oxide_oxygen is not None or onium) else _lambda_text(mol, central)
     parent = f"{lambda_text}{RULES.components.mononuclear_parent_hydrides[central_symbol]}"
+    if oxide_oxygen is not None:
+        parent = f"{parent} oxide"
+    elif onium:
+        # P-73.1.1.1: tetramethylphosphanium -- the cation of the senior hydride.
+        parent = f"{parent[:-1]}ium" if parent.endswith("e") else f"{parent}ium"
 
     name = f"{prefix}-{parent}" if prefix and lambda_text else f"{prefix}{parent}"
+    core_atoms = {central} if oxide_oxygen is None else {central, oxide_oxygen}
     core_binding = NameAtomBinding(
         stage="shortcut",
         role="central_parent_hydride_core",
         term=parent,
-        atom_ids={central},
-        charge_atom_ids={central} if mol.atoms[central].charge else set(),
+        atom_ids=core_atoms,
+        bond_ids=bond_ids_within(mol, core_atoms),
+        charge_atom_ids={a for a in core_atoms if mol.atoms[a].charge},
     )
     return _component_name_result(
         mol,
@@ -2429,6 +2668,36 @@ def _same_element_parent_name(symbol: str, length: int, bond_orders: list[int]) 
     if order == 3:
         return f"{stem}yne" if length == 2 else f"{stem}-{bond_orders.index(order) + 1}-yne"
     return ""
+
+
+def _has_principal_group(mol: Molecule, component_atoms: set[int]) -> bool:
+    """Whether the component carries a characteristic group that would take a suffix."""
+
+    from .perception import perceive_groups
+
+    principal_keys = RULES.functional_groups.principal_keys()
+    return any(
+        group.key in principal_keys and group.attachment_carbon in component_atoms for group in perceive_groups(mol)
+    )
+
+
+def _hydrocarbyl_ligand_name(
+    mol: Molecule, component_atoms: set[int], central: int, neighbor: int, branch_namer: RecursiveSubgraphNamer
+) -> str:
+    """A hydrocarbyl ligand on a senior heteroatom parent, named as a substituent (phenyl, ethyl...)."""
+
+    bond = mol.get_bond(central, neighbor)
+    if bond is None or bond.order != 1:
+        return ""
+    ligand_atoms = component_atoms_until_blocked(mol, component_atoms, neighbor, {central})
+    if not ligand_atoms or any(mol.atoms[a].charge for a in ligand_atoms):
+        return ""
+    if any(other != neighbor and other in ligand_atoms for other in mol.get_neighbors(central)):
+        return ""  # the ligand closes a ring on the centre (a spiro side ring, not a hydrocarbyl group)
+    name = branch_namer(mol, neighbor, set(mol.atoms) - ligand_atoms, upstream_atom=central)
+    if isinstance(name, tuple):
+        name = name[0]
+    return strip_outer_parentheses(str(name)) if name else ""
 
 
 def _terminal_ligand_name(mol: Molecule, atom_idx: int, parent_idx: int) -> str:

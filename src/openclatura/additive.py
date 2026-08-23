@@ -112,6 +112,8 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     plan = mancude_monocycle_hydro_plan(mol, numbered_path, parts.retained_name)
     if plan is not None:
         _add_monocycle_hydro(parts, plan, get_loc)
+        if parts.principal_group is not None and parts.principal_group.key == "ketone":
+            _recast_ring_ketone_hydrogens(mol, parts, numbered_path, get_loc)
         return
 
     metadata = parts.retained_parent_metadata
@@ -142,6 +144,7 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         cited = _name_indicated_hydrogen_locants(parts.retained_name)
         if cited and cited != default_indicated_h and len(cited) == len(default_indicated_h):
             parts.retained_name = _respell_indicated_hydrogen(parts.retained_name, default_indicated_h)
+            name_declared_indicated_h = set(default_indicated_h)
     fusion_locants = set(metadata.fusion_locants) if metadata is not None else set()
     candidates: list[tuple[str, int]] = []
     hydro_only: list[tuple[str, int]] = []
@@ -179,8 +182,20 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 and locant not in default_indicated_h
                 and not (not default_indicated_h and ring_neighbor_count == 3)
             ):
+                # A saturated ring carbon beyond the ketone still has to be spelt: 3,4-dihydro.
+                if metadata is not None and _is_saturated_ring_site(mol, idx, numbered_path):
+                    hydro_only.append((locant, idx))
                 continue
             if default_indicated_h and locant not in default_indicated_h:
+                # A saturated ring heteroatom away from the cited site is a hydro position:
+                # 2,3-dihydro-1H-isoindol-1-one.
+                if (
+                    metadata is not None
+                    and not metadata.inherent_saturated_locants  # indoline spells its own N-H
+                    and not atom.is_carbon
+                    and _is_saturated_ring_site(mol, idx, numbered_path)
+                ):
+                    hydro_only.append((locant, idx))
                 continue
         if atom.symbol in INDICATED_H_ELEMENTS:
             ring_bonds = [mol.get_bond(idx, n) for n in mol.get_neighbors(idx) if n in numbered_path]
@@ -269,15 +284,61 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         )
         _fold_stem_hydro_prefix(parts, numbered_path, get_loc)
 
-    if metadata is not None and oxo_derivative and not name_states_indicated_h and surplus_count % 2 == 1:
-        candidates = sorted(candidates + hydro_only, key=lambda item: parse_locant(item[0]))
-
     # P-14.7: a mancude parent that the -one saturates cites the extra hydrogen
     # after the suffix locant -- quinolin-4(1H)-one, 1,3-benzoxazol-2(3H)-one.
     added_h_needed = oxo_derivative and supported == 0 and _name_spells_no_hydrogen(parts.retained_name)
+    if (
+        metadata is not None
+        and oxo_derivative
+        and (not name_states_indicated_h or added_h_needed)
+        and surplus_count % 2 == 1
+    ):
+        candidates = sorted(candidates + hydro_only, key=lambda item: parse_locant(item[0]))
     if name_states_indicated_h and not added_h_needed:
+        if metadata is not None and oxo_derivative and surplus_count > 0 and surplus_count % 2 == 1 and hydro_only:
+            # 3a,4,7,7a-tetrahydro-1H-isoindole-1,3(2H)-dione: one site beside a ketone is added
+            # hydrogen cited with the suffix, the even remainder a hydro prefix.
+            pool = sorted(candidates[supported:] + hydro_only, key=lambda item: parse_locant(item[0]))
+            ketone_atoms = {idx for idx in numbered_path if _is_oxo_ring_site(mol, idx, numbered_path)}
+            beside = [item for item in pool if any(n in ketone_atoms for n in mol.get_neighbors(item[1]))]
+            added = (beside or pool)[0]
+            rest = [item for item in pool if item != added]
+            parts.indicated_hydrogens.append(added[0])
+            parts.hydro_operations.append(
+                HydroOperation(
+                    key="added_hydrogen",
+                    reason="P-14.7: the ketone's neighbouring sp3 site is added hydrogen.",
+                    locants=(added[0],),
+                    atom_ids=(added[1],),
+                    operation_kind="indicated_hydrogen",
+                )
+            )
+            if rest:
+                parts.hydro_operations.append(
+                    HydroOperation(
+                        key="additive_hydrogen",
+                        reason="Saturation beyond the added hydrogen is a hydro prefix.",
+                        locants=tuple(locant for locant, _ in rest),
+                        atom_ids=tuple(atom_idx for _, atom_idx in rest),
+                        operation_kind="additive_hydrogen",
+                    )
+                )
         return
 
+    if added_h_needed and len(candidates) >= 3 and (len(candidates) - 1) % 2 == 0:
+        # 3,4-dihydroquinolin-2(1H)-one: one added hydrogen, the rest as a hydro prefix.
+        candidates = sorted(candidates, key=lambda item: parse_locant(item[0]))
+        added, rest = candidates[:1], candidates[1:]
+        parts.hydro_operations.append(
+            HydroOperation(
+                key="additive_hydrogen",
+                reason="Saturation beyond the added hydrogen is a hydro prefix.",
+                locants=tuple(locant for locant, _ in rest),
+                atom_ids=tuple(atom_idx for _, atom_idx in rest),
+                operation_kind="additive_hydrogen",
+            )
+        )
+        candidates = added
     for locant, atom_idx in candidates:
         parts.indicated_hydrogens.append(locant)
         parts.hydro_operations.append(
@@ -287,6 +348,65 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 locants=(locant,),
                 atom_ids=(atom_idx,),
                 operation_kind="indicated_hydrogen",
+            )
+        )
+    if oxo_derivative and not added_h_needed:
+        _recast_ring_ketone_hydrogens(mol, parts, numbered_path, get_loc)
+
+
+def _recast_ring_ketone_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
+    """P-31.1.4.2.4: spell a mancude ring ketone's saturation the way the rules do.
+
+    With as many indicated-hydrogen sites as ketones, the hydrogens are *added*
+    hydrogen cited with the suffix -- ``pyrimidine-2,4(1H,3H)-dione``.  With more
+    NH sites than the single ketone, the ketone carbon carries the indicated
+    hydrogen and the NH sites are hydro prefixes -- ``1,9-dihydro-6H-purin-6-one``.
+    """
+
+    group = parts.principal_group
+    if group is None:
+        return
+    indicated = [op for op in parts.hydro_operations if op.key == "indicated_hydrogen"]
+    if not indicated or any(op.key == "added_hydrogen" for op in parts.hydro_operations):
+        return
+    ketone_locants = [str(locant) for locant in group.locants]
+    nh_locants = [str(op.locants[0]) for op in indicated]
+    if set(nh_locants) & set(ketone_locants):
+        return
+    if len(nh_locants) == len(ketone_locants):
+        for op in indicated:
+            parts.hydro_operations[parts.hydro_operations.index(op)] = HydroOperation(
+                key="added_hydrogen",
+                reason="A ring ketone's NH sites are added hydrogen cited with the suffix.",
+                locants=op.locants,
+                atom_ids=op.atom_ids,
+                operation_kind="indicated_hydrogen",
+            )
+        return
+    if len(ketone_locants) == 1 and len(nh_locants) > 1:
+        ketone_atom = next((idx for idx in numbered_path if str(get_loc(idx)) == ketone_locants[0]), None)
+        if ketone_atom is None:
+            return
+        for op in indicated:
+            parts.hydro_operations.remove(op)
+        parts.indicated_hydrogens = [loc for loc in parts.indicated_hydrogens if loc not in nh_locants]
+        parts.indicated_hydrogens.append(ketone_locants[0])
+        parts.hydro_operations.append(
+            HydroOperation(
+                key="indicated_hydrogen",
+                reason="The ketone carbon carries the ring's indicated hydrogen.",
+                locants=(ketone_locants[0],),
+                atom_ids=(ketone_atom,),
+                operation_kind="indicated_hydrogen",
+            )
+        )
+        parts.hydro_operations.append(
+            HydroOperation(
+                key="additive_hydrogen",
+                reason="The remaining NH sites of a ring ketone are hydro prefixes.",
+                locants=tuple(nh_locants),
+                atom_ids=tuple(op.atom_ids[0] for op in indicated),
+                operation_kind="additive_hydrogen",
             )
         )
 
@@ -359,8 +479,12 @@ def _is_oxo_ring_site(mol: Molecule, atom_idx: int, numbered_path: list[int]) ->
     ]
     if not ring_bonds or any(bond.order != 1 for bond in ring_bonds):
         return False
+    # An exocyclic =O, =S or =N (ketone, thione, ylidene) makes the ring position sp2 without a
+    # ring double bond, so it is a hydro site just as a ketone carbon is.
     return any(
-        mol.atoms[n].symbol == "O" and (bond := mol.get_bond(atom_idx, n)) is not None and bond.order == 2
+        mol.atoms[n].symbol in {"O", "S", "N", "C"}
+        and (bond := mol.get_bond(atom_idx, n)) is not None
+        and bond.order == 2
         for n in mol.get_neighbors(atom_idx)
         if n not in numbered_path
     )

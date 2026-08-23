@@ -48,15 +48,30 @@ def group_substituents(substituents: list[SubstituentItem]) -> dict[str, list[Su
 
 
 def substituent_locant_string(parts: AssemblyParts, locs: list[str], grouped_count: int, spiro_subs) -> str:
-    # A one-atom parent has a single position, so a numeric locant on it says nothing -- unless the
-    # suffix brings a nitrogen of its own, which the locant is then what distinguishes it from.
+    imino_beside_another_prefix = grouped_count > 1 and any(sub.name == "imino" for sub in parts.substituents)
     if (
         parts.parent_length == 1
+        and parts.retained_name != "guanidine"
+        and not imino_beside_another_prefix
         and all(str(l).isdigit() for l in locs)
         and not parts.a_prefixes
         and (parts.principal_group is None or parts.principal_group.key not in GROUPS_OFFERING_A_SECOND_POSITION)
     ):
         return ""
+    if (
+        parts.parent_length == 2
+        and not parts.is_ring
+        and not parts.is_substituent
+        and parts.principal_group is None
+        and not parts.a_prefixes
+        and all(str(l).isdigit() for l in locs)
+    ):
+        # P-31.1.4.2.4 / P-31.1.4.3.4: ``chloroethene``; ``tetrafluoroethene`` when every position is taken.
+        total = sum(len(item.locants) for item in parts.substituents)
+        capacity = 6 if not parts.unsaturations else (4 if parts.unsaturations[0].bond_key == "double" else 2)
+        simple = all(not is_complex_prefix(str(item.name)) for item in parts.substituents)
+        if simple and ((grouped_count == 1 and len(locs) == 1) or (grouped_count == 1 and total == capacity)):
+            return ""
     retained_spec = retained_parent_spec(parts.retained_name)
     must_print_retained_locant = bool(
         retained_spec
