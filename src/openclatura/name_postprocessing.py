@@ -4,6 +4,7 @@ import re
 from dataclasses import dataclass
 
 from .nomenclature import RULES
+from .rules import multipliers
 
 OPTIONAL_ONE_LOCANT_PREFIX_RE = re.compile(r"(?P<prefix>\bmethyl |\b\S+yl | |\))1-\(")
 
@@ -98,16 +99,19 @@ def apply_acyl_amido_postprocessing(name: str) -> str:
     """Apply acyl-amino to amido contractions from data."""
 
     for acyl in RULES.postprocess.acyl_amido_terms:
-        name = re.sub(
-            rf"(?<!\))(?<!\])\b\(([^()]*{acyl})\)amino\b",
-            lambda match: _acyl_amido_replacement(match.group(1)),
-            name,
-        )
-        name = re.sub(
-            rf"(?<!\))(?<!\])\b([^()]*{acyl})amino\b",
-            lambda match: _acyl_amido_replacement(match.group(1)),
-            name,
-        )
+
+        def _enclosed(match: re.Match, subject: str = name) -> str:
+            if _multiplies(subject[: match.start()]):
+                return match.group(0)
+            return _acyl_amido_replacement(match.group(1))
+
+        def _bare(match: re.Match, acyl: str = acyl) -> str:
+            if _multiplies(match.group(1)[: -len(acyl)]):
+                return match.group(0)
+            return _acyl_amido_replacement(match.group(1))
+
+        name = re.sub(rf"(?<!\))(?<!\])\b\(([^()]*{acyl})\)amino\b", _enclosed, name)
+        name = re.sub(rf"(?<!\))(?<!\])\b([^()]*{acyl})amino\b", _bare, name)
     return name
 
 
@@ -115,6 +119,21 @@ def _acyl_amido_replacement(acyl_prefix: str) -> str:
     if acyl_prefix.startswith("N,") or acyl_prefix.startswith("N-"):
         return f"{acyl_prefix}amino"
     return f"{acyl_prefix}amido"
+
+
+def _multiplies(before: str) -> bool:
+    """Whether ``before`` ends in a multiplicative prefix counting the acyl itself.
+
+    ``-amido`` spells one acyl replacing one N-H, so a nitrogen carrying several
+    keeps the ``-amino`` parent: ``diacetylamino``, ``bis(2-phenylacetyl)amino``.
+    Only a multiplier sitting directly on the acyl counts -- in
+    ``dimethylaminoacetyl`` the ``di`` multiplies the methyl, and that name
+    contracts as usual.
+    """
+
+    return any(
+        before.endswith(mult.basic) or before.endswith(mult.complex) for mult in multipliers.MULTIPLIERS.values()
+    )
 
 
 def apply_connection_boundary_postprocessing(name: str) -> str:
@@ -142,18 +161,16 @@ def _qualify_n_substituted_functional_prefixes(name: str) -> str:
     result: list[str] = []
     i = 0
     while i < len(name):
-        # The construct is an outer group ``(<N-substituent><acyl+suffix>)`` whose
-        # first element is a parenthesised substituent — an ``(`` directly followed
-        # by another ``(``.
         if name[i] == "(" and i + 1 < len(name) and name[i + 1] == "(":
             outer = _matching_close_paren(name, i)
             nsub = _matching_close_paren(name, i + 1)
             if outer is not None and nsub is not None and nsub < outer:
                 inner = name[i + 2 : nsub]
                 tail = name[nsub + 1 : outer]
-                # The acyl stem + suffix must be a single unparenthesised run that
-                # ends in a functional suffix; anything else (a second ligand, a
-                # trailing group) is outside what this rewrite can safely qualify.
+                if tail.startswith("-"):
+                    result.append(name[i])
+                    i += 1
+                    continue
                 if "(" not in tail and ")" not in tail and suffix_re.search(tail):
                     display = f"({inner})" if ("(" in inner or ")" in inner) else inner
                     result.append(f"(N-{display}{tail})")

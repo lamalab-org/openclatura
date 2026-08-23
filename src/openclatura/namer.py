@@ -1127,15 +1127,32 @@ _MULTI_ACID_ENDINGS = tuple(
 )
 
 
-def _carboxylic_acid_to_amido(acid_name: str) -> str | None:
-    """Convert a carboxylic-acid component name to its N-acyl (amido) substituent form."""
+def _retained_sulfonyl_amino(acid_name: str) -> str | None:
+    """``tosylamino`` for an acid with a retained sulfonyl shorthand.
+
+    The shorthand names the whole group, so the nitrogen keeps the plain ``amino``
+    ending rather than the ``sulfonamido`` contraction the systematic name takes.
+    """
+
+    retained = RULES.heteroatoms.retained_sulfonyl_group_acids.get(acid_name)
+    return None if retained is None else f"{retained}amino"
+
+
+def _acid_name_to_amido(acid_name: str) -> str | None:
+    """Convert an acid component name to its N-acyl (amido) substituent form."""
 
     # Only the acid this nitrogen replaced becomes the amide.  Rewriting the
     # suffix of a diacid amidates both of them, which is how glutamate's free
     # side-chain acid turned into `2-aminopentanediamido`.
     if acid_name.endswith(_MULTI_ACID_ENDINGS):
         return None
-    for ending, replacement in (("carboxylic acid", "carboxamido"), ("oic acid", "amido"), ("ic acid", "amido")):
+    for ending, replacement in (
+        ("carboxylic acid", "carboxamido"),
+        ("sulfonic acid", "sulfonamido"),
+        ("sulfinic acid", "sulfinamido"),
+        ("oic acid", "amido"),
+        ("ic acid", "amido"),
+    ):
         if acid_name.endswith(ending):
             return acid_name[: -len(ending)] + replacement
     return None
@@ -1204,13 +1221,37 @@ def _competing_acid_reachable(mol: Molecule, acyl_c: int, acid_atoms: set[int]) 
     return any(_is_carboxylic_acid_carbon(mol, idx) for idx in seen if idx != acyl_c)
 
 
+def _neutralize_charge_separated_oxo(acid_mol: Molecule, center: int) -> None:
+    """Spell a charge-separated oxo group as a double bond on the capped acid.
+
+    Only ``S(=O)(=O)`` is perceived as the sulfonic acid the amido prefix is
+    named from, so the two spellings of one sulfonyl gave two different names.
+    """
+
+    center_atom = acid_mol.atoms[center]
+    if center_atom.charge <= 0:
+        return
+    for neighbor in acid_mol.get_neighbors(center):
+        atom = acid_mol.atoms[neighbor]
+        bond = acid_mol.get_bond(center, neighbor)
+        if atom.symbol != "O" or atom.charge != -1 or bond is None or bond.order != 1:
+            continue
+        if acid_mol.degree(neighbor) != 1:
+            continue
+        acid_mol.set_atom_charge(neighbor, 0)
+        acid_mol.set_bond_order(bond.idx, 2)
+        acid_mol.set_atom_charge(center, center_atom.charge - 1)
+        return
+
+
 def _acylamino_amido_prefix(
     mol: Molecule, n_idx: int, exclude_atoms: set[int], upstream_atom: int | None
 ) -> str | None:
-    """Name an acylamino substituent ``R-C(=O)-N(R')-`` as an ``[N-R'-]<acid>amido`` prefix.
+    """Name an acylamino substituent ``R-CO-N(R')-`` or ``R-SO2-N(R')-`` as an
+    ``[N-R'-]<acid>amido`` prefix.
 
-    Routes the acyl through the carboxylic-acid component namer so it renders with a
-    proper substitutive amido name (acetamido, benzamido, 2-phenylacetamido,
+    Routes the acyl through the acid component namer so it renders with a
+    proper substitutive amido name (acetamido, benzamido, benzenesulfonamido,
     2-(piperidin-4-yl)acetamido, ...) rather than the ambiguous functional-class
     ``<sub>carbonylamino`` spelling.  N-substituents (tertiary amides) are rendered as
     ``N-`` locanted prefixes.  Returns ``None`` for anything that is not a plain
@@ -1227,18 +1268,30 @@ def _acylamino_amido_prefix(
     if not neighbors:
         return None
 
-    def _amide_acyl(carbon: int) -> bool:
-        """True when ``carbon`` is a single-bonded carboxamide acyl on this nitrogen."""
-        if not mol.atoms[carbon].is_carbon or mol.get_bond(n_idx, carbon).order != 1:
+    def _amide_acyl(center: int) -> bool:
+        """True when ``center`` is a single-bonded amide or sulfonamide acyl here.
+
+        A carboxamide carbon carries one oxo; a sulfonamide sulfur carries two.
+        """
+        if mol.get_bond(n_idx, center).order != 1:
             return False
-        c_os = [
+        # ``[S+](=O)[O-]`` spells the same sulfonyl as ``S(=O)(=O)``.
+        oxo = [
             nb
-            for nb in mol.get_neighbors(carbon)
-            if mol.atoms[nb].symbol == "O" and mol.get_bond(carbon, nb).order == 2
+            for nb in mol.get_neighbors(center)
+            if mol.atoms[nb].symbol == "O"
+            and mol.degree(nb) == 1
+            and (mol.get_bond(center, nb).order == 2 or (mol.atoms[nb].charge == -1 and mol.atoms[center].charge > 0))
         ]
-        if len(c_os) != 1:
+        if mol.atoms[center].is_carbon:
+            if len(oxo) != 1:
+                return False
+        elif mol.atoms[center].symbol == "S":
+            if len(oxo) != 2:
+                return False
+        else:
             return False
-        rest = [nb for nb in mol.get_neighbors(carbon) if nb not in {n_idx, c_os[0]}]
+        rest = [nb for nb in mol.get_neighbors(center) if nb not in {n_idx, *oxo}]
         # The acid's R group (if any) must be carbon; formyl (no R) contracts to formamido.
         return len(rest) <= 1 and all(mol.atoms[nb].is_carbon for nb in rest)
 
@@ -1268,6 +1321,7 @@ def _acylamino_amido_prefix(
         return None
 
     acid_mol = mol.subgraph(acid_atoms)
+    _neutralize_charge_separated_oxo(acid_mol, acyl_c)
     hydroxyl_idx = max(mol.atoms) + 1
     acid_mol.add_atom(symbol="O", idx=hydroxyl_idx)
     acid_mol.add_bond(u=acyl_c, v=hydroxyl_idx, order=1)
@@ -1276,7 +1330,7 @@ def _acylamino_amido_prefix(
         acid_name = name_component(acid_mol, acid_atoms | {hydroxyl_idx}, is_substituent=False)
     except Exception:
         return None
-    amido = _carboxylic_acid_to_amido(str(acid_name))
+    amido = _retained_sulfonyl_amino(str(acid_name)) or _acid_name_to_amido(str(acid_name))
     if amido is None:
         return None
     if n_substituents:
@@ -1807,11 +1861,49 @@ def _visible_ligand_substituent_locants(lower_name: str, child_name: str) -> lis
     return match.group(1).split(",")
 
 
+def _acyl_oxy_shortcut_children(name: str, component: set[int], mol: Molecule) -> list[dict]:
+    """Return the acyl child of an ``<acyl name>oxy`` shortcut substituent."""
+
+    if not name.lower().rstrip(")").endswith("oxy"):
+        return []
+    oxygen = next(
+        (
+            atom_idx
+            for atom_idx in component
+            if mol.atoms[atom_idx].symbol == "O"
+            and any(neighbor not in component for neighbor in mol.get_neighbors(atom_idx))
+        ),
+        None,
+    )
+    if oxygen is None:
+        return []
+    carbonyl = next(
+        (
+            neighbor
+            for neighbor in mol.get_neighbors(oxygen)
+            if neighbor in component
+            and mol.atoms[neighbor].is_carbon
+            and any(
+                other in component
+                and mol.atoms[other].symbol in {"O", "S"}
+                and (bond := mol.get_bond(neighbor, other)) is not None
+                and bond.order == 2
+                for other in mol.get_neighbors(neighbor)
+            )
+        ),
+        None,
+    )
+    if carbonyl is None:
+        return []
+    acyl_tree = _recursive_ligand_tree(mol, carbonyl, (set(mol.atoms) - component) | {oxygen}, upstream_atom=oxygen)
+    return [acyl_tree] if isinstance(acyl_tree, dict) else []
+
+
 def _oxygen_carbonyl_shortcut_children(name: str, component: set[int], mol: Molecule) -> list[dict]:
     """Return nested tree nodes for O-C(=O)-R shortcut substituents."""
 
     if "carbonyloxy" not in name.lower() and "carbonothioyloxy" not in name.lower():
-        return []
+        return _acyl_oxy_shortcut_children(name, component, mol)
     oxygen = next(
         (
             atom_idx

@@ -175,10 +175,10 @@ def test_describe_explains_retained_purine_dione_parent():
 def test_describe_renders_oxygen_carbonyl_shortcut_substituent_tree():
     text = str(describe("C1[C@H]([C@@H]([C@@H](C=C1C(=O)O)OC(=O)/C=C/C2=CC(=C(C=C2)O)O)O)O"))
 
-    assert "Substituent at 3: ((1E)-2-(3,4-dihydroxyphenyl)ethenylcarbonyloxy)" in text
-    assert "Substituent: ethenyl covers 2 atoms and 1 bond" in text
-    assert "Substituent: dihydroxyphenyl covers 8 atoms and 8 bonds" in text
-    assert text.count("Substituent: hydroxy covers 1 atom and 1 bond") >= 2
+    assert "Substituent at 3: (((2E)-3-(3,4-dihydroxyphenyl)prop-2-enoyl)oxy)" in text
+    assert "((2E)-3-(3,4-dihydroxyphenyl)prop-2-enoyl) covers 12 atoms and 12 bonds" in text
+    assert "(3,4-dihydroxyphenyl) covers 8 atoms and 8 bonds" in text
+    assert text.count("hydroxy covers 2 atoms and 2 bonds") >= 2
 
 
 def test_describe_renders_heteroatom_shortcut_ligand_tree():

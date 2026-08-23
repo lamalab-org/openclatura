@@ -1430,11 +1430,7 @@ def _normalised_rendered_term_occurs(term: str, final_text: str) -> bool:
 
 
 def _contextual_postprocess_replacements() -> tuple[tuple[str, str], ...]:
-    from .assembler import LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS
-
-    return tuple((rule.pattern, rule.replacement) for rule in RULES.postprocess.literal_replacements) + tuple(
-        LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS
-    )
+    return tuple((rule.pattern, rule.replacement) for rule in RULES.postprocess.literal_replacements)
 
 
 def _normalise_name_text(text: str) -> str:

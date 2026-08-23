@@ -137,6 +137,7 @@ class AssemblyParts:
     is_substituent: bool = False
     is_double_attach: bool = False
     is_triple_attach: bool = False
+    is_acyl_substituent: bool = False
     attachment_locant: int | str = 1
     retained_name: str | None = None
     retained_absorbs_principal_group: bool = False

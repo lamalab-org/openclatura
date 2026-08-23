@@ -6,6 +6,7 @@ from .assembly_parts import NameTokenBinding
 from .formatting import strip_outer_parentheses
 from .molecule import Molecule, bond_ids_within
 from .naming_protocols import RecursiveSubgraphNamer
+from .nomenclature import RULES
 from .stereo_descriptors import ABSOLUTE_STEREO_DESCRIPTORS, RELATIVE_STEREO_DESCRIPTORS
 from .token_grammar import is_locant_token, lexical_token_spans, lexical_tokens
 
@@ -252,7 +253,8 @@ def _oxygen_carbonyl_like_tokens(
     if mol.atoms[oxygen].symbol != "O":
         return ()
     lower = term_text.lower()
-    if "carbonyloxy" not in lower and "carbonothioyloxy" not in lower:
+    acyl_spelling = "carbonyloxy" not in lower and "carbonothioyloxy" not in lower
+    if acyl_spelling and not lower.rstrip(")").endswith("oxy"):
         return ()
     carbonyl = next(
         (
@@ -277,6 +279,8 @@ def _oxygen_carbonyl_like_tokens(
         return ()
     carbonyl_atoms = {carbonyl, terminal_chalcogens[0]}
     carbonyl_bonds = bond_ids_within(mol, carbonyl_atoms | {oxygen})
+    if acyl_spelling:
+        return _acyl_oxy_tokens(mol, oxygen, carbonyl, terminal_chalcogens[0], atom_ids, term_text)
     tokens: list[NameTokenBinding] = [
         NameTokenBinding(
             text="carbon",
@@ -322,6 +326,63 @@ def _oxygen_carbonyl_like_tokens(
         tokens.extend(_alkenyl_bridge_tokens(mol, bridge_atoms, bridge_bonds, lower))
     if branch_atoms:
         tokens.extend(_branch_phrase_tokens(mol, branch_atoms, lower))
+    return tuple(tokens)
+
+
+def _acyl_oxy_tokens(
+    mol: Molecule,
+    oxygen: int,
+    carbonyl: int,
+    chalcogen: int,
+    atom_ids: set[int],
+    term_text: str,
+) -> tuple[NameTokenBinding, ...]:
+    """Return scopes for an acyloxy prefix written as ``<acyl name>oxy``.
+
+    The carbonyl carbon is inside the acyl chain's own stem, so the acyl name
+    scopes to the whole fragment; its ``oyl`` ending is split out and bound to
+    the carbonyl, keeping a like-spelled token elsewhere off those letters.
+    """
+
+    acyl_ending = RULES.assembly.substituent_attachment_suffixes["acyl"]
+    acyl_atoms = {carbonyl, chalcogen} | _component_within(mol, carbonyl, atom_ids - {oxygen, chalcogen})
+    acyl_bonds = bond_ids_within(mol, acyl_atoms)
+    carbonyl_atoms = {carbonyl, chalcogen}
+    carbonyl_bonds = bond_ids_within(mol, carbonyl_atoms)
+
+    def acyl_token(text: str, scope: set[int], bonds: set[int], priority: int = 0) -> NameTokenBinding:
+        return NameTokenBinding(
+            text=text,
+            token_kind="locant" if is_locant_token(text, allow_element=False) else "prefix",
+            source="substituent_renderer",
+            grammar_role="acyl_oxy_ligand",
+            binding_key="prefix:acyl_oxy_ligand",
+            atom_ids=set(scope),
+            bond_ids=set(bonds),
+            charge_atom_ids={idx for idx in scope if mol.atoms[idx].charge != 0},
+            locants=(text,) if is_locant_token(text, allow_element=False) else (),
+            match_priority=priority,
+        )
+
+    acyl_text = strip_outer_parentheses(term_text[: term_text.lower().rstrip(")").rfind("oxy")])
+    tokens = []
+    for token_text in _lexical_tokens(acyl_text):
+        tokens.append(acyl_token(token_text, acyl_atoms, acyl_bonds))
+        if token_text.endswith(acyl_ending) and len(token_text) > len(acyl_ending):
+            tokens.append(acyl_token(token_text[: -len(acyl_ending)], acyl_atoms, acyl_bonds))
+            tokens.append(acyl_token(acyl_ending, carbonyl_atoms, carbonyl_bonds, priority=80))
+    tokens.append(
+        NameTokenBinding(
+            text="oxy",
+            token_kind="prefix",
+            source="substituent_renderer",
+            grammar_role="heteroatom_center",
+            binding_key="prefix:heteroatom_center",
+            atom_ids={oxygen},
+            bond_ids=bond_ids_within(mol, {oxygen, carbonyl}),
+            match_priority=80,
+        )
+    )
     return tuple(tokens)
 
 

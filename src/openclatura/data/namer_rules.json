@@ -427,6 +427,17 @@
       "phenyl"
     ]
   },
+  "retained_sulfonyl_group_names": {
+    "bluebook_rule": "P-65.3.1; retained shorthands for sulfonyl groups, with the acid they are named from",
+    "values": [
+      {
+        "branch": "4-methylphenyl",
+        "suffix": "sulfonyl",
+        "name": "tosyl",
+        "acid": "4-methylbenzene-1-sulfonic acid"
+      }
+    ]
+  },
   "halogen_prefixes": {
     "bluebook_rule": "P-61.3; halogen detachable prefixes",
     "values": {
@@ -1558,6 +1569,16 @@
     "bluebook_rule": "P-14.5; detachable prefix alphabetization after ignored descriptors",
     "values": {
       "prefix_pattern": "^((?:(?:[0-9]+[a-z]*|[nospmc]'*)(?:,(?:[0-9]+[a-z]*|[nospmc]'*))*|[ezrs]+|sec|tert|t|s|d|l|m|o|p|alpha|beta|gamma))([-)]+)"
+    }
+  },
+  "substituent_attachment_suffixes": {
+    "bluebook_rule": "P-29.2 and P-65.3.1; the word that ends a substituent name for each kind of attachment",
+    "values": {
+      "single": "yl",
+      "double": "ylidene",
+      "triple": "ylidyne",
+      "acyl": "oyl",
+      "acyl_on_branch": "carbonyl"
     }
   },
   "postprocess_literal_replacements": {

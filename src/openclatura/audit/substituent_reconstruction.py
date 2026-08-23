@@ -45,6 +45,7 @@ _LEAF_SMILES: dict[str, str] = {
     "methoxy": "OC",
     "ethoxy": "OCC",
     "propoxy": "OCCC",
+    "tosyl": "S(=O)(=O)c1ccc(C)cc1",
     "methylsulfanyl": "SC",
     "ethylsulfanyl": "SCC",
     "formyl": "C=O",
@@ -413,7 +414,7 @@ def _resolve_operator(name: str, stereo_map: dict[str, str] | None = None) -> Ch
     frag = _resolve_substituted_hydrazinyl(name)
     if frag is not None:
         return frag
-    if name.startswith("N-") and name.endswith("amido"):
+    if name.startswith("N-") and (name.endswith("amido") or name.endswith("amino")):
         frag = _resolve_n_substituted_amido(name[2:])
         if frag is not None:
             return frag
@@ -421,6 +422,11 @@ def _resolve_operator(name: str, stereo_map: dict[str, str] | None = None) -> Ch
         frag = _resolve_carboxamido(name[: -len("carboxamido")], stereo_map)
         if frag is not None:
             return frag
+    for ending, hub in _ACID_AMIDO_HUBS.items():
+        if name.endswith(ending) and len(name) > len(ending):
+            frag = _resolve_acid_amido(name[: -len(ending)], hub, stereo_map)
+            if frag is not None:
+                return frag
     if name.endswith("amino") and len(name) > len("amino"):
         frag = _resolve_amino(name[: -len("amino")])
         if frag is not None:
@@ -508,9 +514,9 @@ def _promote_to_double_attachment(frag: Chem.Mol, stereo_map: dict[str, str] | N
 
 
 def _resolve_n_substituted_amido(rest: str) -> Chem.Mol | None:
-    """``N-<substituent><…amido>`` — an amide prefix whose nitrogen carries an
-    extra group: ``N-methylacetamido`` = ``parent-N(CH3)-C(=O)CH3``,
-    ``N-methylpyridine-3-carboxamido`` = ``parent-N(CH3)-C(=O)-pyridin-3-yl``.
+    """``N-<substituent><…amido|…amino>`` — an amide or sulfonamide prefix whose
+    nitrogen carries an extra group: ``N-methylacetamido`` =
+    ``parent-N(CH3)-C(=O)CH3``, ``N-methyltosylamino`` = ``parent-N(CH3)-Ts``.
 
     ``rest`` is the name with the leading ``N-`` removed.  Where the italic-N
     ligand ends is not marked, so every depth-0 split is tried and the first one
@@ -521,7 +527,7 @@ def _resolve_n_substituted_amido(rest: str) -> Chem.Mol | None:
         if rest[:cut].count("(") != rest[:cut].count(")"):
             continue  # never split inside a parenthesised group
         ligand_name, amide_name = rest[:cut], rest[cut:].lstrip("-")
-        if not amide_name.endswith("amido"):
+        if not amide_name.endswith(("amido", "amino")):
             continue
         ligand = resolve_fragment_mol(ligand_name)
         if ligand is None:
@@ -577,6 +583,26 @@ def _resolve_carboxamido(stem: str, stereo_map: dict[str, str] | None = None) ->
     return None
 
 
+_ACID_AMIDO_HUBS: dict[str, str] = {
+    "sulfonylcarbamoyl": "*C(=O)NS(=O)(=O)*",
+    "sulfonamido": "*NS(=O)(=O)*",
+    "sulfinamido": "*NS(=O)*",
+}
+
+
+def _resolve_acid_amido(stem: str, hub: str, stereo_map: dict[str, str] | None = None) -> Chem.Mol | None:
+    """``benzenesulfonamido`` -> ``NH-SO2-phenyl``: the stem names the parent
+    hydride, resolved through the same ``-yl`` spellings a ring acid stem uses."""
+
+    stem = stem.rstrip("-")
+    prefix = _stereo_prefix(stereo_map)
+    for candidate in _acyl_ring_variants(stem):
+        inner = resolve_fragment_mol(prefix + candidate) or resolve_fragment_mol(candidate)
+        if inner is not None:
+            return _join_two_port(hub, inner)
+    return None
+
+
 def _stereo_prefix(stereo_map: dict[str, str] | None) -> str:
     """Re-render a captured ``{locant: descriptor}`` map as the name prefix it
     came from, so it can be pushed onto an inner ring name."""
@@ -594,7 +620,8 @@ def _acyl_ring_variants(stem: str):
     yield _normalize_yl(stem)
     if "-" in stem and stem.rsplit("-", 1)[1].isdigit():
         yield stem + "-yl"  # furan-2 -> furan-2-yl
-    bm = re.match(r"^(?P<pre>.*?)benzene-1$", stem)
+    # ``benzene-1`` and the unlocanted ``benzene`` are both phenyl.
+    bm = re.match(r"^(?P<pre>.*?)benzene(?:-1)?$", stem)
     if bm is not None:
         yield bm.group("pre") + "phenyl"
     if stem.endswith("ane"):

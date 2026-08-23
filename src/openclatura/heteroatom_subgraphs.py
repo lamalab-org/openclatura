@@ -113,6 +113,19 @@ def sulfur_oxo_suffix(oxo_count: int) -> str:
     return "sulfonyl" if oxo_count == 2 else "sulfinyl"
 
 
+def retained_sulfonyl_group(branch: str, suffix: str) -> str | None:
+    """The retained shorthand for a branch on a sulfonyl -- ``tosyl`` -- if there is one."""
+
+    return RULES.heteroatoms.retained_sulfonyl_groups.get((strip_outer_parentheses(branch), suffix))
+
+
+def sulfonyl_group_name(branch: str, suffix: str) -> str:
+    """The retained shorthand for a branch on a sulfonyl, or the systematic spelling."""
+
+    retained = retained_sulfonyl_group(branch, suffix)
+    return retained if retained is not None else f"{branch}{suffix}"
+
+
 def _single_imino_n_substituent_name(
     mol: Molecule,
     nitrogen: int,
@@ -358,15 +371,17 @@ def name_oxygen_subgraph(
             branch_namer,
         )
         if branch:
-            return f"({stereo_prefix(mol.atoms[nxt])}{branch}{sulfur_oxo_suffix(len(s_oxygens))}oxy)"
+            group = sulfonyl_group_name(branch, sulfur_oxo_suffix(len(s_oxygens)))
+            return f"({stereo_prefix(mol.atoms[nxt])}{group}oxy)"
         return "sulfooxy"
 
     c_oxygens = double_bonded_neighbors(mol, nxt, "O")
     c_sulfurs = double_bonded_neighbors(mol, nxt, "S")
     if mol.atoms[nxt].is_carbon and len(c_oxygens) == 1:
-        return name_carbonyl_like_fragment(
-            mol, nxt, start_idx, c_oxygens, exclude_atoms, "carbonyloxy", "formyloxy", branch_namer, wrap_result=True
-        )
+        # An acyloxy prefix is the acyl group's own name plus ``oxy``:
+        # ``acetyloxy``, ``benzoyloxy``, not ``methylcarbonyloxy``.
+        acyl = name_branch_or_none(mol, nxt, exclude_atoms | {start_idx}, start_idx, branch_namer)
+        return oxy_prefix_from_branch(acyl) if acyl else "formyloxy"
     if mol.atoms[nxt].is_carbon and len(c_sulfurs) == 1:
         return name_carbonyl_like_fragment(
             mol,
@@ -425,19 +440,10 @@ def name_nitrogen_subgraph(
         c_oxygens = double_bonded_neighbors(mol, nxt, "O")
         c_sulfurs = double_bonded_neighbors(mol, nxt, "S")
         if mol.atoms[nxt].is_carbon and len(c_oxygens) == 1:
-            branches.append(
-                name_carbonyl_like_fragment(
-                    mol,
-                    nxt,
-                    start_idx,
-                    c_oxygens,
-                    exclude_atoms,
-                    "carbonyl",
-                    "formyl",
-                    branch_namer,
-                    amino_base="carbamoyl",
-                )
-            )
+            # An acyl ligand is named as the acyl group it is: ``acetyl``, not
+            # ``methylcarbonyl``.
+            acyl = name_branch_or_none(mol, nxt, exclude_atoms | {start_idx}, start_idx, branch_namer)
+            branches.append(acyl or "formyl")
         elif mol.atoms[nxt].is_carbon and len(c_sulfurs) == 1:
             branches.append(
                 name_carbonyl_like_fragment(
@@ -536,17 +542,12 @@ def _sulfur_imide_branch_name(
             format_lambda_substituent(mol, sulfur, branches, stereo_prefix_text, "sulfanylidene")
         )
 
-    # ``sulfinyl``/``sulfonyl`` spell a sulfur carrying this nitrogen, its oxo
-    # groups, and exactly one more ligand.  A sulfonimidoyl has two -- the
-    # imino nitrogen and a carbon ligand -- and naming only the first dropped
-    # the other, so N-S(=N)(=O)Ph came out as `iminosulfinyl` with the phenyl
-    # gone.  Anything larger goes to the general namer.
     if not _has_at_most_one_further_ligand(mol, sulfur, {nitrogen, *s_oxygens}):
         return ""
     branch_idx = first_substituent_neighbor(mol, sulfur, {nitrogen, *s_oxygens})
     branch = name_branch_or_none(mol, branch_idx, local_exclude, sulfur, branch_namer)
     if branch:
-        return f"{stereo_prefix_text}{branch}{sulfur_oxo_suffix(len(s_oxygens))}"
+        return f"{stereo_prefix_text}{sulfonyl_group_name(branch, sulfur_oxo_suffix(len(s_oxygens)))}"
     return "sulfo"
 
 
@@ -674,7 +675,14 @@ def name_sulfur_subgraph(
             branch = name_branch_or_none(
                 mol, next_atoms[0], exclude_atoms | {start_idx} | set(s_oxygens), start_idx, branch_namer
             )
-            return f"({stereo_prefix_text}{branch}{suffix})" if branch else f"{stereo_prefix_text}{suffix}"
+            if not branch:
+                return f"{stereo_prefix_text}{suffix}"
+            # A retained one-word shorthand (``tosyl``) reads unambiguously bare;
+            # a composed ``methylsulfonyl`` still needs its parentheses.
+            retained = retained_sulfonyl_group(branch, suffix)
+            if retained is not None:
+                return f"{stereo_prefix_text}{retained}"
+            return f"({stereo_prefix_text}{branch}{suffix})"
         branches = [
             br
             for nxt in next_atoms
@@ -711,11 +719,7 @@ def name_sulfur_subgraph(
     if not next_atoms:
         if not is_double and mol.atoms[start_idx].charge > 0:
             return f"{stereo_prefix_text}sulfaniumyl"
-        # `sulfanyl` spells an S-H.  A terminal [S-] on a positively charged
-        # centre has no hydrogen -- it is the charge-separated way of drawing a
-        # double bond, exactly as [O-] on the same centre is an oxo -- so
-        # O[P+](=S)[S-] must not come out as a `(sulfanyl)(thioxo)phosphanyl`
-        # that reads back with a phosphorus hydride.
+
         if is_double or _is_charge_normalized_chalcogenido(mol, upstream_atom, start_idx):
             return "thioxo"
         return f"{stereo_prefix_text}{unsubstituted_prefix('S') or 'sulfanyl'}"
@@ -829,9 +833,7 @@ def name_pnictogen_subgraph(
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom, p_oxygens)
     stereo_prefix_text = stereo_prefix(mol.atoms[start_idx])
     named_class = central_oxo_substituent_prefix_for_center(mol, start_idx, exclude_atoms)
-    # ``phosphoryl`` is the trivalent P(=O) hub and only spells a group citing
-    # two ligands; with fewer, the substitutable ``phosphinoyl`` form is read
-    # back correctly instead of binding the open valences to the parent.
+
     deficient = None if named_class else ligand_deficient_prefix(symbol, len(p_oxygens) or 0)
     if deficient is None and not named_class and p_oxygens:
         deficient = ligand_deficient_prefix(symbol, 1)
@@ -841,8 +843,6 @@ def name_pnictogen_subgraph(
         named_class
         or deficient
         or unsubstituted_prefix(symbol, len(p_oxygens))
-        # More oxygens than any configured class: fall back to the element's
-        # own oxidised or plain prefix rather than leaving the centre unnamed.
         or unsubstituted_prefix(symbol, 1 if p_oxygens else 0)
     ) + multiple_bond_suffix
     if not next_atoms:
@@ -853,11 +853,7 @@ def name_pnictogen_subgraph(
         if (br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx} | set(p_oxygens), start_idx))
     ]
     atom = mol.atoms[start_idx]
-    # ``phosphanyl`` spells a trivalent centre, so a singly bonded P carrying
-    # four ligands besides its attachment has to say so with the lambda; without
-    # it, OPSIN reads a ligand off the phosphorus and onto a carbon.  A double
-    # bond at the centre already shows the higher bonding number through its own
-    # ``oxo``/``thioxo``/``-ylidene`` wording, so those keep the plain prefix.
+
     all_single = all(mol.get_bond(start_idx, n).order == 1 for n in mol.get_neighbors(start_idx))
     if (
         all_single

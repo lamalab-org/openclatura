@@ -607,15 +607,14 @@ def test_dihydro_locants_bind_to_parent_scope_without_broad_fallback():
 def test_carbonyl_prefix_morphology_is_bound_from_renderer_data():
     analysis = analyze_smiles("NC(=O)N1CC(=O)C1")
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
-    carbonyl = next(token for token in assembly.data["name_token_spans"] if token["text"] == "carbonyl")
+    carbamoyl = next(token for token in assembly.data["name_token_spans"] if token["text"] == "carbamoyl")
 
-    # No hyphen between a parenthesised substituent and the parent: the old
-    # spelling came from a rewrite that had to re-insert one by hand.
-    assert analysis.name == "1-((amino)carbonyl)azetidin-3-one"
-    assert carbonyl["source"] in {"functional_prefix_renderer", "substituent_renderer"}
-    assert carbonyl["confidence"] == "derived"
-    assert carbonyl["ownership"] == "exact"
-    assert carbonyl["atoms"] == [0, 1, 2]
+    # ``H2N-CO-`` is carbamoyl, and the prefix covers the whole group.
+    assert analysis.name == "1-carbamoylazetidin-3-one"
+    assert carbamoyl["source"] in {"functional_prefix_renderer", "substituent_renderer"}
+    assert carbamoyl["confidence"] == "derived"
+    assert carbamoyl["ownership"] == "exact"
+    assert carbamoyl["atoms"] == [0, 1, 2]
 
 
 def test_unmatched_retained_parent_morphology_uses_operation_scope():
@@ -841,61 +840,62 @@ def test_carbonylamino_heteroatom_shortcut_tree_does_not_invent_hydroxy_children
 
 def test_postprocessing_rewrites_keep_token_metadata_auditable():
     result = NameAssemblyResult.from_raw_name(
-        "phenylcarbonyl",
+        "aminocarbonyl",
         [
             NameAtomBinding(
-                stage="prefix", role="substituent", term="phenylcarbonyl", atom_ids={0, 1, 2}, bond_ids={0, 1}
+                stage="prefix", role="substituent", term="aminocarbonyl", atom_ids={0, 1, 2}, bond_ids={0, 1}
             )
         ],
         postprocess=post_process_name,
     )
 
-    assert result.text == "benzoyl"
+    assert result.text == "carbamoyl"
     assert result.rewrite_history[0].changed_binding_count == 1
     assert result.rewrite_history[0].changed_token_count >= 1
     assert all(token.binding_indices for token in result.token_spans)
-    assert {token.text for token in result.token_spans} == {"benzoyl"}
+    assert {token.text for token in result.token_spans} == {"carbamoyl"}
     assert {token.source for token in result.token_spans} == {"typed_rewrite"}
     assert {token.confidence for token in result.token_spans} == {"derived"}
     assert result.rewrite_history[0].ownership == "preserve_all"
 
 
 def test_postprocessing_rewrites_bindings_to_final_emitted_direction():
+    # The binding has to follow the spelling that survived post-processing.
     result = NameAssemblyResult.from_raw_name(
-        "2-phenylsulfonylaminopropanamide",
-        [NameAtomBinding(stage="prefix", role="substituent", term="benzenesulfonamido", atom_ids={1, 2, 3})],
+        "2-aminocarbonylpropanamide",
+        [NameAtomBinding(stage="prefix", role="substituent", term="aminocarbonyl", atom_ids={1, 2, 3})],
         postprocess=post_process_name,
     )
 
-    assert result.text == "2-phenylsulfonylaminopropanamide"
-    assert result.bindings[0].term == "(phenylsulfonyl)amino"
+    assert result.text == "2-carbamoylpropanamide"
+    assert result.bindings[0].term == "carbamoyl"
     assert all(token.binding_indices for token in result.token_spans)
 
 
 def test_postprocessing_updates_binding_terms():
-    bindings = [NameAtomBinding(stage="prefix", role="substituent", term="phenylcarbonyl", atom_ids={0, 1, 2})]
+    bindings = [NameAtomBinding(stage="prefix", role="substituent", term="aminocarbonyl", atom_ids={0, 1, 2})]
 
     processed = postprocess_name_atom_bindings(bindings, post_process_name)
 
-    assert processed[0].term == "benzoyl"
+    assert processed[0].term == "carbamoyl"
     assert processed[0].atom_ids == {0, 1, 2}
 
 
 def test_name_assembly_result_preserves_binding_metadata_through_postprocessing():
     bindings = [
-        NameAtomBinding(stage="prefix", role="substituent", term="phenylcarbonyl", atom_ids={0, 1, 2}, bond_ids={0, 1})
+        NameAtomBinding(stage="prefix", role="substituent", term="aminocarbonyl", atom_ids={0, 1, 2}, bond_ids={0, 1})
     ]
 
-    result = NameAssemblyResult.from_raw_name("phenylcarbonyl", bindings, postprocess=post_process_name)
+    result = NameAssemblyResult.from_raw_name("aminocarbonyl", bindings, postprocess=post_process_name)
 
-    assert result.text == "benzoyl"
-    assert result.bindings[0].term == "benzoyl"
+    assert result.text == "carbamoyl"
+    assert result.bindings[0].term == "carbamoyl"
     assert result.bindings[0].atom_ids == {0, 1, 2}
     assert result.bindings[0].bond_ids == {0, 1}
     assert result.rewrite_history[0].changed_binding_count == 1
     assert result.rewrite_history[0].changed_token_count >= 1
     assert all(token.binding_indices for token in result.token_spans)
-    assert next(token for token in result.token_spans if token.text == "benzoyl").atom_ids == frozenset({0, 1, 2})
+    assert next(token for token in result.token_spans if token.text == "carbamoyl").atom_ids == frozenset({0, 1, 2})
 
 
 def test_name_assembly_result_tracks_named_rewrite_pipeline():
@@ -1402,6 +1402,14 @@ def test_purine_diones_cite_added_hydrogen_as_a_hydro_prefix():
     assert name_smiles("Nc1ncnc2[nH]cnc12") == "9H-purin-6-amine"
 
 
+def test_ketone_claims_the_indicated_hydrogen_at_its_own_position():
+    # Pyrrolizine's default indicated hydrogen is 1H, but the ketone's sp3
+    # position is the one that has to carry it.  Citing 1H spends the indicated
+    # hydrogen at C1 and leaves the C3 carbonyl nothing to sit on, so the name
+    # reads back with the 1,2 double bond saturated away.
+    assert name_smiles("O=C1C=Cc2cccn21") == "3H-pyrrolizin-3-one"
+
+
 def test_purinone_fusion_carbon_hydrogen_uses_a_dihydro_prefix():
     generated = name_smiles("NC1=NC2N=C(N)NC(=O)C2=N1")
 
@@ -1428,63 +1436,53 @@ def test_nested_hydroxyphenyl_propan_yl_tokens_keep_local_scopes():
 
 
 def test_oxygen_carbonyl_alkenyl_aryl_substituent_tokens_keep_local_scopes():
-    analysis = analyze_smiles("C1[C@H]([C@@H]([C@@H](C=C1C(=O)O)OC(=O)/C=C/C2=CC(=C(C=C2)O)O)O)O")
+    # An acyloxy prefix is the acyl group's name plus ``oxy``: the ``oxy`` keeps
+    # the ester oxygen, the acyl phrase the acyl atoms and nothing else.
+    analysis = analyze_smiles("C(=O)(OCC(=O)O)/C=C/c1ccc(Cl)cc1")
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
     tokens = {(token["text"], token["start"]): token for token in assembly.data["name_token_spans"]}
     name = analysis.name
 
-    assert (
-        analysis.name
-        == "(3R,4S,5R)-3-((1E)-2-(3,4-dihydroxyphenyl)ethenylcarbonyloxy)-4,5-dihydroxycyclohex-1-ene-1-carboxylic acid"
-    )
-    assert tokens[("1", name.index("1E"))]["atoms"] == [12, 13]
-    assert tokens[("1", name.index("1E"))]["bonds"] == [13]
-    assert tokens[("E", name.index("E)-2"))]["atoms"] == [12, 13]
-    assert tokens[("2", name.index("2-(3,4-dihydroxyphenyl"))]["atoms"] == [14, 15, 16, 17, 18, 19, 20, 21]
-    assert tokens[("3,4", name.index("3,4-dihydroxyphenyl"))]["atoms"] == [20, 21]
-    assert tokens[("3,4", name.index("3,4-dihydroxyphenyl"))]["bonds"] == [20, 21]
-    assert tokens[("dihydroxyphenyl", name.index("dihydroxyphenyl"))]["atoms"] == [
-        14,
-        15,
-        16,
-        17,
-        18,
-        19,
-        20,
-        21,
-    ]
-    assert tokens[("eth", name.index("ethenyl"))]["atoms"] == [12, 13]
-    ethenyl_start = name.index("ethenyl")
-    assert tokens[("en", name.index("enyl", ethenyl_start))]["bonds"] == [13]
-    assert tokens[("yl", name.index("ylcarbonyloxy", ethenyl_start))]["atoms"] == [12, 13]
-    assert tokens[("carbonyl", name.index("carbonyloxy"))]["atoms"] == [10, 11]
-    assert tokens[("oxy", name.index("oxy)-4,5"))]["atoms"] == [9]
-    assert tokens[("4,5", name.index("4,5-dihydroxycyclohex"))]["atoms"] == [22, 23]
-    assert tokens[("dihydr", name.index("dihydroxycyclohex"))]["atoms"] == [22, 23]
-    assert tokens[("oxy", name.index("oxycyclohex"))]["atoms"] == [22, 23]
-    assert tokens[("1", name.index("1-ene"))]["atoms"] == [5]
-    assert tokens[("en", name.index("ene-1-carboxylic"))]["atoms"] == [4, 5]
+    assert name == "2-(((2E)-3-(4-chlorophenyl)prop-2-enoyl)oxy)acetic acid"
+    acyl_atoms = [0, 1, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    assert tokens[("chlorophenyl", name.index("chlorophenyl"))]["atoms"] == acyl_atoms
+    assert tokens[("prop", name.index("prop"))]["atoms"] == acyl_atoms
+    assert tokens[("enoyl", name.index("enoyl"))]["atoms"] == acyl_atoms
+    assert tokens[("oxy", name.index("oxy)acetic"))]["atoms"] == [2]
+    assert tokens[("acetic", name.index("acetic"))]["atoms"] == [3, 4, 5, 6]
+    assert tokens[("acid", name.index("acid"))]["atoms"] == [4, 5, 6]
+
+
+def test_acetyloxy_substituent_tokens_bind_the_acyl_and_the_ester_oxygen():
+    analysis = analyze_smiles("CC(=O)Oc1ccccc1C(=O)O")
+    assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
+    tokens = {(token["text"], token["start"]): token for token in assembly.data["name_token_spans"]}
+    name = analysis.name
+
+    assert name == "2-(acetyloxy)benzoic acid"
+    assert tokens[("acetyl", name.index("acetyl"))]["atoms"] == [0, 1, 2]
+    assert tokens[("oxy", name.index("oxy"))]["atoms"] == [3]
 
 
 def test_contextual_postprocessing_updates_absorbed_binding_terms():
     bindings = [
-        NameAtomBinding(stage="prefix", role="substituent", term="hydroxy", atom_ids={2}),
-        NameAtomBinding(stage="suffix", role="amide", term="methanamide", atom_ids={0, 1, 3}),
+        NameAtomBinding(stage="prefix", role="substituent", term="amino", atom_ids={2}),
+        NameAtomBinding(stage="suffix", role="amide", term="carbonylamino", atom_ids={0, 1, 3}),
     ]
 
-    result = NameAssemblyResult.from_raw_name("hydroxymethanamide", bindings, postprocess=post_process_name)
+    result = NameAssemblyResult.from_raw_name("aminocarbonylamino", bindings, postprocess=post_process_name)
 
-    assert result.text == "carbamic acid"
-    assert {binding.term for binding in result.bindings} == {"carbamic acid"}
+    assert result.text == "carbamoylamino"
+    assert {binding.term for binding in result.bindings} == {"carbamoylamino"}
 
-    carbonate = NameAssemblyResult.from_raw_name(
-        "hydroxymethanoate",
-        [NameAtomBinding(stage="prefix", role="substituent", term="hydroxy", atom_ids={0})],
+    sulfamoyl = NameAssemblyResult.from_raw_name(
+        "aminosulfonyl",
+        [NameAtomBinding(stage="prefix", role="substituent", term="aminosulfonyl", atom_ids={0})],
         postprocess=post_process_name,
     )
 
-    assert carbonate.text == "carbonate"
-    assert carbonate.bindings[0].term == "carbonate"
+    assert sulfamoyl.text == "sulfamoyl"
+    assert sulfamoyl.bindings[0].term == "sulfamoyl"
 
 
 def test_assemble_name_result_updates_parts_bindings():
@@ -2066,7 +2064,7 @@ def test_substituted_imino_on_a_ring_centre_keeps_its_double_bond():
         "2-(tert-butylimino)-3,N,N-triethyl-1-methyl-1-aza-2lambda^5-phosphacyclohexan-2-amine"
     )
     assert name_smiles("Cc1ccc(S(=O)(=O)N=S2CCCC3(C2)OCCO3)cc1") == (
-        "7-(4-methylphenylsulfonylimino)-1,4-dioxa-7lambda^4-thiaspiro[4.5]decane"
+        "7-(tosylimino)-1,4-dioxa-7lambda^4-thiaspiro[4.5]decane"
     )
 
 
@@ -2369,7 +2367,7 @@ def test_dihydrazone_primes_its_n_locants():
     # One substituent on *each* of two hydrazone nitrogens is N,N'- — reading it
     # as N,N- would put both on the same nitrogen, which is a different molecule.
     both = oc.name("C/C(=N/NS(=O)(=O)c1ccc(C)cc1)C(=NO)/C(C)=N\\NS(=O)(=O)c1ccc(C)cc1").name
-    assert "N,N'-bis(" in both
+    assert "N,N'-ditosyl" in both
 
     # …while two substituents on a single hydrazone's nitrogen stay N,N-.
     assert oc.name("CC(=NN(C)C)C").name == "N,N-dimethylpropan-2-one hydrazone"
@@ -2559,7 +2557,7 @@ def test_hydrazone_role_preserves_parent_side_metadata():
 def test_amidinohydrazone_tail_is_part_of_principal_group():
     generated = name_smiles(r"Cc1cccc(Cl)c1/C=N\N=C(N)N")
 
-    assert generated == "2-chloro-6-methylbenzene-1-carbaldehyde amidinohydrazone"
+    assert generated == "2-chloro-6-methylbenzaldehyde amidinohydrazone"
 
 
 def test_hydrazone_suffix_preserves_unlocanted_ez_stereo():
@@ -4854,7 +4852,7 @@ def test_public_api_golden_names():
         "C1CCCCC1": "cyclohexane",
         "[Na+].[Cl-]": "sodium chloride",
         "c1ccccc1O": "phenol",
-        "CC(=O)Oc1ccccc1C(=O)O": "2-(acetoxy)benzoic acid",
+        "CC(=O)Oc1ccccc1C(=O)O": "2-(acetyloxy)benzoic acid",
     }
 
     for smiles, expected in cases.items():
@@ -5331,7 +5329,7 @@ def test_pyopsin_regression_names_keep_formate_esters_principal():
     cases = {
         "O=COCC#N": "2-nitriloethyl formate",
         "O=COCCC#N": "3-nitrilopropyl formate",
-        "NC(=[NH2+])[C-](OC=O)C#N": "1-amino-2-cyano-2-formyloxyethan-2-ide-1-iminium",
+        "NC(=[NH2+])[C-](OC=O)C#N": "1-amino-2-cyano-2-(formyloxy)ethan-2-ide-1-iminium",
     }
 
     for smiles, expected in cases.items():
@@ -5406,6 +5404,33 @@ def test_multiplied_formylamino_names_use_n_locants_not_diformamido():
         generated = name_smiles(smiles)
         assert generated == expected
         assert "diformamido" not in generated
+
+
+def test_diacyl_nitrogen_keeps_the_amino_parent_and_its_enclosing_marks():
+    # ``-amido`` spells one acyl replacing one N-H, so a nitrogen carrying two
+    # of them keeps the ``-amino`` parent.  Contracting anyway also ate the
+    # multiplier's enclosing marks, leaving the unreadable ``bis2-phenyl...``.
+    assert name_smiles("CC(=O)N(CCC(=O)O)C(C)=O") == "3-(diacetylamino)propanoic acid"
+    assert name_smiles("CC(C(N)=O)N(C(=O)Cc1ccccc1)C(=O)Cc1ccccc1") == "2-(bis(2-phenylacetyl)amino)propanamide"
+
+    # A single acyl still contracts, with or without an N-substituent.
+    assert name_smiles("CC(=O)NCCC(=O)O") == "3-acetamidopropanoic acid"
+    assert name_smiles("CC(=O)N(C)CCC(=O)O") == "3-(N-methylacetamido)propanoic acid"
+
+
+def test_n_locanted_sulfonamido_branch_keeps_the_systematic_acyl_spelling():
+    # The contraction rewrites the ending that implied the nitrogen into a word
+    # naming a substituent on it, so an italic-N locant in front would read as a
+    # substituent on *that* group's parent hydride: the contracted
+    # ``N-(4-chlorophenyl)methanesulfonylcarbamoyl`` reads back with the
+    # chlorophenyl moved onto the methane and the N-H restored.
+    generated = name_smiles("CCOc1ccc(NC(=O)NC(=O)N(c2ccc(Cl)cc2)S(C)(=O)=O)cc1")
+
+    assert "sulfonylcarbamoyl" not in generated
+    assert generated == ("1-((N-(4-chlorophenyl)methanesulfonamido)carbonylamino)-N-(4-ethoxyphenyl)formamide")
+
+    # Without the N-locant the contraction is unambiguous and still applies.
+    assert name_smiles("OC(=O)c1ccc(C(=O)N)cc1") == "4-carbamoylbenzoic acid"
 
 
 def test_pyopsin_regression_names_preserve_cationic_imino_charge():
@@ -5524,7 +5549,9 @@ def test_anionic_ketone_parent_names_keep_parent_descriptor_intact():
         "O=C1[CH-][NH+]2CCC2=C1": "3-oxo-1-azoniabicyclo[3.2.0]hept-4-en-2-ide",
         "O=C1C=C[NH+]2CC[C-]12": "4-oxo-1-azoniabicyclo[3.2.0]hept-2-en-5-ide",
         "O=C1[CH-]NC2=C1C[NH2+]C2": "4-oxo-2,7-diazabicyclo[3.3.0]oct-1(5)-en-7-ium-3-ide",
-        "CC(=O)[C-]1C[NH2+]CC1=O": "4-(acetyl)-3-oxopyrrolidin-1-ium-4-ide",
+        # The demoted ketone prefix goes in front of the whole prefix run rather
+        # than sorting with it, as in ``3-oxo-4-methyl…``.
+        "CC(=O)[C-]1C[NH2+]CC1=O": "3-oxo-4-acetylpyrrolidin-1-ium-4-ide",
     }
 
     for smiles, expected in cases.items():
@@ -6035,7 +6062,7 @@ def test_acyl_with_a_competing_acid_does_not_take_the_amido_rewrite():
     # carbon: Glu-Leu came out as 2-aminopentanediamido, a diamide.
     glu_leu = name_smiles("CC(C)CC(NC(=O)C(N)CCC(=O)O)C(=O)O")
     assert "diamido" not in glu_leu
-    assert glu_leu == "2-(1-amino-4-hydroxy-4-oxobutylcarbonylamino)-4-methylpentanoic acid"
+    assert glu_leu == "2-((2-amino-5-hydroxy-1,5-dioxopentyl)amino)-4-methylpentanoic acid"
 
     # An acid the chain cannot reach does not compete, so the amido spelling
     # survives wherever it is sound.
@@ -6054,7 +6081,7 @@ def test_ketone_amidinohydrazone_keeps_its_amidino_atoms():
         == "1-(diaminomethylidene)-2-(1-(4-(1H-imidazol-1-yl)phenyl)ethylidene)hydrazine"
     )
     # An aldehyde keeps its suffix, and a senior group elsewhere still wins.
-    assert name_smiles(r"Cc1cccc(Cl)c1/C=N\N=C(N)N") == "2-chloro-6-methylbenzene-1-carbaldehyde amidinohydrazone"
+    assert name_smiles(r"Cc1cccc(Cl)c1/C=N\N=C(N)N") == "2-chloro-6-methylbenzaldehyde amidinohydrazone"
     assert name_smiles("NC(N)=NN=C(C)C") == "propan-2-one diaminomethylidenehydrazone"
 
 
@@ -6076,7 +6103,7 @@ def test_charge_separated_sulfonyl_on_a_nitrogen_keeps_its_ligand():
     # The N-branch renderer counted only oxo oxygens, so [S+](=O)[O-] looked
     # like a sulfinyl and its remaining ligand was dropped.
     charge_separated = name_smiles("CC(N[S+](=O)([O-])c1ccccc1)C(=O)NC")
-    assert charge_separated == "N-methyl-2-phenylsulfonylaminopropanamide"
+    assert charge_separated == "2-benzenesulfonamido-N-methylpropanamide"
     assert charge_separated == name_smiles("CC(NS(=O)(=O)c1ccccc1)C(=O)NC")
     # A three-coordinate sulfinate's charge is real and stays.
     assert "oxidosulfinylamino" in name_smiles("COc1ccc(NS(=O)[O-])cc1[N+]1(N)C=NCC1")

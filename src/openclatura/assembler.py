@@ -10,6 +10,7 @@ from .assembly_parent import (
     format_parent_tail,
     format_substituent_tail,
     parent_stem_and_terminal,
+    promote_acyl_substituent_name,
     promote_benzene_retained_name,
     promote_retained_functional_parent,
     promote_retained_substituent_name,
@@ -28,151 +29,12 @@ from .name_postprocessing import (
     apply_data_postprocessing,
 )
 
-LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS = (
-    ("1-hydroxymethanoic acid", "carbonic acid"),
-    ("1-hydroxymethanoate", "carbonate"),
-    ("1-hydroxymethanamide", "carbamic acid"),
-    ("1-hydroxymethanenitrile", "cyanic acid"),
-    ("1-hydroxymethanoyl", "carboxy"),
-    ("1-hydroxymethanoic anhydride", "dicarbonic acid"),
-    ("hydroxymethanoic acid", "carbonic acid"),
-    ("hydroxymethanoate", "carbonate"),
-    ("hydroxymethanamide", "carbamic acid"),
-    ("hydroxymethanenitrile", "cyanic acid"),
-    ("hydroxymethanoyl", "carboxy"),
-    ("hydroxymethanoic anhydride", "dicarbonic acid"),
-    ("benzene-1-carboxylic acid", "benzoic acid"),
-    ("benzene-1-carboxamide", "benzamide"),
-    ("benzene-1-carboxylate", "benzoate"),
-    ("benzene-1-carbonitrile", "benzonitrile"),
-    ("benzene-1-carbaldehyde", "benzaldehyde"),
-    ("benzene-1-carbonyl", "benzoyl"),
-    ("methanoyl", "formyl"),
-    ("ethanoyl", "acetyl"),
-    ("methylcarbonyloxy", "acetoxy"),
-    ("methylcarbonyl", "acetyl"),
-    ("ethylcarbonyl", "propionyl"),
-    ("propylcarbonyl", "butyryl"),
-    ("phenylcarbonyl", "benzoyl"),
-    ("(methylcarbonyl)oxy", "acetoxy"),
-    ("(ethylcarbonyl)oxy", "propionyloxy"),
-    ("(phenylcarbonyl)oxy", "benzoyloxy"),
-    ("aminocarbonothioyl", "carbamothioyl"),
-    ("(phenylsulfonyl)amino", "benzenesulfonamido"),
-    ("phenylsulfonylamino", "benzenesulfonamido"),
-    ("(benzenesulfonyl)amino", "benzenesulfonamido"),
-    ("benzenesulfonylamino", "benzenesulfonamido"),
-    ("(methanesulfonyl)amino", "methanesulfonamido"),
-    ("methanesulfonylamino", "methanesulfonamido"),
-    ("(ethanesulfonyl)amino", "ethanesulfonamido"),
-    ("ethanesulfonylamino", "ethanesulfonamido"),
-    ("(chloromethyl)carbonyl", "chloroacetyl"),
-    ("((chloromethyl)carbonyl)amino", "2-chloroacetamido"),
-    ("(prop-2-enoyl)amino", "acrylamido"),
-    ("prop-2-enoylamino", "acrylamido"),
-    ("prop-2-enoyloxy", "acryloyloxy"),
-    ("1-oxoethan-1-yl", "acetyl"),
-    ("1-oxopropan-1-yl", "propionyl"),
-    ("1-oxobutan-1-yl", "butyryl"),
-    ("1-oxopentan-1-yl", "pentanoyl"),
-    ("1-oxohexan-1-yl", "hexanoyl"),
-    ("1-oxoethyl", "acetyl"),
-    ("1-oxopropyl", "propionyl"),
-    ("1-oxobutyl", "butyryl"),
-    ("1-oxopentyl", "pentanoyl"),
-    ("1-oxohexyl", "hexanoyl"),
-    ("benzylcarbonyl", "phenylacetyl"),
-    ("methanehydrazine", "methylhydrazine"),
-    ("ethanehydrazine", "ethylhydrazine"),
-    ("propanehydrazine", "propylhydrazine"),
-    ("benzenehydrazine", "phenylhydrazine"),
-    ("fluoroethanoyl", "fluoroacetyl"),
-    ("chloroethanoyl", "chloroacetyl"),
-    ("bromoethanoyl", "bromoacetyl"),
-    ("iodoethanoyl", "iodoacetyl"),
-)
-
-_LEGACY_SUBST_ALKYL_ACYL = {"ethylcarbonyl", "propylcarbonyl"}
-
-
-def _compile_legacy_replacements() -> tuple[tuple[str, re.Pattern, str], ...]:
-    """Precompile the literal-replacement patterns once (they are name-independent).
-
-    Each entry keeps its literal so callers can skip the regex entirely when the literal
-    is absent -- every pattern requires it as a substring, so the sub would be a no-op.
-    """
-
-    compiled: list[tuple[str, re.Pattern, str]] = []
-    for old, new in LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS:
-        esc = re.escape(old)
-        if old in _LEGACY_SUBST_ALKYL_ACYL:
-            compiled.append((old, re.compile(rf"(?<![a-zA-Z)]){esc}(?![a-zA-Z])"), new))
-        else:
-            compiled.append((old, re.compile(rf"(?<![a-zA-Z]){esc}(?![a-zA-Z])"), new))
-    return tuple(compiled)
-
-
-_LEGACY_COMPILED_REPLACEMENTS = _compile_legacy_replacements()
-
-
-def _balanced_group_end(name: str, start: int) -> int | None:
-    """If ``name[start]`` opens a parenthesis, return the index just past its match."""
-
-    if start >= len(name) or name[start] != "(":
-        return None
-    depth = 0
-    for i in range(start, len(name)):
-        if name[i] == "(":
-            depth += 1
-        elif name[i] == ")":
-            depth -= 1
-            if depth == 0:
-                return i + 1
-    return None
-
-
-def _oxo_group_methyl_to_carbonyl(name: str) -> str:
-    """Contract a one-carbon ``methyl`` parent bearing ``(oxo)`` and one parenthesized
-    group into ``(group)carbonyl``, for either substituent order.
-
-    Paren-aware replacement for two regexes that mis-matched the inner ``)methyl`` of a
-    group ending in a substituent methyl (e.g. heteroaryl-methyl), which corrupted names
-    like ``(oxo)(1-((thiophen-2-yl)methyl)cyclohexyl)methyl``.
-    """
-
-    def _word_char(idx: int) -> bool:
-        return idx < len(name) and (name[idx].isalnum() or name[idx] == "_")
-
-    out: list[str] = []
-    i = 0
-    while i < len(name):
-        # (oxo)(GROUP)methyl
-        if name.startswith("(oxo)", i):
-            g_end = _balanced_group_end(name, i + 5)
-            if g_end is not None and name.startswith("methyl", g_end) and not _word_char(g_end + 6):
-                out.append(name[i + 5 : g_end] + "carbonyl")
-                i = g_end + 6
-                continue
-        # (GROUP)(oxo)methyl
-        if name[i] == "(":
-            g_end = _balanced_group_end(name, i)
-            if g_end is not None and name.startswith("(oxo)methyl", g_end) and not _word_char(g_end + 11):
-                out.append(name[i:g_end] + "carbonyl")
-                i = g_end + 11
-                continue
-        out.append(name[i])
-        i += 1
-    return "".join(out)
-
 
 def _post_process_name(name: str) -> str:
     name = apply_data_postprocessing(name)
     name = ensure_stereo_descriptor_boundary(name)
     name = re.sub(r"-1-formate\b", "-formate", name)
 
-    name = _oxo_group_methyl_to_carbonyl(name)
-    name = name.replace("(oxo)methyl", "formyl")
-    name = re.sub(r"(?<!thi)oxomethyl\b", "formyl", name)
     name = name.replace("thioxomethyl", "carbonothioyl")
 
     name = name.replace("aminoiminomethyl", "carbamimidoyl")
@@ -183,15 +45,6 @@ def _post_process_name(name: str) -> str:
     name = re.sub(r"\b1-\((.*?)amino\)methanenitrile\b", r"\1cyanamide", name)
     name = re.sub(r"\b1-([a-zA-Z0-9\-\[\]\(\)\,]+?)aminomethanenitrile\b", r"\1cyanamide", name)
     name = name.replace("aminomethanenitrile", "cyanamide")
-
-    # Substituted-alkyl acyl contractions (ethyl/propyl) renumber the chain, so their
-    # patterns exclude a leading group paren; see _compile_legacy_replacements.
-    for _, pattern, new in _LEGACY_COMPILED_REPLACEMENTS:
-        name = pattern.sub(new, name)
-
-    name = apply_data_postprocessing(name)
-
-    name = re.sub(r"(?<!m)ethanoyl\b", "acetyl", name)
 
     name = apply_acyl_amido_postprocessing(name)
 
@@ -390,14 +243,14 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
     if fused_ion_candidate is not None:
         consume_fused_ion_operation(parts, fused_ion_candidate)
 
-    # Has to run before the prefixes are formatted: it takes one of them away.
+    promote_acyl_substituent_name(parts)
     promote_retained_substituent_name(parts)
+    promote_benzene_retained_name(parts)
+    promote_retained_functional_parent(parts)
     spiro_subs = split_spiro_substituents(parts)
     prefix_str = format_substituent_prefixes(parts, spiro_subs)
     a_prefix_str = format_replacement_prefixes(parts)
-    promote_benzene_retained_name(parts)
-    promote_retained_functional_parent(parts)
-    if parts.retained_substituent_name is not None and parts.name_atom_bindings:
+    if (parts.retained_substituent_name is not None or parts.is_acyl_substituent) and parts.name_atom_bindings:
         refresh_parent_binding(parts)
     if parts.retained_absorbs_principal_group and parts.name_atom_bindings:
         refresh_parent_binding(parts)

@@ -24,6 +24,8 @@ class HeteroatomRules:
     alkyl_oxy_prefixes: dict[str, str]
     simple_sulfanyl_prefixes: set[str]
     simple_selanyl_prefixes: set[str]
+    retained_sulfonyl_groups: dict[tuple[str, str], str]
+    retained_sulfonyl_group_acids: dict[str, str]
     halogen_prefixes: dict[str, str]
     halogen_lambda_suffixes: dict[str, str]
 
@@ -99,6 +101,7 @@ class AssemblyRules:
     unsaturation_order: dict[str, int]
     acid_halide_suffix_keys: set[str]
     substituent_sort_prefix_pattern: str
+    substituent_attachment_suffixes: dict[str, str]
     ambiguous_connection_substituent_stems: set[str]
     connection_boundary_parent_stems: tuple[str, ...]
 
@@ -388,6 +391,15 @@ def registry() -> NomenclatureRegistry:
             alkyl_oxy_prefixes=substituent_vocabulary.mapping("alkyl_oxy_prefixes"),
             simple_sulfanyl_prefixes=set(substituent_vocabulary.values("simple_sulfanyl_prefixes")),
             simple_selanyl_prefixes=set(substituent_vocabulary.values("simple_selanyl_prefixes")),
+            retained_sulfonyl_groups={
+                (row["branch"], row["suffix"]): row["name"]
+                for row in substituent_vocabulary.values("retained_sulfonyl_group_names")
+            },
+            retained_sulfonyl_group_acids={
+                row["acid"]: row["name"]
+                for row in substituent_vocabulary.values("retained_sulfonyl_group_names")
+                if row.get("acid")
+            },
             halogen_prefixes=substituent_vocabulary.mapping("halogen_prefixes"),
             halogen_lambda_suffixes=substituent_vocabulary.mapping("halogen_lambda_suffixes"),
         ),
@@ -435,6 +447,7 @@ def registry() -> NomenclatureRegistry:
             },
             acid_halide_suffix_keys=set(assembly_grammar.values("acid_halide_suffix_keys")),
             substituent_sort_prefix_pattern=assembly_grammar.mapping("substituent_sort")["prefix_pattern"],
+            substituent_attachment_suffixes=assembly_grammar.mapping("substituent_attachment_suffixes"),
             ambiguous_connection_substituent_stems=set(
                 assembly_grammar.values("ambiguous_connection_substituent_stems")
             ),
