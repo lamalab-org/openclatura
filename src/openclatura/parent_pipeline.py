@@ -49,7 +49,7 @@ def build_parent_assembly_plan(
         locant_maps is None
         and selection.ring_parent is not None
         and selection.ring_parent.numbering_candidates
-        and _is_von_baeyer_descriptor(selection.ring_parent.descriptor)
+        and is_von_baeyer_descriptor(selection.ring_parent.descriptor)
     ):
         audited_maps = [
             numbering.locant_map for numbering in selection.ring_parent.numbering_candidates if numbering.audit_ok
@@ -88,10 +88,6 @@ def build_parent_assembly_plan(
         get_loc=get_loc,
         parts=parts,
     )
-
-
-def _is_von_baeyer_descriptor(descriptor: str | None) -> bool:
-    return is_von_baeyer_descriptor(descriptor)
 
 
 def build_parent_parts(

@@ -13,6 +13,7 @@ from functools import cache, lru_cache
 from typing import Any
 
 from .assembly_parts import RetainedParentMetadata
+from .locants import retained_locant_sort_key
 from .molecule import Molecule
 from .naming_data import load_json_table
 from .nomenclature import RULES
@@ -495,38 +496,6 @@ def retained_parent_metadata(parent_name: str) -> RetainedParentMetadata | None:
     )
 
 
-def pending_retained_fused_parent_names() -> tuple[str, ...]:
-    """Return retained fused candidates that still need graph templates.
-
-    These rows are planning metadata only.  They are not considered by the
-    matcher and therefore cannot affect production naming.
-    """
-
-    return tuple(
-        str(row["name"]) for row in load_json_table("retained_fused_graph_templates.json").get("pending_parents", ())
-    )
-
-
-def match_retained_fused_template(
-    mol: Molecule,
-    atom_indices: set[int] | list[int] | tuple[int, ...],
-    template: RetainedGraphTemplate,
-    *,
-    allow_nonaromatic: bool = False,
-) -> RetainedGraphTemplateMatch | None:
-    """Match one retained fused graph template to a molecule atom set.
-
-    It returns graph atom IDs bound to display locants and does not use SMILES
-    or SMARTS.  If a template has several graph automorphisms, this returns the
-    stable first match; production code should use
-    :func:`match_retained_fused_templates` to keep all locant maps available to
-    the numbering layer.
-    """
-
-    matches = _match_all_retained_fused_template(mol, atom_indices, template, allow_nonaromatic=allow_nonaromatic)
-    return matches[0] if matches else None
-
-
 def match_retained_graph_template_maps(
     mol: Molecule,
     atom_indices: set[int] | list[int] | tuple[int, ...],
@@ -700,7 +669,7 @@ def _relocated_indicated_h(
         movable = list(saturated)
     if len(movable) < needed or (strict and len(movable) != needed):
         return None
-    return tuple(sorted(movable, key=_locant_sort_key)[:needed])
+    return tuple(sorted(movable, key=retained_locant_sort_key)[:needed])
 
 
 def _template_match_from_assignment(
@@ -905,9 +874,9 @@ def _retained_fused_match_rank(match: RetainedGraphTemplateMatch) -> tuple:
     """Rank retained fused matches by retained-parent and numbering criteria."""
 
     template = match.template
-    hetero_locants = tuple(_locant_sort_key(atom.locant) for atom in template.atoms if atom.symbol != "C")
-    fusion_locants = tuple(_locant_sort_key(locant) for locant in template.fusion_atoms)
-    indicated_h_rank = tuple(_locant_sort_key(locant) for locant in match.indicated_h)
+    hetero_locants = tuple(retained_locant_sort_key(atom.locant) for atom in template.atoms if atom.symbol != "C")
+    fusion_locants = tuple(retained_locant_sort_key(locant) for locant in template.fusion_atoms)
+    indicated_h_rank = tuple(retained_locant_sort_key(locant) for locant in match.indicated_h)
     atom_order = tuple(match.locant_to_atom[locant] for locant in template.locants)
     return (
         template.priority,
@@ -917,17 +886,6 @@ def _retained_fused_match_rank(match: RetainedGraphTemplateMatch) -> tuple:
         template.name,
         atom_order,
     )
-
-
-def _locant_sort_key(locant: str) -> tuple[int, str]:
-    digits = ""
-    suffix = ""
-    for char in locant:
-        if char.isdigit() and not suffix:
-            digits += char
-        else:
-            suffix += char
-    return (int(digits) if digits else 10_000, suffix)
 
 
 def retained_graph_template_from_data(row: dict[str, Any]) -> RetainedGraphTemplate:

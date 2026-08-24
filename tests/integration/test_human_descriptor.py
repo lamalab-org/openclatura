@@ -59,8 +59,8 @@ def test_human_descriptor_handles_nested_substituent_trees_generically():
     d = describe_human("O=S(=O)(Nc1nc(cc(n1)C)C)c2ccc(N)cc2")
 
     text = str(d)
-    assert "N-(4-aminophenylsulfonyl)-4,6-dimethylpyrimidin-2-amine" in text
-    assert "4-aminophenylsulfonyl" in text
-    assert "4-aminophenyl" in text
+    assert "4-amino-N-(4,6-dimethylpyrimidin-2-yl)benzene-1-sulfonamide" in text
+    assert "sulfonamide group" in text
+    assert "pyrimidine-derived" in text
     assert "retained benzene parent" in text
     assert "amino group" in text

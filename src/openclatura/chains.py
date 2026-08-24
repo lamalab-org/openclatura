@@ -922,10 +922,6 @@ def _audited_von_baeyer_numberings(
     return _dedupe_ring_numberings(audited)
 
 
-def _is_von_baeyer_descriptor(descriptor: str) -> bool:
-    return is_von_baeyer_descriptor(descriptor)
-
-
 def _dedupe_ring_numberings(numberings):
     unique = []
     seen = set()
@@ -1081,7 +1077,7 @@ def _polyspiro_or_von_baeyer_candidate(
         descriptor, paths = dispiro
         return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
     legacy_descriptor, legacy_paths = get_von_baeyer_descriptor_and_path(atoms, edges)
-    if legacy_descriptor and _is_von_baeyer_descriptor(legacy_descriptor):
+    if legacy_descriptor and is_von_baeyer_descriptor(legacy_descriptor):
         legacy_numberings = tuple(
             _audited_von_baeyer_numberings(mol, legacy_descriptor, legacy_paths, frozenset(edges))
         )
@@ -1098,7 +1094,7 @@ def _polyspiro_or_von_baeyer_candidate(
     # von Baeyer numbering tie-breakers.
     if any(mol.atoms[atom].symbol == "Si" for atom in atoms):
         descriptor, paths = get_von_baeyer_descriptor_and_path(atoms, edges)
-        if not descriptor or not _is_von_baeyer_descriptor(descriptor):
+        if not descriptor or not is_von_baeyer_descriptor(descriptor):
             return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
         numberings = tuple(_audited_von_baeyer_numberings(mol, descriptor, paths, frozenset(edges)))
         return PolycycleDescriptorCandidate(
@@ -1125,7 +1121,7 @@ def _polyspiro_or_von_baeyer_candidate(
     descriptor, paths = legacy_descriptor, legacy_paths
     if not descriptor:
         return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
-    if not _is_von_baeyer_descriptor(descriptor):
+    if not is_von_baeyer_descriptor(descriptor):
         return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
     numberings = tuple(_audited_von_baeyer_numberings(mol, descriptor, paths, frozenset(edges)))
     return PolycycleDescriptorCandidate(

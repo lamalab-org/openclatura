@@ -234,6 +234,55 @@
         "double_o": 3
       },
       {
+        "name": "phosphorous acid",
+        "ester_suffix": "phosphite",
+        "central": "P",
+        "single_o": 3,
+        "double_o": 0
+      },
+      {
+        "name": "sulfurous acid",
+        "ester_suffix": "sulfite",
+        "central": "S",
+        "single_o": 2,
+        "double_o": 1
+      },
+      {
+        "name": "nitrous acid",
+        "ester_suffix": "nitrite",
+        "central": "N",
+        "single_o": 1,
+        "double_o": 1
+      },
+      {
+        "name": "boric acid",
+        "ester_suffix": "borate",
+        "central": "B",
+        "single_o": 3,
+        "double_o": 0
+      },
+      {
+        "name": "selenic acid",
+        "ester_suffix": "selenate",
+        "central": "Se",
+        "single_o": 2,
+        "double_o": 2
+      },
+      {
+        "name": "selenous acid",
+        "ester_suffix": "selenite",
+        "central": "Se",
+        "single_o": 2,
+        "double_o": 1
+      },
+      {
+        "name": "arsorous acid",
+        "ester_suffix": "arsorite",
+        "central": "As",
+        "single_o": 3,
+        "double_o": 0
+      },
+      {
         "name": "arsoric acid",
         "ester_suffix": "arsorate",
         "central": "As",
@@ -427,6 +476,27 @@
       "phenyl"
     ]
   },
+  "retained_sulfonyl_ligand_contractions": {
+    "bluebook_rule": "P-65.3.1, P-66.1.4; a sulfonyl whose ligand ends in these words contracts to one retained word",
+    "values": [
+      {
+        "ligand_ending": "amino",
+        "suffix": "sulfonyl",
+        "name": "sulfamoyl"
+      }
+    ]
+  },
+  "retained_sulfonyl_group_names": {
+    "bluebook_rule": "P-65.3.1; retained shorthands for sulfonyl groups, with the acid they are named from",
+    "values": [
+      {
+        "branch": "4-methylphenyl",
+        "suffix": "sulfonyl",
+        "name": "tosyl",
+        "acid": "4-methylbenzene-1-sulfonic acid"
+      }
+    ]
+  },
   "halogen_prefixes": {
     "bluebook_rule": "P-61.3; halogen detachable prefixes",
     "values": {
@@ -524,7 +594,11 @@
       "acid_bromide",
       "ring_acid_bromide",
       "acid_iodide",
-      "ring_acid_iodide"
+      "ring_acid_iodide",
+      "amidine",
+      "ring_amidine",
+      "hydrazide",
+      "ring_hydrazide"
     ]
   },
   "prefix_groups_to_skip": {
@@ -568,7 +642,10 @@
       "amide",
       "ring_amide",
       "thioamide",
-      "ring_thioamide"
+      "ring_thioamide",
+      "sulfonamide",
+      "hydrazide",
+      "ring_hydrazide"
     ]
   },
   "amide_prefix_bases": {
@@ -640,24 +717,6 @@
       "ring_carboxylate",
       "peroxy_ester",
       "ring_peroxy_ester"
-    ]
-  },
-  "n_substituent_principal_groups": {
-    "bluebook_rule": "P-62, P-66; N-substitution locants for amines, amides, imines, hydrazones, and hydrazines",
-    "values": [
-      "amide",
-      "amine",
-      "ring_amide",
-      "thioamide",
-      "ring_thioamide",
-      "hydrazine",
-      "hydrazone",
-      "imine",
-      "iminium",
-      "aldehyde_hydrazone",
-      "ring_aldehyde_hydrazone",
-      "aldehyde_imine",
-      "ring_aldehyde_imine"
     ]
   },
   "hydrazone_principal_groups": {
@@ -805,6 +864,71 @@
           ]
         },
         "seniority": 25,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "sulfonamide": {
+        "role": "principal",
+        "prefix": "sulfamoyl",
+        "suffix": "sulfonamide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 66,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "sulfonyl_fluoride": {
+        "role": "principal",
+        "prefix": "fluorosulfonyl",
+        "suffix": "sulfonyl fluoride",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 55,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "sulfonyl_chloride": {
+        "role": "principal",
+        "prefix": "chlorosulfonyl",
+        "suffix": "sulfonyl chloride",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 56,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "sulfonyl_bromide": {
+        "role": "principal",
+        "prefix": "bromosulfonyl",
+        "suffix": "sulfonyl bromide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 57,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "sulfonyl_iodide": {
+        "role": "principal",
+        "prefix": "iodosulfonyl",
+        "suffix": "sulfonyl iodide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 58,
         "suffix_with_locant": true,
         "needs_locant": true
       },
@@ -964,6 +1088,32 @@
         "suffix_with_locant": false,
         "needs_locant": true
       },
+      "urea": {
+        "role": "principal",
+        "prefix": "carbamoylamino",
+        "suffix": "urea",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 60,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "thiourea": {
+        "role": "principal",
+        "prefix": "carbamothioylamino",
+        "suffix": "thiourea",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 60,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
       "ring_amide": {
         "role": "principal",
         "prefix": "carbamoyl",
@@ -975,6 +1125,71 @@
         },
         "seniority": 60,
         "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "hydrazide": {
+        "role": "principal",
+        "prefix": "hydrazinecarbonyl",
+        "suffix": "hydrazide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 68,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_hydrazide": {
+        "role": "principal",
+        "prefix": "hydrazinecarbonyl",
+        "suffix": "carbohydrazide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 68,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "amidine": {
+        "role": "principal",
+        "prefix": "carbamimidoyl",
+        "suffix": "imidamide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 69,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_amidine": {
+        "role": "principal",
+        "prefix": "carbamimidoyl",
+        "suffix": "carboximidamide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 69,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "guanidine": {
+        "role": "principal",
+        "prefix": "carbamimidoylamino",
+        "suffix": "guanidine",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 69,
+        "suffix_with_locant": false,
         "needs_locant": true
       },
       "thioamide": {
@@ -1489,33 +1704,16 @@
       "isothiazol"
     ]
   },
-  "connection_boundary_parent_stems": {
-    "bluebook_rule": "P-13.6; parent stems that retain optional 1-locants at prefix boundaries to avoid ambiguous OPSIN attachment",
+  "suffix_nitrogen_markers": {
+    "bluebook_rule": "P-14.3.4; a suffix carrying a nitrogen -- or an acid that becomes an amido prefix -- adds a citable position, so a one-atom parent still needs its locant",
     "values": [
-      "aziridin",
-      "azetidin",
-      "pyrrolidin",
-      "piperidin",
-      "piperazin",
-      "pyrazol",
-      "imidazol",
-      "triazol",
-      "tetrazol",
-      "oxazol",
-      "isoxazol",
-      "thiazol",
-      "isothiazol",
-      "cycloprop",
-      "cyclobut",
-      "cyclopent",
-      "cyclohex",
-      "benzen",
-      "methan",
-      "ethan",
-      "propan",
-      "butan",
-      "pentan",
-      "hexan"
+      "amid",
+      "amin",
+      "imin",
+      "hydrazon",
+      "hydrazid",
+      "amidin",
+      "acid"
     ]
   },
   "replacement_prefix_order": {
@@ -1560,6 +1758,16 @@
       "prefix_pattern": "^((?:(?:[0-9]+[a-z]*|[nospmc]'*)(?:,(?:[0-9]+[a-z]*|[nospmc]'*))*|[ezrs]+|sec|tert|t|s|d|l|m|o|p|alpha|beta|gamma))([-)]+)"
     }
   },
+  "substituent_attachment_suffixes": {
+    "bluebook_rule": "P-29.2 and P-65.3.1; the word that ends a substituent name for each kind of attachment",
+    "values": {
+      "single": "yl",
+      "double": "ylidene",
+      "triple": "ylidyne",
+      "acyl": "oyl",
+      "acyl_on_branch": "carbonyl"
+    }
+  },
   "postprocess_literal_replacements": {
     "bluebook_rule": "Ordered retained-name and contracted-prefix post-processing replacements",
     "values": [
@@ -1568,12 +1776,6 @@
         "replacement": "methoxy",
         "category": "retained_alias",
         "reason": "Contract systematic alkyloxy spelling to retained methoxy."
-      },
-      {
-        "pattern": "ethyloxy",
-        "replacement": "ethoxy",
-        "category": "retained_alias",
-        "reason": "Contract systematic alkyloxy spelling to retained ethoxy."
       },
       {
         "pattern": "propyloxy",
@@ -1588,130 +1790,11 @@
         "reason": "Contract systematic alkyloxy spelling to retained butoxy."
       },
       {
-        "pattern": "phenyloxy",
-        "replacement": "phenoxy",
-        "category": "retained_alias",
-        "reason": "Contract systematic aryl oxy spelling to retained phenoxy."
-      },
-      {
-        "pattern": "aminocarbonylamino",
-        "replacement": "carbamoylamino",
-        "category": "retained_alias",
-        "reason": "Use retained carbamoylamino prefix spelling."
-      },
-      {
-        "pattern": "aminocarbonyl",
-        "replacement": "carbamoyl",
-        "category": "retained_alias",
-        "reason": "Use retained carbamoyl prefix spelling."
-      },
-      {
-        "pattern": "aminosulfonyl",
-        "replacement": "sulfamoyl",
-        "category": "retained_alias",
-        "reason": "Use retained sulfamoyl prefix spelling."
-      },
-      {
-        "pattern": "formylamido",
-        "replacement": "formamido",
-        "category": "morphology",
-        "reason": "Use valid formamido morphology for formyl-amido contraction."
-      },
-      {
-        "pattern": "eth-1-en-1-yl",
-        "replacement": "ethenyl",
-        "category": "retained_alias",
-        "reason": "Contract explicit locanted vinyl substituent to ethenyl."
-      },
-      {
-        "pattern": "eth-1-enyl",
-        "replacement": "ethenyl",
-        "category": "retained_alias",
-        "reason": "Contract explicit locanted vinyl substituent to ethenyl."
-      },
-      {
-        "pattern": "eth-1-yn-1-yl",
-        "replacement": "ethynyl",
-        "category": "retained_alias",
-        "reason": "Contract explicit locanted ethynyl substituent to ethynyl."
-      },
-      {
-        "pattern": "eth-1-ynyl",
-        "replacement": "ethynyl",
-        "category": "retained_alias",
-        "reason": "Contract explicit locanted ethynyl substituent to ethynyl."
-      },
-      {
         "pattern": "aminoamino",
         "replacement": "hydrazinyl",
         "category": "retained_alias",
         "reason": "Use retained hydrazinyl prefix for aminoamino."
       }
-    ]
-  },
-  "postprocess_regex_replacements": {
-    "bluebook_rule": "Ordered regex post-processing replacements that are safe to apply before legacy post-processing",
-    "values": [
-      {
-        "pattern": "(?<![)\\w])\\(benzyloxy\\)(?!\\()",
-        "replacement": "benzyloxy",
-        "category": "grammar",
-        "reason": "Remove unnecessary parentheses around a standalone benzyloxy prefix."
-      },
-      {
-        "pattern": "(?<![)\\w])\\(benzyl\\)(?!\\()",
-        "replacement": "benzyl",
-        "category": "grammar",
-        "reason": "Remove unnecessary parentheses around a standalone benzyl prefix."
-      },
-      {
-        "pattern": "(?<![)\\w])\\(ethenyl\\)(?!\\()",
-        "replacement": "ethenyl",
-        "category": "grammar",
-        "reason": "Remove unnecessary parentheses around a standalone ethenyl prefix."
-      },
-      {
-        "pattern": "\\b1-(formate|formamide|formic acid|formyl|formaldehyde|formonitrile)\\b",
-        "replacement": "\\1",
-        "category": "grammar",
-        "reason": "Remove invalid locant on one-carbon retained functional names."
-      },
-      {
-        "pattern": "\\(1-(formate|formamide|formic acid|formyl|formaldehyde|formonitrile)\\)",
-        "replacement": "(\\1)",
-        "category": "grammar",
-        "reason": "Remove invalid locant on one-carbon retained functional names."
-      }
-    ]
-  },
-  "postprocess_exact_replacements": {
-    "bluebook_rule": "Whole-name post-processing replacements",
-    "values": [
-      {
-        "pattern": "methanenitrile",
-        "replacement": "hydrogen cyanide",
-        "category": "retained_alias",
-        "reason": "Use retained common name for whole-component spelling."
-      }
-    ]
-  },
-  "postprocess_acyl_amido_terms": {
-    "bluebook_rule": "Acyl terms converted from amino to amido forms",
-    "values": [
-      "benzoyl",
-      "acetyl",
-      "propionyl",
-      "formyl"
-    ]
-  },
-  "postprocess_n_substituted_functional_suffixes": {
-    "bluebook_rule": "P-62, P-66, P-67; functional prefix suffixes whose leading parenthesized substituent is an N-substituent, not a carbon substituent on the acid parent",
-    "values": [
-      "sulfonamido",
-      "sulfinamido",
-      "sulfamoylamino",
-      "carbamoylamino",
-      "carbamothioylamino"
     ]
   },
   "retained_monocycle_specs": {

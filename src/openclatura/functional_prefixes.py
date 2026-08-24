@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from .assembly_parts import NameTokenBinding, SubstituentItem, rendered_substituent_text
+from .assembly_prefixes import substituent_sort_key
 from .formatting import (
     format_counted_prefixes,
     format_multiplier,
@@ -109,6 +110,71 @@ def ester_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
 
 def amide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     return amide_prefix_from_group(context.mol, group, context.sub_exclude, context.branch_namer)
+
+
+def amidine_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    """P-66.4.1.1.1.4: ``-C(=NR')NR2`` is (N-R)(N'-R')carbamimidoyl."""
+
+    mol = context.mol
+    carbon = next((a for a in group.atoms_involved if mol.atoms[a].is_carbon), None)
+    if carbon is None:
+        return "carbamimidoyl"
+    nitrogens = [n for n in group.atoms_involved if mol.atoms[n].symbol == "N"]
+    nitrogens.sort(key=lambda n: mol.get_bond(n, carbon).order)  # amine N first, imino N' second
+    locants_by_name: dict[str, list[str]] = {}
+    for nitrogen, locant in zip(nitrogens, ("N", "N'"), strict=False):
+        for x in mol.get_neighbors(nitrogen):
+            if x == carbon or mol.atoms[x].symbol == "H":
+                continue
+            name = rendered_substituent_text(
+                context.branch_namer(mol, x, context.sub_exclude | {nitrogen}, upstream_atom=nitrogen)
+            )
+            locants_by_name.setdefault(name, []).append(locant)
+    if not locants_by_name:
+        return "carbamimidoyl"
+    prefixes = []
+    for name in sorted(locants_by_name, key=substituent_sort_key):
+        locants = locants_by_name[name]
+        prefixes.append(
+            f"{','.join(locants)}-{format_multiplier(name, len(locants), safe_enclose=is_complex_prefix(name))}"
+        )
+    return f"({'-'.join(prefixes)}carbamimidoyl)"
+
+
+def hydrazide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    """P-66.3.1.3: ``-C(=O)-NR-NR2`` is (1-R-2-R)hydrazine-1-carbonyl; unsubstituted, hydrazinecarbonyl."""
+
+    mol = context.mol
+    nitrogens = [n for n in group.atoms_involved if mol.atoms[n].symbol == "N"]
+    carbon = next(
+        (
+            a
+            for a in group.atoms_involved
+            if mol.atoms[a].is_carbon and any(mol.get_bond(a, n) is not None for n in nitrogens)
+        ),
+        None,
+    )
+    if carbon is None or len(nitrogens) != 2:
+        return "hydrazinecarbonyl"
+    nitrogens.sort(key=lambda n: mol.get_bond(n, carbon) is None)  # acyl-bound N first (locant 1)
+    locants_by_name: dict[str, list[str]] = {}
+    for nitrogen, locant in zip(nitrogens, ("1", "2"), strict=True):
+        for x in mol.get_neighbors(nitrogen):
+            if x in group.atoms_involved or x == carbon or mol.atoms[x].symbol == "H":
+                continue
+            name = rendered_substituent_text(
+                context.branch_namer(mol, x, context.sub_exclude | {nitrogen}, upstream_atom=nitrogen)
+            )
+            locants_by_name.setdefault(name, []).append(locant)
+    if not locants_by_name:
+        return "hydrazinecarbonyl"
+    prefixes = []
+    for name in sorted(locants_by_name, key=substituent_sort_key):
+        locants = locants_by_name[name]
+        prefixes.append(
+            f"{','.join(locants)}-{format_multiplier(name, len(locants), safe_enclose=is_complex_prefix(name))}"
+        )
+    return f"({'-'.join(prefixes)}hydrazine-1-carbonyl)"
 
 
 def iminium_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
@@ -253,6 +319,10 @@ PREFIX_HANDLERS.update(
 )
 PREFIX_HANDLERS.update(dict.fromkeys(RULES.functional_groups.keys_with_family("sulfonyl"), sulfonyl_prefix_handler))
 PREFIX_HANDLERS.update(dict.fromkeys(RULES.functional_groups.keys_with_family("direct_prefix"), direct_prefix_handler))
+PREFIX_HANDLERS["hydrazide"] = hydrazide_prefix_handler
+PREFIX_HANDLERS["ring_hydrazide"] = hydrazide_prefix_handler
+PREFIX_HANDLERS["amidine"] = amidine_prefix_handler
+PREFIX_HANDLERS["ring_amidine"] = amidine_prefix_handler
 PREFIX_HANDLERS["imino_prefix"] = imino_prefix_handler
 PREFIX_HANDLERS["iminium"] = iminium_prefix_handler
 PREFIX_HANDLERS["hydrazine"] = hydrazine_prefix_handler

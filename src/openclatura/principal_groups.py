@@ -77,6 +77,21 @@ def add_component_principal_group(
                             bond = mol.get_bond(hydrazone_carbon, nitrogen)
                             if bond is not None and bond.order == 2 and bond.stereo in {"E", "Z"}:
                                 parts.stereo_features.append(("", bond.stereo))
+            if group.key == "ring_amidine":
+                # The exocyclic C=N of a carboximidamide has no locant of its own: cite (E)/(Z) unlocanted.
+                amidine_carbon = next(
+                    (
+                        idx
+                        for idx in group.atoms_involved
+                        if mol.atoms[idx].is_carbon and idx != group.attachment_carbon
+                    ),
+                    None,
+                )
+                if amidine_carbon is not None:
+                    for nitrogen in [idx for idx in group.atoms_involved if mol.atoms[idx].symbol == "N"]:
+                        bond = mol.get_bond(amidine_carbon, nitrogen)
+                        if bond is not None and bond.order == 2 and bond.stereo in {"E", "Z"}:
+                            parts.stereo_features.append(("", bond.stereo))
     parts.principal_group = PrincipalGroupItem(
         key=principal_key,
         locants=locants,

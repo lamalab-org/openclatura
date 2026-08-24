@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+from .additive import add_indicated_hydrogens
 from .assembly_parts import (
     AssemblyParts,
     NameAtomBinding,
@@ -17,7 +18,7 @@ from .component_group_rules import (
 )
 from .component_modifiers import add_component_front_modifiers, add_component_n_substituents
 from .functional_prefixes import collect_component_prefix_substituents
-from .molecule import DecisionTrace, Molecule, TracePhase, bond_ids_within
+from .molecule import DecisionTrace, Molecule, TracePhase, bond_ids_within, charged_atoms
 from .name_assembly import NameAssemblyResult, assert_final_name_assembly, token_span_trace_data
 from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
@@ -43,7 +44,6 @@ from .special_cases import (
 from .spiro_assembly import SpiroAssembly
 from .stereo_audit import audit_stereochemistry
 from .subgraph_tools import (
-    add_indicated_hydrogens,
     add_parent_features,
     emit_bond_stereo,
     find_spiro_side_pair,
@@ -116,7 +116,7 @@ def collect_component_branch_substituents(
                     locants=[],
                     atom_ids=sub_comp - {c_idx},
                     bond_ids=bond_ids_within(mol, sub_comp),
-                    charge_atom_ids=_charged_atoms(mol, sub_comp - {c_idx}),
+                    charge_atom_ids=charged_atoms(mol, sub_comp - {c_idx}),
                     spiro=name_spiro_subgraph(mol, c_idx, sub_comp),
                 )
             )
@@ -156,7 +156,7 @@ def collect_component_branch_substituents(
                             outer_parentheses_optional=outer_parentheses_optional,
                             atom_ids=branch_atoms,
                             bond_ids=bond_ids_within(mol, branch_atoms | {c_idx}),
-                            charge_atom_ids=_charged_atoms(mol, branch_atoms),
+                            charge_atom_ids=charged_atoms(mol, branch_atoms),
                             emitted_tokens=(
                                 graph_bound_substituent_tokens(
                                     mol,
@@ -183,12 +183,6 @@ def add_component_substituents(
     """Add collected component substituents to assembly parts."""
 
     add_substituent_traces(parts, subst_mapping, get_loc, only_atoms=set(numbered_path))
-
-
-def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
-    """Return formally charged atoms from an already named graph fragment."""
-
-    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
 
 
 def _chain_audit_parts(plan, component_atoms: set[int]) -> AssemblyParts:
@@ -252,7 +246,7 @@ def _shortcut_component_result(
                 term=name,
                 atom_ids=set(component_atoms),
                 bond_ids=bond_ids_within(mol, component_atoms),
-                charge_atom_ids=_charged_atoms(mol, component_atoms),
+                charge_atom_ids=charged_atoms(mol, component_atoms),
             )
         ]
     )

@@ -379,3 +379,9 @@ def double_bonded_carbon(mol: Molecule, nitrogen: int, blocked: set[int]) -> int
         and bond.order == 2
     ]
     return candidates[0] if len(candidates) == 1 else None
+
+
+def charged_atoms(mol: "Molecule", atom_ids: set[int]) -> set[int]:
+    """Return the formally charged atoms among ``atom_ids``."""
+
+    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}

@@ -11,7 +11,13 @@ from dataclasses import dataclass
 from itertools import combinations
 
 from .molecule import Molecule
-from .polycycle_topology import RingNumbering, adjacency_from_edges, adjacent_atoms, build_von_baeyer_numbering
+from .polycycle_topology import (
+    RingNumbering,
+    adjacency_from_edges,
+    adjacent_atoms,
+    build_von_baeyer_numbering,
+    normalize_edges,
+)
 from .ring_renderer import render_von_baeyer_descriptor
 
 MAX_AUDITED_VON_BAEYER_RINGS = 8
@@ -50,7 +56,7 @@ def find_von_baeyer_candidates(
     """Enumerate ranked, audited von Baeyer candidates for a ring skeleton."""
 
     atom_set = frozenset(atoms)
-    edge_set = frozenset(_normalize_edges(edges))
+    edge_set = frozenset(normalize_edges(edges))
     if not _is_von_baeyer_scope(mol, atom_set, edge_set):
         return ()
 
@@ -416,10 +422,6 @@ def _connected_components(atoms: set[int], edge_set: frozenset[tuple[int, int]])
 
 def _path_edges(path: tuple[int, ...]) -> frozenset[tuple[int, int]]:
     return frozenset(tuple(sorted((first, second))) for first, second in zip(path, path[1:]))
-
-
-def _normalize_edges(edges) -> set[tuple[int, int]]:
-    return {tuple(sorted((first, second))) for first, second in edges}
 
 
 def _dedupe_candidates(candidates: list[VonBaeyerCandidate]) -> list[VonBaeyerCandidate]:
