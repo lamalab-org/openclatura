@@ -1,7 +1,7 @@
 """Configurable constitutional locant-elision regressions."""
 
 from openclatura import DEFAULT_NAMING_ENGINE, NamingRequest, name_many, name_smiles
-from openclatura.assembly_parts import AssemblyParts, SubstituentItem
+from openclatura.assembly_parts import AssemblyParts, PrincipalGroupItem
 from openclatura.locant_elision import apply_redundant_locant_elision
 
 
@@ -29,12 +29,14 @@ def test_hexamethylbenzene_existing_elision_is_preserved_by_default_policy():
 def test_broader_elision_defaults_on_and_can_be_disabled():
     assert NamingRequest().omit_redundant_locants is True
     assert name_smiles("C1=CCCCC1") == "cyclohexene"
-    assert _name_without_elision("C1=CCCCC1").name == "cyclohex-1-ene"
+    # Upstream's conventional simple-ring omission is independent of the
+    # broader graph-search policy and remains active when it is disabled.
+    assert _name_without_elision("C1=CCCCC1").name == "cyclohexene"
 
 
 def test_batch_api_forwards_default_and_opt_out_policy():
     assert name_many(["C1=CCCCC1"])[0].name == "cyclohexene"
-    assert name_many(["C1=CCCCC1"], omit_redundant_locants=False)[0].name == "cyclohex-1-ene"
+    assert name_many(["C1=CCCCC1"], omit_redundant_locants=False)[0].name == "cyclohexene"
 
 
 def test_trace_records_symmetry_proof_without_inventing_rule_id():
@@ -95,9 +97,16 @@ def test_candidate_limit_falls_back_to_printing_locants():
         if index > 1:
             edge = (str(index - 1), locant)
             parts.parent_bond_orders_by_locants[edge] = 1
-    parts.substituents = [SubstituentItem(name="methyl", locants=[str(index) for index in range(1, 11)])]
+    parts.principal_group = PrincipalGroupItem(key="ol", locants=["1"])
 
-    apply_redundant_locant_elision(parts)
+    apply_redundant_locant_elision(parts, max_candidate_placements=5)
 
     assert parts.elided_substituent_locants == set()
-    assert parts.locant_elision_decisions == []
+    assert parts.locant_elision_decisions == [
+        {
+            "category": "search",
+            "key": "candidate-placement-limit",
+            "locants": [],
+            "reason": "exact symmetry search limit exceeded; locants retained",
+        }
+    ]

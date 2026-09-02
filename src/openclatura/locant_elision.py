@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from dataclasses import dataclass
 from itertools import combinations, product
-from math import comb, prod
+from math import prod
 
 from .assembly_parts import AssemblyParts
 from .assembly_utils import parse_locant
@@ -14,6 +14,20 @@ from .locant_sources import LocantMapSource
 MAX_CANDIDATE_PLACEMENTS = 10_000
 MAX_AUTOMORPHISM_CANDIDATES = 12
 ParentLocantLabel = tuple[str, int, bool]
+
+
+class _SearchLimitExceeded(Exception):
+    """Signal that an exact proof exhausted its per-invocation work budget."""
+
+
+@dataclass
+class _SearchBudget:
+    remaining: int
+
+    def consume(self) -> None:
+        if self.remaining <= 0:
+            raise _SearchLimitExceeded
+        self.remaining -= 1
 
 
 def _within_search_limit(size: int) -> bool:
@@ -208,7 +222,11 @@ def _parent_attachment_orbit(
     }
 
 
-def apply_redundant_locant_elision(parts: AssemblyParts) -> None:
+def apply_redundant_locant_elision(
+    parts: AssemblyParts,
+    *,
+    max_candidate_placements: int = MAX_CANDIDATE_PLACEMENTS,
+) -> None:
     """Mark constitutional locant groups that are redundant by exact symmetry.
 
     The proof is deliberately conservative. Candidate placements are drawn from
@@ -223,7 +241,19 @@ def apply_redundant_locant_elision(parts: AssemblyParts) -> None:
     if not groups:
         return
 
-    selected = _maximum_safe_elision(parts, groups)
+    budget = _SearchBudget(max(0, max_candidate_placements))
+    try:
+        selected = _maximum_safe_elision(parts, groups, budget)
+    except _SearchLimitExceeded:
+        parts.locant_elision_decisions.append(
+            {
+                "category": "search",
+                "key": "candidate-placement-limit",
+                "locants": [],
+                "reason": "exact symmetry search limit exceeded; locants retained",
+            }
+        )
+        return
     for group in selected:
         if group.category == "substituent":
             parts.elided_substituent_locants.add(group.key)
@@ -310,18 +340,19 @@ def _feature_groups(parts: AssemblyParts) -> list[_FeatureGroup]:
     return groups
 
 
-def _maximum_safe_elision(parts: AssemblyParts, groups: list[_FeatureGroup]) -> tuple[_FeatureGroup, ...]:
+def _maximum_safe_elision(
+    parts: AssemblyParts,
+    groups: list[_FeatureGroup],
+    budget: _SearchBudget,
+) -> tuple[_FeatureGroup, ...]:
     ordered = sorted(
         (group for group in groups if group.category != "substituent"),
         key=lambda group: (group.priority, group.category, group.key),
     )
-    checked = 0
     for size in range(len(ordered), 0, -1):
         for subset in combinations(ordered, size):
-            checked += 1
-            if not _within_search_limit(checked):
-                return ()
-            if _elision_is_safe(parts, groups, subset):
+            budget.consume()
+            if _elision_is_safe(parts, groups, subset, budget):
                 return subset
     return ()
 
@@ -330,6 +361,7 @@ def _elision_is_safe(
     parts: AssemblyParts,
     all_groups: list[_FeatureGroup],
     omitted: tuple[_FeatureGroup, ...],
+    budget: _SearchBudget,
 ) -> bool:
     locants = tuple(sorted(parts.parent_atom_symbols_by_locant, key=parse_locant))
     edges = tuple(sorted((_edge(pair) for pair in parts.parent_bond_orders_by_locants), key=_edge_sort_key))
@@ -347,39 +379,37 @@ def _elision_is_safe(
     base_edges = {edge: (1 if edge in normalized_unsaturation_edges else parent_edge_orders[edge]) for edge in edges}
     actual_nodes, actual_edges = _decorated_labels(base_nodes, base_edges, (*fixed, *omitted))
 
-    placement_options = [_candidate_positions(group, locants, edges, base_nodes, base_edges) for group in omitted]
+    placement_options = [_candidate_positions(group, locants, edges, base_nodes, base_edges, budget) for group in omitted]
     if any(not options for options in placement_options):
         return False
     candidate_count = prod(len(options) for options in placement_options)
     if not _within_search_limit(candidate_count):
         return False
 
-    checked = 0
     for placements in product(*placement_options):
-        checked += 1
-        if not _within_search_limit(checked):
-            return False
+        budget.consume()
         candidate_groups = tuple(
             _FeatureGroup(group.category, group.key, tuple(positions))
             for group, positions in zip(omitted, placements, strict=True)
         )
         candidate_nodes, candidate_edges = _decorated_labels(base_nodes, base_edges, (*fixed, *candidate_groups))
-        if not _isomorphic(locants, edges, actual_nodes, actual_edges, candidate_nodes, candidate_edges):
+        if not _isomorphic(locants, edges, actual_nodes, actual_edges, candidate_nodes, candidate_edges, budget):
             return False
     return True
 
 
-def _candidate_positions(group, locants, edges, base_nodes, base_edges):
+def _candidate_positions(group, locants, edges, base_nodes, base_edges, budget: _SearchBudget):
     count = len(group.positions)
     universe = locants if group.category != "unsaturation" else edges
-    if count > len(universe) or not _within_search_limit(comb(len(universe), count)):
+    if count > len(universe):
         return ()
     actual_signature = Counter(_position_signature(position, base_nodes, base_edges) for position in group.positions)
-    return tuple(
-        candidate
-        for candidate in combinations(universe, count)
-        if Counter(_position_signature(position, base_nodes, base_edges) for position in candidate) == actual_signature
-    )
+    candidates = []
+    for candidate in combinations(universe, count):
+        budget.consume()
+        if Counter(_position_signature(position, base_nodes, base_edges) for position in candidate) == actual_signature:
+            candidates.append(candidate)
+    return tuple(candidates)
 
 
 def _position_signature(position, node_labels, edge_labels):
@@ -452,7 +482,7 @@ def _decorated_labels(base_nodes, base_edges, groups):
     return nodes, edges
 
 
-def _isomorphic(locants, edges, source_nodes, source_edges, target_nodes, target_edges) -> bool:
+def _isomorphic(locants, edges, source_nodes, source_edges, target_nodes, target_edges, budget: _SearchBudget) -> bool:
     source_adj = _labeled_adjacency(locants, edges, source_edges)
     target_adj = _labeled_adjacency(locants, edges, target_edges)
     mapping: dict[str, str] = {}
@@ -473,6 +503,7 @@ def _isomorphic(locants, edges, source_nodes, source_edges, target_nodes, target
             key=lambda locant: sum(source_adj[locant].get(other) is not None for other in mapping),
         )
         for target in locants:
+            budget.consume()
             if target in used or not compatible(source, target):
                 continue
             mapping[source] = target
