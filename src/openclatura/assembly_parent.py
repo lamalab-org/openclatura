@@ -515,11 +515,7 @@ def format_unsaturations(parts: AssemblyParts, stem_str: str, *, omit_locants: b
             stem_str += "a"
     base_infixes = [(unsaturation, infix) for unsaturation, _count, infix in base_infixes]
     for unsaturation, base_infix in base_infixes:
-        if (
-            unsaturation.locants
-            and not omit_locants
-            and unsaturation.bond_key not in parts.elided_unsaturation_locants
-        ):
+        if unsaturation.locants and not omit_locants and unsaturation.bond_key not in parts.elided_unsaturation_locants:
             loc_str = ",".join(sorted(unsaturation.locants, key=parse_locant))
             unsat_parts.append(f"-{loc_str}-{base_infix}")
         else:

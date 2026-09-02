@@ -379,7 +379,9 @@ def _elision_is_safe(
     base_edges = {edge: (1 if edge in normalized_unsaturation_edges else parent_edge_orders[edge]) for edge in edges}
     actual_nodes, actual_edges = _decorated_labels(base_nodes, base_edges, (*fixed, *omitted))
 
-    placement_options = [_candidate_positions(group, locants, edges, base_nodes, base_edges, budget) for group in omitted]
+    placement_options = [
+        _candidate_positions(group, locants, edges, base_nodes, base_edges, budget) for group in omitted
+    ]
     if any(not options for options in placement_options):
         return False
     candidate_count = prod(len(options) for options in placement_options)
