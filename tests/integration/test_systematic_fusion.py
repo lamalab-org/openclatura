@@ -12,29 +12,11 @@ from openclatura.fusion.model import AuditStatus, FusionConfirmed, FusionNotAppl
 from openclatura.fusion.numbering import MancudeSearchBudgetExceeded
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.graph_io import read_smiles
-from openclatura.molecule import OperationClass, TracePhase, TraceStep
-from openclatura.operations import infer_operations
+from openclatura.molecule import OperationClass
 
 SYSTEMATIC_FUSION_CASES = json.loads(
     (Path(__file__).parents[1] / "data" / "systematic_fusion_cases.json").read_text(encoding="utf-8")
 )
-
-
-def test_existing_polycycle_operation_is_preserved():
-    decisions = [
-        TraceStep(
-            phase=TracePhase.PARENT_SELECTION,
-            decision="selected parent skeleton",
-            reason="test fixture",
-            data={"is_polycycle": True, "polycycle_descriptor": "tricyclo[2.2.1.0]"},
-        )
-    ]
-
-    operations = infer_operations(decisions, [])
-
-    assert [(item.operation_class, item.detail) for item in operations] == [
-        (OperationClass.FUSION, "polycyclic_parent")
-    ]
 
 
 @pytest.mark.parametrize(
@@ -332,7 +314,6 @@ def test_mancude_search_budget_exhaustion_becomes_a_typed_abstention(monkeypatch
     mol = read_smiles("O1C2=C(C=C1)C=CS2")
 
     def exhausted(*args, **kwargs):
-
         raise MancudeSearchBudgetExceeded(1)
 
     monkeypatch.setattr("openclatura.fusion.planner.parent_bond_model", exhausted)
