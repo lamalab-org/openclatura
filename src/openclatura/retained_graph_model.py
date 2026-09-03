@@ -86,13 +86,12 @@ class RetainedGraphTemplate:
             return self.indicated_hydrogen_count_override
         if self.default_indicated_h:
             return len(self.default_indicated_h)
-        from .rules import elements
+        from .rules.elements import MANCUDE_FORCED_SINGLE_SYMBOLS
 
-        forced_single = frozenset(
-            element.symbol for element in elements.ELEMENTS.values() if element.mancude_forced_single
-        )
         return sum(
-            1 for atom in self.atoms if not atom.aromatic and not atom.fusion and atom.symbol not in forced_single
+            1
+            for atom in self.atoms
+            if not atom.aromatic and not atom.fusion and atom.symbol not in MANCUDE_FORCED_SINGLE_SYMBOLS
         )
 
 

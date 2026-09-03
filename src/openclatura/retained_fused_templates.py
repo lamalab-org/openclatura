@@ -33,9 +33,7 @@ ALLOWED_CHARGE_POLICIES = {"exact", "charge_layer"}
 RETAINED_GRAPH_FAMILIES = ("fused", "macrocycle")
 
 # Single-bonded in every mancude parent, so never indicated-hydrogen capacity.
-FIXED_SATURATED_RING_ELEMENTS = frozenset(
-    element.symbol for element in element_rules.ELEMENTS.values() if element.mancude_forced_single
-)
+FIXED_SATURATED_RING_ELEMENTS = element_rules.MANCUDE_FORCED_SINGLE_SYMBOLS
 
 
 @lru_cache(maxsize=1)

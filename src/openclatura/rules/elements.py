@@ -52,3 +52,8 @@ def is_known(symbol: str) -> bool:
 SYMBOLS_BY_HW_STEM: dict[str, str] = {
     element.hw_stem: element.symbol for element in ELEMENTS.values() if element.hw_stem
 }
+
+# Shared chemistry classification derived once from the checked-in table.
+MANCUDE_FORCED_SINGLE_SYMBOLS: frozenset[str] = frozenset(
+    element.symbol for element in ELEMENTS.values() if element.mancude_forced_single
+)

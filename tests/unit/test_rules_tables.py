@@ -124,6 +124,9 @@ def test_fusion_priorities_and_mancude_roles_share_typed_element_data():
         for element in elements.ELEMENTS.values()
         if element.mancude_forced_single
     )
+    assert elements.MANCUDE_FORCED_SINGLE_SYMBOLS == {
+        element.symbol for element in elements.ELEMENTS.values() if element.mancude_forced_single
+    }
 
 
 def test_audit_parsers_share_the_canonical_tables():

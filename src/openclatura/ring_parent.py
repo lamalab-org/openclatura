@@ -6,12 +6,17 @@ maps, and audit metadata together instead of passing a descriptor string and
 plain paths independently.
 """
 
-from dataclasses import dataclass
+from __future__ import annotations
 
-from .fusion.model import FusionParentPlan, ParentBondModel
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
 from .locants import retained_locant_sort_key
 from .polycycle_topology import RingNumbering
 from .ring_renderer import is_von_baeyer_descriptor
+
+if TYPE_CHECKING:
+    from .fusion.model import FusionParentPlan, ParentBondModel
 
 
 @dataclass(frozen=True)
@@ -82,7 +87,7 @@ class RingParent:
         return self.retained_locant_maps
 
     @classmethod
-    def from_fusion_plan(cls, plan: FusionParentPlan) -> "RingParent":
+    def from_fusion_plan(cls, plan: FusionParentPlan) -> RingParent:
         """Build a ring-parent handoff only from an independently audited plan."""
 
         if not plan.audit.confirmed:
@@ -107,7 +112,7 @@ class RingParent:
         descriptor_numbers: tuple[int, ...],
         numberings: list[RingNumbering],
         selected_path: list[int] | tuple[int, ...] | None = None,
-    ) -> "RingParent":
+    ) -> RingParent:
         selected = None
         if selected_path is not None:
             selected_tuple = tuple(selected_path)
@@ -134,7 +139,7 @@ class RingParent:
         descriptor: str | None,
         paths: list[list[int]] | tuple[tuple[int, ...], ...],
         descriptor_numbers: tuple[int, ...] = (),
-    ) -> "RingParent":
+    ) -> RingParent:
         if is_von_baeyer_descriptor(descriptor):
             raise ValueError("von Baeyer RingParent requires audited numbering candidates")
         return cls(
@@ -151,7 +156,7 @@ class RingParent:
         *,
         atoms: set[int] | frozenset[int],
         locant_maps: list[dict[int, str]],
-    ) -> "RingParent":
+    ) -> RingParent:
         """Build an audited parent proof from exact template isomorphisms."""
 
         parent = cls(
