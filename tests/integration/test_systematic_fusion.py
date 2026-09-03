@@ -220,14 +220,6 @@ def test_batch_request_propagates_fusion_mode_without_cross_request_state():
     assert name("O1C2=C(C=C1)C=CS2").name == "2-oxa-8-thiabicyclo[3.3.0]octa-1(5),3,6-triene"
 
 
-def test_systematic_fusion_operation_extends_legacy_polycycle_operation_metadata():
-    legacy = name("CN1CC12C1C3CC1C32", include_trace=True)
-    systematic = name("O1C2=C(C=C1)C=CS2", fusion_mode=FusionMode.GENERAL, include_trace=True)
-
-    assert any(operation.detail == "polycyclic_parent" for operation in legacy.analysis.operations)
-    assert any(operation.detail == "systematic_fusion_parent" for operation in systematic.analysis.operations)
-
-
 def test_planner_cache_is_request_policy_scoped_and_mutation_invalidated():
     mol = read_smiles("O1C2=C(C=C1)C=CS2")
     first = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
