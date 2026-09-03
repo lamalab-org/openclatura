@@ -16,7 +16,7 @@ from openclatura.molecule import OperationClass
         ("O1C2=C(C=C1)C=CS2", "thieno[2,3-b]furan"),
         ("S1C=2N(C=C1)C=CN2", "imidazo[2,1-b][1,3]thiazole"),
         ("O1C=CC2OC=CC=C21", "furo[3,2-b]pyran"),
-        ("O1C=2C(=CC1)C=CC2", "cyclopenta[1,2-b]furan"),
+        ("O1C=2C(=CC1)C=CC2", "cyclopenta[b]furan"),
         ("[Se]1C2=C(C=C1)[Se]C=C2", "selenopheno[3,2-b]selenophene"),
         ("O1C=CC2=NC3=C(C=C21)SC=C3", "furo[3,2-b]thieno[2,3-e]pyridine"),
         ("O1C=CC2=C1C=C1C(=N2)C=CO1", "difuro[3,2-b:2',3'-e]pyridine"),
@@ -135,6 +135,28 @@ def test_simple_hydrogenation_is_derived_from_parent_bond_model():
     assert result.name == "4,5-dihydrothieno[2,3-b]furan"
 
 
+def test_generated_carbocycle_component_uses_existing_retained_polycycle_parent():
+    result = name(
+        "C1C=CC2=C1C1=CC=CC=C1C=1C=CC=CC21",
+        fusion_mode=FusionMode.GENERAL,
+        include_trace=True,
+    )
+
+    assert result.name == "cyclopenta[l]phenanthrene"
+    assert result.parent_nomenclature == "systematic_fusion"
+    assert result.pin_status == "valid_general_name"
+
+
+def test_generated_component_with_retained_polycycle_is_atom_order_invariant():
+    mol = Chem.MolFromSmiles("C1C=CC2=C1C1=CC=CC=C1C=1C=CC=CC21")
+    renumbered = Chem.RenumberAtoms(mol, list(reversed(range(mol.GetNumAtoms()))))
+
+    assert name_mol(mol, fusion_mode=FusionMode.GENERAL).name == name_mol(
+        renumbered,
+        fusion_mode=FusionMode.GENERAL,
+    ).name
+
+
 def test_retained_parent_precedes_systematic_fusion():
     result = name("c1ccc2ccccc2c1", fusion_mode=FusionMode.GENERAL, include_trace=True)
     assert result.name == "naphthalene"
@@ -193,6 +215,28 @@ def test_pin_mode_abstains_when_only_one_ring_meets_size_gate():
     assert "ring-size gate" in result.reason
 
 
+def test_charged_fused_parent_abstains_before_component_planning():
+    mol = read_smiles("O1C2=C(C=C1)C=CS2")
+    atom_id = next(iter(mol.atoms))
+    mol.update_atom(atom_id, charge=1)
+
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert isinstance(result, FusionUnsupported)
+    assert "charged fused parents" in result.reason
+
+
+def test_nonstandard_valence_fused_parent_abstains_before_component_planning():
+    mol = read_smiles("O1C2=C(C=C1)C=CS2")
+    oxygen = next(atom_id for atom_id, atom in mol.atoms.items() if atom.symbol == "O")
+    mol.update_atom(oxygen, total_h_count=1)
+
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert isinstance(result, FusionUnsupported)
+    assert "nonstandard-valence fused parents" in result.reason
+
+
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [
@@ -226,6 +270,7 @@ def test_non_ortho_topologies_do_not_emit_systematic_fusion(smiles):
         "O1C=CC2=C1C=C1C(=N2)C=CO1",
         "CC1=CC2=C(O1)SC=C2",
         "O1C2=C(C=C1)CCS2",
+        "C1C=CC2=C1C1=CC=CC=C1C=1C=CC=CC21",
     ],
 )
 def test_systematic_fusion_round_trips_through_opsin(smiles):

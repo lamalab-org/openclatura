@@ -36,6 +36,7 @@ from .model import (
 from .rules import component_spec_seniority_key
 
 _LIMITS = fusion_nomenclature_config().search
+_SUPPORT = fusion_nomenclature_config().rules.support
 MAX_COMPONENT_OCCURRENCES = _LIMITS.maximum_component_occurrences
 MAX_COMPONENT_SELECTIONS = _LIMITS.maximum_component_selections
 MAX_COMPONENT_SELECTION_STATES = _LIMITS.component_selection_states
@@ -200,10 +201,17 @@ def render_fusion_name_parts(
     def attachment(node: FusionCitationNode) -> list[FusionRenderedPart]:
         descendants = render_children(node)
         spec = _spec_for_match(registry, matches[node.occurrence_id])
+        descriptor = descriptors[node.occurrence_id]
         return [
             *descendants,
             component_part(spec.attached_prefix, "attached_component", (node.occurrence_id,)),
-            descriptor_part(descriptors[node.occurrence_id].render(), (node.occurrence_id,)),
+            descriptor_part(
+                _render_descriptor(
+                    descriptor,
+                    omit_attached_locants=_omit_attached_locants(registry, spec.key),
+                ),
+                (node.occurrence_id,),
+            ),
         ]
 
     def render_children(node: FusionCitationNode) -> list[FusionRenderedPart]:
@@ -222,7 +230,23 @@ def render_fusion_name_parts(
             prefixes = {_spec_for_match(registry, matches[member.occurrence_id]).attached_prefix for member in members}
             if len(prefixes) != 1:
                 raise FusionDescriptorError("a multiplicative group must use one attached prefix")
-            descriptor = _render_combined_descriptors(tuple(descriptors[member.occurrence_id] for member in members))
+            member_descriptors = tuple(descriptors[member.occurrence_id] for member in members)
+            descriptor = _combine_rendered_descriptors(
+                tuple(
+                    _render_descriptor(
+                        item,
+                        omit_attached_locants=_omit_attached_locants(
+                            registry,
+                            _spec_for_match(registry, matches[member.occurrence_id]).key,
+                        ),
+                    )
+                    for item, member in zip(
+                        member_descriptors,
+                        members,
+                        strict=True,
+                    )
+                )
+            )
             pieces.extend(
                 (
                     FusionRenderedPart(group.multiplier, "multiplier", group.occurrence_ids),
@@ -324,9 +348,9 @@ def _candidates_for_component_selection(
     target_atoms = frozenset(atom for scope in scopes for atom in scope.atom_ids)
     target_edges = frozenset(edge for scope in scopes for edge in scope.edges)
     audit = audit_component_cover(scopes, target_atom_ids=target_atoms, target_edges=target_edges)
-    if not audit.ok or audit.proof.kind != "tree":
+    if not audit.ok or audit.proof.kind not in _SUPPORT.cover_kinds:
         return []
-    if any(
+    if "ortho" not in _SUPPORT.join_kinds or any(
         len(interface.shared_edges) != 1 or len(interface.shared_atom_ids) != 2 for interface in audit.graph.interfaces
     ):
         return []
@@ -703,9 +727,27 @@ def _citation_node(root: FusionCitationNode, occurrence: int) -> FusionCitationN
     raise KeyError(occurrence)
 
 
-def _render_combined_descriptors(descriptors: tuple[FusionDescriptor, ...]) -> str:
-    interiors = tuple(descriptor.render()[1:-1] for descriptor in descriptors)
+def _combine_rendered_descriptors(descriptors: tuple[str, ...]) -> str:
+    interiors = tuple(descriptor[1:-1] for descriptor in descriptors)
     return f"[{':'.join(interiors)}]"
+
+
+def _render_descriptor(descriptor: FusionDescriptor, *, omit_attached_locants: bool) -> str:
+    if not omit_attached_locants:
+        return descriptor.render()
+    if descriptor.kind is not FusionJoinKind.ORTHO or len(descriptor.parent_sides) != 1:
+        raise FusionDescriptorError("attached locants may be omitted only for one ordinary fusion side")
+    return f"[{descriptor.parent_sides[0]}]"
+
+
+def _omit_attached_locants(
+    registry: _Registry | Mapping[str, FusionComponentSpec],
+    key: str,
+) -> bool:
+    if isinstance(registry, Mapping):
+        return False
+    component = registry.by_key.get(key)
+    return component.omit_attached_locants
 
 
 def _descriptor_order_key(join: FusionJoin) -> tuple:

@@ -145,8 +145,8 @@ def _search_layouts(
 ) -> None:
     if len(placed_orders) == len(model.faces):
         if _audit_layout(model, placed_orders, atom_positions):
-            layout = _materialize_layout(placed_orders, placed_shapes, atom_positions)
-            completed.setdefault(_layout_geometry_key(layout), layout)
+            for layout in _materialize_layouts(placed_orders, placed_shapes, atom_positions):
+                completed.setdefault(_layout_geometry_key(layout), layout)
             if len(completed) > max_layouts:
                 raise LayoutSearchBudgetExceeded(max_layouts, resource="completed layouts")
         return
@@ -345,14 +345,80 @@ def _audit_layout(
     return perimeter_edges == geometric_perimeter == declared_perimeter and all(len(edge) == 2 for edge in graph_edges)
 
 
-def _materialize_layout(
+def _materialize_layouts(
     placed_orders: dict[int, tuple[int, ...]],
     shapes: dict[int, RingShapeSpec],
     positions: dict[int, Point],
-) -> FusedLayout:
+) -> tuple[FusedLayout, ...]:
     denominators = [coordinate.denominator for point in positions.values() for coordinate in point]
     scale = lcm(*denominators) if denominators else 1
     integer = {atom: (int(x * scale), int(y * scale)) for atom, (x, y) in positions.items()}
+    integer = _normalize_integer_positions(integer)
+    centers = {face: _integer_center(tuple(integer[atom] for atom in order)) for face, order in placed_orders.items()}
+
+    # A generated embedding has an arbitrary horizontal seed edge.  P-25
+    # orientation instead chooses the axis that contains the greatest row of
+    # rings.  Every row containing two or more ring centers is parallel to a
+    # center-pair vector, so these graph-derived directions are a complete
+    # finite set for the supported all-peripheral tier.
+    directions = {(1, 0)}
+    center_values = tuple(centers.values())
+    for index, (left_x, left_y) in enumerate(center_values):
+        for right_x, right_y in center_values[index + 1 :]:
+            dx, dy = right_x - left_x, right_y - left_y
+            divisor = gcd(abs(dx), abs(dy))
+            if divisor == 0:
+                continue
+            dx, dy = dx // divisor, dy // divisor
+            if dx < 0 or (dx == 0 and dy < 0):
+                dx, dy = -dx, -dy
+            directions.add((dx, dy))
+
+    candidates: dict[tuple, FusedLayout] = {}
+    for dx, dy in sorted(directions):
+        for x_sign in (-1, 1):
+            for y_sign in (-1, 1):
+                oriented = {
+                    atom: (
+                        x_sign * (x * dx + y * dy),
+                        y_sign * (-x * dy + y * dx),
+                    )
+                    for atom, (x, y) in integer.items()
+                }
+                oriented = _normalize_integer_positions(oriented)
+                oriented_centers = {
+                    face: _integer_center(tuple(oriented[atom] for atom in order))
+                    for face, order in placed_orders.items()
+                }
+                layout = FusedLayout(
+                    face_positions=tuple(
+                        (face, *oriented_centers[face]) for face in sorted(oriented_centers)
+                    ),
+                    atom_positions=tuple((atom, *oriented[atom]) for atom in sorted(oriented)),
+                    face_shapes=tuple((face, shapes[face].shape_id) for face in sorted(shapes)),
+                    orientation_score=_orientation_score(tuple(oriented_centers.values()), shapes),
+                    audit_evidence=(
+                        "all face boundaries represented",
+                        "shared edge coordinates agree",
+                        "unrelated edges do not cross",
+                        "nonadjacent face interiors do not overlap",
+                        "geometric and topological perimeters agree",
+                        "preferred axis derived from ring-center rows",
+                    ),
+                )
+                candidates.setdefault(_layout_geometry_key(layout), layout)
+
+    best_score = min(layout.orientation_score for layout in candidates.values())
+    return tuple(
+        sorted(
+            (layout for layout in candidates.values() if layout.orientation_score == best_score),
+            key=_layout_sort_key,
+        )
+    )
+
+
+def _normalize_integer_positions(positions: dict[int, tuple[int, int]]) -> dict[int, tuple[int, int]]:
+    integer = dict(positions)
     min_x = min(x for x, _ in integer.values())
     min_y = min(y for _, y in integer.values())
     integer = {atom: (x - min_x, y - min_y) for atom, (x, y) in integer.items()}
@@ -362,21 +428,7 @@ def _materialize_layout(
         divisor = gcd(divisor, point[1])
     if divisor > 1:
         integer = {atom: (x // divisor, y // divisor) for atom, (x, y) in integer.items()}
-    centers = {face: _integer_center(tuple(integer[atom] for atom in order)) for face, order in placed_orders.items()}
-    score = _orientation_score(tuple(centers.values()), shapes)
-    return FusedLayout(
-        face_positions=tuple((face, *centers[face]) for face in sorted(centers)),
-        atom_positions=tuple((atom, *integer[atom]) for atom in sorted(integer)),
-        face_shapes=tuple((face, shapes[face].shape_id) for face in sorted(shapes)),
-        orientation_score=score,
-        audit_evidence=(
-            "all face boundaries represented",
-            "shared edge coordinates agree",
-            "unrelated edges do not cross",
-            "nonadjacent face interiors do not overlap",
-            "geometric and topological perimeters agree",
-        ),
-    )
+    return integer
 
 
 def _orientation_score(centers: tuple[tuple[int, int], ...], shapes: dict[int, RingShapeSpec]) -> tuple[int, ...]:

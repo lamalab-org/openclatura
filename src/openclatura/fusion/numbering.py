@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from fractions import Fraction
 from functools import cmp_to_key
@@ -364,9 +364,27 @@ def _numbering_score(mol: Molecule, locants: dict[int, SystemLocant], fusion_ato
     fusion_carbons = tuple(sorted(_locant_key(locants[atom]) for atom in fusion_atoms if mol.atoms[atom].symbol == "C"))
     fusion_hetero = tuple(sorted(_locant_key(locants[atom]) for atom in fusion_atoms if mol.atoms[atom].symbol != "C"))
     indicated_h = tuple(
-        sorted(_locant_key(locant) for atom, locant in locants.items() if mol.atoms[atom].total_h_count > 0)
+        sorted(
+            _locant_key(locant)
+            for atom, locant in locants.items()
+            if _is_indicated_hydrogen_candidate(mol, atom, locants)
+        )
     )
     return all_hetero, by_element, fusion_carbons, fusion_hetero, indicated_h
+
+
+def _is_indicated_hydrogen_candidate(
+    mol: Molecule,
+    atom: int,
+    parent_locants: Mapping[int, SystemLocant],
+) -> bool:
+    value = mol.atoms[atom]
+    if value.total_h_count <= 0:
+        return False
+    if value.symbol != "C":
+        return True
+    parent_neighbors = [neighbor for neighbor in mol.get_neighbors(atom) if neighbor in parent_locants]
+    return value.total_h_count > 1 and all(mol.get_bond(atom, neighbor).order == 1 for neighbor in parent_neighbors)
 
 
 def _locant_key(locant: SystemLocant) -> tuple[int, str, int]:

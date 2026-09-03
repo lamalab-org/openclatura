@@ -26,6 +26,7 @@ from .model import (
     FusionNumberingProof,
     FusionParentPlan,
     FusionPlanningResult,
+    FusionRenderedPart,
     FusionRuleDecision,
     FusionUnsupported,
     PinStatus,
@@ -35,6 +36,7 @@ from .registry import fusion_component_registry
 from .rules import explain_component_comparison, fusion_mode_allows_planning, pin_ring_size_gate
 
 PLANNER_TIER = fusion_nomenclature_config().rules.planner_tier
+SUPPORT = fusion_nomenclature_config().rules.support
 
 
 def plan_fusion_parent(
@@ -63,9 +65,9 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         return FusionNotApplicable("selected parent is too small to contain an ortho-fused system")
     if atoms - mol.atoms.keys():
         return FusionUnsupported("selected parent contains unknown graph atoms")
-    if any(mol.atoms[atom].charge for atom in atoms):
+    if not SUPPORT.charged_parents and any(mol.atoms[atom].charge for atom in atoms):
         return FusionUnsupported("charged fused parents are outside the bounded production tier")
-    if not _standard_valence_parent(mol, atoms):
+    if not SUPPORT.nonstandard_valence and not _standard_valence_parent(mol, atoms):
         return FusionUnsupported("nonstandard-valence fused parents are outside the bounded production tier")
 
     try:
@@ -74,7 +76,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         return FusionUnsupported("bounded-face search budget exhausted", (str(exc),))
     if bounded is None or bounded.cycle_rank < 2:
         return FusionNotApplicable("selected parent has no audited multi-face fused model")
-    if set(bounded.outer_boundary.atoms) != set(atoms):
+    if not SUPPORT.interior_atoms and set(bounded.outer_boundary.atoms) != set(atoms):
         return FusionUnsupported("interior-atom fused systems require the later numbering tier")
     ring_sizes = tuple(len(face.atoms) for face in bounded.faces)
     if mode is FusionMode.AUDITED_PIN and not pin_ring_size_gate(ring_sizes):
@@ -122,9 +124,19 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         for atom, locant in numbering.abstract_atom_to_locant
         if mol.atoms[atom].symbol != "C" and mol.atoms[atom].total_h_count > 0
     )
-    if len(indicated_h) > 1:
+    if len(indicated_h) > SUPPORT.maximum_indicated_hydrogens:
         return FusionUnsupported("multiple indicated-hydrogen fusion parents require a later additive tier")
     rendered_parts = render_fusion_name_parts(ast, registry, mol=mol)
+    if indicated_h:
+        input_atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
+        rendered_parts = (
+            FusionRenderedPart(
+                text=f"{','.join(f'{locant}H' for locant in indicated_h)}-",
+                role="indicated_hydrogen",
+                atom_ids=frozenset(input_atom_by_locant[locant] for locant in indicated_h),
+            ),
+            *rendered_parts,
+        )
     rendered = "".join(part.text for part in rendered_parts)
     audit = audit_fusion_plan(
         mol,

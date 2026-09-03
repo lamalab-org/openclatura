@@ -18,6 +18,17 @@ class FusionRuleConfig:
     planner_tier: str
     pin_minimum_ring_size: int
     pin_minimum_ring_count: int
+    support: FusionSupportConfig
+
+
+@dataclass(frozen=True, slots=True)
+class FusionSupportConfig:
+    cover_kinds: tuple[str, ...]
+    join_kinds: tuple[str, ...]
+    charged_parents: bool
+    nonstandard_valence: bool
+    interior_atoms: bool
+    maximum_indicated_hydrogens: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,10 +92,20 @@ def fusion_nomenclature_config_from_data(data: dict) -> FusionNomenclatureConfig
         raise ValueError("fusion components must use the shared retained graph-template registry")
     rules_data = _mapping(data, "rules")
     pin_gate = _mapping(rules_data, "pin_gate")
+    support_data = _mapping(rules_data, "support")
+    support = FusionSupportConfig(
+        cover_kinds=_text_list(support_data, "cover_kinds", allowed={"tree", "multiparent"}),
+        join_kinds=_text_list(support_data, "join_kinds", allowed={"ortho", "ortho_peri", "higher_order"}),
+        charged_parents=_boolean(support_data, "charged_parents"),
+        nonstandard_valence=_boolean(support_data, "nonstandard_valence"),
+        interior_atoms=_boolean(support_data, "interior_atoms"),
+        maximum_indicated_hydrogens=_nonnegative_int(support_data, "maximum_indicated_hydrogens"),
+    )
     rules = FusionRuleConfig(
         planner_tier=_text(rules_data, "planner_tier"),
         pin_minimum_ring_size=_positive_int(pin_gate, "minimum_ring_size"),
         pin_minimum_ring_count=_positive_int(pin_gate, "minimum_ring_count"),
+        support=support,
     )
     limits_data = _mapping(data, "search_limits")
     search = FusionSearchLimits(
@@ -138,6 +159,25 @@ def _integer(value: object, label: str) -> int:
     if type(value) is not int:
         raise ValueError(f"fusion nomenclature {label} must be an integer")
     return value
+
+
+def _boolean(data: dict, key: str) -> bool:
+    value = data.get(key)
+    if type(value) is not bool:
+        raise ValueError(f"fusion nomenclature {key} must be a boolean")
+    return value
+
+
+def _text_list(data: dict, key: str, *, allowed: set[str]) -> tuple[str, ...]:
+    values = data.get(key)
+    if not isinstance(values, list) or not values:
+        raise ValueError(f"fusion nomenclature {key} must be a non-empty list")
+    result = tuple(values)
+    if any(not isinstance(value, str) or value not in allowed for value in result):
+        raise ValueError(f"fusion nomenclature {key} contains an unsupported value")
+    if len(result) != len(set(result)):
+        raise ValueError(f"fusion nomenclature {key} must not contain duplicates")
+    return result
 
 
 def _positive_int(data: dict, key: str) -> int:

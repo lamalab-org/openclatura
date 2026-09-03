@@ -14,6 +14,12 @@ def test_checked_in_fusion_configuration_is_complete_and_data_backed():
 
     assert config.graph_source == "retained_graph_templates"
     assert config.rules.planner_tier == "ortho-tree-v1"
+    assert config.rules.support.cover_kinds == ("tree",)
+    assert config.rules.support.join_kinds == ("ortho",)
+    assert not config.rules.support.charged_parents
+    assert not config.rules.support.nonstandard_valence
+    assert not config.rules.support.interior_atoms
+    assert config.rules.support.maximum_indicated_hydrogens == 1
     assert config.rules.pin_minimum_ring_size == 5
     assert config.rules.pin_minimum_ring_count == 2
     assert {shape.ring_size for shape in config.ring_shapes} == set(range(3, 9))

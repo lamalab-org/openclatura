@@ -4,6 +4,14 @@
   "graph_source": "retained_graph_templates",
   "rules": {
     "planner_tier": "ortho-tree-v1",
+    "support": {
+      "cover_kinds": ["tree"],
+      "join_kinds": ["ortho"],
+      "charged_parents": false,
+      "nonstandard_valence": false,
+      "interior_atoms": false,
+      "maximum_indicated_hydrogens": 1
+    },
     "pin_gate": {
       "minimum_ring_size": 5,
       "minimum_ring_count": 2
@@ -38,9 +46,9 @@
     {"key": "cyclooctatetraene", "generator": "monocyclic_carbocycle", "ring_size": 8, "bond_class": "aromatic", "pin_component": true}
   ],
   "components": [
-    {"key": "cyclopentadiene", "parent_name": "cyclopentadiene", "attached_prefix": "cyclopenta", "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
-    {"key": "cycloheptatriene", "parent_name": "cycloheptatriene", "attached_prefix": "cyclohepta", "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
-    {"key": "cyclooctatetraene", "parent_name": "cyclooctatetraene", "attached_prefix": "cycloocta", "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
+    {"key": "cyclopentadiene", "parent_name": "cyclopentadiene", "attached_prefix": "cyclopenta", "omit_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
+    {"key": "cycloheptatriene", "parent_name": "cycloheptatriene", "attached_prefix": "cyclohepta", "omit_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
+    {"key": "cyclooctatetraene", "parent_name": "cyclooctatetraene", "attached_prefix": "cycloocta", "omit_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
     {"key": "benzene", "attached_prefix": "benzo", "omit_attached_locants": true, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "naphthalene", "attached_prefix": "naphtho", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "azulene", "attached_prefix": "azuleno", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},

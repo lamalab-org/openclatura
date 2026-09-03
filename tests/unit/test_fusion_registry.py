@@ -121,6 +121,24 @@ def test_generated_carbocycles_use_shared_numbered_graph_templates():
     assert {bond.bond_class for bond in component.spec.bonds} == {"aromatic"}
 
 
+@pytest.mark.parametrize(
+    ("key", "ring_size", "prefix"),
+    [
+        ("cyclopentadiene", 5, "cyclopenta"),
+        ("cycloheptatriene", 7, "cyclohepta"),
+        ("cyclooctatetraene", 8, "cycloocta"),
+    ],
+)
+def test_generated_carbocycle_policy_is_separate_from_shared_graph_construction(key, ring_size, prefix):
+    component = fusion_component_registry().by_key[key]
+
+    assert component.spec.template.family == "generated_monocycle"
+    assert component.spec.template.locants == tuple(str(index) for index in range(1, ring_size + 1))
+    assert component.spec.attached_prefix == prefix
+    assert component.attached_locant_policy == "always"
+    assert component.spec.rule_reference == "P-25.2.2"
+
+
 def test_registration_rejects_duplicate_keys_and_template_names():
     data = load_json_table("fusion_components.json")
     row = deepcopy(next(item for item in data["components"] if item["key"] == "benzene"))
@@ -202,6 +220,14 @@ def test_generated_component_rows_are_strictly_validated(field, value, message):
     data["generated_components"][0][field] = value
 
     with pytest.raises((TypeError, ValueError), match=message):
+        FusionComponentRegistry.from_data(data)
+
+
+def test_attached_locant_policy_is_strictly_validated():
+    data = deepcopy(load_json_table("fusion_components.json"))
+    data["components"][0]["attached_locant_policy"] = "guess"
+
+    with pytest.raises(ValueError, match="attached_locant_policy"):
         FusionComponentRegistry.from_data(data)
 
 

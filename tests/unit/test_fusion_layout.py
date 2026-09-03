@@ -75,13 +75,14 @@ def test_two_ortho_fused_supported_faces_receive_an_audited_layout(ring_size: in
     assert {atom for atom, _, _ in layout.atom_positions} == {atom for face in model.faces for atom in face.atom_cycle}
     assert {face for face, _, _ in layout.face_positions} == {0, 1}
     assert {face for face, _ in layout.face_shapes} == {0, 1}
-    assert layout.audit_evidence == (
+    assert set(layout.audit_evidence) >= {
         "all face boundaries represented",
         "shared edge coordinates agree",
         "unrelated edges do not cross",
         "nonadjacent face interiors do not overlap",
         "geometric and topological perimeters agree",
-    )
+        "preferred axis derived from ring-center rows",
+    }
 
 
 def test_layout_preference_is_invariant_to_input_atom_ids():
