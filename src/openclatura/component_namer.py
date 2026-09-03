@@ -25,8 +25,11 @@ from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
 from .naming_context import ComponentNamingState, NamingIntent
 from .naming_protocols import RecursiveSubgraphNamer
-from .parent_hydrides import resolve_fusion_parent_hydride
-from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
+from .parent_pipeline import (
+    build_parent_assembly_plan,
+    resolve_retained_parent,
+    resolve_systematic_fusion_parent,
+)
 from .parent_selection import select_principal_parent
 from .principal_groups import (
     add_component_principal_group,
@@ -37,7 +40,6 @@ from .principal_groups import (
 )
 from .retained_fused_production import production_retained_fused_parent
 from .retained_name_policy import retained_parent_output_name
-from .ring_parent import RingParent
 from .rules import elements as _elements
 from .special_cases import (
     single_atom_component_name,
@@ -544,14 +546,14 @@ def name_component(
     ):
         state.retained_name = None
 
-    state.parent_hydride = resolve_fusion_parent_hydride(
+    fusion_parent = resolve_systematic_fusion_parent(
         mol,
         state.parent_selection,
         retained_name=state.retained_name,
         decision_trace=decision_trace,
     )
-    if state.parent_hydride is not None and state.parent_hydride.fusion is not None:
-        state.parent_selection.ring_parent = RingParent.from_fusion_plan(state.parent_hydride.fusion)
+    if fusion_parent is not None:
+        state.parent_selection.ring_parent = fusion_parent
 
     parent_plan = build_parent_assembly_plan(
         mol,
@@ -564,7 +566,6 @@ def name_component(
         state.locant_maps,
         state.retained_name,
         state.retained_parent_metadata,
-        state.parent_hydride,
     )
     numbered_path = parent_plan.numbered_path
     locant_map = parent_plan.locant_map
@@ -582,7 +583,10 @@ def name_component(
             "atom_to_locant": {atom: get_loc(atom) for atom in numbered_path},
             "locant_map_source": parent_plan.locant_map_source.value,
             "parent_nomenclature": (
-                state.parent_hydride.kind.value if state.parent_hydride is not None else "legacy"
+                "systematic_fusion"
+                if state.parent_selection.ring_parent is not None
+                and state.parent_selection.ring_parent.is_systematic_fusion
+                else "legacy"
             ),
         },
     )
@@ -656,10 +660,12 @@ def name_component(
             "name_rewrite_history": parts.name_rewrite_history,
             "locant_elisions": parts.locant_elision_decisions,
             "parent_nomenclature": (
-                parts.parent_hydride.kind.value if parts.parent_hydride is not None else "legacy"
+                "systematic_fusion"
+                if parts.ring_parent is not None and parts.ring_parent.is_systematic_fusion
+                else "legacy"
             ),
             "parent_hydride_proof_source": (
-                parts.parent_hydride.proof_source if parts.parent_hydride is not None else ""
+                parts.ring_parent.proof_source if parts.ring_parent is not None else ""
             ),
         },
     )

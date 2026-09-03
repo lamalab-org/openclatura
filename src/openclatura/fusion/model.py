@@ -8,7 +8,7 @@ mutating assembly state or rendering partially verified names.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import TypeAlias
 
@@ -47,17 +47,6 @@ class FusionJoinKind(StrEnum):
     ORTHO = "ortho"
     ORTHO_PERI = "ortho_peri"
     HIGHER_ORDER = "higher_order"
-
-
-class ParentHydrideKind(StrEnum):
-    """Origin and nomenclature family of a selected parent hydride."""
-
-    GENERATED_CHAIN = "generated_chain"
-    GENERATED_MONOCYCLE = "generated_monocycle"
-    RETAINED = "retained"
-    SYSTEMATIC_FUSION = "systematic_fusion"
-    VON_BAEYER = "von_baeyer"
-    SPIRO = "spiro"
 
 
 _SUPERSCRIPT_DIGITS = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
@@ -603,27 +592,6 @@ class ParentBondModel:
 
 
 @dataclass(frozen=True, slots=True)
-class ParentHydrideMetadata:
-    default_indicated_h: tuple[SystemLocant, ...] = ()
-    fusion_locants: tuple[SystemLocant, ...] = ()
-    derivative_stem: str | None = None
-    mancude_double_bond_count: int = 0
-    inherent_saturated_locants: tuple[SystemLocant, ...] = ()
-    traditional_numbering: bool = False
-
-    def __post_init__(self) -> None:
-        if self.mancude_double_bond_count < 0:
-            raise ValueError("mancude double-bond count must be non-negative")
-        for label, locants in (
-            ("default indicated-H", self.default_indicated_h),
-            ("fusion", self.fusion_locants),
-            ("inherent saturated", self.inherent_saturated_locants),
-        ):
-            if len(locants) != len(set(locants)):
-                raise ValueError(f"{label} locants must be unique")
-
-
-@dataclass(frozen=True, slots=True)
 class FusionRuleDecision:
     """One explainable rule comparison or eligibility decision."""
 
@@ -688,79 +656,6 @@ class FusionParentPlan:
 
 
 TypedLocantMap: TypeAlias = tuple[tuple[int, SystemLocant], ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ParentHydridePlan:
-    """Unified handoff for generated, retained, fusion, and fallback parents."""
-
-    kind: ParentHydrideKind
-    base_name: str
-    derivative_stem: str | None = None
-    locant_maps: tuple[TypedLocantMap, ...] = ()
-    bond_model: ParentBondModel | None = None
-    metadata: ParentHydrideMetadata = field(default_factory=ParentHydrideMetadata)
-    fusion: FusionParentPlan | None = None
-    pin_status: PinStatus | str = PinStatus.UNKNOWN
-    proof_source: str = ""
-
-    def __post_init__(self) -> None:
-        _require_nonempty(self.base_name, "parent hydride base name")
-        if self.kind is ParentHydrideKind.SYSTEMATIC_FUSION:
-            if self.fusion is None or not self.fusion.audit.confirmed:
-                raise ValueError("systematic fusion parent requires a confirmed FusionParentPlan")
-            if self.base_name != self.fusion.rendered_base_name:
-                raise ValueError("parent hydride base name must equal the audited fusion rendering")
-            if self.bond_model != self.fusion.bond_model:
-                raise ValueError("systematic fusion parent must use the audited fusion bond model")
-        elif self.fusion is not None:
-            raise ValueError("only systematic fusion parents may carry a fusion plan")
-        if self.locant_maps:
-            first_atoms = _validate_bijective_map(self.locant_maps[0], "parent locant map 0")
-            first_locants = {locant for _, locant in self.locant_maps[0]}
-            for index, locant_map in enumerate(self.locant_maps[1:], start=1):
-                atoms = _validate_bijective_map(locant_map, f"parent locant map {index}")
-                if atoms != first_atoms or {locant for _, locant in locant_map} != first_locants:
-                    raise ValueError(
-                        "all parent locant maps must be complete alternatives over the same atoms and locants"
-                    )
-        if self.fusion is not None:
-            expected = self.fusion.numbering.string_input_locant_maps()
-            if self.string_locant_maps() != expected:
-                raise ValueError("parent hydride locant maps must equal the audited fusion maps")
-
-    @classmethod
-    def from_fusion(cls, plan: FusionParentPlan) -> ParentHydridePlan:
-        return cls(
-            kind=ParentHydrideKind.SYSTEMATIC_FUSION,
-            base_name=plan.rendered_base_name,
-            derivative_stem=None,
-            locant_maps=plan.numbering.input_locant_maps,
-            bond_model=plan.bond_model,
-            metadata=ParentHydrideMetadata(
-                default_indicated_h=plan.indicated_hydrogens,
-                fusion_locants=tuple(
-                    locant
-                    for _, locant in plan.numbering.abstract_atom_to_locant
-                    if locant.fusion_suffix or locant.interior_distance is not None
-                ),
-                mancude_double_bond_count=plan.bond_model.maximum_non_cumulative_double_bonds,
-            ),
-            fusion=plan,
-            pin_status=plan.pin_status,
-            proof_source="fusion_reconstruction",
-        )
-
-    def string_locant_maps(self) -> tuple[dict[int, str], ...]:
-        return tuple({atom: str(locant) for atom, locant in locant_map} for locant_map in self.locant_maps)
-
-    @property
-    def retained_name(self) -> str | None:
-        return self.base_name if self.kind is ParentHydrideKind.RETAINED else None
-
-    @property
-    def polycycle_descriptor(self) -> str | None:
-        return self.base_name if self.kind is ParentHydrideKind.VON_BAEYER else None
 
 
 @dataclass(frozen=True, slots=True)

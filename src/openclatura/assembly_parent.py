@@ -11,7 +11,6 @@ from .assembly_parts import AssemblyParts, SubstituentItem
 from .assembly_prefixes import substituent_sort_key
 from .assembly_utils import parse_locant
 from .formatting import is_complex_prefix, strip_outer_parentheses
-from .fusion.model import ParentHydrideKind
 from .nomenclature import RULES
 from .principal_suffixes import render_principal_suffix
 from .retained_specs import retained_parent_spec
@@ -455,16 +454,16 @@ def parent_stem_and_terminal(parts: AssemblyParts) -> tuple[str, str]:
     terminal_e = bonds.PARENT_TERMINAL_VOWEL
 
     inferred_ionic_parent = inferred_ionic_retained_parent(parts)
-    if parts.parent_hydride and parts.parent_hydride.kind is ParentHydrideKind.SYSTEMATIC_FUSION:
-        parent = parts.parent_hydride
-        if parts.is_substituent and parent.derivative_stem:
-            stem_str = parent.derivative_stem
+    if parts.ring_parent is not None and parts.ring_parent.is_systematic_fusion:
+        parent_name = parts.ring_parent.base_name or ""
+        if parts.is_substituent and parts.ring_parent.derivative_stem:
+            stem_str = parts.ring_parent.derivative_stem
             terminal_e = ""
-        elif parent.base_name.endswith("e"):
-            stem_str = parent.base_name[:-1]
+        elif parent_name.endswith("e"):
+            stem_str = parent_name[:-1]
             terminal_e = "e"
         else:
-            stem_str = parent.base_name
+            stem_str = parent_name
             terminal_e = ""
     elif has_ionic_retained_parent(parts):
         stem_str = RULES.charges.retained_ionic_n_parents[parts.retained_name]

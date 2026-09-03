@@ -8,7 +8,7 @@ plain paths independently.
 
 from dataclasses import dataclass
 
-from .fusion.model import FusionParentPlan
+from .fusion.model import FusionParentPlan, ParentBondModel
 from .locants import retained_locant_sort_key
 from .polycycle_topology import RingNumbering
 from .ring_renderer import is_von_baeyer_descriptor
@@ -56,6 +56,30 @@ class RingParent:
         if not self.numbering_candidates:
             return not is_von_baeyer_descriptor(self.descriptor)
         return all(numbering.audit_ok for numbering in self.numbering_candidates)
+
+    @property
+    def is_systematic_fusion(self) -> bool:
+        return self.kind == "systematic_fusion" and self.fusion_plan is not None
+
+    @property
+    def base_name(self) -> str | None:
+        if self.is_systematic_fusion:
+            return self.fusion_plan.rendered_base_name
+        return self.descriptor
+
+    @property
+    def derivative_stem(self) -> str | None:
+        return None
+
+    @property
+    def bond_model(self) -> ParentBondModel | None:
+        return self.fusion_plan.bond_model if self.is_systematic_fusion else None
+
+    @property
+    def proof_locant_maps(self) -> tuple[dict[int, str], ...]:
+        if self.is_systematic_fusion:
+            return self.fusion_plan.numbering.string_input_locant_maps()
+        return self.retained_locant_maps
 
     @classmethod
     def from_fusion_plan(cls, plan: FusionParentPlan) -> "RingParent":

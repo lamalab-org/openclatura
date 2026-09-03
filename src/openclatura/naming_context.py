@@ -5,10 +5,10 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from .assembly_parts import RetainedParentMetadata
-from .fusion.model import ParentHydridePlan
 from .locant_sources import LocantMapSource
 from .parent_selection import ParentSelection
 from .perception import PerceivedGroup
+from .ring_parent import RingParent
 
 
 class NamingMode(str, Enum):
@@ -67,7 +67,7 @@ class ParentAssemblyPlan:
     locant_map_source: LocantMapSource
     get_loc: Callable
     parts: object
-    parent_hydride: ParentHydridePlan | None = None
+    ring_parent: RingParent | None = None
 
 
 @dataclass
@@ -86,7 +86,6 @@ class ComponentNamingState:
     retained_name: str | None = None
     locant_maps: list[dict[int, str]] | None = None
     retained_parent_metadata: RetainedParentMetadata | None = None
-    parent_hydride: ParentHydridePlan | None = None
     principal_involved_atoms: set[int] = field(default_factory=set)
     base_exclude: set[int] = field(default_factory=set)
     sub_exclude: set[int] = field(default_factory=set)

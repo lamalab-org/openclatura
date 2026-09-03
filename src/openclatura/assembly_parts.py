@@ -2,9 +2,9 @@
 
 from dataclasses import dataclass, field
 
-from .fusion.model import ParentHydridePlan
 from .locant_sources import LocantMapSource
 from .name_operations import HydroOperation
+from .ring_parent import RingParent
 from .spiro_assembly import SpiroAssembly
 
 
@@ -145,7 +145,7 @@ class AssemblyParts:
     retained_substituent_name: str | None = None
     retained_absorbed_substituents: list[SubstituentItem] = field(default_factory=list)
     retained_parent_metadata: RetainedParentMetadata | None = None
-    parent_hydride: ParentHydridePlan | None = None
+    ring_parent: RingParent | None = None
     front_modifiers: list[str] = field(default_factory=list)
     front_modifier_locants: list[str | None] = field(default_factory=list)
     front_modifier_atom_ids: set[int] = field(default_factory=set)

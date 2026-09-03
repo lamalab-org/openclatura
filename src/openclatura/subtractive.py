@@ -8,7 +8,7 @@ from .molecule import Molecule
 def _implied_parent_multiple_bonds(parts: AssemblyParts) -> frozenset[int]:
     """Return graph bond ids implied by the selected parent-hydride model."""
 
-    parent = parts.parent_hydride
+    parent = parts.ring_parent
     if parent is None or parent.bond_model is None:
         return frozenset()
     actual_by_edge = {

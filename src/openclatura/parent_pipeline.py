@@ -1,20 +1,122 @@
 """Shared parent planning steps for component and subgraph naming."""
 
 from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem, RetainedParentMetadata
-from .fusion.model import ParentHydridePlan
+from .fusion.context import current_fusion_mode
+from .fusion.model import FusionConfirmed
+from .fusion.planner import PLANNER_TIER, plan_fusion_parent
+from .fusion.rules import fusion_mode_allows_planning
 from .heteroatom_subgraphs import upstream_bond_order
 from .locant_sources import LocantMapSource
 from .locants import canonical_locant_pair
-from .molecule import Molecule, bond_ids_within
+from .molecule import DecisionTrace, Molecule, TracePhase, bond_ids_within
 from .name_bindings import ensure_name_atom_binding_tokens
 from .namer_config import RETAINED_RING_ELEMENTS
 from .naming_context import NamingIntent, ParentAssemblyPlan
 from .numbering import choose_parent_numbering
 from .parent_selection import ParentSelection
+from .ring_parent import RingParent
 from .ring_renderer import is_von_baeyer_descriptor
 from .rules import retained
 from .small_ring_stereo import scoped_small_ring_stereo_features
 from .subgraph_tools import subgraph_locant_getter
+from .trace_helpers import trace_decision
+
+
+def resolve_systematic_fusion_parent(
+    mol: Molecule,
+    selection: ParentSelection,
+    *,
+    retained_name: str | None,
+    decision_trace: DecisionTrace | None = None,
+) -> RingParent | None:
+    """Resolve an audited fusion parent through the established ring handoff."""
+
+    mode = current_fusion_mode()
+    if not fusion_mode_allows_planning(mode):
+        trace_decision(
+            decision_trace,
+            TracePhase.PARENT_SELECTION,
+            "systematic fusion disabled",
+            "The request keeps the legacy ring-nomenclature path.",
+            atoms=selection.atom_set,
+            data={"fusion_mode": mode.value, "reason": "request_policy"},
+        )
+        return None
+    if retained_name is not None:
+        trace_decision(
+            decision_trace,
+            TracePhase.PARENT_SELECTION,
+            "skipped systematic fusion",
+            "A retained or independently systematic parent has precedence over fusion nomenclature.",
+            atoms=selection.atom_set,
+            data={"fusion_mode": mode.value, "reason": "retained_parent_precedence"},
+        )
+        return None
+
+    result = plan_fusion_parent(mol, selection.atom_set, mode=mode)
+    if not isinstance(result, FusionConfirmed):
+        trace_decision(
+            decision_trace,
+            TracePhase.PARENT_SELECTION,
+            "systematic fusion fallback",
+            "The bounded fusion planner did not produce an audit-confirmed parent, so legacy ring nomenclature remains active.",
+            atoms=selection.atom_set,
+            data={
+                "fusion_mode": mode.value,
+                "result": type(result).__name__,
+                "reason": result.reason,
+                "details": list(getattr(result, "details", ()) or getattr(result, "candidate_summary", ())),
+            },
+        )
+        return None
+
+    plan = result.plan
+    trace_decision(
+        decision_trace,
+        TracePhase.PARENT_SELECTION,
+        "selected audited systematic fusion parent",
+        "The graph-backed fusion plan passed component, descriptor, numbering, bond-model, and reconstruction audits.",
+        atoms=selection.atom_set,
+        data={
+            "fusion_mode": mode.value,
+            "parent_nomenclature": "systematic_fusion",
+            "base_name": plan.rendered_base_name,
+            "pin_status": str(plan.pin_status),
+            "fusion_support_tier": PLANNER_TIER,
+            "proof_source": "fusion_reconstruction",
+            "components": [
+                {
+                    "occurrence_id": match.occurrence_id,
+                    "spec_key": match.spec_key,
+                    "faces": sorted(match.covered_face_ids),
+                }
+                for match in plan.ast.component_occurrences
+            ],
+            "joins": [
+                {
+                    "attached": join.attached_occurrence,
+                    "host": join.host_occurrence,
+                    "attached_locants": [str(locant) for locant in join.attached_locants],
+                    "host_sides": [str(side) for side in join.host_sides],
+                }
+                for join in plan.ast.joins
+            ],
+            "locant_map_count": len(plan.numbering.input_locant_maps),
+            "atom_to_locant": {atom: str(locant) for atom, locant in plan.numbering.input_locant_maps[0]},
+            "orientation_score": plan.numbering.orientation_score,
+            "rule_trace": [
+                {
+                    "rule": item.rule,
+                    "criterion": item.criterion,
+                    "outcome": item.outcome,
+                    "reason": item.reason,
+                }
+                for item in plan.rule_trace
+            ],
+            "audit_checks": list(plan.audit.checks),
+        },
+    )
+    return RingParent.from_fusion_plan(plan)
 
 
 def resolve_retained_parent(
@@ -43,12 +145,12 @@ def build_parent_assembly_plan(
     locant_maps,
     retained_name: str | None,
     retained_parent_metadata: RetainedParentMetadata | None = None,
-    parent_hydride: ParentHydridePlan | None = None,
 ) -> ParentAssemblyPlan:
     """Number a selected parent and create base assembly parts."""
 
-    if parent_hydride is not None and parent_hydride.locant_maps:
-        locant_maps = list(parent_hydride.string_locant_maps())
+    ring_parent = selection.ring_parent
+    if ring_parent is not None and ring_parent.is_systematic_fusion:
+        locant_maps = list(ring_parent.proof_locant_maps)
         locant_map_source = LocantMapSource.PROOF
     else:
         locant_map_source = LocantMapSource.SUPPLIED if locant_maps else LocantMapSource.GENERATED
@@ -86,7 +188,7 @@ def build_parent_assembly_plan(
         selection,
         intent,
         retained_parent_metadata,
-        parent_hydride=parent_hydride,
+        ring_parent=ring_parent,
         locant_map_source=locant_map_source,
     )
     return ParentAssemblyPlan(
@@ -95,7 +197,7 @@ def build_parent_assembly_plan(
         locant_map_source=locant_map_source,
         get_loc=get_loc,
         parts=parts,
-        parent_hydride=parent_hydride,
+        ring_parent=ring_parent,
     )
 
 
@@ -108,24 +210,27 @@ def build_parent_parts(
     intent: NamingIntent,
     retained_parent_metadata: RetainedParentMetadata | None = None,
     *,
-    parent_hydride: ParentHydridePlan | None = None,
+    ring_parent: RingParent | None = None,
     locant_map_source: LocantMapSource = LocantMapSource.GENERATED,
 ) -> AssemblyParts:
     """Create shared parent assembly parts for a naming intent."""
 
     if retained_parent_metadata is None and retained_name is not None:
         retained_parent_metadata = retained.parent_metadata(retained_name)
-    if retained_parent_metadata is None and parent_hydride is not None:
-        metadata = parent_hydride.metadata
+    if retained_parent_metadata is None and ring_parent is not None and ring_parent.is_systematic_fusion:
+        plan = ring_parent.fusion_plan
+        assert plan is not None
+        fusion_locants = tuple(
+            locant
+            for _, locant in plan.numbering.abstract_atom_to_locant
+            if locant.fusion_suffix or locant.interior_distance is not None
+        )
         retained_parent_metadata = RetainedParentMetadata(
-            default_indicated_h=tuple(str(locant) for locant in metadata.default_indicated_h),
-            fusion_locants=tuple(str(locant) for locant in metadata.fusion_locants),
-            derivative_stem=metadata.derivative_stem,
-            indicated_hydrogen_count=len(metadata.default_indicated_h),
-            mancude_double_bonds=metadata.mancude_double_bond_count,
-            inherent_saturated_locants=tuple(
-                str(locant) for locant in metadata.inherent_saturated_locants
-            ),
+            default_indicated_h=tuple(str(locant) for locant in plan.indicated_hydrogens),
+            fusion_locants=tuple(str(locant) for locant in fusion_locants),
+            derivative_stem=ring_parent.derivative_stem,
+            indicated_hydrogen_count=len(plan.indicated_hydrogens),
+            mancude_double_bonds=plan.bond_model.maximum_non_cumulative_double_bonds,
         )
     assembly_overrides = {}
     if intent.is_substituent:
@@ -152,7 +257,7 @@ def build_parent_parts(
         polycycle_descriptor=selection.polycycle_descriptor,
         retained_name=retained_name,
         retained_parent_metadata=retained_parent_metadata,
-        parent_hydride=parent_hydride,
+        ring_parent=ring_parent,
         locant_map_source=locant_map_source,
         omit_redundant_locants=intent.omit_redundant_locants,
         parent_atom_ids=set(numbered_path),

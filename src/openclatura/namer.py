@@ -37,12 +37,14 @@ from .molecule import bond_ids_within as _bond_ids_within
 from .name_assembly import NameAssemblyResult, rewrite_history_trace_data, token_span_trace_data
 from .naming_context import NamingIntent
 from .nomenclature import RULES
-from .parent_hydrides import resolve_fusion_parent_hydride
-from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
+from .parent_pipeline import (
+    build_parent_assembly_plan,
+    resolve_retained_parent,
+    resolve_systematic_fusion_parent,
+)
 from .parent_selection import select_principal_parent
 from .perception import PerceivedGroup, perceive_groups
 from .retained_fused_production import production_retained_fused_parent
-from .ring_parent import RingParent
 from .rules import elision, multipliers, stems
 from .spiro_assembly import SpiroAssembly
 from .subgraph_tools import (
@@ -1435,14 +1437,14 @@ def name_subgraph(
         retained_name_val = retained_fused.name
         locant_maps = retained_fused.locant_maps
         retained_parent_metadata = retained_fused.metadata
-    parent_hydride = resolve_fusion_parent_hydride(
+    fusion_parent = resolve_systematic_fusion_parent(
         mol,
         parent_selection,
         retained_name=retained_name_val,
         decision_trace=decision_trace,
     )
-    if parent_hydride is not None and parent_hydride.fusion is not None:
-        parent_selection.ring_parent = RingParent.from_fusion_plan(parent_hydride.fusion)
+    if fusion_parent is not None:
+        parent_selection.ring_parent = fusion_parent
     parent_plan = build_parent_assembly_plan(
         mol,
         parent_selection,
@@ -1456,7 +1458,6 @@ def name_subgraph(
         locant_maps,
         retained_name_val,
         retained_parent_metadata,
-        parent_hydride,
     )
     numbered_path = parent_plan.numbered_path
     get_loc = parent_plan.get_loc
@@ -1474,7 +1475,12 @@ def name_subgraph(
                 "atom_to_locant": {atom_idx: get_loc(atom_idx) for atom_idx in numbered_path},
                 "retained_name": retained_name_val,
                 "locant_map_source": parent_plan.locant_map_source.value,
-                "parent_nomenclature": parent_hydride.kind.value if parent_hydride is not None else "legacy",
+                "parent_nomenclature": (
+                    "systematic_fusion"
+                    if parent_selection.ring_parent is not None
+                    and parent_selection.ring_parent.is_systematic_fusion
+                    else "legacy"
+                ),
             },
         )
     _emit_bond_stereo(mol, parts, numbered_path, get_loc, sub_exclude, upstream_atom)
@@ -1515,10 +1521,12 @@ def name_subgraph(
                 "trace_segment_count": len(trace_segments),
                 "locant_elisions": parts.locant_elision_decisions,
                 "parent_nomenclature": (
-                    parts.parent_hydride.kind.value if parts.parent_hydride is not None else "legacy"
+                    "systematic_fusion"
+                    if parts.ring_parent is not None and parts.ring_parent.is_systematic_fusion
+                    else "legacy"
                 ),
                 "parent_hydride_proof_source": (
-                    parts.parent_hydride.proof_source if parts.parent_hydride is not None else ""
+                    parts.ring_parent.proof_source if parts.ring_parent is not None else ""
                 ),
             },
         )

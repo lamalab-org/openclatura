@@ -32,8 +32,6 @@ from openclatura.fusion import (
     FusionSide,
     FusionUnsupported,
     ParentBondModel,
-    ParentHydrideKind,
-    ParentHydridePlan,
     PinStatus,
     SystemLocant,
     component_seniority_key,
@@ -41,6 +39,7 @@ from openclatura.fusion import (
     fusion_mode_allows_planning,
     pin_ring_size_gate,
 )
+from openclatura.ring_parent import RingParent
 
 
 def _match(occurrence_id: int, spec_key: str, offset: int = 0) -> FusionComponentMatch:
@@ -247,28 +246,16 @@ def test_fusion_parent_plan_requires_confirmed_audit():
         )
 
 
-def test_parent_hydride_from_fusion_preserves_proof_maps_and_is_immutable():
+def test_ring_parent_from_fusion_preserves_proof_maps_and_is_immutable():
     fusion = _confirmed_fusion_plan()
-    parent = ParentHydridePlan.from_fusion(fusion)
+    parent = RingParent.from_fusion_plan(fusion)
 
-    assert parent.kind is ParentHydrideKind.SYSTEMATIC_FUSION
-    assert parent.string_locant_maps() == ({10: "1", 11: "2", 12: "2a"},)
+    assert parent.kind == "systematic_fusion"
+    assert parent.proof_locant_maps == ({10: "1", 11: "2", 12: "2a"},)
     assert parent.proof_source == "fusion_reconstruction"
     assert FusionConfirmed(fusion).plan is fusion
     with pytest.raises(FrozenInstanceError):
-        parent.base_name = "changed"
-
-
-def test_systematic_fusion_parent_rejects_locant_maps_not_in_audit():
-    fusion = _confirmed_fusion_plan()
-    with pytest.raises(ValueError, match="audited fusion maps"):
-        ParentHydridePlan(
-            kind=ParentHydrideKind.SYSTEMATIC_FUSION,
-            base_name=fusion.rendered_base_name,
-            locant_maps=(((20, SystemLocant(1)), (21, SystemLocant(2)), (22, SystemLocant(2, "a"))),),
-            bond_model=fusion.bond_model,
-            fusion=fusion,
-        )
+        parent.descriptor = "changed"
 
 
 def test_planning_outcomes_represent_normal_abstention_without_partial_plan():

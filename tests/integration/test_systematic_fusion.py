@@ -55,7 +55,7 @@ def test_legacy_mode_does_not_invoke_fusion_planner(monkeypatch):
         calls += 1
         raise AssertionError("legacy naming must not invoke systematic fusion planning")
 
-    monkeypatch.setattr("openclatura.parent_hydrides.plan_fusion_parent", unexpected_planner)
+    monkeypatch.setattr("openclatura.parent_pipeline.plan_fusion_parent", unexpected_planner)
 
     result = name("O1C2=C(C=C1)C=CS2", fusion_mode=FusionMode.LEGACY)
 
