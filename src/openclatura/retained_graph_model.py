@@ -20,23 +20,10 @@ class RetainedGraphAtomTemplate:
     default_h: bool = False
     saturated: bool = False
     interior: bool = False
-    pi_capacity: int = 1
-    forced_single: bool = False
-    indicated_h_candidate: bool = False
 
     def __post_init__(self) -> None:
         if not self.locant or not self.symbol:
             raise ValueError("template atom locant and symbol must not be empty")
-        if self.pi_capacity < 0:
-            raise ValueError("pi_capacity must be non-negative")
-        if self.forced_single and self.pi_capacity:
-            raise ValueError("a forced-single atom cannot have positive pi_capacity")
-
-    @property
-    def formal_charge(self) -> int:
-        """Compatibility spelling used by graph reconstruction proofs."""
-
-        return self.charge
 
 
 @dataclass(frozen=True, slots=True)

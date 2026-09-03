@@ -1217,22 +1217,15 @@ def _is_assignment_compatible(
 
 
 def _atom_template(data: dict[str, Any]) -> RetainedGraphAtomTemplate:
-    symbol = str(data.get("symbol", "C"))
-    element = element_rules.get(symbol)
-    forced_single = bool(data.get("forced_single", element.mancude_forced_single))
-    pi_capacity = int(data.get("pi_capacity", element.mancude_pi_capacity))
     return RetainedGraphAtomTemplate(
         locant=str(data["locant"]),
-        symbol=symbol,
+        symbol=str(data.get("symbol", "C")),
         charge=int(data.get("charge", 0)),
         aromatic=bool(data.get("aromatic", True)),
         fusion=bool(data.get("fusion", False)),
         default_h=bool(data.get("default_h", False)),
         saturated=bool(data.get("saturated", False)),
         interior=bool(data.get("interior", False)),
-        pi_capacity=0 if bool(data.get("saturated", False)) else pi_capacity,
-        forced_single=bool(data.get("saturated", False)) or forced_single,
-        indicated_h_candidate=bool(data.get("indicated_h_candidate", data.get("default_h", False))),
     )
 
 
