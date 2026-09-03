@@ -17,6 +17,8 @@ from itertools import product
 from typing import Protocol
 
 from ..molecule import Molecule
+from ..rules import multipliers
+from .config import fusion_nomenclature_config
 from .cover import ComponentScope, FusionInterface, audit_component_cover, component_scope
 from .model import (
     ComponentLocant,
@@ -32,10 +34,11 @@ from .model import (
 )
 from .rules import component_seniority_key
 
-MAX_COMPONENT_OCCURRENCES = 8
-MAX_COMPONENT_SELECTIONS = 256
-MAX_COMPONENT_SELECTION_STATES = 4096
-MAX_LOCANT_MAP_COMBINATIONS = 4096
+_LIMITS = fusion_nomenclature_config().search
+MAX_COMPONENT_OCCURRENCES = _LIMITS.maximum_component_occurrences
+MAX_COMPONENT_SELECTIONS = _LIMITS.maximum_component_selections
+MAX_COMPONENT_SELECTION_STATES = _LIMITS.component_selection_states
+MAX_LOCANT_MAP_COMBINATIONS = _LIMITS.locant_map_combinations
 
 
 class FusionDescriptorError(ValueError):
@@ -606,7 +609,12 @@ def _alphabetic_index(index: int) -> str:
 
 
 def _simple_multiplier(count: int) -> str | None:
-    return {2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}.get(count)
+    if count < 2:
+        return None
+    try:
+        return multipliers.basic(count)
+    except ValueError:
+        return None
 
 
 def _plan_kind(component_count: int, groups: tuple[FusionMultiplicityGroup, ...]) -> str:

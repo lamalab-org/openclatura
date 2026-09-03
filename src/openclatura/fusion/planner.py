@@ -7,6 +7,7 @@ from collections.abc import Iterable
 
 from ..molecule import Molecule
 from .audit import audit_fusion_plan
+from .config import fusion_nomenclature_config
 from .descriptor import FusionDescriptorError, build_fusion_name_ast, render_fusion_name
 from .faces import FaceSearchBudgetExceeded, select_bounded_face_model
 from .layout import LayoutSearchBudgetExceeded, preferred_intrinsic_layouts
@@ -32,7 +33,7 @@ from .numbering import completed_system_numbering_selection, parent_bond_model
 from .registry import fusion_component_registry
 from .rules import explain_component_comparison, fusion_mode_allows_planning, pin_ring_size_gate
 
-PLANNER_TIER = "ortho-tree-v1"
+PLANNER_TIER = fusion_nomenclature_config().rules.planner_tier
 
 
 def plan_fusion_parent(
@@ -168,12 +169,15 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
 
 
 def _standard_valence_parent(mol: Molecule, atoms: frozenset[int]) -> bool:
-    allowed = {"B", "C", "N", "O", "P", "S", "Se", "Si", "Te"}
-    return all(
-        mol.atoms[atom].symbol in allowed
-        and sum((mol.get_bond(atom, neighbor).order for neighbor in mol.get_neighbors(atom)), 0) <= 4
-        for atom in atoms
-    )
+    for atom_id in atoms:
+        atom = mol.atoms[atom_id]
+        if not atom.element.fusion_supported:
+            return False
+        bonding_number = sum(mol.get_bond(atom_id, neighbor).order for neighbor in mol.get_neighbors(atom_id))
+        bonding_number += atom.total_h_count or atom.explicit_h_count
+        if bonding_number > atom.element.standard_valence:
+            return False
+    return True
 
 
 def _typed_face_model(mol: Molecule, bounded) -> FaceModel:

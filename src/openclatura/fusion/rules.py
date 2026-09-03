@@ -7,63 +7,32 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
+from ..rules import elements
+from .config import fusion_nomenclature_config
 from .model import FusionComponentMatch, FusionComponentSpec, FusionMode, FusionRuleDecision
 
 # P-25.3.2.4 gives these two criteria independent semantic identities.  Keep
 # separate constants even while the currently supported element sequence is
 # identical, so extending one rule can never silently alter the other.
-EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE = (
-    "N",
-    "F",
-    "Cl",
-    "Br",
-    "I",
-    "O",
-    "S",
-    "Se",
-    "Te",
-    "P",
-    "As",
-    "Sb",
-    "Bi",
-    "Si",
-    "Ge",
-    "Sn",
-    "Pb",
-    "B",
-    "Al",
-    "Ga",
-    "In",
-    "Tl",
+EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE = tuple(
+    item.symbol
+    for item in sorted(
+        (item for item in elements.ELEMENTS.values() if item.fusion_special_priority is not None),
+        key=lambda item: item.fusion_special_priority,
+    )
 )
 
-GENERAL_HETEROATOM_COUNT_PRECEDENCE = (
-    "N",
-    "F",
-    "Cl",
-    "Br",
-    "I",
-    "O",
-    "S",
-    "Se",
-    "Te",
-    "P",
-    "As",
-    "Sb",
-    "Bi",
-    "Si",
-    "Ge",
-    "Sn",
-    "Pb",
-    "B",
-    "Al",
-    "Ga",
-    "In",
-    "Tl",
+GENERAL_HETEROATOM_COUNT_PRECEDENCE = tuple(
+    item.symbol
+    for item in sorted(
+        (item for item in elements.ELEMENTS.values() if item.fusion_general_priority is not None),
+        key=lambda item: item.fusion_general_priority,
+    )
 )
 
-PIN_MINIMUM_LARGE_RING_SIZE = 5
-PIN_MINIMUM_LARGE_RING_COUNT = 2
+_CONFIG = fusion_nomenclature_config()
+PIN_MINIMUM_LARGE_RING_SIZE = _CONFIG.rules.pin_minimum_ring_size
+PIN_MINIMUM_LARGE_RING_COUNT = _CONFIG.rules.pin_minimum_ring_count
 
 
 class FusionComponentLookup(Protocol):

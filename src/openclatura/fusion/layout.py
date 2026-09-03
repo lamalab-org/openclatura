@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from fractions import Fraction
 from math import gcd, lcm
 
+from .config import RingShapeSpec, fusion_nomenclature_config
 from .model import Face, FaceModel, FusedLayout
 
 Point = tuple[Fraction, Fraction]
@@ -28,30 +29,6 @@ class LayoutSearchBudgetExceeded(RuntimeError):
         self.resource = resource
 
 
-@dataclass(frozen=True, slots=True)
-class RingShapeTemplate:
-    """One exact-coordinate standard shape for an anchored ring face."""
-
-    ring_size: int
-    shape_id: str
-    vertices: tuple[tuple[int, int], ...]
-    edge_directions: tuple[int, ...]
-    horizontal_axis_class: str
-    distortion_rank: int = 0
-
-    def __post_init__(self) -> None:
-        if not 3 <= self.ring_size <= 8:
-            raise ValueError("intrinsic ring shapes support sizes 3 through 8")
-        if len(self.vertices) != self.ring_size or len(set(self.vertices)) != self.ring_size:
-            raise ValueError("ring shape vertices must uniquely cover the declared ring size")
-        if len(self.edge_directions) != self.ring_size:
-            raise ValueError("ring shape needs one direction class per edge")
-        if self.vertices[:2] != ((0, 0), (4, 0)):
-            raise ValueError("ring shapes must use the canonical four-unit entrance edge")
-        if self.distortion_rank < 0:
-            raise ValueError("shape distortion rank must be non-negative")
-
-
 @dataclass(slots=True)
 class _Budget:
     limit: int
@@ -63,48 +40,19 @@ class _Budget:
             raise LayoutSearchBudgetExceeded(self.limit)
 
 
-# Coordinates are deliberately schematic quarter-grid shapes. Odd rings have
-# alternative entrance/exit profiles because one fixed polygon cannot express
-# every consistent angular annelation.
-_SHAPES = (
-    RingShapeTemplate(3, "triangle", ((0, 0), (4, 0), (2, 4)), (0, 1, 2), "vertex"),
-    RingShapeTemplate(4, "square", ((0, 0), (4, 0), (4, 4), (0, 4)), (0, 1, 2, 3), "edge"),
-    RingShapeTemplate(5, "pentagon-symmetric", ((0, 0), (4, 0), (6, 3), (3, 6), (0, 4)), (0, 1, 2, 3, 4), "vertex"),
-    RingShapeTemplate(5, "pentagon-shoulder", ((0, 0), (4, 0), (7, 4), (4, 7), (0, 4)), (0, 1, 2, 3, 4), "edge", 1),
-    RingShapeTemplate(6, "hexagon", ((0, 0), (4, 0), (6, 3), (4, 6), (0, 6), (-2, 3)), (0, 1, 2, 3, 4, 5), "edge"),
-    RingShapeTemplate(
-        7,
-        "heptagon-symmetric",
-        ((0, 0), (4, 0), (7, 2), (8, 5), (5, 8), (1, 8), (-2, 4)),
-        (0, 1, 2, 3, 4, 5, 6),
-        "vertex",
-    ),
-    RingShapeTemplate(
-        7,
-        "heptagon-shoulder",
-        ((0, 0), (4, 0), (8, 3), (8, 7), (4, 9), (0, 7), (-2, 3)),
-        (0, 1, 2, 3, 4, 5, 6),
-        "edge",
-        1,
-    ),
-    RingShapeTemplate(
-        8,
-        "octagon",
-        ((0, 0), (4, 0), (7, 2), (8, 5), (7, 8), (4, 10), (0, 10), (-2, 5)),
-        (0, 1, 2, 3, 4, 5, 6, 7),
-        "edge",
-    ),
-)
-
-RING_SHAPE_TEMPLATES: tuple[RingShapeTemplate, ...] = _SHAPES
-_SHAPES_BY_SIZE = {size: tuple(shape for shape in _SHAPES if shape.ring_size == size) for size in range(3, 9)}
+_CONFIG = fusion_nomenclature_config()
+RING_SHAPE_TEMPLATES: tuple[RingShapeSpec, ...] = _CONFIG.ring_shapes
+_SHAPES_BY_SIZE = {
+    size: tuple(shape for shape in RING_SHAPE_TEMPLATES if shape.ring_size == size)
+    for size in range(_CONFIG.search.minimum_ring_size, _CONFIG.search.maximum_ring_size + 1)
+}
 
 
 def intrinsic_fused_layouts(
     model: FaceModel,
     *,
-    search_budget: int = 25_000,
-    max_layouts: int = 4_096,
+    search_budget: int = _CONFIG.search.layout_states,
+    max_layouts: int = _CONFIG.search.maximum_layouts,
 ) -> tuple[FusedLayout, ...]:
     """Enumerate audited intrinsic layouts in nomenclatural preference order.
 
@@ -148,8 +96,8 @@ def intrinsic_fused_layouts(
 def preferred_intrinsic_layout(
     model: FaceModel,
     *,
-    search_budget: int = 25_000,
-    max_layouts: int = 4_096,
+    search_budget: int = _CONFIG.search.layout_states,
+    max_layouts: int = _CONFIG.search.maximum_layouts,
 ) -> FusedLayout | None:
     """Return the preferred audited layout, or ``None`` to abstain."""
 
@@ -164,8 +112,8 @@ def preferred_intrinsic_layout(
 def preferred_intrinsic_layouts(
     model: FaceModel,
     *,
-    search_budget: int = 25_000,
-    max_layouts: int = 4_096,
+    search_budget: int = _CONFIG.search.layout_states,
+    max_layouts: int = _CONFIG.search.maximum_layouts,
 ) -> tuple[FusedLayout, ...]:
     """Return every layout tied on the intrinsic orientation criteria.
 
@@ -189,7 +137,7 @@ def _search_layouts(
     model: FaceModel,
     face_by_id: dict[int, Face],
     placed_orders: dict[int, tuple[int, ...]],
-    placed_shapes: dict[int, RingShapeTemplate],
+    placed_shapes: dict[int, RingShapeSpec],
     atom_positions: dict[int, Point],
     budget: _Budget,
     completed: dict[tuple, FusedLayout],
@@ -308,7 +256,7 @@ def _orders_starting_with_edge(cycle: tuple[int, ...], endpoints: Edge) -> tuple
     return tuple(variants)
 
 
-def _place_shape(shape: RingShapeTemplate, order: tuple[int, ...], start: Point, end: Point) -> dict[int, Point]:
+def _place_shape(shape: RingShapeSpec, order: tuple[int, ...], start: Point, end: Point) -> dict[int, Point]:
     dx, dy = end[0] - start[0], end[1] - start[1]
     return {
         atom: (
@@ -399,7 +347,7 @@ def _audit_layout(
 
 def _materialize_layout(
     placed_orders: dict[int, tuple[int, ...]],
-    shapes: dict[int, RingShapeTemplate],
+    shapes: dict[int, RingShapeSpec],
     positions: dict[int, Point],
 ) -> FusedLayout:
     denominators = [coordinate.denominator for point in positions.values() for coordinate in point]
@@ -431,7 +379,7 @@ def _materialize_layout(
     )
 
 
-def _orientation_score(centers: tuple[tuple[int, int], ...], shapes: dict[int, RingShapeTemplate]) -> tuple[int, ...]:
+def _orientation_score(centers: tuple[tuple[int, int], ...], shapes: dict[int, RingShapeSpec]) -> tuple[int, ...]:
     xs = [x for x, _ in centers]
     ys = [y for _, y in centers]
     axis_x = Fraction(min(xs) + max(xs), 2)

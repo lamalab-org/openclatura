@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import TypeAlias
 
+from ..locants import SystemLocant
+
 
 class FusionMode(StrEnum):
     """Policy controlling whether systematic fusion planning may be used."""
@@ -47,9 +49,6 @@ class FusionJoinKind(StrEnum):
     ORTHO = "ortho"
     ORTHO_PERI = "ortho_peri"
     HIGHER_ORDER = "higher_order"
-
-
-_SUPERSCRIPT_DIGITS = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
 
 
 def _require_nonempty(value: str, label: str) -> None:
@@ -103,40 +102,6 @@ class FusionSide:
     def render(self, *, unicode_primes: bool = False) -> str:
         prime = "′" if unicode_primes else "'"
         return f"{self.letter}{prime * self.prime_depth}"
-
-    def __str__(self) -> str:
-        return self.render()
-
-
-@dataclass(frozen=True, slots=True, order=True)
-class SystemLocant:
-    """A locant in the completed fused parent system."""
-
-    base: int
-    fusion_suffix: str = ""
-    interior_distance: int | None = None
-
-    def __post_init__(self) -> None:
-        if self.base <= 0:
-            raise ValueError("system locant base must be positive")
-        if self.fusion_suffix and (
-            not self.fusion_suffix.isascii()
-            or not self.fusion_suffix.isalpha()
-            or self.fusion_suffix != self.fusion_suffix.lower()
-        ):
-            raise ValueError("fusion suffix must be a lowercase ASCII letter sequence")
-        if self.interior_distance is not None and self.interior_distance <= 0:
-            raise ValueError("interior distance must be positive")
-        if self.fusion_suffix and self.interior_distance is not None:
-            raise ValueError("fusion suffix and interior distance are mutually exclusive")
-
-    def render(self, *, unicode_superscript: bool = True) -> str:
-        text = f"{self.base}{self.fusion_suffix}"
-        if self.interior_distance is None:
-            return text
-        distance = str(self.interior_distance)
-        rendered = distance.translate(_SUPERSCRIPT_DIGITS) if unicode_superscript else f"^{distance}"
-        return f"{text}{rendered}"
 
     def __str__(self) -> str:
         return self.render()

@@ -95,6 +95,34 @@ def test_hw_priorities_are_unique_and_ordered_by_seniority():
     assert len(priorities) == len(set(priorities))
 
 
+def test_fusion_priorities_and_mancude_roles_share_typed_element_data():
+    from openclatura.fusion.rules import (
+        EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE,
+        GENERAL_HETEROATOM_COUNT_PRECEDENCE,
+    )
+
+    special = sorted(
+        (element for element in elements.ELEMENTS.values() if element.fusion_special_priority is not None),
+        key=lambda element: element.fusion_special_priority,
+    )
+    general = sorted(
+        (element for element in elements.ELEMENTS.values() if element.fusion_general_priority is not None),
+        key=lambda element: element.fusion_general_priority,
+    )
+    assert tuple(element.symbol for element in special) == EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE
+    assert tuple(element.symbol for element in general) == GENERAL_HETEROATOM_COUNT_PRECEDENCE
+    assert len({element.fusion_special_priority for element in special}) == len(special)
+    assert len({element.fusion_general_priority for element in general}) == len(general)
+    assert {
+        element.symbol for element in elements.ELEMENTS.values() if element.mancude_forced_single
+    } >= {"O", "S", "Se", "Te"}
+    assert all(
+        element.mancude_pi_capacity == 0
+        for element in elements.ELEMENTS.values()
+        if element.mancude_forced_single
+    )
+
+
 def test_audit_parsers_share_the_canonical_tables():
     # The audit reconstructs names independently of the namer's *bindings*, but it
     # must speak the same vocabulary — these are the shared spelling tables, not

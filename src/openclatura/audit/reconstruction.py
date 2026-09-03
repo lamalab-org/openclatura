@@ -698,7 +698,9 @@ def _open_mancude_template(
     return template_idxs, saturated_idxs
 
 
-_MANCUDE_SINGLE_BONDED = frozenset({8, 16, 34, 52})
+_MANCUDE_SINGLE_BONDED = frozenset(
+    element.atomic_number for element in _elements.ELEMENTS.values() if element.mancude_forced_single
+)
 
 
 def _implied_ketone_saturation(rw: Chem.RWMol, locants: dict[str, int], parts) -> set[int]:

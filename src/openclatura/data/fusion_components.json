@@ -1,6 +1,37 @@
 {
   "schema_version": 1,
   "registry_version": "2026.1",
+  "graph_source": "retained_graph_templates",
+  "rules": {
+    "planner_tier": "ortho-tree-v1",
+    "pin_gate": {
+      "minimum_ring_size": 5,
+      "minimum_ring_count": 2
+    }
+  },
+  "search_limits": {
+    "minimum_ring_size": 3,
+    "maximum_ring_size": 8,
+    "cycle_states": 100000,
+    "face_model_states": 50000,
+    "layout_states": 25000,
+    "maximum_layouts": 4096,
+    "maximum_component_occurrences": 8,
+    "maximum_component_selections": 256,
+    "component_selection_states": 4096,
+    "locant_map_combinations": 4096,
+    "mancude_states": 100000
+  },
+  "ring_shapes": [
+    {"ring_size": 3, "id": "triangle", "vertices": [[0, 0], [4, 0], [2, 4]], "edge_directions": [0, 1, 2], "horizontal_axis_class": "vertex"},
+    {"ring_size": 4, "id": "square", "vertices": [[0, 0], [4, 0], [4, 4], [0, 4]], "edge_directions": [0, 1, 2, 3], "horizontal_axis_class": "edge"},
+    {"ring_size": 5, "id": "pentagon-symmetric", "vertices": [[0, 0], [4, 0], [6, 3], [3, 6], [0, 4]], "edge_directions": [0, 1, 2, 3, 4], "horizontal_axis_class": "vertex"},
+    {"ring_size": 5, "id": "pentagon-shoulder", "vertices": [[0, 0], [4, 0], [7, 4], [4, 7], [0, 4]], "edge_directions": [0, 1, 2, 3, 4], "horizontal_axis_class": "edge", "distortion_rank": 1},
+    {"ring_size": 6, "id": "hexagon", "vertices": [[0, 0], [4, 0], [6, 3], [4, 6], [0, 6], [-2, 3]], "edge_directions": [0, 1, 2, 3, 4, 5], "horizontal_axis_class": "edge"},
+    {"ring_size": 7, "id": "heptagon-symmetric", "vertices": [[0, 0], [4, 0], [7, 2], [8, 5], [5, 8], [1, 8], [-2, 4]], "edge_directions": [0, 1, 2, 3, 4, 5, 6], "horizontal_axis_class": "vertex"},
+    {"ring_size": 7, "id": "heptagon-shoulder", "vertices": [[0, 0], [4, 0], [8, 3], [8, 7], [4, 9], [0, 7], [-2, 3]], "edge_directions": [0, 1, 2, 3, 4, 5, 6], "horizontal_axis_class": "edge", "distortion_rank": 1},
+    {"ring_size": 8, "id": "octagon", "vertices": [[0, 0], [4, 0], [7, 2], [8, 5], [7, 8], [4, 10], [0, 10], [-2, 5]], "edge_directions": [0, 1, 2, 3, 4, 5, 6, 7], "horizontal_axis_class": "edge"}
+  ],
   "components": [
     {"key": "benzene", "template_names": ["benzene"], "parent_name": "benzene", "attached_prefix": "benzo", "omit_attached_locants": true, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "naphthalene", "template_names": ["naphthalene"], "parent_name": "naphthalene", "attached_prefix": "naphtho", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},

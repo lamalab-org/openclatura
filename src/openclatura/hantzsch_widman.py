@@ -109,7 +109,9 @@ def hw_name(size: int, saturated: bool, hetero: list[tuple[int, str]]) -> str | 
 
 # Divalent at their normal valence, so they take no ring double bond and cut the
 # mancude system into segments: 1,2,3,5-oxathiadiazole has one, not two.
-FIXED_SATURATED = ("O", "S", "Se", "Te")
+FIXED_SATURATED = tuple(
+    element.symbol for element in _elements.ELEMENTS.values() if element.mancude_forced_single
+)
 
 
 def mancude_bond_orders(symbols: list[str]) -> list[int]:

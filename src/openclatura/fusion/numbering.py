@@ -9,11 +9,12 @@ from fractions import Fraction
 from functools import cmp_to_key
 
 from ..molecule import Molecule
+from .config import fusion_nomenclature_config
 from .faces import BoundedFaceModel, normalize_edge
 from .model import BondAssignment, FaceModel, FusedLayout, ParentBondModel, RejectedNumbering, SystemLocant
 from .rules import GENERAL_HETEROATOM_COUNT_PRECEDENCE
 
-_FIXED_SINGLE_ELEMENTS = frozenset({"O", "S", "Se", "Te"})
+_CONFIG = fusion_nomenclature_config()
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,7 +277,12 @@ def _numbering_key(numbering: CompletedNumbering) -> tuple[tuple[int, str], ...]
     return tuple(sorted((atom, str(locant)) for atom, locant in numbering.atom_to_locant))
 
 
-def parent_bond_model(mol: Molecule, atom_ids: Iterable[int], *, search_budget: int = 100_000) -> ParentBondModel:
+def parent_bond_model(
+    mol: Molecule,
+    atom_ids: Iterable[int],
+    *,
+    search_budget: int = _CONFIG.search.mancude_states,
+) -> ParentBondModel:
     """Build all maximum non-cumulative Kekule assignments for a parent graph."""
 
     atoms = frozenset(atom_ids)
@@ -286,7 +292,8 @@ def parent_bond_model(mol: Molecule, atom_ids: Iterable[int], *, search_budget: 
     required = frozenset(
         edge
         for edge in edges
-        if mol.atoms[edge[0]].symbol in _FIXED_SINGLE_ELEMENTS or mol.atoms[edge[1]].symbol in _FIXED_SINGLE_ELEMENTS
+        if mol.atoms[edge[0]].element.mancude_forced_single
+        or mol.atoms[edge[1]].element.mancude_forced_single
     )
     eligible = frozenset(edges) - required
     matchings = _maximum_matchings(eligible, search_budget=search_budget)

@@ -18,6 +18,7 @@ from .molecule import Molecule
 from .naming_data import load_json_table
 from .nomenclature import RULES
 from .retained_name_policy import retained_parent_name_policy, retained_parent_output_name
+from .rules import elements as element_rules
 from .rules import multipliers
 
 ALLOWED_BOND_CLASSES = {"single", "double", "aromatic", "mancude", "fusion"}
@@ -26,7 +27,9 @@ ALLOWED_CHARGE_POLICIES = {"exact", "charge_layer"}
 RETAINED_GRAPH_FAMILIES = ("fused", "macrocycle")
 
 # Single-bonded in every mancude parent, so never indicated-hydrogen capacity.
-FIXED_SATURATED_RING_ELEMENTS = frozenset({"O", "S", "Se", "Te"})
+FIXED_SATURATED_RING_ELEMENTS = frozenset(
+    element.symbol for element in element_rules.ELEMENTS.values() if element.mancude_forced_single
+)
 
 
 @lru_cache(maxsize=1)

@@ -14,6 +14,9 @@ from dataclasses import dataclass
 from itertools import combinations
 
 from ..molecule import Molecule
+from .config import fusion_nomenclature_config
+
+_CONFIG = fusion_nomenclature_config()
 
 Edge = tuple[int, int]
 
@@ -119,9 +122,9 @@ def enumerate_chordless_cycles(
     mol: Molecule,
     atom_ids: Iterable[int] | None = None,
     *,
-    min_size: int = 3,
-    max_size: int = 8,
-    search_budget: int = 100_000,
+    min_size: int = _CONFIG.search.minimum_ring_size,
+    max_size: int = _CONFIG.search.maximum_ring_size,
+    search_budget: int = _CONFIG.search.cycle_states,
 ) -> tuple[GraphCycle, ...]:
     """Enumerate chordless cycles deterministically within a hard budget.
 
@@ -130,8 +133,11 @@ def enumerate_chordless_cycles(
     exposing a partial cycle set that could be mistaken for a proof.
     """
 
-    if not 3 <= min_size <= max_size <= 8:
-        raise ValueError("Cycle sizes must satisfy 3 <= min_size <= max_size <= 8")
+    if not _CONFIG.search.minimum_ring_size <= min_size <= max_size <= _CONFIG.search.maximum_ring_size:
+        raise ValueError(
+            f"cycle sizes must satisfy {_CONFIG.search.minimum_ring_size} <= min_size <= "
+            f"max_size <= {_CONFIG.search.maximum_ring_size}"
+        )
     if search_budget < 1:
         raise ValueError("search_budget must be positive")
     atoms = frozenset(mol.atoms if atom_ids is None else atom_ids)
@@ -214,10 +220,10 @@ def select_bounded_face_model(
     mol: Molecule,
     atom_ids: Iterable[int],
     *,
-    min_ring_size: int = 3,
-    max_ring_size: int = 8,
-    cycle_search_budget: int = 100_000,
-    model_search_budget: int = 50_000,
+    min_ring_size: int = _CONFIG.search.minimum_ring_size,
+    max_ring_size: int = _CONFIG.search.maximum_ring_size,
+    cycle_search_budget: int = _CONFIG.search.cycle_states,
+    model_search_budget: int = _CONFIG.search.face_model_states,
 ) -> BoundedFaceModel | None:
     """Return the first deterministic face model satisfying every audit.
 
