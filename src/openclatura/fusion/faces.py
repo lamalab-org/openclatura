@@ -14,7 +14,14 @@ from dataclasses import dataclass
 from itertools import combinations
 
 from ..molecule import Molecule
-from ..polycycle_topology import canonical_cycle, cycle_edges, graph_cycle_rank, normalize_edge
+from ..polycycle_topology import (
+    adjacency_from_edges,
+    canonical_cycle,
+    connected_components,
+    cycle_edges,
+    graph_cycle_rank,
+    normalize_edge,
+)
 from .config import fusion_nomenclature_config
 
 _CONFIG = fusion_nomenclature_config()
@@ -301,41 +308,20 @@ def _is_chordless_for_edges(cycle: GraphCycle, graph_edges: frozenset[Edge]) -> 
 
 
 def _adjacency(atoms: Iterable[int], edges: Iterable[Edge]) -> dict[int, tuple[int, ...]]:
-    neighbors: dict[int, list[int]] = {atom: [] for atom in atoms}
-    for left, right in edges:
-        neighbors[left].append(right)
-        neighbors[right].append(left)
-    return {atom: tuple(sorted(values)) for atom, values in neighbors.items()}
+    atom_set = frozenset(atoms)
+    edge_set = frozenset(edges)
+    return {
+        atom: tuple(sorted(neighbors))
+        for atom, neighbors in adjacency_from_edges(atom_set, edge_set).items()
+    }
 
 
 def _is_connected(atoms: frozenset[int], edges: frozenset[Edge]) -> bool:
-    if not atoms:
-        return False
-    adjacency = _adjacency(atoms, edges)
-    seen = _reachable(min(atoms), adjacency)
-    return seen == set(atoms)
+    return bool(atoms) and len(connected_components(set(atoms), edges)) == 1
 
 
 def _component_count(atoms: frozenset[int], edges: frozenset[Edge]) -> int:
-    adjacency = _adjacency(atoms, edges)
-    remaining = set(atoms)
-    count = 0
-    while remaining:
-        count += 1
-        remaining -= _reachable(min(remaining), adjacency)
-    return count
-
-
-def _reachable(start: int, adjacency: dict[int, tuple[int, ...]]) -> set[int]:
-    stack = [start]
-    seen: set[int] = set()
-    while stack:
-        atom = stack.pop()
-        if atom in seen:
-            continue
-        seen.add(atom)
-        stack.extend(neighbor for neighbor in adjacency[atom] if neighbor not in seen)
-    return seen
+    return len(connected_components(set(atoms), edges))
 
 
 def _dual_adjacency(faces: tuple[GraphCycle, ...]) -> dict[int, tuple[int, ...]]:

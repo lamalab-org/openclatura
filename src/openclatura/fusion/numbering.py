@@ -9,8 +9,9 @@ from fractions import Fraction
 from functools import cmp_to_key
 
 from ..molecule import Molecule
+from ..polycycle_topology import normalize_edge
 from .config import fusion_nomenclature_config
-from .faces import BoundedFaceModel, normalize_edge
+from .faces import BoundedFaceModel
 from .model import BondAssignment, FaceModel, FusedLayout, ParentBondModel, RejectedNumbering, SystemLocant
 from .rules import GENERAL_HETEROATOM_COUNT_PRECEDENCE
 

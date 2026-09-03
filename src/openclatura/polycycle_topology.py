@@ -5,6 +5,7 @@ except for descriptor/audit data that can be proven from the graph.
 """
 
 import re
+from collections import deque
 from dataclasses import dataclass
 
 from .molecule import Molecule, edges_within_atoms
@@ -699,18 +700,19 @@ def simple_cycles_from_edges(atoms: frozenset[int], edges: set[tuple[int, int]])
 
 
 def connected_components(atoms: set[int], edges: frozenset[tuple[int, int]]) -> list[set[int]]:
+    adjacency = adjacency_from_edges(atoms, edges)
     components = []
     seen = set()
     for atom in sorted(atoms):
         if atom in seen:
             continue
-        queue = [atom]
+        queue = deque((atom,))
         seen.add(atom)
         component = set()
         while queue:
-            current = queue.pop(0)
+            current = queue.popleft()
             component.add(current)
-            for neighbor in adjacent_atoms(current, edges):
+            for neighbor in adjacency[current]:
                 if neighbor in atoms and neighbor not in seen:
                     seen.add(neighbor)
                     queue.append(neighbor)
@@ -789,6 +791,8 @@ def adjacency_from_edges(
 ) -> dict[int, set[int]]:
     adjacency: dict[int, set[int]] = {node: set() for node in nodes}
     for first, second in edges:
+        if first not in adjacency or second not in adjacency:
+            continue
         adjacency[first].add(second)
         adjacency[second].add(first)
     return adjacency
