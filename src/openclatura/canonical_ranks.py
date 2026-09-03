@@ -24,34 +24,40 @@ two differ do not arise in molecular graphs of nomenclatural interest.
 from .molecule import Molecule
 
 
-def _initial_invariant(mol: Molecule, idx: int) -> tuple:
+def _initial_invariant(mol: Molecule, idx: int, atom_ids: frozenset[int]) -> tuple:
     """Local properties of one atom, all independent of how it was indexed."""
 
     atom = mol.atoms[idx]
-    bond_orders = sorted(_order(mol, idx, neighbour) for neighbour in mol.get_neighbors(idx))
+    neighbors = tuple(neighbor for neighbor in mol.get_neighbors(idx) if neighbor in atom_ids)
+    bond_orders = sorted(_order(mol, idx, neighbor) for neighbor in neighbors)
     return (
         atom.symbol,
         atom.charge,
         atom.isotope or 0,
-        mol.degree(idx),
+        len(neighbors),
         atom.total_h_count,
         bool(atom.is_aromatic),
         tuple(bond_orders),
     )
 
 
-def canonical_ranks(mol: Molecule) -> dict[int, int]:
+def canonical_ranks(mol: Molecule, atom_ids=None) -> dict[int, int]:
     """Map each atom index to its refinement-equivalence rank.
 
     Equal ranks mean the atoms are interchangeable; the ordering between
     different ranks is deterministic and depends only on the structure.
     """
 
-    cached = mol._canonical_rank_cache
+    atoms = frozenset(mol.atoms if atom_ids is None else atom_ids)
+    unknown = atoms - mol.atoms.keys()
+    if unknown:
+        raise KeyError(f"Unknown atom ids: {sorted(unknown)}")
+    whole_graph = len(atoms) == len(mol.atoms)
+    cached = mol._canonical_rank_cache if whole_graph else None
     if cached is not None:
         return cached
 
-    invariants = {idx: _initial_invariant(mol, idx) for idx in mol.atoms}
+    invariants = {idx: _initial_invariant(mol, idx, atoms) for idx in atoms}
     ranks = _ranks_from_invariants(invariants)
 
     # Refine until the partition stops getting finer.  Each round replaces an
@@ -59,11 +65,13 @@ def canonical_ranks(mol: Molecule) -> dict[int, int]:
     # so information spreads one bond further per round; the partition can only
     # get finer, and it is bounded by the atom count.
     previous_classes = len(set(ranks.values()))
-    for _ in range(len(mol.atoms)):
+    for _ in range(len(atoms)):
         refined = {}
-        for idx in mol.atoms:
+        for idx in atoms:
             neighbour_key = sorted(
-                (_order(mol, idx, neighbour), ranks[neighbour]) for neighbour in mol.get_neighbors(idx)
+                (_order(mol, idx, neighbor), ranks[neighbor])
+                for neighbor in mol.get_neighbors(idx)
+                if neighbor in atoms
             )
             refined[idx] = (ranks[idx], tuple(neighbour_key))
         ranks = _ranks_from_invariants(refined)
@@ -72,7 +80,8 @@ def canonical_ranks(mol: Molecule) -> dict[int, int]:
             break
         previous_classes = classes
 
-    mol._canonical_rank_cache = ranks
+    if whole_graph:
+        mol._canonical_rank_cache = ranks
     return ranks
 
 

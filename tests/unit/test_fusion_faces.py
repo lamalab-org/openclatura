@@ -160,6 +160,20 @@ def test_bounded_face_selection_is_invariant_to_candidate_cycle_order(monkeypatc
     assert actual.audit.reconstructed_edges == expected.audit.reconstructed_edges
 
 
+def test_face_selection_ranks_only_the_selected_parent_subgraph():
+    mol = _linear_fused_hexagons()
+    parent_atoms = frozenset(mol.atoms)
+    expected = select_bounded_face_model(mol, parent_atoms)
+    mol.add_atom("Cl", idx=20)
+    mol.add_bond(0, 20, idx=20)
+
+    actual = select_bounded_face_model(mol, parent_atoms)
+
+    assert expected is not None and actual is not None
+    assert {face.edges for face in actual.faces} == {face.edges for face in expected.faces}
+    assert actual.outer_boundary.edges == expected.outer_boundary.edges
+
+
 def test_face_audit_rejects_incomplete_and_overcovered_models():
     mol = _linear_fused_hexagons()
     left = GraphCycle.from_atoms((0, 1, 2, 3, 4, 5))
