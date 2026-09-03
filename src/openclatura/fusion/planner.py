@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from ..molecule import Molecule
 from .audit import audit_fusion_plan
 from .config import fusion_nomenclature_config
-from .descriptor import FusionDescriptorError, build_fusion_name_ast, render_fusion_name
+from .descriptor import FusionDescriptorError, build_fusion_name_ast, render_fusion_name_parts
 from .faces import FaceSearchBudgetExceeded, select_bounded_face_model
 from .layout import LayoutSearchBudgetExceeded, preferred_intrinsic_layouts
 from .model import (
@@ -123,7 +123,8 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     )
     if len(indicated_h) > 1:
         return FusionUnsupported("multiple indicated-hydrogen fusion parents require a later additive tier")
-    rendered = render_fusion_name(ast, registry)
+    rendered_parts = render_fusion_name_parts(ast, registry, mol=mol)
+    rendered = "".join(part.text for part in rendered_parts)
     audit = audit_fusion_plan(
         mol,
         atoms,
@@ -163,6 +164,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
             ),
         ),
         audit=audit,
+        rendered_parts=rendered_parts,
     )
     return FusionConfirmed(plan)
 
