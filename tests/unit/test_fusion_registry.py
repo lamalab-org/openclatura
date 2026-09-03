@@ -135,7 +135,7 @@ def test_generated_carbocycle_policy_is_separate_from_shared_graph_construction(
     assert component.spec.template.family == "generated_monocycle"
     assert component.spec.template.locants == tuple(str(index) for index in range(1, ring_size + 1))
     assert component.spec.attached_prefix == prefix
-    assert component.attached_locant_policy == "always"
+    assert component.omit_attached_locants
     assert component.spec.rule_reference == "P-25.2.2"
 
 
@@ -223,11 +223,11 @@ def test_generated_component_rows_are_strictly_validated(field, value, message):
         FusionComponentRegistry.from_data(data)
 
 
-def test_attached_locant_policy_is_strictly_validated():
+def test_attached_locant_omission_is_strictly_validated():
     data = deepcopy(load_json_table("fusion_components.json"))
-    data["components"][0]["attached_locant_policy"] = "guess"
+    data["components"][0]["omit_attached_locants"] = "yes"
 
-    with pytest.raises(ValueError, match="attached_locant_policy"):
+    with pytest.raises(ValueError, match="omit_attached_locants"):
         FusionComponentRegistry.from_data(data)
 
 
