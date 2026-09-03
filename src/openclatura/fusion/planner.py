@@ -20,6 +20,7 @@ from .model import (
     Face,
     FaceModel,
     FusionAuditFailed,
+    FusionComponentSpec,
     FusionConfirmed,
     FusionGraph,
     FusionGraphAtom,
@@ -217,15 +218,25 @@ def _cited_indicated_hydrogens(
     root_ids = set(ast.parent_occurrences)
     roots = [match for match in ast.component_occurrences if match.occurrence_id in root_ids]
     attached = [match for match in ast.component_occurrences if match.occurrence_id not in root_ids]
-    has_generated_carbocycle = any(
-        registry.spec_for_match(match).template.family == "generated_monocycle"
-        for match in attached
+    has_attached_carbocycle = any(
+        _is_attached_carbocycle_component(registry.spec_for_match(match)) for match in attached
     )
     has_polycyclic_parent = any(len(registry.spec_for_match(match).rings) > 1 for match in roots)
-    if has_generated_carbocycle and has_polycyclic_parent and observed_parent_matches_bond_model(mol, bond_model):
+    if has_attached_carbocycle and has_polycyclic_parent and observed_parent_matches_bond_model(mol, bond_model):
         cited_atoms.update(atom for atom in candidates if mol.atoms[atom].symbol == "C")
 
     return tuple(sorted((locants[atom] for atom in cited_atoms), key=system_locant_sort_key))
+
+
+def _is_attached_carbocycle_component(spec: FusionComponentSpec) -> bool:
+    """Return whether a component is a monocyclic all-carbon attached prefix."""
+
+    return (
+        len(spec.rings) == 1
+        and spec.usable_as_attached
+        and not spec.usable_as_parent
+        and all(atom.symbol == "C" for atom in spec.atoms)
+    )
 
 
 def _classify_unmodelled_ring_system(mol: Molecule, atoms: frozenset[int]) -> FusionPlanningResult:
