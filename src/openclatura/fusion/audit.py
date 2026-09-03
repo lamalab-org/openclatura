@@ -12,7 +12,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from ..molecule import Molecule
+from ..molecule import Molecule, edges_within_atoms
 from ..polycycle_topology import normalize_edge
 from ..retained_graph_model import merge_parent_bond_classes
 from .cover import audit_component_cover, component_scope
@@ -444,7 +444,7 @@ def _audit_component_and_face_coverage(
     if set(face_owners) != expected_face_ids or any(count != 1 for count in face_owners.values()):
         errors.append("component occurrences do not cover every selected face exactly once")
 
-    target_edges = _molecule_edges(mol, parent_atoms)
+    target_edges = frozenset(edges_within_atoms(mol, set(parent_atoms)))
     cover = audit_component_cover(scopes, target_atom_ids=parent_atoms, target_edges=target_edges)
     errors.extend(cover.errors)
     if reconstruction.input_edges != target_edges:
@@ -539,7 +539,7 @@ def _audit_reconstructed_graph(
     actual_labels = {atom: (mol.atoms[atom].symbol, mol.atoms[atom].charge) for atom in parent_atoms}
     if reconstructed.input_atoms != actual_labels:
         errors.append("reconstructed component atoms differ from selected input elements or formal charges")
-    actual_edges = _molecule_edges(mol, parent_atoms)
+    actual_edges = frozenset(edges_within_atoms(mol, set(parent_atoms)))
     if reconstructed.input_edges != actual_edges:
         errors.append("reconstructed component connectivity differs from the selected input parent")
 
@@ -586,7 +586,7 @@ def _audit_numbering(
                 break
         mapped_edges = frozenset(
             normalize_edge(input_to_abstract[left], input_to_abstract[right])
-            for left, right in _molecule_edges(mol, parent_atoms)
+            for left, right in edges_within_atoms(mol, set(parent_atoms))
         )
         if mapped_edges != abstract_edges:
             errors.append("input locant map is not graph preserving")
@@ -777,12 +777,6 @@ def _audit_bond_model(
             break
     if not observed_matches:
         errors.append("selected input bond orders are not allowed by the parent bond model")
-
-
-def _molecule_edges(mol: Molecule, atoms: frozenset[int]) -> frozenset[_Edge]:
-    return frozenset(
-        normalize_edge(bond.u, bond.v) for bond in mol.bonds.values() if bond.u in atoms and bond.v in atoms
-    )
 
 
 def _error(message: str, *, checks: Iterable[str] = ()) -> FusionAuditResult:

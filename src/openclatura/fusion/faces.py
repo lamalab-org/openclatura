@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from itertools import combinations
 
 from ..canonical_ranks import canonical_ranks
-from ..molecule import Molecule
+from ..molecule import Molecule, edges_within_atoms
 from ..polycycle_topology import (
     adjacency_from_edges,
     canonical_cycle,
@@ -138,7 +138,7 @@ def audit_bounded_face_model(
     """Audit whether ``faces`` exactly prove a bounded-face decomposition."""
 
     atoms = frozenset(atom_ids)
-    graph_edges = _molecule_edges(mol, atoms)
+    graph_edges = frozenset(edges_within_atoms(mol, set(atoms)))
     normalized_faces = tuple(_as_cycle(face) for face in faces)
     errors: list[str] = []
 
@@ -207,7 +207,7 @@ def select_bounded_face_model(
     """
 
     atoms = frozenset(atom_ids)
-    graph_edges = _molecule_edges(mol, atoms)
+    graph_edges = frozenset(edges_within_atoms(mol, set(atoms)))
     try:
         rank = graph_cycle_rank(atoms, graph_edges)
     except ValueError:
@@ -302,15 +302,6 @@ def _enumerate_from_start(
             visited.remove(neighbor)
 
     search(start)
-
-
-def _molecule_edges(mol: Molecule, atoms: frozenset[int]) -> frozenset[Edge]:
-    return frozenset(
-        normalize_edge(atom, neighbor)
-        for atom in atoms
-        for neighbor in mol.get_neighbors(atom)
-        if neighbor in atoms and atom < neighbor
-    )
 
 
 def _is_chordless(cycle: GraphCycle, adjacency: dict[int, tuple[int, ...]]) -> bool:

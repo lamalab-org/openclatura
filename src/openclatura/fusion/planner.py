@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from ..assembly_parts import NameTokenBinding
 from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule
-from ..polycycle_topology import ring_system_topology
+from ..polycycle_topology import cycle_edges, ring_system_topology
 from ..retained_graph_model import merge_parent_bond_classes
 from .audit import audit_fusion_plan
 from .config import fusion_nomenclature_config
@@ -281,7 +281,7 @@ def _typed_face_model(mol: Molecule, bounded) -> FaceModel:
     owners: dict[int, list[int]] = defaultdict(list)
     faces = []
     for face_id, cycle in enumerate(bounded.faces):
-        edge_cycle = tuple(mol.get_bond(left, right).idx for left, right in _cycle_pairs(cycle.atoms))
+        edge_cycle = tuple(mol.get_bond(left, right).idx for left, right in cycle_edges(cycle.atoms))
         faces.append(Face(face_id, cycle.atoms, edge_cycle, len(cycle.atoms)))
         for edge_id in edge_cycle:
             owners[edge_id].append(face_id)
@@ -321,7 +321,3 @@ def _abstract_graph(ast, registry) -> FusionGraph:
         atoms=tuple(FusionGraphAtom(atom, *labels[atom]) for atom in sorted(labels)),
         bonds=tuple(FusionGraphBond(edge, edges[edge]) for edge in sorted(edges)),
     )
-
-
-def _cycle_pairs(cycle: tuple[int, ...]):
-    return zip(cycle, cycle[1:] + cycle[:1])
