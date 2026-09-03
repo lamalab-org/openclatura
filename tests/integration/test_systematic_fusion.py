@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 import pytest
 from rdkit import Chem
 
@@ -10,37 +13,32 @@ from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.graph_io import read_smiles
 from openclatura.molecule import OperationClass
 
+SYSTEMATIC_FUSION_CASES = json.loads(
+    (Path(__file__).parents[1] / "data" / "systematic_fusion_cases.json").read_text(encoding="utf-8")
+)
+
 
 @pytest.mark.parametrize(
-    ("smiles", "expected"),
-    [
-        ("O1C2=C(C=C1)C=CS2", "thieno[2,3-b]furan"),
-        ("S1C=2N(C=C1)C=CN2", "imidazo[2,1-b][1,3]thiazole"),
-        ("O1C=CC2OC=CC=C21", "furo[3,2-b]pyran"),
-        ("O1C=2C(=CC1)C=CC2", "cyclopenta[b]furan"),
-        ("[Se]1C2=C(C=C1)[Se]C=C2", "selenopheno[3,2-b]selenophene"),
-        ("O1C=CC2=NC3=C(C=C21)SC=C3", "furo[3,2-b]thieno[2,3-e]pyridine"),
-        ("O1C=CC2=C1C=C1C(=N2)C=CO1", "difuro[3,2-b:2',3'-e]pyridine"),
-        (
-            "C1=CC=C2C=C3C(=CC=C12)C=C1C=CC=CC1=C3",
-            "naphtho[2,3-f]azulene",
-        ),
-    ],
+    "case",
+    SYSTEMATIC_FUSION_CASES,
+    ids=[case["id"] for case in SYSTEMATIC_FUSION_CASES],
 )
-def test_audited_systematic_fusion_names(smiles, expected):
-    result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, include_trace=True)
+def test_audited_systematic_fusion_names(case):
+    result = name(case["smiles"], fusion_mode=FusionMode.AUDITED_PIN, include_trace=True)
 
     assert result.error is None
-    assert result.name == expected
-    assert result.parent_nomenclature == "systematic_fusion"
-    assert result.pin_status == "confirmed"
-    assert result.fusion_support_tier == "ortho-tree-v1"
-    assert result.proof_source == "fusion_reconstruction"
+    assert result.name == case["name"]
+    assert result.parent_nomenclature == case["parent_nomenclature"]
+    assert result.pin_status == case["pin_status"]
+    assert result.fusion_support_tier == case["support_tier"]
+    assert result.proof_source == case["proof_source"]
     assert result.to_dict()["parent_nomenclature"] == "systematic_fusion"
     decisions = [step for step in result.decisions if step.decision == "selected audited systematic fusion parent"]
     assert len(decisions) == 1
     assert decisions[0].data["parent_nomenclature"] == "systematic_fusion"
     assert "input_graph_identity" in decisions[0].data["audit_checks"]
+    assert decisions[0].data["proof_counts"]["bounded_faces"] >= 2
+    assert decisions[0].data["proof_counts"]["audit_checks"] == len(decisions[0].data["audit_checks"])
     assert any(operation.operation_class is OperationClass.FUSION for operation in result.analysis.operations)
 
 
@@ -58,6 +56,9 @@ def test_fusion_trace_exposes_each_existing_proof_stage():
     assert decisions["constructed fusion descriptor"].data["descriptor"] == "[2,3-b]"
     assert decisions["selected preferred fusion orientation"].data["face_shapes"]
     assert decisions["selected completed fusion numbering"].data["atom_to_locant"]
+    assert decisions["selected completed fusion numbering"].data["proof_counts"] == decisions[
+        "audited systematic fusion parent"
+    ].data["proof_counts"]
     assert decisions["audited systematic fusion parent"].data["status"] == "confirmed"
 
 
