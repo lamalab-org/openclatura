@@ -10,7 +10,13 @@ from rdkit import Chem
 from openclatura import FusionMode, name, name_many, name_mol, opsin_available
 from openclatura.fusion.context import current_fusion_mode, reset_fusion_mode, set_fusion_mode
 from openclatura.fusion.faces import FaceSearchBudgetExceeded
-from openclatura.fusion.model import AuditStatus, FusionConfirmed, FusionNotApplicable, FusionUnsupported
+from openclatura.fusion.model import (
+    AuditStatus,
+    FusionAuditFailed,
+    FusionConfirmed,
+    FusionNotApplicable,
+    FusionUnsupported,
+)
 from openclatura.fusion.numbering import MancudeSearchBudgetExceeded
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.graph_io import read_smiles
@@ -366,6 +372,20 @@ def test_mancude_search_budget_exhaustion_becomes_a_typed_abstention(monkeypatch
     assert isinstance(result, FusionUnsupported)
     assert result.reason == "mancude assignment search budget exhausted"
     assert "budget of 1 states" in result.details[0]
+
+
+def test_component_graph_merge_failure_becomes_a_typed_audit_result(monkeypatch):
+    mol = read_smiles("O1C2=C(C=C1)C=CS2")
+
+    def inconsistent_graph(*args, **kwargs):
+        raise ValueError("shared interface bond classes disagree")
+
+    monkeypatch.setattr("openclatura.fusion.planner._abstract_graph", inconsistent_graph)
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert isinstance(result, FusionAuditFailed)
+    assert result.reason == "fusion component graphs could not be merged consistently"
+    assert result.candidate_summary == ("shared interface bond classes disagree",)
 
 
 @pytest.mark.parametrize(

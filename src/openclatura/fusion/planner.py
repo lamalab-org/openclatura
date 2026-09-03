@@ -133,7 +133,13 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         input_locant_maps=tuple(numbering.atom_to_locant for numbering in numberings),
         rejected_numberings=numbering_selection.rejected,
     )
-    graph = _abstract_graph(ast, registry)
+    try:
+        graph = _abstract_graph(ast, registry)
+    except ValueError as exc:
+        return FusionAuditFailed(
+            "fusion component graphs could not be merged consistently",
+            (str(exc),),
+        )
     try:
         bond_model = parent_bond_model(mol, atoms)
     except MancudeSearchBudgetExceeded as exc:
