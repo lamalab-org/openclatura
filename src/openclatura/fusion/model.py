@@ -190,6 +190,7 @@ class FusionComponentMatch:
     local_to_input_atom: tuple[tuple[str, int], ...]
     local_to_skeleton_atom: tuple[tuple[str, int], ...]
     topology_key: tuple
+    template_name: str = ""
 
     def __post_init__(self) -> None:
         _require_nonnegative(self.occurrence_id, "occurrence_id")

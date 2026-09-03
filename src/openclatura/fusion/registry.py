@@ -9,7 +9,7 @@ SMILES/SMARTS pattern, or drawing coordinates.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import cache
 from typing import Any
@@ -49,6 +49,16 @@ class RegisteredFusionComponent:
     def eligible_for(self, role: FusionComponentRole | str) -> bool:
         role = FusionComponentRole(role)
         return self.spec.usable_as_parent if role is FusionComponentRole.PARENT else self.spec.usable_as_attached
+
+    def spec_for_template(self, template_name: str) -> FusionComponentSpec:
+        """Bind this component policy to the exact matched graph variant."""
+
+        if not template_name:
+            return self.spec
+        template = next((item for item in self.templates if item.name == template_name), None)
+        if template is None:
+            raise KeyError(f"component {self.spec.key!r} has no template {template_name!r}")
+        return replace(self.spec, template=template)
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,13 +127,14 @@ class FusionComponentRegistry:
         if key in self._by_key:
             raise ValueError(f"duplicate fusion component key {key!r}")
 
-        template_names = _template_names(row)
+        template_names = _template_names(row, default=key)
         duplicates = self._claimed_template_names.intersection(template_names)
         if duplicates:
             raise ValueError(f"duplicate fusion component template name {min(duplicates)!r}")
-        templates = tuple(self._template_by_name[name] for name in template_names if name in self._template_by_name)
-        if not templates:
-            raise ValueError(f"fusion component {key!r} has no matching retained graph template")
+        missing = tuple(name for name in template_names if name not in self._template_by_name)
+        if missing:
+            raise ValueError(f"fusion component {key!r} references unknown templates: {', '.join(missing)}")
+        templates = tuple(self._template_by_name[name] for name in template_names)
         for template in templates:
             validate_retained_fused_template(template)
         if any(template.locants != templates[0].locants for template in templates[1:]):
@@ -133,16 +144,16 @@ class FusionComponentRegistry:
         allow_attached = _required_bool(row, "allow_as_attached")
         if not allow_parent and not allow_attached:
             raise ValueError(f"fusion component {key!r} is not eligible for any role")
-        attached_prefix = _optional_text(row, "attached_prefix")
+        primary = templates[0]
+        attached_prefix = _optional_text(row, "attached_prefix") or primary.attached_prefix
         if allow_attached and not attached_prefix:
             raise ValueError(f"attached fusion component {key!r} requires an attached_prefix")
         rule = _required_text(row, "rule")
-        parent_name = _required_text(row, "parent_name")
+        parent_name = _optional_text(row, "parent_name") or primary.output_name
         omit_attached_locants = row.get("omit_attached_locants", False)
         if type(omit_attached_locants) is not bool:
             raise ValueError("omit_attached_locants must be a boolean")
 
-        primary = templates[0]
         spec = _component_spec(
             key=key,
             parent_name=parent_name,
@@ -194,7 +205,7 @@ class FusionComponentRegistry:
 
         ring_counts = frozenset(count for count, _ in self._topology_index)
         matches: list[FusionComponentMatch] = []
-        seen: set[tuple[str, frozenset[int], tuple[tuple[str, int], ...]]] = set()
+        seen: set[tuple[str, str, frozenset[int], tuple[tuple[str, int], ...]]] = set()
         occurrence_id = 0
         for subset in _connected_face_subsets(normalized_faces, ring_counts):
             atom_ids = set().union(*(face.atoms for face in subset))
@@ -215,7 +226,12 @@ class FusionComponentRegistry:
                         if not _template_rings_match_faces(template, exact.locant_to_atom, subset):
                             continue
                         local_to_input = tuple((locant, exact.locant_to_atom[locant]) for locant in template.locants)
-                        identity = (component.spec.key, frozenset(face.id for face in subset), local_to_input)
+                        identity = (
+                            component.spec.key,
+                            template.name,
+                            frozenset(face.id for face in subset),
+                            local_to_input,
+                        )
                         if identity in seen:
                             continue
                         seen.add(identity)
@@ -224,14 +240,23 @@ class FusionComponentRegistry:
                             FusionComponentMatch(
                                 occurrence_id=occurrence_id,
                                 spec_key=component.spec.key,
-                                covered_face_ids=identity[1],
+                                covered_face_ids=identity[2],
                                 local_to_input_atom=local_to_input,
                                 local_to_skeleton_atom=local_to_skeleton,
                                 topology_key=topology_key,
+                                template_name=template.name,
                             )
                         )
                         occurrence_id += 1
         return tuple(matches)
+
+    def spec_for_match(self, match: FusionComponentMatch) -> FusionComponentSpec:
+        """Resolve policy and exact graph data for a proven occurrence."""
+
+        component = self._by_key.get(match.spec_key)
+        if component is None:
+            raise KeyError(f"unknown fusion component {match.spec_key!r}")
+        return component.spec_for_template(match.template_name)
 
 
 def _component_spec(
@@ -298,8 +323,8 @@ def _horizontal_ring_count(row: Mapping[str, Any], template: RetainedGraphTempla
     return 1 if len(template.rings) == 1 else 0
 
 
-def _template_names(row: Mapping[str, Any]) -> tuple[str, ...]:
-    values = row.get("template_names")
+def _template_names(row: Mapping[str, Any], *, default: str) -> tuple[str, ...]:
+    values = row.get("template_names", [default])
     if not isinstance(values, list) or not values:
         raise ValueError("template_names must be a non-empty list")
     names = tuple(values)

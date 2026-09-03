@@ -17,6 +17,7 @@ from .cover import audit_component_cover, component_scope
 from .model import (
     AuditStatus,
     FusionAuditResult,
+    FusionComponentMatch,
     FusionComponentSpec,
     FusionDescriptor,
     FusionGraph,
@@ -97,7 +98,7 @@ def audit_fusion_plan(
             )
 
     try:
-        specs = {match.occurrence_id: _component_spec(registry, match.spec_key) for match in ast.component_occurrences}
+        specs = {match.occurrence_id: _component_spec(registry, match) for match in ast.component_occurrences}
     except (KeyError, TypeError, ValueError) as exc:
         return _error(str(exc))
 
@@ -177,25 +178,28 @@ def _audit_nomenclature_selection(
         errors.append("declared fusion parent is not the intrinsically senior eligible component")
 
 
-def _component_spec(registry: object | None, key: str) -> FusionComponentSpec:
+def _component_spec(registry: object | None, match: FusionComponentMatch) -> FusionComponentSpec:
     if registry is None:
         from .registry import fusion_component_registry
 
         registry = fusion_component_registry()
 
+    resolver = getattr(registry, "spec_for_match", None)
+    if resolver is not None:
+        return resolver(match)
     value: Any = None
     by_key = getattr(registry, "by_key", None)
     if by_key is not None:
-        value = by_key.get(key)
+        value = by_key.get(match.spec_key)
     elif isinstance(registry, Mapping):
-        value = registry.get(key)
+        value = registry.get(match.spec_key)
     else:
         getter = getattr(registry, "get", None)
         if getter is not None:
-            value = getter(key)
+            value = getter(match.spec_key)
     value = getattr(value, "spec", value)
     if not isinstance(value, FusionComponentSpec):
-        raise KeyError(f"unknown fusion component spec: {key}")
+        raise KeyError(f"unknown fusion component spec: {match.spec_key}")
     return value
 
 

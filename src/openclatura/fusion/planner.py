@@ -140,9 +140,8 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         return FusionAuditFailed("fusion reconstruction audit rejected the candidate", audit.errors)
     root_id = ast.parent_occurrences[0]
     root_match = next(match for match in ast.component_occurrences if match.occurrence_id == root_id)
-    specs_by_key = {key: value.spec for key, value in registry.by_key.items()}
     seniority_trace = tuple(
-        explain_component_comparison(root_match, match, specs_by_key)
+        explain_component_comparison(root_match, match, registry)
         for match in ast.component_occurrences
         if match.occurrence_id != root_id
     )
@@ -208,7 +207,7 @@ def _abstract_graph(ast, registry) -> FusionGraph:
     labels: dict[int, tuple[str, int]] = {}
     edges: dict[tuple[int, int], str] = {}
     for match in ast.component_occurrences:
-        spec = registry.by_key[match.spec_key].spec
+        spec = registry.spec_for_match(match)
         local_map = match.input_atom_by_locant
         for atom in spec.atoms:
             labels[local_map[atom.locant]] = (atom.symbol, atom.charge)

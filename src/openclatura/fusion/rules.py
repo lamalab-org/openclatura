@@ -41,6 +41,8 @@ class FusionComponentLookup(Protocol):
 
     def get(self, key: str) -> FusionComponentSpec | None: ...
 
+    def spec_for_match(self, match: FusionComponentMatch) -> FusionComponentSpec: ...
+
 
 @dataclass(frozen=True, slots=True, order=True)
 class ComponentSeniorityKey:
@@ -175,6 +177,9 @@ def _component_spec(
     component: FusionComponentMatch,
     registry: FusionComponentLookup | Mapping[str, FusionComponentSpec],
 ) -> FusionComponentSpec:
+    resolver = getattr(registry, "spec_for_match", None)
+    if resolver is not None:
+        return resolver(component)
     spec = registry.get(component.spec_key)
     if spec is None:
         raise KeyError(f"Unknown fusion component spec: {component.spec_key}")

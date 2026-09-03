@@ -146,7 +146,7 @@ def render_fusion_name(
 
     def attachment(node: FusionCitationNode) -> str:
         descendants = render_children(node)
-        spec = _spec(registry, matches[node.occurrence_id].spec_key)
+        spec = _spec_for_match(registry, matches[node.occurrence_id])
         return f"{descendants}{spec.attached_prefix}{descriptors[node.occurrence_id].render()}"
 
     def render_children(node: FusionCitationNode) -> str:
@@ -162,7 +162,7 @@ def render_fusion_name(
             members = tuple(_citation_node(ast.citation_tree, occurrence) for occurrence in group.occurrence_ids)
             if any(member.children for member in members):
                 raise FusionDescriptorError("multiplicative rendering is limited to leaf components")
-            prefixes = {_spec(registry, matches[member.occurrence_id].spec_key).attached_prefix for member in members}
+            prefixes = {_spec_for_match(registry, matches[member.occurrence_id]).attached_prefix for member in members}
             if len(prefixes) != 1:
                 raise FusionDescriptorError("a multiplicative group must use one attached prefix")
             descriptor = _render_combined_descriptors(tuple(descriptors[member.occurrence_id] for member in members))
@@ -171,7 +171,7 @@ def render_fusion_name(
 
     root = ast.citation_tree
     root_match = matches[root.occurrence_id]
-    root_spec = _spec(registry, root_match.spec_key)
+    root_spec = _spec_for_match(registry, root_match)
     return f"{render_children(root)}{root_spec.parent_name}"
 
 
@@ -179,18 +179,18 @@ def _occurrence_options(
     matches: Sequence[FusionComponentMatch],
     registry: _Registry | Mapping[str, FusionComponentSpec],
 ) -> tuple[_OccurrenceOption, ...]:
-    grouped: dict[tuple[frozenset[int], str, frozenset[int]], list[FusionComponentMatch]] = defaultdict(list)
+    grouped: dict[tuple[frozenset[int], str, str, frozenset[int]], list[FusionComponentMatch]] = defaultdict(list)
     for match in matches:
         if not match.covered_face_ids:
             continue
         atom_ids = frozenset(atom for _, atom in match.local_to_input_atom)
-        grouped[(match.covered_face_ids, match.spec_key, atom_ids)].append(match)
+        grouped[(match.covered_face_ids, match.spec_key, match.template_name, atom_ids)].append(match)
     if not grouped:
         raise FusionDescriptorError("no exact component matches were supplied")
 
     options: list[_OccurrenceOption] = []
-    for (face_ids, spec_key, atom_ids), mappings in grouped.items():
-        _spec(registry, spec_key)
+    for (face_ids, spec_key, _template_name, atom_ids), mappings in grouped.items():
+        _spec_for_match(registry, mappings[0])
         unique = {mapping.local_to_input_atom: mapping for mapping in mappings}
         ordered = tuple(unique[key] for key in sorted(unique, key=_local_map_key))
         options.append(_OccurrenceOption(face_ids, spec_key, atom_ids, ordered))
@@ -251,7 +251,7 @@ def _candidates_for_component_selection(
     canonical_matches = tuple(
         replace(option.mappings[0], occurrence_id=index) for index, option in enumerate(ordered_options)
     )
-    specs = {match.occurrence_id: _spec(registry, match.spec_key) for match in canonical_matches}
+    specs = {match.occurrence_id: _spec_for_match(registry, match) for match in canonical_matches}
     specs_by_key = {spec.key: spec for spec in specs.values()}
     scopes = tuple(_scope_for_match(mol, match, specs[match.occurrence_id]) for match in canonical_matches)
     target_atoms = frozenset(atom for scope in scopes for atom in scope.atom_ids)
@@ -637,6 +637,16 @@ def _spec(
     if not isinstance(spec, FusionComponentSpec):
         raise FusionDescriptorError(f"registry value for {key!r} is not a fusion component spec")
     return spec
+
+
+def _spec_for_match(
+    registry: _Registry | Mapping[str, FusionComponentSpec],
+    match: FusionComponentMatch,
+) -> FusionComponentSpec:
+    resolver = getattr(registry, "spec_for_match", None)
+    if resolver is not None:
+        return resolver(match)
+    return _spec(registry, match.spec_key)
 
 
 def _edge(left: int, right: int) -> tuple[int, int]:

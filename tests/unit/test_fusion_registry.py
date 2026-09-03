@@ -64,6 +64,8 @@ def test_graph_faces_match_every_exact_local_locant_map(
     )
     assert all(set(dict(match.local_to_input_atom).values()) == set(atom_ids) for match in matches)
     assert all(match.local_to_skeleton_atom == match.local_to_input_atom for match in matches)
+    assert all(match.template_name for match in matches)
+    assert all(registry.spec_for_match(match).template.name == match.template_name for match in matches)
     component = registry.by_key[key]
     assert component.spec.attached_prefix == prefix
     assert component.spec.usable_as_parent
@@ -116,9 +118,31 @@ def test_registration_rejects_duplicate_keys_and_template_names():
         registry.register(row)
 
     duplicate_template = deepcopy(data["components"][1])
-    duplicate_template["template_names"] = row["template_names"]
+    duplicate_template["template_names"] = [row["key"]]
     with pytest.raises(ValueError, match="duplicate fusion component template name"):
         registry.register(duplicate_template)
+
+
+def test_registration_rejects_unknown_template_references():
+    row = deepcopy(load_json_table("fusion_components.json")["components"][0])
+    row["template_names"] = ["not-a-registered-template"]
+
+    with pytest.raises(ValueError, match="references unknown templates"):
+        FusionComponentRegistry("test").register(row)
+
+
+def test_registration_inherits_names_from_the_shared_retained_template():
+    data = load_json_table("fusion_components.json")
+    row = deepcopy(next(item for item in data["components"] if item["key"] == "naphthalene"))
+    row.pop("template_names", None)
+    row.pop("parent_name", None)
+    row.pop("attached_prefix", None)
+
+    registry = FusionComponentRegistry("test")
+    spec = registry.register(row)
+
+    assert spec.parent_name == spec.template.output_name == "naphthalene"
+    assert spec.attached_prefix == spec.template.attached_prefix == "naphtho"
 
 
 @pytest.mark.parametrize(
