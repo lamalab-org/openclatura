@@ -14,6 +14,7 @@ from typing import Any
 
 from ..molecule import Molecule
 from ..polycycle_topology import normalize_edge
+from ..retained_graph_model import merge_parent_bond_classes
 from .cover import audit_component_cover, component_scope
 from .model import (
     AuditStatus,
@@ -329,9 +330,14 @@ def _reconstruct(
         skeleton_edge = normalize_edge(root_skeleton[left_root], root_skeleton[right_root])
         input_edges.add(input_edge)
         previous = skeleton_edges.get(skeleton_edge)
-        if previous is not None and previous != bond_class:
-            errors.append(f"shared abstract edge {skeleton_edge} has incompatible bond classes")
-        skeleton_edges[skeleton_edge] = bond_class
+        if previous is None:
+            skeleton_edges[skeleton_edge] = bond_class
+        else:
+            merged = merge_parent_bond_classes(previous, bond_class)
+            if merged is None:
+                errors.append(f"shared abstract edge {skeleton_edge} has incompatible bond classes")
+            else:
+                skeleton_edges[skeleton_edge] = merged
 
     return _ReconstructedGraph(
         input_atom_by_node=input_by_node,

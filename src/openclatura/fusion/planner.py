@@ -6,6 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 from ..molecule import Molecule
+from ..retained_graph_model import merge_parent_bond_classes
 from .audit import audit_fusion_plan
 from .config import fusion_nomenclature_config
 from .descriptor import FusionDescriptorError, build_fusion_name_ast, render_fusion_name_parts
@@ -217,8 +218,10 @@ def _abstract_graph(ast, registry) -> FusionGraph:
             left, right = (local_map[locant] for locant in bond.locants)
             edge = (left, right) if left < right else (right, left)
             previous = edges.setdefault(edge, bond.bond_class)
-            if previous != bond.bond_class:
+            merged = merge_parent_bond_classes(previous, bond.bond_class)
+            if merged is None:
                 raise ValueError("component bond classes disagree on a shared fusion edge")
+            edges[edge] = merged
     return FusionGraph(
         atoms=tuple(FusionGraphAtom(atom, *labels[atom]) for atom in sorted(labels)),
         bonds=tuple(FusionGraphBond(edge, edges[edge]) for edge in sorted(edges)),

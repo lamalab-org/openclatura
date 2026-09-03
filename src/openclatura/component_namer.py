@@ -546,14 +546,15 @@ def name_component(
     ):
         state.retained_name = None
 
-    fusion_parent = resolve_systematic_fusion_parent(
-        mol,
-        state.parent_selection,
-        retained_name=state.retained_name,
-        decision_trace=decision_trace,
-    )
-    if fusion_parent is not None:
-        state.parent_selection.ring_parent = fusion_parent
+    if state.parent_selection.is_bicycle or state.parent_selection.is_polycycle:
+        fusion_parent = resolve_systematic_fusion_parent(
+            mol,
+            state.parent_selection,
+            retained_name=state.retained_name,
+            decision_trace=decision_trace,
+        )
+        if fusion_parent is not None:
+            state.parent_selection.ring_parent = fusion_parent
 
     parent_plan = build_parent_assembly_plan(
         mol,

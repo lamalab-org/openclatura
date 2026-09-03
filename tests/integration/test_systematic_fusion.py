@@ -16,6 +16,7 @@ from openclatura.molecule import OperationClass
         ("O1C2=C(C=C1)C=CS2", "thieno[2,3-b]furan"),
         ("S1C=2N(C=C1)C=CN2", "imidazo[2,1-b][1,3]thiazole"),
         ("O1C=CC2OC=CC=C21", "furo[3,2-b]pyran"),
+        ("O1C=2C(=CC1)C=CC2", "cyclopenta[1,2-b]furan"),
         ("[Se]1C2=C(C=C1)[Se]C=C2", "selenopheno[3,2-b]selenophene"),
         ("O1C=CC2=NC3=C(C=C21)SC=C3", "furo[3,2-b]thieno[2,3-e]pyridine"),
         ("O1C=CC2=C1C=C1C(=N2)C=CO1", "difuro[3,2-b:2',3'-e]pyridine"),
@@ -219,6 +220,7 @@ def test_non_ortho_topologies_do_not_emit_systematic_fusion(smiles):
     "smiles",
     [
         "O1C2=C(C=C1)C=CS2",
+        "O1C=2C(=CC1)C=CC2",
         "S1C=2N(C=C1)C=CN2",
         "O1C=CC2=NC3=C(C=C21)SC=C3",
         "O1C=CC2=C1C=C1C(=N2)C=CO1",

@@ -108,23 +108,42 @@ def test_checked_in_registry_exposes_stable_version_and_unique_policy_keys():
     assert registry.by_key["naphthalene"].spec.horizontal_ring_count == 2
 
 
+def test_generated_carbocycles_use_shared_numbered_graph_templates():
+    registry = fusion_component_registry()
+    component = registry.by_key["cyclopentadiene"]
+
+    assert component.spec.attached_prefix == "cyclopenta"
+    assert not component.spec.usable_as_parent
+    assert component.spec.usable_as_attached
+    assert component.spec.template.family == "generated_monocycle"
+    assert component.spec.locants == ("1", "2", "3", "4", "5")
+    assert len(component.spec.atoms) == len(component.spec.bonds) == 5
+    assert {bond.bond_class for bond in component.spec.bonds} == {"aromatic"}
+
+
 def test_registration_rejects_duplicate_keys_and_template_names():
     data = load_json_table("fusion_components.json")
-    row = deepcopy(data["components"][0])
+    row = deepcopy(next(item for item in data["components"] if item["key"] == "benzene"))
     registry = FusionComponentRegistry("test")
     registry.register(row)
 
     with pytest.raises(ValueError, match="duplicate fusion component key"):
         registry.register(row)
 
-    duplicate_template = deepcopy(data["components"][1])
+    duplicate_template = deepcopy(next(item for item in data["components"] if item["key"] == "naphthalene"))
     duplicate_template["template_names"] = [row["key"]]
     with pytest.raises(ValueError, match="duplicate fusion component template name"):
         registry.register(duplicate_template)
 
 
 def test_registration_rejects_unknown_template_references():
-    row = deepcopy(load_json_table("fusion_components.json")["components"][0])
+    row = deepcopy(
+        next(
+            item
+            for item in load_json_table("fusion_components.json")["components"]
+            if item["key"] == "benzene"
+        )
+    )
     row["template_names"] = ["not-a-registered-template"]
 
     with pytest.raises(ValueError, match="references unknown templates"):
@@ -166,6 +185,23 @@ def test_registry_rejects_unknown_schema_versions():
     data["schema_version"] = 999
 
     with pytest.raises(ValueError, match="unsupported fusion component schema version"):
+        FusionComponentRegistry.from_data(data)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("generator", "text_lookup", "unsupported fusion component generator"),
+        ("ring_size", 2, "ring_size must be at least three"),
+        ("bond_class", "guessed", "unsupported monocyclic graph bond class"),
+        ("pin_component", "yes", "pin_component must be a boolean"),
+    ],
+)
+def test_generated_component_rows_are_strictly_validated(field, value, message):
+    data = deepcopy(load_json_table("fusion_components.json"))
+    data["generated_components"][0][field] = value
+
+    with pytest.raises((TypeError, ValueError), match=message):
         FusionComponentRegistry.from_data(data)
 
 

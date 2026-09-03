@@ -25,6 +25,7 @@ from ..retained_fused_templates import (
     retained_graph_templates,
     validate_retained_fused_template,
 )
+from ..retained_graph_model import monocyclic_graph_template
 from .model import FusionComponentMatch, FusionComponentSpec
 
 SUPPORTED_SCHEMA_VERSION = 1
@@ -101,7 +102,11 @@ class FusionComponentRegistry:
         rows = data.get("components")
         if not isinstance(rows, list):
             raise ValueError("fusion component data must contain a components list")
-        registry = cls(_required_text(data, "registry_version"))
+        generated = _generated_component_templates(data.get("generated_components", ()))
+        registry = cls(
+            _required_text(data, "registry_version"),
+            templates=(*retained_graph_templates(include_disabled=True), *generated),
+        )
         for row in rows:
             if not isinstance(row, Mapping):
                 raise ValueError("every fusion component must be a mapping")
@@ -333,6 +338,39 @@ def _template_names(row: Mapping[str, Any], *, default: str) -> tuple[str, ...]:
     if len(names) != len(set(names)):
         raise ValueError("template_names must be unique")
     return names
+
+
+def _generated_component_templates(rows: object) -> tuple[RetainedGraphTemplate, ...]:
+    """Construct graph templates declared by supported data generators."""
+
+    if not isinstance(rows, list):
+        raise ValueError("generated_components must be a list")
+    templates = []
+    for row in rows:
+        if not isinstance(row, Mapping):
+            raise ValueError("every generated component must be a mapping")
+        generator = _required_text(row, "generator")
+        if generator != "monocyclic_carbocycle":
+            raise ValueError(f"unsupported fusion component generator {generator!r}")
+        ring_size = row.get("ring_size")
+        if type(ring_size) is not int or ring_size < 3:
+            raise ValueError("generated monocyclic carbocycle ring_size must be at least three")
+        templates.append(
+            monocyclic_graph_template(
+                name=_required_text(row, "key"),
+                ring_size=ring_size,
+                bond_class=_required_text(row, "bond_class"),
+                pin=_optional_bool(row, "pin_component", default=True),
+            )
+        )
+    return tuple(templates)
+
+
+def _optional_bool(row: Mapping[str, Any], field: str, *, default: bool) -> bool:
+    value = row.get(field, default)
+    if type(value) is not bool:
+        raise ValueError(f"{field} must be a boolean")
+    return value
 
 
 def _normalize_faces(faces: object) -> tuple[_Face, ...]:

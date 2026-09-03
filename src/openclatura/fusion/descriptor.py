@@ -11,9 +11,8 @@ descriptor construction.
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from itertools import product
 from typing import Protocol
 
 from ..molecule import Molecule
@@ -45,6 +44,10 @@ MAX_LOCANT_MAP_COMBINATIONS = _LIMITS.locant_map_combinations
 
 class FusionDescriptorError(ValueError):
     """Raised when the bounded descriptor tier cannot prove a valid AST."""
+
+
+class _LocantMapBudgetExceeded(RuntimeError):
+    """Internal signal that one candidate cover exceeded its deterministic budget."""
 
 
 class _Registry(Protocol):
@@ -122,9 +125,17 @@ def build_fusion_name_ast(
     selections = _exact_component_covers(options, frozenset(face_ids))
 
     candidates: list[_Candidate] = []
+    budget_exhausted = 0
     for selected_options in selections:
-        candidates.extend(_candidates_for_component_selection(mol, selected_options, registry))
+        try:
+            candidates.extend(_candidates_for_component_selection(mol, selected_options, registry))
+        except _LocantMapBudgetExceeded:
+            budget_exhausted += 1
     if not candidates:
+        if budget_exhausted:
+            raise FusionDescriptorError(
+                f"all viable component covers exceeded the locant-map budget of {MAX_LOCANT_MAP_COMBINATIONS} states"
+            )
         raise FusionDescriptorError("no exact tree-cover fusion citation was found")
     return min(candidates, key=lambda candidate: (candidate.score, candidate.rendered)).ast
 
@@ -333,10 +344,6 @@ def _candidates_for_component_selection(
     mapping_sets: list[tuple[FusionComponentMatch, ...]] = []
     for occurrence_id, option in enumerate(ordered_options):
         mapping_sets.append(tuple(replace(candidate, occurrence_id=occurrence_id) for candidate in option.mappings))
-    map_count = _product_size(tuple(len(values) for values in mapping_sets))
-    if map_count > MAX_LOCANT_MAP_COMBINATIONS:
-        raise FusionDescriptorError(f"locant-map count {map_count} exceeds bounded limit {MAX_LOCANT_MAP_COMBINATIONS}")
-
     candidates: list[_Candidate] = []
     for root in roots:
         parent_by_child, order_by_occurrence = _orient_tree(audit.graph.adjacency, root.occurrence_id)
@@ -345,7 +352,15 @@ def _candidates_for_component_selection(
         interface_by_pair = {
             frozenset((interface.left, interface.right)): interface for interface in audit.graph.interfaces
         }
-        for selected_maps in product(*mapping_sets):
+        for selected_maps in _compatible_mapping_assignments(
+            mapping_sets,
+            specs,
+            root.occurrence_id,
+            parent_by_child,
+            order_by_occurrence,
+            interface_by_pair,
+            mol,
+        ):
             candidate = _build_candidate(
                 selected_maps,
                 specs,
@@ -359,6 +374,96 @@ def _candidates_for_component_selection(
             if candidate is not None:
                 candidates.append(candidate)
     return candidates
+
+
+def _compatible_mapping_assignments(
+    mapping_sets: Sequence[tuple[FusionComponentMatch, ...]],
+    specs: Mapping[int, FusionComponentSpec],
+    root: int,
+    parent_by_child: Mapping[int, int],
+    order_by_occurrence: Mapping[int, int],
+    interface_by_pair: Mapping[frozenset[int], FusionInterface[int]],
+    mol: Molecule,
+) -> tuple[tuple[FusionComponentMatch, ...], ...]:
+    """Assign local maps incrementally along the component-cover tree.
+
+    A component automorphism is relevant only when it maps the shared atoms to
+    a valid directed fusion side. Checking that constraint as each child is
+    attached avoids constructing the Cartesian product of unrelated maps.
+    """
+
+    projected_mapping_sets = _deduplicate_interface_equivalent_maps(
+        mapping_sets,
+        interface_by_pair.values(),
+    )
+    occurrence_order = tuple(
+        sorted(range(len(mapping_sets)), key=lambda occurrence: (order_by_occurrence[occurrence], occurrence))
+    )
+    if not occurrence_order or occurrence_order[0] != root:
+        raise FusionDescriptorError("component cover tree has no numbered root")
+
+    assignments: list[tuple[FusionComponentMatch, ...]] = []
+    selected: dict[int, FusionComponentMatch] = {}
+    visited_states = 0
+
+    def visit(position: int) -> None:
+        nonlocal visited_states
+        visited_states += 1
+        if visited_states > MAX_LOCANT_MAP_COMBINATIONS:
+            raise _LocantMapBudgetExceeded(
+                f"compatible locant-map search exceeds bounded limit {MAX_LOCANT_MAP_COMBINATIONS}"
+            )
+        if position == len(occurrence_order):
+            assignments.append(tuple(selected[occurrence] for occurrence in range(len(projected_mapping_sets))))
+            return
+
+        occurrence = occurrence_order[position]
+        host = parent_by_child.get(occurrence)
+        for candidate in projected_mapping_sets[occurrence]:
+            if host is not None:
+                interface = interface_by_pair[frozenset((occurrence, host))]
+                if (
+                    _ordinary_join(
+                        candidate,
+                        selected[host],
+                        specs[occurrence],
+                        specs[host],
+                        interface,
+                        order_by_occurrence[occurrence],
+                        mol,
+                    )
+                    is None
+                ):
+                    continue
+            selected[occurrence] = candidate
+            visit(position + 1)
+            del selected[occurrence]
+
+    visit(0)
+    return tuple(assignments)
+
+
+def _deduplicate_interface_equivalent_maps(
+    mapping_sets: Sequence[tuple[FusionComponentMatch, ...]],
+    interfaces: Iterable[FusionInterface[int]],
+) -> tuple[tuple[FusionComponentMatch, ...], ...]:
+    """Keep one full map for each distinct assignment at fusion interfaces."""
+
+    interface_atoms: dict[int, set[int]] = defaultdict(set)
+    for interface in interfaces:
+        interface_atoms[interface.left].update(interface.shared_atom_ids)
+        interface_atoms[interface.right].update(interface.shared_atom_ids)
+
+    result = []
+    for occurrence, mappings in enumerate(mapping_sets):
+        relevant_atoms = interface_atoms[occurrence]
+        by_projection: dict[tuple[tuple[int, str], ...], FusionComponentMatch] = {}
+        for mapping in mappings:
+            locant_by_atom = {atom: locant for locant, atom in mapping.local_to_input_atom}
+            projection = tuple((atom, locant_by_atom[atom]) for atom in sorted(relevant_atoms))
+            by_projection.setdefault(projection, mapping)
+        result.append(tuple(by_projection[key] for key in sorted(by_projection)))
+    return tuple(result)
 
 
 def _build_candidate(
@@ -694,10 +799,3 @@ def _spec_for_match(
     if resolver is not None:
         return resolver(match)
     return _spec(registry, match.spec_key)
-
-
-def _product_size(sizes: tuple[int, ...]) -> int:
-    result = 1
-    for size in sizes:
-        result *= size
-    return result

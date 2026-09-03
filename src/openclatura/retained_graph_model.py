@@ -8,6 +8,7 @@ depending on retained-parent assembly code and avoids parallel graph models.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,3 +111,71 @@ RetainedFusedAtomTemplate = RetainedGraphAtomTemplate
 RetainedFusedBondTemplate = RetainedGraphBondTemplate
 RetainedFusedGraphTemplate = RetainedGraphTemplate
 RetainedFusedTemplateMatch = RetainedGraphTemplateMatch
+
+_PI_CAPABLE_BOND_CLASSES = frozenset({"aromatic", "mancude", "fusion"})
+
+
+def merge_parent_bond_classes(left: str, right: str) -> str | None:
+    """Return the common parent-bond capability represented by two templates.
+
+    ``aromatic``, ``mancude``, and ``fusion`` describe different template
+    provenance for an edge that participates in the same delocalized parent
+    bond model. Explicit single and double classes remain exact constraints.
+    """
+
+    if left == right:
+        return left
+    if left in _PI_CAPABLE_BOND_CLASSES and right in _PI_CAPABLE_BOND_CLASSES:
+        return "mancude"
+    return None
+
+
+def monocyclic_graph_template(
+    *,
+    name: str,
+    ring_size: int,
+    symbol: str = "C",
+    bond_class: Literal["single", "double", "aromatic", "mancude"] = "mancude",
+    pin: bool = True,
+) -> RetainedGraphTemplate:
+    """Build a locant-complete monocyclic parent graph.
+
+    This is shared graph infrastructure, not a retained-name lookup.  Callers
+    remain responsible for nomenclatural eligibility, names, and attached
+    forms; this factory only constructs the numbered graph they describe.
+    """
+
+    if not name:
+        raise ValueError("monocyclic graph template requires a name")
+    if ring_size < 3:
+        raise ValueError("monocyclic graph template requires at least three atoms")
+    if not symbol:
+        raise ValueError("monocyclic graph template requires an atom symbol")
+    if bond_class not in {"single", "double", "aromatic", "mancude"}:
+        raise ValueError(f"unsupported monocyclic graph bond class {bond_class!r}")
+    if type(pin) is not bool:
+        raise TypeError("monocyclic graph template pin flag must be a boolean")
+    locants = tuple(str(index) for index in range(1, ring_size + 1))
+    edges = tuple(zip(locants, locants[1:] + locants[:1], strict=True))
+    aromatic = bond_class in {"aromatic", "mancude"}
+    return RetainedGraphTemplate(
+        name=name,
+        pin=pin,
+        priority=1000,
+        aliases=(),
+        attached_prefix=None,
+        derivative_stem=None,
+        default_indicated_h=(),
+        locants=locants,
+        atoms=tuple(RetainedGraphAtomTemplate(locant=locant, symbol=symbol, aromatic=aromatic) for locant in locants),
+        bonds=tuple(RetainedGraphBondTemplate(locants=edge, bond_class=bond_class) for edge in edges),
+        rings=(locants,),
+        fusion_atoms=(),
+        peripheral_atoms=locants,
+        interior_atoms=(),
+        family="generated_monocycle",
+        numbering_policy="generated_monocycle",
+        charge_policy="exact",
+        enabled=True,
+        pre_descriptor_selection=True,
+    )

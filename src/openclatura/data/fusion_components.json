@@ -32,10 +32,26 @@
     {"ring_size": 7, "id": "heptagon-shoulder", "vertices": [[0, 0], [4, 0], [8, 3], [8, 7], [4, 9], [0, 7], [-2, 3]], "edge_directions": [0, 1, 2, 3, 4, 5, 6], "horizontal_axis_class": "edge", "distortion_rank": 1},
     {"ring_size": 8, "id": "octagon", "vertices": [[0, 0], [4, 0], [7, 2], [8, 5], [7, 8], [4, 10], [0, 10], [-2, 5]], "edge_directions": [0, 1, 2, 3, 4, 5, 6, 7], "horizontal_axis_class": "edge"}
   ],
+  "generated_components": [
+    {"key": "cyclopentadiene", "generator": "monocyclic_carbocycle", "ring_size": 5, "bond_class": "aromatic", "pin_component": true},
+    {"key": "cycloheptatriene", "generator": "monocyclic_carbocycle", "ring_size": 7, "bond_class": "aromatic", "pin_component": true},
+    {"key": "cyclooctatetraene", "generator": "monocyclic_carbocycle", "ring_size": 8, "bond_class": "aromatic", "pin_component": true}
+  ],
   "components": [
+    {"key": "cyclopentadiene", "parent_name": "cyclopentadiene", "attached_prefix": "cyclopenta", "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
+    {"key": "cycloheptatriene", "parent_name": "cycloheptatriene", "attached_prefix": "cyclohepta", "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
+    {"key": "cyclooctatetraene", "parent_name": "cyclooctatetraene", "attached_prefix": "cycloocta", "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
     {"key": "benzene", "attached_prefix": "benzo", "omit_attached_locants": true, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "naphthalene", "attached_prefix": "naphtho", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "azulene", "attached_prefix": "azuleno", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "1H-indene", "attached_prefix": "indeno", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "pentalene", "attached_prefix": "pentaleno", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "anthracene", "attached_prefix": "anthraceno", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "phenanthrene", "attached_prefix": "phenanthro", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "quinoline", "attached_prefix": "quinolino", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "carbazole", "attached_prefix": "carbazolo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "1-benzofuran", "attached_prefix": "benzofuro", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "1-benzothiophene", "attached_prefix": "benzothieno", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "pyridine", "attached_prefix": "pyrido", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "pyridazine", "attached_prefix": "pyridazino", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "pyrimidine", "attached_prefix": "pyrimidino", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},

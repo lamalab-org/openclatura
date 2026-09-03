@@ -1437,14 +1437,15 @@ def name_subgraph(
         retained_name_val = retained_fused.name
         locant_maps = retained_fused.locant_maps
         retained_parent_metadata = retained_fused.metadata
-    fusion_parent = resolve_systematic_fusion_parent(
-        mol,
-        parent_selection,
-        retained_name=retained_name_val,
-        decision_trace=decision_trace,
-    )
-    if fusion_parent is not None:
-        parent_selection.ring_parent = fusion_parent
+    if parent_selection.is_bicycle or parent_selection.is_polycycle:
+        fusion_parent = resolve_systematic_fusion_parent(
+            mol,
+            parent_selection,
+            retained_name=retained_name_val,
+            decision_trace=decision_trace,
+        )
+        if fusion_parent is not None:
+            parent_selection.ring_parent = fusion_parent
     parent_plan = build_parent_assembly_plan(
         mol,
         parent_selection,
