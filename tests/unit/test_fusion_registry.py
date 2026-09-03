@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from types import MappingProxyType
 
 import pytest
 
@@ -107,6 +108,9 @@ def test_checked_in_registry_exposes_stable_version_and_unique_policy_keys():
     assert oxygen is next(atom for atom in furan.template.atoms if atom.symbol == "O")
     assert elements.get("O").mancude_forced_single
     assert registry.by_key["naphthalene"].spec.horizontal_ring_count == 2
+    assert isinstance(registry.by_key, MappingProxyType)
+    assert registry.by_key is registry.by_key
+    assert registry.get("furan") is registry.by_key["furan"]
 
 
 def test_every_registered_component_reuses_a_complete_locanted_parent_graph():
@@ -207,6 +211,15 @@ def test_registration_inherits_names_from_the_shared_retained_template():
 
     assert spec.parent_name == spec.template.output_name == "naphthalene"
     assert spec.attached_prefix == spec.template.attached_prefix == "naphtho"
+
+
+def test_polycyclic_component_requires_explicit_horizontal_ring_count():
+    data = load_json_table("fusion_components.json")
+    row = deepcopy(next(item for item in data["components"] if item["key"] == "naphthalene"))
+    row.pop("horizontal_ring_count")
+
+    with pytest.raises(ValueError, match="requires an explicit horizontal_ring_count"):
+        FusionComponentRegistry("test").register(row)
 
 
 @pytest.mark.parametrize(
