@@ -222,7 +222,7 @@ def select_bounded_face_model(
         search_budget=cycle_search_budget,
     )
     budget = _Budget("face-model selection", model_search_budget)
-    ranks = canonical_ranks(mol)
+    ranks = canonical_ranks(mol, atoms)
     valid: list[tuple[tuple, BoundedFaceModel]] = []
     for face_indices in combinations(range(len(cycles)), rank):
         budget.spend()

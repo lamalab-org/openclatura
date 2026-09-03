@@ -18,6 +18,7 @@ from openclatura.fusion.model import (
     FusionCitationNode,
     FusionComponentMatch,
     FusionComponentSpec,
+    FusionConfirmed,
     FusionDescriptor,
     FusionGraph,
     FusionGraphAtom,
@@ -31,6 +32,8 @@ from openclatura.fusion.model import (
     ParentBondModel,
     SystemLocant,
 )
+from openclatura.fusion.planner import plan_fusion_parent
+from openclatura.graph_io import read_smiles
 from openclatura.molecule import Molecule
 from openclatura.retained_fused_templates import RetainedGraphTemplate
 
@@ -324,6 +327,32 @@ def test_audit_rejects_a_non_graph_preserving_completed_numbering_map():
 
     assert result.status is AuditStatus.MISMATCH
     assert any("not graph preserving" in error for error in result.errors)
+
+
+def test_audit_rejects_layout_that_does_not_match_completed_numbering():
+    mol = read_smiles("O1C2=C(C=C1)C=CS2")
+    planned = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+    assert isinstance(planned, FusionConfirmed)
+    plan = planned.plan
+    positions = list(plan.numbering.selected_layout.atom_positions)
+    atom, _, _ = positions[1]
+    _, duplicate_x, duplicate_y = positions[0]
+    positions[1] = (atom, duplicate_x, duplicate_y)
+    bad_layout = replace(plan.numbering.selected_layout, atom_positions=tuple(positions))
+    bad_numbering = replace(plan.numbering, selected_layout=bad_layout)
+
+    result = audit_fusion_plan(
+        mol,
+        mol.atoms,
+        ast=plan.ast,
+        abstract_parent_graph=plan.abstract_parent_graph,
+        numbering=bad_numbering,
+        bond_model=plan.bond_model,
+        mode=FusionMode.GENERAL,
+    )
+
+    assert result.status is AuditStatus.MISMATCH
+    assert "selected layout assigns the same position to multiple parent atoms" in result.errors
 
 
 def test_audit_rejects_parent_bond_model_that_cannot_describe_the_input():
