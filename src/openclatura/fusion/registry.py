@@ -12,6 +12,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
 from functools import cache
+from types import MappingProxyType
 from typing import Any
 
 from ..molecule import Molecule
@@ -87,8 +88,11 @@ class FusionComponentRegistry:
             raise ValueError("retained graph template names must be unique")
         self._components: list[RegisteredFusionComponent] = []
         self._by_key: dict[str, RegisteredFusionComponent] = {}
+        self._by_key_view = MappingProxyType(self._by_key)
         self._claimed_template_names: set[str] = set()
-        self._topology_index: dict[tuple[int, tuple], list[RegisteredFusionComponent]] = {}
+        self._topology_index: dict[
+            tuple[int, tuple], list[tuple[RegisteredFusionComponent, RetainedGraphTemplate]]
+        ] = {}
 
     @classmethod
     def from_data(cls, data: Mapping[str, Any]) -> FusionComponentRegistry:
@@ -123,7 +127,12 @@ class FusionComponentRegistry:
 
     @property
     def by_key(self) -> Mapping[str, RegisteredFusionComponent]:
-        return dict(self._by_key)
+        return self._by_key_view
+
+    def get(self, key: str) -> RegisteredFusionComponent | None:
+        """Return one registered component without copying the registry map."""
+
+        return self._by_key.get(key)
 
     def register(self, row: Mapping[str, Any]) -> FusionComponentSpec:
         """Validate and register one data-backed component policy row."""
@@ -176,7 +185,7 @@ class FusionComponentRegistry:
         self._claimed_template_names.update(template_names)
         for template in templates:
             index_key = (len(template.rings), retained_graph_template_topology_key(template))
-            self._topology_index.setdefault(index_key, []).append(component)
+            self._topology_index.setdefault(index_key, []).append((component, template))
         return spec
 
     def match_faces(
@@ -216,43 +225,40 @@ class FusionComponentRegistry:
             atom_ids = set().union(*(face.atoms for face in subset))
             topology_key = molecule_graph_topology_key(mol, atom_ids)
             candidates = self._topology_index.get((len(subset), topology_key), ())
-            for component in candidates:
+            for component, template in candidates:
                 if requested_role is not None and not component.eligible_for(requested_role):
                     continue
-                for template in component.templates:
-                    if retained_graph_template_topology_key(template) != topology_key:
+                for exact in match_retained_graph_template_maps(
+                    mol,
+                    atom_ids,
+                    template,
+                    allow_nonaromatic=True,
+                ):
+                    if not _template_rings_match_faces(template, exact.locant_to_atom, subset):
                         continue
-                    for exact in match_retained_graph_template_maps(
-                        mol,
-                        atom_ids,
-                        template,
-                        allow_nonaromatic=True,
-                    ):
-                        if not _template_rings_match_faces(template, exact.locant_to_atom, subset):
-                            continue
-                        local_to_input = tuple((locant, exact.locant_to_atom[locant]) for locant in template.locants)
-                        identity = (
-                            component.spec.key,
-                            template.name,
-                            frozenset(face.id for face in subset),
-                            local_to_input,
+                    local_to_input = tuple((locant, exact.locant_to_atom[locant]) for locant in template.locants)
+                    identity = (
+                        component.spec.key,
+                        template.name,
+                        frozenset(face.id for face in subset),
+                        local_to_input,
+                    )
+                    if identity in seen:
+                        continue
+                    seen.add(identity)
+                    local_to_skeleton = tuple((locant, skeleton_map[atom]) for locant, atom in local_to_input)
+                    matches.append(
+                        FusionComponentMatch(
+                            occurrence_id=occurrence_id,
+                            spec_key=component.spec.key,
+                            covered_face_ids=identity[2],
+                            local_to_input_atom=local_to_input,
+                            local_to_skeleton_atom=local_to_skeleton,
+                            topology_key=topology_key,
+                            template_name=template.name,
                         )
-                        if identity in seen:
-                            continue
-                        seen.add(identity)
-                        local_to_skeleton = tuple((locant, skeleton_map[atom]) for locant, atom in local_to_input)
-                        matches.append(
-                            FusionComponentMatch(
-                                occurrence_id=occurrence_id,
-                                spec_key=component.spec.key,
-                                covered_face_ids=identity[2],
-                                local_to_input_atom=local_to_input,
-                                local_to_skeleton_atom=local_to_skeleton,
-                                topology_key=topology_key,
-                                template_name=template.name,
-                            )
-                        )
-                        occurrence_id += 1
+                    )
+                    occurrence_id += 1
         return tuple(matches)
 
     def spec_for_match(self, match: FusionComponentMatch) -> FusionComponentSpec:
@@ -325,7 +331,11 @@ def _horizontal_ring_count(row: Mapping[str, Any], template: RetainedGraphTempla
     value = _optional_nonnegative_int(row, "horizontal_ring_count")
     if value is not None:
         return value
-    return 1 if len(template.rings) == 1 else 0
+    if len(template.rings) == 1:
+        return 1
+    raise ValueError(
+        f"polycyclic fusion component {template.name!r} requires an explicit horizontal_ring_count"
+    )
 
 
 def _template_names(row: Mapping[str, Any], *, default: str) -> tuple[str, ...]:

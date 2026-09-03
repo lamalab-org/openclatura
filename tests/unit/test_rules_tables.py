@@ -119,11 +119,9 @@ def test_fusion_priorities_and_mancude_roles_share_typed_element_data():
     assert {
         element.symbol for element in elements.ELEMENTS.values() if element.mancude_forced_single
     } >= {"O", "S", "Se", "Te"}
-    assert all(
-        element.mancude_pi_capacity == 0
-        for element in elements.ELEMENTS.values()
-        if element.mancude_forced_single
-    )
+    assert not {"C", "N", "P"} & {
+        element.symbol for element in elements.ELEMENTS.values() if element.mancude_forced_single
+    }
     assert elements.MANCUDE_FORCED_SINGLE_SYMBOLS == {
         element.symbol for element in elements.ELEMENTS.values() if element.mancude_forced_single
     }

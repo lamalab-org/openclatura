@@ -15,7 +15,6 @@ class Element:
     substituent_prefix: str | None
     fusion_special_priority: int | None = None
     fusion_general_priority: int | None = None
-    mancude_pi_capacity: int = 1
     mancude_forced_single: bool = False
     fusion_supported: bool = False
 
@@ -29,8 +28,6 @@ def _load_elements() -> dict[str, Element]:
         element = Element(**row)
         if element.symbol in result:
             raise ValueError(f"duplicate element symbol {element.symbol!r}")
-        if element.mancude_forced_single and element.mancude_pi_capacity:
-            raise ValueError(f"forced-single element {element.symbol!r} cannot have pi capacity")
         result[element.symbol] = element
     return result
 

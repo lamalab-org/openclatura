@@ -4,6 +4,7 @@ from copy import deepcopy
 
 import pytest
 
+from openclatura.fusion.descriptor import component_sides
 from openclatura.fusion.faces import GraphCycle
 from openclatura.fusion.registry import (
     FusionComponentRegistry,
@@ -106,6 +107,32 @@ def test_checked_in_registry_exposes_stable_version_and_unique_policy_keys():
     assert oxygen is next(atom for atom in furan.template.atoms if atom.symbol == "O")
     assert elements.get("O").mancude_forced_single
     assert registry.by_key["naphthalene"].spec.horizontal_ring_count == 2
+
+
+def test_every_registered_component_reuses_a_complete_locanted_parent_graph():
+    registry = fusion_component_registry()
+
+    for component in registry.components:
+        assert component.template_names
+        assert component.spec.rule_reference.startswith("P-")
+        assert component.spec.template is component.templates[0]
+        for template in component.templates:
+            atom_locants = {atom.locant for atom in template.atoms}
+            assert atom_locants == set(template.locants), component.spec.key
+            assert len(atom_locants) == len(template.atoms)
+            assert all(set(bond.locants) <= atom_locants for bond in template.bonds)
+            assert all(set(ring) <= atom_locants for ring in template.rings)
+            assert set(template.peripheral_atoms) <= atom_locants
+            assert set(template.fusion_atoms) <= atom_locants
+            assert set(template.interior_atoms) <= atom_locants
+        sides = component_sides(component.spec)
+        assert len(sides) == len(component.spec.peripheral_order)
+        assert tuple(side.letter for side in sides) == tuple(
+            chr(ord("a") + index) for index in range(len(sides))
+        )
+        if component.spec.usable_as_attached:
+            assert component.spec.attached_prefix
+        assert component.spec.usable_as_parent or component.spec.usable_as_attached
 
 
 def test_generated_carbocycles_use_shared_numbered_graph_templates():

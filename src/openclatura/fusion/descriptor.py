@@ -747,7 +747,7 @@ def _omit_attached_locants(
 ) -> bool:
     if isinstance(registry, Mapping):
         return False
-    component = registry.by_key.get(key)
+    component = registry.get(key)
     return component.omit_attached_locants
 
 
@@ -817,7 +817,7 @@ def _spec(
     if isinstance(registry, Mapping):
         value = registry.get(key)
     else:
-        value = registry.by_key.get(key)
+        value = registry.get(key)
     if value is None:
         raise FusionDescriptorError(f"unknown fusion component {key!r}")
     spec = getattr(value, "spec", value)
