@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 from pathlib import Path
 
 import pytest
@@ -227,6 +228,25 @@ def test_fusion_name_is_invariant_to_graph_atom_renumbering():
     assert (
         name_mol(mol, fusion_mode=FusionMode.GENERAL).name == name_mol(renumbered, fusion_mode=FusionMode.GENERAL).name
     )
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    (
+        "O1C2=C(C=C1)C=CS2",
+        "O1C=CC2=NC3=C(C=C21)SC=C3",
+        "C1C=CC2=C1C1=CC=CC=C1C=1C=CC=CC21",
+    ),
+)
+def test_fusion_name_is_invariant_to_random_atom_renumberings(smiles):
+    mol = Chem.MolFromSmiles(smiles)
+    expected = name_mol(mol, fusion_mode=FusionMode.GENERAL).name
+
+    for seed in range(4):
+        order = list(range(mol.GetNumAtoms()))
+        random.Random(seed).shuffle(order)
+        renumbered = Chem.RenumberAtoms(mol, order)
+        assert name_mol(renumbered, fusion_mode=FusionMode.GENERAL).name == expected
 
 
 def test_batch_request_propagates_fusion_mode_without_cross_request_state():

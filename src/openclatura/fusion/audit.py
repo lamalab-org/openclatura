@@ -134,7 +134,7 @@ def audit_fusion_plan(
         )
         checks.append("component_coverage")
 
-        _audit_descriptors(mol, ast, specs, reconstruction, errors)
+        _audit_descriptors(mol, ast, specs, reconstruction, numbering, errors)
         checks.append("descriptor_interfaces")
 
         _audit_reconstructed_graph(mol, parent_atoms, abstract_parent_graph, reconstruction, errors)
@@ -456,6 +456,7 @@ def _audit_descriptors(
     ast: FusionNameAst,
     specs: Mapping[int, FusionComponentSpec],
     reconstruction: _ReconstructedGraph,
+    numbering: FusionNumberingProof,
     errors: list[str],
 ) -> None:
     matches = {match.occurrence_id: match for match in ast.component_occurrences}
@@ -494,6 +495,10 @@ def _audit_descriptors(
             errors.append(f"join {join.attached_occurrence}->{join.host_occurrence} stores wrong shared atoms")
         if join.shared_input_bonds != expected_bond_ids:
             errors.append(f"join {join.attached_occurrence}->{join.host_occurrence} stores wrong shared bonds")
+        if not join.shared_input_bonds <= numbering.selected_face_model.fusion_edges:
+            errors.append(
+                f"join {join.attached_occurrence}->{join.host_occurrence} is not a selected-layout fusion interface"
+            )
 
         if ast.descriptors:
             descriptor = ast.descriptors[index]
@@ -560,6 +565,7 @@ def _audit_numbering(
         errors.append("completed abstract numbering is not a bijection over the parent graph")
 
     _audit_face_model(mol, parent_atoms, numbering, errors)
+    _audit_layout_numbering_compatibility(parent_atoms, numbering, errors)
     face_membership = Counter(atom for face in numbering.selected_face_model.faces for atom in face.atom_cycle)
     fusion_atoms = {atom for atom, count in face_membership.items() if count > 1}
 
@@ -595,6 +601,53 @@ def _audit_numbering(
             if atom in fusion_atoms and mol.atoms[atom].symbol != "C" and locant.fusion_suffix:
                 errors.append("fusion heteroatoms must receive integer completed-system locants")
                 break
+
+
+def _audit_layout_numbering_compatibility(
+    parent_atoms: frozenset[int],
+    numbering: FusionNumberingProof,
+    errors: list[str],
+) -> None:
+    """Verify that the selected layout yields the stored completed numbering."""
+
+    layout = numbering.selected_layout
+    if not layout.atom_positions:
+        # Synthetic audit fixtures predating geometric numbering remain valid;
+        # production plans always carry complete positioned layouts.
+        return
+    atom_positions = {atom: (x, y) for atom, x, y in layout.atom_positions}
+    face_positions = {face: (x, y) for face, x, y in layout.face_positions}
+    face_ids = {face.id for face in numbering.selected_face_model.faces}
+    if set(atom_positions) != parent_atoms:
+        errors.append("selected layout does not position every and only parent atom")
+        return
+    if set(face_positions) != face_ids:
+        errors.append("selected layout does not position every and only selected face")
+    if len(set(atom_positions.values())) != len(atom_positions):
+        errors.append("selected layout assigns the same position to multiple parent atoms")
+
+    boundary = numbering.selected_face_model.outer_boundary
+    signed_area = sum(
+        atom_positions[left][0] * atom_positions[right][1]
+        - atom_positions[right][0] * atom_positions[left][1]
+        for left, right in zip(boundary, boundary[1:] + boundary[:1])
+    )
+    if signed_area == 0:
+        errors.append("selected layout has a degenerate outer boundary")
+        return
+    clockwise = boundary if signed_area < 0 else tuple(reversed(boundary))
+    locant_map = dict(numbering.abstract_atom_to_locant)
+    if set(locant_map) != parent_atoms:
+        return
+    expected = tuple(sorted(parent_atoms, key=lambda atom: _system_locant_key(locant_map[atom])))
+    start = clockwise.index(expected[0])
+    geometric_order = clockwise[start:] + clockwise[:start]
+    if geometric_order != expected:
+        errors.append("completed locant order is incompatible with the selected layout perimeter")
+
+
+def _system_locant_key(locant) -> tuple[int, str, int]:
+    return locant.base, locant.fusion_suffix, locant.interior_distance or 0
 
 
 def _audit_face_model(

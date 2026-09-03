@@ -13,6 +13,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from itertools import combinations
 
+from ..canonical_ranks import canonical_ranks
 from ..molecule import Molecule
 from ..polycycle_topology import (
     adjacency_from_edges,
@@ -221,7 +222,8 @@ def select_bounded_face_model(
         search_budget=cycle_search_budget,
     )
     budget = _Budget("face-model selection", model_search_budget)
-    valid: list[tuple[tuple[int, tuple[tuple[int, ...], ...]], BoundedFaceModel]] = []
+    ranks = canonical_ranks(mol)
+    valid: list[tuple[tuple, BoundedFaceModel]] = []
     for face_indices in combinations(range(len(cycles)), rank):
         budget.spend()
         selected = tuple(cycles[index] for index in face_indices)
@@ -240,9 +242,29 @@ def select_bounded_face_model(
             cycle_rank=rank,
             audit=audit,
         )
-        score = (sum(len(face.atoms) for face in selected), tuple(face.atoms for face in selected))
+        score = _face_model_score(selected, ranks)
         valid.append((score, model))
-    return min(valid, key=lambda item: item[0])[1] if valid else None
+    if not valid:
+        return None
+    best_score = min(score for score, _ in valid)
+    best = [model for score, model in valid if score == best_score]
+    distinct = {frozenset(face.edges for face in model.faces) for model in best}
+    return best[0] if len(distinct) == 1 else None
+
+
+def _face_model_score(faces: tuple[GraphCycle, ...], ranks: dict[int, int]) -> tuple:
+    """Rank face models without consulting input atom identifiers."""
+
+    signatures = tuple(sorted(_cycle_rank_signature(face.atoms, ranks) for face in faces))
+    return sum(len(face.atoms) for face in faces), signatures
+
+
+def _cycle_rank_signature(cycle: tuple[int, ...], ranks: dict[int, int]) -> tuple[int, ...]:
+    values = tuple(ranks[atom] for atom in cycle)
+    variants = []
+    for direction in (values, tuple(reversed(values))):
+        variants.extend(direction[offset:] + direction[:offset] for offset in range(len(direction)))
+    return min(variants)
 
 
 def _as_cycle(face: GraphCycle | Iterable[int]) -> GraphCycle:
