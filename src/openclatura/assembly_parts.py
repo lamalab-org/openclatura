@@ -1,11 +1,16 @@
 """Structured inputs for name assembly."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from .locant_sources import LocantMapSource
 from .name_operations import HydroOperation
-from .ring_parent import RingParent
 from .spiro_assembly import SpiroAssembly
+
+if TYPE_CHECKING:
+    from .ring_parent import RingParent
 
 
 @dataclass(frozen=True)

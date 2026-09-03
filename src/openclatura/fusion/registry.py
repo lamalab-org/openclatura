@@ -22,7 +22,10 @@ from ..retained_fused_templates import (
     molecule_graph_topology_key,
     retained_graph_template_topology_key,
     retained_graph_templates,
+    validate_retained_fused_template,
 )
+from ..rules import elements
+from .faces import normalize_edge
 from .model import ComponentAtom, ComponentBond, FusionComponentMatch, FusionComponentSpec
 
 SUPPORTED_SCHEMA_VERSION = 1
@@ -122,8 +125,8 @@ class FusionComponentRegistry:
         templates = tuple(self._template_by_name[name] for name in template_names if name in self._template_by_name)
         if not templates:
             raise ValueError(f"fusion component {key!r} has no matching retained graph template")
-        if any(not _template_is_connected(template) for template in templates):
-            raise ValueError(f"fusion component {key!r} references a disconnected graph template")
+        for template in templates:
+            validate_retained_fused_template(template)
         if any(template.locants != templates[0].locants for template in templates[1:]):
             raise ValueError(f"fusion component {key!r} template variants use different local locants")
 
@@ -240,17 +243,7 @@ def _component_spec(
     usable_as_attached: bool,
     rule_reference: str,
 ) -> FusionComponentSpec:
-    atoms = tuple(
-        ComponentAtom(
-            locant=atom.locant,
-            symbol=atom.symbol,
-            formal_charge=atom.charge,
-            pi_capacity=0 if atom.saturated else 1,
-            forced_single=atom.saturated,
-            indicated_h_candidate=atom.default_h,
-        )
-        for atom in template.atoms
-    )
+    atoms = tuple(_component_atom(atom) for atom in template.atoms)
     atom_by_locant = template.atom_by_locant
     return FusionComponentSpec(
         key=key,
@@ -273,6 +266,21 @@ def _component_spec(
         preferred_layouts=(),
         seniority_override=None,
         rule_reference=rule_reference,
+    )
+
+
+def _component_atom(atom) -> ComponentAtom:
+    """Project one retained-template atom through the shared element table."""
+
+    element = elements.get(atom.symbol)
+    forced_single = atom.saturated or element.mancude_forced_single
+    return ComponentAtom(
+        locant=atom.locant,
+        symbol=atom.symbol,
+        formal_charge=atom.charge,
+        pi_capacity=0 if forced_single else element.mancude_pi_capacity,
+        forced_single=forced_single,
+        indicated_h_candidate=atom.default_h,
     )
 
 
@@ -324,7 +332,7 @@ def _normalize_faces(faces: object) -> tuple[_Face, ...]:
         if len(atoms) < 3 or len(atoms) != len(set(atoms)):
             raise ValueError("every fusion face must be a simple cycle")
         face_id = int(getattr(face, "id", position))
-        edges = frozenset(_edge(left, right) for left, right in zip(atoms, atoms[1:] + atoms[:1]))
+        edges = frozenset(normalize_edge(left, right) for left, right in zip(atoms, atoms[1:] + atoms[:1]))
         normalized.append(_Face(face_id, frozenset(atoms), edges))
     if len({face.id for face in normalized}) != len(normalized):
         raise ValueError("fusion face ids must be unique")
@@ -364,27 +372,6 @@ def _template_rings_match_faces(
 ) -> bool:
     mapped_rings = {frozenset(locant_to_atom[locant] for locant in ring) for ring in template.rings}
     return mapped_rings == {face.atoms for face in faces}
-
-
-def _template_is_connected(template: RetainedGraphTemplate) -> bool:
-    adjacency = {locant: set() for locant in template.locants}
-    for bond in template.bonds:
-        left, right = bond.locants
-        adjacency[left].add(right)
-        adjacency[right].add(left)
-    reached: set[str] = set()
-    pending = [template.locants[0]]
-    while pending:
-        locant = pending.pop()
-        if locant in reached:
-            continue
-        reached.add(locant)
-        pending.extend(adjacency[locant] - reached)
-    return reached == set(template.locants)
-
-
-def _edge(left: int, right: int) -> tuple[int, int]:
-    return (left, right) if left < right else (right, left)
 
 
 @cache
