@@ -15,6 +15,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Protocol
 
+from ..locants import retained_locant_sort_key
 from ..molecule import Molecule
 from ..polycycle_topology import normalize_edge
 from ..rules import multipliers
@@ -762,11 +763,11 @@ def _join_preference_key(join: FusionJoin, side_rank: int) -> tuple:
 
 
 def _attached_locant_key(join: FusionJoin) -> tuple:
-    return tuple(_locant_sort_key(locant.text) for locant in join.attached_locants)
+    return tuple(retained_locant_sort_key(locant.text) for locant in join.attached_locants)
 
 
 def _local_map_key(mapping: tuple[tuple[str, int], ...]) -> tuple:
-    return tuple((_locant_sort_key(locant), atom) for locant, atom in mapping)
+    return tuple((retained_locant_sort_key(locant), atom) for locant, atom in mapping)
 
 
 def _occurrence_option_key(option: _OccurrenceOption) -> tuple:
@@ -777,14 +778,6 @@ def _occurrence_option_key(option: _OccurrenceOption) -> tuple:
         option.spec_key,
         tuple(sorted(option.atom_ids)),
     )
-
-
-def _locant_sort_key(locant: str) -> tuple[int, str]:
-    position = 0
-    while position < len(locant) and locant[position].isdigit():
-        position += 1
-    number = int(locant[:position]) if position else 1_000_000
-    return number, locant[position:]
 
 
 def _side_sort_key(letter: str) -> tuple[int, ...]:

@@ -31,6 +31,10 @@ class FusionSupportConfig:
     maximum_indicated_hydrogens: int
 
 
+_IMPLEMENTED_COVER_KINDS = ("tree",)
+_IMPLEMENTED_JOIN_KINDS = ("ortho",)
+
+
 @dataclass(frozen=True, slots=True)
 class FusionSearchLimits:
     minimum_ring_size: int
@@ -101,6 +105,7 @@ def fusion_nomenclature_config_from_data(data: dict) -> FusionNomenclatureConfig
         interior_atoms=_boolean(support_data, "interior_atoms"),
         maximum_indicated_hydrogens=_nonnegative_int(support_data, "maximum_indicated_hydrogens"),
     )
+    _validate_implemented_support(support)
     rules = FusionRuleConfig(
         planner_tier=_text(rules_data, "planner_tier"),
         pin_minimum_ring_size=_positive_int(pin_gate, "minimum_ring_size"),
@@ -146,6 +151,17 @@ def _mapping(data: dict, key: str) -> dict:
     if not isinstance(value, dict):
         raise ValueError(f"fusion nomenclature {key} must be a mapping")
     return value
+
+
+def _validate_implemented_support(support: FusionSupportConfig) -> None:
+    """Reject configuration that claims an algorithmic tier not implemented here."""
+
+    if support.cover_kinds != _IMPLEMENTED_COVER_KINDS:
+        raise ValueError("fusion nomenclature currently implements only tree component covers")
+    if support.join_kinds != _IMPLEMENTED_JOIN_KINDS:
+        raise ValueError("fusion nomenclature currently implements only ordinary ortho joins")
+    if support.charged_parents or support.nonstandard_valence or support.interior_atoms:
+        raise ValueError("fusion nomenclature support flags exceed the implemented ortho-tree-v1 tier")
 
 
 def _text(data: dict, key: str) -> str:

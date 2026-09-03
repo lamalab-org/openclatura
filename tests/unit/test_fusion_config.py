@@ -43,3 +43,21 @@ def test_invalid_fusion_configuration_is_rejected(path, value, message):
 
     with pytest.raises(ValueError, match=message):
         fusion_nomenclature_config_from_data(data)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("cover_kinds", ["multiparent"]),
+        ("join_kinds", ["ortho_peri"]),
+        ("charged_parents", True),
+        ("nonstandard_valence", True),
+        ("interior_atoms", True),
+    ],
+)
+def test_configuration_cannot_enable_an_unimplemented_proof_tier(field, value):
+    data = deepcopy(load_json_table("fusion_components.json"))
+    data["rules"]["support"][field] = value
+
+    with pytest.raises(ValueError, match="currently implements|exceed the implemented"):
+        fusion_nomenclature_config_from_data(data)

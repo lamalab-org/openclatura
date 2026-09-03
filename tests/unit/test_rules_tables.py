@@ -111,6 +111,9 @@ def test_fusion_priorities_and_mancude_roles_share_typed_element_data():
     )
     assert tuple(element.symbol for element in special) == EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE
     assert tuple(element.symbol for element in general) == GENERAL_HETEROATOM_COUNT_PRECEDENCE
+    assert EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE[:6] == ("N", "F", "Cl", "Br", "I", "O")
+    assert GENERAL_HETEROATOM_COUNT_PRECEDENCE[:9] == ("F", "Cl", "Br", "I", "O", "S", "Se", "Te", "N")
+    assert EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE != GENERAL_HETEROATOM_COUNT_PRECEDENCE
     assert len({element.fusion_special_priority for element in special}) == len(special)
     assert len({element.fusion_general_priority for element in general}) == len(general)
     assert {
