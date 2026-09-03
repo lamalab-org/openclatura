@@ -339,6 +339,8 @@ class FusionRenderedPart:
     role: str
     occurrence_ids: tuple[int, ...] = ()
     interface_occurrence_ids: tuple[int, ...] = ()
+    atom_ids: frozenset[int] = frozenset()
+    bond_ids: frozenset[int] = frozenset()
 
     def __post_init__(self) -> None:
         _require_nonempty(self.text, "fusion rendered text")
@@ -580,6 +582,7 @@ class FusionParentPlan:
     pin_status: PinStatus | str
     rule_trace: tuple[FusionRuleDecision, ...]
     audit: FusionAuditResult
+    rendered_parts: tuple[FusionRenderedPart, ...] = ()
 
     def __post_init__(self) -> None:
         _require_nonempty(self.rendered_base_name, "rendered fusion base name")

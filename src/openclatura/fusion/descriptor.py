@@ -140,6 +140,8 @@ def render_fusion_name(
 def render_fusion_name_parts(
     ast: FusionNameAst,
     registry: _Registry | Mapping[str, FusionComponentSpec],
+    *,
+    mol: Molecule | None = None,
 ) -> tuple[FusionRenderedPart, ...]:
     """Render ordered text parts while preserving component/interface scope."""
 
@@ -154,17 +156,42 @@ def render_fusion_name_parts(
 
     rendered_groups: set[tuple[int, ...]] = set()
 
+    def component_scope(occurrence_ids: tuple[int, ...]) -> tuple[frozenset[int], frozenset[int]]:
+        atom_ids: set[int] = set()
+        bond_ids: set[int] = set()
+        for occurrence_id in occurrence_ids:
+            match = matches[occurrence_id]
+            spec = _spec_for_match(registry, match)
+            local = match.input_atom_by_locant
+            atom_ids.update(local.values())
+            if mol is not None:
+                for bond in spec.bonds:
+                    molecular_bond = mol.get_bond(local[bond.locants[0]], local[bond.locants[1]])
+                    if molecular_bond is not None:
+                        bond_ids.add(molecular_bond.idx)
+        return frozenset(atom_ids), frozenset(bond_ids)
+
+    def component_part(text: str, role: str, occurrence_ids: tuple[int, ...]) -> FusionRenderedPart:
+        atom_ids, bond_ids = component_scope(occurrence_ids)
+        return FusionRenderedPart(text, role, occurrence_ids, atom_ids=atom_ids, bond_ids=bond_ids)
+
+    def descriptor_part(text: str, occurrence_ids: tuple[int, ...]) -> FusionRenderedPart:
+        interfaces = tuple(join for join in ast.joins if join.attached_occurrence in occurrence_ids)
+        return FusionRenderedPart(
+            text,
+            "descriptor",
+            interface_occurrence_ids=occurrence_ids,
+            atom_ids=frozenset().union(*(join.shared_input_atoms for join in interfaces)),
+            bond_ids=frozenset().union(*(join.shared_input_bonds for join in interfaces)),
+        )
+
     def attachment(node: FusionCitationNode) -> list[FusionRenderedPart]:
         descendants = render_children(node)
         spec = _spec_for_match(registry, matches[node.occurrence_id])
         return [
             *descendants,
-            FusionRenderedPart(spec.attached_prefix, "attached_component", (node.occurrence_id,)),
-            FusionRenderedPart(
-                descriptors[node.occurrence_id].render(),
-                "descriptor",
-                interface_occurrence_ids=(node.occurrence_id,),
-            ),
+            component_part(spec.attached_prefix, "attached_component", (node.occurrence_id,)),
+            descriptor_part(descriptors[node.occurrence_id].render(), (node.occurrence_id,)),
         ]
 
     def render_children(node: FusionCitationNode) -> list[FusionRenderedPart]:
@@ -187,12 +214,8 @@ def render_fusion_name_parts(
             pieces.extend(
                 (
                     FusionRenderedPart(group.multiplier, "multiplier", group.occurrence_ids),
-                    FusionRenderedPart(min(prefixes), "attached_component", group.occurrence_ids),
-                    FusionRenderedPart(
-                        descriptor,
-                        "descriptor",
-                        interface_occurrence_ids=group.occurrence_ids,
-                    ),
+                    component_part(min(prefixes), "attached_component", group.occurrence_ids),
+                    descriptor_part(descriptor, group.occurrence_ids),
                 )
             )
         return pieces
@@ -203,7 +226,7 @@ def render_fusion_name_parts(
     return tuple(
         [
             *render_children(root),
-            FusionRenderedPart(root_spec.parent_name, "parent_component", (root.occurrence_id,)),
+            component_part(root_spec.parent_name, "parent_component", (root.occurrence_id,)),
         ]
     )
 
