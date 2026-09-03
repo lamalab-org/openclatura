@@ -5,10 +5,12 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
+from fractions import Fraction
+from functools import cmp_to_key
 
 from ..molecule import Molecule
 from .faces import BoundedFaceModel, normalize_edge
-from .model import BondAssignment, ParentBondModel, SystemLocant
+from .model import BondAssignment, FaceModel, FusedLayout, ParentBondModel, RejectedNumbering, SystemLocant
 from .rules import GENERAL_HETEROATOM_COUNT_PRECEDENCE
 
 _FIXED_SINGLE_ELEMENTS = frozenset({"O", "S", "Se", "Te"})
@@ -21,13 +23,30 @@ class CompletedNumbering:
     perimeter: tuple[int, ...]
     atom_to_locant: tuple[tuple[int, SystemLocant], ...]
     score: tuple
+    layout_index: int | None = None
+    start_face_id: int | None = None
+    start_atom: int | None = None
 
     @property
     def string_map(self) -> dict[int, str]:
         return {atom: str(locant) for atom, locant in self.atom_to_locant}
 
 
-def completed_system_numberings(mol: Molecule, faces: BoundedFaceModel) -> tuple[CompletedNumbering, ...]:
+@dataclass(frozen=True, slots=True)
+class CompletedNumberingSelection:
+    """Accepted layout-derived numberings and rejected orientation evidence."""
+
+    accepted: tuple[CompletedNumbering, ...]
+    rejected: tuple[RejectedNumbering, ...] = ()
+
+
+def completed_system_numberings(
+    mol: Molecule,
+    faces: BoundedFaceModel,
+    *,
+    face_model: FaceModel | None = None,
+    layouts: tuple[FusedLayout, ...] = (),
+) -> tuple[CompletedNumbering, ...]:
     """Return every tied preferred numbering for an all-peripheral fused system.
 
     Carbon atoms shared by bounded faces receive letter-suffixed locants;
@@ -35,11 +54,85 @@ def completed_system_numberings(mol: Molecule, faces: BoundedFaceModel) -> tuple
     separate nomenclature tier and are deliberately rejected here.
     """
 
+    return completed_system_numbering_selection(
+        mol,
+        faces,
+        face_model=face_model,
+        layouts=layouts,
+    ).accepted
+
+
+def completed_system_numbering_selection(
+    mol: Molecule,
+    faces: BoundedFaceModel,
+    *,
+    face_model: FaceModel | None = None,
+    layouts: tuple[FusedLayout, ...] = (),
+) -> CompletedNumberingSelection:
+    """Select completed-system maps, optionally proving starts from layouts.
+
+    With layouts supplied, every accepted perimeter starts at the most
+    counterclockwise nonfusion atom of the uppermost/rightmost face and then
+    follows the geometric perimeter clockwise. The established ordered locant
+    criteria remain a second-stage filter, preserving nomenclatural choices
+    among reflected layouts.
+    """
+
+    if not layouts:
+        return CompletedNumberingSelection(_graph_numbering_candidates(mol, faces))
+    if face_model is None:
+        raise ValueError("layout-derived numbering requires the corresponding typed face model")
+    if set(faces.outer_boundary.atoms) != set(faces.atom_ids):
+        return CompletedNumberingSelection(())
+    candidates: list[CompletedNumbering] = []
+    rejected: list[RejectedNumbering] = []
+    fusion_atoms = _fusion_atoms(faces)
+    for layout_index, layout in enumerate(layouts):
+        derived = _numbering_from_layout(
+            mol,
+            faces,
+            face_model,
+            layout,
+            layout_index,
+            fusion_atoms,
+        )
+        if derived is None:
+            rejected.append(
+                RejectedNumbering(
+                    orientation_score=layout.orientation_score,
+                    reason=f"layout {layout_index} has no valid uppermost/rightmost clockwise perimeter",
+                )
+            )
+            continue
+        candidates.append(derived)
+    if not candidates:
+        return CompletedNumberingSelection((), tuple(rejected))
+    best_score = min(candidate.score for candidate in candidates)
+    accepted: dict[tuple[tuple[int, str], ...], CompletedNumbering] = {}
+    for candidate in candidates:
+        if candidate.score != best_score:
+            rejected.append(
+                RejectedNumbering(
+                    orientation_score=(
+                        layouts[candidate.layout_index if candidate.layout_index is not None else 0].orientation_score,
+                        candidate.score,
+                    ),
+                    reason=(
+                        f"layout {candidate.layout_index} start at face {candidate.start_face_id}, atom "
+                        f"{candidate.start_atom} loses the ordered completed-system locant criteria"
+                    ),
+                )
+            )
+            continue
+        accepted.setdefault(_numbering_key(candidate), candidate)
+    return CompletedNumberingSelection(tuple(accepted.values()), tuple(rejected))
+
+
+def _graph_numbering_candidates(mol: Molecule, faces: BoundedFaceModel) -> tuple[CompletedNumbering, ...]:
     boundary = faces.outer_boundary.atoms
     if set(boundary) != set(faces.atom_ids):
         return ()
-    face_membership = Counter(atom for face in faces.faces for atom in face.atoms)
-    fusion_atoms = {atom for atom, count in face_membership.items() if count > 1}
+    fusion_atoms = _fusion_atoms(faces)
     candidates: list[CompletedNumbering] = []
     for oriented in _cycle_orientations(boundary):
         locant_map = _number_perimeter(mol, oriented, fusion_atoms)
@@ -70,22 +163,130 @@ def completed_system_numberings(mol: Molecule, faces: BoundedFaceModel) -> tuple
     return tuple(unique.values())
 
 
+def _numbering_from_layout(
+    mol: Molecule,
+    faces: BoundedFaceModel,
+    face_model: FaceModel,
+    layout: FusedLayout,
+    layout_index: int,
+    fusion_atoms: set[int],
+) -> CompletedNumbering | None:
+    positions = {atom: (x, y) for atom, x, y in layout.atom_positions}
+    centers = {face: (x, y) for face, x, y in layout.face_positions}
+    face_by_id = {face.id: face for face in face_model.faces}
+    if set(positions) != set(faces.atom_ids) or set(centers) != set(face_by_id):
+        return None
+    face_order = _clockwise_face_order(centers)
+    if not face_order:
+        return None
+    start_face_id = next(
+        (
+            face_id
+            for face_id in face_order
+            if any(
+                atom not in fusion_atoms and atom in faces.outer_boundary.atoms
+                for atom in face_by_id[face_id].atom_cycle
+            )
+        ),
+        None,
+    )
+    if start_face_id is None:
+        return None
+    start_face = face_by_id[start_face_id]
+    start_candidates = [
+        atom for atom in start_face.atom_cycle if atom not in fusion_atoms and atom in faces.outer_boundary.atoms
+    ]
+    # For a face in its preferred orientation, the uppermost then leftmost
+    # peripheral vertex is its most counterclockwise nonfusion position.
+    start_atom = max(start_candidates, key=lambda atom: (positions[atom][1], -positions[atom][0]))
+    perimeter = _clockwise_perimeter(faces.outer_boundary.atoms, positions, start_atom)
+    if perimeter is None:
+        return None
+    locant_map = _number_perimeter(mol, perimeter, fusion_atoms)
+    if locant_map is None:
+        return None
+    return CompletedNumbering(
+        perimeter=perimeter,
+        atom_to_locant=tuple((atom, locant_map[atom]) for atom in perimeter),
+        score=_numbering_score(mol, locant_map, fusion_atoms),
+        layout_index=layout_index,
+        start_face_id=start_face_id,
+        start_atom=start_atom,
+    )
+
+
+def _clockwise_face_order(centers: dict[int, tuple[int, int]]) -> tuple[int, ...]:
+    """Order faces clockwise from the uppermost, then rightmost face."""
+
+    if not centers or len(set(centers.values())) != len(centers):
+        return ()
+    first = max(centers, key=lambda face: (centers[face][1], centers[face][0]))
+    center_x = Fraction(sum(x for x, _ in centers.values()), len(centers))
+    center_y = Fraction(sum(y for _, y in centers.values()), len(centers))
+
+    def vector(face: int) -> tuple[Fraction, Fraction]:
+        x, y = centers[face]
+        return Fraction(x) - center_x, Fraction(y) - center_y
+
+    def compare(left: int, right: int) -> int:
+        left_vector = vector(left)
+        right_vector = vector(right)
+        left_half = _clockwise_half(*left_vector)
+        right_half = _clockwise_half(*right_vector)
+        if left_half != right_half:
+            return -1 if left_half < right_half else 1
+        cross = left_vector[0] * right_vector[1] - left_vector[1] * right_vector[0]
+        if cross:
+            return -1 if cross < 0 else 1
+        return 0
+
+    ordered = sorted(centers, key=cmp_to_key(compare))
+    offset = ordered.index(first)
+    return tuple(ordered[offset:] + ordered[:offset])
+
+
+def _clockwise_half(dx: Fraction, dy: Fraction) -> int:
+    return 0 if dx > 0 or (dx == 0 and dy >= 0) else 1
+
+
+def _clockwise_perimeter(
+    boundary: tuple[int, ...],
+    positions: dict[int, tuple[int, int]],
+    start_atom: int,
+) -> tuple[int, ...] | None:
+    if start_atom not in boundary or any(atom not in positions for atom in boundary):
+        return None
+    signed_area = sum(
+        positions[left][0] * positions[right][1] - positions[right][0] * positions[left][1]
+        for left, right in zip(boundary, boundary[1:] + boundary[:1])
+    )
+    if signed_area == 0:
+        return None
+    clockwise = boundary if signed_area < 0 else tuple(reversed(boundary))
+    offset = clockwise.index(start_atom)
+    return clockwise[offset:] + clockwise[:offset]
+
+
+def _fusion_atoms(faces: BoundedFaceModel) -> set[int]:
+    face_membership = Counter(atom for face in faces.faces for atom in face.atoms)
+    return {atom for atom, count in face_membership.items() if count > 1}
+
+
+def _numbering_key(numbering: CompletedNumbering) -> tuple[tuple[int, str], ...]:
+    return tuple(sorted((atom, str(locant)) for atom, locant in numbering.atom_to_locant))
+
+
 def parent_bond_model(mol: Molecule, atom_ids: Iterable[int], *, search_budget: int = 100_000) -> ParentBondModel:
     """Build all maximum non-cumulative Kekule assignments for a parent graph."""
 
     atoms = frozenset(atom_ids)
     edges = tuple(
-        sorted(
-            normalize_edge(bond.u, bond.v)
-            for bond in mol.bonds.values()
-            if bond.u in atoms and bond.v in atoms
-        )
+        sorted(normalize_edge(bond.u, bond.v) for bond in mol.bonds.values() if bond.u in atoms and bond.v in atoms)
     )
     required = frozenset(
         edge
         for edge in edges
-        if mol.atoms[edge[0]].symbol in _FIXED_SINGLE_ELEMENTS
-        or mol.atoms[edge[1]].symbol in _FIXED_SINGLE_ELEMENTS
+        if mol.atoms[edge[0]].symbol in _FIXED_SINGLE_ELEMENTS or mol.atoms[edge[1]].symbol in _FIXED_SINGLE_ELEMENTS
     )
     eligible = frozenset(edges) - required
     matchings = _maximum_matchings(eligible, search_budget=search_budget)
@@ -152,12 +353,8 @@ def _numbering_score(mol: Molecule, locants: dict[int, SystemLocant], fusion_ato
         tuple(sorted(_locant_key(locant) for atom, locant in hetero if mol.atoms[atom].symbol == symbol))
         for symbol in GENERAL_HETEROATOM_COUNT_PRECEDENCE
     )
-    fusion_carbons = tuple(
-        sorted(_locant_key(locants[atom]) for atom in fusion_atoms if mol.atoms[atom].symbol == "C")
-    )
-    fusion_hetero = tuple(
-        sorted(_locant_key(locants[atom]) for atom in fusion_atoms if mol.atoms[atom].symbol != "C")
-    )
+    fusion_carbons = tuple(sorted(_locant_key(locants[atom]) for atom in fusion_atoms if mol.atoms[atom].symbol == "C"))
+    fusion_hetero = tuple(sorted(_locant_key(locants[atom]) for atom in fusion_atoms if mol.atoms[atom].symbol != "C"))
     indicated_h = tuple(
         sorted(_locant_key(locant) for atom, locant in locants.items() if mol.atoms[atom].total_h_count > 0)
     )
@@ -169,14 +366,12 @@ def _locant_key(locant: SystemLocant) -> tuple[int, str, int]:
 
 
 def _first_fusion_base(numbering: CompletedNumbering) -> int:
-    return min(
-        locant.base
-        for _, locant in numbering.atom_to_locant
-        if locant.fusion_suffix
-    )
+    return min(locant.base for _, locant in numbering.atom_to_locant if locant.fusion_suffix)
 
 
-def _maximum_matchings(edges: frozenset[tuple[int, int]], *, search_budget: int) -> tuple[frozenset[tuple[int, int]], ...]:
+def _maximum_matchings(
+    edges: frozenset[tuple[int, int]], *, search_budget: int
+) -> tuple[frozenset[tuple[int, int]], ...]:
     ordered = tuple(sorted(edges))
     best_size = -1
     best: set[frozenset[tuple[int, int]]] = set()

@@ -104,7 +104,7 @@ def intrinsic_fused_layouts(
     model: FaceModel,
     *,
     search_budget: int = 25_000,
-    max_layouts: int = 256,
+    max_layouts: int = 4_096,
 ) -> tuple[FusedLayout, ...]:
     """Enumerate audited intrinsic layouts in nomenclatural preference order.
 
@@ -149,12 +149,40 @@ def preferred_intrinsic_layout(
     model: FaceModel,
     *,
     search_budget: int = 25_000,
-    max_layouts: int = 256,
+    max_layouts: int = 4_096,
 ) -> FusedLayout | None:
     """Return the preferred audited layout, or ``None`` to abstain."""
 
-    layouts = intrinsic_fused_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
+    layouts = preferred_intrinsic_layouts(
+        model,
+        search_budget=search_budget,
+        max_layouts=max_layouts,
+    )
     return layouts[0] if layouts else None
+
+
+def preferred_intrinsic_layouts(
+    model: FaceModel,
+    *,
+    search_budget: int = 25_000,
+    max_layouts: int = 4_096,
+) -> tuple[FusedLayout, ...]:
+    """Return every layout tied on the intrinsic orientation criteria.
+
+    Retaining the tied embeddings is essential: completed-system heteroatom
+    locant criteria are applied after preferred orientation and may select a
+    reflected embedding without changing the preferred layout score.
+    """
+
+    layouts = intrinsic_fused_layouts(
+        model,
+        search_budget=search_budget,
+        max_layouts=max_layouts,
+    )
+    if not layouts:
+        return ()
+    best_score = layouts[0].orientation_score
+    return tuple(layout for layout in layouts if layout.orientation_score == best_score)
 
 
 def _search_layouts(
@@ -413,6 +441,8 @@ def _orientation_score(centers: tuple[tuple[int, int], ...], shapes: dict[int, R
     lower_left = sum(_quadrant_units(x, y, axis_x, axis_y, upper=False) for x, y in centers)
     above = sum(4 if y > axis_y else 2 if y == axis_y else 0 for _, y in centers)
     distortion = sum(shape.distortion_rank for shape in shapes.values())
+    # Distorted shapes are disfavored before applying the ordinary P-25
+    # orientation criteria; see the separate distortion precedence rule.
     return distortion, -row_count, -upper_right, lower_left, -above
 
 
@@ -435,9 +465,7 @@ def _layout_sort_key(layout: FusedLayout) -> tuple:
 
 
 def _layout_geometry_key(layout: FusedLayout) -> tuple:
-    return tuple(sorted((x, y) for _, x, y in layout.atom_positions)), tuple(
-        sorted(shape for _, shape in layout.face_shapes)
-    )
+    return layout.atom_positions, layout.face_shapes
 
 
 def _face_center(order: tuple[int, ...], positions: dict[int, Point]) -> Point:

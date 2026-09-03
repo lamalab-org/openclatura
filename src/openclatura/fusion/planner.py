@@ -9,7 +9,7 @@ from ..molecule import Molecule
 from .audit import audit_fusion_plan
 from .descriptor import FusionDescriptorError, build_fusion_name_ast, render_fusion_name
 from .faces import FaceSearchBudgetExceeded, select_bounded_face_model
-from .layout import LayoutSearchBudgetExceeded, preferred_intrinsic_layout
+from .layout import LayoutSearchBudgetExceeded, preferred_intrinsic_layouts
 from .model import (
     AuditStatus,
     Face,
@@ -28,7 +28,7 @@ from .model import (
     FusionUnsupported,
     PinStatus,
 )
-from .numbering import completed_system_numberings, parent_bond_model
+from .numbering import completed_system_numbering_selection, parent_bond_model
 from .registry import fusion_component_registry
 from .rules import explain_component_comparison, fusion_mode_allows_planning, pin_ring_size_gate
 
@@ -85,22 +85,33 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     except FusionDescriptorError as exc:
         return FusionUnsupported("no supported audited fusion-component decomposition", (str(exc),))
 
-    numberings = completed_system_numberings(mol, bounded)
-    if not numberings:
-        return FusionUnsupported("no complete peripheral system numbering was proven")
     face_model = _typed_face_model(mol, bounded)
     try:
-        layout = preferred_intrinsic_layout(face_model)
+        layouts = preferred_intrinsic_layouts(face_model)
     except LayoutSearchBudgetExceeded as exc:
         return FusionUnsupported("intrinsic fused-layout search budget exhausted", (str(exc),))
-    if layout is None:
+    if not layouts:
         return FusionUnsupported("no consistent audited intrinsic fused-ring layout")
+    numbering_selection = completed_system_numbering_selection(
+        mol,
+        bounded,
+        face_model=face_model,
+        layouts=layouts,
+    )
+    numberings = numbering_selection.accepted
+    if not numberings:
+        return FusionUnsupported("no layout-derived peripheral system numbering was proven")
+    selected = numberings[0]
+    if selected.layout_index is None:
+        return FusionUnsupported("completed-system numbering lacks intrinsic-layout provenance")
+    layout = layouts[selected.layout_index]
     numbering = FusionNumberingProof(
         selected_face_model=face_model,
         selected_layout=layout,
         orientation_score=(layout.orientation_score, numberings[0].score),
         abstract_atom_to_locant=numberings[0].atom_to_locant,
         input_locant_maps=tuple(numbering.atom_to_locant for numbering in numberings),
+        rejected_numberings=numbering_selection.rejected,
     )
     graph = _abstract_graph(ast, registry)
     bond_model = parent_bond_model(mol, atoms)
