@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable
 
+from ..assembly_parts import NameTokenBinding
 from ..molecule import Molecule
 from ..polycycle_topology import ring_system_topology
 from ..retained_graph_model import merge_parent_bond_classes
@@ -27,7 +28,6 @@ from .model import (
     FusionNumberingProof,
     FusionParentPlan,
     FusionPlanningResult,
-    FusionRenderedPart,
     FusionRuleDecision,
     FusionUnsupported,
     PinStatus,
@@ -139,10 +139,15 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     if indicated_h:
         input_atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
         rendered_parts = (
-            FusionRenderedPart(
+            NameTokenBinding(
                 text=f"{','.join(f'{locant}H' for locant in indicated_h)}-",
-                role="indicated_hydrogen",
-                atom_ids=frozenset(input_atom_by_locant[locant] for locant in indicated_h),
+                token_kind="locant",
+                source="fusion_renderer",
+                grammar_role="fusion_indicated_hydrogen",
+                binding_key="fusion:indicated_hydrogen",
+                atom_ids=set(input_atom_by_locant[locant] for locant in indicated_h),
+                locants=tuple(str(locant) for locant in indicated_h),
+                match_priority=100,
             ),
             *rendered_parts,
         )

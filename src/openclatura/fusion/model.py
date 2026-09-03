@@ -10,12 +10,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import TypeAlias
+from typing import TYPE_CHECKING, TypeAlias
 
 from ..locants import SystemLocant
 from ..retained_graph_model import (
     RetainedGraphAtomTemplate as ComponentAtom,
 )
+
+if TYPE_CHECKING:
+    from ..assembly_parts import NameTokenBinding
 from ..retained_graph_model import (
     RetainedGraphBondTemplate as ComponentBond,
 )
@@ -332,22 +335,6 @@ class FusionNameAst:
 
 
 @dataclass(frozen=True, slots=True)
-class FusionRenderedPart:
-    """One renderer-owned part of a systematic fusion parent name."""
-
-    text: str
-    role: str
-    occurrence_ids: tuple[int, ...] = ()
-    interface_occurrence_ids: tuple[int, ...] = ()
-    atom_ids: frozenset[int] = frozenset()
-    bond_ids: frozenset[int] = frozenset()
-
-    def __post_init__(self) -> None:
-        _require_nonempty(self.text, "fusion rendered text")
-        _require_nonempty(self.role, "fusion rendered role")
-
-
-@dataclass(frozen=True, slots=True)
 class Face:
     id: int
     atom_cycle: tuple[int, ...]
@@ -582,7 +569,7 @@ class FusionParentPlan:
     pin_status: PinStatus | str
     rule_trace: tuple[FusionRuleDecision, ...]
     audit: FusionAuditResult
-    rendered_parts: tuple[FusionRenderedPart, ...] = ()
+    rendered_parts: tuple[NameTokenBinding, ...] = ()
 
     def __post_init__(self) -> None:
         _require_nonempty(self.rendered_base_name, "rendered fusion base name")

@@ -482,19 +482,24 @@ def _fusion_parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBindin
     render_order = 0
     assert "".join(part.text for part in plan.rendered_parts) == plan.rendered_base_name
     for part in plan.rendered_parts:
-        token_kind = "locant" if part.role == "descriptor" else "grammar" if part.role == "multiplier" else "parent"
         for text in binding_term_tokens(part.text):
             result.append(
                 NameTokenBinding(
                     text=text,
-                    token_kind=token_kind,
-                    source="fusion_renderer",
-                    grammar_role=f"fusion_{part.role}",
-                    binding_key=f"fusion:{part.role}:{','.join(map(str, part.occurrence_ids))}",
+                    token_kind=part.token_kind,
+                    ownership=part.ownership,
+                    confidence=part.confidence,
+                    source=part.source,
+                    grammar_role=part.grammar_role,
+                    binding_key=part.binding_key,
                     atom_ids=set(part.atom_ids),
                     bond_ids=set(part.bond_ids),
+                    charge_atom_ids=set(part.charge_atom_ids),
+                    locants=tuple(part.locants),
                     render_order=render_order,
-                    match_priority=100,
+                    match_priority=part.match_priority,
+                    left_context=part.left_context,
+                    right_context=part.right_context,
                 )
             )
             render_order += 1

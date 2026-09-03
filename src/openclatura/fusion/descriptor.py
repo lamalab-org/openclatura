@@ -15,6 +15,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Protocol
 
+from ..assembly_parts import NameTokenBinding
 from ..locants import retained_locant_sort_key
 from ..molecule import Molecule
 from ..polycycle_topology import normalize_edge
@@ -31,7 +32,6 @@ from .model import (
     FusionJoinKind,
     FusionMultiplicityGroup,
     FusionNameAst,
-    FusionRenderedPart,
     FusionSide,
 )
 from .rules import component_spec_seniority_key
@@ -156,7 +156,7 @@ def render_fusion_name_parts(
     registry: _Registry | Mapping[str, FusionComponentSpec],
     *,
     mol: Molecule | None = None,
-) -> tuple[FusionRenderedPart, ...]:
+) -> tuple[NameTokenBinding, ...]:
     """Render ordered text parts while preserving component/interface scope."""
 
     matches = {match.occurrence_id: match for match in ast.component_occurrences}
@@ -185,21 +185,35 @@ def render_fusion_name_parts(
                         bond_ids.add(molecular_bond.idx)
         return frozenset(atom_ids), frozenset(bond_ids)
 
-    def component_part(text: str, role: str, occurrence_ids: tuple[int, ...]) -> FusionRenderedPart:
+    def component_part(text: str, role: str, occurrence_ids: tuple[int, ...]) -> NameTokenBinding:
         atom_ids, bond_ids = component_scope(occurrence_ids)
-        return FusionRenderedPart(text, role, occurrence_ids, atom_ids=atom_ids, bond_ids=bond_ids)
-
-    def descriptor_part(text: str, occurrence_ids: tuple[int, ...]) -> FusionRenderedPart:
-        interfaces = tuple(join for join in ast.joins if join.attached_occurrence in occurrence_ids)
-        return FusionRenderedPart(
-            text,
-            "descriptor",
-            interface_occurrence_ids=occurrence_ids,
-            atom_ids=frozenset().union(*(join.shared_input_atoms for join in interfaces)),
-            bond_ids=frozenset().union(*(join.shared_input_bonds for join in interfaces)),
+        occurrence_key = ",".join(map(str, occurrence_ids))
+        return NameTokenBinding(
+            text=text,
+            token_kind="parent",
+            source="fusion_renderer",
+            grammar_role=f"fusion_{role}",
+            binding_key=f"fusion:{role}:occurrences={occurrence_key}",
+            atom_ids=set(atom_ids),
+            bond_ids=set(bond_ids),
+            match_priority=100,
         )
 
-    def attachment(node: FusionCitationNode) -> list[FusionRenderedPart]:
+    def descriptor_part(text: str, occurrence_ids: tuple[int, ...]) -> NameTokenBinding:
+        interfaces = tuple(join for join in ast.joins if join.attached_occurrence in occurrence_ids)
+        occurrence_key = ",".join(map(str, occurrence_ids))
+        return NameTokenBinding(
+            text=text,
+            token_kind="locant",
+            source="fusion_renderer",
+            grammar_role="fusion_descriptor",
+            binding_key=f"fusion:descriptor:interfaces={occurrence_key}",
+            atom_ids=frozenset().union(*(join.shared_input_atoms for join in interfaces)),
+            bond_ids=frozenset().union(*(join.shared_input_bonds for join in interfaces)),
+            match_priority=100,
+        )
+
+    def attachment(node: FusionCitationNode) -> list[NameTokenBinding]:
         descendants = render_children(node)
         spec = _spec_for_match(registry, matches[node.occurrence_id])
         descriptor = descriptors[node.occurrence_id]
@@ -215,8 +229,8 @@ def render_fusion_name_parts(
             ),
         ]
 
-    def render_children(node: FusionCitationNode) -> list[FusionRenderedPart]:
-        pieces: list[FusionRenderedPart] = []
+    def render_children(node: FusionCitationNode) -> list[NameTokenBinding]:
+        pieces: list[NameTokenBinding] = []
         for child in node.children:
             group = groups_by_member.get(child.occurrence_id)
             if group is None:
@@ -250,7 +264,17 @@ def render_fusion_name_parts(
             )
             pieces.extend(
                 (
-                    FusionRenderedPart(group.multiplier, "multiplier", group.occurrence_ids),
+                    NameTokenBinding(
+                        text=group.multiplier,
+                        token_kind="grammar",
+                        source="fusion_renderer",
+                        grammar_role="fusion_multiplier",
+                        binding_key=(
+                            "fusion:multiplier:occurrences="
+                            + ",".join(map(str, group.occurrence_ids))
+                        ),
+                        match_priority=100,
+                    ),
                     component_part(min(prefixes), "attached_component", group.occurrence_ids),
                     descriptor_part(descriptor, group.occurrence_ids),
                 )

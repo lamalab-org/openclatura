@@ -43,7 +43,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "FusionNumberingProof": (".model", "FusionNumberingProof"),
     "FusionParentPlan": (".model", "FusionParentPlan"),
     "FusionPlanningResult": (".model", "FusionPlanningResult"),
-    "FusionRenderedPart": (".model", "FusionRenderedPart"),
     "FusionRuleDecision": (".model", "FusionRuleDecision"),
     "FusionSide": (".model", "FusionSide"),
     "FusionUnsupported": (".model", "FusionUnsupported"),

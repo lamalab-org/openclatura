@@ -79,6 +79,7 @@ def test_fusion_tokens_are_owned_by_ast_components_and_interfaces():
     assert tokens["2,3"]["bonds"] == tokens["b"]["bonds"]
     assert len(tokens["2,3"]["atoms"]) == 2
     assert len(tokens["2,3"]["bonds"]) == 1
+    assert tokens["2,3"]["binding_key"].startswith("fusion:descriptor:interfaces=")
 
 
 def test_multiplicative_fusion_token_keeps_grammar_only_ownership():
