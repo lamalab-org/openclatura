@@ -5,7 +5,8 @@ from .grammar_snapshot_data import retained_fused_derivative_gate
 from .molecule import Molecule
 from .namer_config import INDICATED_H_RETAINED_NAMES
 from .perception import PerceivedGroup
-from .retained_fused_templates import RetainedFusedTemplateMatch, match_retained_fused_templates
+from .retained_fused_templates import RetainedGraphTemplateMatch, match_retained_fused_templates
+from .retained_name_policy import retained_parent_name_policy
 
 _DERIVATIVE_GATE = retained_fused_derivative_gate()
 PRODUCTION_RETAINED_FUSED_PARENTS = _DERIVATIVE_GATE.production_parent_names
@@ -57,22 +58,50 @@ def production_retained_fused_parent(
         if group.attachment_carbon in parent_atoms:
             feature_atoms.add(group.attachment_carbon)
 
-    def gated(allow_nonaromatic: bool, allow_relocated_indicated_h: bool = False) -> list[RetainedFusedTemplateMatch]:
+    def eligible(matches: list[RetainedGraphTemplateMatch]) -> list[RetainedGraphTemplateMatch]:
+        # A match that places the indicated hydrogen spells its saturation; prefer it.
+        matches = sorted(matches, key=lambda match: not match.indicated_h)
         return [
             match
-            for match in match_retained_fused_templates(
-                mol,
-                parent_atoms,
-                include_disabled=True,
-                allow_nonaromatic=allow_nonaromatic,
-                allow_relocated_indicated_h=allow_relocated_indicated_h,
-            )
+            for match in matches
             if match.template.name in PRODUCTION_RETAINED_FUSED_PARENTS
             and match.template.derivative_production_enabled
-            and (principal_key != "ketone" or _has_mancude_unsaturation(mol, parent_atoms, match))
+            and (
+                principal_key != "ketone"
+                or _has_mancude_unsaturation(mol, parent_atoms, match)
+                or _saturation_is_hydro_citable(mol, parent_atoms, match)
+            )
+            # A match whose saturation cannot be spelt out must not block a later
+            # (relocated indicated-H) match that can: 1,3-dihydro-2H-1,4-benzodiazepin-2-one.
+            and _added_hydrogen_is_citable(mol, match)
         ]
 
-    matches = gated(False) or gated(True) or gated(False, True) or gated(True, True)
+    strict_matches = match_retained_fused_templates(mol, parent_atoms)
+    matches = eligible(strict_matches)
+    if strict_matches and not matches:
+        # A strict enabled parent has already supplied an exact locant map.
+        # Do not replace it with a weaker hydro/tautomer match merely because
+        # the later derivative-override vocabulary has not adopted its token.
+        return None
+    if not matches:
+        # Pool the derivative modes: each atom map is kept under the first mode that can
+        # spell it, a map that places the indicated hydrogen is preferred for the parent
+        # (1,3-dihydro-2H-…-2-one over 1H-…-4-one), and only maps sharing that placement
+        # stay for the numbering layer.
+        pooled: dict[tuple[tuple[int, str], ...], RetainedGraphTemplateMatch] = {}
+        for kwargs in (
+            {"allow_nonaromatic": True},
+            {"allow_relocated_indicated_h": True},
+            {"allow_nonaromatic": True, "allow_relocated_indicated_h": True},
+        ):
+            for match in eligible(match_retained_fused_templates(mol, parent_atoms, **kwargs)):
+                pooled.setdefault((match.template.name, tuple(sorted(match.atom_to_locant.items()))), match)
+        if pooled:
+            ordered = list(pooled.values())
+            best = next((m for m in ordered if m.indicated_h), ordered[0])
+            matches = [
+                m for m in ordered if m.template.name == best.template.name and m.indicated_h == best.indicated_h
+            ]
     if not matches:
         return None
 
@@ -88,8 +117,15 @@ def production_retained_fused_parent(
     template = matches[0].template
     if not _added_hydrogen_is_citable(mol, matches[0]):
         return None
+    output_context = (
+        "unsubstituted_parent"
+        if attachment_atom is None and not substituent_mapping and principal_key is None
+        else "composite_parent"
+    )
+    name_policy = retained_parent_name_policy(template.name)
+    output_name = name_policy.output_name(output_context) if name_policy is not None else template.name
     return ProductionRetainedFusedParent(
-        name=parent_name,
+        name=output_name,
         locant_maps=maps,
         metadata=RetainedParentMetadata(
             default_indicated_h=matches[0].indicated_h,
@@ -102,7 +138,7 @@ def production_retained_fused_parent(
     )
 
 
-def _added_hydrogen_is_citable(mol: Molecule, match: RetainedFusedTemplateMatch) -> bool:
+def _added_hydrogen_is_citable(mol: Molecule, match: RetainedGraphTemplateMatch) -> bool:
     """
     Whether every saturated position of the parent can be spelt out.
     """
@@ -141,7 +177,7 @@ def _neutral_component(mol: Molecule, atoms: set[int]) -> bool:
 def _has_mancude_unsaturation(
     mol: Molecule,
     parent_atoms: set[int],
-    match: RetainedFusedTemplateMatch,
+    match: RetainedGraphTemplateMatch,
 ) -> bool:
     """Reject hydro derivatives that merely share an oxo-parent topology."""
 
@@ -164,6 +200,28 @@ def _has_mancude_unsaturation(
         bond.order == 2 and (bond.u in parent_atoms or bond.v in parent_atoms) for bond in mol.bonds.values()
     )
     return actual_double_bonds >= expected_double_bonds + nonaromatic_parent_carbonyls
+
+
+def _saturation_is_hydro_citable(mol: Molecule, parent_atoms: set[int], match: RetainedGraphTemplateMatch) -> bool:
+    """A ketone on a partly saturated mancude parent is spelt with hydro prefixes and
+    added hydrogen (3,4-dihydroquinolin-2(1H)-one) when the saturated positions form an
+    even count once the ketone carbon and the parent's own indicated hydrogen are taken out."""
+
+    template = match.template
+    if template.mancude_double_bonds is None:
+        return False
+    saturated = 0
+    for atom, locant in match.atom_to_locant.items():
+        if not template.atom_by_locant[locant].aromatic:
+            continue
+        ring_bonds = [
+            bond
+            for neighbor in mol.get_neighbors(atom)
+            if neighbor in match.matched_atoms and (bond := mol.get_bond(atom, neighbor)) is not None
+        ]
+        if ring_bonds and all(bond.order == 1 for bond in ring_bonds):
+            saturated += 1
+    return saturated > 0 and saturated < len(match.atom_to_locant)
 
 
 def _neutral_retained_parent(mol: Molecule, atoms: set[int]) -> bool:

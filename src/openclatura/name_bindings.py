@@ -17,14 +17,8 @@ from .token_grammar import (
 
 
 def refresh_parent_binding(parts: AssemblyParts) -> None:
-    """Rebuild just the parent binding, leaving every other binding untouched.
-
-    Assembly can rename the parent after the bindings were built -- folding the
-    principal group into a retained name turns ``benzene`` into ``phenol``.  Only
-    that one binding is stale, and a full refresh would discard the emitted-token
-    metadata the substituent bindings have already accumulated, so replace it in
-    place.
-    """
+    """Rebuild just the parent binding, leaving every other binding untouched: folding the principal
+    group into a retained name stales only that one, and a full refresh would discard emitted tokens."""
 
     if not parts.parent_atom_ids:
         return
@@ -63,9 +57,8 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
         parent_atom_ids = set(parts.parent_atom_ids)
         parent_bond_ids = set(parts.parent_bond_ids)
         if parts.retained_absorbs_principal_group and parts.principal_group is not None:
-            # ``phenol`` spells the ring *and* its oxygen, so the parent term is
-            # what those atoms are named by -- the suffix binding no longer has
-            # any text of its own for the final audit to find.
+            # ``phenol`` spells the ring *and* its oxygen, so the suffix binding has
+            # no text of its own left for the audit to find.
             parent_atom_ids |= set(parts.principal_group.atom_ids)
             parent_bond_ids |= set(parts.principal_group.bond_ids)
         bindings.append(
@@ -287,7 +280,7 @@ def postprocess_name_atom_bindings(
 ) -> list[NameAtomBinding]:
     """Apply final name post-processing to binding terms."""
 
-    final_text = _normalise_name_text(final_name or "")
+    final_text = normalise_name_text(final_name or "")
     processed = []
     for binding in bindings:
         processed_term = _contextual_postprocessed_binding_term(
@@ -921,14 +914,8 @@ def _rendered_term_tokens(
 
 
 def _tree_substituent_emitted_tokens(item) -> tuple[NameTokenBinding, ...]:
-    """Emit precise tokens for a recursive substituent tree.
-
-    A complex substituent such as
-    ``(2-(4-fluorophenyl)-...-1H-pyrrol-1-yl)`` has one top-level graph scope
-    but many nested name pieces with narrower graph ownership. Tokenizing the
-    whole top-level phrase would make every child token inherit the full
-    substituent graph. Instead, reuse the recursive tree's local fragments.
-    """
+    """Emit precise tokens for a recursive substituent tree.  Tokenizing the whole top-level phrase would
+    make every nested piece inherit the full substituent graph, so reuse the tree's local fragments."""
 
     tree = item.substituent_tree
     if not isinstance(tree, dict):
@@ -1204,7 +1191,7 @@ def _dedupe_token_bindings(tokens: list[NameTokenBinding]) -> tuple[NameTokenBin
 def _data_backed_prefix_subtokens(term: str) -> tuple[str, ...]:
     """Return subtokens from registered functional-prefix spellings."""
 
-    normalised_term = _normalise_name_text(term)
+    normalised_term = normalise_name_text(term)
     if not normalised_term:
         return ()
     subtokens: list[str] = []
@@ -1213,7 +1200,7 @@ def _data_backed_prefix_subtokens(term: str) -> tuple[str, ...]:
         if not prefix:
             continue
         for token in _binding_term_tokens(prefix):
-            token_norm = _normalise_name_text(token)
+            token_norm = normalise_name_text(token)
             if token_norm and token_norm != normalised_term and token_norm in normalised_term:
                 subtokens.append(token)
     return tuple(dict.fromkeys(subtokens))
@@ -1379,11 +1366,11 @@ def _contextual_postprocessed_binding_term(
 ) -> str:
     """Map terms absorbed by contextual final-name post-processing."""
 
-    original = _normalise_name_text(original_term)
-    rewritten = _normalise_name_text(rewritten_term)
+    original = normalise_name_text(original_term)
+    rewritten = normalise_name_text(rewritten_term)
     for before, after in _contextual_postprocess_replacements():
-        normalised_before = _normalise_name_text(before)
-        normalised_after = _normalise_name_text(after)
+        normalised_before = normalise_name_text(before)
+        normalised_after = normalise_name_text(after)
         if _normalised_rendered_term_occurs(normalised_after, final_text) and (
             _contextual_match_scope(original, normalised_before, normalised_after, allow_suffix_context)
             or _contextual_match_scope(rewritten, normalised_before, normalised_after, allow_suffix_context)
@@ -1430,14 +1417,10 @@ def _normalised_rendered_term_occurs(term: str, final_text: str) -> bool:
 
 
 def _contextual_postprocess_replacements() -> tuple[tuple[str, str], ...]:
-    from .assembler import LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS
-
-    return tuple((rule.pattern, rule.replacement) for rule in RULES.postprocess.literal_replacements) + tuple(
-        LEGACY_POSTPROCESS_LITERAL_REPLACEMENTS
-    )
+    return tuple((rule.pattern, rule.replacement) for rule in RULES.postprocess.literal_replacements)
 
 
-def _normalise_name_text(text: str) -> str:
+def normalise_name_text(text: str) -> str:
     return text.lower().replace(" ", "").replace("(", "").replace(")", "")
 
 

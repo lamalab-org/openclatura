@@ -9,7 +9,6 @@ from .namer_config import RETAINED_RING_ELEMENTS
 from .naming_context import NamingIntent, ParentAssemblyPlan
 from .numbering import choose_parent_numbering
 from .parent_selection import ParentSelection
-from .retained_fused_templates import retained_parent_metadata as graph_retained_parent_metadata
 from .ring_renderer import is_von_baeyer_descriptor
 from .rules import retained
 from .small_ring_stereo import scoped_small_ring_stereo_features
@@ -50,7 +49,7 @@ def build_parent_assembly_plan(
         locant_maps is None
         and selection.ring_parent is not None
         and selection.ring_parent.numbering_candidates
-        and _is_von_baeyer_descriptor(selection.ring_parent.descriptor)
+        and is_von_baeyer_descriptor(selection.ring_parent.descriptor)
     ):
         audited_maps = [
             numbering.locant_map for numbering in selection.ring_parent.numbering_candidates if numbering.audit_ok
@@ -91,10 +90,6 @@ def build_parent_assembly_plan(
     )
 
 
-def _is_von_baeyer_descriptor(descriptor: str | None) -> bool:
-    return is_von_baeyer_descriptor(descriptor)
-
-
 def build_parent_parts(
     mol: Molecule,
     numbered_path: list[int],
@@ -109,7 +104,7 @@ def build_parent_parts(
     """Create shared parent assembly parts for a naming intent."""
 
     if retained_parent_metadata is None and retained_name is not None:
-        retained_parent_metadata = graph_retained_parent_metadata(retained_name)
+        retained_parent_metadata = retained.parent_metadata(retained_name)
     assembly_overrides = {}
     if intent.is_substituent:
         if intent.root_atom is None:

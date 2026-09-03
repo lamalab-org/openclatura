@@ -4,7 +4,7 @@ from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem, sp
 from .formatting import strip_outer_parentheses
 from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
-from .molecule import DecisionTrace, Molecule, bond_ids_within
+from .molecule import DecisionTrace, Molecule, bond_ids_within, charged_atoms
 from .naming_protocols import RecursiveSubgraphNamer
 from .nomenclature import RULES
 from .perception import PerceivedGroup
@@ -42,7 +42,7 @@ def add_component_front_modifiers(
             locant = str(get_loc(group.attachment_carbon)) if get_loc is not None else None
             parts.front_modifier_locants.append(locant)
             parts.front_modifier_atom_ids.update(modifier_atoms)
-            parts.front_modifier_charge_atom_ids.update(_charged_atoms(mol, modifier_atoms))
+            parts.front_modifier_charge_atom_ids.update(charged_atoms(mol, modifier_atoms))
 
 
 def n_substituent_locant(
@@ -90,6 +90,35 @@ def add_component_n_substituents(
         c_idx = group.attachment_carbon
         nitrogens = [n for n in group.atoms_involved if mol.atoms[n].symbol == "N"]
         nitrogens.sort(key=lambda n: mol.get_bond(n, c_idx) is not None, reverse=True)
+        if principal_key in {"urea", "thiourea"}:
+            # The two urea nitrogens are equivalent: P-31.1.4 gives the unprimed locant to
+            # the substituent cited first, and an unsubstituted nitrogen takes no locant.
+            nitrogens.sort(key=lambda n: _nitrogen_alphabetical_rank(mol, n, c_idx, sub_exclude, branch_namer))
+        guanidine_locants: dict[int, str] = {}
+        # The amidine carbon itself (for a ring amidine the attachment is the ring atom).
+        core_c = next(
+            (
+                a
+                for a in group.atoms_involved
+                if mol.atoms[a].is_carbon and any(mol.get_bond(a, n) is not None for n in nitrogens)
+            ),
+            c_idx,
+        )
+        if principal_key in {"amidine", "ring_amidine"}:
+            # P-66.4.1.1.1.3: the amine nitrogen is N, the imino nitrogen N'.
+            nitrogens.sort(key=lambda n: mol.get_bond(n, core_c).order)
+        elif principal_key in {"hydrazide", "ring_hydrazide"}:
+            # P-66.3.1.2: the acyl-bound nitrogen is N, the terminal one N'.
+            nitrogens.sort(key=lambda n: mol.get_bond(n, core_c) is None)
+        elif principal_key == "guanidine":
+            # P-66.4.1.2.1.3: guanidine is numbered 1,2,3 with the imino nitrogen at 2; the amine
+            # nitrogen whose substituent is cited first takes 1.
+            imino = next(n for n in nitrogens if mol.get_bond(n, core_c).order == 2)
+            amines = sorted(
+                (n for n in nitrogens if n != imino),
+                key=lambda n: _nitrogen_alphabetical_rank(mol, n, core_c, sub_exclude, branch_namer),
+            )
+            guanidine_locants = {amines[0]: "1", imino: "2", amines[1]: "3"}
         for n_idx_local, single_n in enumerate(nitrogens):
             n_substituents = [
                 n
@@ -103,7 +132,7 @@ def add_component_n_substituents(
                 n_idx_global += 1
                 continue
 
-            loc_prefix = n_substituent_locant(
+            loc_prefix = guanidine_locants.get(single_n) or n_substituent_locant(
                 principal_key, len(principal_groups), len(nitrogens), n_idx_local, n_idx_global, group_index
             )
             for n_sub in n_substituents:
@@ -139,7 +168,7 @@ def add_component_n_substituents(
                                 outer_parentheses_optional=outer_parentheses_optional,
                                 atom_ids=branch_atoms,
                                 bond_ids=bond_ids_within(mol, branch_atoms | {single_n}),
-                                charge_atom_ids=_charged_atoms(mol, branch_atoms),
+                                charge_atom_ids=charged_atoms(mol, branch_atoms),
                                 emitted_tokens=emitted_tokens,
                                 trace_segments=branch_trace,
                                 nested_decisions=nested_decisions,
@@ -153,19 +182,13 @@ def add_component_n_substituents(
                         loc_prefix,
                         branch_atoms,
                         bond_ids_within(mol, branch_atoms | {single_n}),
-                        _charged_atoms(mol, branch_atoms),
+                        charged_atoms(mol, branch_atoms),
                         branch_trace,
                         nested_decisions,
                         emitted_tokens,
                         substituent_tree=branch_tree,
                     )
             n_idx_global += 1
-
-
-def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
-    """Return formally charged atoms from an already named graph fragment."""
-
-    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
 
 
 def _with_n_substituent_locant_token(
@@ -236,3 +259,20 @@ def _is_principal_hydrazone_carbon(mol: Molecule, principal_key: str | None, nit
         return False
     bond = mol.get_bond(nitrogen, neighbor)
     return bond is not None and bond.order == 2
+
+
+def _nitrogen_alphabetical_rank(
+    mol: Molecule, nitrogen: int, carbon: int, sub_exclude: set[int], branch_namer: RecursiveSubgraphNamer
+) -> tuple[int, str]:
+    from .assembly_prefixes import substituent_sort_key
+
+    names = []
+    for neighbor in mol.get_neighbors(nitrogen):
+        if neighbor == carbon or mol.atoms[neighbor].symbol == "H":
+            continue
+        name, _, _ = _nitrogen_substituent_name(mol, nitrogen, neighbor, sub_exclude, branch_namer, DecisionTrace())
+        if name:
+            names.append(substituent_sort_key(str(name)))
+    if not names:
+        return (1, "", 0)
+    return (0, min(names), -len(names))

@@ -1,9 +1,5 @@
 """Central data registry for nomenclature lookup tables.
-
-This module is the integration point for data-backed naming vocabulary.  Code
-that needs lookup data should prefer ``RULES.<group>.<field>`` over importing
-individual module constants.
-"""
+Prefer ``RULES.<group>.<field>`` over importing individual module constants."""
 
 from dataclasses import dataclass
 from functools import lru_cache
@@ -24,6 +20,9 @@ class HeteroatomRules:
     alkyl_oxy_prefixes: dict[str, str]
     simple_sulfanyl_prefixes: set[str]
     simple_selanyl_prefixes: set[str]
+    retained_sulfonyl_groups: dict[tuple[str, str], str]
+    retained_sulfonyl_group_acids: dict[str, str]
+    sulfonyl_ligand_contractions: tuple[tuple[str, str, str], ...]
     halogen_prefixes: dict[str, str]
     halogen_lambda_suffixes: dict[str, str]
 
@@ -36,26 +35,12 @@ class RingRules:
 
 @dataclass(frozen=True)
 class PrefixRules:
-    direct_group_prefixes: dict[str, str]
-    skip_groups: set[str]
-    ester_like_groups: set[str]
     peroxy_ester_groups: set[str]
     amide_like_groups: set[str]
-    amide_bases: dict[str, str]
-    carboxy_groups: set[str]
-    cyano_groups: set[str]
-    acid_halide_prefixes: dict[str, str]
-    peroxy_acid_groups: set[str]
-    sulfonyl_groups: set[str]
-    direct_prefixes: dict[str, str]
 
 
 @dataclass(frozen=True)
 class ComponentRules:
-    chain_external_carbonyl_groups: set[str]
-    front_modifier_principal_groups: set[str]
-    n_substituent_principal_groups: set[str]
-    hydrazone_principal_groups: set[str]
     salt_metal_names: set[str]
     mononuclear_parent_hydrides: dict[str, str]
     retained_homonuclear_chain_names: dict[str, str]
@@ -99,16 +84,9 @@ class AssemblyRules:
     unsaturation_order: dict[str, int]
     acid_halide_suffix_keys: set[str]
     substituent_sort_prefix_pattern: str
+    substituent_attachment_suffixes: dict[str, str]
     ambiguous_connection_substituent_stems: set[str]
-    connection_boundary_parent_stems: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class RegexReplacement:
-    pattern: str
-    replacement: str
-    category: str = "migration"
-    reason: str = ""
+    suffix_nitrogen_markers: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -122,10 +100,6 @@ class LiteralReplacement:
 @dataclass(frozen=True)
 class PostprocessRules:
     literal_replacements: tuple[LiteralReplacement, ...]
-    regex_replacements: tuple[RegexReplacement, ...]
-    exact_replacements: tuple[LiteralReplacement, ...]
-    acyl_amido_terms: tuple[str, ...]
-    n_substituted_functional_suffixes: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -146,11 +120,7 @@ class FunctionalGroupRule:
     seniority: int | None = None
     suffix_with_locant: bool = False
     needs_locant: bool = True
-    perception_handler: str | None = None
-    prefix_handler: str | None = None
     families: tuple[str, ...] = ()
-    component_flags: tuple[str, ...] = ()
-    postprocess_tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -231,11 +201,7 @@ def _functional_group_rules() -> FunctionalGroupRules:
             seniority=item.get("seniority"),
             suffix_with_locant=bool(item.get("suffix_with_locant", False)),
             needs_locant=bool(item.get("needs_locant", True)),
-            perception_handler=item.get("perception_handler"),
-            prefix_handler=item.get("prefix_handler"),
             families=families,
-            component_flags=tuple(item.get("component_flags", [])),
-            postprocess_tags=tuple(item.get("postprocess_tags", [])),
         )
     return FunctionalGroupRules(by_key=groups)
 
@@ -247,11 +213,8 @@ def _multi_suffix_template(suffix: str | None, multi_suffix) -> MultiSuffixTempl
 
 
 def _suffix_multiplier_positions(suffix: str | None, multi_suffix) -> tuple[int, ...]:
-    """Return which words in a suffix phrase take multiplicative prefixes.
-
-    Built-in rows store ``multi_suffix`` as a template object.  String support
-    remains as an external compatibility path for older override data.
-    """
+    """Return which words in a suffix phrase take multiplicative prefixes.  Built-in rows store
+    ``multi_suffix`` as a template object; string support remains for older override data."""
 
     if not suffix:
         return (0,)
@@ -287,7 +250,6 @@ def _derived_functional_group_families(key: str) -> tuple[str, ...]:
         "peroxy_acid": "peroxy_acid_prefix_groups",
         "sulfonyl": "sulfonyl_prefix_groups",
         "front_modifier": "front_modifier_principal_groups",
-        "n_substitutable": "n_substituent_principal_groups",
         "hydrazone": "hydrazone_principal_groups",
     }
     for family, section in family_sections.items():
@@ -314,26 +276,6 @@ def _postprocess_rules() -> PostprocessRules:
             )
             for item in group.values("postprocess_literal_replacements")
         ),
-        regex_replacements=tuple(
-            RegexReplacement(
-                pattern=item["pattern"],
-                replacement=item["replacement"],
-                category=item["category"],
-                reason=item["reason"],
-            )
-            for item in group.values("postprocess_regex_replacements")
-        ),
-        exact_replacements=tuple(
-            LiteralReplacement(
-                pattern=item["pattern"],
-                replacement=item["replacement"],
-                category=item["category"],
-                reason=item["reason"],
-            )
-            for item in group.values("postprocess_exact_replacements")
-        ),
-        acyl_amido_terms=tuple(group.values("postprocess_acyl_amido_terms")),
-        n_substituted_functional_suffixes=tuple(group.values("postprocess_n_substituted_functional_suffixes")),
     )
 
 
@@ -388,6 +330,19 @@ def registry() -> NomenclatureRegistry:
             alkyl_oxy_prefixes=substituent_vocabulary.mapping("alkyl_oxy_prefixes"),
             simple_sulfanyl_prefixes=set(substituent_vocabulary.values("simple_sulfanyl_prefixes")),
             simple_selanyl_prefixes=set(substituent_vocabulary.values("simple_selanyl_prefixes")),
+            retained_sulfonyl_groups={
+                (row["branch"], row["suffix"]): row["name"]
+                for row in substituent_vocabulary.values("retained_sulfonyl_group_names")
+            },
+            retained_sulfonyl_group_acids={
+                row["acid"]: row["name"]
+                for row in substituent_vocabulary.values("retained_sulfonyl_group_names")
+                if row.get("acid")
+            },
+            sulfonyl_ligand_contractions=tuple(
+                (row["ligand_ending"], row["suffix"], row["name"])
+                for row in substituent_vocabulary.values("retained_sulfonyl_ligand_contractions")
+            ),
             halogen_prefixes=substituent_vocabulary.mapping("halogen_prefixes"),
             halogen_lambda_suffixes=substituent_vocabulary.mapping("halogen_lambda_suffixes"),
         ),
@@ -398,24 +353,10 @@ def registry() -> NomenclatureRegistry:
             },
         ),
         prefixes=PrefixRules(
-            direct_group_prefixes=substituent_vocabulary.mapping("direct_group_prefixes"),
-            skip_groups=set(functional_group_rules.values("prefix_groups_to_skip")),
-            ester_like_groups=set(functional_group_rules.values("ester_like_prefix_groups")),
             peroxy_ester_groups=set(functional_group_rules.values("peroxy_ester_groups")),
             amide_like_groups=set(functional_group_rules.values("amide_like_prefix_groups")),
-            amide_bases=substituent_vocabulary.mapping("amide_prefix_bases"),
-            carboxy_groups=set(functional_group_rules.values("carboxy_prefix_groups")),
-            cyano_groups=set(functional_group_rules.values("cyano_prefix_groups")),
-            acid_halide_prefixes=substituent_vocabulary.mapping("acid_halide_prefixes"),
-            peroxy_acid_groups=set(functional_group_rules.values("peroxy_acid_prefix_groups")),
-            sulfonyl_groups=set(functional_group_rules.values("sulfonyl_prefix_groups")),
-            direct_prefixes=substituent_vocabulary.mapping("direct_prefix_groups"),
         ),
         components=ComponentRules(
-            chain_external_carbonyl_groups=set(functional_group_rules.values("chain_external_carbonyl_groups")),
-            front_modifier_principal_groups=set(functional_group_rules.values("front_modifier_principal_groups")),
-            n_substituent_principal_groups=set(functional_group_rules.values("n_substituent_principal_groups")),
-            hydrazone_principal_groups=set(functional_group_rules.values("hydrazone_principal_groups")),
             salt_metal_names=set(simple_components.values("salt_metal_names")),
             mononuclear_parent_hydrides=simple_components.mapping("mononuclear_parent_hydrides"),
             retained_homonuclear_chain_names=simple_components.mapping("retained_homonuclear_chain_names"),
@@ -435,10 +376,11 @@ def registry() -> NomenclatureRegistry:
             },
             acid_halide_suffix_keys=set(assembly_grammar.values("acid_halide_suffix_keys")),
             substituent_sort_prefix_pattern=assembly_grammar.mapping("substituent_sort")["prefix_pattern"],
+            substituent_attachment_suffixes=assembly_grammar.mapping("substituent_attachment_suffixes"),
             ambiguous_connection_substituent_stems=set(
                 assembly_grammar.values("ambiguous_connection_substituent_stems")
             ),
-            connection_boundary_parent_stems=tuple(assembly_grammar.values("connection_boundary_parent_stems")),
+            suffix_nitrogen_markers=tuple(assembly_grammar.values("suffix_nitrogen_markers")),
         ),
         functional_groups=_functional_group_rules(),
         postprocess=_postprocess_rules(),

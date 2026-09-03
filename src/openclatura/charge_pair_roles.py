@@ -95,12 +95,6 @@ def charge_pair_roles(mol: Molecule, component_atoms: set[int] | None = None) ->
     return roles
 
 
-def unsupported_charge_pair_roles(mol: Molecule, component_atoms: set[int] | None = None) -> list[ChargePairRole]:
-    """Return charge-pair roles that should not use generic fallback spelling."""
-
-    return [role for role in charge_pair_roles(mol, component_atoms) if not role.template_supported]
-
-
 def _classify_charge_pair(
     mol: Molecule,
     component_atoms: set[int],

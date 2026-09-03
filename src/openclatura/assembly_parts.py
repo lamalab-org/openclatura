@@ -120,6 +120,7 @@ class RetainedParentMetadata:
     indicated_hydrogen_count: int = 0
     mancude_double_bonds: int = 0
     relocated_indicated_h: bool = False
+    inherent_saturated_locants: tuple[str, ...] = ()
 
 
 @dataclass
@@ -136,6 +137,7 @@ class AssemblyParts:
     is_substituent: bool = False
     is_double_attach: bool = False
     is_triple_attach: bool = False
+    is_acyl_substituent: bool = False
     attachment_locant: int | str = 1
     retained_name: str | None = None
     retained_absorbs_principal_group: bool = False

@@ -8,12 +8,9 @@ plain paths independently.
 
 from dataclasses import dataclass
 
+from .locants import retained_locant_sort_key
 from .polycycle_topology import RingNumbering
 from .ring_renderer import is_von_baeyer_descriptor
-
-
-def _is_von_baeyer_descriptor(descriptor: str | None) -> bool:
-    return is_von_baeyer_descriptor(descriptor)
 
 
 @dataclass(frozen=True)
@@ -25,11 +22,18 @@ class RingParent:
     candidate_paths: tuple[tuple[int, ...], ...] = ()
     numbering_candidates: tuple[RingNumbering, ...] = ()
     selected_numbering: RingNumbering | None = None
+    retained_locant_maps: tuple[dict[int, str], ...] = ()
+    proof_source: str = "topology"
 
     @property
     def paths(self) -> list[list[int]]:
         if self.numbering_candidates:
             return [list(numbering.path) for numbering in self.numbering_candidates]
+        if self.retained_locant_maps:
+            return [
+                sorted(locant_map, key=lambda atom: retained_locant_sort_key(locant_map[atom]))
+                for locant_map in self.retained_locant_maps
+            ]
         return [list(path) for path in self.candidate_paths]
 
     @property
@@ -40,8 +44,13 @@ class RingParent:
 
     @property
     def audit_ok(self) -> bool:
+        if self.retained_locant_maps:
+            return all(
+                set(locant_map) == set(self.atoms) and len(set(locant_map.values())) == len(self.atoms)
+                for locant_map in self.retained_locant_maps
+            )
         if not self.numbering_candidates:
-            return not _is_von_baeyer_descriptor(self.descriptor)
+            return not is_von_baeyer_descriptor(self.descriptor)
         return all(numbering.audit_ok for numbering in self.numbering_candidates)
 
     @classmethod
@@ -69,6 +78,7 @@ class RingParent:
             candidate_paths=tuple(numbering.path for numbering in numberings),
             numbering_candidates=tuple(numberings),
             selected_numbering=selected,
+            proof_source="descriptor",
         )
 
     @classmethod
@@ -81,7 +91,7 @@ class RingParent:
         paths: list[list[int]] | tuple[tuple[int, ...], ...],
         descriptor_numbers: tuple[int, ...] = (),
     ) -> "RingParent":
-        if _is_von_baeyer_descriptor(descriptor):
+        if is_von_baeyer_descriptor(descriptor):
             raise ValueError("von Baeyer RingParent requires audited numbering candidates")
         return cls(
             kind=kind,
@@ -90,3 +100,22 @@ class RingParent:
             descriptor_numbers=descriptor_numbers,
             candidate_paths=tuple(tuple(path) for path in paths),
         )
+
+    @classmethod
+    def from_retained_locant_maps(
+        cls,
+        *,
+        atoms: set[int] | frozenset[int],
+        locant_maps: list[dict[int, str]],
+    ) -> "RingParent":
+        """Build an audited parent proof from exact template isomorphisms."""
+
+        parent = cls(
+            kind="retained_polycycle",
+            atoms=frozenset(atoms),
+            retained_locant_maps=tuple(dict(locant_map) for locant_map in locant_maps),
+            proof_source="retained_template",
+        )
+        if not parent.audit_ok:
+            raise ValueError("Retained parent locant maps must be complete bijections.")
+        return parent

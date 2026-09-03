@@ -239,7 +239,12 @@ _DIRECT_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int], ...]] = {
     "imine": (("N", 2),),
     "carboxylic_acid": (("O", 2), ("O", 1)),
     "amide": (("O", 2), ("N", 1)),
+    "urea": (("O", 2), ("N", 1), ("N", 1)),
+    # The amine nitrogen is N and the imino nitrogen N' (P-66.4.1.1.1.3); decorate in that order.
+    "amidine": (("N", 1), ("N", 2)),
+    "guanidine": (("N", 1), ("N", 2), ("N", 1)),
     "thioamide": (("S", 2), ("N", 1)),
+    "thiourea": (("S", 2), ("N", 1), ("N", 1)),
     "nitrile": (("N", 3),),
     "acid_chloride": (("O", 2), ("Cl", 1)),
     "acid_fluoride": (("O", 2), ("F", 1)),
@@ -250,6 +255,7 @@ _EXOCYCLIC_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int], ...]] = {
     "ring_aldehyde": (("O", 2),),
     "ring_carboxylic_acid": (("O", 2), ("O", 1)),
     "ring_amide": (("O", 2), ("N", 1)),
+    "ring_amidine": (("N", 1), ("N", 2)),
     "ring_thioamide": (("S", 2), ("N", 1)),
     "ring_nitrile": (("N", 3),),
     "ring_acid_chloride": (("O", 2), ("Cl", 1)),
@@ -259,12 +265,19 @@ _EXOCYCLIC_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int], ...]] = {
 }
 _HUB_ACID_GROUPS: dict[str, tuple[str, tuple[tuple[str, int], ...]]] = {
     "sulfonic_acid": ("S", (("O", 2), ("O", 2), ("O", 1))),
+    "sulfonamide": ("S", (("O", 2), ("O", 2), ("N", 1))),
+    "sulfonyl_fluoride": ("S", (("O", 2), ("O", 2), ("F", 1))),
+    "sulfonyl_chloride": ("S", (("O", 2), ("O", 2), ("Cl", 1))),
+    "sulfonyl_bromide": ("S", (("O", 2), ("O", 2), ("Br", 1))),
+    "sulfonyl_iodide": ("S", (("O", 2), ("O", 2), ("I", 1))),
     "sulfinic_acid": ("S", (("O", 2), ("O", 1))),
     "phosphonic_acid": ("P", (("O", 2), ("O", 1), ("O", 1))),
 }
 
 _FRAGMENT_SUFFIX_GROUPS: dict[str, str] = {
     "hydrazone": "=NN",
+    "hydrazide": "(=O)NN",
+    "ring_hydrazide": "C(=O)NN",
     "aldehyde_hydrazone": "=NN",
     "ring_aldehyde_hydrazone": "C=NN",
 }
@@ -940,13 +953,15 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts) -> No
         return
     if pg.key in _HUB_ACID_GROUPS:
         hub_element, decoration = _HUB_ACID_GROUPS[pg.key]
+        hub_nitrogens: list[int] = []
         for locant in pg.locants:
             base_idx = locants.get(str(locant))
             if base_idx is None:
                 raise _Abstain(f"principal-group locant {locant} outside parent")
             hub = rw.AddAtom(Chem.Atom(hub_element))
             rw.AddBond(base_idx, hub, Chem.BondType.SINGLE)
-            _decorate(rw, hub, decoration)
+            hub_nitrogens += _decorate(rw, hub, decoration)
+        _expose_n_locants(locants, hub_nitrogens)
         return
     fragment = _FRAGMENT_SUFFIX_GROUPS.get(pg.key)
     if fragment is not None:
@@ -960,11 +975,16 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts) -> No
                 raise _Abstain(f"principal-group locant {locant} outside parent")
             first_new = rw.GetNumAtoms()
             _graft(rw, base_idx, added)
-            terminal_nitrogens += [
-                idx
-                for idx in range(first_new, rw.GetNumAtoms())
-                if rw.GetAtomWithIdx(idx).GetAtomicNum() == 7 and rw.GetAtomWithIdx(idx).GetDegree() == 1
+            new_nitrogens = [
+                idx for idx in range(first_new, rw.GetNumAtoms()) if rw.GetAtomWithIdx(idx).GetAtomicNum() == 7
             ]
+            if pg.key in {"hydrazide", "ring_hydrazide"}:
+                # P-66.3.1.2: the acyl-bound nitrogen is N, the terminal one N'.
+                terminal_nitrogens += sorted(
+                    new_nitrogens, key=lambda idx: rw.GetAtomWithIdx(idx).GetDegree(), reverse=True
+                )
+            else:
+                terminal_nitrogens += [idx for idx in new_nitrogens if rw.GetAtomWithIdx(idx).GetDegree() == 1]
         _expose_n_locants(locants, terminal_nitrogens)
         return
     direct = _DIRECT_SUFFIX_GROUPS.get(pg.key)
@@ -982,6 +1002,11 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts) -> No
             nitrogens += _decorate(rw, carbon, exocyclic)
         else:
             nitrogens += _decorate(rw, base_idx, direct)
+    if pg.key == "guanidine" and len(nitrogens) == 3:
+        # P-66.4.1.2.1.3: guanidine nitrogens are numbered 1 (amine), 2 (imino), 3 (amine).
+        for locant, nitrogen in zip(("1", "2", "3"), nitrogens, strict=True):
+            locants[locant] = nitrogen
+        return
     _expose_n_locants(locants, nitrogens)
 
 

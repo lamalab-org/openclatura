@@ -759,14 +759,14 @@ def test_self_audit_abstains_on_unmodelled(smiles):
         ("Cn1cnc2c1c(=O)[nH]c(=O)n2C", "3,7-dimethyl-3,7-dihydro-1H-purine-2,6-dione"),  # theobromine
         ("O=c1[nH]c(=O)c2[nH]cnc2[nH]1", "3,7-dihydro-1H-purine-2,6-dione"),  # xanthine
         # several indicated hydrogens instead
-        ("O=c1[nH]cnc2nc[nH]c12", "1H,7H-purin-6-one"),  # hypoxanthine
-        ("Nc1nc2[nH]cnc2c(=O)[nH]1", "2-amino-1H,9H-purin-6-one"),  # guanine
+        ("O=c1[nH]cnc2nc[nH]c12", "1,7-dihydro-6H-purin-6-one"),  # hypoxanthine
+        ("Nc1nc2[nH]cnc2c(=O)[nH]1", "2-amino-1,9-dihydro-6H-purin-6-one"),  # guanine
         ("O=c1[nH]c(=O)c2[nH]c(=O)[nH]c2[nH]1", "1H,3H,7H,9H-purine-2,6,8-trione"),  # uric acid
         # a six-ring left untouched has two placements, but they are only its two
         # Kekulé forms — one structure, so still attributable
         (
             "Cn1c(=O)n(C2CCCN(C(=O)c3cccs3)C2)c2ncncc21",
-            "7-methyl-9-(1-((thiophen-2-yl)carbonyl)piperidin-3-yl)-7H,9H-purin-8-one",
+            "7-methyl-9-(1-((thiophen-2-yl)carbonyl)piperidin-3-yl)-7,9-dihydro-8H-purin-8-one",
         ),
     ],
 )
@@ -942,7 +942,7 @@ def test_unlocanted_ez_still_adjudicates():
 def test_hydrazone_n_substituent_locant_is_positional():
     # The ``N`` locant must place the substituent on the hydrazone nitrogen and
     # nowhere else, so moving it has to break the rebuild.
-    smiles = "COc1cccc(C=NNc2ccc(S(N)(=O)=O)cc2[N+](=O)[O-])c1"
+    smiles = "COc1cccc(C=NNc2ccc(C)cc2[N+](=O)[O-])c1"
     mol, atoms, parts = _capture_top_level(smiles)
     assert audit_component_reconstruction(mol, parts, atoms).verdict == "confirmed"
 

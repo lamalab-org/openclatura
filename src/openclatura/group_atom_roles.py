@@ -56,3 +56,15 @@ def hydrazone_characteristic_carbon(mol: Molecule, group: PerceivedGroup) -> int
             if bond is not None and bond.order == 2:
                 return neighbor
     return None
+
+
+def group_carbon_off_attachment(mol: Molecule, group: PerceivedGroup) -> int | None:
+    """The carbon a pseudohalide prefix spells itself (isocyano ``C``, isocyanato ``C=O``)."""
+
+    carbon = next(
+        (c for c in group.atoms_involved if mol.atoms[c].symbol == "C" and c != group.attachment_carbon),
+        None,
+    )
+    if carbon is None or not any(atom.is_carbon and atom.idx != carbon for atom in mol):
+        return None  # the pseudohalide carbon is the only carbon there is
+    return carbon

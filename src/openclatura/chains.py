@@ -619,6 +619,28 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                     systems.append(legacy_system)
 
         elif E >= V + 2:
+            # A retained locant graph is already a complete parent proof. Use
+            # its conventional numbering before attempting a generic
+            # von-Baeyer/polycycle descriptor; this is both cheaper and
+            # essential for macrocyclic retained parents whose topology is not
+            # representable by that descriptor grammar.
+            retained_match = retained_rules.get_pre_descriptor_retained_ring(mol, list(comp_nodes))
+            retained_maps = retained_match[1] if retained_match is not None else None
+            if retained_maps:
+                retained_parent = RingParent.from_retained_locant_maps(
+                    atoms=comp_nodes,
+                    locant_maps=retained_maps,
+                )
+                systems.append(
+                    RingSystem(
+                        atoms=comp_nodes,
+                        is_polycycle=True,
+                        paths=retained_parent.paths,
+                        ring_parent=retained_parent,
+                    )
+                )
+                continue
+
             candidate = _polyspiro_or_von_baeyer_candidate(mol, comp_nodes, comp_edges)
             descriptor = candidate.descriptor
             numbered_paths = candidate.paths
@@ -900,10 +922,6 @@ def _audited_von_baeyer_numberings(
     return _dedupe_ring_numberings(audited)
 
 
-def _is_von_baeyer_descriptor(descriptor: str) -> bool:
-    return is_von_baeyer_descriptor(descriptor)
-
-
 def _dedupe_ring_numberings(numberings):
     unique = []
     seen = set()
@@ -1059,7 +1077,7 @@ def _polyspiro_or_von_baeyer_candidate(
         descriptor, paths = dispiro
         return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
     legacy_descriptor, legacy_paths = get_von_baeyer_descriptor_and_path(atoms, edges)
-    if legacy_descriptor and _is_von_baeyer_descriptor(legacy_descriptor):
+    if legacy_descriptor and is_von_baeyer_descriptor(legacy_descriptor):
         legacy_numberings = tuple(
             _audited_von_baeyer_numberings(mol, legacy_descriptor, legacy_paths, frozenset(edges))
         )
@@ -1076,7 +1094,7 @@ def _polyspiro_or_von_baeyer_candidate(
     # von Baeyer numbering tie-breakers.
     if any(mol.atoms[atom].symbol == "Si" for atom in atoms):
         descriptor, paths = get_von_baeyer_descriptor_and_path(atoms, edges)
-        if not descriptor or not _is_von_baeyer_descriptor(descriptor):
+        if not descriptor or not is_von_baeyer_descriptor(descriptor):
             return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
         numberings = tuple(_audited_von_baeyer_numberings(mol, descriptor, paths, frozenset(edges)))
         return PolycycleDescriptorCandidate(
@@ -1103,7 +1121,7 @@ def _polyspiro_or_von_baeyer_candidate(
     descriptor, paths = legacy_descriptor, legacy_paths
     if not descriptor:
         return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
-    if not _is_von_baeyer_descriptor(descriptor):
+    if not is_von_baeyer_descriptor(descriptor):
         return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
     numberings = tuple(_audited_von_baeyer_numberings(mol, descriptor, paths, frozenset(edges)))
     return PolycycleDescriptorCandidate(

@@ -97,13 +97,3 @@ def candidate_splits(name: str):
     for prefix in _PREFIXES_LONGEST_FIRST:
         if name.startswith(prefix):
             yield COUNTS_BY_PREFIX[prefix], name[len(prefix) :]
-
-
-def split_prefix(name: str) -> tuple[int, str]:
-    """Split a leading multiplicative prefix off ``name`` -> ``(count, rest)``.
-
-    Falls back to ``(1, name)`` when there is no leading prefix, so an
-    unmultiplied name reads as a single occurrence.
-    """
-
-    return next(candidate_splits(name), (1, name))

@@ -46,16 +46,16 @@ PARENT_CASES = (
 )
 
 OXO_CASES = (
-    ("phenazin-1-one", "phenazin-1-one"),
+    ("phenazin-1-one", "phenazin-1(2H)-one"),
     ("phenazine-1,6-dione", "phenazine-1,6-dione"),
-    ("1,10-phenanthrolin-5-one", "1,10-phenanthrolin-5-one"),
+    ("1,10-phenanthrolin-5-one", "1,10-phenanthrolin-5(6H)-one"),
     ("1,10-phenanthroline-5,6-dione", "1,10-phenanthroline-5,6-dione"),
     ("acridin-9-one", "acridin-9(10H)-one"),
-    ("9H-carbazol-1-one", "9H-carbazol-1-one"),
+    ("9H-carbazol-1-one", "2,9-dihydro-1H-carbazol-1-one"),
     ("purine-2,6-dione", "1H-purine-2,6-dione"),
     ("2,8-diamino-1,4-dihydropurin-6-one", "2,8-diamino-1,4-dihydropurin-6-one"),
     ("1,3,7-trimethylpurine-2,6-dione", "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione"),
-    ("1H-indazol-3-one", "1H,2H-indazol-3-one"),
+    ("1H-indazol-3-one", "1,2-dihydro-3H-indazol-3-one"),
     ("xanthen-9-one", "9H-xanthen-9-one"),
 )
 
@@ -399,7 +399,10 @@ def test_oxo_and_dione_derivative_classes_are_opsin_exact_and_roundtrip():
 
 
 @pytest.mark.opsin
-def test_hydro_oxo_analogs_do_not_false_match_mancude_production_plans():
+def test_hydro_oxo_analogs_spell_their_saturation_on_the_retained_parent():
+    """P-31.1.4.2.4: a partly saturated ring ketone keeps the fused parent and cites the
+    extra hydrogen -- 3,4-dihydrophenazin-1(2H)-one -- rather than falling back to von Baeyer."""
+
     opsin_names = [
         "3,4-dihydrophenazin-1-one",
         "3,4-dihydroacridin-9-one",
@@ -409,9 +412,11 @@ def test_hydro_oxo_analogs_do_not_false_match_mancude_production_plans():
     generated_names = [result.name for result in name_many(opsin_smiles, processes=1)]
     regenerated_smiles = _opsin(generated_names)
 
-    assert "phenazin" not in generated_names[0]
-    assert "acridin" not in generated_names[1]
-    assert "xanthen" not in generated_names[2]
+    assert generated_names == [
+        "3,4-dihydrophenazin-1(2H)-one",
+        "3,4-dihydroacridin-9(2H)-one",
+        "1,2-dihydro-9H-xanthen-9-one",
+    ]
     assert _normalized_pairs_match(opsin_smiles, regenerated_smiles)
 
 
@@ -429,7 +434,7 @@ def test_pyrrolo_2_3_b_indole_names_the_retained_parent_not_von_baeyer():
 
     assert generated_names == [
         "1H,8H-pyrrolo[2,3-b]indole",
-        "3,3a-dihydro-1H-pyrrolo[2,3-b]indole",
+        "3,3a-dihydro-1H,2H-pyrrolo[2,3-b]indole",
         "methyl 7-chloro-4-methoxy-3,3a-dihydro-1H-pyrrolo[2,3-b]indole-1-carboxylate",
     ]
     assert _normalized_pairs_match(opsin_smiles, _opsin(generated_names))

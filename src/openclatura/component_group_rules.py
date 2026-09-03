@@ -6,6 +6,7 @@ from .group_atom_roles import (
     amide_nitrogen,
     bridge_oxygen,
     ester_single_oxygen,
+    group_carbon_off_attachment,
     hydrazone_characteristic_carbon,
     peroxy_ester_single_oxygen,
     sulfonyl_sulfur,
@@ -30,6 +31,9 @@ NONPARENT_ATOM_SELECTORS.update(
 )
 NONPARENT_ATOM_SELECTORS.update(dict.fromkeys(RULES.functional_groups.keys_with_family("sulfonyl"), sulfonyl_sulfur))
 NONPARENT_ATOM_SELECTORS.update(dict.fromkeys(RULES.functional_groups.keys_with_family("amide_like"), amide_nitrogen))
+NONPARENT_ATOM_SELECTORS.update(
+    dict.fromkeys(("isocyano", "isocyanato", "isothiocyanato", "cyanato", "thiocyanato"), group_carbon_off_attachment)
+)
 
 
 def retarget_external_carbonyl_groups(

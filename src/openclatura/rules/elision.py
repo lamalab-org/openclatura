@@ -36,6 +36,19 @@ def elide_terminal_a(prefix: str, following: str) -> str:
     return prefix + following
 
 
+def elide_terminal_e(stem: str, following: str) -> str:
+    """Elide a parent hydride's terminal 'e' before a suffix starting with a vowel (P-16.3.3).
+
+    A locant set between the two does not stop the elision: "thietane" + "-1-ylidene"
+    -> "thietan-1-ylidene".
+    """
+    if not stem.endswith("e") or not following:
+        return stem + following
+    rest = following.lstrip("-")
+    rest = rest.split("-", 1)[1] if rest[:1].isdigit() and "-" in rest else rest
+    return (stem[:-1] + following) if is_vowel_start(rest) else stem + following
+
+
 def is_vowel_start(s: str) -> bool:
     """Return True if `s` begins with a vowel (a, e, i, o, u, y)."""
     return bool(s) and s[0].lower() in VOWELS

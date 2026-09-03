@@ -120,7 +120,7 @@
       "indolizine",
       "isoquinoline",
       "isoxazolo[5,4-b]pyridine",
-      "naphthacene",
+      "tetracene",
       "naphthalene",
       "naphtho[1,2-b]thiophene",
       "naphtho[2,3-b]furan",
@@ -1412,15 +1412,15 @@
       "fusion_stems": [],
       "derivative_status": "production_safe"
     },
-    "naphthacene": {
+    "tetracene": {
       "parent_stems": [
-        "naphthacen"
+        "tetracen"
       ],
       "substituent_stems": [
-        "naphthacen"
+        "tetracen"
       ],
       "fusion_stems": [
-        "naphthaceno"
+        "tetraceno"
       ],
       "derivative_status": "production_safe"
     },

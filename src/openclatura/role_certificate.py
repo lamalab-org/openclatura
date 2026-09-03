@@ -9,9 +9,8 @@ about atoms, bonds, charges, and locants without parsing final strings.
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from .assembly_parts import AssemblyParts, NameAtomBinding
+from .assembly_parts import NameAtomBinding
 from .molecule import Molecule
-from .name_bindings import refresh_name_atom_bindings
 
 if TYPE_CHECKING:  # pragma: no cover - imported for type checkers only
     from .perception import PerceivedGroup
@@ -161,29 +160,6 @@ def audit_role_certificate(
         expected_bonds=expected_bond_set,
         audit_errors=tuple(errors),
     )
-
-
-def certificate_from_perceived_group(mol: Molecule, group: "PerceivedGroup") -> RoleCertificate:
-    """Create a role certificate from a perceived functional group."""
-
-    return RoleCertificate(
-        key=group.key,
-        projections=(RoleProjection.from_perceived_group(mol, group),),
-        decision_reasons=tuple(group.decision_reasons),
-    )
-
-
-def certificates_from_assembly(mol: Molecule, parts: AssemblyParts) -> list[RoleCertificate]:
-    """Create role certificates from the current assembled name bindings."""
-
-    bindings = parts.name_atom_bindings or refresh_name_atom_bindings(parts)
-    return [
-        RoleCertificate(
-            key=f"{binding.stage}:{binding.role}",
-            projections=(RoleProjection.from_name_binding(mol, binding),),
-        )
-        for binding in bindings
-    ]
 
 
 def _charges_for_atoms(mol: Molecule, atom_ids: frozenset[int]) -> dict[int, int]:
