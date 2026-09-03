@@ -12,9 +12,9 @@ from ..rules import elements
 from .config import fusion_nomenclature_config
 from .model import FusionComponentMatch, FusionComponentSpec, FusionMode, FusionRuleDecision
 
-# P-25.3.2.4 gives these two criteria independent semantic identities.  Keep
-# separate constants even while the currently supported element sequence is
-# identical, so extending one rule can never silently alter the other.
+# P-25.3.2.4 gives these two criteria independent semantic identities and
+# distinct element orders. Keep them separate so data changes to one rule
+# cannot silently alter the other.
 EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE = tuple(
     item.symbol
     for item in sorted(

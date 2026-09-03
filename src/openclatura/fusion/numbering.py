@@ -15,6 +15,14 @@ from .faces import BoundedFaceModel
 from .model import BondAssignment, Face, FaceModel, FusedLayout, ParentBondModel, RejectedNumbering, SystemLocant
 from .rules import GENERAL_HETEROATOM_COUNT_PRECEDENCE
 
+
+class MancudeSearchBudgetExceeded(RuntimeError):
+    """Raised when exhaustive parent bond assignment exceeds its bound."""
+
+    def __init__(self, budget: int) -> None:
+        super().__init__(f"mancude assignment search exceeded its budget of {budget} states")
+        self.budget = budget
+
 _CONFIG = fusion_nomenclature_config()
 
 
@@ -437,7 +445,7 @@ def _maximum_matchings(
         nonlocal best_size, states
         states += 1
         if states > search_budget:
-            raise RuntimeError(f"mancude assignment search exceeded its budget of {search_budget} states")
+            raise MancudeSearchBudgetExceeded(search_budget)
         if position == len(ordered):
             size = len(selected)
             value = frozenset(selected)

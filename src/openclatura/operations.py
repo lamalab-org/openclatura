@@ -18,6 +18,9 @@ def infer_operations(decisions: list[TraceStep], trace_segments: list[dict]) -> 
             and step.decision == "selected audited systematic fusion parent"
         ):
             operations.append(NomenclatureOperation(OperationClass.FUSION, "systematic_fusion_parent"))
+        elif step.phase == TracePhase.PARENT_SELECTION and step.decision == "selected parent skeleton":
+            if step.data.get("is_polycycle") and step.data.get("polycycle_descriptor"):
+                operations.append(NomenclatureOperation(OperationClass.FUSION, "polycyclic_parent"))
         elif step.phase == TracePhase.ASSEMBLY and step.decision == "assembled component name":
             principal_key = step.data.get("principal_key")
             substituent_count = int(step.data.get("substituent_count") or 0)

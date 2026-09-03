@@ -1,9 +1,11 @@
+import pytest
 from rdkit import Chem
 
 from openclatura.fusion.faces import select_bounded_face_model
 from openclatura.fusion.layout import preferred_intrinsic_layouts
 from openclatura.fusion.model import FusionConfirmed, FusionMode
 from openclatura.fusion.numbering import (
+    MancudeSearchBudgetExceeded,
     completed_system_numbering_selection,
     completed_system_numberings,
     observed_parent_matches_bond_model,
@@ -145,3 +147,10 @@ def test_layout_derived_numbering_is_invariant_to_input_atom_order():
     ]
 
     assert left_maps == right_maps
+
+
+def test_mancude_search_budget_has_a_typed_failure():
+    mol = read_smiles("c1ccccc1")
+
+    with pytest.raises(MancudeSearchBudgetExceeded, match="budget of 1 states"):
+        parent_bond_model(mol, mol.atoms, search_budget=1)

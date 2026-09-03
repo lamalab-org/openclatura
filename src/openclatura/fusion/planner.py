@@ -32,7 +32,7 @@ from .model import (
     FusionUnsupported,
     PinStatus,
 )
-from .numbering import completed_system_numbering_selection, parent_bond_model
+from .numbering import MancudeSearchBudgetExceeded, completed_system_numbering_selection, parent_bond_model
 from .registry import fusion_component_registry
 from .rules import explain_component_comparison, fusion_mode_allows_planning, pin_ring_size_gate
 
@@ -124,7 +124,10 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         rejected_numberings=numbering_selection.rejected,
     )
     graph = _abstract_graph(ast, registry)
-    bond_model = parent_bond_model(mol, atoms)
+    try:
+        bond_model = parent_bond_model(mol, atoms)
+    except MancudeSearchBudgetExceeded as exc:
+        return FusionUnsupported("mancude assignment search budget exhausted", (str(exc),))
     indicated_h = tuple(
         locant
         for atom, locant in numbering.abstract_atom_to_locant
