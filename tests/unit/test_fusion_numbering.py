@@ -83,18 +83,34 @@ def test_layout_derived_numbering_starts_at_uppermost_rightmost_face_and_runs_cl
     positions = {atom: (x, y) for atom, x, y in layout.atom_positions}
     fusion_atoms = {atom for atom in bounded.atom_ids if sum(atom in face.atoms for face in bounded.faces) > 1}
     face = next(item for item in face_model.faces if item.id == expected_face)
-    expected_start = max(
-        (atom for atom in face.atom_cycle if atom not in fusion_atoms),
-        key=lambda atom: (positions[atom][1], -positions[atom][0]),
-    )
+    clockwise = selected.perimeter
+    expected_starts = [
+        atom
+        for index, atom in enumerate(clockwise)
+        if atom in face.atom_cycle
+        and atom not in fusion_atoms
+        and clockwise[index - 1] in face.atom_cycle
+        and clockwise[index - 1] in fusion_atoms
+    ]
     signed_area = sum(
         positions[left][0] * positions[right][1] - positions[right][0] * positions[left][1]
         for left, right in zip(selected.perimeter, selected.perimeter[1:] + selected.perimeter[:1])
     )
 
     assert selected.start_face_id == expected_face
-    assert selected.start_atom == expected_start == selected.perimeter[0]
+    assert expected_starts == [selected.start_atom]
+    assert selected.start_atom == selected.perimeter[0]
     assert signed_area < 0
+
+
+def test_completed_numbering_starts_at_counterclockwise_end_of_long_nonfusion_arc():
+    mol, _, _, _, selection = _layout_numbering_selection(
+        "C1C=CC2=C1C1=CC=CC=C1C=1C=CC=CC21"
+    )
+
+    assert selection.accepted
+    saturated_carbon = next(atom for atom, value in mol.atoms.items() if value.total_h_count == 2)
+    assert {numbering.string_map[saturated_carbon] for numbering in selection.accepted} == {"1"}
 
 
 def test_layout_numbering_records_locant_losing_reflections_in_the_plan_proof():

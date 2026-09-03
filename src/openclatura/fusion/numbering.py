@@ -12,7 +12,7 @@ from ..molecule import Molecule
 from ..polycycle_topology import normalize_edge
 from .config import fusion_nomenclature_config
 from .faces import BoundedFaceModel
-from .model import BondAssignment, FaceModel, FusedLayout, ParentBondModel, RejectedNumbering, SystemLocant
+from .model import BondAssignment, Face, FaceModel, FusedLayout, ParentBondModel, RejectedNumbering, SystemLocant
 from .rules import GENERAL_HETEROATOM_COUNT_PRECEDENCE
 
 _CONFIG = fusion_nomenclature_config()
@@ -194,16 +194,18 @@ def _numbering_from_layout(
     )
     if start_face_id is None:
         return None
-    start_face = face_by_id[start_face_id]
-    start_candidates = [
-        atom for atom in start_face.atom_cycle if atom not in fusion_atoms and atom in faces.outer_boundary.atoms
-    ]
-    # For a face in its preferred orientation, the uppermost then leftmost
-    # peripheral vertex is its most counterclockwise nonfusion position.
-    start_atom = max(start_candidates, key=lambda atom: (positions[atom][1], -positions[atom][0]))
-    perimeter = _clockwise_perimeter(faces.outer_boundary.atoms, positions, start_atom)
-    if perimeter is None:
+    clockwise = _clockwise_boundary(faces.outer_boundary.atoms, positions)
+    if clockwise is None:
         return None
+    start_atom = _counterclockwise_nonfusion_start(
+        face_by_id[start_face_id],
+        clockwise,
+        fusion_atoms,
+    )
+    if start_atom is None:
+        return None
+    offset = clockwise.index(start_atom)
+    perimeter = clockwise[offset:] + clockwise[:offset]
     locant_map = _number_perimeter(mol, perimeter, fusion_atoms)
     if locant_map is None:
         return None
@@ -251,12 +253,11 @@ def _clockwise_half(dx: Fraction, dy: Fraction) -> int:
     return 0 if dx > 0 or (dx == 0 and dy >= 0) else 1
 
 
-def _clockwise_perimeter(
+def _clockwise_boundary(
     boundary: tuple[int, ...],
     positions: dict[int, tuple[int, int]],
-    start_atom: int,
 ) -> tuple[int, ...] | None:
-    if start_atom not in boundary or any(atom not in positions for atom in boundary):
+    if any(atom not in positions for atom in boundary):
         return None
     signed_area = sum(
         positions[left][0] * positions[right][1] - positions[right][0] * positions[left][1]
@@ -264,9 +265,38 @@ def _clockwise_perimeter(
     )
     if signed_area == 0:
         return None
-    clockwise = boundary if signed_area < 0 else tuple(reversed(boundary))
-    offset = clockwise.index(start_atom)
-    return clockwise[offset:] + clockwise[:offset]
+    return boundary if signed_area < 0 else tuple(reversed(boundary))
+
+
+def _counterclockwise_nonfusion_start(
+    face: Face,
+    clockwise_boundary: tuple[int, ...],
+    fusion_atoms: set[int],
+) -> int | None:
+    """Return the start of the selected face's clockwise nonfusion arc.
+
+    P-25.3.3.1.1 starts at the most counterclockwise nonfusion atom and then
+    proceeds clockwise around the completed system.  On the outer perimeter,
+    that atom is the first nonfusion atom after a fusion junction.  This
+    topological definition also handles a three-or-more-atom arc, where a
+    coordinate extremum can incorrectly select an atom in the middle.
+    """
+
+    face_atoms = set(face.atom_cycle)
+    candidates = []
+    for index, atom in enumerate(clockwise_boundary):
+        if atom not in face_atoms or atom in fusion_atoms:
+            continue
+        previous = clockwise_boundary[index - 1]
+        if previous in face_atoms and previous in fusion_atoms:
+            candidates.append(atom)
+    if len(candidates) == 1:
+        return candidates[0]
+    if not candidates:
+        return None
+    # More than one nonfusion arc requires a later complex-numbering tier;
+    # selecting one by atom id or drawing coordinates would not be invariant.
+    return None
 
 
 def _fusion_atoms(faces: BoundedFaceModel) -> set[int]:
