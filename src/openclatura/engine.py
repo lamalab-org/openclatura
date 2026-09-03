@@ -14,7 +14,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .fusion.context import reset_fusion_mode, set_fusion_mode
+from .fusion.context import current_fusion_mode, reset_fusion_mode, set_fusion_mode
 from .fusion.model import FusionMode
 from .graph_io import get_connected_components, read_rdkit_mol, read_smiles
 from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
@@ -288,7 +288,9 @@ class NamingEngine:
         # pure-name path so the common API does not pay for diagnostics it discards.
         need_analysis = request.include_trace or request.verify_opsin
         previous_span_building = set_token_span_building(need_analysis)
-        fusion_mode_token = set_fusion_mode(request.fusion_mode)
+        fusion_mode_token = (
+            None if request.fusion_mode is current_fusion_mode() else set_fusion_mode(request.fusion_mode)
+        )
 
         # The OPSIN-free self-audit rebuilds each component from its name while it
         # is being generated, so its capture hook must wrap the naming call.
@@ -331,7 +333,8 @@ class NamingEngine:
         except Exception as exc:  # noqa: BLE001 - intentionally permissive boundary
             return NamingResult(name="", smiles=request.smiles, error=f"{type(exc).__name__}: {exc}")
         finally:
-            reset_fusion_mode(fusion_mode_token)
+            if fusion_mode_token is not None:
+                reset_fusion_mode(fusion_mode_token)
             set_token_span_building(previous_span_building)
 
         if request.verify_opsin:

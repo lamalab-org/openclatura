@@ -7,6 +7,7 @@ import pytest
 from rdkit import Chem
 
 from openclatura import FusionMode, name, name_many, name_mol, opsin_available
+from openclatura.fusion.context import current_fusion_mode, reset_fusion_mode, set_fusion_mode
 from openclatura.fusion.faces import FaceSearchBudgetExceeded
 from openclatura.fusion.model import AuditStatus, FusionConfirmed, FusionNotApplicable, FusionUnsupported
 from openclatura.fusion.numbering import MancudeSearchBudgetExceeded
@@ -236,6 +237,15 @@ def test_batch_request_propagates_fusion_mode_without_cross_request_state():
     )
     assert [result.name for result in values] == ["thieno[2,3-b]furan", "ethanol"]
     assert name("O1C2=C(C=C1)C=CS2").name == "2-oxa-8-thiabicyclo[3.3.0]octa-1(5),3,6-triene"
+
+
+def test_nested_legacy_request_restores_the_active_fusion_policy():
+    token = set_fusion_mode(FusionMode.GENERAL)
+    try:
+        assert name("CCO", fusion_mode=FusionMode.LEGACY).name == "ethanol"
+        assert current_fusion_mode() is FusionMode.GENERAL
+    finally:
+        reset_fusion_mode(token)
 
 
 def test_planner_cache_is_request_policy_scoped_and_mutation_invalidated():
