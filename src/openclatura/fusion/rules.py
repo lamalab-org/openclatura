@@ -1,0 +1,238 @@
+"""Pure eligibility and component-seniority rules for fusion nomenclature."""
+
+from __future__ import annotations
+
+from collections import Counter
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Protocol
+
+from .model import FusionComponentMatch, FusionComponentSpec, FusionMode, FusionRuleDecision
+
+# P-25.3.2.4 gives these two criteria independent semantic identities.  Keep
+# separate constants even while the currently supported element sequence is
+# identical, so extending one rule can never silently alter the other.
+EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE = (
+    "N",
+    "F",
+    "Cl",
+    "Br",
+    "I",
+    "O",
+    "S",
+    "Se",
+    "Te",
+    "P",
+    "As",
+    "Sb",
+    "Bi",
+    "Si",
+    "Ge",
+    "Sn",
+    "Pb",
+    "B",
+    "Al",
+    "Ga",
+    "In",
+    "Tl",
+)
+
+GENERAL_HETEROATOM_COUNT_PRECEDENCE = (
+    "N",
+    "F",
+    "Cl",
+    "Br",
+    "I",
+    "O",
+    "S",
+    "Se",
+    "Te",
+    "P",
+    "As",
+    "Sb",
+    "Bi",
+    "Si",
+    "Ge",
+    "Sn",
+    "Pb",
+    "B",
+    "Al",
+    "Ga",
+    "In",
+    "Tl",
+)
+
+PIN_MINIMUM_LARGE_RING_SIZE = 5
+PIN_MINIMUM_LARGE_RING_COUNT = 2
+
+
+class FusionComponentLookup(Protocol):
+    """Minimal registry interface needed by the pure comparison functions."""
+
+    def get(self, key: str) -> FusionComponentSpec | None: ...
+
+
+@dataclass(frozen=True, slots=True, order=True)
+class ComponentSeniorityKey:
+    """Normalized P-25.3.2.4 key; lower tuple values are preferred."""
+
+    override: int
+    earliest_special_heteroatom: int
+    ring_count: int
+    ring_size_vector: tuple[int, ...]
+    heteroatom_count: int
+    heteroatom_kind_count: int
+    heteroatom_counts_by_priority: tuple[int, ...]
+    horizontal_row_count: int
+    all_heteroatom_locants: tuple[tuple[int, str], ...]
+    per_element_locants: tuple[tuple[tuple[int, str], ...], ...]
+    peripheral_fusion_carbon_locants: tuple[tuple[int, str], ...]
+    deterministic_tiebreak: str
+
+    def as_tuple(self) -> tuple:
+        return (
+            self.override,
+            self.earliest_special_heteroatom,
+            self.ring_count,
+            self.ring_size_vector,
+            self.heteroatom_count,
+            self.heteroatom_kind_count,
+            self.heteroatom_counts_by_priority,
+            self.horizontal_row_count,
+            self.all_heteroatom_locants,
+            self.per_element_locants,
+            self.peripheral_fusion_carbon_locants,
+            self.deterministic_tiebreak,
+        )
+
+
+_CRITERION_LABELS = (
+    "seniority_override",
+    "earliest_special_heteroatom",
+    "ring_count",
+    "ring_size_vector",
+    "heteroatom_count",
+    "heteroatom_kind_count",
+    "heteroatom_counts_by_priority",
+    "horizontal_row_count",
+    "all_heteroatom_locants",
+    "per_element_locants",
+    "peripheral_fusion_carbon_locants",
+    "deterministic_tiebreak",
+)
+
+
+def pin_ring_size_gate(ring_sizes: tuple[int, ...]) -> bool:
+    """Return whether a fused system satisfies the P-25 PIN ring-size gate."""
+
+    return sum(size >= PIN_MINIMUM_LARGE_RING_SIZE for size in ring_sizes) >= PIN_MINIMUM_LARGE_RING_COUNT
+
+
+def fusion_mode_allows_planning(mode: FusionMode) -> bool:
+    """Return whether a request mode permits invoking the new planner."""
+
+    return mode in {FusionMode.AUDITED_PIN, FusionMode.GENERAL}
+
+
+def component_seniority_key(
+    component: FusionComponentMatch,
+    registry: FusionComponentLookup | Mapping[str, FusionComponentSpec],
+) -> ComponentSeniorityKey:
+    """Return the explainable P-25.3.2.4 key for one matched occurrence."""
+
+    spec = _component_spec(component, registry)
+    heteroatoms = tuple(atom for atom in spec.atoms if atom.symbol != "C")
+    counts = Counter(atom.symbol for atom in heteroatoms)
+    special_ranks = [
+        EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE.index(symbol)
+        for symbol in counts
+        if symbol in EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE
+    ]
+    earliest = min(special_ranks, default=len(EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE))
+    all_hetero_locants = tuple(sorted(_locant_sort_key(atom.locant) for atom in heteroatoms))
+    per_element_locants = tuple(
+        tuple(sorted(_locant_sort_key(atom.locant) for atom in heteroatoms if atom.symbol == symbol))
+        for symbol in GENERAL_HETEROATOM_COUNT_PRECEDENCE
+    )
+    return ComponentSeniorityKey(
+        override=spec.seniority_override if spec.seniority_override is not None else 1_000_000,
+        earliest_special_heteroatom=earliest,
+        ring_count=-len(spec.rings),
+        ring_size_vector=tuple(-size for size in sorted(spec.ring_sizes, reverse=True)),
+        heteroatom_count=-len(heteroatoms),
+        heteroatom_kind_count=-len(counts),
+        heteroatom_counts_by_priority=tuple(-counts.get(symbol, 0) for symbol in GENERAL_HETEROATOM_COUNT_PRECEDENCE),
+        horizontal_row_count=-_maximum_horizontal_row_count(spec),
+        all_heteroatom_locants=all_hetero_locants,
+        per_element_locants=per_element_locants,
+        peripheral_fusion_carbon_locants=tuple(
+            sorted(_locant_sort_key(locant) for locant in spec.fusion_carbon_locants)
+        ),
+        deterministic_tiebreak=spec.key,
+    )
+
+
+def explain_component_comparison(
+    left: FusionComponentMatch,
+    right: FusionComponentMatch,
+    registry: FusionComponentLookup | Mapping[str, FusionComponentSpec],
+) -> FusionRuleDecision:
+    """Explain the first seniority criterion that distinguishes two components."""
+
+    left_key = component_seniority_key(left, registry)
+    right_key = component_seniority_key(right, registry)
+    left_values = left_key.as_tuple()
+    right_values = right_key.as_tuple()
+    for criterion, left_value, right_value in zip(_CRITERION_LABELS, left_values, right_values, strict=True):
+        if left_value == right_value:
+            continue
+        winner = "left" if left_value < right_value else "right"
+        return FusionRuleDecision(
+            rule="P-25.3.2.4",
+            criterion=criterion,
+            outcome=winner,
+            reason=f"{winner} component is senior by {criterion.replace('_', ' ')}.",
+        )
+    return FusionRuleDecision(
+        rule="P-25.3.2.4",
+        criterion="complete_tie",
+        outcome="tie",
+        reason="The component occurrences are tied by every implemented seniority criterion.",
+    )
+
+
+def _component_spec(
+    component: FusionComponentMatch,
+    registry: FusionComponentLookup | Mapping[str, FusionComponentSpec],
+) -> FusionComponentSpec:
+    spec = registry.get(component.spec_key)
+    if spec is None:
+        raise KeyError(f"Unknown fusion component spec: {component.spec_key}")
+    return spec
+
+
+def _maximum_horizontal_row_count(spec: FusionComponentSpec) -> int:
+    """Return an intrinsic layout tie-break without using external coordinates.
+
+    Layout coordinates are quarter-grid units.  At foundation stage there is no
+    face-to-position map, so this conservative value counts distinct component
+    atoms on the most populated horizontal level.  A later layout module can
+    supply the exact ring-row criterion without changing the key shape.
+    """
+
+    maximum = 0
+    for layout in spec.preferred_layouts:
+        rows = Counter(y for _, _, y in layout.atom_positions)
+        maximum = max(maximum, max(rows.values(), default=0))
+    return maximum
+
+
+def _locant_sort_key(locant: str) -> tuple[int, str]:
+    digits = ""
+    suffix = ""
+    for char in locant:
+        if char.isdigit() and not suffix:
+            digits += char
+        else:
+            suffix += char
+    return (int(digits) if digits else 1_000_000, suffix)

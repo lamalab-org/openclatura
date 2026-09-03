@@ -1,0 +1,426 @@
+"""Graph-backed registry of components eligible for fusion nomenclature.
+
+The JSON table in :mod:`openclatura.data` contains nomenclature policy only.
+Connectivity and local numbering remain owned by the retained graph-template
+registry, so this module never identifies a component from a textual name,
+SMILES/SMARTS pattern, or drawing coordinates.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
+from enum import StrEnum
+from functools import cache
+from typing import Any
+
+from ..molecule import Molecule
+from ..naming_data import load_json_table
+from ..retained_fused_templates import (
+    RetainedGraphTemplate,
+    match_retained_graph_template_maps,
+    molecule_graph_topology_key,
+    retained_graph_template_topology_key,
+    retained_graph_templates,
+)
+from .model import ComponentAtom, ComponentBond, FusionComponentMatch, FusionComponentSpec
+
+SUPPORTED_SCHEMA_VERSION = 1
+
+
+class FusionComponentRole(StrEnum):
+    """A nomenclatural role for which a fusion component may be eligible."""
+
+    PARENT = "parent"
+    ATTACHED = "attached"
+
+
+@dataclass(frozen=True, slots=True)
+class RegisteredFusionComponent:
+    """One validated policy row joined to its graph templates."""
+
+    spec: FusionComponentSpec
+    template_names: tuple[str, ...]
+    templates: tuple[RetainedGraphTemplate, ...]
+    omit_attached_locants: bool = False
+
+    def eligible_for(self, role: FusionComponentRole | str) -> bool:
+        role = FusionComponentRole(role)
+        return self.spec.usable_as_parent if role is FusionComponentRole.PARENT else self.spec.usable_as_attached
+
+
+@dataclass(frozen=True, slots=True)
+class _Face:
+    id: int
+    atoms: frozenset[int]
+    edges: frozenset[tuple[int, int]]
+
+
+class FusionComponentRegistry:
+    """Validated, topology-indexed fusion-component registry."""
+
+    def __init__(
+        self,
+        version: str,
+        *,
+        templates: Iterable[RetainedGraphTemplate] | None = None,
+    ) -> None:
+        if not isinstance(version, str) or not version.strip():
+            raise ValueError("fusion component registry version must not be empty")
+        self.version = version
+        source_templates = retained_graph_templates(include_disabled=True) if templates is None else tuple(templates)
+        self._template_by_name = {template.name: template for template in source_templates}
+        if len(self._template_by_name) != len(source_templates):
+            raise ValueError("retained graph template names must be unique")
+        self._components: list[RegisteredFusionComponent] = []
+        self._by_key: dict[str, RegisteredFusionComponent] = {}
+        self._claimed_template_names: set[str] = set()
+        self._topology_index: dict[tuple[int, tuple], list[RegisteredFusionComponent]] = {}
+
+    @classmethod
+    def from_data(cls, data: Mapping[str, Any]) -> FusionComponentRegistry:
+        """Build and validate a registry from the serialized policy table."""
+
+        schema_version = data.get("schema_version")
+        if schema_version != SUPPORTED_SCHEMA_VERSION:
+            raise ValueError(
+                f"unsupported fusion component schema version {schema_version!r}; "
+                f"expected {SUPPORTED_SCHEMA_VERSION}"
+            )
+        rows = data.get("components")
+        if not isinstance(rows, list):
+            raise ValueError("fusion component data must contain a components list")
+        registry = cls(_required_text(data, "registry_version"))
+        for row in rows:
+            if not isinstance(row, Mapping):
+                raise ValueError("every fusion component must be a mapping")
+            registry.register(row)
+        return registry
+
+    @property
+    def components(self) -> tuple[RegisteredFusionComponent, ...]:
+        return tuple(self._components)
+
+    @property
+    def specs(self) -> tuple[FusionComponentSpec, ...]:
+        return tuple(component.spec for component in self._components)
+
+    @property
+    def by_key(self) -> Mapping[str, RegisteredFusionComponent]:
+        return dict(self._by_key)
+
+    def register(self, row: Mapping[str, Any]) -> FusionComponentSpec:
+        """Validate and register one data-backed component policy row."""
+
+        key = _required_text(row, "key")
+        if key in self._by_key:
+            raise ValueError(f"duplicate fusion component key {key!r}")
+
+        template_names = _template_names(row)
+        duplicates = self._claimed_template_names.intersection(template_names)
+        if duplicates:
+            raise ValueError(f"duplicate fusion component template name {min(duplicates)!r}")
+        templates = tuple(self._template_by_name[name] for name in template_names if name in self._template_by_name)
+        if not templates:
+            raise ValueError(f"fusion component {key!r} has no matching retained graph template")
+        if any(not _template_is_connected(template) for template in templates):
+            raise ValueError(f"fusion component {key!r} references a disconnected graph template")
+        if any(template.locants != templates[0].locants for template in templates[1:]):
+            raise ValueError(f"fusion component {key!r} template variants use different local locants")
+
+        allow_parent = _required_bool(row, "allow_as_parent")
+        allow_attached = _required_bool(row, "allow_as_attached")
+        if not allow_parent and not allow_attached:
+            raise ValueError(f"fusion component {key!r} is not eligible for any role")
+        attached_prefix = _optional_text(row, "attached_prefix")
+        if allow_attached and not attached_prefix:
+            raise ValueError(f"attached fusion component {key!r} requires an attached_prefix")
+        rule = _required_text(row, "rule")
+        parent_name = _required_text(row, "parent_name")
+        omit_attached_locants = row.get("omit_attached_locants", False)
+        if type(omit_attached_locants) is not bool:
+            raise ValueError("omit_attached_locants must be a boolean")
+
+        primary = templates[0]
+        spec = _component_spec(
+            key=key,
+            parent_name=parent_name,
+            attached_prefix=attached_prefix or "",
+            template=primary,
+            usable_as_parent=allow_parent,
+            usable_as_attached=allow_attached,
+            rule_reference=rule,
+        )
+        component = RegisteredFusionComponent(spec, template_names, templates, omit_attached_locants)
+        self._components.append(component)
+        self._by_key[key] = component
+        self._claimed_template_names.update(template_names)
+        for template in templates:
+            index_key = (len(template.rings), retained_graph_template_topology_key(template))
+            self._topology_index.setdefault(index_key, []).append(component)
+        return spec
+
+    def match_faces(
+        self,
+        mol: Molecule,
+        faces: object,
+        *,
+        role: FusionComponentRole | str | None = None,
+        input_to_skeleton_atom: Mapping[int, int] | None = None,
+    ) -> tuple[FusionComponentMatch, ...]:
+        """Return every exact local numbering for components covering faces.
+
+        Face subsets are connected through shared molecular edges. Cheap graph
+        invariants select candidate templates; the retained graph matcher then
+        proves connectivity, elements, charges, and every local locant map.
+        """
+
+        requested_role = FusionComponentRole(role) if role is not None else None
+        normalized_faces = _normalize_faces(faces)
+        if not normalized_faces:
+            return ()
+        unknown = set().union(*(face.atoms for face in normalized_faces)) - mol.atoms.keys()
+        if unknown:
+            raise KeyError(f"unknown face atom ids: {sorted(unknown)}")
+        if missing_edges := {
+            edge for face in normalized_faces for edge in face.edges if mol.get_bond(*edge) is None
+        }:
+            raise ValueError(f"face cycles contain non-bonded atom pairs: {sorted(missing_edges)}")
+        skeleton_map = dict(input_to_skeleton_atom or ((atom, atom) for atom in mol.atoms))
+        missing_skeleton_atoms = set().union(*(face.atoms for face in normalized_faces)) - skeleton_map.keys()
+        if missing_skeleton_atoms:
+            raise ValueError(f"missing skeleton atom mappings: {sorted(missing_skeleton_atoms)}")
+
+        ring_counts = frozenset(count for count, _ in self._topology_index)
+        matches: list[FusionComponentMatch] = []
+        seen: set[tuple[str, frozenset[int], tuple[tuple[str, int], ...]]] = set()
+        occurrence_id = 0
+        for subset in _connected_face_subsets(normalized_faces, ring_counts):
+            atom_ids = set().union(*(face.atoms for face in subset))
+            topology_key = molecule_graph_topology_key(mol, atom_ids)
+            candidates = self._topology_index.get((len(subset), topology_key), ())
+            for component in candidates:
+                if requested_role is not None and not component.eligible_for(requested_role):
+                    continue
+                for template in component.templates:
+                    if retained_graph_template_topology_key(template) != topology_key:
+                        continue
+                    for exact in match_retained_graph_template_maps(
+                        mol,
+                        atom_ids,
+                        template,
+                        allow_nonaromatic=True,
+                    ):
+                        if not _template_rings_match_faces(template, exact.locant_to_atom, subset):
+                            continue
+                        local_to_input = tuple((locant, exact.locant_to_atom[locant]) for locant in template.locants)
+                        identity = (component.spec.key, frozenset(face.id for face in subset), local_to_input)
+                        if identity in seen:
+                            continue
+                        seen.add(identity)
+                        local_to_skeleton = tuple((locant, skeleton_map[atom]) for locant, atom in local_to_input)
+                        matches.append(
+                            FusionComponentMatch(
+                                occurrence_id=occurrence_id,
+                                spec_key=component.spec.key,
+                                covered_face_ids=identity[1],
+                                local_to_input_atom=local_to_input,
+                                local_to_skeleton_atom=local_to_skeleton,
+                                topology_key=topology_key,
+                            )
+                        )
+                        occurrence_id += 1
+        return tuple(matches)
+
+
+def _component_spec(
+    *,
+    key: str,
+    parent_name: str,
+    attached_prefix: str,
+    template: RetainedGraphTemplate,
+    usable_as_parent: bool,
+    usable_as_attached: bool,
+    rule_reference: str,
+) -> FusionComponentSpec:
+    atoms = tuple(
+        ComponentAtom(
+            locant=atom.locant,
+            symbol=atom.symbol,
+            formal_charge=atom.charge,
+            pi_capacity=0 if atom.saturated else 1,
+            forced_single=atom.saturated,
+            indicated_h_candidate=atom.default_h,
+        )
+        for atom in template.atoms
+    )
+    atom_by_locant = template.atom_by_locant
+    return FusionComponentSpec(
+        key=key,
+        parent_name=parent_name,
+        attached_prefix=attached_prefix,
+        derivative_stem=template.derivative_stem,
+        locants=template.locants,
+        atoms=atoms,
+        bonds=tuple(ComponentBond(bond.locants, bond.bond_class) for bond in template.bonds),
+        rings=template.rings,
+        peripheral_order=template.peripheral_atoms,
+        usable_as_parent=usable_as_parent,
+        usable_as_attached=usable_as_attached,
+        pin_component=template.pin,
+        retained_complete_name=True,
+        benzoheterocycle=False,
+        traditional_numbering=True,
+        ring_sizes=tuple(len(ring) for ring in template.rings),
+        fusion_carbon_locants=tuple(
+            locant for locant in template.fusion_atoms if atom_by_locant[locant].symbol == "C"
+        ),
+        preferred_layouts=(),
+        seniority_override=None,
+        rule_reference=rule_reference,
+    )
+
+
+def _required_text(row: Mapping[str, Any], field: str) -> str:
+    value = row.get(field)
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field} must be a non-empty string")
+    return value
+
+
+def _optional_text(row: Mapping[str, Any], field: str) -> str | None:
+    value = row.get(field)
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field} must be a non-empty string when supplied")
+    return value
+
+
+def _required_bool(row: Mapping[str, Any], field: str) -> bool:
+    value = row.get(field)
+    if type(value) is not bool:
+        raise ValueError(f"{field} must be a boolean")
+    return value
+
+
+def _template_names(row: Mapping[str, Any]) -> tuple[str, ...]:
+    values = row.get("template_names")
+    if not isinstance(values, list) or not values:
+        raise ValueError("template_names must be a non-empty list")
+    names = tuple(values)
+    if any(not isinstance(name, str) or not name.strip() for name in names):
+        raise ValueError("template_names must contain non-empty strings")
+    if len(names) != len(set(names)):
+        raise ValueError("template_names must be unique")
+    return names
+
+
+def _normalize_faces(faces: object) -> tuple[_Face, ...]:
+    values = getattr(faces, "faces", faces)
+    if not isinstance(values, Iterable):
+        raise TypeError("faces must be an iterable or expose a faces iterable")
+    normalized: list[_Face] = []
+    for position, face in enumerate(values):
+        atom_cycle = getattr(face, "atom_cycle", getattr(face, "atoms", face))
+        if not isinstance(atom_cycle, Sequence):
+            atom_cycle = tuple(atom_cycle)
+        atoms = tuple(int(atom) for atom in atom_cycle)
+        if len(atoms) < 3 or len(atoms) != len(set(atoms)):
+            raise ValueError("every fusion face must be a simple cycle")
+        face_id = int(getattr(face, "id", position))
+        edges = frozenset(_edge(left, right) for left, right in zip(atoms, atoms[1:] + atoms[:1]))
+        normalized.append(_Face(face_id, frozenset(atoms), edges))
+    if len({face.id for face in normalized}) != len(normalized):
+        raise ValueError("fusion face ids must be unique")
+    return tuple(sorted(normalized, key=lambda face: face.id))
+
+
+def _connected_face_subsets(faces: tuple[_Face, ...], sizes: frozenset[int]) -> tuple[tuple[_Face, ...], ...]:
+    if not sizes:
+        return ()
+    maximum = min(max(sizes), len(faces))
+    adjacent = {
+        index: frozenset(other for other in range(len(faces)) if other != index and faces[index].edges & faces[other].edges)
+        for index in range(len(faces))
+    }
+    frontier = {frozenset((index,)) for index in range(len(faces))}
+    subsets: list[tuple[_Face, ...]] = []
+    for size in range(1, maximum + 1):
+        if size in sizes:
+            subsets.extend(tuple(faces[index] for index in sorted(indices)) for indices in sorted(frontier, key=tuple))
+        next_frontier: set[frozenset[int]] = set()
+        for indices in frontier:
+            candidates = set().union(*(adjacent[index] for index in indices)) - indices
+            for candidate in candidates:
+                next_frontier.add(indices | {candidate})
+        frontier = {indices for indices in next_frontier if len(indices) == size + 1}
+        if not frontier:
+            break
+    return tuple(subsets)
+
+
+def _template_rings_match_faces(
+    template: RetainedGraphTemplate,
+    locant_to_atom: Mapping[str, int],
+    faces: tuple[_Face, ...],
+) -> bool:
+    mapped_rings = {frozenset(locant_to_atom[locant] for locant in ring) for ring in template.rings}
+    return mapped_rings == {face.atoms for face in faces}
+
+
+def _template_is_connected(template: RetainedGraphTemplate) -> bool:
+    adjacency = {locant: set() for locant in template.locants}
+    for bond in template.bonds:
+        left, right = bond.locants
+        adjacency[left].add(right)
+        adjacency[right].add(left)
+    reached: set[str] = set()
+    pending = [template.locants[0]]
+    while pending:
+        locant = pending.pop()
+        if locant in reached:
+            continue
+        reached.add(locant)
+        pending.extend(adjacency[locant] - reached)
+    return reached == set(template.locants)
+
+
+def _edge(left: int, right: int) -> tuple[int, int]:
+    return (left, right) if left < right else (right, left)
+
+
+@cache
+def fusion_component_registry() -> FusionComponentRegistry:
+    """Return the process-wide registry loaded from checked-in data."""
+
+    return FusionComponentRegistry.from_data(load_json_table("fusion_components.json"))
+
+
+def version() -> str:
+    """Return the checked-in fusion-component registry version."""
+
+    return fusion_component_registry().version
+
+
+def register(row: Mapping[str, Any]) -> FusionComponentSpec:
+    """Register one component in the process-wide registry."""
+
+    return fusion_component_registry().register(row)
+
+
+def match_faces(
+    mol: Molecule,
+    faces: object,
+    *,
+    role: FusionComponentRole | str | None = None,
+    input_to_skeleton_atom: Mapping[int, int] | None = None,
+) -> tuple[FusionComponentMatch, ...]:
+    """Match faces using the process-wide component registry."""
+
+    return fusion_component_registry().match_faces(
+        mol,
+        faces,
+        role=role,
+        input_to_skeleton_atom=input_to_skeleton_atom,
+    )

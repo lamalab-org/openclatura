@@ -1,0 +1,490 @@
+"""Intrinsic, graph-derived layouts for bounded fused-ring face models.
+
+The layout search uses exact rational arithmetic and fixed shape templates. It
+never reads molecular drawing coordinates. A candidate is exposed only after
+its shared edges, graph edges, crossings, overlaps, and topological perimeter
+have all been audited.
+"""
+
+from __future__ import annotations
+
+from collections import defaultdict, deque
+from dataclasses import dataclass
+from fractions import Fraction
+from math import gcd, lcm
+
+from .model import Face, FaceModel, FusedLayout
+
+Point = tuple[Fraction, Fraction]
+Edge = tuple[int, int]
+
+
+class LayoutSearchBudgetExceeded(RuntimeError):
+    """Raised instead of returning a partial intrinsic-layout search."""
+
+    def __init__(self, budget: int, *, resource: str = "states") -> None:
+        super().__init__(f"intrinsic layout search exceeded its budget of {budget} {resource}")
+        self.budget = budget
+        self.resource = resource
+
+
+@dataclass(frozen=True, slots=True)
+class RingShapeTemplate:
+    """One exact-coordinate standard shape for an anchored ring face."""
+
+    ring_size: int
+    shape_id: str
+    vertices: tuple[tuple[int, int], ...]
+    edge_directions: tuple[int, ...]
+    horizontal_axis_class: str
+    distortion_rank: int = 0
+
+    def __post_init__(self) -> None:
+        if not 3 <= self.ring_size <= 8:
+            raise ValueError("intrinsic ring shapes support sizes 3 through 8")
+        if len(self.vertices) != self.ring_size or len(set(self.vertices)) != self.ring_size:
+            raise ValueError("ring shape vertices must uniquely cover the declared ring size")
+        if len(self.edge_directions) != self.ring_size:
+            raise ValueError("ring shape needs one direction class per edge")
+        if self.vertices[:2] != ((0, 0), (4, 0)):
+            raise ValueError("ring shapes must use the canonical four-unit entrance edge")
+        if self.distortion_rank < 0:
+            raise ValueError("shape distortion rank must be non-negative")
+
+
+@dataclass(slots=True)
+class _Budget:
+    limit: int
+    used: int = 0
+
+    def spend(self) -> None:
+        self.used += 1
+        if self.used > self.limit:
+            raise LayoutSearchBudgetExceeded(self.limit)
+
+
+# Coordinates are deliberately schematic quarter-grid shapes. Odd rings have
+# alternative entrance/exit profiles because one fixed polygon cannot express
+# every consistent angular annelation.
+_SHAPES = (
+    RingShapeTemplate(3, "triangle", ((0, 0), (4, 0), (2, 4)), (0, 1, 2), "vertex"),
+    RingShapeTemplate(4, "square", ((0, 0), (4, 0), (4, 4), (0, 4)), (0, 1, 2, 3), "edge"),
+    RingShapeTemplate(5, "pentagon-symmetric", ((0, 0), (4, 0), (6, 3), (3, 6), (0, 4)), (0, 1, 2, 3, 4), "vertex"),
+    RingShapeTemplate(5, "pentagon-shoulder", ((0, 0), (4, 0), (7, 4), (4, 7), (0, 4)), (0, 1, 2, 3, 4), "edge", 1),
+    RingShapeTemplate(6, "hexagon", ((0, 0), (4, 0), (6, 3), (4, 6), (0, 6), (-2, 3)), (0, 1, 2, 3, 4, 5), "edge"),
+    RingShapeTemplate(
+        7,
+        "heptagon-symmetric",
+        ((0, 0), (4, 0), (7, 2), (8, 5), (5, 8), (1, 8), (-2, 4)),
+        (0, 1, 2, 3, 4, 5, 6),
+        "vertex",
+    ),
+    RingShapeTemplate(
+        7,
+        "heptagon-shoulder",
+        ((0, 0), (4, 0), (8, 3), (8, 7), (4, 9), (0, 7), (-2, 3)),
+        (0, 1, 2, 3, 4, 5, 6),
+        "edge",
+        1,
+    ),
+    RingShapeTemplate(
+        8,
+        "octagon",
+        ((0, 0), (4, 0), (7, 2), (8, 5), (7, 8), (4, 10), (0, 10), (-2, 5)),
+        (0, 1, 2, 3, 4, 5, 6, 7),
+        "edge",
+    ),
+)
+
+RING_SHAPE_TEMPLATES: tuple[RingShapeTemplate, ...] = _SHAPES
+_SHAPES_BY_SIZE = {size: tuple(shape for shape in _SHAPES if shape.ring_size == size) for size in range(3, 9)}
+
+
+def intrinsic_fused_layouts(
+    model: FaceModel,
+    *,
+    search_budget: int = 25_000,
+    max_layouts: int = 256,
+) -> tuple[FusedLayout, ...]:
+    """Enumerate audited intrinsic layouts in nomenclatural preference order.
+
+    An empty tuple is an explicit abstention: the face model is unsupported or
+    inconsistent with the standard 3--8 member shape vocabulary.
+    """
+
+    if search_budget < 1 or max_layouts < 1:
+        raise ValueError("layout search budget and result limit must be positive")
+    if any(face.size not in _SHAPES_BY_SIZE for face in model.faces):
+        return ()
+    face_by_id = {face.id: face for face in model.faces}
+    if not _valid_face_adjacency(model, face_by_id):
+        return ()
+    budget = _Budget(search_budget)
+    completed: dict[tuple, FusedLayout] = {}
+
+    # Enumerating every seed avoids making the selected geometry depend on the
+    # input atom IDs used to assign face IDs. The hard state/result budgets keep
+    # this bounded for larger fused systems.
+    for root in sorted(model.faces, key=lambda face: (face.size, face.id)):
+        for shape in _SHAPES_BY_SIZE[root.size]:
+            for offset in range(root.size):
+                for reverse in (False, True):
+                    budget.spend()
+                    order = _oriented_cycle(root.atom_cycle, offset, reverse)
+                    atom_positions = {atom: (Fraction(x), Fraction(y)) for atom, (x, y) in zip(order, shape.vertices)}
+                    _search_layouts(
+                        model,
+                        face_by_id,
+                        {root.id: order},
+                        {root.id: shape},
+                        atom_positions,
+                        budget,
+                        completed,
+                        max_layouts,
+                    )
+    return tuple(sorted(completed.values(), key=_layout_sort_key))
+
+
+def preferred_intrinsic_layout(
+    model: FaceModel,
+    *,
+    search_budget: int = 25_000,
+    max_layouts: int = 256,
+) -> FusedLayout | None:
+    """Return the preferred audited layout, or ``None`` to abstain."""
+
+    layouts = intrinsic_fused_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
+    return layouts[0] if layouts else None
+
+
+def _search_layouts(
+    model: FaceModel,
+    face_by_id: dict[int, Face],
+    placed_orders: dict[int, tuple[int, ...]],
+    placed_shapes: dict[int, RingShapeTemplate],
+    atom_positions: dict[int, Point],
+    budget: _Budget,
+    completed: dict[tuple, FusedLayout],
+    max_layouts: int,
+) -> None:
+    if len(placed_orders) == len(model.faces):
+        if _audit_layout(model, placed_orders, atom_positions):
+            layout = _materialize_layout(placed_orders, placed_shapes, atom_positions)
+            completed.setdefault(_layout_geometry_key(layout), layout)
+            if len(completed) > max_layouts:
+                raise LayoutSearchBudgetExceeded(max_layouts, resource="completed layouts")
+        return
+
+    next_face, placed_neighbor, shared_edge = _next_face(model, placed_orders)
+    if next_face is None or placed_neighbor is None or shared_edge is None:
+        return
+    face = face_by_id[next_face]
+    shared_endpoints = _edge_endpoints(face_by_id[placed_neighbor], shared_edge)
+    if shared_endpoints is None or any(atom not in atom_positions for atom in shared_endpoints):
+        return
+    existing_center = _face_center(placed_orders[placed_neighbor], atom_positions)
+
+    for endpoints in (shared_endpoints, tuple(reversed(shared_endpoints))):
+        for order in _orders_starting_with_edge(face.atom_cycle, endpoints):
+            for shape in _SHAPES_BY_SIZE[face.size]:
+                budget.spend()
+                candidate = _place_shape(shape, order, atom_positions[endpoints[0]], atom_positions[endpoints[1]])
+                candidate_center = _points_center(candidate.values())
+                if not _opposite_side(
+                    atom_positions[endpoints[0]],
+                    atom_positions[endpoints[1]],
+                    existing_center,
+                    candidate_center,
+                ):
+                    continue
+                if any(atom in atom_positions and atom_positions[atom] != point for atom, point in candidate.items()):
+                    continue
+                merged = dict(atom_positions)
+                merged.update(candidate)
+                new_orders = {**placed_orders, face.id: order}
+                if not _partial_layout_is_valid(model, new_orders, merged):
+                    continue
+                _search_layouts(
+                    model,
+                    face_by_id,
+                    new_orders,
+                    {**placed_shapes, face.id: shape},
+                    merged,
+                    budget,
+                    completed,
+                    max_layouts,
+                )
+
+
+def _valid_face_adjacency(model: FaceModel, face_by_id: dict[int, Face]) -> bool:
+    known = set(face_by_id)
+    seen_edges: set[int] = set()
+    for left, right, edge in model.face_adjacency:
+        if left not in known or right not in known or left == right or edge in seen_edges:
+            return False
+        if edge not in face_by_id[left].edge_cycle or edge not in face_by_id[right].edge_cycle:
+            return False
+        seen_edges.add(edge)
+    adjacency = defaultdict(set)
+    for left, right, _ in model.face_adjacency:
+        adjacency[left].add(right)
+        adjacency[right].add(left)
+    reached = {min(known)}
+    pending = deque(reached)
+    while pending:
+        current = pending.popleft()
+        for neighbor in adjacency[current]:
+            if neighbor not in reached:
+                reached.add(neighbor)
+                pending.append(neighbor)
+    return reached == known
+
+
+def _next_face(model: FaceModel, placed: dict[int, tuple[int, ...]]) -> tuple[int | None, int | None, int | None]:
+    options = []
+    for left, right, edge in model.face_adjacency:
+        if (left in placed) == (right in placed):
+            continue
+        unplaced, neighbor = (right, left) if left in placed else (left, right)
+        placed_neighbors = sum(
+            1 for a, b, _ in model.face_adjacency if unplaced in (a, b) and (b if a == unplaced else a) in placed
+        )
+        options.append((-placed_neighbors, unplaced, neighbor, edge))
+    if not options:
+        return None, None, None
+    _, face, neighbor, edge = min(options)
+    return face, neighbor, edge
+
+
+def _edge_endpoints(face: Face, edge_id: int) -> Edge | None:
+    try:
+        index = face.edge_cycle.index(edge_id)
+    except ValueError:
+        return None
+    return face.atom_cycle[index], face.atom_cycle[(index + 1) % face.size]
+
+
+def _oriented_cycle(cycle: tuple[int, ...], offset: int, reverse: bool) -> tuple[int, ...]:
+    order = tuple(reversed(cycle)) if reverse else cycle
+    return order[offset:] + order[:offset]
+
+
+def _orders_starting_with_edge(cycle: tuple[int, ...], endpoints: Edge) -> tuple[tuple[int, ...], ...]:
+    variants = []
+    for reverse in (False, True):
+        order = tuple(reversed(cycle)) if reverse else cycle
+        for offset in range(len(order)):
+            candidate = order[offset:] + order[:offset]
+            if candidate[:2] == endpoints:
+                variants.append(candidate)
+    return tuple(variants)
+
+
+def _place_shape(shape: RingShapeTemplate, order: tuple[int, ...], start: Point, end: Point) -> dict[int, Point]:
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    return {
+        atom: (
+            start[0] + Fraction(x, 4) * dx - Fraction(y, 4) * dy,
+            start[1] + Fraction(x, 4) * dy + Fraction(y, 4) * dx,
+        )
+        for atom, (x, y) in zip(order, shape.vertices)
+    }
+
+
+def _opposite_side(start: Point, end: Point, left: Point, right: Point) -> bool:
+    left_cross = _cross(start, end, left)
+    right_cross = _cross(start, end, right)
+    return left_cross != 0 and right_cross != 0 and (left_cross > 0) != (right_cross > 0)
+
+
+def _partial_layout_is_valid(
+    model: FaceModel,
+    placed_orders: dict[int, tuple[int, ...]],
+    positions: dict[int, Point],
+) -> bool:
+    if len(set(positions.values())) != len(positions):
+        return False
+    drawn_edges: dict[frozenset[int], tuple[Point, Point]] = {}
+    for face_id, order in placed_orders.items():
+        face = next(face for face in model.faces if face.id == face_id)
+        for edge_id, left, right in zip(face.edge_cycle, face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1]):
+            if left not in positions or right not in positions:
+                return False
+            key = frozenset((left, right))
+            segment = (positions[left], positions[right])
+            previous = drawn_edges.setdefault(key, segment)
+            if set(previous) != set(segment):
+                return False
+    edges = list(drawn_edges.items())
+    for index, (left_atoms, left_segment) in enumerate(edges):
+        for right_atoms, right_segment in edges[index + 1 :]:
+            if left_atoms & right_atoms:
+                continue
+            if _segments_intersect(*left_segment, *right_segment):
+                return False
+    polygons = [(face_id, tuple(positions[atom] for atom in order)) for face_id, order in placed_orders.items()]
+    for index, (left_id, left_polygon) in enumerate(polygons):
+        for right_id, right_polygon in polygons[index + 1 :]:
+            if _face_ids_adjacent(model, left_id, right_id):
+                continue
+            if _point_strictly_inside(_points_center(left_polygon), right_polygon):
+                return False
+            if _point_strictly_inside(_points_center(right_polygon), left_polygon):
+                return False
+    return True
+
+
+def _audit_layout(
+    model: FaceModel,
+    placed_orders: dict[int, tuple[int, ...]],
+    positions: dict[int, Point],
+) -> bool:
+    if set(placed_orders) != {face.id for face in model.faces} or not _partial_layout_is_valid(
+        model, placed_orders, positions
+    ):
+        return False
+    graph_edges = {
+        frozenset((left, right))
+        for face in model.faces
+        for left, right in zip(face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1])
+    }
+    perimeter_edges = {
+        frozenset(_edge_endpoints(face, edge) or ())
+        for face in model.faces
+        for edge in face.edge_cycle
+        if edge in model.perimeter_edges
+    }
+    face_edges = [
+        {frozenset((left, right)) for left, right in zip(face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1])}
+        for face in model.faces
+    ]
+    geometric_perimeter = {edge for edge in graph_edges if sum(edge in edges for edges in face_edges) == 1}
+    declared_perimeter = {
+        frozenset((left, right))
+        for left, right in zip(
+            model.outer_boundary,
+            model.outer_boundary[1:] + model.outer_boundary[:1],
+        )
+    }
+    return perimeter_edges == geometric_perimeter == declared_perimeter and all(len(edge) == 2 for edge in graph_edges)
+
+
+def _materialize_layout(
+    placed_orders: dict[int, tuple[int, ...]],
+    shapes: dict[int, RingShapeTemplate],
+    positions: dict[int, Point],
+) -> FusedLayout:
+    denominators = [coordinate.denominator for point in positions.values() for coordinate in point]
+    scale = lcm(*denominators) if denominators else 1
+    integer = {atom: (int(x * scale), int(y * scale)) for atom, (x, y) in positions.items()}
+    min_x = min(x for x, _ in integer.values())
+    min_y = min(y for _, y in integer.values())
+    integer = {atom: (x - min_x, y - min_y) for atom, (x, y) in integer.items()}
+    divisor = 0
+    for point in integer.values():
+        divisor = gcd(divisor, point[0])
+        divisor = gcd(divisor, point[1])
+    if divisor > 1:
+        integer = {atom: (x // divisor, y // divisor) for atom, (x, y) in integer.items()}
+    centers = {face: _integer_center(tuple(integer[atom] for atom in order)) for face, order in placed_orders.items()}
+    score = _orientation_score(tuple(centers.values()), shapes)
+    return FusedLayout(
+        face_positions=tuple((face, *centers[face]) for face in sorted(centers)),
+        atom_positions=tuple((atom, *integer[atom]) for atom in sorted(integer)),
+        face_shapes=tuple((face, shapes[face].shape_id) for face in sorted(shapes)),
+        orientation_score=score,
+        audit_evidence=(
+            "all face boundaries represented",
+            "shared edge coordinates agree",
+            "unrelated edges do not cross",
+            "nonadjacent face interiors do not overlap",
+            "geometric and topological perimeters agree",
+        ),
+    )
+
+
+def _orientation_score(centers: tuple[tuple[int, int], ...], shapes: dict[int, RingShapeTemplate]) -> tuple[int, ...]:
+    xs = [x for x, _ in centers]
+    ys = [y for _, y in centers]
+    axis_x = Fraction(min(xs) + max(xs), 2)
+    axis_y = Fraction(min(ys) + max(ys), 2)
+    row_count = max(sum(y == row for _, y in centers) for row in set(ys))
+    upper_right = sum(_quadrant_units(x, y, axis_x, axis_y, upper=True) for x, y in centers)
+    lower_left = sum(_quadrant_units(x, y, axis_x, axis_y, upper=False) for x, y in centers)
+    above = sum(4 if y > axis_y else 2 if y == axis_y else 0 for _, y in centers)
+    distortion = sum(shape.distortion_rank for shape in shapes.values())
+    return distortion, -row_count, -upper_right, lower_left, -above
+
+
+def _quadrant_units(x: int, y: int, axis_x: Fraction, axis_y: Fraction, *, upper: bool) -> int:
+    x_match = x > axis_x if upper else x < axis_x
+    y_match = y > axis_y if upper else y < axis_y
+    if x_match and y_match:
+        return 4
+    if (x == axis_x and y_match) or (y == axis_y and x_match):
+        return 2
+    if x == axis_x and y == axis_y:
+        return 1
+    return 0
+
+
+def _layout_sort_key(layout: FusedLayout) -> tuple:
+    shape_signature = tuple(sorted(shape for _, shape in layout.face_shapes))
+    geometry = tuple(sorted((x, y) for _, x, y in layout.atom_positions))
+    return layout.orientation_score, shape_signature, geometry
+
+
+def _layout_geometry_key(layout: FusedLayout) -> tuple:
+    return tuple(sorted((x, y) for _, x, y in layout.atom_positions)), tuple(
+        sorted(shape for _, shape in layout.face_shapes)
+    )
+
+
+def _face_center(order: tuple[int, ...], positions: dict[int, Point]) -> Point:
+    return _points_center(positions[atom] for atom in order)
+
+
+def _points_center(points) -> Point:
+    values = tuple(points)
+    return (
+        sum((point[0] for point in values), Fraction()) / len(values),
+        sum((point[1] for point in values), Fraction()) / len(values),
+    )
+
+
+def _integer_center(points: tuple[tuple[int, int], ...]) -> tuple[int, int]:
+    count = len(points)
+    return round(Fraction(sum(x for x, _ in points), count)), round(Fraction(sum(y for _, y in points), count))
+
+
+def _cross(start: Point, end: Point, point: Point) -> Fraction:
+    return (end[0] - start[0]) * (point[1] - start[1]) - (end[1] - start[1]) * (point[0] - start[0])
+
+
+def _segments_intersect(a: Point, b: Point, c: Point, d: Point) -> bool:
+    one, two = _cross(a, b, c), _cross(a, b, d)
+    three, four = _cross(c, d, a), _cross(c, d, b)
+    if one == 0 and _on_segment(a, b, c):
+        return True
+    if two == 0 and _on_segment(a, b, d):
+        return True
+    if three == 0 and _on_segment(c, d, a):
+        return True
+    if four == 0 and _on_segment(c, d, b):
+        return True
+    return (one > 0) != (two > 0) and (three > 0) != (four > 0)
+
+
+def _on_segment(start: Point, end: Point, point: Point) -> bool:
+    return min(start[0], end[0]) <= point[0] <= max(start[0], end[0]) and min(start[1], end[1]) <= point[1] <= max(
+        start[1], end[1]
+    )
+
+
+def _point_strictly_inside(point: Point, polygon: tuple[Point, ...]) -> bool:
+    signs = [_cross(left, right, point) for left, right in zip(polygon, polygon[1:] + polygon[:1])]
+    return all(value > 0 for value in signs) or all(value < 0 for value in signs)
+
+
+def _face_ids_adjacent(model: FaceModel, left: int, right: int) -> bool:
+    return any({left, right} == {first, second} for first, second, _ in model.face_adjacency)
