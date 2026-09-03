@@ -60,6 +60,26 @@ def test_bounded_face_model_proves_fused_edge_and_outer_boundary():
     assert model.audit.reconstructed_edges == model.edge_ids
 
 
+def test_bounded_face_selection_is_invariant_to_candidate_cycle_order(monkeypatch):
+    mol = _linear_fused_hexagons()
+    expected = select_bounded_face_model(mol, range(10))
+    assert expected is not None
+    from openclatura.fusion import faces as faces_module
+
+    enumerate_original = faces_module.enumerate_chordless_cycles
+
+    def reversed_candidates(*args, **kwargs):
+        return tuple(reversed(enumerate_original(*args, **kwargs)))
+
+    monkeypatch.setattr(faces_module, "enumerate_chordless_cycles", reversed_candidates)
+    actual = select_bounded_face_model(mol, range(10))
+
+    assert actual is not None
+    assert {face.edges for face in actual.faces} == {face.edges for face in expected.faces}
+    assert actual.outer_boundary.edges == expected.outer_boundary.edges
+    assert actual.audit.reconstructed_edges == expected.audit.reconstructed_edges
+
+
 def test_face_audit_rejects_incomplete_and_overcovered_models():
     mol = _linear_fused_hexagons()
     left = GraphCycle.from_atoms((0, 1, 2, 3, 4, 5))

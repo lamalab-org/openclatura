@@ -172,6 +172,29 @@ def test_existing_retained_fusion_parent_precedes_the_new_planner():
     assert not any(step.decision == "selected audited systematic fusion parent" for step in result.decisions)
 
 
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("c1ccc2ccccc2c1", "naphthalene"),
+        ("c1ccc2cc3ccccc3cc2c1", "anthracene"),
+        ("c1ccc2c(c1)ccc1ccccc12", "phenanthrene"),
+        ("C1=CC=C2C=CC=CC=C12", "azulene"),
+        ("C1=CC=C2C=CC3=CC=CC4=CC=C1C2=C34", "pyrene"),
+        ("C1=CC=CC2=NC3=CC=CC=C3C=C12", "acridine"),
+        ("C1=CC=CC=2C3=CC=CC=C3NC12", "9H-carbazole"),
+        ("N1=CN=C2N=CNC2=C1", "7H-purine"),
+        ("C1=Cc2cc3ccc(cc4nc(cc5ccc(cc1n2)[nH]5)C=C4)[nH]3", "porphyrin"),
+        ("C1=C2CCC(=N2)C=C2CCC(N2)C2CCC(=N2)C=C2CCC1=N2", "corrin"),
+    ],
+)
+def test_retained_complete_system_matrix_precedes_systematic_fusion(smiles, expected):
+    result = name(smiles, fusion_mode=FusionMode.GENERAL, include_trace=True)
+
+    assert result.name == expected
+    assert result.parent_nomenclature is None
+    assert not any(step.decision == "selected audited systematic fusion parent" for step in result.decisions)
+
+
 def test_aromatic_and_kekule_inputs_choose_the_same_fusion_parent():
     aromatic = name("c1cc2ccsc2o1", fusion_mode=FusionMode.GENERAL).name
     kekule = name("O1C2=C(C=C1)C=CS2", fusion_mode=FusionMode.GENERAL).name
