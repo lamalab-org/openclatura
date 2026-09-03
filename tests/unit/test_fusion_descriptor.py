@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from copy import deepcopy
 
 import pytest
 
@@ -15,6 +16,7 @@ from openclatura.fusion import (
 from openclatura.fusion.faces import GraphCycle
 from openclatura.fusion.registry import FusionComponentRegistry, fusion_component_registry
 from openclatura.molecule import Molecule
+from openclatura.naming_data import load_json_table
 
 OccurrenceLocant = tuple[int, str]
 FusionPair = tuple[OccurrenceLocant, OccurrenceLocant]
@@ -97,8 +99,9 @@ def _build(
     fused_atoms: tuple[FusionPair, ...],
     *,
     atom_id_order: tuple[int, ...] | None = None,
+    registry: FusionComponentRegistry | None = None,
 ):
-    registry = fusion_component_registry()
+    registry = registry or fusion_component_registry()
     mol, faces = _component_graph(component_keys, fused_atoms, atom_id_order=atom_id_order)
     matches = registry.match_faces(mol, faces)
     ast = build_fusion_name_ast(mol, matches, registry)
@@ -246,6 +249,24 @@ def test_rendering_is_context_free_and_atom_renumbering_invariant():
     assert first == second == "furo[3,2-b]thieno[2,3-e]pyridine"
     assert render_fusion_name(first_ast, fusion_component_registry()) == first
     assert render_fusion_name(second_ast, fusion_component_registry()) == second
+
+
+def test_component_policy_iteration_order_does_not_change_the_name():
+    data = deepcopy(load_json_table("fusion_components.json"))
+    data["components"].reverse()
+    reordered_registry = FusionComponentRegistry.from_data(data)
+    components = ("furan", "thiophene", "pyridine")
+    joins = (
+        ((0, "3"), (2, "2")),
+        ((0, "2"), (2, "3")),
+        ((1, "2"), (2, "5")),
+        ((1, "3"), (2, "6")),
+    )
+
+    _, _, ordinary = _build(components, joins)
+    _, _, reordered = _build(components, joins, registry=reordered_registry)
+
+    assert reordered == ordinary == "furo[3,2-b]thieno[2,3-e]pyridine"
 
 
 def test_spiro_overlap_is_outside_the_bounded_fusion_tier():
