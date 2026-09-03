@@ -16,8 +16,9 @@ from math import gcd, lcm
 from .config import RingShapeSpec, fusion_nomenclature_config
 from .model import Face, FaceModel, FusedLayout
 
-Point = tuple[Fraction, Fraction]
+Point = tuple[int, int]
 Edge = tuple[int, int]
+_SHAPE_EDGE_SCALE = 4
 
 
 class LayoutSearchBudgetExceeded(RuntimeError):
@@ -79,7 +80,7 @@ def intrinsic_fused_layouts(
                 for reverse in (False, True):
                     budget.spend()
                     order = _oriented_cycle(root.atom_cycle, offset, reverse)
-                    atom_positions = {atom: (Fraction(x), Fraction(y)) for atom, (x, y) in zip(order, shape.vertices)}
+                    atom_positions = {atom: point for atom, point in zip(order, shape.vertices)}
                     _search_layouts(
                         model,
                         face_by_id,
@@ -158,24 +159,41 @@ def _search_layouts(
     shared_endpoints = _edge_endpoints(face_by_id[placed_neighbor], shared_edge)
     if shared_endpoints is None or any(atom not in atom_positions for atom in shared_endpoints):
         return
-    existing_center = _face_center(placed_orders[placed_neighbor], atom_positions)
+    # A newly attached template can introduce quarter-unit coordinates when
+    # its entrance edge is not horizontal. Scale the complete partial layout
+    # once at this depth so all subsequent geometric predicates stay exact
+    # integer operations. Layout normalization removes this common scale.
+    scaled_positions = {
+        atom: (x * _SHAPE_EDGE_SCALE, y * _SHAPE_EDGE_SCALE)
+        for atom, (x, y) in atom_positions.items()
+    }
+    existing_side = _face_side_point(placed_orders[placed_neighbor], shared_endpoints, scaled_positions)
+    if existing_side is None:
+        return
 
     for endpoints in (shared_endpoints, tuple(reversed(shared_endpoints))):
         for order in _orders_starting_with_edge(face.atom_cycle, endpoints):
             for shape in _SHAPES_BY_SIZE[face.size]:
                 budget.spend()
-                candidate = _place_shape(shape, order, atom_positions[endpoints[0]], atom_positions[endpoints[1]])
-                candidate_center = _points_center(candidate.values())
+                candidate = _place_shape(
+                    shape,
+                    order,
+                    scaled_positions[endpoints[0]],
+                    scaled_positions[endpoints[1]],
+                )
                 if not _opposite_side(
-                    atom_positions[endpoints[0]],
-                    atom_positions[endpoints[1]],
-                    existing_center,
-                    candidate_center,
+                    scaled_positions[endpoints[0]],
+                    scaled_positions[endpoints[1]],
+                    existing_side,
+                    candidate[order[2]],
                 ):
                     continue
-                if any(atom in atom_positions and atom_positions[atom] != point for atom, point in candidate.items()):
+                if any(
+                    atom in scaled_positions and scaled_positions[atom] != point
+                    for atom, point in candidate.items()
+                ):
                     continue
-                merged = dict(atom_positions)
+                merged = dict(scaled_positions)
                 merged.update(candidate)
                 new_orders = {**placed_orders, face.id: order}
                 if not _partial_layout_is_valid(model, new_orders, merged):
@@ -258,13 +276,26 @@ def _orders_starting_with_edge(cycle: tuple[int, ...], endpoints: Edge) -> tuple
 
 def _place_shape(shape: RingShapeSpec, order: tuple[int, ...], start: Point, end: Point) -> dict[int, Point]:
     dx, dy = end[0] - start[0], end[1] - start[1]
+    if dx % _SHAPE_EDGE_SCALE or dy % _SHAPE_EDGE_SCALE:
+        raise ValueError("scaled fusion entrance edge must have integral template coordinates")
     return {
         atom: (
-            start[0] + Fraction(x, 4) * dx - Fraction(y, 4) * dy,
-            start[1] + Fraction(x, 4) * dy + Fraction(y, 4) * dx,
+            start[0] + x * dx // _SHAPE_EDGE_SCALE - y * dy // _SHAPE_EDGE_SCALE,
+            start[1] + x * dy // _SHAPE_EDGE_SCALE + y * dx // _SHAPE_EDGE_SCALE,
         )
         for atom, (x, y) in zip(order, shape.vertices)
     }
+
+
+def _face_side_point(
+    order: tuple[int, ...],
+    shared_endpoints: Edge,
+    positions: dict[int, Point],
+) -> Point | None:
+    """Return any non-interface vertex, sufficient to identify face side."""
+
+    endpoints = frozenset(shared_endpoints)
+    return next((positions[atom] for atom in order if atom not in endpoints), None)
 
 
 def _opposite_side(start: Point, end: Point, left: Point, right: Point) -> bool:
@@ -303,9 +334,9 @@ def _partial_layout_is_valid(
         for right_id, right_polygon in polygons[index + 1 :]:
             if _face_ids_adjacent(model, left_id, right_id):
                 continue
-            if _point_strictly_inside(_points_center(left_polygon), right_polygon):
+            if _polygon_center_strictly_inside(left_polygon, right_polygon):
                 return False
-            if _point_strictly_inside(_points_center(right_polygon), left_polygon):
+            if _polygon_center_strictly_inside(right_polygon, left_polygon):
                 return False
     return True
 
@@ -350,21 +381,14 @@ def _materialize_layouts(
     shapes: dict[int, RingShapeSpec],
     positions: dict[int, Point],
 ) -> tuple[FusedLayout, ...]:
-    fractional_centers = {
-        face: _points_center(positions[atom] for atom in order)
-        for face, order in placed_orders.items()
-    }
-    denominators = [coordinate.denominator for point in positions.values() for coordinate in point]
-    denominators.extend(
-        coordinate.denominator
-        for point in fractional_centers.values()
-        for coordinate in point
-    )
-    scale = lcm(*denominators) if denominators else 1
-    integer = {atom: (int(x * scale), int(y * scale)) for atom, (x, y) in positions.items()}
+    scale = lcm(*(len(order) for order in placed_orders.values()))
+    integer = {atom: (x * scale, y * scale) for atom, (x, y) in positions.items()}
     centers = {
-        face: (int(x * scale), int(y * scale))
-        for face, (x, y) in fractional_centers.items()
+        face: (
+            sum(positions[atom][0] for atom in order) * scale // len(order),
+            sum(positions[atom][1] for atom in order) * scale // len(order),
+        )
+        for face, order in placed_orders.items()
     }
     integer, centers = _normalize_integer_layout(integer, centers)
 
@@ -495,19 +519,7 @@ def _layout_geometry_key(layout: FusedLayout) -> tuple:
     return layout.atom_positions, layout.face_shapes
 
 
-def _face_center(order: tuple[int, ...], positions: dict[int, Point]) -> Point:
-    return _points_center(positions[atom] for atom in order)
-
-
-def _points_center(points) -> Point:
-    values = tuple(points)
-    return (
-        sum((point[0] for point in values), Fraction()) / len(values),
-        sum((point[1] for point in values), Fraction()) / len(values),
-    )
-
-
-def _cross(start: Point, end: Point, point: Point) -> Fraction:
+def _cross(start: Point, end: Point, point: Point) -> int:
     return (end[0] - start[0]) * (point[1] - start[1]) - (end[1] - start[1]) * (point[0] - start[0])
 
 
@@ -531,8 +543,17 @@ def _on_segment(start: Point, end: Point, point: Point) -> bool:
     )
 
 
-def _point_strictly_inside(point: Point, polygon: tuple[Point, ...]) -> bool:
-    signs = [_cross(left, right, point) for left, right in zip(polygon, polygon[1:] + polygon[:1])]
+def _polygon_center_strictly_inside(source: tuple[Point, ...], polygon: tuple[Point, ...]) -> bool:
+    """Test a source centroid against a polygon without constructing fractions."""
+
+    count = len(source)
+    center_x = sum(x for x, _ in source)
+    center_y = sum(y for _, y in source)
+    signs = [
+        (right[0] - left[0]) * (center_y - count * left[1])
+        - (right[1] - left[1]) * (center_x - count * left[0])
+        for left, right in zip(polygon, polygon[1:] + polygon[:1])
+    ]
     return all(value > 0 for value in signs) or all(value < 0 for value in signs)
 
 
