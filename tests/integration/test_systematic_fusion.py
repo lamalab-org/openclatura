@@ -190,7 +190,7 @@ def test_retained_parent_precedes_systematic_fusion():
     assert not any(step.decision == "selected audited systematic fusion parent" for step in result.decisions)
 
 
-def test_existing_retained_fusion_parent_precedes_the_new_planner():
+def test_issue_78_retained_fusion_parent_precedes_the_new_planner():
     result = name("N1C=CC2=NC=CC=C21", fusion_mode=FusionMode.AUDITED_PIN, include_trace=True)
 
     assert result.name == "1H-pyrrolo[3,2-b]pyridine"
@@ -221,10 +221,17 @@ def test_retained_complete_system_matrix_precedes_systematic_fusion(smiles, expe
     assert not any(step.decision == "selected audited systematic fusion parent" for step in result.decisions)
 
 
-def test_aromatic_and_kekule_inputs_choose_the_same_fusion_parent():
+def test_issue_71_aromatic_and_kekule_inputs_choose_the_same_fusion_parent():
     aromatic = name("c1cc2ccsc2o1", fusion_mode=FusionMode.GENERAL).name
     kekule = name("O1C2=C(C=C1)C=CS2", fusion_mode=FusionMode.GENERAL).name
     assert aromatic == kekule == "thieno[2,3-b]furan"
+
+
+def test_issue_89_retained_fused_hydrocarbon_precedes_systematic_fusion():
+    result = name("C1=CC=C2C=CC3=CC=CC4=CC=C1C2=C34", fusion_mode=FusionMode.GENERAL)
+
+    assert result.name == "pyrene"
+    assert result.parent_nomenclature is None
 
 
 def test_fusion_name_is_invariant_to_graph_atom_renumbering():
