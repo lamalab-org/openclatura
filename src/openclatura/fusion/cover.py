@@ -209,4 +209,3 @@ def _connected_nodes(graph: CoverGraph[T], start: T) -> set[T]:
         seen.add(node)
         stack.extend(neighbor for neighbor in graph.adjacency.get(node, ()) if neighbor not in seen)
     return seen
-
