@@ -38,6 +38,86 @@ def _linear_fused_hexagons() -> Molecule:
     )
 
 
+def _molecule_from_faces(*faces: tuple[int, ...]) -> Molecule:
+    edges: set[tuple[int, int]] = set()
+    for face in faces:
+        edges.update(
+            tuple(sorted((left, right)))
+            for left, right in zip(face, face[1:] + face[:1], strict=True)
+        )
+    return _molecule(sorted(edges))
+
+
+@pytest.mark.parametrize(
+    ("faces", "expected_sizes", "expected_outer_size", "expected_fusion_edges", "expected_dual"),
+    [
+        (
+            (
+                (0, 1, 2, 3, 4, 5),
+                (3, 4, 6, 7, 8, 13),
+                (8, 9, 10, 11, 12, 13),
+            ),
+            (6, 6, 6),
+            14,
+            2,
+            ((0, (1,)), (1, (0, 2)), (2, (1,))),
+        ),
+        (
+            ((0, 1, 2, 3, 9), (3, 4, 5, 6, 7, 8, 9)),
+            (5, 7),
+            10,
+            1,
+            ((0, (1,)), (1, (0,))),
+        ),
+        (
+            (
+                (0, 1, 2, 3, 14, 13),
+                (3, 4, 5, 6, 15, 14),
+                (6, 7, 8, 9, 10, 15),
+                (10, 11, 12, 13, 14, 15),
+            ),
+            (6, 6, 6, 6),
+            14,
+            5,
+            ((0, (1, 3)), (1, (0, 2, 3)), (2, (1, 3)), (3, (0, 1, 2))),
+        ),
+    ],
+)
+def test_representative_fused_face_models_are_complete_and_deterministic(
+    faces,
+    expected_sizes,
+    expected_outer_size,
+    expected_fusion_edges,
+    expected_dual,
+):
+    mol = _molecule_from_faces(*faces)
+
+    model = select_bounded_face_model(mol, reversed(tuple(mol.atoms)))
+
+    assert model is not None
+    assert model.audit.ok
+    assert tuple(sorted(len(face.atoms) for face in model.faces)) == expected_sizes
+    assert len(model.outer_boundary.atoms) == expected_outer_size
+    assert sum(count == 2 for _, count in model.audit.edge_multiplicity) == expected_fusion_edges
+    assert model.audit.dual_adjacency == expected_dual
+    assert model.audit.reconstructed_edges == model.edge_ids
+
+
+def test_pericondensed_face_model_exposes_interior_atoms_for_the_production_gate():
+    mol = _molecule_from_faces(
+        (0, 1, 2, 3, 14, 13),
+        (3, 4, 5, 6, 15, 14),
+        (6, 7, 8, 9, 10, 15),
+        (10, 11, 12, 13, 14, 15),
+    )
+
+    model = select_bounded_face_model(mol, mol.atoms)
+
+    assert model is not None
+    assert set(model.outer_boundary.atoms) < set(model.atom_ids)
+    assert set(model.atom_ids) - set(model.outer_boundary.atoms) == {14, 15}
+
+
 def test_chordless_cycle_enumeration_is_deterministic_and_excludes_outer_chorded_cycle():
     mol = _linear_fused_hexagons()
 
