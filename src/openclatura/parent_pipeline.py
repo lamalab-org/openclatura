@@ -2,10 +2,7 @@
 
 from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem, RetainedParentMetadata
 from .fusion.context import current_fusion_mode
-from .fusion.model import FusionConfirmed
-from .fusion.planner import PLANNER_TIER, plan_fusion_parent
-from .fusion.rules import fusion_mode_allows_planning
-from .fusion.trace import trace_confirmed_fusion_plan
+from .fusion.model import FusionMode
 from .heteroatom_subgraphs import upstream_bond_order
 from .locant_sources import LocantMapSource
 from .locants import canonical_locant_pair
@@ -23,6 +20,14 @@ from .subgraph_tools import subgraph_locant_getter
 from .trace_helpers import trace_decision
 
 
+def plan_fusion_parent(mol: Molecule, parent_atoms: frozenset[int], *, mode: FusionMode):
+    """Load the systematic fusion planner only for an enabled request."""
+
+    from .fusion.planner import plan_fusion_parent as _plan_fusion_parent
+
+    return _plan_fusion_parent(mol, parent_atoms, mode=mode)
+
+
 def resolve_systematic_fusion_parent(
     mol: Molecule,
     selection: ParentSelection,
@@ -33,7 +38,7 @@ def resolve_systematic_fusion_parent(
     """Resolve an audited fusion parent through the established ring handoff."""
 
     mode = current_fusion_mode()
-    if not fusion_mode_allows_planning(mode):
+    if mode not in {FusionMode.AUDITED_PIN, FusionMode.GENERAL}:
         trace_decision(
             decision_trace,
             TracePhase.PARENT_SELECTION,
@@ -55,6 +60,8 @@ def resolve_systematic_fusion_parent(
         return None
 
     result = plan_fusion_parent(mol, selection.atom_set, mode=mode)
+    from .fusion.model import FusionConfirmed
+
     if not isinstance(result, FusionConfirmed):
         trace_decision(
             decision_trace,
@@ -72,6 +79,9 @@ def resolve_systematic_fusion_parent(
         return None
 
     plan = result.plan
+    from .fusion.planner import PLANNER_TIER
+    from .fusion.trace import trace_confirmed_fusion_plan
+
     trace_confirmed_fusion_plan(decision_trace, mol, plan, selection.atom_set)
     trace_decision(
         decision_trace,
