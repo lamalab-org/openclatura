@@ -16,15 +16,15 @@ from ..locants import SystemLocant
 from ..retained_graph_model import (
     RetainedGraphAtomTemplate as ComponentAtom,
 )
-
-if TYPE_CHECKING:
-    from ..assembly_parts import NameTokenBinding
 from ..retained_graph_model import (
     RetainedGraphBondTemplate as ComponentBond,
 )
 from ..retained_graph_model import (
     RetainedGraphTemplate,
 )
+
+if TYPE_CHECKING:
+    from ..assembly_parts import NameTokenBinding
 
 
 class FusionMode(StrEnum):

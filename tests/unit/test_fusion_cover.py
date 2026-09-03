@@ -1,11 +1,9 @@
 from openclatura.fusion.cover import (
     audit_component_cover,
-    block_cut_sets,
     build_component_cover_graph,
     build_cover_graph,
     build_cover_proof,
     component_scope,
-    cycle_order_hint,
 )
 
 
@@ -40,7 +38,7 @@ def test_one_atom_spiro_overlap_does_not_become_fusion_interface():
     assert audit.proof.kind == "disconnected"
 
 
-def test_cover_proof_classifies_tree_cycle_cactus_and_complex_graphs():
+def test_cover_proof_classifies_supported_tree_and_non_tree_abstentions():
     tree = build_cover_proof(build_cover_graph(("a", "b", "c"), (("a", "b"), ("b", "c"))))
     cycle = build_cover_proof(build_cover_graph(("a", "b", "c"), (("a", "b"), ("b", "c"), ("c", "a"))))
     cactus = build_cover_proof(
@@ -56,33 +54,10 @@ def test_cover_proof_classifies_tree_cycle_cactus_and_complex_graphs():
         )
     )
 
-    assert (tree.kind, tree.cycle_rank, tree.articulation_nodes) == ("tree", 0, ("b",))
-    assert (cycle.kind, cycle.cycle_rank) == ("cycle", 1)
-    assert cycle.cycle_proofs[0].ordered_nodes == ("a", "b", "c")
-    assert (cactus.kind, cactus.cycle_rank, cactus.articulation_nodes) == ("cactus", 2, ("c",))
-    assert complex_proof.kind == "complex"
-
-
-def test_cycle_order_hints_and_general_block_cut_sets_are_deterministic():
-    cycle_proof = build_cover_proof(build_cover_graph((0, 1, 2), ((0, 1), (1, 2), (2, 0))))
-    complete = build_cover_graph(
-        (0, 1, 2, 3),
-        ((0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)),
-    )
-    complete_proof = build_cover_proof(complete)
-
-    assert cycle_order_hint(cycle_proof) == {
-        (0, 2): 0,
-        (0, 1): 1,
-        (1, 0): 0,
-        (1, 2): 1,
-        (2, 1): 0,
-        (2, 0): 1,
-    }
-    general = complete_proof.blocks[0]
-    cuts = block_cut_sets(complete, general, max_sets=3)
-    assert len(cuts) == 3
-    assert all(len(cut) == 3 for cut in cuts)
+    assert (tree.kind, tree.cycle_rank) == ("tree", 0)
+    assert (cycle.kind, cycle.cycle_rank) == ("non_tree", 1)
+    assert (cactus.kind, cactus.cycle_rank) == ("non_tree", 2)
+    assert complex_proof.kind == "non_tree"
 
 
 def test_component_cover_audit_rejects_missing_edges_and_triple_coverage():

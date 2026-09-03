@@ -170,7 +170,7 @@ def render_fusion_name_parts(
 
     rendered_groups: set[tuple[int, ...]] = set()
 
-    def component_scope(occurrence_ids: tuple[int, ...]) -> tuple[frozenset[int], frozenset[int]]:
+    def rendered_component_scope(occurrence_ids: tuple[int, ...]) -> tuple[frozenset[int], frozenset[int]]:
         atom_ids: set[int] = set()
         bond_ids: set[int] = set()
         for occurrence_id in occurrence_ids:
@@ -186,7 +186,7 @@ def render_fusion_name_parts(
         return frozenset(atom_ids), frozenset(bond_ids)
 
     def component_part(text: str, role: str, occurrence_ids: tuple[int, ...]) -> NameTokenBinding:
-        atom_ids, bond_ids = component_scope(occurrence_ids)
+        atom_ids, bond_ids = rendered_component_scope(occurrence_ids)
         occurrence_key = ",".join(map(str, occurrence_ids))
         return NameTokenBinding(
             text=text,
