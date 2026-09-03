@@ -6,6 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 from ..molecule import Molecule
+from ..polycycle_topology import ring_system_topology
 from ..retained_graph_model import merge_parent_bond_classes
 from .audit import audit_fusion_plan
 from .config import fusion_nomenclature_config
@@ -74,9 +75,14 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         bounded = select_bounded_face_model(mol, atoms)
     except FaceSearchBudgetExceeded as exc:
         return FusionUnsupported("bounded-face search budget exhausted", (str(exc),))
-    if bounded is None or bounded.cycle_rank < 2:
+    if bounded is None:
+        return _classify_unmodelled_ring_system(mol, atoms)
+    if bounded.cycle_rank < 2:
         return FusionNotApplicable("selected parent has no audited multi-face fused model")
     if not SUPPORT.interior_atoms and set(bounded.outer_boundary.atoms) != set(atoms):
+        topology = ring_system_topology(mol, atoms)
+        if topology.classification == "bicyclic":
+            return FusionUnsupported("bridged fused systems are outside the ordinary ortho-fusion tier")
         return FusionUnsupported("interior-atom fused systems require the later numbering tier")
     ring_sizes = tuple(len(face.atoms) for face in bounded.faces)
     if mode is FusionMode.AUDITED_PIN and not pin_ring_size_gate(ring_sizes):
@@ -180,6 +186,26 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         rendered_parts=rendered_parts,
     )
     return FusionConfirmed(plan)
+
+
+def _classify_unmodelled_ring_system(mol: Molecule, atoms: frozenset[int]) -> FusionPlanningResult:
+    """Explain why a completed bounded-face proof was unavailable.
+
+    This deliberately reuses the package's existing topology classifier and is
+    called only on an already rejected candidate, so ordinary and successfully
+    fused naming paths pay no additional graph-search cost.
+    """
+
+    topology = ring_system_topology(mol, atoms)
+    if topology.classification in {"monospiro", "linear_dispiro", "complex_spiro"}:
+        return FusionNotApplicable("spiro-only ring systems do not use fusion nomenclature")
+    if topology.cycle_rank < 2:
+        return FusionNotApplicable("selected parent has no audited multi-face fused model")
+    if topology.fused_edges:
+        return FusionUnsupported(
+            "fused ring system has no bounded face model within the configured ring-size tier"
+        )
+    return FusionUnsupported("bridged or non-ortho polycycles are outside the ordinary fusion tier")
 
 
 def _standard_valence_parent(mol: Molecule, atoms: frozenset[int]) -> bool:

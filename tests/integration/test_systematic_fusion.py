@@ -4,7 +4,8 @@ import pytest
 from rdkit import Chem
 
 from openclatura import FusionMode, name, name_many, name_mol, opsin_available
-from openclatura.fusion.model import AuditStatus, FusionConfirmed, FusionUnsupported
+from openclatura.fusion.faces import FaceSearchBudgetExceeded
+from openclatura.fusion.model import AuditStatus, FusionConfirmed, FusionNotApplicable, FusionUnsupported
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.graph_io import read_smiles
 from openclatura.molecule import OperationClass
@@ -235,6 +236,47 @@ def test_nonstandard_valence_fused_parent_abstains_before_component_planning():
 
     assert isinstance(result, FusionUnsupported)
     assert "nonstandard-valence fused parents" in result.reason
+
+
+def test_spiro_parent_is_explicitly_not_applicable_to_fusion_nomenclature():
+    mol = read_smiles("C1CCC2(CC1)CC2")
+
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert isinstance(result, FusionNotApplicable)
+    assert "spiro-only" in result.reason
+
+
+def test_bridged_parent_explicitly_abstains_from_ordinary_fusion_nomenclature():
+    mol = read_smiles("C1CC2CCC1C2")
+
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert isinstance(result, FusionUnsupported)
+    assert "bridged" in result.reason
+
+
+def test_interior_atom_parent_explicitly_requires_the_later_numbering_tier():
+    mol = read_smiles("C1=CC2=CC=C3C=CC4=CC=C5C=CC6=CC=C1C1=C6C5=C4C3=C21")
+
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert isinstance(result, FusionUnsupported)
+    assert "interior-atom" in result.reason
+
+
+def test_face_search_budget_exhaustion_becomes_a_typed_abstention(monkeypatch):
+    mol = read_smiles("O1C2=C(C=C1)C=CS2")
+
+    def exhausted(*args, **kwargs):
+        raise FaceSearchBudgetExceeded("cycle enumeration", 1)
+
+    monkeypatch.setattr("openclatura.fusion.planner.select_bounded_face_model", exhausted)
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert isinstance(result, FusionUnsupported)
+    assert result.reason == "bounded-face search budget exhausted"
+    assert "cycle enumeration" in result.details[0]
 
 
 @pytest.mark.parametrize(
