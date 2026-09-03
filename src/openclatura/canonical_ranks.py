@@ -29,13 +29,18 @@ def _initial_invariant(mol: Molecule, idx: int, atom_ids: frozenset[int]) -> tup
 
     atom = mol.atoms[idx]
     neighbors = tuple(neighbor for neighbor in mol.get_neighbors(idx) if neighbor in atom_ids)
+    external_valence = sum(
+        (mol.get_bond(idx, neighbor).order if mol.get_bond(idx, neighbor) is not None else 0)
+        for neighbor in mol.get_neighbors(idx)
+        if neighbor not in atom_ids
+    )
     bond_orders = sorted(_order(mol, idx, neighbor) for neighbor in neighbors)
     return (
         atom.symbol,
         atom.charge,
         atom.isotope or 0,
         len(neighbors),
-        atom.total_h_count,
+        atom.total_h_count + external_valence,
         bool(atom.is_aromatic),
         tuple(bond_orders),
     )
@@ -45,7 +50,9 @@ def canonical_ranks(mol: Molecule, atom_ids=None) -> dict[int, int]:
     """Map each atom index to its refinement-equivalence rank.
 
     Equal ranks mean the atoms are interchangeable; the ordering between
-    different ranks is deterministic and depends only on the structure.
+    different ranks is deterministic and depends only on the structure. When
+    ``atom_ids`` selects an induced subgraph, cut bonds are treated as hydrogen
+    valence so substituent identity cannot alter intrinsic parent ranking.
     """
 
     atoms = frozenset(mol.atoms if atom_ids is None else atom_ids)
