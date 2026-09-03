@@ -101,7 +101,7 @@ def ring_system_topology(
     edges: set[tuple[int, int]] | frozenset[tuple[int, int]] | None = None,
 ) -> RingSystemTopology:
     atom_set = frozenset(atoms)
-    edge_set = frozenset(_normalize_edges(edges if edges is not None else edges_within_atoms(mol, set(atom_set))))
+    edge_set = frozenset(normalize_edges(edges if edges is not None else edges_within_atoms(mol, set(atom_set))))
     degrees = internal_degrees(atom_set, edge_set)
     spiro_atoms = tuple(sorted(atom for atom, degree in degrees.items() if degree >= 4))
     bridgeheads = tuple(sorted(atom for atom, degree in degrees.items() if degree == 3))
@@ -333,7 +333,7 @@ def audit_von_baeyer_descriptor(
     """Reconstruct a tricyclo/tetracyclo descriptor and compare it to graph edges."""
 
     numbered_path = tuple(path)
-    normalized_edges = frozenset(_normalize_edges(edge_set))
+    normalized_edges = frozenset(normalize_edges(edge_set))
     errors = []
     parsed = _parse_von_baeyer_descriptor(descriptor)
     if parsed is None:
@@ -432,7 +432,7 @@ def build_ring_numbering(
     numbered_path = tuple(path)
     atom_to_locant = {atom: locant for locant, atom in enumerate(numbered_path, start=1)}
     locant_to_atom = {locant: atom for atom, locant in atom_to_locant.items()}
-    normalized_edges = frozenset(_normalize_edges(edge_set))
+    normalized_edges = frozenset(normalize_edges(edge_set))
     if kind == "spiro":
         expected_edges = _spiro_edges_from_numbering(descriptor_numbers, locant_to_atom)
     elif kind == "bicyclo":
@@ -505,7 +505,7 @@ def build_von_baeyer_numbering(
         descriptor_numbers = tuple(base_numbers) + tuple(length for length, _locants in extra_bridges)
         kind = von_baeyer_kind(kind_count)
 
-    normalized_edges = frozenset(_normalize_edges(edge_set))
+    normalized_edges = frozenset(normalize_edges(edge_set))
     errors = list(audit.audit_errors)
     atom_symbols_by_locant = None
     atom_charges_by_locant = None
@@ -581,7 +581,7 @@ def _dispiro_edges_from_numbering(
         )
     if len(locant_to_atom) != total:
         return frozenset()
-    return frozenset(_normalize_edges(edges))
+    return frozenset(normalize_edges(edges))
 
 
 def _append_ring_segment_edges(
@@ -630,7 +630,7 @@ def _spiro_edges_from_numbering(
     for locant in range(first_large, total):
         edges.append((locant_to_atom[locant], locant_to_atom[locant + 1]))
     edges.append((locant_to_atom[total], locant_to_atom[spiro_locant]))
-    return frozenset(_normalize_edges(edges))
+    return frozenset(normalize_edges(edges))
 
 
 def _bicyclo_edges_from_numbering(
@@ -659,7 +659,7 @@ def _bicyclo_edges_from_numbering(
         edges.append((locant_to_atom[total], locant_to_atom[second_bridgehead_locant]))
     else:
         edges.append((locant_to_atom[1], locant_to_atom[second_bridgehead_locant]))
-    return frozenset(_normalize_edges(edges))
+    return frozenset(normalize_edges(edges))
 
 
 def internal_degrees(atoms: frozenset[int], edges: frozenset[tuple[int, int]]) -> dict[int, int]:
@@ -804,7 +804,7 @@ def adjacent_atoms(atom: int, edges: frozenset[tuple[int, int]]) -> set[int]:
     return adjacent
 
 
-def _normalize_edges(edges) -> set[tuple[int, int]]:
+def normalize_edges(edges) -> set[tuple[int, int]]:
     return {tuple(sorted((first, second))) for first, second in edges}
 
 

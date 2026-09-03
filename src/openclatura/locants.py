@@ -1,7 +1,5 @@
 """Locant parsing and atom/bond locant helpers."""
 
-from collections.abc import Mapping
-
 from .assembly_utils import parse_locant as parse_locant
 from .molecule import Molecule
 
@@ -31,17 +29,6 @@ def locant_text(locant: int, display: str | None = None) -> str:
         return str(display)
     inherited_display = getattr(locant, "display", None)
     return str(locant) if inherited_display is None else str(inherited_display)
-
-
-def coerce_display_numbering(
-    numbering: Mapping[int, int], display_numbering: Mapping[int, str] | None = None
-) -> dict[int, DisplayLocant]:
-    """Attach display locants to a numeric atom-numbering map."""
-
-    return {
-        atom: as_display_locant(locant, display_numbering.get(atom) if display_numbering is not None else None)
-        for atom, locant in numbering.items()
-    }
 
 
 def get_atom_locants(oriented_path: list[int], target_indices: set[int]) -> list[int]:
@@ -87,3 +74,16 @@ def get_bond_locants(
                         triple_locs.append(locant_val)
 
     return sorted(double_locs), sorted(triple_locs)
+
+
+def retained_locant_sort_key(locant: str) -> tuple[int, str]:
+    """Sort retained-ring locants numerically first, then by letter suffix (``4a`` after ``4``)."""
+
+    digits = ""
+    suffix = ""
+    for char in str(locant):
+        if char.isdigit() and not suffix:
+            digits += char
+        else:
+            suffix += char
+    return (int(digits) if digits else 10_000, suffix)

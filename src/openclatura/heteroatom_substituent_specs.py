@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from .formatting import is_complex_prefix, strip_outer_parentheses
+from .formatting import is_complex_prefix
 from .naming_data import load_json_table
 from .oxoacid_roles import CentralOxoRole, OxoLigandRole
 
@@ -107,21 +107,6 @@ def ligand_deficient_prefix(symbol: str, oxo_count: int) -> str | None:
     if spec is None or spec.ligand_deficient_prefixes is None:
         return None
     return spec.ligand_deficient_prefixes.get(oxo_count)
-
-
-def ligand_prefix(symbol: str, ligand_name: str, oxo_count: int = 0) -> str | None:
-    """Return a ligand-bearing heteroatom prefix from data."""
-
-    spec = spec_for_symbol(symbol)
-    if spec is None:
-        return None
-    base = spec.ligand_prefixes.get(oxo_count)
-    if base is None:
-        return None
-    ligand = _apply_join_mode(strip_outer_parentheses(ligand_name), spec.ligand_join_mode)
-    if ligand.startswith("("):
-        return f"({ligand}{base})"
-    return f"({ligand}{base})" if is_complex_prefix(ligand) else f"{ligand}{base}"
 
 
 def _apply_join_mode(name: str, join_mode: str) -> str:

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from .assembly_parts import AssemblyParts, NameAtomBinding, NameTokenBinding
 from .molecule import Molecule
-from .name_bindings import ensure_name_atom_binding_tokens, postprocess_name_atom_bindings
+from .name_bindings import ensure_name_atom_binding_tokens, normalise_name_text, postprocess_name_atom_bindings
 from .stereo_descriptors import is_searchable_stereo_token
 from .token_grammar import is_locant_binding_token, lexical_token_spans
 
@@ -1312,7 +1312,7 @@ def _fallback_token_binding_resolution(
     text: str,
     bindings: tuple[NameAtomBinding, ...],
 ) -> TokenBindingResolution:
-    token_norm = _normalise_name_text(token)
+    token_norm = normalise_name_text(token)
     indices: set[int] = set()
     if token_norm.isdigit() or "," in token_norm:
         indices.update(_locant_binding_indices(token_norm, bindings))
@@ -1788,7 +1788,7 @@ def _token_spans_from_native_matches(
     for index, (clipped_start, clipped_end) in enumerate(ordered_keys):
         if cursor < clipped_start:
             gap_text = text[cursor:clipped_start]
-            if _normalise_name_text(gap_text):
+            if normalise_name_text(gap_text):
                 next_key = (clipped_start, clipped_end)
                 spans.append(
                     _token_span_for_native_gap(
@@ -1818,7 +1818,7 @@ def _token_spans_from_native_matches(
         previous_key = (clipped_start, clipped_end)
     if cursor < end:
         gap_text = text[cursor:end]
-        if _normalise_name_text(gap_text):
+        if normalise_name_text(gap_text):
             spans.append(
                 _token_span_for_native_gap(
                     gap_text,
@@ -2072,7 +2072,7 @@ def _next_structural_native_scope(
     all_matches: list[tuple[int, int, int, NameTokenBinding]],
 ) -> set[int]:
     for next_lexical in lexical_token_spans(text, end):
-        token_norm = _normalise_name_text(next_lexical.text)
+        token_norm = normalise_name_text(next_lexical.text)
         if token_norm in _NON_STRUCTURAL_GRAMMAR_TOKENS:
             continue
         next_start, next_end = next_lexical.start, next_lexical.end
@@ -2108,7 +2108,7 @@ def _token_span_for_native_gap(
     adjacent_matches: list[tuple[int, NameTokenBinding]] | None = None,
     bindings: tuple[NameAtomBinding, ...] = (),
 ) -> NameTokenSpan:
-    token_norm = _normalise_name_text(text)
+    token_norm = normalise_name_text(text)
     if _is_punctuation_only_gap(text):
         return NameTokenSpan(
             text=text,
@@ -2291,7 +2291,7 @@ def _unbound_name_tokens(result: NameAssemblyResult) -> list[dict]:
 def _token_requires_graph_binding(token: NameTokenSpan) -> bool:
     if token.token_kind == "grammar" or token.ownership == "grammar_scope":
         return False
-    return bool(_normalise_name_text(token.text))
+    return bool(normalise_name_text(token.text))
 
 
 def _spans_overlap(left_start: int, left_end: int, right_start: int, right_end: int) -> bool:
@@ -2307,12 +2307,12 @@ def _missing_concrete_binding_terms(result: NameAssemblyResult) -> list[dict]:
     words must still survive post-processing into the final rendered string.
     """
 
-    final_text = _normalise_name_text(result.text)
+    final_text = normalise_name_text(result.text)
     missing: list[dict] = []
     for idx, binding in enumerate(result.bindings):
         if not _binding_term_requires_text_presence(binding):
             continue
-        term = _normalise_name_text(binding.term)
+        term = normalise_name_text(binding.term)
         if term and not _binding_term_occurs_in_final_name(binding, term, final_text):
             if _binding_is_subsumed_by_present_binding(binding, result.bindings, final_text):
                 continue
@@ -2337,7 +2337,7 @@ def _binding_is_subsumed_by_present_binding(
     for other in bindings:
         if other is binding or not _binding_term_requires_text_presence(other):
             continue
-        other_term = _normalise_name_text(other.term)
+        other_term = normalise_name_text(other.term)
         if not other_term or not _binding_term_occurs_in_final_name(other, other_term, final_text):
             continue
         atoms_covered = not binding.atom_ids or binding.atom_ids <= other.atom_ids
@@ -2371,10 +2371,6 @@ def _binding_term_requires_text_presence(binding: NameAtomBinding) -> bool:
     return True
 
 
-def _normalise_name_text(text: str) -> str:
-    return text.lower().replace(" ", "").replace("(", "").replace(")", "")
-
-
 def _term_occurs_in_final_name(term: str, final_text: str) -> bool:
     if term in final_text:
         return True
@@ -2386,14 +2382,14 @@ def _binding_term_occurs_in_final_name(binding: NameAtomBinding, term: str, fina
         return True
     role = binding.role.replace("_", "").lower()
     if any(
-        _term_occurs_in_final_name(_normalise_name_text(alias), final_text)
+        _term_occurs_in_final_name(normalise_name_text(alias), final_text)
         for alias in _ROLE_TOKEN_ALIASES.get(role, ())
     ):
         return True
     if binding.stage == "parent" and _ionic_parent_stem_occurs(term, final_text):
         return True
     if binding.stage == "modifier" and binding.role == "front_modifier":
-        term_parts = [_normalise_name_text(part) for part in binding.term.split()]
+        term_parts = [normalise_name_text(part) for part in binding.term.split()]
         return bool(term_parts) and all(_term_occurs_in_final_name(part, final_text) for part in term_parts)
     if binding.stage == "parent" and term == "benzene":
         return "benz" in final_text

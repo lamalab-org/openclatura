@@ -1,0 +1,70 @@
+{
+  "bluebook_rule": "P-25 retained parent output policy: preferred output names are distinct from accepted retained aliases.",
+  "parents": [
+    {
+      "template_name": "indane",
+      "preferred_name": "2,3-dihydro-1H-indene",
+      "preferred_contexts": [
+        "unsubstituted_parent"
+      ],
+      "accepted_aliases": [
+        "indane",
+        "indan"
+      ],
+      "hydrogenation": {
+        "base_parent": "1H-indene",
+        "hydro_locants": [
+          "2",
+          "3"
+        ],
+        "indicated_hydrogen_locants": [
+          "1"
+        ]
+      },
+      "reason": "P-25.7.1.3 expresses the preferred name as a hydro derivative of the retained indene parent."
+    },
+    {
+      "template_name": "indoline",
+      "preferred_name": "2,3-dihydro-1H-indole",
+      "preferred_contexts": [
+        "unsubstituted_parent"
+      ],
+      "accepted_aliases": [
+        "indoline"
+      ],
+      "hydrogenation": {
+        "base_parent": "1H-indole",
+        "hydro_locants": [
+          "2",
+          "3"
+        ],
+        "indicated_hydrogen_locants": [
+          "1"
+        ]
+      },
+      "reason": "P-25.7.1.3 expresses the preferred name as a hydro derivative of the retained indole parent."
+    },
+    {
+      "template_name": "tetracene",
+      "preferred_name": "tetracene",
+      "preferred_contexts": [
+        "all"
+      ],
+      "accepted_aliases": [
+        "naphthacene"
+      ],
+      "reason": "P-25.1.2.1 selects tetracene; naphthacene is an accepted former retained name."
+    },
+    {
+      "template_name": "dibenz[a,h]anthracene",
+      "preferred_name": "dibenz[a,h]anthracene",
+      "preferred_contexts": [
+        "all"
+      ],
+      "accepted_aliases": [
+        "dibenzo[a,h]anthracene"
+      ],
+      "reason": "Keep the preferred elided fusion-prefix spelling while accepting the widely used unelided spelling."
+    }
+  ]
+}

@@ -61,32 +61,6 @@ class NumberingPreference:
         return self.ordered_key(NUMBERING_CRITERIA["ring"])
 
 
-def polycycle_numbering_key(
-    mol: Molecule,
-    numbered_path: list[int],
-    *,
-    include_saturated_ring_proxy: bool = False,
-) -> tuple[tuple[int, ...], tuple[int, ...]]:
-    """Return the openiupac-style orientation key for ring frameworks.
-
-    `src/openiupac.parent_selection._polycycle_numbering_key` compares
-    heteroatom locants, then indicated-hydrogen locants.  This adapter uses the
-    active lightweight `Molecule` model; explicit hydrogens/aromaticity are not
-    stored here, so the saturated-ring proxy is opt-in until callers can prove
-    it is appropriate for the parent class being numbered.
-    """
-
-    return (
-        _heteroatom_locants_by_priority(mol, numbered_path),
-        _indicated_hydrogen_like_locants(
-            mol,
-            numbered_path,
-            retained_name=None,
-            include_all_ring_carbons=include_saturated_ring_proxy,
-        ),
-    )
-
-
 def number_parent(
     mol: Molecule,
     candidate_paths: list[list[int]],

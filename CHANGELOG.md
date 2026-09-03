@@ -7,6 +7,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added graph-backed retained-parent coverage for fused hydrocarbons, including
+  the acene and polyaphene series and irregular polycyclic aromatic
+  hydrocarbons such as fluoranthene, pyrene, chrysene, benzo-fused PAHs, and
+  related derivatives.
+- Added graph-backed retained macrocycle support for the porphyrin/porphine and
+  corrin families, with conventional locant maps selected before generic
+  polycycle descriptor construction where required.
+- Added a data-backed retained-name policy that separates preferred output
+  names from accepted aliases and records hydrogenated-parent spellings such
+  as `2,3-dihydro-1H-indene` and `2,3-dihydro-1H-indole`.
+- Added optional graph-proven omission of redundant constitutional locants.
+  The public `name`, `name_mol`, and `name_many` APIs expose this through
+  `omit_redundant_locants`, enabled by default.
+- Added a reproducible 5,000-molecule, OPSIN-verified single-thread benchmark,
+  corpus-generation tooling, and a pull-request performance gate that compares
+  paired measurements against the target revision.
+- Added retained-parent derivative, atom-order invariance, graph-isomorphism,
+  OPSIN round-trip, locant-elision, and benchmark regression tests.
+
+### Changed
+
+- Unified fused parents and macrocycles behind one lazy, topology-indexed
+  retained-graph registry with shared matching, numbering, metadata, and cache
+  invalidation behavior.
+- Generated regular acene and polyaphene templates from compact series data
+  while retaining explicit graph templates for irregular parent systems.
+- Moved morphology, functional-role, charge, suffix, and connection-boundary
+  handling out of broad legacy literal post-processing and into structured
+  assembly and data-backed naming rules.
+- Made redundant-locant decisions conservative graph proofs based on labelled
+  parent automorphisms and the complete set of suffix, unsaturation, and
+  substituent features. Searches use strict work limits and retain explicit
+  locants whenever uniqueness cannot be proven cheaply.
+- Added graph mutation APIs that invalidate retained-parent and other derived
+  caches, preventing stale template matches after atom or bond updates.
+
+### Fixed
+
+- Corrected additive-hydrogen accounting for retained parents that already
+  contain inherent saturated positions, and prevented indicated-hydrogen
+  relocation from consuming newly hydrogenated sites.
+- Preserved exact retained-template proofs while keeping an audited von Baeyer
+  fallback for relaxed fused-PAH topology matches that fail later retained-name
+  chemistry checks.
+- Corrected retained-parent metadata lookup for exact template names and
+  unambiguous preferred output spellings while leaving tautomer-ambiguous
+  aliases to graph-derived metadata.
+- Prevented redundant-locant omission when parent symmetry, attachment
+  capacity, supplied locant maps, or bounded-search limits leave more than one
+  constitutional arrangement possible.
+
 ## [0.3.1] - 2026-08-14
 
 ### Changed

@@ -18,7 +18,8 @@ def parse_locant(locant):
     if any(char.isdigit() for char in text):
         numbers = re.findall(r"\d+", text)
         return (1, float(numbers[0]) if numbers else 0.0, text)
-    return (2, 0.0, text)
+    # P-14.3.5: italic-letter locants (N, O, S, N') are cited before numerals: N,4-dimethylbenzamide.
+    return (0, 0.0, text)
 
 
 _STEREO_DESCRIPTOR_START = re.compile(r"\(\d+[A-Za-z']*(?:[RS]|[EZ])(?:,\d+[A-Za-z']*(?:[RS]|[EZ]))*\)")
@@ -29,10 +30,7 @@ def needs_hyphen(left: str, right: str) -> bool:
         return False
     if (
         right[0].isdigit()
-        or right.startswith("N,")
-        or right.startswith("N-")
-        or right.startswith("N',")
-        or right.startswith("N'-")
+        or re.match(r"^[NOSP]'*[,-]", right) is not None  # N-, N,N'-, N'''-, O-, S-
         # A stereo descriptor opening the right-hand side is a separate
         # italicised element and takes a hyphen: `1-methyl-(5'E)-1'-butyl…`.
         or _STEREO_DESCRIPTOR_START.match(right)

@@ -120,6 +120,7 @@ class RetainedParentMetadata:
     indicated_hydrogen_count: int = 0
     mancude_double_bonds: int = 0
     relocated_indicated_h: bool = False
+    inherent_saturated_locants: tuple[str, ...] = ()
 
 
 @dataclass
@@ -136,6 +137,7 @@ class AssemblyParts:
     is_substituent: bool = False
     is_double_attach: bool = False
     is_triple_attach: bool = False
+    is_acyl_substituent: bool = False
     attachment_locant: int | str = 1
     retained_name: str | None = None
     retained_absorbs_principal_group: bool = False
@@ -161,6 +163,7 @@ class AssemblyParts:
     parent_atom_ids_by_locant: dict[str, int] = field(default_factory=dict)
     parent_atom_symbols_by_locant: dict[str, str] = field(default_factory=dict)
     parent_atom_charges_by_locant: dict[str, int] = field(default_factory=dict)
+    parent_atom_isotopes_by_locant: dict[str, int | None] = field(default_factory=dict)
     parent_bond_orders_by_locants: dict[tuple[str, str], int] = field(default_factory=dict)
     parent_bond_ids_by_locants: dict[tuple[str, str], int] = field(default_factory=dict)
     locant_map_source: LocantMapSource = LocantMapSource.GENERATED
@@ -168,3 +171,8 @@ class AssemblyParts:
     name_token_spans: list[dict] = field(default_factory=list)
     name_rewrite_history: list[dict] = field(default_factory=list)
     stereo_audit_issues: list[str] = field(default_factory=list)
+    omit_redundant_locants: bool = True
+    elided_substituent_locants: set[str] = field(default_factory=set)
+    elided_unsaturation_locants: set[str] = field(default_factory=set)
+    elide_principal_group_locants: bool = False
+    locant_elision_decisions: list[dict] = field(default_factory=list)

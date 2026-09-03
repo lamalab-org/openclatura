@@ -56,12 +56,12 @@
   },
   {
     "smiles": "C=C",
-    "name": "eth-1-ene",
+    "name": "ethene",
     "category": "alkene"
   },
   {
     "smiles": "CC=C",
-    "name": "prop-1-ene",
+    "name": "propene",
     "category": "alkene"
   },
   {
@@ -71,12 +71,12 @@
   },
   {
     "smiles": "C#C",
-    "name": "eth-1-yne",
+    "name": "ethyne",
     "category": "alkyne"
   },
   {
     "smiles": "CC#C",
-    "name": "prop-1-yne",
+    "name": "propyne",
     "category": "alkyne"
   },
   {
@@ -246,7 +246,7 @@
   },
   {
     "smiles": "CCOCC",
-    "name": "1-ethoxyethane",
+    "name": "ethoxyethane",
     "category": "ether"
   },
   {
@@ -311,7 +311,7 @@
   },
   {
     "smiles": "BrCC",
-    "name": "1-bromoethane",
+    "name": "bromoethane",
     "category": "haloalkane"
   },
   {
@@ -501,7 +501,7 @@
   },
   {
     "smiles": "CC(C)=C",
-    "name": "2-methylprop-1-ene",
+    "name": "2-methylpropene",
     "category": "alkene"
   },
   {
@@ -511,22 +511,22 @@
   },
   {
     "smiles": "NC(=O)N",
-    "name": "1-aminoformamide",
+    "name": "urea",
     "category": "amide"
   },
   {
     "smiles": "NC(=N)N",
-    "name": "1-iminomethanediamine",
+    "name": "guanidine",
     "category": "guanidine"
   },
   {
     "smiles": "N=C=O",
-    "name": "1-iminomethanal",
+    "name": "isocyanic acid",
     "category": "isocyanate"
   },
   {
     "smiles": "S=C=N",
-    "name": "1-thioxomethanimine",
+    "name": "isothiocyanic acid",
     "category": "isothiocyanate"
   }
 ]

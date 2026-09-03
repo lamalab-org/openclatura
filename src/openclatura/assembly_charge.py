@@ -67,17 +67,6 @@ def parent_charge_suffix_locs(parts: AssemblyParts) -> list[str]:
     )
 
 
-def parent_charge_operations(parts: AssemblyParts) -> list[ParentChargeOperation]:
-    return [
-        ParentChargeOperation(
-            locants=operation.locants,
-            suffix=operation.suffix,
-            reason=operation.reason,
-        )
-        for operation in parent_charge_name_operations(parts)
-    ]
-
-
 def parent_charge_name_operations(parts: AssemblyParts) -> list[ParentSuffixOperation]:
     suffix_locs = tuple(parent_charge_suffix_locs(parts))
     if not suffix_locs:

@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+from .additive import add_indicated_hydrogens
 from .assembly_parts import (
     AssemblyParts,
     NameAtomBinding,
@@ -17,7 +18,8 @@ from .component_group_rules import (
 )
 from .component_modifiers import add_component_front_modifiers, add_component_n_substituents
 from .functional_prefixes import collect_component_prefix_substituents
-from .molecule import DecisionTrace, Molecule, TracePhase, bond_ids_within
+from .locant_elision import apply_redundant_locant_elision
+from .molecule import DecisionTrace, Molecule, TracePhase, bond_ids_within, charged_atoms
 from .name_assembly import NameAssemblyResult, assert_final_name_assembly, token_span_trace_data
 from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
@@ -33,6 +35,7 @@ from .principal_groups import (
     partition_principal_and_prefix_groups,
 )
 from .retained_fused_production import production_retained_fused_parent
+from .retained_name_policy import retained_parent_output_name
 from .rules import elements as _elements
 from .special_cases import (
     single_atom_component_name,
@@ -42,7 +45,6 @@ from .special_cases import (
 from .spiro_assembly import SpiroAssembly
 from .stereo_audit import audit_stereochemistry
 from .subgraph_tools import (
-    add_indicated_hydrogens,
     add_parent_features,
     emit_bond_stereo,
     find_spiro_side_pair,
@@ -115,7 +117,7 @@ def collect_component_branch_substituents(
                     locants=[],
                     atom_ids=sub_comp - {c_idx},
                     bond_ids=bond_ids_within(mol, sub_comp),
-                    charge_atom_ids=_charged_atoms(mol, sub_comp - {c_idx}),
+                    charge_atom_ids=charged_atoms(mol, sub_comp - {c_idx}),
                     spiro=name_spiro_subgraph(mol, c_idx, sub_comp),
                 )
             )
@@ -155,7 +157,7 @@ def collect_component_branch_substituents(
                             outer_parentheses_optional=outer_parentheses_optional,
                             atom_ids=branch_atoms,
                             bond_ids=bond_ids_within(mol, branch_atoms | {c_idx}),
-                            charge_atom_ids=_charged_atoms(mol, branch_atoms),
+                            charge_atom_ids=charged_atoms(mol, branch_atoms),
                             emitted_tokens=(
                                 graph_bound_substituent_tokens(
                                     mol,
@@ -182,12 +184,6 @@ def add_component_substituents(
     """Add collected component substituents to assembly parts."""
 
     add_substituent_traces(parts, subst_mapping, get_loc, only_atoms=set(numbered_path))
-
-
-def _charged_atoms(mol: Molecule, atom_ids: set[int]) -> set[int]:
-    """Return formally charged atoms from an already named graph fragment."""
-
-    return {atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0}
 
 
 def _chain_audit_parts(plan, component_atoms: set[int]) -> AssemblyParts:
@@ -251,7 +247,7 @@ def _shortcut_component_result(
                 term=name,
                 atom_ids=set(component_atoms),
                 bond_ids=bond_ids_within(mol, component_atoms),
-                charge_atom_ids=_charged_atoms(mol, component_atoms),
+                charge_atom_ids=charged_atoms(mol, component_atoms),
             )
         ]
     )
@@ -279,6 +275,7 @@ def name_component(
     name_spiro_subgraph: SpiroSubgraphNamer,
     assemble_parent_name: ParentAssembler,
     token_debug: bool = False,
+    omit_redundant_locants: bool = True,
 ):
     """Name one connected component or recursive component of a molecule."""
 
@@ -325,6 +322,7 @@ def name_component(
             name_spiro_subgraph=name_spiro_subgraph,
             assemble_parent_name=assemble_parent_name,
             token_debug=token_debug,
+            omit_redundant_locants=omit_redundant_locants,
         )
 
     structural_parent_result = structural_replacement_parent_result(mol, component_atoms, name_subgraph)
@@ -455,6 +453,17 @@ def name_component(
             "is_spiro": state.parent_selection.is_spiro,
             "is_polycycle": state.parent_selection.is_polycycle,
             "polycycle_descriptor": state.parent_selection.polycycle_descriptor,
+            "ring_parent_kind": (
+                state.parent_selection.ring_parent.kind if state.parent_selection.ring_parent is not None else None
+            ),
+            "ring_parent_proof_source": (
+                state.parent_selection.ring_parent.proof_source
+                if state.parent_selection.ring_parent is not None
+                else None
+            ),
+            "ring_parent_audit_ok": (
+                state.parent_selection.ring_parent.audit_ok if state.parent_selection.ring_parent is not None else None
+            ),
         },
     )
 
@@ -518,6 +527,13 @@ def name_component(
         state.retained_name = retained_fused.name
         state.locant_maps = retained_fused.locant_maps
         state.retained_parent_metadata = retained_fused.metadata
+    elif state.retained_name:
+        output_context = (
+            "unsubstituted_parent"
+            if not state.is_substituent and not subst_mapping and state.principal_key is None
+            else "composite_parent"
+        )
+        state.retained_name = retained_parent_output_name(state.retained_name, output_context)
     if (
         state.retained_name
         and state.locant_maps is None
@@ -529,7 +545,10 @@ def name_component(
     parent_plan = build_parent_assembly_plan(
         mol,
         state.parent_selection,
-        NamingIntent.component(state.principal_carbons),
+        NamingIntent.component(
+            state.principal_carbons,
+            omit_redundant_locants=omit_redundant_locants,
+        ),
         subst_mapping,
         state.locant_maps,
         state.retained_name,
@@ -587,6 +606,8 @@ def name_component(
     add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
     add_component_substituents(parts, subst_mapping, numbered_path, get_loc)
 
+    apply_redundant_locant_elision(parts)
+
     refresh_name_atom_bindings(parts)
     parts.stereo_audit_issues = list(audit_stereochemistry(mol, parts).issues)
     if COMPONENT_AUDIT_HOOK is not None:
@@ -617,6 +638,7 @@ def name_component(
             "name_atom_bindings": binding_trace_data(parts.name_atom_bindings, include_emitted_tokens=token_debug),
             "name_token_spans": parts.name_token_spans if token_debug else [],
             "name_rewrite_history": parts.name_rewrite_history,
+            "locant_elisions": parts.locant_elision_decisions,
         },
     )
     trace_segments = assembly_trace_segments(parts) if return_trace or return_tree else []
