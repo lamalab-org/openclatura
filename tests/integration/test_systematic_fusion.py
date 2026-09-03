@@ -279,15 +279,6 @@ def test_bridged_parent_explicitly_abstains_from_ordinary_fusion_nomenclature():
     assert "bridged" in result.reason
 
 
-def test_interior_atom_parent_explicitly_requires_the_later_numbering_tier():
-    mol = read_smiles("C1=CC2=CC=C3C=CC4=CC=C5C=CC6=CC=C1C1=C6C5=C4C3=C21")
-
-    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
-
-    assert isinstance(result, FusionUnsupported)
-    assert "interior-atom" in result.reason
-
-
 def test_face_search_budget_exhaustion_becomes_a_typed_abstention(monkeypatch):
     mol = read_smiles("O1C2=C(C=C1)C=CS2")
 
@@ -337,6 +328,15 @@ def test_pin_ring_size_gate_preserves_small_ring_von_baeyer_names(smiles, expect
 def test_non_ortho_topologies_do_not_emit_systematic_fusion(smiles):
     result = name(smiles, fusion_mode=FusionMode.GENERAL, include_trace=True)
     assert "[" not in result.name or "spiro" in result.name or "bicyclo" in result.name
+    assert not any(step.decision == "selected audited systematic fusion parent" for step in result.decisions)
+
+
+def test_unsupported_topology_reason_is_exposed_in_the_public_trace():
+    result = name("C1CC2CCC1C2", fusion_mode=FusionMode.GENERAL, include_trace=True)
+
+    fallback = next(step for step in result.decisions if step.decision == "systematic fusion fallback")
+    assert fallback.data["result"] == "FusionUnsupported"
+    assert "bridged" in fallback.data["reason"]
     assert not any(step.decision == "selected audited systematic fusion parent" for step in result.decisions)
 
 

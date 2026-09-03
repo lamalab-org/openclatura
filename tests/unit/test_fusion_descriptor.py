@@ -279,3 +279,26 @@ def test_spiro_overlap_is_outside_the_bounded_fusion_tier():
 
     with pytest.raises(FusionDescriptorError, match="no exact tree-cover"):
         build_fusion_name_ast(mol, matches, registry)
+
+
+def test_cyclic_multiparent_component_cover_abstains_from_tree_tier():
+    registry = fusion_component_registry()
+    mol, faces = _component_graph(
+        ("benzene", "benzene", "benzene"),
+        (
+            ((0, "1"), (1, "1")),
+            ((0, "2"), (1, "2")),
+            ((1, "4"), (2, "1")),
+            ((1, "5"), (2, "2")),
+            ((2, "4"), (0, "4")),
+            ((2, "5"), (0, "5")),
+        ),
+    )
+    matches = tuple(
+        match
+        for match in registry.match_faces(mol, faces)
+        if match.spec_key == "benzene" and len(match.covered_face_ids) == 1
+    )
+
+    with pytest.raises(FusionDescriptorError, match="no exact tree-cover"):
+        build_fusion_name_ast(mol, matches, registry)
