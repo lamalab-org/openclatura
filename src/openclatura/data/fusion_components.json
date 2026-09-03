@@ -34,8 +34,8 @@
   ],
   "components": [
     {"key": "benzene", "template_names": ["benzene"], "parent_name": "benzene", "attached_prefix": "benzo", "omit_attached_locants": true, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
-    {"key": "naphthalene", "template_names": ["naphthalene"], "parent_name": "naphthalene", "attached_prefix": "naphtho", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
-    {"key": "azulene", "template_names": ["azulene"], "parent_name": "azulene", "attached_prefix": "azuleno", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "naphthalene", "template_names": ["naphthalene"], "parent_name": "naphthalene", "attached_prefix": "naphtho", "allow_as_parent": true, "allow_as_attached": true, "horizontal_ring_count": 2, "rule": "P-25.2"},
+    {"key": "azulene", "template_names": ["azulene"], "parent_name": "azulene", "attached_prefix": "azuleno", "allow_as_parent": true, "allow_as_attached": true, "horizontal_ring_count": 2, "rule": "P-25.2"},
     {"key": "pyridine", "template_names": ["pyridine"], "parent_name": "pyridine", "attached_prefix": "pyrido", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "pyridazine", "template_names": ["pyridazine"], "parent_name": "pyridazine", "attached_prefix": "pyridazino", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "pyrimidine", "template_names": ["pyrimidine"], "parent_name": "pyrimidine", "attached_prefix": "pyrimidino", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},

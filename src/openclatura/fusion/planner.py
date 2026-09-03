@@ -211,7 +211,7 @@ def _abstract_graph(ast, registry) -> FusionGraph:
         spec = registry.by_key[match.spec_key].spec
         local_map = match.input_atom_by_locant
         for atom in spec.atoms:
-            labels[local_map[atom.locant]] = (atom.symbol, atom.formal_charge)
+            labels[local_map[atom.locant]] = (atom.symbol, atom.charge)
         for bond in spec.bonds:
             left, right = (local_map[locant] for locant in bond.locants)
             edge = (left, right) if left < right else (right, left)

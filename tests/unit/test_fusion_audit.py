@@ -32,6 +32,7 @@ from openclatura.fusion.model import (
     SystemLocant,
 )
 from openclatura.molecule import Molecule
+from openclatura.retained_fused_templates import RetainedGraphTemplate
 
 
 @dataclass(frozen=True)
@@ -155,26 +156,29 @@ def _two_fused_rings(left_size: int = 6, right_size: int = 6) -> _Candidate:
 
 def _ring_spec(key: str, size: int) -> FusionComponentSpec:
     locants = tuple(str(index) for index in range(1, size + 1))
+    template = RetainedGraphTemplate(
+        name=f"{key}-parent",
+        pin=True,
+        priority=0,
+        aliases=(),
+        attached_prefix=f"{key}o",
+        derivative_stem=None,
+        default_indicated_h=(),
+        locants=locants,
+        atoms=tuple(ComponentAtom(locant, "C", aromatic=False, saturated=True) for locant in locants),
+        bonds=tuple(ComponentBond((left, right), "single") for left, right in zip(locants, locants[1:] + locants[:1])),
+        rings=(locants,),
+        fusion_atoms=locants,
+        peripheral_atoms=locants,
+        interior_atoms=(),
+    )
     return FusionComponentSpec(
         key=key,
         parent_name=f"{key}-parent",
         attached_prefix=f"{key}o",
-        derivative_stem=None,
-        locants=locants,
-        atoms=tuple(ComponentAtom(locant, "C", pi_capacity=0, forced_single=True) for locant in locants),
-        bonds=tuple(ComponentBond((left, right), "single") for left, right in zip(locants, locants[1:] + locants[:1])),
-        rings=(locants,),
-        peripheral_order=locants,
+        template=template,
         usable_as_parent=True,
         usable_as_attached=True,
-        pin_component=True,
-        retained_complete_name=False,
-        benzoheterocycle=False,
-        traditional_numbering=False,
-        ring_sizes=(size,),
-        fusion_carbon_locants=locants,
-        preferred_layouts=(),
-        seniority_override=None,
         rule_reference="P-25",
     )
 

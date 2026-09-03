@@ -24,9 +24,8 @@ from ..retained_fused_templates import (
     retained_graph_templates,
     validate_retained_fused_template,
 )
-from ..rules import elements
 from .faces import normalize_edge
-from .model import ComponentAtom, ComponentBond, FusionComponentMatch, FusionComponentSpec
+from .model import FusionComponentMatch, FusionComponentSpec
 
 SUPPORTED_SCHEMA_VERSION = 1
 
@@ -152,6 +151,8 @@ class FusionComponentRegistry:
             usable_as_parent=allow_parent,
             usable_as_attached=allow_attached,
             rule_reference=rule,
+            seniority_override=_optional_nonnegative_int(row, "seniority_override"),
+            horizontal_ring_count=_horizontal_ring_count(row, primary),
         )
         component = RegisteredFusionComponent(spec, template_names, templates, omit_attached_locants)
         self._components.append(component)
@@ -242,45 +243,19 @@ def _component_spec(
     usable_as_parent: bool,
     usable_as_attached: bool,
     rule_reference: str,
+    seniority_override: int | None,
+    horizontal_ring_count: int,
 ) -> FusionComponentSpec:
-    atoms = tuple(_component_atom(atom) for atom in template.atoms)
-    atom_by_locant = template.atom_by_locant
     return FusionComponentSpec(
         key=key,
         parent_name=parent_name,
         attached_prefix=attached_prefix,
-        derivative_stem=template.derivative_stem,
-        locants=template.locants,
-        atoms=atoms,
-        bonds=tuple(ComponentBond(bond.locants, bond.bond_class) for bond in template.bonds),
-        rings=template.rings,
-        peripheral_order=template.peripheral_atoms,
+        template=template,
         usable_as_parent=usable_as_parent,
         usable_as_attached=usable_as_attached,
-        pin_component=template.pin,
-        retained_complete_name=True,
-        benzoheterocycle=False,
-        traditional_numbering=True,
-        ring_sizes=tuple(len(ring) for ring in template.rings),
-        fusion_carbon_locants=tuple(locant for locant in template.fusion_atoms if atom_by_locant[locant].symbol == "C"),
-        preferred_layouts=(),
-        seniority_override=None,
         rule_reference=rule_reference,
-    )
-
-
-def _component_atom(atom) -> ComponentAtom:
-    """Project one retained-template atom through the shared element table."""
-
-    element = elements.get(atom.symbol)
-    forced_single = atom.saturated or element.mancude_forced_single
-    return ComponentAtom(
-        locant=atom.locant,
-        symbol=atom.symbol,
-        formal_charge=atom.charge,
-        pi_capacity=0 if forced_single else element.mancude_pi_capacity,
-        forced_single=forced_single,
-        indicated_h_candidate=atom.default_h,
+        seniority_override=seniority_override,
+        horizontal_ring_count=horizontal_ring_count,
     )
 
 
@@ -305,6 +280,22 @@ def _required_bool(row: Mapping[str, Any], field: str) -> bool:
     if type(value) is not bool:
         raise ValueError(f"{field} must be a boolean")
     return value
+
+
+def _optional_nonnegative_int(row: Mapping[str, Any], field: str) -> int | None:
+    value = row.get(field)
+    if value is None:
+        return None
+    if type(value) is not int or value < 0:
+        raise ValueError(f"{field} must be a non-negative integer when supplied")
+    return value
+
+
+def _horizontal_ring_count(row: Mapping[str, Any], template: RetainedGraphTemplate) -> int:
+    value = _optional_nonnegative_int(row, "horizontal_ring_count")
+    if value is not None:
+        return value
+    return 1 if len(template.rings) == 1 else 0
 
 
 def _template_names(row: Mapping[str, Any]) -> tuple[str, ...]:

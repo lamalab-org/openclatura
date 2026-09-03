@@ -68,7 +68,12 @@ class FusionNomenclatureConfig:
 
 @cache
 def fusion_nomenclature_config() -> FusionNomenclatureConfig:
-    data = load_json_table("fusion_components.json")
+    return fusion_nomenclature_config_from_data(load_json_table("fusion_components.json"))
+
+
+def fusion_nomenclature_config_from_data(data: dict) -> FusionNomenclatureConfig:
+    """Validate one complete fusion configuration mapping."""
+
     if data.get("schema_version") != 1:
         raise ValueError("unsupported fusion nomenclature schema version")
     graph_source = _text(data, "graph_source")

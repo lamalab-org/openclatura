@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Protocol
 
+from ..locants import retained_locant_sort_key
 from ..rules import elements
 from .config import fusion_nomenclature_config
 from .model import FusionComponentMatch, FusionComponentSpec, FusionMode, FusionRuleDecision
@@ -118,9 +119,9 @@ def component_seniority_key(
         if symbol in EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE
     ]
     earliest = min(special_ranks, default=len(EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE))
-    all_hetero_locants = tuple(sorted(_locant_sort_key(atom.locant) for atom in heteroatoms))
+    all_hetero_locants = tuple(sorted(retained_locant_sort_key(atom.locant) for atom in heteroatoms))
     per_element_locants = tuple(
-        tuple(sorted(_locant_sort_key(atom.locant) for atom in heteroatoms if atom.symbol == symbol))
+        tuple(sorted(retained_locant_sort_key(atom.locant) for atom in heteroatoms if atom.symbol == symbol))
         for symbol in GENERAL_HETEROATOM_COUNT_PRECEDENCE
     )
     return ComponentSeniorityKey(
@@ -135,7 +136,7 @@ def component_seniority_key(
         all_heteroatom_locants=all_hetero_locants,
         per_element_locants=per_element_locants,
         peripheral_fusion_carbon_locants=tuple(
-            sorted(_locant_sort_key(locant) for locant in spec.fusion_carbon_locants)
+            sorted(retained_locant_sort_key(locant) for locant in spec.fusion_carbon_locants)
         ),
         deterministic_tiebreak=spec.key,
     )
@@ -181,27 +182,6 @@ def _component_spec(
 
 
 def _maximum_horizontal_row_count(spec: FusionComponentSpec) -> int:
-    """Return an intrinsic layout tie-break without using external coordinates.
+    """Return the graph-template-derived preferred horizontal ring count."""
 
-    Layout coordinates are quarter-grid units.  At foundation stage there is no
-    face-to-position map, so this conservative value counts distinct component
-    atoms on the most populated horizontal level.  A later layout module can
-    supply the exact ring-row criterion without changing the key shape.
-    """
-
-    maximum = 0
-    for layout in spec.preferred_layouts:
-        rows = Counter(y for _, _, y in layout.atom_positions)
-        maximum = max(maximum, max(rows.values(), default=0))
-    return maximum
-
-
-def _locant_sort_key(locant: str) -> tuple[int, str]:
-    digits = ""
-    suffix = ""
-    for char in locant:
-        if char.isdigit() and not suffix:
-            digits += char
-        else:
-            suffix += char
-    return (int(digits) if digits else 1_000_000, suffix)
+    return spec.horizontal_ring_count

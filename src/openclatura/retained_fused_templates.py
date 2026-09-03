@@ -8,7 +8,7 @@ SMILES or SMARTS strings.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from functools import cache, lru_cache
 from typing import Any
 
@@ -17,7 +17,13 @@ from .locants import retained_locant_sort_key
 from .molecule import Molecule
 from .naming_data import load_json_table
 from .nomenclature import RULES
-from .retained_name_policy import retained_parent_name_policy, retained_parent_output_name
+from .retained_graph_model import (
+    RetainedGraphAtomTemplate,
+    RetainedGraphBondTemplate,
+    RetainedGraphTemplate,
+    RetainedGraphTemplateMatch,
+)
+from .retained_name_policy import retained_parent_name_policy
 from .rules import elements as element_rules
 from .rules import multipliers
 
@@ -45,101 +51,6 @@ def retained_fused_base_templates() -> dict[str, dict[str, Any]]:
             raise ValueError(f"Retained fused base template {name!r} must be a mapping.")
         templates[str(name)] = dict(template)
     return templates
-
-
-@dataclass(frozen=True)
-class RetainedGraphAtomTemplate:
-    locant: str
-    symbol: str = "C"
-    charge: int = 0
-    aromatic: bool = True
-    fusion: bool = False
-    default_h: bool = False
-    saturated: bool = False
-    interior: bool = False
-
-
-@dataclass(frozen=True)
-class RetainedGraphBondTemplate:
-    locants: tuple[str, str]
-    bond_class: str = "aromatic"
-
-
-@dataclass(frozen=True)
-class RetainedGraphTemplate:
-    name: str
-    pin: bool
-    priority: int
-    aliases: tuple[str, ...]
-    attached_prefix: str | None
-    derivative_stem: str | None
-    default_indicated_h: tuple[str, ...]
-    locants: tuple[str, ...]
-    atoms: tuple[RetainedGraphAtomTemplate, ...]
-    bonds: tuple[RetainedGraphBondTemplate, ...]
-    rings: tuple[tuple[str, ...], ...]
-    fusion_atoms: tuple[str, ...]
-    peripheral_atoms: tuple[str, ...]
-    interior_atoms: tuple[str, ...]
-    family: str = "fused"
-    numbering_policy: str = "retained_template"
-    aromatic_equivalence_policy: str = "neutral_kekule_equivalent"
-    charge_policy: str = "charge_layer"
-    enforce_mancude_double_bonds: bool = False
-    enabled: bool = False
-    derivative_production_enabled: bool = False
-    derivative_audit_enabled: bool = False
-    implied_stereo: bool = False
-    mancude_double_bonds: int | None = None
-    indicated_hydrogen_count_override: int | None = None
-    pre_descriptor_selection: bool = False
-
-    @property
-    def atom_by_locant(self) -> dict[str, RetainedGraphAtomTemplate]:
-        return {atom.locant: atom for atom in self.atoms}
-
-    @property
-    def output_name(self) -> str:
-        return retained_parent_output_name(self.name, "unsubstituted_parent")
-
-    @property
-    def indicated_hydrogen_count(self) -> int:
-        """Indicated hydrogens this parent hydride supports.
-
-        Declared carbon sites (9H-xanthene, 2H-pyran) when it has them, else the
-        positions holding no mancude bond less the chalcogens, which are
-        single-bonded anyway -- 1,4-benzodioxine's oxygens are not hydro sites.
-        A bridgehead spends all three bonds inside the rings, so it has none
-        left for a hydrogen: indolizine's N4 supports no indicated H.
-        """
-
-        if self.indicated_hydrogen_count_override is not None:
-            return self.indicated_hydrogen_count_override
-        if self.default_indicated_h:
-            return len(self.default_indicated_h)
-        return sum(
-            1
-            for atom in self.atoms
-            if not atom.aromatic and not atom.fusion and atom.symbol not in FIXED_SATURATED_RING_ELEMENTS
-        )
-
-
-@dataclass(frozen=True)
-class RetainedGraphTemplateMatch:
-    template: RetainedGraphTemplate
-    atom_to_locant: dict[int, str]
-    locant_to_atom: dict[str, int]
-    matched_atoms: frozenset[int]
-    indicated_h: tuple[str, ...]
-    trace: tuple[str, ...] = ()
-
-
-# Backward-compatible type names for callers that imported the original fused
-# kernel directly. New code should use the family-neutral names above.
-RetainedFusedAtomTemplate = RetainedGraphAtomTemplate
-RetainedFusedBondTemplate = RetainedGraphBondTemplate
-RetainedFusedGraphTemplate = RetainedGraphTemplate
-RetainedFusedTemplateMatch = RetainedGraphTemplateMatch
 
 
 def retained_graph_templates(
@@ -1306,15 +1217,22 @@ def _is_assignment_compatible(
 
 
 def _atom_template(data: dict[str, Any]) -> RetainedGraphAtomTemplate:
+    symbol = str(data.get("symbol", "C"))
+    element = element_rules.get(symbol)
+    forced_single = bool(data.get("forced_single", element.mancude_forced_single))
+    pi_capacity = int(data.get("pi_capacity", element.mancude_pi_capacity))
     return RetainedGraphAtomTemplate(
         locant=str(data["locant"]),
-        symbol=str(data.get("symbol", "C")),
+        symbol=symbol,
         charge=int(data.get("charge", 0)),
         aromatic=bool(data.get("aromatic", True)),
         fusion=bool(data.get("fusion", False)),
         default_h=bool(data.get("default_h", False)),
         saturated=bool(data.get("saturated", False)),
         interior=bool(data.get("interior", False)),
+        pi_capacity=0 if bool(data.get("saturated", False)) else pi_capacity,
+        forced_single=bool(data.get("saturated", False)) or forced_single,
+        indicated_h_candidate=bool(data.get("indicated_h_candidate", data.get("default_h", False))),
     )
 
 

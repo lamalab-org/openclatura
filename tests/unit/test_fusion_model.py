@@ -39,6 +39,7 @@ from openclatura.fusion import (
     fusion_mode_allows_planning,
     pin_ring_size_gate,
 )
+from openclatura.retained_fused_templates import RetainedGraphTemplate, validate_retained_fused_template
 from openclatura.ring_parent import RingParent
 
 
@@ -127,26 +128,29 @@ def _confirmed_fusion_plan() -> FusionParentPlan:
 def _component_spec(key: str, symbols: tuple[str, ...], *, rings: int = 1) -> FusionComponentSpec:
     locants = tuple(str(index) for index in range(1, len(symbols) + 1))
     ring = tuple(locants)
-    return FusionComponentSpec(
-        key=key,
-        parent_name=key,
+    template = RetainedGraphTemplate(
+        name=key,
+        pin=True,
+        priority=0,
+        aliases=(),
         attached_prefix=f"{key}o",
         derivative_stem=None,
+        default_indicated_h=(),
         locants=locants,
         atoms=tuple(ComponentAtom(locant, symbol) for locant, symbol in zip(locants, symbols, strict=True)),
         bonds=tuple(ComponentBond((locants[index - 1], locants[index])) for index in range(len(locants))),
         rings=tuple(ring for _ in range(rings)),
-        peripheral_order=locants,
+        fusion_atoms=(),
+        peripheral_atoms=locants,
+        interior_atoms=(),
+    )
+    return FusionComponentSpec(
+        key=key,
+        parent_name=key,
+        attached_prefix=f"{key}o",
+        template=template,
         usable_as_parent=True,
         usable_as_attached=True,
-        pin_component=True,
-        retained_complete_name=False,
-        benzoheterocycle=False,
-        traditional_numbering=False,
-        ring_sizes=tuple(len(ring) for _ in range(rings)),
-        fusion_carbon_locants=(),
-        preferred_layouts=(),
-        seniority_override=None,
         rule_reference="P-25",
     )
 
@@ -178,8 +182,8 @@ def test_component_spec_validates_complete_local_graph():
     spec = _component_spec("pyridine", ("N", "C", "C", "C", "C", "C"))
     assert len(spec.rings) == 1
 
-    with pytest.raises(ValueError, match="every locant"):
-        replace(spec, atoms=spec.atoms[:-1])
+    with pytest.raises(ValueError, match="atom locants"):
+        validate_retained_fused_template(replace(spec.template, atoms=spec.atoms[:-1]))
 
 
 def test_component_match_requires_two_complete_bijective_maps():

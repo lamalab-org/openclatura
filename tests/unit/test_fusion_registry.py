@@ -13,6 +13,7 @@ from openclatura.fusion.registry import (
 )
 from openclatura.molecule import Molecule
 from openclatura.naming_data import load_json_table
+from openclatura.rules import elements
 
 
 def _ring(
@@ -97,6 +98,12 @@ def test_checked_in_registry_exposes_stable_version_and_unique_policy_keys():
     assert len({name for component in registry.components for name in component.template_names}) == sum(
         len(component.template_names) for component in registry.components
     )
+    furan = registry.by_key["furan"].spec
+    assert furan.template is registry.by_key["furan"].templates[0]
+    oxygen = next(atom for atom in furan.atoms if atom.symbol == "O")
+    assert oxygen is next(atom for atom in furan.template.atoms if atom.symbol == "O")
+    assert elements.get("O").mancude_forced_single
+    assert registry.by_key["naphthalene"].spec.horizontal_ring_count == 2
 
 
 def test_registration_rejects_duplicate_keys_and_template_names():

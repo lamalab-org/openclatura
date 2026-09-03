@@ -13,6 +13,15 @@ from enum import StrEnum
 from typing import TypeAlias
 
 from ..locants import SystemLocant
+from ..retained_graph_model import (
+    RetainedGraphAtomTemplate as ComponentAtom,
+)
+from ..retained_graph_model import (
+    RetainedGraphBondTemplate as ComponentBond,
+)
+from ..retained_graph_model import (
+    RetainedGraphTemplate,
+)
 
 
 class FusionMode(StrEnum):
@@ -108,77 +117,18 @@ class FusionSide:
 
 
 @dataclass(frozen=True, slots=True)
-class ComponentAtom:
-    """One locally locanted atom in a fusion component specification."""
-
-    locant: str
-    symbol: str
-    formal_charge: int = 0
-    pi_capacity: int = 1
-    forced_single: bool = False
-    indicated_h_candidate: bool = False
-
-    def __post_init__(self) -> None:
-        _require_nonempty(self.locant, "component atom locant")
-        _require_nonempty(self.symbol, "component atom symbol")
-        if self.pi_capacity < 0:
-            raise ValueError("pi_capacity must be non-negative")
-        if self.forced_single and self.pi_capacity:
-            raise ValueError("a forced-single atom cannot have positive pi_capacity")
-
-
-@dataclass(frozen=True, slots=True)
-class ComponentBond:
-    """One bond in the local locant graph of a fusion component."""
-
-    locants: tuple[str, str]
-    bond_class: str = "mancude"
-
-    def __post_init__(self) -> None:
-        if len(self.locants) != 2 or self.locants[0] == self.locants[1]:
-            raise ValueError("component bond must join two distinct locants")
-        if any(not locant for locant in self.locants):
-            raise ValueError("component bond locants must not be empty")
-        _require_nonempty(self.bond_class, "component bond class")
-
-
-@dataclass(frozen=True, slots=True)
-class ComponentLayout:
-    """One intrinsic local layout, expressed in integer quarter-grid units."""
-
-    atom_positions: tuple[tuple[str, int, int], ...]
-    name: str = ""
-
-    def __post_init__(self) -> None:
-        locants = [locant for locant, _, _ in self.atom_positions]
-        if len(locants) != len(set(locants)):
-            raise ValueError("component layout contains duplicate locants")
-
-
-@dataclass(frozen=True, slots=True)
 class FusionComponentSpec:
-    """A complete independently nameable component definition."""
+    """Fusion policy layered over the shared retained graph template."""
 
     key: str
     parent_name: str
     attached_prefix: str
-    derivative_stem: str | None
-    locants: tuple[str, ...]
-    atoms: tuple[ComponentAtom, ...]
-    bonds: tuple[ComponentBond, ...]
-    rings: tuple[tuple[str, ...], ...]
-    peripheral_order: tuple[str, ...]
+    template: RetainedGraphTemplate
     usable_as_parent: bool
     usable_as_attached: bool
-    pin_component: bool
-    retained_complete_name: bool
-    benzoheterocycle: bool
-    traditional_numbering: bool
-    ring_sizes: tuple[int, ...]
-    fusion_carbon_locants: tuple[str, ...]
-    preferred_layouts: tuple[ComponentLayout, ...]
-    seniority_override: int | None
     rule_reference: str
+    seniority_override: int | None = None
+    horizontal_ring_count: int = 0
 
     def __post_init__(self) -> None:
         for value, label in (
@@ -189,37 +139,45 @@ class FusionComponentSpec:
             _require_nonempty(value, label)
         if self.usable_as_attached:
             _require_nonempty(self.attached_prefix, "attached prefix")
-        if not self.locants or len(self.locants) != len(set(self.locants)):
-            raise ValueError("component locants must be non-empty and unique")
-        atom_locants = tuple(atom.locant for atom in self.atoms)
-        if len(atom_locants) != len(set(atom_locants)) or set(atom_locants) != set(self.locants):
-            raise ValueError("component atoms must define every locant exactly once")
-        locant_set = set(self.locants)
-        seen_edges: set[frozenset[str]] = set()
-        for bond in self.bonds:
-            if not set(bond.locants) <= locant_set:
-                raise ValueError("component bond references an unknown locant")
-            edge = frozenset(bond.locants)
-            if edge in seen_edges:
-                raise ValueError("component contains a duplicate bond")
-            seen_edges.add(edge)
-        if not self.rings or any(len(ring) < 3 or not set(ring) <= locant_set for ring in self.rings):
-            raise ValueError("component rings must be valid cycles of declared locants")
-        if self.ring_sizes != tuple(len(ring) for ring in self.rings):
-            raise ValueError("ring_sizes must correspond to rings in declaration order")
-        if (
-            len(self.peripheral_order) != len(set(self.peripheral_order))
-            or not set(self.peripheral_order) <= locant_set
-        ):
-            raise ValueError("peripheral_order must contain unique declared locants")
-        if not set(self.fusion_carbon_locants) <= locant_set:
-            raise ValueError("fusion carbon locants must belong to the component")
-        atom_by_locant = {atom.locant: atom for atom in self.atoms}
-        if any(atom_by_locant[locant].symbol != "C" for locant in self.fusion_carbon_locants):
-            raise ValueError("fusion carbon locants must identify carbon atoms")
-        for layout in self.preferred_layouts:
-            if set(locant for locant, _, _ in layout.atom_positions) != locant_set:
-                raise ValueError("each preferred layout must position every component atom")
+        if self.horizontal_ring_count < 0:
+            raise ValueError("horizontal_ring_count must be non-negative")
+
+    @property
+    def derivative_stem(self) -> str | None:
+        return self.template.derivative_stem
+
+    @property
+    def locants(self) -> tuple[str, ...]:
+        return self.template.locants
+
+    @property
+    def atoms(self) -> tuple[ComponentAtom, ...]:
+        return self.template.atoms
+
+    @property
+    def bonds(self) -> tuple[ComponentBond, ...]:
+        return self.template.bonds
+
+    @property
+    def rings(self) -> tuple[tuple[str, ...], ...]:
+        return self.template.rings
+
+    @property
+    def peripheral_order(self) -> tuple[str, ...]:
+        return self.template.peripheral_atoms
+
+    @property
+    def pin_component(self) -> bool:
+        return self.template.pin
+
+    @property
+    def ring_sizes(self) -> tuple[int, ...]:
+        return tuple(len(ring) for ring in self.template.rings)
+
+    @property
+    def fusion_carbon_locants(self) -> tuple[str, ...]:
+        atoms = self.template.atom_by_locant
+        return tuple(locant for locant in self.template.fusion_atoms if atoms[locant].symbol == "C")
 
 
 @dataclass(frozen=True, slots=True)

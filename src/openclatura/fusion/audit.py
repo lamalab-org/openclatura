@@ -239,7 +239,7 @@ def _reconstruct(
             node = (occurrence, locant)
             nodes.append(node)
             atom = atom_by_locant[locant]
-            labels[node] = (atom.symbol, atom.formal_charge)
+            labels[node] = (atom.symbol, atom.charge)
             input_by_node[node] = input_map[locant]
             skeleton_by_node[node] = skeleton_map[locant]
         occurrence_edges: set[_Edge] = set()
