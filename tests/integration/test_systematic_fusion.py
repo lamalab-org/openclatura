@@ -238,6 +238,22 @@ def test_nonstandard_valence_fused_parent_abstains_before_component_planning():
 
 
 @pytest.mark.parametrize(
+    "smiles",
+    [
+        "C1=CC=C2C=CC3=CC=CC4=CC=C1C2=C34",  # pyrene
+        "c1cc2ccc3ccc4ccc5ccc6ccc1c2c3c4c56",  # coronene
+    ],
+)
+def test_interior_atom_fused_parent_abstains_before_component_planning(smiles):
+    mol = read_smiles(smiles)
+
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert isinstance(result, FusionUnsupported)
+    assert "interior-atom fused systems" in result.reason
+
+
+@pytest.mark.parametrize(
     ("smiles", "expected"),
     [
         ("C12=CC=CC=C2C1", "bicyclo[4.1.0]hepta-1,3,5-triene"),

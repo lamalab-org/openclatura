@@ -345,8 +345,8 @@ def _seniority_variant(
             "all_heteroatom_locants",
         ),
         (
-            _seniority_variant("senior-at-one", ("N", "O", "C", "C", "C", "C")),
-            _seniority_variant("senior-at-two", ("O", "N", "C", "C", "C", "C")),
+            _seniority_variant("senior-at-one", ("O", "N", "C", "C", "C", "C")),
+            _seniority_variant("senior-at-two", ("N", "O", "C", "C", "C", "C")),
             "per_element_locants",
         ),
         (

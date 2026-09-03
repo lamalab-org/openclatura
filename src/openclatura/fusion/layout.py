@@ -350,11 +350,23 @@ def _materialize_layouts(
     shapes: dict[int, RingShapeSpec],
     positions: dict[int, Point],
 ) -> tuple[FusedLayout, ...]:
+    fractional_centers = {
+        face: _points_center(positions[atom] for atom in order)
+        for face, order in placed_orders.items()
+    }
     denominators = [coordinate.denominator for point in positions.values() for coordinate in point]
+    denominators.extend(
+        coordinate.denominator
+        for point in fractional_centers.values()
+        for coordinate in point
+    )
     scale = lcm(*denominators) if denominators else 1
     integer = {atom: (int(x * scale), int(y * scale)) for atom, (x, y) in positions.items()}
-    integer = _normalize_integer_positions(integer)
-    centers = {face: _integer_center(tuple(integer[atom] for atom in order)) for face, order in placed_orders.items()}
+    centers = {
+        face: (int(x * scale), int(y * scale))
+        for face, (x, y) in fractional_centers.items()
+    }
+    integer, centers = _normalize_integer_layout(integer, centers)
 
     # A generated embedding has an arbitrary horizontal seed edge.  P-25
     # orientation instead chooses the axis that contains the greatest row of
@@ -385,11 +397,14 @@ def _materialize_layouts(
                     )
                     for atom, (x, y) in integer.items()
                 }
-                oriented = _normalize_integer_positions(oriented)
                 oriented_centers = {
-                    face: _integer_center(tuple(oriented[atom] for atom in order))
-                    for face, order in placed_orders.items()
+                    face: (
+                        x_sign * (x * dx + y * dy),
+                        y_sign * (-x * dy + y * dx),
+                    )
+                    for face, (x, y) in centers.items()
                 }
+                oriented, oriented_centers = _normalize_integer_layout(oriented, oriented_centers)
                 layout = FusedLayout(
                     face_positions=tuple(
                         (face, *oriented_centers[face]) for face in sorted(oriented_centers)
@@ -417,33 +432,45 @@ def _materialize_layouts(
     )
 
 
-def _normalize_integer_positions(positions: dict[int, tuple[int, int]]) -> dict[int, tuple[int, int]]:
-    integer = dict(positions)
-    min_x = min(x for x, _ in integer.values())
-    min_y = min(y for _, y in integer.values())
-    integer = {atom: (x - min_x, y - min_y) for atom, (x, y) in integer.items()}
+def _normalize_integer_layout(
+    positions: dict[int, tuple[int, int]],
+    centers: dict[int, tuple[int, int]],
+) -> tuple[dict[int, tuple[int, int]], dict[int, tuple[int, int]]]:
+    min_x = min(x for x, _ in positions.values())
+    min_y = min(y for _, y in positions.values())
+    positions = {atom: (x - min_x, y - min_y) for atom, (x, y) in positions.items()}
+    centers = {face: (x - min_x, y - min_y) for face, (x, y) in centers.items()}
     divisor = 0
-    for point in integer.values():
+    for point in (*positions.values(), *centers.values()):
         divisor = gcd(divisor, point[0])
         divisor = gcd(divisor, point[1])
     if divisor > 1:
-        integer = {atom: (x // divisor, y // divisor) for atom, (x, y) in integer.items()}
-    return integer
+        positions = {atom: (x // divisor, y // divisor) for atom, (x, y) in positions.items()}
+        centers = {face: (x // divisor, y // divisor) for face, (x, y) in centers.items()}
+    return positions, centers
 
 
 def _orientation_score(centers: tuple[tuple[int, int], ...], shapes: dict[int, RingShapeSpec]) -> tuple[int, ...]:
-    xs = [x for x, _ in centers]
     ys = [y for _, y in centers]
-    axis_x = Fraction(min(xs) + max(xs), 2)
-    axis_y = Fraction(min(ys) + max(ys), 2)
     row_count = max(sum(y == row for _, y in centers) for row in set(ys))
-    upper_right = sum(_quadrant_units(x, y, axis_x, axis_y, upper=True) for x, y in centers)
-    lower_left = sum(_quadrant_units(x, y, axis_x, axis_y, upper=False) for x, y in centers)
-    above = sum(4 if y > axis_y else 2 if y == axis_y else 0 for _, y in centers)
+    orientation = min(
+        _row_orientation_score(centers, row)
+        for row in set(ys)
+        if sum(y == row for _, y in centers) == row_count
+    )
     distortion = sum(shape.distortion_rank for shape in shapes.values())
     # Distorted shapes are disfavored before applying the ordinary P-25
     # orientation criteria; see the separate distortion precedence rule.
-    return distortion, -row_count, -upper_right, lower_left, -above
+    return distortion, -row_count, *orientation
+
+
+def _row_orientation_score(centers: tuple[tuple[int, int], ...], axis_y: int) -> tuple[int, int, int]:
+    row_x = [x for x, y in centers if y == axis_y]
+    axis_x = Fraction(min(row_x) + max(row_x), 2)
+    upper_right = sum(_quadrant_units(x, y, axis_x, axis_y, upper=True) for x, y in centers)
+    lower_left = sum(_quadrant_units(x, y, axis_x, axis_y, upper=False) for x, y in centers)
+    above = sum(4 if y > axis_y else 2 if y == axis_y else 0 for _, y in centers)
+    return -upper_right, lower_left, -above
 
 
 def _quadrant_units(x: int, y: int, axis_x: Fraction, axis_y: Fraction, *, upper: bool) -> int:
@@ -478,11 +505,6 @@ def _points_center(points) -> Point:
         sum((point[0] for point in values), Fraction()) / len(values),
         sum((point[1] for point in values), Fraction()) / len(values),
     )
-
-
-def _integer_center(points: tuple[tuple[int, int], ...]) -> tuple[int, int]:
-    count = len(points)
-    return round(Fraction(sum(x for x, _ in points), count)), round(Fraction(sum(y for _, y in points), count))
 
 
 def _cross(start: Point, end: Point, point: Point) -> Fraction:
