@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from itertools import combinations
 from typing import Generic, Literal, TypeVar
 
+from ..polycycle_topology import normalize_edge
+
 T = TypeVar("T", bound=Hashable)
 Edge = tuple[int, int]
 
@@ -83,7 +85,7 @@ def component_scope(key: T, atom_ids: Iterable[int], edges: Iterable[Edge]) -> C
     """Build a normalized immutable component scope."""
 
     atoms = frozenset(atom_ids)
-    normalized = frozenset(_normalize_edge(*edge) for edge in edges)
+    normalized = frozenset(normalize_edge(*edge) for edge in edges)
     if any(left not in atoms or right not in atoms for left, right in normalized):
         raise ValueError("Every component edge must have both endpoints in atom_ids")
     return ComponentScope(key=key, atom_ids=atoms, edges=normalized)
@@ -170,7 +172,7 @@ def audit_component_cover(
     reconstructed_atoms = frozenset(atom for scope in ordered for atom in scope.atom_ids)
     reconstructed_edges = frozenset(edge for scope in ordered for edge in scope.edges)
     target_atoms = frozenset(target_atom_ids)
-    normalized_target_edges = frozenset(_normalize_edge(*edge) for edge in target_edges)
+    normalized_target_edges = frozenset(normalize_edge(*edge) for edge in target_edges)
     errors: list[str] = []
     if len(ordered) < 2:
         errors.append("a fusion cover requires at least two components")
@@ -423,9 +425,3 @@ def _interfaces_connect(nodes: tuple[T, ...], interfaces: Iterable[FusionInterfa
         seen.add(node)
         stack.extend(neighbor for neighbor in adjacency[node] if neighbor not in seen)
     return len(seen) == len(nodes)
-
-
-def _normalize_edge(left: int, right: int) -> Edge:
-    if left == right:
-        raise ValueError("Self edges are not supported")
-    return (left, right) if left < right else (right, left)

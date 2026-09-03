@@ -5,6 +5,7 @@ import re
 from .assembly_parent import parent_stem_and_terminal
 from .assembly_parts import AssemblyParts, NameAtomBinding, NameTokenBinding
 from .formatting import format_multiplier
+from .locants import canonical_locant_pair
 from .nomenclature import RULES
 from .principal_suffixes import render_principal_suffix
 from .rules import bonds, stems
@@ -442,6 +443,8 @@ def _operation_emitted_tokens(binding: NameAtomBinding) -> tuple[NameTokenBindin
 
 
 def _parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]:
+    if parts.ring_parent is not None and parts.ring_parent.is_systematic_fusion:
+        return _fusion_parent_emitted_tokens(parts)
     tokens = _parent_display_tokens(parts)
     atom_ids = set(parts.parent_atom_ids)
     bond_ids = set(parts.parent_bond_ids)
@@ -468,6 +471,68 @@ def _parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]
         for token in tokens
         if token
     )
+
+
+def _fusion_parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]:
+    """Translate renderer-owned fusion parts into graph-bound token records."""
+
+    from .fusion.descriptor import render_fusion_name_parts
+    from .fusion.registry import fusion_component_registry
+
+    plan = parts.ring_parent.fusion_plan
+    assert plan is not None
+    registry = fusion_component_registry()
+    matches = {match.occurrence_id: match for match in plan.ast.component_occurrences}
+    joins = {join.attached_occurrence: join for join in plan.ast.joins}
+    system_locants = dict(plan.numbering.input_locant_maps[0])
+
+    def component_scope(occurrence_id: int) -> tuple[set[int], set[int]]:
+        match = matches[occurrence_id]
+        atoms = set(match.input_atom_by_locant.values())
+        bonds: set[int] = set()
+        local_atoms = match.input_atom_by_locant
+        for bond in registry.spec_for_match(match).bonds:
+            left = str(system_locants[local_atoms[bond.locants[0]]])
+            right = str(system_locants[local_atoms[bond.locants[1]]])
+            bond_id = parts.parent_bond_ids_by_locants.get(canonical_locant_pair(left, right))
+            if bond_id is not None:
+                bonds.add(bond_id)
+        return atoms, bonds
+
+    result: list[NameTokenBinding] = []
+    render_order = 0
+    rendered_parts = render_fusion_name_parts(plan.ast, registry)
+    assert "".join(part.text for part in rendered_parts) == plan.rendered_base_name
+    for part in rendered_parts:
+        if part.role == "descriptor":
+            interfaces = tuple(joins[occurrence] for occurrence in part.interface_occurrence_ids)
+            atom_ids = set().union(*(join.shared_input_atoms for join in interfaces))
+            bond_ids = set().union(*(join.shared_input_bonds for join in interfaces))
+            token_kind = "locant"
+        elif part.role == "multiplier":
+            atom_ids, bond_ids = set(), set()
+            token_kind = "grammar"
+        else:
+            scopes = tuple(component_scope(occurrence) for occurrence in part.occurrence_ids)
+            atom_ids = set().union(*(scope[0] for scope in scopes))
+            bond_ids = set().union(*(scope[1] for scope in scopes))
+            token_kind = "parent"
+        for text in binding_term_tokens(part.text):
+            result.append(
+                NameTokenBinding(
+                    text=text,
+                    token_kind=token_kind,
+                    source="fusion_renderer",
+                    grammar_role=f"fusion_{part.role}",
+                    binding_key=f"fusion:{part.role}:{','.join(map(str, part.occurrence_ids))}",
+                    atom_ids=set(atom_ids),
+                    bond_ids=set(bond_ids),
+                    render_order=render_order,
+                    match_priority=100,
+                )
+            )
+            render_order += 1
+    return tuple(result)
 
 
 def _parent_display_tokens(parts: AssemblyParts) -> tuple[str, ...]:

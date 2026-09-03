@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from itertools import combinations
 
 from ..molecule import Molecule
+from ..polycycle_topology import canonical_cycle, cycle_edges, graph_cycle_rank, normalize_edge
 from .config import fusion_nomenclature_config
 
 _CONFIG = fusion_nomenclature_config()
@@ -80,42 +81,6 @@ class _Budget:
         self.used += 1
         if self.used > self.limit:
             raise FaceSearchBudgetExceeded(self.phase, self.limit)
-
-
-def normalize_edge(left: int, right: int) -> Edge:
-    """Return an undirected edge in stable endpoint order."""
-
-    if left == right:
-        raise ValueError("Self edges are not supported")
-    return (left, right) if left < right else (right, left)
-
-
-def cycle_edges(atoms: tuple[int, ...]) -> tuple[Edge, ...]:
-    """Return the undirected edges around an ordered cycle."""
-
-    return tuple(normalize_edge(left, right) for left, right in zip(atoms, atoms[1:] + atoms[:1]))
-
-
-def canonical_cycle(atoms: tuple[int, ...]) -> tuple[int, ...]:
-    """Canonicalize a cycle independently of start and traversal direction."""
-
-    if not atoms:
-        return ()
-    variants: list[tuple[int, ...]] = []
-    for order in (atoms, tuple(reversed(atoms))):
-        for offset in range(len(order)):
-            variants.append(order[offset:] + order[:offset])
-    return min(variants)
-
-
-def graph_cycle_rank(atom_ids: Iterable[int], edges: Iterable[Edge]) -> int:
-    """Return ``E - V + 1`` for a connected graph, otherwise raise."""
-
-    atoms = frozenset(atom_ids)
-    normalized_edges = frozenset(normalize_edge(*edge) for edge in edges)
-    if not atoms or not _is_connected(atoms, normalized_edges):
-        raise ValueError("Cycle rank requires a non-empty connected graph")
-    return len(normalized_edges) - len(atoms) + 1
 
 
 def enumerate_chordless_cycles(

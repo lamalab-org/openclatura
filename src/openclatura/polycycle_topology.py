@@ -794,6 +794,43 @@ def adjacency_from_edges(
     return adjacency
 
 
+def normalize_edge(first: int, second: int) -> tuple[int, int]:
+    """Return one undirected graph edge in deterministic endpoint order."""
+
+    if first == second:
+        raise ValueError("Self edges are not supported")
+    return (first, second) if first < second else (second, first)
+
+
+def canonical_cycle(atoms) -> tuple[int, ...]:
+    """Canonicalize a cycle independently of start and traversal direction."""
+
+    path = tuple(atoms)
+    if not path:
+        return ()
+    variants = []
+    for sequence in (path, tuple(reversed(path))):
+        variants.extend(sequence[index:] + sequence[:index] for index in range(len(sequence)))
+    return min(variants)
+
+
+def cycle_edges(atoms) -> tuple[tuple[int, int], ...]:
+    """Return normalized undirected edges around an ordered cycle."""
+
+    cycle = tuple(atoms)
+    return tuple(normalize_edge(left, right) for left, right in zip(cycle, cycle[1:] + cycle[:1]))
+
+
+def graph_cycle_rank(atoms, edges) -> int:
+    """Return the cyclomatic rank of a non-empty connected graph."""
+
+    atom_set = set(atoms)
+    edge_set = frozenset(normalize_edge(*edge) for edge in edges)
+    if not atom_set or len(connected_components(atom_set, edge_set)) != 1:
+        raise ValueError("Cycle rank requires a non-empty connected graph")
+    return len(edge_set) - len(atom_set) + 1
+
+
 def adjacent_atoms(atom: int, edges: frozenset[tuple[int, int]]) -> set[int]:
     adjacent = set()
     for first, second in edges:
@@ -805,13 +842,8 @@ def adjacent_atoms(atom: int, edges: frozenset[tuple[int, int]]) -> set[int]:
 
 
 def normalize_edges(edges) -> set[tuple[int, int]]:
-    return {tuple(sorted((first, second))) for first, second in edges}
+    return {normalize_edge(first, second) for first, second in edges}
 
 
 def _canonical_cycle(path: list[int]) -> tuple[int, ...]:
-    variants = []
-    for seq in (path, list(reversed(path))):
-        for idx in range(len(seq)):
-            rotated = tuple(seq[idx:] + seq[:idx])
-            variants.append(rotated)
-    return min(variants)
+    return canonical_cycle(path)

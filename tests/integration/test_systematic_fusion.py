@@ -42,6 +42,57 @@ def test_audited_systematic_fusion_names(smiles, expected):
     assert any(operation.operation_class is OperationClass.FUSION for operation in result.analysis.operations)
 
 
+def test_fusion_trace_exposes_each_existing_proof_stage():
+    result = name(
+        "O1C2=C(C=C1)C=CS2",
+        fusion_mode=FusionMode.GENERAL,
+        include_trace=True,
+    )
+
+    decisions = {step.decision: step for step in result.decisions}
+    assert decisions["selected fusion face model"].data["fusion_edges"]
+    assert len([step for step in result.decisions if step.decision == "matched fusion component"]) == 2
+    assert decisions["selected fusion parent location"].data["parent_occurrences"]
+    assert decisions["constructed fusion descriptor"].data["descriptor"] == "[2,3-b]"
+    assert decisions["selected preferred fusion orientation"].data["face_shapes"]
+    assert decisions["selected completed fusion numbering"].data["atom_to_locant"]
+    assert decisions["audited systematic fusion parent"].data["status"] == "confirmed"
+
+
+def test_fusion_tokens_are_owned_by_ast_components_and_interfaces():
+    result = name(
+        "O1C2=C(C=C1)C=CS2",
+        fusion_mode=FusionMode.GENERAL,
+        include_trace=True,
+        token_debug=True,
+    )
+    assembly = next(step for step in reversed(result.decisions) if "name_token_spans" in step.data)
+    tokens = {token["text"]: token for token in assembly.data["name_token_spans"]}
+
+    assert tokens["thieno"]["source"] == "fusion_renderer"
+    assert tokens["furan"]["source"] == "fusion_renderer"
+    assert tokens["2,3"]["atoms"] == tokens["b"]["atoms"]
+    assert tokens["2,3"]["bonds"] == tokens["b"]["bonds"]
+    assert len(tokens["2,3"]["atoms"]) == 2
+    assert len(tokens["2,3"]["bonds"]) == 1
+
+
+def test_multiplicative_fusion_token_keeps_grammar_only_ownership():
+    result = name(
+        "O1C=CC2=C1C=C1C(=N2)C=CO1",
+        fusion_mode=FusionMode.GENERAL,
+        include_trace=True,
+        token_debug=True,
+    )
+    assembly = next(step for step in reversed(result.decisions) if "name_token_spans" in step.data)
+    multiplier = next(token for token in assembly.data["name_token_spans"] if token["text"] == "di")
+
+    assert multiplier["source"] == "fusion_renderer"
+    assert multiplier["token_kind"] == "grammar"
+    assert multiplier["atoms"] == []
+    assert multiplier["bonds"] == []
+
+
 def test_legacy_mode_preserves_previous_ring_name():
     result = name("O1C2=C(C=C1)C=CS2", fusion_mode=FusionMode.LEGACY)
     assert result.name == "2-oxa-8-thiabicyclo[3.3.0]octa-1(5),3,6-triene"

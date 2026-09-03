@@ -1266,7 +1266,7 @@ def _token_context_matches(search_text: str, token_binding: NameTokenBinding, st
 def _is_standalone_locant_span(text: str, start: int, end: int) -> bool:
     before = text[start - 1] if start > 0 else ""
     after = text[end] if end < len(text) else ""
-    return (not before or before in "-,( ") and (not after or after in "-,()' " or after in "EZRS")
+    return (not before or before in "[-,(: ") and (not after or after in "]-,():' " or after in "EZRS")
 
 
 def _native_token_is_searchable(token: str, token_binding: NameTokenBinding | None = None) -> bool:
@@ -1274,6 +1274,8 @@ def _native_token_is_searchable(token: str, token_binding: NameTokenBinding | No
         return False
     if token_binding is not None and token_binding.token_kind == "stereo":
         return is_searchable_stereo_token(token)
+    if token_binding is not None and token_binding.token_kind == "locant":
+        return True
     return len(token) >= 2 or token.isdigit() or "," in token or token in _ELEMENT_LOCANT_TOKENS
 
 

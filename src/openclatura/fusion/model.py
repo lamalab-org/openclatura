@@ -332,6 +332,20 @@ class FusionNameAst:
 
 
 @dataclass(frozen=True, slots=True)
+class FusionRenderedPart:
+    """One renderer-owned part of a systematic fusion parent name."""
+
+    text: str
+    role: str
+    occurrence_ids: tuple[int, ...] = ()
+    interface_occurrence_ids: tuple[int, ...] = ()
+
+    def __post_init__(self) -> None:
+        _require_nonempty(self.text, "fusion rendered text")
+        _require_nonempty(self.role, "fusion rendered role")
+
+
+@dataclass(frozen=True, slots=True)
 class Face:
     id: int
     atom_cycle: tuple[int, ...]

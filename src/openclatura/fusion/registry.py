@@ -16,6 +16,7 @@ from typing import Any
 
 from ..molecule import Molecule
 from ..naming_data import load_json_table
+from ..polycycle_topology import normalize_edge
 from ..retained_fused_templates import (
     RetainedGraphTemplate,
     match_retained_graph_template_maps,
@@ -24,7 +25,6 @@ from ..retained_fused_templates import (
     retained_graph_templates,
     validate_retained_fused_template,
 )
-from .faces import normalize_edge
 from .model import FusionComponentMatch, FusionComponentSpec
 
 SUPPORTED_SCHEMA_VERSION = 1

@@ -30,6 +30,7 @@ from .model import (
     FusionJoinKind,
     FusionMultiplicityGroup,
     FusionNameAst,
+    FusionRenderedPart,
     FusionSide,
 )
 from .rules import component_seniority_key
@@ -133,6 +134,15 @@ def render_fusion_name(
 ) -> str:
     """Render a fusion name using only the AST and component registry."""
 
+    return "".join(part.text for part in render_fusion_name_parts(ast, registry))
+
+
+def render_fusion_name_parts(
+    ast: FusionNameAst,
+    registry: _Registry | Mapping[str, FusionComponentSpec],
+) -> tuple[FusionRenderedPart, ...]:
+    """Render ordered text parts while preserving component/interface scope."""
+
     matches = {match.occurrence_id: match for match in ast.component_occurrences}
     descriptors = {
         join.attached_occurrence: descriptor for join, descriptor in zip(ast.joins, ast.descriptors, strict=True)
@@ -144,17 +154,25 @@ def render_fusion_name(
 
     rendered_groups: set[tuple[int, ...]] = set()
 
-    def attachment(node: FusionCitationNode) -> str:
+    def attachment(node: FusionCitationNode) -> list[FusionRenderedPart]:
         descendants = render_children(node)
         spec = _spec_for_match(registry, matches[node.occurrence_id])
-        return f"{descendants}{spec.attached_prefix}{descriptors[node.occurrence_id].render()}"
+        return [
+            *descendants,
+            FusionRenderedPart(spec.attached_prefix, "attached_component", (node.occurrence_id,)),
+            FusionRenderedPart(
+                descriptors[node.occurrence_id].render(),
+                "descriptor",
+                interface_occurrence_ids=(node.occurrence_id,),
+            ),
+        ]
 
-    def render_children(node: FusionCitationNode) -> str:
-        pieces: list[str] = []
+    def render_children(node: FusionCitationNode) -> list[FusionRenderedPart]:
+        pieces: list[FusionRenderedPart] = []
         for child in node.children:
             group = groups_by_member.get(child.occurrence_id)
             if group is None:
-                pieces.append(attachment(child))
+                pieces.extend(attachment(child))
                 continue
             if group.occurrence_ids in rendered_groups:
                 continue
@@ -166,13 +184,28 @@ def render_fusion_name(
             if len(prefixes) != 1:
                 raise FusionDescriptorError("a multiplicative group must use one attached prefix")
             descriptor = _render_combined_descriptors(tuple(descriptors[member.occurrence_id] for member in members))
-            pieces.append(f"{group.multiplier}{min(prefixes)}{descriptor}")
-        return "".join(pieces)
+            pieces.extend(
+                (
+                    FusionRenderedPart(group.multiplier, "multiplier", group.occurrence_ids),
+                    FusionRenderedPart(min(prefixes), "attached_component", group.occurrence_ids),
+                    FusionRenderedPart(
+                        descriptor,
+                        "descriptor",
+                        interface_occurrence_ids=group.occurrence_ids,
+                    ),
+                )
+            )
+        return pieces
 
     root = ast.citation_tree
     root_match = matches[root.occurrence_id]
     root_spec = _spec_for_match(registry, root_match)
-    return f"{render_children(root)}{root_spec.parent_name}"
+    return tuple(
+        [
+            *render_children(root),
+            FusionRenderedPart(root_spec.parent_name, "parent_component", (root.occurrence_id,)),
+        ]
+    )
 
 
 def _occurrence_options(

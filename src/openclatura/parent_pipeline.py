@@ -71,6 +71,7 @@ def resolve_systematic_fusion_parent(
         return None
 
     plan = result.plan
+    _trace_confirmed_fusion_plan(decision_trace, mol, plan, selection.atom_set)
     trace_decision(
         decision_trace,
         TracePhase.PARENT_SELECTION,
@@ -117,6 +118,123 @@ def resolve_systematic_fusion_parent(
         },
     )
     return RingParent.from_fusion_plan(plan)
+
+
+def _trace_confirmed_fusion_plan(
+    trace: DecisionTrace | None,
+    mol: Molecule,
+    plan,
+    parent_atoms: set[int] | frozenset[int],
+) -> None:
+    """Expose each proof stage without rerunning any fusion computation."""
+
+    if trace is None:
+        return
+    face_model = plan.numbering.selected_face_model
+    trace_decision(
+        trace,
+        TracePhase.PARENT_SELECTION,
+        "selected fusion face model",
+        "A bounded face set covers every cyclic parent edge and reconstructs one connected perimeter.",
+        atoms=parent_atoms,
+        bonds=set(face_model.perimeter_edges) | set(face_model.fusion_edges),
+        data={
+            "faces": [
+                {"id": face.id, "atoms": list(face.atom_cycle), "bonds": list(face.edge_cycle), "size": face.size}
+                for face in face_model.faces
+            ],
+            "perimeter_edges": sorted(face_model.perimeter_edges),
+            "fusion_edges": sorted(face_model.fusion_edges),
+        },
+    )
+    for match in plan.ast.component_occurrences:
+        atom_ids = set(match.input_atom_by_locant.values())
+        trace_decision(
+            trace,
+            TracePhase.PARENT_SELECTION,
+            "matched fusion component",
+            "The shared retained-template matcher proved a complete locanted component occurrence.",
+            atoms=atom_ids,
+            bonds=bond_ids_within(mol, atom_ids),
+            data={
+                "occurrence_id": match.occurrence_id,
+                "spec_key": match.spec_key,
+                "covered_faces": sorted(match.covered_face_ids),
+                "component_locants": dict(match.local_to_input_atom),
+            },
+        )
+    trace_decision(
+        trace,
+        TracePhase.PARENT_SELECTION,
+        "selected fusion parent location",
+        "The citation root won the ordered component-seniority and attachment-location criteria.",
+        atoms=parent_atoms,
+        data={
+            "parent_occurrences": list(plan.ast.parent_occurrences),
+            "plan_kind": plan.ast.plan_kind,
+            "criteria": [
+                {
+                    "rule": decision.rule,
+                    "criterion": decision.criterion,
+                    "outcome": decision.outcome,
+                    "reason": decision.reason,
+                }
+                for decision in plan.rule_trace
+            ],
+        },
+    )
+    for join, descriptor in zip(plan.ast.joins, plan.ast.descriptors, strict=True):
+        trace_decision(
+            trace,
+            TracePhase.ASSEMBLY,
+            "constructed fusion descriptor",
+            "Component-local locants and parent-side letters were taken from the graph-bound fusion interface.",
+            atoms=join.shared_input_atoms,
+            bonds=join.shared_input_bonds,
+            data={
+                "attached_occurrence": join.attached_occurrence,
+                "host_occurrence": join.host_occurrence,
+                "order": join.order,
+                "kind": join.kind.value,
+                "descriptor": descriptor.render(),
+            },
+        )
+    layout = plan.numbering.selected_layout
+    trace_decision(
+        trace,
+        TracePhase.NUMBERING,
+        "selected preferred fusion orientation",
+        "Intrinsic ring layouts were ranked by the configured P-25 orientation criteria.",
+        atoms=parent_atoms,
+        data={
+            "orientation_score": list(layout.orientation_score),
+            "face_positions": [list(item) for item in layout.face_positions],
+            "face_shapes": [list(item) for item in layout.face_shapes],
+            "audit_evidence": list(layout.audit_evidence),
+        },
+    )
+    trace_decision(
+        trace,
+        TracePhase.NUMBERING,
+        "selected completed fusion numbering",
+        "The final parent locants come from the preferred oriented perimeter and ordered heteroatom tie-breaks.",
+        atoms=parent_atoms,
+        data={
+            "atom_to_locant": {
+                atom: str(locant) for atom, locant in plan.numbering.input_locant_maps[0]
+            },
+            "candidate_count": len(plan.numbering.input_locant_maps),
+            "rejected_candidates": [item.reason for item in plan.numbering.rejected_numberings],
+        },
+    )
+    trace_decision(
+        trace,
+        TracePhase.ASSEMBLY,
+        "audited systematic fusion parent",
+        "Independent descriptor, numbering, bond-model, and graph reconstruction checks all passed.",
+        atoms=parent_atoms,
+        data={"status": plan.audit.status.value, "checks": list(plan.audit.checks)},
+    )
 
 
 def resolve_retained_parent(
