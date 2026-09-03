@@ -200,6 +200,12 @@ _BETA_GIT_REF = os.environ.get("BETA_GIT_REF") or ""
 # Requests may set ``no_cache`` to opt out: their structure is then never
 # written to the cache. Reads still happen (serving an already-cached result
 # stores nothing new, and keeps the response fast).
+#
+# Usage statistics are derived from the cache (one entry per newly named
+# structure, dated by its object's LastModified). An opt-out would make the
+# structure invisible to that count, so a suppressed write records a tally
+# marker instead: a random key under ``stats/{kind}/{version}/`` with an empty
+# body. It carries nothing about the structure, only that one was named.
 # ---------------------------------------------------------------------------
 _CACHE_URL = (os.environ.get("KV_REST_API_URL") or os.environ.get("UPSTASH_REDIS_REST_URL") or "").rstrip("/")
 _CACHE_TOKEN = os.environ.get("KV_REST_API_TOKEN") or os.environ.get("UPSTASH_REDIS_REST_TOKEN") or ""
@@ -260,6 +266,37 @@ def _s3_request(method: str, key: str, body: bytes = b"", timeout: float = 2.0) 
         return exc.code, b""
     except Exception:
         return 0, b""
+
+
+def _count_uncached(kind: str) -> None:
+    """Record that a structure was named but, by request, not cached.
+
+    Written only where the cache write itself would have happened, so the
+    marker and the cache entry are mutually exclusive and the statistics can
+    simply add them. The key is a random UUID; there is nothing to derive a
+    structure from.
+    """
+    if _IS_BETA:
+        return
+    import uuid
+
+    if _S3_ENABLED:
+        _s3_request("PUT", f"stats/{kind}/{_pkg_version()}/{uuid.uuid4().hex}", timeout=2.0)
+        return
+    if not _CACHE_URL:
+        return
+    import datetime
+
+    day = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d")
+    req = urllib.request.Request(
+        f"{_CACHE_URL}/incr/{urllib.parse.quote(f'stats:{kind}:{_pkg_version()}:{day}', safe='')}",
+        headers={"Authorization": f"Bearer {_CACHE_TOKEN}"},
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(req, timeout=2).read()
+    except Exception:
+        pass
 
 
 def _pkg_version() -> str:
@@ -511,8 +548,11 @@ def name_endpoint(req: NameRequest) -> dict:
                     if result.opsin_check is None or result.opsin_check.status != "error":
                         break
     payload = result.to_dict(include_trace=req.include_trace)
-    if not req.no_cache and _name_cacheable(payload, req.verify_opsin):
-        _cache_set(key, payload)
+    if _name_cacheable(payload, req.verify_opsin):
+        if req.no_cache:
+            _count_uncached("name")
+        else:
+            _cache_set(key, payload)
     return payload
 
 
@@ -529,7 +569,9 @@ def describe_endpoint(req: DescribeRequest) -> dict:
     if cached is not None:
         return cached
     payload = describe(req.smiles).to_dict()
-    if not req.no_cache:
+    if req.no_cache:
+        _count_uncached("desc")
+    else:
         _cache_set(key, payload)
     return payload
 
@@ -612,7 +654,9 @@ def depict(req: DepictRequest) -> dict:
     # Drop the XML declaration so the SVG can be injected via innerHTML.
     svg = re.sub(r"^\s*<\?xml[^>]*\?>\s*", "", svg)
     payload = {"ok": True, "svg": svg}
-    if not req.no_cache:
+    if req.no_cache:
+        _count_uncached("depict")
+    else:
         _cache_set(key, payload)
     return payload
 
@@ -1061,7 +1105,9 @@ def teach(req: TeachRequest) -> dict:
         "depiction": _teach_depiction(req.smiles, locants, req.width, req.height),
         "locants": {str(atom): locant for atom, locant in locants.items()},
     }
-    if not req.no_cache:
+    if req.no_cache:
+        _count_uncached("teach")
+    else:
         _cache_set(key, out)
     return out
 
@@ -1961,7 +2007,9 @@ def polymer_endpoint(req: PolymerRequest) -> dict:
         tacticity=req.tacticity,
     )
 
-    if not req.no_cache:
+    if req.no_cache:
+        _count_uncached("polymer")
+    else:
         _cache_set(key, payload)
     return payload
 
