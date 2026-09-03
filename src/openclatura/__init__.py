@@ -38,6 +38,7 @@ def name(
     verify_opsin: bool = False,
     verify_self: bool = False,
     token_debug: bool = False,
+    omit_redundant_locants: bool = True,
 ) -> NamingResult:
     """One-shot naming with the default engine. Returns a typed ``NamingResult``.
 
@@ -56,6 +57,7 @@ def name(
             verify_opsin=verify_opsin,
             verify_self=verify_self,
             token_debug=token_debug,
+            omit_redundant_locants=omit_redundant_locants,
         )
     )
 
@@ -67,6 +69,7 @@ def name_mol(
     verify_opsin: bool = False,
     verify_self: bool = False,
     token_debug: bool = False,
+    omit_redundant_locants: bool = True,
 ) -> NamingResult:
     """One-shot naming of an existing RDKit molecule. Returns a ``NamingResult``.
 
@@ -83,6 +86,7 @@ def name_mol(
             verify_opsin=verify_opsin,
             verify_self=verify_self,
             token_debug=token_debug,
+            omit_redundant_locants=omit_redundant_locants,
         )
     )
 
@@ -94,6 +98,7 @@ def name_many(
     verify_opsin: bool = False,
     verify_self: bool = False,
     token_debug: bool = False,
+    omit_redundant_locants: bool = True,
     processes: int | None | str = 1,
     chunksize: int = 64,
 ) -> list[NamingResult]:
@@ -111,6 +116,7 @@ def name_many(
         verify_opsin=verify_opsin,
         verify_self=verify_self,
         token_debug=token_debug,
+        omit_redundant_locants=omit_redundant_locants,
         processes=processes,
         chunksize=chunksize,
     )

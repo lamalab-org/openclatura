@@ -3,6 +3,7 @@
 import re
 from collections import Counter
 from dataclasses import dataclass, field
+from functools import partial
 
 from .additive import add_indicated_hydrogens as _add_indicated_hydrogens
 from .assembler import assemble_name_raw, post_process_rewrite_rules
@@ -29,6 +30,7 @@ from .functional_prefixes import PREFIX_HANDLERS, PrefixContext
 from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
+from .locant_elision import apply_redundant_locant_elision
 from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase, charged_atoms
 from .molecule import bond_ids_within as _bond_ids_within
 from .name_assembly import NameAssemblyResult, rewrite_history_trace_data, token_span_trace_data
@@ -101,6 +103,12 @@ class DirectSubgraphPrefix:
             "ligand_count": len(self.ligand_trees),
             "source": self.source,
         }
+
+
+def _subgraph_namer_with_locant_policy(omit_redundant_locants: bool):
+    """Bind request-scoped locant policy at the recursive naming entry point."""
+
+    return partial(name_subgraph, omit_redundant_locants=omit_redundant_locants)
 
 
 def _direct_subgraph_prefix(mol: Molecule, start_idx: int, component: set[int]) -> DirectSubgraphPrefix | None:
@@ -842,6 +850,7 @@ def _collect_subgraph_substituents(
     sub_exclude: set[int],
     *,
     emit_metadata: bool = True,
+    omit_redundant_locants: bool = True,
 ) -> dict[int, list[SubstituentItem]]:
     """Collect prefixes attached to a recursive subgraph parent.
     P-14.2, P-16.5, P-44, P-61 through P-67, and P-24 for the spiro side-ring substituents."""
@@ -849,6 +858,8 @@ def _collect_subgraph_substituents(
     main_set = set(candidate_path)
     subst_mapping: dict[int, list[SubstituentItem]] = {}
     sub_handled_atoms = set()
+
+    configured_name_subgraph = _subgraph_namer_with_locant_policy(omit_redundant_locants)
 
     for group in sub_perceived:
         # The attachment carbon being on this parent is not enough: the group's own
@@ -902,7 +913,7 @@ def _collect_subgraph_substituents(
                 branch_decisions = DecisionTrace() if emit_metadata else None
                 branch_exclude = sub_exclude | main_set
                 if emit_metadata:
-                    branch_name, branch_trace, branch_tree = name_subgraph(
+                    branch_name, branch_trace, branch_tree = configured_name_subgraph(
                         mol,
                         n_idx,
                         branch_exclude,
@@ -912,7 +923,7 @@ def _collect_subgraph_substituents(
                         decision_trace=branch_decisions,
                     )
                 else:
-                    branch_name = name_subgraph(
+                    branch_name = configured_name_subgraph(
                         mol,
                         n_idx,
                         branch_exclude,
@@ -932,7 +943,7 @@ def _collect_subgraph_substituents(
                             branch_name,
                             c_idx,
                             branch_exclude,
-                            name_subgraph,
+                            configured_name_subgraph,
                         )
                         if emit_metadata
                         else ()
@@ -1278,6 +1289,7 @@ def name_subgraph(
     return_trace: bool = False,
     return_tree: bool = False,
     decision_trace: DecisionTrace | None = None,
+    omit_redundant_locants: bool = True,
 ):
     """Name a recursive substituent subgraph attached to the current parent (P-13.6, P-14.2, P-16.5, P-61
     through P-67).  Extendable prefix vocabularies come from ``data/namer_rules.json``."""
@@ -1402,6 +1414,7 @@ def name_subgraph(
         sub_perceived,
         sub_exclude,
         emit_metadata=emit_metadata,
+        omit_redundant_locants=omit_redundant_locants,
     )
     # A retained ring is retained as a prefix too (``quinolin-7-yl``); a substituent
     # has no principal group, and its attachment is one more locant to cite.
@@ -1426,6 +1439,7 @@ def name_subgraph(
             start_idx,
             upstream_atom,
             fixed_start=parent_selection.fixed_start_required,
+            omit_redundant_locants=omit_redundant_locants,
         ),
         subst_mapping,
         locant_maps,
@@ -1462,6 +1476,8 @@ def name_subgraph(
         parent_selection.is_polycycle,
     )
 
+    apply_redundant_locant_elision(parts)
+
     rendered_name = _assemble_parent_name(
         mol,
         parts,
@@ -1483,6 +1499,7 @@ def name_subgraph(
             data={
                 "name": name,
                 "trace_segment_count": len(trace_segments),
+                "locant_elisions": parts.locant_elision_decisions,
             },
         )
     if return_trace:
@@ -1912,8 +1929,11 @@ def name_component(
     return_tree: bool = False,
     decision_trace: DecisionTrace | None = None,
     token_debug: bool = False,
+    omit_redundant_locants: bool = True,
 ):
     """Name one connected component or recursive component of a molecule."""
+
+    configured_name_subgraph = _subgraph_namer_with_locant_policy(omit_redundant_locants)
 
     return _name_component_impl(
         mol,
@@ -1922,10 +1942,11 @@ def name_component(
         return_trace=return_trace,
         return_tree=return_tree,
         decision_trace=decision_trace,
-        name_subgraph=name_subgraph,
+        name_subgraph=configured_name_subgraph,
         name_spiro_subgraph=_spiro_subgraph_assembly,
         assemble_parent_name=_assemble_parent_name,
         token_debug=token_debug,
+        omit_redundant_locants=omit_redundant_locants,
     )
 
 

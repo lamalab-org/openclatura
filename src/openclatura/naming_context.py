@@ -27,13 +27,25 @@ class NamingIntent:
     upstream_atom: int | None = None
     fixed_start: bool = False
     is_substituent: bool = False
+    omit_redundant_locants: bool = True
 
     @classmethod
-    def component(cls, principal_atoms) -> "NamingIntent":
-        return cls(mode=NamingMode.COMPONENT, principal_atoms=tuple(principal_atoms))
+    def component(cls, principal_atoms, *, omit_redundant_locants: bool = True) -> "NamingIntent":
+        return cls(
+            mode=NamingMode.COMPONENT,
+            principal_atoms=tuple(principal_atoms),
+            omit_redundant_locants=omit_redundant_locants,
+        )
 
     @classmethod
-    def subgraph(cls, root_atom: int, upstream_atom: int | None, *, fixed_start: bool) -> "NamingIntent":
+    def subgraph(
+        cls,
+        root_atom: int,
+        upstream_atom: int | None,
+        *,
+        fixed_start: bool,
+        omit_redundant_locants: bool = True,
+    ) -> "NamingIntent":
         return cls(
             mode=NamingMode.SUBGRAPH,
             principal_atoms=(root_atom,),
@@ -41,6 +53,7 @@ class NamingIntent:
             upstream_atom=upstream_atom,
             fixed_start=fixed_start,
             is_substituent=True,
+            omit_redundant_locants=omit_redundant_locants,
         )
 
 

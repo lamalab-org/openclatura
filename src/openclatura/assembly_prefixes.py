@@ -47,7 +47,9 @@ def group_substituents(substituents: list[SubstituentItem]) -> dict[str, list[Su
     return grouped
 
 
-def substituent_locant_string(parts: AssemblyParts, locs: list[str], grouped_count: int, spiro_subs) -> str:
+def substituent_locant_string(parts: AssemblyParts, name: str, locs: list[str], grouped_count: int, spiro_subs) -> str:
+    if name in parts.elided_substituent_locants:
+        return ""
     imino_beside_another_prefix = grouped_count > 1 and any(sub.name == "imino" for sub in parts.substituents)
     if (
         parts.parent_length == 1
@@ -112,7 +114,7 @@ def format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:
         count = max(1, count_raw // attachments_per_group)
         is_complex = is_complex_prefix(name)
         mult = (multipliers.complex_(count) if is_complex else multipliers.basic(count)) if count > 1 else ""
-        loc_str = substituent_locant_string(parts, locs, len(grouped), spiro_subs)
+        loc_str = substituent_locant_string(parts, name, locs, len(grouped), spiro_subs)
 
         name_to_use = _omit_optional_outer_parentheses(
             parts,

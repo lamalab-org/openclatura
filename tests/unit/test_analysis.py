@@ -5718,7 +5718,7 @@ def test_long_unsaturation_multiplicities_are_spellable():
     assert name_smiles("C=C=C=C=C=C=C=C=C=C=C=C=C=C=C[C@@H](Cl)[C@H](C)N") == (
         "(2S,3R)-3-chlorooctadeca-4,5,6,7,8,9,10,11,12,13,14,15,16,17-tetradecaen-2-amine"
     )
-    assert name_smiles("=".join("C" * 12)) == "dodeca-1,2,3,4,5,6,7,8,9,10,11-undecaene"
+    assert name_smiles("=".join("C" * 12)) == "dodecaundecaene"
 
 
 def test_unsaturation_interfix_survives_a_locant_set():
@@ -5726,7 +5726,7 @@ def test_unsaturation_interfix_survives_a_locant_set():
     # holds the stem and a vowel-initial multiplier apart, so the ``a`` stays --
     # ``hexadeca-...-octaene``, never ``hexadec-...-octaene``.
     assert name_smiles("C=CC=CC=CC=CC=CC=CC=CC=C") == "hexadeca-1,3,5,7,9,11,13,15-octaene"
-    assert name_smiles("C=C=C=C=C=C=C=C=C") == "nona-1,2,3,4,5,6,7,8-octaene"
+    assert name_smiles("C=C=C=C=C=C=C=C=C") == "nonaoctaene"
     # A consonant-initial multiplier never elided, and still does not.
     assert name_smiles("C=CC=C") == "buta-1,3-diene"
     assert name_smiles("C#CC#CC") == "penta-1,3-diyne"

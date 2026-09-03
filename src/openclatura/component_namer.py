@@ -18,6 +18,7 @@ from .component_group_rules import (
 )
 from .component_modifiers import add_component_front_modifiers, add_component_n_substituents
 from .functional_prefixes import collect_component_prefix_substituents
+from .locant_elision import apply_redundant_locant_elision
 from .molecule import DecisionTrace, Molecule, TracePhase, bond_ids_within, charged_atoms
 from .name_assembly import NameAssemblyResult, assert_final_name_assembly, token_span_trace_data
 from .name_bindings import binding_trace_data, refresh_name_atom_bindings
@@ -274,6 +275,7 @@ def name_component(
     name_spiro_subgraph: SpiroSubgraphNamer,
     assemble_parent_name: ParentAssembler,
     token_debug: bool = False,
+    omit_redundant_locants: bool = True,
 ):
     """Name one connected component or recursive component of a molecule."""
 
@@ -320,6 +322,7 @@ def name_component(
             name_spiro_subgraph=name_spiro_subgraph,
             assemble_parent_name=assemble_parent_name,
             token_debug=token_debug,
+            omit_redundant_locants=omit_redundant_locants,
         )
 
     structural_parent_result = structural_replacement_parent_result(mol, component_atoms, name_subgraph)
@@ -542,7 +545,10 @@ def name_component(
     parent_plan = build_parent_assembly_plan(
         mol,
         state.parent_selection,
-        NamingIntent.component(state.principal_carbons),
+        NamingIntent.component(
+            state.principal_carbons,
+            omit_redundant_locants=omit_redundant_locants,
+        ),
         subst_mapping,
         state.locant_maps,
         state.retained_name,
@@ -600,6 +606,8 @@ def name_component(
     add_indicated_hydrogens(mol, parts, numbered_path, get_loc)
     add_component_substituents(parts, subst_mapping, numbered_path, get_loc)
 
+    apply_redundant_locant_elision(parts)
+
     refresh_name_atom_bindings(parts)
     parts.stereo_audit_issues = list(audit_stereochemistry(mol, parts).issues)
     if COMPONENT_AUDIT_HOOK is not None:
@@ -630,6 +638,7 @@ def name_component(
             "name_atom_bindings": binding_trace_data(parts.name_atom_bindings, include_emitted_tokens=token_debug),
             "name_token_spans": parts.name_token_spans if token_debug else [],
             "name_rewrite_history": parts.name_rewrite_history,
+            "locant_elisions": parts.locant_elision_decisions,
         },
     )
     trace_segments = assembly_trace_segments(parts) if return_trace or return_tree else []

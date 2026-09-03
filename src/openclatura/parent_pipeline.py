@@ -131,6 +131,7 @@ def build_parent_parts(
         retained_name=retained_name,
         retained_parent_metadata=retained_parent_metadata,
         locant_map_source=locant_map_source,
+        omit_redundant_locants=intent.omit_redundant_locants,
         parent_atom_ids=set(numbered_path),
         parent_bond_ids=bond_ids_within(mol, set(numbered_path)),
         **assembly_overrides,
@@ -140,6 +141,7 @@ def build_parent_parts(
         parts.parent_atom_ids_by_locant[locant] = atom_idx
         parts.parent_atom_symbols_by_locant[locant] = mol.atoms[atom_idx].symbol
         parts.parent_atom_charges_by_locant[locant] = mol.atoms[atom_idx].charge
+        parts.parent_atom_isotopes_by_locant[locant] = mol.atoms[atom_idx].isotope
         if mol.atoms[atom_idx].stereo:
             parts.stereo_features.append((get_loc(atom_idx), mol.atoms[atom_idx].stereo))
         if mol.atoms[atom_idx].charge:
