@@ -57,7 +57,10 @@ def test_graph_faces_match_every_exact_local_locant_map(
     assert len(matches) == map_count
     assert {match.covered_face_ids for match in matches} == {frozenset({0})}
     assert len({match.local_to_input_atom for match in matches}) == map_count
-    assert all(dict(match.local_to_input_atom).keys() == {str(index) for index in range(1, len(symbols) + 1)} for match in matches)
+    assert all(
+        dict(match.local_to_input_atom).keys() == {str(index) for index in range(1, len(symbols) + 1)}
+        for match in matches
+    )
     assert all(set(dict(match.local_to_input_atom).values()) == set(atom_ids) for match in matches)
     assert all(match.local_to_skeleton_atom == match.local_to_input_atom for match in matches)
     component = registry.by_key[key]

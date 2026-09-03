@@ -1,8 +1,10 @@
 """Shared parent planning steps for component and subgraph naming."""
 
 from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem, RetainedParentMetadata
+from .fusion.model import ParentHydridePlan
 from .heteroatom_subgraphs import upstream_bond_order
 from .locant_sources import LocantMapSource
+from .locants import canonical_locant_pair
 from .molecule import Molecule, bond_ids_within
 from .name_bindings import ensure_name_atom_binding_tokens
 from .namer_config import RETAINED_RING_ELEMENTS
@@ -41,10 +43,15 @@ def build_parent_assembly_plan(
     locant_maps,
     retained_name: str | None,
     retained_parent_metadata: RetainedParentMetadata | None = None,
+    parent_hydride: ParentHydridePlan | None = None,
 ) -> ParentAssemblyPlan:
     """Number a selected parent and create base assembly parts."""
 
-    locant_map_source = LocantMapSource.SUPPLIED if locant_maps else LocantMapSource.GENERATED
+    if parent_hydride is not None and parent_hydride.locant_maps:
+        locant_maps = list(parent_hydride.string_locant_maps())
+        locant_map_source = LocantMapSource.PROOF
+    else:
+        locant_map_source = LocantMapSource.SUPPLIED if locant_maps else LocantMapSource.GENERATED
     if (
         locant_maps is None
         and selection.ring_parent is not None
@@ -79,6 +86,7 @@ def build_parent_assembly_plan(
         selection,
         intent,
         retained_parent_metadata,
+        parent_hydride=parent_hydride,
         locant_map_source=locant_map_source,
     )
     return ParentAssemblyPlan(
@@ -87,6 +95,7 @@ def build_parent_assembly_plan(
         locant_map_source=locant_map_source,
         get_loc=get_loc,
         parts=parts,
+        parent_hydride=parent_hydride,
     )
 
 
@@ -99,12 +108,25 @@ def build_parent_parts(
     intent: NamingIntent,
     retained_parent_metadata: RetainedParentMetadata | None = None,
     *,
+    parent_hydride: ParentHydridePlan | None = None,
     locant_map_source: LocantMapSource = LocantMapSource.GENERATED,
 ) -> AssemblyParts:
     """Create shared parent assembly parts for a naming intent."""
 
     if retained_parent_metadata is None and retained_name is not None:
         retained_parent_metadata = retained.parent_metadata(retained_name)
+    if retained_parent_metadata is None and parent_hydride is not None:
+        metadata = parent_hydride.metadata
+        retained_parent_metadata = RetainedParentMetadata(
+            default_indicated_h=tuple(str(locant) for locant in metadata.default_indicated_h),
+            fusion_locants=tuple(str(locant) for locant in metadata.fusion_locants),
+            derivative_stem=metadata.derivative_stem,
+            indicated_hydrogen_count=len(metadata.default_indicated_h),
+            mancude_double_bonds=metadata.mancude_double_bond_count,
+            inherent_saturated_locants=tuple(
+                str(locant) for locant in metadata.inherent_saturated_locants
+            ),
+        )
     assembly_overrides = {}
     if intent.is_substituent:
         if intent.root_atom is None:
@@ -130,6 +152,7 @@ def build_parent_parts(
         polycycle_descriptor=selection.polycycle_descriptor,
         retained_name=retained_name,
         retained_parent_metadata=retained_parent_metadata,
+        parent_hydride=parent_hydride,
         locant_map_source=locant_map_source,
         omit_redundant_locants=intent.omit_redundant_locants,
         parent_atom_ids=set(numbered_path),
@@ -162,7 +185,7 @@ def build_parent_parts(
                 neighbor_locant = str(get_loc(neighbor_idx))
                 bond = mol.get_bond(atom_idx, neighbor_idx)
                 if bond is not None:
-                    locant_pair = tuple(sorted((locant, neighbor_locant)))
+                    locant_pair = canonical_locant_pair(locant, neighbor_locant)
                     parts.parent_bond_orders_by_locants[locant_pair] = bond.order
                     parts.parent_bond_ids_by_locants[locant_pair] = bond.idx
     return parts

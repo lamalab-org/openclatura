@@ -32,6 +32,4 @@ def test_opsin_derived_naphtho_azulene_uses_polycyclic_component_cover():
     assert render_fusion_name(ast, registry) == expected
     assert {match.spec_key for match in ast.component_occurrences} == {"naphthalene", "azulene"}
     assert all(len(match.covered_face_ids) == 2 for match in ast.component_occurrences)
-    assert set().union(*(match.covered_face_ids for match in ast.component_occurrences)) == set(
-        range(len(faces.faces))
-    )
+    assert set().union(*(match.covered_face_ids for match in ast.component_occurrences)) == set(range(len(faces.faces)))

@@ -246,8 +246,7 @@ def _candidates_for_component_selection(
 ) -> list[_Candidate]:
     ordered_options = tuple(sorted(options, key=_occurrence_option_key))
     canonical_matches = tuple(
-        replace(option.mappings[0], occurrence_id=index)
-        for index, option in enumerate(ordered_options)
+        replace(option.mappings[0], occurrence_id=index) for index, option in enumerate(ordered_options)
     )
     specs = {match.occurrence_id: _spec(registry, match.spec_key) for match in canonical_matches}
     specs_by_key = {spec.key: spec for spec in specs.values()}
@@ -270,9 +269,7 @@ def _candidates_for_component_selection(
 
     mapping_sets: list[tuple[FusionComponentMatch, ...]] = []
     for occurrence_id, option in enumerate(ordered_options):
-        mapping_sets.append(
-            tuple(replace(candidate, occurrence_id=occurrence_id) for candidate in option.mappings)
-        )
+        mapping_sets.append(tuple(replace(candidate, occurrence_id=occurrence_id) for candidate in option.mappings))
     map_count = _product_size(tuple(len(values) for values in mapping_sets))
     if map_count > MAX_LOCANT_MAP_COMBINATIONS:
         raise FusionDescriptorError(f"locant-map count {map_count} exceeds bounded limit {MAX_LOCANT_MAP_COMBINATIONS}")

@@ -27,6 +27,7 @@ from .formatting import (
     strip_outer_parentheses,
 )
 from .functional_prefixes import PREFIX_HANDLERS, PrefixContext
+from .fusion.model import FusionMode
 from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
@@ -36,10 +37,12 @@ from .molecule import bond_ids_within as _bond_ids_within
 from .name_assembly import NameAssemblyResult, rewrite_history_trace_data, token_span_trace_data
 from .naming_context import NamingIntent
 from .nomenclature import RULES
+from .parent_hydrides import resolve_fusion_parent_hydride
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
 from .parent_selection import select_principal_parent
 from .perception import PerceivedGroup, perceive_groups
 from .retained_fused_production import production_retained_fused_parent
+from .ring_parent import RingParent
 from .rules import elision, multipliers, stems
 from .spiro_assembly import SpiroAssembly
 from .subgraph_tools import (
@@ -1432,6 +1435,14 @@ def name_subgraph(
         retained_name_val = retained_fused.name
         locant_maps = retained_fused.locant_maps
         retained_parent_metadata = retained_fused.metadata
+    parent_hydride = resolve_fusion_parent_hydride(
+        mol,
+        parent_selection,
+        retained_name=retained_name_val,
+        decision_trace=decision_trace,
+    )
+    if parent_hydride is not None and parent_hydride.fusion is not None:
+        parent_selection.ring_parent = RingParent.from_fusion_plan(parent_hydride.fusion)
     parent_plan = build_parent_assembly_plan(
         mol,
         parent_selection,
@@ -1445,6 +1456,7 @@ def name_subgraph(
         locant_maps,
         retained_name_val,
         retained_parent_metadata,
+        parent_hydride,
     )
     numbered_path = parent_plan.numbered_path
     get_loc = parent_plan.get_loc
@@ -1461,6 +1473,8 @@ def name_subgraph(
                 "numbered_path": list(numbered_path),
                 "atom_to_locant": {atom_idx: get_loc(atom_idx) for atom_idx in numbered_path},
                 "retained_name": retained_name_val,
+                "locant_map_source": parent_plan.locant_map_source.value,
+                "parent_nomenclature": parent_hydride.kind.value if parent_hydride is not None else "legacy",
             },
         )
     _emit_bond_stereo(mol, parts, numbered_path, get_loc, sub_exclude, upstream_atom)
@@ -1500,6 +1514,12 @@ def name_subgraph(
                 "name": name,
                 "trace_segment_count": len(trace_segments),
                 "locant_elisions": parts.locant_elision_decisions,
+                "parent_nomenclature": (
+                    parts.parent_hydride.kind.value if parts.parent_hydride is not None else "legacy"
+                ),
+                "parent_hydride_proof_source": (
+                    parts.parent_hydride.proof_source if parts.parent_hydride is not None else ""
+                ),
             },
         )
     if return_trace:
@@ -1950,41 +1970,59 @@ def name_component(
     )
 
 
-def name_smiles_with_trace(smiles: str) -> tuple[str, list[dict]]:
+def name_smiles_with_trace(
+    smiles: str, *, fusion_mode: FusionMode | str = FusionMode.LEGACY
+) -> tuple[str, list[dict]]:
     """Return a generated name and AssemblyParts-derived trace annotations, exposing the atom and bond IDs
     selected during parent, prefix, unsaturation and suffix assembly."""
 
-    return DEFAULT_NAMING_ENGINE.name_smiles_with_trace(smiles)
+    return DEFAULT_NAMING_ENGINE.name_smiles_with_trace(smiles, fusion_mode=fusion_mode)
 
 
-def analyze_smiles(smiles: str, *, token_debug: bool = False) -> NameAnalysis:
+def analyze_smiles(
+    smiles: str,
+    *,
+    token_debug: bool = False,
+    fusion_mode: FusionMode | str = FusionMode.LEGACY,
+) -> NameAnalysis:
     """Return a generated name with structure annotations and decision traces: parsing, component
     splitting, group perception, priority, parent selection, numbering and assembly."""
 
-    return DEFAULT_NAMING_ENGINE.analyze_smiles(smiles, token_debug=token_debug)
+    return DEFAULT_NAMING_ENGINE.analyze_smiles(
+        smiles, token_debug=token_debug, fusion_mode=fusion_mode
+    )
 
 
-def name_smiles(smiles: str) -> str:
+def name_smiles(smiles: str, *, fusion_mode: FusionMode | str = FusionMode.LEGACY) -> str:
     """Return an IUPAC-style name for a SMILES string.  P-13 for name construction, P-44/P-45 for parent
     selection and numbering, P-72 for ordering disconnected ionic components."""
 
-    return DEFAULT_NAMING_ENGINE.name_smiles(smiles)
+    return DEFAULT_NAMING_ENGINE.name_smiles(smiles, fusion_mode=fusion_mode)
 
 
-def name_rdkit_mol(rdkit_mol) -> str:
+def name_rdkit_mol(rdkit_mol, *, fusion_mode: FusionMode | str = FusionMode.LEGACY) -> str:
     """Return an IUPAC-style name for an existing ``rdkit.Chem.rdchem.Mol``, for callers that already hold
     one.  Equivalent to :func:`name_smiles` without the SMILES round-trip; the input is not modified."""
 
-    return DEFAULT_NAMING_ENGINE.name_rdkit_mol(rdkit_mol)
+    return DEFAULT_NAMING_ENGINE.name_rdkit_mol(rdkit_mol, fusion_mode=fusion_mode)
 
 
-def name_rdkit_mol_with_trace(rdkit_mol) -> tuple[str, list[dict]]:
+def name_rdkit_mol_with_trace(
+    rdkit_mol, *, fusion_mode: FusionMode | str = FusionMode.LEGACY
+) -> tuple[str, list[dict]]:
     """RDKit-molecule counterpart of :func:`name_smiles_with_trace`."""
 
-    return DEFAULT_NAMING_ENGINE.name_rdkit_mol_with_trace(rdkit_mol)
+    return DEFAULT_NAMING_ENGINE.name_rdkit_mol_with_trace(rdkit_mol, fusion_mode=fusion_mode)
 
 
-def analyze_rdkit_mol(rdkit_mol, *, token_debug: bool = False) -> NameAnalysis:
+def analyze_rdkit_mol(
+    rdkit_mol,
+    *,
+    token_debug: bool = False,
+    fusion_mode: FusionMode | str = FusionMode.LEGACY,
+) -> NameAnalysis:
     """RDKit-molecule counterpart of :func:`analyze_smiles`."""
 
-    return DEFAULT_NAMING_ENGINE.analyze_rdkit_mol(rdkit_mol, token_debug=token_debug)
+    return DEFAULT_NAMING_ENGINE.analyze_rdkit_mol(
+        rdkit_mol, token_debug=token_debug, fusion_mode=fusion_mode
+    )

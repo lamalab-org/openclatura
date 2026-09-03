@@ -26,7 +26,7 @@ from .model import (
     FusionNumberingProof,
     ParentBondModel,
 )
-from .rules import pin_ring_size_gate
+from .rules import component_seniority_key, pin_ring_size_gate
 
 _Node = tuple[int, str]
 _Edge = tuple[int, int]
@@ -118,6 +118,8 @@ def audit_fusion_plan(
     checks: list[str] = []
     try:
         reconstruction = _reconstruct(ast, specs, mol, errors)
+        _audit_nomenclature_selection(ast, specs, errors)
+        checks.append("nomenclature_selection")
         _audit_component_and_face_coverage(
             mol,
             parent_atoms,
@@ -146,6 +148,33 @@ def audit_fusion_plan(
     if errors:
         return FusionAuditResult(AuditStatus.MISMATCH, checks=tuple(checks), errors=tuple(dict.fromkeys(errors)))
     return FusionAuditResult(AuditStatus.CONFIRMED, checks=tuple(checks))
+
+
+def _audit_nomenclature_selection(
+    ast: FusionNameAst,
+    specs: Mapping[int, FusionComponentSpec],
+    errors: list[str],
+) -> None:
+    """Verify parent identity and intrinsic component seniority independently."""
+
+    if len(ast.parent_occurrences) != 1:
+        errors.append("bounded fusion tier requires exactly one parent occurrence")
+        return
+    parent = ast.parent_occurrences[0]
+    if ast.citation_tree.occurrence_id != parent:
+        errors.append("fusion citation root does not match the declared parent occurrence")
+    matches = {match.occurrence_id: match for match in ast.component_occurrences}
+    if parent not in matches:
+        errors.append("declared fusion parent is absent from component occurrences")
+        return
+    eligible = [match for occurrence, match in matches.items() if specs[occurrence].usable_as_parent]
+    if not eligible:
+        errors.append("fusion plan has no component eligible as a parent")
+        return
+    specs_by_key = {spec.key: spec for spec in specs.values()}
+    preferred = min(component_seniority_key(match, specs_by_key) for match in eligible)
+    if component_seniority_key(matches[parent], specs_by_key) != preferred:
+        errors.append("declared fusion parent is not the intrinsically senior eligible component")
 
 
 def _component_spec(registry: object | None, key: str) -> FusionComponentSpec:
@@ -666,10 +695,13 @@ def _audit_bond_model(
             for edge, order in observed.items():
                 if order is None or allowed[edge] == order:
                     continue
-                if order != 1 or allowed[edge] != 2 or any(
-                    atom not in abstract_to_input
-                    or mol.atoms[abstract_to_input[atom]].total_h_count <= 0
-                    for atom in edge
+                if (
+                    order != 1
+                    or allowed[edge] != 2
+                    or any(
+                        atom not in abstract_to_input or mol.atoms[abstract_to_input[atom]].total_h_count <= 0
+                        for atom in edge
+                    )
                 ):
                     compatible = False
                     break

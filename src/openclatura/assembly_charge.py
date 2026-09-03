@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from .assembly_parts import AssemblyParts, ParentChargeItem
 from .assembly_utils import parse_locant
+from .fusion.model import ParentHydrideKind
 from .name_operations import ParentSuffixOperation
 from .nomenclature import RULES
 from .suffix_stack import suffix_operation_spelling
@@ -31,7 +32,14 @@ def has_ionic_retained_parent(parts: AssemblyParts) -> bool:
 
 
 def has_retained_like_parent(parts: AssemblyParts) -> bool:
-    return bool(parts.retained_name or inferred_ionic_retained_parent(parts))
+    return bool(
+        parts.retained_name
+        or inferred_ionic_retained_parent(parts)
+        or (
+            parts.parent_hydride is not None
+            and parts.parent_hydride.kind is ParentHydrideKind.SYSTEMATIC_FUSION
+        )
+    )
 
 
 def inferred_ionic_retained_parent(parts: AssemblyParts) -> str | None:

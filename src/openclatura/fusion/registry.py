@@ -84,8 +84,7 @@ class FusionComponentRegistry:
         schema_version = data.get("schema_version")
         if schema_version != SUPPORTED_SCHEMA_VERSION:
             raise ValueError(
-                f"unsupported fusion component schema version {schema_version!r}; "
-                f"expected {SUPPORTED_SCHEMA_VERSION}"
+                f"unsupported fusion component schema version {schema_version!r}; expected {SUPPORTED_SCHEMA_VERSION}"
             )
         rows = data.get("components")
         if not isinstance(rows, list):
@@ -182,9 +181,7 @@ class FusionComponentRegistry:
         unknown = set().union(*(face.atoms for face in normalized_faces)) - mol.atoms.keys()
         if unknown:
             raise KeyError(f"unknown face atom ids: {sorted(unknown)}")
-        if missing_edges := {
-            edge for face in normalized_faces for edge in face.edges if mol.get_bond(*edge) is None
-        }:
+        if missing_edges := {edge for face in normalized_faces for edge in face.edges if mol.get_bond(*edge) is None}:
             raise ValueError(f"face cycles contain non-bonded atom pairs: {sorted(missing_edges)}")
         skeleton_map = dict(input_to_skeleton_atom or ((atom, atom) for atom in mol.atoms))
         missing_skeleton_atoms = set().union(*(face.atoms for face in normalized_faces)) - skeleton_map.keys()
@@ -272,9 +269,7 @@ def _component_spec(
         benzoheterocycle=False,
         traditional_numbering=True,
         ring_sizes=tuple(len(ring) for ring in template.rings),
-        fusion_carbon_locants=tuple(
-            locant for locant in template.fusion_atoms if atom_by_locant[locant].symbol == "C"
-        ),
+        fusion_carbon_locants=tuple(locant for locant in template.fusion_atoms if atom_by_locant[locant].symbol == "C"),
         preferred_layouts=(),
         seniority_override=None,
         rule_reference=rule_reference,
@@ -341,7 +336,9 @@ def _connected_face_subsets(faces: tuple[_Face, ...], sizes: frozenset[int]) -> 
         return ()
     maximum = min(max(sizes), len(faces))
     adjacent = {
-        index: frozenset(other for other in range(len(faces)) if other != index and faces[index].edges & faces[other].edges)
+        index: frozenset(
+            other for other in range(len(faces)) if other != index and faces[index].edges & faces[other].edges
+        )
         for index in range(len(faces))
     }
     frontier = {frozenset((index,)) for index in range(len(faces))}

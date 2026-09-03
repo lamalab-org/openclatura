@@ -95,7 +95,12 @@ def _two_fused_rings(left_size: int = 6, right_size: int = 6) -> _Candidate:
         face_adjacency=tuple(sorted((owners[0], owners[1], edge) for edge, owners in edge_owners if len(owners) == 2)),
     )
 
-    specs = {"left": _ring_spec("left", left_size), "right": _ring_spec("right", right_size)}
+    specs = {
+        "left": _ring_spec("left", left_size),
+        # Keep the synthetic host senior so this fixture is a valid
+        # nomenclature candidate as well as a valid graph reconstruction.
+        "right": replace(_ring_spec("right", right_size), seniority_override=0),
+    }
     face_by_atoms = {frozenset(face.atom_cycle): face.id for face in faces}
     left_match = _match(0, "left", left_cycle, face_by_atoms[frozenset(left_cycle)])
     right_match = _match(1, "right", right_cycle, face_by_atoms[frozenset(right_cycle)])
@@ -228,6 +233,7 @@ def test_audit_confirms_independent_component_join_numbering_and_bond_reconstruc
 
     assert result.status is AuditStatus.CONFIRMED
     assert result.checks == (
+        "nomenclature_selection",
         "component_coverage",
         "descriptor_interfaces",
         "abstract_graph_reconstruction",
@@ -252,6 +258,20 @@ def test_audit_rejects_a_descriptor_whose_ordered_interface_is_reversed():
 
     assert result.status is AuditStatus.MISMATCH
     assert any("ordered input atoms" in error for error in result.errors)
+
+
+def test_audit_rejects_a_non_senior_declared_parent():
+    candidate = _two_fused_rings()
+    corrupted = replace(
+        candidate.ast,
+        parent_occurrences=(0,),
+        citation_tree=FusionCitationNode(0, children=(FusionCitationNode(1),)),
+    )
+
+    result = _audit(candidate, ast=corrupted)
+
+    assert result.status is AuditStatus.MISMATCH
+    assert "declared fusion parent is not the intrinsically senior eligible component" in result.errors
 
 
 def test_audit_rejects_element_and_formal_charge_graph_mismatch():

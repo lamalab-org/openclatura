@@ -1,8 +1,41 @@
 """Explicit subtractive feature collection for selected parents."""
 
 from .assembly_parts import AssemblyParts, UnsaturationItem
-from .locants import parse_locant
+from .locants import canonical_locant_pair, parse_locant
 from .molecule import Molecule
+
+
+def _implied_parent_multiple_bonds(parts: AssemblyParts) -> frozenset[int]:
+    """Return graph bond ids implied by the selected parent-hydride model."""
+
+    parent = parts.parent_hydride
+    if parent is None or parent.bond_model is None:
+        return frozenset()
+    actual_by_edge = {
+        frozenset(locants): order for locants, order in parts.parent_bond_orders_by_locants.items()
+    }
+    for assignment in parent.bond_model.allowed_kekule_assignments:
+        assignment_by_edge = {
+            frozenset(
+                (
+                    _locant_for_atom(parts, edge[0]),
+                    _locant_for_atom(parts, edge[1]),
+                )
+            ): order
+            for edge, order in assignment.orders
+        }
+        if assignment_by_edge != actual_by_edge:
+            continue
+        return frozenset(
+            parts.parent_bond_ids_by_locants[canonical_locant_pair(*locants)]
+            for locants, order in assignment_by_edge.items()
+            if order > 1 and canonical_locant_pair(*locants) in parts.parent_bond_ids_by_locants
+        )
+    return frozenset()
+
+
+def _locant_for_atom(parts: AssemblyParts, atom_id: int) -> str:
+    return next(locant for locant, atom in parts.parent_atom_ids_by_locant.items() if atom == atom_id)
 
 
 def add_unsaturations(
@@ -20,12 +53,18 @@ def add_unsaturations(
         return
 
     seen_bonds = set()
+    implied_multiple_bonds = _implied_parent_multiple_bonds(parts)
     for u_idx in numbered_path:
         for v_idx in mol.get_neighbors(u_idx):
             if v_idx not in numbered_path:
                 continue
             bond = mol.get_bond(u_idx, v_idx)
-            if not bond or bond.order <= 1 or bond.idx in seen_bonds:
+            if (
+                not bond
+                or bond.order <= 1
+                or bond.idx in seen_bonds
+                or bond.idx in implied_multiple_bonds
+            ):
                 continue
             seen_bonds.add(bond.idx)
             bond_key = "double" if bond.order == 2 else "triple"

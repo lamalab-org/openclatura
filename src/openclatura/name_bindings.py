@@ -33,7 +33,12 @@ def refresh_parent_binding(parts: AssemblyParts) -> None:
     rebuilt = NameAtomBinding(
         stage="parent",
         role="parent",
-        term=parts.retained_substituent_name or parts.retained_name or _parent_term(parts),
+        term=(
+            parts.retained_substituent_name
+            or parts.retained_name
+            or (parts.parent_hydride.base_name if parts.parent_hydride is not None else None)
+            or _parent_term(parts)
+        ),
         atom_ids=atom_ids,
         bond_ids=bond_ids,
         emitted_tokens=_parent_emitted_tokens(parts),
@@ -1473,6 +1478,8 @@ _EXACT_CHARGE_RENDERER_KEYS = frozenset(
 
 
 def _parent_term(parts: AssemblyParts) -> str:
+    if parts.parent_hydride is not None:
+        return parts.parent_hydride.base_name
     if parts.is_spiro:
         return "spiro parent"
     if parts.is_bicycle:

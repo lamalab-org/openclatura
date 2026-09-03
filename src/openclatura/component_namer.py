@@ -25,6 +25,7 @@ from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
 from .naming_context import ComponentNamingState, NamingIntent
 from .naming_protocols import RecursiveSubgraphNamer
+from .parent_hydrides import resolve_fusion_parent_hydride
 from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
 from .parent_selection import select_principal_parent
 from .principal_groups import (
@@ -36,6 +37,7 @@ from .principal_groups import (
 )
 from .retained_fused_production import production_retained_fused_parent
 from .retained_name_policy import retained_parent_output_name
+from .ring_parent import RingParent
 from .rules import elements as _elements
 from .special_cases import (
     single_atom_component_name,
@@ -542,6 +544,15 @@ def name_component(
     ):
         state.retained_name = None
 
+    state.parent_hydride = resolve_fusion_parent_hydride(
+        mol,
+        state.parent_selection,
+        retained_name=state.retained_name,
+        decision_trace=decision_trace,
+    )
+    if state.parent_hydride is not None and state.parent_hydride.fusion is not None:
+        state.parent_selection.ring_parent = RingParent.from_fusion_plan(state.parent_hydride.fusion)
+
     parent_plan = build_parent_assembly_plan(
         mol,
         state.parent_selection,
@@ -553,6 +564,7 @@ def name_component(
         state.locant_maps,
         state.retained_name,
         state.retained_parent_metadata,
+        state.parent_hydride,
     )
     numbered_path = parent_plan.numbered_path
     locant_map = parent_plan.locant_map
@@ -568,6 +580,10 @@ def name_component(
             "numbered_path": numbered_path,
             "locants": locant_map or {atom: i + 1 for i, atom in enumerate(numbered_path)},
             "atom_to_locant": {atom: get_loc(atom) for atom in numbered_path},
+            "locant_map_source": parent_plan.locant_map_source.value,
+            "parent_nomenclature": (
+                state.parent_hydride.kind.value if state.parent_hydride is not None else "legacy"
+            ),
         },
     )
     parts = parent_plan.parts
@@ -639,6 +655,12 @@ def name_component(
             "name_token_spans": parts.name_token_spans if token_debug else [],
             "name_rewrite_history": parts.name_rewrite_history,
             "locant_elisions": parts.locant_elision_decisions,
+            "parent_nomenclature": (
+                parts.parent_hydride.kind.value if parts.parent_hydride is not None else "legacy"
+            ),
+            "parent_hydride_proof_source": (
+                parts.parent_hydride.proof_source if parts.parent_hydride is not None else ""
+            ),
         },
     )
     trace_segments = assembly_trace_segments(parts) if return_trace or return_tree else []

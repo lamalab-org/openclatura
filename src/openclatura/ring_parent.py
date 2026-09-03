@@ -8,6 +8,7 @@ plain paths independently.
 
 from dataclasses import dataclass
 
+from .fusion.model import FusionParentPlan
 from .locants import retained_locant_sort_key
 from .polycycle_topology import RingNumbering
 from .ring_renderer import is_von_baeyer_descriptor
@@ -24,6 +25,7 @@ class RingParent:
     selected_numbering: RingNumbering | None = None
     retained_locant_maps: tuple[dict[int, str], ...] = ()
     proof_source: str = "topology"
+    fusion_plan: FusionParentPlan | None = None
 
     @property
     def paths(self) -> list[list[int]]:
@@ -44,6 +46,8 @@ class RingParent:
 
     @property
     def audit_ok(self) -> bool:
+        if self.kind == "systematic_fusion":
+            return self.fusion_plan is not None and self.fusion_plan.audit.confirmed
         if self.retained_locant_maps:
             return all(
                 set(locant_map) == set(self.atoms) and len(set(locant_map.values())) == len(self.atoms)
@@ -52,6 +56,22 @@ class RingParent:
         if not self.numbering_candidates:
             return not is_von_baeyer_descriptor(self.descriptor)
         return all(numbering.audit_ok for numbering in self.numbering_candidates)
+
+    @classmethod
+    def from_fusion_plan(cls, plan: FusionParentPlan) -> "RingParent":
+        """Build a ring-parent handoff only from an independently audited plan."""
+
+        if not plan.audit.confirmed:
+            raise ValueError("Systematic fusion RingParent requires a confirmed audit.")
+        maps = plan.numbering.string_input_locant_maps()
+        return cls(
+            kind="systematic_fusion",
+            atoms=frozenset(dict(maps[0])) if maps else frozenset(),
+            descriptor=plan.rendered_base_name,
+            retained_locant_maps=maps,
+            proof_source="fusion_reconstruction",
+            fusion_plan=plan,
+        )
 
     @classmethod
     def from_numberings(

@@ -13,7 +13,12 @@ def infer_operations(decisions: list[TraceStep], trace_segments: list[dict]) -> 
 
     operations: list[NomenclatureOperation] = []
     for step in decisions:
-        if step.phase == TracePhase.ASSEMBLY and step.decision == "assembled component name":
+        if (
+            step.phase == TracePhase.PARENT_SELECTION
+            and step.decision == "selected audited systematic fusion parent"
+        ):
+            operations.append(NomenclatureOperation(OperationClass.FUSION, "systematic_fusion_parent"))
+        elif step.phase == TracePhase.ASSEMBLY and step.decision == "assembled component name":
             principal_key = step.data.get("principal_key")
             substituent_count = int(step.data.get("substituent_count") or 0)
             unsaturation_count = int(step.data.get("unsaturation_count") or 0)
@@ -26,9 +31,6 @@ def infer_operations(decisions: list[TraceStep], trace_segments: list[dict]) -> 
                 )
             if unsaturation_count:
                 operations.append(NomenclatureOperation(OperationClass.SUBTRACTIVE, "unsaturation"))
-        elif step.phase == TracePhase.PARENT_SELECTION and step.decision == "selected parent skeleton":
-            if step.data.get("is_polycycle") and step.data.get("polycycle_descriptor"):
-                operations.append(NomenclatureOperation(OperationClass.FUSION, "polycyclic_parent"))
 
     if any(str(segment.get("key", "")).startswith("replacement:") for segment in trace_segments):
         operations.append(NomenclatureOperation(OperationClass.REPLACEMENT, "replacement_prefix"))

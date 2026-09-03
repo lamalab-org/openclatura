@@ -197,6 +197,9 @@ def multiplied_name_terms(name: str, count: int) -> list[str]:
 def assembly_parent_terms(parts: AssemblyParts) -> list[str]:
     """Return parent-name terms from the actual assembly configuration."""
 
+    if parts.parent_hydride is not None:
+        parent = parts.parent_hydride
+        return [parent.base_name, parent.derivative_stem or parent.base_name]
     if parts.retained_name:
         return [
             parts.retained_name,
@@ -543,6 +546,15 @@ def _parent_tree_node(parts: AssemblyParts) -> dict:
     node = {
         "kind": "parent",
         "retained_name": parts.retained_name,
+        "parent_nomenclature": (
+            parts.parent_hydride.kind.value if parts.parent_hydride is not None else "legacy"
+        ),
+        "parent_hydride_name": (
+            parts.parent_hydride.base_name if parts.parent_hydride is not None else None
+        ),
+        "parent_hydride_proof_source": (
+            parts.parent_hydride.proof_source if parts.parent_hydride is not None else ""
+        ),
         "parent_length": parts.parent_length,
         "is_ring": parts.is_ring,
         "is_bicycle": parts.is_bicycle,
