@@ -148,7 +148,7 @@ def test_generated_carbocycle_component_uses_existing_retained_polycycle_parent(
         include_trace=True,
     )
 
-    assert result.name == "cyclopenta[l]phenanthrene"
+    assert result.name == "1H-cyclopenta[l]phenanthrene"
     assert result.parent_nomenclature == "systematic_fusion"
     assert result.pin_status == "valid_general_name"
 
@@ -172,10 +172,16 @@ def test_saturated_carbon_uses_the_correct_completed_system_proof_locant():
         include_trace=True,
     )
 
-    assert result.name == "cyclopenta[l]phenanthrene"
+    assert result.name == "1H-cyclopenta[l]phenanthrene"
     numbering = next(step for step in result.decisions if step.decision == "selected completed fusion numbering")
     saturated_carbon = next(atom for atom, value in mol.atoms.items() if value.total_h_count == 2)
     assert numbering.data["atom_to_locant"][saturated_carbon] == "1"
+
+
+def test_carbon_indicated_hydrogen_is_not_added_to_two_monocycle_fusion():
+    result = name("O1C=2C(=CC1)C=CC2", fusion_mode=FusionMode.GENERAL)
+
+    assert result.name == "cyclopenta[b]furan"
 
 
 def test_retained_parent_precedes_systematic_fusion():

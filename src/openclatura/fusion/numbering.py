@@ -403,12 +403,24 @@ def _numbering_score(mol: Molecule, locants: dict[int, SystemLocant], fusion_ato
     fusion_hetero = tuple(sorted(_locant_key(locants[atom]) for atom in fusion_atoms if mol.atoms[atom].symbol != "C"))
     indicated_h = tuple(
         sorted(
-            _locant_key(locant)
-            for atom, locant in locants.items()
-            if _is_indicated_hydrogen_candidate(mol, atom, locants)
+            _locant_key(locants[atom])
+            for atom in indicated_hydrogen_candidate_atoms(mol, locants)
         )
     )
     return all_hetero, by_element, fusion_carbons, fusion_hetero, indicated_h
+
+
+def indicated_hydrogen_candidate_atoms(
+    mol: Molecule,
+    parent_locants: Mapping[int, SystemLocant],
+) -> tuple[int, ...]:
+    """Return parent atoms considered by the indicated-H numbering tie-break."""
+
+    return tuple(
+        atom
+        for atom in parent_locants
+        if _is_indicated_hydrogen_candidate(mol, atom, parent_locants)
+    )
 
 
 def _is_indicated_hydrogen_candidate(

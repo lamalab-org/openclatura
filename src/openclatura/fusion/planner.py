@@ -6,6 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 from ..assembly_parts import NameTokenBinding
+from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule
 from ..polycycle_topology import ring_system_topology
 from ..retained_graph_model import merge_parent_bond_classes
@@ -24,16 +25,24 @@ from .model import (
     FusionGraphAtom,
     FusionGraphBond,
     FusionMode,
+    FusionNameAst,
     FusionNotApplicable,
     FusionNumberingProof,
     FusionParentPlan,
     FusionPlanningResult,
     FusionRuleDecision,
     FusionUnsupported,
+    ParentBondModel,
     PinStatus,
 )
-from .numbering import MancudeSearchBudgetExceeded, completed_system_numbering_selection, parent_bond_model
-from .registry import fusion_component_registry
+from .numbering import (
+    MancudeSearchBudgetExceeded,
+    completed_system_numbering_selection,
+    indicated_hydrogen_candidate_atoms,
+    observed_parent_matches_bond_model,
+    parent_bond_model,
+)
+from .registry import FusionComponentRegistry, fusion_component_registry
 from .rules import explain_component_comparison, fusion_mode_allows_planning, pin_ring_size_gate
 
 PLANNER_TIER = fusion_nomenclature_config().rules.planner_tier
@@ -128,11 +137,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         bond_model = parent_bond_model(mol, atoms)
     except MancudeSearchBudgetExceeded as exc:
         return FusionUnsupported("mancude assignment search budget exhausted", (str(exc),))
-    indicated_h = tuple(
-        locant
-        for atom, locant in numbering.abstract_atom_to_locant
-        if mol.atoms[atom].symbol != "C" and mol.atoms[atom].total_h_count > 0
-    )
+    indicated_h = _cited_indicated_hydrogens(mol, ast, registry, numbering, bond_model)
     if len(indicated_h) > SUPPORT.maximum_indicated_hydrogens:
         return FusionUnsupported("multiple indicated-hydrogen fusion parents require a later additive tier")
     rendered_parts = render_fusion_name_parts(ast, registry, mol=mol)
@@ -194,6 +199,33 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         rendered_parts=rendered_parts,
     )
     return FusionConfirmed(plan)
+
+
+def _cited_indicated_hydrogens(
+    mol: Molecule,
+    ast: FusionNameAst,
+    registry: FusionComponentRegistry,
+    numbering: FusionNumberingProof,
+    bond_model: ParentBondModel,
+) -> tuple[SystemLocant, ...]:
+    """Select citations from component roles and the completed-system map."""
+
+    locants = dict(numbering.abstract_atom_to_locant)
+    candidates = indicated_hydrogen_candidate_atoms(mol, locants)
+    cited_atoms = {atom for atom in candidates if mol.atoms[atom].symbol != "C"}
+
+    root_ids = set(ast.parent_occurrences)
+    roots = [match for match in ast.component_occurrences if match.occurrence_id in root_ids]
+    attached = [match for match in ast.component_occurrences if match.occurrence_id not in root_ids]
+    has_generated_carbocycle = any(
+        registry.spec_for_match(match).template.family == "generated_monocycle"
+        for match in attached
+    )
+    has_polycyclic_parent = any(len(registry.spec_for_match(match).rings) > 1 for match in roots)
+    if has_generated_carbocycle and has_polycyclic_parent and observed_parent_matches_bond_model(mol, bond_model):
+        cited_atoms.update(atom for atom in candidates if mol.atoms[atom].symbol == "C")
+
+    return tuple(sorted((locants[atom] for atom in cited_atoms), key=system_locant_sort_key))
 
 
 def _classify_unmodelled_ring_system(mol: Molecule, atoms: frozenset[int]) -> FusionPlanningResult:
