@@ -77,7 +77,7 @@ def trace_confirmed_fusion_plan(
         trace,
         TracePhase.PARENT_SELECTION,
         "selected fusion parent location",
-        "The citation root won the ordered component-seniority and attachment-location criteria.",
+        "The citation root won the implemented component-seniority criteria within the audited tree cover.",
         atoms=atoms,
         data={
             "parent_occurrences": list(plan.ast.parent_occurrences),
