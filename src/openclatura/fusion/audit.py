@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ..molecule import Molecule
+from ..polycycle_topology import normalize_edge
 from .cover import audit_component_cover, component_scope
 from .model import (
     AuditStatus,
@@ -27,7 +28,7 @@ from .model import (
     FusionNumberingProof,
     ParentBondModel,
 )
-from .rules import component_seniority_key, pin_ring_size_gate
+from .rules import component_spec_seniority_key, pin_ring_size_gate
 
 _Node = tuple[int, str]
 _Edge = tuple[int, int]
@@ -172,9 +173,8 @@ def _audit_nomenclature_selection(
     if not eligible:
         errors.append("fusion plan has no component eligible as a parent")
         return
-    specs_by_key = {spec.key: spec for spec in specs.values()}
-    preferred = min(component_seniority_key(match, specs_by_key) for match in eligible)
-    if component_seniority_key(matches[parent], specs_by_key) != preferred:
+    preferred = min(component_spec_seniority_key(specs[match.occurrence_id]) for match in eligible)
+    if component_spec_seniority_key(specs[parent]) != preferred:
         errors.append("declared fusion parent is not the intrinsically senior eligible component")
 
 
@@ -250,7 +250,7 @@ def _reconstruct(
         for bond in spec.bonds:
             left, right = bond.locants
             local_edges.append(((occurrence, left), (occurrence, right), bond.bond_class))
-            occurrence_edges.add(_edge(input_map[left], input_map[right]))
+            occurrence_edges.add(normalize_edge(input_map[left], input_map[right]))
         input_edges_by_occurrence[occurrence] = frozenset(occurrence_edges)
 
     disjoint = _DisjointSet(nodes)
@@ -325,8 +325,8 @@ def _reconstruct(
             continue
         if left_root not in root_input or right_root not in root_input:
             continue
-        input_edge = _edge(root_input[left_root], root_input[right_root])
-        skeleton_edge = _edge(root_skeleton[left_root], root_skeleton[right_root])
+        input_edge = normalize_edge(root_input[left_root], root_input[right_root])
+        skeleton_edge = normalize_edge(root_skeleton[left_root], root_skeleton[right_root])
         input_edges.add(input_edge)
         previous = skeleton_edges.get(skeleton_edge)
         if previous is not None and previous != bond_class:
@@ -417,7 +417,7 @@ def _audit_component_and_face_coverage(
         spec = specs[occurrence]
         atom_ids = set(input_map.values())
         edges = {
-            _edge(input_map[bond.locants[0]], input_map[bond.locants[1]])
+            normalize_edge(input_map[bond.locants[0]], input_map[bond.locants[1]])
             for bond in spec.bonds
             if set(bond.locants) <= input_map.keys()
         }
@@ -469,7 +469,9 @@ def _audit_descriptors(
         host_input_paths = tuple(tuple(host_map.get(node[1]) for node in path) for path in host_paths)
         if attached_path not in host_input_paths:
             continue
-        derived_edges = frozenset(_edge(left, right) for left, right in zip(attached_path, attached_path[1:]))
+        derived_edges = frozenset(
+            normalize_edge(left, right) for left, right in zip(attached_path, attached_path[1:])
+        )
         actual_edges = (
             reconstruction.input_edges_by_occurrence[join.attached_occurrence]
             & reconstruction.input_edges_by_occurrence[join.host_occurrence]
@@ -531,7 +533,7 @@ def _audit_reconstructed_graph(
         errors.append("reconstructed component connectivity differs from the selected input parent")
 
     abstract_labels = {atom.id: (atom.symbol, atom.formal_charge) for atom in abstract.atoms}
-    abstract_edges = {_edge(*bond.atoms): bond.bond_class for bond in abstract.bonds}
+    abstract_edges = {normalize_edge(*bond.atoms): bond.bond_class for bond in abstract.bonds}
     if reconstructed.skeleton_atoms != abstract_labels:
         errors.append("reconstructed component atoms differ from the declared abstract parent graph")
     if reconstructed.skeleton_edges != abstract_edges:
@@ -547,7 +549,7 @@ def _audit_numbering(
 ) -> None:
     abstract_map = dict(numbering.abstract_atom_to_locant)
     abstract_labels = {atom.id: (atom.symbol, atom.formal_charge) for atom in abstract.atoms}
-    abstract_edges = frozenset(_edge(*bond.atoms) for bond in abstract.bonds)
+    abstract_edges = frozenset(normalize_edge(*bond.atoms) for bond in abstract.bonds)
     if set(abstract_map) != set(abstract_labels) or len(set(abstract_map.values())) != len(abstract_map):
         errors.append("completed abstract numbering is not a bijection over the parent graph")
 
@@ -571,7 +573,7 @@ def _audit_numbering(
                 errors.append("input locant map does not preserve element and formal-charge labels")
                 break
         mapped_edges = frozenset(
-            _edge(input_to_abstract[left], input_to_abstract[right])
+            normalize_edge(input_to_abstract[left], input_to_abstract[right])
             for left, right in _molecule_edges(mol, parent_atoms)
         )
         if mapped_edges != abstract_edges:
@@ -649,15 +651,15 @@ def _audit_bond_model(
     model: ParentBondModel,
     errors: list[str],
 ) -> None:
-    abstract_edges = frozenset(_edge(*bond.atoms) for bond in abstract.bonds)
-    known_edges = frozenset(_edge(*edge) for edge in model.required_single_bonds | model.pi_eligible_edges)
+    abstract_edges = frozenset(normalize_edge(*bond.atoms) for bond in abstract.bonds)
+    known_edges = frozenset(normalize_edge(*edge) for edge in model.required_single_bonds | model.pi_eligible_edges)
     if known_edges != abstract_edges:
         errors.append("parent bond model does not cover every and only abstract parent edge")
         return
 
     maximum = 0
     for assignment in model.allowed_kekule_assignments:
-        orders = {_edge(*edge): order for edge, order in assignment.orders}
+        orders = {normalize_edge(*edge): order for edge, order in assignment.orders}
         if set(orders) != abstract_edges:
             errors.append("parent bond assignment is incomplete")
             continue
@@ -687,11 +689,11 @@ def _audit_bond_model(
         for bond in mol.bonds.values():
             if bond.u not in input_to_abstract or bond.v not in input_to_abstract:
                 continue
-            edge = _edge(input_to_abstract[bond.u], input_to_abstract[bond.v])
+            edge = normalize_edge(input_to_abstract[bond.u], input_to_abstract[bond.v])
             aromatic = mol.atoms[bond.u].is_aromatic and mol.atoms[bond.v].is_aromatic
             observed[edge] = None if aromatic and edge in model.pi_eligible_edges else bond.order
         for assignment in model.allowed_kekule_assignments:
-            allowed = {_edge(*edge): order for edge, order in assignment.orders}
+            allowed = {normalize_edge(*edge): order for edge, order in assignment.orders}
             if set(observed) != abstract_edges:
                 continue
             abstract_to_input = {abstract: input_atom for input_atom, abstract in input_to_abstract.items()}
@@ -719,13 +721,9 @@ def _audit_bond_model(
 
 
 def _molecule_edges(mol: Molecule, atoms: frozenset[int]) -> frozenset[_Edge]:
-    return frozenset(_edge(bond.u, bond.v) for bond in mol.bonds.values() if bond.u in atoms and bond.v in atoms)
-
-
-def _edge(left: int, right: int) -> _Edge:
-    if left == right:
-        raise ValueError("fusion graph cannot contain a self edge")
-    return (left, right) if left < right else (right, left)
+    return frozenset(
+        normalize_edge(bond.u, bond.v) for bond in mol.bonds.values() if bond.u in atoms and bond.v in atoms
+    )
 
 
 def _error(message: str, *, checks: Iterable[str] = ()) -> FusionAuditResult:

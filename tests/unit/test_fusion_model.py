@@ -35,6 +35,7 @@ from openclatura.fusion import (
     PinStatus,
     SystemLocant,
     component_seniority_key,
+    component_spec_seniority_key,
     explain_component_comparison,
     fusion_mode_allows_planning,
     pin_ring_size_gate,
@@ -286,6 +287,90 @@ def test_component_seniority_is_lexicographic_and_explainable():
     decision = explain_component_comparison(nitrogen_match, carbon_match, registry)
     assert decision.outcome == "left"
     assert decision.criterion == "earliest_special_heteroatom"
+
+
+def _seniority_variant(
+    key: str,
+    symbols: tuple[str, ...],
+    *,
+    rings: tuple[tuple[str, ...], ...] | None = None,
+    fusion_atoms: tuple[str, ...] = (),
+    horizontal_ring_count: int = 1,
+) -> FusionComponentSpec:
+    base = _component_spec(key, symbols)
+    template = replace(
+        base.template,
+        rings=rings or base.template.rings,
+        fusion_atoms=fusion_atoms,
+    )
+    return replace(base, template=template, horizontal_ring_count=horizontal_ring_count)
+
+
+@pytest.mark.parametrize(
+    ("preferred", "other", "criterion"),
+    [
+        (
+            _seniority_variant("two-rings", ("C",) * 6, rings=(("1", "2", "3"), ("3", "4", "5", "6"))),
+            _seniority_variant("one-ring", ("C",) * 6),
+            "ring_count",
+        ),
+        (
+            _seniority_variant("seven-ring", ("C",) * 7),
+            _seniority_variant("six-ring", ("C",) * 6),
+            "ring_size_vector",
+        ),
+        (
+            _seniority_variant("two-nitrogens", ("N", "N", "C", "C", "C", "C")),
+            _seniority_variant("one-nitrogen", ("N", "C", "C", "C", "C", "C")),
+            "heteroatom_count",
+        ),
+        (
+            _seniority_variant("two-kinds", ("N", "O", "C", "C", "C", "C")),
+            _seniority_variant("one-kind", ("N", "N", "C", "C", "C", "C")),
+            "heteroatom_kind_count",
+        ),
+        (
+            _seniority_variant("nitrogen-oxygen", ("N", "O", "C", "C", "C", "C")),
+            _seniority_variant("nitrogen-sulfur", ("N", "S", "C", "C", "C", "C")),
+            "heteroatom_counts_by_priority",
+        ),
+        (
+            _seniority_variant("linear", ("C",) * 6, horizontal_ring_count=2),
+            _seniority_variant("angular", ("C",) * 6, horizontal_ring_count=1),
+            "horizontal_row_count",
+        ),
+        (
+            _seniority_variant("lower-set", ("N", "C", "C", "C", "C", "C")),
+            _seniority_variant("higher-set", ("C", "N", "C", "C", "C", "C")),
+            "all_heteroatom_locants",
+        ),
+        (
+            _seniority_variant("senior-at-one", ("N", "O", "C", "C", "C", "C")),
+            _seniority_variant("senior-at-two", ("O", "N", "C", "C", "C", "C")),
+            "per_element_locants",
+        ),
+        (
+            _seniority_variant("fusion-at-one", ("C",) * 6, fusion_atoms=("1",)),
+            _seniority_variant("fusion-at-two", ("C",) * 6, fusion_atoms=("2",)),
+            "peripheral_fusion_carbon_locants",
+        ),
+    ],
+)
+def test_each_component_seniority_criterion_is_ordered_independently(preferred, other, criterion):
+    assert component_spec_seniority_key(preferred) < component_spec_seniority_key(other)
+    decision = explain_component_comparison(
+        _match(0, preferred.key),
+        _match(1, other.key, offset=10),
+        {preferred.key: preferred, other.key: other},
+    )
+    assert decision.criterion == criterion
+
+
+def test_resolved_component_variant_controls_seniority_without_key_collapse():
+    lower = _seniority_variant("shared", ("N", "C", "C", "C", "C", "C"))
+    higher = _seniority_variant("shared", ("C", "N", "C", "C", "C", "C"))
+
+    assert component_spec_seniority_key(lower) < component_spec_seniority_key(higher)
 
 
 def test_parent_bond_model_rejects_incomplete_kekule_assignment():

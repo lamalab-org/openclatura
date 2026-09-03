@@ -112,7 +112,16 @@ def component_seniority_key(
 ) -> ComponentSeniorityKey:
     """Return the explainable P-25.3.2.4 key for one matched occurrence."""
 
-    spec = _component_spec(component, registry)
+    return component_spec_seniority_key(_component_spec(component, registry))
+
+
+def component_spec_seniority_key(spec: FusionComponentSpec) -> ComponentSeniorityKey:
+    """Return the P-25.3.2.4 key for one resolved component variant.
+
+    This avoids discarding an occurrence's exact graph-template variant by
+    resolving the shared component key a second time.
+    """
+
     heteroatoms = tuple(atom for atom in spec.atoms if atom.symbol != "C")
     counts = Counter(atom.symbol for atom in heteroatoms)
     special_ranks = [

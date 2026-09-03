@@ -62,6 +62,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     ),
     "ComponentSeniorityKey": (".rules", "ComponentSeniorityKey"),
     "component_seniority_key": (".rules", "component_seniority_key"),
+    "component_spec_seniority_key": (".rules", "component_spec_seniority_key"),
     "explain_component_comparison": (".rules", "explain_component_comparison"),
     "fusion_mode_allows_planning": (".rules", "fusion_mode_allows_planning"),
     "pin_ring_size_gate": (".rules", "pin_ring_size_gate"),

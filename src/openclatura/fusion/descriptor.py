@@ -17,6 +17,7 @@ from itertools import product
 from typing import Protocol
 
 from ..molecule import Molecule
+from ..polycycle_topology import normalize_edge
 from ..rules import multipliers
 from .config import fusion_nomenclature_config
 from .cover import ComponentScope, FusionInterface, audit_component_cover, component_scope
@@ -33,7 +34,7 @@ from .model import (
     FusionRenderedPart,
     FusionSide,
 )
-from .rules import component_seniority_key
+from .rules import component_spec_seniority_key
 
 _LIMITS = fusion_nomenclature_config().search
 MAX_COMPONENT_OCCURRENCES = _LIMITS.maximum_component_occurrences
@@ -308,7 +309,6 @@ def _candidates_for_component_selection(
         replace(option.mappings[0], occurrence_id=index) for index, option in enumerate(ordered_options)
     )
     specs = {match.occurrence_id: _spec_for_match(registry, match) for match in canonical_matches}
-    specs_by_key = {spec.key: spec for spec in specs.values()}
     scopes = tuple(_scope_for_match(mol, match, specs[match.occurrence_id]) for match in canonical_matches)
     target_atoms = frozenset(atom for scope in scopes for atom in scope.atom_ids)
     target_edges = frozenset(edge for scope in scopes for edge in scope.edges)
@@ -323,8 +323,12 @@ def _candidates_for_component_selection(
     eligible_roots = [match for match in canonical_matches if specs[match.occurrence_id].usable_as_parent]
     if not eligible_roots:
         return []
-    senior_key = min(component_seniority_key(match, specs_by_key) for match in eligible_roots)
-    roots = [match for match in eligible_roots if component_seniority_key(match, specs_by_key) == senior_key]
+    senior_key = min(component_spec_seniority_key(specs[match.occurrence_id]) for match in eligible_roots)
+    roots = [
+        match
+        for match in eligible_roots
+        if component_spec_seniority_key(specs[match.occurrence_id]) == senior_key
+    ]
 
     mapping_sets: list[tuple[FusionComponentMatch, ...]] = []
     for occurrence_id, option in enumerate(ordered_options):
@@ -410,13 +414,12 @@ def _build_candidate(
         descriptors=descriptors,
     )
     rendered = render_fusion_name(ast, registry)
-    specs_by_key = {spec.key: spec for spec in specs.values()}
     score = (
-        component_seniority_key(match_by_id[root], specs_by_key).as_tuple(),
+        component_spec_seniority_key(specs[root]).as_tuple(),
         len(matches),
         max(order_by_occurrence.values(), default=0),
         tuple(_join_preference_key(joins_by_child[child], side_rank[child]) for child in citation_children),
-        tuple(component_seniority_key(match_by_id[child], specs_by_key).as_tuple() for child in citation_children),
+        tuple(component_spec_seniority_key(specs[child]).as_tuple() for child in citation_children),
         rendered,
     )
     return _Candidate(ast, score, rendered)
@@ -471,7 +474,7 @@ def _scope_for_match(
     atom_by_locant = match.input_atom_by_locant
     edges: list[tuple[int, int]] = []
     for bond in spec.bonds:
-        edge = _edge(atom_by_locant[bond.locants[0]], atom_by_locant[bond.locants[1]])
+        edge = normalize_edge(atom_by_locant[bond.locants[0]], atom_by_locant[bond.locants[1]])
         if mol.get_bond(*edge) is None:
             raise FusionDescriptorError(
                 f"component {spec.key!r} maps local bond {bond.locants!r} to a missing molecular edge"
@@ -505,18 +508,6 @@ def _ordered_children(
     side_rank: Mapping[int, int],
 ) -> dict[int, tuple[int, ...]]:
     children: dict[int, list[int]] = defaultdict(list)
-    synthetic_matches = {
-        occurrence: FusionComponentMatch(
-            occurrence_id=occurrence,
-            spec_key=spec.key,
-            covered_face_ids=frozenset((occurrence,)),
-            local_to_input_atom=tuple((locant, index) for index, locant in enumerate(spec.locants)),
-            local_to_skeleton_atom=tuple((locant, index) for index, locant in enumerate(spec.locants)),
-            topology_key=(),
-        )
-        for occurrence, spec in specs.items()
-    }
-    specs_by_key = {spec.key: spec for spec in specs.values()}
     for child, parent in parent_by_child.items():
         children[parent].append(child)
     return {
@@ -524,7 +515,7 @@ def _ordered_children(
             sorted(
                 values,
                 key=lambda child: (
-                    component_seniority_key(synthetic_matches[child], specs_by_key).as_tuple(),
+                    component_spec_seniority_key(specs[child]).as_tuple(),
                     side_rank[child],
                     _attached_locant_key(joins[child]),
                     specs[child].key,
@@ -703,10 +694,6 @@ def _spec_for_match(
     if resolver is not None:
         return resolver(match)
     return _spec(registry, match.spec_key)
-
-
-def _edge(left: int, right: int) -> tuple[int, int]:
-    return (left, right) if left < right else (right, left)
 
 
 def _product_size(sizes: tuple[int, ...]) -> int:
