@@ -10,7 +10,6 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from fractions import Fraction
 from math import gcd, lcm
 
 from .config import RingShapeSpec, fusion_nomenclature_config
@@ -490,21 +489,22 @@ def _orientation_score(centers: tuple[tuple[int, int], ...], shapes: dict[int, R
 
 def _row_orientation_score(centers: tuple[tuple[int, int], ...], axis_y: int) -> tuple[int, int, int]:
     row_x = [x for x, y in centers if y == axis_y]
-    axis_x = Fraction(min(row_x) + max(row_x), 2)
-    upper_right = sum(_quadrant_units(x, y, axis_x, axis_y, upper=True) for x, y in centers)
-    lower_left = sum(_quadrant_units(x, y, axis_x, axis_y, upper=False) for x, y in centers)
+    doubled_axis_x = min(row_x) + max(row_x)
+    upper_right = sum(_quadrant_units(x, y, doubled_axis_x, axis_y, upper=True) for x, y in centers)
+    lower_left = sum(_quadrant_units(x, y, doubled_axis_x, axis_y, upper=False) for x, y in centers)
     above = sum(4 if y > axis_y else 2 if y == axis_y else 0 for _, y in centers)
     return -upper_right, lower_left, -above
 
 
-def _quadrant_units(x: int, y: int, axis_x: Fraction, axis_y: Fraction, *, upper: bool) -> int:
-    x_match = x > axis_x if upper else x < axis_x
+def _quadrant_units(x: int, y: int, doubled_axis_x: int, axis_y: int, *, upper: bool) -> int:
+    doubled_x = 2 * x
+    x_match = doubled_x > doubled_axis_x if upper else doubled_x < doubled_axis_x
     y_match = y > axis_y if upper else y < axis_y
     if x_match and y_match:
         return 4
-    if (x == axis_x and y_match) or (y == axis_y and x_match):
+    if (doubled_x == doubled_axis_x and y_match) or (y == axis_y and x_match):
         return 2
-    if x == axis_x and y == axis_y:
+    if doubled_x == doubled_axis_x and y == axis_y:
         return 1
     return 0
 
