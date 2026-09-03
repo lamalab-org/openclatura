@@ -158,6 +158,21 @@ def test_generated_component_with_retained_polycycle_is_atom_order_invariant():
     ).name
 
 
+def test_saturated_carbon_uses_the_correct_completed_system_proof_locant():
+    smiles = "C1C=CC2=C1C1=CC=CC=C1C=1C=CC=CC21"
+    mol = read_smiles(smiles)
+    result = name(
+        smiles,
+        fusion_mode=FusionMode.GENERAL,
+        include_trace=True,
+    )
+
+    assert result.name == "cyclopenta[l]phenanthrene"
+    numbering = next(step for step in result.decisions if step.decision == "selected completed fusion numbering")
+    saturated_carbon = next(atom for atom, value in mol.atoms.items() if value.total_h_count == 2)
+    assert numbering.data["atom_to_locant"][saturated_carbon] == "1"
+
+
 def test_retained_parent_precedes_systematic_fusion():
     result = name("c1ccc2ccccc2c1", fusion_mode=FusionMode.GENERAL, include_trace=True)
     assert result.name == "naphthalene"
