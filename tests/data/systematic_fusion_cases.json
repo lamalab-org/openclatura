@@ -1,0 +1,74 @@
+[
+  {
+    "id": "thienofuran",
+    "smiles": "O1C2=C(C=C1)C=CS2",
+    "name": "thieno[2,3-b]furan",
+    "parent_nomenclature": "systematic_fusion",
+    "pin_status": "confirmed",
+    "support_tier": "ortho-tree-v1",
+    "proof_source": "fusion_reconstruction"
+  },
+  {
+    "id": "imidazothiazole",
+    "smiles": "S1C=2N(C=C1)C=CN2",
+    "name": "imidazo[2,1-b][1,3]thiazole",
+    "parent_nomenclature": "systematic_fusion",
+    "pin_status": "confirmed",
+    "support_tier": "ortho-tree-v1",
+    "proof_source": "fusion_reconstruction"
+  },
+  {
+    "id": "furopyran",
+    "smiles": "O1C=CC2OC=CC=C21",
+    "name": "furo[3,2-b]pyran",
+    "parent_nomenclature": "systematic_fusion",
+    "pin_status": "confirmed",
+    "support_tier": "ortho-tree-v1",
+    "proof_source": "fusion_reconstruction"
+  },
+  {
+    "id": "cyclopentafuran",
+    "smiles": "O1C=2C(=CC1)C=CC2",
+    "name": "cyclopenta[b]furan",
+    "parent_nomenclature": "systematic_fusion",
+    "pin_status": "confirmed",
+    "support_tier": "ortho-tree-v1",
+    "proof_source": "fusion_reconstruction"
+  },
+  {
+    "id": "selenophenoselenophene",
+    "smiles": "[Se]1C2=C(C=C1)[Se]C=C2",
+    "name": "selenopheno[3,2-b]selenophene",
+    "parent_nomenclature": "systematic_fusion",
+    "pin_status": "confirmed",
+    "support_tier": "ortho-tree-v1",
+    "proof_source": "fusion_reconstruction"
+  },
+  {
+    "id": "furothienopyridine",
+    "smiles": "O1C=CC2=NC3=C(C=C21)SC=C3",
+    "name": "furo[3,2-b]thieno[2,3-e]pyridine",
+    "parent_nomenclature": "systematic_fusion",
+    "pin_status": "confirmed",
+    "support_tier": "ortho-tree-v1",
+    "proof_source": "fusion_reconstruction"
+  },
+  {
+    "id": "difuropyridine",
+    "smiles": "O1C=CC2=C1C=C1C(=N2)C=CO1",
+    "name": "difuro[3,2-b:2',3'-e]pyridine",
+    "parent_nomenclature": "systematic_fusion",
+    "pin_status": "confirmed",
+    "support_tier": "ortho-tree-v1",
+    "proof_source": "fusion_reconstruction"
+  },
+  {
+    "id": "naphthoazulene",
+    "smiles": "C1=CC=C2C=C3C(=CC=C12)C=C1C=CC=CC1=C3",
+    "name": "naphtho[2,3-f]azulene",
+    "parent_nomenclature": "systematic_fusion",
+    "pin_status": "confirmed",
+    "support_tier": "ortho-tree-v1",
+    "proof_source": "fusion_reconstruction"
+  }
+]

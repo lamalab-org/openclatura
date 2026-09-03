@@ -9,6 +9,25 @@ from ..trace_helpers import trace_decision
 from .model import FusionParentPlan
 
 
+def fusion_proof_counts(plan: FusionParentPlan) -> dict[str, int]:
+    """Summarize bounded proof work already retained by ``plan``.
+
+    These counts are projections of immutable proof objects, not mutable
+    instrumentation.  Producing a decision trace therefore does not rerun any
+    graph search.
+    """
+
+    return {
+        "bounded_faces": len(plan.numbering.selected_face_model.faces),
+        "component_occurrences": len(plan.ast.component_occurrences),
+        "fusion_joins": len(plan.ast.joins),
+        "preferred_numberings": len(plan.numbering.input_locant_maps),
+        "rejected_numberings": len(plan.numbering.rejected_numberings),
+        "mancude_assignments": len(plan.bond_model.allowed_kekule_assignments),
+        "audit_checks": len(plan.audit.checks),
+    }
+
+
 def trace_confirmed_fusion_plan(
     trace: DecisionTrace | None,
     mol: Molecule,
@@ -114,6 +133,7 @@ def trace_confirmed_fusion_plan(
             "atom_to_locant": {atom: str(locant) for atom, locant in plan.numbering.input_locant_maps[0]},
             "candidate_count": len(plan.numbering.input_locant_maps),
             "rejected_candidates": [item.reason for item in plan.numbering.rejected_numberings],
+            "proof_counts": fusion_proof_counts(plan),
         },
     )
     trace_decision(
@@ -122,5 +142,9 @@ def trace_confirmed_fusion_plan(
         "audited systematic fusion parent",
         "Independent descriptor, numbering, bond-model, and graph reconstruction checks all passed.",
         atoms=atoms,
-        data={"status": plan.audit.status.value, "checks": list(plan.audit.checks)},
+        data={
+            "status": plan.audit.status.value,
+            "checks": list(plan.audit.checks),
+            "proof_counts": fusion_proof_counts(plan),
+        },
     )

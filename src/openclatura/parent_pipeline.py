@@ -80,7 +80,7 @@ def resolve_systematic_fusion_parent(
 
     plan = result.plan
     from .fusion.planner import PLANNER_TIER
-    from .fusion.trace import trace_confirmed_fusion_plan
+    from .fusion.trace import fusion_proof_counts, trace_confirmed_fusion_plan
 
     trace_confirmed_fusion_plan(decision_trace, mol, plan, selection.atom_set)
     trace_decision(
@@ -126,6 +126,7 @@ def resolve_systematic_fusion_parent(
                 for item in plan.rule_trace
             ],
             "audit_checks": list(plan.audit.checks),
+            "proof_counts": fusion_proof_counts(plan),
         },
     )
     return RingParent.from_fusion_plan(plan)
