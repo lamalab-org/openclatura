@@ -13,7 +13,10 @@ from openclatura.fusion import (
     component_sides,
     render_fusion_name,
 )
+from openclatura.fusion.cover import FusionInterface
+from openclatura.fusion.descriptor import classify_ordered_fusion_interface
 from openclatura.fusion.faces import GraphCycle
+from openclatura.fusion.model import FusionComponentMatch, FusionDescriptor, FusionJoinKind
 from openclatura.fusion.registry import FusionComponentRegistry, fusion_component_registry
 from openclatura.molecule import Molecule
 from openclatura.naming_data import load_json_table
@@ -155,6 +158,121 @@ def test_two_component_ortho_fusion_is_derived_from_exact_shared_edges(
     assert len(join.shared_input_atoms) == 2
     assert join.shared_input_bonds == frozenset(
         bond.idx for bond in mol.bonds.values() if frozenset((bond.u, bond.v)) == join.shared_input_atoms
+    )
+
+
+def test_shared_classifier_builds_an_ordered_ortho_peri_interface_from_graph_paths():
+    registry = fusion_component_registry()
+    attached_spec = registry.by_key["benzene"].spec
+    host_spec = registry.by_key["pyridine"].spec
+    host_atoms = (0, 1, 2, 3, 4, 5)
+    attached_atoms = (1, 2, 3, 6, 7, 8)
+    mol = Molecule()
+    for atom in range(9):
+        mol.add_atom("N" if atom == 0 else "C", idx=atom, is_aromatic=True)
+    edges: set[tuple[int, int]] = set()
+    for cycle in (host_atoms, attached_atoms):
+        for left, right in zip(cycle, cycle[1:] + cycle[:1]):
+            edge = tuple(sorted((left, right)))
+            if edge not in edges:
+                edges.add(edge)
+                mol.add_bond(*edge, idx=100 + len(edges))
+
+    attached = FusionComponentMatch(
+        occurrence_id=0,
+        spec_key="benzene",
+        covered_face_ids=frozenset({0}),
+        local_to_input_atom=tuple(zip(attached_spec.locants, attached_atoms, strict=True)),
+        local_to_skeleton_atom=tuple(zip(attached_spec.locants, attached_atoms, strict=True)),
+        topology_key=(),
+    )
+    host = FusionComponentMatch(
+        occurrence_id=1,
+        spec_key="pyridine",
+        covered_face_ids=frozenset({1}),
+        local_to_input_atom=tuple(zip(host_spec.locants, host_atoms, strict=True)),
+        local_to_skeleton_atom=tuple(zip(host_spec.locants, host_atoms, strict=True)),
+        topology_key=(),
+    )
+    shared_edges = frozenset({(1, 2), (2, 3)})
+    interface = FusionInterface(
+        left=0,
+        right=1,
+        shared_atom_ids=frozenset({1, 2, 3}),
+        shared_edges=shared_edges,
+    )
+
+    classified = classify_ordered_fusion_interface(
+        attached,
+        host,
+        attached_spec,
+        host_spec,
+        interface,
+        mol,
+    )
+
+    assert classified is not None
+    evidence, side_rank = classified
+    assert evidence.kind is FusionJoinKind.ORTHO_PERI
+    assert side_rank == 1
+    assert tuple(locant.text for locant in evidence.attached_path) == ("1", "2", "3")
+    assert tuple(locant.text for locant in evidence.host_path) == ("2", "3", "4")
+    assert tuple(side.letter for side in evidence.host_sides) == ("b", "c")
+    assert evidence.ordered_input_atoms == (1, 2, 3)
+    assert evidence.shared_input_edges == shared_edges
+    descriptor = FusionDescriptor.from_interface(evidence)
+    assert descriptor.render() == "[1,2,3-bc]"
+
+
+def test_shared_classifier_rejects_disconnected_host_sides():
+    registry = fusion_component_registry()
+    spec = registry.by_key["benzene"].spec
+    mol, _faces = _component_graph(
+        ("benzene", "benzene"),
+        (
+            ((0, "1"), (1, "1")),
+            ((0, "2"), (1, "2")),
+            ((0, "4"), (1, "4")),
+            ((0, "5"), (1, "5")),
+        ),
+    )
+    matches = tuple(
+        FusionComponentMatch(
+            occurrence_id=occurrence,
+            spec_key="benzene",
+            covered_face_ids=frozenset({occurrence}),
+            local_to_input_atom=match.local_to_input_atom,
+            local_to_skeleton_atom=match.local_to_skeleton_atom,
+            topology_key=match.topology_key,
+        )
+        for occurrence, match in enumerate(
+            next(
+                candidate
+                for candidate in fusion_component_registry().match_faces(mol, _faces)
+                if candidate.spec_key == "benzene" and candidate.covered_face_ids == frozenset({face})
+            )
+            for face in range(2)
+        )
+    )
+    left_atoms = frozenset(atom for _, atom in matches[0].local_to_input_atom)
+    right_atoms = frozenset(atom for _, atom in matches[1].local_to_input_atom)
+    shared_atoms = left_atoms & right_atoms
+    shared_edges = frozenset(
+        tuple(sorted((bond.u, bond.v)))
+        for bond in mol.bonds.values()
+        if {bond.u, bond.v} <= shared_atoms
+    )
+
+    assert (
+        classify_ordered_fusion_interface(
+            matches[0],
+            matches[1],
+            spec,
+            spec,
+            FusionInterface(0, 1, shared_atoms, shared_edges),
+            mol,
+        )
+        is None
     )
 
 

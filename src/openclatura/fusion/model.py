@@ -120,6 +120,94 @@ class FusionSide:
 
 
 @dataclass(frozen=True, slots=True)
+class OrderedFusionInterface:
+    """One fully ordered, graph-derived fusion interface.
+
+    Component-local paths, descriptor projection, and input-graph evidence are
+    kept together so construction and audit cannot silently choose different
+    orientations.  ``cited_attached_locants`` is separate from the complete
+    attached path because some fusion classes cite only a projection of the
+    graph interface.
+    """
+
+    kind: FusionJoinKind
+    attached_occurrence: int
+    host_occurrence: int
+    attached_path: tuple[ComponentLocant, ...]
+    host_path: tuple[ComponentLocant, ...]
+    cited_attached_locants: tuple[ComponentLocant, ...]
+    host_sides: tuple[FusionSide, ...] = ()
+    host_locants: tuple[ComponentLocant, ...] = ()
+    ordered_input_atoms: tuple[int, ...] = ()
+    ordered_input_edges: tuple[tuple[int, int], ...] = ()
+    ordered_input_bonds: tuple[int, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.attached_occurrence == self.host_occurrence:
+            raise ValueError("fusion interface must connect distinct component occurrences")
+        if len(self.attached_path) < 2 or len(self.host_path) < 2:
+            raise ValueError("fusion interface paths require at least one shared edge")
+        if len(self.attached_path) != len(self.host_path):
+            raise ValueError("attached and host interface paths must have equal lengths")
+        if len(self.ordered_input_atoms) != len(self.attached_path):
+            raise ValueError("ordered input atoms must correspond exactly to interface paths")
+        edge_count = len(self.ordered_input_atoms) - 1
+        if len(self.ordered_input_edges) != edge_count or len(self.ordered_input_bonds) != edge_count:
+            raise ValueError("ordered input edges and bonds must correspond exactly to the interface path")
+        if len(set(self.ordered_input_atoms)) != len(self.ordered_input_atoms):
+            raise ValueError("ordered fusion interface must be a simple path")
+        if len(set(self.ordered_input_edges)) != len(self.ordered_input_edges):
+            raise ValueError("ordered fusion interface edges must be unique")
+        if len(set(self.ordered_input_bonds)) != len(self.ordered_input_bonds):
+            raise ValueError("ordered fusion interface bonds must be unique")
+        expected_edges = tuple(
+            tuple(sorted((left, right)))
+            for left, right in zip(self.ordered_input_atoms, self.ordered_input_atoms[1:])
+        )
+        if self.ordered_input_edges != expected_edges:
+            raise ValueError("ordered input edges must follow the ordered input atom path")
+        if any(locant.component_id != self.attached_occurrence for locant in self.attached_path):
+            raise ValueError("attached path locants must belong to the attached occurrence")
+        if any(locant.component_id != self.host_occurrence for locant in self.host_path):
+            raise ValueError("host path locants must belong to the host occurrence")
+        if not self.cited_attached_locants:
+            raise ValueError("fusion interface requires cited attached-component locants")
+        if any(
+            locant.component_id != self.attached_occurrence
+            for locant in self.cited_attached_locants
+        ):
+            raise ValueError("cited locants must belong to the attached occurrence")
+        if not set(self.cited_attached_locants) <= set(self.attached_path):
+            raise ValueError("cited attached locants must be drawn from the attached interface path")
+        if bool(self.host_sides) == bool(self.host_locants):
+            raise ValueError("fusion interface requires exactly one host descriptor representation")
+        if any(side.component_id != self.host_occurrence for side in self.host_sides):
+            raise ValueError("host sides must belong to the host occurrence")
+        if any(locant.component_id != self.host_occurrence for locant in self.host_locants):
+            raise ValueError("host locants must belong to the host occurrence")
+        if self.kind is FusionJoinKind.ORTHO:
+            if len(self.ordered_input_edges) != 1 or len(self.host_sides) != 1:
+                raise ValueError("ordinary ortho fusion requires exactly one shared side")
+        elif self.kind is FusionJoinKind.ORTHO_PERI:
+            if len(self.ordered_input_edges) < 2 or len(self.host_sides) != edge_count:
+                raise ValueError("ortho-peri fusion requires two or more ordered shared sides")
+        elif not self.host_locants:
+            raise ValueError("higher-order fusion requires numeric host locants")
+
+    @property
+    def shared_input_atoms(self) -> frozenset[int]:
+        return frozenset(self.ordered_input_atoms)
+
+    @property
+    def shared_input_edges(self) -> frozenset[tuple[int, int]]:
+        return frozenset(self.ordered_input_edges)
+
+    @property
+    def shared_input_bonds(self) -> frozenset[int]:
+        return frozenset(self.ordered_input_bonds)
+
+
+@dataclass(frozen=True, slots=True)
 class FusionComponentSpec:
     """Fusion policy layered over the shared retained graph template."""
 
@@ -218,35 +306,44 @@ class FusionComponentMatch:
 class FusionJoin:
     """An ordered, graph-bound fusion interface between two occurrences."""
 
-    attached_occurrence: int
-    host_occurrence: int
     order: int
-    kind: FusionJoinKind
-    attached_locants: tuple[ComponentLocant, ...]
-    host_sides: tuple[FusionSide, ...] = ()
-    host_locants: tuple[ComponentLocant, ...] = ()
-    shared_input_atoms: frozenset[int] = frozenset()
-    shared_input_bonds: frozenset[int] = frozenset()
+    interface: OrderedFusionInterface
 
     def __post_init__(self) -> None:
-        if self.attached_occurrence == self.host_occurrence:
-            raise ValueError("fusion join must connect distinct component occurrences")
         if self.order <= 0:
             raise ValueError("fusion join order must be positive")
-        if not self.attached_locants:
-            raise ValueError("fusion join requires ordered attached locants")
-        if bool(self.host_sides) == bool(self.host_locants):
-            raise ValueError("fusion join requires exactly one host interface representation")
-        if any(locant.component_id != self.attached_occurrence for locant in self.attached_locants):
-            raise ValueError("attached locants must belong to the attached occurrence")
-        if any(side.component_id != self.host_occurrence for side in self.host_sides):
-            raise ValueError("host sides must belong to the host occurrence")
-        if any(locant.component_id != self.host_occurrence for locant in self.host_locants):
-            raise ValueError("host locants must belong to the host occurrence")
-        if self.kind is FusionJoinKind.HIGHER_ORDER and not self.host_locants:
-            raise ValueError("higher-order joins require numeric host locants")
-        if self.kind is not FusionJoinKind.HIGHER_ORDER and not self.host_sides:
-            raise ValueError("ordinary and ortho-peri joins require host sides")
+
+    @property
+    def attached_occurrence(self) -> int:
+        return self.interface.attached_occurrence
+
+    @property
+    def host_occurrence(self) -> int:
+        return self.interface.host_occurrence
+
+    @property
+    def kind(self) -> FusionJoinKind:
+        return self.interface.kind
+
+    @property
+    def attached_locants(self) -> tuple[ComponentLocant, ...]:
+        return self.interface.cited_attached_locants
+
+    @property
+    def host_sides(self) -> tuple[FusionSide, ...]:
+        return self.interface.host_sides
+
+    @property
+    def host_locants(self) -> tuple[ComponentLocant, ...]:
+        return self.interface.host_locants
+
+    @property
+    def shared_input_atoms(self) -> frozenset[int]:
+        return self.interface.shared_input_atoms
+
+    @property
+    def shared_input_bonds(self) -> frozenset[int]:
+        return self.interface.shared_input_bonds
 
 
 @dataclass(frozen=True, slots=True)
@@ -275,6 +372,17 @@ class FusionDescriptor:
             return f"[{attached}-{host}]"
         host = ",".join(str(locant) for locant in self.parent_locants)
         return f"[{attached}:{host}]"
+
+    @classmethod
+    def from_interface(cls, interface: OrderedFusionInterface) -> FusionDescriptor:
+        """Project context-free descriptor data from audited interface evidence."""
+
+        return cls(
+            attached_locants=interface.cited_attached_locants,
+            parent_sides=interface.host_sides,
+            parent_locants=interface.host_locants,
+            kind=interface.kind,
+        )
 
 
 @dataclass(frozen=True, slots=True)

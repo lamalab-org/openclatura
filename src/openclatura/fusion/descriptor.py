@@ -33,6 +33,7 @@ from .model import (
     FusionMultiplicityGroup,
     FusionNameAst,
     FusionSide,
+    OrderedFusionInterface,
     ParentLocationKey,
 )
 from .rules import component_spec_seniority_key
@@ -379,9 +380,7 @@ def _candidates_for_component_selection(
     audit = audit_component_cover(scopes, target_atom_ids=target_atoms, target_edges=target_edges)
     if not audit.ok or audit.proof.kind not in _SUPPORT.cover_kinds:
         return []
-    if "ortho" not in _SUPPORT.join_kinds or any(
-        len(interface.shared_edges) != 1 or len(interface.shared_atom_ids) != 2 for interface in audit.graph.interfaces
-    ):
+    if any(_interface_support_key(interface) not in _SUPPORT.join_kinds for interface in audit.graph.interfaces):
         return []
 
     eligible_roots = [match for match in canonical_matches if specs[match.occurrence_id].usable_as_parent]
@@ -533,7 +532,7 @@ def _compatible_mapping_assignments(
             if host is not None:
                 interface = interface_by_pair[frozenset((occurrence, host))]
                 if (
-                    _ordinary_join(
+                    _classified_join(
                         candidate,
                         selected[host],
                         specs[occurrence],
@@ -591,7 +590,7 @@ def _build_candidate(
     side_rank: dict[int, int] = {}
     for child, host in parent_by_child.items():
         interface = interface_by_pair[frozenset((child, host))]
-        join_data = _ordinary_join(
+        join_data = _classified_join(
             match_by_id[child],
             match_by_id[host],
             specs[child],
@@ -611,12 +610,7 @@ def _build_candidate(
     citation_children = _preorder_children(citation_tree)
     joins = tuple(joins_by_child[child] for child in citation_children)
     descriptors = tuple(
-        FusionDescriptor(
-            attached_locants=join.attached_locants,
-            parent_sides=join.host_sides,
-            parent_locants=join.host_locants,
-            kind=join.kind,
-        )
+        FusionDescriptor.from_interface(join.interface)
         for join in joins
     )
     ast = FusionNameAst(
@@ -640,7 +634,85 @@ def _build_candidate(
     return _Candidate(ast, score, rendered)
 
 
-def _ordinary_join(
+def classify_ordered_fusion_interface(
+    attached: FusionComponentMatch,
+    host: FusionComponentMatch,
+    attached_spec: FusionComponentSpec,
+    host_spec: FusionComponentSpec,
+    interface: FusionInterface[int],
+    mol: Molecule,
+) -> tuple[OrderedFusionInterface, int] | None:
+    """Project one exact graph overlap onto ordered component interfaces.
+
+    Host side order determines direction.  The attached path is then read by
+    mapping those same input atoms back into the attached component.  Ordinary
+    ortho and contiguous multi-side ortho-peri joins therefore use one proof
+    path and one orientation rule.
+    """
+
+    if not interface.shared_edges:
+        return None
+    host_map = host.input_atom_by_locant
+    attached_inverse = {atom: locant for locant, atom in attached.local_to_input_atom}
+    sides = component_sides(host_spec)
+    side_edges = tuple(
+        normalize_edge(host_map[side.start_locant], host_map[side.end_locant]) for side in sides
+    )
+    selected_indices = frozenset(
+        index for index, edge in enumerate(side_edges) if edge in interface.shared_edges
+    )
+    if len(selected_indices) != len(interface.shared_edges) or len(selected_indices) == len(sides):
+        return None
+    starts = tuple(index for index in selected_indices if (index - 1) % len(sides) not in selected_indices)
+    if len(starts) != 1:
+        return None
+    start = starts[0]
+    ordered_indices = tuple((start + offset) % len(sides) for offset in range(len(selected_indices)))
+    if frozenset(ordered_indices) != selected_indices:
+        return None
+
+    selected_sides = tuple(sides[index] for index in ordered_indices)
+    host_text = (selected_sides[0].start_locant,) + tuple(side.end_locant for side in selected_sides)
+    ordered_atoms = tuple(host_map[locant] for locant in host_text)
+    ordered_edges = tuple(
+        normalize_edge(left, right) for left, right in zip(ordered_atoms, ordered_atoms[1:])
+    )
+    if frozenset(ordered_edges) != interface.shared_edges:
+        return None
+    if frozenset(ordered_atoms) != interface.shared_atom_ids:
+        return None
+    try:
+        attached_text = tuple(attached_inverse[atom] for atom in ordered_atoms)
+    except KeyError:
+        return None
+    attached_bonds = {frozenset(bond.locants) for bond in attached_spec.bonds}
+    if any(
+        frozenset(pair) not in attached_bonds
+        for pair in zip(attached_text, attached_text[1:])
+    ):
+        return None
+    molecular_bonds = tuple(mol.get_bond(*edge) for edge in ordered_edges)
+    if any(bond is None for bond in molecular_bonds):
+        return None
+
+    kind = FusionJoinKind.ORTHO if len(ordered_edges) == 1 else FusionJoinKind.ORTHO_PERI
+    attached_path = tuple(ComponentLocant(attached.occurrence_id, text) for text in attached_text)
+    evidence = OrderedFusionInterface(
+        kind=kind,
+        attached_occurrence=attached.occurrence_id,
+        host_occurrence=host.occurrence_id,
+        attached_path=attached_path,
+        host_path=tuple(ComponentLocant(host.occurrence_id, text) for text in host_text),
+        cited_attached_locants=attached_path,
+        host_sides=tuple(FusionSide(host.occurrence_id, side.letter) for side in selected_sides),
+        ordered_input_atoms=ordered_atoms,
+        ordered_input_edges=ordered_edges,
+        ordered_input_bonds=tuple(bond.idx for bond in molecular_bonds if bond is not None),
+    )
+    return evidence, start
+
+
+def _classified_join(
     attached: FusionComponentMatch,
     host: FusionComponentMatch,
     attached_spec: FusionComponentSpec,
@@ -649,36 +721,22 @@ def _ordinary_join(
     order: int,
     mol: Molecule,
 ) -> tuple[FusionJoin, int] | None:
-    if len(interface.shared_edges) != 1:
+    classified = classify_ordered_fusion_interface(
+        attached,
+        host,
+        attached_spec,
+        host_spec,
+        interface,
+        mol,
+    )
+    if classified is None:
         return None
-    shared_edge = next(iter(interface.shared_edges))
-    host_map = host.input_atom_by_locant
-    attached_inverse = {atom: locant for locant, atom in attached.local_to_input_atom}
-    for side_index, side in enumerate(component_sides(host_spec)):
-        directed_atoms = (host_map[side.start_locant], host_map[side.end_locant])
-        if frozenset(directed_atoms) != frozenset(shared_edge):
-            continue
-        try:
-            attached_text = tuple(attached_inverse[atom] for atom in directed_atoms)
-        except KeyError:
-            return None
-        if frozenset(attached_text) not in {frozenset(bond.locants) for bond in attached_spec.bonds}:
-            return None
-        molecular_bond = mol.get_bond(*shared_edge)
-        if molecular_bond is None:
-            return None
-        join = FusionJoin(
-            attached_occurrence=attached.occurrence_id,
-            host_occurrence=host.occurrence_id,
-            order=order,
-            kind=FusionJoinKind.ORTHO,
-            attached_locants=tuple(ComponentLocant(attached.occurrence_id, locant) for locant in attached_text),
-            host_sides=(FusionSide(host.occurrence_id, side.letter),),
-            shared_input_atoms=interface.shared_atom_ids,
-            shared_input_bonds=frozenset((molecular_bond.idx,)),
-        )
-        return join, side_index
-    return None
+    evidence, side_rank = classified
+    return FusionJoin(order=order, interface=evidence), side_rank
+
+
+def _interface_support_key(interface: FusionInterface[int]) -> str:
+    return "ortho" if len(interface.shared_edges) == 1 else "ortho_peri"
 
 
 def _scope_for_match(
@@ -781,9 +839,27 @@ def _with_prime_depths(join: FusionJoin, depths: Mapping[int, int]) -> FusionJoi
     host_depth = depths.get(join.host_occurrence, 0)
     return replace(
         join,
-        attached_locants=tuple(replace(locant, prime_depth=attached_depth) for locant in join.attached_locants),
-        host_sides=tuple(replace(side, prime_depth=host_depth) for side in join.host_sides),
-        host_locants=tuple(replace(locant, prime_depth=host_depth) for locant in join.host_locants),
+        interface=replace(
+            join.interface,
+            attached_path=tuple(
+                replace(locant, prime_depth=attached_depth)
+                for locant in join.interface.attached_path
+            ),
+            cited_attached_locants=tuple(
+                replace(locant, prime_depth=attached_depth)
+                for locant in join.interface.cited_attached_locants
+            ),
+            host_path=tuple(
+                replace(locant, prime_depth=host_depth) for locant in join.interface.host_path
+            ),
+            host_sides=tuple(
+                replace(side, prime_depth=host_depth) for side in join.interface.host_sides
+            ),
+            host_locants=tuple(
+                replace(locant, prime_depth=host_depth)
+                for locant in join.interface.host_locants
+            ),
+        ),
     )
 
 

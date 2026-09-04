@@ -29,6 +29,7 @@ from openclatura.fusion.model import (
     FusionNameAst,
     FusionNumberingProof,
     FusionSide,
+    OrderedFusionInterface,
     ParentBondModel,
     SystemLocant,
 )
@@ -49,15 +50,22 @@ class _Candidate:
     registry: dict[str, FusionComponentSpec]
 
 
-def _two_fused_rings(left_size: int = 6, right_size: int = 6) -> _Candidate:
+def _two_fused_rings(
+    left_size: int = 6,
+    right_size: int = 6,
+    *,
+    interface_atom_count: int = 2,
+) -> _Candidate:
     """Build two carbocycles sharing one edge, without line notation."""
 
-    shared = (left_size - 2, left_size - 1)
+    if not 2 <= interface_atom_count < min(left_size, right_size):
+        raise ValueError("interface_atom_count must define a proper ring path")
+    shared = tuple(range(left_size - interface_atom_count, left_size))
     left_cycle = tuple(range(left_size))
-    right_cycle = shared + tuple(range(left_size, left_size + right_size - 2))
+    right_cycle = shared + tuple(range(left_size, left_size + right_size - interface_atom_count))
 
     mol = Molecule()
-    for atom in range(left_size + right_size - 2):
+    for atom in range(left_size + right_size - interface_atom_count):
         mol.add_atom("C", idx=atom)
     next_bond = 100
     for cycle in (left_cycle, right_cycle):
@@ -109,14 +117,38 @@ def _two_fused_rings(left_size: int = 6, right_size: int = 6) -> _Candidate:
     left_match = _match(0, "left", left_cycle, face_by_atoms[frozenset(left_cycle)])
     right_match = _match(1, "right", right_cycle, face_by_atoms[frozenset(right_cycle)])
     join = FusionJoin(
-        attached_occurrence=0,
-        host_occurrence=1,
         order=1,
-        kind=FusionJoinKind.ORTHO,
-        attached_locants=(ComponentLocant(0, str(left_size - 1)), ComponentLocant(0, str(left_size))),
-        host_sides=(FusionSide(1, "a"),),
-        shared_input_atoms=frozenset(shared),
-        shared_input_bonds=frozenset({_bond_id(mol, *shared)}),
+        interface=OrderedFusionInterface(
+            kind=(
+                FusionJoinKind.ORTHO
+                if interface_atom_count == 2
+                else FusionJoinKind.ORTHO_PERI
+            ),
+            attached_occurrence=0,
+            host_occurrence=1,
+            attached_path=tuple(
+                ComponentLocant(0, str(left_size - interface_atom_count + index + 1))
+                for index in range(interface_atom_count)
+            ),
+            host_path=tuple(
+                ComponentLocant(1, str(index + 1)) for index in range(interface_atom_count)
+            ),
+            cited_attached_locants=tuple(
+                ComponentLocant(0, str(left_size - interface_atom_count + index + 1))
+                for index in range(interface_atom_count)
+            ),
+            host_sides=tuple(
+                FusionSide(1, chr(ord("a") + index))
+                for index in range(interface_atom_count - 1)
+            ),
+            ordered_input_atoms=shared,
+            ordered_input_edges=tuple(
+                _edge(left, right) for left, right in zip(shared, shared[1:])
+            ),
+            ordered_input_bonds=tuple(
+                _bond_id(mol, left, right) for left, right in zip(shared, shared[1:])
+            ),
+        ),
     )
     ast = FusionNameAst(
         plan_kind="two_component",
@@ -124,10 +156,14 @@ def _two_fused_rings(left_size: int = 6, right_size: int = 6) -> _Candidate:
         component_occurrences=(left_match, right_match),
         joins=(join,),
         citation_tree=FusionCitationNode(1, children=(FusionCitationNode(0),)),
-        descriptors=(FusionDescriptor(join.attached_locants, parent_sides=join.host_sides),),
+        descriptors=(FusionDescriptor.from_interface(join.interface),),
     )
 
     locant_map = _completed_locants(bounded.outer_boundary.atoms, frozenset(shared))
+    next_locant = max(locant.base for locant in locant_map.values()) + 1
+    for atom in sorted(set(mol.atoms) - locant_map.keys()):
+        locant_map[atom] = SystemLocant(next_locant, interior_distance=1)
+        next_locant += 1
     numbering = FusionNumberingProof(
         selected_face_model=face_model,
         selected_layout=FusedLayout(face_positions=((faces[0].id, 0, 0), (faces[1].id, 4, 0))),
@@ -251,14 +287,33 @@ def test_audit_confirms_independent_component_join_numbering_and_bond_reconstruc
     assert result.errors == ()
 
 
+def test_audit_confirms_graph_built_ortho_peri_interface_without_descriptor_inference():
+    candidate = _two_fused_rings(interface_atom_count=3)
+    join = candidate.ast.joins[0]
+
+    result = _audit(candidate)
+
+    assert result.status is AuditStatus.CONFIRMED
+    assert result.errors == ()
+    assert join.kind is FusionJoinKind.ORTHO_PERI
+    assert tuple(side.letter for side in join.interface.host_sides) == ("a", "b")
+    assert candidate.ast.descriptors[0].render() == "[4,5,6-ab]"
+
+
 def test_audit_rejects_a_descriptor_whose_ordered_interface_is_reversed():
     candidate = _two_fused_rings()
     join = candidate.ast.joins[0]
-    corrupted_join = replace(join, attached_locants=tuple(reversed(join.attached_locants)))
+    corrupted_join = replace(
+        join,
+        interface=replace(
+            join.interface,
+            attached_path=tuple(reversed(join.interface.attached_path)),
+        ),
+    )
     corrupted_ast = replace(
         candidate.ast,
         joins=(corrupted_join,),
-        descriptors=(FusionDescriptor(corrupted_join.attached_locants, parent_sides=corrupted_join.host_sides),),
+        descriptors=(FusionDescriptor.from_interface(corrupted_join.interface),),
     )
 
     result = _audit(candidate, ast=corrupted_ast)
@@ -306,7 +361,11 @@ def test_audit_rejects_incomplete_or_duplicate_component_face_coverage():
 
 def test_audit_rejects_shared_interface_metadata_that_disagrees_with_the_graph():
     candidate = _two_fused_rings()
-    join = replace(candidate.ast.joins[0], shared_input_bonds=frozenset({999}))
+    original = candidate.ast.joins[0]
+    join = replace(
+        original,
+        interface=replace(original.interface, ordered_input_bonds=(999,)),
+    )
     corrupted_ast = replace(candidate.ast, joins=(join,))
 
     result = _audit(candidate, ast=corrupted_ast)

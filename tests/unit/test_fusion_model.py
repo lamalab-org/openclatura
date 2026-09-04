@@ -40,6 +40,7 @@ from openclatura.fusion import (
     fusion_mode_allows_planning,
     pin_ring_size_gate,
 )
+from openclatura.fusion.model import OrderedFusionInterface
 from openclatura.retained_fused_templates import RetainedGraphTemplate, validate_retained_fused_template
 from openclatura.ring_parent import RingParent
 
@@ -79,14 +80,19 @@ def _confirmed_fusion_plan() -> FusionParentPlan:
     attached = _match(0, "furan")
     parent = _match(1, "pyridine", offset=2)
     join = FusionJoin(
-        attached_occurrence=0,
-        host_occurrence=1,
         order=1,
-        kind=FusionJoinKind.ORTHO,
-        attached_locants=(ComponentLocant(0, "2"), ComponentLocant(0, "3")),
-        host_sides=(FusionSide(1, "b"),),
-        shared_input_atoms=frozenset({2, 3}),
-        shared_input_bonds=frozenset({2}),
+        interface=OrderedFusionInterface(
+            kind=FusionJoinKind.ORTHO,
+            attached_occurrence=0,
+            host_occurrence=1,
+            attached_path=(ComponentLocant(0, "2"), ComponentLocant(0, "3")),
+            host_path=(ComponentLocant(1, "1"), ComponentLocant(1, "2")),
+            cited_attached_locants=(ComponentLocant(0, "2"), ComponentLocant(0, "3")),
+            host_sides=(FusionSide(1, "b"),),
+            ordered_input_atoms=(2, 3),
+            ordered_input_edges=((2, 3),),
+            ordered_input_bonds=(2,),
+        ),
     )
     ast = FusionNameAst(
         plan_kind="two_component",
@@ -173,8 +179,7 @@ def test_locant_namespaces_render_without_becoming_interchangeable():
 def test_locants_reject_ambiguous_or_invalid_states():
     with pytest.raises(ValueError, match="prime marks"):
         ComponentLocant(0, "3'")
-    with pytest.raises(ValueError, match="mutually exclusive"):
-        SystemLocant(3, fusion_suffix="a", interior_distance=2)
+    assert str(SystemLocant(3, fusion_suffix="a", interior_distance=2)) == "3a²"
     with pytest.raises(ValueError, match="positive"):
         SystemLocant(0)
 
@@ -210,17 +215,61 @@ def test_component_match_requires_two_complete_bijective_maps():
 
 def test_join_and_descriptor_preserve_attached_locant_direction():
     join = FusionJoin(
-        attached_occurrence=0,
-        host_occurrence=1,
         order=1,
-        kind=FusionJoinKind.ORTHO,
-        attached_locants=(ComponentLocant(0, "3"), ComponentLocant(0, "2")),
-        host_sides=(FusionSide(1, "b"),),
+        interface=OrderedFusionInterface(
+            kind=FusionJoinKind.ORTHO,
+            attached_occurrence=0,
+            host_occurrence=1,
+            attached_path=(ComponentLocant(0, "3"), ComponentLocant(0, "2")),
+            host_path=(ComponentLocant(1, "2"), ComponentLocant(1, "3")),
+            cited_attached_locants=(ComponentLocant(0, "3"), ComponentLocant(0, "2")),
+            host_sides=(FusionSide(1, "b"),),
+            ordered_input_atoms=(2, 3),
+            ordered_input_edges=((2, 3),),
+            ordered_input_bonds=(7,),
+        ),
     )
-    descriptor = FusionDescriptor(join.attached_locants, parent_sides=join.host_sides)
+    descriptor = FusionDescriptor.from_interface(join.interface)
 
     assert descriptor.render() == "[3,2-b]"
     assert tuple(locant.text for locant in join.attached_locants) == ("3", "2")
+
+
+def test_ordered_ortho_peri_interface_keeps_complete_paths_and_descriptor_projection():
+    interface = OrderedFusionInterface(
+        kind=FusionJoinKind.ORTHO_PERI,
+        attached_occurrence=0,
+        host_occurrence=1,
+        attached_path=tuple(ComponentLocant(0, text) for text in ("1", "2", "3")),
+        host_path=tuple(ComponentLocant(1, text) for text in ("3", "4", "5")),
+        cited_attached_locants=tuple(ComponentLocant(0, text) for text in ("1", "2", "3")),
+        host_sides=(FusionSide(1, "c"), FusionSide(1, "d")),
+        ordered_input_atoms=(10, 11, 12),
+        ordered_input_edges=((10, 11), (11, 12)),
+        ordered_input_bonds=(20, 21),
+    )
+    join = FusionJoin(order=1, interface=interface)
+    descriptor = FusionDescriptor.from_interface(join.interface)
+
+    assert descriptor.render() == "[1,2,3-cd]"
+    assert join.shared_input_atoms == frozenset({10, 11, 12})
+    assert join.shared_input_bonds == frozenset({20, 21})
+
+
+def test_ordered_interface_rejects_disconnected_or_misordered_graph_evidence():
+    with pytest.raises(ValueError, match="follow the ordered input atom path"):
+        OrderedFusionInterface(
+            kind=FusionJoinKind.ORTHO_PERI,
+            attached_occurrence=0,
+            host_occurrence=1,
+            attached_path=tuple(ComponentLocant(0, text) for text in ("1", "2", "3")),
+            host_path=tuple(ComponentLocant(1, text) for text in ("3", "4", "5")),
+            cited_attached_locants=tuple(ComponentLocant(0, text) for text in ("1", "2", "3")),
+            host_sides=(FusionSide(1, "c"), FusionSide(1, "d")),
+            ordered_input_atoms=(10, 11, 12),
+            ordered_input_edges=((10, 11), (10, 12)),
+            ordered_input_bonds=(20, 21),
+        )
 
 
 def test_numbering_proof_rejects_incomplete_input_map():

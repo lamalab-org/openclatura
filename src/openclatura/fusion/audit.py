@@ -377,7 +377,12 @@ def _host_path_from_sides(
     if not path:
         errors.append(f"host sides do not form one ordered interface on component {host.key}")
         return ()
-    return tuple(ComponentLocant(occurrence, locant) for locant in path)
+    prime_depths = {side.prime_depth for side in join.host_sides}
+    if len(prime_depths) != 1:
+        errors.append(f"host sides use inconsistent prime depths on component {host.key}")
+        return ()
+    prime_depth = next(iter(prime_depths))
+    return tuple(ComponentLocant(occurrence, locant, prime_depth) for locant in path)
 
 
 def _ordered_side_path(edges: list[tuple[str, str]]) -> tuple[str, ...]:
@@ -530,12 +535,7 @@ def _audit_descriptors(
 
 
 def _descriptor_matches_join(descriptor: FusionDescriptor, join: FusionJoin) -> bool:
-    return (
-        descriptor.attached_locants == join.attached_locants
-        and descriptor.parent_sides == join.host_sides
-        and descriptor.parent_locants == join.host_locants
-        and descriptor.kind is join.kind
-    )
+    return descriptor == FusionDescriptor.from_interface(join.interface)
 
 
 def _audit_reconstructed_graph(
