@@ -32,7 +32,7 @@ class FusionSupportConfig:
 
 
 _IMPLEMENTED_COVER_KINDS = ("tree",)
-_IMPLEMENTED_JOIN_KINDS = ("ortho",)
+_IMPLEMENTED_JOIN_KINDS = ("ortho", "ortho_peri")
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,8 +165,8 @@ def _validate_implemented_support(support: FusionSupportConfig) -> None:
         raise ValueError("fusion nomenclature currently implements only tree component covers")
     if support.join_kinds != _IMPLEMENTED_JOIN_KINDS:
         raise ValueError("fusion nomenclature currently implements only ordinary ortho joins")
-    if support.charged_parents or support.nonstandard_valence or support.interior_atoms:
-        raise ValueError("fusion nomenclature support flags exceed the implemented ortho-tree-v1 tier")
+    if support.charged_parents or support.nonstandard_valence:
+        raise ValueError("fusion nomenclature support flags exceed the implemented neutral standard-valence tier")
 
 
 def _text(data: dict, key: str) -> str:

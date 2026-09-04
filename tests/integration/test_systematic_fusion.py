@@ -388,20 +388,28 @@ def test_component_graph_merge_failure_becomes_a_typed_audit_result(monkeypatch)
     assert result.candidate_summary == ("shared interface bond classes disagree",)
 
 
-@pytest.mark.parametrize(
-    "smiles",
-    [
-        "C1=CC=C2C=CC3=CC=CC4=CC=C1C2=C34",  # pyrene
-        "c1cc2ccc3ccc4ccc5ccc6ccc1c2c3c4c56",  # coronene
-    ],
-)
-def test_interior_atom_fused_parent_abstains_before_component_planning(smiles):
-    mol = read_smiles(smiles)
+def test_ortho_peri_parent_with_interior_atoms_receives_a_complete_audited_numbering():
+    mol = read_smiles("C1=CC=C2C=CC3=CC=CC4=CC=C1C2=C34")
+
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert isinstance(result, FusionConfirmed)
+    assert result.plan.rendered_base_name == "benzo[1,2,3,4-def]phenanthrene"
+    assert any(join.kind.value == "ortho_peri" for join in result.plan.ast.joins)
+    assert set(dict(result.plan.numbering.input_locant_maps[0])) == set(mol.atoms)
+    assert any(
+        locant.interior_distance is not None
+        for _, locant in result.plan.numbering.input_locant_maps[0]
+    )
+
+
+def test_unsupported_multiparent_interior_system_still_abstains_safely():
+    mol = read_smiles("c1cc2ccc3ccc4ccc5ccc6ccc1c2c3c4c56")
 
     result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
 
     assert isinstance(result, FusionUnsupported)
-    assert "interior-atom fused systems" in result.reason
+    assert "component decomposition" in result.reason
 
 
 @pytest.mark.parametrize(

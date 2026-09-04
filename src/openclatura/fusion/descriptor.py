@@ -898,7 +898,7 @@ def _render_descriptor(descriptor: FusionDescriptor, *, omit_attached_locants: b
     if not omit_attached_locants:
         return descriptor.render()
     if descriptor.kind is not FusionJoinKind.ORTHO or len(descriptor.parent_sides) != 1:
-        raise FusionDescriptorError("attached locants may be omitted only for one ordinary fusion side")
+        return descriptor.render()
     return f"[{descriptor.parent_sides[0]}]"
 
 

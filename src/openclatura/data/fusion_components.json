@@ -3,13 +3,13 @@
   "registry_version": "2026.1",
   "graph_source": "retained_graph_templates",
   "rules": {
-    "planner_tier": "ortho-tree-v1",
+    "planner_tier": "ortho-peri-tree-v2",
     "support": {
       "cover_kinds": ["tree"],
-      "join_kinds": ["ortho"],
+      "join_kinds": ["ortho", "ortho_peri"],
       "charged_parents": false,
       "nonstandard_valence": false,
-      "interior_atoms": false,
+      "interior_atoms": true,
       "maximum_indicated_hydrogens": 1
     },
     "pin_gate": {

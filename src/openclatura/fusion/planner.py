@@ -89,10 +89,11 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         return _classify_unmodelled_ring_system(mol, atoms)
     if bounded.cycle_rank < 2:
         return FusionNotApplicable("selected parent has no audited multi-face fused model")
-    if not SUPPORT.interior_atoms and bounded.interior_atoms:
+    if bounded.interior_atoms:
         topology = ring_system_topology(mol, atoms)
         if topology.classification == "bicyclic":
             return FusionUnsupported("bridged fused systems are outside the ordinary ortho-fusion tier")
+    if not SUPPORT.interior_atoms and bounded.interior_atoms:
         return FusionUnsupported("interior-atom fused systems require the later numbering tier")
     ring_sizes = tuple(len(face.atoms) for face in bounded.faces)
     if mode is FusionMode.AUDITED_PIN and not pin_ring_size_gate(ring_sizes):
