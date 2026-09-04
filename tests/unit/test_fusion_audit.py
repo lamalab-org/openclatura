@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+import pytest
+
 from openclatura.fusion.audit import audit_fusion_plan
 from openclatura.fusion.faces import select_bounded_face_model
 from openclatura.fusion.model import (
@@ -461,6 +463,40 @@ def test_audit_rejects_a_descriptor_whose_ordered_interface_is_reversed():
     assert any("ordered input atoms" in error for error in result.errors)
 
 
+def test_audit_rejects_a_wrong_parent_side_letter():
+    candidate = _two_fused_rings()
+    join = candidate.ast.joins[0]
+    original_side = join.interface.host_sides[0]
+    shifted_letter = chr(ord("a") + ((ord(original_side.letter) - ord("a") + 1) % 6))
+    corrupted_join = replace(
+        join,
+        interface=replace(
+            join.interface,
+            host_sides=(replace(original_side, letter=shifted_letter),),
+        ),
+    )
+    corrupted_ast = replace(
+        candidate.ast,
+        joins=(corrupted_join,),
+        descriptors=(FusionDescriptor.from_interface(corrupted_join.interface),),
+    )
+
+    result = _audit(candidate, ast=corrupted_ast)
+
+    assert result.status is AuditStatus.MISMATCH
+    assert any("host sides disagree" in error for error in result.errors)
+
+
+def test_audit_rejects_an_incomplete_ortho_peri_parent_side_path():
+    candidate = _two_fused_rings(left_size=6, right_size=6, interface_atom_count=3)
+    join = candidate.ast.joins[0]
+    assert join.kind is FusionJoinKind.ORTHO_PERI
+    assert len(join.interface.host_sides) == 2
+
+    with pytest.raises(ValueError, match="two or more ordered shared sides"):
+        replace(join.interface, host_sides=join.interface.host_sides[:1])
+
+
 def test_audit_rejects_a_wrong_multiplicative_count():
     mol = read_smiles("O1C=CC2=C1C=C1C(=N2)C=CO1")
     planned = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
@@ -484,6 +520,49 @@ def test_audit_rejects_a_wrong_multiplicative_count():
 
     assert result.status is AuditStatus.MISMATCH
     assert "multiplicative groups do not match exact sibling interface orbits" in result.errors
+
+
+def test_audit_rejects_a_wrong_multiplicative_prime_depth():
+    mol = read_smiles("O1C=CC2=C1C=C1C(=N2)C=CO1")
+    planned = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+    assert isinstance(planned, FusionConfirmed)
+    plan = planned.plan
+    group = plan.ast.multiplicative_groups[0]
+    primed_occurrence = group.occurrence_ids[1]
+    joins = list(plan.ast.joins)
+    position = next(
+        index
+        for index, join in enumerate(joins)
+        if join.attached_occurrence == primed_occurrence
+    )
+    join = joins[position]
+    corrupted_interface = replace(
+        join.interface,
+        attached_path=tuple(replace(locant, prime_depth=0) for locant in join.interface.attached_path),
+        cited_attached_locants=tuple(
+            replace(locant, prime_depth=0)
+            for locant in join.interface.cited_attached_locants
+        ),
+    )
+    joins[position] = replace(join, interface=corrupted_interface)
+    corrupted_ast = replace(
+        plan.ast,
+        joins=tuple(joins),
+        descriptors=tuple(FusionDescriptor.from_interface(item.interface) for item in joins),
+    )
+
+    result = audit_fusion_plan(
+        mol,
+        mol.atoms,
+        ast=corrupted_ast,
+        abstract_parent_graph=plan.abstract_parent_graph,
+        numbering=plan.numbering,
+        bond_model=plan.bond_model,
+        mode=FusionMode.GENERAL,
+    )
+
+    assert result.status is AuditStatus.MISMATCH
+    assert any("prime depth" in error for error in result.errors)
 
 
 def test_audit_rejects_a_non_senior_declared_parent():
