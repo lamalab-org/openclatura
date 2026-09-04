@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from copy import deepcopy
+from dataclasses import replace
 
 import pytest
 
@@ -14,7 +15,7 @@ from openclatura.fusion import (
     render_fusion_name,
 )
 from openclatura.fusion.cover import FusionInterface
-from openclatura.fusion.descriptor import classify_ordered_fusion_interface
+from openclatura.fusion.descriptor import _multiparent_root_sets, classify_ordered_fusion_interface
 from openclatura.fusion.faces import GraphCycle
 from openclatura.fusion.model import FusionComponentMatch, FusionConfirmed, FusionDescriptor, FusionJoinKind, FusionMode
 from openclatura.fusion.planner import plan_fusion_parent
@@ -605,6 +606,19 @@ def test_multiparent_cover_records_interparent_component_and_is_atom_order_invar
     assert first_ast.citation_plan.interparent_join_indices == (1,)
     assert first_name.startswith("benzo[")
     assert first_name.endswith("difuran")
+
+
+def test_multiparent_roots_require_identical_graph_template_variants():
+    furan = fusion_component_registry().by_key["furan"].spec
+    variant = replace(furan, template=replace(furan.template, name="furan-variant"))
+    adjacency = {0: (1,), 1: (0, 2), 2: (1,)}
+
+    assert _multiparent_root_sets((0, 2), adjacency, {0: furan, 1: furan, 2: furan})
+    assert not _multiparent_root_sets(
+        (0, 2),
+        adjacency,
+        {0: furan, 1: furan, 2: variant},
+    )
 
 
 @pytest.mark.skipif(not opsin_available(), reason="py2opsin/Java is unavailable")

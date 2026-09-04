@@ -40,6 +40,7 @@ from .model import (
 )
 from .rules import (
     component_spec_seniority_key,
+    component_variant_identity,
     multiplicative_attachment_key,
     multiplicative_member_order_key,
 )
@@ -727,7 +728,7 @@ def _multiparent_root_sets(
     and creates an exponential search, so the check is deliberately linear.
     """
 
-    if len(roots) < 2 or len({specs[root].key for root in roots}) != 1:
+    if len(roots) < 2 or len({component_variant_identity(specs[root]) for root in roots}) != 1:
         return ()
     selected = tuple(sorted(roots, key=lambda root: _cover_node_key(root, adjacency, specs)))
     if any(right in adjacency[left] for left, right in combinations(selected, 2)):
