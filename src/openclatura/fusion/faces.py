@@ -15,6 +15,7 @@ from itertools import combinations
 
 from ..canonical_ranks import canonical_ranks
 from ..graph_kernel import cycle_rank as graph_cycle_rank
+from ..graph_kernel import gf2_basis_insert
 from ..molecule import Molecule, edges_within_atoms
 from ..polycycle_topology import (
     adjacency_from_edges,
@@ -370,7 +371,7 @@ def _independent_face_sets(
             mask = masks[index]
             if covered_twice & mask:
                 continue
-            next_basis = _gf2_insert(basis, mask)
+            next_basis = gf2_basis_insert(basis, mask)
             if next_basis is None:
                 continue
             new_twice = covered_twice | (covered_once & mask)
@@ -381,22 +382,6 @@ def _independent_face_sets(
 
     visit(frozenset(), 0, 0, ())
     return tuple(sorted(results))
-
-
-def _gf2_insert(basis: tuple[int, ...], vector: int) -> tuple[int, ...] | None:
-    """Insert one bit vector into a canonical GF(2) basis."""
-
-    value = vector
-    rows = list(basis)
-    for row in rows:
-        value = min(value, value ^ row)
-    if value == 0:
-        return None
-    pivot = value.bit_length()
-    rows = [min(row, row ^ value) if row.bit_length() == pivot else row for row in rows]
-    rows.append(value)
-    rows.sort(reverse=True)
-    return tuple(rows)
 
 
 def _face_model_score(faces: tuple[GraphCycle, ...], ranks: dict[int, int]) -> tuple:

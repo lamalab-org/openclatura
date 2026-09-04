@@ -15,7 +15,7 @@ from functools import cache
 from types import MappingProxyType
 from typing import Any
 
-from ..graph_kernel import GraphFace
+from ..graph_kernel import GraphFace, connected_subsets
 from ..hantzsch_widman import (
     HWFusionComponent,
     hw_fusion_component_from_key,
@@ -611,29 +611,16 @@ def _normalize_faces(faces: object) -> tuple[GraphFace, ...]:
 
 
 def _connected_face_subsets(faces: tuple[GraphFace, ...], sizes: frozenset[int]) -> tuple[tuple[GraphFace, ...], ...]:
-    if not sizes:
-        return ()
-    maximum = min(max(sizes), len(faces))
     adjacent = {
-        index: frozenset(
+        index: {
             other for other in range(len(faces)) if other != index and faces[index].edges & faces[other].edges
-        )
+        }
         for index in range(len(faces))
     }
-    frontier = {frozenset((index,)) for index in range(len(faces))}
-    subsets: list[tuple[GraphFace, ...]] = []
-    for size in range(1, maximum + 1):
-        if size in sizes:
-            subsets.extend(tuple(faces[index] for index in sorted(indices)) for indices in sorted(frontier, key=tuple))
-        next_frontier: set[frozenset[int]] = set()
-        for indices in frontier:
-            candidates = set().union(*(adjacent[index] for index in indices)) - indices
-            for candidate in candidates:
-                next_frontier.add(indices | {candidate})
-        frontier = {indices for indices in next_frontier if len(indices) == size + 1}
-        if not frontier:
-            break
-    return tuple(subsets)
+    return tuple(
+        tuple(faces[index] for index in sorted(indices))
+        for indices in connected_subsets(range(len(faces)), adjacent, sizes)
+    )
 
 
 def _template_rings_match_faces(

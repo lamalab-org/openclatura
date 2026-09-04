@@ -81,6 +81,56 @@ def cycle_rank(nodes: Iterable[int], edges: Iterable[tuple[int, int]]) -> int:
     return len(edge_set) - len(node_set) + 1
 
 
+def connected_subsets(
+    nodes: Iterable[int],
+    adjacency: dict[int, set[int] | frozenset[int]],
+    sizes: Iterable[int],
+) -> tuple[frozenset[int], ...]:
+    """Enumerate connected node subsets of selected sizes exactly once."""
+
+    node_set = frozenset(nodes)
+    requested = frozenset(sizes)
+    if not requested or not node_set:
+        return ()
+    if any(size < 1 for size in requested):
+        raise ValueError("connected subset sizes must be positive")
+    if set(adjacency) != set(node_set) or any(set(neighbors) - node_set for neighbors in adjacency.values()):
+        raise ValueError("connected subset adjacency must cover exactly the supplied nodes")
+
+    maximum = min(max(requested), len(node_set))
+    frontier = {frozenset((node,)) for node in node_set}
+    result: list[frozenset[int]] = []
+    for size in range(1, maximum + 1):
+        if size in requested:
+            result.extend(sorted(frontier, key=lambda subset: tuple(sorted(subset))))
+        next_frontier: set[frozenset[int]] = set()
+        for subset in frontier:
+            candidates = set().union(*(adjacency[node] for node in subset)) - subset
+            next_frontier.update(subset | {candidate} for candidate in candidates)
+        frontier = {subset for subset in next_frontier if len(subset) == size + 1}
+        if not frontier:
+            break
+    return tuple(result)
+
+
+def gf2_basis_insert(basis: tuple[int, ...], vector: int) -> tuple[int, ...] | None:
+    """Insert a nonzero bit vector into a canonical GF(2) basis."""
+
+    if vector < 0 or any(row <= 0 for row in basis):
+        raise ValueError("GF(2) basis vectors must be positive integers")
+    value = vector
+    rows = list(basis)
+    for row in rows:
+        value = min(value, value ^ row)
+    if value == 0:
+        return None
+    pivot = value.bit_length()
+    rows = [min(row, row ^ value) if row.bit_length() == pivot else row for row in rows]
+    rows.append(value)
+    rows.sort(reverse=True)
+    return tuple(rows)
+
+
 @dataclass(frozen=True, slots=True)
 class GraphFace:
     """A validated bounded face with graph-derived atom and edge sets."""
