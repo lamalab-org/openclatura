@@ -20,6 +20,7 @@ from .model import (
     AuditStatus,
     ComponentLocant,
     FusionAuditResult,
+    FusionCitationPlan,
     FusionComponentMatch,
     FusionComponentSpec,
     FusionDescriptor,
@@ -162,23 +163,49 @@ def _audit_nomenclature_selection(
 ) -> None:
     """Verify parent identity and intrinsic component seniority independently."""
 
-    if len(ast.parent_occurrences) != 1:
-        errors.append("bounded fusion tier requires exactly one parent occurrence")
-        return
-    parent = ast.parent_occurrences[0]
-    if ast.citation_tree.occurrence_id != parent:
-        errors.append("fusion citation root does not match the declared parent occurrence")
+    citation = _citation_plan(ast)
+    if citation.parent_occurrences != ast.parent_occurrences:
+        errors.append("fusion citation roots do not match the declared parent occurrences")
+    if ast.citation_tree is not None and (
+        len(citation.roots) != 1 or citation.roots[0] != ast.citation_tree
+    ):
+        errors.append("legacy citation tree does not match the citation plan")
+    parent_set = set(citation.parent_occurrences)
+    if any(
+        ast.joins[index].attached_occurrence in parent_set
+        for index in citation.primary_join_indices
+    ):
+        errors.append("a citation root is attached by a primary join")
+    if any(
+        ast.joins[index].kind is not FusionJoinKind.HIGHER_ORDER
+        for index in citation.cycle_closing_join_indices
+    ):
+        errors.append("a cycle-closing join lacks a higher-order descriptor")
     matches = {match.occurrence_id: match for match in ast.component_occurrences}
-    if parent not in matches:
-        errors.append("declared fusion parent is absent from component occurrences")
+    if any(parent not in matches for parent in ast.parent_occurrences):
+        errors.append("a declared fusion parent is absent from component occurrences")
         return
     eligible = [match for occurrence, match in matches.items() if specs[occurrence].usable_as_parent]
     if not eligible:
         errors.append("fusion plan has no component eligible as a parent")
         return
     preferred = min(component_spec_seniority_key(specs[match.occurrence_id]) for match in eligible)
-    if component_spec_seniority_key(specs[parent]) != preferred:
+    if any(component_spec_seniority_key(specs[parent]) != preferred for parent in ast.parent_occurrences):
         errors.append("declared fusion parent is not the intrinsically senior eligible component")
+    if len(ast.parent_occurrences) > 1:
+        parent_keys = {specs[parent].key for parent in ast.parent_occurrences}
+        if len(parent_keys) != 1:
+            errors.append("multiparent citation does not use identical parent components")
+        if not citation.interparent_occurrences:
+            errors.append("multiparent citation has no explicit interparent component")
+
+
+def _citation_plan(ast: FusionNameAst) -> FusionCitationPlan:
+    if ast.citation_plan is not None:
+        return ast.citation_plan
+    if ast.citation_tree is None:
+        raise ValueError("fusion AST has no citation structure")
+    return FusionCitationPlan.from_tree(ast.citation_tree, ast.joins)
 
 
 def _component_spec(registry: object | None, match: FusionComponentMatch) -> FusionComponentSpec:
@@ -505,9 +532,14 @@ def _audit_descriptors(
                 f"join {join.attached_occurrence}->{join.host_occurrence} host sides disagree "
                 "with its typed host path"
             )
-        expected_kind = (
-            FusionJoinKind.ORTHO if len(derived_ordered_edges) == 1 else FusionJoinKind.ORTHO_PERI
-        )
+        if evidence.host_locants:
+            expected_kind = FusionJoinKind.HIGHER_ORDER
+        else:
+            expected_kind = (
+                FusionJoinKind.ORTHO
+                if len(derived_ordered_edges) == 1
+                else FusionJoinKind.ORTHO_PERI
+            )
         if evidence.kind is not expected_kind:
             errors.append(
                 f"join {join.attached_occurrence}->{join.host_occurrence} has the wrong fusion kind "
@@ -532,6 +564,28 @@ def _audit_descriptors(
         keys = {matches[occurrence].spec_key for occurrence in group.occurrence_ids}
         if len(keys) != 1:
             errors.append(f"multiplicative group {group.occurrence_ids} combines nonidentical components")
+
+    citation = _citation_plan(ast)
+    closing = set(citation.cycle_closing_join_indices)
+    if any(ast.joins[index].kind is not FusionJoinKind.HIGHER_ORDER for index in closing):
+        errors.append("citation-plan join classes disagree with descriptor kinds")
+    if any(
+        ast.joins[index].kind is FusionJoinKind.HIGHER_ORDER
+        for index in citation.interparent_join_indices
+    ):
+        errors.append("interparent joins must retain parent-side descriptors")
+    interparents = set(citation.interparent_occurrences)
+    parent_set = set(citation.parent_occurrences)
+    for occurrence in interparents:
+        joined_hosts = {
+            join.host_occurrence
+            for join in ast.joins
+            if join.attached_occurrence == occurrence
+        }
+        if len(joined_hosts & parent_set) < 2:
+            errors.append(
+                f"interparent component occurrence {occurrence} does not join multiple parents"
+            )
 
 
 def _descriptor_matches_join(descriptor: FusionDescriptor, join: FusionJoin) -> bool:

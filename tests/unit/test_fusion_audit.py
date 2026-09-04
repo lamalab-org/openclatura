@@ -16,6 +16,7 @@ from openclatura.fusion.model import (
     FaceModel,
     FusedLayout,
     FusionCitationNode,
+    FusionCitationPlan,
     FusionComponentMatch,
     FusionComponentSpec,
     FusionConfirmed,
@@ -300,6 +301,133 @@ def test_audit_confirms_graph_built_ortho_peri_interface_without_descriptor_infe
     assert candidate.ast.descriptors[0].render() == "[4,5,6-ab]"
 
 
+def test_audit_reconstructs_every_interface_of_a_cyclic_component_cover():
+    cycles = ((0, 1, 2, 3), (1, 4, 5, 2), (2, 5, 6, 3))
+    mol = Molecule()
+    for atom in range(7):
+        mol.add_atom("C", idx=atom)
+    for cycle in cycles:
+        for left, right in zip(cycle, cycle[1:] + cycle[:1]):
+            if mol.get_bond(left, right) is None:
+                mol.add_bond(left, right, idx=100 + len(mol.bonds))
+
+    spec = _ring_spec("ring", 4)
+    matches = tuple(
+        FusionComponentMatch(
+            occurrence_id=occurrence,
+            spec_key="ring",
+            covered_face_ids=frozenset({occurrence}),
+            local_to_input_atom=tuple(zip(spec.locants, cycle, strict=True)),
+            local_to_skeleton_atom=tuple(zip(spec.locants, cycle, strict=True)),
+            topology_key=(4,),
+        )
+        for occurrence, cycle in enumerate(cycles)
+    )
+
+    def interface(attached, host, atoms, attached_locants, host_locants, *, higher=False):
+        edges = tuple(_edge(left, right) for left, right in zip(atoms, atoms[1:]))
+        evidence = OrderedFusionInterface(
+            kind=FusionJoinKind.HIGHER_ORDER if higher else FusionJoinKind.ORTHO,
+            attached_occurrence=attached,
+            host_occurrence=host,
+            attached_path=tuple(ComponentLocant(attached, value) for value in attached_locants),
+            host_path=tuple(ComponentLocant(host, value) for value in host_locants),
+            cited_attached_locants=tuple(ComponentLocant(attached, value) for value in attached_locants),
+            host_sides=() if higher else (FusionSide(host, chr(ord("a") + int(host_locants[0]) - 1)),),
+            host_locants=(
+                tuple(ComponentLocant(host, value) for value in host_locants) if higher else ()
+            ),
+            ordered_input_atoms=atoms,
+            ordered_input_edges=edges,
+            ordered_input_bonds=tuple(_bond_id(mol, *edge) for edge in edges),
+        )
+        return FusionJoin(order=2 if higher else 1, interface=evidence)
+
+    joins = (
+        interface(1, 0, (1, 2), ("1", "4"), ("2", "3")),
+        interface(2, 0, (2, 3), ("1", "4"), ("3", "4")),
+        interface(2, 1, (2, 5), ("1", "2"), ("4", "3"), higher=True),
+    )
+    tree = FusionCitationNode(0, (FusionCitationNode(1), FusionCitationNode(2)))
+    citation = FusionCitationPlan(
+        roots=(tree,),
+        primary_join_indices=(0, 1),
+        cycle_closing_join_indices=(2,),
+        render_order=(1, 2),
+    )
+    ast = FusionNameAst(
+        plan_kind="cyclic_component_cover",
+        parent_occurrences=(0,),
+        component_occurrences=matches,
+        joins=joins,
+        citation_tree=tree,
+        descriptors=tuple(FusionDescriptor.from_interface(join.interface) for join in joins),
+        citation_plan=citation,
+    )
+    edge_owners = {
+        _bond_id(mol, left, right): tuple(
+            occurrence
+            for occurrence, cycle in enumerate(cycles)
+            if _edge(left, right)
+            in {_edge(a, b) for a, b in zip(cycle, cycle[1:] + cycle[:1])}
+        )
+        for left, right in {_edge(bond.u, bond.v) for bond in mol.bonds.values()}
+    }
+    face_model = FaceModel(
+        faces=tuple(
+            Face(
+                occurrence,
+                cycle,
+                tuple(_bond_id(mol, left, right) for left, right in zip(cycle, cycle[1:] + cycle[:1])),
+                4,
+            )
+            for occurrence, cycle in enumerate(cycles)
+        ),
+        edge_to_faces=tuple(sorted(edge_owners.items())),
+        perimeter_edges=frozenset(edge for edge, owners in edge_owners.items() if len(owners) == 1),
+        fusion_edges=frozenset(edge for edge, owners in edge_owners.items() if len(owners) == 2),
+        outer_boundary=(0, 1, 4, 5, 6, 3),
+        face_adjacency=tuple(
+            sorted((owners[0], owners[1], edge) for edge, owners in edge_owners.items() if len(owners) == 2)
+        ),
+    )
+    fusion_atoms = {1, 2, 3, 5}
+    locants = {
+        atom: SystemLocant(atom + 1, "a" if atom in fusion_atoms else "")
+        for atom in mol.atoms
+    }
+    numbering = FusionNumberingProof(
+        selected_face_model=face_model,
+        selected_layout=FusedLayout(face_positions=((0, 0, 0), (1, 4, 0), (2, 2, 4))),
+        orientation_score=(),
+        abstract_atom_to_locant=tuple(locants.items()),
+        input_locant_maps=(tuple(locants.items()),),
+    )
+    graph_edges = frozenset(_edge(bond.u, bond.v) for bond in mol.bonds.values())
+    graph = FusionGraph(
+        atoms=tuple(FusionGraphAtom(atom, "C") for atom in mol.atoms),
+        bonds=tuple(FusionGraphBond(edge, "single") for edge in graph_edges),
+    )
+    bond_model = ParentBondModel(
+        allowed_kekule_assignments=(BondAssignment(tuple((edge, 1) for edge in graph_edges)),),
+        required_single_bonds=graph_edges,
+        pi_eligible_edges=frozenset(),
+        maximum_non_cumulative_double_bonds=0,
+    )
+
+    result = audit_fusion_plan(
+        mol,
+        mol.atoms,
+        ast=ast,
+        abstract_parent_graph=graph,
+        numbering=numbering,
+        bond_model=bond_model,
+        registry={"ring": spec},
+    )
+
+    assert result.status is AuditStatus.CONFIRMED, result.errors
+
+
 def test_audit_rejects_a_descriptor_whose_ordered_interface_is_reversed():
     candidate = _two_fused_rings()
     join = candidate.ast.joins[0]
@@ -324,8 +452,15 @@ def test_audit_rejects_a_descriptor_whose_ordered_interface_is_reversed():
 
 def test_audit_rejects_a_non_senior_declared_parent():
     candidate = _two_fused_rings()
-    corrupted = replace(
+    explicit = replace(
         candidate.ast,
+        citation_plan=FusionCitationPlan.from_tree(
+            candidate.ast.citation_tree,
+            candidate.ast.joins,
+        ),
+    )
+    corrupted = replace(
+        explicit,
         parent_occurrences=(0,),
         citation_tree=FusionCitationNode(0, children=(FusionCitationNode(1),)),
     )
@@ -333,6 +468,7 @@ def test_audit_rejects_a_non_senior_declared_parent():
     result = _audit(candidate, ast=corrupted)
 
     assert result.status is AuditStatus.MISMATCH
+    assert "fusion citation roots do not match the declared parent occurrences" in result.errors
     assert "declared fusion parent is not the intrinsically senior eligible component" in result.errors
 
 

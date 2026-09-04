@@ -397,6 +397,80 @@ class FusionCitationNode:
 
 
 @dataclass(frozen=True, slots=True)
+class FusionCitationPlan:
+    """A citation forest together with every non-tree fusion interface.
+
+    A conventional citation has one root. Multiparent citations have several
+    roots and identify the components connecting them in
+    ``interparent_occurrences``. Interfaces outside the spanning forest are
+    retained as ``cycle_closing_join_indices`` and are rendered with numeric
+    higher-order descriptors instead of being silently discarded.
+    """
+
+    roots: tuple[FusionCitationNode, ...]
+    primary_join_indices: tuple[int, ...]
+    interparent_join_indices: tuple[int, ...] = ()
+    cycle_closing_join_indices: tuple[int, ...] = ()
+    interparent_occurrences: tuple[int, ...] = ()
+    render_order: tuple[int, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.roots:
+            raise ValueError("fusion citation plan requires at least one root")
+        occurrence_ids = tuple(
+            occurrence
+            for root in self.roots
+            for occurrence in _citation_occurrence_sequence(root)
+        )
+        if len(occurrence_ids) != len(set(occurrence_ids)):
+            raise ValueError("citation forest contains a component occurrence more than once")
+        join_indices = (
+            *self.primary_join_indices,
+            *self.interparent_join_indices,
+            *self.cycle_closing_join_indices,
+        )
+        if any(index < 0 for index in join_indices):
+            raise ValueError("citation plan join indices must be non-negative")
+        if len(join_indices) != len(set(join_indices)):
+            raise ValueError("primary and cycle-closing joins must be disjoint")
+        occurrence_set = set(occurrence_ids)
+        parent_set = {root.occurrence_id for root in self.roots}
+        if not set(self.interparent_occurrences) <= occurrence_set - parent_set:
+            raise ValueError("interparent occurrences must be nonparent citation components")
+        if self.render_order:
+            if len(self.render_order) != len(set(self.render_order)):
+                raise ValueError("citation render order must not repeat component occurrences")
+            if set(self.render_order) != occurrence_set - parent_set:
+                raise ValueError("citation render order must contain every nonparent occurrence")
+
+    @property
+    def parent_occurrences(self) -> tuple[int, ...]:
+        return tuple(root.occurrence_id for root in self.roots)
+
+    @property
+    def occurrence_ids(self) -> frozenset[int]:
+        return frozenset(
+            occurrence
+            for root in self.roots
+            for occurrence in _citation_occurrence_sequence(root)
+        )
+
+    @classmethod
+    def from_tree(
+        cls,
+        root: FusionCitationNode,
+        joins: tuple[FusionJoin, ...],
+    ) -> FusionCitationPlan:
+        """Adapt the original one-root citation without changing behavior."""
+
+        return cls(
+            roots=(root,),
+            primary_join_indices=tuple(range(len(joins))),
+            render_order=_citation_postorder(root),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class FusionMultiplicityGroup:
     """A group of nomenclaturally identical attached occurrences."""
 
@@ -439,9 +513,10 @@ class FusionNameAst:
     parent_occurrences: tuple[int, ...]
     component_occurrences: tuple[FusionComponentMatch, ...]
     joins: tuple[FusionJoin, ...]
-    citation_tree: FusionCitationNode
+    citation_tree: FusionCitationNode | None
     multiplicative_groups: tuple[FusionMultiplicityGroup, ...] = ()
     descriptors: tuple[FusionDescriptor, ...] = ()
+    citation_plan: FusionCitationPlan | None = None
 
     def __post_init__(self) -> None:
         _require_nonempty(self.plan_kind, "fusion plan kind")
@@ -454,9 +529,24 @@ class FusionNameAst:
         for join in self.joins:
             if {join.attached_occurrence, join.host_occurrence} - occurrence_set:
                 raise ValueError("fusion join references an unknown occurrence")
-        citation_ids = _citation_occurrence_ids(self.citation_tree)
+        if self.citation_plan is None:
+            if self.citation_tree is None:
+                raise ValueError("fusion AST requires a citation tree or citation plan")
+            citation_plan = FusionCitationPlan.from_tree(self.citation_tree, self.joins)
+        else:
+            citation_plan = self.citation_plan
+        citation_ids = set(citation_plan.occurrence_ids)
         if citation_ids != occurrence_set:
-            raise ValueError("citation tree must contain every component occurrence exactly once")
+            raise ValueError("citation plan must contain every component occurrence exactly once")
+        planned_indices = (
+            *citation_plan.primary_join_indices,
+            *citation_plan.interparent_join_indices,
+            *citation_plan.cycle_closing_join_indices,
+        )
+        if set(planned_indices) != set(range(len(self.joins))):
+            raise ValueError("citation plan must classify every fusion join exactly once")
+        if len(citation_plan.primary_join_indices) != len(occurrence_set) - len(citation_plan.roots):
+            raise ValueError("primary citation joins must form a spanning forest")
         grouped_ids = [occurrence for group in self.multiplicative_groups for occurrence in group.occurrence_ids]
         if len(grouped_ids) != len(set(grouped_ids)) or not set(grouped_ids) <= occurrence_set:
             raise ValueError("multiplicative groups must reference unique declared occurrences")
@@ -778,13 +868,19 @@ def _validate_edges(edges: frozenset[tuple[int, int]], label: str) -> set[frozen
     return canonical
 
 
-def _citation_occurrence_ids(root: FusionCitationNode) -> set[int]:
+def _citation_occurrence_sequence(root: FusionCitationNode) -> tuple[int, ...]:
     ids: list[int] = []
     stack = [root]
     while stack:
         node = stack.pop()
         ids.append(node.occurrence_id)
         stack.extend(node.children)
-    if len(ids) != len(set(ids)):
-        raise ValueError("citation tree contains a component occurrence more than once")
-    return set(ids)
+    return tuple(ids)
+
+
+def _citation_postorder(root: FusionCitationNode) -> tuple[int, ...]:
+    result: list[int] = []
+    for child in root.children:
+        result.extend(_citation_postorder(child))
+        result.append(child.occurrence_id)
+    return tuple(result)

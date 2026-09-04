@@ -40,9 +40,9 @@ from openclatura.fusion import (
     fusion_mode_allows_planning,
     pin_ring_size_gate,
 )
-from openclatura.fusion.model import OrderedFusionInterface
+from openclatura.fusion.model import FusionCitationPlan, OrderedFusionInterface
 from openclatura.retained_fused_templates import RetainedGraphTemplate, validate_retained_fused_template
-from openclatura.ring_parent import RingParent
+from openclatura.ring_parent import ParentHydrideKind, RingParent
 
 
 def _match(occurrence_id: int, spec_key: str, offset: int = 0) -> FusionComponentMatch:
@@ -130,6 +130,45 @@ def _confirmed_fusion_plan() -> FusionParentPlan:
         rule_trace=(),
         audit=FusionAuditResult(AuditStatus.CONFIRMED, checks=("reconstruction", "numbering")),
     )
+
+
+def test_citation_plan_uses_join_indices_when_attachment_depths_repeat():
+    ast = _confirmed_fusion_plan().ast
+    original = ast.joins[0]
+    second = replace(
+        original,
+        interface=replace(
+            original.interface,
+            attached_occurrence=2,
+            attached_path=(ComponentLocant(2, "2"), ComponentLocant(2, "3")),
+            cited_attached_locants=(ComponentLocant(2, "2"), ComponentLocant(2, "3")),
+        ),
+    )
+    tree = FusionCitationNode(1, children=(FusionCitationNode(0), FusionCitationNode(2)))
+    repeated_depth_ast = FusionNameAst(
+        plan_kind="polycomponent_tree",
+        parent_occurrences=(1,),
+        component_occurrences=(*ast.component_occurrences, _match(2, "furan", offset=4)),
+        joins=(original, second),
+        citation_tree=tree,
+        descriptors=(
+            FusionDescriptor.from_interface(original.interface),
+            FusionDescriptor.from_interface(second.interface),
+        ),
+    )
+
+    plan = FusionCitationPlan.from_tree(tree, repeated_depth_ast.joins)
+
+    assert tuple(join.order for join in repeated_depth_ast.joins) == (1, 1)
+    assert plan.primary_join_indices == (0, 1)
+    assert replace(repeated_depth_ast, parent_occurrences=(0,)).parent_occurrences == (0,)
+    explicit = replace(repeated_depth_ast, citation_plan=plan)
+    corrupted = replace(
+        explicit,
+        parent_occurrences=(0,),
+        citation_tree=FusionCitationNode(0, children=(FusionCitationNode(1), FusionCitationNode(2))),
+    )
+    assert corrupted.parent_occurrences == (0,)
 
 
 def _component_spec(key: str, symbols: tuple[str, ...], *, rings: int = 1) -> FusionComponentSpec:
@@ -307,6 +346,11 @@ def test_ring_parent_from_fusion_preserves_proof_maps_and_is_immutable():
     assert parent.kind == "systematic_fusion"
     assert parent.proof_locant_maps == ({10: "1", 11: "2", 12: "2a"},)
     assert parent.proof_source == "fusion_reconstruction"
+    assert parent.hydride_kind is ParentHydrideKind.SYSTEMATIC_FUSION
+    assert parent.base_name == fusion.rendered_base_name
+    assert parent.bond_model is fusion.bond_model
+    assert parent.metadata is not None
+    assert parent.metadata.mancude_double_bonds == fusion.bond_model.maximum_non_cumulative_double_bonds
     assert FusionConfirmed(fusion).plan is fusion
     with pytest.raises(FrozenInstanceError):
         parent.descriptor = "changed"

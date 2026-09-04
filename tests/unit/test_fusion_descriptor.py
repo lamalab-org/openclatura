@@ -103,11 +103,21 @@ def _build(
     *,
     atom_id_order: tuple[int, ...] | None = None,
     registry: FusionComponentRegistry | None = None,
+    experimental: bool = False,
+    atomic_components_only: bool = False,
 ):
     registry = registry or fusion_component_registry()
     mol, faces = _component_graph(component_keys, fused_atoms, atom_id_order=atom_id_order)
     matches = registry.match_faces(mol, faces)
-    ast = build_fusion_name_ast(mol, matches, registry)
+    if atomic_components_only:
+        allowed = set(component_keys)
+        matches = tuple(match for match in matches if match.spec_key in allowed and len(match.covered_face_ids) == 1)
+    kwargs = (
+        {"cover_kinds": ("tree", "multiparent"), "join_kinds": ("ortho", "ortho_peri", "higher_order")}
+        if experimental
+        else {}
+    )
+    ast = build_fusion_name_ast(mol, matches, registry, **kwargs)
     return mol, ast, render_fusion_name(ast, registry)
 
 
@@ -258,9 +268,7 @@ def test_shared_classifier_rejects_disconnected_host_sides():
     right_atoms = frozenset(atom for _, atom in matches[1].local_to_input_atom)
     shared_atoms = left_atoms & right_atoms
     shared_edges = frozenset(
-        tuple(sorted((bond.u, bond.v)))
-        for bond in mol.bonds.values()
-        if {bond.u, bond.v} <= shared_atoms
+        tuple(sorted((bond.u, bond.v))) for bond in mol.bonds.values() if {bond.u, bond.v} <= shared_atoms
     )
 
     assert (
@@ -329,6 +337,34 @@ def test_long_component_tree_uses_a_central_parent_location_and_is_atom_order_in
         return result
 
     assert maximum_depth(first_ast) == maximum_depth(second_ast) == 5
+
+
+def test_opted_in_higher_order_component_uses_numeric_host_locants():
+    components = ("furan", "thiophene", "pyridine")
+    interfaces = (
+        ((0, "2"), (1, "4")),
+        ((0, "3"), (1, "5")),
+        ((1, "2"), (2, "2")),
+        ((1, "3"), (2, "3")),
+    )
+
+    first_mol, first_ast, first_name = _build(components, interfaces, experimental=True)
+    arbitrary_ids = tuple(700 + 23 * index for index in reversed(range(len(first_mol.atoms))))
+    _second_mol, second_ast, second_name = _build(
+        components,
+        interfaces,
+        atom_id_order=arbitrary_ids,
+        experimental=True,
+    )
+
+    assert first_name == second_name
+    higher = tuple(join for join in first_ast.joins if join.order == 2)
+    assert len(higher) == 1
+    assert higher[0].kind is FusionJoinKind.HIGHER_ORDER
+    assert higher[0].host_locants
+    assert not higher[0].host_sides
+    assert any(descriptor.kind is FusionJoinKind.HIGHER_ORDER for descriptor in first_ast.descriptors)
+    assert any(descriptor.kind is FusionJoinKind.HIGHER_ORDER for descriptor in second_ast.descriptors)
 
 
 def test_identical_leaf_components_form_one_primed_multiplicative_group():
@@ -451,3 +487,76 @@ def test_cyclic_multiparent_component_cover_abstains_from_tree_tier():
 
     with pytest.raises(FusionDescriptorError, match="no exact tree-cover"):
         build_fusion_name_ast(mol, matches, registry)
+
+
+def test_cyclic_cover_retains_cycle_closing_interface_as_numeric_higher_order_join():
+    components = ("benzene", "benzene", "benzene")
+    interfaces = (
+        ((0, "1"), (1, "1")),
+        ((0, "2"), (1, "2")),
+        ((1, "4"), (2, "1")),
+        ((1, "5"), (2, "2")),
+        ((2, "4"), (0, "4")),
+        ((2, "5"), (0, "5")),
+    )
+
+    first_mol, first_ast, first_name = _build(
+        components,
+        interfaces,
+        experimental=True,
+        atomic_components_only=True,
+    )
+    arbitrary_ids = tuple(900 + 17 * index for index in reversed(range(len(first_mol.atoms))))
+    _second_mol, second_ast, second_name = _build(
+        components,
+        interfaces,
+        atom_id_order=arbitrary_ids,
+        experimental=True,
+        atomic_components_only=True,
+    )
+
+    assert first_ast.plan_kind == second_ast.plan_kind == "cyclic_component_cover"
+    assert first_name == second_name
+    assert first_ast.citation_plan is not None
+    assert len(first_ast.joins) == 3
+    assert first_ast.citation_plan.cycle_closing_join_indices == (2,)
+    closing = first_ast.joins[2]
+    assert closing.kind is FusionJoinKind.HIGHER_ORDER
+    assert closing.host_locants
+    assert not closing.host_sides
+    assert first_ast.descriptors[2].render().count(":") == 1
+
+
+def test_multiparent_cover_records_interparent_component_and_is_atom_order_invariant():
+    components = ("furan", "benzene", "furan")
+    interfaces = (
+        ((0, "2"), (1, "1")),
+        ((0, "3"), (1, "2")),
+        ((2, "2"), (1, "4")),
+        ((2, "3"), (1, "5")),
+    )
+
+    first_mol, first_ast, first_name = _build(
+        components,
+        interfaces,
+        experimental=True,
+        atomic_components_only=True,
+    )
+    arbitrary_ids = tuple(1200 + 19 * index for index in reversed(range(len(first_mol.atoms))))
+    _second_mol, second_ast, second_name = _build(
+        components,
+        interfaces,
+        atom_id_order=arbitrary_ids,
+        experimental=True,
+        atomic_components_only=True,
+    )
+
+    assert first_ast.plan_kind == second_ast.plan_kind == "multiparent"
+    assert first_name == second_name
+    assert first_ast.citation_tree is None
+    assert first_ast.citation_plan is not None
+    assert len(first_ast.parent_occurrences) == 2
+    assert len(first_ast.citation_plan.interparent_occurrences) == 1
+    assert first_ast.citation_plan.interparent_join_indices == (1,)
+    assert first_name.startswith("benzo[")
+    assert first_name.endswith("bis(furan)")

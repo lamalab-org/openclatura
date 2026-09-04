@@ -13,6 +13,7 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
+from itertools import combinations
 from typing import Protocol
 
 from ..assembly_parts import NameTokenBinding
@@ -25,6 +26,7 @@ from .cover import ComponentScope, FusionInterface, audit_component_cover, compo
 from .model import (
     ComponentLocant,
     FusionCitationNode,
+    FusionCitationPlan,
     FusionComponentMatch,
     FusionComponentSpec,
     FusionDescriptor,
@@ -88,6 +90,17 @@ class _Candidate:
     rendered: str
 
 
+@dataclass(frozen=True, slots=True)
+class _CitationTopology:
+    roots: tuple[int, ...]
+    parent_by_child: Mapping[int, int]
+    order_by_occurrence: Mapping[int, int]
+    interparent_pairs: tuple[frozenset[int], ...]
+    cycle_closing_pairs: tuple[frozenset[int], ...]
+    interparent_occurrences: tuple[int, ...]
+    location_key: ParentLocationKey
+
+
 def component_sides(spec: FusionComponentSpec) -> tuple[ComponentSide, ...]:
     """Return the component's directed sides in ``a``, ``b``, ... order."""
 
@@ -108,6 +121,9 @@ def build_fusion_name_ast(
     mol: Molecule,
     component_matches: Sequence[FusionComponentMatch],
     registry: _Registry | Mapping[str, FusionComponentSpec],
+    *,
+    cover_kinds: Iterable[str] | None = None,
+    join_kinds: Iterable[str] | None = None,
 ) -> FusionNameAst:
     """Build the preferred bounded fusion citation from exact component maps.
 
@@ -117,6 +133,13 @@ def build_fusion_name_ast(
     enumerated under explicit bounds and compared without using molecular atom
     identifiers as nomenclature tie-breakers.
     """
+
+    supported_covers = frozenset(_SUPPORT.cover_kinds if cover_kinds is None else cover_kinds)
+    supported_joins = frozenset(_SUPPORT.join_kinds if join_kinds is None else join_kinds)
+    if not supported_covers <= {"tree", "multiparent"}:
+        raise ValueError("unknown fusion cover kind")
+    if not supported_joins <= {"ortho", "ortho_peri", "higher_order"}:
+        raise ValueError("unknown fusion join kind")
 
     options = _occurrence_options(component_matches, registry)
     face_ids = tuple(sorted(set().union(*(option.face_ids for option in options))))
@@ -133,7 +156,15 @@ def build_fusion_name_ast(
     budget_exhausted = 0
     for selected_options in selections:
         try:
-            candidates.extend(_candidates_for_component_selection(mol, selected_options, registry))
+            candidates.extend(
+                _candidates_for_component_selection(
+                    mol,
+                    selected_options,
+                    registry,
+                    supported_covers=supported_covers,
+                    supported_joins=supported_joins,
+                )
+            )
         except _LocantMapBudgetExceeded:
             budget_exhausted += 1
     if not candidates:
@@ -141,7 +172,8 @@ def build_fusion_name_ast(
             raise FusionDescriptorError(
                 f"all viable component covers exceeded the locant-map budget of {MAX_LOCANT_MAP_COMBINATIONS} states"
             )
-        raise FusionDescriptorError("no exact tree-cover fusion citation was found")
+        tier = "tree-cover" if supported_covers == {"tree"} else "supported-cover"
+        raise FusionDescriptorError(f"no exact {tier} fusion citation was found")
     return min(candidates, key=lambda candidate: (candidate.score, candidate.rendered)).ast
 
 
@@ -163,9 +195,9 @@ def render_fusion_name_parts(
     """Render ordered text parts while preserving component/interface scope."""
 
     matches = {match.occurrence_id: match for match in ast.component_occurrences}
-    descriptors = {
-        join.attached_occurrence: descriptor for join, descriptor in zip(ast.joins, ast.descriptors, strict=True)
-    }
+    descriptors_by_attached: dict[int, list[FusionDescriptor]] = defaultdict(list)
+    for join, descriptor in zip(ast.joins, ast.descriptors, strict=True):
+        descriptors_by_attached[join.attached_occurrence].append(descriptor)
     groups_by_member: dict[int, FusionMultiplicityGroup] = {}
     for group in ast.multiplicative_groups:
         for occurrence in group.occurrence_ids:
@@ -219,15 +251,24 @@ def render_fusion_name_parts(
     def attachment(node: FusionCitationNode) -> list[NameTokenBinding]:
         descendants = render_children(node)
         spec = _spec_for_match(registry, matches[node.occurrence_id])
-        descriptor = descriptors[node.occurrence_id]
+        descriptors = tuple(descriptors_by_attached[node.occurrence_id])
+        descriptor_text = _combine_rendered_descriptors(
+            tuple(
+                _render_descriptor(
+                    descriptor,
+                    omit_attached_locants=(
+                        len(descriptors) == 1
+                        and _omit_attached_locants(registry, spec.key)
+                    ),
+                )
+                for descriptor in descriptors
+            )
+        )
         return [
             *descendants,
             component_part(spec.attached_prefix, "attached_component", (node.occurrence_id,)),
             descriptor_part(
-                _render_descriptor(
-                    descriptor,
-                    omit_attached_locants=_omit_attached_locants(registry, spec.key),
-                ),
+                descriptor_text,
                 (node.occurrence_id,),
             ),
         ]
@@ -248,7 +289,9 @@ def render_fusion_name_parts(
             prefixes = {_spec_for_match(registry, matches[member.occurrence_id]).attached_prefix for member in members}
             if len(prefixes) != 1:
                 raise FusionDescriptorError("a multiplicative group must use one attached prefix")
-            member_descriptors = tuple(descriptors[member.occurrence_id] for member in members)
+            member_descriptors = tuple(
+                descriptors_by_attached[member.occurrence_id][0] for member in members
+            )
             descriptor = _combine_rendered_descriptors(
                 tuple(
                     _render_descriptor(
@@ -284,9 +327,64 @@ def render_fusion_name_parts(
             )
         return pieces
 
-    root = ast.citation_tree
-    root_match = matches[root.occurrence_id]
-    root_spec = _spec_for_match(registry, root_match)
+    plan = ast.citation_plan
+    if plan is None:
+        if ast.citation_tree is None:
+            raise FusionDescriptorError("fusion AST has no citation plan")
+        plan = FusionCitationPlan.from_tree(ast.citation_tree, ast.joins)
+
+    if (
+        len(plan.roots) > 1
+        or plan.interparent_join_indices
+        or plan.cycle_closing_join_indices
+    ):
+        pieces: list[NameTokenBinding] = []
+        for occurrence in plan.render_order:
+            spec = _spec_for_match(registry, matches[occurrence])
+            descriptors = tuple(descriptors_by_attached[occurrence])
+            if not descriptors:
+                raise FusionDescriptorError(
+                    f"nonparent component occurrence {occurrence} has no fusion descriptor"
+                )
+            pieces.extend(
+                (
+                    component_part(spec.attached_prefix, "attached_component", (occurrence,)),
+                    descriptor_part(
+                        _combine_rendered_descriptors(
+                            tuple(
+                                _render_descriptor(descriptor, omit_attached_locants=False)
+                                for descriptor in descriptors
+                            )
+                        ),
+                        (occurrence,),
+                    ),
+                )
+            )
+        root_specs = tuple(
+            _spec_for_match(registry, matches[root.occurrence_id]) for root in plan.roots
+        )
+        parent_names = {spec.parent_name for spec in root_specs}
+        if len(parent_names) != 1:
+            raise FusionDescriptorError("multiparent rendering requires identical parent components")
+        parent_name = next(iter(parent_names))
+        if len(root_specs) == 1:
+            pieces.append(component_part(parent_name, "parent_component", plan.parent_occurrences))
+        else:
+            try:
+                multiplier = multipliers.complex_(len(root_specs))
+            except KeyError as exc:
+                raise FusionDescriptorError("unsupported multiparent multiplicity") from exc
+            pieces.append(
+                component_part(
+                    f"{multiplier}({parent_name})",
+                    "multiparent_components",
+                    plan.parent_occurrences,
+                )
+            )
+        return tuple(pieces)
+
+    root = plan.roots[0]
+    root_spec = _spec_for_match(registry, matches[root.occurrence_id])
     return tuple(
         [
             *render_children(root),
@@ -366,6 +464,9 @@ def _candidates_for_component_selection(
     mol: Molecule,
     options: Sequence[_OccurrenceOption],
     registry: _Registry | Mapping[str, FusionComponentSpec],
+    *,
+    supported_covers: frozenset[str],
+    supported_joins: frozenset[str],
 ) -> list[_Candidate]:
     if len(options) > MAX_COMPONENT_OCCURRENCES:
         return []
@@ -378,9 +479,9 @@ def _candidates_for_component_selection(
     target_atoms = frozenset(atom for scope in scopes for atom in scope.atom_ids)
     target_edges = frozenset(edge for scope in scopes for edge in scope.edges)
     audit = audit_component_cover(scopes, target_atom_ids=target_atoms, target_edges=target_edges)
-    if not audit.ok or audit.proof.kind not in _SUPPORT.cover_kinds:
+    if not audit.ok or audit.proof.kind not in supported_covers:
         return []
-    if any(_interface_support_key(interface) not in _SUPPORT.join_kinds for interface in audit.graph.interfaces):
+    if any(_interface_support_key(interface) not in supported_joins for interface in audit.graph.interfaces):
         return []
 
     eligible_roots = [match for match in canonical_matches if specs[match.occurrence_id].usable_as_parent]
@@ -392,20 +493,26 @@ def _candidates_for_component_selection(
         for match in eligible_roots
         if component_spec_seniority_key(specs[match.occurrence_id]) == senior_key
     ]
-    root_locations = {
-        root.occurrence_id: _tree_parent_location_key(audit.graph.adjacency, root.occurrence_id, specs)
-        for root in roots
-    }
-    preferred_location = min(root_locations.values())
-    roots = [root for root in roots if root_locations[root.occurrence_id] == preferred_location]
+    root_sets = [(root.occurrence_id,) for root in roots]
+    if "multiparent" in supported_covers:
+        root_sets.extend(_multiparent_root_sets(tuple(root.occurrence_id for root in roots), audit.graph.adjacency, specs))
+    topologies = tuple(
+        _citation_topology(audit.graph.adjacency, root_set, specs)
+        for root_set in root_sets
+    )
+    if audit.proof.kind == "multiparent" and "higher_order" not in supported_joins:
+        return []
+    preferred_location = min(topology.location_key for topology in topologies)
+    topologies = tuple(
+        topology for topology in topologies if topology.location_key == preferred_location
+    )
 
     mapping_sets: list[tuple[FusionComponentMatch, ...]] = []
     for occurrence_id, option in enumerate(ordered_options):
         mapping_sets.append(tuple(replace(candidate, occurrence_id=occurrence_id) for candidate in option.mappings))
     candidates: list[_Candidate] = []
-    for root in roots:
-        parent_by_child, order_by_occurrence = _orient_tree(audit.graph.adjacency, root.occurrence_id)
-        if any(not specs[occurrence].usable_as_attached for occurrence in parent_by_child):
+    for topology in topologies:
+        if any(not specs[occurrence].usable_as_attached for occurrence in topology.parent_by_child):
             continue
         interface_by_pair = {
             frozenset((interface.left, interface.right)): interface for interface in audit.graph.interfaces
@@ -413,25 +520,134 @@ def _candidates_for_component_selection(
         for selected_maps in _compatible_mapping_assignments(
             mapping_sets,
             specs,
-            root.occurrence_id,
-            parent_by_child,
-            order_by_occurrence,
+            topology.roots[0],
+            topology.parent_by_child,
+            topology.order_by_occurrence,
             interface_by_pair,
             mol,
         ):
             candidate = _build_candidate(
                 selected_maps,
                 specs,
-                root.occurrence_id,
-                parent_by_child,
-                order_by_occurrence,
+                topology,
                 interface_by_pair,
                 registry,
                 mol,
+                supported_joins,
             )
             if candidate is not None:
                 candidates.append(candidate)
     return candidates
+
+
+def _multiparent_root_sets(
+    roots: tuple[int, ...],
+    adjacency: Mapping[int, tuple[int, ...]],
+    specs: Mapping[int, FusionComponentSpec],
+) -> tuple[tuple[int, ...], ...]:
+    """Enumerate bounded identical-parent sets with an intervening component."""
+
+    result: list[tuple[int, ...]] = []
+    for count in range(2, len(roots) + 1):
+        for selected in combinations(roots, count):
+            if len({specs[root].key for root in selected}) != 1:
+                continue
+            if any(right in adjacency[left] for left, right in combinations(selected, 2)):
+                continue
+            topology = _citation_topology(adjacency, selected, specs)
+            if topology.interparent_occurrences:
+                result.append(selected)
+    return tuple(result)
+
+
+def _citation_topology(
+    adjacency: Mapping[int, tuple[int, ...]],
+    roots: tuple[int, ...],
+    specs: Mapping[int, FusionComponentSpec],
+) -> _CitationTopology:
+    """Build one deterministic spanning forest and retain all closing edges."""
+
+    root_set = set(roots)
+    parent_by_child: dict[int, int] = {}
+    order = {root: 0 for root in roots}
+    owner = {root: root for root in roots}
+    pending = deque(sorted(roots, key=lambda node: _cover_node_key(node, adjacency, specs)))
+    while pending:
+        host = pending.popleft()
+        for child in sorted(
+            adjacency[host],
+            key=lambda node: _cover_node_key(node, adjacency, specs),
+        ):
+            if child in order:
+                continue
+            parent_by_child[child] = host
+            order[child] = order[host] + 1
+            owner[child] = owner[host]
+            pending.append(child)
+
+    primary_pairs = {
+        frozenset((child, host)) for child, host in parent_by_child.items()
+    }
+    all_pairs = {
+        frozenset((left, right))
+        for left, neighbors in adjacency.items()
+        for right in neighbors
+        if left != right
+    }
+    closing = tuple(
+        sorted(
+            all_pairs - primary_pairs,
+            key=lambda pair: tuple(
+                sorted(_cover_node_key(node, adjacency, specs) for node in pair)
+            ),
+        )
+    )
+    interparent_pairs = tuple(
+        pair
+        for pair in closing
+        if len({owner.get(node) for node in pair}) > 1
+    )
+    cycle_closing_pairs = tuple(pair for pair in closing if pair not in interparent_pairs)
+    interparents = tuple(
+        sorted(
+            {
+                node
+                for pair in interparent_pairs
+                for node in pair
+                if node not in root_set
+            },
+            key=lambda node: _cover_node_key(node, adjacency, specs),
+        )
+    )
+    location = _parent_location_key(
+        parent_by_child,
+        order,
+        roots,
+        interparents,
+        specs,
+    )
+    return _CitationTopology(
+        roots=roots,
+        parent_by_child=parent_by_child,
+        order_by_occurrence=order,
+        interparent_pairs=interparent_pairs,
+        cycle_closing_pairs=cycle_closing_pairs,
+        interparent_occurrences=interparents,
+        location_key=location,
+    )
+
+
+def _cover_node_key(
+    occurrence: int,
+    adjacency: Mapping[int, tuple[int, ...]],
+    specs: Mapping[int, FusionComponentSpec],
+) -> tuple:
+    return (
+        component_spec_seniority_key(specs[occurrence]).as_tuple(),
+        -len(adjacency[occurrence]),
+        specs[occurrence].key,
+        occurrence,
+    )
 
 
 def _tree_parent_location_key(
@@ -442,6 +658,24 @@ def _tree_parent_location_key(
     """Return the topology-only parent-location criteria for a tree cover."""
 
     parent_by_child, order_by_occurrence = _orient_tree(adjacency, root)
+    return _parent_location_key(
+        parent_by_child,
+        order_by_occurrence,
+        (root,),
+        (),
+        specs,
+    )
+
+
+def _parent_location_key(
+    parent_by_child: Mapping[int, int],
+    order_by_occurrence: Mapping[int, int],
+    roots: tuple[int, ...],
+    interparents: tuple[int, ...],
+    specs: Mapping[int, FusionComponentSpec],
+) -> ParentLocationKey:
+    """Return the complete deterministic P-25 parent-location key."""
+
     maximum_order = max(order_by_occurrence.values(), default=0)
     counts = tuple(
         -sum(order == level for order in order_by_occurrence.values())
@@ -462,18 +696,30 @@ def _tree_parent_location_key(
             reverse=True,
         )
     )
+    parent_keys = {specs[root].key for root in roots}
+    incomplete = int(
+        len(roots) == 1
+        and any(
+            occurrence not in roots and specs[occurrence].key in parent_keys
+            for occurrence in specs
+        )
+    )
+    interparent_seniority = tuple(
+        sorted(component_spec_seniority_key(specs[occurrence]).as_tuple() for occurrence in interparents)
+    )
     attached = tuple(
         sorted(
             component_spec_seniority_key(specs[occurrence]).as_tuple()
             for occurrence in specs
-            if occurrence != root
+            if occurrence not in roots and occurrence not in interparents
         )
     )
     return ParentLocationKey(
-        incomplete_system=0,
+        incomplete_system=incomplete,
         maximum_attachment_order=maximum_order,
         attachment_count_by_order=counts,
         multiplicative_grouping_score=grouping,
+        interparent_seniority=interparent_seniority,
         attached_component_preference=attached,
     )
 
@@ -578,17 +824,18 @@ def _deduplicate_interface_equivalent_maps(
 def _build_candidate(
     matches: Sequence[FusionComponentMatch],
     specs: Mapping[int, FusionComponentSpec],
-    root: int,
-    parent_by_child: Mapping[int, int],
-    order_by_occurrence: Mapping[int, int],
+    topology: _CitationTopology,
     interface_by_pair: Mapping[frozenset[int], FusionInterface[int]],
     registry: _Registry | Mapping[str, FusionComponentSpec],
     mol: Molecule,
+    supported_joins: frozenset[str],
 ) -> _Candidate | None:
     match_by_id = {match.occurrence_id: match for match in matches}
-    raw_joins: dict[int, FusionJoin] = {}
+    primary_joins: dict[int, FusionJoin] = {}
+    interparent_joins: list[FusionJoin] = []
+    cycle_closing_joins: list[FusionJoin] = []
     side_rank: dict[int, int] = {}
-    for child, host in parent_by_child.items():
+    for child, host in topology.parent_by_child.items():
         interface = interface_by_pair[frozenset((child, host))]
         join_data = _classified_join(
             match_by_id[child],
@@ -596,42 +843,152 @@ def _build_candidate(
             specs[child],
             specs[host],
             interface,
-            order_by_occurrence[child],
+            topology.order_by_occurrence[child],
             mol,
         )
         if join_data is None:
             return None
-        raw_joins[child], side_rank[child] = join_data
+        join, side_rank[child] = join_data
+        if (
+            topology.order_by_occurrence[child] > 1
+            and "higher_order" in supported_joins
+        ):
+            join = replace(
+                join,
+                interface=replace(
+                    join.interface,
+                    kind=FusionJoinKind.HIGHER_ORDER,
+                    host_sides=(),
+                    host_locants=join.interface.host_path,
+                ),
+            )
+        primary_joins[child] = join
 
-    child_order = _ordered_children(parent_by_child, specs, raw_joins, side_rank)
-    prime_depths, groups = _multiplicative_groups(child_order, specs, raw_joins)
-    joins_by_child = {child: _with_prime_depths(join, prime_depths) for child, join in raw_joins.items()}
-    citation_tree = _build_citation_tree(root, child_order)
-    citation_children = _preorder_children(citation_tree)
-    joins = tuple(joins_by_child[child] for child in citation_children)
+    for pair in (*topology.interparent_pairs, *topology.cycle_closing_pairs):
+        attached, host = _closing_join_direction(
+            pair,
+            topology.roots,
+            topology.order_by_occurrence,
+            specs,
+        )
+        classified = classify_ordered_fusion_interface(
+            match_by_id[attached],
+            match_by_id[host],
+            specs[attached],
+            specs[host],
+            interface_by_pair[pair],
+            mol,
+        )
+        if classified is None:
+            return None
+        evidence, _rank = classified
+        join = FusionJoin(
+            order=max(topology.order_by_occurrence[attached], 1) + 1,
+            interface=(
+                evidence
+                if pair in topology.interparent_pairs
+                else replace(
+                    evidence,
+                    kind=FusionJoinKind.HIGHER_ORDER,
+                    host_sides=(),
+                    host_locants=evidence.host_path,
+                )
+            ),
+        )
+        target = interparent_joins if pair in topology.interparent_pairs else cycle_closing_joins
+        target.append(join)
+
+    child_order = _ordered_children(topology.parent_by_child, specs, primary_joins, side_rank)
+    prime_depths, groups = _multiplicative_groups(child_order, specs, primary_joins)
+    if len(topology.roots) > 1:
+        groups = ()
+        prime_depths.update({root: depth for depth, root in enumerate(topology.roots)})
+    joins_by_child = {
+        child: _with_prime_depths(join, prime_depths)
+        for child, join in primary_joins.items()
+    }
+    roots = tuple(_build_citation_tree(root, child_order) for root in topology.roots)
+    citation_children = tuple(
+        occurrence for root in roots for occurrence in _preorder_children(root)
+    )
+    primary = tuple(joins_by_child[child] for child in citation_children)
+    interparent = tuple(_with_prime_depths(join, prime_depths) for join in interparent_joins)
+    cycle_closing = tuple(
+        _with_prime_depths(join, prime_depths) for join in cycle_closing_joins
+    )
+    joins = (*primary, *interparent, *cycle_closing)
     descriptors = tuple(
         FusionDescriptor.from_interface(join.interface)
         for join in joins
     )
+    citation_plan = FusionCitationPlan(
+        roots=roots,
+        primary_join_indices=tuple(range(len(primary))),
+        interparent_join_indices=tuple(
+            range(len(primary), len(primary) + len(interparent))
+        ),
+        cycle_closing_join_indices=tuple(
+            range(len(primary) + len(interparent), len(joins))
+        ),
+        interparent_occurrences=topology.interparent_occurrences,
+        render_order=tuple(
+            occurrence
+            for root in roots
+            for occurrence in _preorder_children(root)
+        ),
+    )
     ast = FusionNameAst(
-        plan_kind=_plan_kind(len(matches), groups),
-        parent_occurrences=(root,),
+        plan_kind=_plan_kind(len(matches), groups, topology),
+        parent_occurrences=topology.roots,
         component_occurrences=tuple(sorted(matches, key=lambda match: match.occurrence_id)),
         joins=joins,
-        citation_tree=citation_tree,
+        citation_tree=roots[0] if len(roots) == 1 else None,
         multiplicative_groups=groups,
         descriptors=descriptors,
+        citation_plan=citation_plan,
     )
     rendered = render_fusion_name(ast, registry)
     score = (
-        component_spec_seniority_key(specs[root]).as_tuple(),
+        component_spec_seniority_key(specs[topology.roots[0]]).as_tuple(),
+        topology.location_key,
         len(matches),
-        max(order_by_occurrence.values(), default=0),
+        max(topology.order_by_occurrence.values(), default=0),
         tuple(_join_preference_key(joins_by_child[child], side_rank[child]) for child in citation_children),
         tuple(component_spec_seniority_key(specs[child]).as_tuple() for child in citation_children),
         rendered,
     )
     return _Candidate(ast, score, rendered)
+
+
+def _closing_join_direction(
+    pair: frozenset[int],
+    roots: tuple[int, ...],
+    orders: Mapping[int, int],
+    specs: Mapping[int, FusionComponentSpec],
+) -> tuple[int, int]:
+    """Orient a non-tree interface without consulting molecular atom ids."""
+
+    root_set = set(roots)
+    left, right = sorted(
+        pair,
+        key=lambda occurrence: (
+            component_spec_seniority_key(specs[occurrence]).as_tuple(),
+            specs[occurrence].key,
+            occurrence,
+        ),
+    )
+    if (left in root_set) != (right in root_set):
+        return (right, left) if left in root_set else (left, right)
+    ranked = sorted(
+        (left, right),
+        key=lambda occurrence: (
+            orders[occurrence],
+            component_spec_seniority_key(specs[occurrence]).as_tuple(),
+            specs[occurrence].key,
+            occurrence,
+        ),
+    )
+    return ranked[-1], ranked[0]
 
 
 def classify_ordered_fusion_interface(
@@ -965,7 +1322,15 @@ def _simple_multiplier(count: int) -> str | None:
         return None
 
 
-def _plan_kind(component_count: int, groups: tuple[FusionMultiplicityGroup, ...]) -> str:
+def _plan_kind(
+    component_count: int,
+    groups: tuple[FusionMultiplicityGroup, ...],
+    topology: _CitationTopology,
+) -> str:
+    if len(topology.roots) > 1:
+        return "multiparent"
+    if topology.cycle_closing_pairs:
+        return "cyclic_component_cover"
     if groups:
         return "multiplicative_tree"
     return "two_component" if component_count == 2 else "polycomponent_tree"
