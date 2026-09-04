@@ -13,6 +13,7 @@ from openclatura.fusion.registry import (
     fusion_component_registry,
     version,
 )
+from openclatura.hantzsch_widman import hw_generated_names
 from openclatura.molecule import Molecule
 from openclatura.naming_data import load_json_table
 from openclatura.rules import elements
@@ -31,6 +32,24 @@ def _ring(
         mol.add_atom(symbol, idx=atom_id, is_aromatic=position not in nonaromatic_positions)
     for bond_id, (left, right) in enumerate(zip(atom_ids, atom_ids[1:] + atom_ids[:1]), start=100):
         mol.add_bond(left, right, idx=bond_id)
+    return mol, GraphCycle.from_atoms(atom_ids)
+
+
+def _triazole_ring(*, atom_ids: tuple[int, ...] = (0, 1, 2, 3, 4)) -> tuple[Molecule, GraphCycle]:
+    """Graph-build a neutral mancude 1,2,4-triazole component."""
+
+    mol = Molecule()
+    symbols = ("N", "N", "C", "N", "C")
+    for position, (atom_id, symbol) in enumerate(zip(atom_ids, symbols, strict=True)):
+        mol.add_atom(symbol, idx=atom_id, is_aromatic=True, total_h_count=position == 0)
+    double_edges = {frozenset((atom_ids[1], atom_ids[2])), frozenset((atom_ids[3], atom_ids[4]))}
+    for bond_id, (left, right) in enumerate(zip(atom_ids, atom_ids[1:] + atom_ids[:1]), start=200):
+        mol.add_bond(
+            left,
+            right,
+            idx=bond_id,
+            order=2 if frozenset((left, right)) in double_edges else 1,
+        )
     return mol, GraphCycle.from_atoms(atom_ids)
 
 
@@ -155,6 +174,79 @@ def test_generated_carbocycles_use_shared_numbered_graph_templates():
     assert {bond.bond_class for bond in component.spec.bonds} == {"aromatic"}
 
 
+def test_unlisted_hw_monocycle_is_derived_as_a_systematic_component():
+    registry = fusion_component_registry()
+    mol, face = _triazole_ring(atom_ids=(40, 10, 50, 20, 30))
+    before_keys = tuple(registry.by_key)
+    before_hw_names = tuple(hw_generated_names())
+
+    matches = tuple(
+        match
+        for match in registry.match_faces(mol, (face,), role=FusionComponentRole.ATTACHED)
+        if match.spec_key.startswith("generated-hw:")
+    )
+
+    assert len(matches) == 2
+    assert {registry.spec_for_match(match).parent_name for match in matches} == {"[1,2,4]triazole"}
+    assert {registry.spec_for_match(match).attached_prefix for match in matches} == {"[1,2,4]triazolo"}
+    assert all(registry.spec_for_match(match).template.family == "generated_hw_monocycle" for match in matches)
+    assert all(registry.spec_for_match(match).template.charge_policy == "exact" for match in matches)
+    assert all(set(dict(match.local_to_input_atom).values()) == set(mol.atoms) for match in matches)
+    assert tuple(registry.by_key) == before_keys
+    assert tuple(hw_generated_names()) == before_hw_names
+
+
+def test_systematic_hw_numbering_is_independent_of_face_cycle_orientation():
+    registry = fusion_component_registry()
+    mol, face = _triazole_ring()
+    rotated = GraphCycle.from_atoms((2, 3, 4, 0, 1))
+    reversed_cycle = GraphCycle.from_atoms(tuple(reversed(face.atoms)))
+
+    def maps(cycle):
+        return {
+            match.local_to_input_atom
+            for match in registry.match_faces(mol, (cycle,))
+            if match.spec_key.startswith("generated-hw:")
+        }
+
+    assert maps(face) == maps(rotated) == maps(reversed_cycle)
+
+
+def test_explicit_retained_component_precedes_systematic_hw_derivation():
+    mol, face = _ring(
+        ("O", "C", "C", "C", "C"),
+        atom_ids=(40, 10, 50, 20, 30),
+        nonaromatic_positions=frozenset({0}),
+    )
+    ring_edges = tuple(zip(face.atoms, face.atoms[1:] + face.atoms[:1]))
+    for position, edge in enumerate(ring_edges):
+        if position in {1, 3}:
+            bond = mol.get_bond(*edge)
+            assert bond is not None
+            mol.update_bond(bond.idx, order=2)
+
+    matches = fusion_component_registry().match_faces(mol, (face,))
+
+    assert {match.spec_key for match in matches} == {"furan"}
+
+
+@pytest.mark.parametrize("invalid_kind", ("charged", "nonstandard_valence", "saturated"))
+def test_systematic_hw_component_rejects_out_of_scope_ring_chemistry(invalid_kind):
+    mol, face = _triazole_ring()
+    if invalid_kind == "charged":
+        mol.update_atom(0, charge=1)
+    elif invalid_kind == "nonstandard_valence":
+        mol.add_atom("C", idx=9)
+        mol.add_bond(0, 9, idx=999)
+    else:
+        for bond_id in tuple(mol.bonds):
+            mol.update_bond(bond_id, order=1)
+
+    matches = fusion_component_registry().match_faces(mol, (face,))
+
+    assert not any(match.spec_key.startswith("generated-hw:") for match in matches)
+
+
 @pytest.mark.parametrize(
     ("key", "ring_size", "prefix"),
     [
@@ -263,6 +355,23 @@ def test_generated_component_rows_are_strictly_validated(field, value, message):
     data["generated_components"][0][field] = value
 
     with pytest.raises((TypeError, ValueError), match=message):
+        FusionComponentRegistry.from_data(data)
+
+
+@pytest.mark.parametrize(
+    ("change", "message"),
+    [
+        ({"generator": "name_table"}, "unsupported systematic fusion component generator"),
+        ({"allow_as_parent": "yes"}, "allow_as_parent must be a boolean"),
+        ({"allow_as_parent": False, "allow_as_attached": False}, "not eligible for any role"),
+        ({"rule": ""}, "rule must be a non-empty string"),
+    ],
+)
+def test_systematic_component_generator_policy_is_strictly_validated(change, message):
+    data = deepcopy(load_json_table("fusion_components.json"))
+    data["systematic_component_generators"][0].update(change)
+
+    with pytest.raises(ValueError, match=message):
         FusionComponentRegistry.from_data(data)
 
 

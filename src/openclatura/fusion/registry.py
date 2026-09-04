@@ -15,6 +15,11 @@ from functools import cache
 from types import MappingProxyType
 from typing import Any
 
+from ..hantzsch_widman import (
+    HWFusionComponent,
+    hw_fusion_component_from_key,
+    hw_fusion_components_for_ring,
+)
 from ..molecule import Molecule
 from ..naming_data import load_json_table
 from ..polycycle_topology import normalize_edge
@@ -66,8 +71,16 @@ class RegisteredFusionComponent:
 @dataclass(frozen=True, slots=True)
 class _Face:
     id: int
+    atom_cycle: tuple[int, ...]
     atoms: frozenset[int]
     edges: frozenset[tuple[int, int]]
+
+
+@dataclass(frozen=True, slots=True)
+class _GeneratedHWPolicy:
+    usable_as_parent: bool
+    usable_as_attached: bool
+    rule_reference: str
 
 
 class FusionComponentRegistry:
@@ -93,6 +106,7 @@ class FusionComponentRegistry:
         self._topology_index: dict[
             tuple[int, tuple], list[tuple[RegisteredFusionComponent, RetainedGraphTemplate]]
         ] = {}
+        self._generated_hw_policy: _GeneratedHWPolicy | None = None
 
     @classmethod
     def from_data(cls, data: Mapping[str, Any]) -> FusionComponentRegistry:
@@ -115,6 +129,7 @@ class FusionComponentRegistry:
             if not isinstance(row, Mapping):
                 raise ValueError("every fusion component must be a mapping")
             registry.register(row)
+        registry._generated_hw_policy = _generated_hw_policy(data.get("systematic_component_generators", ()))
         return registry
 
     @property
@@ -132,7 +147,13 @@ class FusionComponentRegistry:
     def get(self, key: str) -> RegisteredFusionComponent | None:
         """Return one registered component without copying the registry map."""
 
-        return self._by_key.get(key)
+        component = self._by_key.get(key)
+        if component is not None:
+            return component
+        generated = hw_fusion_component_from_key(key)
+        if generated is None or self._generated_hw_policy is None:
+            return None
+        return self._registered_hw_component(generated)
 
     def register(self, row: Mapping[str, Any]) -> FusionComponentSpec:
         """Validate and register one data-backed component policy row."""
@@ -220,14 +241,16 @@ class FusionComponentRegistry:
         ring_counts = frozenset(count for count, _ in self._topology_index)
         matches: list[FusionComponentMatch] = []
         seen: set[tuple[str, str, frozenset[int], tuple[tuple[str, int], ...]]] = set()
+        explicit_single_faces: set[int] = set()
+        single_face_topology: dict[int, tuple] = {}
         occurrence_id = 0
         for subset in _connected_face_subsets(normalized_faces, ring_counts):
             atom_ids = set().union(*(face.atoms for face in subset))
             topology_key = molecule_graph_topology_key(mol, atom_ids)
+            if len(subset) == 1:
+                single_face_topology[subset[0].id] = topology_key
             candidates = self._topology_index.get((len(subset), topology_key), ())
             for component, template in candidates:
-                if requested_role is not None and not component.eligible_for(requested_role):
-                    continue
                 for exact in match_retained_graph_template_maps(
                     mol,
                     atom_ids,
@@ -235,6 +258,10 @@ class FusionComponentRegistry:
                     allow_nonaromatic=True,
                 ):
                     if not _template_rings_match_faces(template, exact.locant_to_atom, subset):
+                        continue
+                    if len(subset) == 1:
+                        explicit_single_faces.add(subset[0].id)
+                    if requested_role is not None and not component.eligible_for(requested_role):
                         continue
                     local_to_input = tuple((locant, exact.locant_to_atom[locant]) for locant in template.locants)
                     identity = (
@@ -259,6 +286,42 @@ class FusionComponentRegistry:
                         )
                     )
                     occurrence_id += 1
+        if self._generated_hw_policy is not None and (
+            requested_role is None
+            or (requested_role is FusionComponentRole.PARENT and self._generated_hw_policy.usable_as_parent)
+            or (requested_role is FusionComponentRole.ATTACHED and self._generated_hw_policy.usable_as_attached)
+        ):
+            for face in normalized_faces:
+                if face.id in explicit_single_faces:
+                    continue
+                topology_key = single_face_topology.get(face.id)
+                if topology_key is None:
+                    topology_key = molecule_graph_topology_key(mol, set(face.atoms))
+                for generated in hw_fusion_components_for_ring(mol, list(face.atom_cycle)):
+                    local_to_input = tuple((locant, atom_idx) for atom_idx, locant in generated.atom_to_locant)
+                    identity = (
+                        generated.key,
+                        generated.template.name,
+                        frozenset((face.id,)),
+                        local_to_input,
+                    )
+                    if identity in seen:
+                        continue
+                    seen.add(identity)
+                    matches.append(
+                        FusionComponentMatch(
+                            occurrence_id=occurrence_id,
+                            spec_key=generated.key,
+                            covered_face_ids=identity[2],
+                            local_to_input_atom=local_to_input,
+                            local_to_skeleton_atom=tuple(
+                                (locant, skeleton_map[atom_idx]) for locant, atom_idx in local_to_input
+                            ),
+                            topology_key=topology_key,
+                            template_name=generated.template.name,
+                        )
+                    )
+                    occurrence_id += 1
         return tuple(matches)
 
     def spec_for_match(self, match: FusionComponentMatch) -> FusionComponentSpec:
@@ -266,8 +329,30 @@ class FusionComponentRegistry:
 
         component = self._by_key.get(match.spec_key)
         if component is None:
-            raise KeyError(f"unknown fusion component {match.spec_key!r}")
+            generated = hw_fusion_component_from_key(match.spec_key)
+            if generated is None or self._generated_hw_policy is None:
+                raise KeyError(f"unknown fusion component {match.spec_key!r}")
+            if match.template_name != generated.template.name:
+                raise KeyError(f"generated component {match.spec_key!r} has no template {match.template_name!r}")
+            return self._registered_hw_component(generated).spec
         return component.spec_for_template(match.template_name)
+
+    def _registered_hw_component(self, generated: HWFusionComponent) -> RegisteredFusionComponent:
+        policy = self._generated_hw_policy
+        if policy is None:
+            raise KeyError("generated Hantzsch-Widman fusion components are disabled")
+        spec = _component_spec(
+            key=generated.key,
+            parent_name=generated.parent_name,
+            attached_prefix=generated.attached_prefix,
+            template=generated.template,
+            usable_as_parent=policy.usable_as_parent,
+            usable_as_attached=policy.usable_as_attached,
+            rule_reference=policy.rule_reference,
+            seniority_override=None,
+            horizontal_ring_count=1,
+        )
+        return RegisteredFusionComponent(spec, (generated.template.name,), (generated.template,))
 
 
 def _component_spec(
@@ -376,6 +461,30 @@ def _generated_component_templates(rows: object) -> tuple[RetainedGraphTemplate,
     return tuple(templates)
 
 
+def _generated_hw_policy(rows: object) -> _GeneratedHWPolicy | None:
+    """Validate the one stateless systematic-component generator policy."""
+
+    if not isinstance(rows, list):
+        raise ValueError("systematic_component_generators must be a list")
+    policy = None
+    for row in rows:
+        if not isinstance(row, Mapping):
+            raise ValueError("every systematic component generator must be a mapping")
+        generator = _required_text(row, "generator")
+        if generator != "hantzsch_widman_monocycle":
+            raise ValueError(f"unsupported systematic fusion component generator {generator!r}")
+        if policy is not None:
+            raise ValueError("hantzsch_widman_monocycle generator must be unique")
+        policy = _GeneratedHWPolicy(
+            usable_as_parent=_required_bool(row, "allow_as_parent"),
+            usable_as_attached=_required_bool(row, "allow_as_attached"),
+            rule_reference=_required_text(row, "rule"),
+        )
+        if not policy.usable_as_parent and not policy.usable_as_attached:
+            raise ValueError("systematic HW fusion components are not eligible for any role")
+    return policy
+
+
 def _optional_bool(row: Mapping[str, Any], field: str, *, default: bool) -> bool:
     value = row.get(field, default)
     if type(value) is not bool:
@@ -397,7 +506,7 @@ def _normalize_faces(faces: object) -> tuple[_Face, ...]:
             raise ValueError("every fusion face must be a simple cycle")
         face_id = int(getattr(face, "id", position))
         edges = frozenset(normalize_edge(left, right) for left, right in zip(atoms, atoms[1:] + atoms[:1]))
-        normalized.append(_Face(face_id, frozenset(atoms), edges))
+        normalized.append(_Face(face_id, atoms, frozenset(atoms), edges))
     if len({face.id for face in normalized}) != len(normalized):
         raise ValueError("fusion face ids must be unique")
     return tuple(sorted(normalized, key=lambda face: face.id))

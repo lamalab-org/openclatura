@@ -20,7 +20,7 @@ from openclatura.fusion.model import (
 from openclatura.fusion.numbering import MancudeSearchBudgetExceeded
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.graph_io import read_smiles
-from openclatura.molecule import OperationClass
+from openclatura.molecule import Molecule, OperationClass
 
 SYSTEMATIC_FUSION_CASES = json.loads(
     (Path(__file__).parents[1] / "data" / "systematic_fusion_cases.json").read_text(encoding="utf-8")
@@ -157,6 +157,35 @@ def test_generated_carbocycle_component_uses_existing_retained_polycycle_parent(
     assert result.name == "1H-cyclopenta[l]phenanthrene"
     assert result.parent_nomenclature == "systematic_fusion"
     assert result.pin_status == "valid_general_name"
+
+
+def test_graph_derived_hw_component_passes_the_full_fusion_proof_pipeline():
+    mol = Molecule()
+    symbols = {0: "N", 1: "N", 2: "C", 3: "N", 4: "C", 5: "C", 6: "C", 7: "C", 8: "C"}
+    for atom_id, symbol in symbols.items():
+        mol.add_atom(symbol, idx=atom_id, is_aromatic=True)
+    edges = (
+        (0, 1),
+        (1, 2),
+        (2, 3),
+        (3, 4),
+        (4, 0),
+        (3, 5),
+        (5, 6),
+        (6, 7),
+        (7, 8),
+        (8, 4),
+    )
+    double_edges = {frozenset(edge) for edge in ((1, 2), (4, 0), (5, 6), (7, 8))}
+    for bond_id, edge in enumerate(edges, start=500):
+        mol.add_bond(*edge, idx=bond_id, order=2 if frozenset(edge) in double_edges else 1)
+
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert isinstance(result, FusionConfirmed)
+    assert result.plan.rendered_base_name == "[1,2,4]triazolo[4,3-a]pyridine"
+    assert result.plan.audit.status is AuditStatus.CONFIRMED
+    assert result.plan.pin_status.value == "valid_general_name"
 
 
 def test_generated_component_with_retained_polycycle_is_atom_order_invariant():

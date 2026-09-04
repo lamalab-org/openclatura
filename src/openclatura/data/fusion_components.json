@@ -47,6 +47,14 @@
     {"key": "cycloheptatriene", "generator": "monocyclic_carbocycle", "ring_size": 7, "bond_class": "aromatic", "pin_component": true},
     {"key": "cyclooctatetraene", "generator": "monocyclic_carbocycle", "ring_size": 8, "bond_class": "aromatic", "pin_component": true}
   ],
+  "systematic_component_generators": [
+    {
+      "generator": "hantzsch_widman_monocycle",
+      "allow_as_parent": true,
+      "allow_as_attached": true,
+      "rule": "P-25.2"
+    }
+  ],
   "components": [
     {"key": "cyclopentadiene", "parent_name": "cyclopentadiene", "attached_prefix": "cyclopenta", "omit_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
     {"key": "cycloheptatriene", "parent_name": "cycloheptatriene", "attached_prefix": "cyclohepta", "omit_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
