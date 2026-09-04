@@ -73,6 +73,8 @@ def intrinsic_fused_layouts(
     coordinate_systems = set.intersection(
         *(set(shape.coordinate_system for shape in _SHAPES_BY_SIZE[face.size]) for face in model.faces)
     )
+    if "eisenstein" in coordinate_systems:
+        coordinate_systems = {"eisenstein"}
     # Enumerating every seed avoids making the selected geometry depend on the
     # input atom IDs used to assign face IDs. The hard state/result budgets keep
     # this bounded for larger fused systems.
