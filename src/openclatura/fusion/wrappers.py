@@ -18,9 +18,10 @@ from ..molecule import Molecule, bond_ids_within, edges_within_atoms
 from ..polycycle_topology import connected_components, ring_system_topology
 from ..retained_fused_templates import match_retained_fused_templates
 from ..retained_name_policy import retained_parent_output_name
+from ..ring_parent import ParentHydrideKind, RingParent
 from ..rules import stems
 from .config import fusion_nomenclature_config
-from .model import FusionConfirmed, FusionMode, FusionParentPlan
+from .model import FusionConfirmed, FusionMode, PinDecision, PinStatus
 
 _WRAPPER_SEARCH_STATES = fusion_nomenclature_config().search.component_selection_states
 
@@ -43,13 +44,10 @@ class NondetachableBridgeKind(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class WrapperParentPlan:
-    """A locant-complete parent that may receive a graph wrapper."""
+    """Compatibility projection over one canonical parent-hydride plan."""
 
-    kind: WrapperParentKind
-    name: str
-    atom_ids: frozenset[int]
-    locant_maps: tuple[tuple[tuple[int, str], ...], ...]
-    fusion_plan: FusionParentPlan | None = None
+    hydride: RingParent
+    selected_locant_map: tuple[tuple[int, str], ...] | None = None
 
     def __post_init__(self) -> None:
         if not self.name or not self.atom_ids or not self.locant_maps:
@@ -60,6 +58,32 @@ class WrapperParentPlan:
                 raise ValueError("wrapper parent locant maps must be complete and bijective")
         if self.kind is WrapperParentKind.SYSTEMATIC_FUSION and self.fusion_plan is None:
             raise ValueError("systematic-fusion wrapper parent requires its fusion proof")
+
+    @property
+    def kind(self) -> WrapperParentKind:
+        return (
+            WrapperParentKind.SYSTEMATIC_FUSION
+            if self.hydride.hydride_kind is ParentHydrideKind.SYSTEMATIC_FUSION
+            else WrapperParentKind.RETAINED
+        )
+
+    @property
+    def name(self) -> str:
+        return self.hydride.base_name or ""
+
+    @property
+    def atom_ids(self) -> frozenset[int]:
+        return self.hydride.atoms
+
+    @property
+    def locant_maps(self) -> tuple[tuple[tuple[int, str], ...], ...]:
+        if self.selected_locant_map is not None:
+            return (self.selected_locant_map,)
+        return tuple(tuple(sorted(mapping.items())) for mapping in self.hydride.proof_locant_maps)
+
+    @property
+    def fusion_plan(self):
+        return self.hydride.fusion_plan
 
 
 @dataclass(frozen=True, slots=True)
@@ -226,7 +250,7 @@ def plan_bridged_fusion_wrapper(
                     )
                     if audit_checks is None:
                         continue
-                    selected_parent = replace(parent, locant_maps=(entries,))
+                    selected_parent = replace(parent, selected_locant_map=entries)
                     rendered_parts = _render_bridge_parts(mol, selected_parent, operations)
                     rendered = "".join(part.text for part in rendered_parts)
                     plan = BridgedFusionWrapperPlan(
@@ -271,10 +295,11 @@ def _retained_wrapper_parent(mol: Molecule, atoms: frozenset[int]) -> WrapperPar
         tuple(sorted(((atom, str(locant)) for atom, locant in match.atom_to_locant.items()))) for match in same_parent
     )
     return WrapperParentPlan(
-        kind=WrapperParentKind.RETAINED,
-        name=retained_parent_output_name(template_name, "wrapped_parent"),
-        atom_ids=atoms,
-        locant_maps=tuple(dict.fromkeys(maps)),
+        hydride=RingParent.from_retained_locant_maps(
+            atoms=atoms,
+            locant_maps=[dict(entries) for entries in dict.fromkeys(maps)],
+            name=retained_parent_output_name(template_name, "wrapped_parent"),
+        ),
     )
 
 
@@ -290,16 +315,14 @@ def _systematic_fusion_parent(
     result = plan_fusion_parent(mol, atoms, mode=mode)
     if not isinstance(result, FusionConfirmed):
         return None
-    maps = tuple(
-        tuple(sorted((atom, str(locant)) for atom, locant in entries))
-        for entries in result.plan.numbering.input_locant_maps
-    )
     return WrapperParentPlan(
-        kind=WrapperParentKind.SYSTEMATIC_FUSION,
-        name=result.plan.rendered_base_name,
-        atom_ids=atoms,
-        locant_maps=maps,
-        fusion_plan=result.plan,
+        hydride=RingParent.from_fusion_plan(
+            result.plan,
+            pin_decision=PinDecision(
+                PinStatus.VALID_GENERAL_NAME,
+                ("fusion_rules_satisfied", *result.plan.audit.checks),
+            ),
+        ),
     )
 
 

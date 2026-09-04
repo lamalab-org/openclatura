@@ -261,6 +261,8 @@ class RingParent:
     def bond_model(self) -> ParentBondModel | None:
         if self.parent_bond_model is not None:
             return self.parent_bond_model
+        if self.is_bridged_fusion:
+            return self.fusion_wrapper_plan.parent.hydride.bond_model
         return self.fusion_plan.bond_model if self.uses_fusion_plan else None
 
     @property
@@ -395,20 +397,14 @@ class RingParent:
 
         if not plan.audit_ok:
             raise ValueError("Bridged fusion RingParent requires a confirmed wrapper audit.")
-        underlying_fusion = plan.parent.fusion_plan
         all_atoms = set(plan.parent.atom_ids)
         all_atoms.update(atom for bridge in plan.bridges for atom in bridge.atom_ids)
         return cls(
             kind="bridged_fusion",
             atoms=frozenset(all_atoms),
-            descriptor=plan.rendered_name,
-            retained_locant_maps=tuple(dict(entries) for entries in plan.parent.locant_maps),
             proof_source="fusion_wrapper_reconstruction",
-            fusion_plan=underlying_fusion,
             fusion_wrapper_plan=plan,
             parent_hydride_kind=ParentHydrideKind.BRIDGED_FUSION,
-            parent_name=plan.rendered_name,
-            parent_bond_model=(underlying_fusion.bond_model if underlying_fusion is not None else None),
         )
 
     @classmethod
