@@ -18,6 +18,7 @@ from .ring_renderer import is_von_baeyer_descriptor
 
 if TYPE_CHECKING:
     from .fusion.model import FusionParentPlan, ParentBondModel
+    from .fusion.wrappers import BridgedFusionWrapperPlan
 
 
 class ParentHydrideKind(str, Enum):
@@ -26,6 +27,7 @@ class ParentHydrideKind(str, Enum):
     GENERATED_MONOCYCLE = "generated_monocycle"
     RETAINED = "retained"
     SYSTEMATIC_FUSION = "systematic_fusion"
+    BRIDGED_FUSION = "bridged_fusion"
     VON_BAEYER = "von_baeyer"
     SPIRO = "spiro"
     LEGACY_RING = "legacy_ring"
@@ -56,6 +58,7 @@ class RingParent:
     retained_locant_maps: tuple[dict[int, str], ...] = ()
     proof_source: str = "topology"
     fusion_plan: FusionParentPlan | None = None
+    fusion_wrapper_plan: BridgedFusionWrapperPlan | None = None
     parent_hydride_kind: ParentHydrideKind | None = None
     parent_name: str | None = None
     substituent_stem: str | None = None
@@ -71,6 +74,8 @@ class RingParent:
             return self.parent_hydride_kind
         if self.is_systematic_fusion:
             return ParentHydrideKind.SYSTEMATIC_FUSION
+        if self.is_bridged_fusion:
+            return ParentHydrideKind.BRIDGED_FUSION
         if self.retained_locant_maps and self.kind == "retained_polycycle":
             return ParentHydrideKind.RETAINED
         if self.kind == "bicyclo" or is_von_baeyer_descriptor(self.descriptor):
@@ -100,6 +105,8 @@ class RingParent:
 
     @property
     def audit_ok(self) -> bool:
+        if self.is_bridged_fusion:
+            return self.fusion_wrapper_plan is not None and self.fusion_wrapper_plan.audit_ok
         if self.kind == "systematic_fusion":
             return self.fusion_plan is not None and self.fusion_plan.audit.confirmed
         if self.retained_locant_maps:
@@ -116,11 +123,33 @@ class RingParent:
         return self.kind == "systematic_fusion" and self.fusion_plan is not None
 
     @property
+    def is_bridged_fusion(self) -> bool:
+        return self.kind == "bridged_fusion" and self.fusion_wrapper_plan is not None
+
+    @property
+    def is_fusion_parent(self) -> bool:
+        """Whether fusion nomenclature supplied the complete parent hydride."""
+
+        return self.is_systematic_fusion or self.is_bridged_fusion
+
+    @property
+    def absorbs_skeletal_replacement(self) -> bool:
+        """Whether heteroatom replacement is already present in ``base_name``."""
+
+        return self.hydride_kind in {
+            ParentHydrideKind.RETAINED,
+            ParentHydrideKind.SYSTEMATIC_FUSION,
+            ParentHydrideKind.BRIDGED_FUSION,
+        }
+
+    @property
     def base_name(self) -> str | None:
         if self.parent_name is not None:
             return self.parent_name
         if self.is_systematic_fusion:
             return self.fusion_plan.rendered_base_name
+        if self.is_bridged_fusion:
+            return self.fusion_wrapper_plan.rendered_name
         from .rules import stems
 
         stem = stems.stem_for(len(self.atoms))
@@ -137,6 +166,7 @@ class RingParent:
         if self.hydride_kind in {
             ParentHydrideKind.RETAINED,
             ParentHydrideKind.SYSTEMATIC_FUSION,
+            ParentHydrideKind.BRIDGED_FUSION,
         }:
             return self.base_name
         return self.descriptor
@@ -157,6 +187,7 @@ class RingParent:
 
         if self.hydride_kind in {
             ParentHydrideKind.SYSTEMATIC_FUSION,
+            ParentHydrideKind.BRIDGED_FUSION,
             ParentHydrideKind.RETAINED,
         }:
             name = self.base_name
@@ -182,6 +213,8 @@ class RingParent:
     def proof_locant_maps(self) -> tuple[dict[int, str], ...]:
         if self.is_systematic_fusion:
             return self.fusion_plan.numbering.string_input_locant_maps()
+        if self.is_bridged_fusion:
+            return tuple(dict(entries) for entries in self.fusion_wrapper_plan.parent.locant_maps)
         if self.retained_locant_maps:
             return self.retained_locant_maps
         return tuple(
@@ -207,6 +240,7 @@ class RingParent:
         return self.hydride_kind in {
             ParentHydrideKind.RETAINED,
             ParentHydrideKind.SYSTEMATIC_FUSION,
+            ParentHydrideKind.BRIDGED_FUSION,
         }
 
     @property
@@ -216,6 +250,7 @@ class RingParent:
         return self.hydride_kind in {
             ParentHydrideKind.RETAINED,
             ParentHydrideKind.SYSTEMATIC_FUSION,
+            ParentHydrideKind.BRIDGED_FUSION,
         } or is_von_baeyer_descriptor(self.descriptor)
 
     def with_retained_identity(
@@ -270,6 +305,33 @@ class RingParent:
             ),
             parent_bond_model=plan.bond_model,
             pin_status=str(plan.pin_status),
+        )
+
+    @classmethod
+    def from_fusion_wrapper(cls, plan: BridgedFusionWrapperPlan) -> RingParent:
+        """Build a parent handoff from an audited nondetachable bridge plan."""
+
+        if not plan.audit_ok:
+            raise ValueError("Bridged fusion RingParent requires a confirmed wrapper audit.")
+        underlying_fusion = plan.parent.fusion_plan
+        all_atoms = set(plan.parent.atom_ids)
+        all_atoms.update(atom for bridge in plan.bridges for atom in bridge.atom_ids)
+        return cls(
+            kind="bridged_fusion",
+            atoms=frozenset(all_atoms),
+            descriptor=plan.rendered_name,
+            retained_locant_maps=tuple(dict(entries) for entries in plan.parent.locant_maps),
+            proof_source="fusion_wrapper_reconstruction",
+            fusion_plan=underlying_fusion,
+            fusion_wrapper_plan=plan,
+            parent_hydride_kind=ParentHydrideKind.BRIDGED_FUSION,
+            parent_name=plan.rendered_name,
+            parent_bond_model=(underlying_fusion.bond_model if underlying_fusion is not None else None),
+            pin_status=(
+                str(underlying_fusion.pin_status)
+                if underlying_fusion is not None
+                else "valid_general_name"
+            ),
         )
 
     @classmethod

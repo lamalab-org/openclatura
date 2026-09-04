@@ -132,6 +132,50 @@ def resolve_systematic_fusion_parent(
     return RingParent.from_fusion_plan(plan)
 
 
+def resolve_bridged_fusion_parent(
+    mol: Molecule,
+    selection: ParentSelection,
+    *,
+    decision_trace: DecisionTrace | None = None,
+) -> RingParent | None:
+    """Resolve a proven nondetachable bridge around a fused parent."""
+
+    mode = current_fusion_mode()
+    if mode not in {FusionMode.AUDITED_PIN, FusionMode.GENERAL}:
+        return None
+    from .fusion.wrappers import plan_bridged_fusion_wrapper
+
+    plan = plan_bridged_fusion_wrapper(mol, selection.atom_set, mode=mode)
+    if plan is None:
+        return None
+    trace_decision(
+        decision_trace,
+        TracePhase.PARENT_SELECTION,
+        "selected audited bridged fusion parent",
+        "A bounded bridge decomposition exposed a locant-complete retained or systematic fused parent.",
+        atoms=selection.atom_set,
+        bonds=bond_ids_within(mol, selection.atom_set),
+        data={
+            "base_name": plan.rendered_name,
+            "parent_kind": plan.parent.kind.value,
+            "parent_atoms": sorted(plan.parent.atom_ids),
+            "bridges": [
+                {
+                    "kind": bridge.kind.value,
+                    "atoms": list(bridge.atom_ids),
+                    "endpoint_atoms": list(bridge.endpoint_atom_ids),
+                    "endpoint_locants": list(bridge.endpoint_locants),
+                }
+                for bridge in plan.bridges
+            ],
+            "proof_source": "fusion_wrapper_reconstruction",
+            "audit_checks": list(plan.audit_checks),
+            "search_states": plan.search_states,
+        },
+    )
+    return RingParent.from_fusion_wrapper(plan)
+
+
 def resolve_retained_parent(
     mol: Molecule, path: list[int], is_ring: bool, is_bicycle: bool, is_polycycle: bool
 ) -> tuple[str | None, list[dict[int, str]] | None]:
@@ -184,6 +228,13 @@ def resolve_parent_hydride_plan(
         )
 
     if selection.is_bicycle or selection.is_polycycle:
+        bridged_parent = resolve_bridged_fusion_parent(
+            mol,
+            selection,
+            decision_trace=decision_trace,
+        )
+        if bridged_parent is not None:
+            return bridged_parent
         fusion_parent = resolve_systematic_fusion_parent(
             mol,
             selection,
@@ -230,7 +281,8 @@ def build_parent_assembly_plan(
         if proof_maps:
             locant_maps = list(proof_maps)
     if parent_hydride is not None and (
-        parent_hydride.hydride_kind is ParentHydrideKind.SYSTEMATIC_FUSION
+        parent_hydride.hydride_kind
+        in {ParentHydrideKind.SYSTEMATIC_FUSION, ParentHydrideKind.BRIDGED_FUSION}
         or is_von_baeyer_descriptor(parent_hydride.descriptor)
     ):
         locant_map_source = LocantMapSource.PROOF

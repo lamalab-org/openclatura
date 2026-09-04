@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 
+from openclatura import name
 from openclatura.fusion.model import FusionMode
 from openclatura.fusion.wrappers import (
     NondetachableBridgeKind,
@@ -55,10 +56,49 @@ def test_bridged_fusion_wrapper_records_bridge_roles_and_local_graph_ownership()
     bridge_tokens = [part for part in plan.rendered_parts if part.grammar_role == "nondetachable_bridge"]
     assert {part.text.rstrip("-") for part in bridge_tokens} == {"epoxy", "methano"}
     assert all(part.source == "fusion_wrapper_renderer" for part in plan.rendered_parts)
+    assert plan.audit_checks == (
+        "complete_bijective_parent_locants",
+        "disjoint_parent_and_bridge_atoms",
+        "simple_bridge_paths",
+        "exact_bridge_endpoints_and_locants",
+        "exact_bridge_bond_ownership",
+        "complete_wrapper_graph_reconstruction",
+    )
+    assert 0 < plan.search_states <= 16
+
+
+def test_bridged_fusion_wrapper_is_used_by_public_parent_pipeline():
+    result = name(
+        "C12=C(C)C=C(C3=CC=CC=C13)O2",
+        fusion_mode=FusionMode.GENERAL,
+        verify_opsin=True,
+        include_trace=True,
+    )
+
+    assert result.name == "2-methyl-1,4-epoxynaphthalene"
+    assert result.verified
+    selected = next(
+        step for step in result.decisions if step.decision == "selected audited bridged fusion parent"
+    )
+    assert selected.data["audit_checks"][-1] == "complete_wrapper_graph_reconstruction"
+    assert selected.data["search_states"] > 0
+
+
+def test_bridged_fusion_wrapper_abstains_when_search_budget_is_exhausted(monkeypatch):
+    mol = read_smiles("C12=CC=C(C=3C4=CC=C(C13)C4)O2")
+    monkeypatch.setattr("openclatura.fusion.wrappers._WRAPPER_SEARCH_STATES", 1)
+
+    assert plan_bridged_fusion_wrapper(mol, mol.atoms, mode=FusionMode.GENERAL) is None
 
 
 def test_ordinary_fused_parent_is_not_misclassified_as_a_bridge_wrapper():
     mol = read_smiles("O1C2=C(C=C1)C=CS2")
+
+    assert plan_bridged_fusion_wrapper(mol, mol.atoms, mode=FusionMode.GENERAL) is None
+
+
+def test_annelated_ring_path_is_not_misclassified_as_a_bridge_wrapper():
+    mol = read_smiles("C1C=CC2=C1C1=CC=CC=C1C=1C=CC=CC21")
 
     assert plan_bridged_fusion_wrapper(mol, mol.atoms, mode=FusionMode.GENERAL) is None
 
@@ -87,4 +127,3 @@ def test_spiro_subgraph_prefers_typed_fusion_side_in_general_mode(monkeypatch):
     assert assembly.side_parent_name == "thieno[2,3-b]furan"
     assert assembly.side_locant == "2"
     assert assembly.side_prefixes == ()
-

@@ -8,7 +8,7 @@ The wrapper never infers a junction locant from rendered name text.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from itertools import combinations
 
@@ -19,7 +19,10 @@ from ..polycycle_topology import connected_components, ring_system_topology
 from ..retained_fused_templates import match_retained_fused_templates
 from ..retained_name_policy import retained_parent_output_name
 from ..rules import stems
+from .config import fusion_nomenclature_config
 from .model import FusionConfirmed, FusionMode, FusionParentPlan
+
+_WRAPPER_SEARCH_STATES = fusion_nomenclature_config().search.component_selection_states
 
 
 class WrapperParentKind(StrEnum):
@@ -84,12 +87,18 @@ class BridgedFusionWrapperPlan:
     rendered_name: str
     rendered_parts: tuple[NameTokenBinding, ...]
     audit_ok: bool
+    audit_checks: tuple[str, ...] = ()
+    search_states: int = 0
 
     def __post_init__(self) -> None:
         if not self.bridges:
             raise ValueError("bridged fusion wrapper requires at least one bridge")
         if not self.audit_ok:
             raise ValueError("bridged fusion wrapper must pass its graph partition audit")
+        if not self.audit_checks:
+            raise ValueError("bridged fusion wrapper must record its successful audits")
+        if self.search_states < 1:
+            raise ValueError("bridged fusion wrapper must record bounded search effort")
         if "".join(part.text for part in self.rendered_parts) != self.rendered_name:
             raise ValueError("bridged fusion wrapper parts must reproduce the rendered name")
 
@@ -180,10 +189,14 @@ def plan_bridged_fusion_wrapper(
         if len([neighbor for neighbor in mol.get_neighbors(atom) if neighbor in atoms]) == 2
         and (mol.atoms[atom].symbol != "C" or not mol.atoms[atom].is_aromatic)
     )
+    visited_states = 0
     for parent_kind in (WrapperParentKind.RETAINED, WrapperParentKind.SYSTEMATIC_FUSION):
         candidates: list[tuple[tuple, BridgedFusionWrapperPlan]] = []
         for count in range(1, min(maximum_bridge_atoms, len(removable)) + 1):
             for removed_tuple in combinations(removable, count):
+                visited_states += 1
+                if visited_states > _WRAPPER_SEARCH_STATES:
+                    return None
                 removed = frozenset(removed_tuple)
                 parent_atoms = atoms - removed
                 parent = (
@@ -204,18 +217,33 @@ def plan_bridged_fusion_wrapper(
                     operations = tuple(
                         sorted(operations, key=lambda operation: (operation.prefix, operation.endpoint_locants))
                     )
-                    rendered_parts = _render_bridge_parts(mol, parent, operations)
-                    rendered = "".join(part.text for part in rendered_parts)
-                    audit_ok = _audit_bridge_partition(mol, atoms, parent_atoms, operations)
-                    if not audit_ok:
+                    audit_checks = _audit_bridge_plan(
+                        mol,
+                        atoms,
+                        parent_atoms,
+                        dict(entries),
+                        operations,
+                    )
+                    if audit_checks is None:
                         continue
-                    plan = BridgedFusionWrapperPlan(parent, operations, rendered, rendered_parts, audit_ok=True)
+                    selected_parent = replace(parent, locant_maps=(entries,))
+                    rendered_parts = _render_bridge_parts(mol, selected_parent, operations)
+                    rendered = "".join(part.text for part in rendered_parts)
+                    plan = BridgedFusionWrapperPlan(
+                        selected_parent,
+                        operations,
+                        rendered,
+                        rendered_parts,
+                        audit_ok=True,
+                        audit_checks=audit_checks,
+                        search_states=visited_states,
+                    )
                     rank = (
                         -len(parent_atoms),
                         map_index,
                         tuple(operation.prefix for operation in operations),
                         tuple(operation.endpoint_locants for operation in operations),
-                        tuple(sorted(removed)),
+                        rendered,
                     )
                     candidates.append((rank, plan))
             if candidates:
@@ -355,6 +383,10 @@ def _bridge_operations(
         )
         if len(endpoints) != 2:
             return None
+        # A path whose parent endpoints already share an edge is an annelated
+        # ring component, not a nondetachable bridge over the parent.
+        if mol.get_bond(*endpoints) is not None:
+            return None
         bridge_class = _bridge_class(mol, path)
         if bridge_class is None:
             return None
@@ -431,20 +463,56 @@ def _render_bridge_parts(
     return tuple(parts)
 
 
-def _audit_bridge_partition(
+def _audit_bridge_plan(
     mol: Molecule,
     all_atoms: frozenset[int],
     parent_atoms: frozenset[int],
+    parent_locants: dict[int, str],
     operations: tuple[NondetachableBridgeOperation, ...],
-) -> bool:
+) -> tuple[str, ...] | None:
+    if set(parent_locants) != set(parent_atoms) or len(set(parent_locants.values())) != len(parent_atoms):
+        return None
     bridge_atoms = {atom for operation in operations for atom in operation.atom_ids}
-    if parent_atoms & bridge_atoms or parent_atoms | bridge_atoms != all_atoms:
-        return False
+    if (
+        sum(len(operation.atom_ids) for operation in operations) != len(bridge_atoms)
+        or parent_atoms & bridge_atoms
+        or parent_atoms | bridge_atoms != all_atoms
+    ):
+        return None
     expected_edges = set(edges_within_atoms(mol, set(parent_atoms)))
     for operation in operations:
+        path = operation.atom_ids
+        if not path or any(mol.get_bond(left, right) is None for left, right in zip(path, path[1:])):
+            return None
+        attachments = {
+            neighbor
+            for atom in path
+            for neighbor in mol.get_neighbors(atom)
+            if neighbor in parent_atoms
+        }
+        if attachments != set(operation.endpoint_atom_ids):
+            return None
+        if operation.endpoint_locants != tuple(parent_locants[atom] for atom in operation.endpoint_atom_ids):
+            return None
         scope = set(operation.atom_ids) | set(operation.endpoint_atom_ids)
-        expected_edges.update(edges_within_atoms(mol, scope))
-    return expected_edges == set(edges_within_atoms(mol, set(all_atoms)))
+        operation_edges = edges_within_atoms(mol, scope) - edges_within_atoms(
+            mol, set(operation.endpoint_atom_ids)
+        )
+        expected_edges.update(operation_edges)
+        if operation.bond_ids != bond_ids_within(mol, scope) - bond_ids_within(
+            mol, set(operation.endpoint_atom_ids)
+        ):
+            return None
+    if expected_edges != set(edges_within_atoms(mol, set(all_atoms))):
+        return None
+    return (
+        "complete_bijective_parent_locants",
+        "disjoint_parent_and_bridge_atoms",
+        "simple_bridge_paths",
+        "exact_bridge_endpoints_and_locants",
+        "exact_bridge_bond_ownership",
+        "complete_wrapper_graph_reconstruction",
+    )
 
 
 __all__ = [

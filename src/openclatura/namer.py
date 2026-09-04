@@ -1495,7 +1495,7 @@ def name_subgraph(
                 "parent_nomenclature": (
                     "systematic_fusion"
                     if parent_selection.ring_parent is not None
-                    and parent_selection.ring_parent.is_systematic_fusion
+                    and parent_selection.ring_parent.is_fusion_parent
                     else "legacy"
                 ),
             },
@@ -1539,7 +1539,7 @@ def name_subgraph(
                 "locant_elisions": parts.locant_elision_decisions,
                 "parent_nomenclature": (
                     "systematic_fusion"
-                    if parts.ring_parent is not None and parts.ring_parent.is_systematic_fusion
+                    if parts.ring_parent is not None and parts.ring_parent.is_fusion_parent
                     else "legacy"
                 ),
                 "parent_hydride_proof_source": (

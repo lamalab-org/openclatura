@@ -15,8 +15,16 @@ def infer_operations(decisions: list[TraceStep], trace_segments: list[dict]) -> 
     operations: list[NomenclatureOperation] = []
     for step in decisions:
         hydride_kind = step.data.get("parent_hydride_kind")
-        if hydride_kind == ParentHydrideKind.SYSTEMATIC_FUSION.value:
-            operations.append(NomenclatureOperation(OperationClass.FUSION, "systematic_fusion_parent"))
+        if hydride_kind in {
+            ParentHydrideKind.SYSTEMATIC_FUSION.value,
+            ParentHydrideKind.BRIDGED_FUSION.value,
+        }:
+            detail = (
+                "bridged_fusion_parent"
+                if hydride_kind == ParentHydrideKind.BRIDGED_FUSION.value
+                else "systematic_fusion_parent"
+            )
+            operations.append(NomenclatureOperation(OperationClass.FUSION, detail))
         elif (
             step.phase == TracePhase.PARENT_SELECTION
             and step.decision == "selected audited systematic fusion parent"

@@ -22,8 +22,11 @@ def refresh_parent_binding(parts: AssemblyParts) -> None:
 
     if not parts.parent_atom_ids:
         return
+    parent_tokens = _parent_emitted_tokens(parts)
     atom_ids = set(parts.parent_atom_ids)
     bond_ids = set(parts.parent_bond_ids)
+    atom_ids.update(atom for token in parent_tokens for atom in token.atom_ids)
+    bond_ids.update(bond for token in parent_tokens for bond in token.bond_ids)
     if parts.retained_absorbs_principal_group and parts.principal_group is not None:
         atom_ids |= set(parts.principal_group.atom_ids)
         bond_ids |= set(parts.principal_group.bond_ids)
@@ -41,7 +44,7 @@ def refresh_parent_binding(parts: AssemblyParts) -> None:
         ),
         atom_ids=atom_ids,
         bond_ids=bond_ids,
-        emitted_tokens=_parent_emitted_tokens(parts),
+        emitted_tokens=parent_tokens,
     )
     for index, binding in enumerate(parts.name_atom_bindings):
         if binding.stage == "parent" and binding.role == "parent":
@@ -59,8 +62,11 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
     ]
     bindings: list[NameAtomBinding] = []
     if parts.parent_atom_ids:
+        parent_tokens = _parent_emitted_tokens(parts)
         parent_atom_ids = set(parts.parent_atom_ids)
         parent_bond_ids = set(parts.parent_bond_ids)
+        parent_atom_ids.update(atom for token in parent_tokens for atom in token.atom_ids)
+        parent_bond_ids.update(bond for token in parent_tokens for bond in token.bond_ids)
         if parts.retained_absorbs_principal_group and parts.principal_group is not None:
             # ``phenol`` spells the ring *and* its oxygen, so the suffix binding has
             # no text of its own left for the audit to find.
@@ -73,7 +79,7 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
                 term=parts.retained_name or _parent_term(parts),
                 atom_ids=parent_atom_ids,
                 bond_ids=parent_bond_ids,
-                emitted_tokens=_parent_emitted_tokens(parts),
+                emitted_tokens=parent_tokens,
             )
         )
     for operation in parts.hydro_operations:
@@ -442,6 +448,10 @@ def _operation_emitted_tokens(binding: NameAtomBinding) -> tuple[NameTokenBindin
 
 
 def _parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]:
+    if parts.ring_parent is not None and parts.ring_parent.is_bridged_fusion:
+        plan = parts.ring_parent.fusion_wrapper_plan
+        assert plan is not None
+        return _structured_parent_emitted_tokens(plan.rendered_name, plan.rendered_parts)
     if parts.ring_parent is not None and parts.ring_parent.is_systematic_fusion:
         return _fusion_parent_emitted_tokens(parts)
     tokens = _parent_display_tokens(parts)
@@ -478,10 +488,19 @@ def _fusion_parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBindin
     plan = parts.ring_parent.fusion_plan
     assert plan is not None
 
+    return _structured_parent_emitted_tokens(plan.rendered_base_name, plan.rendered_parts)
+
+
+def _structured_parent_emitted_tokens(
+    rendered_name: str,
+    rendered_parts: tuple[NameTokenBinding, ...],
+) -> tuple[NameTokenBinding, ...]:
+    """Split already-owned parent segments without rediscovering graph scope."""
+
     result: list[NameTokenBinding] = []
     render_order = 0
-    assert "".join(part.text for part in plan.rendered_parts) == plan.rendered_base_name
-    for part in plan.rendered_parts:
+    assert "".join(part.text for part in rendered_parts) == rendered_name
+    for part in rendered_parts:
         for text in binding_term_tokens(part.text):
             result.append(
                 NameTokenBinding(
