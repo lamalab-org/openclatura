@@ -27,8 +27,8 @@ from .naming_context import ComponentNamingState, NamingIntent
 from .naming_protocols import RecursiveSubgraphNamer
 from .parent_pipeline import (
     build_parent_assembly_plan,
+    resolve_parent_hydride_plan,
     resolve_retained_parent,
-    resolve_systematic_fusion_parent,
 )
 from .parent_selection import select_principal_parent
 from .principal_groups import (
@@ -546,15 +546,19 @@ def name_component(
     ):
         state.retained_name = None
 
-    if state.parent_selection.is_bicycle or state.parent_selection.is_polycycle:
-        fusion_parent = resolve_systematic_fusion_parent(
-            mol,
-            state.parent_selection,
-            retained_name=state.retained_name,
-            decision_trace=decision_trace,
-        )
-        if fusion_parent is not None:
-            state.parent_selection.ring_parent = fusion_parent
+    state.parent_hydride = resolve_parent_hydride_plan(
+        mol,
+        state.parent_selection,
+        retained_name=state.retained_name,
+        locant_maps=state.locant_maps,
+        retained_parent_metadata=state.retained_parent_metadata,
+        decision_trace=decision_trace,
+        retained_proof_source=(
+            "retained_graph_template" if retained_fused is not None else "retained_template"
+        ),
+    )
+    if state.parent_hydride is not None:
+        state.parent_selection.ring_parent = state.parent_hydride
 
     parent_plan = build_parent_assembly_plan(
         mol,
@@ -564,9 +568,7 @@ def name_component(
             omit_redundant_locants=omit_redundant_locants,
         ),
         subst_mapping,
-        state.locant_maps,
-        state.retained_name,
-        state.retained_parent_metadata,
+        parent_hydride=state.parent_hydride,
     )
     numbered_path = parent_plan.numbered_path
     locant_map = parent_plan.locant_map
@@ -583,6 +585,9 @@ def name_component(
             "locants": locant_map or {atom: i + 1 for i, atom in enumerate(numbered_path)},
             "atom_to_locant": {atom: get_loc(atom) for atom in numbered_path},
             "locant_map_source": parent_plan.locant_map_source.value,
+            "parent_hydride_kind": (
+                parent_plan.parent_hydride.hydride_kind.value if parent_plan.parent_hydride is not None else None
+            ),
             "parent_nomenclature": (
                 "systematic_fusion"
                 if state.parent_selection.ring_parent is not None
@@ -666,7 +671,10 @@ def name_component(
                 else "legacy"
             ),
             "parent_hydride_proof_source": (
-                parts.ring_parent.proof_source if parts.ring_parent is not None else ""
+                parts.parent_hydride.proof_source if parts.parent_hydride is not None else ""
+            ),
+            "parent_hydride_kind": (
+                parts.parent_hydride.hydride_kind.value if parts.parent_hydride is not None else None
             ),
         },
     )

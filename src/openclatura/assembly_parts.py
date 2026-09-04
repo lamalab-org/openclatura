@@ -7,10 +7,11 @@ from typing import TYPE_CHECKING
 
 from .locant_sources import LocantMapSource
 from .name_operations import HydroOperation
+from .ring_parent import ParentHydrideMetadata
 from .spiro_assembly import SpiroAssembly
 
 if TYPE_CHECKING:
-    from .ring_parent import RingParent
+    from .ring_parent import ParentHydridePlan, RingParent
 
 
 @dataclass(frozen=True)
@@ -116,17 +117,9 @@ class NameAtomBinding:
     emitted_tokens: tuple[NameTokenBinding, ...] = ()
 
 
-@dataclass(frozen=True)
-class RetainedParentMetadata:
-    """Naming metadata carried from a matched retained-parent template."""
-
-    default_indicated_h: tuple[str, ...] = ()
-    fusion_locants: tuple[str, ...] = ()
-    derivative_stem: str | None = None
-    indicated_hydrogen_count: int = 0
-    mancude_double_bonds: int = 0
-    relocated_indicated_h: bool = False
-    inherent_saturated_locants: tuple[str, ...] = ()
+# Historical import name retained while the canonical metadata lives beside
+# the parent-hydride plan that owns it.
+RetainedParentMetadata = ParentHydrideMetadata
 
 
 @dataclass
@@ -150,6 +143,7 @@ class AssemblyParts:
     retained_substituent_name: str | None = None
     retained_absorbed_substituents: list[SubstituentItem] = field(default_factory=list)
     retained_parent_metadata: RetainedParentMetadata | None = None
+    parent_hydride: ParentHydridePlan | None = None
     ring_parent: RingParent | None = None
     front_modifiers: list[str] = field(default_factory=list)
     front_modifier_locants: list[str | None] = field(default_factory=list)
@@ -183,3 +177,19 @@ class AssemblyParts:
     elided_unsaturation_locants: set[str] = field(default_factory=set)
     elide_principal_group_locants: bool = False
     locant_elision_decisions: list[dict] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        """Keep the historical ring-parent field as a compatibility alias."""
+
+        if self.parent_hydride is None:
+            self.parent_hydride = self.ring_parent
+        elif self.ring_parent is None:
+            self.ring_parent = self.parent_hydride
+        elif self.parent_hydride is not self.ring_parent:
+            raise ValueError("parent_hydride and ring_parent must reference the same plan")
+
+        if self.parent_hydride is not None:
+            if self.retained_name is None:
+                self.retained_name = self.parent_hydride.retained_name
+            if self.retained_parent_metadata is None:
+                self.retained_parent_metadata = self.parent_hydride.metadata

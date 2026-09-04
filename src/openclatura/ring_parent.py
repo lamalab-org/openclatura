@@ -8,7 +8,8 @@ plain paths independently.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from enum import Enum
 from typing import TYPE_CHECKING
 
 from .locants import retained_locant_sort_key
@@ -17,6 +18,30 @@ from .ring_renderer import is_von_baeyer_descriptor
 
 if TYPE_CHECKING:
     from .fusion.model import FusionParentPlan, ParentBondModel
+
+
+class ParentHydrideKind(str, Enum):
+    """Naming system that supplies a selected ring parent hydride."""
+
+    GENERATED_MONOCYCLE = "generated_monocycle"
+    RETAINED = "retained"
+    SYSTEMATIC_FUSION = "systematic_fusion"
+    VON_BAEYER = "von_baeyer"
+    SPIRO = "spiro"
+    LEGACY_RING = "legacy_ring"
+
+
+@dataclass(frozen=True)
+class ParentHydrideMetadata:
+    """Hydrogen and bond-capacity facts implied by a named parent hydride."""
+
+    default_indicated_h: tuple[str, ...] = ()
+    fusion_locants: tuple[str, ...] = ()
+    derivative_stem: str | None = None
+    indicated_hydrogen_count: int = 0
+    mancude_double_bonds: int = 0
+    relocated_indicated_h: bool = False
+    inherent_saturated_locants: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -31,6 +56,30 @@ class RingParent:
     retained_locant_maps: tuple[dict[int, str], ...] = ()
     proof_source: str = "topology"
     fusion_plan: FusionParentPlan | None = None
+    parent_hydride_kind: ParentHydrideKind | None = None
+    parent_name: str | None = None
+    substituent_stem: str | None = None
+    hydride_metadata: ParentHydrideMetadata | None = None
+    parent_bond_model: ParentBondModel | None = None
+    pin_status: str = "unknown"
+
+    @property
+    def hydride_kind(self) -> ParentHydrideKind:
+        """Return the naming system without changing the legacy topology kind."""
+
+        if self.parent_hydride_kind is not None:
+            return self.parent_hydride_kind
+        if self.is_systematic_fusion:
+            return ParentHydrideKind.SYSTEMATIC_FUSION
+        if self.retained_locant_maps and self.kind == "retained_polycycle":
+            return ParentHydrideKind.RETAINED
+        if self.kind == "bicyclo" or is_von_baeyer_descriptor(self.descriptor):
+            return ParentHydrideKind.VON_BAEYER
+        if self.kind in {"spiro", "dispiro"}:
+            return ParentHydrideKind.SPIRO
+        if self.kind == "monocycle":
+            return ParentHydrideKind.GENERATED_MONOCYCLE
+        return ParentHydrideKind.LEGACY_RING
 
     @property
     def paths(self) -> list[list[int]]:
@@ -68,23 +117,119 @@ class RingParent:
 
     @property
     def base_name(self) -> str | None:
+        if self.parent_name is not None:
+            return self.parent_name
         if self.is_systematic_fusion:
             return self.fusion_plan.rendered_base_name
-        return self.descriptor
+        from .rules import stems
+
+        stem = stems.stem_for(len(self.atoms))
+        if self.descriptor is not None:
+            return f"{self.descriptor}{stem}ane"
+        if self.hydride_kind is ParentHydrideKind.GENERATED_MONOCYCLE:
+            return f"cyclo{stem}ane"
+        return None
 
     @property
     def derivative_stem(self) -> str | None:
+        return self.substituent_stem
+
+    def base_hydride_name(self, parent_length: int) -> str | None:
+        """Return the saturated parent-hydride spelling for diagnostics."""
+
+        if parent_length != len(self.atoms):
+            return None
+        return self.base_name
+
+    def assembly_stem_and_terminal(self, parent_length: int) -> tuple[str, str] | None:
+        """Project the hydride onto the existing suffix assembler."""
+
+        if self.hydride_kind in {
+            ParentHydrideKind.SYSTEMATIC_FUSION,
+            ParentHydrideKind.RETAINED,
+        }:
+            name = self.base_name
+            if name is None:
+                return None
+            return (name[:-1], "e") if name.endswith("e") else (name, "")
+        from .rules import stems
+
+        stem = stems.stem_for(parent_length)
+        if self.descriptor is not None:
+            return f"{self.descriptor}{stem}", "e"
+        if self.hydride_kind is ParentHydrideKind.GENERATED_MONOCYCLE:
+            return f"cyclo{stem}", "e"
         return None
 
     @property
     def bond_model(self) -> ParentBondModel | None:
+        if self.parent_bond_model is not None:
+            return self.parent_bond_model
         return self.fusion_plan.bond_model if self.is_systematic_fusion else None
 
     @property
     def proof_locant_maps(self) -> tuple[dict[int, str], ...]:
         if self.is_systematic_fusion:
             return self.fusion_plan.numbering.string_input_locant_maps()
-        return self.retained_locant_maps
+        if self.retained_locant_maps:
+            return self.retained_locant_maps
+        return tuple(
+            numbering.locant_map for numbering in self.numbering_candidates if numbering.audit_ok
+        )
+
+    @property
+    def metadata(self) -> ParentHydrideMetadata | None:
+        """Hydride metadata used by additive and subtractive operations."""
+
+        return self.hydride_metadata
+
+    @property
+    def retained_name(self) -> str | None:
+        """Compatibility view for code that specifically needs retained rules."""
+
+        return self.base_name if self.hydride_kind is ParentHydrideKind.RETAINED else None
+
+    @property
+    def implies_parent_unsaturation(self) -> bool:
+        """Whether unsaturation is supplied by the named parent hydride."""
+
+        return self.hydride_kind in {
+            ParentHydrideKind.RETAINED,
+            ParentHydrideKind.SYSTEMATIC_FUSION,
+        }
+
+    @property
+    def numbering_uses_proof_locant_maps(self) -> bool:
+        """Whether the existing numbering scorer must consume proof maps."""
+
+        return self.hydride_kind in {
+            ParentHydrideKind.RETAINED,
+            ParentHydrideKind.SYSTEMATIC_FUSION,
+        } or is_von_baeyer_descriptor(self.descriptor)
+
+    def with_retained_identity(
+        self,
+        *,
+        name: str,
+        locant_maps: list[dict[int, str]] | tuple[dict[int, str], ...] | None,
+        metadata: ParentHydrideMetadata | None,
+        proof_source: str = "retained_template",
+    ) -> RingParent:
+        """Return this topology enriched by a retained-parent proof."""
+
+        maps = tuple(dict(locant_map) for locant_map in (locant_maps or ()))
+        enriched = replace(
+            self,
+            parent_hydride_kind=ParentHydrideKind.RETAINED,
+            parent_name=name,
+            substituent_stem=metadata.derivative_stem if metadata is not None else None,
+            retained_locant_maps=maps,
+            hydride_metadata=metadata,
+            proof_source=proof_source,
+        )
+        if maps and not enriched.audit_ok:
+            raise ValueError("Retained parent locant maps must be complete bijections.")
+        return enriched
 
     @classmethod
     def from_fusion_plan(cls, plan: FusionParentPlan) -> RingParent:
@@ -100,6 +245,20 @@ class RingParent:
             retained_locant_maps=maps,
             proof_source="fusion_reconstruction",
             fusion_plan=plan,
+            parent_hydride_kind=ParentHydrideKind.SYSTEMATIC_FUSION,
+            parent_name=plan.rendered_base_name,
+            hydride_metadata=ParentHydrideMetadata(
+                default_indicated_h=tuple(str(locant) for locant in plan.indicated_hydrogens),
+                fusion_locants=tuple(
+                    str(locant)
+                    for _, locant in plan.numbering.abstract_atom_to_locant
+                    if locant.fusion_suffix or locant.interior_distance is not None
+                ),
+                indicated_hydrogen_count=len(plan.indicated_hydrogens),
+                mancude_double_bonds=plan.bond_model.maximum_non_cumulative_double_bonds,
+            ),
+            parent_bond_model=plan.bond_model,
+            pin_status=str(plan.pin_status),
         )
 
     @classmethod
@@ -156,6 +315,8 @@ class RingParent:
         *,
         atoms: set[int] | frozenset[int],
         locant_maps: list[dict[int, str]],
+        name: str | None = None,
+        metadata: ParentHydrideMetadata | None = None,
     ) -> RingParent:
         """Build an audited parent proof from exact template isomorphisms."""
 
@@ -164,7 +325,17 @@ class RingParent:
             atoms=frozenset(atoms),
             retained_locant_maps=tuple(dict(locant_map) for locant_map in locant_maps),
             proof_source="retained_template",
+            parent_hydride_kind=ParentHydrideKind.RETAINED,
+            parent_name=name,
+            substituent_stem=metadata.derivative_stem if metadata is not None else None,
+            hydride_metadata=metadata,
         )
         if not parent.audit_ok:
             raise ValueError("Retained parent locant maps must be complete bijections.")
         return parent
+
+
+# ``RingParent`` remains the public compatibility name.  New pipeline code uses
+# the semantic alias to make clear that the object is the complete handoff to
+# numbering and assembly, not merely a discovered ring topology.
+ParentHydridePlan = RingParent

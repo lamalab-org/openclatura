@@ -8,7 +8,7 @@ from .assembly_parts import RetainedParentMetadata
 from .locant_sources import LocantMapSource
 from .parent_selection import ParentSelection
 from .perception import PerceivedGroup
-from .ring_parent import RingParent
+from .ring_parent import ParentHydridePlan, RingParent
 
 
 class NamingMode(str, Enum):
@@ -67,7 +67,13 @@ class ParentAssemblyPlan:
     locant_map_source: LocantMapSource
     get_loc: Callable
     parts: object
-    ring_parent: RingParent | None = None
+    parent_hydride: ParentHydridePlan | None = None
+
+    @property
+    def ring_parent(self) -> RingParent | None:
+        """Compatibility view for callers that still use the topology name."""
+
+        return self.parent_hydride
 
 
 @dataclass
@@ -86,6 +92,7 @@ class ComponentNamingState:
     retained_name: str | None = None
     locant_maps: list[dict[int, str]] | None = None
     retained_parent_metadata: RetainedParentMetadata | None = None
+    parent_hydride: ParentHydridePlan | None = None
     principal_involved_atoms: set[int] = field(default_factory=set)
     base_exclude: set[int] = field(default_factory=set)
     sub_exclude: set[int] = field(default_factory=set)

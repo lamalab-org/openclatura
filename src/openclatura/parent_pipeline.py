@@ -12,7 +12,7 @@ from .namer_config import RETAINED_RING_ELEMENTS
 from .naming_context import NamingIntent, ParentAssemblyPlan
 from .numbering import choose_parent_numbering
 from .parent_selection import ParentSelection
-from .ring_parent import RingParent
+from .ring_parent import ParentHydrideKind, ParentHydridePlan, RingParent
 from .ring_renderer import is_von_baeyer_descriptor
 from .rules import retained
 from .small_ring_stereo import scoped_small_ring_stereo_features
@@ -150,31 +150,100 @@ def resolve_retained_parent(
     return retained_name, locant_maps
 
 
+def resolve_parent_hydride_plan(
+    mol: Molecule,
+    selection: ParentSelection,
+    *,
+    retained_name: str | None,
+    locant_maps: list[dict[int, str]] | None,
+    retained_parent_metadata: RetainedParentMetadata | None = None,
+    decision_trace: DecisionTrace | None = None,
+    retained_proof_source: str = "retained_template",
+) -> ParentHydridePlan | None:
+    """Resolve one ring parent-hydride handoff without changing selection rules.
+
+    Retained-parent eligibility remains with the existing retained resolvers,
+    and fusion eligibility remains with the audited fusion planner.  This
+    function only consolidates their outputs before numbering and assembly.
+    """
+
+    parent = selection.ring_parent
+    if retained_name is not None:
+        if parent is None:
+            parent = RingParent.from_paths(
+                kind="legacy_ring",
+                atoms=selection.atom_set,
+                descriptor=selection.polycycle_descriptor,
+                paths=selection.paths,
+            )
+        return parent.with_retained_identity(
+            name=retained_name,
+            locant_maps=locant_maps,
+            metadata=retained_parent_metadata,
+            proof_source=retained_proof_source,
+        )
+
+    if selection.is_bicycle or selection.is_polycycle:
+        fusion_parent = resolve_systematic_fusion_parent(
+            mol,
+            selection,
+            retained_name=None,
+            decision_trace=decision_trace,
+        )
+        if fusion_parent is not None:
+            return fusion_parent
+    return parent
+
+
 def build_parent_assembly_plan(
     mol: Molecule,
     selection: ParentSelection,
     intent: NamingIntent,
     substituent_mapping: dict[int, list],
-    locant_maps,
-    retained_name: str | None,
+    locant_maps=None,
+    retained_name: str | None = None,
     retained_parent_metadata: RetainedParentMetadata | None = None,
+    *,
+    parent_hydride: ParentHydridePlan | None = None,
 ) -> ParentAssemblyPlan:
     """Number a selected parent and create base assembly parts."""
 
-    ring_parent = selection.ring_parent
-    if ring_parent is not None and ring_parent.is_systematic_fusion:
-        locant_maps = list(ring_parent.proof_locant_maps)
+    parent_hydride = parent_hydride or selection.ring_parent
+    if (
+        parent_hydride is not None
+        and retained_name is not None
+        and parent_hydride.hydride_kind is not ParentHydrideKind.RETAINED
+    ):
+        retained_parent_metadata = retained_parent_metadata or retained.parent_metadata(retained_name)
+        parent_hydride = parent_hydride.with_retained_identity(
+            name=retained_name,
+            locant_maps=locant_maps,
+            metadata=retained_parent_metadata,
+        )
+    if parent_hydride is not None:
+        retained_name = parent_hydride.retained_name or retained_name
+        retained_parent_metadata = parent_hydride.metadata or retained_parent_metadata
+        if parent_hydride.numbering_uses_proof_locant_maps:
+            proof_maps = parent_hydride.proof_locant_maps
+        else:
+            proof_maps = ()
+        if proof_maps:
+            locant_maps = list(proof_maps)
+    if parent_hydride is not None and (
+        parent_hydride.hydride_kind is ParentHydrideKind.SYSTEMATIC_FUSION
+        or is_von_baeyer_descriptor(parent_hydride.descriptor)
+    ):
         locant_map_source = LocantMapSource.PROOF
     else:
         locant_map_source = LocantMapSource.SUPPLIED if locant_maps else LocantMapSource.GENERATED
     if (
         locant_maps is None
-        and selection.ring_parent is not None
-        and selection.ring_parent.numbering_candidates
-        and is_von_baeyer_descriptor(selection.ring_parent.descriptor)
+        and parent_hydride is not None
+        and parent_hydride.numbering_candidates
+        and is_von_baeyer_descriptor(parent_hydride.descriptor)
     ):
         audited_maps = [
-            numbering.locant_map for numbering in selection.ring_parent.numbering_candidates if numbering.audit_ok
+            numbering.locant_map for numbering in parent_hydride.numbering_candidates if numbering.audit_ok
         ]
         locant_maps = audited_maps or None
         if locant_maps:
@@ -201,7 +270,7 @@ def build_parent_assembly_plan(
         selection,
         intent,
         retained_parent_metadata,
-        ring_parent=ring_parent,
+        parent_hydride=parent_hydride,
         locant_map_source=locant_map_source,
     )
     return ParentAssemblyPlan(
@@ -210,7 +279,7 @@ def build_parent_assembly_plan(
         locant_map_source=locant_map_source,
         get_loc=get_loc,
         parts=parts,
-        ring_parent=ring_parent,
+        parent_hydride=parent_hydride,
     )
 
 
@@ -224,27 +293,17 @@ def build_parent_parts(
     retained_parent_metadata: RetainedParentMetadata | None = None,
     *,
     ring_parent: RingParent | None = None,
+    parent_hydride: ParentHydridePlan | None = None,
     locant_map_source: LocantMapSource = LocantMapSource.GENERATED,
 ) -> AssemblyParts:
     """Create shared parent assembly parts for a naming intent."""
 
+    parent_hydride = parent_hydride or ring_parent
+    if parent_hydride is not None:
+        retained_name = parent_hydride.retained_name or retained_name
+        retained_parent_metadata = parent_hydride.metadata or retained_parent_metadata
     if retained_parent_metadata is None and retained_name is not None:
         retained_parent_metadata = retained.parent_metadata(retained_name)
-    if retained_parent_metadata is None and ring_parent is not None and ring_parent.is_systematic_fusion:
-        plan = ring_parent.fusion_plan
-        assert plan is not None
-        fusion_locants = tuple(
-            locant
-            for _, locant in plan.numbering.abstract_atom_to_locant
-            if locant.fusion_suffix or locant.interior_distance is not None
-        )
-        retained_parent_metadata = RetainedParentMetadata(
-            default_indicated_h=tuple(str(locant) for locant in plan.indicated_hydrogens),
-            fusion_locants=tuple(str(locant) for locant in fusion_locants),
-            derivative_stem=ring_parent.derivative_stem,
-            indicated_hydrogen_count=len(plan.indicated_hydrogens),
-            mancude_double_bonds=plan.bond_model.maximum_non_cumulative_double_bonds,
-        )
     assembly_overrides = {}
     if intent.is_substituent:
         if intent.root_atom is None:
@@ -270,7 +329,7 @@ def build_parent_parts(
         polycycle_descriptor=selection.polycycle_descriptor,
         retained_name=retained_name,
         retained_parent_metadata=retained_parent_metadata,
-        ring_parent=ring_parent,
+        parent_hydride=parent_hydride,
         locant_map_source=locant_map_source,
         omit_redundant_locants=intent.omit_redundant_locants,
         parent_atom_ids=set(numbered_path),

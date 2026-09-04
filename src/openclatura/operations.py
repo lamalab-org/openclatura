@@ -1,6 +1,7 @@
 """Derive high-level nomenclature operations from naming traces."""
 
 from .molecule import NomenclatureOperation, OperationClass, TracePhase, TraceStep
+from .ring_parent import ParentHydrideKind
 
 
 def infer_operations(decisions: list[TraceStep], trace_segments: list[dict]) -> list[NomenclatureOperation]:
@@ -13,7 +14,10 @@ def infer_operations(decisions: list[TraceStep], trace_segments: list[dict]) -> 
 
     operations: list[NomenclatureOperation] = []
     for step in decisions:
-        if (
+        hydride_kind = step.data.get("parent_hydride_kind")
+        if hydride_kind == ParentHydrideKind.SYSTEMATIC_FUSION.value:
+            operations.append(NomenclatureOperation(OperationClass.FUSION, "systematic_fusion_parent"))
+        elif (
             step.phase == TracePhase.PARENT_SELECTION
             and step.decision == "selected audited systematic fusion parent"
         ):

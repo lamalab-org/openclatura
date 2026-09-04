@@ -8,18 +8,19 @@ from .molecule import Molecule
 def _implied_parent_multiple_bonds(parts: AssemblyParts) -> frozenset[int]:
     """Return graph bond ids implied by the selected parent-hydride model."""
 
-    parent = parts.ring_parent
+    parent = parts.parent_hydride
     if parent is None or parent.bond_model is None:
         return frozenset()
     actual_by_edge = {
         frozenset(locants): order for locants, order in parts.parent_bond_orders_by_locants.items()
     }
+    atom_to_locant = {atom: locant for locant, atom in parts.parent_atom_ids_by_locant.items()}
     for assignment in parent.bond_model.allowed_kekule_assignments:
         assignment_by_edge = {
             frozenset(
                 (
-                    _locant_for_atom(parts, edge[0]),
-                    _locant_for_atom(parts, edge[1]),
+                    atom_to_locant[edge[0]],
+                    atom_to_locant[edge[1]],
                 )
             ): order
             for edge, order in assignment.orders
@@ -34,10 +35,6 @@ def _implied_parent_multiple_bonds(parts: AssemblyParts) -> frozenset[int]:
     return frozenset()
 
 
-def _locant_for_atom(parts: AssemblyParts, atom_id: int) -> str:
-    return next(locant for locant, atom in parts.parent_atom_ids_by_locant.items() if atom == atom_id)
-
-
 def add_unsaturations(
     mol: Molecule,
     parts: AssemblyParts,
@@ -49,7 +46,8 @@ def add_unsaturations(
 ) -> None:
     """Add double/triple bond locants to assembly parts."""
 
-    if parts.retained_name:
+    parent = parts.parent_hydride
+    if parts.retained_name or (parent is not None and parent.implies_parent_unsaturation and parent.bond_model is None):
         return
 
     seen_bonds = set()
