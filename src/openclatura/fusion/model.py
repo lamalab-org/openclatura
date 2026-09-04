@@ -56,6 +56,25 @@ class PinStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
+@dataclass(frozen=True, slots=True)
+class PinDecision:
+    """Evidence-backed preferred-name conclusion made by parent resolution."""
+
+    status: PinStatus
+    checks: tuple[str, ...]
+    rejected_preceding_parents: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if self.status is PinStatus.CONFIRMED:
+            required = {
+                "no_preferred_retained_complete_parent",
+                "no_preferred_independently_systematic_complete_parent",
+                "fusion_rules_satisfied",
+            }
+            if not required <= set(self.checks):
+                raise ValueError("confirmed PIN decisions require precedence and fusion-rule evidence")
+
+
 class FusionJoinKind(StrEnum):
     """Supported relationship between two fusion component occurrences."""
 
@@ -784,7 +803,7 @@ class FusionParentPlan:
     numbering: FusionNumberingProof
     bond_model: ParentBondModel
     indicated_hydrogens: tuple[SystemLocant, ...]
-    pin_status: PinStatus | str
+    pin_eligibility: str
     rule_trace: tuple[FusionRuleDecision, ...]
     audit: FusionAuditResult
     lambda_descriptors: tuple[FusionLambdaDescriptor, ...] = ()
@@ -800,6 +819,14 @@ class FusionParentPlan:
         numbered_atoms = {atom for atom, _ in self.numbering.abstract_atom_to_locant}
         if graph_atoms != numbered_atoms:
             raise ValueError("fusion numbering must completely cover the abstract parent graph")
+        if self.pin_eligibility != "fusion_rules_satisfied":
+            raise ValueError("fusion parent plans must record fusion-rule eligibility")
+
+    @property
+    def pin_status(self) -> PinStatus:
+        """Compatibility status; final PIN status belongs to parent resolution."""
+
+        return PinStatus.VALID_GENERAL_NAME
 
 
 TypedLocantMap: TypeAlias = tuple[tuple[int, SystemLocant], ...]

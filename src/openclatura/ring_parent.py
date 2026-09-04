@@ -17,7 +17,7 @@ from .polycycle_topology import RingNumbering
 from .ring_renderer import is_von_baeyer_descriptor
 
 if TYPE_CHECKING:
-    from .fusion.model import FusionParentPlan, ParentBondModel
+    from .fusion.model import FusionParentPlan, ParentBondModel, PinDecision
     from .fusion.wrappers import BridgedFusionWrapperPlan
 
 
@@ -65,7 +65,7 @@ class RingParent:
     substituent_stem: str | None = None
     hydride_metadata: ParentHydrideMetadata | None = None
     parent_bond_model: ParentBondModel | None = None
-    pin_status: str = "unknown"
+    pin_decision: PinDecision | None = None
     skeletal_replacement_atom_ids: tuple[int, ...] = ()
     skeletal_replacement_audit_checks: tuple[str, ...] = ()
 
@@ -172,6 +172,17 @@ class RingParent:
         }:
             return self.hydride_kind.value
         return "legacy"
+
+    @property
+    def pin_status(self) -> str:
+        """Compatibility projection of the evidence-backed PIN decision."""
+
+        return str(self.pin_decision.status) if self.pin_decision is not None else "unknown"
+
+    def with_pin_decision(self, decision: PinDecision) -> RingParent:
+        """Attach the parent resolver's final nomenclature-precedence result."""
+
+        return replace(self, pin_decision=decision)
 
     @property
     def absorbs_skeletal_replacement(self) -> bool:
@@ -321,7 +332,7 @@ class RingParent:
         return enriched
 
     @classmethod
-    def from_fusion_plan(cls, plan: FusionParentPlan) -> RingParent:
+    def from_fusion_plan(cls, plan: FusionParentPlan, *, pin_decision: PinDecision) -> RingParent:
         """Build a ring-parent handoff only from an independently audited plan."""
 
         if not plan.audit.confirmed:
@@ -347,7 +358,7 @@ class RingParent:
                 mancude_double_bonds=plan.bond_model.maximum_non_cumulative_double_bonds,
             ),
             parent_bond_model=plan.bond_model,
-            pin_status=str(plan.pin_status),
+            pin_decision=pin_decision,
         )
 
     def as_skeletal_replacement_fusion(
@@ -398,7 +409,6 @@ class RingParent:
             parent_hydride_kind=ParentHydrideKind.BRIDGED_FUSION,
             parent_name=plan.rendered_name,
             parent_bond_model=(underlying_fusion.bond_model if underlying_fusion is not None else None),
-            pin_status=(str(underlying_fusion.pin_status) if underlying_fusion is not None else "valid_general_name"),
         )
 
     @classmethod

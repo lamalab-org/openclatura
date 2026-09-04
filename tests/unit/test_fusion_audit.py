@@ -266,6 +266,8 @@ def test_audit_confirms_independent_component_join_numbering_and_bond_reconstruc
 
     assert result.status is AuditStatus.CONFIRMED
     assert result.checks == (
+        "pin_ring_size_gate",
+        "pin_component_policy",
         "nomenclature_selection",
         "component_coverage",
         "descriptor_interfaces",

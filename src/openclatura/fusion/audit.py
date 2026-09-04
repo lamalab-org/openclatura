@@ -133,6 +133,8 @@ def audit_fusion_plan(
 
     errors: list[str] = []
     checks: list[str] = []
+    if mode is FusionMode.AUDITED_PIN:
+        checks.extend(("pin_ring_size_gate", "pin_component_policy"))
     try:
         reconstruction = _reconstruct(ast, specs, mol, errors)
         _audit_nomenclature_selection(ast, specs, errors)

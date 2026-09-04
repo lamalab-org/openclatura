@@ -19,7 +19,7 @@ from ..ring_parent import RingParent
 from .cover import audit_component_cover, component_scope
 from .descriptor import FusionDescriptorError, build_fusion_name_ast
 from .faces import FaceSearchBudgetExceeded, cached_bounded_face_model
-from .model import FusionConfirmed, FusionMode, FusionNameAst, PinStatus
+from .model import FusionConfirmed, FusionMode, FusionNameAst, PinDecision, PinStatus
 from .registry import fusion_component_registry
 from .rules import pin_ring_size_gate
 
@@ -257,7 +257,6 @@ def _carbon_parent(
             kind="retained_polycycle",
             atoms=atoms,
             retained_locant_maps=tuple(maps),
-            pin_status=str(PinStatus.CONFIRMED if mode is FusionMode.AUDITED_PIN else PinStatus.VALID_GENERAL_NAME),
         )
         return base.with_retained_identity(
             name=template.name,
@@ -271,7 +270,13 @@ def _carbon_parent(
     planned = plan_fusion_parent(carbon, atoms, mode=mode)
     if not isinstance(planned, FusionConfirmed):
         return None
-    return RingParent.from_fusion_plan(planned.plan)
+    return RingParent.from_fusion_plan(
+        planned.plan,
+        pin_decision=PinDecision(
+            status=PinStatus.VALID_GENERAL_NAME,
+            checks=("fusion_rules_satisfied", *planned.plan.audit.checks),
+        ),
+    )
 
 
 __all__ = [

@@ -406,6 +406,15 @@ def test_planner_cache_is_request_policy_scoped_and_mutation_invalidated():
     assert not mol._fusion_plan_cache
 
 
+def test_low_level_pin_request_proves_eligibility_not_global_precedence():
+    mol = read_smiles("O1C2=C(C=C1)C=CS2")
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.AUDITED_PIN)
+
+    assert isinstance(result, FusionConfirmed)
+    assert result.plan.pin_eligibility == "fusion_rules_satisfied"
+    assert result.plan.pin_status.value == "valid_general_name"
+
+
 def test_pin_mode_abstains_when_only_one_ring_meets_size_gate():
     mol = read_smiles("C1CC2=C1CCC2")
     result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.AUDITED_PIN)

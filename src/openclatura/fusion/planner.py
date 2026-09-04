@@ -34,7 +34,6 @@ from .model import (
     FusionRuleDecision,
     FusionUnsupported,
     ParentBondModel,
-    PinStatus,
 )
 from .numbering import (
     MancudeSearchBudgetExceeded,
@@ -222,7 +221,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         numbering=numbering,
         bond_model=bond_model,
         indicated_hydrogens=indicated_h,
-        pin_status=PinStatus.CONFIRMED if mode is FusionMode.AUDITED_PIN else PinStatus.VALID_GENERAL_NAME,
+        pin_eligibility="fusion_rules_satisfied",
         rule_trace=seniority_trace
         + (
             FusionRuleDecision(

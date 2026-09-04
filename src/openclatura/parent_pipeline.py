@@ -2,7 +2,7 @@
 
 from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem, RetainedParentMetadata
 from .fusion.context import current_fusion_mode
-from .fusion.model import FusionMode
+from .fusion.model import FusionMode, PinDecision, PinStatus
 from .heteroatom_subgraphs import upstream_bond_order
 from .locant_sources import LocantMapSource
 from .locants import canonical_locant_pair
@@ -79,6 +79,21 @@ def resolve_systematic_fusion_parent(
         return None
 
     plan = result.plan
+    if mode is FusionMode.AUDITED_PIN:
+        pin_decision = PinDecision(
+            status=PinStatus.CONFIRMED,
+            checks=(
+                "no_preferred_retained_complete_parent",
+                "no_preferred_independently_systematic_complete_parent",
+                "fusion_rules_satisfied",
+                *plan.audit.checks,
+            ),
+        )
+    else:
+        pin_decision = PinDecision(
+            status=PinStatus.VALID_GENERAL_NAME,
+            checks=("fusion_rules_satisfied", *plan.audit.checks),
+        )
     from .fusion.planner import PLANNER_TIER
     from .fusion.trace import fusion_proof_counts, trace_confirmed_fusion_plan
 
@@ -93,7 +108,8 @@ def resolve_systematic_fusion_parent(
             "fusion_mode": mode.value,
             "parent_nomenclature": "systematic_fusion",
             "base_name": plan.rendered_base_name,
-            "pin_status": str(plan.pin_status),
+            "pin_status": str(pin_decision.status),
+            "pin_checks": list(pin_decision.checks),
             "fusion_support_tier": PLANNER_TIER,
             "proof_source": "fusion_reconstruction",
             "components": [
@@ -129,7 +145,7 @@ def resolve_systematic_fusion_parent(
             "proof_counts": fusion_proof_counts(plan),
         },
     )
-    return RingParent.from_fusion_plan(plan)
+    return RingParent.from_fusion_plan(plan, pin_decision=pin_decision)
 
 
 def resolve_bridged_fusion_parent(
@@ -173,7 +189,14 @@ def resolve_bridged_fusion_parent(
             "search_states": plan.search_states,
         },
     )
-    return RingParent.from_fusion_wrapper(plan)
+    status = PinStatus.CONFIRMED if mode is FusionMode.AUDITED_PIN else PinStatus.VALID_GENERAL_NAME
+    checks = (
+        "no_preferred_retained_complete_parent",
+        "no_preferred_independently_systematic_complete_parent",
+        "fusion_rules_satisfied",
+        *plan.audit_checks,
+    )
+    return RingParent.from_fusion_wrapper(plan).with_pin_decision(PinDecision(status=status, checks=checks))
 
 
 def resolve_third_component_fusion_parent(
@@ -195,7 +218,14 @@ def resolve_third_component_fusion_parent(
     plan = plan_third_component_fusion_parent(mol, selection.atom_set, mode=mode)
     if plan is None:
         return None
-    parent = plan.parent
+    status = PinStatus.CONFIRMED if mode is FusionMode.AUDITED_PIN else PinStatus.VALID_GENERAL_NAME
+    checks = (
+        "no_preferred_retained_complete_parent",
+        "no_preferred_independently_systematic_complete_parent",
+        "fusion_rules_satisfied",
+        *plan.audit_checks,
+    )
+    parent = plan.parent.with_pin_decision(PinDecision(status=status, checks=checks))
     trace_decision(
         decision_trace,
         TracePhase.PARENT_SELECTION,

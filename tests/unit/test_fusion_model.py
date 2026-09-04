@@ -32,6 +32,7 @@ from openclatura.fusion import (
     FusionSide,
     FusionUnsupported,
     ParentBondModel,
+    PinDecision,
     PinStatus,
     SystemLocant,
     component_seniority_key,
@@ -126,7 +127,7 @@ def _confirmed_fusion_plan() -> FusionParentPlan:
         numbering=numbering,
         bond_model=_bond_model(),
         indicated_hydrogens=(),
-        pin_status=PinStatus.CONFIRMED,
+        pin_eligibility="fusion_rules_satisfied",
         rule_trace=(),
         audit=FusionAuditResult(AuditStatus.CONFIRMED, checks=("reconstruction", "numbering")),
     )
@@ -333,7 +334,7 @@ def test_fusion_parent_plan_requires_confirmed_audit():
             numbering=confirmed.numbering,
             bond_model=confirmed.bond_model,
             indicated_hydrogens=(),
-            pin_status=PinStatus.UNSUPPORTED,
+            pin_eligibility="fusion_rules_satisfied",
             rule_trace=(),
             audit=FusionAuditResult(AuditStatus.ABSTAIN),
         )
@@ -341,7 +342,17 @@ def test_fusion_parent_plan_requires_confirmed_audit():
 
 def test_ring_parent_from_fusion_preserves_proof_maps_and_is_immutable():
     fusion = _confirmed_fusion_plan()
-    parent = RingParent.from_fusion_plan(fusion)
+    parent = RingParent.from_fusion_plan(
+        fusion,
+        pin_decision=PinDecision(
+            PinStatus.CONFIRMED,
+            (
+                "no_preferred_retained_complete_parent",
+                "no_preferred_independently_systematic_complete_parent",
+                "fusion_rules_satisfied",
+            ),
+        ),
+    )
 
     assert parent.kind == "systematic_fusion"
     assert parent.proof_locant_maps == ({10: "1", 11: "2", 12: "2a"},)
@@ -367,6 +378,11 @@ def test_pin_gate_and_modes_are_explicit():
     assert not fusion_mode_allows_planning(FusionMode.LEGACY)
     assert fusion_mode_allows_planning(FusionMode.AUDITED_PIN)
     assert fusion_mode_allows_planning(FusionMode.GENERAL)
+
+
+def test_confirmed_pin_decision_requires_precedence_and_fusion_evidence():
+    with pytest.raises(ValueError, match="precedence and fusion-rule evidence"):
+        PinDecision(PinStatus.CONFIRMED, ("fusion_rules_satisfied",))
 
 
 def test_component_seniority_is_lexicographic_and_explainable():
