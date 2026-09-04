@@ -221,6 +221,7 @@ class FusionComponentSpec:
     rule_reference: str
     seniority_override: int | None = None
     horizontal_ring_count: int = 0
+    multiplicative_prefix_style: str = "basic"
 
     def __post_init__(self) -> None:
         for value, label in (
@@ -233,6 +234,8 @@ class FusionComponentSpec:
             _require_nonempty(self.attached_prefix, "attached prefix")
         if self.horizontal_ring_count < 0:
             raise ValueError("horizontal_ring_count must be non-negative")
+        if self.multiplicative_prefix_style not in {"basic", "complex"}:
+            raise ValueError("fusion component multiplicative prefix style must be basic or complex")
 
     @property
     def derivative_stem(self) -> str | None:

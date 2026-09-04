@@ -44,6 +44,7 @@ class HWFusionComponent:
     attached_prefix: str
     template: RetainedGraphTemplate
     atom_to_locant: tuple[tuple[int, str], ...]
+    multiplicative_prefix_style: str
 
 
 # P-22.2.2.1: the three six-membered stem sets, keyed by the class of the least
@@ -245,7 +246,14 @@ def _hw_fusion_component(
         pre_descriptor_selection=True,
         mancude_double_bonds=mancude_double_bonds(list(symbols)),
     )
-    return HWFusionComponent(key, parent_name, attached_prefix, template, atom_to_locant)
+    return HWFusionComponent(
+        key,
+        parent_name,
+        attached_prefix,
+        template,
+        atom_to_locant,
+        "complex" if len(hetero) > 1 else "basic",
+    )
 
 
 def _fusion_symbols_supported(symbols: tuple[str, ...]) -> bool:

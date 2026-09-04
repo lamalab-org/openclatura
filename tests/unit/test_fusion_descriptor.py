@@ -20,6 +20,7 @@ from openclatura.fusion.model import FusionComponentMatch, FusionConfirmed, Fusi
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.fusion.registry import FusionComponentRegistry, fusion_component_registry
 from openclatura.fusion.rules import component_interface_orbit
+from openclatura.hantzsch_widman import mancude_bond_orders
 from openclatura.molecule import Molecule
 from openclatura.naming_data import load_json_table
 from openclatura.opsin_verify import opsin_available, verify_with_opsin
@@ -54,7 +55,9 @@ def _component_graph(
     """Construct a molecular graph by identifying local component atoms."""
 
     registry = fusion_component_registry()
-    specs = tuple(registry.by_key[key].spec for key in component_keys)
+    registered = tuple(registry.get(key) for key in component_keys)
+    assert all(component is not None for component in registered)
+    specs = tuple(component.spec for component in registered if component is not None)
     local_atoms = tuple((occurrence, locant) for occurrence, spec in enumerate(specs) for locant in spec.locants)
     sets = _DisjointSet(local_atoms)
     for left, right in fused_atoms:
@@ -82,15 +85,19 @@ def _component_graph(
             is_aromatic=symbol not in {"O", "S", "Se", "Te"},
         )
 
-    seen_edges: set[tuple[int, int]] = set()
+    edge_orders: dict[tuple[int, int], int] = {}
     for occurrence, spec in enumerate(specs):
-        for bond in spec.bonds:
+        generated_orders = (
+            mancude_bond_orders([atom.symbol for atom in spec.atoms])
+            if spec.template.family == "generated_hw_monocycle"
+            else [1] * len(spec.bonds)
+        )
+        for bond, order in zip(spec.bonds, generated_orders, strict=True):
             endpoints = tuple(atom_by_local[(occurrence, locant)] for locant in bond.locants)
             edge = tuple(sorted(endpoints))
-            if edge in seen_edges:
-                continue
-            seen_edges.add(edge)
-            mol.add_bond(*edge, idx=100 + len(seen_edges))
+            edge_orders[edge] = max(edge_orders.get(edge, 1), order)
+    for edge, order in sorted(edge_orders.items()):
+        mol.add_bond(*edge, order=order, idx=100 + len(mol.bonds))
 
     faces = tuple(
         GraphCycle.from_atoms(atom_by_local[(occurrence, locant)] for locant in ring)
@@ -288,7 +295,7 @@ def test_shared_classifier_rejects_disconnected_host_sides():
 
 
 def test_polycomponent_tree_orders_attached_components_by_seniority():
-    _mol, ast, rendered = _build(
+    mol, ast, rendered = _build(
         ("furan", "thiophene", "pyridine"),
         (
             ((0, "3"), (2, "2")),
@@ -615,3 +622,23 @@ def test_production_multiparent_grammar_round_trips_through_opsin():
 
     assert rendered == "benzo[1,2-b:4,5-b']difuran"
     assert verify_with_opsin(rendered, "O1C=2C(C=C1)=CC=1OC=CC1C2").ok
+
+
+def test_locanted_hw_multiparents_use_data_selected_complex_multiplier():
+    oxadiazole = "generated-hw:O.N.C.C.N"
+    mol, ast, rendered = _build(
+        (oxadiazole, "benzene", oxadiazole),
+        (
+            ((1, "1"), (0, "3")),
+            ((1, "2"), (0, "4")),
+            ((1, "3"), (2, "3")),
+            ((1, "4"), (2, "4")),
+        ),
+        atomic_components_only=True,
+    )
+
+    assert ast.plan_kind == "multiparent"
+    assert rendered == "benzo[1,2-c:3,4-c']bis([1,2,5]oxadiazole)"
+    planned = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+    assert isinstance(planned, FusionConfirmed)
+    assert planned.plan.rendered_base_name == rendered

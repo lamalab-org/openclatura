@@ -199,6 +199,7 @@ class FusionComponentRegistry:
             rule_reference=rule,
             seniority_override=_optional_nonnegative_int(row, "seniority_override"),
             horizontal_ring_count=_horizontal_ring_count(row, primary),
+            multiplicative_prefix_style=_optional_text(row, "multiplicative_prefix_style") or "basic",
         )
         component = RegisteredFusionComponent(spec, template_names, templates, omit_attached_locants)
         self._components.append(component)
@@ -351,6 +352,7 @@ class FusionComponentRegistry:
             rule_reference=policy.rule_reference,
             seniority_override=None,
             horizontal_ring_count=1,
+            multiplicative_prefix_style=generated.multiplicative_prefix_style,
         )
         return RegisteredFusionComponent(spec, (generated.template.name,), (generated.template,))
 
@@ -366,6 +368,7 @@ def _component_spec(
     rule_reference: str,
     seniority_override: int | None,
     horizontal_ring_count: int,
+    multiplicative_prefix_style: str = "basic",
 ) -> FusionComponentSpec:
     return FusionComponentSpec(
         key=key,
@@ -377,6 +380,7 @@ def _component_spec(
         rule_reference=rule_reference,
         seniority_override=seniority_override,
         horizontal_ring_count=horizontal_ring_count,
+        multiplicative_prefix_style=multiplicative_prefix_style,
     )
 
 

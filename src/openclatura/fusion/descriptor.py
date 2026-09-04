@@ -377,17 +377,29 @@ def render_fusion_name_parts(
         parent_names = {spec.parent_name for spec in root_specs}
         if len(parent_names) != 1:
             raise FusionDescriptorError("multiparent rendering requires identical parent components")
+        multiplier_styles = {spec.multiplicative_prefix_style for spec in root_specs}
+        if len(multiplier_styles) != 1:
+            raise FusionDescriptorError("multiparent components require one multiplier style")
         parent_name = next(iter(parent_names))
         if len(root_specs) == 1:
             pieces.append(component_part(parent_name, "parent_component", plan.parent_occurrences))
         else:
             try:
-                multiplier = multipliers.basic(len(root_specs))
+                multiplier = (
+                    multipliers.complex_(len(root_specs))
+                    if next(iter(multiplier_styles)) == "complex"
+                    else multipliers.basic(len(root_specs))
+                )
             except KeyError as exc:
                 raise FusionDescriptorError("unsupported multiparent multiplicity") from exc
+            rendered_parent = (
+                f"{multiplier}({parent_name})"
+                if next(iter(multiplier_styles)) == "complex"
+                else f"{multiplier}{parent_name}"
+            )
             pieces.append(
                 component_part(
-                    f"{multiplier}{parent_name}",
+                    rendered_parent,
                     "multiparent_components",
                     plan.parent_occurrences,
                 )

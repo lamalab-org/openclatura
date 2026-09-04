@@ -85,9 +85,9 @@
     {"key": "pyrrole", "attached_prefix": "pyrrolo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "imidazole", "attached_prefix": "imidazo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "pyrazole", "attached_prefix": "pyrazolo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
-    {"key": "oxazole", "template_names": ["1,3-oxazole"], "parent_name": "[1,3]oxazole", "attached_prefix": "oxazolo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "oxazole", "template_names": ["1,3-oxazole"], "parent_name": "[1,3]oxazole", "attached_prefix": "oxazolo", "multiplicative_prefix_style": "complex", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "isoxazole", "template_names": ["1,2-oxazole"], "parent_name": "isoxazole", "attached_prefix": "isoxazolo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
-    {"key": "thiazole", "template_names": ["1,3-thiazole"], "parent_name": "[1,3]thiazole", "attached_prefix": "thiazolo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "thiazole", "template_names": ["1,3-thiazole"], "parent_name": "[1,3]thiazole", "attached_prefix": "thiazolo", "multiplicative_prefix_style": "complex", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "isothiazole", "template_names": ["1,2-thiazole"], "parent_name": "isothiazole", "attached_prefix": "isothiazolo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "pyran", "template_names": ["pyran"], "parent_name": "pyran", "attached_prefix": "pyrano", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"}
   ]

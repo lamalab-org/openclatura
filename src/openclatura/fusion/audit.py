@@ -36,6 +36,7 @@ from .model import (
 )
 from .rules import (
     component_spec_seniority_key,
+    component_variant_identity,
     multiplicative_attachment_key,
     multiplicative_member_order_key,
     pin_ring_size_gate,
@@ -245,8 +246,10 @@ def _audit_nomenclature_selection(
     if any(component_spec_seniority_key(specs[parent]) != preferred for parent in ast.parent_occurrences):
         errors.append("declared fusion parent is not the intrinsically senior eligible component")
     if len(ast.parent_occurrences) > 1:
-        parent_keys = {specs[parent].key for parent in ast.parent_occurrences}
-        if len(parent_keys) != 1:
+        parent_variants = {
+            component_variant_identity(specs[parent]) for parent in ast.parent_occurrences
+        }
+        if len(parent_variants) != 1:
             errors.append("multiparent citation does not use identical parent components")
         if not citation.interparent_occurrences:
             errors.append("multiparent citation has no explicit interparent component")

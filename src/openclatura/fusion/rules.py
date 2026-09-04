@@ -131,17 +131,8 @@ def multiplicative_attachment_key(
 ) -> tuple:
     """Identity required for attached components to share a multiplier."""
 
-    template = spec.template
-    variant = (
-        template.name,
-        tuple((atom.locant, atom.symbol, atom.charge, atom.aromatic, atom.fusion, atom.saturated, atom.interior)
-              for atom in template.atoms),
-        tuple(sorted((tuple(sorted(bond.locants)), bond.bond_class) for bond in template.bonds)),
-        tuple(sorted(tuple(sorted(ring, key=retained_locant_sort_key)) for ring in template.rings)),
-    )
     return (
-        spec.key,
-        variant,
+        component_variant_identity(spec),
         join.kind.value,
         join.order,
         "sides" if join.host_sides else "locants",
@@ -149,6 +140,23 @@ def multiplicative_attachment_key(
             spec,
             tuple(locant.text for locant in join.interface.attached_path),
         ),
+    )
+
+
+def component_variant_identity(spec: FusionComponentSpec) -> tuple:
+    """Stable typed identity of one exact component-policy/template variant."""
+
+    template = spec.template
+    return (
+        spec.key,
+        template.name,
+        tuple(
+            (atom.locant, atom.symbol, atom.charge, atom.aromatic, atom.fusion, atom.saturated, atom.interior)
+            for atom in template.atoms
+        ),
+        tuple(sorted((tuple(sorted(bond.locants)), bond.bond_class) for bond in template.bonds)),
+        tuple(sorted(tuple(sorted(ring, key=retained_locant_sort_key)) for ring in template.rings)),
+        spec.multiplicative_prefix_style,
     )
 
 
