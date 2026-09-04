@@ -20,6 +20,7 @@ from ..hantzsch_widman import (
     hw_fusion_component_from_key,
     hw_fusion_components_for_ring,
 )
+from ..locants import retained_locant_sort_key
 from ..molecule import Molecule
 from ..naming_data import load_json_table
 from ..polycycle_topology import normalize_edge
@@ -169,9 +170,13 @@ class FusionComponentRegistry:
         missing = tuple(name for name in template_names if name not in self._template_by_name)
         if missing:
             raise ValueError(f"fusion component {key!r} references unknown templates: {', '.join(missing)}")
-        templates = tuple(self._template_by_name[name] for name in template_names)
+        templates = tuple(
+            _with_ordered_fusion_perimeter(self._template_by_name[name])
+            for name in template_names
+        )
         for template in templates:
             validate_retained_fused_template(template)
+            _validate_fusion_component_template(template)
         if any(template.locants != templates[0].locants for template in templates[1:]):
             raise ValueError(f"fusion component {key!r} template variants use different local locants")
 
@@ -382,6 +387,84 @@ def _component_spec(
         horizontal_ring_count=horizontal_ring_count,
         multiplicative_prefix_style=multiplicative_prefix_style,
     )
+
+
+def _validate_fusion_component_template(template: RetainedGraphTemplate) -> None:
+    """Validate graph contracts needed specifically for fusion side lettering."""
+
+    edges = {frozenset(bond.locants) for bond in template.bonds}
+    neighbors = {locant: set() for locant in template.locants}
+    for left, right in (tuple(edge) for edge in edges):
+        neighbors[left].add(right)
+        neighbors[right].add(left)
+    reached = set()
+    pending = [template.locants[0]]
+    while pending:
+        locant = pending.pop()
+        if locant in reached:
+            continue
+        reached.add(locant)
+        pending.extend(neighbors[locant] - reached)
+    if reached != set(template.locants):
+        raise ValueError(f"fusion component template {template.name!r} graph is disconnected")
+
+    peripheral = template.peripheral_atoms
+    if len(peripheral) < 3 or len(peripheral) != len(set(peripheral)):
+        raise ValueError(f"fusion component template {template.name!r} requires a simple peripheral walk")
+    if any(
+        frozenset(edge) not in edges
+        for edge in zip(peripheral, peripheral[1:] + peripheral[:1])
+    ):
+        raise ValueError(
+            f"fusion component template {template.name!r} peripheral walk does not follow declared bonds"
+        )
+    if set(template.interior_atoms) & set(peripheral):
+        raise ValueError(f"fusion component template {template.name!r} interior and peripheral atoms overlap")
+
+
+def _with_ordered_fusion_perimeter(template: RetainedGraphTemplate) -> RetainedGraphTemplate:
+    """Derive the directed outer walk from typed graph/face membership.
+
+    Shared retained templates store peripheral *membership* in completed-locant
+    order.  Fusion side letters instead require a bonded perimeter traversal.
+    An edge belongs to the outer walk exactly when it occurs in one declared
+    component ring; edges shared by two rings are internal fusion edges.
+    """
+
+    peripheral = set(template.peripheral_atoms)
+    ring_sets = tuple(frozenset(ring) for ring in template.rings)
+    boundary_edges = {
+        frozenset(bond.locants)
+        for bond in template.bonds
+        if set(bond.locants) <= peripheral
+        and sum(set(bond.locants) <= ring for ring in ring_sets) == 1
+    }
+    adjacency = {locant: set() for locant in peripheral}
+    for left, right in (tuple(edge) for edge in boundary_edges):
+        adjacency[left].add(right)
+        adjacency[right].add(left)
+    if not peripheral or any(len(neighbors) != 2 for neighbors in adjacency.values()):
+        return template
+
+    start = min(peripheral, key=retained_locant_sort_key)
+    # Preserve the retained parent's conventional 1 -> 2 direction whenever
+    # that edge lies on the perimeter.  The generic locant order is the
+    # deterministic fallback for parents whose locants are not simple digits.
+    first = "2" if start == "1" and "2" in adjacency[start] else min(
+        adjacency[start], key=retained_locant_sort_key
+    )
+    order = [start, first]
+    while len(order) < len(peripheral):
+        candidates = adjacency[order[-1]] - {order[-2]}
+        if len(candidates) != 1:
+            return template
+        following = next(iter(candidates))
+        if following in order:
+            return template
+        order.append(following)
+    if start not in adjacency[order[-1]]:
+        return template
+    return replace(template, peripheral_atoms=tuple(order))
 
 
 def _required_text(row: Mapping[str, Any], field: str) -> str:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from dataclasses import replace
 from types import MappingProxyType
 
 import pytest
@@ -159,6 +160,65 @@ def test_every_registered_component_reuses_a_complete_locanted_parent_graph():
         if component.spec.usable_as_attached:
             assert component.spec.attached_prefix
         assert component.spec.usable_as_parent or component.spec.usable_as_attached
+
+
+def test_registered_polycycles_expose_a_bonded_locant_ordered_perimeter():
+    registry = fusion_component_registry()
+
+    for key in ("naphthalene", "anthracene"):
+        template = registry.by_key[key].spec.template
+        edges = {frozenset(bond.locants) for bond in template.bonds}
+        perimeter = template.peripheral_atoms
+
+        assert perimeter[:2] == ("1", "2")
+        assert all(
+            frozenset(pair) in edges
+            for pair in zip(perimeter, perimeter[1:] + perimeter[:1])
+        )
+
+
+def test_registration_rejects_a_disconnected_component_template():
+    source = fusion_component_registry().by_key["benzene"].spec.template
+    bonds = tuple(
+        replace(bond, locants=("2", "4"))
+        if set(bond.locants) == {"1", "2"}
+        else replace(bond, locants=("3", "6"))
+        if set(bond.locants) == {"1", "6"}
+        else bond
+        for bond in source.bonds
+    )
+    disconnected = replace(source, name="disconnected-benzene", bonds=bonds)
+    registry = FusionComponentRegistry("test", templates=(disconnected,))
+    row = {
+        "key": "disconnected-benzene",
+        "allow_as_parent": True,
+        "allow_as_attached": True,
+        "attached_prefix": "benzo",
+        "rule": "P-25.2",
+    }
+
+    with pytest.raises(ValueError, match="graph is disconnected"):
+        registry.register(row)
+
+
+def test_registration_rejects_incomplete_peripheral_membership():
+    source = fusion_component_registry().by_key["benzene"].spec.template
+    incomplete = replace(
+        source,
+        name="incomplete-benzene",
+        peripheral_atoms=source.peripheral_atoms[:-1],
+    )
+    registry = FusionComponentRegistry("test", templates=(incomplete,))
+    row = {
+        "key": "incomplete-benzene",
+        "allow_as_parent": True,
+        "allow_as_attached": True,
+        "attached_prefix": "benzo",
+        "rule": "P-25.2",
+    }
+
+    with pytest.raises(ValueError, match="peripheral walk does not follow declared bonds"):
+        registry.register(row)
 
 
 def test_generated_carbocycles_use_shared_numbered_graph_templates():
