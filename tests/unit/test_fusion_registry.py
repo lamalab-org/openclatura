@@ -17,6 +17,7 @@ from openclatura.fusion.registry import (
 from openclatura.hantzsch_widman import hw_generated_names
 from openclatura.molecule import Molecule
 from openclatura.naming_data import load_json_table
+from openclatura.retained_fused_templates import retained_graph_templates
 from openclatura.rules import elements
 
 
@@ -358,6 +359,21 @@ def test_registration_inherits_names_from_the_shared_retained_template():
 
     assert spec.parent_name == spec.template.output_name == "naphthalene"
     assert spec.attached_prefix == spec.template.attached_prefix == "naphtho"
+
+
+def test_component_policy_does_not_repeat_inherited_template_prefixes():
+    data = load_json_table("fusion_components.json")
+    templates = {template.name: template for template in retained_graph_templates(include_disabled=True)}
+
+    redundant = {
+        row["key"]
+        for row in data["components"]
+        if "attached_prefix" in row
+        and row.get("template_names", [row["key"]])[0] in templates
+        and row["attached_prefix"] == templates[row.get("template_names", [row["key"]])[0]].attached_prefix
+    }
+
+    assert not redundant
 
 
 def test_preferred_fusion_prefix_is_separate_from_accepted_general_aliases():
