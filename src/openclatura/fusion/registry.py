@@ -612,9 +612,7 @@ def _normalize_faces(faces: object) -> tuple[GraphFace, ...]:
 
 def _connected_face_subsets(faces: tuple[GraphFace, ...], sizes: frozenset[int]) -> tuple[tuple[GraphFace, ...], ...]:
     adjacent = {
-        index: {
-            other for other in range(len(faces)) if other != index and faces[index].edges & faces[other].edges
-        }
+        index: {other for other in range(len(faces)) if other != index and faces[index].edges & faces[other].edges}
         for index in range(len(faces))
     }
     return tuple(

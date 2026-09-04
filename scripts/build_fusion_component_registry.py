@@ -74,8 +74,7 @@ def compiled_registry() -> dict[str, Any]:
         "generated_by": "scripts/build_fusion_component_registry.py",
         "runtime_dependency": False,
         "source_sha256": {
-            str(path.relative_to(ROOT)): _sha256(path)
-            for path in (POLICY_PATH, TEMPLATE_PATH, HW_PATH, PARSER_PATH)
+            str(path.relative_to(ROOT)): _sha256(path) for path in (POLICY_PATH, TEMPLATE_PATH, HW_PATH, PARSER_PATH)
         },
         "components": components,
     }
