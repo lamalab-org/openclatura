@@ -70,26 +70,31 @@ def intrinsic_fused_layouts(
     budget = _Budget(search_budget)
     completed: dict[tuple, FusedLayout] = {}
 
+    coordinate_systems = set.intersection(
+        *(set(shape.coordinate_system for shape in _SHAPES_BY_SIZE[face.size]) for face in model.faces)
+    )
     # Enumerating every seed avoids making the selected geometry depend on the
     # input atom IDs used to assign face IDs. The hard state/result budgets keep
     # this bounded for larger fused systems.
-    for root in sorted(model.faces, key=lambda face: (face.size, face.id)):
-        for shape in _SHAPES_BY_SIZE[root.size]:
-            for offset in range(root.size):
-                for reverse in (False, True):
-                    budget.spend()
-                    order = _oriented_cycle(root.atom_cycle, offset, reverse)
-                    atom_positions = {atom: point for atom, point in zip(order, shape.vertices)}
-                    _search_layouts(
-                        model,
-                        face_by_id,
-                        {root.id: order},
-                        {root.id: shape},
-                        atom_positions,
-                        budget,
-                        completed,
-                        max_layouts,
-                    )
+    for coordinate_system in sorted(coordinate_systems):
+        for root in sorted(model.faces, key=lambda face: (face.size, face.id)):
+            for shape in _shapes_for(root.size, coordinate_system):
+                for offset in range(root.size):
+                    for reverse in (False, True):
+                        budget.spend()
+                        order = _oriented_cycle(root.atom_cycle, offset, reverse)
+                        atom_positions = {atom: point for atom, point in zip(order, shape.vertices)}
+                        _search_layouts(
+                            model,
+                            face_by_id,
+                            {root.id: order},
+                            {root.id: shape},
+                            atom_positions,
+                            budget,
+                            completed,
+                            max_layouts,
+                            coordinate_system,
+                        )
     return tuple(sorted(completed.values(), key=_layout_sort_key))
 
 
@@ -142,10 +147,16 @@ def _search_layouts(
     budget: _Budget,
     completed: dict[tuple, FusedLayout],
     max_layouts: int,
+    coordinate_system: str,
 ) -> None:
     if len(placed_orders) == len(model.faces):
         if _audit_layout(model, placed_orders, atom_positions):
-            for layout in _materialize_layouts(placed_orders, placed_shapes, atom_positions):
+            for layout in _materialize_layouts(
+                placed_orders,
+                placed_shapes,
+                atom_positions,
+                coordinate_system=coordinate_system,
+            ):
                 completed.setdefault(_layout_geometry_key(layout), layout)
             if len(completed) > max_layouts:
                 raise LayoutSearchBudgetExceeded(max_layouts, resource="completed layouts")
@@ -172,13 +183,14 @@ def _search_layouts(
 
     for endpoints in (shared_endpoints, tuple(reversed(shared_endpoints))):
         for order in _orders_starting_with_edge(face.atom_cycle, endpoints):
-            for shape in _SHAPES_BY_SIZE[face.size]:
+            for shape in _shapes_for(face.size, coordinate_system):
                 budget.spend()
                 candidate = _place_shape(
                     shape,
                     order,
                     scaled_positions[endpoints[0]],
                     scaled_positions[endpoints[1]],
+                    coordinate_system=coordinate_system,
                 )
                 if not _opposite_side(
                     scaled_positions[endpoints[0]],
@@ -206,7 +218,14 @@ def _search_layouts(
                     budget,
                     completed,
                     max_layouts,
+                    coordinate_system,
                 )
+
+
+def _shapes_for(ring_size: int, coordinate_system: str) -> tuple[RingShapeSpec, ...]:
+    return tuple(
+        shape for shape in _SHAPES_BY_SIZE[ring_size] if shape.coordinate_system == coordinate_system
+    )
 
 
 def _valid_face_adjacency(model: FaceModel, face_by_id: dict[int, Face]) -> bool:
@@ -273,10 +292,25 @@ def _orders_starting_with_edge(cycle: tuple[int, ...], endpoints: Edge) -> tuple
     return tuple(variants)
 
 
-def _place_shape(shape: RingShapeSpec, order: tuple[int, ...], start: Point, end: Point) -> dict[int, Point]:
+def _place_shape(
+    shape: RingShapeSpec,
+    order: tuple[int, ...],
+    start: Point,
+    end: Point,
+    *,
+    coordinate_system: str = "cartesian",
+) -> dict[int, Point]:
     dx, dy = end[0] - start[0], end[1] - start[1]
     if dx % _SHAPE_EDGE_SCALE or dy % _SHAPE_EDGE_SCALE:
         raise ValueError("scaled fusion entrance edge must have integral template coordinates")
+    if coordinate_system == "eisenstein":
+        return {
+            atom: (
+                start[0] + (x * dx - y * dy) // _SHAPE_EDGE_SCALE,
+                start[1] + (x * dy + y * dx + y * dy) // _SHAPE_EDGE_SCALE,
+            )
+            for atom, (x, y) in zip(order, shape.vertices)
+        }
     return {
         atom: (
             start[0] + x * dx // _SHAPE_EDGE_SCALE - y * dy // _SHAPE_EDGE_SCALE,
@@ -379,7 +413,11 @@ def _materialize_layouts(
     placed_orders: dict[int, tuple[int, ...]],
     shapes: dict[int, RingShapeSpec],
     positions: dict[int, Point],
+    *,
+    coordinate_system: str = "cartesian",
 ) -> tuple[FusedLayout, ...]:
+    if coordinate_system == "eisenstein":
+        positions = {atom: (2 * x + y, 3 * y) for atom, (x, y) in positions.items()}
     scale = lcm(*(len(order) for order in placed_orders.values()))
     integer = {atom: (x * scale, y * scale) for atom, (x, y) in positions.items()}
     centers = {

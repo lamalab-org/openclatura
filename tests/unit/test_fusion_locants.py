@@ -12,6 +12,8 @@ from openclatura.molecule import Molecule
         ("4a", SystemLocant(4, "a")),
         ("9^2", SystemLocant(9, interior_distance=2)),
         ("9²", SystemLocant(9, interior_distance=2)),
+        ("3a^2", SystemLocant(3, fusion_suffix="a", interior_distance=2)),
+        ("3a²", SystemLocant(3, fusion_suffix="a", interior_distance=2)),
     ],
 )
 def test_completed_system_locants_are_typed(text, expected):
@@ -27,6 +29,13 @@ def test_completed_system_locant_order_is_numeric_then_fusion_suffix():
     values = ["10", "4b", "4", "4a", "9^2"]
     assert sorted(values, key=system_locant_sort_key) == ["4", "4a", "4b", "9^2", "10"]
     assert canonical_locant_pair("4a", "4") == ("4", "4a")
+
+
+def test_interior_distance_can_extend_a_fusion_anchor_locant():
+    locant = SystemLocant(3, fusion_suffix="a", interior_distance=2)
+
+    assert str(locant) == "3a²"
+    assert locant.render(unicode_superscript=False) == "3a^2"
 
 
 def test_graph_mutation_invalidates_fusion_plans():

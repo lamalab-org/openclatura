@@ -59,6 +59,7 @@ class RingShapeSpec:
     edge_directions: tuple[int, ...]
     horizontal_axis_class: str
     distortion_rank: int = 0
+    coordinate_system: str = "cartesian"
 
     def __post_init__(self) -> None:
         if not 3 <= self.ring_size <= 8:
@@ -71,6 +72,8 @@ class RingShapeSpec:
             raise ValueError("ring shapes must use the canonical four-unit entrance edge")
         if self.distortion_rank < 0:
             raise ValueError("shape distortion rank must be non-negative")
+        if self.coordinate_system not in {"cartesian", "eisenstein"}:
+            raise ValueError("ring shape coordinate_system must be cartesian or eisenstein")
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,6 +147,7 @@ def _ring_shape(row: object) -> RingShapeSpec:
         edge_directions=tuple(_integer(value, "edge direction") for value in row.get("edge_directions", ())),
         horizontal_axis_class=_text(row, "horizontal_axis_class"),
         distortion_rank=_nonnegative_int(row, "distortion_rank", default=0),
+        coordinate_system=row.get("coordinate_system", "cartesian"),
     )
 
 

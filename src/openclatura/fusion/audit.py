@@ -18,12 +18,14 @@ from ..retained_graph_model import merge_parent_bond_classes
 from .cover import audit_component_cover, component_scope
 from .model import (
     AuditStatus,
+    ComponentLocant,
     FusionAuditResult,
     FusionComponentMatch,
     FusionComponentSpec,
     FusionDescriptor,
     FusionGraph,
     FusionJoin,
+    FusionJoinKind,
     FusionMode,
     FusionNameAst,
     FusionNumberingProof,
@@ -259,27 +261,24 @@ def _reconstruct(
         if join.attached_occurrence not in matches or join.host_occurrence not in matches:
             errors.append("fusion join references an unknown component occurrence")
             continue
-        attached_nodes = tuple((join.attached_occurrence, locant.text) for locant in join.attached_locants)
-        host_paths = _host_interface_paths(join, specs[join.host_occurrence], errors)
-        if not host_paths:
-            continue
-        if len(attached_nodes) != join.order + 1:
-            errors.append(
-                f"join {join.attached_occurrence}->{join.host_occurrence} has an attached interface "
-                f"of {len(attached_nodes) - 1} bonds but declares order {join.order}"
-            )
-            continue
+        attached_nodes = tuple(
+            (join.attached_occurrence, locant.text) for locant in join.interface.attached_path
+        )
+        host_nodes = tuple((join.host_occurrence, locant.text) for locant in join.interface.host_path)
         attached_input = tuple(input_by_node.get(node) for node in attached_nodes)
-        matching_paths = [
-            path for path in host_paths if tuple(input_by_node.get(node) for node in path) == attached_input
-        ]
-        if not matching_paths:
+        host_input = tuple(input_by_node.get(node) for node in host_nodes)
+        if attached_input != join.interface.ordered_input_atoms:
             errors.append(
-                f"join {join.attached_occurrence}->{join.host_occurrence} cites interfaces that do not map "
-                "to the same ordered input atoms"
+                f"join {join.attached_occurrence}->{join.host_occurrence} attached path disagrees "
+                "with its ordered input atoms"
             )
             continue
-        host_nodes = matching_paths[0]
+        if host_input != join.interface.ordered_input_atoms:
+            errors.append(
+                f"join {join.attached_occurrence}->{join.host_occurrence} host path disagrees "
+                "with its ordered input atoms"
+            )
+            continue
         for attached, host in zip(attached_nodes, host_nodes, strict=True):
             disjoint.union(attached, host)
 
@@ -350,21 +349,14 @@ def _reconstruct(
     )
 
 
-def _host_interface_paths(
+def _host_path_from_sides(
     join: FusionJoin,
     host: FusionComponentSpec,
     errors: list[str],
-) -> tuple[tuple[_Node, ...], ...]:
+) -> tuple[ComponentLocant, ...]:
     occurrence = join.host_occurrence
     if join.host_locants:
-        path = tuple((occurrence, locant.text) for locant in join.host_locants)
-        if len(path) != join.order + 1:
-            errors.append(
-                f"join {join.attached_occurrence}->{occurrence} has a numeric host interface "
-                f"of {len(path) - 1} bonds but declares order {join.order}"
-            )
-            return ()
-        return (path,)
+        return join.host_locants
 
     side_indices: list[int] = []
     for side in join.host_sides:
@@ -374,12 +366,6 @@ def _host_interface_paths(
                 errors.append(f"host side {letter!r} is not defined by component {host.key}")
                 return ()
             side_indices.append(index)
-    if len(side_indices) != join.order:
-        errors.append(
-            f"join {join.attached_occurrence}->{occurrence} cites {len(side_indices)} host sides "
-            f"but declares order {join.order}"
-        )
-        return ()
     edges = [
         (
             host.peripheral_order[index],
@@ -391,7 +377,7 @@ def _host_interface_paths(
     if not path:
         errors.append(f"host sides do not form one ordered interface on component {host.key}")
         return ()
-    return (tuple((occurrence, locant) for locant in path),)
+    return tuple(ComponentLocant(occurrence, locant) for locant in path)
 
 
 def _ordered_side_path(edges: list[tuple[str, str]]) -> tuple[str, ...]:
@@ -471,19 +457,28 @@ def _audit_descriptors(
         host = matches[join.host_occurrence]
         attached_map = attached.input_atom_by_locant
         host_map = host.input_atom_by_locant
-        attached_path = tuple(attached_map.get(locant.text) for locant in join.attached_locants)
-        host_paths = _host_interface_paths(join, specs[join.host_occurrence], errors)
-        host_input_paths = tuple(tuple(host_map.get(node[1]) for node in path) for path in host_paths)
-        if attached_path not in host_input_paths:
+        evidence = join.interface
+        attached_path = tuple(attached_map.get(locant.text) for locant in evidence.attached_path)
+        host_path = tuple(host_map.get(locant.text) for locant in evidence.host_path)
+        if attached_path != evidence.ordered_input_atoms or host_path != evidence.ordered_input_atoms:
+            errors.append(
+                f"join {join.attached_occurrence}->{join.host_occurrence} component paths do not preserve "
+                "the ordered input interface"
+            )
             continue
-        derived_edges = frozenset(
+        derived_ordered_edges = tuple(
             normalize_edge(left, right) for left, right in zip(attached_path, attached_path[1:])
         )
+        derived_edges = frozenset(derived_ordered_edges)
         actual_edges = (
             reconstruction.input_edges_by_occurrence[join.attached_occurrence]
             & reconstruction.input_edges_by_occurrence[join.host_occurrence]
         )
         derived_atoms = frozenset(attached_path)
+        if evidence.ordered_input_edges != derived_ordered_edges:
+            errors.append(
+                f"join {join.attached_occurrence}->{join.host_occurrence} stores a wrong ordered edge path"
+            )
         if derived_edges != actual_edges:
             errors.append(
                 f"join {join.attached_occurrence}->{join.host_occurrence} does not cite every and only shared edge"
@@ -491,13 +486,27 @@ def _audit_descriptors(
         if derived_atoms != frozenset(atom for edge in actual_edges for atom in edge):
             errors.append(f"join {join.attached_occurrence}->{join.host_occurrence} cites wrong shared atoms")
         expected_bond_ids = frozenset(bond.idx for edge in actual_edges if (bond := mol.get_bond(*edge)) is not None)
-        if join.shared_input_atoms != derived_atoms:
+        if evidence.shared_input_atoms != derived_atoms:
             errors.append(f"join {join.attached_occurrence}->{join.host_occurrence} stores wrong shared atoms")
-        if join.shared_input_bonds != expected_bond_ids:
+        if evidence.shared_input_bonds != expected_bond_ids:
             errors.append(f"join {join.attached_occurrence}->{join.host_occurrence} stores wrong shared bonds")
-        if not join.shared_input_bonds <= numbering.selected_face_model.fusion_edges:
+        if not evidence.shared_input_bonds <= numbering.selected_face_model.fusion_edges:
             errors.append(
                 f"join {join.attached_occurrence}->{join.host_occurrence} is not a selected-layout fusion interface"
+            )
+        expected_host_path = _host_path_from_sides(join, specs[join.host_occurrence], errors)
+        if expected_host_path and expected_host_path != evidence.host_path:
+            errors.append(
+                f"join {join.attached_occurrence}->{join.host_occurrence} host sides disagree "
+                "with its typed host path"
+            )
+        expected_kind = (
+            FusionJoinKind.ORTHO if len(derived_ordered_edges) == 1 else FusionJoinKind.ORTHO_PERI
+        )
+        if evidence.kind is not expected_kind:
+            errors.append(
+                f"join {join.attached_occurrence}->{join.host_occurrence} has the wrong fusion kind "
+                "for its ordered interface"
             )
 
         if ast.descriptors:
@@ -639,7 +648,8 @@ def _audit_layout_numbering_compatibility(
     locant_map = dict(numbering.abstract_atom_to_locant)
     if set(locant_map) != parent_atoms:
         return
-    expected = tuple(sorted(parent_atoms, key=lambda atom: _system_locant_key(locant_map[atom])))
+    peripheral_atoms = set(boundary)
+    expected = tuple(sorted(peripheral_atoms, key=lambda atom: _system_locant_key(locant_map[atom])))
     start = clockwise.index(expected[0])
     geometric_order = clockwise[start:] + clockwise[:start]
     if geometric_order != expected:

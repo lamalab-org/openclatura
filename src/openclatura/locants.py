@@ -32,8 +32,6 @@ class SystemLocant:
             raise ValueError("fusion suffix must be a lowercase ASCII letter sequence")
         if self.interior_distance is not None and self.interior_distance <= 0:
             raise ValueError("interior distance must be positive")
-        if self.fusion_suffix and self.interior_distance is not None:
-            raise ValueError("fusion suffix and interior distance are mutually exclusive")
 
     def render(self, *, unicode_superscript: bool = True) -> str:
         text = f"{self.base}{self.fusion_suffix}"

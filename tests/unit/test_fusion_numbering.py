@@ -13,6 +13,32 @@ from openclatura.fusion.numbering import (
 )
 from openclatura.fusion.planner import _typed_face_model, plan_fusion_parent
 from openclatura.graph_io import read_smiles
+from openclatura.molecule import Molecule
+
+
+def _pericondensed_patch(*, interior_symbol: str = "C"):
+    face_cycles = (
+        (0, 1, 2, 3, 14, 13),
+        (3, 4, 5, 6, 15, 14),
+        (6, 7, 8, 9, 10, 15),
+        (10, 11, 12, 13, 14, 15),
+    )
+    edges = {
+        tuple(sorted((left, right)))
+        for cycle in face_cycles
+        for left, right in zip(cycle, cycle[1:] + cycle[:1])
+    }
+    mol = Molecule()
+    for atom in range(16):
+        mol.add_atom(interior_symbol if atom == 14 else "C", idx=atom)
+    for bond_id, edge in enumerate(sorted(edges), start=1):
+        mol.add_bond(*edge, idx=bond_id)
+    bounded = select_bounded_face_model(mol, mol.atoms)
+    assert bounded is not None
+    face_model = _typed_face_model(mol, bounded)
+    layouts = preferred_intrinsic_layouts(face_model)
+    assert layouts
+    return mol, bounded, face_model, layouts
 
 
 def test_completed_numbering_assigns_fusion_suffixes_to_shared_carbons():
@@ -56,6 +82,40 @@ def test_completed_numbering_is_invariant_to_input_atom_order():
     ]
 
     assert left_symbols == right_symbols
+
+
+def test_pericondensed_numbering_assigns_interior_carbons_from_peripheral_anchors():
+    mol, bounded, face_model, layouts = _pericondensed_patch()
+
+    selection = completed_system_numbering_selection(
+        mol,
+        bounded,
+        face_model=face_model,
+        layouts=layouts,
+    )
+
+    assert selection.accepted
+    for numbering in selection.accepted:
+        locants = dict(numbering.atom_to_locant)
+        assert set(locants) == set(mol.atoms)
+        assert all(locants[atom].interior_distance == 1 for atom in (14, 15))
+        assert all(locants[atom].fusion_suffix for atom in (14, 15))
+
+
+def test_interior_heteroatom_continues_the_peripheral_integer_sequence():
+    mol, bounded, face_model, layouts = _pericondensed_patch(interior_symbol="N")
+
+    selection = completed_system_numbering_selection(
+        mol,
+        bounded,
+        face_model=face_model,
+        layouts=layouts,
+    )
+
+    assert selection.accepted
+    for numbering in selection.accepted:
+        locant = dict(numbering.atom_to_locant)[14]
+        assert (locant.base, locant.fusion_suffix, locant.interior_distance) == (11, "", None)
 
 
 def _layout_numbering_selection(smiles: str):

@@ -1,5 +1,6 @@
 import pytest
 
+from openclatura.fusion.faces import select_bounded_face_model
 from openclatura.fusion.layout import (
     RING_SHAPE_TEMPLATES,
     LayoutSearchBudgetExceeded,
@@ -7,6 +8,8 @@ from openclatura.fusion.layout import (
     preferred_intrinsic_layout,
 )
 from openclatura.fusion.model import Face, FaceModel
+from openclatura.fusion.planner import _typed_face_model
+from openclatura.molecule import Molecule
 
 
 def _fused_faces(ring_size: int, permutation: dict[int, int] | None = None) -> FaceModel:
@@ -96,6 +99,36 @@ def test_layout_preference_is_invariant_to_input_atom_ids():
 
     assert left is not None and right is not None
     assert _geometry_signature(left) == _geometry_signature(right)
+
+
+def test_exact_hexagonal_lattice_closes_a_pericondensed_face_dual_cycle():
+    face_cycles = (
+        (0, 1, 2, 3, 14, 13),
+        (3, 4, 5, 6, 15, 14),
+        (6, 7, 8, 9, 10, 15),
+        (10, 11, 12, 13, 14, 15),
+    )
+    edges = {
+        tuple(sorted((left, right)))
+        for cycle in face_cycles
+        for left, right in zip(cycle, cycle[1:] + cycle[:1])
+    }
+    mol = Molecule()
+    for atom in range(16):
+        mol.add_atom("C", idx=atom)
+    for bond_id, edge in enumerate(sorted(edges), start=1):
+        mol.add_bond(*edge, idx=bond_id)
+    bounded = select_bounded_face_model(mol, mol.atoms)
+
+    assert bounded is not None
+    layouts = intrinsic_fused_layouts(_typed_face_model(mol, bounded))
+
+    assert layouts
+    assert all(
+        {shape for _, shape in layout.face_shapes} == {"hexagon-eisenstein"}
+        for layout in layouts
+    )
+    assert all({atom for atom, _, _ in layout.atom_positions} == set(range(16)) for layout in layouts)
 
 
 def test_inconsistent_face_adjacency_abstains():

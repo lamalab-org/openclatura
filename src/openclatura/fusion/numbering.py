@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, deque
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from fractions import Fraction
 from functools import cmp_to_key
 
+from ..canonical_ranks import canonical_ranks
+from ..locants import system_locant_sort_key
 from ..molecule import Molecule
 from ..polycycle_topology import normalize_edge
 from .config import fusion_nomenclature_config
@@ -92,8 +94,6 @@ def completed_system_numbering_selection(
         return CompletedNumberingSelection(_graph_numbering_candidates(mol, faces))
     if face_model is None:
         raise ValueError("layout-derived numbering requires the corresponding typed face model")
-    if set(faces.outer_boundary.atoms) != set(faces.atom_ids):
-        return CompletedNumberingSelection(())
     candidates: list[CompletedNumbering] = []
     rejected: list[RejectedNumbering] = []
     fusion_atoms = _fusion_atoms(faces)
@@ -145,13 +145,13 @@ def _graph_numbering_candidates(mol: Molecule, faces: BoundedFaceModel) -> tuple
     fusion_atoms = _fusion_atoms(faces)
     candidates: list[CompletedNumbering] = []
     for oriented in _cycle_orientations(boundary):
-        locant_map = _number_perimeter(mol, oriented, fusion_atoms)
+        locant_map = _number_completed_system(mol, faces, oriented, fusion_atoms)
         if locant_map is None:
             continue
         candidates.append(
             CompletedNumbering(
                 perimeter=oriented,
-                atom_to_locant=tuple((atom, locant_map[atom]) for atom in oriented),
+                atom_to_locant=_ordered_locant_items(locant_map),
                 score=_numbering_score(mol, locant_map, fusion_atoms),
             )
         )
@@ -214,12 +214,12 @@ def _numbering_from_layout(
         return None
     offset = clockwise.index(start_atom)
     perimeter = clockwise[offset:] + clockwise[:offset]
-    locant_map = _number_perimeter(mol, perimeter, fusion_atoms)
+    locant_map = _number_completed_system(mol, faces, perimeter, fusion_atoms)
     if locant_map is None:
         return None
     return CompletedNumbering(
         perimeter=perimeter,
-        atom_to_locant=tuple((atom, locant_map[atom]) for atom in perimeter),
+        atom_to_locant=_ordered_locant_items(locant_map),
         score=_numbering_score(mol, locant_map, fusion_atoms),
         layout_index=layout_index,
         start_face_id=start_face_id,
@@ -390,6 +390,91 @@ def _number_perimeter(
             integer += 1
             result[atom] = SystemLocant(integer)
     return result
+
+
+def _number_completed_system(
+    mol: Molecule,
+    faces: BoundedFaceModel,
+    perimeter: tuple[int, ...],
+    fusion_atoms: set[int],
+) -> dict[int, SystemLocant] | None:
+    """Number the perimeter, then extend the map to interior atoms."""
+
+    result = _number_perimeter(mol, perimeter, fusion_atoms)
+    if result is None:
+        return None
+    interior = set(faces.atom_ids) - set(perimeter)
+    if not interior:
+        return result
+
+    distance, anchors = _interior_distances_and_anchors(mol, faces.atom_ids, perimeter)
+    if set(distance) != set(faces.atom_ids):
+        return None
+    ranks = canonical_ranks(mol, faces.atom_ids)
+    interior_hetero = sorted(
+        (atom for atom in interior if mol.atoms[atom].symbol != "C"),
+        key=lambda atom: (
+            distance[atom],
+            min(system_locant_sort_key(result[anchor]) for anchor in anchors[atom]),
+            _heteroatom_rank(mol.atoms[atom].symbol),
+            ranks[atom],
+        ),
+    )
+    next_integer = max(locant.base for locant in result.values())
+    for atom in interior_hetero:
+        next_integer += 1
+        result[atom] = SystemLocant(next_integer)
+
+    for atom in sorted(interior - set(interior_hetero), key=lambda value: (distance[value], ranks[value])):
+        anchor = min(anchors[atom], key=lambda value: system_locant_sort_key(result[value]))
+        anchor_locant = result[anchor]
+        result[atom] = SystemLocant(
+            anchor_locant.base,
+            fusion_suffix=anchor_locant.fusion_suffix,
+            interior_distance=distance[atom],
+        )
+    if len(set(result.values())) != len(result):
+        return None
+    return result
+
+
+def _ordered_locant_items(locants: Mapping[int, SystemLocant]) -> tuple[tuple[int, SystemLocant], ...]:
+    return tuple(sorted(locants.items(), key=lambda item: system_locant_sort_key(item[1])))
+
+
+def _interior_distances_and_anchors(
+    mol: Molecule,
+    atom_ids: frozenset[int],
+    perimeter: tuple[int, ...],
+) -> tuple[dict[int, int], dict[int, frozenset[int]]]:
+    """Return shortest perimeter distances and every equally short anchor."""
+
+    distance = {atom: 0 for atom in perimeter}
+    anchors: dict[int, frozenset[int]] = {atom: frozenset((atom,)) for atom in perimeter}
+    pending = deque(perimeter)
+    while pending:
+        atom = pending.popleft()
+        next_distance = distance[atom] + 1
+        for neighbor in mol.get_neighbors(atom):
+            if neighbor not in atom_ids:
+                continue
+            if neighbor not in distance:
+                distance[neighbor] = next_distance
+                anchors[neighbor] = anchors[atom]
+                pending.append(neighbor)
+            elif distance[neighbor] == next_distance:
+                merged = anchors[neighbor] | anchors[atom]
+                if merged != anchors[neighbor]:
+                    anchors[neighbor] = merged
+                    pending.append(neighbor)
+    return distance, anchors
+
+
+def _heteroatom_rank(symbol: str) -> int:
+    try:
+        return GENERAL_HETEROATOM_COUNT_PRECEDENCE.index(symbol)
+    except ValueError:
+        return len(GENERAL_HETEROATOM_COUNT_PRECEDENCE)
 
 
 def _numbering_score(mol: Molecule, locants: dict[int, SystemLocant], fusion_atoms: set[int]) -> tuple:
