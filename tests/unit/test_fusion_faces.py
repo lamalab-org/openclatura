@@ -114,8 +114,10 @@ def test_pericondensed_face_model_exposes_interior_atoms_for_the_production_gate
     model = select_bounded_face_model(mol, mol.atoms)
 
     assert model is not None
-    assert set(model.outer_boundary.atoms) < set(model.atom_ids)
-    assert set(model.atom_ids) - set(model.outer_boundary.atoms) == {14, 15}
+    assert model.peripheral_atoms < model.atom_ids
+    assert model.interior_atoms == {14, 15}
+    assert model.fusion_atoms == {3, 6, 10, 13, 14, 15}
+    assert dict(model.face_membership_by_atom)[14] == (0, 1, 3)
 
 
 def test_chordless_cycle_enumeration_is_deterministic_and_excludes_outer_chorded_cycle():

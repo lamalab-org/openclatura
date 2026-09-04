@@ -78,6 +78,26 @@ class BoundedFaceModel:
     cycle_rank: int
     audit: FaceModelAudit
 
+    @property
+    def peripheral_atoms(self) -> frozenset[int]:
+        return frozenset(self.outer_boundary.atoms)
+
+    @property
+    def interior_atoms(self) -> frozenset[int]:
+        return self.atom_ids - self.peripheral_atoms
+
+    @property
+    def face_membership_by_atom(self) -> tuple[tuple[int, tuple[int, ...]], ...]:
+        owners: dict[int, list[int]] = {atom: [] for atom in self.atom_ids}
+        for face_id, face in enumerate(self.faces):
+            for atom in face.atoms:
+                owners[atom].append(face_id)
+        return tuple((atom, tuple(face_ids)) for atom, face_ids in sorted(owners.items()))
+
+    @property
+    def fusion_atoms(self) -> frozenset[int]:
+        return frozenset(atom for atom, face_ids in self.face_membership_by_atom if len(face_ids) > 1)
+
 
 @dataclass(slots=True)
 class _Budget:

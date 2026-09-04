@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import Counter, deque
+from collections import deque
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from fractions import Fraction
@@ -308,8 +308,7 @@ def _counterclockwise_nonfusion_start(
 
 
 def _fusion_atoms(faces: BoundedFaceModel) -> set[int]:
-    face_membership = Counter(atom for face in faces.faces for atom in face.atoms)
-    return {atom for atom, count in face_membership.items() if count > 1}
+    return set(faces.fusion_atoms)
 
 
 def _numbering_key(numbering: CompletedNumbering) -> tuple[tuple[int, str], ...]:
