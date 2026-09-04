@@ -8,7 +8,7 @@ have all been audited.
 
 from __future__ import annotations
 
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from dataclasses import dataclass
 from math import gcd, lcm
 
@@ -69,6 +69,7 @@ def intrinsic_fused_layouts(
         return ()
     budget = _Budget(search_budget)
     completed: dict[tuple, FusedLayout] = {}
+    materialized_embeddings: set[tuple] = set()
     best_distortion: list[int | None] = [None]
 
     coordinate_systems = set.intersection(
@@ -97,6 +98,7 @@ def intrinsic_fused_layouts(
                             atom_positions,
                             budget,
                             completed,
+                            materialized_embeddings,
                             max_layouts,
                             coordinate_system,
                             best_distortion,
@@ -152,6 +154,7 @@ def _search_layouts(
     atom_positions: dict[int, Point],
     budget: _Budget,
     completed: dict[tuple, FusedLayout],
+    materialized_embeddings: set[tuple],
     max_layouts: int,
     coordinate_system: str,
     best_distortion: list[int | None],
@@ -161,6 +164,15 @@ def _search_layouts(
         return
     if len(placed_orders) == len(model.faces):
         if _audit_layout(model, placed_orders, atom_positions):
+            embedding_key = _intrinsic_embedding_key(
+                placed_orders,
+                placed_shapes,
+                atom_positions,
+                coordinate_system=coordinate_system,
+            )
+            if embedding_key in materialized_embeddings:
+                return
+            materialized_embeddings.add(embedding_key)
             if best_distortion[0] is None or current_distortion < best_distortion[0]:
                 best_distortion[0] = current_distortion
                 completed.clear()
@@ -235,6 +247,7 @@ def _search_layouts(
                     merged,
                     budget,
                     completed,
+                    materialized_embeddings,
                     max_layouts,
                     coordinate_system,
                     best_distortion,
@@ -435,18 +448,11 @@ def _materialize_layouts(
     *,
     coordinate_system: str = "cartesian",
 ) -> tuple[FusedLayout, ...]:
-    if coordinate_system == "eisenstein":
-        positions = {atom: (2 * x + y, 3 * y) for atom, (x, y) in positions.items()}
-    scale = lcm(*(len(order) for order in placed_orders.values()))
-    integer = {atom: (x * scale, y * scale) for atom, (x, y) in positions.items()}
-    centers = {
-        face: (
-            sum(positions[atom][0] for atom in order) * scale // len(order),
-            sum(positions[atom][1] for atom in order) * scale // len(order),
-        )
-        for face, order in placed_orders.items()
-    }
-    integer, centers = _normalize_integer_layout(integer, centers)
+    integer, centers = _normalized_embedding_geometry(
+        placed_orders,
+        positions,
+        coordinate_system=coordinate_system,
+    )
 
     # A generated embedding has an arbitrary horizontal seed edge.  P-25
     # orientation instead chooses the axis that contains the greatest row of
@@ -467,22 +473,29 @@ def _materialize_layouts(
             directions.add((dx, dy))
 
     candidates: dict[tuple, FusedLayout] = {}
+    best_score: tuple[int, ...] | None = None
     for dx, dy in sorted(directions):
         for x_sign in (-1, 1):
             for y_sign in (-1, 1):
-                oriented = {
-                    atom: (
-                        x_sign * (x * dx + y * dy),
-                        y_sign * (-x * dy + y * dx),
-                    )
-                    for atom, (x, y) in integer.items()
-                }
                 oriented_centers = {
                     face: (
                         x_sign * (x * dx + y * dy),
                         y_sign * (-x * dy + y * dx),
                     )
                     for face, (x, y) in centers.items()
+                }
+                score = _orientation_score(tuple(oriented_centers.values()), shapes)
+                if best_score is not None and score > best_score:
+                    continue
+                if best_score is None or score < best_score:
+                    best_score = score
+                    candidates.clear()
+                oriented = {
+                    atom: (
+                        x_sign * (x * dx + y * dy),
+                        y_sign * (-x * dy + y * dx),
+                    )
+                    for atom, (x, y) in integer.items()
                 }
                 oriented, oriented_centers = _normalize_integer_layout(oriented, oriented_centers)
                 layout = FusedLayout(
@@ -491,7 +504,7 @@ def _materialize_layouts(
                     ),
                     atom_positions=tuple((atom, *oriented[atom]) for atom in sorted(oriented)),
                     face_shapes=tuple((face, shapes[face].shape_id) for face in sorted(shapes)),
-                    orientation_score=_orientation_score(tuple(oriented_centers.values()), shapes),
+                    orientation_score=score,
                     audit_evidence=(
                         "all face boundaries represented",
                         "shared edge coordinates agree",
@@ -503,12 +516,55 @@ def _materialize_layouts(
                 )
                 candidates.setdefault(_layout_geometry_key(layout), layout)
 
-    best_score = min(layout.orientation_score for layout in candidates.values())
-    return tuple(
-        sorted(
-            (layout for layout in candidates.values() if layout.orientation_score == best_score),
-            key=_layout_sort_key,
+    return tuple(sorted(candidates.values(), key=_layout_sort_key))
+
+
+def _normalized_embedding_geometry(
+    placed_orders: dict[int, tuple[int, ...]],
+    positions: dict[int, Point],
+    *,
+    coordinate_system: str,
+) -> tuple[dict[int, Point], dict[int, Point]]:
+    """Return scale-normalized Cartesian atom and face coordinates."""
+
+    if coordinate_system == "eisenstein":
+        positions = {atom: (2 * x + y, 3 * y) for atom, (x, y) in positions.items()}
+    scale = lcm(*(len(order) for order in placed_orders.values()))
+    integer = {atom: (x * scale, y * scale) for atom, (x, y) in positions.items()}
+    centers = {
+        face: (
+            sum(positions[atom][0] for atom in order) * scale // len(order),
+            sum(positions[atom][1] for atom in order) * scale // len(order),
         )
+        for face, order in placed_orders.items()
+    }
+    return _normalize_integer_layout(integer, centers)
+
+
+def _intrinsic_embedding_key(
+    placed_orders: dict[int, tuple[int, ...]],
+    shapes: dict[int, RingShapeSpec],
+    positions: dict[int, Point],
+    *,
+    coordinate_system: str,
+) -> tuple:
+    """Identify embeddings modulo translation, rotation, and reflection."""
+
+    integer, _centers = _normalized_embedding_geometry(
+        placed_orders,
+        positions,
+        coordinate_system=coordinate_system,
+    )
+    atoms = tuple(sorted(integer))
+    squared_distances = tuple(
+        (integer[left][0] - integer[right][0]) ** 2
+        + (integer[left][1] - integer[right][1]) ** 2
+        for position, left in enumerate(atoms)
+        for right in atoms[position + 1 :]
+    )
+    return (
+        tuple((face, shapes[face].shape_id) for face in sorted(shapes)),
+        squared_distances,
     )
 
 
@@ -531,12 +587,12 @@ def _normalize_integer_layout(
 
 
 def _orientation_score(centers: tuple[tuple[int, int], ...], shapes: dict[int, RingShapeSpec]) -> tuple[int, ...]:
-    ys = [y for _, y in centers]
-    row_count = max(sum(y == row for _, y in centers) for row in set(ys))
+    row_counts = Counter(y for _, y in centers)
+    row_count = max(row_counts.values())
     orientation = min(
         _row_orientation_score(centers, row)
-        for row in set(ys)
-        if sum(y == row for _, y in centers) == row_count
+        for row, count in row_counts.items()
+        if count == row_count
     )
     distortion = sum(shape.distortion_rank for shape in shapes.values())
     # Distorted shapes are disfavored before applying the ordinary P-25
