@@ -79,6 +79,7 @@ def audit_fusion_plan(
     mode: FusionMode = FusionMode.GENERAL,
     registry: object | None = None,
     lambda_descriptors: tuple[FusionLambdaDescriptor, ...] = (),
+    rendered_core_name: str | None = None,
 ) -> FusionAuditResult:
     """Independently reconstruct and audit a completed fusion candidate.
 
@@ -153,6 +154,12 @@ def audit_fusion_plan(
         checks.append("parent_bond_model")
         _audit_lambda_descriptors(mol, parent_atoms, numbering, lambda_descriptors, errors)
         checks.append("lambda_descriptors")
+        if rendered_core_name is not None:
+            from .descriptor import render_fusion_name
+
+            if render_fusion_name(ast, registry) != rendered_core_name:
+                errors.append("rendered fusion parent does not reproduce its context-free AST")
+            checks.append("context_free_rendering")
     except (KeyError, TypeError, ValueError) as exc:
         return _error(f"fusion audit could not evaluate candidate: {exc}", checks=checks)
 

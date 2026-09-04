@@ -77,11 +77,27 @@ def trace_confirmed_fusion_plan(
         trace,
         TracePhase.PARENT_SELECTION,
         "selected fusion parent location",
-        "The citation root won the implemented component-seniority criteria within the audited tree cover.",
+        "The citation parent occurrence or occurrences won the component-seniority and parent-location criteria within the audited component cover.",
         atoms=atoms,
         data={
             "parent_occurrences": list(plan.ast.parent_occurrences),
             "plan_kind": plan.ast.plan_kind,
+            "citation_plan": {
+                "primary_join_indices": list(plan.ast.citation_plan.primary_join_indices),
+                "interparent_join_indices": list(plan.ast.citation_plan.interparent_join_indices),
+                "cycle_closing_join_indices": list(plan.ast.citation_plan.cycle_closing_join_indices),
+                "interparent_occurrences": list(plan.ast.citation_plan.interparent_occurrences),
+                "render_order": list(plan.ast.citation_plan.render_order),
+            }
+            if plan.ast.citation_plan is not None
+            else None,
+            "multiplicative_groups": [
+                {
+                    "occurrences": list(group.occurrence_ids),
+                    "multiplier": group.multiplier,
+                }
+                for group in plan.ast.multiplicative_groups
+            ],
             "criteria": [
                 {
                     "rule": decision.rule,
@@ -108,6 +124,30 @@ def trace_confirmed_fusion_plan(
                 "kind": join.kind.value,
                 "descriptor": descriptor.render(),
             },
+        )
+    if plan.lambda_descriptors:
+        trace_decision(
+            trace,
+            TracePhase.ASSEMBLY,
+            "cited fusion bonding-number descriptors",
+            "Neutral nonstandard-valence parent atoms are cited from the completed-system locant map.",
+            atoms={descriptor.atom_id for descriptor in plan.lambda_descriptors},
+            data={
+                "descriptors": [descriptor.text for descriptor in plan.lambda_descriptors],
+                "locants": [str(descriptor.locant) for descriptor in plan.lambda_descriptors],
+            },
+        )
+    if plan.indicated_hydrogens:
+        atom_by_locant = {
+            locant: atom for atom, locant in plan.numbering.input_locant_maps[0]
+        }
+        trace_decision(
+            trace,
+            TracePhase.ASSEMBLY,
+            "cited fusion indicated hydrogen",
+            "Indicated-hydrogen positions were projected through the completed-system numbering proof.",
+            atoms={atom_by_locant[locant] for locant in plan.indicated_hydrogens},
+            data={"locants": [str(locant) for locant in plan.indicated_hydrogens]},
         )
     layout = plan.numbering.selected_layout
     trace_decision(

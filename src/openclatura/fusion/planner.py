@@ -152,6 +152,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     if len(indicated_h) > SUPPORT.maximum_indicated_hydrogens:
         return FusionUnsupported("multiple indicated-hydrogen fusion parents require a later additive tier")
     rendered_parts = render_fusion_name_parts(ast, registry, mol=mol)
+    rendered_core_name = "".join(part.text for part in rendered_parts)
     lambda_descriptors = fusion_lambda_descriptors(
         mol,
         atoms,
@@ -197,6 +198,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         mode=mode,
         registry=registry,
         lambda_descriptors=lambda_descriptors,
+        rendered_core_name=rendered_core_name,
     )
     if audit.status is AuditStatus.ABSTAIN:
         return FusionUnsupported("fusion nomenclature audit abstained", audit.errors)

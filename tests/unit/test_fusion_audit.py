@@ -289,6 +289,16 @@ def test_audit_confirms_independent_component_join_numbering_and_bond_reconstruc
     assert result.errors == ()
 
 
+def test_audit_rejects_a_rendered_parent_that_does_not_reproduce_the_ast():
+    candidate = _two_fused_rings()
+
+    result = _audit(candidate, rendered_core_name="wrong-parent")
+
+    assert result.status is AuditStatus.MISMATCH
+    assert "context_free_rendering" in result.checks
+    assert "rendered fusion parent does not reproduce its context-free AST" in result.errors
+
+
 def test_audit_confirms_graph_built_ortho_peri_interface_without_descriptor_inference():
     candidate = _two_fused_rings(interface_atom_count=3)
     join = candidate.ast.joins[0]

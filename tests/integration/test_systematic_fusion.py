@@ -147,6 +147,21 @@ def test_simple_hydrogenation_is_derived_from_parent_bond_model():
     assert result.name == "4,5-dihydrothieno[2,3-b]furan"
 
 
+def test_fusion_trace_reports_citation_topology_and_context_free_render_audit():
+    result = name(
+        "O1C=CC2=NC3=C(C=C21)SC=C3",
+        fusion_mode=FusionMode.GENERAL,
+        include_trace=True,
+    )
+
+    location = next(step for step in result.decisions if step.decision == "selected fusion parent location")
+    audited = next(step for step in result.decisions if step.decision == "audited systematic fusion parent")
+    assert location.data["plan_kind"] == "polycomponent_tree"
+    assert location.data["citation_plan"]["primary_join_indices"] == [0, 1]
+    assert location.data["citation_plan"]["interparent_join_indices"] == []
+    assert "context_free_rendering" in audited.data["checks"]
+
+
 def test_generated_carbocycle_component_uses_existing_retained_polycycle_parent():
     result = name(
         "C1C=CC2=C1C1=CC=CC=C1C=1C=CC=CC21",
