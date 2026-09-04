@@ -343,12 +343,9 @@ class RingParent:
         return cls(
             kind="systematic_fusion",
             atoms=frozenset(dict(maps[0])) if maps else frozenset(),
-            descriptor=plan.rendered_base_name,
-            retained_locant_maps=maps,
             proof_source="fusion_reconstruction",
             fusion_plan=plan,
             parent_hydride_kind=ParentHydrideKind.SYSTEMATIC_FUSION,
-            parent_name=plan.rendered_base_name,
             hydride_metadata=ParentHydrideMetadata(
                 default_indicated_h=tuple(str(locant) for locant in plan.indicated_hydrogens),
                 fusion_locants=tuple(
@@ -359,7 +356,6 @@ class RingParent:
                 indicated_hydrogen_count=len(plan.indicated_hydrogens),
                 mancude_double_bonds=plan.bond_model.maximum_non_cumulative_double_bonds,
             ),
-            parent_bond_model=plan.bond_model,
             pin_decision=pin_decision,
         )
 

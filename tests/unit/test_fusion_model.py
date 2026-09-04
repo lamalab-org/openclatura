@@ -362,6 +362,13 @@ def test_ring_parent_from_fusion_preserves_proof_maps_and_is_immutable():
     assert parent.bond_model is fusion.bond_model
     assert parent.metadata is not None
     assert parent.metadata.mancude_double_bonds == fusion.bond_model.maximum_non_cumulative_double_bonds
+    assert parent.parent_name is None
+    assert parent.descriptor is None
+    assert not parent.retained_locant_maps
+    assert parent.parent_bond_model is None
+    assert parent.base_name == fusion.rendered_base_name
+    assert parent.proof_locant_maps == fusion.numbering.string_input_locant_maps()
+    assert parent.bond_model is fusion.bond_model
     assert FusionConfirmed(fusion).plan is fusion
     with pytest.raises(FrozenInstanceError):
         parent.descriptor = "changed"
