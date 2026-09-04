@@ -37,6 +37,7 @@
     {"ring_size": 4, "id": "square", "vertices": [[0, 0], [4, 0], [4, 4], [0, 4]], "edge_directions": [0, 1, 2, 3], "horizontal_axis_class": "edge"},
     {"ring_size": 5, "id": "pentagon-symmetric", "vertices": [[0, 0], [4, 0], [6, 3], [3, 6], [0, 4]], "edge_directions": [0, 1, 2, 3, 4], "horizontal_axis_class": "vertex"},
     {"ring_size": 5, "id": "pentagon-shoulder", "vertices": [[0, 0], [4, 0], [7, 4], [4, 7], [0, 4]], "edge_directions": [0, 1, 2, 3, 4], "horizontal_axis_class": "edge", "distortion_rank": 1},
+    {"ring_size": 5, "id": "pentagon-eisenstein", "vertices": [[0, 0], [4, 0], [4, 4], [0, 8], [-4, 4]], "edge_directions": [0, 1, 2, 3, 4], "horizontal_axis_class": "vertex", "coordinate_system": "eisenstein"},
     {"ring_size": 6, "id": "hexagon", "vertices": [[0, 0], [4, 0], [6, 3], [4, 6], [0, 6], [-2, 3]], "edge_directions": [0, 1, 2, 3, 4, 5], "horizontal_axis_class": "edge"},
     {"ring_size": 6, "id": "hexagon-eisenstein", "vertices": [[0, 0], [4, 0], [4, 4], [0, 8], [-4, 8], [-4, 4]], "edge_directions": [0, 1, 2, 3, 4, 5], "horizontal_axis_class": "edge", "coordinate_system": "eisenstein"},
     {"ring_size": 7, "id": "heptagon-symmetric", "vertices": [[0, 0], [4, 0], [7, 2], [8, 5], [5, 8], [1, 8], [-2, 4]], "edge_directions": [0, 1, 2, 3, 4, 5, 6], "horizontal_axis_class": "vertex"},
@@ -57,9 +58,9 @@
     }
   ],
   "components": [
-    {"key": "cyclopentadiene", "parent_name": "cyclopentadiene", "attached_prefix": "cyclopenta", "omit_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
-    {"key": "cycloheptatriene", "parent_name": "cycloheptatriene", "attached_prefix": "cyclohepta", "omit_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
-    {"key": "cyclooctatetraene", "parent_name": "cyclooctatetraene", "attached_prefix": "cycloocta", "omit_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
+    {"key": "cyclopentadiene", "parent_name": "cyclopentadiene", "attached_prefix": "cyclopenta", "omit_attached_locants": true, "omit_ortho_peri_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
+    {"key": "cycloheptatriene", "parent_name": "cycloheptatriene", "attached_prefix": "cyclohepta", "omit_attached_locants": true, "omit_ortho_peri_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
+    {"key": "cyclooctatetraene", "parent_name": "cyclooctatetraene", "attached_prefix": "cycloocta", "omit_attached_locants": true, "omit_ortho_peri_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
     {"key": "benzene", "attached_prefix": "benzo", "omit_attached_locants": true, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "naphthalene", "attached_prefix": "naphtho", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "azulene", "attached_prefix": "azuleno", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},

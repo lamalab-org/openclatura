@@ -133,11 +133,13 @@ def build_fusion_name_ast(
 ) -> FusionNameAst:
     """Build the preferred bounded fusion citation from exact component maps.
 
-    Selected components must cover every face exactly once, reconstruct their
-    graph union exactly, and have a tree-shaped overlap graph. Alternative
-    component identities, parent locations, and local numbering maps are
-    enumerated under explicit bounds and compared without using molecular atom
-    identifiers as nomenclature tie-breakers.
+    Selected components must cover every face exactly once and reconstruct
+    their graph union exactly. Production citations use pairwise tree covers;
+    cyclic covers may be requested by the P-25.5 applicability audit but are
+    never rendered as ordinary fusion names. Alternative component identities,
+    parent locations, and local numbering maps are enumerated under explicit
+    bounds and compared without using molecular atom identifiers as
+    nomenclature tie-breakers.
     """
 
     supported_covers = frozenset(_SUPPORT.cover_kinds if cover_kinds is None else cover_kinds)
@@ -268,10 +270,8 @@ def render_fusion_name_parts(
             tuple(
                 _render_descriptor(
                     descriptor,
-                    omit_attached_locants=(
-                        len(descriptors) == 1
-                        and _omit_attached_locants(registry, spec.key)
-                    ),
+                    omit_attached_locants=len(descriptors) == 1
+                    and _omit_attached_locants(registry, spec.key, descriptor.kind),
                 )
                 for descriptor in descriptors
             )
@@ -311,6 +311,7 @@ def render_fusion_name_parts(
                         omit_attached_locants=_omit_attached_locants(
                             registry,
                             _spec_for_match(registry, matches[member.occurrence_id]).key,
+                            item.kind,
                         ),
                     )
                     for item, member in zip(
@@ -512,38 +513,76 @@ def _candidates_for_component_selection(
     eligible_roots = [match for match in canonical_matches if specs[match.occurrence_id].usable_as_parent]
     if not eligible_roots:
         return []
-    senior_key = min(component_spec_seniority_key(specs[match.occurrence_id]) for match in eligible_roots)
-    roots = [
-        match
-        for match in eligible_roots
-        if component_spec_seniority_key(specs[match.occurrence_id]) == senior_key
-    ]
-    root_sets = [(root.occurrence_id,) for root in roots]
-    if allow_multiparent_parents:
-        root_sets.extend(_multiparent_root_sets(tuple(root.occurrence_id for root in roots), audit.graph.adjacency, specs))
-    topologies = tuple(
-        _citation_topology(audit.graph.adjacency, root_set, specs)
-        for root_set in root_sets
-    )
     if audit.proof.kind == "multiparent" and "higher_order" not in supported_joins:
         return []
-    preferred_location = min(_pre_mapping_location_key(topology.location_key) for topology in topologies)
-    topologies = tuple(
-        topology
-        for topology in topologies
-        if _pre_mapping_location_key(topology.location_key) == preferred_location
-    )
 
     mapping_sets: list[tuple[FusionComponentMatch, ...]] = []
     for occurrence_id, option in enumerate(ordered_options):
         mapping_sets.append(tuple(replace(candidate, occurrence_id=occurrence_id) for candidate in option.mappings))
+    roots_by_seniority: dict[tuple, list[int]] = defaultdict(list)
+    for root in eligible_roots:
+        roots_by_seniority[
+            component_spec_seniority_key(specs[root.occurrence_id]).as_tuple()
+        ].append(root.occurrence_id)
+    for seniority in sorted(roots_by_seniority):
+        roots = tuple(roots_by_seniority[seniority])
+        root_sets = [(root,) for root in roots]
+        if allow_multiparent_parents:
+            roots_by_variant: dict[tuple, list[int]] = defaultdict(list)
+            for root in roots:
+                roots_by_variant[component_variant_identity(specs[root])].append(root)
+            for variant_roots in roots_by_variant.values():
+                root_sets.extend(
+                    _multiparent_root_sets(tuple(variant_roots), audit.graph.adjacency, specs)
+                )
+        candidates = _candidates_for_root_sets(
+            root_sets,
+            audit.graph,
+            mapping_sets,
+            specs,
+            registry,
+            mol,
+            supported_joins,
+            audit.proof.kind,
+        )
+        if candidates:
+            return candidates
+    return []
+
+
+def _candidates_for_root_sets(
+    root_sets: Sequence[tuple[int, ...]],
+    graph,
+    mapping_sets: Sequence[tuple[FusionComponentMatch, ...]],
+    specs: Mapping[int, FusionComponentSpec],
+    registry: _Registry | Mapping[str, FusionComponentSpec],
+    mol: Molecule,
+    supported_joins: frozenset[str],
+    cover_kind: str,
+) -> list[_Candidate]:
+    """Build candidates for one intrinsic parent-seniority tier.
+
+    P-25.5.2 permits moving to a less-senior parent only when no location of
+    the current tier can name the complete system. Keeping tiers separate
+    prevents a lower-seniority but topologically shorter citation from
+    displacing a valid senior parent.
+    """
+
+    topologies = tuple(_citation_topology(graph.adjacency, roots, specs) for roots in root_sets)
+    preferred_location = min(_pre_mapping_location_key(item.location_key) for item in topologies)
+    topologies = tuple(
+        item
+        for item in topologies
+        if _pre_mapping_location_key(item.location_key) == preferred_location
+    )
+    interface_by_pair = {
+        frozenset((interface.left, interface.right)): interface
+        for interface in graph.interfaces
+    }
     candidates: list[_Candidate] = []
     for topology in topologies:
         if any(not specs[occurrence].usable_as_attached for occurrence in topology.parent_by_child):
             continue
-        interface_by_pair = {
-            frozenset((interface.left, interface.right)): interface for interface in audit.graph.interfaces
-        }
         if len(topology.roots) == 1 and not (
             topology.interparent_pairs or topology.cycle_closing_pairs
         ):
@@ -555,7 +594,7 @@ def _candidates_for_component_selection(
                 registry,
                 mol,
                 supported_joins,
-                audit.proof.kind,
+                cover_kind,
             )
             if candidate is not None:
                 candidates.append(candidate)
@@ -577,7 +616,7 @@ def _candidates_for_component_selection(
                 registry,
                 mol,
                 supported_joins,
-                audit.proof.kind,
+                cover_kind,
             )
             if candidate is not None:
                 candidates.append(candidate)
@@ -1423,19 +1462,26 @@ def _combine_rendered_descriptors(descriptors: tuple[str, ...]) -> str:
 def _render_descriptor(descriptor: FusionDescriptor, *, omit_attached_locants: bool) -> str:
     if not omit_attached_locants:
         return descriptor.render()
-    if descriptor.kind is not FusionJoinKind.ORTHO or len(descriptor.parent_sides) != 1:
+    if descriptor.kind not in {FusionJoinKind.ORTHO, FusionJoinKind.ORTHO_PERI}:
         return descriptor.render()
-    return f"[{descriptor.parent_sides[0]}]"
+    if not descriptor.parent_sides:
+        return descriptor.render()
+    return f"[{''.join(str(side) for side in descriptor.parent_sides)}]"
 
 
 def _omit_attached_locants(
     registry: _Registry | Mapping[str, FusionComponentSpec],
     key: str,
+    kind: FusionJoinKind,
 ) -> bool:
     if isinstance(registry, Mapping):
         return False
     component = registry.get(key)
-    return component.omit_attached_locants
+    if kind is FusionJoinKind.ORTHO:
+        return component.omit_attached_locants
+    if kind is FusionJoinKind.ORTHO_PERI:
+        return component.omit_ortho_peri_attached_locants
+    return False
 
 
 def _join_preference_key(join: FusionJoin, side_rank: int) -> tuple:

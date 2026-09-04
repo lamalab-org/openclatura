@@ -53,6 +53,7 @@ class RegisteredFusionComponent:
     template_names: tuple[str, ...]
     templates: tuple[RetainedGraphTemplate, ...]
     omit_attached_locants: bool = False
+    omit_ortho_peri_attached_locants: bool = False
 
     def eligible_for(self, role: FusionComponentRole | str) -> bool:
         role = FusionComponentRole(role)
@@ -193,6 +194,12 @@ class FusionComponentRegistry:
         omit_attached_locants = row.get("omit_attached_locants", False)
         if type(omit_attached_locants) is not bool:
             raise ValueError("omit_attached_locants must be a boolean")
+        omit_ortho_peri_attached_locants = row.get(
+            "omit_ortho_peri_attached_locants",
+            False,
+        )
+        if type(omit_ortho_peri_attached_locants) is not bool:
+            raise ValueError("omit_ortho_peri_attached_locants must be a boolean")
 
         spec = _component_spec(
             key=key,
@@ -206,7 +213,13 @@ class FusionComponentRegistry:
             horizontal_ring_count=_horizontal_ring_count(row, primary),
             multiplicative_prefix_style=_optional_text(row, "multiplicative_prefix_style") or "basic",
         )
-        component = RegisteredFusionComponent(spec, template_names, templates, omit_attached_locants)
+        component = RegisteredFusionComponent(
+            spec,
+            template_names,
+            templates,
+            omit_attached_locants,
+            omit_ortho_peri_attached_locants,
+        )
         self._components.append(component)
         self._by_key[key] = component
         self._claimed_template_names.update(template_names)
