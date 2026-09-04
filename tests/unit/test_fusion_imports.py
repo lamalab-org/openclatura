@@ -34,7 +34,14 @@ assert not heavy_modules.intersection(sys.modules)
 
 
 def test_fusion_public_facade_keeps_lazy_exports_available():
-    from openclatura.fusion import FusionMode, render_fusion_name_parts
+    from openclatura.fusion import (
+        FusionMode,
+        ThirdComponentFusionPlan,
+        plan_third_component_fusion_parent,
+        render_fusion_name_parts,
+    )
 
     assert FusionMode.LEGACY.value == "legacy"
+    assert ThirdComponentFusionPlan.__name__ == "ThirdComponentFusionPlan"
+    assert callable(plan_third_component_fusion_parent)
     assert callable(render_fusion_name_parts)

@@ -162,6 +162,30 @@ def test_bounded_face_selection_is_invariant_to_candidate_cycle_order(monkeypatc
     assert actual.audit.reconstructed_edges == expected.audit.reconstructed_edges
 
 
+def test_cached_face_model_is_reused_and_invalidated_with_the_molecule(monkeypatch):
+    from openclatura.fusion import faces as faces_module
+
+    mol = _linear_fused_hexagons()
+    original = faces_module.select_bounded_face_model
+    calls = 0
+
+    def counted(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(faces_module, "select_bounded_face_model", counted)
+    first = faces_module.cached_bounded_face_model(mol, mol.atoms)
+    second = faces_module.cached_bounded_face_model(mol, mol.atoms)
+
+    assert first is second
+    assert calls == 1
+
+    mol.update_atom(0, isotope=13)
+    faces_module.cached_bounded_face_model(mol, mol.atoms)
+    assert calls == 2
+
+
 def test_face_selection_ranks_only_the_selected_parent_subgraph():
     mol = _linear_fused_hexagons()
     parent_atoms = frozenset(mol.atoms)
