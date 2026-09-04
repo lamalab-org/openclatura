@@ -219,20 +219,12 @@ def _audit_nomenclature_selection(
     citation = _citation_plan(ast)
     if citation.parent_occurrences != ast.parent_occurrences:
         errors.append("fusion citation roots do not match the declared parent occurrences")
-    if ast.citation_tree is not None and (
-        len(citation.roots) != 1 or citation.roots[0] != ast.citation_tree
-    ):
+    if ast.citation_tree is not None and (len(citation.roots) != 1 or citation.roots[0] != ast.citation_tree):
         errors.append("legacy citation tree does not match the citation plan")
     parent_set = set(citation.parent_occurrences)
-    if any(
-        ast.joins[index].attached_occurrence in parent_set
-        for index in citation.primary_join_indices
-    ):
+    if any(ast.joins[index].attached_occurrence in parent_set for index in citation.primary_join_indices):
         errors.append("a citation root is attached by a primary join")
-    if any(
-        ast.joins[index].kind is not FusionJoinKind.HIGHER_ORDER
-        for index in citation.cycle_closing_join_indices
-    ):
+    if any(ast.joins[index].kind is not FusionJoinKind.HIGHER_ORDER for index in citation.cycle_closing_join_indices):
         errors.append("a cycle-closing join lacks a higher-order descriptor")
     matches = {match.occurrence_id: match for match in ast.component_occurrences}
     if any(parent not in matches for parent in ast.parent_occurrences):
@@ -246,9 +238,7 @@ def _audit_nomenclature_selection(
     if any(component_spec_seniority_key(specs[parent]) != preferred for parent in ast.parent_occurrences):
         errors.append("declared fusion parent is not the intrinsically senior eligible component")
     if len(ast.parent_occurrences) > 1:
-        parent_variants = {
-            component_variant_identity(specs[parent]) for parent in ast.parent_occurrences
-        }
+        parent_variants = {component_variant_identity(specs[parent]) for parent in ast.parent_occurrences}
         if len(parent_variants) != 1:
             errors.append("multiparent citation does not use identical parent components")
         if not citation.interparent_occurrences:
@@ -343,9 +333,7 @@ def _reconstruct(
         if join.attached_occurrence not in matches or join.host_occurrence not in matches:
             errors.append("fusion join references an unknown component occurrence")
             continue
-        attached_nodes = tuple(
-            (join.attached_occurrence, locant.text) for locant in join.interface.attached_path
-        )
+        attached_nodes = tuple((join.attached_occurrence, locant.text) for locant in join.interface.attached_path)
         host_nodes = tuple((join.host_occurrence, locant.text) for locant in join.interface.host_path)
         attached_input = tuple(input_by_node.get(node) for node in attached_nodes)
         host_input = tuple(input_by_node.get(node) for node in host_nodes)
@@ -563,9 +551,7 @@ def _audit_descriptors(
         )
         derived_atoms = frozenset(attached_path)
         if evidence.ordered_input_edges != derived_ordered_edges:
-            errors.append(
-                f"join {join.attached_occurrence}->{join.host_occurrence} stores a wrong ordered edge path"
-            )
+            errors.append(f"join {join.attached_occurrence}->{join.host_occurrence} stores a wrong ordered edge path")
         if derived_edges != actual_edges:
             errors.append(
                 f"join {join.attached_occurrence}->{join.host_occurrence} does not cite every and only shared edge"
@@ -584,17 +570,12 @@ def _audit_descriptors(
         expected_host_path = _host_path_from_sides(join, specs[join.host_occurrence], errors)
         if expected_host_path and expected_host_path != evidence.host_path:
             errors.append(
-                f"join {join.attached_occurrence}->{join.host_occurrence} host sides disagree "
-                "with its typed host path"
+                f"join {join.attached_occurrence}->{join.host_occurrence} host sides disagree with its typed host path"
             )
         if evidence.host_locants:
             expected_kind = FusionJoinKind.HIGHER_ORDER
         else:
-            expected_kind = (
-                FusionJoinKind.ORTHO
-                if len(derived_ordered_edges) == 1
-                else FusionJoinKind.ORTHO_PERI
-            )
+            expected_kind = FusionJoinKind.ORTHO if len(derived_ordered_edges) == 1 else FusionJoinKind.ORTHO_PERI
         if evidence.kind is not expected_kind:
             errors.append(
                 f"join {join.attached_occurrence}->{join.host_occurrence} has the wrong fusion kind "
@@ -645,40 +626,26 @@ def _audit_descriptors(
             if audit_multiplicity:
                 expected_groups.append((ordered, multiplier))
                 for prime_depth, occurrence in enumerate(ordered):
-                    depths = {
-                        locant.prime_depth
-                        for locant in joins_by_attached[occurrence].interface.attached_path
-                    }
+                    depths = {locant.prime_depth for locant in joins_by_attached[occurrence].interface.attached_path}
                     if depths != {prime_depth}:
                         errors.append(
                             f"multiplicative occurrence {occurrence} has prime depth {depths}, expected {prime_depth}"
                         )
-    actual_groups = sorted(
-        (group.occurrence_ids, group.multiplier) for group in ast.multiplicative_groups
-    )
+    actual_groups = sorted((group.occurrence_ids, group.multiplier) for group in ast.multiplicative_groups)
     if audit_multiplicity and actual_groups != sorted(expected_groups):
         errors.append("multiplicative groups do not match exact sibling interface orbits")
 
     closing = set(citation.cycle_closing_join_indices)
     if any(ast.joins[index].kind is not FusionJoinKind.HIGHER_ORDER for index in closing):
         errors.append("citation-plan join classes disagree with descriptor kinds")
-    if any(
-        ast.joins[index].kind is FusionJoinKind.HIGHER_ORDER
-        for index in citation.interparent_join_indices
-    ):
+    if any(ast.joins[index].kind is FusionJoinKind.HIGHER_ORDER for index in citation.interparent_join_indices):
         errors.append("interparent joins must retain parent-side descriptors")
     interparents = set(citation.interparent_occurrences)
     parent_set = set(citation.parent_occurrences)
     for occurrence in interparents:
-        joined_hosts = {
-            join.host_occurrence
-            for join in ast.joins
-            if join.attached_occurrence == occurrence
-        }
+        joined_hosts = {join.host_occurrence for join in ast.joins if join.attached_occurrence == occurrence}
         if len(joined_hosts & parent_set) < 2:
-            errors.append(
-                f"interparent component occurrence {occurrence} does not join multiple parents"
-            )
+            errors.append(f"interparent component occurrence {occurrence} does not join multiple parents")
 
 
 def _descriptor_matches_join(descriptor: FusionDescriptor, join: FusionJoin) -> bool:
@@ -784,8 +751,7 @@ def _audit_layout_numbering_compatibility(
 
     boundary = numbering.selected_face_model.outer_boundary
     signed_area = sum(
-        atom_positions[left][0] * atom_positions[right][1]
-        - atom_positions[right][0] * atom_positions[left][1]
+        atom_positions[left][0] * atom_positions[right][1] - atom_positions[right][0] * atom_positions[left][1]
         for left, right in zip(boundary, boundary[1:] + boundary[:1])
     )
     if signed_area == 0:

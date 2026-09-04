@@ -198,10 +198,7 @@ def _search_layouts(
     # its entrance edge is not horizontal. Scale the complete partial layout
     # once at this depth so all subsequent geometric predicates stay exact
     # integer operations. Layout normalization removes this common scale.
-    scaled_positions = {
-        atom: (x * _SHAPE_EDGE_SCALE, y * _SHAPE_EDGE_SCALE)
-        for atom, (x, y) in atom_positions.items()
-    }
+    scaled_positions = {atom: (x * _SHAPE_EDGE_SCALE, y * _SHAPE_EDGE_SCALE) for atom, (x, y) in atom_positions.items()}
     existing_side = _face_side_point(placed_orders[placed_neighbor], shared_endpoints, scaled_positions)
     if existing_side is None:
         return
@@ -209,10 +206,7 @@ def _search_layouts(
     for endpoints in (shared_endpoints, tuple(reversed(shared_endpoints))):
         for order in _orders_starting_with_edge(face.atom_cycle, endpoints):
             for shape in _shapes_for(face.size, coordinate_system):
-                if (
-                    best_distortion[0] is not None
-                    and current_distortion + shape.distortion_rank > best_distortion[0]
-                ):
+                if best_distortion[0] is not None and current_distortion + shape.distortion_rank > best_distortion[0]:
                     continue
                 budget.spend()
                 candidate = _place_shape(
@@ -230,8 +224,7 @@ def _search_layouts(
                 ):
                     continue
                 if any(
-                    atom in scaled_positions and scaled_positions[atom] != point
-                    for atom, point in candidate.items()
+                    atom in scaled_positions and scaled_positions[atom] != point for atom, point in candidate.items()
                 ):
                     continue
                 merged = dict(scaled_positions)
@@ -255,9 +248,7 @@ def _search_layouts(
 
 
 def _shapes_for(ring_size: int, coordinate_system: str) -> tuple[RingShapeSpec, ...]:
-    return tuple(
-        shape for shape in _SHAPES_BY_SIZE[ring_size] if shape.coordinate_system == coordinate_system
-    )
+    return tuple(shape for shape in _SHAPES_BY_SIZE[ring_size] if shape.coordinate_system == coordinate_system)
 
 
 def _valid_face_adjacency(model: FaceModel, face_by_id: dict[int, Face]) -> bool:
@@ -499,9 +490,7 @@ def _materialize_layouts(
                 }
                 oriented, oriented_centers = _normalize_integer_layout(oriented, oriented_centers)
                 layout = FusedLayout(
-                    face_positions=tuple(
-                        (face, *oriented_centers[face]) for face in sorted(oriented_centers)
-                    ),
+                    face_positions=tuple((face, *oriented_centers[face]) for face in sorted(oriented_centers)),
                     atom_positions=tuple((atom, *oriented[atom]) for atom in sorted(oriented)),
                     face_shapes=tuple((face, shapes[face].shape_id) for face in sorted(shapes)),
                     orientation_score=score,
@@ -557,8 +546,7 @@ def _intrinsic_embedding_key(
     )
     atoms = tuple(sorted(integer))
     squared_distances = tuple(
-        (integer[left][0] - integer[right][0]) ** 2
-        + (integer[left][1] - integer[right][1]) ** 2
+        (integer[left][0] - integer[right][0]) ** 2 + (integer[left][1] - integer[right][1]) ** 2
         for position, left in enumerate(atoms)
         for right in atoms[position + 1 :]
     )
@@ -589,11 +577,7 @@ def _normalize_integer_layout(
 def _orientation_score(centers: tuple[tuple[int, int], ...], shapes: dict[int, RingShapeSpec]) -> tuple[int, ...]:
     row_counts = Counter(y for _, y in centers)
     row_count = max(row_counts.values())
-    orientation = min(
-        _row_orientation_score(centers, row)
-        for row, count in row_counts.items()
-        if count == row_count
-    )
+    orientation = min(_row_orientation_score(centers, row) for row, count in row_counts.items() if count == row_count)
     distortion = sum(shape.distortion_rank for shape in shapes.values())
     # Distorted shapes are disfavored before applying the ordinary P-25
     # orientation criteria; see the separate distortion precedence rule.
@@ -663,8 +647,7 @@ def _polygon_center_strictly_inside(source: tuple[Point, ...], polygon: tuple[Po
     center_x = sum(x for x, _ in source)
     center_y = sum(y for _, y in source)
     signs = [
-        (right[0] - left[0]) * (center_y - count * left[1])
-        - (right[1] - left[1]) * (center_x - count * left[0])
+        (right[0] - left[0]) * (center_y - count * left[1]) - (right[1] - left[1]) * (center_x - count * left[0])
         for left, right in zip(polygon, polygon[1:] + polygon[:1])
     ]
     return all(value > 0 for value in signs) or all(value < 0 for value in signs)

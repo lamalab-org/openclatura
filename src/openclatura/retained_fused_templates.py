@@ -482,11 +482,7 @@ def retained_graph_template_automorphisms(
         )
 
     candidates = {
-        locant: [
-            index_by_locant[target]
-            for target in locants
-            if atom_role(target) == atom_role(locant)
-        ]
+        locant: [index_by_locant[target] for target in locants if atom_role(target) == atom_role(locant)]
         for locant in locants
     }
     assignments = _match_locants_backtracking(

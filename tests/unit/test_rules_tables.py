@@ -116,9 +116,12 @@ def test_fusion_priorities_and_mancude_roles_share_typed_element_data():
     assert EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE != GENERAL_HETEROATOM_COUNT_PRECEDENCE
     assert len({element.fusion_special_priority for element in special}) == len(special)
     assert len({element.fusion_general_priority for element in general}) == len(general)
-    assert {
-        element.symbol for element in elements.ELEMENTS.values() if element.mancude_forced_single
-    } >= {"O", "S", "Se", "Te"}
+    assert {element.symbol for element in elements.ELEMENTS.values() if element.mancude_forced_single} >= {
+        "O",
+        "S",
+        "Se",
+        "Te",
+    }
     assert not {"C", "N", "P"} & {
         element.symbol for element in elements.ELEMENTS.values() if element.mancude_forced_single
     }

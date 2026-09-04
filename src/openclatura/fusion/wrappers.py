@@ -268,8 +268,7 @@ def _retained_wrapper_parent(mol: Molecule, atoms: frozenset[int]) -> WrapperPar
     template_name = first.template.name
     same_parent = [match for match in matches if match.template.name == template_name]
     maps = tuple(
-        tuple(sorted(((atom, str(locant)) for atom, locant in match.atom_to_locant.items())))
-        for match in same_parent
+        tuple(sorted(((atom, str(locant)) for atom, locant in match.atom_to_locant.items()))) for match in same_parent
     )
     return WrapperParentPlan(
         kind=WrapperParentKind.RETAINED,
@@ -329,10 +328,7 @@ def _bridge_path_components(
         if any(degree > 2 for degree in internal_degree.values()):
             return None
         attachments = {
-            neighbor
-            for atom in component
-            for neighbor in mol.get_neighbors(atom)
-            if neighbor in parent_atoms
+            neighbor for atom in component for neighbor in mol.get_neighbors(atom) if neighbor in parent_atoms
         }
         if len(attachments) != 2:
             return None
@@ -351,9 +347,7 @@ def _walk_path(mol: Molecule, atoms: set[int], start: int) -> tuple[int, ...]:
     previous = None
     while len(path) < len(atoms):
         following = sorted(
-            neighbor
-            for neighbor in mol.get_neighbors(path[-1])
-            if neighbor in atoms and neighbor != previous
+            neighbor for neighbor in mol.get_neighbors(path[-1]) if neighbor in atoms and neighbor != previous
         )
         if not following:
             break
@@ -372,12 +366,7 @@ def _bridge_operations(
     for path in paths:
         endpoints = tuple(
             sorted(
-                {
-                    neighbor
-                    for atom in path
-                    for neighbor in mol.get_neighbors(atom)
-                    if neighbor in parent_atoms
-                },
+                {neighbor for atom in path for neighbor in mol.get_neighbors(atom) if neighbor in parent_atoms},
                 key=lambda atom: retained_locant_sort_key(locants[atom]),
             )
         )
@@ -484,24 +473,15 @@ def _audit_bridge_plan(
         path = operation.atom_ids
         if not path or any(mol.get_bond(left, right) is None for left, right in zip(path, path[1:])):
             return None
-        attachments = {
-            neighbor
-            for atom in path
-            for neighbor in mol.get_neighbors(atom)
-            if neighbor in parent_atoms
-        }
+        attachments = {neighbor for atom in path for neighbor in mol.get_neighbors(atom) if neighbor in parent_atoms}
         if attachments != set(operation.endpoint_atom_ids):
             return None
         if operation.endpoint_locants != tuple(parent_locants[atom] for atom in operation.endpoint_atom_ids):
             return None
         scope = set(operation.atom_ids) | set(operation.endpoint_atom_ids)
-        operation_edges = edges_within_atoms(mol, scope) - edges_within_atoms(
-            mol, set(operation.endpoint_atom_ids)
-        )
+        operation_edges = edges_within_atoms(mol, scope) - edges_within_atoms(mol, set(operation.endpoint_atom_ids))
         expected_edges.update(operation_edges)
-        if operation.bond_ids != bond_ids_within(mol, scope) - bond_ids_within(
-            mol, set(operation.endpoint_atom_ids)
-        ):
+        if operation.bond_ids != bond_ids_within(mol, scope) - bond_ids_within(mol, set(operation.endpoint_atom_ids)):
             return None
     if expected_edges != set(edges_within_atoms(mol, set(all_atoms))):
         return None

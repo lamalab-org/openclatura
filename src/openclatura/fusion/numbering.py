@@ -25,6 +25,7 @@ class MancudeSearchBudgetExceeded(RuntimeError):
         super().__init__(f"mancude assignment search exceeded its budget of {budget} states")
         self.budget = budget
 
+
 _CONFIG = fusion_nomenclature_config()
 
 
@@ -330,8 +331,7 @@ def parent_bond_model(
     required = frozenset(
         edge
         for edge in edges
-        if mol.atoms[edge[0]].element.mancude_forced_single
-        or mol.atoms[edge[1]].element.mancude_forced_single
+        if mol.atoms[edge[0]].element.mancude_forced_single or mol.atoms[edge[1]].element.mancude_forced_single
     )
     eligible = frozenset(edges) - required
     matchings = _maximum_matchings(eligible, search_budget=search_budget)
@@ -485,12 +485,7 @@ def _numbering_score(mol: Molecule, locants: dict[int, SystemLocant], fusion_ato
     )
     fusion_carbons = tuple(sorted(_locant_key(locants[atom]) for atom in fusion_atoms if mol.atoms[atom].symbol == "C"))
     fusion_hetero = tuple(sorted(_locant_key(locants[atom]) for atom in fusion_atoms if mol.atoms[atom].symbol != "C"))
-    indicated_h = tuple(
-        sorted(
-            _locant_key(locants[atom])
-            for atom in indicated_hydrogen_candidate_atoms(mol, locants)
-        )
-    )
+    indicated_h = tuple(sorted(_locant_key(locants[atom]) for atom in indicated_hydrogen_candidate_atoms(mol, locants)))
     return all_hetero, by_element, fusion_carbons, fusion_hetero, indicated_h
 
 
@@ -500,11 +495,7 @@ def indicated_hydrogen_candidate_atoms(
 ) -> tuple[int, ...]:
     """Return parent atoms considered by the indicated-H numbering tie-break."""
 
-    return tuple(
-        atom
-        for atom in parent_locants
-        if _is_indicated_hydrogen_candidate(mol, atom, parent_locants)
-    )
+    return tuple(atom for atom in parent_locants if _is_indicated_hydrogen_candidate(mol, atom, parent_locants))
 
 
 def _is_indicated_hydrogen_candidate(
@@ -543,13 +534,7 @@ def _maximum_matchings(
 
     vertices = tuple(sorted({atom for edge in edges for atom in edge}))
     neighbors = {
-        atom: tuple(
-            sorted(
-                edge[1] if edge[0] == atom else edge[0]
-                for edge in edges
-                if atom in edge
-            )
-        )
+        atom: tuple(sorted(edge[1] if edge[0] == atom else edge[0] for edge in edges if atom in edge))
         for atom in vertices
     }
     memo: dict[frozenset[int], tuple[frozenset[tuple[int, int]], ...]] = {}
@@ -573,10 +558,7 @@ def _maximum_matchings(
             if neighbor not in available:
                 continue
             edge = normalize_edge(atom, neighbor)
-            candidates.extend(
-                matching | {edge}
-                for matching in search(without_atom - {neighbor})
-            )
+            candidates.extend(matching | {edge} for matching in search(without_atom - {neighbor}))
         maximum = max(map(len, candidates), default=0)
         result = tuple(
             sorted(

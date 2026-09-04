@@ -130,9 +130,7 @@ def _corresponding_carbon_graph_is_exact(
     """Audit carbonization and inverse skeletal replacement by graph identity."""
 
     replacement = frozenset(replacement_atoms)
-    if replacement != {
-        atom_id for atom_id in parent_atoms if original.atoms[atom_id].symbol != "C"
-    }:
+    if replacement != {atom_id for atom_id in parent_atoms if original.atoms[atom_id].symbol != "C"}:
         return False
     if set(carbon.atoms) != set(original.atoms) or set(carbon.bonds) != set(original.bonds):
         return False
@@ -202,9 +200,7 @@ def _prohibited_pairwise_citation(
             )
         )
     target_edges = {
-        tuple(sorted((bond.u, bond.v)))
-        for bond in mol.bonds.values()
-        if bond.u in atoms and bond.v in atoms
+        tuple(sorted((bond.u, bond.v))) for bond in mol.bonds.values() if bond.u in atoms and bond.v in atoms
     }
     cover = audit_component_cover(scopes, target_atom_ids=atoms, target_edges=target_edges)
     if not cover.ok or cover.proof.topology not in {"unicyclic", "cactus"}:
@@ -261,11 +257,7 @@ def _carbon_parent(
             kind="retained_polycycle",
             atoms=atoms,
             retained_locant_maps=tuple(maps),
-            pin_status=str(
-                PinStatus.CONFIRMED
-                if mode is FusionMode.AUDITED_PIN
-                else PinStatus.VALID_GENERAL_NAME
-            ),
+            pin_status=str(PinStatus.CONFIRMED if mode is FusionMode.AUDITED_PIN else PinStatus.VALID_GENERAL_NAME),
         )
         return base.with_retained_identity(
             name=template.name,

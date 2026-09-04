@@ -162,8 +162,7 @@ class OrderedFusionInterface:
         if len(set(self.ordered_input_bonds)) != len(self.ordered_input_bonds):
             raise ValueError("ordered fusion interface bonds must be unique")
         expected_edges = tuple(
-            tuple(sorted((left, right)))
-            for left, right in zip(self.ordered_input_atoms, self.ordered_input_atoms[1:])
+            tuple(sorted((left, right))) for left, right in zip(self.ordered_input_atoms, self.ordered_input_atoms[1:])
         )
         if self.ordered_input_edges != expected_edges:
             raise ValueError("ordered input edges must follow the ordered input atom path")
@@ -173,10 +172,7 @@ class OrderedFusionInterface:
             raise ValueError("host path locants must belong to the host occurrence")
         if not self.cited_attached_locants:
             raise ValueError("fusion interface requires cited attached-component locants")
-        if any(
-            locant.component_id != self.attached_occurrence
-            for locant in self.cited_attached_locants
-        ):
+        if any(locant.component_id != self.attached_occurrence for locant in self.cited_attached_locants):
             raise ValueError("cited locants must belong to the attached occurrence")
         if not set(self.cited_attached_locants) <= set(self.attached_path):
             raise ValueError("cited attached locants must be drawn from the attached interface path")
@@ -421,11 +417,7 @@ class FusionCitationPlan:
     def __post_init__(self) -> None:
         if not self.roots:
             raise ValueError("fusion citation plan requires at least one root")
-        occurrence_ids = tuple(
-            occurrence
-            for root in self.roots
-            for occurrence in _citation_occurrence_sequence(root)
-        )
+        occurrence_ids = tuple(occurrence for root in self.roots for occurrence in _citation_occurrence_sequence(root))
         if len(occurrence_ids) != len(set(occurrence_ids)):
             raise ValueError("citation forest contains a component occurrence more than once")
         join_indices = (
@@ -453,11 +445,7 @@ class FusionCitationPlan:
 
     @property
     def occurrence_ids(self) -> frozenset[int]:
-        return frozenset(
-            occurrence
-            for root in self.roots
-            for occurrence in _citation_occurrence_sequence(root)
-        )
+        return frozenset(occurrence for root in self.roots for occurrence in _citation_occurrence_sequence(root))
 
     @classmethod
     def from_tree(

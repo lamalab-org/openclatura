@@ -123,35 +123,22 @@ def _two_fused_rings(
     join = FusionJoin(
         order=1,
         interface=OrderedFusionInterface(
-            kind=(
-                FusionJoinKind.ORTHO
-                if interface_atom_count == 2
-                else FusionJoinKind.ORTHO_PERI
-            ),
+            kind=(FusionJoinKind.ORTHO if interface_atom_count == 2 else FusionJoinKind.ORTHO_PERI),
             attached_occurrence=0,
             host_occurrence=1,
             attached_path=tuple(
                 ComponentLocant(0, str(left_size - interface_atom_count + index + 1))
                 for index in range(interface_atom_count)
             ),
-            host_path=tuple(
-                ComponentLocant(1, str(index + 1)) for index in range(interface_atom_count)
-            ),
+            host_path=tuple(ComponentLocant(1, str(index + 1)) for index in range(interface_atom_count)),
             cited_attached_locants=tuple(
                 ComponentLocant(0, str(left_size - interface_atom_count + index + 1))
                 for index in range(interface_atom_count)
             ),
-            host_sides=tuple(
-                FusionSide(1, chr(ord("a") + index))
-                for index in range(interface_atom_count - 1)
-            ),
+            host_sides=tuple(FusionSide(1, chr(ord("a") + index)) for index in range(interface_atom_count - 1)),
             ordered_input_atoms=shared,
-            ordered_input_edges=tuple(
-                _edge(left, right) for left, right in zip(shared, shared[1:])
-            ),
-            ordered_input_bonds=tuple(
-                _bond_id(mol, left, right) for left, right in zip(shared, shared[1:])
-            ),
+            ordered_input_edges=tuple(_edge(left, right) for left, right in zip(shared, shared[1:])),
+            ordered_input_bonds=tuple(_bond_id(mol, left, right) for left, right in zip(shared, shared[1:])),
         ),
     )
     ast = FusionNameAst(
@@ -348,9 +335,7 @@ def test_audit_reconstructs_every_interface_of_a_cyclic_component_cover():
             host_path=tuple(ComponentLocant(host, value) for value in host_locants),
             cited_attached_locants=tuple(ComponentLocant(attached, value) for value in attached_locants),
             host_sides=() if higher else (FusionSide(host, chr(ord("a") + int(host_locants[0]) - 1)),),
-            host_locants=(
-                tuple(ComponentLocant(host, value) for value in host_locants) if higher else ()
-            ),
+            host_locants=(tuple(ComponentLocant(host, value) for value in host_locants) if higher else ()),
             ordered_input_atoms=atoms,
             ordered_input_edges=edges,
             ordered_input_bonds=tuple(_bond_id(mol, *edge) for edge in edges),
@@ -382,8 +367,7 @@ def test_audit_reconstructs_every_interface_of_a_cyclic_component_cover():
         _bond_id(mol, left, right): tuple(
             occurrence
             for occurrence, cycle in enumerate(cycles)
-            if _edge(left, right)
-            in {_edge(a, b) for a, b in zip(cycle, cycle[1:] + cycle[:1])}
+            if _edge(left, right) in {_edge(a, b) for a, b in zip(cycle, cycle[1:] + cycle[:1])}
         )
         for left, right in {_edge(bond.u, bond.v) for bond in mol.bonds.values()}
     }
@@ -406,10 +390,7 @@ def test_audit_reconstructs_every_interface_of_a_cyclic_component_cover():
         ),
     )
     fusion_atoms = {1, 2, 3, 5}
-    locants = {
-        atom: SystemLocant(atom + 1, "a" if atom in fusion_atoms else "")
-        for atom in mol.atoms
-    }
+    locants = {atom: SystemLocant(atom + 1, "a" if atom in fusion_atoms else "") for atom in mol.atoms}
     numbering = FusionNumberingProof(
         selected_face_model=face_model,
         selected_layout=FusedLayout(face_positions=((0, 0, 0), (1, 4, 0), (2, 2, 4))),
@@ -531,18 +512,13 @@ def test_audit_rejects_a_wrong_multiplicative_prime_depth():
     group = plan.ast.multiplicative_groups[0]
     primed_occurrence = group.occurrence_ids[1]
     joins = list(plan.ast.joins)
-    position = next(
-        index
-        for index, join in enumerate(joins)
-        if join.attached_occurrence == primed_occurrence
-    )
+    position = next(index for index, join in enumerate(joins) if join.attached_occurrence == primed_occurrence)
     join = joins[position]
     corrupted_interface = replace(
         join.interface,
         attached_path=tuple(replace(locant, prime_depth=0) for locant in join.interface.attached_path),
         cited_attached_locants=tuple(
-            replace(locant, prime_depth=0)
-            for locant in join.interface.cited_attached_locants
+            replace(locant, prime_depth=0) for locant in join.interface.cited_attached_locants
         ),
     )
     joins[position] = replace(join, interface=corrupted_interface)
@@ -577,13 +553,16 @@ def test_audit_rejects_nonidentical_components_under_one_multiplier():
         if occurrence.occurrence_id not in plan.ast.parent_occurrences
     )
     assert len(attached) == 2
-    assert len(
-        {
-            occurrence.spec_key
-            for occurrence in plan.ast.component_occurrences
-            if occurrence.occurrence_id in attached
-        }
-    ) == 2
+    assert (
+        len(
+            {
+                occurrence.spec_key
+                for occurrence in plan.ast.component_occurrences
+                if occurrence.occurrence_id in attached
+            }
+        )
+        == 2
+    )
     corrupted_ast = replace(
         plan.ast,
         plan_kind="multiplicative_tree",

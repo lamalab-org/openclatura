@@ -423,15 +423,9 @@ def test_multiplicative_interfaces_use_typed_component_automorphism_orbits():
     furan = registry.get("furan").spec
     pyridine = registry.get("pyridine").spec
 
-    assert component_interface_orbit(furan, ("3", "2")) == component_interface_orbit(
-        furan, ("2", "3")
-    )
-    assert component_interface_orbit(pyridine, ("2", "3")) == component_interface_orbit(
-        pyridine, ("5", "6")
-    )
-    assert component_interface_orbit(pyridine, ("2", "3")) != component_interface_orbit(
-        pyridine, ("3", "4")
-    )
+    assert component_interface_orbit(furan, ("3", "2")) == component_interface_orbit(furan, ("2", "3"))
+    assert component_interface_orbit(pyridine, ("2", "3")) == component_interface_orbit(pyridine, ("5", "6"))
+    assert component_interface_orbit(pyridine, ("2", "3")) != component_interface_orbit(pyridine, ("3", "4"))
 
 
 def test_retained_polycyclic_components_form_an_exact_face_cover():

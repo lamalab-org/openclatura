@@ -118,8 +118,7 @@ class RingParent:
                 and set(self.skeletal_replacement_atom_ids) <= set(self.atoms)
                 and bool(self.skeletal_replacement_audit_checks)
                 and all(
-                    set(locant_map) == set(self.atoms)
-                    and len(set(locant_map.values())) == len(self.atoms)
+                    set(locant_map) == set(self.atoms) and len(set(locant_map.values())) == len(self.atoms)
                     for locant_map in self.retained_locant_maps
                 )
             )
@@ -261,9 +260,7 @@ class RingParent:
             return tuple(dict(entries) for entries in self.fusion_wrapper_plan.parent.locant_maps)
         if self.retained_locant_maps:
             return self.retained_locant_maps
-        return tuple(
-            numbering.locant_map for numbering in self.numbering_candidates if numbering.audit_ok
-        )
+        return tuple(numbering.locant_map for numbering in self.numbering_candidates if numbering.audit_ok)
 
     @property
     def metadata(self) -> ParentHydrideMetadata | None:
@@ -401,11 +398,7 @@ class RingParent:
             parent_hydride_kind=ParentHydrideKind.BRIDGED_FUSION,
             parent_name=plan.rendered_name,
             parent_bond_model=(underlying_fusion.bond_model if underlying_fusion is not None else None),
-            pin_status=(
-                str(underlying_fusion.pin_status)
-                if underlying_fusion is not None
-                else "valid_general_name"
-            ),
+            pin_status=(str(underlying_fusion.pin_status) if underlying_fusion is not None else "valid_general_name"),
         )
 
     @classmethod

@@ -154,9 +154,7 @@ def test_every_registered_component_reuses_a_complete_locanted_parent_graph():
             assert set(template.interior_atoms) <= atom_locants
         sides = component_sides(component.spec)
         assert len(sides) == len(component.spec.peripheral_order)
-        assert tuple(side.letter for side in sides) == tuple(
-            chr(ord("a") + index) for index in range(len(sides))
-        )
+        assert tuple(side.letter for side in sides) == tuple(chr(ord("a") + index) for index in range(len(sides)))
         if component.spec.usable_as_attached:
             assert component.spec.attached_prefix
         assert component.spec.usable_as_parent or component.spec.usable_as_attached
@@ -171,10 +169,7 @@ def test_registered_polycycles_expose_a_bonded_locant_ordered_perimeter():
         perimeter = template.peripheral_atoms
 
         assert perimeter[:2] == ("1", "2")
-        assert all(
-            frozenset(pair) in edges
-            for pair in zip(perimeter, perimeter[1:] + perimeter[:1])
-        )
+        assert all(frozenset(pair) in edges for pair in zip(perimeter, perimeter[1:] + perimeter[:1]))
 
 
 def test_registration_rejects_a_disconnected_component_template():
@@ -343,11 +338,7 @@ def test_registration_rejects_duplicate_keys_and_template_names():
 
 def test_registration_rejects_unknown_template_references():
     row = deepcopy(
-        next(
-            item
-            for item in load_json_table("fusion_components.json")["components"]
-            if item["key"] == "benzene"
-        )
+        next(item for item in load_json_table("fusion_components.json")["components"] if item["key"] == "benzene")
     )
     row["template_names"] = ["not-a-registered-template"]
 

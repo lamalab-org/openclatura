@@ -1537,9 +1537,7 @@ def name_subgraph(
                 "trace_segment_count": len(trace_segments),
                 "locant_elisions": parts.locant_elision_decisions,
                 "parent_nomenclature": (
-                    parts.ring_parent.parent_nomenclature
-                    if parts.ring_parent is not None
-                    else "legacy"
+                    parts.ring_parent.parent_nomenclature if parts.ring_parent is not None else "legacy"
                 ),
                 "parent_hydride_proof_source": (
                     parts.ring_parent.proof_source if parts.ring_parent is not None else ""
@@ -1994,9 +1992,7 @@ def name_component(
     )
 
 
-def name_smiles_with_trace(
-    smiles: str, *, fusion_mode: FusionMode | str = FusionMode.LEGACY
-) -> tuple[str, list[dict]]:
+def name_smiles_with_trace(smiles: str, *, fusion_mode: FusionMode | str = FusionMode.LEGACY) -> tuple[str, list[dict]]:
     """Return a generated name and AssemblyParts-derived trace annotations, exposing the atom and bond IDs
     selected during parent, prefix, unsaturation and suffix assembly."""
 
@@ -2012,9 +2008,7 @@ def analyze_smiles(
     """Return a generated name with structure annotations and decision traces: parsing, component
     splitting, group perception, priority, parent selection, numbering and assembly."""
 
-    return DEFAULT_NAMING_ENGINE.analyze_smiles(
-        smiles, token_debug=token_debug, fusion_mode=fusion_mode
-    )
+    return DEFAULT_NAMING_ENGINE.analyze_smiles(smiles, token_debug=token_debug, fusion_mode=fusion_mode)
 
 
 def name_smiles(smiles: str, *, fusion_mode: FusionMode | str = FusionMode.LEGACY) -> str:
@@ -2047,6 +2041,4 @@ def analyze_rdkit_mol(
 ) -> NameAnalysis:
     """RDKit-molecule counterpart of :func:`analyze_smiles`."""
 
-    return DEFAULT_NAMING_ENGINE.analyze_rdkit_mol(
-        rdkit_mol, token_debug=token_debug, fusion_mode=fusion_mode
-    )
+    return DEFAULT_NAMING_ENGINE.analyze_rdkit_mol(rdkit_mol, token_debug=token_debug, fusion_mode=fusion_mode)

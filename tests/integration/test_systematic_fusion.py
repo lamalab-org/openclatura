@@ -65,9 +65,10 @@ def test_fusion_trace_exposes_each_existing_proof_stage():
     assert decisions["constructed fusion descriptor"].data["descriptor"] == "[2,3-b]"
     assert decisions["selected preferred fusion orientation"].data["face_shapes"]
     assert decisions["selected completed fusion numbering"].data["atom_to_locant"]
-    assert decisions["selected completed fusion numbering"].data["proof_counts"] == decisions[
-        "audited systematic fusion parent"
-    ].data["proof_counts"]
+    assert (
+        decisions["selected completed fusion numbering"].data["proof_counts"]
+        == decisions["audited systematic fusion parent"].data["proof_counts"]
+    )
     assert decisions["audited systematic fusion parent"].data["status"] == "confirmed"
 
 
@@ -207,10 +208,13 @@ def test_generated_component_with_retained_polycycle_is_atom_order_invariant():
     mol = Chem.MolFromSmiles("C1C=CC2=C1C1=CC=CC=C1C=1C=CC=CC21")
     renumbered = Chem.RenumberAtoms(mol, list(reversed(range(mol.GetNumAtoms()))))
 
-    assert name_mol(mol, fusion_mode=FusionMode.GENERAL).name == name_mol(
-        renumbered,
-        fusion_mode=FusionMode.GENERAL,
-    ).name
+    assert (
+        name_mol(mol, fusion_mode=FusionMode.GENERAL).name
+        == name_mol(
+            renumbered,
+            fusion_mode=FusionMode.GENERAL,
+        ).name
+    )
 
 
 def test_saturated_carbon_uses_the_correct_completed_system_proof_locant():
@@ -519,10 +523,7 @@ def test_ortho_peri_parent_with_interior_atoms_receives_a_complete_audited_numbe
     assert result.plan.rendered_base_name == "benzo[1,2,3,4-def]phenanthrene"
     assert any(join.kind.value == "ortho_peri" for join in result.plan.ast.joins)
     assert set(dict(result.plan.numbering.input_locant_maps[0])) == set(mol.atoms)
-    assert any(
-        locant.interior_distance is not None
-        for _, locant in result.plan.numbering.input_locant_maps[0]
-    )
+    assert any(locant.interior_distance is not None for _, locant in result.plan.numbering.input_locant_maps[0])
 
 
 def test_complex_multiparent_interior_system_still_abstains_safely():

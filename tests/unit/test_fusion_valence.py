@@ -6,9 +6,7 @@ from openclatura.locants import SystemLocant
 def test_lambda_descriptor_uses_complete_graph_bonding_and_proof_locant():
     mol = read_smiles("O=S1C=CC=C1")
     sulfur = next(atom_id for atom_id, atom in mol.atoms.items() if atom.symbol == "S")
-    ring_atoms = set(mol.atoms) - {
-        next(atom_id for atom_id, atom in mol.atoms.items() if atom.symbol == "O")
-    }
+    ring_atoms = set(mol.atoms) - {next(atom_id for atom_id, atom in mol.atoms.items() if atom.symbol == "O")}
 
     descriptors = fusion_lambda_descriptors(
         mol,
@@ -24,15 +22,11 @@ def test_lambda_descriptor_uses_complete_graph_bonding_and_proof_locant():
 
 def test_standard_valence_and_charged_centers_do_not_enter_neutral_lambda_layer():
     standard = read_smiles("S1C=CC=C1")
-    standard_locants = {
-        atom_id: SystemLocant(index) for index, atom_id in enumerate(sorted(standard.atoms), start=1)
-    }
+    standard_locants = {atom_id: SystemLocant(index) for index, atom_id in enumerate(sorted(standard.atoms), start=1)}
     assert fusion_lambda_descriptors(standard, standard.atoms, standard_locants) == ()
 
     charged = read_smiles("[S+]1C=CC=C1")
-    charged_locants = {
-        atom_id: SystemLocant(index) for index, atom_id in enumerate(sorted(charged.atoms), start=1)
-    }
+    charged_locants = {atom_id: SystemLocant(index) for index, atom_id in enumerate(sorted(charged.atoms), start=1)}
     assert fusion_lambda_descriptors(charged, charged.atoms, charged_locants) == ()
 
 

@@ -40,9 +40,7 @@ def compare_actual_parent_to_implied_parent(
 
     atoms = frozenset(atom_ids)
     observed = {
-        normalize_edge(bond.u, bond.v): bond
-        for bond in mol.bonds.values()
-        if bond.u in atoms and bond.v in atoms
+        normalize_edge(bond.u, bond.v): bond for bond in mol.bonds.values() if bond.u in atoms and bond.v in atoms
     }
     known_edges = bond_model.required_single_bonds | bond_model.pi_eligible_edges
     if set(observed) != set(known_edges):

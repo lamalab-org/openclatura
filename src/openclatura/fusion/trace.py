@@ -138,9 +138,7 @@ def trace_confirmed_fusion_plan(
             },
         )
     if plan.indicated_hydrogens:
-        atom_by_locant = {
-            locant: atom for atom, locant in plan.numbering.input_locant_maps[0]
-        }
+        atom_by_locant = {locant: atom for atom, locant in plan.numbering.input_locant_maps[0]}
         trace_decision(
             trace,
             TracePhase.ASSEMBLY,

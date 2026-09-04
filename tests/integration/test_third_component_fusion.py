@@ -40,15 +40,10 @@ def test_third_component_fusion_uses_corresponding_carbon_parent(smiles, expecte
     assert result.pin_status == "confirmed"
     assert result.proof_source == "p25_5_skeletal_replacement"
     assert any(
-        operation.operation_class is OperationClass.FUSION
-        and operation.detail == "skeletal_replacement_fusion_parent"
+        operation.operation_class is OperationClass.FUSION and operation.detail == "skeletal_replacement_fusion_parent"
         for operation in result.analysis.operations
     )
-    selected = next(
-        step
-        for step in result.decisions
-        if step.decision == "selected skeletal-replacement fusion parent"
-    )
+    selected = next(step for step in result.decisions if step.decision == "selected skeletal-replacement fusion parent")
     assert selected.data["cover_topology"] == "unicyclic"
     assert selected.data["prohibited_cycle_closing_joins"]
     assert "ordinary_pairwise_citation_not_emitted" in selected.data["audit_checks"]
@@ -77,18 +72,14 @@ def test_third_component_tokens_use_replacement_and_fusion_graph_scopes():
     assembly = next(step for step in reversed(result.decisions) if "name_token_spans" in step.data)
     tokens = assembly.data["name_token_spans"]
     nitrogen_ids = {
-        atom.GetIdx()
-        for atom in Chem.MolFromSmiles(THIRD_COMPONENT_CASES[0][0]).GetAtoms()
-        if atom.GetSymbol() == "N"
+        atom.GetIdx() for atom in Chem.MolFromSmiles(THIRD_COMPONENT_CASES[0][0]).GetAtoms() if atom.GetSymbol() == "N"
     }
 
     aza = next(token for token in tokens if token["text"] == "aza")
     assert set(aza["atoms"]) == nitrogen_ids
     assert aza["grammar_role"] == "replacement_prefix"
     assert all(
-        token["source"] == "fusion_renderer"
-        for token in tokens
-        if token["text"] in {"cyclopenta", "cd", "pentalene"}
+        token["source"] == "fusion_renderer" for token in tokens if token["text"] in {"cyclopenta", "cd", "pentalene"}
     )
     descriptor = next(token for token in tokens if token["text"] == "cd")
     assert descriptor["atoms"]

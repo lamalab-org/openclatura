@@ -108,11 +108,7 @@ def test_exact_hexagonal_lattice_closes_a_pericondensed_face_dual_cycle():
         (6, 7, 8, 9, 10, 15),
         (10, 11, 12, 13, 14, 15),
     )
-    edges = {
-        tuple(sorted((left, right)))
-        for cycle in face_cycles
-        for left, right in zip(cycle, cycle[1:] + cycle[:1])
-    }
+    edges = {tuple(sorted((left, right))) for cycle in face_cycles for left, right in zip(cycle, cycle[1:] + cycle[:1])}
     mol = Molecule()
     for atom in range(16):
         mol.add_atom("C", idx=atom)
@@ -124,10 +120,7 @@ def test_exact_hexagonal_lattice_closes_a_pericondensed_face_dual_cycle():
     layouts = intrinsic_fused_layouts(_typed_face_model(mol, bounded))
 
     assert layouts
-    assert all(
-        {shape for _, shape in layout.face_shapes} == {"hexagon-eisenstein"}
-        for layout in layouts
-    )
+    assert all({shape for _, shape in layout.face_shapes} == {"hexagon-eisenstein"} for layout in layouts)
     assert all({atom for atom, _, _ in layout.atom_positions} == set(range(16)) for layout in layouts)
 
 

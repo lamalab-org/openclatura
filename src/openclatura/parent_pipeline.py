@@ -213,9 +213,7 @@ def resolve_third_component_fusion_parent(
             "cover_topology": plan.cover_topology,
             "ring_sizes": list(plan.ring_sizes),
             "replacement_atoms": list(plan.replacement_atom_ids),
-            "prohibited_cycle_closing_joins": list(
-                plan.prohibited_citation.citation_plan.cycle_closing_join_indices
-            ),
+            "prohibited_cycle_closing_joins": list(plan.prohibited_citation.citation_plan.cycle_closing_join_indices),
             "audit_checks": list(plan.audit_checks),
         },
     )
@@ -351,9 +349,7 @@ def build_parent_assembly_plan(
         and parent_hydride.numbering_candidates
         and is_von_baeyer_descriptor(parent_hydride.descriptor)
     ):
-        audited_maps = [
-            numbering.locant_map for numbering in parent_hydride.numbering_candidates if numbering.audit_ok
-        ]
+        audited_maps = [numbering.locant_map for numbering in parent_hydride.numbering_candidates if numbering.audit_ok]
         locant_maps = audited_maps or None
         if locant_maps:
             locant_map_source = LocantMapSource.PROOF

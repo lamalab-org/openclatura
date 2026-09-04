@@ -38,12 +38,7 @@ def add_unsaturations(
             if v_idx not in numbered_path:
                 continue
             bond = mol.get_bond(u_idx, v_idx)
-            if (
-                not bond
-                or bond.order <= 1
-                or bond.idx in seen_bonds
-                or bond.idx in implied_multiple_bonds
-            ):
+            if not bond or bond.order <= 1 or bond.idx in seen_bonds or bond.idx in implied_multiple_bonds:
                 continue
             seen_bonds.add(bond.idx)
             bond_key = "double" if bond.order == 2 else "triple"

@@ -546,17 +546,9 @@ def _parent_tree_node(parts: AssemblyParts) -> dict:
     node = {
         "kind": "parent",
         "retained_name": parts.retained_name,
-        "parent_nomenclature": (
-            parts.ring_parent.parent_nomenclature
-            if parts.ring_parent is not None
-            else "legacy"
-        ),
-        "parent_hydride_name": (
-            parts.ring_parent.base_name if parts.ring_parent is not None else None
-        ),
-        "parent_hydride_proof_source": (
-            parts.ring_parent.proof_source if parts.ring_parent is not None else ""
-        ),
+        "parent_nomenclature": (parts.ring_parent.parent_nomenclature if parts.ring_parent is not None else "legacy"),
+        "parent_hydride_name": (parts.ring_parent.base_name if parts.ring_parent is not None else None),
+        "parent_hydride_proof_source": (parts.ring_parent.proof_source if parts.ring_parent is not None else ""),
         "parent_length": parts.parent_length,
         "is_ring": parts.is_ring,
         "is_bicycle": parts.is_bicycle,

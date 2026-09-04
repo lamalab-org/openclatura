@@ -299,9 +299,7 @@ def _has_cumulated_ring_double_bonds(mol: Molecule, path: list[int]) -> bool:
 
 # Divalent at their normal valence, so they take no ring double bond and cut the
 # mancude system into segments: 1,2,3,5-oxathiadiazole has one, not two.
-FIXED_SATURATED = tuple(
-    element.symbol for element in _elements.ELEMENTS.values() if element.mancude_forced_single
-)
+FIXED_SATURATED = tuple(element.symbol for element in _elements.ELEMENTS.values() if element.mancude_forced_single)
 
 
 def mancude_bond_orders(symbols: list[str]) -> list[int]:

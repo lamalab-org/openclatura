@@ -189,9 +189,7 @@ class NamingEngine:
 
         return self.name(smiles, fusion_mode=fusion_mode)
 
-    def name_rdkit_mol(
-        self, rdkit_mol: Any, *, fusion_mode: FusionMode | str = FusionMode.LEGACY
-    ) -> str:
+    def name_rdkit_mol(self, rdkit_mol: Any, *, fusion_mode: FusionMode | str = FusionMode.LEGACY) -> str:
         """Return the generated name for an existing ``rdkit.Chem.rdchem.Mol``."""
 
         return self.run(NamingRequest(rdkit_mol=rdkit_mol, fusion_mode=FusionMode(fusion_mode))).name
@@ -201,9 +199,7 @@ class NamingEngine:
     ) -> tuple[str, list[dict]]:
         """Return the generated name and assembly trace for an RDKit molecule."""
 
-        result = self.run(
-            NamingRequest(rdkit_mol=rdkit_mol, include_trace=True, fusion_mode=FusionMode(fusion_mode))
-        )
+        result = self.run(NamingRequest(rdkit_mol=rdkit_mol, include_trace=True, fusion_mode=FusionMode(fusion_mode)))
         return result.name, result.trace_segments
 
     def analyze_rdkit_mol(
@@ -232,9 +228,7 @@ class NamingEngine:
     ) -> tuple[str, list[dict]]:
         """Return the generated name and assembly trace segments."""
 
-        result = self.run(
-            NamingRequest(smiles=smiles, include_trace=True, fusion_mode=FusionMode(fusion_mode))
-        )
+        result = self.run(NamingRequest(smiles=smiles, include_trace=True, fusion_mode=FusionMode(fusion_mode)))
         return result.name, result.trace_segments
 
     def name_smiles_with_trace(
@@ -530,8 +524,7 @@ def _fusion_result_metadata(decisions) -> dict[str, str | None]:
         (
             item
             for item in decisions
-            if item.phase == TracePhase.PARENT_SELECTION
-            and item.data.get("parent_nomenclature")
+            if item.phase == TracePhase.PARENT_SELECTION and item.data.get("parent_nomenclature")
         ),
         None,
     )
@@ -604,8 +597,7 @@ def _run_parallel(
 
     mode = FusionMode(fusion_mode).value
     payload = [
-        (s, include_trace, verify_opsin, verify_self, token_debug, omit_redundant_locants, mode)
-        for s in smiles_list
+        (s, include_trace, verify_opsin, verify_self, token_debug, omit_redundant_locants, mode) for s in smiles_list
     ]
     with ProcessPoolExecutor(max_workers=processes) as ex:
         return list(ex.map(_name_one_for_worker, payload, chunksize=chunksize))

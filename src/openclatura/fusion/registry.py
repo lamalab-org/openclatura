@@ -171,10 +171,7 @@ class FusionComponentRegistry:
         missing = tuple(name for name in template_names if name not in self._template_by_name)
         if missing:
             raise ValueError(f"fusion component {key!r} references unknown templates: {', '.join(missing)}")
-        templates = tuple(
-            _with_ordered_fusion_perimeter(self._template_by_name[name])
-            for name in template_names
-        )
+        templates = tuple(_with_ordered_fusion_perimeter(self._template_by_name[name]) for name in template_names)
         for template in templates:
             validate_retained_fused_template(template)
             _validate_fusion_component_template(template)
@@ -424,13 +421,8 @@ def _validate_fusion_component_template(template: RetainedGraphTemplate) -> None
     peripheral = template.peripheral_atoms
     if len(peripheral) < 3 or len(peripheral) != len(set(peripheral)):
         raise ValueError(f"fusion component template {template.name!r} requires a simple peripheral walk")
-    if any(
-        frozenset(edge) not in edges
-        for edge in zip(peripheral, peripheral[1:] + peripheral[:1])
-    ):
-        raise ValueError(
-            f"fusion component template {template.name!r} peripheral walk does not follow declared bonds"
-        )
+    if any(frozenset(edge) not in edges for edge in zip(peripheral, peripheral[1:] + peripheral[:1])):
+        raise ValueError(f"fusion component template {template.name!r} peripheral walk does not follow declared bonds")
     if set(template.interior_atoms) & set(peripheral):
         raise ValueError(f"fusion component template {template.name!r} interior and peripheral atoms overlap")
 
@@ -449,8 +441,7 @@ def _with_ordered_fusion_perimeter(template: RetainedGraphTemplate) -> RetainedG
     boundary_edges = {
         frozenset(bond.locants)
         for bond in template.bonds
-        if set(bond.locants) <= peripheral
-        and sum(set(bond.locants) <= ring for ring in ring_sets) == 1
+        if set(bond.locants) <= peripheral and sum(set(bond.locants) <= ring for ring in ring_sets) == 1
     }
     adjacency = {locant: set() for locant in peripheral}
     for left, right in (tuple(edge) for edge in boundary_edges):
@@ -463,9 +454,7 @@ def _with_ordered_fusion_perimeter(template: RetainedGraphTemplate) -> RetainedG
     # Preserve the retained parent's conventional 1 -> 2 direction whenever
     # that edge lies on the perimeter.  The generic locant order is the
     # deterministic fallback for parents whose locants are not simple digits.
-    first = "2" if start == "1" and "2" in adjacency[start] else min(
-        adjacency[start], key=retained_locant_sort_key
-    )
+    first = "2" if start == "1" and "2" in adjacency[start] else min(adjacency[start], key=retained_locant_sort_key)
     order = [start, first]
     while len(order) < len(peripheral):
         candidates = adjacency[order[-1]] - {order[-2]}
@@ -518,9 +507,7 @@ def _horizontal_ring_count(row: Mapping[str, Any], template: RetainedGraphTempla
         return value
     if len(template.rings) == 1:
         return 1
-    raise ValueError(
-        f"polycyclic fusion component {template.name!r} requires an explicit horizontal_ring_count"
-    )
+    raise ValueError(f"polycyclic fusion component {template.name!r} requires an explicit horizontal_ring_count")
 
 
 def _template_names(row: Mapping[str, Any], *, default: str) -> tuple[str, ...]:

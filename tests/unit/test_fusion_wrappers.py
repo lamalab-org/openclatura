@@ -77,9 +77,7 @@ def test_bridged_fusion_wrapper_is_used_by_public_parent_pipeline():
 
     assert result.name == "2-methyl-1,4-epoxynaphthalene"
     assert result.verified
-    selected = next(
-        step for step in result.decisions if step.decision == "selected audited bridged fusion parent"
-    )
+    selected = next(step for step in result.decisions if step.decision == "selected audited bridged fusion parent")
     assert selected.data["audit_checks"][-1] == "complete_wrapper_graph_reconstruction"
     assert selected.data["search_states"] > 0
 

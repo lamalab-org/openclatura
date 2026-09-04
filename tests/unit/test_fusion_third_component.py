@@ -65,21 +65,14 @@ def test_cyclic_component_cover_becomes_audited_skeletal_replacement_parent():
     assert plan.prohibited_citation.citation_plan.cycle_closing_join_indices
     assert plan.parent.is_skeletal_replacement_fusion
     assert plan.parent.audit_ok
-    assert set(plan.replacement_atom_ids) == {
-        atom_id for atom_id, atom in mol.atoms.items() if atom.symbol == "N"
-    }
-    assert all(
-        set(locant_map) == set(mol.atoms)
-        for locant_map in plan.parent.proof_locant_maps
-    )
+    assert set(plan.replacement_atom_ids) == {atom_id for atom_id, atom in mol.atoms.items() if atom.symbol == "N"}
+    assert all(set(locant_map) == set(mol.atoms) for locant_map in plan.parent.proof_locant_maps)
 
 
 def test_corresponding_carbon_certificate_rejects_graph_corruption():
     mol = read_smiles(THIRD_COMPONENT_PARENT)
     atoms = frozenset(mol.atoms)
-    replacements = tuple(
-        sorted(atom_id for atom_id, atom in mol.atoms.items() if atom.symbol != "C")
-    )
+    replacements = tuple(sorted(atom_id for atom_id, atom in mol.atoms.items() if atom.symbol != "C"))
     carbon = _carbon_skeleton(mol, atoms)
 
     assert _corresponding_carbon_graph_is_exact(mol, carbon, atoms, replacements)
@@ -119,12 +112,8 @@ def test_third_component_planning_is_cached_even_when_not_applicable(monkeypatch
 
     monkeypatch.setattr(module, "_plan_uncached", not_applicable)
 
-    assert module.plan_third_component_fusion_parent(
-        mol, mol.atoms, mode=FusionMode.GENERAL
-    ) is None
-    assert module.plan_third_component_fusion_parent(
-        mol, mol.atoms, mode=FusionMode.GENERAL
-    ) is None
+    assert module.plan_third_component_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL) is None
+    assert module.plan_third_component_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL) is None
     assert calls == 1
 
 

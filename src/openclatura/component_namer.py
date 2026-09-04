@@ -553,9 +553,7 @@ def name_component(
         locant_maps=state.locant_maps,
         retained_parent_metadata=state.retained_parent_metadata,
         decision_trace=decision_trace,
-        retained_proof_source=(
-            "retained_graph_template" if retained_fused is not None else "retained_template"
-        ),
+        retained_proof_source=("retained_graph_template" if retained_fused is not None else "retained_template"),
     )
     if state.parent_hydride is not None:
         state.parent_selection.ring_parent = state.parent_hydride
@@ -665,9 +663,7 @@ def name_component(
             "name_rewrite_history": parts.name_rewrite_history,
             "locant_elisions": parts.locant_elision_decisions,
             "parent_nomenclature": (
-                parts.ring_parent.parent_nomenclature
-                if parts.ring_parent is not None
-                else "legacy"
+                parts.ring_parent.parent_nomenclature if parts.ring_parent is not None else "legacy"
             ),
             "parent_hydride_proof_source": (
                 parts.parent_hydride.proof_source if parts.parent_hydride is not None else ""

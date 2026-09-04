@@ -41,10 +41,7 @@ def _linear_fused_hexagons() -> Molecule:
 def _molecule_from_faces(*faces: tuple[int, ...]) -> Molecule:
     edges: set[tuple[int, int]] = set()
     for face in faces:
-        edges.update(
-            tuple(sorted((left, right)))
-            for left, right in zip(face, face[1:] + face[:1], strict=True)
-        )
+        edges.update(tuple(sorted((left, right))) for left, right in zip(face, face[1:] + face[:1], strict=True))
     return _molecule(sorted(edges))
 
 

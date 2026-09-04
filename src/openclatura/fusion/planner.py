@@ -290,9 +290,7 @@ def _classify_unmodelled_ring_system(mol: Molecule, atoms: frozenset[int]) -> Fu
     if topology.cycle_rank < 2:
         return FusionNotApplicable("selected parent has no audited multi-face fused model")
     if topology.fused_edges:
-        return FusionUnsupported(
-            "fused ring system has no bounded face model within the configured ring-size tier"
-        )
+        return FusionUnsupported("fused ring system has no bounded face model within the configured ring-size tier")
     return FusionUnsupported("bridged or non-ortho polycycles are outside the ordinary fusion tier")
 
 

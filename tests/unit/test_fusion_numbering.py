@@ -23,11 +23,7 @@ def _pericondensed_patch(*, interior_symbol: str = "C"):
         (6, 7, 8, 9, 10, 15),
         (10, 11, 12, 13, 14, 15),
     )
-    edges = {
-        tuple(sorted((left, right)))
-        for cycle in face_cycles
-        for left, right in zip(cycle, cycle[1:] + cycle[:1])
-    }
+    edges = {tuple(sorted((left, right))) for cycle in face_cycles for left, right in zip(cycle, cycle[1:] + cycle[:1])}
     mol = Molecule()
     for atom in range(16):
         mol.add_atom(interior_symbol if atom == 14 else "C", idx=atom)
@@ -166,9 +162,7 @@ def test_layout_derived_numbering_starts_at_uppermost_rightmost_face_and_runs_cl
 
 
 def test_completed_numbering_starts_at_counterclockwise_end_of_long_nonfusion_arc():
-    mol, _, _, _, selection = _layout_numbering_selection(
-        "C1C=CC2=C1C1=CC=CC=C1C=1C=CC=CC21"
-    )
+    mol, _, _, _, selection = _layout_numbering_selection("C1C=CC2=C1C1=CC=CC=C1C=1C=CC=CC21")
 
     assert selection.accepted
     saturated_carbon = next(atom for atom, value in mol.atoms.items() if value.total_h_count == 2)

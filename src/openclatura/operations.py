@@ -30,10 +30,7 @@ def infer_operations(decisions: list[TraceStep], trace_segments: list[dict]) -> 
                 )
             )
             operations.append(NomenclatureOperation(OperationClass.FUSION, detail))
-        elif (
-            step.phase == TracePhase.PARENT_SELECTION
-            and step.decision == "selected audited systematic fusion parent"
-        ):
+        elif step.phase == TracePhase.PARENT_SELECTION and step.decision == "selected audited systematic fusion parent":
             operations.append(NomenclatureOperation(OperationClass.FUSION, "systematic_fusion_parent"))
         elif step.phase == TracePhase.PARENT_SELECTION and step.decision == "selected parent skeleton":
             if step.data.get("is_polycycle") and step.data.get("polycycle_descriptor"):

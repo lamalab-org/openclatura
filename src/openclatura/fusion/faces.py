@@ -470,10 +470,7 @@ def _is_chordless_for_edges(cycle: GraphCycle, graph_edges: frozenset[Edge]) -> 
 def _adjacency(atoms: Iterable[int], edges: Iterable[Edge]) -> dict[int, tuple[int, ...]]:
     atom_set = frozenset(atoms)
     edge_set = frozenset(edges)
-    return {
-        atom: tuple(sorted(neighbors))
-        for atom, neighbors in adjacency_from_edges(atom_set, edge_set).items()
-    }
+    return {atom: tuple(sorted(neighbors)) for atom, neighbors in adjacency_from_edges(atom_set, edge_set).items()}
 
 
 def _is_connected(atoms: frozenset[int], edges: frozenset[Edge]) -> bool:
