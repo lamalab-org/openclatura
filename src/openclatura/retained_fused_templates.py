@@ -432,6 +432,88 @@ def match_retained_graph_template_maps(
     )
 
 
+@cache
+def retained_graph_template_automorphisms(
+    template: RetainedGraphTemplate,
+) -> tuple[tuple[tuple[str, str], ...], ...]:
+    """Return every typed automorphism of a retained graph template.
+
+    The existing locant matcher performs the graph search.  This adapter builds
+    one in-memory graph from the typed template, constrains candidates by all
+    atom roles, and filters the matcher result by exact bond classes and ring
+    membership.  Fusion policies can therefore compare interface orbits
+    without introducing a second graph-isomorphism implementation.
+    """
+
+    locants = template.locants
+    index_by_locant = {locant: index for index, locant in enumerate(locants)}
+    locant_by_index = {index: locant for locant, index in index_by_locant.items()}
+    atom_by_locant = template.atom_by_locant
+
+    mol = Molecule()
+    for locant, index in index_by_locant.items():
+        atom = atom_by_locant[locant]
+        mol.add_atom(
+            atom.symbol,
+            idx=index,
+            charge=atom.charge,
+            is_aromatic=atom.aromatic,
+            total_h_count=int(atom.default_h),
+        )
+    for bond_index, bond in enumerate(template.bonds, start=1):
+        mol.add_bond(
+            index_by_locant[bond.locants[0]],
+            index_by_locant[bond.locants[1]],
+            order=_bond_order(bond.bond_class),
+            idx=bond_index,
+        )
+
+    def atom_role(locant: str) -> tuple:
+        atom = atom_by_locant[locant]
+        return (
+            atom.symbol,
+            atom.charge,
+            atom.aromatic,
+            atom.fusion,
+            atom.default_h,
+            atom.saturated,
+            atom.interior,
+            locant in template.peripheral_atoms,
+        )
+
+    candidates = {
+        locant: [
+            index_by_locant[target]
+            for target in locants
+            if atom_role(target) == atom_role(locant)
+        ]
+        for locant in locants
+    }
+    assignments = _match_locants_backtracking(
+        mol,
+        list(locants),
+        candidates,
+        _template_neighbors(template),
+        template_bond_classes={frozenset(bond.locants): bond.bond_class for bond in template.bonds},
+        bond_policy=template.aromatic_equivalence_policy,
+    )
+    bond_classes = {frozenset(bond.locants): bond.bond_class for bond in template.bonds}
+    ring_sets = {frozenset(ring) for ring in template.rings}
+    automorphisms = []
+    for assignment in assignments:
+        mapped = {locant: locant_by_index[index] for locant, index in assignment.items()}
+        if any(
+            bond_classes.get(frozenset((mapped[left], mapped[right]))) != bond_class
+            for edge, bond_class in bond_classes.items()
+            for left, right in (tuple(edge),)
+        ):
+            continue
+        if {frozenset(mapped[locant] for locant in ring) for ring in template.rings} != ring_sets:
+            continue
+        automorphisms.append(tuple((locant, mapped[locant]) for locant in locants))
+    return tuple(sorted(set(automorphisms)))
+
+
 def _ring_fusion_stereo_is_assigned(mol: Molecule, atom_set: set[int]) -> bool:
     """Whether every ring-fusion centre of a matched skeleton has a configuration.
 

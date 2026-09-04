@@ -19,6 +19,7 @@ from openclatura.fusion.faces import GraphCycle
 from openclatura.fusion.model import FusionComponentMatch, FusionConfirmed, FusionDescriptor, FusionJoinKind, FusionMode
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.fusion.registry import FusionComponentRegistry, fusion_component_registry
+from openclatura.fusion.rules import component_interface_orbit
 from openclatura.molecule import Molecule
 from openclatura.naming_data import load_json_table
 from openclatura.opsin_verify import opsin_available, verify_with_opsin
@@ -406,6 +407,22 @@ def test_identical_leaf_components_form_one_primed_multiplicative_group():
     assert tuple(descriptor.render() for descriptor in ast.descriptors) == (
         "[3,2-b]",
         "[2',3'-e]",
+    )
+
+
+def test_multiplicative_interfaces_use_typed_component_automorphism_orbits():
+    registry = fusion_component_registry()
+    furan = registry.get("furan").spec
+    pyridine = registry.get("pyridine").spec
+
+    assert component_interface_orbit(furan, ("3", "2")) == component_interface_orbit(
+        furan, ("2", "3")
+    )
+    assert component_interface_orbit(pyridine, ("2", "3")) == component_interface_orbit(
+        pyridine, ("5", "6")
+    )
+    assert component_interface_orbit(pyridine, ("2", "3")) != component_interface_orbit(
+        pyridine, ("3", "4")
     )
 
 

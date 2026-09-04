@@ -461,6 +461,31 @@ def test_audit_rejects_a_descriptor_whose_ordered_interface_is_reversed():
     assert any("ordered input atoms" in error for error in result.errors)
 
 
+def test_audit_rejects_a_wrong_multiplicative_count():
+    mol = read_smiles("O1C=CC2=C1C=C1C(=N2)C=CO1")
+    planned = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+    assert isinstance(planned, FusionConfirmed)
+    plan = planned.plan
+    group = plan.ast.multiplicative_groups[0]
+    corrupted_ast = replace(
+        plan.ast,
+        multiplicative_groups=(replace(group, multiplier="tri"),),
+    )
+
+    result = audit_fusion_plan(
+        mol,
+        mol.atoms,
+        ast=corrupted_ast,
+        abstract_parent_graph=plan.abstract_parent_graph,
+        numbering=plan.numbering,
+        bond_model=plan.bond_model,
+        mode=FusionMode.GENERAL,
+    )
+
+    assert result.status is AuditStatus.MISMATCH
+    assert "multiplicative groups do not match exact sibling interface orbits" in result.errors
+
+
 def test_audit_rejects_a_non_senior_declared_parent():
     candidate = _two_fused_rings()
     explicit = replace(

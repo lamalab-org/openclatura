@@ -10,7 +10,7 @@ from typing import Protocol
 from ..locants import retained_locant_sort_key
 from ..rules import elements
 from .config import fusion_nomenclature_config
-from .model import FusionComponentMatch, FusionComponentSpec, FusionMode, FusionRuleDecision
+from .model import FusionComponentMatch, FusionComponentSpec, FusionJoin, FusionMode, FusionRuleDecision
 
 # P-25.3.2.4 gives these two criteria independent semantic identities and
 # distinct element orders. Keep them separate so data changes to one rule
@@ -98,6 +98,67 @@ def pin_ring_size_gate(ring_sizes: tuple[int, ...]) -> bool:
     """Return whether a fused system satisfies the P-25 PIN ring-size gate."""
 
     return sum(size >= PIN_MINIMUM_LARGE_RING_SIZE for size in ring_sizes) >= PIN_MINIMUM_LARGE_RING_COUNT
+
+
+def component_interface_orbit(
+    spec: FusionComponentSpec,
+    directed_path: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Return the canonical typed-automorphism orbit of one local path."""
+
+    from ..retained_fused_templates import retained_graph_template_automorphisms
+
+    variants = []
+    for automorphism in retained_graph_template_automorphisms(spec.template):
+        image = dict(automorphism)
+        variants.extend(
+            (
+                tuple(image[locant] for locant in directed_path),
+                tuple(image[locant] for locant in reversed(directed_path)),
+            )
+        )
+    if not variants:
+        raise ValueError(f"component template {spec.key!r} has no graph automorphism")
+    return min(
+        variants,
+        key=lambda path: tuple(retained_locant_sort_key(locant) for locant in path),
+    )
+
+
+def multiplicative_attachment_key(
+    spec: FusionComponentSpec,
+    join: FusionJoin,
+) -> tuple:
+    """Identity required for attached components to share a multiplier."""
+
+    template = spec.template
+    variant = (
+        template.name,
+        tuple((atom.locant, atom.symbol, atom.charge, atom.aromatic, atom.fusion, atom.saturated, atom.interior)
+              for atom in template.atoms),
+        tuple(sorted((tuple(sorted(bond.locants)), bond.bond_class) for bond in template.bonds)),
+        tuple(sorted(tuple(sorted(ring, key=retained_locant_sort_key)) for ring in template.rings)),
+    )
+    return (
+        spec.key,
+        variant,
+        join.kind.value,
+        join.order,
+        "sides" if join.host_sides else "locants",
+        component_interface_orbit(
+            spec,
+            tuple(locant.text for locant in join.interface.attached_path),
+        ),
+    )
+
+
+def multiplicative_member_order_key(join: FusionJoin) -> tuple:
+    """Canonical descriptor order within one multiplicative group."""
+
+    return (
+        tuple(tuple(ord(char) - ord("a") for char in side.letter) for side in join.host_sides),
+        tuple(retained_locant_sort_key(locant.text) for locant in join.attached_locants),
+    )
 
 
 def fusion_mode_allows_planning(mode: FusionMode) -> bool:

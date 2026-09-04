@@ -16,6 +16,7 @@ from ..locants import SystemLocant
 from ..molecule import Molecule, edges_within_atoms
 from ..polycycle_topology import normalize_edge
 from ..retained_graph_model import merge_parent_bond_classes
+from ..rules import multipliers
 from .cover import audit_component_cover, component_scope
 from .model import (
     AuditStatus,
@@ -33,7 +34,12 @@ from .model import (
     FusionNumberingProof,
     ParentBondModel,
 )
-from .rules import component_spec_seniority_key, pin_ring_size_gate
+from .rules import (
+    component_spec_seniority_key,
+    multiplicative_attachment_key,
+    multiplicative_member_order_key,
+    pin_ring_size_gate,
+)
 from .valence import FusionLambdaDescriptor
 
 _Node = tuple[int, str]
@@ -606,12 +612,50 @@ def _audit_descriptors(
                     f"shared interface between component occurrences {left} and {right} is not described exactly once"
                 )
 
-    for group in ast.multiplicative_groups:
-        keys = {matches[occurrence].spec_key for occurrence in group.occurrence_ids}
-        if len(keys) != 1:
-            errors.append(f"multiplicative group {group.occurrence_ids} combines nonidentical components")
-
     citation = _citation_plan(ast)
+    primary_joins = tuple(ast.joins[index] for index in citation.primary_join_indices)
+    children_by_host: dict[int, list[int]] = defaultdict(list)
+    joins_by_attached: dict[int, FusionJoin] = {}
+    for join in primary_joins:
+        children_by_host[join.host_occurrence].append(join.attached_occurrence)
+        joins_by_attached[join.attached_occurrence] = join
+    nonleaves = set(children_by_host)
+    expected_groups = []
+    audit_multiplicity = ast.plan_kind == "multiplicative_tree" or bool(ast.multiplicative_groups)
+    for _host, children in sorted(children_by_host.items()):
+        by_identity: dict[tuple, list[int]] = defaultdict(list)
+        for child in children:
+            if child in nonleaves:
+                continue
+            join = joins_by_attached[child]
+            by_identity[multiplicative_attachment_key(specs[child], join)].append(child)
+        for members in by_identity.values():
+            if len(members) < 2:
+                continue
+            ordered = tuple(
+                sorted(members, key=lambda child: multiplicative_member_order_key(joins_by_attached[child]))
+            )
+            try:
+                multiplier = multipliers.basic(len(ordered))
+            except KeyError:
+                continue
+            if audit_multiplicity:
+                expected_groups.append((ordered, multiplier))
+                for prime_depth, occurrence in enumerate(ordered):
+                    depths = {
+                        locant.prime_depth
+                        for locant in joins_by_attached[occurrence].interface.attached_path
+                    }
+                    if depths != {prime_depth}:
+                        errors.append(
+                            f"multiplicative occurrence {occurrence} has prime depth {depths}, expected {prime_depth}"
+                        )
+    actual_groups = sorted(
+        (group.occurrence_ids, group.multiplier) for group in ast.multiplicative_groups
+    )
+    if audit_multiplicity and actual_groups != sorted(expected_groups):
+        errors.append("multiplicative groups do not match exact sibling interface orbits")
+
     closing = set(citation.cycle_closing_join_indices)
     if any(ast.joins[index].kind is not FusionJoinKind.HIGHER_ORDER for index in closing):
         errors.append("citation-plan join classes disagree with descriptor kinds")

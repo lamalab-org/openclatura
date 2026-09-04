@@ -38,7 +38,11 @@ from .model import (
     OrderedFusionInterface,
     ParentLocationKey,
 )
-from .rules import component_spec_seniority_key
+from .rules import (
+    component_spec_seniority_key,
+    multiplicative_attachment_key,
+    multiplicative_member_order_key,
+)
 
 _LIMITS = fusion_nomenclature_config().search
 _SUPPORT = fusion_nomenclature_config().rules.support
@@ -510,9 +514,11 @@ def _candidates_for_component_selection(
     )
     if audit.proof.kind == "multiparent" and "higher_order" not in supported_joins:
         return []
-    preferred_location = min(topology.location_key for topology in topologies)
+    preferred_location = min(_pre_mapping_location_key(topology.location_key) for topology in topologies)
     topologies = tuple(
-        topology for topology in topologies if topology.location_key == preferred_location
+        topology
+        for topology in topologies
+        if _pre_mapping_location_key(topology.location_key) == preferred_location
     )
 
     mapping_sets: list[tuple[FusionComponentMatch, ...]] = []
@@ -839,21 +845,6 @@ def _parent_location_key(
         -sum(order == level for order in order_by_occurrence.values())
         for level in range(1, maximum_order + 1)
     )
-    children: dict[int, list[int]] = defaultdict(list)
-    for child, parent in parent_by_child.items():
-        children[parent].append(child)
-    grouping = tuple(
-        -count
-        for count in sorted(
-            (
-                count
-                for child_ids in children.values()
-                for count in _value_counts(specs[child].key for child in child_ids).values()
-                if count > 1
-            ),
-            reverse=True,
-        )
-    )
     parent_keys = {specs[root].key for root in roots}
     incomplete = int(
         len(roots) == 1
@@ -876,17 +867,22 @@ def _parent_location_key(
         incomplete_system=incomplete,
         maximum_attachment_order=maximum_order,
         attachment_count_by_order=counts,
-        multiplicative_grouping_score=grouping,
+        # Exact multiplicative equivalence depends on the selected local
+        # interface orbits and is filled after locant-map selection.
+        multiplicative_grouping_score=(),
         interparent_seniority=interparent_seniority,
         attached_component_preference=attached,
     )
 
 
-def _value_counts(values: Iterable[str]) -> dict[str, int]:
-    counts: dict[str, int] = defaultdict(int)
-    for value in values:
-        counts[value] += 1
-    return counts
+def _pre_mapping_location_key(location: ParentLocationKey) -> tuple:
+    """Criteria that are fully known before local component maps are chosen."""
+
+    return (
+        location.incomplete_system,
+        location.maximum_attachment_order,
+        location.attachment_count_by_order,
+    )
 
 
 def _compatible_mapping_assignments(
@@ -1108,9 +1104,16 @@ def _build_candidate(
         citation_plan=citation_plan,
     )
     rendered = render_fusion_name(ast, registry)
+    exact_location_key = replace(
+        topology.location_key,
+        multiplicative_grouping_score=tuple(
+            -len(group.occurrence_ids)
+            for group in sorted(groups, key=lambda group: (-len(group.occurrence_ids), group.occurrence_ids))
+        ),
+    )
     score = (
         component_spec_seniority_key(specs[topology.roots[0]]).as_tuple(),
-        topology.location_key,
+        exact_location_key,
         len(matches),
         max(topology.order_by_occurrence.values(), default=0),
         tuple(_join_preference_key(joins_by_child[child], side_rank[child]) for child in citation_children),
@@ -1328,19 +1331,12 @@ def _multiplicative_groups(
         for child in children:
             if child not in child_order:
                 join = joins[child]
-                pattern = (
-                    specs[child].key,
-                    join.kind,
-                    join.order,
-                    len(join.attached_locants),
-                    len(join.host_sides),
-                    len(join.host_locants),
-                )
+                pattern = multiplicative_attachment_key(specs[child], join)
                 by_pattern[pattern].append(child)
         for _pattern, members in sorted(by_pattern.items()):
             if len(members) < 2:
                 continue
-            ordered = tuple(sorted(members, key=lambda child: _descriptor_order_key(joins[child])))
+            ordered = tuple(sorted(members, key=lambda child: multiplicative_member_order_key(joins[child])))
             multiplier = _simple_multiplier(len(ordered))
             if multiplier is None:
                 continue
@@ -1429,13 +1425,6 @@ def _omit_attached_locants(
     return component.omit_attached_locants
 
 
-def _descriptor_order_key(join: FusionJoin) -> tuple:
-    return (
-        tuple(_side_sort_key(side.letter) for side in join.host_sides),
-        _attached_locant_key(join),
-    )
-
-
 def _join_preference_key(join: FusionJoin, side_rank: int) -> tuple:
     return (join.order, side_rank, _attached_locant_key(join))
 
@@ -1456,10 +1445,6 @@ def _occurrence_option_key(option: _OccurrenceOption) -> tuple:
         option.spec_key,
         tuple(sorted(option.atom_ids)),
     )
-
-
-def _side_sort_key(letter: str) -> tuple[int, ...]:
-    return tuple(ord(char) - ord("a") for char in letter)
 
 
 def _alphabetic_index(index: int) -> str:
