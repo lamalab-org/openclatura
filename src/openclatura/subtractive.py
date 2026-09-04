@@ -1,38 +1,19 @@
 """Explicit subtractive feature collection for selected parents."""
 
 from .assembly_parts import AssemblyParts, UnsaturationItem
-from .locants import canonical_locant_pair, parse_locant
+from .fusion.mancude import compare_actual_parent_to_implied_parent
+from .locants import parse_locant
 from .molecule import Molecule
 
 
-def _implied_parent_multiple_bonds(parts: AssemblyParts) -> frozenset[int]:
+def _implied_parent_multiple_bonds(mol: Molecule, parts: AssemblyParts) -> frozenset[int]:
     """Return graph bond ids implied by the selected parent-hydride model."""
 
     parent = parts.parent_hydride
     if parent is None or parent.bond_model is None:
         return frozenset()
-    actual_by_edge = {
-        frozenset(locants): order for locants, order in parts.parent_bond_orders_by_locants.items()
-    }
-    atom_to_locant = {atom: locant for locant, atom in parts.parent_atom_ids_by_locant.items()}
-    for assignment in parent.bond_model.allowed_kekule_assignments:
-        assignment_by_edge = {
-            frozenset(
-                (
-                    atom_to_locant[edge[0]],
-                    atom_to_locant[edge[1]],
-                )
-            ): order
-            for edge, order in assignment.orders
-        }
-        if assignment_by_edge != actual_by_edge:
-            continue
-        return frozenset(
-            parts.parent_bond_ids_by_locants[canonical_locant_pair(*locants)]
-            for locants, order in assignment_by_edge.items()
-            if order > 1 and canonical_locant_pair(*locants) in parts.parent_bond_ids_by_locants
-        )
-    return frozenset()
+    delta = compare_actual_parent_to_implied_parent(mol, parts.parent_atom_ids, parent.bond_model)
+    return delta.implied_multiple_bond_ids if delta is not None and delta.compatible else frozenset()
 
 
 def add_unsaturations(
@@ -51,7 +32,7 @@ def add_unsaturations(
         return
 
     seen_bonds = set()
-    implied_multiple_bonds = _implied_parent_multiple_bonds(parts)
+    implied_multiple_bonds = _implied_parent_multiple_bonds(mol, parts)
     for u_idx in numbered_path:
         for v_idx in mol.get_neighbors(u_idx):
             if v_idx not in numbered_path:

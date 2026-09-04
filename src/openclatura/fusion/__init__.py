@@ -51,6 +51,11 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "RejectedNumbering": (".model", "RejectedNumbering"),
     "SystemLocant": (".model", "SystemLocant"),
     "TypedLocantMap": (".model", "TypedLocantMap"),
+    "ParentBondDelta": (".mancude", "ParentBondDelta"),
+    "compare_actual_parent_to_implied_parent": (
+        ".mancude",
+        "compare_actual_parent_to_implied_parent",
+    ),
     "EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE": (
         ".rules",
         "EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE",
