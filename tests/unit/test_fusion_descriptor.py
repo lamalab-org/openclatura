@@ -494,6 +494,45 @@ def test_component_policy_iteration_order_does_not_change_the_name():
     assert reordered == ordinary == "furo[3,2-b]thieno[2,3-e]pyridine"
 
 
+def test_component_registry_keys_do_not_change_chemical_selection_or_rendering():
+    data = deepcopy(load_json_table("fusion_components.json"))
+    for index, row in enumerate(data["components"]):
+        original_key = row["key"]
+        row.setdefault("template_names", [original_key])
+        row["key"] = f"implementation-key-{index}"
+    renamed_registry = FusionComponentRegistry.from_data(data)
+    components = ("furan", "thiophene", "pyridine")
+    joins = (
+        ((0, "3"), (2, "2")),
+        ((0, "2"), (2, "3")),
+        ((1, "2"), (2, "5")),
+        ((1, "3"), (2, "6")),
+    )
+
+    _, _, ordinary = _build(components, joins)
+    _, renamed_ast, renamed = _build(components, joins, registry=renamed_registry)
+
+    assert renamed == ordinary == "furo[3,2-b]thieno[2,3-e]pyridine"
+    assert all(match.spec_key.startswith("implementation-key-") for match in renamed_ast.component_occurrences)
+
+
+def test_face_enumeration_order_does_not_change_chemical_selection_or_rendering():
+    registry = fusion_component_registry()
+    components = ("furan", "thiophene", "pyridine")
+    joins = (
+        ((0, "3"), (2, "2")),
+        ((0, "2"), (2, "3")),
+        ((1, "2"), (2, "5")),
+        ((1, "3"), (2, "6")),
+    )
+    mol, faces = _component_graph(components, joins)
+
+    ordinary_ast = build_fusion_name_ast(mol, registry.match_faces(mol, faces), registry)
+    reversed_ast = build_fusion_name_ast(mol, registry.match_faces(mol, tuple(reversed(faces))), registry)
+
+    assert render_fusion_name(ordinary_ast, registry) == render_fusion_name(reversed_ast, registry)
+
+
 def test_spiro_overlap_is_outside_the_bounded_fusion_tier():
     registry: FusionComponentRegistry = fusion_component_registry()
     mol, faces = _component_graph(
