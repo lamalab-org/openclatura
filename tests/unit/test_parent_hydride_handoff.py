@@ -27,9 +27,7 @@ def _resolved_ring_parent(smiles: str) -> ParentHydridePlan:
         selection,
         retained_name=retained_name,
         locant_maps=locant_maps,
-        retained_parent_metadata=(
-            retained.parent_metadata(retained_name) if retained_name is not None else None
-        ),
+        retained_parent_metadata=(retained.parent_metadata(retained_name) if retained_name is not None else None),
     )
     assert plan is not None
     return plan
