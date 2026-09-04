@@ -550,9 +550,7 @@ def _parent_tree_node(parts: AssemblyParts) -> dict:
             parts.parent_hydride.parent_nomenclature if parts.parent_hydride is not None else "legacy"
         ),
         "parent_hydride_name": (parts.parent_hydride.base_name if parts.parent_hydride is not None else None),
-        "parent_hydride_proof_source": (
-            parts.parent_hydride.proof_source if parts.parent_hydride is not None else ""
-        ),
+        "parent_hydride_proof_source": (parts.parent_hydride.proof_source if parts.parent_hydride is not None else ""),
         "parent_length": parts.parent_length,
         "is_ring": parts.is_ring,
         "is_bicycle": parts.is_bicycle,

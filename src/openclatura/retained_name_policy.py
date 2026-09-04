@@ -128,7 +128,5 @@ def _policy_from_data(row: dict) -> RetainedParentNamePolicy:
         preferred_contexts=tuple(str(context) for context in row.get("preferred_contexts", ("all",))),
         hydrogenation=hydrogenation,
         reason=str(row.get("reason", "")),
-        context_names=tuple(
-            (str(context), str(name)) for context, name in row.get("context_names", {}).items()
-        ),
+        context_names=tuple((str(context), str(name)) for context, name in row.get("context_names", {}).items()),
     )

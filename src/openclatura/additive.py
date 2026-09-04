@@ -522,9 +522,7 @@ def _add_monocycle_hydro(parts: AssemblyParts, plan: tuple[int, list[int]], get_
 def add_replacement_prefixes(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     """Add replacement prefixes and lambda annotations for parent atoms."""
 
-    if parts.retained_name or (
-        parts.parent_hydride is not None and parts.parent_hydride.absorbs_skeletal_replacement
-    ):
+    if parts.retained_name or (parts.parent_hydride is not None and parts.parent_hydride.absorbs_skeletal_replacement):
         return
     for atom_idx in numbered_path:
         atom = mol.atoms[atom_idx]

@@ -584,9 +584,7 @@ def name_component(
                 parent_plan.parent_hydride.hydride_kind.value if parent_plan.parent_hydride is not None else None
             ),
             "parent_nomenclature": (
-                parent_plan.parent_hydride.parent_nomenclature
-                if parent_plan.parent_hydride is not None
-                else "legacy"
+                parent_plan.parent_hydride.parent_nomenclature if parent_plan.parent_hydride is not None else "legacy"
             ),
         },
     )
