@@ -33,12 +33,14 @@ from .model import (
     FusionMultiplicityGroup,
     FusionNameAst,
     FusionSide,
+    ParentLocationKey,
 )
 from .rules import component_spec_seniority_key
 
 _LIMITS = fusion_nomenclature_config().search
 _SUPPORT = fusion_nomenclature_config().rules.support
 MAX_COMPONENT_OCCURRENCES = _LIMITS.maximum_component_occurrences
+MAX_FACES = _LIMITS.maximum_faces
 MAX_COMPONENT_SELECTIONS = _LIMITS.maximum_component_selections
 MAX_COMPONENT_SELECTION_STATES = _LIMITS.component_selection_states
 MAX_LOCANT_MAP_COMBINATIONS = _LIMITS.locant_map_combinations
@@ -119,9 +121,9 @@ def build_fusion_name_ast(
     face_ids = tuple(sorted(set().union(*(option.face_ids for option in options))))
     if len(face_ids) < 2:
         raise FusionDescriptorError("a fusion citation requires at least two component faces")
-    if len(face_ids) > MAX_COMPONENT_OCCURRENCES:
+    if len(face_ids) > MAX_FACES:
         raise FusionDescriptorError(
-            f"component count {len(face_ids)} exceeds bounded limit {MAX_COMPONENT_OCCURRENCES}"
+            f"face count {len(face_ids)} exceeds bounded limit {MAX_FACES}"
         )
 
     selections = _exact_component_covers(options, frozenset(face_ids))
@@ -364,6 +366,8 @@ def _candidates_for_component_selection(
     options: Sequence[_OccurrenceOption],
     registry: _Registry | Mapping[str, FusionComponentSpec],
 ) -> list[_Candidate]:
+    if len(options) > MAX_COMPONENT_OCCURRENCES:
+        return []
     ordered_options = tuple(sorted(options, key=_occurrence_option_key))
     canonical_matches = tuple(
         replace(option.mappings[0], occurrence_id=index) for index, option in enumerate(ordered_options)
@@ -389,6 +393,12 @@ def _candidates_for_component_selection(
         for match in eligible_roots
         if component_spec_seniority_key(specs[match.occurrence_id]) == senior_key
     ]
+    root_locations = {
+        root.occurrence_id: _tree_parent_location_key(audit.graph.adjacency, root.occurrence_id, specs)
+        for root in roots
+    }
+    preferred_location = min(root_locations.values())
+    roots = [root for root in roots if root_locations[root.occurrence_id] == preferred_location]
 
     mapping_sets: list[tuple[FusionComponentMatch, ...]] = []
     for occurrence_id, option in enumerate(ordered_options):
@@ -423,6 +433,57 @@ def _candidates_for_component_selection(
             if candidate is not None:
                 candidates.append(candidate)
     return candidates
+
+
+def _tree_parent_location_key(
+    adjacency: Mapping[int, tuple[int, ...]],
+    root: int,
+    specs: Mapping[int, FusionComponentSpec],
+) -> ParentLocationKey:
+    """Return the topology-only parent-location criteria for a tree cover."""
+
+    parent_by_child, order_by_occurrence = _orient_tree(adjacency, root)
+    maximum_order = max(order_by_occurrence.values(), default=0)
+    counts = tuple(
+        -sum(order == level for order in order_by_occurrence.values())
+        for level in range(1, maximum_order + 1)
+    )
+    children: dict[int, list[int]] = defaultdict(list)
+    for child, parent in parent_by_child.items():
+        children[parent].append(child)
+    grouping = tuple(
+        -count
+        for count in sorted(
+            (
+                count
+                for child_ids in children.values()
+                for count in _value_counts(specs[child].key for child in child_ids).values()
+                if count > 1
+            ),
+            reverse=True,
+        )
+    )
+    attached = tuple(
+        sorted(
+            component_spec_seniority_key(specs[occurrence]).as_tuple()
+            for occurrence in specs
+            if occurrence != root
+        )
+    )
+    return ParentLocationKey(
+        incomplete_system=0,
+        maximum_attachment_order=maximum_order,
+        attachment_count_by_order=counts,
+        multiplicative_grouping_score=grouping,
+        attached_component_preference=attached,
+    )
+
+
+def _value_counts(values: Iterable[str]) -> dict[str, int]:
+    counts: dict[str, int] = defaultdict(int)
+    for value in values:
+        counts[value] += 1
+    return counts
 
 
 def _compatible_mapping_assignments(

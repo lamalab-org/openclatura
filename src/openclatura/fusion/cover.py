@@ -5,12 +5,14 @@ from __future__ import annotations
 from collections.abc import Hashable, Iterable, Mapping
 from dataclasses import dataclass
 from itertools import combinations
-from typing import Generic, Literal, TypeVar
+from typing import Generic, Literal, TypeAlias, TypeVar
 
 from ..polycycle_topology import normalize_edge
 
 T = TypeVar("T", bound=Hashable)
 Edge = tuple[int, int]
+CoverKind: TypeAlias = Literal["tree", "multiparent", "disconnected"]
+CoverTopology: TypeAlias = Literal["tree", "unicyclic", "cactus", "complex", "disconnected"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,10 +45,16 @@ class CoverGraph(Generic[T]):
 
 @dataclass(frozen=True, slots=True)
 class CoverProof(Generic[T]):
-    """Proof that a component cover is a supported tree or must abstain."""
+    """Topology proof for a component-cover graph.
 
-    kind: Literal["tree", "non_tree", "disconnected"]
+    ``kind`` is the nomenclature-level cover class used by configuration.
+    ``topology`` retains the finer graph class needed by later multiparent
+    planning without making cyclic covers eligible for production naming.
+    """
+
+    kind: CoverKind
     cycle_rank: int
+    topology: CoverTopology
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,18 +193,92 @@ def is_connected(graph: CoverGraph[T]) -> bool:
 
 
 def cycle_rank(graph: CoverGraph[T]) -> int:
-    """Return the cyclomatic rank of a connected cover graph."""
+    """Return the cyclomatic rank, including for disconnected graphs."""
 
-    return len(graph.interfaces) - len(graph.nodes) + 1 if graph.nodes else 0
+    if not graph.nodes:
+        return 0
+    return len(graph.interfaces) - len(graph.nodes) + len(_connected_components(graph))
 
 
 def build_cover_proof(graph: CoverGraph[T]) -> CoverProof[T]:
-    """Classify the exact production boundary: connected tree or abstention."""
+    """Classify tree and typed multiparent component-cover topologies."""
 
     if not graph.nodes or not is_connected(graph):
-        return CoverProof("disconnected", cycle_rank(graph))
+        return CoverProof("disconnected", cycle_rank(graph), "disconnected")
     rank = cycle_rank(graph)
-    return CoverProof("tree" if rank == 0 else "non_tree", rank)
+    if rank == 0:
+        return CoverProof("tree", rank, "tree")
+    topology: CoverTopology
+    if rank == 1:
+        topology = "unicyclic"
+    elif _is_cactus_graph(graph):
+        topology = "cactus"
+    else:
+        topology = "complex"
+    return CoverProof("multiparent", rank, topology)
+
+
+def _is_cactus_graph(graph: CoverGraph[T]) -> bool:
+    """Return whether every biconnected cyclic block is a simple cycle.
+
+    Tarjan's edge-stack algorithm keeps this classification linear in the
+    size of the cover graph. Trees attached to cycles form one-edge blocks
+    and therefore do not affect the result.
+    """
+
+    discovery: dict[T, int] = {}
+    low: dict[T, int] = {}
+    edge_stack: list[tuple[T, T]] = []
+    cyclic_blocks: list[tuple[tuple[T, T], ...]] = []
+    counter = 0
+
+    def visit(node: T, parent: T | None) -> None:
+        nonlocal counter
+        counter += 1
+        discovery[node] = counter
+        low[node] = counter
+        for neighbor in graph.adjacency.get(node, ()):
+            if neighbor == parent:
+                continue
+            edge = (node, neighbor)
+            if neighbor not in discovery:
+                edge_stack.append(edge)
+                visit(neighbor, node)
+                low[node] = min(low[node], low[neighbor])
+                if low[neighbor] >= discovery[node]:
+                    block: list[tuple[T, T]] = []
+                    while edge_stack:
+                        stacked = edge_stack.pop()
+                        block.append(stacked)
+                        if stacked == edge:
+                            break
+                    if len(block) > 1:
+                        cyclic_blocks.append(tuple(block))
+            elif discovery[neighbor] < discovery[node]:
+                edge_stack.append(edge)
+                low[node] = min(low[node], discovery[neighbor])
+
+    for node in graph.nodes:
+        if node not in discovery:
+            visit(node, None)
+
+    for block in cyclic_blocks:
+        vertices = {endpoint for edge in block for endpoint in edge}
+        if len(block) != len(vertices):
+            return False
+    return bool(cyclic_blocks)
+
+
+def _connected_components(graph: CoverGraph[T]) -> tuple[frozenset[T], ...]:
+    remaining = set(graph.nodes)
+    components: list[frozenset[T]] = []
+    for node in graph.nodes:
+        if node not in remaining:
+            continue
+        component = frozenset(_connected_nodes(graph, node))
+        components.append(component)
+        remaining.difference_update(component)
+    return tuple(components)
 
 
 def _connected_nodes(graph: CoverGraph[T], start: T) -> set[T]:

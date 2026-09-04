@@ -39,6 +39,7 @@ _IMPLEMENTED_JOIN_KINDS = ("ortho",)
 class FusionSearchLimits:
     minimum_ring_size: int
     maximum_ring_size: int
+    maximum_faces: int
     cycle_states: int
     face_model_states: int
     layout_states: int

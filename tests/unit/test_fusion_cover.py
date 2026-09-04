@@ -16,6 +16,7 @@ def test_component_scopes_build_typed_overlap_interface_and_exact_cover_audit():
 
     assert audit.ok
     assert audit.proof.kind == "tree"
+    assert audit.proof.topology == "tree"
     assert len(audit.graph.interfaces) == 1
     interface = audit.graph.interfaces[0]
     assert interface.shared_atom_ids == frozenset({4, 5})
@@ -36,9 +37,10 @@ def test_one_atom_spiro_overlap_does_not_become_fusion_interface():
     assert graph.interfaces == ()
     assert not audit.ok
     assert audit.proof.kind == "disconnected"
+    assert audit.proof.topology == "disconnected"
 
 
-def test_cover_proof_classifies_supported_tree_and_non_tree_abstentions():
+def test_cover_proof_classifies_tree_and_multiparent_topologies():
     tree = build_cover_proof(build_cover_graph(("a", "b", "c"), (("a", "b"), ("b", "c"))))
     cycle = build_cover_proof(build_cover_graph(("a", "b", "c"), (("a", "b"), ("b", "c"), ("c", "a"))))
     cactus = build_cover_proof(
@@ -54,10 +56,25 @@ def test_cover_proof_classifies_supported_tree_and_non_tree_abstentions():
         )
     )
 
-    assert (tree.kind, tree.cycle_rank) == ("tree", 0)
-    assert (cycle.kind, cycle.cycle_rank) == ("non_tree", 1)
-    assert (cactus.kind, cactus.cycle_rank) == ("non_tree", 2)
-    assert complex_proof.kind == "non_tree"
+    assert (tree.kind, tree.cycle_rank, tree.topology) == ("tree", 0, "tree")
+    assert (cycle.kind, cycle.cycle_rank, cycle.topology) == ("multiparent", 1, "unicyclic")
+    assert (cactus.kind, cactus.cycle_rank, cactus.topology) == ("multiparent", 2, "cactus")
+    assert (complex_proof.kind, complex_proof.cycle_rank, complex_proof.topology) == (
+        "multiparent",
+        3,
+        "complex",
+    )
+
+
+def test_cover_proof_preserves_cycle_rank_for_disconnected_graphs():
+    graph = build_cover_graph(
+        ("a", "b", "c", "d", "e"),
+        (("a", "b"), ("b", "c"), ("c", "a"), ("d", "e")),
+    )
+
+    proof = build_cover_proof(graph)
+
+    assert (proof.kind, proof.cycle_rank, proof.topology) == ("disconnected", 1, "disconnected")
 
 
 def test_component_cover_audit_rejects_missing_edges_and_triple_coverage():

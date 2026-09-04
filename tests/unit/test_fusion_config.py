@@ -23,7 +23,8 @@ def test_checked_in_fusion_configuration_is_complete_and_data_backed():
     assert config.rules.pin_minimum_ring_size == 5
     assert config.rules.pin_minimum_ring_count == 2
     assert {shape.ring_size for shape in config.ring_shapes} == set(range(3, 9))
-    assert config.search.maximum_component_occurrences == 8
+    assert config.search.maximum_faces == 24
+    assert config.search.maximum_component_occurrences == 16
 
 
 @pytest.mark.parametrize(
@@ -31,6 +32,7 @@ def test_checked_in_fusion_configuration_is_complete_and_data_backed():
     [
         (("graph_source",), "independent_templates", "shared retained"),
         (("search_limits", "layout_states"), 0, "must be positive"),
+        (("search_limits", "maximum_faces"), 0, "must be positive"),
         (("ring_shapes",), [], "ring_shapes"),
     ],
 )
@@ -61,3 +63,14 @@ def test_configuration_cannot_enable_an_unimplemented_proof_tier(field, value):
 
     with pytest.raises(ValueError, match="currently implements|exceed the implemented"):
         fusion_nomenclature_config_from_data(data)
+
+
+def test_face_and_component_occurrence_limits_are_independent():
+    data = deepcopy(load_json_table("fusion_components.json"))
+    data["search_limits"]["maximum_faces"] = 19
+    data["search_limits"]["maximum_component_occurrences"] = 13
+
+    config = fusion_nomenclature_config_from_data(data)
+
+    assert config.search.maximum_faces == 19
+    assert config.search.maximum_component_occurrences == 13

@@ -182,6 +182,37 @@ def test_polycomponent_tree_orders_attached_components_by_seniority():
     )
 
 
+def test_long_component_tree_uses_a_central_parent_location_and_is_atom_order_invariant():
+    components = ("furan",) * 10
+    joins = tuple(
+        pair
+        for occurrence in range(9)
+        for pair in (
+            ((occurrence, "4"), (occurrence + 1, "2")),
+            ((occurrence, "5"), (occurrence + 1, "3")),
+        )
+    )
+
+    first_mol, first_ast, first_name = _build(components, joins)
+    arbitrary_ids = tuple(500 + 13 * index for index in reversed(range(len(first_mol.atoms))))
+    _second_mol, second_ast, second_name = _build(components, joins, atom_id_order=arbitrary_ids)
+
+    assert len(first_ast.component_occurrences) == len(second_ast.component_occurrences) == 10
+    assert first_ast.plan_kind == second_ast.plan_kind == "polycomponent_tree"
+    assert first_name == second_name
+
+    def maximum_depth(ast) -> int:
+        pending = [(ast.citation_tree, 0)]
+        result = 0
+        while pending:
+            node, depth = pending.pop()
+            result = max(result, depth)
+            pending.extend((child, depth + 1) for child in node.children)
+        return result
+
+    assert maximum_depth(first_ast) == maximum_depth(second_ast) == 5
+
+
 def test_identical_leaf_components_form_one_primed_multiplicative_group():
     _mol, ast, rendered = _build(
         ("furan", "furan", "pyridine"),

@@ -20,11 +20,12 @@
   "search_limits": {
     "minimum_ring_size": 3,
     "maximum_ring_size": 8,
+    "maximum_faces": 24,
     "cycle_states": 100000,
     "face_model_states": 50000,
     "layout_states": 25000,
     "maximum_layouts": 4096,
-    "maximum_component_occurrences": 8,
+    "maximum_component_occurrences": 16,
     "maximum_component_selections": 256,
     "component_selection_states": 4096,
     "locant_map_combinations": 4096,

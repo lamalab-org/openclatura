@@ -301,6 +301,28 @@ class FusionMultiplicityGroup:
         _require_nonempty(self.multiplier, "fusion multiplier")
 
 
+@dataclass(frozen=True, slots=True, order=True)
+class ParentLocationKey:
+    """Ordered P-25 quality key for one component-parent location.
+
+    Fields are normalized so the lexicographically smallest key wins.  The
+    intrinsic seniority of the component type is evaluated separately before
+    this location key is used.
+    """
+
+    incomplete_system: int
+    maximum_attachment_order: int
+    attachment_count_by_order: tuple[int, ...]
+    multiplicative_grouping_score: tuple[int, ...]
+    interparent_seniority: tuple = ()
+    attached_component_preference: tuple = ()
+
+    def __post_init__(self) -> None:
+        if self.incomplete_system not in (0, 1):
+            raise ValueError("incomplete_system must be a normalized boolean")
+        _require_nonnegative(self.maximum_attachment_order, "maximum_attachment_order")
+
+
 @dataclass(frozen=True, slots=True)
 class FusionNameAst:
     """Structured fusion citation; rendering must be a pure function of this AST."""
