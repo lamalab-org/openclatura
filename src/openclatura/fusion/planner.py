@@ -45,6 +45,7 @@ from .numbering import (
 )
 from .registry import FusionComponentRegistry, fusion_component_registry
 from .rules import explain_component_comparison, fusion_mode_allows_planning, pin_ring_size_gate
+from .valence import fusion_lambda_descriptors
 
 PLANNER_TIER = fusion_nomenclature_config().rules.planner_tier
 SUPPORT = fusion_nomenclature_config().rules.support
@@ -78,6 +79,8 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         return FusionUnsupported("selected parent contains unknown graph atoms")
     if not SUPPORT.charged_parents and any(mol.atoms[atom].charge for atom in atoms):
         return FusionUnsupported("charged fused parents are outside the bounded production tier")
+    if any(not mol.atoms[atom].element.fusion_supported for atom in atoms):
+        return FusionUnsupported("fused parent contains an unsupported skeletal element")
     if not SUPPORT.nonstandard_valence and not _standard_valence_parent(mol, atoms):
         return FusionUnsupported("nonstandard-valence fused parents are outside the bounded production tier")
 
@@ -149,6 +152,25 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     if len(indicated_h) > SUPPORT.maximum_indicated_hydrogens:
         return FusionUnsupported("multiple indicated-hydrogen fusion parents require a later additive tier")
     rendered_parts = render_fusion_name_parts(ast, registry, mol=mol)
+    lambda_descriptors = fusion_lambda_descriptors(
+        mol,
+        atoms,
+        dict(numbering.input_locant_maps[0]),
+    )
+    if lambda_descriptors:
+        rendered_parts = (
+            NameTokenBinding(
+                text=f"{','.join(descriptor.text for descriptor in lambda_descriptors)}-",
+                token_kind="replacement",
+                source="fusion_renderer",
+                grammar_role="fusion_lambda_descriptor",
+                binding_key="fusion:lambda_descriptor",
+                atom_ids={descriptor.atom_id for descriptor in lambda_descriptors},
+                locants=tuple(str(descriptor.locant) for descriptor in lambda_descriptors),
+                match_priority=100,
+            ),
+            *rendered_parts,
+        )
     if indicated_h:
         input_atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
         rendered_parts = (
@@ -174,6 +196,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         bond_model=bond_model,
         mode=mode,
         registry=registry,
+        lambda_descriptors=lambda_descriptors,
     )
     if audit.status is AuditStatus.ABSTAIN:
         return FusionUnsupported("fusion nomenclature audit abstained", audit.errors)
@@ -204,6 +227,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
             ),
         ),
         audit=audit,
+        lambda_descriptors=lambda_descriptors,
         rendered_parts=rendered_parts,
     )
     return FusionConfirmed(plan)

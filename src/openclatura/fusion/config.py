@@ -25,6 +25,7 @@ class FusionRuleConfig:
 class FusionSupportConfig:
     cover_kinds: tuple[str, ...]
     join_kinds: tuple[str, ...]
+    multiparent_parents: bool
     charged_parents: bool
     nonstandard_valence: bool
     interior_atoms: bool
@@ -104,6 +105,7 @@ def fusion_nomenclature_config_from_data(data: dict) -> FusionNomenclatureConfig
     support = FusionSupportConfig(
         cover_kinds=_text_list(support_data, "cover_kinds", allowed={"tree", "multiparent"}),
         join_kinds=_text_list(support_data, "join_kinds", allowed={"ortho", "ortho_peri", "higher_order"}),
+        multiparent_parents=_boolean(support_data, "multiparent_parents"),
         charged_parents=_boolean(support_data, "charged_parents"),
         nonstandard_valence=_boolean(support_data, "nonstandard_valence"),
         interior_atoms=_boolean(support_data, "interior_atoms"),
@@ -162,11 +164,11 @@ def _validate_implemented_support(support: FusionSupportConfig) -> None:
     """Reject configuration that claims an algorithmic tier not implemented here."""
 
     if support.cover_kinds != _IMPLEMENTED_COVER_KINDS:
-        raise ValueError("fusion nomenclature currently implements only tree component covers")
+        raise ValueError("fusion nomenclature support includes an unimplemented component-cover kind")
     if support.join_kinds != _IMPLEMENTED_JOIN_KINDS:
-        raise ValueError("fusion nomenclature currently implements only ordinary ortho joins")
-    if support.charged_parents or support.nonstandard_valence:
-        raise ValueError("fusion nomenclature support flags exceed the implemented neutral standard-valence tier")
+        raise ValueError("fusion nomenclature support includes an unimplemented join kind")
+    if support.charged_parents:
+        raise ValueError("fusion nomenclature support flags exceed the implemented neutral tier")
 
 
 def _text(data: dict, key: str) -> str:

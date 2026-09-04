@@ -5,7 +5,7 @@
     "name": "thieno[2,3-b]furan",
     "parent_nomenclature": "systematic_fusion",
     "pin_status": "confirmed",
-    "support_tier": "ortho-peri-tree-v2",
+    "support_tier": "bounded-polycomponent-v3",
     "proof_source": "fusion_reconstruction"
   },
   {
@@ -14,7 +14,7 @@
     "name": "imidazo[2,1-b][1,3]thiazole",
     "parent_nomenclature": "systematic_fusion",
     "pin_status": "confirmed",
-    "support_tier": "ortho-peri-tree-v2",
+    "support_tier": "bounded-polycomponent-v3",
     "proof_source": "fusion_reconstruction"
   },
   {
@@ -23,7 +23,7 @@
     "name": "furo[3,2-b]pyran",
     "parent_nomenclature": "systematic_fusion",
     "pin_status": "confirmed",
-    "support_tier": "ortho-peri-tree-v2",
+    "support_tier": "bounded-polycomponent-v3",
     "proof_source": "fusion_reconstruction"
   },
   {
@@ -32,7 +32,7 @@
     "name": "cyclopenta[b]furan",
     "parent_nomenclature": "systematic_fusion",
     "pin_status": "confirmed",
-    "support_tier": "ortho-peri-tree-v2",
+    "support_tier": "bounded-polycomponent-v3",
     "proof_source": "fusion_reconstruction"
   },
   {
@@ -41,7 +41,7 @@
     "name": "selenopheno[3,2-b]selenophene",
     "parent_nomenclature": "systematic_fusion",
     "pin_status": "confirmed",
-    "support_tier": "ortho-peri-tree-v2",
+    "support_tier": "bounded-polycomponent-v3",
     "proof_source": "fusion_reconstruction"
   },
   {
@@ -50,7 +50,7 @@
     "name": "furo[3,2-b]thieno[2,3-e]pyridine",
     "parent_nomenclature": "systematic_fusion",
     "pin_status": "confirmed",
-    "support_tier": "ortho-peri-tree-v2",
+    "support_tier": "bounded-polycomponent-v3",
     "proof_source": "fusion_reconstruction"
   },
   {
@@ -59,7 +59,7 @@
     "name": "difuro[3,2-b:2',3'-e]pyridine",
     "parent_nomenclature": "systematic_fusion",
     "pin_status": "confirmed",
-    "support_tier": "ortho-peri-tree-v2",
+    "support_tier": "bounded-polycomponent-v3",
     "proof_source": "fusion_reconstruction"
   },
   {
@@ -68,7 +68,7 @@
     "name": "naphtho[2,3-f]azulene",
     "parent_nomenclature": "systematic_fusion",
     "pin_status": "confirmed",
-    "support_tier": "ortho-peri-tree-v2",
+    "support_tier": "bounded-polycomponent-v3",
     "proof_source": "fusion_reconstruction"
   }
 ]

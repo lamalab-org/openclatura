@@ -12,6 +12,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from ..locants import SystemLocant
 from ..molecule import Molecule, edges_within_atoms
 from ..polycycle_topology import normalize_edge
 from ..retained_graph_model import merge_parent_bond_classes
@@ -33,6 +34,7 @@ from .model import (
     ParentBondModel,
 )
 from .rules import component_spec_seniority_key, pin_ring_size_gate
+from .valence import FusionLambdaDescriptor
 
 _Node = tuple[int, str]
 _Edge = tuple[int, int]
@@ -76,6 +78,7 @@ def audit_fusion_plan(
     bond_model: ParentBondModel,
     mode: FusionMode = FusionMode.GENERAL,
     registry: object | None = None,
+    lambda_descriptors: tuple[FusionLambdaDescriptor, ...] = (),
 ) -> FusionAuditResult:
     """Independently reconstruct and audit a completed fusion candidate.
 
@@ -148,12 +151,48 @@ def audit_fusion_plan(
 
         _audit_bond_model(mol, abstract_parent_graph, numbering, bond_model, errors)
         checks.append("parent_bond_model")
+        _audit_lambda_descriptors(mol, parent_atoms, numbering, lambda_descriptors, errors)
+        checks.append("lambda_descriptors")
     except (KeyError, TypeError, ValueError) as exc:
         return _error(f"fusion audit could not evaluate candidate: {exc}", checks=checks)
 
     if errors:
         return FusionAuditResult(AuditStatus.MISMATCH, checks=tuple(checks), errors=tuple(dict.fromkeys(errors)))
     return FusionAuditResult(AuditStatus.CONFIRMED, checks=tuple(checks))
+
+
+def _audit_lambda_descriptors(
+    mol: Molecule,
+    parent_atoms: frozenset[int],
+    numbering: FusionNumberingProof,
+    descriptors: tuple[FusionLambdaDescriptor, ...],
+    errors: list[str],
+) -> None:
+    """Check neutral nonstandard bonding numbers against the final locant map."""
+
+    locants = dict(numbering.input_locant_maps[0])
+    expected: dict[int, tuple[SystemLocant, int, int]] = {}
+    for atom_id in parent_atoms:
+        atom = mol.atoms[atom_id]
+        if atom.charge or atom.is_carbon:
+            continue
+        bonding_number = (atom.total_h_count or atom.explicit_h_count) + sum(
+            bond.order
+            for neighbor in mol.get_neighbors(atom_id)
+            if (bond := mol.get_bond(atom_id, neighbor)) is not None
+        )
+        if bonding_number > atom.element.standard_valence:
+            expected[atom_id] = (locants[atom_id], bonding_number, atom.element.standard_valence)
+    observed = {
+        descriptor.atom_id: (
+            descriptor.locant,
+            descriptor.bonding_number,
+            descriptor.standard_valence,
+        )
+        for descriptor in descriptors
+    }
+    if observed != expected:
+        errors.append("lambda descriptors do not represent every neutral nonstandard-valence parent atom")
 
 
 def _audit_nomenclature_selection(

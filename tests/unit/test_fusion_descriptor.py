@@ -20,6 +20,7 @@ from openclatura.fusion.model import FusionComponentMatch, FusionDescriptor, Fus
 from openclatura.fusion.registry import FusionComponentRegistry, fusion_component_registry
 from openclatura.molecule import Molecule
 from openclatura.naming_data import load_json_table
+from openclatura.opsin_verify import opsin_available, verify_with_opsin
 
 OccurrenceLocant = tuple[int, str]
 FusionPair = tuple[OccurrenceLocant, OccurrenceLocant]
@@ -339,7 +340,7 @@ def test_long_component_tree_uses_a_central_parent_location_and_is_atom_order_in
     assert maximum_depth(first_ast) == maximum_depth(second_ast) == 5
 
 
-def test_opted_in_higher_order_component_uses_numeric_host_locants():
+def test_second_order_pairwise_component_keeps_ordinary_fusion_descriptor():
     components = ("furan", "thiophene", "pyridine")
     interfaces = (
         ((0, "2"), (1, "4")),
@@ -360,11 +361,11 @@ def test_opted_in_higher_order_component_uses_numeric_host_locants():
     assert first_name == second_name
     higher = tuple(join for join in first_ast.joins if join.order == 2)
     assert len(higher) == 1
-    assert higher[0].kind is FusionJoinKind.HIGHER_ORDER
-    assert higher[0].host_locants
-    assert not higher[0].host_sides
-    assert any(descriptor.kind is FusionJoinKind.HIGHER_ORDER for descriptor in first_ast.descriptors)
-    assert any(descriptor.kind is FusionJoinKind.HIGHER_ORDER for descriptor in second_ast.descriptors)
+    assert higher[0].kind is FusionJoinKind.ORTHO
+    assert higher[0].host_sides
+    assert not higher[0].host_locants
+    assert all(descriptor.kind is not FusionJoinKind.HIGHER_ORDER for descriptor in first_ast.descriptors)
+    assert all(descriptor.kind is not FusionJoinKind.HIGHER_ORDER for descriptor in second_ast.descriptors)
 
 
 def test_identical_leaf_components_form_one_primed_multiplicative_group():
@@ -463,7 +464,7 @@ def test_spiro_overlap_is_outside_the_bounded_fusion_tier():
     matches = registry.match_faces(mol, faces)
 
     with pytest.raises(FusionDescriptorError, match="no exact tree-cover"):
-        build_fusion_name_ast(mol, matches, registry)
+        build_fusion_name_ast(mol, matches, registry, cover_kinds=("tree",))
 
 
 def test_cyclic_multiparent_component_cover_abstains_from_tree_tier():
@@ -486,7 +487,7 @@ def test_cyclic_multiparent_component_cover_abstains_from_tree_tier():
     )
 
     with pytest.raises(FusionDescriptorError, match="no exact tree-cover"):
-        build_fusion_name_ast(mol, matches, registry)
+        build_fusion_name_ast(mol, matches, registry, cover_kinds=("tree",))
 
 
 def test_cyclic_cover_retains_cycle_closing_interface_as_numeric_higher_order_join():
@@ -559,4 +560,21 @@ def test_multiparent_cover_records_interparent_component_and_is_atom_order_invar
     assert len(first_ast.citation_plan.interparent_occurrences) == 1
     assert first_ast.citation_plan.interparent_join_indices == (1,)
     assert first_name.startswith("benzo[")
-    assert first_name.endswith("bis(furan)")
+    assert first_name.endswith("difuran")
+
+
+@pytest.mark.skipif(not opsin_available(), reason="py2opsin/Java is unavailable")
+def test_production_multiparent_grammar_round_trips_through_opsin():
+    _mol, _ast, rendered = _build(
+        ("furan", "benzene", "furan"),
+        (
+            ((0, "2"), (1, "1")),
+            ((0, "3"), (1, "2")),
+            ((2, "2"), (1, "4")),
+            ((2, "3"), (1, "5")),
+        ),
+        atomic_components_only=True,
+    )
+
+    assert rendered == "benzo[1,2-b:4,5-b']difuran"
+    assert verify_with_opsin(rendered, "O1C=2C(C=C1)=CC=1OC=CC1C2").ok

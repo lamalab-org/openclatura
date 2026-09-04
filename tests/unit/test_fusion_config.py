@@ -13,11 +13,12 @@ def test_checked_in_fusion_configuration_is_complete_and_data_backed():
     config = fusion_nomenclature_config()
 
     assert config.graph_source == "retained_graph_templates"
-    assert config.rules.planner_tier == "ortho-peri-tree-v2"
+    assert config.rules.planner_tier == "bounded-polycomponent-v3"
     assert config.rules.support.cover_kinds == ("tree",)
     assert config.rules.support.join_kinds == ("ortho", "ortho_peri")
+    assert config.rules.support.multiparent_parents
     assert not config.rules.support.charged_parents
-    assert not config.rules.support.nonstandard_valence
+    assert config.rules.support.nonstandard_valence
     assert config.rules.support.interior_atoms
     assert config.rules.support.maximum_indicated_hydrogens == 1
     assert config.rules.pin_minimum_ring_size == 5
@@ -52,14 +53,13 @@ def test_invalid_fusion_configuration_is_rejected(path, value, message):
     [
         ("cover_kinds", ["multiparent"]),
         ("charged_parents", True),
-        ("nonstandard_valence", True),
     ],
 )
 def test_configuration_cannot_enable_an_unimplemented_proof_tier(field, value):
     data = deepcopy(load_json_table("fusion_components.json"))
     data["rules"]["support"][field] = value
 
-    with pytest.raises(ValueError, match="currently implements|exceed the implemented"):
+    with pytest.raises(ValueError, match="unimplemented|exceed the implemented"):
         fusion_nomenclature_config_from_data(data)
 
 

@@ -346,15 +346,34 @@ def test_charged_fused_parent_abstains_before_component_planning():
     assert "charged fused parents" in result.reason
 
 
-def test_nonstandard_valence_fused_parent_abstains_before_component_planning():
+def test_neutral_nonstandard_valence_uses_completed_system_lambda_locant():
     mol = read_smiles("O1C2=C(C=C1)C=CS2")
     oxygen = next(atom_id for atom_id, atom in mol.atoms.items() if atom.symbol == "O")
     mol.update_atom(oxygen, total_h_count=1)
 
     result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
 
-    assert isinstance(result, FusionUnsupported)
-    assert "nonstandard-valence fused parents" in result.reason
+    assert isinstance(result, FusionConfirmed)
+    assert result.plan.rendered_base_name == "1H-1lambda^3-thieno[2,3-b]furan"
+    assert len(result.plan.lambda_descriptors) == 1
+    descriptor = result.plan.lambda_descriptors[0]
+    assert descriptor.atom_id == oxygen
+    assert str(descriptor.locant) == "1"
+    assert descriptor.bonding_number == 3
+    assert "lambda_descriptors" in result.plan.audit.checks
+
+
+def test_neutral_fused_phosphorus_lambda_parent_uses_normal_derivative_assembly():
+    result = name(
+        "O=P1C=CC2=CC=CC=C12",
+        fusion_mode=FusionMode.GENERAL,
+        verify_opsin=opsin_available(),
+    )
+
+    assert result.name == "1-oxo-1H-1lambda^5-benzo[b]phosphole"
+    assert result.parent_nomenclature == "systematic_fusion"
+    if result.opsin_check is not None:
+        assert result.opsin_check.ok, result.opsin_check.to_dict()
 
 
 def test_spiro_parent_is_explicitly_not_applicable_to_fusion_nomenclature():
@@ -432,13 +451,16 @@ def test_ortho_peri_parent_with_interior_atoms_receives_a_complete_audited_numbe
     )
 
 
-def test_unsupported_multiparent_interior_system_still_abstains_safely():
+def test_complex_multiparent_interior_system_still_abstains_safely():
     mol = read_smiles("c1cc2ccc3ccc4ccc5ccc6ccc1c2c3c4c56")
 
     result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
 
     assert isinstance(result, FusionUnsupported)
-    assert "component decomposition" in result.reason
+    assert result.reason in {
+        "no supported audited fusion-component decomposition",
+        "no consistent audited intrinsic fused-ring layout",
+    }
 
 
 @pytest.mark.parametrize(

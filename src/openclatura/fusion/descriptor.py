@@ -124,6 +124,7 @@ def build_fusion_name_ast(
     *,
     cover_kinds: Iterable[str] | None = None,
     join_kinds: Iterable[str] | None = None,
+    multiparent_parents: bool | None = None,
 ) -> FusionNameAst:
     """Build the preferred bounded fusion citation from exact component maps.
 
@@ -136,6 +137,11 @@ def build_fusion_name_ast(
 
     supported_covers = frozenset(_SUPPORT.cover_kinds if cover_kinds is None else cover_kinds)
     supported_joins = frozenset(_SUPPORT.join_kinds if join_kinds is None else join_kinds)
+    allow_multiparent_parents = (
+        _SUPPORT.multiparent_parents
+        if multiparent_parents is None
+        else multiparent_parents
+    )
     if not supported_covers <= {"tree", "multiparent"}:
         raise ValueError("unknown fusion cover kind")
     if not supported_joins <= {"ortho", "ortho_peri", "higher_order"}:
@@ -163,6 +169,7 @@ def build_fusion_name_ast(
                     registry,
                     supported_covers=supported_covers,
                     supported_joins=supported_joins,
+                    allow_multiparent_parents=allow_multiparent_parents,
                 )
             )
         except _LocantMapBudgetExceeded:
@@ -371,12 +378,12 @@ def render_fusion_name_parts(
             pieces.append(component_part(parent_name, "parent_component", plan.parent_occurrences))
         else:
             try:
-                multiplier = multipliers.complex_(len(root_specs))
+                multiplier = multipliers.basic(len(root_specs))
             except KeyError as exc:
                 raise FusionDescriptorError("unsupported multiparent multiplicity") from exc
             pieces.append(
                 component_part(
-                    f"{multiplier}({parent_name})",
+                    f"{multiplier}{parent_name}",
                     "multiparent_components",
                     plan.parent_occurrences,
                 )
@@ -467,6 +474,7 @@ def _candidates_for_component_selection(
     *,
     supported_covers: frozenset[str],
     supported_joins: frozenset[str],
+    allow_multiparent_parents: bool,
 ) -> list[_Candidate]:
     if len(options) > MAX_COMPONENT_OCCURRENCES:
         return []
@@ -494,7 +502,7 @@ def _candidates_for_component_selection(
         if component_spec_seniority_key(specs[match.occurrence_id]) == senior_key
     ]
     root_sets = [(root.occurrence_id,) for root in roots]
-    if "multiparent" in supported_covers:
+    if allow_multiparent_parents:
         root_sets.extend(_multiparent_root_sets(tuple(root.occurrence_id for root in roots), audit.graph.adjacency, specs))
     topologies = tuple(
         _citation_topology(audit.graph.adjacency, root_set, specs)
@@ -534,6 +542,7 @@ def _candidates_for_component_selection(
                 registry,
                 mol,
                 supported_joins,
+                audit.proof.kind,
             )
             if candidate is not None:
                 candidates.append(candidate)
@@ -545,19 +554,20 @@ def _multiparent_root_sets(
     adjacency: Mapping[int, tuple[int, ...]],
     specs: Mapping[int, FusionComponentSpec],
 ) -> tuple[tuple[int, ...], ...]:
-    """Enumerate bounded identical-parent sets with an intervening component."""
+    """Return the complete set of identical, nonadjacent senior parents.
 
-    result: list[tuple[int, ...]] = []
-    for count in range(2, len(roots) + 1):
-        for selected in combinations(roots, count):
-            if len({specs[root].key for root in selected}) != 1:
-                continue
-            if any(right in adjacency[left] for left, right in combinations(selected, 2)):
-                continue
-            topology = _citation_topology(adjacency, selected, specs)
-            if topology.interparent_occurrences:
-                result.append(selected)
-    return tuple(result)
+    Multiparent nomenclature cites every occurrence of the intrinsically
+    senior parent component. Choosing arbitrary subsets changes the citation
+    and creates an exponential search, so the check is deliberately linear.
+    """
+
+    if len(roots) < 2 or len({specs[root].key for root in roots}) != 1:
+        return ()
+    selected = tuple(sorted(roots, key=lambda root: _cover_node_key(root, adjacency, specs)))
+    if any(right in adjacency[left] for left, right in combinations(selected, 2)):
+        return ()
+    topology = _citation_topology(adjacency, selected, specs)
+    return (selected,) if topology.interparent_occurrences else ()
 
 
 def _citation_topology(
@@ -829,6 +839,7 @@ def _build_candidate(
     registry: _Registry | Mapping[str, FusionComponentSpec],
     mol: Molecule,
     supported_joins: frozenset[str],
+    cover_kind: str,
 ) -> _Candidate | None:
     match_by_id = {match.occurrence_id: match for match in matches}
     primary_joins: dict[int, FusionJoin] = {}
@@ -850,7 +861,8 @@ def _build_candidate(
             return None
         join, side_rank[child] = join_data
         if (
-            topology.order_by_occurrence[child] > 1
+            cover_kind == "multiparent"
+            and topology.order_by_occurrence[child] > 1
             and "higher_order" in supported_joins
         ):
             join = replace(

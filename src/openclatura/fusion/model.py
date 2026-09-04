@@ -25,6 +25,7 @@ from ..retained_graph_model import (
 
 if TYPE_CHECKING:
     from ..assembly_parts import NameTokenBinding
+    from .valence import FusionLambdaDescriptor
 
 
 class FusionMode(StrEnum):
@@ -789,6 +790,7 @@ class FusionParentPlan:
     pin_status: PinStatus | str
     rule_trace: tuple[FusionRuleDecision, ...]
     audit: FusionAuditResult
+    lambda_descriptors: tuple[FusionLambdaDescriptor, ...] = ()
     rendered_parts: tuple[NameTokenBinding, ...] = ()
 
     def __post_init__(self) -> None:
