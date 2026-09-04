@@ -160,6 +160,10 @@ class FusionComponentRegistry:
     def register(self, row: Mapping[str, Any]) -> FusionComponentSpec:
         """Validate and register one data-backed component policy row."""
 
+        if "seniority_override" in row:
+            raise ValueError("seniority_override is not a chemical seniority criterion")
+        if "preferred_fusion_prefix" in row and "attached_prefix" in row:
+            raise ValueError("use preferred_fusion_prefix without a conflicting attached_prefix")
         key = _required_text(row, "key")
         if key in self._by_key:
             raise ValueError(f"duplicate fusion component key {key!r}")
@@ -183,7 +187,11 @@ class FusionComponentRegistry:
         if not allow_parent and not allow_attached:
             raise ValueError(f"fusion component {key!r} is not eligible for any role")
         primary = templates[0]
-        attached_prefix = _optional_text(row, "attached_prefix") or primary.attached_prefix
+        attached_prefix = (
+            _optional_text(row, "preferred_fusion_prefix")
+            or _optional_text(row, "attached_prefix")
+            or primary.attached_prefix
+        )
         if allow_attached and not attached_prefix:
             raise ValueError(f"attached fusion component {key!r} requires an attached_prefix")
         rule = _required_text(row, "rule")
@@ -206,7 +214,7 @@ class FusionComponentRegistry:
             usable_as_parent=allow_parent,
             usable_as_attached=allow_attached,
             rule_reference=rule,
-            seniority_override=_optional_nonnegative_int(row, "seniority_override"),
+            accepted_general_prefixes=_optional_text_tuple(row, "accepted_general_prefixes"),
             horizontal_ring_count=_horizontal_ring_count(row, primary),
             multiplicative_prefix_style=_optional_text(row, "multiplicative_prefix_style") or "basic",
         )
@@ -365,7 +373,7 @@ class FusionComponentRegistry:
             usable_as_parent=policy.usable_as_parent,
             usable_as_attached=policy.usable_as_attached,
             rule_reference=policy.rule_reference,
-            seniority_override=None,
+            accepted_general_prefixes=(),
             horizontal_ring_count=1,
             multiplicative_prefix_style=generated.multiplicative_prefix_style,
         )
@@ -381,7 +389,7 @@ def _component_spec(
     usable_as_parent: bool,
     usable_as_attached: bool,
     rule_reference: str,
-    seniority_override: int | None,
+    accepted_general_prefixes: tuple[str, ...],
     horizontal_ring_count: int,
     multiplicative_prefix_style: str = "basic",
 ) -> FusionComponentSpec:
@@ -393,7 +401,7 @@ def _component_spec(
         usable_as_parent=usable_as_parent,
         usable_as_attached=usable_as_attached,
         rule_reference=rule_reference,
-        seniority_override=seniority_override,
+        accepted_general_prefixes=accepted_general_prefixes,
         horizontal_ring_count=horizontal_ring_count,
         multiplicative_prefix_style=multiplicative_prefix_style,
     )
@@ -577,6 +585,18 @@ def _optional_bool(row: Mapping[str, Any], field: str, *, default: bool) -> bool
     if type(value) is not bool:
         raise ValueError(f"{field} must be a boolean")
     return value
+
+
+def _optional_text_tuple(row: Mapping[str, Any], field: str) -> tuple[str, ...]:
+    values = row.get(field, ())
+    if not isinstance(values, list | tuple):
+        raise ValueError(f"{field} must be a list of non-empty strings")
+    result = tuple(values)
+    if any(not isinstance(value, str) or not value.strip() for value in result):
+        raise ValueError(f"{field} must contain non-empty strings")
+    if len(result) != len(set(result)):
+        raise ValueError(f"{field} must contain unique strings")
+    return result
 
 
 def _normalize_faces(faces: object) -> tuple[_Face, ...]:

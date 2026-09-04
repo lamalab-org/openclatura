@@ -215,7 +215,7 @@ class FusionComponentSpec:
     usable_as_parent: bool
     usable_as_attached: bool
     rule_reference: str
-    seniority_override: int | None = None
+    accepted_general_prefixes: tuple[str, ...] = ()
     horizontal_ring_count: int = 0
     multiplicative_prefix_style: str = "basic"
 
@@ -227,7 +227,7 @@ class FusionComponentSpec:
         ):
             _require_nonempty(value, label)
         if self.usable_as_attached:
-            _require_nonempty(self.attached_prefix, "attached prefix")
+            _require_nonempty(self.attached_prefix, "preferred fusion prefix")
         if self.horizontal_ring_count < 0:
             raise ValueError("horizontal_ring_count must be non-negative")
         if self.multiplicative_prefix_style not in {"basic", "complex"}:
@@ -236,6 +236,12 @@ class FusionComponentSpec:
     @property
     def derivative_stem(self) -> str | None:
         return self.template.derivative_stem
+
+    @property
+    def preferred_fusion_prefix(self) -> str:
+        """Preferred contraction emitted by systematic fusion rendering."""
+
+        return self.attached_prefix
 
     @property
     def locants(self) -> tuple[str, ...]:

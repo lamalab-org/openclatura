@@ -66,7 +66,7 @@
     {"key": "azulene", "attached_prefix": "azuleno", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "1H-indene", "attached_prefix": "indeno", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "pentalene", "attached_prefix": "pentaleno", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
-    {"key": "anthracene", "attached_prefix": "anthraceno", "horizontal_ring_count": 3, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "anthracene", "preferred_fusion_prefix": "anthra", "accepted_general_prefixes": ["anthraceno"], "horizontal_ring_count": 3, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.3.2.2.3"},
     {"key": "phenanthrene", "attached_prefix": "phenanthro", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "quinoline", "attached_prefix": "quinolino", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "carbazole", "attached_prefix": "carbazolo", "horizontal_ring_count": 3, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},

@@ -113,9 +113,8 @@ def _two_fused_rings(
 
     specs = {
         "left": _ring_spec("left", left_size),
-        # Keep the synthetic host senior so this fixture is a valid
-        # nomenclature candidate as well as a valid graph reconstruction.
-        "right": replace(_ring_spec("right", right_size), seniority_override=0),
+        # Give the synthetic host a real chemical seniority distinction.
+        "right": replace(_ring_spec("right", right_size), horizontal_ring_count=1),
     }
     face_by_atoms = {frozenset(face.atom_cycle): face.id for face in faces}
     left_match = _match(0, "left", left_cycle, face_by_atoms[frozenset(left_cycle)])

@@ -466,6 +466,20 @@ def test_resolved_component_variant_controls_seniority_without_key_collapse():
     assert component_spec_seniority_key(lower) < component_spec_seniority_key(higher)
 
 
+def test_registry_key_is_not_a_component_seniority_criterion():
+    original = _seniority_variant("original-key", ("N", "C", "C", "C", "C", "C"))
+    renamed = replace(original, key="renamed-key")
+
+    assert component_spec_seniority_key(original) == component_spec_seniority_key(renamed)
+    decision = explain_component_comparison(
+        _match(0, original.key),
+        _match(1, renamed.key, offset=10),
+        {original.key: original, renamed.key: renamed},
+    )
+    assert decision.criterion == "complete_tie"
+    assert decision.outcome == "tie"
+
+
 def test_parent_bond_model_rejects_incomplete_kekule_assignment():
     with pytest.raises(ValueError, match="every parent bond"):
         ParentBondModel(

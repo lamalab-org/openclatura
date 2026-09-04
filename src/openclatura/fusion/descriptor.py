@@ -39,6 +39,7 @@ from .model import (
     ParentLocationKey,
 )
 from .rules import (
+    component_canonicalization_key,
     component_spec_seniority_key,
     component_variant_identity,
     multiplicative_attachment_key,
@@ -681,7 +682,7 @@ def _best_tree_mapping_candidate(
                             component_spec_seniority_key(specs[child]).as_tuple(),
                             side_ranks[child],
                             _attached_locant_key(selected_joins[child]),
-                            specs[child].key,
+                            component_canonicalization_key(specs[child]),
                         ),
                     )
                 )
@@ -815,7 +816,7 @@ def _cover_node_key(
     return (
         component_spec_seniority_key(specs[occurrence]).as_tuple(),
         -len(adjacency[occurrence]),
-        specs[occurrence].key,
+        component_canonicalization_key(specs[occurrence]),
         occurrence,
     )
 
@@ -850,10 +851,13 @@ def _parent_location_key(
     counts = tuple(
         -sum(order == level for order in order_by_occurrence.values()) for level in range(1, maximum_order + 1)
     )
-    parent_keys = {specs[root].key for root in roots}
+    parent_variants = {component_variant_identity(specs[root]) for root in roots}
     incomplete = int(
         len(roots) == 1
-        and any(occurrence not in roots and specs[occurrence].key in parent_keys for occurrence in specs)
+        and any(
+            occurrence not in roots and component_variant_identity(specs[occurrence]) in parent_variants
+            for occurrence in specs
+        )
     )
     interparent_seniority = tuple(
         sorted(component_spec_seniority_key(specs[occurrence]).as_tuple() for occurrence in interparents)
@@ -1120,7 +1124,7 @@ def _closing_join_direction(
         pair,
         key=lambda occurrence: (
             component_spec_seniority_key(specs[occurrence]).as_tuple(),
-            specs[occurrence].key,
+            component_canonicalization_key(specs[occurrence]),
             occurrence,
         ),
     )
@@ -1131,7 +1135,7 @@ def _closing_join_direction(
         key=lambda occurrence: (
             orders[occurrence],
             component_spec_seniority_key(specs[occurrence]).as_tuple(),
-            specs[occurrence].key,
+            component_canonicalization_key(specs[occurrence]),
             occurrence,
         ),
     )
@@ -1286,7 +1290,7 @@ def _ordered_children(
                     component_spec_seniority_key(specs[child]).as_tuple(),
                     side_rank[child],
                     _attached_locant_key(joins[child]),
-                    specs[child].key,
+                    component_canonicalization_key(specs[child]),
                 ),
             )
         )
@@ -1413,7 +1417,7 @@ def _occurrence_option_key(option: _OccurrenceOption) -> tuple:
         min(option.face_ids),
         -len(option.face_ids),
         tuple(sorted(option.face_ids)),
-        option.spec_key,
+        option.mappings[0].template_name,
         tuple(sorted(option.atom_ids)),
     )
 

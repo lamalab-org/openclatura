@@ -360,6 +360,25 @@ def test_registration_inherits_names_from_the_shared_retained_template():
     assert spec.attached_prefix == spec.template.attached_prefix == "naphtho"
 
 
+def test_preferred_fusion_prefix_is_separate_from_accepted_general_aliases():
+    registry = fusion_component_registry()
+    component = registry.get("anthracene")
+
+    assert component is not None
+    assert component.spec.preferred_fusion_prefix == "anthra"
+    assert component.spec.attached_prefix == "anthra"
+    assert component.spec.accepted_general_prefixes == ("anthraceno",)
+
+
+def test_registry_rejects_nonchemical_seniority_override():
+    data = load_json_table("fusion_components.json")
+    row = deepcopy(next(item for item in data["components"] if item["key"] == "benzene"))
+    row["seniority_override"] = 0
+
+    with pytest.raises(ValueError, match="not a chemical seniority criterion"):
+        FusionComponentRegistry("test").register(row)
+
+
 def test_polycyclic_component_requires_explicit_horizontal_ring_count():
     data = load_json_table("fusion_components.json")
     row = deepcopy(next(item for item in data["components"] if item["key"] == "naphthalene"))

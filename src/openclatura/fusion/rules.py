@@ -45,10 +45,9 @@ class FusionComponentLookup(Protocol):
 
 
 @dataclass(frozen=True, slots=True, order=True)
-class ComponentSeniorityKey:
+class ChemicalComponentSeniorityKey:
     """Normalized P-25.3.2.4 key; lower tuple values are preferred."""
 
-    override: int
     earliest_special_heteroatom: int
     ring_count: int
     ring_size_vector: tuple[int, ...]
@@ -59,11 +58,9 @@ class ComponentSeniorityKey:
     all_heteroatom_locants: tuple[tuple[int, str], ...]
     per_element_locants: tuple[tuple[tuple[int, str], ...], ...]
     peripheral_fusion_carbon_locants: tuple[tuple[int, str], ...]
-    deterministic_tiebreak: str
 
     def as_tuple(self) -> tuple:
         return (
-            self.override,
             self.earliest_special_heteroatom,
             self.ring_count,
             self.ring_size_vector,
@@ -74,12 +71,14 @@ class ComponentSeniorityKey:
             self.all_heteroatom_locants,
             self.per_element_locants,
             self.peripheral_fusion_carbon_locants,
-            self.deterministic_tiebreak,
         )
 
 
+# Public compatibility alias. The value now contains chemical criteria only.
+ComponentSeniorityKey = ChemicalComponentSeniorityKey
+
+
 _CRITERION_LABELS = (
-    "seniority_override",
     "earliest_special_heteroatom",
     "ring_count",
     "ring_size_vector",
@@ -90,7 +89,6 @@ _CRITERION_LABELS = (
     "all_heteroatom_locants",
     "per_element_locants",
     "peripheral_fusion_carbon_locants",
-    "deterministic_tiebreak",
 )
 
 
@@ -148,7 +146,6 @@ def component_variant_identity(spec: FusionComponentSpec) -> tuple:
 
     template = spec.template
     return (
-        spec.key,
         template.name,
         tuple(
             (atom.locant, atom.symbol, atom.charge, atom.aromatic, atom.fusion, atom.saturated, atom.interior)
@@ -157,6 +154,21 @@ def component_variant_identity(spec: FusionComponentSpec) -> tuple:
         tuple(sorted((tuple(sorted(bond.locants)), bond.bond_class) for bond in template.bonds)),
         tuple(sorted(tuple(sorted(ring, key=retained_locant_sort_key)) for ring in template.rings)),
         spec.multiplicative_prefix_style,
+    )
+
+
+def component_canonicalization_key(spec: FusionComponentSpec) -> tuple:
+    """Return a registry-key-independent ordering after chemical ties.
+
+    This is an implementation ordering, not an IUPAC seniority criterion. It
+    uses the actual rendered policy and graph variant so renaming a registry
+    lookup key cannot alter a generated name.
+    """
+
+    return (
+        spec.parent_name,
+        spec.preferred_fusion_prefix,
+        component_variant_identity(spec),
     )
 
 
@@ -178,13 +190,13 @@ def fusion_mode_allows_planning(mode: FusionMode) -> bool:
 def component_seniority_key(
     component: FusionComponentMatch,
     registry: FusionComponentLookup | Mapping[str, FusionComponentSpec],
-) -> ComponentSeniorityKey:
+) -> ChemicalComponentSeniorityKey:
     """Return the explainable P-25.3.2.4 key for one matched occurrence."""
 
     return component_spec_seniority_key(_component_spec(component, registry))
 
 
-def component_spec_seniority_key(spec: FusionComponentSpec) -> ComponentSeniorityKey:
+def component_spec_seniority_key(spec: FusionComponentSpec) -> ChemicalComponentSeniorityKey:
     """Return the P-25.3.2.4 key for one resolved component variant.
 
     This avoids discarding an occurrence's exact graph-template variant by
@@ -204,8 +216,7 @@ def component_spec_seniority_key(spec: FusionComponentSpec) -> ComponentSeniorit
         tuple(sorted(retained_locant_sort_key(atom.locant) for atom in heteroatoms if atom.symbol == symbol))
         for symbol in GENERAL_HETEROATOM_COUNT_PRECEDENCE
     )
-    return ComponentSeniorityKey(
-        override=spec.seniority_override if spec.seniority_override is not None else 1_000_000,
+    return ChemicalComponentSeniorityKey(
         earliest_special_heteroatom=earliest,
         ring_count=-len(spec.rings),
         ring_size_vector=tuple(-size for size in sorted(spec.ring_sizes, reverse=True)),
@@ -218,7 +229,6 @@ def component_spec_seniority_key(spec: FusionComponentSpec) -> ComponentSeniorit
         peripheral_fusion_carbon_locants=tuple(
             sorted(retained_locant_sort_key(locant) for locant in spec.fusion_carbon_locants)
         ),
-        deterministic_tiebreak=spec.key,
     )
 
 
