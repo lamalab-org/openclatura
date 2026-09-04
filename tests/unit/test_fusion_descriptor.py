@@ -311,10 +311,10 @@ def test_polycomponent_tree_orders_attached_components_by_seniority():
 
 
 def test_long_component_tree_uses_a_central_parent_location_and_is_atom_order_invariant():
-    components = ("furan",) * 10
+    components = ("furan",) * 16
     joins = tuple(
         pair
-        for occurrence in range(9)
+        for occurrence in range(15)
         for pair in (
             ((occurrence, "4"), (occurrence + 1, "2")),
             ((occurrence, "5"), (occurrence + 1, "3")),
@@ -325,7 +325,7 @@ def test_long_component_tree_uses_a_central_parent_location_and_is_atom_order_in
     arbitrary_ids = tuple(500 + 13 * index for index in reversed(range(len(first_mol.atoms))))
     _second_mol, second_ast, second_name = _build(components, joins, atom_id_order=arbitrary_ids)
 
-    assert len(first_ast.component_occurrences) == len(second_ast.component_occurrences) == 10
+    assert len(first_ast.component_occurrences) == len(second_ast.component_occurrences) == 16
     assert first_ast.plan_kind == second_ast.plan_kind == "polycomponent_tree"
     assert first_name == second_name
 
@@ -338,14 +338,14 @@ def test_long_component_tree_uses_a_central_parent_location_and_is_atom_order_in
             pending.extend((child, depth + 1) for child in node.children)
         return result
 
-    assert maximum_depth(first_ast) == maximum_depth(second_ast) == 5
+    assert maximum_depth(first_ast) == maximum_depth(second_ast) == 8
 
 
 def test_long_five_membered_ring_chain_completes_the_bounded_layout_proof():
-    components = ("furan",) * 8
+    components = ("furan",) * 16
     joins = tuple(
         pair
-        for occurrence in range(7)
+        for occurrence in range(15)
         for pair in (
             ((occurrence, "4"), (occurrence + 1, "2")),
             ((occurrence, "5"), (occurrence + 1, "3")),
@@ -356,7 +356,7 @@ def test_long_five_membered_ring_chain_completes_the_bounded_layout_proof():
     result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
 
     assert isinstance(result, FusionConfirmed)
-    assert len(result.plan.ast.component_occurrences) == 8
+    assert len(result.plan.ast.component_occurrences) == 16
     assert result.plan.audit.confirmed
 
 

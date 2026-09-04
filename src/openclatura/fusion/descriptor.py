@@ -525,6 +525,22 @@ def _candidates_for_component_selection(
         interface_by_pair = {
             frozenset((interface.left, interface.right)): interface for interface in audit.graph.interfaces
         }
+        if len(topology.roots) == 1 and not (
+            topology.interparent_pairs or topology.cycle_closing_pairs
+        ):
+            candidate = _best_tree_mapping_candidate(
+                mapping_sets,
+                specs,
+                topology,
+                interface_by_pair,
+                registry,
+                mol,
+                supported_joins,
+                audit.proof.kind,
+            )
+            if candidate is not None:
+                candidates.append(candidate)
+            continue
         for selected_maps in _compatible_mapping_assignments(
             mapping_sets,
             specs,
@@ -547,6 +563,138 @@ def _candidates_for_component_selection(
             if candidate is not None:
                 candidates.append(candidate)
     return candidates
+
+
+def _best_tree_mapping_candidate(
+    mapping_sets: Sequence[tuple[FusionComponentMatch, ...]],
+    specs: Mapping[int, FusionComponentSpec],
+    topology: _CitationTopology,
+    interface_by_pair: Mapping[frozenset[int], FusionInterface[int]],
+    registry: _Registry | Mapping[str, FusionComponentSpec],
+    mol: Molecule,
+    supported_joins: frozenset[str],
+    cover_kind: str,
+) -> _Candidate | None:
+    """Return the exact preferred mapping assignment for a citation tree.
+
+    Local component automorphisms are selected while walking the citation in
+    the same postorder used by the final preference key.  Once an emitted
+    join-key prefix is lexicographically worse than the best complete prefix,
+    no descendant choice can improve it, so that branch can be discarded.
+    This avoids materializing the exponential Cartesian product for long
+    unbranched systems without changing the ordering rules.
+    """
+
+    projected = _deduplicate_interface_equivalent_maps(
+        mapping_sets,
+        interface_by_pair.values(),
+    )
+    root = topology.roots[0]
+    children: dict[int, tuple[int, ...]] = {
+        parent: tuple(child for child, host in topology.parent_by_child.items() if host == parent)
+        for parent in range(len(projected))
+    }
+    selected: dict[int, FusionComponentMatch] = {}
+    selected_joins: dict[int, FusionJoin] = {}
+    side_ranks: dict[int, int] = {}
+    best: _Candidate | None = None
+    visited_states = 0
+
+    def prefix_is_worse(prefix: tuple[tuple, ...]) -> bool:
+        if best is None:
+            return False
+        return prefix > best.score[4][: len(prefix)]
+
+    def complete(prefix: tuple[tuple, ...]) -> None:
+        nonlocal best
+        candidate = _build_candidate(
+            tuple(selected[occurrence] for occurrence in range(len(projected))),
+            specs,
+            topology,
+            interface_by_pair,
+            registry,
+            mol,
+            supported_joins,
+            cover_kind,
+        )
+        if candidate is not None and (best is None or candidate.score < best.score):
+            best = candidate
+
+    def visit_ordered_children(
+        ordered: tuple[int, ...],
+        index: int,
+        prefix: tuple[tuple, ...],
+        continuation,
+    ) -> None:
+        if index == len(ordered):
+            continuation(prefix)
+            return
+        child = ordered[index]
+
+        def after_child(child_prefix: tuple[tuple, ...]) -> None:
+            next_prefix = child_prefix + (
+                _join_preference_key(selected_joins[child], side_ranks[child]),
+            )
+            if not prefix_is_worse(next_prefix):
+                visit_ordered_children(ordered, index + 1, next_prefix, continuation)
+
+        visit_node(child, prefix, after_child)
+
+    def visit_node(node: int, prefix: tuple[tuple, ...], continuation) -> None:
+        child_ids = children.get(node, ())
+
+        def select_direct_child(position: int) -> None:
+            nonlocal visited_states
+            if position == len(child_ids):
+                ordered = tuple(
+                    sorted(
+                        child_ids,
+                        key=lambda child: (
+                            component_spec_seniority_key(specs[child]).as_tuple(),
+                            side_ranks[child],
+                            _attached_locant_key(selected_joins[child]),
+                            specs[child].key,
+                        ),
+                    )
+                )
+                visit_ordered_children(ordered, 0, prefix, continuation)
+                return
+
+            child = child_ids[position]
+            interface = interface_by_pair[frozenset((child, node))]
+            for mapping in projected[child]:
+                visited_states += 1
+                if visited_states > MAX_LOCANT_MAP_COMBINATIONS:
+                    raise _LocantMapBudgetExceeded(
+                        f"tree locant-map search exceeds bounded limit {MAX_LOCANT_MAP_COMBINATIONS} states"
+                    )
+                classified = _classified_join(
+                    mapping,
+                    selected[node],
+                    specs[child],
+                    specs[node],
+                    interface,
+                    topology.order_by_occurrence[child],
+                    mol,
+                )
+                if classified is None:
+                    continue
+                join, side_rank = classified
+                selected[child] = mapping
+                selected_joins[child] = join
+                side_ranks[child] = side_rank
+                select_direct_child(position + 1)
+                del side_ranks[child]
+                del selected_joins[child]
+                del selected[child]
+
+        select_direct_child(0)
+
+    for root_mapping in projected[root]:
+        selected[root] = root_mapping
+        visit_node(root, (), complete)
+        del selected[root]
+    return best
 
 
 def _multiparent_root_sets(

@@ -532,31 +532,59 @@ def _first_fusion_base(numbering: CompletedNumbering) -> int:
 def _maximum_matchings(
     edges: frozenset[tuple[int, int]], *, search_budget: int
 ) -> tuple[frozenset[tuple[int, int]], ...]:
-    ordered = tuple(sorted(edges))
-    best_size = -1
-    best: set[frozenset[tuple[int, int]]] = set()
+    """Return every maximum matching using memoized residual vertex states.
+
+    Branching on edges revisits the same residual graph many times, which is
+    exponential even for an unbranched acene-like parent.  A matching state is
+    completely determined by the vertices still available, so solving each
+    such state once preserves exhaustive output while making long fused chains
+    practical.
+    """
+
+    vertices = tuple(sorted({atom for edge in edges for atom in edge}))
+    neighbors = {
+        atom: tuple(
+            sorted(
+                edge[1] if edge[0] == atom else edge[0]
+                for edge in edges
+                if atom in edge
+            )
+        )
+        for atom in vertices
+    }
+    memo: dict[frozenset[int], tuple[frozenset[tuple[int, int]], ...]] = {}
     states = 0
 
-    def search(position: int, used: frozenset[int], selected: tuple[tuple[int, int], ...]) -> None:
-        nonlocal best_size, states
+    def search(available: frozenset[int]) -> tuple[frozenset[tuple[int, int]], ...]:
+        nonlocal states
+        cached = memo.get(available)
+        if cached is not None:
+            return cached
         states += 1
         if states > search_budget:
             raise MancudeSearchBudgetExceeded(search_budget)
-        if position == len(ordered):
-            size = len(selected)
-            value = frozenset(selected)
-            if size > best_size:
-                best_size = size
-                best.clear()
-            if size == best_size:
-                best.add(value)
-            return
-        if len(selected) + (len(ordered) - position) < best_size:
-            return
-        edge = ordered[position]
-        search(position + 1, used, selected)
-        if edge[0] not in used and edge[1] not in used:
-            search(position + 1, used | frozenset(edge), selected + (edge,))
+        if not available:
+            return (frozenset(),)
 
-    search(0, frozenset(), ())
-    return tuple(sorted(best, key=lambda matching: tuple(sorted(matching))))
+        atom = min(available)
+        without_atom = available - {atom}
+        candidates = list(search(without_atom))
+        for neighbor in neighbors[atom]:
+            if neighbor not in available:
+                continue
+            edge = normalize_edge(atom, neighbor)
+            candidates.extend(
+                matching | {edge}
+                for matching in search(without_atom - {neighbor})
+            )
+        maximum = max(map(len, candidates), default=0)
+        result = tuple(
+            sorted(
+                {matching for matching in candidates if len(matching) == maximum},
+                key=lambda matching: tuple(sorted(matching)),
+            )
+        )
+        memo[available] = result
+        return result
+
+    return search(frozenset(vertices))
