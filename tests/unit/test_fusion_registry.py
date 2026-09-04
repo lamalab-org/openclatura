@@ -386,6 +386,25 @@ def test_preferred_fusion_prefix_is_separate_from_accepted_general_aliases():
     assert component.spec.accepted_general_prefixes == ("anthraceno",)
 
 
+@pytest.mark.parametrize(
+    ("key", "template_name", "preferred_prefix"),
+    [
+        ("benzene", "benzene", "benzo"),
+        ("naphthalene", "naphthalene", "naphtho"),
+        ("anthracene", "anthracene", "anthra"),
+        ("phenanthrene", "phenanthrene", "phenanthro"),
+        ("furan", "furan", "furo"),
+        ("imidazole", "imidazole", "imidazo"),
+    ],
+)
+def test_reviewed_contracted_prefix_has_explicit_component_provenance(key, template_name, preferred_prefix):
+    component = fusion_component_registry().by_key[key]
+
+    assert component.template_names == (template_name,)
+    assert component.spec.template.name == template_name
+    assert component.spec.preferred_fusion_prefix == preferred_prefix
+
+
 def test_registry_rejects_nonchemical_seniority_override():
     data = load_json_table("fusion_components.json")
     row = deepcopy(next(item for item in data["components"] if item["key"] == "benzene"))
