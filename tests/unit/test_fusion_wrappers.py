@@ -79,6 +79,18 @@ def test_bridged_fusion_wrapper_is_used_by_public_parent_pipeline():
     assert result.verified
     selected = next(step for step in result.decisions if step.decision == "selected audited bridged fusion parent")
     assert selected.data["audit_checks"][-1] == "complete_wrapper_graph_reconstruction"
+
+
+def test_bridged_wrapper_request_mode_does_not_claim_unaudited_pin_preference():
+    result = name(
+        "C12=C(C)C=C(C3=CC=CC=C13)O2",
+        fusion_mode=FusionMode.AUDITED_PIN,
+        include_trace=True,
+    )
+
+    selected = next(step for step in result.decisions if step.decision == "selected audited bridged fusion parent")
+    assert selected.data["pin_status"] == "valid_general_name"
+    assert "wrapper_parent_preference_not_yet_audited" in selected.data["pin_checks"]
     assert selected.data["search_states"] > 0
 
 

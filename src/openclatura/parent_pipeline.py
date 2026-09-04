@@ -164,6 +164,10 @@ def resolve_bridged_fusion_parent(
     plan = plan_bridged_fusion_wrapper(mol, selection.atom_set, mode=mode)
     if plan is None:
         return None
+    pin_decision = PinDecision(
+        status=PinStatus.VALID_GENERAL_NAME,
+        checks=("fusion_rules_satisfied", "wrapper_parent_preference_not_yet_audited", *plan.audit_checks),
+    )
     trace_decision(
         decision_trace,
         TracePhase.PARENT_SELECTION,
@@ -185,18 +189,13 @@ def resolve_bridged_fusion_parent(
                 for bridge in plan.bridges
             ],
             "proof_source": "fusion_wrapper_reconstruction",
+            "pin_status": str(pin_decision.status),
+            "pin_checks": list(pin_decision.checks),
             "audit_checks": list(plan.audit_checks),
             "search_states": plan.search_states,
         },
     )
-    status = PinStatus.CONFIRMED if mode is FusionMode.AUDITED_PIN else PinStatus.VALID_GENERAL_NAME
-    checks = (
-        "no_preferred_retained_complete_parent",
-        "no_preferred_independently_systematic_complete_parent",
-        "fusion_rules_satisfied",
-        *plan.audit_checks,
-    )
-    return RingParent.from_fusion_wrapper(plan).with_pin_decision(PinDecision(status=status, checks=checks))
+    return RingParent.from_fusion_wrapper(plan).with_pin_decision(pin_decision)
 
 
 def resolve_third_component_fusion_parent(
