@@ -224,12 +224,8 @@ def select_bounded_face_model(
     budget = _Budget("face-model selection", model_search_budget)
     ranks = canonical_ranks(mol, atoms)
     valid: list[tuple[tuple, BoundedFaceModel]] = []
-    for face_indices in combinations(range(len(cycles)), rank):
-        budget.spend()
+    for face_indices in _independent_face_sets(cycles, graph_edges, rank, budget):
         selected = tuple(cycles[index] for index in face_indices)
-        # Cheap rejection before constructing the full audit record.
-        if frozenset().union(*(face.edges for face in selected)) != graph_edges:
-            continue
         audit = audit_bounded_face_model(mol, atoms, selected)
         if not audit.ok:
             continue
@@ -250,6 +246,105 @@ def select_bounded_face_model(
     best = [model for score, model in valid if score == best_score]
     distinct = {frozenset(face.edges for face in model.faces) for model in best}
     return best[0] if len(distinct) == 1 else None
+
+
+def _independent_face_sets(
+    cycles: tuple[GraphCycle, ...],
+    graph_edges: frozenset[Edge],
+    target_rank: int,
+    budget: _Budget,
+) -> tuple[tuple[int, ...], ...]:
+    """Enumerate complete face sets with edge-pivot and GF(2) pruning.
+
+    The old combinations loop paid for every size-``target_rank`` subset even
+    when an early edge could no longer be covered.  This search branches on
+    the least-supported uncovered edge, maintains edge multiplicities, and
+    rejects linearly dependent cycle vectors before a full face audit.
+    """
+
+    if target_rank <= 0 or len(cycles) < target_rank:
+        return ()
+    edge_order = tuple(sorted(graph_edges))
+    edge_position = {edge: index for index, edge in enumerate(edge_order)}
+    masks = tuple(sum(1 << edge_position[edge] for edge in cycle.edges) for cycle in cycles)
+    candidates_by_edge = tuple(
+        tuple(index for index, mask in enumerate(masks) if mask & (1 << position))
+        for position in range(len(edge_order))
+    )
+    all_edges_mask = (1 << len(edge_order)) - 1
+    results: set[tuple[int, ...]] = set()
+    visited: set[frozenset[int]] = set()
+
+    def visit(
+        selected: frozenset[int],
+        covered_once: int,
+        covered_twice: int,
+        basis: tuple[int, ...],
+    ) -> None:
+        budget.spend()
+        if selected in visited:
+            return
+        visited.add(selected)
+        if len(selected) == target_rank:
+            if covered_once == all_edges_mask:
+                results.add(tuple(sorted(selected)))
+            return
+        if len(selected) > target_rank:
+            return
+
+        uncovered = all_edges_mask ^ covered_once
+        if not uncovered:
+            return
+        uncovered_positions = tuple(position for position in range(len(edge_order)) if uncovered & (1 << position))
+        pivot = min(
+            uncovered_positions,
+            key=lambda position: (
+                sum(index not in selected for index in candidates_by_edge[position]),
+                position,
+            ),
+        )
+        choices = tuple(index for index in candidates_by_edge[pivot] if index not in selected)
+        if not choices:
+            return
+        remaining_slots = target_rank - len(selected)
+        possible = 0
+        for index, mask in enumerate(masks):
+            if index not in selected:
+                possible |= mask
+        if uncovered & ~possible:
+            return
+
+        for index in choices:
+            mask = masks[index]
+            if covered_twice & mask:
+                continue
+            next_basis = _gf2_insert(basis, mask)
+            if next_basis is None:
+                continue
+            new_twice = covered_twice | (covered_once & mask)
+            new_once = covered_once | mask
+            if remaining_slots == 1 and new_once != all_edges_mask:
+                continue
+            visit(selected | {index}, new_once, new_twice, next_basis)
+
+    visit(frozenset(), 0, 0, ())
+    return tuple(sorted(results))
+
+
+def _gf2_insert(basis: tuple[int, ...], vector: int) -> tuple[int, ...] | None:
+    """Insert one bit vector into a canonical GF(2) basis."""
+
+    value = vector
+    rows = list(basis)
+    for row in rows:
+        value = min(value, value ^ row)
+    if value == 0:
+        return None
+    pivot = value.bit_length()
+    rows = [min(row, row ^ value) if row.bit_length() == pivot else row for row in rows]
+    rows.append(value)
+    rows.sort(reverse=True)
+    return tuple(rows)
 
 
 def _face_model_score(faces: tuple[GraphCycle, ...], ranks: dict[int, int]) -> tuple:
