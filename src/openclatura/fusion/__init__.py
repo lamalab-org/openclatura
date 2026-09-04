@@ -65,6 +65,14 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "explain_component_comparison": (".rules", "explain_component_comparison"),
     "fusion_mode_allows_planning": (".rules", "fusion_mode_allows_planning"),
     "pin_ring_size_gate": (".rules", "pin_ring_size_gate"),
+    "BridgedFusionWrapperPlan": (".wrappers", "BridgedFusionWrapperPlan"),
+    "FusionSpiroSidePlan": (".wrappers", "FusionSpiroSidePlan"),
+    "NondetachableBridgeKind": (".wrappers", "NondetachableBridgeKind"),
+    "NondetachableBridgeOperation": (".wrappers", "NondetachableBridgeOperation"),
+    "WrapperParentKind": (".wrappers", "WrapperParentKind"),
+    "WrapperParentPlan": (".wrappers", "WrapperParentPlan"),
+    "plan_bridged_fusion_wrapper": (".wrappers", "plan_bridged_fusion_wrapper"),
+    "plan_fusion_spiro_side": (".wrappers", "plan_fusion_spiro_side"),
 }
 
 __all__ = sorted(_EXPORTS)

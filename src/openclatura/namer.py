@@ -300,8 +300,7 @@ def _select_subgraph_parent(mol: Molecule, start_idx: int, component: set[int], 
 
 
 def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> SpiroAssembly:
-    """Name a side ring as structured spiro assembly data (P-24, P-52.3).  The attachment atom stands in
-    as silicon so the side ring names independently, and the marker is stripped before rendering."""
+    """Name a side ring as structured spiro assembly data (P-24, P-52.3)."""
 
     retained_n_ring = _retained_n_ring_spiro_assembly(mol, c_idx, sub_comp)
     if retained_n_ring is not None:
@@ -311,10 +310,27 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
     if simple_side_ring is not None:
         return simple_side_ring
 
+    # An audited systematic-fusion side already owns a complete atom-to-locant
+    # map.  Consume that proof directly instead of changing the junction atom
+    # to silicon and recovering its locant from rendered text.
+    from .fusion.context import current_fusion_mode
+    from .fusion.wrappers import plan_fusion_spiro_side
+
+    fusion_side = plan_fusion_spiro_side(
+        mol,
+        sub_comp,
+        c_idx,
+        mode=current_fusion_mode(),
+    )
+    if fusion_side is not None:
+        return fusion_side.to_spiro_assembly()
+
     heteroaromatic_side = _heteroaromatic_spiro_side_assembly(mol, c_idx, sub_comp)
     if heteroaromatic_side is not None:
         return heteroaromatic_side
 
+    # Compatibility fallback for side-parent classes that do not yet expose a
+    # typed locant proof.
     sub_mol = mol.subgraph(sub_comp, symbols={c_idx: "Si"})
 
     sub_name_raw = name_component(sub_mol, sub_comp, is_substituent=False)
