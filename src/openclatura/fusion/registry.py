@@ -15,6 +15,7 @@ from functools import cache
 from types import MappingProxyType
 from typing import Any
 
+from ..graph_kernel import GraphFace
 from ..hantzsch_widman import (
     HWFusionComponent,
     hw_fusion_component_from_key,
@@ -23,7 +24,6 @@ from ..hantzsch_widman import (
 from ..locants import retained_locant_sort_key
 from ..molecule import Molecule
 from ..naming_data import load_json_table
-from ..polycycle_topology import normalize_edge
 from ..retained_fused_templates import (
     RetainedGraphTemplate,
     match_retained_graph_template_maps,
@@ -68,14 +68,6 @@ class RegisteredFusionComponent:
         if template is None:
             raise KeyError(f"component {self.spec.key!r} has no template {template_name!r}")
         return replace(self.spec, template=template)
-
-
-@dataclass(frozen=True, slots=True)
-class _Face:
-    id: int
-    atom_cycle: tuple[int, ...]
-    atoms: frozenset[int]
-    edges: frozenset[tuple[int, int]]
 
 
 @dataclass(frozen=True, slots=True)
@@ -599,11 +591,11 @@ def _optional_text_tuple(row: Mapping[str, Any], field: str) -> tuple[str, ...]:
     return result
 
 
-def _normalize_faces(faces: object) -> tuple[_Face, ...]:
+def _normalize_faces(faces: object) -> tuple[GraphFace, ...]:
     values = getattr(faces, "faces", faces)
     if not isinstance(values, Iterable):
         raise TypeError("faces must be an iterable or expose a faces iterable")
-    normalized: list[_Face] = []
+    normalized: list[GraphFace] = []
     for position, face in enumerate(values):
         atom_cycle = getattr(face, "atom_cycle", getattr(face, "atoms", face))
         if not isinstance(atom_cycle, Sequence):
@@ -612,14 +604,13 @@ def _normalize_faces(faces: object) -> tuple[_Face, ...]:
         if len(atoms) < 3 or len(atoms) != len(set(atoms)):
             raise ValueError("every fusion face must be a simple cycle")
         face_id = int(getattr(face, "id", position))
-        edges = frozenset(normalize_edge(left, right) for left, right in zip(atoms, atoms[1:] + atoms[:1]))
-        normalized.append(_Face(face_id, atoms, frozenset(atoms), edges))
+        normalized.append(GraphFace(face_id, atoms))
     if len({face.id for face in normalized}) != len(normalized):
         raise ValueError("fusion face ids must be unique")
     return tuple(sorted(normalized, key=lambda face: face.id))
 
 
-def _connected_face_subsets(faces: tuple[_Face, ...], sizes: frozenset[int]) -> tuple[tuple[_Face, ...], ...]:
+def _connected_face_subsets(faces: tuple[GraphFace, ...], sizes: frozenset[int]) -> tuple[tuple[GraphFace, ...], ...]:
     if not sizes:
         return ()
     maximum = min(max(sizes), len(faces))
@@ -630,7 +621,7 @@ def _connected_face_subsets(faces: tuple[_Face, ...], sizes: frozenset[int]) -> 
         for index in range(len(faces))
     }
     frontier = {frozenset((index,)) for index in range(len(faces))}
-    subsets: list[tuple[_Face, ...]] = []
+    subsets: list[tuple[GraphFace, ...]] = []
     for size in range(1, maximum + 1):
         if size in sizes:
             subsets.extend(tuple(faces[index] for index in sorted(indices)) for indices in sorted(frontier, key=tuple))
@@ -648,7 +639,7 @@ def _connected_face_subsets(faces: tuple[_Face, ...], sizes: frozenset[int]) -> 
 def _template_rings_match_faces(
     template: RetainedGraphTemplate,
     locant_to_atom: Mapping[str, int],
-    faces: tuple[_Face, ...],
+    faces: tuple[GraphFace, ...],
 ) -> bool:
     mapped_rings = {frozenset(locant_to_atom[locant] for locant in ring) for ring in template.rings}
     return mapped_rings == {face.atoms for face in faces}

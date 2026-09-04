@@ -5,9 +5,26 @@ except for descriptor/audit data that can be proven from the graph.
 """
 
 import re
-from collections import deque
 from dataclasses import dataclass
 
+from .graph_kernel import (
+    adjacency_from_edges as adjacency_from_edges,
+)
+from .graph_kernel import (
+    canonical_cycle,
+)
+from .graph_kernel import (
+    connected_components as connected_components,
+)
+from .graph_kernel import (
+    cycle_edges as cycle_edges,
+)
+from .graph_kernel import (
+    normalize_edge as normalize_edge,
+)
+from .graph_kernel import (
+    normalize_edges as normalize_edges,
+)
 from .molecule import Molecule, edges_within_atoms
 from .ring_renderer import render_ring_descriptor, von_baeyer_cycle_count, von_baeyer_kind
 
@@ -699,27 +716,6 @@ def simple_cycles_from_edges(atoms: frozenset[int], edges: set[tuple[int, int]])
     return [tuple(cycle) for cycle in sorted(cycles)]
 
 
-def connected_components(atoms: set[int], edges: frozenset[tuple[int, int]]) -> list[set[int]]:
-    adjacency = adjacency_from_edges(atoms, edges)
-    components = []
-    seen = set()
-    for atom in sorted(atoms):
-        if atom in seen:
-            continue
-        queue = deque((atom,))
-        seen.add(atom)
-        component = set()
-        while queue:
-            current = queue.popleft()
-            component.add(current)
-            for neighbor in adjacency[current]:
-                if neighbor in atoms and neighbor not in seen:
-                    seen.add(neighbor)
-                    queue.append(neighbor)
-        components.append(component)
-    return components
-
-
 def _component_path_between_attachment_atoms(
     component: frozenset[int], attachment_centers: set[int], edges: frozenset[tuple[int, int]]
 ) -> tuple[int, ...]:
@@ -786,55 +782,6 @@ def _dedupe_paths(paths: list[tuple[int, ...]]) -> list[tuple[int, ...]]:
     return deduped
 
 
-def adjacency_from_edges(
-    nodes: set[int] | frozenset[int], edges: set[tuple[int, int]] | frozenset[tuple[int, int]]
-) -> dict[int, set[int]]:
-    adjacency: dict[int, set[int]] = {node: set() for node in nodes}
-    for first, second in edges:
-        if first not in adjacency or second not in adjacency:
-            continue
-        adjacency[first].add(second)
-        adjacency[second].add(first)
-    return adjacency
-
-
-def normalize_edge(first: int, second: int) -> tuple[int, int]:
-    """Return one undirected graph edge in deterministic endpoint order."""
-
-    if first == second:
-        raise ValueError("Self edges are not supported")
-    return (first, second) if first < second else (second, first)
-
-
-def canonical_cycle(atoms) -> tuple[int, ...]:
-    """Canonicalize a cycle independently of start and traversal direction."""
-
-    path = tuple(atoms)
-    if not path:
-        return ()
-    variants = []
-    for sequence in (path, tuple(reversed(path))):
-        variants.extend(sequence[index:] + sequence[:index] for index in range(len(sequence)))
-    return min(variants)
-
-
-def cycle_edges(atoms) -> tuple[tuple[int, int], ...]:
-    """Return normalized undirected edges around an ordered cycle."""
-
-    cycle = tuple(atoms)
-    return tuple(normalize_edge(left, right) for left, right in zip(cycle, cycle[1:] + cycle[:1]))
-
-
-def graph_cycle_rank(atoms, edges) -> int:
-    """Return the cyclomatic rank of a non-empty connected graph."""
-
-    atom_set = set(atoms)
-    edge_set = frozenset(normalize_edge(*edge) for edge in edges)
-    if not atom_set or len(connected_components(atom_set, edge_set)) != 1:
-        raise ValueError("Cycle rank requires a non-empty connected graph")
-    return len(edge_set) - len(atom_set) + 1
-
-
 def adjacent_atoms(atom: int, edges: frozenset[tuple[int, int]]) -> set[int]:
     adjacent = set()
     for first, second in edges:
@@ -843,10 +790,6 @@ def adjacent_atoms(atom: int, edges: frozenset[tuple[int, int]]) -> set[int]:
         elif second == atom:
             adjacent.add(first)
     return adjacent
-
-
-def normalize_edges(edges) -> set[tuple[int, int]]:
-    return {normalize_edge(first, second) for first, second in edges}
 
 
 def _canonical_cycle(path: list[int]) -> tuple[int, ...]:

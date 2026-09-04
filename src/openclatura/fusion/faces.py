@@ -14,13 +14,13 @@ from dataclasses import dataclass
 from itertools import combinations
 
 from ..canonical_ranks import canonical_ranks
+from ..graph_kernel import cycle_rank as graph_cycle_rank
 from ..molecule import Molecule, edges_within_atoms
 from ..polycycle_topology import (
     adjacency_from_edges,
     canonical_cycle,
     connected_components,
     cycle_edges,
-    graph_cycle_rank,
     normalize_edge,
 )
 from .config import fusion_nomenclature_config
