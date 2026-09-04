@@ -57,12 +57,16 @@ class RetainedParentNamePolicy:
     preferred_contexts: tuple[str, ...] = ("all",)
     hydrogenation: RetainedHydrogenationPolicy | None = None
     reason: str = ""
+    context_names: tuple[tuple[str, str], ...] = ()
 
     @property
     def accepted_names(self) -> tuple[str, ...]:
         return tuple(dict.fromkeys((self.preferred_name, self.template_name, *self.accepted_aliases)))
 
     def output_name(self, context: str) -> str:
+        contextual = dict(self.context_names).get(context)
+        if contextual is not None:
+            return contextual
         if "all" in self.preferred_contexts or context in self.preferred_contexts:
             return self.preferred_name
         return self.template_name
@@ -124,4 +128,7 @@ def _policy_from_data(row: dict) -> RetainedParentNamePolicy:
         preferred_contexts=tuple(str(context) for context in row.get("preferred_contexts", ("all",))),
         hydrogenation=hydrogenation,
         reason=str(row.get("reason", "")),
+        context_names=tuple(
+            (str(context), str(name)) for context, name in row.get("context_names", {}).items()
+        ),
     )

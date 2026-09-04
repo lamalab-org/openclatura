@@ -272,14 +272,7 @@ def _retained_wrapper_parent(mol: Molecule, atoms: frozenset[int]) -> WrapperPar
     )
     return WrapperParentPlan(
         kind=WrapperParentKind.RETAINED,
-        name=min(
-            (
-                retained_parent_output_name(template_name, "composite_parent"),
-                template_name,
-                *first.template.aliases,
-            ),
-            key=lambda candidate: (len(candidate), candidate),
-        ),
+        name=retained_parent_output_name(template_name, "wrapped_parent"),
         atom_ids=atoms,
         locant_maps=tuple(dict.fromkeys(maps)),
     )
