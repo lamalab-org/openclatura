@@ -294,6 +294,65 @@ def test_fusion_name_is_invariant_to_graph_atom_renumbering():
 
 
 @pytest.mark.parametrize(
+    ("smiles", "expected_name", "expected_signature"),
+    [
+        (
+            "O1C2=C(C=C1)C=CS2",
+            "thieno[2,3-b]furan",
+            (
+                ("1", "O", 2),
+                ("2", "C", 2),
+                ("3", "C", 2),
+                ("3a", "C", 3),
+                ("4", "C", 2),
+                ("5", "C", 2),
+                ("6", "S", 2),
+                ("6a", "C", 3),
+            ),
+        ),
+        (
+            "C1C=CC2=C1C1=CC=CC=C1C=1C=CC=CC21",
+            "1H-cyclopenta[l]phenanthrene",
+            (
+                ("1", "C", 2),
+                ("2", "C", 2),
+                ("3", "C", 2),
+                ("3a", "C", 3),
+                ("3b", "C", 3),
+                ("4", "C", 2),
+                ("5", "C", 2),
+                ("6", "C", 2),
+                ("7", "C", 2),
+                ("7a", "C", 3),
+                ("7b", "C", 3),
+                ("8", "C", 2),
+                ("9", "C", 2),
+                ("10", "C", 2),
+                ("11", "C", 2),
+                ("11a", "C", 3),
+                ("11b", "C", 3),
+            ),
+        ),
+    ],
+)
+def test_completed_system_numbering_matches_reviewed_graph_signatures(
+    smiles,
+    expected_name,
+    expected_signature,
+):
+    mol = read_smiles(smiles)
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert isinstance(result, FusionConfirmed)
+    assert result.plan.rendered_base_name == expected_name
+    actual = tuple(
+        (str(locant), mol.atoms[atom].symbol, len(mol.get_neighbors(atom)))
+        for atom, locant in result.plan.numbering.input_locant_maps[0]
+    )
+    assert actual == expected_signature
+
+
+@pytest.mark.parametrize(
     "smiles",
     (
         "O1C2=C(C=C1)C=CS2",

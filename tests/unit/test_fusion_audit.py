@@ -29,6 +29,7 @@ from openclatura.fusion.model import (
     FusionJoin,
     FusionJoinKind,
     FusionMode,
+    FusionMultiplicityGroup,
     FusionNameAst,
     FusionNumberingProof,
     FusionSide,
@@ -563,6 +564,44 @@ def test_audit_rejects_a_wrong_multiplicative_prime_depth():
 
     assert result.status is AuditStatus.MISMATCH
     assert any("prime depth" in error for error in result.errors)
+
+
+def test_audit_rejects_nonidentical_components_under_one_multiplier():
+    mol = read_smiles("O1C=CC2=NC3=C(C=C21)SC=C3")
+    planned = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+    assert isinstance(planned, FusionConfirmed)
+    plan = planned.plan
+    attached = tuple(
+        occurrence.occurrence_id
+        for occurrence in plan.ast.component_occurrences
+        if occurrence.occurrence_id not in plan.ast.parent_occurrences
+    )
+    assert len(attached) == 2
+    assert len(
+        {
+            occurrence.spec_key
+            for occurrence in plan.ast.component_occurrences
+            if occurrence.occurrence_id in attached
+        }
+    ) == 2
+    corrupted_ast = replace(
+        plan.ast,
+        plan_kind="multiplicative_tree",
+        multiplicative_groups=(FusionMultiplicityGroup(attached, "di"),),
+    )
+
+    result = audit_fusion_plan(
+        mol,
+        mol.atoms,
+        ast=corrupted_ast,
+        abstract_parent_graph=plan.abstract_parent_graph,
+        numbering=plan.numbering,
+        bond_model=plan.bond_model,
+        mode=FusionMode.GENERAL,
+    )
+
+    assert result.status is AuditStatus.MISMATCH
+    assert "multiplicative groups do not match exact sibling interface orbits" in result.errors
 
 
 def test_audit_rejects_a_non_senior_declared_parent():
