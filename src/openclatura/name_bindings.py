@@ -39,7 +39,7 @@ def refresh_parent_binding(parts: AssemblyParts) -> None:
         term=(
             parts.retained_substituent_name
             or parts.retained_name
-            or (parts.ring_parent.binding_term if parts.ring_parent is not None else None)
+            or (parts.parent_hydride.binding_term if parts.parent_hydride is not None else None)
             or _parent_term(parts)
         ),
         atom_ids=atom_ids,
@@ -448,11 +448,11 @@ def _operation_emitted_tokens(binding: NameAtomBinding) -> tuple[NameTokenBindin
 
 
 def _parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]:
-    if parts.ring_parent is not None and parts.ring_parent.is_bridged_fusion:
-        plan = parts.ring_parent.fusion_wrapper_plan
+    if parts.parent_hydride is not None and parts.parent_hydride.is_bridged_fusion:
+        plan = parts.parent_hydride.fusion_wrapper_plan
         assert plan is not None
         return _structured_parent_emitted_tokens(plan.rendered_name, plan.rendered_parts)
-    if parts.ring_parent is not None and parts.ring_parent.uses_fusion_plan:
+    if parts.parent_hydride is not None and parts.parent_hydride.uses_fusion_plan:
         return _fusion_parent_emitted_tokens(parts)
     tokens = _parent_display_tokens(parts)
     atom_ids = set(parts.parent_atom_ids)
@@ -485,7 +485,7 @@ def _parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]
 def _fusion_parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]:
     """Adapt graph ownership already emitted by the fusion renderer."""
 
-    plan = parts.ring_parent.fusion_plan
+    plan = parts.parent_hydride.fusion_plan
     assert plan is not None
 
     return _structured_parent_emitted_tokens(plan.rendered_base_name, plan.rendered_parts)
@@ -1533,8 +1533,8 @@ _EXACT_CHARGE_RENDERER_KEYS = frozenset(
 
 
 def _parent_term(parts: AssemblyParts) -> str:
-    if parts.ring_parent is not None and parts.ring_parent.binding_term is not None:
-        return parts.ring_parent.binding_term
+    if parts.parent_hydride is not None and parts.parent_hydride.binding_term is not None:
+        return parts.parent_hydride.binding_term
     if parts.is_spiro:
         return "spiro parent"
     if parts.is_bicycle:

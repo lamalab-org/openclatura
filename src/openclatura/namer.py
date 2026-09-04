@@ -1453,6 +1453,7 @@ def name_subgraph(
         retained_name_val = retained_fused.name
         locant_maps = retained_fused.locant_maps
         retained_parent_metadata = retained_fused.metadata
+    parent_hydride = parent_selection.ring_parent
     if parent_selection.is_bicycle or parent_selection.is_polycycle:
         fusion_parent = resolve_systematic_fusion_parent(
             mol,
@@ -1461,7 +1462,7 @@ def name_subgraph(
             decision_trace=decision_trace,
         )
         if fusion_parent is not None:
-            parent_selection.ring_parent = fusion_parent
+            parent_hydride = fusion_parent
     parent_plan = build_parent_assembly_plan(
         mol,
         parent_selection,
@@ -1475,6 +1476,7 @@ def name_subgraph(
         locant_maps,
         retained_name_val,
         retained_parent_metadata,
+        parent_hydride=parent_hydride,
     )
     numbered_path = parent_plan.numbered_path
     get_loc = parent_plan.get_loc
@@ -1493,8 +1495,8 @@ def name_subgraph(
                 "retained_name": retained_name_val,
                 "locant_map_source": parent_plan.locant_map_source.value,
                 "parent_nomenclature": (
-                    parent_selection.ring_parent.parent_nomenclature
-                    if parent_selection.ring_parent is not None
+                    parent_plan.parent_hydride.parent_nomenclature
+                    if parent_plan.parent_hydride is not None
                     else "legacy"
                 ),
             },
@@ -1537,10 +1539,10 @@ def name_subgraph(
                 "trace_segment_count": len(trace_segments),
                 "locant_elisions": parts.locant_elision_decisions,
                 "parent_nomenclature": (
-                    parts.ring_parent.parent_nomenclature if parts.ring_parent is not None else "legacy"
+                    parts.parent_hydride.parent_nomenclature if parts.parent_hydride is not None else "legacy"
                 ),
                 "parent_hydride_proof_source": (
-                    parts.ring_parent.proof_source if parts.ring_parent is not None else ""
+                    parts.parent_hydride.proof_source if parts.parent_hydride is not None else ""
                 ),
             },
         )

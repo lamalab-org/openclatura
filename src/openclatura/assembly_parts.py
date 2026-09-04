@@ -11,7 +11,7 @@ from .ring_parent import ParentHydrideMetadata
 from .spiro_assembly import SpiroAssembly
 
 if TYPE_CHECKING:
-    from .ring_parent import ParentHydridePlan, RingParent
+    from .ring_parent import RingParent
 
 
 @dataclass(frozen=True)
@@ -143,8 +143,7 @@ class AssemblyParts:
     retained_substituent_name: str | None = None
     retained_absorbed_substituents: list[SubstituentItem] = field(default_factory=list)
     retained_parent_metadata: RetainedParentMetadata | None = None
-    parent_hydride: ParentHydridePlan | None = None
-    ring_parent: RingParent | None = None
+    parent_hydride: RingParent | None = None
     front_modifiers: list[str] = field(default_factory=list)
     front_modifier_locants: list[str | None] = field(default_factory=list)
     front_modifier_atom_ids: set[int] = field(default_factory=set)
@@ -179,17 +178,15 @@ class AssemblyParts:
     locant_elision_decisions: list[dict] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        """Keep the historical ring-parent field as a compatibility alias."""
-
-        if self.parent_hydride is None:
-            self.parent_hydride = self.ring_parent
-        elif self.ring_parent is None:
-            self.ring_parent = self.parent_hydride
-        elif self.parent_hydride is not self.ring_parent:
-            raise ValueError("parent_hydride and ring_parent must reference the same plan")
-
+        """Project immutable parent-hydride facts into mutable assembly state."""
         if self.parent_hydride is not None:
             if self.retained_name is None:
                 self.retained_name = self.parent_hydride.retained_name
             if self.retained_parent_metadata is None:
                 self.retained_parent_metadata = self.parent_hydride.metadata
+
+    @property
+    def ring_parent(self) -> RingParent | None:
+        """Read-only compatibility view of the canonical parent hydride."""
+
+        return self.parent_hydride

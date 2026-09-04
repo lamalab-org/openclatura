@@ -555,9 +555,6 @@ def name_component(
         decision_trace=decision_trace,
         retained_proof_source=("retained_graph_template" if retained_fused is not None else "retained_template"),
     )
-    if state.parent_hydride is not None:
-        state.parent_selection.ring_parent = state.parent_hydride
-
     parent_plan = build_parent_assembly_plan(
         mol,
         state.parent_selection,
@@ -587,8 +584,8 @@ def name_component(
                 parent_plan.parent_hydride.hydride_kind.value if parent_plan.parent_hydride is not None else None
             ),
             "parent_nomenclature": (
-                state.parent_selection.ring_parent.parent_nomenclature
-                if state.parent_selection.ring_parent is not None
+                parent_plan.parent_hydride.parent_nomenclature
+                if parent_plan.parent_hydride is not None
                 else "legacy"
             ),
         },
@@ -663,7 +660,7 @@ def name_component(
             "name_rewrite_history": parts.name_rewrite_history,
             "locant_elisions": parts.locant_elision_decisions,
             "parent_nomenclature": (
-                parts.ring_parent.parent_nomenclature if parts.ring_parent is not None else "legacy"
+                parts.parent_hydride.parent_nomenclature if parts.parent_hydride is not None else "legacy"
             ),
             "parent_hydride_proof_source": (
                 parts.parent_hydride.proof_source if parts.parent_hydride is not None else ""

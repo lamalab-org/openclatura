@@ -34,7 +34,7 @@ def has_retained_like_parent(parts: AssemblyParts) -> bool:
     return bool(
         parts.retained_name
         or inferred_ionic_retained_parent(parts)
-        or (parts.ring_parent is not None and parts.ring_parent.is_fusion_parent)
+        or (parts.parent_hydride is not None and parts.parent_hydride.is_fusion_parent)
     )
 
 

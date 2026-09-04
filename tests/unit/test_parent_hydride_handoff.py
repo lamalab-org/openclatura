@@ -69,8 +69,8 @@ def test_assembly_parts_exposes_ring_parent_as_compatibility_alias():
     assert parts.retained_parent_metadata is plan.metadata
 
     other = _resolved_ring_parent("C1CCCCC1")
-    with pytest.raises(ValueError, match="same plan"):
-        AssemblyParts(parent_length=6, parent_hydride=plan, ring_parent=other)
+    with pytest.raises(AttributeError):
+        parts.ring_parent = other
 
 
 @pytest.mark.parametrize(

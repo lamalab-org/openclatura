@@ -4,11 +4,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from enum import Enum
 
-from .assembly_parts import RetainedParentMetadata
+from .assembly_parts import AssemblyParts, RetainedParentMetadata
 from .locant_sources import LocantMapSource
 from .parent_selection import ParentSelection
 from .perception import PerceivedGroup
-from .ring_parent import ParentHydridePlan, RingParent
+from .ring_parent import RingParent
 
 
 class NamingMode(str, Enum):
@@ -66,8 +66,11 @@ class ParentAssemblyPlan:
     locant_map: dict[int, str] | None
     locant_map_source: LocantMapSource
     get_loc: Callable
-    parts: object
-    parent_hydride: ParentHydridePlan | None = None
+    parts: AssemblyParts
+
+    @property
+    def parent_hydride(self) -> RingParent | None:
+        return self.parts.parent_hydride
 
     @property
     def ring_parent(self) -> RingParent | None:
@@ -92,7 +95,7 @@ class ComponentNamingState:
     retained_name: str | None = None
     locant_maps: list[dict[int, str]] | None = None
     retained_parent_metadata: RetainedParentMetadata | None = None
-    parent_hydride: ParentHydridePlan | None = None
+    parent_hydride: RingParent | None = None
     principal_involved_atoms: set[int] = field(default_factory=set)
     base_exclude: set[int] = field(default_factory=set)
     sub_exclude: set[int] = field(default_factory=set)

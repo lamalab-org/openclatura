@@ -12,7 +12,7 @@ from .namer_config import RETAINED_RING_ELEMENTS
 from .naming_context import NamingIntent, ParentAssemblyPlan
 from .numbering import choose_parent_numbering
 from .parent_selection import ParentSelection
-from .ring_parent import ParentHydrideKind, ParentHydridePlan, RingParent
+from .ring_parent import ParentHydrideKind, RingParent
 from .ring_renderer import is_von_baeyer_descriptor
 from .rules import retained
 from .small_ring_stereo import scoped_small_ring_stereo_features
@@ -277,7 +277,7 @@ def resolve_parent_hydride_plan(
     retained_parent_metadata: RetainedParentMetadata | None = None,
     decision_trace: DecisionTrace | None = None,
     retained_proof_source: str = "retained_template",
-) -> ParentHydridePlan | None:
+) -> RingParent | None:
     """Resolve one ring parent-hydride handoff without changing selection rules.
 
     Retained-parent eligibility remains with the existing retained resolvers,
@@ -336,7 +336,7 @@ def build_parent_assembly_plan(
     retained_name: str | None = None,
     retained_parent_metadata: RetainedParentMetadata | None = None,
     *,
-    parent_hydride: ParentHydridePlan | None = None,
+    parent_hydride: RingParent | None = None,
 ) -> ParentAssemblyPlan:
     """Number a selected parent and create base assembly parts."""
 
@@ -414,7 +414,6 @@ def build_parent_assembly_plan(
         locant_map_source=locant_map_source,
         get_loc=get_loc,
         parts=parts,
-        parent_hydride=parent_hydride,
     )
 
 
@@ -428,7 +427,7 @@ def build_parent_parts(
     retained_parent_metadata: RetainedParentMetadata | None = None,
     *,
     ring_parent: RingParent | None = None,
-    parent_hydride: ParentHydridePlan | None = None,
+    parent_hydride: RingParent | None = None,
     locant_map_source: LocantMapSource = LocantMapSource.GENERATED,
 ) -> AssemblyParts:
     """Create shared parent assembly parts for a naming intent."""
