@@ -452,7 +452,7 @@ def _parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]
         plan = parts.ring_parent.fusion_wrapper_plan
         assert plan is not None
         return _structured_parent_emitted_tokens(plan.rendered_name, plan.rendered_parts)
-    if parts.ring_parent is not None and parts.ring_parent.is_systematic_fusion:
+    if parts.ring_parent is not None and parts.ring_parent.uses_fusion_plan:
         return _fusion_parent_emitted_tokens(parts)
     tokens = _parent_display_tokens(parts)
     atom_ids = set(parts.parent_atom_ids)

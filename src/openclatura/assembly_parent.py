@@ -458,6 +458,7 @@ def parent_stem_and_terminal(parts: AssemblyParts) -> tuple[str, str]:
     parent_hydride = parts.parent_hydride
     if parent_hydride is not None and parent_hydride.hydride_kind in {
         ParentHydrideKind.SYSTEMATIC_FUSION,
+        ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION,
         ParentHydrideKind.BRIDGED_FUSION,
     }:
         if parts.is_substituent and parent_hydride.derivative_stem:

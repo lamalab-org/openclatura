@@ -589,9 +589,8 @@ def name_component(
                 parent_plan.parent_hydride.hydride_kind.value if parent_plan.parent_hydride is not None else None
             ),
             "parent_nomenclature": (
-                "systematic_fusion"
+                state.parent_selection.ring_parent.parent_nomenclature
                 if state.parent_selection.ring_parent is not None
-                and state.parent_selection.ring_parent.is_fusion_parent
                 else "legacy"
             ),
         },
@@ -666,8 +665,8 @@ def name_component(
             "name_rewrite_history": parts.name_rewrite_history,
             "locant_elisions": parts.locant_elision_decisions,
             "parent_nomenclature": (
-                "systematic_fusion"
-                if parts.ring_parent is not None and parts.ring_parent.is_fusion_parent
+                parts.ring_parent.parent_nomenclature
+                if parts.ring_parent is not None
                 else "legacy"
             ),
             "parent_hydride_proof_source": (

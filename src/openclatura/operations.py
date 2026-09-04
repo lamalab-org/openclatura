@@ -17,12 +17,17 @@ def infer_operations(decisions: list[TraceStep], trace_segments: list[dict]) -> 
         hydride_kind = step.data.get("parent_hydride_kind")
         if hydride_kind in {
             ParentHydrideKind.SYSTEMATIC_FUSION.value,
+            ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION.value,
             ParentHydrideKind.BRIDGED_FUSION.value,
         }:
             detail = (
                 "bridged_fusion_parent"
                 if hydride_kind == ParentHydrideKind.BRIDGED_FUSION.value
-                else "systematic_fusion_parent"
+                else (
+                    "skeletal_replacement_fusion_parent"
+                    if hydride_kind == ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION.value
+                    else "systematic_fusion_parent"
+                )
             )
             operations.append(NomenclatureOperation(OperationClass.FUSION, detail))
         elif (

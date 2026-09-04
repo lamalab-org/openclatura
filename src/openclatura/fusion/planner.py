@@ -13,7 +13,7 @@ from ..retained_graph_model import merge_parent_bond_classes
 from .audit import audit_fusion_plan
 from .config import fusion_nomenclature_config
 from .descriptor import FusionDescriptorError, build_fusion_name_ast, render_fusion_name_parts
-from .faces import FaceSearchBudgetExceeded, select_bounded_face_model
+from .faces import FaceSearchBudgetExceeded, cached_bounded_face_model
 from .layout import LayoutSearchBudgetExceeded, preferred_intrinsic_layouts
 from .model import (
     AuditStatus,
@@ -49,6 +49,10 @@ from .valence import fusion_lambda_descriptors
 
 PLANNER_TIER = fusion_nomenclature_config().rules.planner_tier
 SUPPORT = fusion_nomenclature_config().rules.support
+
+# Preserve the planner-level test/extension seam while sharing face proofs
+# between ordinary and P-25.5 planning.
+select_bounded_face_model = cached_bounded_face_model
 
 
 def plan_fusion_parent(

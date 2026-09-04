@@ -78,6 +78,12 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "WrapperParentPlan": (".wrappers", "WrapperParentPlan"),
     "plan_bridged_fusion_wrapper": (".wrappers", "plan_bridged_fusion_wrapper"),
     "plan_fusion_spiro_side": (".wrappers", "plan_fusion_spiro_side"),
+    "ThirdComponentFusionPlan": (".third_component", "ThirdComponentFusionPlan"),
+    "plan_third_component_fusion_parent": (
+        ".third_component",
+        "plan_third_component_fusion_parent",
+    ),
+    "THIRD_COMPONENT_TIER": (".third_component", "THIRD_COMPONENT_TIER"),
 }
 
 __all__ = sorted(_EXPORTS)

@@ -268,6 +268,38 @@ def select_bounded_face_model(
     return best[0] if len(distinct) == 1 else None
 
 
+def cached_bounded_face_model(
+    mol: Molecule,
+    atom_ids: Iterable[int],
+    *,
+    min_ring_size: int = _CONFIG.search.minimum_ring_size,
+    max_ring_size: int = _CONFIG.search.maximum_ring_size,
+    cycle_search_budget: int = _CONFIG.search.cycle_states,
+    model_search_budget: int = _CONFIG.search.face_model_states,
+) -> BoundedFaceModel | None:
+    """Reuse one immutable face proof across fusion naming alternatives."""
+
+    atoms = frozenset(atom_ids)
+    cache_key = (
+        "bounded_face_model",
+        tuple(sorted(atoms)),
+        min_ring_size,
+        max_ring_size,
+        cycle_search_budget,
+        model_search_budget,
+    )
+    if cache_key not in mol._fusion_plan_cache:
+        mol._fusion_plan_cache[cache_key] = select_bounded_face_model(
+            mol,
+            atoms,
+            min_ring_size=min_ring_size,
+            max_ring_size=max_ring_size,
+            cycle_search_budget=cycle_search_budget,
+            model_search_budget=model_search_budget,
+        )
+    return mol._fusion_plan_cache[cache_key]
+
+
 def _independent_face_sets(
     cycles: tuple[GraphCycle, ...],
     graph_edges: frozenset[Edge],

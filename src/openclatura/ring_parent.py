@@ -27,6 +27,7 @@ class ParentHydrideKind(str, Enum):
     GENERATED_MONOCYCLE = "generated_monocycle"
     RETAINED = "retained"
     SYSTEMATIC_FUSION = "systematic_fusion"
+    SKELETAL_REPLACEMENT_FUSION = "skeletal_replacement_fusion"
     BRIDGED_FUSION = "bridged_fusion"
     VON_BAEYER = "von_baeyer"
     SPIRO = "spiro"
@@ -65,6 +66,8 @@ class RingParent:
     hydride_metadata: ParentHydrideMetadata | None = None
     parent_bond_model: ParentBondModel | None = None
     pin_status: str = "unknown"
+    skeletal_replacement_atom_ids: tuple[int, ...] = ()
+    skeletal_replacement_audit_checks: tuple[str, ...] = ()
 
     @property
     def hydride_kind(self) -> ParentHydrideKind:
@@ -109,6 +112,17 @@ class RingParent:
             return self.fusion_wrapper_plan is not None and self.fusion_wrapper_plan.audit_ok
         if self.kind == "systematic_fusion":
             return self.fusion_plan is not None and self.fusion_plan.audit.confirmed
+        if self.is_skeletal_replacement_fusion:
+            return (
+                bool(self.skeletal_replacement_atom_ids)
+                and set(self.skeletal_replacement_atom_ids) <= set(self.atoms)
+                and bool(self.skeletal_replacement_audit_checks)
+                and all(
+                    set(locant_map) == set(self.atoms)
+                    and len(set(locant_map.values())) == len(self.atoms)
+                    for locant_map in self.retained_locant_maps
+                )
+            )
         if self.retained_locant_maps:
             return all(
                 set(locant_map) == set(self.atoms) and len(set(locant_map.values())) == len(self.atoms)
@@ -123,6 +137,22 @@ class RingParent:
         return self.kind == "systematic_fusion" and self.fusion_plan is not None
 
     @property
+    def uses_fusion_plan(self) -> bool:
+        """Whether an audited fusion AST supplies the underlying carbon parent."""
+
+        return self.fusion_plan is not None and self.kind in {
+            "systematic_fusion",
+            "skeletal_replacement_fusion",
+        }
+
+    @property
+    def is_skeletal_replacement_fusion(self) -> bool:
+        return (
+            self.kind == "skeletal_replacement_fusion"
+            and self.hydride_kind is ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION
+        )
+
+    @property
     def is_bridged_fusion(self) -> bool:
         return self.kind == "bridged_fusion" and self.fusion_wrapper_plan is not None
 
@@ -130,7 +160,19 @@ class RingParent:
     def is_fusion_parent(self) -> bool:
         """Whether fusion nomenclature supplied the complete parent hydride."""
 
-        return self.is_systematic_fusion or self.is_bridged_fusion
+        return self.uses_fusion_plan or self.is_skeletal_replacement_fusion or self.is_bridged_fusion
+
+    @property
+    def parent_nomenclature(self) -> str:
+        """Stable trace/API label for the selected parent naming system."""
+
+        if self.hydride_kind in {
+            ParentHydrideKind.SYSTEMATIC_FUSION,
+            ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION,
+            ParentHydrideKind.BRIDGED_FUSION,
+        }:
+            return self.hydride_kind.value
+        return "legacy"
 
     @property
     def absorbs_skeletal_replacement(self) -> bool:
@@ -146,7 +188,7 @@ class RingParent:
     def base_name(self) -> str | None:
         if self.parent_name is not None:
             return self.parent_name
-        if self.is_systematic_fusion:
+        if self.uses_fusion_plan:
             return self.fusion_plan.rendered_base_name
         if self.is_bridged_fusion:
             return self.fusion_wrapper_plan.rendered_name
@@ -166,6 +208,7 @@ class RingParent:
         if self.hydride_kind in {
             ParentHydrideKind.RETAINED,
             ParentHydrideKind.SYSTEMATIC_FUSION,
+            ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION,
             ParentHydrideKind.BRIDGED_FUSION,
         }:
             return self.base_name
@@ -187,6 +230,7 @@ class RingParent:
 
         if self.hydride_kind in {
             ParentHydrideKind.SYSTEMATIC_FUSION,
+            ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION,
             ParentHydrideKind.BRIDGED_FUSION,
             ParentHydrideKind.RETAINED,
         }:
@@ -207,11 +251,11 @@ class RingParent:
     def bond_model(self) -> ParentBondModel | None:
         if self.parent_bond_model is not None:
             return self.parent_bond_model
-        return self.fusion_plan.bond_model if self.is_systematic_fusion else None
+        return self.fusion_plan.bond_model if self.uses_fusion_plan else None
 
     @property
     def proof_locant_maps(self) -> tuple[dict[int, str], ...]:
-        if self.is_systematic_fusion:
+        if self.uses_fusion_plan:
             return self.fusion_plan.numbering.string_input_locant_maps()
         if self.is_bridged_fusion:
             return tuple(dict(entries) for entries in self.fusion_wrapper_plan.parent.locant_maps)
@@ -240,6 +284,7 @@ class RingParent:
         return self.hydride_kind in {
             ParentHydrideKind.RETAINED,
             ParentHydrideKind.SYSTEMATIC_FUSION,
+            ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION,
             ParentHydrideKind.BRIDGED_FUSION,
         }
 
@@ -250,6 +295,7 @@ class RingParent:
         return self.hydride_kind in {
             ParentHydrideKind.RETAINED,
             ParentHydrideKind.SYSTEMATIC_FUSION,
+            ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION,
             ParentHydrideKind.BRIDGED_FUSION,
         } or is_von_baeyer_descriptor(self.descriptor)
 
@@ -305,6 +351,34 @@ class RingParent:
             ),
             parent_bond_model=plan.bond_model,
             pin_status=str(plan.pin_status),
+        )
+
+    def as_skeletal_replacement_fusion(
+        self,
+        *,
+        replacement_atom_ids: tuple[int, ...],
+        audit_checks: tuple[str, ...],
+    ) -> RingParent:
+        """Use this carbon parent as a P-25.5.1 replacement parent.
+
+        The parent name and proof numbering remain those of the corresponding
+        hydrocarbon. The ordinary replacement-prefix operation then restores
+        the original skeletal elements at those proven locants.
+        """
+
+        if not self.audit_ok:
+            raise ValueError("Skeletal replacement requires an audited carbon parent.")
+        if not replacement_atom_ids or not audit_checks:
+            raise ValueError("Skeletal replacement requires atoms and audit evidence.")
+        if not set(replacement_atom_ids) <= set(self.atoms):
+            raise ValueError("Skeletal replacement atoms must belong to the parent.")
+        return replace(
+            self,
+            kind="skeletal_replacement_fusion",
+            parent_hydride_kind=ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION,
+            proof_source="p25_5_skeletal_replacement",
+            skeletal_replacement_atom_ids=replacement_atom_ids,
+            skeletal_replacement_audit_checks=audit_checks,
         )
 
     @classmethod

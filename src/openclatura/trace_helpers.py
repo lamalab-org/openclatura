@@ -197,7 +197,7 @@ def multiplied_name_terms(name: str, count: int) -> list[str]:
 def assembly_parent_terms(parts: AssemblyParts) -> list[str]:
     """Return parent-name terms from the actual assembly configuration."""
 
-    if parts.ring_parent is not None and parts.ring_parent.is_systematic_fusion:
+    if parts.ring_parent is not None and parts.ring_parent.uses_fusion_plan:
         parent_name = parts.ring_parent.base_name or ""
         return [parent_name, parts.ring_parent.derivative_stem or parent_name]
     if parts.retained_name:
@@ -547,8 +547,8 @@ def _parent_tree_node(parts: AssemblyParts) -> dict:
         "kind": "parent",
         "retained_name": parts.retained_name,
         "parent_nomenclature": (
-            "systematic_fusion"
-            if parts.ring_parent is not None and parts.ring_parent.is_systematic_fusion
+            parts.ring_parent.parent_nomenclature
+            if parts.ring_parent is not None
             else "legacy"
         ),
         "parent_hydride_name": (

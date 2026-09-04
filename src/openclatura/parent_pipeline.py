@@ -176,6 +176,52 @@ def resolve_bridged_fusion_parent(
     return RingParent.from_fusion_wrapper(plan)
 
 
+def resolve_third_component_fusion_parent(
+    mol: Molecule,
+    selection: ParentSelection,
+    *,
+    decision_trace: DecisionTrace | None = None,
+) -> RingParent | None:
+    """Apply P-25.5.1 after an ordinary cyclic fusion citation is prohibited."""
+
+    mode = current_fusion_mode()
+    if mode not in {FusionMode.AUDITED_PIN, FusionMode.GENERAL}:
+        return None
+    from .fusion.third_component import (
+        THIRD_COMPONENT_TIER,
+        plan_third_component_fusion_parent,
+    )
+
+    plan = plan_third_component_fusion_parent(mol, selection.atom_set, mode=mode)
+    if plan is None:
+        return None
+    parent = plan.parent
+    trace_decision(
+        decision_trace,
+        TracePhase.PARENT_SELECTION,
+        "selected skeletal-replacement fusion parent",
+        "A cyclic component cover cannot be emitted as an ordinary pairwise fusion name; the corresponding audited carbon parent is used under P-25.5.1.",
+        atoms=selection.atom_set,
+        bonds=bond_ids_within(mol, selection.atom_set),
+        data={
+            "fusion_mode": mode.value,
+            "parent_nomenclature": "skeletal_replacement_fusion",
+            "base_name": parent.base_name,
+            "pin_status": parent.pin_status,
+            "fusion_support_tier": THIRD_COMPONENT_TIER,
+            "proof_source": parent.proof_source,
+            "cover_topology": plan.cover_topology,
+            "ring_sizes": list(plan.ring_sizes),
+            "replacement_atoms": list(plan.replacement_atom_ids),
+            "prohibited_cycle_closing_joins": list(
+                plan.prohibited_citation.citation_plan.cycle_closing_join_indices
+            ),
+            "audit_checks": list(plan.audit_checks),
+        },
+    )
+    return parent
+
+
 def resolve_retained_parent(
     mol: Molecule, path: list[int], is_ring: bool, is_bicycle: bool, is_polycycle: bool
 ) -> tuple[str | None, list[dict[int, str]] | None]:
@@ -228,13 +274,6 @@ def resolve_parent_hydride_plan(
         )
 
     if selection.is_bicycle or selection.is_polycycle:
-        bridged_parent = resolve_bridged_fusion_parent(
-            mol,
-            selection,
-            decision_trace=decision_trace,
-        )
-        if bridged_parent is not None:
-            return bridged_parent
         fusion_parent = resolve_systematic_fusion_parent(
             mol,
             selection,
@@ -243,6 +282,20 @@ def resolve_parent_hydride_plan(
         )
         if fusion_parent is not None:
             return fusion_parent
+        third_component_parent = resolve_third_component_fusion_parent(
+            mol,
+            selection,
+            decision_trace=decision_trace,
+        )
+        if third_component_parent is not None:
+            return third_component_parent
+        bridged_parent = resolve_bridged_fusion_parent(
+            mol,
+            selection,
+            decision_trace=decision_trace,
+        )
+        if bridged_parent is not None:
+            return bridged_parent
     return parent
 
 
@@ -282,7 +335,11 @@ def build_parent_assembly_plan(
             locant_maps = list(proof_maps)
     if parent_hydride is not None and (
         parent_hydride.hydride_kind
-        in {ParentHydrideKind.SYSTEMATIC_FUSION, ParentHydrideKind.BRIDGED_FUSION}
+        in {
+            ParentHydrideKind.SYSTEMATIC_FUSION,
+            ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION,
+            ParentHydrideKind.BRIDGED_FUSION,
+        }
         or is_von_baeyer_descriptor(parent_hydride.descriptor)
     ):
         locant_map_source = LocantMapSource.PROOF

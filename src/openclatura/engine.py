@@ -531,7 +531,7 @@ def _fusion_result_metadata(decisions) -> dict[str, str | None]:
             item
             for item in decisions
             if item.phase == TracePhase.PARENT_SELECTION
-            and item.decision == "selected audited systematic fusion parent"
+            and item.data.get("parent_nomenclature")
         ),
         None,
     )

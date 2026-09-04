@@ -1493,9 +1493,8 @@ def name_subgraph(
                 "retained_name": retained_name_val,
                 "locant_map_source": parent_plan.locant_map_source.value,
                 "parent_nomenclature": (
-                    "systematic_fusion"
+                    parent_selection.ring_parent.parent_nomenclature
                     if parent_selection.ring_parent is not None
-                    and parent_selection.ring_parent.is_fusion_parent
                     else "legacy"
                 ),
             },
@@ -1538,8 +1537,8 @@ def name_subgraph(
                 "trace_segment_count": len(trace_segments),
                 "locant_elisions": parts.locant_elision_decisions,
                 "parent_nomenclature": (
-                    "systematic_fusion"
-                    if parts.ring_parent is not None and parts.ring_parent.is_fusion_parent
+                    parts.ring_parent.parent_nomenclature
+                    if parts.ring_parent is not None
                     else "legacy"
                 ),
                 "parent_hydride_proof_source": (
