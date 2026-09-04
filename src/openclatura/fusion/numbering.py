@@ -337,10 +337,13 @@ def parent_bond_model(
         sites = {atom.id: atom for atom in parent.atoms}
         edges = tuple(sorted(normalize_edge(*bond.atoms) for bond in parent.bonds))
         bond_classes = {normalize_edge(*bond.atoms): bond.bond_class for bond in parent.bonds}
+        required_double = frozenset(edge for edge in edges if bond_classes[edge] == "double")
+        occupied = frozenset(atom for edge in required_double for atom in edge)
         eligible = frozenset(
             edge
             for edge in edges
-            if bond_classes[edge] in {"aromatic", "mancude", "fusion", "double"}
+            if bond_classes[edge] in {"aromatic", "mancude", "fusion"}
+            and not occupied.intersection(edge)
             and all(sites[atom].pi_capacity and not sites[atom].forced_single for atom in edge)
         )
     else:
@@ -358,16 +361,20 @@ def parent_bond_model(
             if not parent.atoms[edge[0]].element.mancude_forced_single
             and not parent.atoms[edge[1]].element.mancude_forced_single
         )
-    required = frozenset(edges) - eligible
+        required_double = frozenset()
+    required = frozenset(edges) - eligible - required_double
     matchings = _maximum_matchings(eligible, search_budget=search_budget)
     assignments = tuple(
-        BondAssignment(tuple((edge, 2 if edge in matching else 1) for edge in edges)) for matching in matchings
+        BondAssignment(tuple((edge, 2 if edge in matching or edge in required_double else 1) for edge in edges))
+        for matching in matchings
     )
     return ParentBondModel(
         allowed_kekule_assignments=assignments,
         required_single_bonds=required,
         pi_eligible_edges=eligible,
-        maximum_non_cumulative_double_bonds=max((len(matching) for matching in matchings), default=0),
+        maximum_non_cumulative_double_bonds=len(required_double)
+        + max((len(matching) for matching in matchings), default=0),
+        required_double_bonds=required_double,
     )
 
 
@@ -377,7 +384,8 @@ def observed_parent_matches_bond_model(mol: Molecule, model: ParentBondModel) ->
     observed = {
         normalize_edge(bond.u, bond.v): bond.order
         for bond in mol.bonds.values()
-        if normalize_edge(bond.u, bond.v) in model.required_single_bonds | model.pi_eligible_edges
+        if normalize_edge(bond.u, bond.v)
+        in model.required_single_bonds | model.required_double_bonds | model.pi_eligible_edges
     }
     return any(dict(assignment.orders) == observed for assignment in model.allowed_kekule_assignments)
 

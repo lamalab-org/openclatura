@@ -743,21 +743,27 @@ class ParentBondModel:
     required_single_bonds: frozenset[tuple[int, int]]
     pi_eligible_edges: frozenset[tuple[int, int]]
     maximum_non_cumulative_double_bonds: int
+    required_double_bonds: frozenset[tuple[int, int]] = frozenset()
 
     def __post_init__(self) -> None:
         if self.maximum_non_cumulative_double_bonds < 0:
             raise ValueError("maximum non-cumulative double-bond count must be non-negative")
         required = _validate_edges(self.required_single_bonds, "required single bonds")
+        required_double = _validate_edges(self.required_double_bonds, "required double bonds")
         eligible = _validate_edges(self.pi_eligible_edges, "pi-eligible edges")
-        if required & eligible:
-            raise ValueError("required-single and pi-eligible edges must be disjoint")
-        known_edges = required | eligible
+        if required & eligible or required & required_double or eligible & required_double:
+            raise ValueError("required-single, required-double, and pi-eligible edges must be disjoint")
+        if len({atom for edge in required_double for atom in edge}) != 2 * len(required_double):
+            raise ValueError("required-double bonds must be non-cumulative")
+        known_edges = required | required_double | eligible
         for assignment in self.allowed_kekule_assignments:
             assignment_edges = {frozenset(edge) for edge, _ in assignment.orders}
             if assignment_edges != known_edges:
                 raise ValueError("each Kekule assignment must cover every parent bond exactly once")
             if any(order != 1 for edge, order in assignment.orders if frozenset(edge) in required):
                 raise ValueError("required-single bonds must have order one in every assignment")
+            if any(order != 2 for edge, order in assignment.orders if frozenset(edge) in required_double):
+                raise ValueError("required-double bonds must have order two in every assignment")
             double_count = sum(order == 2 for _, order in assignment.orders)
             if double_count > self.maximum_non_cumulative_double_bonds:
                 raise ValueError("Kekule assignment exceeds the declared double-bond maximum")

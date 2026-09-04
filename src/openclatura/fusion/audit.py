@@ -836,7 +836,10 @@ def _audit_bond_model(
     errors: list[str],
 ) -> None:
     abstract_edges = frozenset(normalize_edge(*bond.atoms) for bond in abstract.bonds)
-    known_edges = frozenset(normalize_edge(*edge) for edge in model.required_single_bonds | model.pi_eligible_edges)
+    known_edges = frozenset(
+        normalize_edge(*edge)
+        for edge in model.required_single_bonds | model.required_double_bonds | model.pi_eligible_edges
+    )
     if known_edges != abstract_edges:
         errors.append("parent bond model does not cover every and only abstract parent edge")
         return
@@ -855,6 +858,8 @@ def _audit_bond_model(
             errors.append("parent bond assignment contains cumulative double bonds")
         if any(orders[edge] != 1 for edge in model.required_single_bonds):
             errors.append("parent bond assignment violates a required-single edge")
+        if any(orders[edge] != 2 for edge in model.required_double_bonds):
+            errors.append("parent bond assignment violates a required-double edge")
     if maximum != model.maximum_non_cumulative_double_bonds:
         errors.append("parent bond model double-bond maximum is inconsistent with its assignments")
     if not model.allowed_kekule_assignments:
