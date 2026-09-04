@@ -69,6 +69,7 @@ def intrinsic_fused_layouts(
         return ()
     budget = _Budget(search_budget)
     completed: dict[tuple, FusedLayout] = {}
+    best_distortion: list[int | None] = [None]
 
     coordinate_systems = set.intersection(
         *(set(shape.coordinate_system for shape in _SHAPES_BY_SIZE[face.size]) for face in model.faces)
@@ -81,6 +82,8 @@ def intrinsic_fused_layouts(
     for coordinate_system in sorted(coordinate_systems):
         for root in sorted(model.faces, key=lambda face: (face.size, face.id)):
             for shape in _shapes_for(root.size, coordinate_system):
+                if best_distortion[0] is not None and shape.distortion_rank > best_distortion[0]:
+                    continue
                 for offset in range(root.size):
                     for reverse in (False, True):
                         budget.spend()
@@ -96,6 +99,7 @@ def intrinsic_fused_layouts(
                             completed,
                             max_layouts,
                             coordinate_system,
+                            best_distortion,
                         )
     return tuple(sorted(completed.values(), key=_layout_sort_key))
 
@@ -150,9 +154,16 @@ def _search_layouts(
     completed: dict[tuple, FusedLayout],
     max_layouts: int,
     coordinate_system: str,
+    best_distortion: list[int | None],
 ) -> None:
+    current_distortion = sum(shape.distortion_rank for shape in placed_shapes.values())
+    if best_distortion[0] is not None and current_distortion > best_distortion[0]:
+        return
     if len(placed_orders) == len(model.faces):
         if _audit_layout(model, placed_orders, atom_positions):
+            if best_distortion[0] is None or current_distortion < best_distortion[0]:
+                best_distortion[0] = current_distortion
+                completed.clear()
             for layout in _materialize_layouts(
                 placed_orders,
                 placed_shapes,
@@ -186,6 +197,11 @@ def _search_layouts(
     for endpoints in (shared_endpoints, tuple(reversed(shared_endpoints))):
         for order in _orders_starting_with_edge(face.atom_cycle, endpoints):
             for shape in _shapes_for(face.size, coordinate_system):
+                if (
+                    best_distortion[0] is not None
+                    and current_distortion + shape.distortion_rank > best_distortion[0]
+                ):
+                    continue
                 budget.spend()
                 candidate = _place_shape(
                     shape,
@@ -221,6 +237,7 @@ def _search_layouts(
                     completed,
                     max_layouts,
                     coordinate_system,
+                    best_distortion,
                 )
 
 

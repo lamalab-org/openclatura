@@ -16,7 +16,8 @@ from openclatura.fusion import (
 from openclatura.fusion.cover import FusionInterface
 from openclatura.fusion.descriptor import classify_ordered_fusion_interface
 from openclatura.fusion.faces import GraphCycle
-from openclatura.fusion.model import FusionComponentMatch, FusionDescriptor, FusionJoinKind
+from openclatura.fusion.model import FusionComponentMatch, FusionConfirmed, FusionDescriptor, FusionJoinKind, FusionMode
+from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.fusion.registry import FusionComponentRegistry, fusion_component_registry
 from openclatura.molecule import Molecule
 from openclatura.naming_data import load_json_table
@@ -338,6 +339,25 @@ def test_long_component_tree_uses_a_central_parent_location_and_is_atom_order_in
         return result
 
     assert maximum_depth(first_ast) == maximum_depth(second_ast) == 5
+
+
+def test_long_five_membered_ring_chain_completes_the_bounded_layout_proof():
+    components = ("furan",) * 8
+    joins = tuple(
+        pair
+        for occurrence in range(7)
+        for pair in (
+            ((occurrence, "4"), (occurrence + 1, "2")),
+            ((occurrence, "5"), (occurrence + 1, "3")),
+        )
+    )
+    mol, _faces = _component_graph(components, joins)
+
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert isinstance(result, FusionConfirmed)
+    assert len(result.plan.ast.component_occurrences) == 8
+    assert result.plan.audit.confirmed
 
 
 def test_second_order_pairwise_component_keeps_ordinary_fusion_descriptor():
