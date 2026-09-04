@@ -1302,6 +1302,9 @@ def _atom_template(data: dict[str, Any]) -> RetainedGraphAtomTemplate:
         default_h=bool(data.get("default_h", False)),
         saturated=bool(data.get("saturated", False)),
         interior=bool(data.get("interior", False)),
+        pi_capacity=(int(data["pi_capacity"]) if data.get("pi_capacity") is not None else None),
+        forced_single=bool(data.get("forced_single", False)),
+        indicated_h_site=bool(data.get("indicated_h_site", False)),
     )
 
 

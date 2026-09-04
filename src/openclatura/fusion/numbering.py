@@ -14,7 +14,16 @@ from ..molecule import Molecule
 from ..polycycle_topology import normalize_edge
 from .config import fusion_nomenclature_config
 from .faces import BoundedFaceModel
-from .model import BondAssignment, Face, FaceModel, FusedLayout, ParentBondModel, RejectedNumbering, SystemLocant
+from .model import (
+    BondAssignment,
+    Face,
+    FaceModel,
+    FusedLayout,
+    FusionGraph,
+    ParentBondModel,
+    RejectedNumbering,
+    SystemLocant,
+)
 from .rules import GENERAL_HETEROATOM_COUNT_PRECEDENCE
 
 
@@ -317,23 +326,39 @@ def _numbering_key(numbering: CompletedNumbering) -> tuple[tuple[int, str], ...]
 
 
 def parent_bond_model(
-    mol: Molecule,
-    atom_ids: Iterable[int],
+    parent: FusionGraph | Molecule,
+    atom_ids: Iterable[int] | None = None,
     *,
     search_budget: int = _CONFIG.search.mancude_states,
 ) -> ParentBondModel:
     """Build all maximum non-cumulative Kekule assignments for a parent graph."""
 
-    atoms = frozenset(atom_ids)
-    edges = tuple(
-        sorted(normalize_edge(bond.u, bond.v) for bond in mol.bonds.values() if bond.u in atoms and bond.v in atoms)
-    )
-    required = frozenset(
-        edge
-        for edge in edges
-        if mol.atoms[edge[0]].element.mancude_forced_single or mol.atoms[edge[1]].element.mancude_forced_single
-    )
-    eligible = frozenset(edges) - required
+    if isinstance(parent, FusionGraph):
+        sites = {atom.id: atom for atom in parent.atoms}
+        edges = tuple(sorted(normalize_edge(*bond.atoms) for bond in parent.bonds))
+        bond_classes = {normalize_edge(*bond.atoms): bond.bond_class for bond in parent.bonds}
+        eligible = frozenset(
+            edge
+            for edge in edges
+            if bond_classes[edge] in {"aromatic", "mancude", "fusion", "double"}
+            and all(sites[atom].pi_capacity and not sites[atom].forced_single for atom in edge)
+        )
+    else:
+        if atom_ids is None:
+            raise TypeError("atom_ids are required for the Molecule compatibility path")
+        atoms = frozenset(atom_ids)
+        edges = tuple(
+            sorted(
+                normalize_edge(bond.u, bond.v) for bond in parent.bonds.values() if bond.u in atoms and bond.v in atoms
+            )
+        )
+        eligible = frozenset(
+            edge
+            for edge in edges
+            if not parent.atoms[edge[0]].element.mancude_forced_single
+            and not parent.atoms[edge[1]].element.mancude_forced_single
+        )
+    required = frozenset(edges) - eligible
     matchings = _maximum_matchings(eligible, search_budget=search_budget)
     assignments = tuple(
         BondAssignment(tuple((edge, 2 if edge in matching else 1) for edge in edges)) for matching in matchings

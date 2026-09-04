@@ -226,7 +226,7 @@ def test_generated_carbocycles_use_shared_numbered_graph_templates():
     assert component.spec.template.family == "generated_monocycle"
     assert component.spec.locants == ("1", "2", "3", "4", "5")
     assert len(component.spec.atoms) == len(component.spec.bonds) == 5
-    assert {bond.bond_class for bond in component.spec.bonds} == {"aromatic"}
+    assert {bond.bond_class for bond in component.spec.bonds} == {"mancude"}
 
 
 def test_unlisted_hw_monocycle_is_derived_as_a_systematic_component():

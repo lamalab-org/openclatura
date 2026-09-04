@@ -3,7 +3,7 @@ from rdkit import Chem
 
 from openclatura.fusion.faces import select_bounded_face_model
 from openclatura.fusion.layout import preferred_intrinsic_layouts
-from openclatura.fusion.model import FusionConfirmed, FusionMode
+from openclatura.fusion.model import FusionConfirmed, FusionGraph, FusionGraphAtom, FusionGraphBond, FusionMode
 from openclatura.fusion.numbering import (
     MancudeSearchBudgetExceeded,
     completed_system_numbering_selection,
@@ -59,6 +59,27 @@ def test_parent_bond_model_accepts_input_kekule_assignment():
 
     assert model.maximum_non_cumulative_double_bonds == 5
     assert observed_parent_matches_bond_model(mol, model)
+
+
+def test_parent_bond_model_uses_merged_graph_site_constraints():
+    graph = FusionGraph(
+        atoms=(
+            FusionGraphAtom(0, "N", pi_capacity=0, indicated_h_site=True),
+            FusionGraphAtom(1, "C"),
+            FusionGraphAtom(2, "C"),
+        ),
+        bonds=(
+            FusionGraphBond((0, 1)),
+            FusionGraphBond((1, 2)),
+            FusionGraphBond((2, 0)),
+        ),
+    )
+
+    model = parent_bond_model(graph)
+
+    assert model.pi_eligible_edges == frozenset({(1, 2)})
+    assert model.required_single_bonds == frozenset({(0, 1), (0, 2)})
+    assert model.maximum_non_cumulative_double_bonds == 1
 
 
 def test_completed_numbering_is_invariant_to_input_atom_order():

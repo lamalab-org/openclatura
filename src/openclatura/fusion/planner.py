@@ -148,7 +148,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
             (str(exc),),
         )
     try:
-        bond_model = parent_bond_model(mol, atoms)
+        bond_model = parent_bond_model(graph)
     except MancudeSearchBudgetExceeded as exc:
         return FusionUnsupported("mancude assignment search budget exhausted", (str(exc),))
     indicated_h = _cited_indicated_hydrogens(mol, ast, registry, numbering, bond_model)
@@ -330,13 +330,35 @@ def _typed_face_model(mol: Molecule, bounded) -> FaceModel:
 
 
 def _abstract_graph(ast, registry) -> FusionGraph:
-    labels: dict[int, tuple[str, int]] = {}
+    labels: dict[int, FusionGraphAtom] = {}
     edges: dict[tuple[int, int], str] = {}
     for match in ast.component_occurrences:
         spec = registry.spec_for_match(match)
         local_map = match.input_atom_by_locant
         for atom in spec.atoms:
-            labels[local_map[atom.locant]] = (atom.symbol, atom.charge)
+            input_atom = local_map[atom.locant]
+            site = FusionGraphAtom(
+                input_atom,
+                atom.symbol,
+                atom.charge,
+                pi_capacity=atom.resolved_pi_capacity,
+                forced_single=atom.forced_single,
+                indicated_h_site=atom.indicated_h_site or atom.default_h,
+                saturated=atom.saturated,
+            )
+            previous_site = labels.setdefault(input_atom, site)
+            if previous_site.symbol != site.symbol or previous_site.formal_charge != site.formal_charge:
+                raise ValueError("component atom identities disagree at a shared fusion site")
+            if previous_site != site:
+                labels[input_atom] = FusionGraphAtom(
+                    input_atom,
+                    site.symbol,
+                    site.formal_charge,
+                    pi_capacity=min(previous_site.pi_capacity, site.pi_capacity),
+                    forced_single=previous_site.forced_single or site.forced_single,
+                    indicated_h_site=previous_site.indicated_h_site or site.indicated_h_site,
+                    saturated=previous_site.saturated or site.saturated,
+                )
         for bond in spec.bonds:
             left, right = (local_map[locant] for locant in bond.locants)
             edge = (left, right) if left < right else (right, left)
@@ -346,6 +368,6 @@ def _abstract_graph(ast, registry) -> FusionGraph:
                 raise ValueError("component bond classes disagree on a shared fusion edge")
             edges[edge] = merged
     return FusionGraph(
-        atoms=tuple(FusionGraphAtom(atom, *labels[atom]) for atom in sorted(labels)),
+        atoms=tuple(labels[atom] for atom in sorted(labels)),
         bonds=tuple(FusionGraphBond(edge, edges[edge]) for edge in sorted(edges)),
     )

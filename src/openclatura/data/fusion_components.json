@@ -45,9 +45,9 @@
     {"ring_size": 8, "id": "octagon", "vertices": [[0, 0], [4, 0], [7, 2], [8, 5], [7, 8], [4, 10], [0, 10], [-2, 5]], "edge_directions": [0, 1, 2, 3, 4, 5, 6, 7], "horizontal_axis_class": "edge"}
   ],
   "generated_components": [
-    {"key": "cyclopentadiene", "generator": "monocyclic_carbocycle", "ring_size": 5, "bond_class": "aromatic", "pin_component": true},
-    {"key": "cycloheptatriene", "generator": "monocyclic_carbocycle", "ring_size": 7, "bond_class": "aromatic", "pin_component": true},
-    {"key": "cyclooctatetraene", "generator": "monocyclic_carbocycle", "ring_size": 8, "bond_class": "aromatic", "pin_component": true}
+    {"key": "cyclopentadiene", "generator": "monocyclic_carbocycle", "ring_size": 5, "bond_class": "mancude", "pin_component": true},
+    {"key": "cycloheptatriene", "generator": "monocyclic_carbocycle", "ring_size": 7, "bond_class": "mancude", "pin_component": true},
+    {"key": "cyclooctatetraene", "generator": "monocyclic_carbocycle", "ring_size": 8, "bond_class": "mancude", "pin_component": true}
   ],
   "systematic_component_generators": [
     {

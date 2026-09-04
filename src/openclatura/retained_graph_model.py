@@ -21,10 +21,27 @@ class RetainedGraphAtomTemplate:
     default_h: bool = False
     saturated: bool = False
     interior: bool = False
+    pi_capacity: int | None = None
+    forced_single: bool = False
+    indicated_h_site: bool = False
 
     def __post_init__(self) -> None:
         if not self.locant or not self.symbol:
             raise ValueError("template atom locant and symbol must not be empty")
+        if self.pi_capacity is not None and self.pi_capacity not in {0, 1}:
+            raise ValueError("template atom pi_capacity must be zero or one")
+
+    @property
+    def resolved_pi_capacity(self) -> int:
+        """Return template-local pi capacity, falling back to element policy."""
+
+        if self.saturated or self.forced_single:
+            return 0
+        if self.pi_capacity is not None:
+            return self.pi_capacity
+        from .rules.elements import MANCUDE_FORCED_SINGLE_SYMBOLS
+
+        return int(self.symbol not in MANCUDE_FORCED_SINGLE_SYMBOLS)
 
 
 @dataclass(frozen=True, slots=True)

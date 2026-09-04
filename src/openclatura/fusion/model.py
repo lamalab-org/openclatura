@@ -673,10 +673,18 @@ class FusionGraphAtom:
     id: int
     symbol: str
     formal_charge: int = 0
+    pi_capacity: int = 1
+    forced_single: bool = False
+    indicated_h_site: bool = False
+    saturated: bool = False
 
     def __post_init__(self) -> None:
         _require_nonnegative(self.id, "fusion graph atom id")
         _require_nonempty(self.symbol, "fusion graph atom symbol")
+        if self.pi_capacity not in {0, 1}:
+            raise ValueError("fusion graph atom pi_capacity must be zero or one")
+        if self.saturated and self.pi_capacity:
+            raise ValueError("saturated fusion graph atoms cannot have pi capacity")
 
 
 @dataclass(frozen=True, slots=True)
