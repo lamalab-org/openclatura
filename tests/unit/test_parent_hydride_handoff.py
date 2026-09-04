@@ -57,6 +57,7 @@ def test_generated_and_von_baeyer_parents_use_the_same_handoff_type():
     assert monocycle.base_hydride_name(6) == "cyclohexane"
     assert bicyclo.hydride_kind is ParentHydrideKind.VON_BAEYER
     assert bicyclo.base_hydride_name(7) == "bicyclo[2.2.1]heptane"
+    assert bicyclo.binding_term == "bicyclo[2.2.1]"
     assert bicyclo.proof_locant_maps
 
 

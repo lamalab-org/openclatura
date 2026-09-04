@@ -131,6 +131,17 @@ class RingParent:
         return None
 
     @property
+    def binding_term(self) -> str | None:
+        """Return parent text that survives suffix and unsaturation morphology."""
+
+        if self.hydride_kind in {
+            ParentHydrideKind.RETAINED,
+            ParentHydrideKind.SYSTEMATIC_FUSION,
+        }:
+            return self.base_name
+        return self.descriptor
+
+    @property
     def derivative_stem(self) -> str | None:
         return self.substituent_stem
 

@@ -36,7 +36,7 @@ def refresh_parent_binding(parts: AssemblyParts) -> None:
         term=(
             parts.retained_substituent_name
             or parts.retained_name
-            or (parts.ring_parent.base_name if parts.ring_parent is not None else None)
+            or (parts.ring_parent.binding_term if parts.ring_parent is not None else None)
             or _parent_term(parts)
         ),
         atom_ids=atom_ids,
@@ -1514,8 +1514,8 @@ _EXACT_CHARGE_RENDERER_KEYS = frozenset(
 
 
 def _parent_term(parts: AssemblyParts) -> str:
-    if parts.ring_parent is not None and parts.ring_parent.base_name is not None:
-        return parts.ring_parent.base_name
+    if parts.ring_parent is not None and parts.ring_parent.binding_term is not None:
+        return parts.ring_parent.binding_term
     if parts.is_spiro:
         return "spiro parent"
     if parts.is_bicycle:
