@@ -34,6 +34,7 @@ from .model import (
     FusionNumberingProof,
     ParentBondModel,
 )
+from .numbering import bond_model_indicated_hydrogen_atoms, indicated_hydrogen_candidate_atoms
 from .rules import (
     component_spec_seniority_key,
     component_variant_identity,
@@ -86,6 +87,7 @@ def audit_fusion_plan(
     mode: FusionMode = FusionMode.GENERAL,
     registry: object | None = None,
     lambda_descriptors: tuple[FusionLambdaDescriptor, ...] = (),
+    indicated_hydrogens: tuple[SystemLocant, ...] = (),
     rendered_core_name: str | None = None,
 ) -> FusionAuditResult:
     """Independently reconstruct and audit a completed fusion candidate.
@@ -161,6 +163,8 @@ def audit_fusion_plan(
 
         _audit_bond_model(mol, abstract_parent_graph, numbering, bond_model, errors)
         checks.append("parent_bond_model")
+        _audit_indicated_hydrogens(mol, numbering, bond_model, indicated_hydrogens, errors)
+        checks.append("indicated_hydrogens")
         _audit_lambda_descriptors(mol, parent_atoms, numbering, lambda_descriptors, errors)
         checks.append("lambda_descriptors")
         if rendered_core_name is not None:
@@ -828,6 +832,33 @@ def _audit_face_model(
         errors.append("numbering outer boundary does not equal the face-model perimeter")
 
 
+def _audit_indicated_hydrogens(
+    mol: Molecule,
+    numbering: FusionNumberingProof,
+    model: ParentBondModel,
+    cited: tuple[SystemLocant, ...],
+    errors: list[str],
+) -> None:
+    """Audit fusion indicated-H citations against graph and bond-model state."""
+
+    if len(cited) != len(set(cited)):
+        errors.append("fusion indicated-hydrogen citations contain duplicate locants")
+        return
+    selected_map = dict(numbering.input_locant_maps[0])
+    atom_by_locant = {locant: atom for atom, locant in selected_map.items()}
+    if any(locant not in atom_by_locant for locant in cited):
+        errors.append("fusion indicated-hydrogen citation is outside the completed numbering")
+        return
+    candidates = set(indicated_hydrogen_candidate_atoms(mol, selected_map))
+    cited_atoms = {atom_by_locant[locant] for locant in cited}
+    if not cited_atoms <= candidates:
+        errors.append("fusion indicated-hydrogen citation points to an ineligible graph atom")
+    required = {atom for atom in candidates if mol.atoms[atom].symbol != "C"}
+    required.update(bond_model_indicated_hydrogen_atoms(mol, model, candidates))
+    if not required <= cited_atoms:
+        errors.append("fusion indicated-hydrogen citations omit a graph-required site")
+
+
 def _audit_bond_model(
     mol: Molecule,
     abstract: FusionGraph,
@@ -868,6 +899,12 @@ def _audit_bond_model(
 
     abstract_by_locant = {locant: atom for atom, locant in numbering.abstract_atom_to_locant}
     observed_matches = False
+    indicated_hydrogen_atoms = set(
+        indicated_hydrogen_candidate_atoms(
+            mol,
+            dict(numbering.input_locant_maps[0]),
+        )
+    )
     for input_map_items in numbering.input_locant_maps:
         input_to_abstract = {
             input_atom: abstract_by_locant[locant]
@@ -893,8 +930,8 @@ def _audit_bond_model(
                 if (
                     order != 1
                     or allowed[edge] != 2
-                    or any(
-                        atom not in abstract_to_input or mol.atoms[abstract_to_input[atom]].total_h_count <= 0
+                    or not any(
+                        atom in abstract_to_input and abstract_to_input[atom] in indicated_hydrogen_atoms
                         for atom in edge
                     )
                 ):

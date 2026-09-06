@@ -11,7 +11,7 @@
       "charged_parents": false,
       "nonstandard_valence": true,
       "interior_atoms": true,
-      "maximum_indicated_hydrogens": 1
+      "maximum_indicated_hydrogens": null
     },
     "pin_gate": {
       "minimum_ring_size": 5,

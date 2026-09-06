@@ -29,7 +29,7 @@ class FusionSupportConfig:
     charged_parents: bool
     nonstandard_valence: bool
     interior_atoms: bool
-    maximum_indicated_hydrogens: int
+    maximum_indicated_hydrogens: int | None
 
 
 _IMPLEMENTED_COVER_KINDS = ("tree",)
@@ -109,7 +109,7 @@ def fusion_nomenclature_config_from_data(data: dict) -> FusionNomenclatureConfig
         charged_parents=_boolean(support_data, "charged_parents"),
         nonstandard_valence=_boolean(support_data, "nonstandard_valence"),
         interior_atoms=_boolean(support_data, "interior_atoms"),
-        maximum_indicated_hydrogens=_nonnegative_int(support_data, "maximum_indicated_hydrogens"),
+        maximum_indicated_hydrogens=_optional_positive_int(support_data, "maximum_indicated_hydrogens"),
     )
     _validate_implemented_support(support)
     rules = FusionRuleConfig(
@@ -215,6 +215,16 @@ def _nonnegative_int(data: dict, key: str, *, default: int | None = None) -> int
     if value < 0:
         raise ValueError(f"fusion nomenclature {key} must be non-negative")
     return value
+
+
+def _optional_positive_int(data: dict, key: str) -> int | None:
+    value = data.get(key)
+    if value is None:
+        return None
+    parsed = _integer(value, key)
+    if parsed <= 0:
+        raise ValueError(f"fusion nomenclature {key} must be positive or null")
+    return parsed
 
 
 def _point(value: object) -> tuple[int, int]:

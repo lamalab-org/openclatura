@@ -531,6 +531,55 @@ def indicated_hydrogen_candidate_atoms(
     return tuple(atom for atom in parent_locants if _is_indicated_hydrogen_candidate(mol, atom, parent_locants))
 
 
+def bond_model_indicated_hydrogen_atoms(
+    mol: Molecule,
+    bond_model: ParentBondModel,
+    candidates: set[int],
+) -> frozenset[int]:
+    """Return saturated sites required by the closest mancude assignment.
+
+    The symmetric bond-order delta is interpreted without reading a rendered
+    parent name. A missing double bond with hydrogen-bearing atoms at both ends
+    is ordinary additive hydrogenation. If only one endpoint is an eligible
+    saturated site, that endpoint requires an indicated-hydrogen citation.
+    """
+
+    model_edges = bond_model.required_single_bonds | bond_model.required_double_bonds | bond_model.pi_eligible_edges
+    observed = {
+        tuple(sorted((bond.u, bond.v))): (
+            None
+            if mol.atoms[bond.u].is_aromatic
+            and mol.atoms[bond.v].is_aromatic
+            and tuple(sorted((bond.u, bond.v))) in bond_model.pi_eligible_edges
+            else bond.order
+        )
+        for bond in mol.bonds.values()
+        if tuple(sorted((bond.u, bond.v))) in model_edges
+    }
+    viable: list[frozenset[int]] = []
+    for assignment in bond_model.allowed_kekule_assignments:
+        allowed = {tuple(sorted(edge)): order for edge, order in assignment.orders}
+        if set(observed) != set(allowed):
+            continue
+        indicated: set[int] = set()
+        compatible = True
+        for edge, order in observed.items():
+            if order is None or order == allowed[edge]:
+                continue
+            if order != 1 or allowed[edge] != 2:
+                compatible = False
+                break
+            endpoints = set(edge) & candidates
+            if len(endpoints) == 1:
+                indicated.update(endpoints)
+            elif len(endpoints) != 2:
+                compatible = False
+                break
+        if compatible:
+            viable.append(frozenset(indicated))
+    return min(viable, key=lambda atoms: (len(atoms), tuple(sorted(atoms)))) if viable else frozenset()
+
+
 def _is_indicated_hydrogen_candidate(
     mol: Molecule,
     atom: int,

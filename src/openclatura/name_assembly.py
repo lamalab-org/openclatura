@@ -1105,28 +1105,44 @@ def _ordered_renderer_native_token_spans(
     search_text: str,
     bindings: tuple[NameAtomBinding, ...],
 ) -> list[tuple[int, int, int, NameTokenBinding]]:
-    """Place explicitly ordered renderer tokens once, in rendered order."""
+    """Place explicitly ordered renderer tokens once within each owning binding.
 
-    ordered_items = []
+    ``render_order`` is local renderer provenance, not a global order shared by
+    unrelated parent, suffix, and substituent operations.  Keeping each
+    sequence scoped to its binding prevents repeated locants in one operation
+    from consuming identically spelled tokens emitted by another operation.
+    """
+
+    ordered_groups: list[tuple[int, list[tuple[int, int, NameTokenBinding]]]] = []
     for binding_idx, binding in enumerate(bindings):
-        for token_idx, token in enumerate(binding.emitted_tokens):
-            if token.render_order is not None:
-                ordered_items.append((token.render_order, binding_idx, token_idx, token))
-    ordered_tokens = sorted(
-        ordered_items,
-        key=lambda item: (item[0], item[1], item[2]),
-    )
+        ordered = [
+            (token.render_order, token_idx, token)
+            for token_idx, token in enumerate(binding.emitted_tokens)
+            if token.render_order is not None
+        ]
+        if ordered:
+            ordered_groups.append((binding_idx, sorted(ordered, key=lambda item: (item[0], item[1]))))
     spans: list[tuple[int, int, int, NameTokenBinding]] = []
-    cursor = 0
-    for _render_order, binding_idx, _token_idx, token_binding in ordered_tokens:
-        token = token_binding.text.strip().lower()
-        if not _native_token_is_searchable(token, token_binding):
-            continue
-        found = next(iter(_native_token_occurrences(text, search_text, token_binding, cursor)), -1)
-        if found < 0:
-            continue
-        spans.append((found, found + len(token), binding_idx, token_binding))
-        cursor = found + len(token)
+    for binding_idx, ordered_tokens in ordered_groups:
+        cursor = 0
+        placed: list[tuple[int, int, int, NameTokenBinding]] = []
+        for _render_order, _token_idx, token_binding in ordered_tokens:
+            token = token_binding.text.strip().lower()
+            if not token:
+                continue
+            # The renderer has already supplied an exact local sequence.  Use
+            # that sequence as the disambiguator, including one-character
+            # tokens such as the H in an indicated-hydrogen citation.  Global
+            # lexical safeguards are only needed for unordered recovery.
+            found = search_text.find(token, cursor)
+            if found >= 0 and not _token_context_matches(search_text, token_binding, found, found + len(token)):
+                found = -1
+            if found < 0:
+                placed = []
+                break
+            placed.append((found, found + len(token), binding_idx, token_binding))
+            cursor = found + len(token)
+        spans.extend(placed)
     return spans
 
 

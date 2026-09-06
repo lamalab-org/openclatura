@@ -37,6 +37,7 @@ from .model import (
 )
 from .numbering import (
     MancudeSearchBudgetExceeded,
+    bond_model_indicated_hydrogen_atoms,
     completed_system_numbering_selection,
     indicated_hydrogen_candidate_atoms,
     observed_parent_matches_bond_model,
@@ -152,7 +153,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     except MancudeSearchBudgetExceeded as exc:
         return FusionUnsupported("mancude assignment search budget exhausted", (str(exc),))
     indicated_h = _cited_indicated_hydrogens(mol, ast, registry, numbering, bond_model)
-    if len(indicated_h) > SUPPORT.maximum_indicated_hydrogens:
+    if SUPPORT.maximum_indicated_hydrogens is not None and len(indicated_h) > SUPPORT.maximum_indicated_hydrogens:
         return FusionUnsupported("multiple indicated-hydrogen fusion parents require a later additive tier")
     rendered_parts = render_fusion_name_parts(ast, registry, mol=mol)
     rendered_core_name = "".join(part.text for part in rendered_parts)
@@ -177,19 +178,42 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         )
     if indicated_h:
         input_atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
-        rendered_parts = (
-            NameTokenBinding(
-                text=f"{','.join(f'{locant}H' for locant in indicated_h)}-",
-                token_kind="locant",
-                source="fusion_renderer",
-                grammar_role="fusion_indicated_hydrogen",
-                binding_key="fusion:indicated_hydrogen",
-                atom_ids=set(input_atom_by_locant[locant] for locant in indicated_h),
-                locants=tuple(str(locant) for locant in indicated_h),
-                match_priority=100,
-            ),
-            *rendered_parts,
-        )
+        hydrogen_parts: list[NameTokenBinding] = []
+        for index, locant in enumerate(indicated_h):
+            hydrogen_parts.append(
+                NameTokenBinding(
+                    text=str(locant),
+                    token_kind="locant",
+                    source="fusion_renderer",
+                    grammar_role="fusion_indicated_hydrogen",
+                    binding_key=f"fusion:indicated_hydrogen:{locant}",
+                    atom_ids={input_atom_by_locant[locant]},
+                    locants=(str(locant),),
+                    match_priority=100,
+                )
+            )
+            hydrogen_parts.append(
+                NameTokenBinding(
+                    text="H",
+                    token_kind="hydro",
+                    source="fusion_renderer",
+                    grammar_role="fusion_indicated_hydrogen",
+                    binding_key=f"fusion:indicated_hydrogen:{locant}",
+                    atom_ids={input_atom_by_locant[locant]},
+                    locants=(str(locant),),
+                    match_priority=100,
+                )
+            )
+            hydrogen_parts.append(
+                NameTokenBinding(
+                    text="," if index + 1 < len(indicated_h) else "-",
+                    token_kind="grammar",
+                    source="fusion_renderer",
+                    grammar_role="fusion_indicated_hydrogen_separator",
+                    binding_key="fusion:indicated_hydrogen:separator",
+                )
+            )
+        rendered_parts = (*hydrogen_parts, *rendered_parts)
     rendered = "".join(part.text for part in rendered_parts)
     audit = audit_fusion_plan(
         mol,
@@ -201,6 +225,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         mode=mode,
         registry=registry,
         lambda_descriptors=lambda_descriptors,
+        indicated_hydrogens=indicated_h,
         rendered_core_name=rendered_core_name,
     )
     if audit.status is AuditStatus.ABSTAIN:
@@ -250,6 +275,7 @@ def _cited_indicated_hydrogens(
     locants = dict(numbering.abstract_atom_to_locant)
     candidates = indicated_hydrogen_candidate_atoms(mol, locants)
     cited_atoms = {atom for atom in candidates if mol.atoms[atom].symbol != "C"}
+    cited_atoms.update(bond_model_indicated_hydrogen_atoms(mol, bond_model, set(candidates)))
 
     root_ids = set(ast.parent_occurrences)
     roots = [match for match in ast.component_occurrences if match.occurrence_id in root_ids]

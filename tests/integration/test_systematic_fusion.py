@@ -176,6 +176,35 @@ def test_partly_hydrogenated_hw_fusion_is_atom_order_invariant():
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [
+        ("N1C=NC2=C1N=CN2", "1H,4H-imidazo[4,5-d]imidazole"),
+        ("N1N=CC=2C1=CNN2", "1H,5H-pyrazolo[4,3-c]pyrazole"),
+    ],
+)
+def test_multiple_indicated_hydrogens_are_graph_derived_and_roundtrip(smiles, expected):
+    result = name(
+        smiles,
+        fusion_mode=FusionMode.AUDITED_PIN,
+        verify_opsin=True,
+        include_trace=True,
+        token_debug=True,
+    )
+
+    assert result.name == expected
+    assert result.opsin_check is not None and result.opsin_check.status == "matched"
+    assert result.parent_nomenclature == "systematic_fusion"
+    assembly = next(step for step in reversed(result.decisions) if "name_token_spans" in step.data)
+    hydrogen_tokens = [
+        token
+        for token in assembly.data["name_token_spans"]
+        if token["binding_key"].startswith("fusion:indicated_hydrogen:") and token["token_kind"] != "grammar"
+    ]
+    assert len({tuple(token["atoms"]) for token in hydrogen_tokens}) == 2
+    assert all(len(token["atoms"]) == 1 for token in hydrogen_tokens)
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
         (
             "O=S1(=O)CCc2c1scc/c2=N\\Nc1ccc(Cl)c(Cl)c1",
             "(4E)-N-(3,4-dichlorophenyl)-1,1-dioxo-2,3-dihydro-1lambda^6-thieno[2,3-b]thiin-4-one hydrazone",

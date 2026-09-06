@@ -20,7 +20,7 @@ def test_checked_in_fusion_configuration_is_complete_and_data_backed():
     assert not config.rules.support.charged_parents
     assert config.rules.support.nonstandard_valence
     assert config.rules.support.interior_atoms
-    assert config.rules.support.maximum_indicated_hydrogens == 1
+    assert config.rules.support.maximum_indicated_hydrogens is None
     assert config.rules.pin_minimum_ring_size == 5
     assert config.rules.pin_minimum_ring_count == 2
     assert {shape.ring_size for shape in config.ring_shapes} == set(range(3, 9))
