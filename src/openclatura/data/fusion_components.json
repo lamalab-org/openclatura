@@ -8,6 +8,8 @@
       "cover_kinds": ["tree"],
       "join_kinds": ["ortho", "ortho_peri"],
       "multiparent_parents": true,
+      "maximum_tree_component_occurrences": 3,
+      "maximum_multiparent_component_occurrences": 3,
       "charged_parents": true,
       "nonstandard_valence": true,
       "interior_atoms": true,

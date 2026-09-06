@@ -22,7 +22,7 @@ from ..molecule import Molecule
 from ..polycycle_topology import normalize_edge
 from ..rules import multipliers
 from .config import fusion_nomenclature_config
-from .cover import ComponentScope, FusionInterface, audit_component_cover, component_scope
+from .cover import ComponentScope, CoverGraph, FusionInterface, audit_component_cover, component_scope
 from .model import (
     ComponentLocant,
     FusionCitationNode,
@@ -107,6 +107,17 @@ class _CitationTopology:
     location_key: ParentLocationKey
 
 
+@dataclass(frozen=True, slots=True)
+class _PreparedComponentSelection:
+    """One exact cover normalized and audited before preference search."""
+
+    options: tuple[_OccurrenceOption, ...]
+    matches: tuple[FusionComponentMatch, ...]
+    specs: Mapping[int, FusionComponentSpec]
+    graph: CoverGraph[int]
+    cover_kind: str
+
+
 def component_sides(spec: FusionComponentSpec) -> tuple[ComponentSide, ...]:
     """Return the component's directed sides in ``a``, ``b``, ... order."""
 
@@ -131,6 +142,7 @@ def build_fusion_name_ast(
     cover_kinds: Iterable[str] | None = None,
     join_kinds: Iterable[str] | None = None,
     multiparent_parents: bool | None = None,
+    enforce_interoperability_limits: bool = True,
 ) -> FusionNameAst:
     """Build the preferred bounded fusion citation from exact component maps.
 
@@ -160,22 +172,45 @@ def build_fusion_name_ast(
 
     selections = _exact_component_covers(options, frozenset(face_ids))
 
-    candidates: list[_Candidate] = []
     budget_exhausted = 0
-    for selected_options in selections:
-        try:
-            candidates.extend(
-                _candidates_for_component_selection(
-                    mol,
-                    selected_options,
-                    registry,
-                    supported_covers=supported_covers,
-                    supported_joins=supported_joins,
-                    allow_multiparent_parents=allow_multiparent_parents,
+    selections_by_preference: dict[tuple, list[_PreparedComponentSelection]] = defaultdict(list)
+    for selection in selections:
+        prepared = _prepare_component_selection(
+            mol,
+            selection,
+            registry,
+            supported_covers=supported_covers,
+            supported_joins=supported_joins,
+        )
+        if prepared is None:
+            continue
+        for preference in _selection_preference_tiers(
+            prepared,
+            allow_multiparent_parents=allow_multiparent_parents,
+            enforce_interoperability_limits=enforce_interoperability_limits,
+        ):
+            selections_by_preference[preference].append(prepared)
+
+    candidates: list[_Candidate] = []
+    for preference in sorted(selections_by_preference):
+        parent_seniority, _location_prefix = preference
+        for prepared in selections_by_preference[preference]:
+            try:
+                candidates.extend(
+                    _candidates_for_component_selection(
+                        mol,
+                        prepared,
+                        registry,
+                        supported_joins=supported_joins,
+                        allow_multiparent_parents=allow_multiparent_parents,
+                        enforce_interoperability_limits=enforce_interoperability_limits,
+                        required_parent_seniority=parent_seniority,
+                    )
                 )
-            )
-        except _LocantMapBudgetExceeded:
-            budget_exhausted += 1
+            except _LocantMapBudgetExceeded:
+                budget_exhausted += 1
+        if candidates:
+            break
     if not candidates:
         if budget_exhausted:
             raise FusionDescriptorError(
@@ -184,6 +219,76 @@ def build_fusion_name_ast(
         tier = "tree-cover" if supported_covers == {"tree"} else "supported-cover"
         raise FusionDescriptorError(f"no exact {tier} fusion citation was found")
     return min(candidates, key=lambda candidate: (candidate.score, candidate.rendered)).ast
+
+
+def _selection_preference_tiers(
+    prepared: _PreparedComponentSelection,
+    *,
+    allow_multiparent_parents: bool,
+    enforce_interoperability_limits: bool,
+) -> tuple[tuple, ...]:
+    """Return score prefixes that can be proved without local-map search."""
+
+    specs = prepared.specs
+    graph = prepared.graph
+
+    roots_by_seniority: dict[tuple, list[int]] = defaultdict(list)
+    for match in prepared.matches:
+        spec = specs[match.occurrence_id]
+        if spec.usable_as_parent:
+            roots_by_seniority[component_spec_seniority_key(spec).as_tuple()].append(match.occurrence_id)
+
+    result = []
+    for seniority, roots in roots_by_seniority.items():
+        root_sets = [(root,) for root in roots]
+        if allow_multiparent_parents:
+            roots_by_variant: dict[tuple, list[int]] = defaultdict(list)
+            for root in roots:
+                roots_by_variant[component_variant_identity(specs[root])].append(root)
+            for variant_roots in roots_by_variant.values():
+                root_sets.extend(_multiparent_root_sets(tuple(variant_roots), graph.adjacency, specs))
+        supported_topologies = tuple(
+            topology
+            for root_set in root_sets
+            if _citation_grammar_supported(
+                topology := _citation_topology(graph.adjacency, root_set, specs),
+                specs,
+                enforce_interoperability_limits=enforce_interoperability_limits,
+            )
+        )
+        if not supported_topologies:
+            continue
+        location_prefix = min(_pre_mapping_location_key(topology.location_key) for topology in supported_topologies)
+        result.append((seniority, location_prefix))
+    return tuple(sorted(result))
+
+
+def _prepare_component_selection(
+    mol: Molecule,
+    options: Sequence[_OccurrenceOption],
+    registry: _Registry | Mapping[str, FusionComponentSpec],
+    *,
+    supported_covers: frozenset[str],
+    supported_joins: frozenset[str],
+) -> _PreparedComponentSelection | None:
+    """Normalize and audit one exact component cover once."""
+
+    if len(options) > MAX_COMPONENT_OCCURRENCES:
+        return None
+    ordered = tuple(sorted(options, key=_occurrence_option_key))
+    matches = tuple(replace(option.mappings[0], occurrence_id=index) for index, option in enumerate(ordered))
+    specs = {match.occurrence_id: _spec_for_match(registry, match) for match in matches}
+    scopes = tuple(_scope_for_match(mol, match, specs[match.occurrence_id]) for match in matches)
+    target_atoms = frozenset(atom for scope in scopes for atom in scope.atom_ids)
+    target_edges = frozenset(edge for scope in scopes for edge in scope.edges)
+    audit = audit_component_cover(scopes, target_atom_ids=target_atoms, target_edges=target_edges)
+    if not audit.ok or audit.proof.kind not in supported_covers:
+        return None
+    if any(_interface_support_key(interface) not in supported_joins for interface in audit.graph.interfaces):
+        return None
+    if audit.proof.kind == "multiparent" and "higher_order" not in supported_joins:
+        return None
+    return _PreparedComponentSelection(ordered, matches, specs, audit.graph, audit.proof.kind)
 
 
 def render_fusion_name(
@@ -469,37 +574,21 @@ def _exact_component_covers(
 
 def _candidates_for_component_selection(
     mol: Molecule,
-    options: Sequence[_OccurrenceOption],
+    prepared: _PreparedComponentSelection,
     registry: _Registry | Mapping[str, FusionComponentSpec],
     *,
-    supported_covers: frozenset[str],
     supported_joins: frozenset[str],
     allow_multiparent_parents: bool,
+    enforce_interoperability_limits: bool,
+    required_parent_seniority: tuple | None = None,
 ) -> list[_Candidate]:
-    if len(options) > MAX_COMPONENT_OCCURRENCES:
-        return []
-    ordered_options = tuple(sorted(options, key=_occurrence_option_key))
-    canonical_matches = tuple(
-        replace(option.mappings[0], occurrence_id=index) for index, option in enumerate(ordered_options)
-    )
-    specs = {match.occurrence_id: _spec_for_match(registry, match) for match in canonical_matches}
-    scopes = tuple(_scope_for_match(mol, match, specs[match.occurrence_id]) for match in canonical_matches)
-    target_atoms = frozenset(atom for scope in scopes for atom in scope.atom_ids)
-    target_edges = frozenset(edge for scope in scopes for edge in scope.edges)
-    audit = audit_component_cover(scopes, target_atom_ids=target_atoms, target_edges=target_edges)
-    if not audit.ok or audit.proof.kind not in supported_covers:
-        return []
-    if any(_interface_support_key(interface) not in supported_joins for interface in audit.graph.interfaces):
-        return []
-
-    eligible_roots = [match for match in canonical_matches if specs[match.occurrence_id].usable_as_parent]
+    specs = prepared.specs
+    eligible_roots = [match for match in prepared.matches if specs[match.occurrence_id].usable_as_parent]
     if not eligible_roots:
-        return []
-    if audit.proof.kind == "multiparent" and "higher_order" not in supported_joins:
         return []
 
     mapping_sets: list[tuple[FusionComponentMatch, ...]] = []
-    for occurrence_id, option in enumerate(ordered_options):
+    for occurrence_id, option in enumerate(prepared.options):
         mapping_sets.append(tuple(replace(candidate, occurrence_id=occurrence_id) for candidate in option.mappings))
     roots_by_seniority: dict[tuple, list[int]] = defaultdict(list)
     for root in eligible_roots:
@@ -507,6 +596,8 @@ def _candidates_for_component_selection(
             root.occurrence_id
         )
     for seniority in sorted(roots_by_seniority):
+        if required_parent_seniority is not None and seniority != required_parent_seniority:
+            continue
         roots = tuple(roots_by_seniority[seniority])
         root_sets = [(root,) for root in roots]
         if allow_multiparent_parents:
@@ -514,16 +605,17 @@ def _candidates_for_component_selection(
             for root in roots:
                 roots_by_variant[component_variant_identity(specs[root])].append(root)
             for variant_roots in roots_by_variant.values():
-                root_sets.extend(_multiparent_root_sets(tuple(variant_roots), audit.graph.adjacency, specs))
+                root_sets.extend(_multiparent_root_sets(tuple(variant_roots), prepared.graph.adjacency, specs))
         candidates = _candidates_for_root_sets(
             root_sets,
-            audit.graph,
+            prepared.graph,
             mapping_sets,
             specs,
             registry,
             mol,
             supported_joins,
-            audit.proof.kind,
+            prepared.cover_kind,
+            enforce_interoperability_limits=enforce_interoperability_limits,
         )
         if candidates:
             return candidates
@@ -539,6 +631,8 @@ def _candidates_for_root_sets(
     mol: Molecule,
     supported_joins: frozenset[str],
     cover_kind: str,
+    *,
+    enforce_interoperability_limits: bool,
 ) -> list[_Candidate]:
     """Build candidates for one intrinsic parent-seniority tier.
 
@@ -548,7 +642,17 @@ def _candidates_for_root_sets(
     displacing a valid senior parent.
     """
 
-    topologies = tuple(_citation_topology(graph.adjacency, roots, specs) for roots in root_sets)
+    topologies = tuple(
+        topology
+        for roots in root_sets
+        if _citation_grammar_supported(
+            topology := _citation_topology(graph.adjacency, roots, specs),
+            specs,
+            enforce_interoperability_limits=enforce_interoperability_limits,
+        )
+    )
+    if not topologies:
+        return []
     preferred_location = min(_pre_mapping_location_key(item.location_key) for item in topologies)
     topologies = tuple(
         item for item in topologies if _pre_mapping_location_key(item.location_key) == preferred_location
@@ -575,7 +679,7 @@ def _candidates_for_root_sets(
         for selected_maps in _compatible_mapping_assignments(
             mapping_sets,
             specs,
-            topology.roots[0],
+            topology.roots,
             topology.parent_by_child,
             topology.order_by_occurrence,
             interface_by_pair,
@@ -594,6 +698,24 @@ def _candidates_for_root_sets(
             if candidate is not None:
                 candidates.append(candidate)
     return candidates
+
+
+def _citation_grammar_supported(
+    topology: _CitationTopology,
+    specs: Mapping[int, FusionComponentSpec],
+    *,
+    enforce_interoperability_limits: bool,
+) -> bool:
+    """Limit production to citation sizes covered by parser-backed tests."""
+
+    if not enforce_interoperability_limits:
+        return True
+    maximum = (
+        _SUPPORT.maximum_multiparent_component_occurrences
+        if len(topology.roots) > 1
+        else _SUPPORT.maximum_tree_component_occurrences
+    )
+    return len(specs) <= maximum
 
 
 def _best_tree_mapping_candidate(
@@ -894,7 +1016,7 @@ def _pre_mapping_location_key(location: ParentLocationKey) -> tuple:
 def _compatible_mapping_assignments(
     mapping_sets: Sequence[tuple[FusionComponentMatch, ...]],
     specs: Mapping[int, FusionComponentSpec],
-    root: int,
+    roots: tuple[int, ...],
     parent_by_child: Mapping[int, int],
     order_by_occurrence: Mapping[int, int],
     interface_by_pair: Mapping[frozenset[int], FusionInterface[int]],
@@ -914,8 +1036,10 @@ def _compatible_mapping_assignments(
     occurrence_order = tuple(
         sorted(range(len(mapping_sets)), key=lambda occurrence: (order_by_occurrence[occurrence], occurrence))
     )
-    if not occurrence_order or occurrence_order[0] != root:
-        raise FusionDescriptorError("component cover tree has no numbered root")
+    root_set = frozenset(roots)
+    leading_roots = frozenset(occurrence for occurrence in occurrence_order if order_by_occurrence[occurrence] == 0)
+    if not occurrence_order or not root_set or leading_roots != root_set:
+        raise FusionDescriptorError("component cover graph has inconsistent numbered roots")
 
     assignments: list[tuple[FusionComponentMatch, ...]] = []
     selected: dict[int, FusionComponentMatch] = {}

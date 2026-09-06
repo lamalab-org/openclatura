@@ -17,7 +17,14 @@ from openclatura.fusion import (
 from openclatura.fusion.cover import FusionInterface
 from openclatura.fusion.descriptor import _multiparent_root_sets, classify_ordered_fusion_interface
 from openclatura.fusion.faces import GraphCycle
-from openclatura.fusion.model import FusionComponentMatch, FusionConfirmed, FusionDescriptor, FusionJoinKind, FusionMode
+from openclatura.fusion.model import (
+    FusionComponentMatch,
+    FusionConfirmed,
+    FusionDescriptor,
+    FusionJoinKind,
+    FusionMode,
+    FusionUnsupported,
+)
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.fusion.registry import FusionComponentRegistry, fusion_component_registry
 from openclatura.fusion.rules import component_interface_orbit
@@ -116,6 +123,7 @@ def _build(
     registry: FusionComponentRegistry | None = None,
     experimental: bool = False,
     atomic_components_only: bool = False,
+    enforce_interoperability_limits: bool = True,
 ):
     registry = registry or fusion_component_registry()
     mol, faces = _component_graph(component_keys, fused_atoms, atom_id_order=atom_id_order)
@@ -128,7 +136,13 @@ def _build(
         if experimental
         else {}
     )
-    ast = build_fusion_name_ast(mol, matches, registry, **kwargs)
+    ast = build_fusion_name_ast(
+        mol,
+        matches,
+        registry,
+        enforce_interoperability_limits=enforce_interoperability_limits,
+        **kwargs,
+    )
     return mol, ast, render_fusion_name(ast, registry)
 
 
@@ -330,9 +344,18 @@ def test_long_component_tree_uses_a_central_parent_location_and_is_atom_order_in
         )
     )
 
-    first_mol, first_ast, first_name = _build(components, joins)
+    first_mol, first_ast, first_name = _build(
+        components,
+        joins,
+        enforce_interoperability_limits=False,
+    )
     arbitrary_ids = tuple(500 + 13 * index for index in reversed(range(len(first_mol.atoms))))
-    _second_mol, second_ast, second_name = _build(components, joins, atom_id_order=arbitrary_ids)
+    _second_mol, second_ast, second_name = _build(
+        components,
+        joins,
+        atom_id_order=arbitrary_ids,
+        enforce_interoperability_limits=False,
+    )
 
     assert len(first_ast.component_occurrences) == len(second_ast.component_occurrences) == 16
     assert first_ast.plan_kind == second_ast.plan_kind == "polycomponent_tree"
@@ -350,7 +373,7 @@ def test_long_component_tree_uses_a_central_parent_location_and_is_atom_order_in
     assert maximum_depth(first_ast) == maximum_depth(second_ast) == 8
 
 
-def test_long_five_membered_ring_chain_completes_the_bounded_layout_proof():
+def test_long_five_membered_ring_chain_abstains_outside_interoperable_grammar():
     components = ("furan",) * 16
     joins = tuple(
         pair
@@ -364,9 +387,8 @@ def test_long_five_membered_ring_chain_completes_the_bounded_layout_proof():
 
     result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
 
-    assert isinstance(result, FusionConfirmed)
-    assert len(result.plan.ast.component_occurrences) == 16
-    assert result.plan.audit.confirmed
+    assert isinstance(result, FusionUnsupported)
+    assert result.reason == "no supported audited fusion-component decomposition"
 
 
 def test_second_order_pairwise_component_keeps_ordinary_fusion_descriptor():

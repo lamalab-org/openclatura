@@ -51,6 +51,80 @@ def connected_components(nodes: Iterable[int], edges: Iterable[tuple[int, int]])
     return components
 
 
+def biconnected_edge_components(nodes: Iterable[int], edges: Iterable[tuple[int, int]]) -> tuple[frozenset[Edge], ...]:
+    """Return maximal edge-biconnected blocks in linear graph time.
+
+    A fused or bridged ring system is one cyclic block. Rings meeting at only
+    one spiro atom remain separate blocks that share that articulation atom.
+    Bridge edges between otherwise separate cyclic systems are returned as
+    one-edge blocks, allowing callers to discard them without cycle search.
+
+    The implementation is iterative so large fused systems do not depend on
+    Python's recursion limit. Output ordering is deterministic but carries no
+    chemical preference; nomenclature-specific orientation remains the job of
+    the parent numbering engine.
+    """
+
+    node_set = frozenset(nodes)
+    edge_set = normalize_edges(edges)
+    if any(not set(edge) <= node_set for edge in edge_set):
+        raise ValueError("graph edge references an unknown node")
+    adjacency = {node: tuple(sorted(neighbors)) for node, neighbors in adjacency_from_edges(node_set, edge_set).items()}
+    discovery: dict[int, int] = {}
+    low: dict[int, int] = {}
+    parent: dict[int, int | None] = {}
+    edge_stack: list[Edge] = []
+    blocks: list[frozenset[Edge]] = []
+    counter = 0
+
+    for root in sorted(node_set):
+        if root in discovery:
+            continue
+        counter += 1
+        discovery[root] = low[root] = counter
+        parent[root] = None
+        stack: list[tuple[int, int]] = [(root, 0)]
+        while stack:
+            node, neighbor_index = stack[-1]
+            neighbors = adjacency[node]
+            if neighbor_index < len(neighbors):
+                neighbor = neighbors[neighbor_index]
+                stack[-1] = (node, neighbor_index + 1)
+                edge = normalize_edge(node, neighbor)
+                if neighbor not in discovery:
+                    parent[neighbor] = node
+                    edge_stack.append(edge)
+                    counter += 1
+                    discovery[neighbor] = low[neighbor] = counter
+                    stack.append((neighbor, 0))
+                elif neighbor != parent[node] and discovery[neighbor] < discovery[node]:
+                    edge_stack.append(edge)
+                    low[node] = min(low[node], discovery[neighbor])
+                continue
+
+            stack.pop()
+            ancestor = parent[node]
+            if ancestor is None:
+                if edge_stack:
+                    blocks.append(frozenset(edge_stack))
+                    edge_stack.clear()
+                continue
+            low[ancestor] = min(low[ancestor], low[node])
+            if low[node] < discovery[ancestor]:
+                continue
+            tree_edge = normalize_edge(ancestor, node)
+            block: set[Edge] = set()
+            while edge_stack:
+                stacked = edge_stack.pop()
+                block.add(stacked)
+                if stacked == tree_edge:
+                    break
+            if block:
+                blocks.append(frozenset(block))
+
+    return tuple(sorted(blocks, key=lambda block: (min(block), len(block), tuple(sorted(block)))))
+
+
 def induced_edges(nodes: Iterable[int], edges: Iterable[tuple[int, int]]) -> frozenset[Edge]:
     node_set = frozenset(nodes)
     return frozenset(edge for edge in normalize_edges(edges) if set(edge) <= node_set)

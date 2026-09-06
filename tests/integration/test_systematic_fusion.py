@@ -8,6 +8,7 @@ import pytest
 from rdkit import Chem
 
 from openclatura import FusionMode, name, name_many, name_mol, opsin_available
+from openclatura.chains import find_ring_systems
 from openclatura.fusion.audit import audit_fusion_plan
 from openclatura.fusion.context import current_fusion_mode, reset_fusion_mode, set_fusion_mode
 from openclatura.fusion.faces import FaceSearchBudgetExceeded
@@ -28,6 +29,81 @@ from openclatura.molecule import Molecule, OperationClass
 SYSTEMATIC_FUSION_CASES = json.loads(
     (Path(__file__).parents[1] / "data" / "systematic_fusion_cases.json").read_text(encoding="utf-8")
 )
+
+HIGH_RANK_MULTIPARENT_SMILES = "C1=CC2=C(C=C3C(=C2)C=C2C(C=C4C(=C2)C=C2C(C=C5C(=C2)C=C2C=CC6C=CC=CC=6C2=C5)=C4)=C3)C=C1"
+
+
+def _graph_built_three_component_heterocycle() -> Molecule:
+    mol = Molecule()
+    for atom_id, symbol in enumerate(("O", "C", "C", "C", "N", "C", "C", "C", "C", "S", "C", "C")):
+        mol.add_atom(symbol, idx=atom_id, is_aromatic=True)
+    edges = (
+        (0, 1, 1),
+        (1, 2, 2),
+        (2, 3, 1),
+        (3, 4, 2),
+        (4, 5, 1),
+        (5, 6, 2),
+        (6, 7, 1),
+        (7, 8, 2),
+        (6, 9, 1),
+        (9, 10, 1),
+        (10, 11, 2),
+        (8, 0, 1),
+        (8, 3, 1),
+        (11, 5, 1),
+    )
+    for bond_id, (first, second, order) in enumerate(edges, start=1):
+        mol.add_bond(first, second, order=order, idx=bond_id)
+    return mol
+
+
+def test_graph_built_polycycle_has_complete_fusion_numbering_without_legacy_descriptor():
+    mol = _graph_built_three_component_heterocycle()
+    systems = find_ring_systems(mol)
+    result = plan_fusion_parent(mol, systems[0].atoms, mode=FusionMode.AUDITED_PIN)
+
+    assert len(systems) == 1
+    assert systems[0].is_polycycle
+    assert isinstance(result, FusionConfirmed)
+    assert result.plan.rendered_base_name == "furo[3,2-b]thieno[2,3-e]pyridine"
+
+
+def test_high_rank_cyclic_multiparent_fusion_is_audited_and_atom_order_invariant():
+    mol = Chem.MolFromSmiles(HIGH_RANK_MULTIPARENT_SMILES)
+    reversed_mol = Chem.RenumberAtoms(mol, list(reversed(range(mol.GetNumAtoms()))))
+
+    first = name_mol(mol, include_trace=True)
+    second = name_mol(reversed_mol)
+
+    assert first.name == second.name == "anthra[2,3-b]phenanthro[2,3-i]anthracene"
+    assert first.parent_nomenclature == "systematic_fusion"
+    assert first.pin_status == "confirmed"
+
+
+@pytest.mark.skipif(not opsin_available(), reason="py2opsin/Java is unavailable")
+def test_high_rank_fusion_cover_round_trips_through_opsin():
+    result = name(HIGH_RANK_MULTIPARENT_SMILES, verify_opsin=True)
+
+    assert result.name == "anthra[2,3-b]phenanthro[2,3-i]anthracene"
+    assert result.opsin_check is not None and result.opsin_check.status == "matched"
+
+
+def test_high_rank_cover_search_prunes_lower_preference_tiers(monkeypatch):
+    import openclatura.fusion.descriptor as descriptor
+
+    calls = 0
+    build_candidates = descriptor._candidates_for_component_selection
+
+    def counted_candidates(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        return build_candidates(*args, **kwargs)
+
+    monkeypatch.setattr(descriptor, "_candidates_for_component_selection", counted_candidates)
+
+    assert name(HIGH_RANK_MULTIPARENT_SMILES).name == "anthra[2,3-b]phenanthro[2,3-i]anthracene"
+    assert calls == 1
 
 
 @pytest.mark.parametrize(
