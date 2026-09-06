@@ -268,9 +268,22 @@ def plan_bridged_fusion_wrapper(
                     )
                     rank = (
                         -len(parent_atoms),
-                        map_index,
+                        tuple(
+                            sorted(
+                                (
+                                    retained_locant_sort_key(locant)
+                                    for operation in operations
+                                    for locant in operation.endpoint_locants
+                                )
+                            )
+                        ),
+                        tuple(
+                            tuple(retained_locant_sort_key(locant) for locant in operation.endpoint_locants)
+                            for operation in operations
+                        ),
+                        tuple(operation.unsaturation_locants for operation in operations),
                         tuple(operation.prefix for operation in operations),
-                        tuple(operation.endpoint_locants for operation in operations),
+                        map_index,
                         rendered,
                     )
                     candidates.append((rank, plan))

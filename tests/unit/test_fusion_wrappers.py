@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import pytest
+from rdkit import Chem
 
-from openclatura import name
+from openclatura import name, name_mol
 from openclatura.fusion.model import FusionConfirmed, FusionMode
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.fusion.wrappers import (
@@ -89,7 +90,7 @@ def test_bridged_fusion_wrapper_is_used_by_public_parent_pipeline():
         ("C12=CC=C(C3=CC=CC=C13)CCCCCC2", "1,4-hexanonaphthalene", (1, 1, 1, 1, 1), ()),
         ("C12=CC=C(C3=CC=CC=C13)C=C2", "1,4-ethenonaphthalene", (2,), ("1",)),
         ("C12=CC=C(C3=CC=CC=C13)CC=C2", "1,4-prop[1]enonaphthalene", (2, 1), ("1",)),
-        ("C12=CC=C(C3=CC=CC=C13)C=CC2", "4,1-prop[1]enonaphthalene", (2, 1), ("1",)),
+        ("C12=CC=C(C3=CC=CC=C13)C=CC2", "1,4-prop[1]enonaphthalene", (2, 1), ("1",)),
         (
             "C12=CC=C(C3=CC=CC=C13)C=CC=C2",
             "1,4-buta[1,3]dienonaphthalene",
@@ -119,10 +120,29 @@ def test_arbitrary_length_and_unsaturated_carbo_bridges_use_typed_path_bonds(
     assert plan.bridges[0].internal_bond_orders == orders
     assert plan.bridges[0].unsaturation_locants == unsaturation_locants
     assert "typed_bridge_bond_and_prefix_model" in plan.audit_checks
+    if len(plan.bridges[0].atom_ids) > 4:
+        assert plan.search_states <= len(plan.bridges[0].atom_ids)
 
     selected = next(step for step in result.decisions if step.decision == "selected audited bridged fusion parent")
     assert selected.data["bridges"][0]["internal_bond_orders"] == list(orders)
     assert selected.data["bridges"][0]["unsaturation_locants"] == list(unsaturation_locants)
+
+
+def test_arbitrary_length_bridge_name_is_invariant_to_input_atom_order():
+    source = Chem.MolFromSmiles("C12=CC=C(C3=CC=CC=C13)CCCCCC2")
+    expected = "1,4-hexanonaphthalene"
+
+    for order in (
+        list(reversed(range(source.GetNumAtoms()))),
+        [*range(5, source.GetNumAtoms()), *range(5)],
+    ):
+        result = name_mol(
+            Chem.RenumberAtoms(source, order),
+            fusion_mode=FusionMode.GENERAL,
+            verify_opsin=True,
+        )
+        assert result.name == expected
+        assert result.opsin_check is not None and result.opsin_check.status == "matched"
 
 
 def test_bridge_wrapper_composes_with_a_graph_proven_systematic_fusion_parent():
