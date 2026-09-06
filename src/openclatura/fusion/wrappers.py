@@ -19,7 +19,7 @@ from ..polycycle_topology import connected_components, ring_system_topology
 from ..retained_fused_templates import match_retained_fused_templates
 from ..retained_name_policy import retained_parent_output_name
 from ..ring_parent import ParentHydrideKind, RingParent
-from ..rules import stems
+from ..rules import multipliers, stems
 from .config import fusion_nomenclature_config
 from .model import FusionConfirmed, FusionMode, PinDecision, PinStatus
 
@@ -96,6 +96,14 @@ class NondetachableBridgeOperation:
     endpoint_atom_ids: tuple[int, int]
     endpoint_locants: tuple[str, str]
     bond_ids: frozenset[int]
+    internal_bond_orders: tuple[int, ...] = ()
+    unsaturation_locants: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        if len(self.internal_bond_orders) != max(0, len(self.atom_ids) - 1):
+            raise ValueError("bridge bond orders must describe each internal path edge")
+        if any(order not in {1, 2} for order in self.internal_bond_orders):
+            raise ValueError("the audited bridge tier supports only single and double internal bonds")
 
     @property
     def rendered(self) -> str:
@@ -181,12 +189,14 @@ def plan_bridged_fusion_wrapper(
     atom_ids: set[int] | frozenset[int],
     *,
     mode: FusionMode | str,
-    maximum_bridge_atoms: int = 4,
+    maximum_bridge_atoms: int | None = None,
 ) -> BridgedFusionWrapperPlan | None:
-    """Find a retained or systematic fused parent beneath simple bridges.
+    """Find a retained or systematic fused parent beneath divalent path bridges.
 
-    Candidate removal is restricted to neutral degree-two atoms and bounded by
-    ``maximum_bridge_atoms``.  A candidate is accepted only when every removed
+    Candidate removal is restricted to neutral degree-two atoms.  Short
+    combinations preserve support for multiple bridges, while connected path
+    enumeration admits a single bridge of arbitrary configured length without
+    an exponential all-subsets scan.  A candidate is accepted only when every removed
     component is a path with exactly two parent attachments and the remaining
     graph has a locant-complete retained or audited systematic-fusion parent.
     This search runs only for already bridged polycycles.
@@ -196,7 +206,7 @@ def plan_bridged_fusion_wrapper(
     policy = FusionMode(mode)
     if (
         policy in {FusionMode.DISABLED, FusionMode.LEGACY}
-        or maximum_bridge_atoms < 1
+        or (maximum_bridge_atoms is not None and maximum_bridge_atoms < 1)
         or any(mol.atoms[atom].charge for atom in atoms)
     ):
         return None
@@ -204,24 +214,18 @@ def plan_bridged_fusion_wrapper(
     if topology.cycle_rank < 3 or not topology.bridgeheads:
         return None
 
-    # RDKit may mark a bridge heteroatom aromatic as part of the input ring
-    # model.  Degree and the audited parent remainder, rather than that input
-    # flag, determine whether an atom can be a bridge-path interior.
-    removable = tuple(
-        atom
-        for atom in sorted(atoms)
-        if len([neighbor for neighbor in mol.get_neighbors(atom) if neighbor in atoms]) == 2
-        and (mol.atoms[atom].symbol != "C" or not mol.atoms[atom].is_aromatic)
-    )
+    bridge_segments = _junction_path_interiors(mol, atoms, topology.internal_degrees)
+    if not bridge_segments:
+        return None
     visited_states = 0
     for parent_kind in (WrapperParentKind.RETAINED, WrapperParentKind.SYSTEMATIC_FUSION):
         candidates: list[tuple[tuple, BridgedFusionWrapperPlan]] = []
-        for count in range(1, min(maximum_bridge_atoms, len(removable)) + 1):
-            for removed_tuple in combinations(removable, count):
+        candidate_groups = _bridge_removal_candidate_groups(bridge_segments, maximum_bridge_atoms)
+        for count, removed_candidates in candidate_groups:
+            for removed in removed_candidates:
                 visited_states += 1
                 if visited_states > _WRAPPER_SEARCH_STATES:
                     return None
-                removed = frozenset(removed_tuple)
                 parent_atoms = atoms - removed
                 parent = (
                     _retained_wrapper_parent(mol, parent_atoms)
@@ -275,6 +279,59 @@ def plan_bridged_fusion_wrapper(
         if candidates:
             return min(candidates, key=lambda item: item[0])[1]
     return None
+
+
+def _bridge_removal_candidate_groups(
+    bridge_segments: tuple[frozenset[int], ...],
+    maximum_bridge_atoms: int | None,
+):
+    """Yield bounded unions of complete junction-to-junction path interiors."""
+
+    by_size: dict[int, set[frozenset[int]]] = {}
+    generated = 0
+    for count in range(1, len(bridge_segments) + 1):
+        for selected in combinations(bridge_segments, count):
+            generated += 1
+            if generated > _WRAPPER_SEARCH_STATES:
+                break
+            removed = frozenset().union(*selected)
+            if maximum_bridge_atoms is not None and len(removed) > maximum_bridge_atoms:
+                continue
+            by_size.setdefault(len(removed), set()).add(removed)
+        if generated > _WRAPPER_SEARCH_STATES:
+            break
+    for atom_count in sorted(by_size):
+        yield atom_count, tuple(sorted(by_size[atom_count], key=lambda atoms: tuple(sorted(atoms))))
+
+
+def _junction_path_interiors(
+    mol: Molecule,
+    atoms: frozenset[int],
+    degrees: dict[int, int],
+) -> tuple[frozenset[int], ...]:
+    """Return maximal degree-two paths connecting distinct ring junctions."""
+
+    junctions = {atom for atom, degree in degrees.items() if degree != 2}
+    interiors: set[frozenset[int]] = set()
+    for junction in sorted(junctions):
+        for neighbor in sorted(item for item in mol.get_neighbors(junction) if item in atoms):
+            if neighbor in junctions:
+                continue
+            path: list[int] = []
+            previous, current = junction, neighbor
+            while current not in junctions:
+                if degrees.get(current) != 2 or current in path:
+                    path = []
+                    break
+                path.append(current)
+                following = [item for item in mol.get_neighbors(current) if item in atoms and item != previous]
+                if len(following) != 1:
+                    path = []
+                    break
+                previous, current = current, following[0]
+            if path and current != junction:
+                interiors.add(frozenset(path))
+    return tuple(sorted(interiors, key=lambda path: (len(path), tuple(sorted(path)))))
 
 
 def _retained_wrapper_parent(mol: Molecule, atoms: frozenset[int]) -> WrapperParentPlan | None:
@@ -380,13 +437,13 @@ def _bridge_operations(
 ) -> tuple[NondetachableBridgeOperation, ...] | None:
     operations = []
     for path in paths:
-        endpoints = tuple(
-            sorted(
-                {neighbor for atom in path for neighbor in mol.get_neighbors(atom) if neighbor in parent_atoms},
-                key=lambda atom: retained_locant_sort_key(locants[atom]),
-            )
-        )
-        if len(endpoints) != 2:
+        oriented = _orient_bridge_path(mol, path, parent_atoms, locants)
+        if oriented is None:
+            return None
+        path, endpoints = oriented
+        if any(
+            mol.get_bond(path_atom, endpoint).order != 1 for path_atom, endpoint in zip((path[0], path[-1]), endpoints)
+        ):
             return None
         # A path whose parent endpoints already share an edge is an annelated
         # ring component, not a nondetachable bridge over the parent.
@@ -395,7 +452,7 @@ def _bridge_operations(
         bridge_class = _bridge_class(mol, path)
         if bridge_class is None:
             return None
-        kind, prefix = bridge_class
+        kind, prefix, internal_orders, unsaturation_locants = bridge_class
         endpoint_locants = tuple(locants[atom] for atom in endpoints)
         operation_atoms = set(path) | set(endpoints)
         operations.append(
@@ -406,22 +463,91 @@ def _bridge_operations(
                 endpoint_atom_ids=endpoints,
                 endpoint_locants=endpoint_locants,
                 bond_ids=frozenset(bond_ids_within(mol, operation_atoms) - bond_ids_within(mol, set(endpoints))),
+                internal_bond_orders=internal_orders,
+                unsaturation_locants=unsaturation_locants,
             )
         )
     return tuple(operations)
 
 
-def _bridge_class(mol: Molecule, path: tuple[int, ...]) -> tuple[NondetachableBridgeKind, str] | None:
+def _orient_bridge_path(
+    mol: Molecule,
+    path: tuple[int, ...],
+    parent_atoms: frozenset[int],
+    locants: dict[int, str],
+) -> tuple[tuple[int, ...], tuple[int, int]] | None:
+    """Orient a bridge from its preferred parent attachment and validate attachment topology."""
+
+    attachments_by_atom = {
+        atom: tuple(sorted(neighbor for neighbor in mol.get_neighbors(atom) if neighbor in parent_atoms))
+        for atom in path
+    }
+    if len(path) == 1:
+        endpoints = attachments_by_atom[path[0]]
+        if len(endpoints) != 2:
+            return None
+        ordered = tuple(sorted(endpoints, key=lambda atom: retained_locant_sort_key(locants[atom])))
+        return path, ordered
+    if any(attachments_by_atom[atom] for atom in path[1:-1]):
+        return None
+    if len(attachments_by_atom[path[0]]) != 1 or len(attachments_by_atom[path[-1]]) != 1:
+        return None
+    forward_endpoints = (attachments_by_atom[path[0]][0], attachments_by_atom[path[-1]][0])
+    reverse_path = tuple(reversed(path))
+    reverse_endpoints = tuple(reversed(forward_endpoints))
+
+    def orientation_key(candidate_path: tuple[int, ...], endpoints: tuple[int, int]) -> tuple:
+        double_locants = tuple(
+            index
+            for index, (left, right) in enumerate(zip(candidate_path, candidate_path[1:]), start=1)
+            if mol.get_bond(left, right).order == 2
+        )
+        return (
+            double_locants,
+            retained_locant_sort_key(locants[endpoints[0]]),
+            retained_locant_sort_key(locants[endpoints[1]]),
+        )
+
+    return min(
+        ((path, forward_endpoints), (reverse_path, reverse_endpoints)),
+        key=lambda candidate: orientation_key(*candidate),
+    )
+
+
+def _bridge_class(
+    mol: Molecule,
+    path: tuple[int, ...],
+) -> tuple[NondetachableBridgeKind, str, tuple[int, ...], tuple[str, ...]] | None:
     symbols = tuple(mol.atoms[atom].symbol for atom in path)
+    internal_orders = tuple(mol.get_bond(left, right).order for left, right in zip(path, path[1:]))
     if all(symbol == "C" for symbol in symbols):
-        return NondetachableBridgeKind.CARBO, f"{stems.get(len(symbols)).stem}ano"
+        double_locants = tuple(str(index) for index, order in enumerate(internal_orders, start=1) if order == 2)
+        if any(order not in {1, 2} for order in internal_orders):
+            return None
+        prefix = _carbo_bridge_prefix(len(symbols), double_locants)
+        return NondetachableBridgeKind.CARBO, prefix, internal_orders, double_locants
+    if internal_orders:
+        return None
     if symbols == ("O",):
-        return NondetachableBridgeKind.EPOXY, "epoxy"
+        return NondetachableBridgeKind.EPOXY, "epoxy", (), ()
     if symbols == ("S",):
-        return NondetachableBridgeKind.EPITHIO, "epithio"
+        return NondetachableBridgeKind.EPITHIO, "epithio", (), ()
     if symbols == ("N",):
-        return NondetachableBridgeKind.EPIMINO, "epimino"
+        return NondetachableBridgeKind.EPIMINO, "epimino", (), ()
     return None
+
+
+def _carbo_bridge_prefix(length: int, double_locants: tuple[str, ...]) -> str:
+    """Render one acyclic carbon bridge from its typed internal bond model."""
+
+    stem = stems.get(length).stem
+    if not double_locants:
+        return f"{stem}ano"
+    if length == 2 and double_locants == ("1",):
+        return "etheno"
+    multiplier = "" if len(double_locants) == 1 else multipliers.basic(len(double_locants))
+    interfix = "a" if len(double_locants) > 1 else ""
+    return f"{stem}{interfix}[{','.join(double_locants)}]{multiplier}eno"
 
 
 def _render_bridge_parts(
@@ -494,6 +620,17 @@ def _audit_bridge_plan(
             return None
         if operation.endpoint_locants != tuple(parent_locants[atom] for atom in operation.endpoint_atom_ids):
             return None
+        classified = _bridge_class(mol, path)
+        if classified is None:
+            return None
+        kind, prefix, internal_orders, unsaturation_locants = classified
+        if (
+            operation.kind is not kind
+            or operation.prefix != prefix
+            or operation.internal_bond_orders != internal_orders
+            or operation.unsaturation_locants != unsaturation_locants
+        ):
+            return None
         scope = set(operation.atom_ids) | set(operation.endpoint_atom_ids)
         operation_edges = edges_within_atoms(mol, scope) - edges_within_atoms(mol, set(operation.endpoint_atom_ids))
         expected_edges.update(operation_edges)
@@ -507,6 +644,7 @@ def _audit_bridge_plan(
         "simple_bridge_paths",
         "exact_bridge_endpoints_and_locants",
         "exact_bridge_bond_ownership",
+        "typed_bridge_bond_and_prefix_model",
         "complete_wrapper_graph_reconstruction",
     )
 

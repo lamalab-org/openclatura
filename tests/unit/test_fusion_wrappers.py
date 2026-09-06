@@ -3,7 +3,8 @@ from __future__ import annotations
 import pytest
 
 from openclatura import name
-from openclatura.fusion.model import FusionMode
+from openclatura.fusion.model import FusionConfirmed, FusionMode
+from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.fusion.wrappers import (
     NondetachableBridgeKind,
     WrapperParentKind,
@@ -62,6 +63,7 @@ def test_bridged_fusion_wrapper_records_bridge_roles_and_local_graph_ownership()
         "simple_bridge_paths",
         "exact_bridge_endpoints_and_locants",
         "exact_bridge_bond_ownership",
+        "typed_bridge_bond_and_prefix_model",
         "complete_wrapper_graph_reconstruction",
     )
     assert 0 < plan.search_states <= 16
@@ -79,6 +81,68 @@ def test_bridged_fusion_wrapper_is_used_by_public_parent_pipeline():
     assert result.verified
     selected = next(step for step in result.decisions if step.decision == "selected audited bridged fusion parent")
     assert selected.data["audit_checks"][-1] == "complete_wrapper_graph_reconstruction"
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected", "orders", "unsaturation_locants"),
+    [
+        ("C12=CC=C(C3=CC=CC=C13)CCCCCC2", "1,4-hexanonaphthalene", (1, 1, 1, 1, 1), ()),
+        ("C12=CC=C(C3=CC=CC=C13)C=C2", "1,4-ethenonaphthalene", (2,), ("1",)),
+        ("C12=CC=C(C3=CC=CC=C13)CC=C2", "1,4-prop[1]enonaphthalene", (2, 1), ("1",)),
+        ("C12=CC=C(C3=CC=CC=C13)C=CC2", "4,1-prop[1]enonaphthalene", (2, 1), ("1",)),
+        (
+            "C12=CC=C(C3=CC=CC=C13)C=CC=C2",
+            "1,4-buta[1,3]dienonaphthalene",
+            (2, 1, 2),
+            ("1", "3"),
+        ),
+    ],
+)
+def test_arbitrary_length_and_unsaturated_carbo_bridges_use_typed_path_bonds(
+    smiles,
+    expected,
+    orders,
+    unsaturation_locants,
+):
+    result = name(
+        smiles,
+        fusion_mode=FusionMode.GENERAL,
+        verify_opsin=True,
+        include_trace=True,
+    )
+    mol = read_smiles(smiles)
+    plan = plan_bridged_fusion_wrapper(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert result.name == expected
+    assert result.opsin_check is not None and result.opsin_check.status == "matched"
+    assert plan is not None and len(plan.bridges) == 1
+    assert plan.bridges[0].internal_bond_orders == orders
+    assert plan.bridges[0].unsaturation_locants == unsaturation_locants
+    assert "typed_bridge_bond_and_prefix_model" in plan.audit_checks
+
+    selected = next(step for step in result.decisions if step.decision == "selected audited bridged fusion parent")
+    assert selected.data["bridges"][0]["internal_bond_orders"] == list(orders)
+    assert selected.data["bridges"][0]["unsaturation_locants"] == list(unsaturation_locants)
+
+
+def test_bridge_wrapper_composes_with_a_graph_proven_systematic_fusion_parent():
+    mol = read_smiles("O1C2=C(C=C1)C=CS2")
+    fusion = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+    assert isinstance(fusion, FusionConfirmed)
+    atom_by_locant = {str(locant): atom for atom, locant in fusion.plan.numbering.input_locant_maps[0]}
+    bridge_atom = max(mol.atoms) + 1
+    first_bond = max(mol.bonds) + 1
+    mol.add_atom("O", idx=bridge_atom)
+    mol.add_bond(atom_by_locant["2"], bridge_atom, idx=first_bond)
+    mol.add_bond(bridge_atom, atom_by_locant["3a"], idx=first_bond + 1)
+
+    plan = plan_bridged_fusion_wrapper(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert plan is not None
+    assert plan.parent.kind is WrapperParentKind.SYSTEMATIC_FUSION
+    assert plan.rendered_name == "2,3a-epoxythieno[2,3-b]furan"
+    assert plan.bridges[0].kind is NondetachableBridgeKind.EPOXY
+    assert plan.audit_checks[-1] == "complete_wrapper_graph_reconstruction"
 
 
 def test_bridged_wrapper_request_mode_does_not_claim_unaudited_pin_preference():

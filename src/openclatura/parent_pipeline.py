@@ -196,6 +196,8 @@ def resolve_bridged_fusion_parent(
                     "atoms": list(bridge.atom_ids),
                     "endpoint_atoms": list(bridge.endpoint_atom_ids),
                     "endpoint_locants": list(bridge.endpoint_locants),
+                    "internal_bond_orders": list(bridge.internal_bond_orders),
+                    "unsaturation_locants": list(bridge.unsaturation_locants),
                 }
                 for bridge in plan.bridges
             ],
