@@ -8,7 +8,7 @@
       "cover_kinds": ["tree"],
       "join_kinds": ["ortho", "ortho_peri"],
       "multiparent_parents": true,
-      "charged_parents": false,
+      "charged_parents": true,
       "nonstandard_valence": true,
       "interior_atoms": true,
       "maximum_indicated_hydrogens": null

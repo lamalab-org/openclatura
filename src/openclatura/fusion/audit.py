@@ -22,6 +22,7 @@ from .model import (
     AuditStatus,
     ComponentLocant,
     FusionAuditResult,
+    FusionChargeOperation,
     FusionCitationPlan,
     FusionComponentMatch,
     FusionComponentSpec,
@@ -88,6 +89,7 @@ def audit_fusion_plan(
     registry: object | None = None,
     lambda_descriptors: tuple[FusionLambdaDescriptor, ...] = (),
     indicated_hydrogens: tuple[SystemLocant, ...] = (),
+    charge_operations: tuple[FusionChargeOperation, ...] = (),
     rendered_core_name: str | None = None,
 ) -> FusionAuditResult:
     """Independently reconstruct and audit a completed fusion candidate.
@@ -155,11 +157,21 @@ def audit_fusion_plan(
         _audit_descriptors(mol, ast, specs, reconstruction, numbering, errors)
         checks.append("descriptor_interfaces")
 
-        _audit_reconstructed_graph(mol, parent_atoms, abstract_parent_graph, reconstruction, errors)
+        _audit_reconstructed_graph(
+            mol,
+            parent_atoms,
+            abstract_parent_graph,
+            reconstruction,
+            charge_operations,
+            errors,
+        )
         checks.extend(("abstract_graph_reconstruction", "input_graph_identity"))
 
-        _audit_numbering(mol, parent_atoms, abstract_parent_graph, numbering, errors)
+        _audit_numbering(mol, parent_atoms, abstract_parent_graph, numbering, charge_operations, errors)
         checks.append("completed_numbering")
+
+        _audit_charge_operations(mol, parent_atoms, abstract_parent_graph, numbering, charge_operations, errors)
+        checks.append("charge_operations")
 
         _audit_bond_model(mol, abstract_parent_graph, numbering, bond_model, errors)
         checks.append("parent_bond_model")
@@ -213,6 +225,37 @@ def _audit_lambda_descriptors(
     }
     if observed != expected:
         errors.append("lambda descriptors do not represent every neutral nonstandard-valence parent atom")
+
+
+def _audit_charge_operations(
+    mol: Molecule,
+    parent_atoms: frozenset[int],
+    abstract: FusionGraph,
+    numbering: FusionNumberingProof,
+    operations: tuple[FusionChargeOperation, ...],
+    errors: list[str],
+) -> None:
+    """Verify that charge operations exactly explain observed parent charges."""
+
+    locants = dict(numbering.input_locant_maps[0])
+    base_atoms = {atom.id: atom for atom in abstract.atoms}
+    expected = {
+        atom_id: (base_atoms[atom_id].formal_charge, mol.atoms[atom_id].charge)
+        for atom_id in parent_atoms
+        if mol.atoms[atom_id].charge != base_atoms[atom_id].formal_charge
+    }
+    observed: dict[int, tuple[int, int]] = {}
+    for operation in operations:
+        if operation.atom_id not in parent_atoms or operation.atom_id not in base_atoms:
+            errors.append("fusion charge operation targets an atom outside the parent graph")
+            continue
+        if operation.locant != locants.get(operation.atom_id):
+            errors.append("fusion charge operation locant does not map to its charged atom")
+        if operation.symbol != mol.atoms[operation.atom_id].symbol:
+            errors.append("fusion charge operation does not preserve the charged atom element")
+        observed[operation.atom_id] = (operation.base_charge, operation.observed_charge)
+    if observed != expected:
+        errors.append("fusion charge operations do not exactly represent parent formal-charge changes")
 
 
 def _audit_nomenclature_selection(
@@ -663,10 +706,16 @@ def _audit_reconstructed_graph(
     parent_atoms: frozenset[int],
     abstract: FusionGraph,
     reconstructed: _ReconstructedGraph,
+    charge_operations: tuple[FusionChargeOperation, ...],
     errors: list[str],
 ) -> None:
     actual_labels = {atom: (mol.atoms[atom].symbol, mol.atoms[atom].charge) for atom in parent_atoms}
-    if reconstructed.input_atoms != actual_labels:
+    reconstructed_observed = dict(reconstructed.input_atoms)
+    for operation in charge_operations:
+        symbol, base_charge = reconstructed_observed.get(operation.atom_id, ("", 0))
+        if symbol == operation.symbol and base_charge == operation.base_charge:
+            reconstructed_observed[operation.atom_id] = (symbol, operation.observed_charge)
+    if reconstructed_observed != actual_labels:
         errors.append("reconstructed component atoms differ from selected input elements or formal charges")
     actual_edges = frozenset(edges_within_atoms(mol, set(parent_atoms)))
     if reconstructed.input_edges != actual_edges:
@@ -685,6 +734,7 @@ def _audit_numbering(
     parent_atoms: frozenset[int],
     abstract: FusionGraph,
     numbering: FusionNumberingProof,
+    charge_operations: tuple[FusionChargeOperation, ...],
     errors: list[str],
 ) -> None:
     abstract_map = dict(numbering.abstract_atom_to_locant)
@@ -698,6 +748,7 @@ def _audit_numbering(
     face_membership = Counter(atom for face in numbering.selected_face_model.faces for atom in face.atom_cycle)
     fusion_atoms = {atom for atom, count in face_membership.items() if count > 1}
 
+    operation_by_atom = {operation.atom_id: operation for operation in charge_operations}
     for input_map_items in numbering.input_locant_maps:
         input_map = dict(input_map_items)
         if set(input_map) != parent_atoms or len(set(input_map.values())) != len(input_map):
@@ -710,7 +761,11 @@ def _audit_numbering(
             continue
         for input_atom, abstract_atom in input_to_abstract.items():
             assert abstract_atom is not None
-            if (mol.atoms[input_atom].symbol, mol.atoms[input_atom].charge) != abstract_labels[abstract_atom]:
+            expected_symbol, expected_charge = abstract_labels[abstract_atom]
+            operation = operation_by_atom.get(input_atom)
+            if operation is not None:
+                expected_charge = operation.observed_charge
+            if (mol.atoms[input_atom].symbol, mol.atoms[input_atom].charge) != (expected_symbol, expected_charge):
                 errors.append("input locant map does not preserve element and formal-charge labels")
                 break
         mapped_edges = frozenset(

@@ -129,6 +129,17 @@ def resolve_systematic_fusion_parent(
                 }
                 for join in plan.ast.joins
             ],
+            "charge_operations": [
+                {
+                    "atom_id": operation.atom_id,
+                    "locant": str(operation.locant),
+                    "symbol": operation.symbol,
+                    "base_charge": operation.base_charge,
+                    "observed_charge": operation.observed_charge,
+                    "operation_kind": operation.operation_kind.value,
+                }
+                for operation in plan.charge_operations
+            ],
             "locant_map_count": len(plan.numbering.input_locant_maps),
             "atom_to_locant": {atom: str(locant) for atom, locant in plan.numbering.input_locant_maps[0]},
             "orientation_score": plan.numbering.orientation_score,

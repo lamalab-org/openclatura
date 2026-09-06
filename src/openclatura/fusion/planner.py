@@ -20,6 +20,8 @@ from .model import (
     Face,
     FaceModel,
     FusionAuditFailed,
+    FusionChargeOperation,
+    FusionChargeOperationKind,
     FusionComponentSpec,
     FusionConfirmed,
     FusionGraph,
@@ -82,7 +84,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     if atoms - mol.atoms.keys():
         return FusionUnsupported("selected parent contains unknown graph atoms")
     if not SUPPORT.charged_parents and any(mol.atoms[atom].charge for atom in atoms):
-        return FusionUnsupported("charged fused parents are outside the bounded production tier")
+        return FusionUnsupported("charged fused parents are outside the configured production tier")
     if any(not mol.atoms[atom].element.fusion_supported for atom in atoms):
         return FusionUnsupported("fused parent contains an unsupported skeletal element")
     if not SUPPORT.nonstandard_valence and not _standard_valence_parent(mol, atoms):
@@ -148,6 +150,10 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
             "fusion component graphs could not be merged consistently",
             (str(exc),),
         )
+    try:
+        charge_operations = _fusion_charge_operations(mol, graph, numbering)
+    except ValueError as exc:
+        return FusionUnsupported("fused-parent charge operation is outside the audited production tier", (str(exc),))
     try:
         bond_model = parent_bond_model(graph)
     except MancudeSearchBudgetExceeded as exc:
@@ -226,6 +232,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         registry=registry,
         lambda_descriptors=lambda_descriptors,
         indicated_hydrogens=indicated_h,
+        charge_operations=charge_operations,
         rendered_core_name=rendered_core_name,
     )
     if audit.status is AuditStatus.ABSTAIN:
@@ -257,10 +264,39 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
             ),
         ),
         audit=audit,
+        charge_operations=charge_operations,
         lambda_descriptors=lambda_descriptors,
         rendered_parts=rendered_parts,
     )
     return FusionConfirmed(plan)
+
+
+def _fusion_charge_operations(
+    mol: Molecule,
+    graph: FusionGraph,
+    numbering: FusionNumberingProof,
+) -> tuple[FusionChargeOperation, ...]:
+    """Describe supported charge deltas from the component parent graphs."""
+
+    locants = dict(numbering.input_locant_maps[0])
+    operations: list[FusionChargeOperation] = []
+    for graph_atom in graph.atoms:
+        observed = mol.atoms[graph_atom.id]
+        if observed.charge == graph_atom.formal_charge:
+            continue
+        if graph_atom.id not in locants:
+            raise ValueError(f"charged atom {graph_atom.id} has no completed-system locant")
+        operations.append(
+            FusionChargeOperation(
+                atom_id=graph_atom.id,
+                locant=locants[graph_atom.id],
+                symbol=observed.symbol,
+                base_charge=graph_atom.formal_charge,
+                observed_charge=observed.charge,
+                operation_kind=FusionChargeOperationKind.HETEROATOM_CATIONIZATION,
+            )
+        )
+    return tuple(sorted(operations, key=lambda operation: system_locant_sort_key(operation.locant)))
 
 
 def _cited_indicated_hydrogens(

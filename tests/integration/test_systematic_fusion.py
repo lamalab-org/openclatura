@@ -13,6 +13,7 @@ from openclatura.fusion.faces import FaceSearchBudgetExceeded
 from openclatura.fusion.model import (
     AuditStatus,
     FusionAuditFailed,
+    FusionChargeOperationKind,
     FusionConfirmed,
     FusionNotApplicable,
     FusionUnsupported,
@@ -499,15 +500,61 @@ def test_pin_mode_abstains_when_only_one_ring_meets_size_gate():
     assert "ring-size gate" in result.reason
 
 
-def test_charged_fused_parent_abstains_before_component_planning():
+def test_positive_heteroatom_charge_is_audited_as_a_locanted_parent_operation():
+    mol = read_smiles("O1C=CC=2C1=[NH+]C=CC2")
+
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+
+    assert isinstance(result, FusionConfirmed)
+    assert result.plan.rendered_base_name == "7H-furo[2,3-b]pyridine"
+    assert len(result.plan.charge_operations) == 1
+    operation = result.plan.charge_operations[0]
+    assert operation.operation_kind is FusionChargeOperationKind.HETEROATOM_CATIONIZATION
+    assert operation.symbol == "N"
+    assert operation.base_charge == 0
+    assert operation.observed_charge == 1
+    assert str(operation.locant) == "7"
+    assert "charge_operations" in result.plan.audit.checks
+
+    named = name(
+        "O1C=CC=2C1=[NH+]C=CC2",
+        fusion_mode=FusionMode.GENERAL,
+        include_trace=True,
+    )
+    assert named.name == "7H-furo[2,3-b]pyridin-7-ium"
+    decision = next(step for step in named.decisions if step.decision == "selected audited systematic fusion parent")
+    assert decision.data["charge_operations"] == [
+        {
+            "atom_id": operation.atom_id,
+            "locant": "7",
+            "symbol": "N",
+            "base_charge": 0,
+            "observed_charge": 1,
+            "operation_kind": "heteroatom_cationization",
+        }
+    ]
+
+
+def test_positive_oxygen_fusion_parent_uses_same_charge_operation_model():
+    result = name(
+        "[O+]1C=CC=2C1=NC=CC2",
+        fusion_mode=FusionMode.GENERAL,
+        include_trace=True,
+    )
+
+    assert result.name == "furo[2,3-b]pyridin-1-ium"
+    assert result.parent_nomenclature == "systematic_fusion"
+
+
+def test_unsupported_fused_parent_charge_abstains_safely():
     mol = read_smiles("O1C2=C(C=C1)C=CS2")
-    atom_id = next(iter(mol.atoms))
-    mol.update_atom(atom_id, charge=1)
+    atom_id = next(atom for atom, data in mol.atoms.items() if data.symbol == "C")
+    mol.update_atom(atom_id, charge=-1)
 
     result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
 
     assert isinstance(result, FusionUnsupported)
-    assert "charged fused parents" in result.reason
+    assert "charge operation" in result.reason
 
 
 def test_neutral_nonstandard_valence_uses_completed_system_lambda_locant():

@@ -807,6 +807,31 @@ class FusionAuditResult:
         return self.status is AuditStatus.CONFIRMED
 
 
+class FusionChargeOperationKind(StrEnum):
+    """Supported charge changes from the neutral fusion parent hydride."""
+
+    HETEROATOM_CATIONIZATION = "heteroatom_cationization"
+
+
+@dataclass(frozen=True, slots=True)
+class FusionChargeOperation:
+    """One locanted formal-charge change applied to a fusion parent graph."""
+
+    atom_id: int
+    locant: SystemLocant
+    symbol: str
+    base_charge: int
+    observed_charge: int
+    operation_kind: FusionChargeOperationKind
+
+    def __post_init__(self) -> None:
+        _require_nonnegative(self.atom_id, "fusion charge atom id")
+        _require_nonempty(self.symbol, "fusion charge atom symbol")
+        if self.operation_kind is FusionChargeOperationKind.HETEROATOM_CATIONIZATION:
+            if self.symbol not in {"N", "O"} or self.base_charge != 0 or self.observed_charge != 1:
+                raise ValueError("heteroatom cationization requires a neutral N/O parent site becoming +1")
+
+
 @dataclass(frozen=True, slots=True)
 class FusionParentPlan:
     """A complete systematic fusion parent that passed independent audit."""
@@ -820,6 +845,7 @@ class FusionParentPlan:
     pin_eligibility: str
     rule_trace: tuple[FusionRuleDecision, ...]
     audit: FusionAuditResult
+    charge_operations: tuple[FusionChargeOperation, ...] = ()
     lambda_descriptors: tuple[FusionLambdaDescriptor, ...] = ()
     rendered_parts: tuple[NameTokenBinding, ...] = ()
 
@@ -829,6 +855,8 @@ class FusionParentPlan:
             raise ValueError("FusionParentPlan requires a confirmed independent audit")
         if len(self.indicated_hydrogens) != len(set(self.indicated_hydrogens)):
             raise ValueError("fusion indicated-hydrogen locants must be unique")
+        if len({operation.atom_id for operation in self.charge_operations}) != len(self.charge_operations):
+            raise ValueError("fusion charge operations must target unique atoms")
         graph_atoms = {atom.id for atom in self.abstract_parent_graph.atoms}
         numbered_atoms = {atom for atom, _ in self.numbering.abstract_atom_to_locant}
         if graph_atoms != numbered_atoms:

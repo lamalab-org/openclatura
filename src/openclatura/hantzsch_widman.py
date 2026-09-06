@@ -181,7 +181,7 @@ def hw_fusion_components_for_ring(mol: Molecule, path: list[int]) -> tuple[HWFus
     atoms = tuple(mol.atoms[atom_idx] for atom_idx in path)
     if (
         all(atom.symbol == "C" for atom in atoms)
-        or any(atom.charge or atom.isotope is not None for atom in atoms)
+        or any(not _fusion_parent_charge_supported(atom.symbol, atom.charge) or atom.isotope is not None for atom in atoms)
         or any(not atom.element.fusion_supported for atom in atoms)
         or any(
             atom.symbol != "C" and (atom.element.hw_stem is None or atom.element.hw_priority is None) for atom in atoms
@@ -207,6 +207,12 @@ def hw_fusion_components_for_ring(mol: Molecule, path: list[int]) -> tuple[HWFus
         atom_to_locant = tuple((atom_idx, str(locant)) for locant, atom_idx in enumerate(order, start=1))
         components.append(_hw_fusion_component(symbols, atom_to_locant))
     return tuple(components)
+
+
+def _fusion_parent_charge_supported(symbol: str, charge: int) -> bool:
+    """Whether fusion nomenclature can express the atom as a parent charge operation."""
+
+    return charge == 0 or (charge == 1 and symbol in {"N", "O"})
 
 
 def _is_mancude_or_hydro_derivative(

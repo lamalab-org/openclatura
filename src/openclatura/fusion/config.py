@@ -167,8 +167,6 @@ def _validate_implemented_support(support: FusionSupportConfig) -> None:
         raise ValueError("fusion nomenclature support includes an unimplemented component-cover kind")
     if support.join_kinds != _IMPLEMENTED_JOIN_KINDS:
         raise ValueError("fusion nomenclature support includes an unimplemented join kind")
-    if support.charged_parents:
-        raise ValueError("fusion nomenclature support flags exceed the implemented neutral tier")
 
 
 def _text(data: dict, key: str) -> str:
