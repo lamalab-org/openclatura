@@ -540,8 +540,10 @@ def bond_model_indicated_hydrogen_atoms(
 
     The symmetric bond-order delta is interpreted without reading a rendered
     parent name. A missing double bond with hydrogen-bearing atoms at both ends
-    is ordinary additive hydrogenation. If only one endpoint is an eligible
-    saturated site, that endpoint requires an indicated-hydrogen citation.
+    is ordinary additive hydrogenation. A lone eligible heteroatom endpoint is
+    an indicated-hydrogen site. Carbon indicated-H citations have additional
+    component-context requirements and remain with the fusion planner's
+    carbocycle/polycyclic rule.
     """
 
     model_edges = bond_model.required_single_bonds | bond_model.required_double_bonds | bond_model.pi_eligible_edges
@@ -569,7 +571,7 @@ def bond_model_indicated_hydrogen_atoms(
             if order != 1 or allowed[edge] != 2:
                 compatible = False
                 break
-            endpoints = set(edge) & candidates
+            endpoints = {atom for atom in set(edge) & candidates if mol.atoms[atom].symbol != "C"}
             if len(endpoints) == 1:
                 indicated.update(endpoints)
             elif len(endpoints) != 2:
