@@ -158,11 +158,18 @@ def hw_fusion_component_from_key(key: str) -> HWFusionComponent | None:
 
 
 def hw_fusion_components_for_ring(mol: Molecule, path: list[int]) -> tuple[HWFusionComponent, ...]:
-    """Derive all preferred local numberings for one neutral mancude face.
+    """Derive preferred local numberings for a neutral HW fusion face.
 
     The operation is linear in the ring size apart from the at-most ``2n``
     orientation comparison required by HW numbering.  It neither consults nor
     mutates the generated-parent name cache used by the general parent pipeline.
+
+    A face may be the mancude component itself or a hydro derivative of it.
+    The latter is accepted only when its observed double bonds are a subset of
+    at least one valid maximum noncumulative mancude assignment.  The generated
+    template remains mancude: the fusion parent's ordinary hydro-operation
+    machinery records the missing double bonds after the component graphs have
+    been merged and numbered.
     """
 
     if not MIN_RING_SIZE <= len(path) <= MAX_RING_SIZE or len(path) != len(set(path)):
@@ -188,11 +195,10 @@ def hw_fusion_components_for_ring(mol: Molecule, path: list[int]) -> tuple[HWFus
         return ()
     symbols = tuple(mol.atoms[atom_idx].symbol for atom_idx in orders[0])
     expected_double_bonds = mancude_double_bonds(list(symbols))
-    actual_double_bonds = _ring_double_bonds(mol, path)
-    if (
-        expected_double_bonds == 0
-        or actual_double_bonds != expected_double_bonds
-        or _has_cumulated_ring_double_bonds(mol, path)
+    if expected_double_bonds == 0 or not _is_mancude_or_hydro_derivative(
+        mol,
+        path,
+        expected_double_bonds=expected_double_bonds,
     ):
         return ()
 
@@ -201,6 +207,64 @@ def hw_fusion_components_for_ring(mol: Molecule, path: list[int]) -> tuple[HWFus
         atom_to_locant = tuple((atom_idx, str(locant)) for locant, atom_idx in enumerate(order, start=1))
         components.append(_hw_fusion_component(symbols, atom_to_locant))
     return tuple(components)
+
+
+def _is_mancude_or_hydro_derivative(
+    mol: Molecule,
+    path: list[int],
+    *,
+    expected_double_bonds: int,
+) -> bool:
+    """Whether a ring's pi bonds can belong to its generated mancude parent.
+
+    Merely accepting fewer double bonds is insufficient: it would also admit a
+    double bond at a forced-single chalcogen or a pattern that no Kekule form of
+    the parent can contain.  Fix the observed double bonds, remove their
+    endpoints, and prove that the remaining eligible cycle vertices can still
+    complete a maximum matching of the expected size.
+    """
+
+    actual_double_bonds = _ring_double_bonds(mol, path)
+    if actual_double_bonds is None or actual_double_bonds == 0 or actual_double_bonds > expected_double_bonds:
+        return False
+
+    size = len(path)
+    unavailable = [mol.atoms[atom_idx].symbol in FIXED_SATURATED for atom_idx in path]
+    for position, (left, right) in enumerate(zip(path, path[1:] + path[:1])):
+        bond = mol.get_bond(left, right)
+        if bond is None or bond.order != 2:
+            continue
+        following = (position + 1) % size
+        if unavailable[position] or unavailable[following]:
+            return False
+        unavailable[position] = True
+        unavailable[following] = True
+
+    available = tuple(not blocked for blocked in unavailable)
+    return actual_double_bonds + _maximum_cycle_matching_size(available) == expected_double_bonds
+
+
+def _maximum_cycle_matching_size(available: tuple[bool, ...]) -> int:
+    """Maximum edge matching on a cycle after unavailable vertices are removed."""
+
+    size = len(available)
+    if not size or not any(available):
+        return 0
+    if all(available):
+        return size // 2
+
+    # Starting immediately after a blocked vertex turns the residual cycle into
+    # independent paths.  A path of n vertices contributes floor(n / 2) edges.
+    blocked = available.index(False)
+    result = 0
+    run_length = 0
+    for offset in range(1, size + 1):
+        if available[(blocked + offset) % size]:
+            run_length += 1
+        else:
+            result += run_length // 2
+            run_length = 0
+    return result + run_length // 2
 
 
 def _hw_fusion_component(
@@ -284,17 +348,6 @@ def _hw_fusion_forms(name: str) -> tuple[str, str]:
     attached_base = f"{base[:-1]}o" if base.endswith("e") else f"{base}o"
     attached = f"[{locants}]{attached_base}" if locants else attached_base
     return parent, attached
-
-
-def _has_cumulated_ring_double_bonds(mol: Molecule, path: list[int]) -> bool:
-    return any(
-        sum(
-            (bond := mol.get_bond(atom_idx, neighbor)) is not None and bond.order == 2
-            for neighbor in (path[position - 1], path[(position + 1) % len(path)])
-        )
-        > 1
-        for position, atom_idx in enumerate(path)
-    )
 
 
 # Divalent at their normal valence, so they take no ring double bond and cut the

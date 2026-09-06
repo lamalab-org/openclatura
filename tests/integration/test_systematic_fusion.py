@@ -148,6 +148,31 @@ def test_simple_hydrogenation_is_derived_from_parent_bond_model():
     assert result.name == "4,5-dihydrothieno[2,3-b]furan"
 
 
+def test_partly_hydrogenated_hw_component_uses_fusion_nomenclature():
+    smiles = "C1COC2=C(ON=C2)O1"
+    result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True)
+
+    assert result.name == "5,6-dihydro[1,4]dioxino[2,3-d]isoxazole"
+    assert result.parent_nomenclature == "systematic_fusion"
+    assert result.opsin_check is not None and result.opsin_check.status == "matched"
+    assert result.substituent_tree[0]["hydro_operations"] == [
+        {
+            "key": "additive_hydrogen",
+            "reason": "Observed parent bond orders require hydrogenation of the proved mancude parent.",
+            "locants": ["5", "6"],
+            "atom_ids": [0, 1],
+            "operation_kind": "additive_hydrogen",
+        }
+    ]
+
+
+def test_partly_hydrogenated_hw_fusion_is_atom_order_invariant():
+    mol = Chem.MolFromSmiles("C1COC2=C(ON=C2)O1")
+    renumbered = Chem.RenumberAtoms(mol, list(reversed(range(mol.GetNumAtoms()))))
+
+    assert name_mol(mol).name == name_mol(renumbered).name == "5,6-dihydro[1,4]dioxino[2,3-d]isoxazole"
+
+
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [

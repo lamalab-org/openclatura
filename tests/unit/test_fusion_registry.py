@@ -252,6 +252,43 @@ def test_unlisted_hw_monocycle_is_derived_as_a_systematic_component():
     assert tuple(hw_generated_names()) == before_hw_names
 
 
+def test_partly_hydrogenated_hw_face_keeps_its_mancude_fusion_component():
+    """A hydro derivative is represented by the parent plus a HydroOperation."""
+
+    mol, face = _ring(
+        ("O", "C", "C", "O", "C", "C"),
+        atom_ids=(40, 10, 50, 20, 30, 60),
+        nonaromatic_positions=frozenset(range(6)),
+    )
+    double_bond = mol.get_bond(10, 50)
+    assert double_bond is not None
+    mol.update_bond(double_bond.idx, order=2)
+
+    generated = tuple(
+        match
+        for match in fusion_component_registry().match_faces(mol, (face,))
+        if match.spec_key.startswith("generated-hw:")
+    )
+
+    assert generated
+    assert {fusion_component_registry().spec_for_match(match).parent_name for match in generated} == {"[1,4]dioxine"}
+
+
+def test_partly_hydrogenated_hw_face_rejects_double_bond_at_forced_single_atom():
+    mol, face = _ring(
+        ("O", "C", "C", "O", "C", "C"),
+        atom_ids=(40, 10, 50, 20, 30, 60),
+        nonaromatic_positions=frozenset(range(6)),
+    )
+    invalid_double_bond = mol.get_bond(40, 10)
+    assert invalid_double_bond is not None
+    mol.update_bond(invalid_double_bond.idx, order=2)
+
+    matches = fusion_component_registry().match_faces(mol, (face,))
+
+    assert not any(match.spec_key.startswith("generated-hw:") for match in matches)
+
+
 def test_systematic_hw_numbering_is_independent_of_face_cycle_orientation():
     registry = fusion_component_registry()
     mol, face = _triazole_ring()
