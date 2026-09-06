@@ -382,7 +382,10 @@ def test_batch_request_propagates_fusion_mode_without_cross_request_state():
         processes=1,
     )
     assert [result.name for result in values] == ["thieno[2,3-b]furan", "ethanol"]
-    assert name("O1C2=C(C=C1)C=CS2").name == "2-oxa-8-thiabicyclo[3.3.0]octa-1(5),3,6-triene"
+    default_result = name("O1C2=C(C=C1)C=CS2", include_trace=True)
+    assert default_result.name == "thieno[2,3-b]furan"
+    assert default_result.parent_nomenclature == "systematic_fusion"
+    assert default_result.pin_status == "confirmed"
 
 
 def test_nested_legacy_request_restores_the_active_fusion_policy():

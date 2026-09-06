@@ -41,7 +41,7 @@ def name(
     verify_self: bool = False,
     token_debug: bool = False,
     omit_redundant_locants: bool = True,
-    fusion_mode: FusionMode | str = FusionMode.LEGACY,
+    fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
 ) -> NamingResult:
     """One-shot naming with the default engine. Returns a typed ``NamingResult``.
 
@@ -50,7 +50,9 @@ def name(
     returns a structured result with rules-hit information and optional
     verification metadata.  ``verify_opsin`` round-trips the name through OPSIN
     (needs Java); ``verify_self`` runs the dependency-free reconstruction audit
-    (see ``result.self_audit`` / ``result.self_verified``).
+    (see ``result.self_audit`` / ``result.self_verified``). Systematic fusion
+    naming defaults to the audited PIN policy; pass an explicit ``FusionMode``
+    to select general fusion nomenclature or legacy behavior.
     """
 
     return DEFAULT_NAMING_ENGINE.run(
@@ -74,7 +76,7 @@ def name_mol(
     verify_self: bool = False,
     token_debug: bool = False,
     omit_redundant_locants: bool = True,
-    fusion_mode: FusionMode | str = FusionMode.LEGACY,
+    fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
 ) -> NamingResult:
     """One-shot naming of an existing RDKit molecule. Returns a ``NamingResult``.
 
@@ -105,7 +107,7 @@ def name_many(
     verify_self: bool = False,
     token_debug: bool = False,
     omit_redundant_locants: bool = True,
-    fusion_mode: FusionMode | str = FusionMode.LEGACY,
+    fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
     processes: int | None | str = 1,
     chunksize: int = 64,
 ) -> list[NamingResult]:

@@ -6,7 +6,7 @@ from contextvars import ContextVar, Token
 
 from .model import FusionMode
 
-_FUSION_MODE: ContextVar[FusionMode] = ContextVar("openclatura_fusion_mode", default=FusionMode.LEGACY)
+_FUSION_MODE: ContextVar[FusionMode] = ContextVar("openclatura_fusion_mode", default=FusionMode.AUDITED_PIN)
 
 
 def current_fusion_mode() -> FusionMode:

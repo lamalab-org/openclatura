@@ -82,7 +82,7 @@ class NamingRequest:
     verify_self: bool = False
     token_debug: bool = False
     omit_redundant_locants: bool = True
-    fusion_mode: FusionMode = FusionMode.LEGACY
+    fusion_mode: FusionMode = FusionMode.AUDITED_PIN
     rdkit_mol: Any | None = None
 
 
@@ -179,23 +179,23 @@ class NamingEngine:
     public callers.
     """
 
-    def name(self, smiles: str, *, fusion_mode: FusionMode | str = FusionMode.LEGACY) -> str:
+    def name(self, smiles: str, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN) -> str:
         """Return the generated name for ``smiles``."""
 
         return self.run(NamingRequest(smiles=smiles, fusion_mode=FusionMode(fusion_mode))).name
 
-    def name_smiles(self, smiles: str, *, fusion_mode: FusionMode | str = FusionMode.LEGACY) -> str:
+    def name_smiles(self, smiles: str, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN) -> str:
         """Compatibility alias for the legacy public API name."""
 
         return self.name(smiles, fusion_mode=fusion_mode)
 
-    def name_rdkit_mol(self, rdkit_mol: Any, *, fusion_mode: FusionMode | str = FusionMode.LEGACY) -> str:
+    def name_rdkit_mol(self, rdkit_mol: Any, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN) -> str:
         """Return the generated name for an existing ``rdkit.Chem.rdchem.Mol``."""
 
         return self.run(NamingRequest(rdkit_mol=rdkit_mol, fusion_mode=FusionMode(fusion_mode))).name
 
     def name_rdkit_mol_with_trace(
-        self, rdkit_mol: Any, *, fusion_mode: FusionMode | str = FusionMode.LEGACY
+        self, rdkit_mol: Any, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN
     ) -> tuple[str, list[dict]]:
         """Return the generated name and assembly trace for an RDKit molecule."""
 
@@ -207,7 +207,7 @@ class NamingEngine:
         rdkit_mol: Any,
         *,
         token_debug: bool = False,
-        fusion_mode: FusionMode | str = FusionMode.LEGACY,
+        fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
     ) -> NameAnalysis:
         """Return the full explainable naming analysis for an RDKit molecule."""
 
@@ -224,7 +224,7 @@ class NamingEngine:
         return result.analysis
 
     def name_with_trace(
-        self, smiles: str, *, fusion_mode: FusionMode | str = FusionMode.LEGACY
+        self, smiles: str, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN
     ) -> tuple[str, list[dict]]:
         """Return the generated name and assembly trace segments."""
 
@@ -232,7 +232,7 @@ class NamingEngine:
         return result.name, result.trace_segments
 
     def name_smiles_with_trace(
-        self, smiles: str, *, fusion_mode: FusionMode | str = FusionMode.LEGACY
+        self, smiles: str, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN
     ) -> tuple[str, list[dict]]:
         """Compatibility alias for the legacy public API name."""
 
@@ -243,7 +243,7 @@ class NamingEngine:
         smiles: str,
         *,
         token_debug: bool = False,
-        fusion_mode: FusionMode | str = FusionMode.LEGACY,
+        fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
     ) -> NameAnalysis:
         """Return the full explainable naming analysis for ``smiles``."""
 
@@ -264,7 +264,7 @@ class NamingEngine:
         smiles: str,
         *,
         token_debug: bool = False,
-        fusion_mode: FusionMode | str = FusionMode.LEGACY,
+        fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
     ) -> NameAnalysis:
         """Compatibility alias for the legacy public API name."""
 
@@ -351,7 +351,7 @@ class NamingEngine:
         verify_self: bool = False,
         token_debug: bool = False,
         omit_redundant_locants: bool = True,
-        fusion_mode: FusionMode | str = FusionMode.LEGACY,
+        fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
         processes: int | None | str = 1,
         chunksize: int = 64,
     ) -> list[NamingResult]:
@@ -549,7 +549,7 @@ def _request_for(
     verify_self: bool = False,
     token_debug: bool,
     omit_redundant_locants: bool = True,
-    fusion_mode: FusionMode | str = FusionMode.LEGACY,
+    fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
 ) -> NamingRequest:
     """Build a request from a batch item, which may be a SMILES or an RDKit molecule."""
 
@@ -588,7 +588,7 @@ def _run_parallel(
     verify_self: bool = False,
     token_debug: bool,
     omit_redundant_locants: bool = True,
-    fusion_mode: FusionMode | str = FusionMode.LEGACY,
+    fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
     processes: int,
     chunksize: int,
 ) -> list[NamingResult]:

@@ -1994,7 +1994,9 @@ def name_component(
     )
 
 
-def name_smiles_with_trace(smiles: str, *, fusion_mode: FusionMode | str = FusionMode.LEGACY) -> tuple[str, list[dict]]:
+def name_smiles_with_trace(
+    smiles: str, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN
+) -> tuple[str, list[dict]]:
     """Return a generated name and AssemblyParts-derived trace annotations, exposing the atom and bond IDs
     selected during parent, prefix, unsaturation and suffix assembly."""
 
@@ -2005,7 +2007,7 @@ def analyze_smiles(
     smiles: str,
     *,
     token_debug: bool = False,
-    fusion_mode: FusionMode | str = FusionMode.LEGACY,
+    fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
 ) -> NameAnalysis:
     """Return a generated name with structure annotations and decision traces: parsing, component
     splitting, group perception, priority, parent selection, numbering and assembly."""
@@ -2013,14 +2015,14 @@ def analyze_smiles(
     return DEFAULT_NAMING_ENGINE.analyze_smiles(smiles, token_debug=token_debug, fusion_mode=fusion_mode)
 
 
-def name_smiles(smiles: str, *, fusion_mode: FusionMode | str = FusionMode.LEGACY) -> str:
+def name_smiles(smiles: str, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN) -> str:
     """Return an IUPAC-style name for a SMILES string.  P-13 for name construction, P-44/P-45 for parent
     selection and numbering, P-72 for ordering disconnected ionic components."""
 
     return DEFAULT_NAMING_ENGINE.name_smiles(smiles, fusion_mode=fusion_mode)
 
 
-def name_rdkit_mol(rdkit_mol, *, fusion_mode: FusionMode | str = FusionMode.LEGACY) -> str:
+def name_rdkit_mol(rdkit_mol, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN) -> str:
     """Return an IUPAC-style name for an existing ``rdkit.Chem.rdchem.Mol``, for callers that already hold
     one.  Equivalent to :func:`name_smiles` without the SMILES round-trip; the input is not modified."""
 
@@ -2028,7 +2030,7 @@ def name_rdkit_mol(rdkit_mol, *, fusion_mode: FusionMode | str = FusionMode.LEGA
 
 
 def name_rdkit_mol_with_trace(
-    rdkit_mol, *, fusion_mode: FusionMode | str = FusionMode.LEGACY
+    rdkit_mol, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN
 ) -> tuple[str, list[dict]]:
     """RDKit-molecule counterpart of :func:`name_smiles_with_trace`."""
 
@@ -2039,7 +2041,7 @@ def analyze_rdkit_mol(
     rdkit_mol,
     *,
     token_debug: bool = False,
-    fusion_mode: FusionMode | str = FusionMode.LEGACY,
+    fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
 ) -> NameAnalysis:
     """RDKit-molecule counterpart of :func:`analyze_smiles`."""
 
