@@ -506,6 +506,35 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
     # Every cycle lies entirely within the ring atoms, so searching only those prunes the
     # exhaustive DFS out of all acyclic branches without losing any cycle.
     valid_nodes = get_cyclic_atoms(mol, exclude_atoms)
+    if not valid_nodes:
+        return []
+
+    # A complete retained locant graph already proves both the ring-system
+    # boundary and its numbering. Resolve it before enumerating simple cycles;
+    # the number of such cycles grows exponentially in long fused systems.
+    ring_edge_count = (
+        sum(neighbor in valid_nodes for atom_idx in valid_nodes for neighbor in mol.get_neighbors(atom_idx)) // 2
+    )
+    retained_match = (
+        retained_rules.get_pre_descriptor_retained_ring(mol, list(valid_nodes))
+        if ring_edge_count >= len(valid_nodes) + 2
+        else None
+    )
+    retained_maps = retained_match[1] if retained_match is not None else None
+    if retained_maps:
+        retained_parent = RingParent.from_retained_locant_maps(
+            atoms=valid_nodes,
+            locant_maps=retained_maps,
+        )
+        return [
+            RingSystem(
+                atoms=valid_nodes,
+                is_polycycle=True,
+                paths=retained_parent.paths,
+                ring_parent=retained_parent,
+            )
+        ]
+
     cycles = []
 
     def dfs_cycle(curr, start, path, visited):

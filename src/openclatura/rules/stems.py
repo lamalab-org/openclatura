@@ -14,6 +14,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 from re import Pattern
 
+from . import multipliers
+
 
 @dataclass(frozen=True)
 class Stem:
@@ -62,82 +64,12 @@ STEMS: dict[int, Stem] = {
 MIN_STEM_LENGTH = 1
 MAX_STEM_LENGTH = 1000
 
-_UNITS = {
-    1: "hen",
-    2: "do",
-    3: "tri",
-    4: "tetra",
-    5: "penta",
-    6: "hexa",
-    7: "hepta",
-    8: "octa",
-    9: "nona",
-}
-
-_TENS = {
-    1: "deca",
-    2: "icosa",
-    3: "triaconta",
-    4: "tetraconta",
-    5: "pentaconta",
-    6: "hexaconta",
-    7: "heptaconta",
-    8: "octaconta",
-    9: "nonaconta",
-}
-
-_HUNDREDS = {
-    1: "hecta",
-    2: "dicta",
-    3: "tricta",
-    4: "tetracta",
-    5: "pentacta",
-    6: "hexacta",
-    7: "heptacta",
-    8: "octacta",
-    9: "nonacta",
-}
-
 
 def _validate_length(length: int) -> None:
     if isinstance(length, bool) or not isinstance(length, int):
         raise ValueError("Stem length must be an integer from 1 through 1000")
     if not MIN_STEM_LENGTH <= length <= MAX_STEM_LENGTH:
         raise ValueError("Stem length must be from 1 through 1000")
-
-
-def _under_one_hundred(value: int) -> str:
-    """Return the basic numerical term for a value from 1 through 99."""
-
-    if value == 11:
-        return "undeca"
-
-    units = value % 10
-    tens = value // 10
-    unit_term = _UNITS.get(units, "")
-    tens_term = _TENS.get(tens, "")
-
-    # The initial i of icosa is elided after a vowel (P-14.2.1.2), e.g.
-    # do + icosa -> docosa, but hen + icosa -> henicosa.
-    if unit_term and tens == 2 and unit_term[-1] in "aeiou":
-        tens_term = tens_term[1:]
-    return unit_term + tens_term
-
-
-def _numerical_term(length: int) -> str:
-    """Build the P-14.2.1 basic numerical term for ``length``."""
-
-    _validate_length(length)
-    if length == 1000:
-        return "kilia"
-
-    hundreds, remainder = divmod(length, 100)
-    parts = []
-    if remainder:
-        parts.append(_under_one_hundred(remainder))
-    if hundreds:
-        parts.append(_HUNDREDS[hundreds])
-    return "".join(parts)
 
 
 def get(length: int) -> Stem:
@@ -153,7 +85,7 @@ def _get_cached(length: int) -> Stem:
 
     if length in STEMS:
         return STEMS[length]
-    numerical_term = _numerical_term(length)
+    numerical_term = multipliers.numerical_term(length)
     return Stem(length, numerical_term.removesuffix("a"), retained=False)
 
 

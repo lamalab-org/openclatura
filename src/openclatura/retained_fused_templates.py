@@ -147,7 +147,7 @@ def _generated_acene_templates() -> tuple[RetainedGraphTemplate, ...]:
 
     series = load_json_table("retained_fused_series.json").get("acenes", {})
     minimum = int(series.get("minimum_ring_count", 4))
-    maximum = int(series.get("maximum_ring_count", minimum))
+    maximum = int(series.get("eager_maximum_ring_count", series.get("maximum_ring_count", minimum)))
     overrides = {int(count): dict(values) for count, values in series.get("member_overrides", {}).items()}
     rows = []
     for ring_count in range(minimum, maximum + 1):
@@ -204,7 +204,7 @@ def _generated_polyaphene_templates() -> tuple[RetainedGraphTemplate, ...]:
 
     series = load_json_table("retained_fused_series.json").get("polyaphenes", {})
     minimum = int(series.get("minimum_ring_count", 5))
-    maximum = int(series.get("maximum_ring_count", minimum))
+    maximum = int(series.get("eager_maximum_ring_count", series.get("maximum_ring_count", minimum)))
     overrides = {int(count): dict(values) for count, values in series.get("member_overrides", {}).items()}
     rows = []
     for ring_count in range(minimum, maximum + 1):
@@ -710,6 +710,58 @@ def _templates_by_topology(
     return {key: tuple(templates) for key, templates in index.items()}
 
 
+@lru_cache(maxsize=64)
+def _generated_series_templates_for_topology(
+    topology_key: TopologyKey,
+    families: frozenset[str] | None,
+) -> tuple[RetainedGraphTemplate, ...]:
+    """Synthesize only generated fused-series members compatible with one graph.
+
+    The registry eagerly materializes a small, frequently used window. Larger
+    acenes and polyaphenes are inferred from the candidate atom count and then
+    rejected by the same cheap topology key before exact graph matching. This
+    removes the family-size cap without constructing every smaller member.
+    """
+
+    if families is not None and "fused" not in families:
+        return ()
+    size, symbol_counts, degree_counts, edge_degree_counts = topology_key
+    if symbol_counts != (("C", size),):
+        return ()
+    ring_count, remainder = divmod(size - 2, 4)
+    if remainder or ring_count < 1:
+        return ()
+    edge_count = sum(count for _, count in edge_degree_counts)
+    if edge_count - size + 1 != ring_count:
+        return ()
+    if any(degree not in {2, 3} for degree, _ in degree_counts):
+        return ()
+
+    templates = []
+    for family, builder in (
+        ("acenes", _acene_template_from_data),
+        ("polyaphenes", _polyaphene_template_from_data),
+    ):
+        series = load_json_table("retained_fused_series.json").get(family, {})
+        minimum = int(series.get("minimum_ring_count", 4))
+        eager_maximum = int(series.get("eager_maximum_ring_count", minimum - 1))
+        maximum = series.get("maximum_ring_count")
+        supported_maximum = multipliers.MAX_MULTIPLIER_COUNT if maximum is None else int(maximum)
+        if not max(minimum, eager_maximum + 1) <= ring_count <= supported_maximum:
+            continue
+        overrides = {int(count): dict(values) for count, values in series.get("member_overrides", {}).items()}
+        suffix = "cene" if family == "acenes" else "phene"
+        row = {
+            "ring_count": ring_count,
+            "name": f"{multipliers.basic(ring_count)}{suffix}",
+            **overrides.get(ring_count, {}),
+        }
+        template = builder(row)
+        if _template_topology_key(template) == topology_key:
+            templates.append(template)
+    return tuple(templates)
+
+
 @cache
 def _template_topology_key(template: RetainedGraphTemplate) -> TopologyKey:
     degrees = _template_degrees(template)
@@ -809,8 +861,13 @@ def match_retained_graph_templates(
     cached = mol._retained_fused_cache.get(cache_key)
     if cached is not None:
         return list(cached)
-    candidates = _templates_by_topology(include_disabled, pre_descriptor_only, families).get(
-        _molecule_topology_key(mol, atom_set), ()
+    topology_key = _molecule_topology_key(mol, atom_set)
+    candidates = list(_templates_by_topology(include_disabled, pre_descriptor_only, families).get(topology_key, ()))
+    candidate_names = {template.name for template in candidates}
+    candidates.extend(
+        template
+        for template in _generated_series_templates_for_topology(topology_key, families)
+        if template.name not in candidate_names and (include_disabled or template.enabled)
     )
     matches = [
         match
@@ -1199,11 +1256,13 @@ def _match_locants_backtracking(
     max_matches: int = 256,
 ) -> list[dict[str, int]]:
     matches: list[dict[str, int]] = []
+    molecule_neighbors = {atom_idx: frozenset(mol.get_neighbors(atom_idx)) for atom_idx in mol.atoms}
     _collect_locant_matches(
         mol,
         locants,
         candidates,
         template_neighbors,
+        molecule_neighbors,
         {},
         set(),
         matches,
@@ -1219,6 +1278,7 @@ def _collect_locant_matches(
     locants: list[str],
     candidates: dict[str, list[int]],
     template_neighbors: dict[str, set[str]],
+    molecule_neighbors: dict[int, frozenset[int]],
     assignment: dict[str, int],
     used_atoms: set[int],
     matches: list[dict[str, int]],
@@ -1237,13 +1297,23 @@ def _collect_locant_matches(
     # many disconnected partial permutations.  Dynamic frontier selection is
     # the same exact isomorphism search, but it grows outward from established
     # edges and rejects impossible mappings immediately.
+    remaining = [locant for locant in locants if locant not in assignment]
+    frontier = [
+        locant for locant in remaining if any(neighbor in assignment for neighbor in template_neighbors[locant])
+    ]
+    search_locants = frontier or remaining
     options_by_locant: list[tuple[int, int, int, str, list[int]]] = []
-    for locant in locants:
-        if locant in assignment:
-            continue
+    for locant in search_locants:
+        assigned_neighbors = [neighbor for neighbor in template_neighbors[locant] if neighbor in assignment]
+        candidate_pool = candidates[locant]
+        if assigned_neighbors:
+            allowed_atoms = set(molecule_neighbors[assignment[assigned_neighbors[0]]])
+            for neighbor in assigned_neighbors[1:]:
+                allowed_atoms.intersection_update(molecule_neighbors[assignment[neighbor]])
+            candidate_pool = [atom_idx for atom_idx in candidate_pool if atom_idx in allowed_atoms]
         options = [
             atom_idx
-            for atom_idx in candidates[locant]
+            for atom_idx in candidate_pool
             if atom_idx not in used_atoms
             and _is_assignment_compatible(
                 mol,
@@ -1251,14 +1321,16 @@ def _collect_locant_matches(
                 atom_idx,
                 template_neighbors,
                 assignment,
+                molecule_neighbors=molecule_neighbors,
                 template_bond_classes=template_bond_classes,
                 bond_policy=bond_policy,
             )
         ]
         if not options:
             return
-        assigned_neighbors = sum(neighbor in assignment for neighbor in template_neighbors[locant])
-        options_by_locant.append((len(options), -assigned_neighbors, -len(template_neighbors[locant]), locant, options))
+        options_by_locant.append(
+            (len(options), -len(assigned_neighbors), -len(template_neighbors[locant]), locant, options)
+        )
     _, _, _, locant, options = min(options_by_locant)
     for atom_idx in options:
         assignment[locant] = atom_idx
@@ -1268,6 +1340,7 @@ def _collect_locant_matches(
             locants,
             candidates,
             template_neighbors,
+            molecule_neighbors,
             assignment,
             used_atoms,
             matches,
@@ -1286,12 +1359,13 @@ def _is_assignment_compatible(
     template_neighbors: dict[str, set[str]],
     assignment: dict[str, int],
     *,
+    molecule_neighbors: dict[int, frozenset[int]],
     template_bond_classes: dict[frozenset[str], str],
     bond_policy: str,
 ) -> bool:
     for assigned_locant, assigned_atom in assignment.items():
         expected_bond = assigned_locant in template_neighbors[locant]
-        actual_bond = mol.get_bond(atom_idx, assigned_atom) is not None
+        actual_bond = assigned_atom in molecule_neighbors[atom_idx]
         if expected_bond != actual_bond:
             return False
         if expected_bond and bond_policy == "exact":

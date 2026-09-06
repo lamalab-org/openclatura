@@ -42,6 +42,7 @@ def test_candidate_splits_are_longest_first():
         (12, "adodecaen"),
         (14, "atetradecaen"),
         (20, "aicosaen"),
+        (27, "aheptacosaen"),
     ],
 )
 def test_unsaturation_infix_spans_the_whole_multiplier_table(count: int, expected: str):
@@ -62,9 +63,30 @@ def test_a_single_bond_has_no_multiplicity():
         bonds.unsaturation_infix("single", 2)
 
 
-def test_a_count_beyond_the_table_reports_itself():
+@pytest.mark.parametrize(
+    ("count", "basic", "complex_prefix"),
+    (
+        (21, "henicosa", "henicosakis"),
+        (27, "heptacosa", "heptacosakis"),
+        (1000, "kilia", "kiliakis"),
+    ),
+)
+def test_generated_multipliers_round_trip(count: int, basic: str, complex_prefix: str):
+    assert multipliers.basic(count) == basic
+    assert multipliers.complex_(count) == complex_prefix
+    assert multipliers.count_for(basic) == count
+    assert multipliers.count_for(complex_prefix) == count
+
+
+def test_every_supported_generated_multiplier_reads_back():
+    for count in range(multipliers.MIN_MULTIPLIER_COUNT, multipliers.MAX_MULTIPLIER_COUNT + 1):
+        assert multipliers.count_for(multipliers.basic(count)) == count
+        assert multipliers.count_for(multipliers.complex_(count)) == count
+
+
+def test_a_count_beyond_the_supported_numerical_range_reports_itself():
     with pytest.raises(ValueError, match="no multiplicative prefix"):
-        bonds.unsaturation_infix("double", max(multipliers.MULTIPLIERS) + 1)
+        bonds.unsaturation_infix("double", multipliers.MAX_MULTIPLIER_COUNT + 1)
 
 
 def test_every_replacement_prefix_maps_to_its_element():
