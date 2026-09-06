@@ -8,6 +8,7 @@ import pytest
 from rdkit import Chem
 
 from openclatura import FusionMode, name, name_many, name_mol, opsin_available
+from openclatura.fusion.audit import audit_fusion_plan
 from openclatura.fusion.context import current_fusion_mode, reset_fusion_mode, set_fusion_mode
 from openclatura.fusion.faces import FaceSearchBudgetExceeded
 from openclatura.fusion.model import (
@@ -20,6 +21,7 @@ from openclatura.fusion.model import (
 )
 from openclatura.fusion.numbering import MancudeSearchBudgetExceeded
 from openclatura.fusion.planner import plan_fusion_parent
+from openclatura.fusion.registry import fusion_component_registry
 from openclatura.graph_io import read_smiles
 from openclatura.molecule import Molecule, OperationClass
 
@@ -201,6 +203,30 @@ def test_multiple_indicated_hydrogens_are_graph_derived_and_roundtrip(smiles, ex
     ]
     assert len({tuple(token["atoms"]) for token in hydrogen_tokens}) == 2
     assert all(len(token["atoms"]) == 1 for token in hydrogen_tokens)
+
+
+def test_fusion_audit_rejects_an_omitted_indicated_hydrogen_site():
+    mol = read_smiles("N1C=NC2=C1N=CN2")
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.AUDITED_PIN)
+    assert isinstance(result, FusionConfirmed)
+    plan = result.plan
+
+    audit = audit_fusion_plan(
+        mol,
+        mol.atoms,
+        ast=plan.ast,
+        abstract_parent_graph=plan.abstract_parent_graph,
+        numbering=plan.numbering,
+        bond_model=plan.bond_model,
+        mode=FusionMode.AUDITED_PIN,
+        registry=fusion_component_registry(),
+        indicated_hydrogens=plan.indicated_hydrogens[:1],
+        charge_operations=plan.charge_operations,
+        lambda_descriptors=plan.lambda_descriptors,
+    )
+
+    assert audit.status is AuditStatus.MISMATCH
+    assert "indicated-hydrogen" in " ".join(audit.errors)
 
 
 @pytest.mark.parametrize(
@@ -533,6 +559,30 @@ def test_positive_heteroatom_charge_is_audited_as_a_locanted_parent_operation():
             "operation_kind": "heteroatom_cationization",
         }
     ]
+
+
+def test_fusion_audit_rejects_an_omitted_parent_charge_operation():
+    mol = read_smiles("O1C=CC=2C1=[NH+]C=CC2")
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
+    assert isinstance(result, FusionConfirmed)
+    plan = result.plan
+
+    audit = audit_fusion_plan(
+        mol,
+        mol.atoms,
+        ast=plan.ast,
+        abstract_parent_graph=plan.abstract_parent_graph,
+        numbering=plan.numbering,
+        bond_model=plan.bond_model,
+        mode=FusionMode.GENERAL,
+        registry=fusion_component_registry(),
+        indicated_hydrogens=plan.indicated_hydrogens,
+        charge_operations=(),
+        lambda_descriptors=plan.lambda_descriptors,
+    )
+
+    assert audit.status is AuditStatus.MISMATCH
+    assert "formal charge" in " ".join(audit.errors)
 
 
 def test_positive_oxygen_fusion_parent_uses_same_charge_operation_model():
