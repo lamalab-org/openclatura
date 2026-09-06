@@ -117,8 +117,19 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             delta = compare_actual_parent_to_implied_parent(mol, parts.parent_atom_ids, parent.bond_model)
             parts.parent_bond_delta = delta
         if delta is not None and delta.compatible and delta.hydrogenated_edges:
+            indicated_locants = (
+                set(parent.hydride_metadata.default_indicated_h) if parent.hydride_metadata is not None else set()
+            )
+            indicated_atoms = {
+                atom_idx for atom_idx in numbered_path if str(get_loc(atom_idx)) in indicated_locants
+            }
+            hydrogenated_edges = tuple(
+                edge for edge in delta.hydrogenated_edges if not (set(edge) & indicated_atoms)
+            )
+            if not hydrogenated_edges:
+                return
             atom_ids = sorted(
-                delta.hydrogenated_atom_ids,
+                {atom for edge in hydrogenated_edges for atom in edge},
                 key=lambda atom_idx: parse_locant(str(get_loc(atom_idx))),
             )
             parts.hydro_operations.append(
