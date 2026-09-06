@@ -23376,17 +23376,20 @@
           {
             "locant": "8",
             "aromatic": false,
-            "fusion": true
+            "fusion": true,
+            "required_stereo": true
           },
           {
             "locant": "9",
             "aromatic": false,
-            "fusion": true
+            "fusion": true,
+            "required_stereo": true
           },
           {
             "locant": "10",
             "aromatic": false,
-            "fusion": true
+            "fusion": true,
+            "required_stereo": true
           },
           {
             "locant": "11",
@@ -23399,12 +23402,14 @@
           {
             "locant": "13",
             "aromatic": false,
-            "fusion": true
+            "fusion": true,
+            "required_stereo": true
           },
           {
             "locant": "14",
             "aromatic": false,
-            "fusion": true
+            "fusion": true,
+            "required_stereo": true
           },
           {
             "locant": "15",

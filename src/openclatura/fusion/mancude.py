@@ -63,7 +63,11 @@ def compare_actual_parent_to_implied_parent(
                 and mol.atoms[edge[1]].is_aromatic
             )
             if aromatic:
-                if bond.order > 1 and expected_order > 1:
+                # Aromatic inputs are Kekule-representation independent. Any
+                # observed multiple bond on a pi-eligible parent edge belongs
+                # to the parent, even when another equivalent assignment was
+                # selected to calculate the hydrogenation delta.
+                if bond.order > 1:
                     implied_ids.add(bond.idx)
                 continue
             if bond.order == expected_order:

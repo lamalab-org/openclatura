@@ -232,6 +232,17 @@ def test_component_spec_validates_complete_local_graph():
         validate_retained_fused_template(replace(spec.template, atoms=spec.atoms[:-1]))
 
 
+def test_retained_template_stereo_policy_requires_locant_level_declarations():
+    spec = _component_spec("stereoparent", ("C", "C", "C"))
+
+    with pytest.raises(ValueError, match="declares no stereo locants"):
+        validate_retained_fused_template(replace(spec.template, implied_stereo=True))
+
+    atoms = (replace(spec.atoms[0], required_stereo=True), *spec.atoms[1:])
+    with pytest.raises(ValueError, match="without implied stereo"):
+        validate_retained_fused_template(replace(spec.template, atoms=atoms))
+
+
 def test_component_match_requires_two_complete_bijective_maps():
     with pytest.raises(ValueError, match="bijective"):
         FusionComponentMatch(

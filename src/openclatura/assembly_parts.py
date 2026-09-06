@@ -11,6 +11,7 @@ from .ring_parent import ParentHydrideMetadata
 from .spiro_assembly import SpiroAssembly
 
 if TYPE_CHECKING:
+    from .fusion.mancude import ParentBondDelta
     from .ring_parent import RingParent
 
 
@@ -144,6 +145,7 @@ class AssemblyParts:
     retained_absorbed_substituents: list[SubstituentItem] = field(default_factory=list)
     retained_parent_metadata: RetainedParentMetadata | None = None
     parent_hydride: RingParent | None = None
+    parent_bond_delta: ParentBondDelta | None = None
     front_modifiers: list[str] = field(default_factory=list)
     front_modifier_locants: list[str | None] = field(default_factory=list)
     front_modifier_atom_ids: set[int] = field(default_factory=set)

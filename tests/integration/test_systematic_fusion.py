@@ -148,6 +148,26 @@ def test_simple_hydrogenation_is_derived_from_parent_bond_model():
     assert result.name == "4,5-dihydrothieno[2,3-b]furan"
 
 
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        (
+            "O=S1(=O)CCc2c1scc/c2=N\\Nc1ccc(Cl)c(Cl)c1",
+            "(4E)-N-(3,4-dichlorophenyl)-1,1-dioxo-2,3-dihydro-1lambda^6-thieno[2,3-b]thiin-4-one hydrazone",
+        ),
+        (
+            "O=S1(=O)CCc2c1scc/c2=N\\NC",
+            "(4E)-N-methyl-1,1-dioxo-2,3-dihydro-1lambda^6-thieno[2,3-b]thiin-4-one hydrazone",
+        ),
+    ],
+)
+def test_fused_parent_hydrogenation_comes_from_the_parent_bond_delta(smiles, expected):
+    result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True)
+
+    assert result.name == expected
+    assert result.opsin_check is not None and result.opsin_check.status == "matched"
+
+
 def test_fusion_trace_reports_citation_topology_and_context_free_render_audit():
     result = name(
         "O1C=CC2=NC3=C(C=C21)SC=C3",

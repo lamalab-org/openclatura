@@ -34,6 +34,7 @@ from typing import Literal
 from rdkit import Chem
 
 from ..hantzsch_widman import hw_parent_template
+from ..locants import parse_system_locant, system_locant_sort_key
 from ..molecule import Molecule
 from ..rules import elements as _elements
 from ..rules import multipliers as _multipliers
@@ -597,7 +598,9 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
     """Rebuild the component skeleton from ``parts``; raise ``_Abstain`` if any
     construct is not modelled."""
 
-    has_template = parts.retained_name is not None and _lookup_parent_template(parts.retained_name) is not None
+    has_template = (
+        parts.retained_name is not None and _lookup_parent_template(parts.retained_name) is not None
+    ) or _has_systematic_fusion_parent(parts)
     if getattr(parts, "is_substituent", False):
         raise _Abstain("substituent component (audited via recursion, not here)")
     if parts.front_modifiers and not _is_ester_component(parts):
@@ -810,6 +813,9 @@ def _placement_structure(rw: Chem.RWMol, solution: tuple[int, ...]) -> str | Non
 def _build_parent(parts) -> tuple[Chem.RWMol, dict[str, int], bool]:
     """Return (editable mol, locant->idx, is_aromatic_template)."""
 
+    if _has_systematic_fusion_parent(parts):
+        return _build_systematic_fusion_parent(parts)
+
     if parts.retained_name is not None and not _is_retained_chain_parent(parts.retained_name):
         template = _lookup_parent_template(parts.retained_name)
         if template is None:
@@ -865,6 +871,40 @@ def _build_parent(parts) -> tuple[Chem.RWMol, dict[str, int], bool]:
     return rw, {str(i + 1): idxs[i] for i in range(n)}, False
 
 
+def _has_systematic_fusion_parent(parts) -> bool:
+    parent = getattr(parts, "parent_hydride", None)
+    return parent is not None and parent.uses_fusion_plan
+
+
+def _build_systematic_fusion_parent(parts) -> tuple[Chem.RWMol, dict[str, int], bool]:
+    """Build an audited fusion parent from its graph proof, not its name text."""
+
+    parent = parts.parent_hydride
+    plan = parent.fusion_plan
+    if plan is None or not plan.audit.confirmed or not plan.numbering.input_locant_maps:
+        raise _Abstain("systematic fusion parent has no confirmed graph proof")
+
+    graph_atoms = {atom.id: atom for atom in plan.abstract_parent_graph.atoms}
+    input_locants = dict(plan.numbering.input_locant_maps[0])
+    if set(graph_atoms) != set(input_locants):
+        raise _Abstain("systematic fusion graph and numbering use different atoms")
+
+    rw = Chem.RWMol()
+    output_by_atom = {atom_id: rw.AddAtom(Chem.Atom(graph_atoms[atom_id].symbol)) for atom_id in sorted(graph_atoms)}
+    for atom_id, output_idx in output_by_atom.items():
+        rw.GetAtomWithIdx(output_idx).SetFormalCharge(graph_atoms[atom_id].formal_charge)
+
+    delta = getattr(parts, "parent_bond_delta", None)
+    assignment = (
+        delta.assignment if delta is not None and delta.compatible else plan.bond_model.allowed_kekule_assignments[0]
+    )
+    for (left, right), order in assignment.orders:
+        rw.AddBond(output_by_atom[left], output_by_atom[right], _BOND_TYPES[order])
+
+    locants = {str(locant): output_by_atom[atom_id] for atom_id, locant in input_locants.items()}
+    return rw, locants, False
+
+
 _LAMBDA_RE = re.compile(r"lambda\^?\{?\d+\}?")
 
 
@@ -914,22 +954,30 @@ def _apply_unsaturations(rw: Chem.RWMol, locants: dict[str, int], parts, aromati
 
 def _parse_unsaturation_locant(token: str) -> tuple[str | None, str | None]:
     """Split an unsaturation locant into (start, explicit-partner). ``4`` -> the
-    bond 4→5 (partner ``None``); ``1(10)`` -> the fusion bond 1→10."""
-    m = re.fullmatch(r"(\d+)(?:\((\d+)\))?", token)
-    if m is None:
+    bond 4→5 (partner ``None``); ``3a(7a)`` cites a fusion bond."""
+    start, separator, partner = token.partition("(")
+    if separator and not partner.endswith(")"):
         return None, None
-    return m.group(1), m.group(2)
+    partner = partner[:-1] if separator else ""
+    try:
+        parse_system_locant(start)
+        if partner:
+            parse_system_locant(partner)
+    except ValueError:
+        return None, None
+    return start, partner or None
 
 
 def _next_locant_idx(locants: dict[str, int], locant: str, is_ring: bool) -> int | None:
     try:
-        nxt = str(int(locant) + 1)
-    except ValueError:
+        ordered = sorted(locants, key=system_locant_sort_key)
+        position = ordered.index(locant)
+    except (TypeError, ValueError):
         return None
-    if nxt in locants:
-        return locants[nxt]
-    if is_ring:  # wrap N -> 1
-        return locants.get("1")
+    if position + 1 < len(ordered):
+        return locants[ordered[position + 1]]
+    if is_ring and ordered:
+        return locants[ordered[0]]
     return None
 
 

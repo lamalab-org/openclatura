@@ -510,22 +510,26 @@ def retained_graph_template_automorphisms(
     return tuple(sorted(set(automorphisms)))
 
 
-def _ring_fusion_stereo_is_assigned(mol: Molecule, atom_set: set[int]) -> bool:
-    """Whether every ring-fusion centre of a matched skeleton has a configuration.
+def _required_template_stereo_is_assigned(
+    mol: Molecule,
+    template: RetainedGraphTemplate,
+    assignment: dict[str, int],
+) -> bool:
+    """Whether configurations implied by a retained parent are present.
 
-    A steroid name carries the configuration of its ring fusions, so spelling a
-    structure that leaves them open as ``gonane`` asserts stereochemistry the
-    structure does not have.  Those fall back to the von Baeyer name.
+    Ring-junction degree is not a stereo specification: a junction may be
+    potentially stereogenic without its configuration being fixed by the
+    retained parent. Templates therefore declare the exact locants whose
+    configurations their names imply, after graph matching maps those locants
+    onto input atoms.
     """
 
-    for atom_idx in atom_set:
-        atom = mol.atoms[atom_idx]
-        ring_neighbors = sum(1 for neighbor in mol.get_neighbors(atom_idx) if neighbor in atom_set)
-        if ring_neighbors < 3:
-            continue
-        if atom.stereo is None and atom.raw_stereo is None:
-            return False
-    return True
+    return all(
+        mol.atoms[assignment[atom.locant]].stereo is not None
+        or mol.atoms[assignment[atom.locant]].raw_stereo is not None
+        for atom in template.atoms
+        if atom.required_stereo
+    )
 
 
 def _match_all_retained_fused_template(
@@ -543,9 +547,6 @@ def _match_all_retained_fused_template(
         not _is_saturated_site(mol, atom_idx, atom_set) for atom_idx in atom_set
     ):
         return []
-    if template.implied_stereo and not _ring_fusion_stereo_is_assigned(mol, atom_set):
-        return []
-
     atom_by_locant = _relocatable_atom_by_locant(template) if allow_relocated_indicated_h else template.atom_by_locant
     template_degrees = _template_degrees(template)
     molecule_degrees = {
@@ -588,6 +589,10 @@ def _match_all_retained_fused_template(
         template_bond_classes=template_bond_classes,
         bond_policy=template.aromatic_equivalence_policy,
     )
+    if template.implied_stereo:
+        assignments = [
+            assignment for assignment in assignments if _required_template_stereo_is_assigned(mol, template, assignment)
+        ]
     if not allow_relocated_indicated_h:
         derive = not template.default_indicated_h and template.indicated_hydrogen_count > 0
         return [
@@ -1045,6 +1050,11 @@ def validate_retained_fused_template(template: RetainedGraphTemplate) -> None:
         raise ValueError(f"Retained fused template {template.name!r} has unknown interior atoms.")
     if set(template.default_indicated_h) - locant_set:
         raise ValueError(f"Retained fused template {template.name!r} has unknown indicated-H locants.")
+    required_stereo = {atom.locant for atom in template.atoms if atom.required_stereo}
+    if template.implied_stereo and not required_stereo:
+        raise ValueError(f"Retained fused template {template.name!r} implies stereo but declares no stereo locants.")
+    if required_stereo and not template.implied_stereo:
+        raise ValueError(f"Retained fused template {template.name!r} declares stereo locants without implied stereo.")
 
     seen_bonds: set[tuple[str, str]] = set()
     for bond in template.bonds:
@@ -1305,6 +1315,7 @@ def _atom_template(data: dict[str, Any]) -> RetainedGraphAtomTemplate:
         pi_capacity=(int(data["pi_capacity"]) if data.get("pi_capacity") is not None else None),
         forced_single=bool(data.get("forced_single", False)),
         indicated_h_site=bool(data.get("indicated_h_site", False)),
+        required_stereo=bool(data.get("required_stereo", False)),
     )
 
 

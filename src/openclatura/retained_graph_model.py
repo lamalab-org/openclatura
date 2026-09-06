@@ -24,6 +24,7 @@ class RetainedGraphAtomTemplate:
     pi_capacity: int | None = None
     forced_single: bool = False
     indicated_h_site: bool = False
+    required_stereo: bool = False
 
     def __post_init__(self) -> None:
         if not self.locant or not self.symbol:
