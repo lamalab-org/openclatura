@@ -323,12 +323,10 @@ def test_explicit_retained_component_precedes_systematic_hw_derivation():
     assert {match.spec_key for match in matches} == {"furan"}
 
 
-@pytest.mark.parametrize("invalid_kind", ("charged", "nonstandard_valence", "saturated"))
+@pytest.mark.parametrize("invalid_kind", ("nonstandard_valence", "saturated"))
 def test_systematic_hw_component_rejects_out_of_scope_ring_chemistry(invalid_kind):
     mol, face = _triazole_ring()
-    if invalid_kind == "charged":
-        mol.update_atom(0, charge=1)
-    elif invalid_kind == "nonstandard_valence":
+    if invalid_kind == "nonstandard_valence":
         mol.add_atom("C", idx=9)
         mol.add_bond(0, 9, idx=999)
     else:
@@ -338,6 +336,15 @@ def test_systematic_hw_component_rejects_out_of_scope_ring_chemistry(invalid_kin
     matches = fusion_component_registry().match_faces(mol, (face,))
 
     assert not any(match.spec_key.startswith("generated-hw:") for match in matches)
+
+
+def test_systematic_hw_component_defers_supported_positive_n_charge_to_parent_operation():
+    mol, face = _triazole_ring()
+    mol.update_atom(0, charge=1)
+
+    matches = fusion_component_registry().match_faces(mol, (face,))
+
+    assert any(match.spec_key.startswith("generated-hw:") for match in matches)
 
 
 @pytest.mark.parametrize(
