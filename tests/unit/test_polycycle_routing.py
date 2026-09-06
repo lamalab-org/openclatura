@@ -1,4 +1,3 @@
-import openclatura.chains as chains
 from openclatura.chains import find_ring_systems
 from openclatura.molecule import Molecule
 
@@ -17,7 +16,16 @@ def _fused_triangle_chain(ring_count: int) -> Molecule:
     return mol
 
 
-def test_large_polycycle_uses_confirmed_fusion_before_legacy_search(monkeypatch):
+def _carbon_cycle(atom_count: int) -> Molecule:
+    mol = Molecule()
+    for atom_id in range(atom_count):
+        mol.add_atom("C", idx=atom_id)
+    for bond_id, atom_id in enumerate(range(atom_count), start=1):
+        mol.add_bond(atom_id, (atom_id + 1) % atom_count, idx=bond_id)
+    return mol
+
+
+def test_large_polycycle_uses_confirmed_fusion_before_descriptor_search(monkeypatch):
     mol = _fused_triangle_chain(9)
     expected_path = list(mol.atoms)
 
@@ -26,10 +34,10 @@ def test_large_polycycle_uses_confirmed_fusion_before_legacy_search(monkeypatch)
         lambda _mol, atoms: [sorted(atoms)],
     )
 
-    def fail_legacy(*_args, **_kwargs):
-        raise AssertionError("large audited fusion parent reached legacy cycle enumeration")
+    def fail_descriptor_search(*_args, **_kwargs):
+        raise AssertionError("large audited fusion parent reached descriptor search")
 
-    monkeypatch.setattr("openclatura.chains._polyspiro_or_von_baeyer_candidate", fail_legacy)
+    monkeypatch.setattr("openclatura.chains._polyspiro_or_von_baeyer_candidate", fail_descriptor_search)
 
     systems = find_ring_systems(mol)
 
@@ -39,41 +47,23 @@ def test_large_polycycle_uses_confirmed_fusion_before_legacy_search(monkeypatch)
     assert systems[0].polycycle_descriptor is None
 
 
-def test_small_ring_block_preserves_bounded_legacy_cycle_order(monkeypatch):
+def test_small_ring_block_uses_graph_decomposition():
     mol = _fused_triangle_chain(2)
-    calls = 0
-    legacy = chains._legacy_small_cycle_blocks
-
-    def counted_legacy(*args, **kwargs):
-        nonlocal calls
-        calls += 1
-        return legacy(*args, **kwargs)
-
-    monkeypatch.setattr(chains, "_legacy_small_cycle_blocks", counted_legacy)
 
     systems = find_ring_systems(mol)
 
-    assert calls == 1
     assert len(systems) == 1
     assert systems[0].is_bicycle
     assert systems[0].ring_parent is not None
     assert systems[0].ring_parent.descriptor == "bicyclo[1.1.0]"
 
 
-def test_high_rank_block_never_enumerates_legacy_cycles(monkeypatch):
-    mol = _fused_triangle_chain(9)
-
-    def fail_legacy(*_args, **_kwargs):
-        raise AssertionError("high-rank block reached bounded legacy cycle enumeration")
-
-    monkeypatch.setattr(chains, "_legacy_small_cycle_blocks", fail_legacy)
-    monkeypatch.setattr(
-        chains,
-        "_confirmed_fusion_numbering_paths",
-        lambda _mol, atoms: [sorted(atoms)],
-    )
+def test_ring_decomposition_has_no_legacy_atom_limit():
+    mol = _carbon_cycle(128)
 
     systems = find_ring_systems(mol)
 
     assert len(systems) == 1
-    assert systems[0].is_polycycle
+    assert not systems[0].is_polycycle
+    assert len(systems[0].paths[0]) == 128
+    assert set(systems[0].paths[0]) == set(range(128))
