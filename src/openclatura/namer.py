@@ -27,6 +27,7 @@ from .formatting import (
     strip_outer_parentheses,
 )
 from .functional_prefixes import PREFIX_HANDLERS, PrefixContext
+from .fusion.model import FusionMode
 from .group_atom_roles import amide_nitrogen
 from .heteroatom_subgraphs import name_heteroatom_subgraph
 from .ionic_naming import apply_anionic_parent_names, apply_cationic_imino_names, apply_cationic_imino_parent_prefixes
@@ -36,7 +37,11 @@ from .molecule import bond_ids_within as _bond_ids_within
 from .name_assembly import NameAssemblyResult, rewrite_history_trace_data, token_span_trace_data
 from .naming_context import NamingIntent
 from .nomenclature import RULES
-from .parent_pipeline import build_parent_assembly_plan, resolve_retained_parent
+from .parent_pipeline import (
+    build_parent_assembly_plan,
+    resolve_retained_parent,
+    resolve_systematic_fusion_parent,
+)
 from .parent_selection import select_principal_parent
 from .perception import PerceivedGroup, perceive_groups
 from .retained_fused_production import production_retained_fused_parent
@@ -295,8 +300,7 @@ def _select_subgraph_parent(mol: Molecule, start_idx: int, component: set[int], 
 
 
 def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> SpiroAssembly:
-    """Name a side ring as structured spiro assembly data (P-24, P-52.3).  The attachment atom stands in
-    as silicon so the side ring names independently, and the marker is stripped before rendering."""
+    """Name a side ring as structured spiro assembly data (P-24, P-52.3)."""
 
     retained_n_ring = _retained_n_ring_spiro_assembly(mol, c_idx, sub_comp)
     if retained_n_ring is not None:
@@ -306,10 +310,27 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
     if simple_side_ring is not None:
         return simple_side_ring
 
+    # An audited systematic-fusion side already owns a complete atom-to-locant
+    # map.  Consume that proof directly instead of changing the junction atom
+    # to silicon and recovering its locant from rendered text.
+    from .fusion.context import current_fusion_mode
+    from .fusion.wrappers import plan_fusion_spiro_side
+
+    fusion_side = plan_fusion_spiro_side(
+        mol,
+        sub_comp,
+        c_idx,
+        mode=current_fusion_mode(),
+    )
+    if fusion_side is not None:
+        return fusion_side.to_spiro_assembly()
+
     heteroaromatic_side = _heteroaromatic_spiro_side_assembly(mol, c_idx, sub_comp)
     if heteroaromatic_side is not None:
         return heteroaromatic_side
 
+    # Compatibility fallback for side-parent classes that do not yet expose a
+    # typed locant proof.
     sub_mol = mol.subgraph(sub_comp, symbols={c_idx: "Si"})
 
     sub_name_raw = name_component(sub_mol, sub_comp, is_substituent=False)
@@ -1432,6 +1453,16 @@ def name_subgraph(
         retained_name_val = retained_fused.name
         locant_maps = retained_fused.locant_maps
         retained_parent_metadata = retained_fused.metadata
+    parent_hydride = parent_selection.ring_parent
+    if parent_selection.is_bicycle or parent_selection.is_polycycle:
+        fusion_parent = resolve_systematic_fusion_parent(
+            mol,
+            parent_selection,
+            retained_name=retained_name_val,
+            decision_trace=decision_trace,
+        )
+        if fusion_parent is not None:
+            parent_hydride = fusion_parent
     parent_plan = build_parent_assembly_plan(
         mol,
         parent_selection,
@@ -1445,6 +1476,7 @@ def name_subgraph(
         locant_maps,
         retained_name_val,
         retained_parent_metadata,
+        parent_hydride=parent_hydride,
     )
     numbered_path = parent_plan.numbered_path
     get_loc = parent_plan.get_loc
@@ -1461,6 +1493,12 @@ def name_subgraph(
                 "numbered_path": list(numbered_path),
                 "atom_to_locant": {atom_idx: get_loc(atom_idx) for atom_idx in numbered_path},
                 "retained_name": retained_name_val,
+                "locant_map_source": parent_plan.locant_map_source.value,
+                "parent_nomenclature": (
+                    parent_plan.parent_hydride.parent_nomenclature
+                    if parent_plan.parent_hydride is not None
+                    else "legacy"
+                ),
             },
         )
     _emit_bond_stereo(mol, parts, numbered_path, get_loc, sub_exclude, upstream_atom)
@@ -1500,6 +1538,12 @@ def name_subgraph(
                 "name": name,
                 "trace_segment_count": len(trace_segments),
                 "locant_elisions": parts.locant_elision_decisions,
+                "parent_nomenclature": (
+                    parts.parent_hydride.parent_nomenclature if parts.parent_hydride is not None else "legacy"
+                ),
+                "parent_hydride_proof_source": (
+                    parts.parent_hydride.proof_source if parts.parent_hydride is not None else ""
+                ),
             },
         )
     if return_trace:
@@ -1950,41 +1994,55 @@ def name_component(
     )
 
 
-def name_smiles_with_trace(smiles: str) -> tuple[str, list[dict]]:
+def name_smiles_with_trace(
+    smiles: str, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN
+) -> tuple[str, list[dict]]:
     """Return a generated name and AssemblyParts-derived trace annotations, exposing the atom and bond IDs
     selected during parent, prefix, unsaturation and suffix assembly."""
 
-    return DEFAULT_NAMING_ENGINE.name_smiles_with_trace(smiles)
+    return DEFAULT_NAMING_ENGINE.name_smiles_with_trace(smiles, fusion_mode=fusion_mode)
 
 
-def analyze_smiles(smiles: str, *, token_debug: bool = False) -> NameAnalysis:
+def analyze_smiles(
+    smiles: str,
+    *,
+    token_debug: bool = False,
+    fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
+) -> NameAnalysis:
     """Return a generated name with structure annotations and decision traces: parsing, component
     splitting, group perception, priority, parent selection, numbering and assembly."""
 
-    return DEFAULT_NAMING_ENGINE.analyze_smiles(smiles, token_debug=token_debug)
+    return DEFAULT_NAMING_ENGINE.analyze_smiles(smiles, token_debug=token_debug, fusion_mode=fusion_mode)
 
 
-def name_smiles(smiles: str) -> str:
+def name_smiles(smiles: str, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN) -> str:
     """Return an IUPAC-style name for a SMILES string.  P-13 for name construction, P-44/P-45 for parent
     selection and numbering, P-72 for ordering disconnected ionic components."""
 
-    return DEFAULT_NAMING_ENGINE.name_smiles(smiles)
+    return DEFAULT_NAMING_ENGINE.name_smiles(smiles, fusion_mode=fusion_mode)
 
 
-def name_rdkit_mol(rdkit_mol) -> str:
+def name_rdkit_mol(rdkit_mol, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN) -> str:
     """Return an IUPAC-style name for an existing ``rdkit.Chem.rdchem.Mol``, for callers that already hold
     one.  Equivalent to :func:`name_smiles` without the SMILES round-trip; the input is not modified."""
 
-    return DEFAULT_NAMING_ENGINE.name_rdkit_mol(rdkit_mol)
+    return DEFAULT_NAMING_ENGINE.name_rdkit_mol(rdkit_mol, fusion_mode=fusion_mode)
 
 
-def name_rdkit_mol_with_trace(rdkit_mol) -> tuple[str, list[dict]]:
+def name_rdkit_mol_with_trace(
+    rdkit_mol, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN
+) -> tuple[str, list[dict]]:
     """RDKit-molecule counterpart of :func:`name_smiles_with_trace`."""
 
-    return DEFAULT_NAMING_ENGINE.name_rdkit_mol_with_trace(rdkit_mol)
+    return DEFAULT_NAMING_ENGINE.name_rdkit_mol_with_trace(rdkit_mol, fusion_mode=fusion_mode)
 
 
-def analyze_rdkit_mol(rdkit_mol, *, token_debug: bool = False) -> NameAnalysis:
+def analyze_rdkit_mol(
+    rdkit_mol,
+    *,
+    token_debug: bool = False,
+    fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
+) -> NameAnalysis:
     """RDKit-molecule counterpart of :func:`analyze_smiles`."""
 
-    return DEFAULT_NAMING_ENGINE.analyze_rdkit_mol(rdkit_mol, token_debug=token_debug)
+    return DEFAULT_NAMING_ENGINE.analyze_rdkit_mol(rdkit_mol, token_debug=token_debug, fusion_mode=fusion_mode)

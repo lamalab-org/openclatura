@@ -2,7 +2,8 @@
   "bluebook_rule": "P-25.1.2 higher acenes and polyaphenes generated from the number and arrangement of fused six-membered rings.",
   "acenes": {
     "minimum_ring_count": 4,
-    "maximum_ring_count": 9,
+    "eager_maximum_ring_count": 9,
+    "maximum_ring_count": null,
     "member_overrides": {
       "4": {
         "priority": 355,
@@ -23,7 +24,8 @@
   },
   "polyaphenes": {
     "minimum_ring_count": 5,
-    "maximum_ring_count": 10,
+    "eager_maximum_ring_count": 10,
+    "maximum_ring_count": null,
     "member_overrides": {
       "5": {
         "priority": 367

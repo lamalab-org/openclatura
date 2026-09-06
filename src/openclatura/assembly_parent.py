@@ -14,6 +14,7 @@ from .formatting import is_complex_prefix, strip_outer_parentheses
 from .nomenclature import RULES
 from .principal_suffixes import render_principal_suffix
 from .retained_specs import retained_parent_spec
+from .ring_parent import ParentHydrideKind
 from .ring_renderer import render_ring_descriptor
 from .rules import bonds, elision, multipliers, stems
 from .suffix_stack import suffix_operation_spelling
@@ -454,24 +455,43 @@ def parent_stem_and_terminal(parts: AssemblyParts) -> tuple[str, str]:
     terminal_e = bonds.PARENT_TERMINAL_VOWEL
 
     inferred_ionic_parent = inferred_ionic_retained_parent(parts)
-    if has_ionic_retained_parent(parts):
+    parent_hydride = parts.parent_hydride
+    if parent_hydride is not None and parent_hydride.hydride_kind in {
+        ParentHydrideKind.SYSTEMATIC_FUSION,
+        ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION,
+        ParentHydrideKind.BRIDGED_FUSION,
+    }:
+        if parts.is_substituent and parent_hydride.derivative_stem:
+            stem_str = parent_hydride.derivative_stem
+            terminal_e = ""
+        else:
+            stem_str, terminal_e = parent_hydride.assembly_stem_and_terminal(parts.parent_length) or ("", "")
+    elif has_ionic_retained_parent(parts):
         stem_str = RULES.charges.retained_ionic_n_parents[parts.retained_name]
         terminal_e = ""
     elif inferred_ionic_parent:
         stem_str = inferred_ionic_parent
         terminal_e = ""
     elif parts.retained_name:
-        retained_spec = retained_parent_spec(parts.retained_name)
+        # Assembly may promote a retained parent to a functional parent
+        # (benzene -> benzoic acid).  That operation-local spelling takes
+        # precedence over the immutable base-parent identity.
+        retained_name = parts.retained_name
+        retained_spec = retained_parent_spec(retained_name)
         if parts.is_substituent and retained_spec and retained_spec.substituent_stem is not None:
             stem_str = retained_spec.substituent_stem
             terminal_e = retained_spec.substituent_terminal or ""
         else:
-            if parts.retained_name.endswith("e"):
-                stem_str = parts.retained_name[:-1]
+            if retained_name.endswith("e"):
+                stem_str = retained_name[:-1]
                 terminal_e = "e"
             else:
-                stem_str = parts.retained_name
+                stem_str = retained_name
                 terminal_e = ""
+    elif parent_hydride is not None and (
+        hydride_spelling := parent_hydride.assembly_stem_and_terminal(parts.parent_length)
+    ):
+        stem_str, terminal_e = hydride_spelling
     else:
         stem_str = stems.stem_for(parts.parent_length)
         if parts.is_bicycle:

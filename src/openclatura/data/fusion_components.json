@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "registry_version": "2026.1",
+  "graph_source": "retained_graph_templates",
+  "rules": {
+    "planner_tier": "bounded-polycomponent-v3",
+    "support": {
+      "cover_kinds": ["tree"],
+      "join_kinds": ["ortho", "ortho_peri"],
+      "multiparent_parents": true,
+      "maximum_tree_component_occurrences": 3,
+      "maximum_multiparent_component_occurrences": 3,
+      "charged_parents": true,
+      "nonstandard_valence": true,
+      "interior_atoms": true,
+      "maximum_indicated_hydrogens": null
+    },
+    "pin_gate": {
+      "minimum_ring_size": 5,
+      "minimum_ring_count": 2
+    }
+  },
+  "search_limits": {
+    "minimum_ring_size": 3,
+    "maximum_ring_size": 8,
+    "maximum_faces": 24,
+    "cycle_states": 100000,
+    "face_model_states": 50000,
+    "layout_states": 25000,
+    "maximum_layouts": 4096,
+    "maximum_component_occurrences": 16,
+    "maximum_component_selections": 256,
+    "component_selection_states": 4096,
+    "locant_map_combinations": 4096,
+    "mancude_states": 100000
+  },
+  "ring_shapes": [
+    {"ring_size": 3, "id": "triangle", "vertices": [[0, 0], [4, 0], [2, 4]], "edge_directions": [0, 1, 2], "horizontal_axis_class": "vertex"},
+    {"ring_size": 4, "id": "square", "vertices": [[0, 0], [4, 0], [4, 4], [0, 4]], "edge_directions": [0, 1, 2, 3], "horizontal_axis_class": "edge"},
+    {"ring_size": 5, "id": "pentagon-symmetric", "vertices": [[0, 0], [4, 0], [6, 3], [3, 6], [0, 4]], "edge_directions": [0, 1, 2, 3, 4], "horizontal_axis_class": "vertex"},
+    {"ring_size": 5, "id": "pentagon-shoulder", "vertices": [[0, 0], [4, 0], [7, 4], [4, 7], [0, 4]], "edge_directions": [0, 1, 2, 3, 4], "horizontal_axis_class": "edge", "distortion_rank": 1},
+    {"ring_size": 5, "id": "pentagon-eisenstein", "vertices": [[0, 0], [4, 0], [4, 4], [0, 8], [-4, 4]], "edge_directions": [0, 1, 2, 3, 4], "horizontal_axis_class": "vertex", "coordinate_system": "eisenstein"},
+    {"ring_size": 6, "id": "hexagon", "vertices": [[0, 0], [4, 0], [6, 3], [4, 6], [0, 6], [-2, 3]], "edge_directions": [0, 1, 2, 3, 4, 5], "horizontal_axis_class": "edge"},
+    {"ring_size": 6, "id": "hexagon-eisenstein", "vertices": [[0, 0], [4, 0], [4, 4], [0, 8], [-4, 8], [-4, 4]], "edge_directions": [0, 1, 2, 3, 4, 5], "horizontal_axis_class": "edge", "coordinate_system": "eisenstein"},
+    {"ring_size": 7, "id": "heptagon-symmetric", "vertices": [[0, 0], [4, 0], [7, 2], [8, 5], [5, 8], [1, 8], [-2, 4]], "edge_directions": [0, 1, 2, 3, 4, 5, 6], "horizontal_axis_class": "vertex"},
+    {"ring_size": 7, "id": "heptagon-shoulder", "vertices": [[0, 0], [4, 0], [8, 3], [8, 7], [4, 9], [0, 7], [-2, 3]], "edge_directions": [0, 1, 2, 3, 4, 5, 6], "horizontal_axis_class": "edge", "distortion_rank": 1},
+    {"ring_size": 8, "id": "octagon", "vertices": [[0, 0], [4, 0], [7, 2], [8, 5], [7, 8], [4, 10], [0, 10], [-2, 5]], "edge_directions": [0, 1, 2, 3, 4, 5, 6, 7], "horizontal_axis_class": "edge"}
+  ],
+  "generated_components": [
+    {"key": "cyclopentadiene", "generator": "monocyclic_carbocycle", "ring_size": 5, "bond_class": "mancude", "pin_component": true},
+    {"key": "cycloheptatriene", "generator": "monocyclic_carbocycle", "ring_size": 7, "bond_class": "mancude", "pin_component": true},
+    {"key": "cyclooctatetraene", "generator": "monocyclic_carbocycle", "ring_size": 8, "bond_class": "mancude", "pin_component": true}
+  ],
+  "systematic_component_generators": [
+    {
+      "generator": "hantzsch_widman_monocycle",
+      "allow_as_parent": true,
+      "allow_as_attached": true,
+      "rule": "P-25.2"
+    }
+  ],
+  "components": [
+    {"key": "cyclopentadiene", "parent_name": "cyclopentadiene", "attached_prefix": "cyclopenta", "omit_attached_locants": true, "omit_ortho_peri_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
+    {"key": "cycloheptatriene", "parent_name": "cycloheptatriene", "attached_prefix": "cyclohepta", "omit_attached_locants": true, "omit_ortho_peri_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
+    {"key": "cyclooctatetraene", "parent_name": "cyclooctatetraene", "attached_prefix": "cycloocta", "omit_attached_locants": true, "omit_ortho_peri_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
+    {"key": "benzene", "attached_prefix": "benzo", "omit_attached_locants": true, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "naphthalene", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "azulene", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "1H-indene", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "pentalene", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "anthracene", "preferred_fusion_prefix": "anthra", "accepted_general_prefixes": ["anthraceno"], "horizontal_ring_count": 3, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.3.2.2.3"},
+    {"key": "phenanthrene", "attached_prefix": "phenanthro", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "quinoline", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "carbazole", "horizontal_ring_count": 3, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "1-benzofuran", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "1-benzothiophene", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "pyridine", "attached_prefix": "pyrido", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "pyridazine", "attached_prefix": "pyridazino", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "pyrimidine", "attached_prefix": "pyrimidino", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "pyrazine", "attached_prefix": "pyrazino", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "furan", "attached_prefix": "furo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "thiophene", "attached_prefix": "thieno", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "selenophene", "attached_prefix": "selenopheno", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "tellurophene", "attached_prefix": "telluropheno", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "phosphole", "attached_prefix": "phospholo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "arsole", "attached_prefix": "arsolo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "borole", "attached_prefix": "borolo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "pyrrole", "attached_prefix": "pyrrolo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "imidazole", "attached_prefix": "imidazo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "pyrazole", "attached_prefix": "pyrazolo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "oxazole", "template_names": ["1,3-oxazole"], "parent_name": "[1,3]oxazole", "attached_prefix": "oxazolo", "multiplicative_prefix_style": "complex", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "isoxazole", "template_names": ["1,2-oxazole"], "parent_name": "isoxazole", "attached_prefix": "isoxazolo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "thiazole", "template_names": ["1,3-thiazole"], "parent_name": "[1,3]thiazole", "attached_prefix": "thiazolo", "multiplicative_prefix_style": "complex", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "isothiazole", "template_names": ["1,2-thiazole"], "parent_name": "isothiazole", "attached_prefix": "isothiazolo", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "pyran", "template_names": ["pyran"], "parent_name": "pyran", "attached_prefix": "pyrano", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"}
+  ]
+}

@@ -2,6 +2,14 @@
   "bluebook_rule": "P-25 retained parent output policy: preferred output names are distinct from accepted retained aliases.",
   "parents": [
     {
+      "template_name": "1H-indole",
+      "preferred_name": "1H-indole",
+      "preferred_contexts": ["all"],
+      "accepted_aliases": ["indole"],
+      "context_names": {"wrapped_parent": "indole"},
+      "reason": "A nondetachable bridge supplies the cited hydrogen state of the indole framework."
+    },
+    {
       "template_name": "indane",
       "preferred_name": "2,3-dihydro-1H-indene",
       "preferred_contexts": [

@@ -1,0 +1,520 @@
+{
+  "components": [
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "1-benzofuran",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "benzofuro",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "1-benzofuran"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "1-benzothiophene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "benzothieno",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "1-benzothiophene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "1H-indene",
+      "parser_visible_forms": [
+        "indeno"
+      ],
+      "preferred_fusion_prefix": "indeno",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "1H-indene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[1,3]oxazole",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "oxazolo",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "1,3-oxazole"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[1,3]thiazole",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "thiazolo",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "1,3-thiazole"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [
+        "anthraceno"
+      ],
+      "parent_name": "anthracene",
+      "parser_visible_forms": [
+        "anthra",
+        "anthraceno"
+      ],
+      "preferred_fusion_prefix": "anthra",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.2.3",
+      "template_names": [
+        "anthracene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "arsole",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "arsolo",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "arsole"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "azulene",
+      "parser_visible_forms": [
+        "azuleno"
+      ],
+      "preferred_fusion_prefix": "azuleno",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "azulene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "benzene",
+      "parser_visible_forms": [
+        "benzo"
+      ],
+      "preferred_fusion_prefix": "benzo",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "benzene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "borole",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "borolo",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "borole"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "carbazole",
+      "parser_visible_forms": [
+        "carbazolo"
+      ],
+      "preferred_fusion_prefix": "carbazolo",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "carbazole"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "cycloheptatriene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cyclohepta",
+      "roles": [
+        "attached"
+      ],
+      "rule": "P-25.2.2",
+      "template_names": [
+        "cycloheptatriene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "cyclooctatetraene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cycloocta",
+      "roles": [
+        "attached"
+      ],
+      "rule": "P-25.2.2",
+      "template_names": [
+        "cyclooctatetraene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "cyclopentadiene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cyclopenta",
+      "roles": [
+        "attached"
+      ],
+      "rule": "P-25.2.2",
+      "template_names": [
+        "cyclopentadiene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "furan",
+      "parser_visible_forms": [
+        "furo"
+      ],
+      "preferred_fusion_prefix": "furo",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "furan"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "imidazole",
+      "parser_visible_forms": [
+        "imidazo"
+      ],
+      "preferred_fusion_prefix": "imidazo",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "imidazole"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "isothiazole",
+      "parser_visible_forms": [
+        "isothiazolo"
+      ],
+      "preferred_fusion_prefix": "isothiazolo",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "1,2-thiazole"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "isoxazole",
+      "parser_visible_forms": [
+        "isoxazolo"
+      ],
+      "preferred_fusion_prefix": "isoxazolo",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "1,2-oxazole"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "naphthalene",
+      "parser_visible_forms": [
+        "naphtho"
+      ],
+      "preferred_fusion_prefix": "naphtho",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "naphthalene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "pentalene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "pentaleno",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "pentalene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "phenanthrene",
+      "parser_visible_forms": [
+        "phenanthro"
+      ],
+      "preferred_fusion_prefix": "phenanthro",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "phenanthrene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "phosphole",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "phospholo",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "phosphole"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "pyran",
+      "parser_visible_forms": [
+        "pyrano"
+      ],
+      "preferred_fusion_prefix": "pyrano",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "pyran"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "pyrazine",
+      "parser_visible_forms": [
+        "pyrazino"
+      ],
+      "preferred_fusion_prefix": "pyrazino",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "pyrazine"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "pyrazole",
+      "parser_visible_forms": [
+        "pyrazolo"
+      ],
+      "preferred_fusion_prefix": "pyrazolo",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "pyrazole"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "pyridazine",
+      "parser_visible_forms": [
+        "pyridazino"
+      ],
+      "preferred_fusion_prefix": "pyridazino",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "pyridazine"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "pyridine",
+      "parser_visible_forms": [
+        "pyrido"
+      ],
+      "preferred_fusion_prefix": "pyrido",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "pyridine"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "pyrimidine",
+      "parser_visible_forms": [
+        "pyrimidino"
+      ],
+      "preferred_fusion_prefix": "pyrimidino",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "pyrimidine"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "pyrrole",
+      "parser_visible_forms": [
+        "pyrrolo"
+      ],
+      "preferred_fusion_prefix": "pyrrolo",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "pyrrole"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "quinoline",
+      "parser_visible_forms": [
+        "quinolino"
+      ],
+      "preferred_fusion_prefix": "quinolino",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "quinoline"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "selenophene",
+      "parser_visible_forms": [
+        "selenopheno"
+      ],
+      "preferred_fusion_prefix": "selenopheno",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "selenophene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "tellurophene",
+      "parser_visible_forms": [
+        "telluropheno"
+      ],
+      "preferred_fusion_prefix": "telluropheno",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "tellurophene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "thiophene",
+      "parser_visible_forms": [
+        "thieno"
+      ],
+      "preferred_fusion_prefix": "thieno",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "thiophene"
+      ]
+    }
+  ],
+  "generated_by": "scripts/build_fusion_component_registry.py",
+  "registry_version": "2026.1",
+  "runtime_dependency": false,
+  "schema_version": 1,
+  "source_sha256": {
+    "src/openclatura/data/fusion_components.json": "2b63afab2ea7a13c8b4d9c4b308584fc85109ea34f54c82292e31de02234f3f5",
+    "src/openclatura/data/retained_fused_graph_templates.json": "0244db6b07d95309fc049138b31d9ad983980180dcfed6821ca129553239767c",
+    "src/openclatura/hantzsch_widman.py": "d3feb494c12b35e460e542e4f982a6058bec564d2958bc671ee5e79739042e7b",
+    "tests/data/parser_xml_resources/fusionComponents.json": "6f6465633bcbc26e30be994c7711f8fc40df807f16f780e993c0e60db39e9723"
+  }
+}

@@ -8,7 +8,7 @@ SMILES or SMARTS strings.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from functools import cache, lru_cache
 from typing import Any
 
@@ -17,7 +17,14 @@ from .locants import retained_locant_sort_key
 from .molecule import Molecule
 from .naming_data import load_json_table
 from .nomenclature import RULES
-from .retained_name_policy import retained_parent_name_policy, retained_parent_output_name
+from .retained_graph_model import (
+    RetainedGraphAtomTemplate,
+    RetainedGraphBondTemplate,
+    RetainedGraphTemplate,
+    RetainedGraphTemplateMatch,
+)
+from .retained_name_policy import retained_parent_name_policy
+from .rules import elements as element_rules
 from .rules import multipliers
 
 ALLOWED_BOND_CLASSES = {"single", "double", "aromatic", "mancude", "fusion"}
@@ -26,7 +33,7 @@ ALLOWED_CHARGE_POLICIES = {"exact", "charge_layer"}
 RETAINED_GRAPH_FAMILIES = ("fused", "macrocycle")
 
 # Single-bonded in every mancude parent, so never indicated-hydrogen capacity.
-FIXED_SATURATED_RING_ELEMENTS = frozenset({"O", "S", "Se", "Te"})
+FIXED_SATURATED_RING_ELEMENTS = element_rules.MANCUDE_FORCED_SINGLE_SYMBOLS
 
 
 @lru_cache(maxsize=1)
@@ -42,101 +49,6 @@ def retained_fused_base_templates() -> dict[str, dict[str, Any]]:
             raise ValueError(f"Retained fused base template {name!r} must be a mapping.")
         templates[str(name)] = dict(template)
     return templates
-
-
-@dataclass(frozen=True)
-class RetainedGraphAtomTemplate:
-    locant: str
-    symbol: str = "C"
-    charge: int = 0
-    aromatic: bool = True
-    fusion: bool = False
-    default_h: bool = False
-    saturated: bool = False
-    interior: bool = False
-
-
-@dataclass(frozen=True)
-class RetainedGraphBondTemplate:
-    locants: tuple[str, str]
-    bond_class: str = "aromatic"
-
-
-@dataclass(frozen=True)
-class RetainedGraphTemplate:
-    name: str
-    pin: bool
-    priority: int
-    aliases: tuple[str, ...]
-    attached_prefix: str | None
-    derivative_stem: str | None
-    default_indicated_h: tuple[str, ...]
-    locants: tuple[str, ...]
-    atoms: tuple[RetainedGraphAtomTemplate, ...]
-    bonds: tuple[RetainedGraphBondTemplate, ...]
-    rings: tuple[tuple[str, ...], ...]
-    fusion_atoms: tuple[str, ...]
-    peripheral_atoms: tuple[str, ...]
-    interior_atoms: tuple[str, ...]
-    family: str = "fused"
-    numbering_policy: str = "retained_template"
-    aromatic_equivalence_policy: str = "neutral_kekule_equivalent"
-    charge_policy: str = "charge_layer"
-    enforce_mancude_double_bonds: bool = False
-    enabled: bool = False
-    derivative_production_enabled: bool = False
-    derivative_audit_enabled: bool = False
-    implied_stereo: bool = False
-    mancude_double_bonds: int | None = None
-    indicated_hydrogen_count_override: int | None = None
-    pre_descriptor_selection: bool = False
-
-    @property
-    def atom_by_locant(self) -> dict[str, RetainedGraphAtomTemplate]:
-        return {atom.locant: atom for atom in self.atoms}
-
-    @property
-    def output_name(self) -> str:
-        return retained_parent_output_name(self.name, "unsubstituted_parent")
-
-    @property
-    def indicated_hydrogen_count(self) -> int:
-        """Indicated hydrogens this parent hydride supports.
-
-        Declared carbon sites (9H-xanthene, 2H-pyran) when it has them, else the
-        positions holding no mancude bond less the chalcogens, which are
-        single-bonded anyway -- 1,4-benzodioxine's oxygens are not hydro sites.
-        A bridgehead spends all three bonds inside the rings, so it has none
-        left for a hydrogen: indolizine's N4 supports no indicated H.
-        """
-
-        if self.indicated_hydrogen_count_override is not None:
-            return self.indicated_hydrogen_count_override
-        if self.default_indicated_h:
-            return len(self.default_indicated_h)
-        return sum(
-            1
-            for atom in self.atoms
-            if not atom.aromatic and not atom.fusion and atom.symbol not in FIXED_SATURATED_RING_ELEMENTS
-        )
-
-
-@dataclass(frozen=True)
-class RetainedGraphTemplateMatch:
-    template: RetainedGraphTemplate
-    atom_to_locant: dict[int, str]
-    locant_to_atom: dict[str, int]
-    matched_atoms: frozenset[int]
-    indicated_h: tuple[str, ...]
-    trace: tuple[str, ...] = ()
-
-
-# Backward-compatible type names for callers that imported the original fused
-# kernel directly. New code should use the family-neutral names above.
-RetainedFusedAtomTemplate = RetainedGraphAtomTemplate
-RetainedFusedBondTemplate = RetainedGraphBondTemplate
-RetainedFusedGraphTemplate = RetainedGraphTemplate
-RetainedFusedTemplateMatch = RetainedGraphTemplateMatch
 
 
 def retained_graph_templates(
@@ -235,7 +147,7 @@ def _generated_acene_templates() -> tuple[RetainedGraphTemplate, ...]:
 
     series = load_json_table("retained_fused_series.json").get("acenes", {})
     minimum = int(series.get("minimum_ring_count", 4))
-    maximum = int(series.get("maximum_ring_count", minimum))
+    maximum = int(series.get("eager_maximum_ring_count", series.get("maximum_ring_count", minimum)))
     overrides = {int(count): dict(values) for count, values in series.get("member_overrides", {}).items()}
     rows = []
     for ring_count in range(minimum, maximum + 1):
@@ -292,7 +204,7 @@ def _generated_polyaphene_templates() -> tuple[RetainedGraphTemplate, ...]:
 
     series = load_json_table("retained_fused_series.json").get("polyaphenes", {})
     minimum = int(series.get("minimum_ring_count", 5))
-    maximum = int(series.get("maximum_ring_count", minimum))
+    maximum = int(series.get("eager_maximum_ring_count", series.get("maximum_ring_count", minimum)))
     overrides = {int(count): dict(values) for count, values in series.get("member_overrides", {}).items()}
     rows = []
     for ring_count in range(minimum, maximum + 1):
@@ -520,22 +432,104 @@ def match_retained_graph_template_maps(
     )
 
 
-def _ring_fusion_stereo_is_assigned(mol: Molecule, atom_set: set[int]) -> bool:
-    """Whether every ring-fusion centre of a matched skeleton has a configuration.
+@cache
+def retained_graph_template_automorphisms(
+    template: RetainedGraphTemplate,
+) -> tuple[tuple[tuple[str, str], ...], ...]:
+    """Return every typed automorphism of a retained graph template.
 
-    A steroid name carries the configuration of its ring fusions, so spelling a
-    structure that leaves them open as ``gonane`` asserts stereochemistry the
-    structure does not have.  Those fall back to the von Baeyer name.
+    The existing locant matcher performs the graph search.  This adapter builds
+    one in-memory graph from the typed template, constrains candidates by all
+    atom roles, and filters the matcher result by exact bond classes and ring
+    membership.  Fusion policies can therefore compare interface orbits
+    without introducing a second graph-isomorphism implementation.
     """
 
-    for atom_idx in atom_set:
-        atom = mol.atoms[atom_idx]
-        ring_neighbors = sum(1 for neighbor in mol.get_neighbors(atom_idx) if neighbor in atom_set)
-        if ring_neighbors < 3:
+    locants = template.locants
+    index_by_locant = {locant: index for index, locant in enumerate(locants)}
+    locant_by_index = {index: locant for locant, index in index_by_locant.items()}
+    atom_by_locant = template.atom_by_locant
+
+    mol = Molecule()
+    for locant, index in index_by_locant.items():
+        atom = atom_by_locant[locant]
+        mol.add_atom(
+            atom.symbol,
+            idx=index,
+            charge=atom.charge,
+            is_aromatic=atom.aromatic,
+            total_h_count=int(atom.default_h),
+        )
+    for bond_index, bond in enumerate(template.bonds, start=1):
+        mol.add_bond(
+            index_by_locant[bond.locants[0]],
+            index_by_locant[bond.locants[1]],
+            order=_bond_order(bond.bond_class),
+            idx=bond_index,
+        )
+
+    def atom_role(locant: str) -> tuple:
+        atom = atom_by_locant[locant]
+        return (
+            atom.symbol,
+            atom.charge,
+            atom.aromatic,
+            atom.fusion,
+            atom.default_h,
+            atom.saturated,
+            atom.interior,
+            locant in template.peripheral_atoms,
+        )
+
+    candidates = {
+        locant: [index_by_locant[target] for target in locants if atom_role(target) == atom_role(locant)]
+        for locant in locants
+    }
+    assignments = _match_locants_backtracking(
+        mol,
+        list(locants),
+        candidates,
+        _template_neighbors(template),
+        template_bond_classes={frozenset(bond.locants): bond.bond_class for bond in template.bonds},
+        bond_policy=template.aromatic_equivalence_policy,
+    )
+    bond_classes = {frozenset(bond.locants): bond.bond_class for bond in template.bonds}
+    ring_sets = {frozenset(ring) for ring in template.rings}
+    automorphisms = []
+    for assignment in assignments:
+        mapped = {locant: locant_by_index[index] for locant, index in assignment.items()}
+        if any(
+            bond_classes.get(frozenset((mapped[left], mapped[right]))) != bond_class
+            for edge, bond_class in bond_classes.items()
+            for left, right in (tuple(edge),)
+        ):
             continue
-        if atom.stereo is None and atom.raw_stereo is None:
-            return False
-    return True
+        if {frozenset(mapped[locant] for locant in ring) for ring in template.rings} != ring_sets:
+            continue
+        automorphisms.append(tuple((locant, mapped[locant]) for locant in locants))
+    return tuple(sorted(set(automorphisms)))
+
+
+def _required_template_stereo_is_assigned(
+    mol: Molecule,
+    template: RetainedGraphTemplate,
+    assignment: dict[str, int],
+) -> bool:
+    """Whether configurations implied by a retained parent are present.
+
+    Ring-junction degree is not a stereo specification: a junction may be
+    potentially stereogenic without its configuration being fixed by the
+    retained parent. Templates therefore declare the exact locants whose
+    configurations their names imply, after graph matching maps those locants
+    onto input atoms.
+    """
+
+    return all(
+        mol.atoms[assignment[atom.locant]].stereo is not None
+        or mol.atoms[assignment[atom.locant]].raw_stereo is not None
+        for atom in template.atoms
+        if atom.required_stereo
+    )
 
 
 def _match_all_retained_fused_template(
@@ -553,9 +547,6 @@ def _match_all_retained_fused_template(
         not _is_saturated_site(mol, atom_idx, atom_set) for atom_idx in atom_set
     ):
         return []
-    if template.implied_stereo and not _ring_fusion_stereo_is_assigned(mol, atom_set):
-        return []
-
     atom_by_locant = _relocatable_atom_by_locant(template) if allow_relocated_indicated_h else template.atom_by_locant
     template_degrees = _template_degrees(template)
     molecule_degrees = {
@@ -598,6 +589,10 @@ def _match_all_retained_fused_template(
         template_bond_classes=template_bond_classes,
         bond_policy=template.aromatic_equivalence_policy,
     )
+    if template.implied_stereo:
+        assignments = [
+            assignment for assignment in assignments if _required_template_stereo_is_assigned(mol, template, assignment)
+        ]
     if not allow_relocated_indicated_h:
         derive = not template.default_indicated_h and template.indicated_hydrogen_count > 0
         return [
@@ -715,6 +710,58 @@ def _templates_by_topology(
     return {key: tuple(templates) for key, templates in index.items()}
 
 
+@lru_cache(maxsize=64)
+def _generated_series_templates_for_topology(
+    topology_key: TopologyKey,
+    families: frozenset[str] | None,
+) -> tuple[RetainedGraphTemplate, ...]:
+    """Synthesize only generated fused-series members compatible with one graph.
+
+    The registry eagerly materializes a small, frequently used window. Larger
+    acenes and polyaphenes are inferred from the candidate atom count and then
+    rejected by the same cheap topology key before exact graph matching. This
+    removes the family-size cap without constructing every smaller member.
+    """
+
+    if families is not None and "fused" not in families:
+        return ()
+    size, symbol_counts, degree_counts, edge_degree_counts = topology_key
+    if symbol_counts != (("C", size),):
+        return ()
+    ring_count, remainder = divmod(size - 2, 4)
+    if remainder or ring_count < 1:
+        return ()
+    edge_count = sum(count for _, count in edge_degree_counts)
+    if edge_count - size + 1 != ring_count:
+        return ()
+    if any(degree not in {2, 3} for degree, _ in degree_counts):
+        return ()
+
+    templates = []
+    for family, builder in (
+        ("acenes", _acene_template_from_data),
+        ("polyaphenes", _polyaphene_template_from_data),
+    ):
+        series = load_json_table("retained_fused_series.json").get(family, {})
+        minimum = int(series.get("minimum_ring_count", 4))
+        eager_maximum = int(series.get("eager_maximum_ring_count", minimum - 1))
+        maximum = series.get("maximum_ring_count")
+        supported_maximum = multipliers.MAX_MULTIPLIER_COUNT if maximum is None else int(maximum)
+        if not max(minimum, eager_maximum + 1) <= ring_count <= supported_maximum:
+            continue
+        overrides = {int(count): dict(values) for count, values in series.get("member_overrides", {}).items()}
+        suffix = "cene" if family == "acenes" else "phene"
+        row = {
+            "ring_count": ring_count,
+            "name": f"{multipliers.basic(ring_count)}{suffix}",
+            **overrides.get(ring_count, {}),
+        }
+        template = builder(row)
+        if _template_topology_key(template) == topology_key:
+            templates.append(template)
+    return tuple(templates)
+
+
 @cache
 def _template_topology_key(template: RetainedGraphTemplate) -> TopologyKey:
     degrees = _template_degrees(template)
@@ -814,8 +861,13 @@ def match_retained_graph_templates(
     cached = mol._retained_fused_cache.get(cache_key)
     if cached is not None:
         return list(cached)
-    candidates = _templates_by_topology(include_disabled, pre_descriptor_only, families).get(
-        _molecule_topology_key(mol, atom_set), ()
+    topology_key = _molecule_topology_key(mol, atom_set)
+    candidates = list(_templates_by_topology(include_disabled, pre_descriptor_only, families).get(topology_key, ()))
+    candidate_names = {template.name for template in candidates}
+    candidates.extend(
+        template
+        for template in _generated_series_templates_for_topology(topology_key, families)
+        if template.name not in candidate_names and (include_disabled or template.enabled)
     )
     matches = [
         match
@@ -1055,6 +1107,11 @@ def validate_retained_fused_template(template: RetainedGraphTemplate) -> None:
         raise ValueError(f"Retained fused template {template.name!r} has unknown interior atoms.")
     if set(template.default_indicated_h) - locant_set:
         raise ValueError(f"Retained fused template {template.name!r} has unknown indicated-H locants.")
+    required_stereo = {atom.locant for atom in template.atoms if atom.required_stereo}
+    if template.implied_stereo and not required_stereo:
+        raise ValueError(f"Retained fused template {template.name!r} implies stereo but declares no stereo locants.")
+    if required_stereo and not template.implied_stereo:
+        raise ValueError(f"Retained fused template {template.name!r} declares stereo locants without implied stereo.")
 
     seen_bonds: set[tuple[str, str]] = set()
     for bond in template.bonds:
@@ -1199,11 +1256,13 @@ def _match_locants_backtracking(
     max_matches: int = 256,
 ) -> list[dict[str, int]]:
     matches: list[dict[str, int]] = []
+    molecule_neighbors = {atom_idx: frozenset(mol.get_neighbors(atom_idx)) for atom_idx in mol.atoms}
     _collect_locant_matches(
         mol,
         locants,
         candidates,
         template_neighbors,
+        molecule_neighbors,
         {},
         set(),
         matches,
@@ -1219,6 +1278,7 @@ def _collect_locant_matches(
     locants: list[str],
     candidates: dict[str, list[int]],
     template_neighbors: dict[str, set[str]],
+    molecule_neighbors: dict[int, frozenset[int]],
     assignment: dict[str, int],
     used_atoms: set[int],
     matches: list[dict[str, int]],
@@ -1237,13 +1297,23 @@ def _collect_locant_matches(
     # many disconnected partial permutations.  Dynamic frontier selection is
     # the same exact isomorphism search, but it grows outward from established
     # edges and rejects impossible mappings immediately.
+    remaining = [locant for locant in locants if locant not in assignment]
+    frontier = [
+        locant for locant in remaining if any(neighbor in assignment for neighbor in template_neighbors[locant])
+    ]
+    search_locants = frontier or remaining
     options_by_locant: list[tuple[int, int, int, str, list[int]]] = []
-    for locant in locants:
-        if locant in assignment:
-            continue
+    for locant in search_locants:
+        assigned_neighbors = [neighbor for neighbor in template_neighbors[locant] if neighbor in assignment]
+        candidate_pool = candidates[locant]
+        if assigned_neighbors:
+            allowed_atoms = set(molecule_neighbors[assignment[assigned_neighbors[0]]])
+            for neighbor in assigned_neighbors[1:]:
+                allowed_atoms.intersection_update(molecule_neighbors[assignment[neighbor]])
+            candidate_pool = [atom_idx for atom_idx in candidate_pool if atom_idx in allowed_atoms]
         options = [
             atom_idx
-            for atom_idx in candidates[locant]
+            for atom_idx in candidate_pool
             if atom_idx not in used_atoms
             and _is_assignment_compatible(
                 mol,
@@ -1251,14 +1321,16 @@ def _collect_locant_matches(
                 atom_idx,
                 template_neighbors,
                 assignment,
+                molecule_neighbors=molecule_neighbors,
                 template_bond_classes=template_bond_classes,
                 bond_policy=bond_policy,
             )
         ]
         if not options:
             return
-        assigned_neighbors = sum(neighbor in assignment for neighbor in template_neighbors[locant])
-        options_by_locant.append((len(options), -assigned_neighbors, -len(template_neighbors[locant]), locant, options))
+        options_by_locant.append(
+            (len(options), -len(assigned_neighbors), -len(template_neighbors[locant]), locant, options)
+        )
     _, _, _, locant, options = min(options_by_locant)
     for atom_idx in options:
         assignment[locant] = atom_idx
@@ -1268,6 +1340,7 @@ def _collect_locant_matches(
             locants,
             candidates,
             template_neighbors,
+            molecule_neighbors,
             assignment,
             used_atoms,
             matches,
@@ -1286,12 +1359,13 @@ def _is_assignment_compatible(
     template_neighbors: dict[str, set[str]],
     assignment: dict[str, int],
     *,
+    molecule_neighbors: dict[int, frozenset[int]],
     template_bond_classes: dict[frozenset[str], str],
     bond_policy: str,
 ) -> bool:
     for assigned_locant, assigned_atom in assignment.items():
         expected_bond = assigned_locant in template_neighbors[locant]
-        actual_bond = mol.get_bond(atom_idx, assigned_atom) is not None
+        actual_bond = assigned_atom in molecule_neighbors[atom_idx]
         if expected_bond != actual_bond:
             return False
         if expected_bond and bond_policy == "exact":
@@ -1312,6 +1386,10 @@ def _atom_template(data: dict[str, Any]) -> RetainedGraphAtomTemplate:
         default_h=bool(data.get("default_h", False)),
         saturated=bool(data.get("saturated", False)),
         interior=bool(data.get("interior", False)),
+        pi_capacity=(int(data["pi_capacity"]) if data.get("pi_capacity") is not None else None),
+        forced_single=bool(data.get("forced_single", False)),
+        indicated_h_site=bool(data.get("indicated_h_site", False)),
+        required_stereo=bool(data.get("required_stereo", False)),
     )
 
 

@@ -577,6 +577,7 @@ CONFIRMED_SMILES = [
     "COc1cccc(C=NNc2ccc(S(N)(=O)=O)cc2[N+](=O)[O-])c1",
     "COc1ccc(/C(C)=N/Nc2ncnc3sc(C)c(C)c23)cc1OC",
     "O=S1(=O)CCc2c1scc/c2=N\\Nc1ccc(Cl)c(Cl)c1",
+    "O=S1(=O)CCc2c1scc/c2=N\\NC",
     # …and an E/Z cited with no locant at all, which can only mean the
     # structure's single stereo bond.
     "Cc1ccccc1N/N=C/c1cc([N+](=O)[O-])ccc1N(CC(C)C)CC(C)C",

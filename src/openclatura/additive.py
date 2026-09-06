@@ -1,6 +1,7 @@
 import re
 
 from .assembly_parts import AssemblyParts, SubstituentItem
+from .fusion.mancude import compare_actual_parent_to_implied_parent
 from .locants import parse_locant
 from .molecule import Molecule
 from .name_operations import HydroOperation
@@ -109,6 +110,39 @@ def _declared_sites_are_unambiguous(mol: Molecule, numbered_path: list[int], get
 def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     """Add indicated hydrogen locants for retained ring names."""
 
+    parent = parts.parent_hydride
+    if parent is not None and parent.bond_model is not None:
+        delta = parts.parent_bond_delta
+        if delta is None:
+            delta = compare_actual_parent_to_implied_parent(mol, parts.parent_atom_ids, parent.bond_model)
+            parts.parent_bond_delta = delta
+        if delta is not None and delta.compatible and delta.hydrogenated_edges:
+            indicated_locants = (
+                set(parent.hydride_metadata.default_indicated_h) if parent.hydride_metadata is not None else set()
+            )
+            indicated_atoms = {
+                atom_idx for atom_idx in numbered_path if str(get_loc(atom_idx)) in indicated_locants
+            }
+            hydrogenated_edges = tuple(
+                edge for edge in delta.hydrogenated_edges if not (set(edge) & indicated_atoms)
+            )
+            if not hydrogenated_edges:
+                return
+            atom_ids = sorted(
+                {atom for edge in hydrogenated_edges for atom in edge},
+                key=lambda atom_idx: parse_locant(str(get_loc(atom_idx))),
+            )
+            parts.hydro_operations.append(
+                HydroOperation(
+                    key="additive_hydrogen",
+                    reason="Observed parent bond orders require hydrogenation of the proved mancude parent.",
+                    locants=tuple(str(get_loc(atom_idx)) for atom_idx in atom_ids),
+                    atom_ids=tuple(atom_ids),
+                    operation_kind="additive_hydrogen",
+                )
+            )
+            return
+
     plan = mancude_monocycle_hydro_plan(mol, numbered_path, parts.retained_name)
     if plan is not None:
         _add_monocycle_hydro(parts, plan, get_loc)
@@ -128,6 +162,9 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     if parts.retained_name == "tetrazole" and any(mol.atoms[idx].charge for idx in numbered_path):
         return
     oxo_derivative = parts.principal_group is not None and parts.principal_group.key == "ketone"
+    principal_suffix_sites = (
+        parts.parent_atom_ids & parts.principal_group.atom_ids if parts.principal_group is not None else set()
+    )
     default_indicated_h = set(metadata.default_indicated_h) if metadata is not None else set()
     inherent_saturated_locants = set(metadata.inherent_saturated_locants) if metadata is not None else set()
     name_declared_indicated_h = set(default_indicated_h) or _name_indicated_hydrogen_locants(parts.retained_name)
@@ -156,7 +193,11 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             continue
         # An oxo prefix must cite its saturation; an -one/-dione suffix implies it.
         if not oxo_derivative and metadata is not None and _is_oxo_ring_site(mol, idx, numbered_path):
-            hydro_only.append((locant, idx))
+            # A principal suffix already represents an exocyclic multiple bond
+            # at its parent site (for example C=N in a ring hydrazone). Only an
+            # otherwise unrepresented site contributes another hydro operation.
+            if idx not in principal_suffix_sites:
+                hydro_only.append((locant, idx))
             continue
 
         if metadata is not None and default_indicated_h and atom.is_carbon and locant not in default_indicated_h:
@@ -522,7 +563,7 @@ def _add_monocycle_hydro(parts: AssemblyParts, plan: tuple[int, list[int]], get_
 def add_replacement_prefixes(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     """Add replacement prefixes and lambda annotations for parent atoms."""
 
-    if parts.retained_name:
+    if parts.retained_name or (parts.parent_hydride is not None and parts.parent_hydride.absorbs_skeletal_replacement):
         return
     for atom_idx in numbered_path:
         atom = mol.atoms[atom_idx]

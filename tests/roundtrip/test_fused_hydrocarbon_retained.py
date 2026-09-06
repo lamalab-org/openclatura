@@ -12,11 +12,13 @@ from rdkit import Chem
 
 from openclatura import name_many, name_smiles
 from openclatura.retained_fused_templates import (
+    _acene_template_from_data,
     _generated_acene_templates,
     _generated_polyaphene_templates,
     retained_fused_graph_templates,
 )
 from openclatura.retained_name_policy import retained_parent_name_policy
+from openclatura.rules import multipliers
 from openclatura.utils import standardize_mol
 
 try:
@@ -138,6 +140,35 @@ def test_higher_acene_series_extends_without_new_graph_templates(expected_name, 
     assert name_smiles(smiles) == expected_name
 
 
+def test_higher_acene_series_is_synthesized_on_demand_beyond_eager_registry():
+    smiles = (
+        "C1C=CC2C=C3C=C4C=C5C=C6C=C7C=C8C=C9C=C%10C=C%11C=C%12C=C%13C=CC=CC%13=CC%12="
+        "CC%11=CC%10=CC9=CC8=CC7=CC6=CC5=CC4=CC3=CC=2C=1"
+    )
+    assert name_smiles(smiles) == "tridecacene"
+
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None
+    for _ in range(2):
+        reordered = Chem.MolToSmiles(mol, canonical=False, doRandom=True)
+        assert name_smiles(reordered) == "tridecacene"
+
+
+def test_generated_acene_name_uses_shared_numerical_terms_beyond_explicit_multiplier_table():
+    template = _acene_template_from_data({"ring_count": 21, "name": f"{multipliers.basic(21)}cene"})
+    assert template.name == "henicosacene"
+    assert len(template.atoms) == 86
+    assert len(template.rings) == 21
+
+
+def test_higher_polyaphene_series_is_synthesized_on_demand_beyond_eager_registry():
+    smiles = (
+        "C1=CC=CC2=CC3=CC4=CC5=CC6=CC7=CC=C8C=C9C=C%10C=C%11C=C%12C=C%13C=CC=CC%13=CC%12="
+        "CC%11=CC%10=CC9=CC8=C7C=C6C=C5C=C4C=C3C=C12"
+    )
+    assert name_smiles(smiles) == "tridecaphene"
+
+
 def test_polyaphene_series_generates_standard_locant_graphs():
     generated = {template.name: template for template in _generated_polyaphene_templates()}
     expected_sizes = {
@@ -233,6 +264,24 @@ def test_requested_fused_names_roundtrip_through_opsin_one_by_one():
         standardize_mol(original) == standardize_mol(back)
         for original, back in zip(expected_smiles, roundtripped, strict=True)
     )
+
+
+@pytest.mark.opsin
+def test_on_demand_tridecacene_roundtrips_through_opsin():
+    original = _opsin("tridecacene")
+    generated = name_smiles(original)
+    assert generated == "tridecacene"
+    assert standardize_mol(_opsin(generated)) == standardize_mol(original)
+
+    derivative = _opsin("1-methyltridecacene")
+    derivative_name = name_smiles(derivative)
+    assert derivative_name == "1-methyltridecacene"
+    assert standardize_mol(_opsin(derivative_name)) == standardize_mol(derivative)
+
+    angular = _opsin("tridecaphene")
+    angular_name = name_smiles(angular)
+    assert angular_name == "tridecaphene"
+    assert standardize_mol(_opsin(angular_name)) == standardize_mol(angular)
 
 
 @pytest.mark.opsin

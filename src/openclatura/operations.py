@@ -1,6 +1,7 @@
 """Derive high-level nomenclature operations from naming traces."""
 
 from .molecule import NomenclatureOperation, OperationClass, TracePhase, TraceStep
+from .ring_parent import ParentHydrideKind
 
 
 def infer_operations(decisions: list[TraceStep], trace_segments: list[dict]) -> list[NomenclatureOperation]:
@@ -13,7 +14,28 @@ def infer_operations(decisions: list[TraceStep], trace_segments: list[dict]) -> 
 
     operations: list[NomenclatureOperation] = []
     for step in decisions:
-        if step.phase == TracePhase.ASSEMBLY and step.decision == "assembled component name":
+        hydride_kind = step.data.get("parent_hydride_kind")
+        if hydride_kind in {
+            ParentHydrideKind.SYSTEMATIC_FUSION.value,
+            ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION.value,
+            ParentHydrideKind.BRIDGED_FUSION.value,
+        }:
+            detail = (
+                "bridged_fusion_parent"
+                if hydride_kind == ParentHydrideKind.BRIDGED_FUSION.value
+                else (
+                    "skeletal_replacement_fusion_parent"
+                    if hydride_kind == ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION.value
+                    else "systematic_fusion_parent"
+                )
+            )
+            operations.append(NomenclatureOperation(OperationClass.FUSION, detail))
+        elif step.phase == TracePhase.PARENT_SELECTION and step.decision == "selected audited systematic fusion parent":
+            operations.append(NomenclatureOperation(OperationClass.FUSION, "systematic_fusion_parent"))
+        elif step.phase == TracePhase.PARENT_SELECTION and step.decision == "selected parent skeleton":
+            if step.data.get("is_polycycle") and step.data.get("polycycle_descriptor"):
+                operations.append(NomenclatureOperation(OperationClass.FUSION, "polycyclic_parent"))
+        elif step.phase == TracePhase.ASSEMBLY and step.decision == "assembled component name":
             principal_key = step.data.get("principal_key")
             substituent_count = int(step.data.get("substituent_count") or 0)
             unsaturation_count = int(step.data.get("unsaturation_count") or 0)
@@ -26,9 +48,6 @@ def infer_operations(decisions: list[TraceStep], trace_segments: list[dict]) -> 
                 )
             if unsaturation_count:
                 operations.append(NomenclatureOperation(OperationClass.SUBTRACTIVE, "unsaturation"))
-        elif step.phase == TracePhase.PARENT_SELECTION and step.decision == "selected parent skeleton":
-            if step.data.get("is_polycycle") and step.data.get("polycycle_descriptor"):
-                operations.append(NomenclatureOperation(OperationClass.FUSION, "polycyclic_parent"))
 
     if any(str(segment.get("key", "")).startswith("replacement:") for segment in trace_segments):
         operations.append(NomenclatureOperation(OperationClass.REPLACEMENT, "replacement_prefix"))

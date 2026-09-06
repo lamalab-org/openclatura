@@ -1,8 +1,20 @@
 """Explicit subtractive feature collection for selected parents."""
 
 from .assembly_parts import AssemblyParts, UnsaturationItem
+from .fusion.mancude import compare_actual_parent_to_implied_parent
 from .locants import parse_locant
 from .molecule import Molecule
+
+
+def _implied_parent_multiple_bonds(mol: Molecule, parts: AssemblyParts) -> frozenset[int]:
+    """Return graph bond ids implied by the selected parent-hydride model."""
+
+    parent = parts.parent_hydride
+    if parent is None or parent.bond_model is None:
+        return frozenset()
+    delta = compare_actual_parent_to_implied_parent(mol, parts.parent_atom_ids, parent.bond_model)
+    parts.parent_bond_delta = delta
+    return delta.implied_multiple_bond_ids if delta is not None and delta.compatible else frozenset()
 
 
 def add_unsaturations(
@@ -16,16 +28,18 @@ def add_unsaturations(
 ) -> None:
     """Add double/triple bond locants to assembly parts."""
 
-    if parts.retained_name:
+    parent = parts.parent_hydride
+    if parts.retained_name or (parent is not None and parent.implies_parent_unsaturation and parent.bond_model is None):
         return
 
     seen_bonds = set()
+    implied_multiple_bonds = _implied_parent_multiple_bonds(mol, parts)
     for u_idx in numbered_path:
         for v_idx in mol.get_neighbors(u_idx):
             if v_idx not in numbered_path:
                 continue
             bond = mol.get_bond(u_idx, v_idx)
-            if not bond or bond.order <= 1 or bond.idx in seen_bonds:
+            if not bond or bond.order <= 1 or bond.idx in seen_bonds or bond.idx in implied_multiple_bonds:
                 continue
             seen_bonds.add(bond.idx)
             bond_key = "double" if bond.order == 2 else "triple"

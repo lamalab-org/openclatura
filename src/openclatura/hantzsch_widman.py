@@ -13,12 +13,39 @@ can treat a generated parent exactly like a tabulated one.  Genuinely retained
 names -- pyridine, furan, morpholine -- stay in the table and are matched first.
 """
 
+from dataclasses import dataclass
+
 from .molecule import Molecule
+from .retained_graph_model import (
+    RetainedGraphAtomTemplate,
+    RetainedGraphBondTemplate,
+    RetainedGraphTemplate,
+)
 from .rules import elements as _elements
 from .rules import elision, multipliers
 
 MIN_RING_SIZE = 3
 MAX_RING_SIZE = 10
+
+_FUSION_COMPONENT_KEY_PREFIX = "generated-hw:"
+
+
+@dataclass(frozen=True, slots=True)
+class HWFusionComponent:
+    """One graph-derived, independently numbered HW fusion component.
+
+    This is deliberately a value object rather than a registry entry.  Fusion
+    matching may derive it from a face and discard it after planning; no global
+    table grows with the molecules processed by the naming engine.
+    """
+
+    key: str
+    parent_name: str
+    attached_prefix: str
+    template: RetainedGraphTemplate
+    atom_to_locant: tuple[tuple[int, str], ...]
+    multiplicative_prefix_style: str
+
 
 # P-22.2.2.1: the three six-membered stem sets, keyed by the class of the least
 # senior heteroatom in the ring -- boron makes trioxatriborinane, not -borane.
@@ -107,9 +134,231 @@ def hw_name(size: int, saturated: bool, hetero: list[tuple[int, str]]) -> str | 
     return f"{','.join(str(locant) for locant in locants)}-{parent}"
 
 
+def hw_fusion_component_key(ring_symbols: tuple[str, ...]) -> str:
+    """Return a reversible internal key for a numbered HW component graph."""
+
+    if not MIN_RING_SIZE <= len(ring_symbols) <= MAX_RING_SIZE:
+        raise ValueError("HW fusion component ring size is outside the supported range")
+    if not _fusion_symbols_supported(ring_symbols):
+        raise ValueError("unsupported HW fusion component atom sequence")
+    return f"{_FUSION_COMPONENT_KEY_PREFIX}{'.'.join(ring_symbols)}"
+
+
+def hw_fusion_component_from_key(key: str) -> HWFusionComponent | None:
+    """Reconstruct a generated fusion component without a mutable cache."""
+
+    if not key.startswith(_FUSION_COMPONENT_KEY_PREFIX):
+        return None
+    symbols = tuple(key.removeprefix(_FUSION_COMPONENT_KEY_PREFIX).split("."))
+    if not MIN_RING_SIZE <= len(symbols) <= MAX_RING_SIZE:
+        return None
+    if not _fusion_symbols_supported(symbols):
+        return None
+    return _hw_fusion_component(symbols, ())
+
+
+def hw_fusion_components_for_ring(mol: Molecule, path: list[int]) -> tuple[HWFusionComponent, ...]:
+    """Derive preferred local numberings for a neutral HW fusion face.
+
+    The operation is linear in the ring size apart from the at-most ``2n``
+    orientation comparison required by HW numbering.  It neither consults nor
+    mutates the generated-parent name cache used by the general parent pipeline.
+
+    A face may be the mancude component itself or a hydro derivative of it.
+    The latter is accepted only when its observed double bonds are a subset of
+    at least one valid maximum noncumulative mancude assignment.  The generated
+    template remains mancude: the fusion parent's ordinary hydro-operation
+    machinery records the missing double bonds after the component graphs have
+    been merged and numbered.
+    """
+
+    if not MIN_RING_SIZE <= len(path) <= MAX_RING_SIZE or len(path) != len(set(path)):
+        return ()
+    if any(atom_idx not in mol.atoms for atom_idx in path):
+        return ()
+    if any(mol.get_bond(left, right) is None for left, right in zip(path, path[1:] + path[:1])):
+        return ()
+    atoms = tuple(mol.atoms[atom_idx] for atom_idx in path)
+    if (
+        all(atom.symbol == "C" for atom in atoms)
+        or any(not _fusion_parent_charge_supported(atom.symbol, atom.charge) or atom.isotope is not None for atom in atoms)
+        or any(not atom.element.fusion_supported for atom in atoms)
+        or any(
+            atom.symbol != "C" and (atom.element.hw_stem is None or atom.element.hw_priority is None) for atom in atoms
+        )
+        or any(_needs_lambda(mol, atom.idx) for atom in atoms)
+    ):
+        return ()
+
+    orders = _canonical_ring_orders(mol, path)
+    if not orders:
+        return ()
+    symbols = tuple(mol.atoms[atom_idx].symbol for atom_idx in orders[0])
+    expected_double_bonds = mancude_double_bonds(list(symbols))
+    if expected_double_bonds == 0 or not _is_mancude_or_hydro_derivative(
+        mol,
+        path,
+        expected_double_bonds=expected_double_bonds,
+    ):
+        return ()
+
+    components = []
+    for order in orders:
+        atom_to_locant = tuple((atom_idx, str(locant)) for locant, atom_idx in enumerate(order, start=1))
+        components.append(_hw_fusion_component(symbols, atom_to_locant))
+    return tuple(components)
+
+
+def _fusion_parent_charge_supported(symbol: str, charge: int) -> bool:
+    """Whether fusion nomenclature can express the atom as a parent charge operation."""
+
+    return charge == 0 or (charge == 1 and symbol in {"N", "O"})
+
+
+def _is_mancude_or_hydro_derivative(
+    mol: Molecule,
+    path: list[int],
+    *,
+    expected_double_bonds: int,
+) -> bool:
+    """Whether a ring's pi bonds can belong to its generated mancude parent.
+
+    Merely accepting fewer double bonds is insufficient: it would also admit a
+    double bond at a forced-single chalcogen or a pattern that no Kekule form of
+    the parent can contain.  Fix the observed double bonds, remove their
+    endpoints, and prove that the remaining eligible cycle vertices can still
+    complete a maximum matching of the expected size.
+    """
+
+    actual_double_bonds = _ring_double_bonds(mol, path)
+    if actual_double_bonds is None or actual_double_bonds == 0 or actual_double_bonds > expected_double_bonds:
+        return False
+
+    size = len(path)
+    unavailable = [mol.atoms[atom_idx].symbol in FIXED_SATURATED for atom_idx in path]
+    for position, (left, right) in enumerate(zip(path, path[1:] + path[:1])):
+        bond = mol.get_bond(left, right)
+        if bond is None or bond.order != 2:
+            continue
+        following = (position + 1) % size
+        if unavailable[position] or unavailable[following]:
+            return False
+        unavailable[position] = True
+        unavailable[following] = True
+
+    available = tuple(not blocked for blocked in unavailable)
+    return actual_double_bonds + _maximum_cycle_matching_size(available) == expected_double_bonds
+
+
+def _maximum_cycle_matching_size(available: tuple[bool, ...]) -> int:
+    """Maximum edge matching on a cycle after unavailable vertices are removed."""
+
+    size = len(available)
+    if not size or not any(available):
+        return 0
+    if all(available):
+        return size // 2
+
+    # Starting immediately after a blocked vertex turns the residual cycle into
+    # independent paths.  A path of n vertices contributes floor(n / 2) edges.
+    blocked = available.index(False)
+    result = 0
+    run_length = 0
+    for offset in range(1, size + 1):
+        if available[(blocked + offset) % size]:
+            run_length += 1
+        else:
+            result += run_length // 2
+            run_length = 0
+    return result + run_length // 2
+
+
+def _hw_fusion_component(
+    symbols: tuple[str, ...],
+    atom_to_locant: tuple[tuple[int, str], ...],
+) -> HWFusionComponent:
+    hetero = [(locant, symbol) for locant, symbol in enumerate(symbols, start=1) if symbol != "C"]
+    ordinary_name = hw_name(len(symbols), False, hetero)
+    if ordinary_name is None:
+        raise ValueError("invalid generated HW fusion component")
+    parent_name, attached_prefix = _hw_fusion_forms(ordinary_name)
+    key = hw_fusion_component_key(symbols)
+    locants = tuple(str(locant) for locant in range(1, len(symbols) + 1))
+    edges = tuple(zip(locants, locants[1:] + locants[:1], strict=True))
+    template = RetainedGraphTemplate(
+        name=key,
+        pin=True,
+        priority=1000,
+        aliases=(),
+        attached_prefix=attached_prefix,
+        derivative_stem=None,
+        default_indicated_h=(),
+        locants=locants,
+        atoms=tuple(
+            RetainedGraphAtomTemplate(
+                locant=locant,
+                symbol=symbol,
+                aromatic=symbol == "C",
+            )
+            for locant, symbol in zip(locants, symbols, strict=True)
+        ),
+        bonds=tuple(RetainedGraphBondTemplate(locants=edge, bond_class="mancude") for edge in edges),
+        rings=(locants,),
+        fusion_atoms=(),
+        peripheral_atoms=locants,
+        interior_atoms=(),
+        family="generated_hw_monocycle",
+        numbering_policy="hantzsch_widman",
+        aromatic_equivalence_policy="neutral_kekule_equivalent",
+        charge_policy="exact",
+        enforce_mancude_double_bonds=True,
+        enabled=True,
+        pre_descriptor_selection=True,
+        mancude_double_bonds=mancude_double_bonds(list(symbols)),
+    )
+    return HWFusionComponent(
+        key,
+        parent_name,
+        attached_prefix,
+        template,
+        atom_to_locant,
+        "complex" if len(hetero) > 1 else "basic",
+    )
+
+
+def _fusion_symbols_supported(symbols: tuple[str, ...]) -> bool:
+    if not symbols or all(symbol == "C" for symbol in symbols):
+        return False
+    for symbol in symbols:
+        if symbol not in _elements.ELEMENTS:
+            return False
+        element = _elements.get(symbol)
+        if not element.fusion_supported:
+            return False
+        if symbol != "C" and (element.hw_stem is None or element.hw_priority is None):
+            return False
+    return True
+
+
+def _hw_fusion_forms(name: str) -> tuple[str, str]:
+    """Return P-25 parent and attached forms of a generated HW name."""
+
+    locants = ""
+    base = name
+    if "-" in name:
+        candidate, remainder = name.split("-", 1)
+        if all(part.isdigit() for part in candidate.split(",")):
+            locants = candidate
+            base = remainder
+    parent = f"[{locants}]{base}" if locants else base
+    attached_base = f"{base[:-1]}o" if base.endswith("e") else f"{base}o"
+    attached = f"[{locants}]{attached_base}" if locants else attached_base
+    return parent, attached
+
+
 # Divalent at their normal valence, so they take no ring double bond and cut the
 # mancude system into segments: 1,2,3,5-oxathiadiazole has one, not two.
-FIXED_SATURATED = ("O", "S", "Se", "Te")
+FIXED_SATURATED = tuple(element.symbol for element in _elements.ELEMENTS.values() if element.mancude_forced_single)
 
 
 def mancude_bond_orders(symbols: list[str]) -> list[int]:
@@ -171,28 +420,46 @@ def _canonical_hetero(mol: Molecule, path: list[int]) -> list[tuple[int, str]] |
     on the same answer, so the spelling and the locant map agree.
     """
 
+    orders = _canonical_ring_orders(mol, path)
+    if not orders:
+        return None
+    return [
+        (locant, mol.atoms[atom_idx].symbol)
+        for locant, atom_idx in enumerate(orders[0], start=1)
+        if mol.atoms[atom_idx].symbol != "C"
+    ]
+
+
+def _canonical_ring_orders(mol: Molecule, path: list[int]) -> tuple[tuple[int, ...], ...]:
+    """Return every ring orientation tied by the HW numbering criteria."""
+
     size = len(path)
     symbols = [mol.atoms[idx].symbol for idx in path]
     if not any(symbol != "C" for symbol in symbols):
-        return None
+        return ()
     priorities = [_elements.get(symbol).hw_priority if symbol != "C" else None for symbol in symbols]
     if any(symbol != "C" and priority is None for symbol, priority in zip(symbols, priorities)):
-        return None
+        return ()
 
-    best = None
+    candidates: list[tuple[tuple, tuple[int, ...]]] = []
     for offset in range(size):
         for step in (1, -1):
-            order = [symbols[(offset + step * i) % size] for i in range(size)]
-            hetero = [(pos, symbol) for pos, symbol in enumerate(order, start=1) if symbol != "C"]
-            if _elements.get(hetero[0][1]).hw_priority != min(
-                _elements.get(symbol).hw_priority for _, symbol in hetero
-            ):
+            atom_order = tuple(path[(offset + step * index) % size] for index in range(size))
+            hetero = [
+                (locant, mol.atoms[atom_idx].symbol)
+                for locant, atom_idx in enumerate(atom_order, start=1)
+                if mol.atoms[atom_idx].symbol != "C"
+            ]
+            first_priority = _elements.get(hetero[0][1]).hw_priority
+            if first_priority != min(_elements.get(symbol).hw_priority for _, symbol in hetero):
                 continue
             by_seniority = tuple(sorted((_elements.get(symbol).hw_priority, locant) for locant, symbol in hetero))
             key = (tuple(locant for locant, _ in hetero), by_seniority)
-            if best is None or key < best[0]:
-                best = (key, hetero)
-    return best[1] if best else None
+            candidates.append((key, atom_order))
+    if not candidates:
+        return ()
+    best_key = min(key for key, _ in candidates)
+    return tuple(dict.fromkeys(order for key, order in candidates if key == best_key))
 
 
 def hw_spec_for_ring(mol: Molecule, path: list[int]) -> dict | None:

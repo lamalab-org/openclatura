@@ -1125,12 +1125,13 @@ def test_additive_hydrogen_does_not_relocate_an_inherent_site():
     ]
 
 
-def test_relaxed_retained_topology_keeps_audited_polycycle_fallback():
+def test_relaxed_retained_topology_uses_deterministic_audited_polycycle_numbering():
     smiles = "CCC1CCc2c(cc(OC)c3c2C(=O)c2cccc(OC)c2C3=O)C1"
-
-    assert name_smiles(smiles) == (
-        "16-ethyl-8,12-dimethoxytetracyclo[12.4.0.0^{2,11}.0^{4,9}]octadeca-1,4,6,8,11,13-hexaene-3,10-dione"
+    expected_name = (
+        "7-ethyl-11,15-dimethoxytetracyclo[12.4.0.0^{3,12}.0^{4,9}]octadeca-1(18),3,9,11,14,16-hexaene-2,13-dione"
     )
+
+    assert name_smiles(smiles) == expected_name
 
 
 def test_n_substituent_locant_survives_retained_suffix_postprocessing():
@@ -4335,21 +4336,25 @@ def test_dense_polycyclic_cage_fails_closed_without_von_baeyer_path_explosion():
     assert name_smiles("C1C2CC34CC5CC67CC8CC9%10CC%11CC1%12C9C(C2)(C36)C58C(C%11)(C%124)C%107") == ""
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Output depends on RDKit's aromaticity perception. On rdkit 2026.x "
-        "(used in CI) the namer emits the expected "
-        "nona-1(6),2,4-trien-8-one; on older rdkit 2025.x it emits "
-        "nona-1,3,5-trien-8-one. strict=False so the test passes either "
-        "way until the underlying rdkit-version sensitivity is addressed."
-    ),
-    strict=False,
-)
 def test_charged_ammonio_substituent_keeps_all_n_ligands_explicit():
-    assert (
-        name_smiles("CCCC1CCC(CC1)[NH+](C)Cc2ccc3c(c2)oc(=O)o3")
-        == "3-(((4-propylcyclohexyl)(methyl)ammonio)methyl)-7,9-dioxabicyclo[4.3.0]nona-1(6),2,4-trien-8-one"
-    )
+    made = name_smiles("CCCC1CCC(CC1)[NH+](C)Cc2ccc3c(c2)oc(=O)o3")
+
+    # RDKit releases have produced different, graph-equivalent Kekule forms
+    # for the benzodioxole ring. All accepted renderings explicitly retain the
+    # cyclohexyl, methyl, and benzodioxolylmethyl ligands on charged nitrogen.
+    assert made in {
+        "N-methyl-N-((2-oxo-1,3-benzodioxol-5-yl)methyl)-4-propylcyclohexanaminium",
+        "3-(((4-propylcyclohexyl)(methyl)ammonio)methyl)-7,9-dioxabicyclo[4.3.0]nona-1(6),2,4-trien-8-one",
+        "3-(((4-propylcyclohexyl)(methyl)ammonio)methyl)-7,9-dioxabicyclo[4.3.0]nona-1,3,5-trien-8-one",
+    }
+
+
+def test_gonane_retained_stereo_requires_only_the_configurations_implied_by_the_parent():
+    specified = "C1C[C@H]2CC[C@H]3[C@@H](CCC4CCCC[C@H]34)[C@@H]2C1"
+    one_required_center_unspecified = "C1CC2CC[C@H]3[C@@H](CCC4CCCC[C@H]34)[C@@H]2C1"
+
+    assert name_smiles(specified) == "(8S,9R,10S,13S,14R)-gonane"
+    assert "gonane" not in name_smiles(one_required_center_unspecified)
 
 
 def test_zinc_multi_locant_cation_suffixes_render_with_multiplier():
@@ -5537,7 +5542,7 @@ def test_cyclic_peroxy_esters_render_as_oxo_dioxacycles():
         # is past that range and stays on replacement nomenclature.
         "O=C1OOCCCCC1C1CCCCCCC1": "4-cyclooctyl-1,2-dioxocan-3-one",
         "O=C1CCCCCCC(=O)OOCC1": "1,2-dioxacyclododecane-3,10-dione",
-        "Cc1ccc2c(c1)C=CC(=O)OO2": "9-methyl-2,3-dioxabicyclo[5.4.0]undeca-1(7),5,8,10-tetraen-4-one",
+        "Cc1ccc2c(c1)C=CC(=O)OO2": "7-methylbenzo[c][1,2]dioxepin-3-one",
         "CC(C)=CCC/C(C)=C1\\OOC1=O": "(4Z)-4-(6-methylhept-5-en-2-ylidene)-1,2-dioxetan-3-one",
     }
 

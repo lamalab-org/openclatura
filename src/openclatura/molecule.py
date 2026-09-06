@@ -165,6 +165,7 @@ class Molecule:
         self._perception_cache: tuple | None = None  # perceived functional groups; invalidated on mutation
         self._canonical_rank_cache: dict[int, int] | None = None
         self._retained_fused_cache: dict[tuple, tuple] = {}
+        self._fusion_plan_cache: dict[tuple, object] = {}
         self.audit_rdmol = None
         self.accurate_cip: dict[int, str] = {}
         self.substituted_symbols: frozenset[int] = frozenset()
@@ -176,6 +177,7 @@ class Molecule:
         self._perception_cache = None
         self._canonical_rank_cache = None
         self._retained_fused_cache.clear()
+        self._fusion_plan_cache.clear()
 
     def add_atom(
         self,

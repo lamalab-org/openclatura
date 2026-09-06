@@ -1,7 +1,48 @@
 """Locant parsing and atom/bond locant helpers."""
 
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+
 from .assembly_utils import parse_locant as parse_locant
 from .molecule import Molecule
+
+_SYSTEM_LOCANT_RE = re.compile(r"^(?P<base>[1-9][0-9]*)(?P<suffix>[a-z]*)(?:\^(?P<distance>[1-9][0-9]*))?$")
+_SUPERSCRIPT_TO_ASCII = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻", "0123456789-")
+_ASCII_TO_SUPERSCRIPT = str.maketrans("0123456789-", "⁰¹²³⁴⁵⁶⁷⁸⁹⁻")
+
+
+@dataclass(frozen=True, slots=True, order=True)
+class SystemLocant:
+    """A locant in a completed fused parent system."""
+
+    base: int
+    fusion_suffix: str = ""
+    interior_distance: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.base <= 0:
+            raise ValueError("system locant base must be positive")
+        if self.fusion_suffix and (
+            not self.fusion_suffix.isascii()
+            or not self.fusion_suffix.isalpha()
+            or self.fusion_suffix != self.fusion_suffix.lower()
+        ):
+            raise ValueError("fusion suffix must be a lowercase ASCII letter sequence")
+        if self.interior_distance is not None and self.interior_distance <= 0:
+            raise ValueError("interior distance must be positive")
+
+    def render(self, *, unicode_superscript: bool = True) -> str:
+        text = f"{self.base}{self.fusion_suffix}"
+        if self.interior_distance is None:
+            return text
+        distance = str(self.interior_distance)
+        rendered = distance.translate(_ASCII_TO_SUPERSCRIPT) if unicode_superscript else f"^{distance}"
+        return f"{text}{rendered}"
+
+    def __str__(self) -> str:
+        return self.render()
 
 
 class DisplayLocant(int):
@@ -87,3 +128,49 @@ def retained_locant_sort_key(locant: str) -> tuple[int, str]:
         else:
             suffix += char
     return (int(digits) if digits else 10_000, suffix)
+
+
+def parse_system_locant(value: object):
+    """Parse a completed fused-system locant into its typed representation.
+
+    Ordinary integer locants, fusion locants such as ``4a``, and explicit
+    interior-distance forms such as ``9^2`` are accepted. Component primes are
+    intentionally excluded because they belong to fusion descriptors, not the
+    completed parent numbering namespace.
+    """
+
+    if isinstance(value, SystemLocant):
+        return value
+    text = str(value).strip()
+    if any(mark in text for mark in ("'", "′")):
+        raise ValueError(f"component prime is not valid in a system locant: {text!r}")
+    if any(char in text for char in "⁰¹²³⁴⁵⁶⁷⁸⁹"):
+        split = next((index for index, char in enumerate(text) if char in "⁰¹²³⁴⁵⁶⁷⁸⁹"), len(text))
+        text = f"{text[:split]}^{text[split:].translate(_SUPERSCRIPT_TO_ASCII)}"
+    match = _SYSTEM_LOCANT_RE.fullmatch(text)
+    if match is None:
+        raise ValueError(f"invalid completed-system locant: {value!r}")
+    distance = match.group("distance")
+    return SystemLocant(
+        base=int(match.group("base")),
+        fusion_suffix=match.group("suffix"),
+        interior_distance=int(distance) if distance else None,
+    )
+
+
+def system_locant_sort_key(value: object) -> tuple[int, int, str, int]:
+    """Return the single canonical ordering key for completed-system locants."""
+
+    locant = parse_system_locant(value)
+    return (
+        locant.base,
+        0 if not locant.fusion_suffix else 1,
+        locant.fusion_suffix,
+        locant.interior_distance or 0,
+    )
+
+
+def canonical_locant_pair(left: object, right: object) -> tuple[str, str]:
+    """Return a deterministically ordered pair of completed-system locants."""
+
+    return tuple(sorted((str(left), str(right)), key=system_locant_sort_key))

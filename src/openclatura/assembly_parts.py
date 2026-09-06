@@ -1,10 +1,18 @@
 """Structured inputs for name assembly."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from .locant_sources import LocantMapSource
 from .name_operations import HydroOperation
+from .ring_parent import ParentHydrideMetadata
 from .spiro_assembly import SpiroAssembly
+
+if TYPE_CHECKING:
+    from .fusion.mancude import ParentBondDelta
+    from .ring_parent import RingParent
 
 
 @dataclass(frozen=True)
@@ -110,17 +118,9 @@ class NameAtomBinding:
     emitted_tokens: tuple[NameTokenBinding, ...] = ()
 
 
-@dataclass(frozen=True)
-class RetainedParentMetadata:
-    """Naming metadata carried from a matched retained-parent template."""
-
-    default_indicated_h: tuple[str, ...] = ()
-    fusion_locants: tuple[str, ...] = ()
-    derivative_stem: str | None = None
-    indicated_hydrogen_count: int = 0
-    mancude_double_bonds: int = 0
-    relocated_indicated_h: bool = False
-    inherent_saturated_locants: tuple[str, ...] = ()
+# Historical import name retained while the canonical metadata lives beside
+# the parent-hydride plan that owns it.
+RetainedParentMetadata = ParentHydrideMetadata
 
 
 @dataclass
@@ -144,6 +144,8 @@ class AssemblyParts:
     retained_substituent_name: str | None = None
     retained_absorbed_substituents: list[SubstituentItem] = field(default_factory=list)
     retained_parent_metadata: RetainedParentMetadata | None = None
+    parent_hydride: RingParent | None = None
+    parent_bond_delta: ParentBondDelta | None = None
     front_modifiers: list[str] = field(default_factory=list)
     front_modifier_locants: list[str | None] = field(default_factory=list)
     front_modifier_atom_ids: set[int] = field(default_factory=set)
@@ -176,3 +178,17 @@ class AssemblyParts:
     elided_unsaturation_locants: set[str] = field(default_factory=set)
     elide_principal_group_locants: bool = False
     locant_elision_decisions: list[dict] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        """Project immutable parent-hydride facts into mutable assembly state."""
+        if self.parent_hydride is not None:
+            if self.retained_name is None:
+                self.retained_name = self.parent_hydride.retained_name
+            if self.retained_parent_metadata is None:
+                self.retained_parent_metadata = self.parent_hydride.metadata
+
+    @property
+    def ring_parent(self) -> RingParent | None:
+        """Read-only compatibility view of the canonical parent hydride."""
+
+        return self.parent_hydride
