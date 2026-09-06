@@ -270,11 +270,11 @@ def plan_bridged_fusion_wrapper(
                         -len(parent_atoms),
                         tuple(
                             sorted(
-                                (
+
                                     retained_locant_sort_key(locant)
                                     for operation in operations
                                     for locant in operation.endpoint_locants
-                                )
+
                             )
                         ),
                         tuple(
