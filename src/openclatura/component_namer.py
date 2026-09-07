@@ -674,6 +674,7 @@ def name_component(
         tree = assembly_substituent_tree(
             parts,
             name=name,
+            mol=mol,
             atom_ids=state.component_atoms,
             bond_ids=bond_ids_within(mol, state.component_atoms),
             trace_segments=trace_segments,

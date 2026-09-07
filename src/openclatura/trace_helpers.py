@@ -462,6 +462,7 @@ def assembly_substituent_tree(
     parts: AssemblyParts,
     *,
     name: str,
+    mol=None,
     atom_ids=None,
     bond_ids=None,
     decisions=None,
@@ -478,7 +479,7 @@ def assembly_substituent_tree(
         name=name,
         atom_ids=component_atoms,
         bond_ids=component_bonds,
-        parent=_parent_tree_node(parts),
+        parent=_parent_tree_node(parts, mol=mol),
         principal_group=_principal_group_tree_node(parts),
         substituents=_substituent_tree_nodes(parts.substituents),
         replacement_prefixes=_simple_item_tree_nodes(parts.a_prefixes, "replacement_prefix"),
@@ -543,7 +544,7 @@ def _merge_substituent_tree_instances(existing: dict | None, new: dict, name: st
     }
 
 
-def _parent_tree_node(parts: AssemblyParts) -> dict:
+def _parent_tree_node(parts: AssemblyParts, *, mol=None) -> dict:
     node = {
         "kind": "parent",
         "retained_name": parts.retained_name,
@@ -566,6 +567,22 @@ def _parent_tree_node(parts: AssemblyParts) -> dict:
         "atom_symbols_by_locant": dict(parts.parent_atom_symbols_by_locant),
         "atom_charges_by_locant": dict(parts.parent_atom_charges_by_locant),
     }
+    if mol is not None and (parts.is_bicycle or parts.is_polycycle) and not parts.is_spiro:
+        from .descriptive_topology import von_baeyer_topology_view
+
+        selected_locants = {atom: locant for locant, atom in parts.parent_atom_ids_by_locant.items()}
+        topology_view = von_baeyer_topology_view(
+            mol,
+            parts.parent_atom_ids,
+            preferred_atom_to_locant=selected_locants,
+        )
+        if topology_view is not None:
+            node["von_baeyer_topology"] = {
+                "descriptor": topology_view.descriptor,
+                "cycle_count": topology_view.cycle_count,
+                "atom_ids_by_locant": {locant: atom for atom, locant in topology_view.atom_to_locant},
+                "proof_source": topology_view.proof_source,
+            }
     suffix_data = _substituent_suffix_tree_node(parts)
     if suffix_data:
         node["substituent_suffix"] = suffix_data

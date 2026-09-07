@@ -1554,6 +1554,7 @@ def name_subgraph(
                 _assembly_substituent_tree(
                     parts,
                     name=name,
+                    mol=mol,
                     atom_ids=component,
                     bond_ids=_bond_ids_within(mol, component),
                     decisions=decision_trace_data(decision_trace),
@@ -1567,6 +1568,7 @@ def name_subgraph(
             _assembly_substituent_tree(
                 parts,
                 name=name,
+                mol=mol,
                 atom_ids=component,
                 bond_ids=_bond_ids_within(mol, component),
                 decisions=decision_trace_data(decision_trace),

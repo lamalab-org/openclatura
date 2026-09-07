@@ -145,6 +145,10 @@ def _describe_node(node: dict[str, Any], mol: Molecule, *, subject: str, depth: 
     if parent_sentence:
         sentences.append(parent_sentence)
 
+    topology_sentence = _von_baeyer_topology_sentence(parent)
+    if topology_sentence:
+        sentences.append(topology_sentence)
+
     hetero_sentence = _heteroatom_sentence(parent)
     if hetero_sentence:
         sentences.append(hetero_sentence)
@@ -209,6 +213,17 @@ def _parent_kind(parent: dict[str, Any]) -> str:
     if parent.get("is_ring"):
         return f"{length_text}ring {skeleton}".strip()
     return f"{length_text}acyclic {skeleton}".strip()
+
+
+def _von_baeyer_topology_sentence(parent: dict[str, Any]) -> str:
+    view = parent.get("von_baeyer_topology") or {}
+    descriptor = view.get("descriptor")
+    if not descriptor:
+        return ""
+    return (
+        f"As an equivalent von Baeyer representation, the ring connectivity has "
+        f"the descriptor {descriptor}; this auxiliary representation uses its own numbering."
+    )
 
 
 def _heteroatom_sentence(parent: dict[str, Any]) -> str:

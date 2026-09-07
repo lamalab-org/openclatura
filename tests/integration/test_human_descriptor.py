@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from openclatura import HumanDescription, describe_human
+from openclatura import HumanDescription, describe_human, name
 
 
 def test_human_descriptor_uses_parent_metadata_without_token_spans():
@@ -12,6 +12,8 @@ def test_human_descriptor_uses_parent_metadata_without_token_spans():
     text = str(d)
     assert "9-membered bicyclic [4.3.0] heteroskeleton" in text
     assert "retained purine parent" in text
+    assert "equivalent von Baeyer representation" in text
+    assert "descriptor bicyclo[4.3.0]" in text
     assert "nitrogen at positions 1 (atom id" in text
     assert "3 (atom id" in text
     assert "7 (atom id" in text
@@ -21,6 +23,51 @@ def test_human_descriptor_uses_parent_metadata_without_token_spans():
     assert "methyl groups at positions 1 (atom id" in text
     assert "token" not in text.lower()
     assert "span" not in text.lower()
+
+
+def test_human_descriptor_adds_audited_von_baeyer_view_to_fusion_parent():
+    d = describe_human("O1C=CC2=NC3=C(C=C21)SC=C3")
+
+    text = str(d)
+    assert d.name == "furo[3,2-b]thieno[2,3-e]pyridine"
+    assert "12-membered polycyclic heteroskeleton" in text
+    assert "descriptor tricyclo[7.3.0.0^{3,7}]" in text
+    view = d.result.substituent_tree[0]["parent"]["von_baeyer_topology"]
+    assert view["cycle_count"] == 3
+    assert len(view["atom_ids_by_locant"]) == 12
+    assert view["proof_source"] == "audited_von_baeyer_candidate"
+
+
+def test_human_descriptor_adds_audited_von_baeyer_view_to_tetracyclic_retained_parent():
+    d = describe_human("c1cc2ccc3cccc4ccc(c1)c2c34")
+
+    assert d.name == "pyrene"
+    assert "descriptor tetracyclo[6.6.2.0^{4,16}.0^{11,15}]" in str(d)
+    assert d.result.substituent_tree[0]["parent"]["von_baeyer_topology"]["cycle_count"] == 4
+
+
+def test_human_descriptor_adds_von_baeyer_view_to_nested_retained_polycycle():
+    d = describe_human("CC(=O)c1ccc2c(c1)ccc1ccccc12")
+
+    text = str(d)
+    assert d.name == "1-(phenanthren-2-yl)ethan-1-one"
+    assert "phenanthrene-derived substituent" in text
+    assert "descriptor tricyclo[8.4.0.0^{2,7}]" in text
+
+
+def test_human_descriptor_does_not_add_von_baeyer_view_to_nonpolycycle():
+    d = describe_human("CC(=O)Nc1ccccc1")
+
+    assert "equivalent von Baeyer representation" not in str(d)
+
+
+def test_plain_naming_does_not_compute_description_only_topology(monkeypatch):
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("description-only topology entered ordinary naming")
+
+    monkeypatch.setattr("openclatura.descriptive_topology.von_baeyer_topology_view", fail_if_called)
+
+    assert name("c1ccc2c(c1)ccc1ccccc12").name == "phenanthrene"
 
 
 def test_human_descriptor_starts_with_processed_smiles_atom_ids():
