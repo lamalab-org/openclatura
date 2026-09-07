@@ -251,34 +251,19 @@ def test_partly_hydrogenated_hw_component_uses_fusion_nomenclature():
     [
         (
             "CC(=O)OC1Oc2ccc(C)cc2-c2oc(=O)c([Se]c3ccccc3)cc21",
-            "13-methyl-4-oxo-5-(phenylselanyl)-3,9-dioxatricyclo[8.4.0.0^{2,7}]"
-            "tetradeca-1(10),2(7),5,11,13-pentaen-8-yl acetate",
-        ),
-        (
-            "O=C(Nc1ccc2nc(=O)n3c(c2c1)NCC3)c1cc(Cl)ccc1Cl",
-            "2,5-dichloro-N-(7-oxo-3,6,8-triazatricyclo[7.4.0.0^{2,6}]trideca-1,8,10,12-tetraen-12-yl)benzamide",
-        ),
-        (
-            "CCc1cccc2c1[nH]c1c3c(c(C(C)=O)cc12)C(=O)C=CC3=O",
-            "12-acetyl-5-ethyl-3-azatetracyclo[11.4.0.0^{2,10}.0^{4,9}]heptadeca-1,4,6,8,10,12,15-heptaene-14,17-dione",
-        ),
-        (
-            "CC1(CO)CN(Cc2ccccc2)CC2CN(Cc3ccc(F)cc3)CCN21",
-            "(4-benzyl-8-((4-fluorophenyl)methyl)-2-methyl-1,4,8-triazabicyclo[4.4.0]decan-2-yl)methanol",
+            "9-methyl-2-oxo-3-(phenylselanyl)-2,5-dihydropyrano[5,6-c]benzo[e]pyran-5-yl acetate",
         ),
         (
             "CC1=C2CC3C(C)(C=CC(=O)C34CO4)CC2OC1=O",
-            "4,9-dimethylspiro[6-oxatricyclo[7.4.0.0^{3,7}]trideca-3,10-diene-13,2'-oxirane]-5,12-dione",
+            "3,8a-dimethyl-4,4a,8a,9-tetrahydrospiro[benzo[f]1-benzofuran-5,2'-oxirane]-2,6(9aH)-dione",
         ),
     ],
 )
-def test_audited_pin_abstains_from_unproved_fusion_composition_grammar(smiles, expected):
-    """These are verified fallback names, not certified preferred names."""
+def test_audited_pin_composes_intrinsic_carbon_h_and_spiro_oxo(smiles, expected):
+    """Completed-system operations also survive ester and spiro wrappers."""
     result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True, include_trace=True)
 
     assert result.name == expected
-    assert result.parent_nomenclature is None
-    assert result.pin_status != "confirmed"
     assert result.opsin_check is not None and result.opsin_check.status == "matched"
 
 
@@ -781,7 +766,7 @@ def test_positive_heteroatom_charge_is_audited_as_a_locanted_parent_operation():
     result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
 
     assert isinstance(result, FusionConfirmed)
-    assert result.plan.rendered_base_name == "7H-furo[2,3-b]pyridine"
+    assert result.plan.rendered_base_name == "furo[2,3-b]pyridine"
     assert len(result.plan.charge_operations) == 1
     operation = result.plan.charge_operations[0]
     assert operation.operation_kind is FusionChargeOperationKind.HETEROATOM_CATIONIZATION
@@ -796,7 +781,7 @@ def test_positive_heteroatom_charge_is_audited_as_a_locanted_parent_operation():
         fusion_mode=FusionMode.GENERAL,
         include_trace=True,
     )
-    assert named.name == "7H-furo[2,3-b]pyridin-7-ium"
+    assert named.name == "furo[2,3-b]pyridin-7-ium"
     decision = next(step for step in named.decisions if step.decision == "selected audited systematic fusion parent")
     assert decision.data["charge_operations"] == [
         {

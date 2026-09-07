@@ -8,7 +8,7 @@ have all been audited.
 
 from __future__ import annotations
 
-from collections import Counter, defaultdict, deque
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from math import gcd, lcm
 
@@ -75,12 +75,10 @@ def intrinsic_fused_layouts(
     coordinate_systems = set.intersection(
         *(set(shape.coordinate_system for shape in _SHAPES_BY_SIZE[face.size]) for face in model.faces)
     )
-    if "eisenstein" in coordinate_systems:
-        coordinate_systems = {"eisenstein"}
     # Enumerating every seed avoids making the selected geometry depend on the
     # input atom IDs used to assign face IDs. The hard state/result budgets keep
     # this bounded for larger fused systems.
-    for coordinate_system in sorted(coordinate_systems):
+    for coordinate_system in sorted(coordinate_systems, key=lambda system: (system != "eisenstein", system)):
         for root in sorted(model.faces, key=lambda face: (face.size, face.id)):
             for shape in _shapes_for(root.size, coordinate_system):
                 if best_distortion[0] is not None and shape.distortion_rank > best_distortion[0]:
@@ -103,6 +101,11 @@ def intrinsic_fused_layouts(
                             coordinate_system,
                             best_distortion,
                         )
+        # Exact hexagonal geometry is preferred. Closely folded systems can
+        # require the existing deformable vocabulary to avoid atom overlaps;
+        # it still has to pass every geometry audit under the same budget.
+        if completed:
+            break
     return tuple(sorted(completed.values(), key=_layout_sort_key))
 
 
@@ -159,7 +162,7 @@ def _search_layouts(
     coordinate_system: str,
     best_distortion: list[int | None],
 ) -> None:
-    current_distortion = sum(shape.distortion_rank for shape in placed_shapes.values())
+    current_distortion = _layout_distortion(placed_orders, placed_shapes, atom_positions, coordinate_system)
     if best_distortion[0] is not None and current_distortion > best_distortion[0]:
         return
     if len(placed_orders) == len(model.faces):
@@ -439,6 +442,7 @@ def _materialize_layouts(
     *,
     coordinate_system: str = "cartesian",
 ) -> tuple[FusedLayout, ...]:
+    distortion = _layout_distortion(placed_orders, shapes, positions, coordinate_system)
     integer, centers = _normalized_embedding_geometry(
         placed_orders,
         positions,
@@ -447,35 +451,43 @@ def _materialize_layouts(
 
     # A generated embedding has an arbitrary horizontal seed edge.  P-25
     # orientation instead chooses the axis that contains the greatest row of
-    # rings.  Every row containing two or more ring centers is parallel to a
-    # center-pair vector, so these graph-derived directions are a complete
-    # finite set for the supported all-peripheral tier.
+    # consecutively fused rings. Nonadjacent collinear centers do not form a
+    # row. Thus only directions between edge-sharing faces are needed.
+    edge_owners: dict[Edge, list[int]] = defaultdict(list)
+    for face, order in placed_orders.items():
+        for left, right in zip(order, order[1:] + order[:1]):
+            edge_owners[tuple(sorted((left, right)))].append(face)
+    adjacent = frozenset(frozenset(owners) for owners in edge_owners.values() if len(owners) == 2)
     directions = {(1, 0)}
-    center_values = tuple(centers.values())
-    for index, (left_x, left_y) in enumerate(center_values):
-        for right_x, right_y in center_values[index + 1 :]:
-            dx, dy = right_x - left_x, right_y - left_y
-            divisor = gcd(abs(dx), abs(dy))
-            if divisor == 0:
-                continue
-            dx, dy = dx // divisor, dy // divisor
-            if dx < 0 or (dx == 0 and dy < 0):
-                dx, dy = -dx, -dy
-            directions.add((dx, dy))
+    for pair in adjacent:
+        left, right = pair
+        left_x, left_y = centers[left]
+        right_x, right_y = centers[right]
+        dx, dy = right_x - left_x, right_y - left_y
+        divisor = gcd(abs(dx), abs(dy))
+        if divisor == 0:
+            continue
+        dx, dy = dx // divisor, dy // divisor
+        if dx < 0 or (dx == 0 and dy < 0):
+            dx, dy = -dx, -dy
+        directions.add((dx, dy))
 
     candidates: dict[tuple, FusedLayout] = {}
     best_score: tuple[int, ...] | None = None
+    # Integer Eisenstein coordinates are (2*x+y, 3*y), so their squared
+    # Euclidean length is proportional to 3*X**2 + Y**2, not X**2 + Y**2.
+    metric_x = 3 if coordinate_system == "eisenstein" else 1
     for dx, dy in sorted(directions):
         for x_sign in (-1, 1):
             for y_sign in (-1, 1):
                 oriented_centers = {
                     face: (
-                        x_sign * (x * dx + y * dy),
+                        x_sign * (metric_x * x * dx + y * dy),
                         y_sign * (-x * dy + y * dx),
                     )
                     for face, (x, y) in centers.items()
                 }
-                score = _orientation_score(tuple(oriented_centers.values()), shapes)
+                score = _orientation_score(oriented_centers, shapes, adjacent, distortion=distortion)
                 if best_score is not None and score > best_score:
                     continue
                 if best_score is None or score < best_score:
@@ -483,7 +495,7 @@ def _materialize_layouts(
                     candidates.clear()
                 oriented = {
                     atom: (
-                        x_sign * (x * dx + y * dy),
+                        x_sign * (metric_x * x * dx + y * dy),
                         y_sign * (-x * dy + y * dx),
                     )
                     for atom, (x, y) in integer.items()
@@ -508,6 +520,41 @@ def _materialize_layouts(
     return tuple(sorted(candidates.values(), key=_layout_sort_key))
 
 
+def _layout_distortion(
+    orders: dict[int, tuple[int, ...]],
+    shapes: dict[int, RingShapeSpec],
+    positions: dict[int, Point],
+    coordinate_system: str,
+) -> int:
+    """Count template distortion and relatively enlarged rings.
+
+    Each order starts with its template's entrance edge. Attaching that edge
+    to an elongated side can resize a whole ring, even with an undistorted
+    template. Exact squared scale ratios expose this without penalizing a
+    common rescaling of the drawing. The smallest scale sets the reference;
+    adding a face cannot lower the number of enlarged rings or this bound.
+    """
+
+    scales = []
+    for face, order in orders.items():
+        left, right = (positions[atom] for atom in order[:2])
+        start, end = shapes[face].vertices[:2]
+        dx, dy = right[0] - left[0], right[1] - left[1]
+        sx, sy = end[0] - start[0], end[1] - start[1]
+        placed_length = dx * dx + dy * dy
+        template_length = sx * sx + sy * sy
+        if coordinate_system == "eisenstein":
+            placed_length += dx * dy
+            template_length += sx * sy
+        scales.append((placed_length, template_length))
+    smallest = scales[0]
+    for numerator, denominator in scales[1:]:
+        if numerator * smallest[1] < smallest[0] * denominator:
+            smallest = numerator, denominator
+    enlarged = sum(numerator * smallest[1] > smallest[0] * denominator for numerator, denominator in scales)
+    return sum(shape.distortion_rank for shape in shapes.values()) + enlarged
+
+
 def _normalized_embedding_geometry(
     placed_orders: dict[int, tuple[int, ...]],
     positions: dict[int, Point],
@@ -518,16 +565,41 @@ def _normalized_embedding_geometry(
 
     if coordinate_system == "eisenstein":
         positions = {atom: (2 * x + y, 3 * y) for atom, (x, y) in positions.items()}
-    scale = lcm(*(len(order) for order in placed_orders.values()))
+    scale = lcm(4, *(len(order) for order in placed_orders.values()))
     integer = {atom: (x * scale, y * scale) for atom, (x, y) in positions.items()}
-    centers = {
-        face: (
-            sum(positions[atom][0] for atom in order) * scale // len(order),
-            sum(positions[atom][1] for atom in order) * scale // len(order),
-        )
-        for face, order in placed_orders.items()
-    }
+    centers = {face: _ring_axis_center(order, integer) for face, order in placed_orders.items()}
     return _normalize_integer_layout(integer, centers)
+
+
+def _ring_axis_center(order: tuple[int, ...], positions: dict[int, Point]) -> Point:
+    """Keep opposite parallel fusion sides on one ring-centre axis.
+
+    An odd ring's vertex average is displaced towards its extra vertex.
+    Equal, oppositely directed sides instead define the centre of a linear
+    fusion row. Use that centre when all such pairs agree; otherwise retain
+    the vertex average. Coordinates are scaled for exact division by four.
+    """
+
+    edges = tuple((positions[left], positions[right]) for left, right in zip(order, order[1:] + order[:1]))
+    centers = set()
+    for index, (left, right) in enumerate(edges):
+        for other_left, other_right in edges[index + 1 :]:
+            if (right[0] - left[0], right[1] - left[1]) == (
+                other_left[0] - other_right[0],
+                other_left[1] - other_right[1],
+            ):
+                centers.add(
+                    (
+                        (left[0] + right[0] + other_left[0] + other_right[0]) // 4,
+                        (left[1] + right[1] + other_left[1] + other_right[1]) // 4,
+                    )
+                )
+    if len(centers) == 1:
+        return centers.pop()
+    return (
+        sum(positions[atom][0] for atom in order) // len(order),
+        sum(positions[atom][1] for atom in order) // len(order),
+    )
 
 
 def _intrinsic_embedding_key(
@@ -545,8 +617,9 @@ def _intrinsic_embedding_key(
         coordinate_system=coordinate_system,
     )
     atoms = tuple(sorted(integer))
+    metric_x = 3 if coordinate_system == "eisenstein" else 1
     squared_distances = tuple(
-        (integer[left][0] - integer[right][0]) ** 2 + (integer[left][1] - integer[right][1]) ** 2
+        metric_x * (integer[left][0] - integer[right][0]) ** 2 + (integer[left][1] - integer[right][1]) ** 2
         for position, left in enumerate(atoms)
         for right in atoms[position + 1 :]
     )
@@ -574,19 +647,34 @@ def _normalize_integer_layout(
     return positions, centers
 
 
-def _orientation_score(centers: tuple[tuple[int, int], ...], shapes: dict[int, RingShapeSpec]) -> tuple[int, ...]:
-    row_counts = Counter(y for _, y in centers)
-    row_count = max(row_counts.values())
-    orientation = min(_row_orientation_score(centers, row) for row, count in row_counts.items() if count == row_count)
-    distortion = sum(shape.distortion_rank for shape in shapes.values())
+def _orientation_score(
+    centers: dict[int, Point],
+    shapes: dict[int, RingShapeSpec],
+    adjacent: frozenset[frozenset[int]],
+    *,
+    distortion: int | None = None,
+) -> tuple[int, ...]:
+    rows: list[list[int]] = []
+    for face in sorted(centers, key=lambda face: (centers[face][1], centers[face][0])):
+        if not rows or centers[rows[-1][-1]][1] != centers[face][1] or frozenset((rows[-1][-1], face)) not in adjacent:
+            rows.append([])
+        rows[-1].append(face)
+    row_count = max(map(len, rows))
+    orientation = min(
+        _row_orientation_score(tuple(centers.values()), centers[row[0]][1], centers[row[0]][0] + centers[row[-1]][0])
+        for row in rows
+        if len(row) == row_count
+    )
+    if distortion is None:
+        distortion = sum(shape.distortion_rank for shape in shapes.values())
     # Distorted shapes are disfavored before applying the ordinary P-25
     # orientation criteria; see the separate distortion precedence rule.
     return distortion, -row_count, *orientation
 
 
-def _row_orientation_score(centers: tuple[tuple[int, int], ...], axis_y: int) -> tuple[int, int, int]:
-    row_x = [x for x, y in centers if y == axis_y]
-    doubled_axis_x = min(row_x) + max(row_x)
+def _row_orientation_score(
+    centers: tuple[tuple[int, int], ...], axis_y: int, doubled_axis_x: int
+) -> tuple[int, int, int]:
     upper_right = sum(_quadrant_units(x, y, doubled_axis_x, axis_y, upper=True) for x, y in centers)
     lower_left = sum(_quadrant_units(x, y, doubled_axis_x, axis_y, upper=False) for x, y in centers)
     above = sum(4 if y > axis_y else 2 if y == axis_y else 0 for _, y in centers)

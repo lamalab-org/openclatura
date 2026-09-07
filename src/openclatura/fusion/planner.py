@@ -10,6 +10,8 @@ from ..molecule import Molecule
 from ..polycycle_topology import ring_system_topology
 from ..retained_graph_model import merge_parent_bond_classes
 from .audit import audit_fusion_plan
+from .charges import fusion_charge_lone_pair_sites, fusion_component_charge_parent
+from .charges import fusion_charge_operations as _fusion_charge_operations
 from .config import fusion_nomenclature_config
 from .descriptor import FusionDescriptorError, build_fusion_name_ast, render_fusion_name_parts
 from .faces import FaceSearchBudgetExceeded, cached_bounded_face_model
@@ -26,8 +28,6 @@ from .mancude import indicated_hydrogen_parent_bond_model, parent_derivative_sta
 from .model import (
     AuditStatus,
     FusionAuditFailed,
-    FusionChargeOperation,
-    FusionChargeOperationKind,
     FusionComponentSpec,
     FusionConfirmed,
     FusionGraph,
@@ -115,7 +115,11 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         return FusionUnsupported("fusion ring-size eligibility requires at least two rings of size five or larger")
 
     registry = fusion_component_registry()
-    matches = registry.match_faces(mol, bounded)
+    try:
+        matching_parent = fusion_component_charge_parent(mol, atoms)
+    except ValueError as exc:
+        return FusionUnsupported("fused-parent charge operation is outside the audited production tier", (str(exc),))
+    matches = registry.match_faces(matching_parent, bounded)
     try:
         ast = build_fusion_name_ast(mol, matches, registry)
     except FusionDescriptorError as exc:
@@ -161,7 +165,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     except ValueError as exc:
         return FusionUnsupported("fused-parent charge operation is outside the audited production tier", (str(exc),))
     try:
-        intrinsic_n_h = aromatic_nitrogen_hydrogen_atoms(mol, graph)
+        intrinsic_n_h = aromatic_nitrogen_hydrogen_atoms(mol, graph) | fusion_charge_lone_pair_sites(mol, graph)
         bond_model = (
             indicated_hydrogen_parent_bond_model(graph, intrinsic_n_h) if intrinsic_n_h else parent_bond_model(graph)
         )
@@ -184,13 +188,16 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     )
     input_atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
     indicated_h_atoms = {input_atom_by_locant[locant] for locant in indicated_h}
-    derivative_state = parent_derivative_state(
-        mol,
-        atoms,
-        bond_model,
-        dict(numbering.input_locant_maps[0]),
-        indicated_hydrogen_atom_ids=indicated_h_atoms,
-    )
+    try:
+        derivative_state = parent_derivative_state(
+            mol,
+            atoms,
+            bond_model,
+            dict(numbering.input_locant_maps[0]),
+            indicated_hydrogen_atom_ids=indicated_h_atoms,
+        )
+    except MancudeSearchBudgetExceeded as exc:
+        return FusionUnsupported("derivative parent assignment search budget exhausted", (str(exc),))
     if derivative_state is None:
         return FusionUnsupported("observed bond state cannot be expressed from the fused parent hydride")
     if SUPPORT.maximum_indicated_hydrogens is not None and len(indicated_h) > SUPPORT.maximum_indicated_hydrogens:
@@ -305,34 +312,6 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         rendered_parts=rendered_parts,
     )
     return FusionConfirmed(plan)
-
-
-def _fusion_charge_operations(
-    mol: Molecule,
-    graph: FusionGraph,
-    numbering: FusionNumberingProof,
-) -> tuple[FusionChargeOperation, ...]:
-    """Describe supported charge deltas from the component parent graphs."""
-
-    locants = dict(numbering.input_locant_maps[0])
-    operations: list[FusionChargeOperation] = []
-    for graph_atom in graph.atoms:
-        observed = mol.atoms[graph_atom.id]
-        if observed.charge == graph_atom.formal_charge:
-            continue
-        if graph_atom.id not in locants:
-            raise ValueError(f"charged atom {graph_atom.id} has no completed-system locant")
-        operations.append(
-            FusionChargeOperation(
-                atom_id=graph_atom.id,
-                locant=locants[graph_atom.id],
-                symbol=observed.symbol,
-                base_charge=graph_atom.formal_charge,
-                observed_charge=observed.charge,
-                operation_kind=FusionChargeOperationKind.HETEROATOM_CATIONIZATION,
-            )
-        )
-    return tuple(sorted(operations, key=lambda operation: system_locant_sort_key(operation.locant)))
 
 
 def _cited_indicated_hydrogens(

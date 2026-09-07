@@ -8,7 +8,7 @@ mutating assembly state or rendering partially verified names.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import TYPE_CHECKING, TypeAlias
 
@@ -26,6 +26,7 @@ from ..retained_graph_model import (
 if TYPE_CHECKING:
     from ..assembly_parts import NameTokenBinding
     from .mancude import ParentDerivativeState
+    from .rules import ChemicalComponentSeniorityKey
     from .valence import FusionLambdaDescriptor
 
 
@@ -238,6 +239,7 @@ class FusionComponentSpec:
     accepted_general_prefixes: tuple[str, ...] = ()
     horizontal_ring_count: int = 0
     multiplicative_prefix_style: str = "basic"
+    _seniority_key: ChemicalComponentSeniorityKey | None = field(default=None, init=False, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         for value, label in (
@@ -812,6 +814,7 @@ class FusionChargeOperationKind(StrEnum):
     """Supported charge changes from the neutral fusion parent hydride."""
 
     HETEROATOM_CATIONIZATION = "heteroatom_cationization"
+    DEPROTONATION = "deprotonation"
 
 
 @dataclass(frozen=True, slots=True)
@@ -831,6 +834,11 @@ class FusionChargeOperation:
         if self.operation_kind is FusionChargeOperationKind.HETEROATOM_CATIONIZATION:
             if self.symbol not in {"N", "O"} or self.base_charge != 0 or self.observed_charge != 1:
                 raise ValueError("heteroatom cationization requires a neutral N/O parent site becoming +1")
+        elif self.operation_kind is FusionChargeOperationKind.DEPROTONATION:
+            if self.symbol not in {"C", "N"} or self.base_charge != 0 or self.observed_charge != -1:
+                raise ValueError("deprotonation requires a neutral C/N parent site becoming -1")
+        else:
+            raise ValueError("unsupported fusion charge operation kind")
 
 
 @dataclass(frozen=True, slots=True)

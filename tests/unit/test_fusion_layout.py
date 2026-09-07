@@ -4,6 +4,8 @@ from openclatura.fusion.faces import select_bounded_face_model
 from openclatura.fusion.layout import (
     RING_SHAPE_TEMPLATES,
     LayoutSearchBudgetExceeded,
+    _orientation_score,
+    _ring_axis_center,
     intrinsic_fused_layouts,
     preferred_intrinsic_layout,
 )
@@ -66,6 +68,33 @@ def test_shape_registry_covers_every_supported_ring_size_with_exact_templates():
     assert {shape.ring_size for shape in RING_SHAPE_TEMPLATES} == set(range(3, 9))
     assert all(shape.vertices[:2] == ((0, 0), (4, 0)) for shape in RING_SHAPE_TEMPLATES)
     assert {shape.ring_size for shape in RING_SHAPE_TEMPLATES if shape.distortion_rank} == {5, 7}
+
+
+def test_horizontal_rows_require_consecutive_fusions_and_use_their_own_midpoint():
+    centers = {0: (0, 0), 1: (2, 0), 2: (4, 0), 3: (6, 0), 4: (3, 2)}
+    adjacent = frozenset(frozenset(pair) for pair in ((0, 1), (1, 4), (4, 2), (2, 3)))
+    shape = next(shape for shape in RING_SHAPE_TEMPLATES if shape.ring_size == 6)
+
+    score = _orientation_score(centers, dict.fromkeys(centers, shape), adjacent)
+
+    # Two separate two-ring rows, not one four-ring row. The preferred
+    # quadrant origin is the midpoint of the left pair, not all four centers.
+    assert score == (0, -2, -10, 2, -12)
+
+
+@pytest.mark.parametrize("reverse", (False, True))
+def test_odd_ring_center_lies_between_opposite_parallel_sides(reverse):
+    shape = next(shape for shape in RING_SHAPE_TEMPLATES if shape.shape_id == "pentagon-eisenstein")
+    positions = dict(enumerate(shape.vertices))
+    order = tuple(reversed(range(5))) if reverse else tuple(range(5))
+
+    assert _ring_axis_center(order, positions) == (0, 4)
+
+
+def test_ring_without_opposite_parallel_sides_uses_vertex_average():
+    positions = {0: (0, 0), 1: (12, 0), 2: (6, 12)}
+
+    assert _ring_axis_center((0, 1, 2), positions) == (6, 4)
 
 
 @pytest.mark.parametrize("ring_size", range(3, 9))

@@ -373,7 +373,10 @@ def test_long_component_tree_uses_a_central_parent_location_and_is_atom_order_in
     assert maximum_depth(first_ast) == maximum_depth(second_ast) == 8
 
 
-def test_long_five_membered_ring_chain_abstains_outside_interoperable_grammar():
+def test_long_five_membered_ring_chain_respects_configured_component_budget(monkeypatch):
+    from openclatura.fusion import descriptor
+
+    monkeypatch.setattr(descriptor, "_SUPPORT", replace(descriptor._SUPPORT, maximum_tree_component_occurrences=3))
     components = ("furan",) * 16
     joins = tuple(
         pair
@@ -389,6 +392,39 @@ def test_long_five_membered_ring_chain_abstains_outside_interoperable_grammar():
 
     assert isinstance(result, FusionUnsupported)
     assert result.reason == "no supported audited fusion-component decomposition"
+
+
+@pytest.mark.opsin
+@pytest.mark.parametrize("count", (4, 8, 16))
+def test_deep_fusion_citations_reconstruct_and_roundtrip(count):
+    from rdkit import Chem
+
+    if not opsin_available():
+        pytest.skip("OPSIN and Java are required")
+    components = ("furan",) * count
+    joins = tuple(
+        pair
+        for occurrence in range(count - 1)
+        for pair in (
+            ((occurrence, "4"), (occurrence + 1, "2")),
+            ((occurrence, "5"), (occurrence + 1, "3")),
+        )
+    )
+    mol, _ = _component_graph(components, joins)
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.AUDITED_PIN)
+    assert isinstance(result, FusionConfirmed)
+    assert result.plan.audit.confirmed
+    rd_mol = Chem.RWMol()
+    ids = {}
+    for atom in mol.atoms.values():
+        rd_atom = Chem.Atom(atom.symbol)
+        rd_atom.SetIsAromatic(True)
+        ids[atom.idx] = rd_mol.AddAtom(rd_atom)
+    for bond in mol.bonds.values():
+        rd_mol.AddBond(ids[bond.u], ids[bond.v], Chem.BondType.AROMATIC)
+    Chem.SanitizeMol(rd_mol)
+    check = verify_with_opsin(result.plan.rendered_base_name, Chem.MolToSmiles(rd_mol), standardize_smiles=False)
+    assert check.status == "matched", check.to_dict()
 
 
 def test_second_order_component_uses_primed_numeric_higher_order_descriptor():

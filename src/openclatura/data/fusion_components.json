@@ -8,7 +8,7 @@
       "cover_kinds": ["tree"],
       "join_kinds": ["ortho", "ortho_peri", "higher_order"],
       "multiparent_parents": true,
-      "maximum_tree_component_occurrences": 3,
+      "maximum_tree_component_occurrences": 16,
       "maximum_multiparent_component_occurrences": 3,
       "charged_parents": true,
       "nonstandard_valence": true,
@@ -45,6 +45,9 @@
     {"ring_size": 7, "id": "heptagon-symmetric", "vertices": [[0, 0], [4, 0], [7, 2], [8, 5], [5, 8], [1, 8], [-2, 4]], "edge_directions": [0, 1, 2, 3, 4, 5, 6], "horizontal_axis_class": "vertex"},
     {"ring_size": 7, "id": "heptagon-shoulder", "vertices": [[0, 0], [4, 0], [8, 3], [8, 7], [4, 9], [0, 7], [-2, 3]], "edge_directions": [0, 1, 2, 3, 4, 5, 6], "horizontal_axis_class": "edge", "distortion_rank": 1},
     {"ring_size": 8, "id": "octagon", "vertices": [[0, 0], [4, 0], [7, 2], [8, 5], [7, 8], [4, 10], [0, 10], [-2, 5]], "edge_directions": [0, 1, 2, 3, 4, 5, 6, 7], "horizontal_axis_class": "edge"}
+  ],
+  "retained_component_generators": [
+    {"family": "benzoheterocycle", "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.3.5"}
   ],
   "generated_components": [
     {"key": "cyclopentadiene", "generator": "monocyclic_carbocycle", "ring_size": 5, "bond_class": "mancude", "pin_component": true},

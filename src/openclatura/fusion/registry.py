@@ -123,8 +123,36 @@ class FusionComponentRegistry:
             if not isinstance(row, Mapping):
                 raise ValueError("every fusion component must be a mapping")
             registry.register(row)
+        registry._register_retained_families(data.get("retained_component_generators", ()))
         registry._generated_hw_policy = _generated_hw_policy(data.get("systematic_component_generators", ()))
         return registry
+
+    def _register_retained_families(self, policies: Iterable[Mapping[str, Any]]) -> None:
+        """Reuse eligible retained graphs instead of duplicating component lists."""
+
+        for policy in policies:
+            if _required_text(policy, "family") != "benzoheterocycle":
+                raise ValueError("unsupported retained fusion-component family")
+            allow_parent = _required_bool(policy, "allow_as_parent")
+            allow_attached = _required_bool(policy, "allow_as_attached")
+            rule = _required_text(policy, "rule")
+            for template in self._template_by_name.values():
+                if template.name in self._claimed_template_names or not _is_retained_benzoheterocycle(template):
+                    continue
+                # Component indicated H belongs to the completed system, not
+                # inside the parent-component citation. Its atoms remain on
+                # the template for the existing parent-bond-model machinery.
+                hydrogen_prefix = ",".join(f"{locant}H" for locant in template.default_indicated_h) + "-"
+                self.register(
+                    {
+                        "key": template.name,
+                        "parent_name": template.output_name.removeprefix(hydrogen_prefix),
+                        "allow_as_parent": allow_parent,
+                        "allow_as_attached": allow_attached,
+                        "horizontal_ring_count": len(template.rings),
+                        "rule": rule,
+                    }
+                )
 
     @property
     def components(self) -> tuple[RegisteredFusionComponent, ...]:
@@ -396,6 +424,28 @@ def _component_spec(
         accepted_general_prefixes=accepted_general_prefixes,
         horizontal_ring_count=horizontal_ring_count,
         multiplicative_prefix_style=multiplicative_prefix_style,
+    )
+
+
+def _is_retained_benzoheterocycle(template: RetainedGraphTemplate) -> bool:
+    if (
+        not template.enabled
+        or not template.pin
+        or not template.attached_prefix
+        or len(template.rings) != 2
+        or any(atom.charge or atom.saturated for atom in template.atoms)
+        or not any(atom.symbol != "C" for atom in template.atoms)
+    ):
+        return False
+    left, right = map(frozenset, template.rings)
+    shared = left & right
+    if len(shared) != 2 or left | right != set(template.locants):
+        return False
+    if shared not in {frozenset(bond.locants) for bond in template.bonds}:
+        return False
+    atoms = template.atom_by_locant
+    return min(len(left), len(right)) >= 5 and any(
+        len(ring) == 6 and all(atoms[locant].symbol == "C" for locant in ring) for ring in (left, right)
     )
 
 

@@ -10282,7 +10282,7 @@
         "isobenzothiophene",
         "benzo[c]thiophene"
       ],
-      "attached_prefix": "isobenzothieno",
+      "attached_prefix": "[2]benzothieno",
       "derivative_stem": "2-benzothiophen",
       "template": {
         "atoms": [
@@ -10592,7 +10592,7 @@
       "pin": true,
       "priority": 33,
       "aliases": [],
-      "attached_prefix": "benzoxadiazolo",
+      "attached_prefix": "[2,1,3]benzoxadiazolo",
       "derivative_stem": "2,1,3-benzoxadiazol",
       "template": {
         "atoms": [
@@ -10748,7 +10748,7 @@
       "pin": true,
       "priority": 34,
       "aliases": [],
-      "attached_prefix": "benzothiadiazolo",
+      "attached_prefix": "[2,1,3]benzothiadiazolo",
       "derivative_stem": "2,1,3-benzothiadiazol",
       "template": {
         "atoms": [
@@ -12426,7 +12426,7 @@
       "pin": true,
       "priority": 40,
       "aliases": [],
-      "attached_prefix": "benzodiazepino",
+      "attached_prefix": "[1,5]benzodiazepino",
       "derivative_stem": "1,5-benzodiazepin",
       "template": {
         "atoms": [

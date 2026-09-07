@@ -118,9 +118,16 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             delta = (
                 parent.fusion_plan.derivative_state.bond_delta
                 if parent.uses_fusion_plan and parent.fusion_plan is not None
-                else compare_actual_parent_to_implied_parent(mol, parts.parent_atom_ids, parent.bond_model)
+                else compare_actual_parent_to_implied_parent(
+                    mol, parts.parent_atom_ids, parent.bond_model, preserve_retained_parent_state=True
+                )
             )
             parts.parent_bond_delta = delta
+        if delta is not None and delta.compatible:
+            parts.hydro_operations.extend(delta.added_hydrogen_operations)
+            parts.hydro_operations.extend(delta.intrinsic_hydro_operations)
+            if delta.intrinsic_hydro_operations:
+                return
         if delta is not None and delta.compatible and delta.hydrogenated_edges:
             indicated_locants = (
                 set(parent.hydride_metadata.default_indicated_h) if parent.hydride_metadata is not None else set()

@@ -144,6 +144,17 @@ def resolve_systematic_fusion_parent(
                 for operation in plan.charge_operations
             ],
             "derivative_operations": {
+                **{
+                    key: [
+                        {"locants": list(op.locants), "atom_ids": list(op.atom_ids), "bond_ids": list(op.bond_ids)}
+                        for op in operations
+                    ]
+                    for key, operations in (
+                        ("intrinsic_hydro", plan.derivative_state.intrinsic_hydro_operations),
+                        ("added_hydrogen", plan.derivative_state.added_hydrogen_operations),
+                    )
+                    if operations
+                },
                 "hydro": [
                     {
                         "locants": list(operation.locants),

@@ -35,6 +35,7 @@ from .model import (
     ComponentLocant,
     FusionAuditResult,
     FusionChargeOperation,
+    FusionChargeOperationKind,
     FusionCitationNode,
     FusionCitationPlan,
     FusionComponentMatch,
@@ -100,6 +101,7 @@ def _unrepresented_component_indicated_hydrogens(
     specs: Mapping[int, FusionComponentSpec],
     indicated_hydrogens: tuple[SystemLocant, ...],
     numbering: FusionNumberingProof,
+    derivative_state: ParentDerivativeState | None = None,
 ) -> tuple[tuple[int, str], ...]:
     """Return component H sites neither consumed by fusion nor cited.
 
@@ -112,12 +114,17 @@ def _unrepresented_component_indicated_hydrogens(
     fusion_atoms = frozenset(atom for join in ast.joins for atom in join.shared_input_atoms)
     completed_locants = {atom: str(locant) for atom, locant in numbering.input_locant_maps[0]}
     cited = {str(locant) for locant in indicated_hydrogens}
+    converted = (
+        {atom for operation in derivative_state.intrinsic_hydro_operations for atom in operation.atom_ids}
+        if derivative_state is not None
+        else set()
+    )
     unresolved = []
     for occurrence, spec in specs.items():
         local = matches[occurrence].input_atom_by_locant
         for locant in spec.template.default_indicated_h:
             atom = local[locant]
-            if atom in fusion_atoms or completed_locants.get(atom) in cited:
+            if atom in fusion_atoms or atom in converted or completed_locants.get(atom) in cited:
                 continue
             unresolved.append((occurrence, locant))
     return tuple(sorted(unresolved))
@@ -182,6 +189,7 @@ def audit_fusion_plan(
             specs,
             indicated_hydrogens,
             numbering,
+            derivative_state,
         )
         if unresolved_component_h:
             return FusionAuditResult(
@@ -358,10 +366,27 @@ def _audit_charge_operations(
         if operation.atom_id not in parent_atoms or operation.atom_id not in base_atoms:
             errors.append("fusion charge operation targets an atom outside the parent graph")
             continue
+        if operation.atom_id in observed:
+            errors.append("fusion charge operations duplicate a charged atom")
+            continue
         if operation.locant != locants.get(operation.atom_id):
             errors.append("fusion charge operation locant does not map to its charged atom")
         if operation.symbol != mol.atoms[operation.atom_id].symbol:
             errors.append("fusion charge operation does not preserve the charged atom element")
+        if operation.operation_kind is FusionChargeOperationKind.DEPROTONATION:
+            atom = mol.atoms[operation.atom_id]
+            valence = atom.total_h_count + sum(
+                mol.get_bond(atom.idx, neighbor).order for neighbor in mol.get_neighbors(atom.idx)
+            )
+            if (operation.base_charge, operation.observed_charge) != (0, -1) or valence != {"C": 3, "N": 2}.get(
+                atom.symbol
+            ):
+                errors.append("fusion deprotonation does not preserve proton-removal valence")
+        elif operation.operation_kind is FusionChargeOperationKind.HETEROATOM_CATIONIZATION:
+            if operation.symbol not in {"N", "O"} or (operation.base_charge, operation.observed_charge) != (0, 1):
+                errors.append("fusion cationization is not a neutral N/O to +1 operation")
+        else:
+            errors.append("fusion charge operation has an unsupported operation kind")
         observed[operation.atom_id] = (operation.base_charge, operation.observed_charge)
     if observed != expected:
         errors.append("fusion charge operations do not exactly represent parent formal-charge changes")
@@ -480,9 +505,14 @@ def _audited_pin_composition_errors(
     if derivative_state is None:
         return ()
 
+    if _has_separate_carbon_hydrogen_operations(mol, derivative_state):
+        return ()
+
     if _has_separate_nitrogen_h_and_carbon_derivatives(
         mol, ast, specs, numbering, indicated_hydrogens, derivative_state
     ):
+        return ()
+    if _has_complete_neutral_hydrogenation(mol, numbering, indicated_hydrogens, derivative_state):
         return ()
     if intrinsic_carbon_composition:
         return ()
@@ -555,7 +585,7 @@ def _has_separate_nitrogen_h_and_carbon_derivatives(
     indicated_hydrogens: tuple[SystemLocant, ...],
     state: ParentDerivativeState,
 ) -> bool:
-    """Admit independent completed-system H/hydro/oxo sites in an ortho bicycle.
+    """Admit carbon derivatives with optional independent nitrogen H sites.
 
     Carbon hydrogenation may span the fusion edge or only part of a component:
     its ownership is the completed parent, not an independently named ring.
@@ -566,15 +596,7 @@ def _has_separate_nitrogen_h_and_carbon_derivatives(
     unsaturation remain outside this tier.
     """
 
-    if (
-        len(ast.component_occurrences) != 2
-        or len(ast.joins) != 1
-        or ast.joins[0].kind is not FusionJoinKind.ORTHO
-        or any(len(spec.rings) != 1 for spec in specs.values())
-        or not indicated_hydrogens
-        or not state.hydro_operations
-        or state.unsaturation_operations
-    ):
+    if state.unsaturation_operations:
         return False
     symbols = {
         match.input_atom_by_locant[atom.locant]: atom.symbol
@@ -585,11 +607,78 @@ def _has_separate_nitrogen_h_and_carbon_derivatives(
     h_atoms = {atom_by_locant.get(locant) for locant in indicated_hydrogens}
     hydro_atoms = {atom for operation in state.hydro_operations for atom in operation.atom_ids}
     oxo_atoms = {operation.parent_atom_id for operation in state.oxo_operations}
+    if not indicated_hydrogens:
+        represented_external = {operation.bond_id for operation in state.oxo_operations}
+        if any(
+            neighbor not in symbols
+            and mol.get_bond(atom, neighbor).order > 1
+            and mol.get_bond(atom, neighbor).idx not in represented_external
+            for atom in symbols
+            for neighbor in mol.get_neighbors(atom)
+        ):
+            return False
     return (
         all(symbols.get(atom) == "N" for atom in h_atoms)
         and sum(not mol.atoms[atom].is_aromatic for atom in h_atoms) <= 1
         and all(symbols.get(atom) == "C" for atom in hydro_atoms | oxo_atoms)
+        and not h_atoms & (hydro_atoms | oxo_atoms)
         and not hydro_atoms & oxo_atoms
+    )
+
+
+def _has_complete_neutral_hydrogenation(
+    mol: Molecule,
+    numbering: FusionNumberingProof,
+    indicated_hydrogens: tuple[SystemLocant, ...],
+    state: ParentDerivativeState,
+) -> bool:
+    """Complete hydrogenation belongs to the whole parent, not one component.
+
+    Neutral fusion nitrogen is already single-bonded in the parent model.
+    Only the remaining parent double bonds contribute hydrogenation pairs;
+    the derivative audit independently checks their exact locants and bonds.
+    """
+
+    if indicated_hydrogens or state.unsaturation_operations or state.oxo_operations or not state.hydro_operations:
+        return False
+    atoms = {atom for atom, _ in numbering.input_locant_maps[0]}
+    hydrogenated = frozenset(state.bond_delta.hydrogenated_edges)
+    return (
+        all(mol.atoms[atom].charge == 0 and mol.atoms[atom].symbol in {"C", "N", "O", "S"} for atom in atoms)
+        and not any(
+            neighbor not in atoms and mol.get_bond(atom, neighbor).order > 1
+            for atom in atoms
+            for neighbor in mol.get_neighbors(atom)
+        )
+        and all(mol.get_bond(*edge).order == 1 for edge, _ in state.bond_delta.assignment.orders)
+        and all(
+            set(edge) <= atoms and (order != 2 or edge in hydrogenated)
+            for edge, order in state.bond_delta.assignment.orders
+        )
+    )
+
+
+def _has_separate_carbon_hydrogen_operations(mol: Molecule, state: ParentDerivativeState) -> bool:
+    """Check operation scopes before the independent bond-delta audit.
+
+    Added H is distinct from ordinary hydrogenation and oxo sites. Intrinsic
+    parent-H conversion may include an oxo site, but cannot count an ordinary
+    hydrogenation site twice. The comparison audit validates the operations'
+    locants, atoms, bonds, and parent assignments rather than their spelling.
+    """
+
+    if state.unsaturation_operations:
+        return False
+    added = {atom for operation in state.added_hydrogen_operations for atom in operation.atom_ids}
+    intrinsic = {atom for operation in state.intrinsic_hydro_operations for atom in operation.atom_ids}
+    if not added and not intrinsic:
+        return False
+    hydro = {atom for operation in state.hydro_operations for atom in operation.atom_ids}
+    oxo = {operation.parent_atom_id for operation in state.oxo_operations}
+    return (
+        not added & (intrinsic | hydro | oxo)
+        and not intrinsic & hydro
+        and all(mol.atoms[atom].symbol == "C" and mol.atoms[atom].charge == 0 for atom in added | intrinsic)
     )
 
 
@@ -906,6 +995,7 @@ def _audit_descriptors(
         joins_by_attached[join.attached_occurrence] = join
     nonleaves = set(children_by_host)
     expected_groups = []
+    multiplicity_offsets: dict[int, int] = {}
     audit_multiplicity = ast.plan_kind == "multiplicative_tree" or bool(ast.multiplicative_groups)
     for _host, children in sorted(children_by_host.items()):
         by_identity: dict[tuple, list[int]] = defaultdict(list)
@@ -927,6 +1017,8 @@ def _audit_descriptors(
             if audit_multiplicity:
                 expected_groups.append((ordered, multiplier))
                 for prime_depth, occurrence in enumerate(ordered):
+                    multiplicity_offsets[occurrence] = prime_depth
+                    prime_depth += joins_by_attached[occurrence].order - 1
                     depths = {locant.prime_depth for locant in joins_by_attached[occurrence].interface.attached_path}
                     if depths != {prime_depth}:
                         errors.append(
@@ -967,7 +1059,9 @@ def _audit_descriptors(
             continue
         attached_depths = {locant.prime_depth for locant in join.attached_locants}
         host_depths = {locant.prime_depth for locant in join.host_locants}
-        if attached_depths != {expected_order - 1} or host_depths != {expected_order - 2}:
+        if attached_depths != {
+            expected_order - 1 + multiplicity_offsets.get(join.attached_occurrence, 0)
+        } or host_depths != {expected_order - 2}:
             errors.append(f"higher-order primary join {index} has incorrect intermediate-component prime depths")
 
     if any(ast.joins[index].kind is FusionJoinKind.HIGHER_ORDER for index in citation.interparent_join_indices):

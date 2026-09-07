@@ -181,7 +181,9 @@ def hw_fusion_components_for_ring(mol: Molecule, path: list[int]) -> tuple[HWFus
     atoms = tuple(mol.atoms[atom_idx] for atom_idx in path)
     if (
         all(atom.symbol == "C" for atom in atoms)
-        or any(not _fusion_parent_charge_supported(atom.symbol, atom.charge) or atom.isotope is not None for atom in atoms)
+        or any(
+            not _fusion_parent_charge_supported(atom.symbol, atom.charge) or atom.isotope is not None for atom in atoms
+        )
         or any(not atom.element.fusion_supported for atom in atoms)
         or any(
             atom.symbol != "C" and (atom.element.hw_stem is None or atom.element.hw_priority is None) for atom in atoms
@@ -231,7 +233,7 @@ def _is_mancude_or_hydro_derivative(
     """
 
     actual_double_bonds = _ring_double_bonds(mol, path)
-    if actual_double_bonds is None or actual_double_bonds == 0 or actual_double_bonds > expected_double_bonds:
+    if actual_double_bonds is None or actual_double_bonds > expected_double_bonds:
         return False
 
     size = len(path)

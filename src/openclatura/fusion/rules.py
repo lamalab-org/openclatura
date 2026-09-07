@@ -206,9 +206,12 @@ def component_spec_seniority_key(spec: FusionComponentSpec) -> ChemicalComponent
     """Return the P-25.3.2.4 key for one resolved component variant.
 
     This avoids discarding an occurrence's exact graph-template variant by
-    resolving the shared component key a second time.
+    resolving the shared component key a second time. Immutable component
+    instances retain the result; dataclass replacement resets the cached field.
     """
 
+    if spec._seniority_key is not None:
+        return spec._seniority_key
     heteroatoms = tuple(atom for atom in spec.atoms if atom.symbol != "C")
     counts = Counter(atom.symbol for atom in heteroatoms)
     special_ranks = [
@@ -222,7 +225,7 @@ def component_spec_seniority_key(spec: FusionComponentSpec) -> ChemicalComponent
         tuple(sorted(retained_locant_sort_key(atom.locant) for atom in heteroatoms if atom.symbol == symbol))
         for symbol in GENERAL_HETEROATOM_COUNT_PRECEDENCE
     )
-    return ChemicalComponentSeniorityKey(
+    result = ChemicalComponentSeniorityKey(
         earliest_special_heteroatom=earliest,
         ring_count=-len(spec.rings),
         ring_size_vector=tuple(-size for size in sorted(spec.ring_sizes, reverse=True)),
@@ -236,6 +239,8 @@ def component_spec_seniority_key(spec: FusionComponentSpec) -> ChemicalComponent
             sorted(retained_locant_sort_key(locant) for locant in spec.fusion_carbon_locants)
         ),
     )
+    object.__setattr__(spec, "_seniority_key", result)
+    return result
 
 
 def explain_component_comparison(

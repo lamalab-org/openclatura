@@ -633,6 +633,14 @@ def _is_indicated_hydrogen_candidate(
     value = mol.atoms[atom]
     if value.total_h_count <= 0:
         return False
+    # A proton on an imine-like N+ is supplied by -ium, not intrinsic H.
+    if (
+        value.symbol == "N"
+        and value.charge == 1
+        and value.total_h_count == 1
+        and any(mol.get_bond(atom, neighbor).order == 2 for neighbor in mol.get_neighbors(atom))
+    ):
+        return False
     if value.symbol != "C":
         return True
     parent_neighbors = [neighbor for neighbor in mol.get_neighbors(atom) if neighbor in parent_locants]

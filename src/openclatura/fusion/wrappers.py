@@ -268,6 +268,7 @@ def plan_bridged_fusion_wrapper(
                         parent_atoms,
                         selected_parent.selected_bond_model,
                         locants,
+                        preserve_retained_parent_state=True,
                     )
                     if derivative_state is None:
                         continue
@@ -709,7 +710,12 @@ def _audit_bridge_plan(
             return None
     if expected_edges != set(edges_within_atoms(mol, set(all_atoms))):
         return None
-    if parent_derivative_state(mol, parent_atoms, parent_bond_model, parent_locants) != derivative_state:
+    if (
+        parent_derivative_state(
+            mol, parent_atoms, parent_bond_model, parent_locants, preserve_retained_parent_state=True
+        )
+        != derivative_state
+    ):
         return None
     return (
         "complete_bijective_parent_locants",

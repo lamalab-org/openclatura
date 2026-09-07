@@ -1,5 +1,9 @@
 {
   "suite_cases": [
+    {"smiles": "c1ccc2c(c1)CCOc1ccccc1-2", "name": "6,7-dihydrodibenzo[b,d]oxepine"},
+    {"smiles": "c1ccc2c(c1)CCSc1ccccc1-2", "name": "6,7-dihydrodibenzo[b,d]thiepine"},
+    {"smiles": "Oc1ccc2c(c1)CCOc1ccccc1-2", "name": "6,7-dihydrodibenzo[b,d]oxepin-9-ol"},
+    {"smiles": "Oc1ccc2c(c1)CCSc1ccccc1-2", "name": "6,7-dihydrodibenzo[b,d]thiepin-9-ol"},
     {"smiles": "c1oc2ncccc2c1", "name": "furo[2,3-b]pyridine"},
     {"smiles": "c1ccc2cc3ncccc3cc2c1", "name": "benzo[g]quinoline"},
     {"smiles": "c1oc2nc3occc3cc2c1", "name": "difuro[2,3-b:3',2'-e]pyridine"},
@@ -58,8 +62,7 @@
   ],
   "expected_suite_routes": {
     "retained_parent": 84,
-    "systematic_fusion": 38,
-    "principal_parent_shortcut": 5,
-    "unverified_fallback": 4
+    "systematic_fusion": 42,
+    "principal_parent_shortcut": 5
   }
 }

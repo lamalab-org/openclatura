@@ -4,6 +4,7 @@ import re
 
 from .assembly_charge import (
     positive_parent_n_charges,
+    prepare_fusion_charge_assembly,
 )
 from .assembly_parent import (
     apply_replacement_prefix,
@@ -78,9 +79,24 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
             # The template counts its inherent saturation, but the stem has been
             # rewritten to its mancude parent and states only the cited H.
             stated = cited
-        if len(additive_hydrogens) + max(
-            len(indicated_hydrogens), stated
-        ) == parts.parent_length and not core_name.startswith("spiro["):
+        parent = parts.parent_hydride
+        delta = parts.parent_bond_delta
+        # A fused parent can already contain saturated sites (notably neutral
+        # three-connected N). Full hydrogenation consumes all parent pi bonds,
+        # not necessarily one hydrogen for every skeletal atom.
+        fully_hydrogenated_fusion = (
+            parent is not None
+            and parent.uses_fusion_plan
+            and delta is not None
+            and delta.compatible
+            and not delta.implied_multiple_bond_ids
+            and not delta.additional_multiple_bond_ids
+            and set(delta.hydrogenated_edges) == {edge for edge, order in delta.assignment.orders if order == 2}
+        )
+        if (
+            fully_hydrogenated_fusion
+            or len(additive_hydrogens) + max(len(indicated_hydrogens), stated) == parts.parent_length
+        ) and not core_name.startswith("spiro["):
             return f"{hydro}{separator}{core_name}"
         core_name = f"{','.join(additive_hydrogens)}-{hydro}{separator}{core_name}"
     return core_name
@@ -199,6 +215,8 @@ def post_process_rewrite_rules():
 
 
 def assemble_name_raw(parts: AssemblyParts) -> str:
+    if prepare_fusion_charge_assembly(parts):
+        refresh_name_atom_bindings(parts)
     fused_ion_candidate = select_fused_ion_operation(parts)
     if fused_ion_candidate is not None:
         consume_fused_ion_operation(parts, fused_ion_candidate)
@@ -221,6 +239,9 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
         core_name = parts.retained_substituent_name
     else:
         stem_str, terminal_e = parent_stem_and_terminal(parts)
+        spiro_parent_terminal = (
+            terminal_e if parts.parent_hydride is not None and parts.parent_hydride.uses_fusion_plan else "e"
+        )
         stem_str = apply_replacement_prefix(stem_str, a_prefix_str)
         if parts.is_substituent:
             stem_str, unsat_str, terminal_e, suffix_str = format_substituent_tail(
@@ -229,7 +250,9 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
         else:
             stem_str, unsat_str, terminal_e, suffix_str = format_parent_tail(parts, stem_str, terminal_e, spiro_subs)
 
-        core_name, terminal_e, suffix_str = format_spiro_core(stem_str, unsat_str, terminal_e, spiro_subs, suffix_str)
+        core_name, terminal_e, suffix_str = format_spiro_core(
+            stem_str, unsat_str, terminal_e, spiro_subs, suffix_str, parent_terminal_e=spiro_parent_terminal
+        )
         core_name = _add_indicated_hydrogen_prefix(parts, core_name)
         core_name, suffix_str = _move_added_hydrogen_to_suffix(parts, core_name, suffix_str)
         core_name += suffix_str

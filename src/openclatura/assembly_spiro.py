@@ -164,11 +164,17 @@ def _normalize_spiro_assembly(spiro: SpiroAssembly) -> SpiroAssembly:
 
 
 def format_spiro_core(
-    stem_str: str, unsat_str: str, terminal_e: str, spiro_subs: list[SpiroAssembly], suffix_str: str = ""
+    stem_str: str,
+    unsat_str: str,
+    terminal_e: str,
+    spiro_subs: list[SpiroAssembly],
+    suffix_str: str = "",
+    *,
+    parent_terminal_e: str = "e",
 ) -> tuple[str, str, str]:
     if not spiro_subs:
         return stem_str + unsat_str + terminal_e, terminal_e, suffix_str
-    core_name = stem_str + unsat_str + ("" if stem_str.endswith("ium") else "e")
+    core_name = stem_str + unsat_str + ("" if stem_str.endswith("ium") else parent_terminal_e)
     if len(spiro_subs) == 2 and not core_name.startswith("spiro["):
         return _format_dispiro_core(core_name, terminal_e, spiro_subs), "", suffix_str
     side_prefixes = []

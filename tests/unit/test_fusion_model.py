@@ -530,6 +530,22 @@ def test_registry_key_is_not_a_component_seniority_criterion():
     assert decision.outcome == "tie"
 
 
+def test_component_seniority_reuses_immutable_metadata_and_resets_on_replacement():
+    original = _seniority_variant("same-key", ("N", "C", "C", "C", "C", "C"))
+    unchanged = replace(original)
+    before_hash = hash(original)
+    assert original._seniority_key is None
+    first = component_spec_seniority_key(original)
+    assert component_spec_seniority_key(original) is first
+    assert original == unchanged
+    assert hash(original) == before_hash
+    different = _seniority_variant("same-key", ("C", "N", "C", "C", "C", "C"))
+    updated = replace(original, template=different.template)
+    assert updated._seniority_key is None
+    assert component_spec_seniority_key(updated) == component_spec_seniority_key(different)
+    assert component_spec_seniority_key(updated) != first
+
+
 def test_parent_bond_model_rejects_incomplete_kekule_assignment():
     with pytest.raises(ValueError, match="every parent bond"):
         ParentBondModel(

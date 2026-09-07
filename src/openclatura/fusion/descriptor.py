@@ -116,6 +116,7 @@ class _PreparedComponentSelection:
     specs: Mapping[int, FusionComponentSpec]
     graph: CoverGraph[int]
     cover_kind: str
+    hidden_parent_variants: frozenset[tuple] = frozenset()
 
 
 def component_sides(spec: FusionComponentSpec) -> tuple[ComponentSide, ...]:
@@ -171,6 +172,12 @@ def build_fusion_name_ast(
         raise FusionDescriptorError(f"face count {len(face_ids)} exceeds bounded limit {MAX_FACES}")
 
     selections = _exact_component_covers(options, frozenset(face_ids))
+    parent_scopes: dict[tuple, set[frozenset[int]]] = defaultdict(set)
+    for option in options:
+        spec = _spec_for_match(registry, option.mappings[0])
+        if spec.usable_as_parent:
+            parent_scopes[component_variant_identity(spec)].add(option.atom_ids)
+    parent_scopes = {variant: scopes for variant, scopes in parent_scopes.items() if len(scopes) > 1}
 
     budget_exhausted = 0
     selections_by_preference: dict[tuple, list[_PreparedComponentSelection]] = defaultdict(list)
@@ -181,6 +188,7 @@ def build_fusion_name_ast(
             registry,
             supported_covers=supported_covers,
             supported_joins=supported_joins,
+            parent_scopes=parent_scopes,
         )
         if prepared is None:
             continue
@@ -251,7 +259,7 @@ def _selection_preference_tiers(
             topology
             for root_set in root_sets
             if _citation_grammar_supported(
-                topology := _citation_topology(graph.adjacency, root_set, specs),
+                topology := _citation_topology(graph.adjacency, root_set, specs, prepared.hidden_parent_variants),
                 specs,
                 enforce_interoperability_limits=enforce_interoperability_limits,
             )
@@ -270,6 +278,7 @@ def _prepare_component_selection(
     *,
     supported_covers: frozenset[str],
     supported_joins: frozenset[str],
+    parent_scopes: Mapping[tuple, set[frozenset[int]]] | None = None,
 ) -> _PreparedComponentSelection | None:
     """Normalize and audit one exact component cover once."""
 
@@ -288,7 +297,17 @@ def _prepare_component_selection(
         return None
     if audit.proof.kind == "multiparent" and "higher_order" not in supported_joins:
         return None
-    return _PreparedComponentSelection(ordered, matches, specs, audit.graph, audit.proof.kind)
+    hidden: frozenset[tuple] = frozenset()
+    if parent_scopes:
+        selected_scopes: dict[tuple, set[frozenset[int]]] = defaultdict(set)
+        for match, scope in zip(matches, scopes, strict=True):
+            selected_scopes[component_variant_identity(specs[match.occurrence_id])].add(scope.atom_ids)
+        hidden = frozenset(
+            variant
+            for variant, atom_scopes in parent_scopes.items()
+            if atom_scopes - selected_scopes.get(variant, set())
+        )
+    return _PreparedComponentSelection(ordered, matches, specs, audit.graph, audit.proof.kind, hidden)
 
 
 def render_fusion_name(
@@ -375,7 +394,8 @@ def render_fusion_name_parts(
                     and _omit_attached_locants(registry, spec.key, descriptor.kind),
                 )
                 for descriptor in descriptors
-            )
+            ),
+            higher_order=any(item.kind is FusionJoinKind.HIGHER_ORDER for item in descriptors),
         )
         return [
             *descendants,
@@ -403,22 +423,23 @@ def render_fusion_name_parts(
             if len(prefixes) != 1:
                 raise FusionDescriptorError("a multiplicative group must use one attached prefix")
             member_descriptors = tuple(descriptors_by_attached[member.occurrence_id][0] for member in members)
+            omitted_locants = tuple(
+                _omit_attached_locants(
+                    registry, _spec_for_match(registry, matches[member.occurrence_id]).key, item.kind
+                )
+                for item, member in zip(member_descriptors, members, strict=True)
+            )
             descriptor = _combine_rendered_descriptors(
                 tuple(
-                    _render_descriptor(
-                        item,
-                        omit_attached_locants=_omit_attached_locants(
-                            registry,
-                            _spec_for_match(registry, matches[member.occurrence_id]).key,
-                            item.kind,
-                        ),
-                    )
-                    for item, member in zip(
+                    _render_descriptor(item, omit_attached_locants=omitted)
+                    for item, omitted in zip(
                         member_descriptors,
-                        members,
+                        omitted_locants,
                         strict=True,
                     )
-                )
+                ),
+                higher_order=any(item.kind is FusionJoinKind.HIGHER_ORDER for item in member_descriptors),
+                side_only=all(omitted_locants),
             )
             pieces.extend(
                 (
@@ -457,7 +478,8 @@ def render_fusion_name_parts(
                             tuple(
                                 _render_descriptor(descriptor, omit_attached_locants=False)
                                 for descriptor in descriptors
-                            )
+                            ),
+                            higher_order=any(item.kind is FusionJoinKind.HIGHER_ORDER for item in descriptors),
                         ),
                         (occurrence,),
                     ),
@@ -617,6 +639,7 @@ def _candidates_for_component_selection(
             supported_joins,
             prepared.cover_kind,
             enforce_interoperability_limits=enforce_interoperability_limits,
+            hidden_parent_variants=prepared.hidden_parent_variants,
         )
         if candidates:
             return candidates
@@ -634,6 +657,7 @@ def _candidates_for_root_sets(
     cover_kind: str,
     *,
     enforce_interoperability_limits: bool,
+    hidden_parent_variants: frozenset[tuple] = frozenset(),
 ) -> list[_Candidate]:
     """Build candidates for one intrinsic parent-seniority tier.
 
@@ -647,7 +671,7 @@ def _candidates_for_root_sets(
         topology
         for roots in root_sets
         if _citation_grammar_supported(
-            topology := _citation_topology(graph.adjacency, roots, specs),
+            topology := _citation_topology(graph.adjacency, roots, specs, hidden_parent_variants),
             specs,
             enforce_interoperability_limits=enforce_interoperability_limits,
         )
@@ -673,6 +697,7 @@ def _candidates_for_root_sets(
                 mol,
                 supported_joins,
                 cover_kind,
+                enforce_interoperability_limits,
             )
             if candidate is not None:
                 candidates.append(candidate)
@@ -695,6 +720,7 @@ def _candidates_for_root_sets(
                 mol,
                 supported_joins,
                 cover_kind,
+                enforce_interoperability_limits,
             )
             if candidate is not None:
                 candidates.append(candidate)
@@ -716,7 +742,23 @@ def _citation_grammar_supported(
         if len(topology.roots) > 1
         else _SUPPORT.maximum_tree_component_occurrences
     )
-    return len(specs) <= maximum
+    if len(specs) > maximum:
+        return False
+    if len(topology.roots) == 1:
+        children: dict[int, list[int]] = defaultdict(list)
+        for child, host in topology.parent_by_child.items():
+            children[host].append(child)
+        for host, siblings in children.items():
+            if host == topology.roots[0]:
+                continue
+            branches = [child for child in siblings if child in children]
+            if len(branches) > 1:
+                return False
+            if branches:
+                branch_key = component_spec_seniority_key(specs[branches[0]]).as_tuple()
+                if any(component_spec_seniority_key(specs[child]).as_tuple() < branch_key for child in siblings):
+                    return False
+    return True
 
 
 def _best_tree_mapping_candidate(
@@ -728,6 +770,7 @@ def _best_tree_mapping_candidate(
     mol: Molecule,
     supported_joins: frozenset[str],
     cover_kind: str,
+    enforce_interoperability_limits: bool,
 ) -> _Candidate | None:
     """Return the exact preferred mapping assignment for a citation tree.
 
@@ -770,6 +813,7 @@ def _best_tree_mapping_candidate(
             mol,
             supported_joins,
             cover_kind,
+            enforce_interoperability_limits,
         )
         if candidate is not None and (best is None or candidate.score < best.score):
             best = candidate
@@ -874,6 +918,7 @@ def _citation_topology(
     adjacency: Mapping[int, tuple[int, ...]],
     roots: tuple[int, ...],
     specs: Mapping[int, FusionComponentSpec],
+    hidden_parent_variants: frozenset[tuple] = frozenset(),
 ) -> _CitationTopology:
     """Build one deterministic spanning forest and retain all closing edges."""
 
@@ -920,6 +965,12 @@ def _citation_topology(
         interparents,
         specs,
     )
+    # A larger attached component can contain another occurrence of the
+    # parent. It must not hide that occurrence from multiparent preference.
+    if hidden_parent_variants and any(
+        component_variant_identity(specs[root]) in hidden_parent_variants for root in roots
+    ):
+        location = replace(location, incomplete_system=1)
     return _CitationTopology(
         roots=roots,
         parent_by_child=parent_by_child,
@@ -1115,6 +1166,7 @@ def _build_candidate(
     mol: Molecule,
     supported_joins: frozenset[str],
     cover_kind: str,
+    enforce_interoperability_limits: bool,
 ) -> _Candidate | None:
     match_by_id = {match.occurrence_id: match for match in matches}
     primary_joins: dict[int, FusionJoin] = {}
@@ -1185,14 +1237,17 @@ def _build_candidate(
 
     child_order = _ordered_children(topology.parent_by_child, specs, primary_joins, side_rank)
     prime_depths, groups = _multiplicative_groups(child_order, specs, primary_joins)
+    # Higher-order depth and sibling identity are independent prime offsets.
     for occurrence, order in topology.order_by_occurrence.items():
         if order > 1:
-            prime_depths[occurrence] = max(prime_depths.get(occurrence, 0), order - 1)
+            prime_depths[occurrence] = prime_depths.get(occurrence, 0) + order - 1
     if len(topology.roots) > 1:
         groups = ()
         prime_depths.update({root: depth for depth, root in enumerate(topology.roots)})
     joins_by_child = {child: _with_prime_depths(join, prime_depths) for child, join in primary_joins.items()}
     roots = tuple(_build_citation_tree(root, child_order) for root in topology.roots)
+    if enforce_interoperability_limits and len(roots) == 1 and not _tree_citation_scope_supported(roots[0], groups):
+        return None
     citation_children = tuple(occurrence for root in roots for occurrence in _preorder_children(root))
     primary = tuple(joins_by_child[child] for child in citation_children)
     interparent = tuple(_with_prime_depths(join, prime_depths) for join in interparent_joins)
@@ -1424,6 +1479,37 @@ def _ordered_children(
     }
 
 
+def _tree_citation_scope_supported(root: FusionCitationNode, groups: tuple[FusionMultiplicityGroup, ...]) -> bool:
+    """Check parser scope transitions on the citation tree, without reading text.
+
+    OPSIN can reset to the main parent or revisit the immediately preceding
+    fusion level. Returning across multiple completed levels requires a
+    different component cover; do not emit a citation the parser mis-scopes.
+    """
+
+    group_by_member = {member: group.occurrence_ids for group in groups for member in group.occurrence_ids}
+    visited_groups: set[tuple[int, ...]] = set()
+    level = 0
+
+    def visit(node: FusionCitationNode, depth: int) -> bool:
+        nonlocal level
+        for child in reversed(node.children):
+            group = group_by_member.get(child.occurrence_id)
+            if group is not None:
+                if group in visited_groups:
+                    continue
+                visited_groups.add(group)
+            order = depth + 1
+            if order != 1 and order not in (level, level + 1):
+                return False
+            level = order
+            if not visit(child, order):
+                return False
+        return True
+
+    return visit(root, 0)
+
+
 def _multiplicative_groups(
     child_order: Mapping[int, tuple[int, ...]],
     specs: Mapping[int, FusionComponentSpec],
@@ -1496,9 +1582,13 @@ def _citation_node(root: FusionCitationNode, occurrence: int) -> FusionCitationN
     raise KeyError(occurrence)
 
 
-def _combine_rendered_descriptors(descriptors: tuple[str, ...]) -> str:
+def _combine_rendered_descriptors(
+    descriptors: tuple[str, ...], *, higher_order: bool = False, side_only: bool = False
+) -> str:
     interiors = tuple(descriptor[1:-1] for descriptor in descriptors)
-    return f"[{':'.join(interiors)}]"
+    # A higher-order join already uses ':' between its two numerical paths.
+    separator = ";" if higher_order else "," if side_only else ":"
+    return f"[{separator.join(interiors)}]"
 
 
 def _render_descriptor(descriptor: FusionDescriptor, *, omit_attached_locants: bool) -> str:

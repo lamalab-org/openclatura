@@ -4934,7 +4934,7 @@ def test_pyopsin_regression_names_preserve_zwitterionic_parent_suffix_order():
     cases = {
         "[NH3+]C1=CC(=O)NC(=O)[CH-]1": "2,6-dioxo-1H,3H-pyridin-3-ide-4-aminium",
         "NC1=NC(N)=[NH+][N-]C1=N": "6-imino-1H-1,2,4-triazin-2-ium-1-ide-3,5-diamine",
-        "[NH3+][C-]1C=CC2=C1N=NO2": "2-oxa-3,4-diazabicyclo[3.3.0]octa-1(5),3,7-trien-6-ide-6-aminium",
+        "[NH3+][C-]1C=CC2=C1N=NO2": "cyclopenta[d][1,2,3]oxadiazol-4-ide-4-aminium",
     }
 
     for smiles, expected in cases.items():
@@ -5033,12 +5033,12 @@ def test_pyopsin_regression_names_preserve_cationic_imino_charge():
 
 def test_charged_fused_heteroaromatic_bicycles_spell_nitrogen_zwitterion():
     cases = {
-        "[N-]1[NH+]=CC=C2C=CN=C12": "2,3,9-triazabicyclo[4.3.0]nona-1(9),3,5,7-tetraen-2-ide-3-ium",
-        "[N-]1[NH+]=CC=C2N=CC=C12": "2,3,7-triazabicyclo[4.3.0]nona-1(9),3,5,7-tetraen-2-ide-3-ium",
-        "[N-]1[NH+]=CC=C2N=CN=C12": "2,3,7,9-tetraazabicyclo[4.3.0]nona-1(9),3,5,7-tetraen-2-ide-3-ium",
-        "[N-]1[NH+]=CN=C2C=CN=C12": "2,3,5,9-tetraazabicyclo[4.3.0]nona-1(9),3,5,7-tetraen-2-ide-3-ium",
-        "[N-]1[NH+]=CN=C2N=CN=C12": "2,3,5,7,9-pentaazabicyclo[4.3.0]nona-1(9),3,5,7-tetraen-2-ide-3-ium",
-        "[N-]1[NH+]=NC=C2N=CN=C12": "2,3,4,7,9-pentaazabicyclo[4.3.0]nona-1(9),3,5,7-tetraen-2-ide-3-ium",
+        "[N-]1[NH+]=CC=C2C=CN=C12": "pyrrolo[2,3-c]pyridazin-1-ide-2-ium",
+        "[N-]1[NH+]=CC=C2N=CC=C12": "pyrrolo[3,2-c]pyridazin-1-ide-2-ium",
+        "[N-]1[NH+]=CC=C2N=CN=C12": "imidazo[4,5-c]pyridazin-1-ide-2-ium",
+        "[N-]1[NH+]=CN=C2C=CN=C12": "pyrrolo[3,2-e][1,2,4]triazin-1-ide-2-ium",
+        "[N-]1[NH+]=CN=C2N=CN=C12": "imidazo[4,5-e][1,2,4]triazin-1-ide-2-ium",
+        "[N-]1[NH+]=NC=C2N=CN=C12": "imidazo[4,5-d][1,2,3]triazin-1-ide-2-ium",
     }
 
     for smiles, expected in cases.items():
@@ -5128,7 +5128,7 @@ def test_anionic_ketone_parent_names_keep_parent_descriptor_intact():
     cases = {
         "O=C1[CH-][NH+]2CCC2=C1": "3-oxo-1-azoniabicyclo[3.2.0]hept-4-en-2-ide",
         "O=C1C=C[NH+]2CC[C-]12": "4-oxo-1-azoniabicyclo[3.2.0]hept-2-en-5-ide",
-        "O=C1[CH-]NC2=C1C[NH2+]C2": "4-oxo-2,7-diazabicyclo[3.3.0]oct-1(5)-en-7-ium-3-ide",
+        "O=C1[CH-]NC2=C1C[NH2+]C2": "3-oxo-4,6-dihydro-1H,5H-pyrrolo[3,4-b]pyrrol-5-ium-2-ide",
         # The demoted ketone prefix goes in front of the whole prefix run rather
         # than sorting with it, as in ``3-oxo-4-methyl…``.
         "CC(=O)[C-]1C[NH2+]CC1=O": "3-oxo-4-acetylpyrrolidin-1-ium-4-ide",
