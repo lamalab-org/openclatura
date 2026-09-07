@@ -12,6 +12,7 @@ from ..canonical_ranks import canonical_ranks
 from ..locants import system_locant_sort_key
 from ..molecule import Molecule
 from ..polycycle_topology import normalize_edge
+from ..retained_graph_model import RetainedGraphTemplate
 from .config import fusion_nomenclature_config
 from .faces import BoundedFaceModel
 from .model import (
@@ -20,6 +21,8 @@ from .model import (
     FaceModel,
     FusedLayout,
     FusionGraph,
+    FusionGraphAtom,
+    FusionGraphBond,
     ParentBondModel,
     RejectedNumbering,
     SystemLocant,
@@ -376,6 +379,51 @@ def parent_bond_model(
         + max((len(matching) for matching in matchings), default=0),
         required_double_bonds=required_double,
     )
+
+
+def retained_template_parent_bond_model(
+    template: RetainedGraphTemplate,
+    locant_to_input_atom: Mapping[str, int],
+    *,
+    search_budget: int = _CONFIG.search.mancude_states,
+) -> ParentBondModel:
+    """Build the parent-hydride bond model for one retained-template mapping.
+
+    The template owns mancude eligibility and forced-single sites; the mapping
+    supplies only input-graph atom identities.  Keeping this conversion beside
+    :func:`parent_bond_model` gives retained parents and systematic fusion
+    parents the same bond-state comparison semantics.
+    """
+
+    if set(locant_to_input_atom) != set(template.locants):
+        raise ValueError("retained parent bond model requires a complete locant map")
+    saturated_parent = template.mancude_double_bonds is None
+    graph = FusionGraph(
+        atoms=tuple(
+            FusionGraphAtom(
+                locant_to_input_atom[atom.locant],
+                atom.symbol,
+                atom.charge,
+                pi_capacity=0 if saturated_parent else atom.resolved_pi_capacity,
+                forced_single=saturated_parent or atom.forced_single,
+                indicated_h_site=atom.indicated_h_site or atom.default_h,
+                saturated=atom.saturated,
+            )
+            for atom in template.atoms
+        ),
+        bonds=tuple(
+            FusionGraphBond(
+                tuple(sorted(locant_to_input_atom[locant] for locant in bond.locants)),
+                "single" if saturated_parent else bond.bond_class,
+            )
+            for bond in template.bonds
+        ),
+    )
+    model = parent_bond_model(graph, search_budget=search_budget)
+    expected_double_bonds = template.mancude_double_bonds or 0
+    if model.maximum_non_cumulative_double_bonds != expected_double_bonds:
+        raise ValueError("retained template and derived parent bond model disagree on mancude capacity")
+    return model
 
 
 def observed_parent_matches_bond_model(mol: Molecule, model: ParentBondModel) -> bool:

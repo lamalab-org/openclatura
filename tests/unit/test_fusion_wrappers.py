@@ -4,6 +4,7 @@ import pytest
 from rdkit import Chem
 
 from openclatura import name, name_mol
+from openclatura.chains import find_ring_systems
 from openclatura.fusion.model import FusionConfirmed, FusionMode
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.fusion.wrappers import (
@@ -65,6 +66,7 @@ def test_bridged_fusion_wrapper_records_bridge_roles_and_local_graph_ownership()
         "exact_bridge_endpoints_and_locants",
         "exact_bridge_bond_ownership",
         "typed_bridge_bond_and_prefix_model",
+        "parent_derivative_state",
         "complete_wrapper_graph_reconstruction",
     )
     assert 0 < plan.search_states <= 16
@@ -197,17 +199,75 @@ def test_annelated_ring_path_is_not_misclassified_as_a_bridge_wrapper():
     assert plan_bridged_fusion_wrapper(mol, mol.atoms, mode=FusionMode.GENERAL) is None
 
 
-def test_bridge_wrapper_requires_an_exact_retained_parent_bond_state():
+def test_bridge_wrapper_renders_a_graph_derived_retained_parent_hydro_operation():
     smiles = "C1C2CCC3=CC=C1N23"
     mol = read_smiles(smiles)
 
-    # Removing the methano candidate exposes only a permissive derivative
-    # match for 1H-pyrrolizine.  Since the wrapper does not model parent hydro
-    # operations, it must not render that retained parent.
-    assert plan_bridged_fusion_wrapper(mol, mol.atoms, mode=FusionMode.AUDITED_PIN) is None
+    plan = plan_bridged_fusion_wrapper(mol, mol.atoms, mode=FusionMode.AUDITED_PIN)
+
+    result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True, include_trace=True)
+    assert plan is not None
+    assert plan.rendered_name == "3,5-methano-1H-pyrrolizine"
+    assert [operation.locants for operation in plan.derivative_state.hydro_operations] == [("3", "4")]
+    assert result.name == "3,4-dihydro-3,5-methano-1H-pyrrolizine"
+    assert result.parent_nomenclature == "bridged_fusion"
+    assert result.opsin_check is not None and result.opsin_check.ok
+    selected = next(step for step in result.decisions if step.decision == "selected audited bridged fusion parent")
+    assert selected.data["derivative_operations"]["hydro"] == [
+        {"locants": ["3", "4"], "atom_ids": [1, 8], "bond_ids": [10]}
+    ]
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected", "hydro_locants", "oxo_locants"),
+    [
+        (
+            "C12CC=C(C3=CC=CC=C13)O2",
+            "1,2-dihydro-1,4-epoxynaphthalene",
+            [("1", "2")],
+            [],
+        ),
+        (
+            "C12C(C=C(C3=CC=CC=C13)O2)=O",
+            "1,2-dihydro-1,4-epoxynaphthalen-2-one",
+            [],
+            ["2"],
+        ),
+    ],
+)
+def test_bridge_wrapper_composes_with_shared_parent_derivative_operations(
+    smiles,
+    expected,
+    hydro_locants,
+    oxo_locants,
+):
+    mol = read_smiles(smiles)
+    parent_atoms = max(find_ring_systems(mol), key=lambda system: len(system.atoms)).atoms
+    plan = plan_bridged_fusion_wrapper(mol, parent_atoms, mode=FusionMode.AUDITED_PIN)
 
     result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True)
-    assert result.name == "9-azatricyclo[4.2.1.0^{3,9}]nona-3,5-diene"
+
+    assert plan is not None
+    assert [operation.locants for operation in plan.derivative_state.hydro_operations] == hydro_locants
+    assert [operation.locant for operation in plan.derivative_state.oxo_operations] == oxo_locants
+    assert result.name == expected
+    assert result.opsin_check is not None and result.opsin_check.ok
+
+
+def test_bridge_wrapper_does_not_invent_hydro_for_a_saturated_retained_parent():
+    smiles = "OC12CC3C1CN3C2"
+    mol = read_smiles(smiles)
+    parent_atoms = max(find_ring_systems(mol), key=lambda system: len(system.atoms)).atoms
+
+    plan = plan_bridged_fusion_wrapper(mol, parent_atoms, mode=FusionMode.AUDITED_PIN)
+    result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True)
+
+    assert plan is not None
+    assert plan.parent.name == "pyrrolidine"
+    assert plan.parent.selected_bond_model is not None
+    assert plan.parent.selected_bond_model.maximum_non_cumulative_double_bonds == 0
+    assert plan.derivative_state.hydro_operations == ()
+    assert result.name == "1,3-methano-2,4-methanopyrrolidin-4-ol"
     assert result.opsin_check is not None and result.opsin_check.ok
 
 

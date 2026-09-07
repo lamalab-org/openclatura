@@ -13,15 +13,18 @@ from enum import StrEnum
 from itertools import combinations
 
 from ..assembly_parts import NameTokenBinding
+from ..assembly_utils import needs_hyphen
 from ..locants import retained_locant_sort_key
 from ..molecule import Molecule, bond_ids_within, edges_within_atoms
 from ..polycycle_topology import connected_components, ring_system_topology
-from ..retained_fused_templates import match_retained_fused_templates
+from ..retained_fused_templates import match_retained_fused_templates, retained_parent_metadata
 from ..retained_name_policy import retained_parent_output_name
-from ..ring_parent import ParentHydrideKind, RingParent
+from ..ring_parent import ParentHydrideKind, ParentHydrideMetadata, RingParent
 from ..rules import multipliers, stems
 from .config import fusion_nomenclature_config
-from .model import FusionConfirmed, FusionMode, PinDecision, PinStatus
+from .mancude import ParentDerivativeState, parent_derivative_state
+from .model import FusionConfirmed, FusionMode, ParentBondModel, PinDecision, PinStatus
+from .numbering import retained_template_parent_bond_model
 
 _WRAPPER_SEARCH_STATES = fusion_nomenclature_config().search.component_selection_states
 
@@ -47,7 +50,9 @@ class WrapperParentPlan:
     """Compatibility projection over one canonical parent-hydride plan."""
 
     hydride: RingParent
+    bond_models: tuple[ParentBondModel, ...]
     selected_locant_map: tuple[tuple[int, str], ...] | None = None
+    selected_bond_model: ParentBondModel | None = None
 
     def __post_init__(self) -> None:
         if not self.name or not self.atom_ids or not self.locant_maps:
@@ -56,6 +61,10 @@ class WrapperParentPlan:
             mapping = dict(entries)
             if set(mapping) != set(self.atom_ids) or len(set(mapping.values())) != len(mapping):
                 raise ValueError("wrapper parent locant maps must be complete and bijective")
+        if len(self.bond_models) != len(self.locant_maps):
+            raise ValueError("wrapper parent requires one bond model per locant map")
+        if (self.selected_locant_map is None) != (self.selected_bond_model is None):
+            raise ValueError("wrapper parent locant and bond-model selections must be made together")
         if self.kind is WrapperParentKind.SYSTEMATIC_FUSION and self.fusion_plan is None:
             raise ValueError("systematic-fusion wrapper parent requires its fusion proof")
 
@@ -84,6 +93,19 @@ class WrapperParentPlan:
     @property
     def fusion_plan(self):
         return self.hydride.fusion_plan
+
+    def select(self, index: int) -> WrapperParentPlan:
+        """Select one aligned locant map and parent bond model."""
+
+        entries = self.locant_maps[index]
+        model = self.bond_models[index]
+        return replace(
+            self,
+            hydride=replace(self.hydride, parent_bond_model=model),
+            bond_models=(model,),
+            selected_locant_map=entries,
+            selected_bond_model=model,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +138,7 @@ class BridgedFusionWrapperPlan:
 
     parent: WrapperParentPlan
     bridges: tuple[NondetachableBridgeOperation, ...]
+    derivative_state: ParentDerivativeState
     rendered_name: str
     rendered_parts: tuple[NameTokenBinding, ...]
     audit_ok: bool
@@ -239,6 +262,15 @@ def plan_bridged_fusion_wrapper(
                     continue
                 for map_index, entries in enumerate(parent.locant_maps):
                     locants = dict(entries)
+                    selected_parent = parent.select(map_index)
+                    derivative_state = parent_derivative_state(
+                        mol,
+                        parent_atoms,
+                        selected_parent.selected_bond_model,
+                        locants,
+                    )
+                    if derivative_state is None:
+                        continue
                     operations = _bridge_operations(mol, bridge_paths, parent_atoms, locants)
                     if operations is None:
                         continue
@@ -251,15 +283,17 @@ def plan_bridged_fusion_wrapper(
                         parent_atoms,
                         dict(entries),
                         operations,
+                        selected_parent.selected_bond_model,
+                        derivative_state,
                     )
                     if audit_checks is None:
                         continue
-                    selected_parent = replace(parent, selected_locant_map=entries)
                     rendered_parts = _render_bridge_parts(mol, selected_parent, operations)
                     rendered = "".join(part.text for part in rendered_parts)
                     plan = BridgedFusionWrapperPlan(
                         selected_parent,
                         operations,
+                        derivative_state,
                         rendered,
                         rendered_parts,
                         audit_ok=True,
@@ -280,6 +314,11 @@ def plan_bridged_fusion_wrapper(
                             for operation in operations
                         ),
                         tuple(operation.unsaturation_locants for operation in operations),
+                        tuple(
+                            retained_locant_sort_key(locant)
+                            for operation in derivative_state.hydro_operations
+                            for locant in operation.locants
+                        ),
                         tuple(operation.prefix for operation in operations),
                         map_index,
                         rendered,
@@ -346,26 +385,45 @@ def _junction_path_interiors(
 
 
 def _retained_wrapper_parent(mol: Molecule, atoms: frozenset[int]) -> WrapperParentPlan | None:
-    # A bridge wrapper currently composes only the bridge operations with the
-    # retained parent.  Therefore the retained parent itself must be an exact
-    # bond-state and indicated-hydrogen match.  Permissive derivative matching
-    # is valid only when the corresponding hydro/unsaturation/H operations are
-    # represented explicitly by the caller.
     matches = match_retained_fused_templates(mol, set(atoms))
+    if not matches:
+        matches = match_retained_fused_templates(
+            mol,
+            set(atoms),
+            allow_nonaromatic=True,
+            allow_relocated_indicated_h=True,
+        )
     if not matches:
         return None
     first = matches[0]
     template_name = first.template.name
     same_parent = [match for match in matches if match.template.name == template_name]
-    maps = tuple(
-        tuple(sorted(((atom, str(locant)) for atom, locant in match.atom_to_locant.items()))) for match in same_parent
-    )
+    candidates: dict[tuple[tuple[int, str], ...], ParentBondModel] = {}
+    for match in same_parent:
+        entries = tuple(sorted((atom, str(locant)) for atom, locant in match.atom_to_locant.items()))
+        if entries not in candidates:
+            candidates[entries] = retained_template_parent_bond_model(match.template, match.locant_to_atom)
+    maps = tuple(candidates)
+    metadata = retained_parent_metadata(template_name)
     return WrapperParentPlan(
         hydride=RingParent.from_retained_locant_maps(
             atoms=atoms,
-            locant_maps=[dict(entries) for entries in dict.fromkeys(maps)],
+            locant_maps=[dict(entries) for entries in maps],
             name=retained_parent_output_name(template_name, "wrapped_parent"),
+            metadata=(
+                None
+                if metadata is None
+                else ParentHydrideMetadata(
+                    default_indicated_h=metadata.default_indicated_h,
+                    fusion_locants=metadata.fusion_locants,
+                    derivative_stem=metadata.derivative_stem,
+                    indicated_hydrogen_count=metadata.indicated_hydrogen_count,
+                    mancude_double_bonds=metadata.mancude_double_bonds,
+                    inherent_saturated_locants=metadata.inherent_saturated_locants,
+                )
+            ),
         ),
+        bond_models=tuple(candidates[entries] for entries in maps),
     )
 
 
@@ -389,6 +447,7 @@ def _systematic_fusion_parent(
                 ("fusion_rules_satisfied", *result.plan.audit.checks),
             ),
         ),
+        bond_models=tuple(result.plan.bond_model for _ in result.plan.numbering.input_locant_maps),
     )
 
 
@@ -580,7 +639,8 @@ def _render_bridge_parts(
         )
         parts.append(
             NameTokenBinding(
-                text=operation.prefix + ("-" if index + 1 < len(operations) else ""),
+                text=operation.prefix
+                + ("-" if index + 1 < len(operations) or needs_hyphen(operation.prefix, parent.name) else ""),
                 token_kind="prefix",
                 source="fusion_wrapper_renderer",
                 grammar_role="nondetachable_bridge",
@@ -609,6 +669,8 @@ def _audit_bridge_plan(
     parent_atoms: frozenset[int],
     parent_locants: dict[int, str],
     operations: tuple[NondetachableBridgeOperation, ...],
+    parent_bond_model: ParentBondModel,
+    derivative_state: ParentDerivativeState,
 ) -> tuple[str, ...] | None:
     if set(parent_locants) != set(parent_atoms) or len(set(parent_locants.values())) != len(parent_atoms):
         return None
@@ -647,6 +709,8 @@ def _audit_bridge_plan(
             return None
     if expected_edges != set(edges_within_atoms(mol, set(all_atoms))):
         return None
+    if parent_derivative_state(mol, parent_atoms, parent_bond_model, parent_locants) != derivative_state:
+        return None
     return (
         "complete_bijective_parent_locants",
         "disjoint_parent_and_bridge_atoms",
@@ -654,6 +718,7 @@ def _audit_bridge_plan(
         "exact_bridge_endpoints_and_locants",
         "exact_bridge_bond_ownership",
         "typed_bridge_bond_and_prefix_model",
+        "parent_derivative_state",
         "complete_wrapper_graph_reconstruction",
     )
 

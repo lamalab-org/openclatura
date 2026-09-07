@@ -263,9 +263,33 @@ def test_partly_hydrogenated_hw_component_uses_fusion_nomenclature():
             "C=C1C(=O)O[C@H]2[C@H]1CCC(C)=C1CCC(=O)O[C@]12C",
             "(1R,2S,6S)-1,9-dimethyl-5-methylidene-3,14-dioxatricyclo[8.4.0.0^{2,6}]tetradec-9-ene-4,13-dione",
         ),
+        (
+            "O=C(Nc1ccc2nc(=O)n3c(c2c1)NCC3)c1cc(Cl)ccc1Cl",
+            "2,5-dichloro-N-(7-oxo-3,6,8-triazatricyclo[7.4.0.0^{2,6}]trideca-1,8,10,12-tetraen-12-yl)benzamide",
+        ),
+        (
+            "CCOC(=O)c1c(NC(=O)C(CC)Sc2cccc(N)c2)sc2c1CCCCC2",
+            "ethyl 9-(2-((3-aminophenyl)sulfanyl)butanamido)-8-thiabicyclo[5.3.0]deca-1(7),9-diene-10-carboxylate",
+        ),
+        (
+            "CCc1cccc2c1[nH]c1c3c(c(C(C)=O)cc12)C(=O)C=CC3=O",
+            "12-acetyl-5-ethyl-3-azatetracyclo[11.4.0.0^{2,10}.0^{4,9}]heptadeca-1,4,6,8,10,12,15-heptaene-14,17-dione",
+        ),
+        (
+            "CC1(CO)CN(Cc2ccccc2)CC2CN(Cc3ccc(F)cc3)CCN21",
+            "(4-benzyl-8-((4-fluorophenyl)methyl)-2-methyl-1,4,8-triazabicyclo[4.4.0]decan-2-yl)methanol",
+        ),
+        (
+            "CC1=C2CC3C(C)(C=CC(=O)C34CO4)CC2OC1=O",
+            "4,9-dimethylspiro[6-oxatricyclo[7.4.0.0^{3,7}]trideca-3,10-diene-13,2'-oxirane]-5,12-dione",
+        ),
+        ("C1CC2OCC=CC2O1", "2,7-dioxabicyclo[4.3.0]non-4-ene"),
+        ("CN1CCC2=C1C=NN2", "6-methyl-2,3,6-triazabicyclo[3.3.0]octa-1(5),3-diene"),
+        ("C1CNC2=C(N1)ON=N2", "7-oxa-2,5,8,9-tetraazabicyclo[4.3.0]nona-1(6),8-diene"),
+        ("C1N=COC2=NON=C12", "2,8-dioxa-4,7,9-triazabicyclo[4.3.0]nona-1(9),3,6-triene"),
     ],
 )
-def test_audited_pin_abstains_from_unproved_polycomponent_indicated_h_grammar(smiles, expected):
+def test_audited_pin_abstains_from_unproved_fusion_composition_grammar(smiles, expected):
     result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True, include_trace=True)
 
     assert result.name == expected

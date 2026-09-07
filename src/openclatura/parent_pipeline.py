@@ -230,9 +230,38 @@ def resolve_bridged_fusion_parent(
                 for bridge in plan.bridges
             ],
             "proof_source": "fusion_wrapper_reconstruction",
+            "parent_nomenclature": "bridged_fusion",
             "pin_status": str(pin_decision.status),
             "pin_checks": list(pin_decision.checks),
             "audit_checks": list(plan.audit_checks),
+            "derivative_operations": {
+                "hydro": [
+                    {
+                        "locants": list(operation.locants),
+                        "atom_ids": list(operation.atom_ids),
+                        "bond_ids": list(operation.bond_ids),
+                    }
+                    for operation in plan.derivative_state.hydro_operations
+                ],
+                "unsaturation": [
+                    {
+                        "locants": list(operation.locants),
+                        "atom_ids": list(operation.atom_ids),
+                        "bond_id": operation.bond_id,
+                        "bond_order": operation.bond_order,
+                    }
+                    for operation in plan.derivative_state.unsaturation_operations
+                ],
+                "oxo": [
+                    {
+                        "locant": operation.locant,
+                        "parent_atom_id": operation.parent_atom_id,
+                        "oxygen_atom_id": operation.oxygen_atom_id,
+                        "bond_id": operation.bond_id,
+                    }
+                    for operation in plan.derivative_state.oxo_operations
+                ],
+            },
             "search_states": plan.search_states,
         },
     )
