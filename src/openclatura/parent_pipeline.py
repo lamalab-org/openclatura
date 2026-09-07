@@ -244,6 +244,27 @@ def resolve_bridged_fusion_parent(
                 for bridge in plan.bridges
             ],
             "proof_source": "fusion_wrapper_reconstruction",
+            "bridge_unsaturation_operations": [
+                {
+                    "locants": list(operation.locants),
+                    "atom_ids": list(operation.atom_ids),
+                    "bond_id": operation.bond_id,
+                    "bond_order": operation.bond_order,
+                }
+                for operation in plan.bridge_unsaturation_operations
+            ],
+            "saturated_bridge_precursor": (
+                None
+                if plan.saturated_bridge_precursor is None
+                else {
+                    "prefix": plan.saturated_bridge_precursor.prefix,
+                    "atom_ids": list(plan.saturated_bridge_precursor.atom_ids),
+                    "endpoint_atom_ids": list(plan.saturated_bridge_precursor.endpoint_atom_ids),
+                    "endpoint_locants": list(plan.saturated_bridge_precursor.endpoint_locants),
+                    "bond_ids": sorted(plan.saturated_bridge_precursor.bond_ids),
+                    "internal_bond_orders": list(plan.saturated_bridge_precursor.internal_bond_orders),
+                }
+            ),
             "parent_nomenclature": "bridged_fusion",
             "pin_status": str(pin_decision.status),
             "pin_checks": list(pin_decision.checks),

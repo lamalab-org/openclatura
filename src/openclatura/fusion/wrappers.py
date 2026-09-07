@@ -16,6 +16,7 @@ from ..assembly_parts import NameTokenBinding
 from ..assembly_utils import needs_hyphen
 from ..locants import retained_locant_sort_key
 from ..molecule import Molecule, bond_ids_within, edges_within_atoms
+from ..name_operations import UnsaturationOperation
 from ..polycycle_topology import connected_components, ring_system_topology
 from ..retained_fused_templates import match_retained_fused_templates, retained_parent_metadata
 from ..retained_name_policy import retained_parent_output_name
@@ -144,6 +145,8 @@ class BridgedFusionWrapperPlan:
     audit_ok: bool
     audit_checks: tuple[str, ...] = ()
     search_states: int = 0
+    bridge_unsaturation_operations: tuple[UnsaturationOperation, ...] = ()
+    saturated_bridge_precursor: NondetachableBridgeOperation | None = None
 
     def __post_init__(self) -> None:
         if not self.bridges:
@@ -156,6 +159,8 @@ class BridgedFusionWrapperPlan:
             raise ValueError("bridged fusion wrapper must record bounded search effort")
         if "".join(part.text for part in self.rendered_parts) != self.rendered_name:
             raise ValueError("bridged fusion wrapper parts must reproduce the rendered name")
+        if bool(self.bridge_unsaturation_operations) != (self.saturated_bridge_precursor is not None):
+            raise ValueError("bridge dehydrogenation requires both a saturated precursor and operations")
 
 
 @dataclass(frozen=True, slots=True)
@@ -257,6 +262,7 @@ def plan_bridged_fusion_wrapper(
                 )
                 if parent is None:
                     continue
+                prefer_bridge_dehydro = _prefer_completed_system_bridge_unsaturation(parent)
                 bridge_paths = _bridge_path_components(mol, atoms, parent_atoms, removed)
                 if bridge_paths is None:
                     continue
@@ -278,6 +284,10 @@ def plan_bridged_fusion_wrapper(
                     operations = tuple(
                         sorted(operations, key=lambda operation: (operation.prefix, operation.endpoint_locants))
                     )
+                    bridge_unsaturation = ()
+                    if prefer_bridge_dehydro:
+                        bridge_unsaturation = _bridge_dehydrogenation(mol, operations, locants) or ()
+                    precursor = _saturated_bridge_precursor(operations[0]) if bridge_unsaturation else None
                     audit_checks = _audit_bridge_plan(
                         mol,
                         atoms,
@@ -286,10 +296,12 @@ def plan_bridged_fusion_wrapper(
                         operations,
                         selected_parent.selected_bond_model,
                         derivative_state,
+                        bridge_unsaturation,
+                        precursor,
                     )
                     if audit_checks is None:
                         continue
-                    rendered_parts = _render_bridge_parts(mol, selected_parent, operations)
+                    rendered_parts = _render_bridge_parts(mol, selected_parent, operations, bridge_unsaturation)
                     rendered = "".join(part.text for part in rendered_parts)
                     plan = BridgedFusionWrapperPlan(
                         selected_parent,
@@ -300,6 +312,8 @@ def plan_bridged_fusion_wrapper(
                         audit_ok=True,
                         audit_checks=audit_checks,
                         search_states=visited_states,
+                        bridge_unsaturation_operations=bridge_unsaturation,
+                        saturated_bridge_precursor=precursor,
                     )
                     rank = (
                         -len(parent_atoms),
@@ -330,6 +344,77 @@ def plan_bridged_fusion_wrapper(
         if candidates:
             return min(candidates, key=lambda item: item[0])[1]
     return None
+
+
+def _prefer_completed_system_bridge_unsaturation(parent: WrapperParentPlan) -> bool:
+    """Prefer delocalized bridge grammar for carbon-H-sensitive fusion components."""
+
+    if parent.kind is WrapperParentKind.RETAINED:
+        return False
+    from .indicated_hydrogen import _component_carbon_h_locants, intrinsic_carbon_fusion_scope
+    from .registry import fusion_component_registry
+
+    plan = parent.fusion_plan
+    registry = fusion_component_registry()
+    specs = {match.occurrence_id: registry.spec_for_match(match) for match in plan.ast.component_occurrences}
+    if intrinsic_carbon_fusion_scope(plan.ast, specs):
+        return False
+    # P-25.4.3.4.1 assigns pi bonds after bridge insertion. Localizing the
+    # bridge double bonds can prevent OPSIN from resolving these components;
+    # dehydrogenation lets it assign pi bonds over the completed system.
+    return any(len(spec.rings) == 1 and _component_carbon_h_locants(spec) for spec in specs.values())
+
+
+def _bridge_dehydrogenation(
+    mol: Molecule,
+    bridges: tuple[NondetachableBridgeOperation, ...],
+    parent_locants: dict[int, str],
+) -> tuple[UnsaturationOperation, ...] | None:
+    """Express a conjugated carbon path as dehydrogenation of its saturated bridge."""
+
+    if len(bridges) != 1:
+        return None
+    bridge = bridges[0]
+    if bridge.kind is not NondetachableBridgeKind.CARBO or not bridge.unsaturation_locants:
+        return None
+    if not all(mol.atoms[atom].is_aromatic for atom in (*bridge.atom_ids, *bridge.endpoint_atom_ids)):
+        return None
+    if not all(mol.atoms[atom].symbol == "C" and mol.atoms[atom].is_aromatic for atom in parent_locants):
+        return None
+    # Bridge numbering continues the parent integers from the higher bridgehead.
+    next_locant = max(retained_locant_sort_key(locant)[0] for locant in parent_locants.values()) + 1
+    path = bridge.atom_ids
+    if retained_locant_sort_key(bridge.endpoint_locants[0]) < retained_locant_sort_key(bridge.endpoint_locants[1]):
+        path = tuple(reversed(path))
+    locants = {atom: str(next_locant + index) for index, atom in enumerate(path)}
+    result = []
+    unsaturated_atoms = set()
+    for left, right in zip(path, path[1:]):
+        bond = mol.get_bond(left, right)
+        if bond.order != 2:
+            continue
+        if unsaturated_atoms.intersection((left, right)):
+            return None
+        unsaturated_atoms.update((left, right))
+        result.append(
+            UnsaturationOperation(
+                key=f"fusion:bridge:dehydro:{locants[left]},{locants[right]}",
+                reason="completed-system conjugated bridge unsaturation",
+                locants=(locants[left], locants[right]),
+                atom_ids=(left, right),
+                bond_id=bond.idx,
+            )
+        )
+    return tuple(result)
+
+
+def _saturated_bridge_precursor(bridge: NondetachableBridgeOperation) -> NondetachableBridgeOperation:
+    return replace(
+        bridge,
+        prefix=_carbo_bridge_prefix(len(bridge.atom_ids), ()),
+        internal_bond_orders=(1,) * len(bridge.internal_bond_orders),
+        unsaturation_locants=(),
+    )
 
 
 def _bridge_removal_candidate_groups(
@@ -623,9 +708,36 @@ def _render_bridge_parts(
     mol: Molecule,
     parent: WrapperParentPlan,
     operations: tuple[NondetachableBridgeOperation, ...],
+    bridge_unsaturation: tuple[UnsaturationOperation, ...] = (),
 ) -> tuple[NameTokenBinding, ...]:
     parts: list[NameTokenBinding] = []
+    if bridge_unsaturation:
+        locants = tuple(locant for operation in bridge_unsaturation for locant in operation.locants)
+        atoms = {atom for operation in bridge_unsaturation for atom in operation.atom_ids}
+        parts.extend(
+            (
+                NameTokenBinding(
+                    text=f"{','.join(locants)}-",
+                    token_kind="locant",
+                    source="fusion_wrapper_renderer",
+                    grammar_role="bridge_dehydro_locants",
+                    binding_key="fusion:bridge:dehydro:locants",
+                    atom_ids=atoms,
+                    locants=locants,
+                ),
+                NameTokenBinding(
+                    text=f"{multipliers.basic(len(locants))}dehydro-",
+                    token_kind="prefix",
+                    source="fusion_wrapper_renderer",
+                    grammar_role="bridge_dehydro",
+                    binding_key="fusion:bridge:dehydro",
+                    atom_ids=atoms,
+                    bond_ids={operation.bond_id for operation in bridge_unsaturation},
+                ),
+            )
+        )
     for index, operation in enumerate(operations):
+        prefix = _carbo_bridge_prefix(len(operation.atom_ids), ()) if bridge_unsaturation else operation.prefix
         endpoint_atoms = set(operation.endpoint_atom_ids)
         parts.append(
             NameTokenBinding(
@@ -640,8 +752,7 @@ def _render_bridge_parts(
         )
         parts.append(
             NameTokenBinding(
-                text=operation.prefix
-                + ("-" if index + 1 < len(operations) or needs_hyphen(operation.prefix, parent.name) else ""),
+                text=prefix + ("-" if index + 1 < len(operations) or needs_hyphen(prefix, parent.name) else ""),
                 token_kind="prefix",
                 source="fusion_wrapper_renderer",
                 grammar_role="nondetachable_bridge",
@@ -672,6 +783,8 @@ def _audit_bridge_plan(
     operations: tuple[NondetachableBridgeOperation, ...],
     parent_bond_model: ParentBondModel,
     derivative_state: ParentDerivativeState,
+    bridge_unsaturation: tuple[UnsaturationOperation, ...] = (),
+    saturated_bridge_precursor: NondetachableBridgeOperation | None = None,
 ) -> tuple[str, ...] | None:
     if set(parent_locants) != set(parent_atoms) or len(set(parent_locants.values())) != len(parent_atoms):
         return None
@@ -717,6 +830,23 @@ def _audit_bridge_plan(
         != derivative_state
     ):
         return None
+    if bool(bridge_unsaturation) != (saturated_bridge_precursor is not None):
+        return None
+    if bridge_unsaturation:
+        if len(operations) != 1 or saturated_bridge_precursor != _saturated_bridge_precursor(operations[0]):
+            return None
+        if bridge_unsaturation != _bridge_dehydrogenation(mol, operations, parent_locants):
+            return None
+        pi_degrees = dict.fromkeys(all_atoms, 0)
+        double_edges = [edge for edge, order in derivative_state.bond_delta.assignment.orders if order == 2]
+        double_edges.extend(operation.atom_ids for operation in bridge_unsaturation)
+        for edge in double_edges:
+            for atom in edge:
+                pi_degrees[atom] += 1
+        # A perfect matching reaches the carbon graph's upper bound and proves
+        # the maximum noncumulative pi count without a second matching search.
+        if any(degree != 1 for degree in pi_degrees.values()):
+            return None
     return (
         "complete_bijective_parent_locants",
         "disjoint_parent_and_bridge_atoms",
@@ -725,6 +855,7 @@ def _audit_bridge_plan(
         "exact_bridge_bond_ownership",
         "typed_bridge_bond_and_prefix_model",
         "parent_derivative_state",
+        *(("graph_bound_bridge_dehydrogenation", "complete_bridge_pi_assignment") if bridge_unsaturation else ()),
         "complete_wrapper_graph_reconstruction",
     )
 
