@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 import tempfile
 import warnings
 import xml.etree.ElementTree as ET
@@ -11,6 +10,7 @@ import pytest
 from rdkit import Chem
 
 from openclatura import name_many, name_smiles
+from openclatura.opsin_verify import _opsin_error_message, opsin_available
 from openclatura.retained_fused_templates import (
     _acene_template_from_data,
     _generated_acene_templates,
@@ -220,7 +220,7 @@ def test_retained_parent_policy_separates_preferred_name_from_accepted_spelling(
 def _require_opsin() -> None:
     if py2opsin is None:
         pytest.skip("py2opsin is not available")
-    if shutil.which("java") is None:
+    if not opsin_available():
         pytest.skip("Java runtime not found (OPSIN requires Java)")
 
 
@@ -229,7 +229,12 @@ def _opsin(name: str, output_format: str = "SMILES") -> str:
     with tempfile.TemporaryDirectory(prefix="openclatura_fused_opsin_") as tmpdir:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
-            return py2opsin.py2opsin(name, output_format=output_format, tmp_fpath=f"{tmpdir}/input.txt")
+            try:
+                result = py2opsin.py2opsin(name, output_format=output_format, tmp_fpath=f"{tmpdir}/input.txt")
+            except Exception as exc:
+                pytest.fail(f"OPSIN failed for {name!r} ({output_format}): {_opsin_error_message(exc)}")
+            assert result, f"OPSIN could not parse {name!r} ({output_format})"
+            return result
 
 
 @pytest.mark.opsin
