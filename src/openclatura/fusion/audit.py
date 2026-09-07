@@ -94,10 +94,7 @@ def _unrepresented_component_indicated_hydrogens(
 
     matches = {match.occurrence_id: match for match in ast.component_occurrences}
     fusion_atoms = frozenset(atom for join in ast.joins for atom in join.shared_input_atoms)
-    completed_locants = {
-        atom: str(locant)
-        for atom, locant in numbering.input_locant_maps[0]
-    }
+    completed_locants = {atom: str(locant) for atom, locant in numbering.input_locant_maps[0]}
     cited = {str(locant) for locant in indicated_hydrogens}
     unresolved = []
     for occurrence, spec in specs.items():
@@ -181,8 +178,10 @@ def audit_fusion_plan(
             )
 
         composition_errors = _audited_pin_composition_errors(
+            mol,
             ast,
             specs,
+            numbering=numbering,
             indicated_hydrogens=indicated_hydrogens,
             derivative_state=derivative_state,
         )
@@ -417,9 +416,11 @@ def _component_role_errors(
 
 
 def _audited_pin_composition_errors(
+    mol: Molecule,
     ast: FusionNameAst,
     specs: Mapping[int, FusionComponentSpec],
     *,
+    numbering: FusionNumberingProof,
     indicated_hydrogens: tuple[SystemLocant, ...],
     derivative_state: ParentDerivativeState | None,
 ) -> tuple[str, ...]:
@@ -435,6 +436,11 @@ def _audited_pin_composition_errors(
     if specs and all(spec.template.family == "generated_hw_monocycle" for spec in specs.values()):
         return ("fusion of exclusively generated Hantzsch-Widman components lacks an audited orientation anchor",)
     if derivative_state is None:
+        return ()
+
+    if _has_separate_nitrogen_h_and_carbon_derivatives(
+        mol, ast, specs, numbering, indicated_hydrogens, derivative_state
+    ):
         return ()
 
     has_bond_or_oxo_derivative = bool(
@@ -468,6 +474,52 @@ def _audited_pin_composition_errors(
         if not has_exact_component_owner:
             return ("additive hydrogenation does not exactly cover one component's non-fused carbon positions",)
     return ()
+
+
+def _has_separate_nitrogen_h_and_carbon_derivatives(
+    mol: Molecule,
+    ast: FusionNameAst,
+    specs: Mapping[int, FusionComponentSpec],
+    numbering: FusionNumberingProof,
+    indicated_hydrogens: tuple[SystemLocant, ...],
+    state: ParentDerivativeState,
+) -> bool:
+    """Admit independent completed-system H/hydro/oxo sites in an ortho bicycle.
+
+    Carbon hydrogenation may span the fusion edge or only part of a component:
+    its ownership is the completed parent, not an independently named ring.
+    The derivative audit below still proves every operation against the graph.
+    Multiple non-aromatic H sites can consume separate missing pi bonds without
+    proving the resulting hydrogen count, so only one is admitted. Aromatic H
+    sites do not consume a missing bond. Heteroatom hydrogenation and additional
+    unsaturation remain outside this tier.
+    """
+
+    if (
+        len(ast.component_occurrences) != 2
+        or len(ast.joins) != 1
+        or ast.joins[0].kind is not FusionJoinKind.ORTHO
+        or any(len(spec.rings) != 1 for spec in specs.values())
+        or not indicated_hydrogens
+        or not state.hydro_operations
+        or state.unsaturation_operations
+    ):
+        return False
+    symbols = {
+        match.input_atom_by_locant[atom.locant]: atom.symbol
+        for match in ast.component_occurrences
+        for atom in specs[match.occurrence_id].template.atoms
+    }
+    atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
+    h_atoms = {atom_by_locant.get(locant) for locant in indicated_hydrogens}
+    hydro_atoms = {atom for operation in state.hydro_operations for atom in operation.atom_ids}
+    oxo_atoms = {operation.parent_atom_id for operation in state.oxo_operations}
+    return (
+        all(symbols.get(atom) == "N" for atom in h_atoms)
+        and sum(not mol.atoms[atom].is_aromatic for atom in h_atoms) <= 1
+        and all(symbols.get(atom) == "C" for atom in hydro_atoms | oxo_atoms)
+        and not hydro_atoms & oxo_atoms
+    )
 
 
 def _reconstruct(
@@ -1126,6 +1178,7 @@ def _audit_derivative_state(
         model,
         externally_unsaturated_atom_ids={operation.parent_atom_id for operation in state.oxo_operations},
         indicated_hydrogen_atom_ids=indicated_h_atoms,
+        atom_to_locant=dict(numbering.input_locant_maps[0]),
     )
     if delta is None or not delta.compatible:
         errors.append("observed parent bond state is incompatible with the parent hydride")

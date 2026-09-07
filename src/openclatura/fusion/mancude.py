@@ -44,6 +44,7 @@ def compare_actual_parent_to_implied_parent(
     *,
     externally_unsaturated_atom_ids: set[int] | frozenset[int] = frozenset(),
     indicated_hydrogen_atom_ids: set[int] | frozenset[int] = frozenset(),
+    atom_to_locant: Mapping[int, str | SystemLocant] | None = None,
 ) -> ParentBondDelta | None:
     """Select the allowed Kekulé form requiring the smallest observed delta.
 
@@ -55,6 +56,9 @@ def compare_actual_parent_to_implied_parent(
     consumed by that typed operation rather than misclassified as additive
     hydrogenation. The function only compares graph data and does not infer
     nomenclature from rendered text.
+
+    When completed-system locants are supplied, they break equivalent-form
+    ties independently of the input atom numbering.
     """
 
     atoms = frozenset(atom_ids)
@@ -66,6 +70,16 @@ def compare_actual_parent_to_implied_parent(
         return None
 
     candidates: list[tuple[tuple, ParentBondDelta]] = []
+    locant_keys = (
+        {atom: system_locant_sort_key(str(atom_to_locant[atom])) for atom in atoms}
+        if atom_to_locant is not None
+        else None
+    )
+    numbered_edges = (
+        sorted(observed, key=lambda edge: tuple(sorted(locant_keys[atom] for atom in edge)))
+        if locant_keys is not None
+        else None
+    )
     for assignment in bond_model.allowed_kekule_assignments:
         expected = {normalize_edge(*edge): order for edge, order in assignment.orders}
         if set(expected) != set(observed):
@@ -98,9 +112,7 @@ def compare_actual_parent_to_implied_parent(
                 additional_ids.add(bond.idx)
             else:
                 incompatible += 1
-        after_indicated_h = tuple(
-            edge for edge in hydrogenated if not set(edge) & indicated_hydrogen_atom_ids
-        )
+        after_indicated_h = tuple(edge for edge in hydrogenated if not set(edge) & indicated_hydrogen_atom_ids)
         residual_hydrogenated = tuple(
             sorted(edge for edge in after_indicated_h if not set(edge) & externally_unsaturated_atom_ids)
         )
@@ -121,7 +133,11 @@ def compare_actual_parent_to_implied_parent(
             len(hydrogenated),
             len(after_indicated_h),
             len(after_indicated_h) - len(residual_hydrogenated),
-            tuple(assignment.orders),
+            # Equivalent parent forms must not change their hydro citations
+            # when input atoms are reordered. Use the proved system numbering.
+            tuple(expected[edge] for edge in numbered_edges)
+            if numbered_edges is not None
+            else tuple(assignment.orders),
         )
         candidates.append((rank, delta))
     return min(candidates, key=lambda item: item[0])[1] if candidates else None
@@ -172,6 +188,7 @@ def parent_derivative_state(
         bond_model,
         externally_unsaturated_atom_ids={operation.parent_atom_id for operation in oxo},
         indicated_hydrogen_atom_ids=indicated_hydrogen_atom_ids,
+        atom_to_locant=atom_to_locant,
     )
     if delta is None or not delta.compatible:
         return None

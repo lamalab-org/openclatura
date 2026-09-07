@@ -1,8 +1,11 @@
+from rdkit import Chem
+
+from openclatura.chains import find_ring_systems
 from openclatura.fusion.mancude import compare_actual_parent_to_implied_parent, parent_derivative_state
 from openclatura.fusion.model import FusionConfirmed, FusionGraph, FusionGraphAtom, FusionGraphBond, FusionMode
 from openclatura.fusion.numbering import parent_bond_model
 from openclatura.fusion.planner import plan_fusion_parent
-from openclatura.graph_io import read_smiles
+from openclatura.graph_io import read_rdkit_mol, read_smiles
 
 
 def _confirmed_plan(smiles: str):
@@ -84,3 +87,19 @@ def test_exact_template_double_bond_is_required_and_reserves_its_endpoints():
     assert model.pi_eligible_edges == frozenset({(2, 3)})
     assert all(dict(assignment.orders)[(0, 1)] == 2 for assignment in model.allowed_kekule_assignments)
     assert model.maximum_non_cumulative_double_bonds == 2
+
+
+def test_mancude_ties_use_completed_locants_instead_of_input_atom_ids():
+    rdkit_mol = Chem.MolFromSmiles("CN1CCCC2C1C[NH2+]C2")
+    for order in (list(range(rdkit_mol.GetNumAtoms())), list(reversed(range(rdkit_mol.GetNumAtoms())))):
+        mol = read_rdkit_mol(Chem.RenumberAtoms(rdkit_mol, order))
+        atoms = find_ring_systems(mol)[0].atoms
+        result = plan_fusion_parent(mol, atoms, mode=FusionMode.AUDITED_PIN)
+        assert isinstance(result, FusionConfirmed)
+        plan = result.plan
+        state = plan.derivative_state
+        assert tuple(map(str, plan.indicated_hydrogens)) == ("6",)
+        assert len(state.hydro_operations) == 1
+        assert state.hydro_operations[0].locants == ("2", "3", "4", "4a", "7", "7a")
+        assert len(state.hydro_operations[0].bond_ids) == 3
+        assert all(mol.atoms[atom].symbol == "C" for atom in state.hydro_operations[0].atom_ids)
