@@ -197,6 +197,20 @@ def test_annelated_ring_path_is_not_misclassified_as_a_bridge_wrapper():
     assert plan_bridged_fusion_wrapper(mol, mol.atoms, mode=FusionMode.GENERAL) is None
 
 
+def test_bridge_wrapper_requires_an_exact_retained_parent_bond_state():
+    smiles = "C1C2CCC3=CC=C1N23"
+    mol = read_smiles(smiles)
+
+    # Removing the methano candidate exposes only a permissive derivative
+    # match for 1H-pyrrolizine.  Since the wrapper does not model parent hydro
+    # operations, it must not render that retained parent.
+    assert plan_bridged_fusion_wrapper(mol, mol.atoms, mode=FusionMode.AUDITED_PIN) is None
+
+    result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True)
+    assert result.name == "9-azatricyclo[4.2.1.0^{3,9}]nona-3,5-diene"
+    assert result.opsin_check is not None and result.opsin_check.ok
+
+
 def test_fusion_spiro_side_consumes_the_proof_locant_without_name_parsing():
     mol = read_smiles("O1C2=C(C=C1)C=CS2")
 

@@ -270,11 +270,9 @@ def plan_bridged_fusion_wrapper(
                         -len(parent_atoms),
                         tuple(
                             sorted(
-
-                                    retained_locant_sort_key(locant)
-                                    for operation in operations
-                                    for locant in operation.endpoint_locants
-
+                                retained_locant_sort_key(locant)
+                                for operation in operations
+                                for locant in operation.endpoint_locants
                             )
                         ),
                         tuple(
@@ -348,14 +346,12 @@ def _junction_path_interiors(
 
 
 def _retained_wrapper_parent(mol: Molecule, atoms: frozenset[int]) -> WrapperParentPlan | None:
+    # A bridge wrapper currently composes only the bridge operations with the
+    # retained parent.  Therefore the retained parent itself must be an exact
+    # bond-state and indicated-hydrogen match.  Permissive derivative matching
+    # is valid only when the corresponding hydro/unsaturation/H operations are
+    # represented explicitly by the caller.
     matches = match_retained_fused_templates(mol, set(atoms))
-    if not matches:
-        matches = match_retained_fused_templates(
-            mol,
-            set(atoms),
-            allow_nonaromatic=True,
-            allow_relocated_indicated_h=True,
-        )
     if not matches:
         return None
     first = matches[0]

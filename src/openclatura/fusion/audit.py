@@ -132,6 +132,37 @@ def audit_fusion_plan(
                 errors=(f"component occurrences are not PIN-eligible: {non_pin}",),
             )
 
+        # In a polycomponent citation fusion can consume or relocate the
+        # indicated-hydrogen site of an individual component.  The current
+        # completed-system hydrogen proof handles the assembled parent, but it
+        # does not yet prove that a bare attached-component prefix communicates
+        # that component-state transition unambiguously.  Keep verified binary
+        # fusions available and leave this broader grammar to GENERAL mode.
+        indicated_h_components = sorted(
+            occurrence for occurrence, spec in specs.items() if spec.template.default_indicated_h
+        )
+        if len(specs) > 2 and indicated_h_components:
+            return FusionAuditResult(
+                AuditStatus.ABSTAIN,
+                checks=("fusion_ring_size_gate", "pin_component_policy", "component_indicated_h_composition"),
+                errors=(
+                    f"polycomponent fusion contains intrinsic indicated-hydrogen components: {indicated_h_components}",
+                ),
+            )
+
+        composition_errors = _audited_pin_composition_errors(
+            ast,
+            specs,
+            indicated_hydrogens=indicated_hydrogens,
+            derivative_state=derivative_state,
+        )
+        if composition_errors:
+            return FusionAuditResult(
+                AuditStatus.ABSTAIN,
+                checks=("fusion_ring_size_gate", "pin_component_policy", "audited_composition_capability"),
+                errors=composition_errors,
+            )
+
     policy_errors = _component_role_errors(ast, specs)
     if policy_errors:
         return FusionAuditResult(AuditStatus.ABSTAIN, checks=("component_role_policy",), errors=policy_errors)
@@ -345,6 +376,52 @@ def _component_role_errors(
         if occurrence not in parents and not spec.usable_as_attached:
             errors.append(f"component occurrence {occurrence} is not allowed as an attached component")
     return tuple(errors)
+
+
+def _audited_pin_composition_errors(
+    ast: FusionNameAst,
+    specs: Mapping[int, FusionComponentSpec],
+    *,
+    indicated_hydrogens: tuple[SystemLocant, ...],
+    derivative_state: ParentDerivativeState | None,
+) -> tuple[str, ...]:
+    """Return composition classes not yet proved for preferred-name output.
+
+    GENERAL mode remains available for syntactically experimental fusion
+    compositions. AUDITED_PIN requires an operation-local proof that survives
+    composition, rather than treating graph reconstruction of the unrendered
+    AST as proof of the rendered name.
+    """
+
+    matches = {match.occurrence_id: match for match in ast.component_occurrences}
+    if specs and all(spec.template.family == "generated_hw_monocycle" for spec in specs.values()):
+        return ("fusion of exclusively generated Hantzsch-Widman components lacks an audited orientation anchor",)
+    if derivative_state is None:
+        return ()
+
+    has_bond_or_oxo_derivative = bool(
+        derivative_state.hydro_operations or derivative_state.unsaturation_operations or derivative_state.oxo_operations
+    )
+    if indicated_hydrogens and has_bond_or_oxo_derivative:
+        return ("combined indicated-hydrogen and bond/oxo derivative fusion grammar is not audited",)
+
+    atom_occurrences = Counter(atom for match in matches.values() for atom in match.input_atom_by_locant.values())
+    for operation in derivative_state.hydro_operations:
+        operation_atoms = set(operation.atom_ids)
+        has_exact_component_owner = False
+        for occurrence, match in matches.items():
+            template_symbols = {atom.locant: atom.symbol for atom in specs[occurrence].template.atoms}
+            nonfused_carbons = {
+                atom_id
+                for locant, atom_id in match.input_atom_by_locant.items()
+                if template_symbols.get(locant) == "C" and atom_occurrences[atom_id] == 1
+            }
+            if operation_atoms == nonfused_carbons:
+                has_exact_component_owner = True
+                break
+        if not has_exact_component_owner:
+            return ("additive hydrogenation does not exactly cover one component's non-fused carbon positions",)
+    return ()
 
 
 def _reconstruct(

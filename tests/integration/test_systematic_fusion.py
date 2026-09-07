@@ -246,6 +246,41 @@ def test_partly_hydrogenated_hw_component_uses_fusion_nomenclature():
     ]
 
 
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        (
+            "CSc1ccc(C2c3c(oc4ccccc4c3=O)C(=O)N2c2ncccn2)cc1",
+            "6-(4-(methylsulfanyl)phenyl)-5-(pyrimidin-2-yl)-2-oxa-5-azatricyclo[7.4.0.0^{3,7}]"
+            "trideca-1(13),3(7),9,11-tetraene-4,8-dione",
+        ),
+        (
+            "CC(=O)OC1Oc2ccc(C)cc2-c2oc(=O)c([Se]c3ccccc3)cc21",
+            "13-methyl-4-oxo-5-(phenylselanyl)-3,9-dioxatricyclo[8.4.0.0^{2,7}]"
+            "tetradeca-1(10),2(7),5,11,13-pentaen-8-yl acetate",
+        ),
+        (
+            "C=C1C(=O)O[C@H]2[C@H]1CCC(C)=C1CCC(=O)O[C@]12C",
+            "(1R,2S,6S)-1,9-dimethyl-5-methylidene-3,14-dioxatricyclo[8.4.0.0^{2,6}]tetradec-9-ene-4,13-dione",
+        ),
+    ],
+)
+def test_audited_pin_abstains_from_unproved_polycomponent_indicated_h_grammar(smiles, expected):
+    result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True, include_trace=True)
+
+    assert result.name == expected
+    assert result.parent_nomenclature is None
+    assert result.opsin_check is not None and result.opsin_check.status == "matched"
+
+
+def test_general_mode_keeps_experimental_polycomponent_indicated_h_fusion():
+    smiles = "CSc1ccc(C2c3c(oc4ccccc4c3=O)C(=O)N2c2ncccn2)cc1"
+
+    result = name(smiles, fusion_mode=FusionMode.GENERAL)
+
+    assert "benzo[b]pyrano[5,6-c]pyrrole" in result.name
+
+
 def test_fusion_derivative_state_separates_carbonyl_changes_from_hydrogenation():
     smiles = "CCC1CCc2c(cc(OC)c3c2C(=O)c2cccc(OC)c2C3=O)C1"
     mol = read_smiles(smiles)
