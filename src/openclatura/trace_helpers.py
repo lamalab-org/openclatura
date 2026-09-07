@@ -567,7 +567,54 @@ def _parent_tree_node(parts: AssemblyParts, *, mol=None) -> dict:
         "atom_symbols_by_locant": dict(parts.parent_atom_symbols_by_locant),
         "atom_charges_by_locant": dict(parts.parent_atom_charges_by_locant),
     }
-    if mol is not None and (parts.is_bicycle or parts.is_polycycle) and not parts.is_spiro:
+    hydride = parts.parent_hydride
+    fusion_parent = hydride is not None and hydride.is_fusion_parent
+    if fusion_parent:
+        plan = hydride.fusion_plan
+        if plan is None and hydride.fusion_wrapper_plan is not None:
+            plan = hydride.fusion_wrapper_plan.parent.fusion_plan
+        if plan is not None:
+            node["selected_fusion"] = {
+                "proof_source": "selected_fusion_plan",
+                "faces": [
+                    {"id": face.id, "atoms": list(face.atom_cycle), "bonds": list(face.edge_cycle)}
+                    for face in plan.numbering.selected_face_model.faces
+                ],
+                "components": [
+                    {
+                        "occurrence_id": match.occurrence_id,
+                        "name": match.template_name,
+                        "spec_key": match.spec_key,
+                        "is_parent": match.occurrence_id in plan.ast.parent_occurrences,
+                        "atom_ids_by_locant": dict(match.local_to_input_atom),
+                        "face_ids": sorted(match.covered_face_ids),
+                    }
+                    for match in plan.ast.component_occurrences
+                ],
+                "joins": [
+                    {
+                        "attached_occurrence": join.attached_occurrence,
+                        "host_occurrence": join.host_occurrence,
+                        "kind": join.kind.value,
+                        "order": join.order,
+                        "attached_locants": [str(locant) for locant in join.attached_locants],
+                        "host_locants": [str(locant) for locant in join.host_locants],
+                        "host_sides": [str(side) for side in join.host_sides],
+                        "atoms": sorted(join.shared_input_atoms),
+                        "bonds": sorted(join.shared_input_bonds),
+                    }
+                    for join in plan.ast.joins
+                ],
+            }
+    # Retained/fusion parents use their selected nomenclature, not a second
+    # description-only topology proof with independent numbering.
+    if (
+        mol is not None
+        and (parts.is_bicycle or parts.is_polycycle)
+        and not parts.is_spiro
+        and not parts.retained_name
+        and not fusion_parent
+    ):
         from .descriptive_topology import von_baeyer_topology_view
 
         selected_locants = {atom: locant for locant, atom in parts.parent_atom_ids_by_locant.items()}

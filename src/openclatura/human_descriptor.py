@@ -8,14 +8,18 @@ the nested component/substituent tree.  It does not inspect final token spans.
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any
 
 from rdkit import Chem
 
+from .assembly_utils import parse_locant
 from .engine import DEFAULT_NAMING_ENGINE, NamingRequest, NamingResult
 from .graph_io import read_smiles
+from .graph_kernel import biconnected_edge_components, cycle_edges
 from .molecule import Molecule
+from .retained_fused_templates import _smallest_ring_basis
 from .rules import stems
 
 
@@ -145,7 +149,11 @@ def _describe_node(node: dict[str, Any], mol: Molecule, *, subject: str, depth: 
     if parent_sentence:
         sentences.append(parent_sentence)
 
-    topology_sentence = _von_baeyer_topology_sentence(parent)
+    fusion_sentence = _fusion_components_sentence(parent)
+    if fusion_sentence:
+        sentences.append(fusion_sentence)
+
+    topology_sentence = _retained_fusion_framework_sentence(parent, mol)
     if topology_sentence:
         sentences.append(topology_sentence)
 
@@ -188,6 +196,10 @@ def _parent_sentence(subject: str, parent: dict[str, Any]) -> str:
         return ""
     retained = parent.get("retained_name")
     parent_kind = _parent_kind(parent)
+    if _is_fusion_parent(parent):
+        label = parent.get("parent_hydride_name")
+        named = f" {label}" if label else ""
+        return f"{subject} is built around the fusion{named} parent, {parent_kind}."
     if retained:
         return f"{subject} is built around the retained {retained} parent, {parent_kind}."
     return f"{subject} is built around a {parent_kind}."
@@ -198,6 +210,9 @@ def _parent_kind(parent: dict[str, Any]) -> str:
     length_text = f"{length}-membered " if isinstance(length, int) and length > 0 else ""
     hetero = _hetero_locants(parent)
     skeleton = "heteroskeleton" if hetero else "carbon skeleton"
+    if parent.get("retained_name") or _is_fusion_parent(parent):
+        if parent.get("is_bicycle") or parent.get("is_polycycle"):
+            return f"{length}-atom polycyclic {skeleton}" if length_text else f"polycyclic {skeleton}"
     if parent.get("is_spiro"):
         descriptor = ".".join(str(x) for x in parent.get("spiro_descriptor") or ())
         prefix = f"spiro[{descriptor}] " if descriptor else "spiro "
@@ -215,15 +230,106 @@ def _parent_kind(parent: dict[str, Any]) -> str:
     return f"{length_text}acyclic {skeleton}".strip()
 
 
-def _von_baeyer_topology_sentence(parent: dict[str, Any]) -> str:
-    view = parent.get("von_baeyer_topology") or {}
-    descriptor = view.get("descriptor")
-    if not descriptor:
+def _is_fusion_parent(parent: dict[str, Any]) -> bool:
+    return parent.get("parent_nomenclature") in {"systematic_fusion", "bridged_fusion", "skeletal_replacement_fusion"}
+
+
+def _fusion_components_sentence(parent: dict[str, Any]) -> str:
+    selected = parent.get("selected_fusion") or {}
+    components = selected.get("components") or ()
+    if not components:
         return ""
-    return (
-        f"As an equivalent von Baeyer representation, the ring connectivity has "
-        f"the descriptor {descriptor}; this auxiliary representation uses its own numbering."
-    )
+    atom_to_locant = {int(atom): str(locant) for locant, atom in (parent.get("atom_ids_by_locant") or {}).items()}
+    labels = {
+        item["occurrence_id"]: f"{item.get('name') or 'unnamed'} component {item['occurrence_id']}"
+        for item in components
+    }
+    details = []
+    for item in components:
+        locants = [atom_to_locant[atom] for atom in item["atom_ids_by_locant"].values() if atom in atom_to_locant]
+        role = " (fusion parent component)" if item.get("is_parent") else ""
+        location = f" at {_positions(locants, parent)}" if locants else ""
+        details.append(labels[item["occurrence_id"]] + role + location)
+    sentences = ["The selected fusion components are " + _join_phrases(details) + "."]
+    for join in selected.get("joins") or ():
+        attached = labels.get(join["attached_occurrence"])
+        host = labels.get(join["host_occurrence"])
+        locants = [atom_to_locant[atom] for atom in join["atoms"] if atom in atom_to_locant]
+        if attached and host and locants:
+            sentences.append(f"The {attached} joins the {host} at {_positions(locants, parent)}.")
+    return "\n".join(sentences)
+
+
+def _retained_fusion_framework_sentence(parent: dict[str, Any], mol: Molecule) -> str:
+    if not (parent.get("retained_name") or _is_fusion_parent(parent)):
+        return ""
+    atom_to_locant = {int(atom): str(locant) for locant, atom in (parent.get("atom_ids_by_locant") or {}).items()}
+    atoms = {int(atom) for atom in parent.get("atoms") or ()}
+    if not atoms or not atoms <= mol.atoms.keys():
+        return ""
+
+    edges = set()
+    for bond_id in parent.get("bonds") or ():
+        bond = mol.bonds.get(int(bond_id))
+        if bond is not None and bond.u in atoms and bond.v in atoms:
+            edges.add(tuple(sorted((bond.u, bond.v))))
+
+    faces = (parent.get("selected_fusion") or {}).get("faces") or ()
+    rings = [tuple(face["atoms"]) for face in faces]
+    selected_edges = {edge for ring in rings for edge in cycle_edges(ring)}
+    selected_atoms = {atom for ring in rings for atom in ring}
+    # A bridged wrapper can carry faces for only its underlying fused parent.
+    # Use those as the whole basis only when they cover the complete parent.
+    if selected_edges != edges or selected_atoms != atoms:
+        rings = []
+    # Reuse the retained-template basis only when no complete selected view
+    # exists. Atom IDs are graph keys, not inferred nomenclature locants.
+    blocks = () if rings else biconnected_edge_components(atoms, edges)
+    for block in blocks:
+        block_atoms = {atom for edge in block for atom in edge}
+        if len(block) < len(block_atoms):
+            continue
+        try:
+            basis = _smallest_ring_basis(
+                tuple(str(atom) for atom in sorted(block_atoms)),
+                tuple((str(first), str(second)) for first, second in sorted(block)),
+                maximum_ring_size=len(block_atoms) if len(block) == len(block_atoms) else 8,
+            )
+        except ValueError:
+            # The bounded helper must prove a complete basis; do not describe
+            # a partial set when a polycyclic block is outside its size range.
+            return ""
+        rings.extend(tuple(int(atom) for atom in ring) for ring in basis)
+    if not rings:
+        return ""
+
+    def position(atom: int) -> str:
+        locant = atom_to_locant.get(atom)
+        return _position_label(locant, parent) if locant is not None else f"atom id {atom}"
+
+    ring_details = []
+    edge_counts: Counter[tuple[int, int]] = Counter()
+    for ring in rings:
+        aromatic = " of aromatic atoms" if all(mol.atoms[atom].is_aromatic for atom in ring) else ""
+        ordered = sorted(ring, key=lambda atom: _locant_sort_key(atom_to_locant.get(atom, str(atom))))
+        ring_details.append(
+            f"a {len(ring)}-membered ring{aromatic} containing " + _join_phrases([position(atom) for atom in ordered])
+        )
+        edge_counts.update(cycle_edges(ring))
+    sentences = ["The parent ring basis comprises " + _join_phrases(sorted(ring_details)) + "."]
+    shared_edges = {edge for edge, count in edge_counts.items() if count > 1}
+    if shared_edges:
+        pairs = [
+            sorted(edge, key=lambda atom: _locant_sort_key(atom_to_locant.get(atom, str(atom))))
+            for edge in shared_edges
+        ]
+        pairs.sort(key=lambda pair: [_locant_sort_key(atom_to_locant.get(atom, str(atom))) for atom in pair])
+        sentences.append(
+            "These rings share parent bonds between "
+            + _join_phrases([f"{position(first)} and {position(second)}" for first, second in pairs])
+            + "."
+        )
+    return "\n".join(sentences)
 
 
 def _heteroatom_sentence(parent: dict[str, Any]) -> str:
@@ -563,8 +669,4 @@ def _sort_locants(locants: list[str]) -> list[str]:
 
 
 def _locant_sort_key(locant: str):
-    primary = locant.split("(", 1)[0].rstrip("'")
-    try:
-        return (0, int(primary), locant)
-    except ValueError:
-        return (1, primary, locant)
+    return (*parse_locant(locant), locant)
