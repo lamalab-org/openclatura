@@ -1,6 +1,10 @@
+from collections import Counter
+from dataclasses import replace
+
 import pytest
 from rdkit import Chem
 
+import openclatura.fusion.numbering as fusion_numbering
 from openclatura.fusion.faces import select_bounded_face_model
 from openclatura.fusion.layout import preferred_intrinsic_layouts
 from openclatura.fusion.model import FusionConfirmed, FusionGraph, FusionGraphAtom, FusionGraphBond, FusionMode
@@ -229,3 +233,80 @@ def test_mancude_search_budget_has_a_typed_failure():
 
     with pytest.raises(MancudeSearchBudgetExceeded, match="budget of 1 states"):
         parent_bond_model(mol, mol.atoms, search_budget=1)
+
+
+@pytest.mark.parametrize("interior", [False, True])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_perimeter_cache_preserves_complete_selection_and_provenance(monkeypatch, interior, reverse):
+    if interior:
+        mol, bounded, face_model, layouts = _pericondensed_patch()
+    else:
+        mol, bounded, face_model, layouts, _ = _layout_numbering_selection("O1C2=C(C=C1)C=CS2")
+    # Include duplicate and invalid layouts to retain all rejection evidence.
+    layouts = (*layouts, layouts[0], replace(layouts[0], atom_positions=()))
+    if reverse:
+        layouts = tuple(reversed(layouts))
+    cached = completed_system_numbering_selection(mol, bounded, face_model=face_model, layouts=layouts)
+    original = fusion_numbering._numbering_from_layout
+
+    def uncached(*args, **kwargs):
+        kwargs.pop("perimeter_cache", None)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(fusion_numbering, "_numbering_from_layout", uncached)
+    expected = completed_system_numbering_selection(mol, bounded, face_model=face_model, layouts=layouts)
+
+    assert cached.accepted
+    assert cached.rejected
+    assert cached == expected
+
+
+def test_perimeter_cache_reuses_builds_and_scores_only_within_one_selection(monkeypatch):
+    mol, bounded, face_model, layouts, expected = _layout_numbering_selection("O1C2=C(C=C1)C=CS2")
+    builds = Counter()
+    scores = []
+    original_build = fusion_numbering._number_completed_system
+    original_score = fusion_numbering._numbering_score
+
+    def counted_build(mol, faces, perimeter, fusion_atoms):
+        builds[perimeter] += 1
+        return original_build(mol, faces, perimeter, fusion_atoms)
+
+    def counted_score(*args):
+        scores.append(1)
+        return original_score(*args)
+
+    monkeypatch.setattr(fusion_numbering, "_number_completed_system", counted_build)
+    monkeypatch.setattr(fusion_numbering, "_numbering_score", counted_score)
+    actual = completed_system_numbering_selection(mol, bounded, face_model=face_model, layouts=layouts)
+
+    assert actual == expected
+    assert len(builds) == 4
+    assert set(builds.values()) == {1}
+    assert len(scores) == len(builds) < len(layouts)
+
+    again = completed_system_numbering_selection(mol, bounded, face_model=face_model, layouts=layouts)
+
+    assert again == actual
+    assert set(builds.values()) == {2}
+    assert len(scores) == 2 * len(builds)
+
+
+def test_perimeter_cache_reuses_failed_numbering_without_losing_rejections(monkeypatch):
+    mol, bounded, face_model, layouts, _ = _layout_numbering_selection("O1C2=C(C=C1)C=CS2")
+    calls = []
+
+    def failed_numbering(*args):
+        calls.append(1)
+        return None
+
+    monkeypatch.setattr(fusion_numbering, "_number_completed_system", failed_numbering)
+    selection = completed_system_numbering_selection(
+        mol, bounded, face_model=face_model, layouts=(layouts[0], layouts[0])
+    )
+
+    assert len(calls) == 1
+    assert selection.accepted == ()
+    assert [item.reason for item in selection.rejected] == [
+        f"layout {index} has no valid uppermost/rightmost clockwise perimeter" for index in range(2)
+    ]

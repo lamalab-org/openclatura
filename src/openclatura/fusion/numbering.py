@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from fractions import Fraction
 from functools import cmp_to_key
 
@@ -110,6 +110,7 @@ def completed_system_numbering_selection(
     candidates: list[CompletedNumbering] = []
     rejected: list[RejectedNumbering] = []
     fusion_atoms = _fusion_atoms(faces)
+    perimeter_cache: dict[tuple[int, ...], CompletedNumbering | None] = {}
     for layout_index, layout in enumerate(layouts):
         derived = _numbering_from_layout(
             mol,
@@ -118,6 +119,7 @@ def completed_system_numbering_selection(
             layout,
             layout_index,
             fusion_atoms,
+            perimeter_cache=perimeter_cache,
         )
         if derived is None:
             rejected.append(
@@ -193,6 +195,8 @@ def _numbering_from_layout(
     layout: FusedLayout,
     layout_index: int,
     fusion_atoms: set[int],
+    *,
+    perimeter_cache: dict[tuple[int, ...], CompletedNumbering | None] | None = None,
 ) -> CompletedNumbering | None:
     positions = {atom: (x, y) for atom, x, y in layout.atom_positions}
     centers = {face: (x, y) for face, x, y in layout.face_positions}
@@ -227,13 +231,26 @@ def _numbering_from_layout(
         return None
     offset = clockwise.index(start_atom)
     perimeter = clockwise[offset:] + clockwise[:offset]
-    locant_map = _number_completed_system(mol, faces, perimeter, fusion_atoms)
-    if locant_map is None:
+    # Only graph-derived data is shared; each layout keeps its own provenance.
+    if perimeter_cache is not None and perimeter in perimeter_cache:
+        numbered = perimeter_cache[perimeter]
+    else:
+        locant_map = _number_completed_system(mol, faces, perimeter, fusion_atoms)
+        numbered = (
+            CompletedNumbering(
+                perimeter=perimeter,
+                atom_to_locant=_ordered_locant_items(locant_map),
+                score=_numbering_score(mol, locant_map, fusion_atoms),
+            )
+            if locant_map is not None
+            else None
+        )
+        if perimeter_cache is not None:
+            perimeter_cache[perimeter] = numbered
+    if numbered is None:
         return None
-    return CompletedNumbering(
-        perimeter=perimeter,
-        atom_to_locant=_ordered_locant_items(locant_map),
-        score=_numbering_score(mol, locant_map, fusion_atoms),
+    return replace(
+        numbered,
         layout_index=layout_index,
         start_face_id=start_face_id,
         start_atom=start_atom,

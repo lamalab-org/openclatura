@@ -151,6 +151,9 @@ def choose_parent_numbering(
 
     principal_atom_set = set(principal_atoms)
     if locant_maps:
+        if len(locant_maps) == 1:
+            locant_map = locant_maps[0]
+            return list(locant_map.keys()), locant_map
 
         def evaluate_map(lmap):
             def get_val(idx):
