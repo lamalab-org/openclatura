@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule
 from ..name_operations import HydroOperation, OxoOperation, UnsaturationOperation
 from ..polycycle_topology import normalize_edge
-from .model import BondAssignment, ParentBondModel
+from .model import BondAssignment, FusionGraph, ParentBondModel
 
 
 @dataclass(frozen=True, slots=True)
@@ -35,6 +35,32 @@ class ParentDerivativeState:
     hydro_operations: tuple[HydroOperation, ...] = ()
     unsaturation_operations: tuple[UnsaturationOperation, ...] = ()
     oxo_operations: tuple[OxoOperation, ...] = ()
+
+
+def indicated_hydrogen_parent_bond_model(
+    graph: FusionGraph,
+    indicated_hydrogen_atom_ids: set[int] | frozenset[int],
+) -> ParentBondModel:
+    """Constrain proved intrinsic-H sites before maximizing parent pi bonds.
+
+    Callers own the proof that these sites cannot carry a parent double bond;
+    additive hydrogenation and charged-N hydrogen are not intrinsic-H sites.
+    Keep the original component atom roles and exact bond constraints intact.
+    Search-budget exhaustion propagates to the planner's typed abstention.
+    """
+
+    from .numbering import parent_bond_model
+
+    sites = frozenset(indicated_hydrogen_atom_ids)
+    if not sites <= {atom.id for atom in graph.atoms}:
+        raise ValueError("indicated-hydrogen site is outside the parent graph")
+    if any(bond.bond_class == "double" and sites.intersection(bond.atoms) for bond in graph.bonds):
+        raise ValueError("indicated-hydrogen site conflicts with a required parent double bond")
+    constrained = replace(
+        graph,
+        atoms=tuple(replace(atom, forced_single=True) if atom.id in sites else atom for atom in graph.atoms),
+    )
+    return parent_bond_model(constrained)
 
 
 def compare_actual_parent_to_implied_parent(
@@ -241,6 +267,7 @@ def parent_derivative_state(
 __all__ = [
     "ParentBondDelta",
     "ParentDerivativeState",
+    "indicated_hydrogen_parent_bond_model",
     "compare_actual_parent_to_implied_parent",
     "parent_derivative_state",
 ]

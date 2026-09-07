@@ -259,10 +259,6 @@ def test_partly_hydrogenated_hw_component_uses_fusion_nomenclature():
             "2,5-dichloro-N-(7-oxo-3,6,8-triazatricyclo[7.4.0.0^{2,6}]trideca-1,8,10,12-tetraen-12-yl)benzamide",
         ),
         (
-            "CCOC(=O)c1c(NC(=O)C(CC)Sc2cccc(N)c2)sc2c1CCCCC2",
-            "ethyl 9-(2-((3-aminophenyl)sulfanyl)butanamido)-8-thiabicyclo[5.3.0]deca-1(7),9-diene-10-carboxylate",
-        ),
-        (
             "CCc1cccc2c1[nH]c1c3c(c(C(C)=O)cc12)C(=O)C=CC3=O",
             "12-acetyl-5-ethyl-3-azatetracyclo[11.4.0.0^{2,10}.0^{4,9}]heptadeca-1,4,6,8,10,12,15-heptaene-14,17-dione",
         ),
@@ -274,17 +270,38 @@ def test_partly_hydrogenated_hw_component_uses_fusion_nomenclature():
             "CC1=C2CC3C(C)(C=CC(=O)C34CO4)CC2OC1=O",
             "4,9-dimethylspiro[6-oxatricyclo[7.4.0.0^{3,7}]trideca-3,10-diene-13,2'-oxirane]-5,12-dione",
         ),
-        ("C1CC2OCC=CC2O1", "2,7-dioxabicyclo[4.3.0]non-4-ene"),
-        ("CN1CCC2=C1C=NN2", "6-methyl-2,3,6-triazabicyclo[3.3.0]octa-1(5),3-diene"),
-        ("C1N=COC2=NON=C12", "2,8-dioxa-4,7,9-triazabicyclo[4.3.0]nona-1(9),3,6-triene"),
     ],
 )
 def test_audited_pin_abstains_from_unproved_fusion_composition_grammar(smiles, expected):
+    """These are verified fallback names, not certified preferred names."""
     result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True, include_trace=True)
 
     assert result.name == expected
     assert result.parent_nomenclature is None
+    assert result.pin_status != "confirmed"
     assert result.opsin_check is not None and result.opsin_check.status == "matched"
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("CN1CCC2=C1C=NN2", "4-methyl-5,6-dihydro-1H-pyrrolo[3,2-c]pyrazole"),
+        ("C1CC2OCC=CC2O1", "2,3,3a,7a-tetrahydro-5H-furo[3,2-b]pyran"),
+        ("C1N=COC2=NON=C12", "7H-[1,2,5]oxadiazolo[3,4-e][1,3]oxazine"),
+        (
+            "CCOC(=O)c1c(NC(=O)C(CC)Sc2cccc(N)c2)sc2c1CCCCC2",
+            "ethyl 2-(2-((3-aminophenyl)sulfanyl)butanamido)-5,6,7,8-tetrahydro-4H-cyclohepta[b]thiophene-3-carboxylate",
+        ),
+    ],
+)
+def test_intrinsic_h_parent_state_replaces_von_baeyer_fallback(smiles, expected):
+    mol = Chem.MolFromSmiles(smiles)
+    reversed_mol = Chem.RenumberAtoms(mol, list(reversed(range(mol.GetNumAtoms()))))
+    for result in (name(smiles, verify_opsin=True), name_mol(reversed_mol, verify_opsin=True)):
+        assert result.name == expected
+        assert result.parent_nomenclature == "systematic_fusion"
+        assert result.pin_status == "confirmed"
+        assert result.opsin_check is not None and result.opsin_check.status == "matched"
 
 
 def test_higher_order_fusion_composes_completed_hydro_and_oxo_operations():
@@ -340,8 +357,7 @@ def test_higher_order_fusion_composes_completed_hydro_and_oxo_operations():
 def test_higher_order_component_indicated_hydrogen_composition_roundtrips():
     smiles = "CSc1ccc(C2c3c(oc4ccccc4c3=O)C(=O)N2c2ncccn2)cc1"
     expected = (
-        "1-(4-(methylsulfanyl)phenyl)-2-(pyrimidin-2-yl)-1,2-dihydro"
-        "benzo[1',2':2,3]pyrano[5,6-c]pyrrole-3,9-dione"
+        "1-(4-(methylsulfanyl)phenyl)-2-(pyrimidin-2-yl)-1,2-dihydrobenzo[1',2':2,3]pyrano[5,6-c]pyrrole-3,9-dione"
     )
 
     result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True)
@@ -963,6 +979,7 @@ def test_complex_multiparent_interior_system_still_abstains_safely():
     ],
 )
 def test_pin_ring_size_gate_preserves_small_ring_von_baeyer_names(smiles, expected):
+    """P-52.2.4.1 explicitly gives these two von Baeyer names as PINs."""
     result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, include_trace=True)
 
     assert result.name == expected

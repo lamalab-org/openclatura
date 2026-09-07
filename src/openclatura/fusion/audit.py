@@ -18,7 +18,18 @@ from ..polycycle_topology import normalize_edge
 from ..retained_graph_model import merge_parent_bond_classes
 from ..rules import multipliers
 from .cover import audit_component_cover, component_scope
-from .mancude import ParentDerivativeState, compare_actual_parent_to_implied_parent
+from .indicated_hydrogen import (
+    aromatic_nitrogen_hydrogen_atoms,
+    component_parent_atoms,
+    intrinsic_carbon_candidate_atoms,
+    intrinsic_carbon_fusion_scope,
+    intrinsic_carbon_parent_model,
+)
+from .mancude import (
+    ParentDerivativeState,
+    compare_actual_parent_to_implied_parent,
+    indicated_hydrogen_parent_bond_model,
+)
 from .model import (
     AuditStatus,
     ComponentLocant,
@@ -37,7 +48,12 @@ from .model import (
     FusionNumberingProof,
     ParentBondModel,
 )
-from .numbering import bond_model_indicated_hydrogen_atoms, indicated_hydrogen_candidate_atoms
+from .numbering import (
+    MancudeSearchBudgetExceeded,
+    bond_model_indicated_hydrogen_atoms,
+    indicated_hydrogen_candidate_atoms,
+    parent_bond_model,
+)
 from .rules import (
     component_spec_seniority_key,
     component_variant_identity,
@@ -227,6 +243,7 @@ def audit_fusion_plan(
             errors,
         )
         checks.extend(("abstract_graph_reconstruction", "input_graph_identity"))
+        _audit_component_pi_constraints(ast, specs, abstract_parent_graph, errors)
 
         _audit_numbering(mol, parent_atoms, abstract_parent_graph, numbering, charge_operations, errors)
         checks.append("completed_numbering")
@@ -234,6 +251,24 @@ def audit_fusion_plan(
         _audit_charge_operations(mol, parent_atoms, abstract_parent_graph, numbering, charge_operations, errors)
         checks.append("charge_operations")
 
+        intrinsic_n_h = aromatic_nitrogen_hydrogen_atoms(mol, abstract_parent_graph)
+        carbon_candidates = intrinsic_carbon_candidate_atoms(ast, specs, mol)
+        intrinsic_c_h = frozenset()
+        if intrinsic_n_h or carbon_candidates:
+            expected_model = (
+                indicated_hydrogen_parent_bond_model(abstract_parent_graph, intrinsic_n_h)
+                if intrinsic_n_h
+                else parent_bond_model(abstract_parent_graph)
+            )
+            expected_model, intrinsic_c_h = intrinsic_carbon_parent_model(
+                mol,
+                abstract_parent_graph,
+                expected_model,
+                dict(numbering.input_locant_maps[0]),
+                carbon_candidates,
+            )
+            if (intrinsic_n_h or intrinsic_c_h) and bond_model != expected_model:
+                errors.append("parent bond model does not preserve the proved intrinsic-hydrogen sites")
         _audit_bond_model(abstract_parent_graph, bond_model, errors)
         checks.append("parent_bond_model")
         if derivative_state is None:
@@ -249,7 +284,7 @@ def audit_fusion_plan(
                 errors,
             )
         checks.append("parent_derivative_state")
-        _audit_indicated_hydrogens(mol, numbering, bond_model, indicated_hydrogens, errors)
+        _audit_indicated_hydrogens(mol, numbering, bond_model, indicated_hydrogens, errors, intrinsic_c_h)
         checks.append("indicated_hydrogens")
         _audit_lambda_descriptors(mol, parent_atoms, numbering, lambda_descriptors, errors)
         checks.append("lambda_descriptors")
@@ -259,7 +294,7 @@ def audit_fusion_plan(
             if render_fusion_name(ast, registry) != rendered_core_name:
                 errors.append("rendered fusion parent does not reproduce its context-free AST")
             checks.append("context_free_rendering")
-    except (KeyError, TypeError, ValueError) as exc:
+    except (KeyError, TypeError, ValueError, MancudeSearchBudgetExceeded) as exc:
         return _error(f"fusion audit could not evaluate candidate: {exc}", checks=checks)
 
     if errors:
@@ -433,7 +468,14 @@ def _audited_pin_composition_errors(
     """
 
     matches = {match.occurrence_id: match for match in ast.component_occurrences}
-    if specs and all(spec.template.family == "generated_hw_monocycle" for spec in specs.values()):
+    intrinsic_carbon_composition = derivative_state is not None and _has_separate_intrinsic_carbon_h_and_hydro(
+        mol, ast, specs, numbering, indicated_hydrogens, derivative_state
+    )
+    if (
+        specs
+        and all(spec.template.family == "generated_hw_monocycle" for spec in specs.values())
+        and not intrinsic_carbon_composition
+    ):
         return ("fusion of exclusively generated Hantzsch-Widman components lacks an audited orientation anchor",)
     if derivative_state is None:
         return ()
@@ -441,6 +483,8 @@ def _audited_pin_composition_errors(
     if _has_separate_nitrogen_h_and_carbon_derivatives(
         mol, ast, specs, numbering, indicated_hydrogens, derivative_state
     ):
+        return ()
+    if intrinsic_carbon_composition:
         return ()
 
     has_bond_or_oxo_derivative = bool(
@@ -474,6 +518,33 @@ def _audited_pin_composition_errors(
         if not has_exact_component_owner:
             return ("additive hydrogenation does not exactly cover one component's non-fused carbon positions",)
     return ()
+
+
+def _has_separate_intrinsic_carbon_h_and_hydro(
+    mol: Molecule,
+    ast: FusionNameAst,
+    specs: Mapping[int, FusionComponentSpec],
+    numbering: FusionNumberingProof,
+    indicated_hydrogens: tuple[SystemLocant, ...],
+    state: ParentDerivativeState,
+) -> bool:
+    """Admit one component-proved intrinsic CH2 with disjoint carbon hydro pairs."""
+
+    if len(indicated_hydrogens) != 1 or state.oxo_operations or state.unsaturation_operations:
+        return False
+    atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
+    atom = atom_by_locant.get(indicated_hydrogens[0])
+    if atom not in intrinsic_carbon_candidate_atoms(ast, specs, mol):
+        return False
+    hydro_atoms = {site for operation in state.hydro_operations for site in operation.atom_ids}
+    return (
+        mol.atoms[atom].symbol == "C"
+        and mol.atoms[atom].charge == 0
+        and mol.atoms[atom].total_h_count == 2
+        and atom not in hydro_atoms
+        and all(mol.atoms[site].symbol == "C" for site in hydro_atoms)
+        and all(order == 1 for edge, order in state.bond_delta.assignment.orders if atom in edge)
+    )
 
 
 def _has_separate_nitrogen_h_and_carbon_derivatives(
@@ -941,6 +1012,28 @@ def _audit_reconstructed_graph(
         errors.append("reconstructed component bonds differ from the declared abstract parent graph")
 
 
+def _audit_component_pi_constraints(
+    ast: FusionNameAst,
+    specs: Mapping[int, FusionComponentSpec],
+    abstract: FusionGraph,
+    errors: list[str],
+) -> None:
+    expected = defaultdict(list)
+    relocate_carbon_h = intrinsic_carbon_fusion_scope(ast, specs)
+    for match in ast.component_occurrences:
+        spec = specs[match.occurrence_id]
+        for atom in component_parent_atoms(spec) if relocate_carbon_h else spec.atoms:
+            expected[match.input_atom_by_locant[atom.locant]].append(atom)
+    for atom in abstract.atoms:
+        components = expected[atom.id]
+        if (
+            atom.pi_capacity != min(site.resolved_pi_capacity for site in components)
+            or atom.forced_single != any(site.forced_single for site in components)
+            or atom.saturated != any(site.saturated for site in components)
+        ):
+            errors.append("abstract parent changes a component's fixed pi-capacity or saturation constraint")
+
+
 def _audit_numbering(
     mol: Molecule,
     parent_atoms: frozenset[int],
@@ -1105,6 +1198,7 @@ def _audit_indicated_hydrogens(
     model: ParentBondModel,
     cited: tuple[SystemLocant, ...],
     errors: list[str],
+    intrinsic_carbon_atoms: frozenset[int] = frozenset(),
 ) -> None:
     """Audit fusion indicated-H citations against graph and bond-model state."""
 
@@ -1122,6 +1216,7 @@ def _audit_indicated_hydrogens(
         errors.append("fusion indicated-hydrogen citation points to an ineligible graph atom")
     required = {atom for atom in candidates if mol.atoms[atom].symbol != "C"}
     required.update(bond_model_indicated_hydrogen_atoms(mol, model, candidates))
+    required.update(intrinsic_carbon_atoms)
     if not required <= cited_atoms:
         errors.append("fusion indicated-hydrogen citations omit a graph-required site")
 

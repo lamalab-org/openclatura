@@ -2,24 +2,29 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
 from collections.abc import Iterable
 
 from ..assembly_parts import NameTokenBinding
 from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule
-from ..polycycle_topology import cycle_edges, ring_system_topology
+from ..polycycle_topology import ring_system_topology
 from ..retained_graph_model import merge_parent_bond_classes
 from .audit import audit_fusion_plan
 from .config import fusion_nomenclature_config
 from .descriptor import FusionDescriptorError, build_fusion_name_ast, render_fusion_name_parts
 from .faces import FaceSearchBudgetExceeded, cached_bounded_face_model
+from .faces import typed_face_model as _typed_face_model
+from .indicated_hydrogen import (
+    aromatic_nitrogen_hydrogen_atoms,
+    component_parent_atoms,
+    intrinsic_carbon_candidate_atoms,
+    intrinsic_carbon_fusion_scope,
+    intrinsic_carbon_parent_model,
+)
 from .layout import LayoutSearchBudgetExceeded, preferred_intrinsic_layouts
-from .mancude import parent_derivative_state
+from .mancude import indicated_hydrogen_parent_bond_model, parent_derivative_state
 from .model import (
     AuditStatus,
-    Face,
-    FaceModel,
     FusionAuditFailed,
     FusionChargeOperation,
     FusionChargeOperationKind,
@@ -156,10 +161,27 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     except ValueError as exc:
         return FusionUnsupported("fused-parent charge operation is outside the audited production tier", (str(exc),))
     try:
-        bond_model = parent_bond_model(graph)
+        intrinsic_n_h = aromatic_nitrogen_hydrogen_atoms(mol, graph)
+        bond_model = (
+            indicated_hydrogen_parent_bond_model(graph, intrinsic_n_h) if intrinsic_n_h else parent_bond_model(graph)
+        )
+        specs = {match.occurrence_id: registry.spec_for_match(match) for match in ast.component_occurrences}
+        bond_model, intrinsic_carbon_h = intrinsic_carbon_parent_model(
+            mol,
+            graph,
+            bond_model,
+            dict(numbering.input_locant_maps[0]),
+            intrinsic_carbon_candidate_atoms(ast, specs, mol),
+        )
     except MancudeSearchBudgetExceeded as exc:
         return FusionUnsupported("mancude assignment search budget exhausted", (str(exc),))
+    except ValueError as exc:
+        return FusionUnsupported("intrinsic hydrogen conflicts with the fused parent bond model", (str(exc),))
     indicated_h = _cited_indicated_hydrogens(mol, ast, registry, numbering, bond_model)
+    input_locants = dict(numbering.input_locant_maps[0])
+    indicated_h = tuple(
+        sorted(set(indicated_h) | {input_locants[atom] for atom in intrinsic_carbon_h}, key=system_locant_sort_key)
+    )
     input_atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
     indicated_h_atoms = {input_atom_by_locant[locant] for locant in indicated_h}
     derivative_state = parent_derivative_state(
@@ -381,37 +403,15 @@ def _standard_valence_parent(mol: Molecule, atoms: frozenset[int]) -> bool:
     return True
 
 
-def _typed_face_model(mol: Molecule, bounded) -> FaceModel:
-    owners: dict[int, list[int]] = defaultdict(list)
-    faces = []
-    for face_id, cycle in enumerate(bounded.faces):
-        edge_cycle = tuple(mol.get_bond(left, right).idx for left, right in cycle_edges(cycle.atoms))
-        faces.append(Face(face_id, cycle.atoms, edge_cycle, len(cycle.atoms)))
-        for edge_id in edge_cycle:
-            owners[edge_id].append(face_id)
-    perimeter = frozenset(edge for edge, face_ids in owners.items() if len(face_ids) == 1)
-    fusion = frozenset(edge for edge, face_ids in owners.items() if len(face_ids) == 2)
-    adjacency = []
-    for edge, face_ids in sorted(owners.items()):
-        if len(face_ids) == 2:
-            adjacency.append((face_ids[0], face_ids[1], edge))
-    return FaceModel(
-        faces=tuple(faces),
-        edge_to_faces=tuple(sorted((edge, tuple(sorted(face_ids))) for edge, face_ids in owners.items())),
-        perimeter_edges=perimeter,
-        fusion_edges=fusion,
-        outer_boundary=bounded.outer_boundary.atoms,
-        face_adjacency=tuple(sorted(adjacency)),
-    )
-
-
 def _abstract_graph(ast, registry) -> FusionGraph:
     labels: dict[int, FusionGraphAtom] = {}
     edges: dict[tuple[int, int], str] = {}
+    specs = {match.occurrence_id: registry.spec_for_match(match) for match in ast.component_occurrences}
+    relocate_carbon_h = intrinsic_carbon_fusion_scope(ast, specs)
     for match in ast.component_occurrences:
         spec = registry.spec_for_match(match)
         local_map = match.input_atom_by_locant
-        for atom in spec.atoms:
+        for atom in component_parent_atoms(spec) if relocate_carbon_h else spec.atoms:
             input_atom = local_map[atom.locant]
             site = FusionGraphAtom(
                 input_atom,

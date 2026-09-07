@@ -165,7 +165,7 @@ def _two_fused_rings(
     )
     graph_edges = frozenset(_edge(bond.u, bond.v) for bond in mol.bonds.values())
     graph = FusionGraph(
-        atoms=tuple(FusionGraphAtom(atom, "C") for atom in sorted(mol.atoms)),
+        atoms=tuple(FusionGraphAtom(atom, "C", pi_capacity=0, saturated=True) for atom in sorted(mol.atoms)),
         bonds=tuple(FusionGraphBond(edge, "single") for edge in sorted(graph_edges)),
     )
     bond_model = ParentBondModel(
@@ -290,6 +290,19 @@ def test_audit_confirms_independent_component_join_numbering_and_bond_reconstruc
         "lambda_descriptors",
     )
     assert result.errors == ()
+
+
+def test_audit_rejects_loss_of_component_saturation_metadata():
+    candidate = _two_fused_rings()
+    graph = replace(
+        candidate.graph,
+        atoms=(replace(candidate.graph.atoms[0], pi_capacity=1, saturated=False), *candidate.graph.atoms[1:]),
+    )
+
+    result = _audit(candidate, abstract_parent_graph=graph)
+
+    assert result.status is AuditStatus.MISMATCH
+    assert "abstract parent changes a component's fixed pi-capacity or saturation constraint" in result.errors
 
 
 def test_audit_rejects_a_rendered_parent_that_does_not_reproduce_the_ast():
