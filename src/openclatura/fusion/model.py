@@ -25,6 +25,7 @@ from ..retained_graph_model import (
 
 if TYPE_CHECKING:
     from ..assembly_parts import NameTokenBinding
+    from .mancude import ParentDerivativeState
     from .valence import FusionLambdaDescriptor
 
 
@@ -845,6 +846,7 @@ class FusionParentPlan:
     pin_eligibility: str
     rule_trace: tuple[FusionRuleDecision, ...]
     audit: FusionAuditResult
+    derivative_state: ParentDerivativeState
     charge_operations: tuple[FusionChargeOperation, ...] = ()
     lambda_descriptors: tuple[FusionLambdaDescriptor, ...] = ()
     rendered_parts: tuple[NameTokenBinding, ...] = ()
@@ -857,6 +859,8 @@ class FusionParentPlan:
             raise ValueError("fusion indicated-hydrogen locants must be unique")
         if len({operation.atom_id for operation in self.charge_operations}) != len(self.charge_operations):
             raise ValueError("fusion charge operations must target unique atoms")
+        if not self.derivative_state.bond_delta.compatible:
+            raise ValueError("fusion derivative state must use a compatible parent bond delta")
         graph_atoms = {atom.id for atom in self.abstract_parent_graph.atoms}
         numbered_atoms = {atom for atom, _ in self.numbering.abstract_atom_to_locant}
         if graph_atoms != numbered_atoms:

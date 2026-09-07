@@ -505,6 +505,7 @@ def assembly_substituent_tree(
                     "reason": operation.reason,
                     "locants": list(operation.locants),
                     "atom_ids": sorted(operation.atom_ids),
+                    "bond_ids": sorted(operation.bond_ids),
                     "operation_kind": operation.operation_kind,
                 }
                 for operation in parts.hydro_operations

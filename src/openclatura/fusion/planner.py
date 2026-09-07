@@ -15,6 +15,7 @@ from .config import fusion_nomenclature_config
 from .descriptor import FusionDescriptorError, build_fusion_name_ast, render_fusion_name_parts
 from .faces import FaceSearchBudgetExceeded, cached_bounded_face_model
 from .layout import LayoutSearchBudgetExceeded, preferred_intrinsic_layouts
+from .mancude import parent_derivative_state
 from .model import (
     AuditStatus,
     Face,
@@ -46,7 +47,7 @@ from .numbering import (
     parent_bond_model,
 )
 from .registry import FusionComponentRegistry, fusion_component_registry
-from .rules import explain_component_comparison, fusion_mode_allows_planning, pin_ring_size_gate
+from .rules import explain_component_comparison, fusion_mode_allows_planning, fusion_ring_size_gate
 from .valence import fusion_lambda_descriptors
 
 PLANNER_TIER = fusion_nomenclature_config().rules.planner_tier
@@ -105,8 +106,8 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     if not SUPPORT.interior_atoms and bounded.interior_atoms:
         return FusionUnsupported("interior-atom fused systems require the later numbering tier")
     ring_sizes = tuple(len(face.atoms) for face in bounded.faces)
-    if mode is FusionMode.AUDITED_PIN and not pin_ring_size_gate(ring_sizes):
-        return FusionUnsupported("PIN ring-size gate requires at least two rings of size five or larger")
+    if not fusion_ring_size_gate(ring_sizes):
+        return FusionUnsupported("fusion ring-size eligibility requires at least two rings of size five or larger")
 
     registry = fusion_component_registry()
     matches = registry.match_faces(mol, bounded)
@@ -158,6 +159,14 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         bond_model = parent_bond_model(graph)
     except MancudeSearchBudgetExceeded as exc:
         return FusionUnsupported("mancude assignment search budget exhausted", (str(exc),))
+    derivative_state = parent_derivative_state(
+        mol,
+        atoms,
+        bond_model,
+        dict(numbering.input_locant_maps[0]),
+    )
+    if derivative_state is None:
+        return FusionUnsupported("observed bond state cannot be expressed from the fused parent hydride")
     indicated_h = _cited_indicated_hydrogens(mol, ast, registry, numbering, bond_model)
     if SUPPORT.maximum_indicated_hydrogens is not None and len(indicated_h) > SUPPORT.maximum_indicated_hydrogens:
         return FusionUnsupported("multiple indicated-hydrogen fusion parents require a later additive tier")
@@ -233,6 +242,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         lambda_descriptors=lambda_descriptors,
         indicated_hydrogens=indicated_h,
         charge_operations=charge_operations,
+        derivative_state=derivative_state,
         rendered_core_name=rendered_core_name,
     )
     if audit.status is AuditStatus.ABSTAIN:
@@ -264,6 +274,7 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
             ),
         ),
         audit=audit,
+        derivative_state=derivative_state,
         charge_operations=charge_operations,
         lambda_descriptors=lambda_descriptors,
         rendered_parts=rendered_parts,

@@ -240,9 +240,44 @@ def test_partly_hydrogenated_hw_component_uses_fusion_nomenclature():
             "reason": "Observed parent bond orders require hydrogenation of the proved mancude parent.",
             "locants": ["5", "6"],
             "atom_ids": [0, 1],
+            "bond_ids": [1],
             "operation_kind": "additive_hydrogen",
         }
     ]
+
+
+def test_fusion_derivative_state_separates_carbonyl_changes_from_hydrogenation():
+    smiles = "CCC1CCc2c(cc(OC)c3c2C(=O)c2cccc(OC)c2C3=O)C1"
+    mol = read_smiles(smiles)
+    parent_atoms = find_ring_systems(mol)[0].atoms
+
+    planned = plan_fusion_parent(mol, parent_atoms, mode=FusionMode.AUDITED_PIN)
+
+    assert isinstance(planned, FusionConfirmed)
+    plan = planned.plan
+    assert plan.rendered_base_name == "benzo[a]anthracene"
+    assert [operation.locants for operation in plan.derivative_state.hydro_operations] == [("1", "2", "3", "4")]
+    assert [operation.locant for operation in plan.derivative_state.oxo_operations] == ["7", "12"]
+    assert plan.derivative_state.unsaturation_operations == ()
+    assert "parent_derivative_state" in plan.audit.checks
+
+
+@pytest.mark.skipif(not opsin_available(), reason="py2opsin/Java is unavailable")
+def test_fusion_derivative_complete_name_reconstructs_and_roundtrips():
+    smiles = "CCC1CCc2c(cc(OC)c3c2C(=O)c2cccc(OC)c2C3=O)C1"
+
+    result = name(
+        smiles,
+        fusion_mode=FusionMode.AUDITED_PIN,
+        include_trace=True,
+        verify_opsin=True,
+        verify_self=True,
+    )
+
+    assert result.name == ("3-ethyl-6,8-dimethoxy-1,2,3,4-tetrahydrobenzo[a]anthracene-7,12-dione")
+    assert result.parent_nomenclature == "systematic_fusion"
+    assert result.self_audit is not None and result.self_audit.verdict == "confirmed"
+    assert result.opsin_check is not None and result.opsin_check.status == "matched"
 
 
 def test_partly_hydrogenated_hw_fusion_is_atom_order_invariant():
@@ -294,6 +329,7 @@ def test_fusion_audit_rejects_an_omitted_indicated_hydrogen_site():
         abstract_parent_graph=plan.abstract_parent_graph,
         numbering=plan.numbering,
         bond_model=plan.bond_model,
+        derivative_state=plan.derivative_state,
         mode=FusionMode.AUDITED_PIN,
         registry=fusion_component_registry(),
         indicated_hydrogens=plan.indicated_hydrogens[:1],
@@ -595,11 +631,12 @@ def test_low_level_pin_request_proves_eligibility_not_global_precedence():
     assert result.plan.pin_status.value == "valid_general_name"
 
 
-def test_pin_mode_abstains_when_only_one_ring_meets_size_gate():
+@pytest.mark.parametrize("mode", [FusionMode.AUDITED_PIN, FusionMode.GENERAL])
+def test_every_mode_abstains_when_only_one_ring_meets_size_gate(mode):
     mol = read_smiles("C1CC2=C1CCC2")
-    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.AUDITED_PIN)
+    result = plan_fusion_parent(mol, mol.atoms, mode=mode)
     assert isinstance(result, FusionUnsupported)
-    assert "ring-size gate" in result.reason
+    assert "ring-size eligibility" in result.reason
 
 
 def test_positive_heteroatom_charge_is_audited_as_a_locanted_parent_operation():
@@ -650,6 +687,7 @@ def test_fusion_audit_rejects_an_omitted_parent_charge_operation():
         abstract_parent_graph=plan.abstract_parent_graph,
         numbering=plan.numbering,
         bond_model=plan.bond_model,
+        derivative_state=plan.derivative_state,
         mode=FusionMode.GENERAL,
         registry=fusion_component_registry(),
         indicated_hydrogens=plan.indicated_hydrogens,

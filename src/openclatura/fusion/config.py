@@ -16,8 +16,8 @@ from ..naming_data import load_json_table
 @dataclass(frozen=True, slots=True)
 class FusionRuleConfig:
     planner_tier: str
-    pin_minimum_ring_size: int
-    pin_minimum_ring_count: int
+    minimum_ring_size: int
+    minimum_ring_count: int
     support: FusionSupportConfig
 
 
@@ -102,7 +102,7 @@ def fusion_nomenclature_config_from_data(data: dict) -> FusionNomenclatureConfig
     if graph_source != "retained_graph_templates":
         raise ValueError("fusion components must use the shared retained graph-template registry")
     rules_data = _mapping(data, "rules")
-    pin_gate = _mapping(rules_data, "pin_gate")
+    eligibility_gate = _mapping(rules_data, "eligibility_gate")
     support_data = _mapping(rules_data, "support")
     support = FusionSupportConfig(
         cover_kinds=_text_list(support_data, "cover_kinds", allowed={"tree", "multiparent"}),
@@ -121,8 +121,8 @@ def fusion_nomenclature_config_from_data(data: dict) -> FusionNomenclatureConfig
     _validate_implemented_support(support)
     rules = FusionRuleConfig(
         planner_tier=_text(rules_data, "planner_tier"),
-        pin_minimum_ring_size=_positive_int(pin_gate, "minimum_ring_size"),
-        pin_minimum_ring_count=_positive_int(pin_gate, "minimum_ring_count"),
+        minimum_ring_size=_positive_int(eligibility_gate, "minimum_ring_size"),
+        minimum_ring_count=_positive_int(eligibility_gate, "minimum_ring_count"),
         support=support,
     )
     limits_data = _mapping(data, "search_limits")

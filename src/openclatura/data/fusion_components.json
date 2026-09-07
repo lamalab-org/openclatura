@@ -15,7 +15,7 @@
       "interior_atoms": true,
       "maximum_indicated_hydrogens": null
     },
-    "pin_gate": {
+    "eligibility_gate": {
       "minimum_ring_size": 5,
       "minimum_ring_count": 2
     }

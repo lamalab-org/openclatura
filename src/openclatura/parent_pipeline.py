@@ -140,6 +140,34 @@ def resolve_systematic_fusion_parent(
                 }
                 for operation in plan.charge_operations
             ],
+            "derivative_operations": {
+                "hydro": [
+                    {
+                        "locants": list(operation.locants),
+                        "atom_ids": list(operation.atom_ids),
+                        "bond_ids": list(operation.bond_ids),
+                    }
+                    for operation in plan.derivative_state.hydro_operations
+                ],
+                "unsaturation": [
+                    {
+                        "locants": list(operation.locants),
+                        "atom_ids": list(operation.atom_ids),
+                        "bond_id": operation.bond_id,
+                        "bond_order": operation.bond_order,
+                    }
+                    for operation in plan.derivative_state.unsaturation_operations
+                ],
+                "oxo": [
+                    {
+                        "locant": operation.locant,
+                        "parent_atom_id": operation.parent_atom_id,
+                        "oxygen_atom_id": operation.oxygen_atom_id,
+                        "bond_id": operation.bond_id,
+                    }
+                    for operation in plan.derivative_state.oxo_operations
+                ],
+            },
             "locant_map_count": len(plan.numbering.input_locant_maps),
             "atom_to_locant": {atom: str(locant) for atom, locant in plan.numbering.input_locant_maps[0]},
             "orientation_score": plan.numbering.orientation_score,

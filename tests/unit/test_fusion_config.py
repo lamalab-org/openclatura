@@ -23,8 +23,8 @@ def test_checked_in_fusion_configuration_is_complete_and_data_backed():
     assert config.rules.support.nonstandard_valence
     assert config.rules.support.interior_atoms
     assert config.rules.support.maximum_indicated_hydrogens is None
-    assert config.rules.pin_minimum_ring_size == 5
-    assert config.rules.pin_minimum_ring_count == 2
+    assert config.rules.minimum_ring_size == 5
+    assert config.rules.minimum_ring_count == 2
     assert {shape.ring_size for shape in config.ring_shapes} == set(range(3, 9))
     assert config.search.maximum_faces == 24
     assert config.search.maximum_component_occurrences == 16

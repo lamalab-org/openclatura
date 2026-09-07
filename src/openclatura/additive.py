@@ -39,6 +39,7 @@ def _fold_stem_hydro_prefix(parts: AssemblyParts, numbered_path: list[int], get_
         reason=operation.reason,
         locants=tuple(locant for locant, _ in merged),
         atom_ids=tuple(atom_idx for _, atom_idx in merged),
+        bond_ids=operation.bond_ids,
         operation_kind=operation.operation_kind,
     )
 
@@ -114,23 +115,26 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     if parent is not None and parent.bond_model is not None:
         delta = parts.parent_bond_delta
         if delta is None:
-            delta = compare_actual_parent_to_implied_parent(mol, parts.parent_atom_ids, parent.bond_model)
+            delta = (
+                parent.fusion_plan.derivative_state.bond_delta
+                if parent.uses_fusion_plan and parent.fusion_plan is not None
+                else compare_actual_parent_to_implied_parent(mol, parts.parent_atom_ids, parent.bond_model)
+            )
             parts.parent_bond_delta = delta
         if delta is not None and delta.compatible and delta.hydrogenated_edges:
             indicated_locants = (
                 set(parent.hydride_metadata.default_indicated_h) if parent.hydride_metadata is not None else set()
             )
-            indicated_atoms = {
-                atom_idx for atom_idx in numbered_path if str(get_loc(atom_idx)) in indicated_locants
-            }
-            hydrogenated_edges = tuple(
-                edge for edge in delta.hydrogenated_edges if not (set(edge) & indicated_atoms)
-            )
+            indicated_atoms = {atom_idx for atom_idx in numbered_path if str(get_loc(atom_idx)) in indicated_locants}
+            hydrogenated_edges = tuple(edge for edge in delta.hydrogenated_edges if not (set(edge) & indicated_atoms))
             if not hydrogenated_edges:
                 return
             atom_ids = sorted(
                 {atom for edge in hydrogenated_edges for atom in edge},
                 key=lambda atom_idx: parse_locant(str(get_loc(atom_idx))),
+            )
+            bond_ids = tuple(
+                sorted(bond.idx for edge in hydrogenated_edges if (bond := mol.get_bond(*edge)) is not None)
             )
             parts.hydro_operations.append(
                 HydroOperation(
@@ -138,6 +142,7 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                     reason="Observed parent bond orders require hydrogenation of the proved mancude parent.",
                     locants=tuple(str(get_loc(atom_idx)) for atom_idx in atom_ids),
                     atom_ids=tuple(atom_ids),
+                    bond_ids=bond_ids,
                     operation_kind="additive_hydrogen",
                 )
             )
@@ -421,6 +426,7 @@ def _recast_ring_ketone_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_
                 reason="A ring ketone's NH sites are added hydrogen cited with the suffix.",
                 locants=op.locants,
                 atom_ids=op.atom_ids,
+                bond_ids=op.bond_ids,
                 operation_kind="indicated_hydrogen",
             )
         return

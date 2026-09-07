@@ -39,8 +39,10 @@ from openclatura.fusion import (
     component_spec_seniority_key,
     explain_component_comparison,
     fusion_mode_allows_planning,
+    fusion_ring_size_gate,
     pin_ring_size_gate,
 )
+from openclatura.fusion.mancude import ParentBondDelta, ParentDerivativeState
 from openclatura.fusion.model import FusionCitationPlan, OrderedFusionInterface
 from openclatura.retained_fused_templates import RetainedGraphTemplate, validate_retained_fused_template
 from openclatura.ring_parent import ParentHydrideKind, RingParent
@@ -120,16 +122,27 @@ def _confirmed_fusion_plan() -> FusionParentPlan:
         atoms=tuple(FusionGraphAtom(index, "C") for index in range(3)),
         bonds=(FusionGraphBond((0, 1)), FusionGraphBond((1, 2)), FusionGraphBond((2, 0))),
     )
+    bond_model = _bond_model()
+    derivative_state = ParentDerivativeState(
+        bond_delta=ParentBondDelta(
+            assignment=bond_model.allowed_kekule_assignments[0],
+            implied_multiple_bond_ids=frozenset(),
+            hydrogenated_edges=(),
+            additional_multiple_bond_ids=frozenset(),
+            compatible=True,
+        )
+    )
     return FusionParentPlan(
         ast=ast,
         rendered_base_name="furo[2,3-b]pyridine",
         abstract_parent_graph=graph,
         numbering=numbering,
-        bond_model=_bond_model(),
+        bond_model=bond_model,
         indicated_hydrogens=(),
         pin_eligibility="fusion_rules_satisfied",
         rule_trace=(),
         audit=FusionAuditResult(AuditStatus.CONFIRMED, checks=("reconstruction", "numbering")),
+        derivative_state=derivative_state,
     )
 
 
@@ -348,6 +361,7 @@ def test_fusion_parent_plan_requires_confirmed_audit():
             pin_eligibility="fusion_rules_satisfied",
             rule_trace=(),
             audit=FusionAuditResult(AuditStatus.ABSTAIN),
+            derivative_state=confirmed.derivative_state,
         )
 
 
@@ -391,6 +405,8 @@ def test_planning_outcomes_represent_normal_abstention_without_partial_plan():
 
 
 def test_pin_gate_and_modes_are_explicit():
+    assert fusion_ring_size_gate((5, 6))
+    assert not fusion_ring_size_gate((4, 6))
     assert pin_ring_size_gate((5, 6))
     assert not pin_ring_size_gate((4, 6))
     assert not fusion_mode_allows_planning(FusionMode.LEGACY)

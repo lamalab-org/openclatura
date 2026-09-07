@@ -1,4 +1,4 @@
-from openclatura.fusion.mancude import compare_actual_parent_to_implied_parent
+from openclatura.fusion.mancude import compare_actual_parent_to_implied_parent, parent_derivative_state
 from openclatura.fusion.model import FusionConfirmed, FusionGraph, FusionGraphAtom, FusionGraphBond, FusionMode
 from openclatura.fusion.numbering import parent_bond_model
 from openclatura.fusion.planner import plan_fusion_parent
@@ -49,6 +49,22 @@ def test_mancude_delta_keeps_additional_multiple_bonds_outside_the_implied_set()
     assert delta is not None and delta.compatible
     assert bond_id in delta.additional_multiple_bond_ids
     assert bond_id not in delta.implied_multiple_bond_ids
+
+    state = parent_derivative_state(
+        mol,
+        set(mol.atoms),
+        plan.bond_model,
+        dict(plan.numbering.input_locant_maps[0]),
+    )
+    assert state is not None
+    assert len(state.unsaturation_operations) == 1
+    operation = state.unsaturation_operations[0]
+    assert operation.bond_id == bond_id
+    assert operation.bond_order == 2
+    assert set(operation.atom_ids) == {mol.bonds[bond_id].u, mol.bonds[bond_id].v}
+    assert operation.locants == tuple(
+        str(dict(plan.numbering.input_locant_maps[0])[atom]) for atom in operation.atom_ids
+    )
 
 
 def test_exact_template_double_bond_is_required_and_reserves_its_endpoints():

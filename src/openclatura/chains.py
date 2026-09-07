@@ -587,6 +587,44 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
 
         V, E = len(comp_nodes), len(comp_edges)
 
+        if E >= V + 1:
+            # A block-local retained graph remains senior to a generated
+            # fusion name. This second retained lookup matters when the
+            # molecule contains more than one independent ring block.
+            retained_match = (
+                retained_rules.get_pre_descriptor_retained_ring(mol, list(comp_nodes)) if E >= V + 2 else None
+            )
+            retained_maps = retained_match[1] if retained_match is not None else None
+            if retained_maps:
+                retained_parent = RingParent.from_retained_locant_maps(
+                    atoms=comp_nodes,
+                    locant_maps=retained_maps,
+                )
+                systems.append(
+                    RingSystem(
+                        atoms=comp_nodes,
+                        is_polycycle=True,
+                        paths=retained_parent.paths,
+                        ring_parent=retained_parent,
+                    )
+                )
+                continue
+
+            fusion_paths = _confirmed_fusion_numbering_paths(mol, comp_nodes)
+            if fusion_paths:
+                # The cached planner proof owns the component decomposition,
+                # completed numbering, and reconstruction. Descriptor engines
+                # are only fallbacks after fusion has abstained.
+                systems.append(
+                    RingSystem(
+                        atoms=comp_nodes,
+                        is_bicycle=E == V + 1,
+                        is_polycycle=E >= V + 2,
+                        paths=fusion_paths,
+                    )
+                )
+                continue
+
         if E == V:
             path = [min(comp_nodes)]
             curr = path[0]
@@ -619,47 +657,6 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                     systems.append(fallback_system)
 
         elif E >= V + 2:
-            # A retained locant graph is already a complete parent proof. Use
-            # its conventional numbering before attempting a generic
-            # von-Baeyer/polycycle descriptor; this is both cheaper and
-            # essential for macrocyclic retained parents whose topology is not
-            # representable by that descriptor grammar.
-            retained_match = retained_rules.get_pre_descriptor_retained_ring(mol, list(comp_nodes))
-            retained_maps = retained_match[1] if retained_match is not None else None
-            if retained_maps:
-                retained_parent = RingParent.from_retained_locant_maps(
-                    atoms=comp_nodes,
-                    locant_maps=retained_maps,
-                )
-                systems.append(
-                    RingSystem(
-                        atoms=comp_nodes,
-                        is_polycycle=True,
-                        paths=retained_parent.paths,
-                        ring_parent=retained_parent,
-                    )
-                )
-                continue
-
-            fusion_paths = (
-                _confirmed_fusion_numbering_paths(mol, comp_nodes)
-                if _prefer_fusion_before_descriptor_search(V, E)
-                else []
-            )
-            if fusion_paths:
-                # The parent resolver consumes the same cached proof and adds
-                # policy/trace metadata after parent selection. Keeping only
-                # its complete locant paths here avoids descriptor work before
-                # an already proven fusion parent can be selected.
-                systems.append(
-                    RingSystem(
-                        atoms=comp_nodes,
-                        is_polycycle=True,
-                        paths=fusion_paths,
-                    )
-                )
-                continue
-
             candidate = _polyspiro_or_von_baeyer_candidate(mol, comp_nodes, comp_edges)
             descriptor = candidate.descriptor
             numbered_paths = candidate.paths
@@ -769,14 +766,6 @@ def _confirmed_fusion_numbering_paths(mol: Molecule, atoms: set[int]) -> list[li
         sorted(locant_map, key=lambda atom: retained_locant_sort_key(str(locant_map[atom])))
         for locant_map in locant_maps
     ]
-
-
-def _prefer_fusion_before_descriptor_search(atom_count: int, edge_count: int) -> bool:
-    """Resolve fusion parents first once von Baeyer topology limits are exceeded."""
-
-    from .von_baeyer import MAX_AUDITED_VON_BAEYER_RINGS
-
-    return edge_count - atom_count + 1 > MAX_AUDITED_VON_BAEYER_RINGS
 
 
 def _ring_block(edges: set[tuple[int, int]] | frozenset[tuple[int, int]]) -> dict:

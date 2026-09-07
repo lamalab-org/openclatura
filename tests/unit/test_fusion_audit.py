@@ -8,6 +8,7 @@ import pytest
 
 from openclatura.fusion.audit import audit_fusion_plan
 from openclatura.fusion.faces import select_bounded_face_model
+from openclatura.fusion.mancude import parent_derivative_state
 from openclatura.fusion.model import (
     AuditStatus,
     BondAssignment,
@@ -246,6 +247,13 @@ def _audit(candidate: _Candidate, **changes):
         "registry": candidate.registry,
     }
     arguments.update(changes)
+    if "derivative_state" not in arguments:
+        arguments["derivative_state"] = parent_derivative_state(
+            candidate.mol,
+            candidate.parent_atoms,
+            arguments["bond_model"],
+            dict(arguments["numbering"].input_locant_maps[0]),
+        )
     return audit_fusion_plan(candidate.mol, candidate.parent_atoms, **arguments)
 
 
@@ -266,7 +274,7 @@ def test_audit_confirms_independent_component_join_numbering_and_bond_reconstruc
 
     assert result.status is AuditStatus.CONFIRMED
     assert result.checks == (
-        "pin_ring_size_gate",
+        "fusion_ring_size_gate",
         "pin_component_policy",
         "nomenclature_selection",
         "component_coverage",
@@ -276,6 +284,7 @@ def test_audit_confirms_independent_component_join_numbering_and_bond_reconstruc
         "completed_numbering",
         "charge_operations",
         "parent_bond_model",
+        "parent_derivative_state",
         "indicated_hydrogens",
         "lambda_descriptors",
     )
@@ -305,7 +314,7 @@ def test_audit_confirms_graph_built_ortho_peri_interface_without_descriptor_infe
     assert candidate.ast.descriptors[0].render() == "[4,5,6-ab]"
 
 
-def test_audit_reconstructs_every_interface_of_a_cyclic_component_cover():
+def test_audit_rejects_cyclic_component_cover_made_only_of_small_rings():
     cycles = ((0, 1, 2, 3), (1, 4, 5, 2), (2, 5, 6, 3))
     mol = Molecule()
     for atom in range(7):
@@ -420,10 +429,12 @@ def test_audit_reconstructs_every_interface_of_a_cyclic_component_cover():
         abstract_parent_graph=graph,
         numbering=numbering,
         bond_model=bond_model,
+        derivative_state=parent_derivative_state(mol, frozenset(mol.atoms), bond_model, locants),
         registry={"ring": spec},
     )
 
-    assert result.status is AuditStatus.CONFIRMED, result.errors
+    assert result.status is AuditStatus.ABSTAIN
+    assert result.checks == ("fusion_ring_size_gate",)
 
 
 def test_audit_rejects_a_descriptor_whose_ordered_interface_is_reversed():
@@ -500,6 +511,7 @@ def test_audit_rejects_a_wrong_multiplicative_count():
         abstract_parent_graph=plan.abstract_parent_graph,
         numbering=plan.numbering,
         bond_model=plan.bond_model,
+        derivative_state=plan.derivative_state,
         mode=FusionMode.GENERAL,
     )
 
@@ -538,6 +550,7 @@ def test_audit_rejects_a_wrong_multiplicative_prime_depth():
         abstract_parent_graph=plan.abstract_parent_graph,
         numbering=plan.numbering,
         bond_model=plan.bond_model,
+        derivative_state=plan.derivative_state,
         mode=FusionMode.GENERAL,
     )
 
@@ -579,6 +592,7 @@ def test_audit_rejects_nonidentical_components_under_one_multiplier():
         abstract_parent_graph=plan.abstract_parent_graph,
         numbering=plan.numbering,
         bond_model=plan.bond_model,
+        derivative_state=plan.derivative_state,
         mode=FusionMode.GENERAL,
     )
 
@@ -679,6 +693,7 @@ def test_audit_rejects_layout_that_does_not_match_completed_numbering():
         abstract_parent_graph=plan.abstract_parent_graph,
         numbering=bad_numbering,
         bond_model=plan.bond_model,
+        derivative_state=plan.derivative_state,
         mode=FusionMode.GENERAL,
     )
 
@@ -686,30 +701,32 @@ def test_audit_rejects_layout_that_does_not_match_completed_numbering():
     assert "selected layout assigns the same position to multiple parent atoms" in result.errors
 
 
-def test_audit_rejects_parent_bond_model_that_cannot_describe_the_input():
+def test_audit_rejects_parent_bond_model_with_the_wrong_skeleton_edges():
     candidate = _two_fused_rings()
     edges = tuple(sorted(_edge(*bond.atoms) for bond in candidate.graph.bonds))
-    orders = tuple((edge, 2 if position == 0 else 1) for position, edge in enumerate(edges))
+    corrupted_edges = (*edges[:-1], (0, 99))
+    orders = tuple((edge, 1) for edge in corrupted_edges)
     corrupted = ParentBondModel(
         allowed_kekule_assignments=(BondAssignment(orders),),
-        required_single_bonds=frozenset(edges[1:]),
-        pi_eligible_edges=frozenset({edges[0]}),
-        maximum_non_cumulative_double_bonds=1,
+        required_single_bonds=frozenset(corrupted_edges),
+        pi_eligible_edges=frozenset(),
+        maximum_non_cumulative_double_bonds=0,
     )
 
     result = _audit(candidate, bond_model=corrupted)
 
     assert result.status is AuditStatus.MISMATCH
-    assert "selected input bond orders are not allowed by the parent bond model" in result.errors
+    assert "parent bond model does not cover every and only abstract parent edge" in result.errors
 
 
-def test_pin_mode_abstains_when_only_one_ring_has_at_least_five_atoms():
+@pytest.mark.parametrize("mode", [FusionMode.AUDITED_PIN, FusionMode.GENERAL])
+def test_every_mode_abstains_when_only_one_ring_has_at_least_five_atoms(mode):
     candidate = _two_fused_rings(6, 4)
 
-    result = _audit(candidate, mode=FusionMode.AUDITED_PIN)
+    result = _audit(candidate, mode=mode)
 
     assert result.status is AuditStatus.ABSTAIN
-    assert result.checks == ("pin_ring_size_gate",)
+    assert result.checks == ("fusion_ring_size_gate",)
     assert result.errors == ("fewer than two rings of size at least five",)
 
 

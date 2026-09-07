@@ -32,4 +32,25 @@ class HydroOperation(NameOperation):
 
     locants: tuple[str, ...] = ()
     atom_ids: tuple[int, ...] = ()
+    bond_ids: tuple[int, ...] = ()
     operation_kind: str = "indicated_hydrogen"
+
+
+@dataclass(frozen=True)
+class UnsaturationOperation(NameOperation):
+    """An observed parent multiple bond not implied by its parent hydride."""
+
+    locants: tuple[str, str] = ("", "")
+    atom_ids: tuple[int, int] = (0, 0)
+    bond_id: int = 0
+    bond_order: int = 2
+
+
+@dataclass(frozen=True)
+class OxoOperation(NameOperation):
+    """An exocyclic oxo group attached to a parent-hydride atom."""
+
+    locant: str = ""
+    parent_atom_id: int = 0
+    oxygen_atom_id: int = 0
+    bond_id: int = 0

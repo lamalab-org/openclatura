@@ -32,8 +32,8 @@ GENERAL_HETEROATOM_COUNT_PRECEDENCE = tuple(
 )
 
 _CONFIG = fusion_nomenclature_config()
-PIN_MINIMUM_LARGE_RING_SIZE = _CONFIG.rules.pin_minimum_ring_size
-PIN_MINIMUM_LARGE_RING_COUNT = _CONFIG.rules.pin_minimum_ring_count
+MINIMUM_FUSION_RING_SIZE = _CONFIG.rules.minimum_ring_size
+MINIMUM_FUSION_RING_COUNT = _CONFIG.rules.minimum_ring_count
 
 
 class FusionComponentLookup(Protocol):
@@ -92,10 +92,16 @@ _CRITERION_LABELS = (
 )
 
 
-def pin_ring_size_gate(ring_sizes: tuple[int, ...]) -> bool:
-    """Return whether a fused system satisfies the P-25 PIN ring-size gate."""
+def fusion_ring_size_gate(ring_sizes: tuple[int, ...]) -> bool:
+    """Return whether ring sizes permit fusion nomenclature at all."""
 
-    return sum(size >= PIN_MINIMUM_LARGE_RING_SIZE for size in ring_sizes) >= PIN_MINIMUM_LARGE_RING_COUNT
+    return sum(size >= MINIMUM_FUSION_RING_SIZE for size in ring_sizes) >= MINIMUM_FUSION_RING_COUNT
+
+
+def pin_ring_size_gate(ring_sizes: tuple[int, ...]) -> bool:
+    """Compatibility alias for :func:`fusion_ring_size_gate`."""
+
+    return fusion_ring_size_gate(ring_sizes)
 
 
 def component_interface_orbit(

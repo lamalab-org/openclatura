@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
+from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule
+from ..name_operations import HydroOperation, OxoOperation, UnsaturationOperation
 from ..polycycle_topology import normalize_edge
 from .model import BondAssignment, ParentBondModel
 
@@ -24,18 +27,32 @@ class ParentBondDelta:
         return frozenset(atom for edge in self.hydrogenated_edges for atom in edge)
 
 
+@dataclass(frozen=True, slots=True)
+class ParentDerivativeState:
+    """Typed graph operations separating a parent skeleton from its derivative."""
+
+    bond_delta: ParentBondDelta
+    hydro_operations: tuple[HydroOperation, ...] = ()
+    unsaturation_operations: tuple[UnsaturationOperation, ...] = ()
+    oxo_operations: tuple[OxoOperation, ...] = ()
+
+
 def compare_actual_parent_to_implied_parent(
     mol: Molecule,
     atom_ids: set[int] | frozenset[int],
     bond_model: ParentBondModel,
+    *,
+    externally_unsaturated_atom_ids: set[int] | frozenset[int] = frozenset(),
 ) -> ParentBondDelta | None:
     """Select the allowed Kekulé form requiring the smallest observed delta.
 
     Aromatic input bonds are representation-independent.  Explicit single
     bonds where the parent permits a double bond are hydrogenation sites;
     explicit multiple bonds where the selected parent has a single bond are
-    additional unsaturation.  The function only compares graph data and does
-    not infer nomenclature from rendered text.
+    additional unsaturation. A missing internal double bond incident to an
+    externally unsaturated parent atom is consumed by that typed operation
+    rather than misclassified as hydrogenation. The function only compares
+    graph data and does not infer nomenclature from rendered text.
     """
 
     atoms = frozenset(atom_ids)
@@ -79,21 +96,120 @@ def compare_actual_parent_to_implied_parent(
                 additional_ids.add(bond.idx)
             else:
                 incompatible += 1
+        residual_hydrogenated = tuple(
+            sorted(edge for edge in hydrogenated if not set(edge) & externally_unsaturated_atom_ids)
+        )
         delta = ParentBondDelta(
             assignment=assignment,
             implied_multiple_bond_ids=frozenset(implied_ids),
-            hydrogenated_edges=tuple(sorted(hydrogenated)),
+            hydrogenated_edges=residual_hydrogenated,
             additional_multiple_bond_ids=frozenset(additional_ids),
             compatible=incompatible == 0,
         )
         rank = (
             incompatible,
             len(additional_ids),
-            len(hydrogenated),
+            len(residual_hydrogenated),
             tuple(assignment.orders),
         )
         candidates.append((rank, delta))
     return min(candidates, key=lambda item: item[0])[1] if candidates else None
 
 
-__all__ = ["ParentBondDelta", "compare_actual_parent_to_implied_parent"]
+def parent_derivative_state(
+    mol: Molecule,
+    atom_ids: set[int] | frozenset[int],
+    bond_model: ParentBondModel,
+    atom_to_locant: Mapping[int, str | SystemLocant],
+) -> ParentDerivativeState | None:
+    """Describe every supported bond-state difference from a parent hydride.
+
+    Parent topology is deliberately not inferred here. The supplied bond model
+    already owns that proof; this function only records graph-bound operations
+    needed to obtain the observed derivative from one allowed parent state.
+    """
+
+    atoms = frozenset(atom_ids)
+    locants = {atom: str(locant) for atom, locant in atom_to_locant.items()}
+    if set(locants) != set(atoms):
+        return None
+
+    oxo = []
+    for parent_atom in sorted(atoms, key=lambda atom: system_locant_sort_key(locants[atom])):
+        for neighbor in mol.get_neighbors(parent_atom):
+            if neighbor in atoms or mol.atoms[neighbor].symbol != "O":
+                continue
+            bond = mol.get_bond(parent_atom, neighbor)
+            if bond is None or bond.order != 2:
+                continue
+            oxo.append(
+                OxoOperation(
+                    key="oxo",
+                    reason="Exocyclic doubly bonded oxygen modifies the fused parent.",
+                    locant=locants[parent_atom],
+                    parent_atom_id=parent_atom,
+                    oxygen_atom_id=neighbor,
+                    bond_id=bond.idx,
+                )
+            )
+
+    delta = compare_actual_parent_to_implied_parent(
+        mol,
+        atoms,
+        bond_model,
+        externally_unsaturated_atom_ids={operation.parent_atom_id for operation in oxo},
+    )
+    if delta is None or not delta.compatible:
+        return None
+
+    hydrogenated_atoms = sorted(
+        delta.hydrogenated_atom_ids,
+        key=lambda atom: system_locant_sort_key(locants[atom]),
+    )
+    hydrogenated_bonds = tuple(
+        sorted(mol.get_bond(*edge).idx for edge in delta.hydrogenated_edges if mol.get_bond(*edge) is not None)
+    )
+    hydro = (
+        (
+            HydroOperation(
+                key="additive_hydrogen",
+                reason="Observed single bonds replace parent-hydride double bonds.",
+                locants=tuple(locants[atom] for atom in hydrogenated_atoms),
+                atom_ids=tuple(hydrogenated_atoms),
+                bond_ids=hydrogenated_bonds,
+                operation_kind="additive_hydrogen",
+            ),
+        )
+        if hydrogenated_atoms
+        else ()
+    )
+
+    unsaturation = []
+    for bond_id in sorted(delta.additional_multiple_bond_ids):
+        bond = mol.bonds[bond_id]
+        ordered_atoms = tuple(sorted((bond.u, bond.v), key=lambda atom: system_locant_sort_key(locants[atom])))
+        unsaturation.append(
+            UnsaturationOperation(
+                key="additional_unsaturation",
+                reason="Observed multiple bond is not implied by the parent hydride.",
+                locants=(locants[ordered_atoms[0]], locants[ordered_atoms[1]]),
+                atom_ids=ordered_atoms,
+                bond_id=bond_id,
+                bond_order=bond.order,
+            )
+        )
+
+    return ParentDerivativeState(
+        bond_delta=delta,
+        hydro_operations=hydro,
+        unsaturation_operations=tuple(unsaturation),
+        oxo_operations=tuple(oxo),
+    )
+
+
+__all__ = [
+    "ParentBondDelta",
+    "ParentDerivativeState",
+    "compare_actual_parent_to_implied_parent",
+    "parent_derivative_state",
+]

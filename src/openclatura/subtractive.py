@@ -12,7 +12,11 @@ def _implied_parent_multiple_bonds(mol: Molecule, parts: AssemblyParts) -> froze
     parent = parts.parent_hydride
     if parent is None or parent.bond_model is None:
         return frozenset()
-    delta = compare_actual_parent_to_implied_parent(mol, parts.parent_atom_ids, parent.bond_model)
+    delta = (
+        parent.fusion_plan.derivative_state.bond_delta
+        if parent.uses_fusion_plan and parent.fusion_plan is not None
+        else compare_actual_parent_to_implied_parent(mol, parts.parent_atom_ids, parent.bond_model)
+    )
     parts.parent_bond_delta = delta
     return delta.implied_multiple_bond_ids if delta is not None and delta.compatible else frozenset()
 

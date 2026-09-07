@@ -21,7 +21,7 @@ from .descriptor import FusionDescriptorError, build_fusion_name_ast
 from .faces import FaceSearchBudgetExceeded, cached_bounded_face_model
 from .model import FusionConfirmed, FusionMode, FusionNameAst, PinDecision, PinStatus
 from .registry import fusion_component_registry
-from .rules import pin_ring_size_gate
+from .rules import fusion_ring_size_gate
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -85,7 +85,7 @@ def _plan_uncached(
     if prohibited is None:
         return None
     prohibited_ast, topology, ring_sizes = prohibited
-    if mode is FusionMode.AUDITED_PIN and not pin_ring_size_gate(ring_sizes):
+    if not fusion_ring_size_gate(ring_sizes):
         return None
 
     carbon = _carbon_skeleton(mol, atoms)

@@ -53,10 +53,12 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "SystemLocant": (".model", "SystemLocant"),
     "TypedLocantMap": (".model", "TypedLocantMap"),
     "ParentBondDelta": (".mancude", "ParentBondDelta"),
+    "ParentDerivativeState": (".mancude", "ParentDerivativeState"),
     "compare_actual_parent_to_implied_parent": (
         ".mancude",
         "compare_actual_parent_to_implied_parent",
     ),
+    "parent_derivative_state": (".mancude", "parent_derivative_state"),
     "EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE": (
         ".rules",
         "EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE",
@@ -71,6 +73,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "component_spec_seniority_key": (".rules", "component_spec_seniority_key"),
     "explain_component_comparison": (".rules", "explain_component_comparison"),
     "fusion_mode_allows_planning": (".rules", "fusion_mode_allows_planning"),
+    "fusion_ring_size_gate": (".rules", "fusion_ring_size_gate"),
     "pin_ring_size_gate": (".rules", "pin_ring_size_gate"),
     "BridgedFusionWrapperPlan": (".wrappers", "BridgedFusionWrapperPlan"),
     "FusionSpiroSidePlan": (".wrappers", "FusionSpiroSidePlan"),

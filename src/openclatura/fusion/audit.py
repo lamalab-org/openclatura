@@ -12,12 +12,13 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from ..locants import SystemLocant
+from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule, edges_within_atoms
 from ..polycycle_topology import normalize_edge
 from ..retained_graph_model import merge_parent_bond_classes
 from ..rules import multipliers
 from .cover import audit_component_cover, component_scope
+from .mancude import ParentDerivativeState, compare_actual_parent_to_implied_parent
 from .model import (
     AuditStatus,
     ComponentLocant,
@@ -39,9 +40,9 @@ from .numbering import bond_model_indicated_hydrogen_atoms, indicated_hydrogen_c
 from .rules import (
     component_spec_seniority_key,
     component_variant_identity,
+    fusion_ring_size_gate,
     multiplicative_attachment_key,
     multiplicative_member_order_key,
-    pin_ring_size_gate,
 )
 from .valence import FusionLambdaDescriptor
 
@@ -90,12 +91,13 @@ def audit_fusion_plan(
     lambda_descriptors: tuple[FusionLambdaDescriptor, ...] = (),
     indicated_hydrogens: tuple[SystemLocant, ...] = (),
     charge_operations: tuple[FusionChargeOperation, ...] = (),
+    derivative_state: ParentDerivativeState | None = None,
     rendered_core_name: str | None = None,
 ) -> FusionAuditResult:
     """Independently reconstruct and audit a completed fusion candidate.
 
     ``ABSTAIN`` is reserved for a nomenclatural applicability gate, currently
-    the PIN ring-size and component-policy gates.  A self-inconsistent proof or
+    the universal ring-size and PIN component-policy gates. A self-inconsistent proof or
     graph is a ``MISMATCH``.  Missing registry data and unexpected audit
     failures are reported as ``ERROR`` rather than allowing an unaudited name
     to enter rendering.
@@ -108,14 +110,13 @@ def audit_fusion_plan(
     if not parent_atoms:
         return _error("selected parent graph is empty")
 
-    if mode is FusionMode.AUDITED_PIN:
-        ring_sizes = tuple(face.size for face in numbering.selected_face_model.faces)
-        if not pin_ring_size_gate(ring_sizes):
-            return FusionAuditResult(
-                AuditStatus.ABSTAIN,
-                checks=("pin_ring_size_gate",),
-                errors=("fewer than two rings of size at least five",),
-            )
+    ring_sizes = tuple(face.size for face in numbering.selected_face_model.faces)
+    if not fusion_ring_size_gate(ring_sizes):
+        return FusionAuditResult(
+            AuditStatus.ABSTAIN,
+            checks=("fusion_ring_size_gate",),
+            errors=("fewer than two rings of size at least five",),
+        )
 
     try:
         specs = {match.occurrence_id: _component_spec(registry, match) for match in ast.component_occurrences}
@@ -127,7 +128,7 @@ def audit_fusion_plan(
         if non_pin:
             return FusionAuditResult(
                 AuditStatus.ABSTAIN,
-                checks=("pin_ring_size_gate", "pin_component_policy"),
+                checks=("fusion_ring_size_gate", "pin_component_policy"),
                 errors=(f"component occurrences are not PIN-eligible: {non_pin}",),
             )
 
@@ -136,9 +137,9 @@ def audit_fusion_plan(
         return FusionAuditResult(AuditStatus.ABSTAIN, checks=("component_role_policy",), errors=policy_errors)
 
     errors: list[str] = []
-    checks: list[str] = []
+    checks: list[str] = ["fusion_ring_size_gate"]
     if mode is FusionMode.AUDITED_PIN:
-        checks.extend(("pin_ring_size_gate", "pin_component_policy"))
+        checks.append("pin_component_policy")
     try:
         reconstruction = _reconstruct(ast, specs, mol, errors)
         _audit_nomenclature_selection(ast, specs, errors)
@@ -173,8 +174,13 @@ def audit_fusion_plan(
         _audit_charge_operations(mol, parent_atoms, abstract_parent_graph, numbering, charge_operations, errors)
         checks.append("charge_operations")
 
-        _audit_bond_model(mol, abstract_parent_graph, numbering, bond_model, errors)
+        _audit_bond_model(abstract_parent_graph, bond_model, errors)
         checks.append("parent_bond_model")
+        if derivative_state is None:
+            errors.append("fusion parent has no typed derivative-state proof")
+        else:
+            _audit_derivative_state(mol, parent_atoms, numbering, bond_model, derivative_state, errors)
+        checks.append("parent_derivative_state")
         _audit_indicated_hydrogens(mol, numbering, bond_model, indicated_hydrogens, errors)
         checks.append("indicated_hydrogens")
         _audit_lambda_descriptors(mol, parent_atoms, numbering, lambda_descriptors, errors)
@@ -914,13 +920,7 @@ def _audit_indicated_hydrogens(
         errors.append("fusion indicated-hydrogen citations omit a graph-required site")
 
 
-def _audit_bond_model(
-    mol: Molecule,
-    abstract: FusionGraph,
-    numbering: FusionNumberingProof,
-    model: ParentBondModel,
-    errors: list[str],
-) -> None:
+def _audit_bond_model(abstract: FusionGraph, model: ParentBondModel, errors: list[str]) -> None:
     abstract_edges = frozenset(normalize_edge(*bond.atoms) for bond in abstract.bonds)
     known_edges = frozenset(
         normalize_edge(*edge)
@@ -952,53 +952,85 @@ def _audit_bond_model(
         errors.append("parent bond model has no allowed bonding assignment")
         return
 
-    abstract_by_locant = {locant: atom for atom, locant in numbering.abstract_atom_to_locant}
-    observed_matches = False
-    indicated_hydrogen_atoms = set(
-        indicated_hydrogen_candidate_atoms(
-            mol,
-            dict(numbering.input_locant_maps[0]),
-        )
+
+def _audit_derivative_state(
+    mol: Molecule,
+    parent_atoms: frozenset[int],
+    numbering: FusionNumberingProof,
+    model: ParentBondModel,
+    state: ParentDerivativeState,
+    errors: list[str],
+) -> None:
+    """Verify typed hydro, unsaturation, and oxo operations against the graph."""
+
+    delta = compare_actual_parent_to_implied_parent(
+        mol,
+        parent_atoms,
+        model,
+        externally_unsaturated_atom_ids={operation.parent_atom_id for operation in state.oxo_operations},
     )
-    for input_map_items in numbering.input_locant_maps:
-        input_to_abstract = {
-            input_atom: abstract_by_locant[locant]
-            for input_atom, locant in input_map_items
-            if locant in abstract_by_locant
-        }
-        observed: dict[_Edge, int | None] = {}
-        for bond in mol.bonds.values():
-            if bond.u not in input_to_abstract or bond.v not in input_to_abstract:
-                continue
-            edge = normalize_edge(input_to_abstract[bond.u], input_to_abstract[bond.v])
-            aromatic = mol.atoms[bond.u].is_aromatic and mol.atoms[bond.v].is_aromatic
-            observed[edge] = None if aromatic and edge in model.pi_eligible_edges else bond.order
-        for assignment in model.allowed_kekule_assignments:
-            allowed = {normalize_edge(*edge): order for edge, order in assignment.orders}
-            if set(observed) != abstract_edges:
-                continue
-            abstract_to_input = {abstract: input_atom for input_atom, abstract in input_to_abstract.items()}
-            compatible = True
-            for edge, order in observed.items():
-                if order is None or allowed[edge] == order:
-                    continue
-                if (
-                    order != 1
-                    or allowed[edge] != 2
-                    or not any(
-                        atom in abstract_to_input and abstract_to_input[atom] in indicated_hydrogen_atoms
-                        for atom in edge
-                    )
-                ):
-                    compatible = False
-                    break
-            if compatible:
-                observed_matches = True
-                break
-        if observed_matches:
-            break
-    if not observed_matches:
-        errors.append("selected input bond orders are not allowed by the parent bond model")
+    if delta is None or not delta.compatible:
+        errors.append("observed parent bond state is incompatible with the parent hydride")
+        return
+    if state.bond_delta != delta:
+        errors.append("typed derivative state does not carry the selected parent bond delta")
+
+    locants = {atom: str(locant) for atom, locant in numbering.input_locant_maps[0]}
+    expected_hydrogenated_atoms = sorted(
+        delta.hydrogenated_atom_ids,
+        key=lambda atom: system_locant_sort_key(locants[atom]),
+    )
+    expected_hydrogenated_bonds = tuple(sorted(mol.get_bond(*edge).idx for edge in delta.hydrogenated_edges))
+    if expected_hydrogenated_atoms:
+        if len(state.hydro_operations) != 1:
+            errors.append("hydrogenated parent edges require one typed hydro operation")
+        else:
+            operation = state.hydro_operations[0]
+            if (
+                operation.operation_kind != "additive_hydrogen"
+                or operation.atom_ids != tuple(expected_hydrogenated_atoms)
+                or operation.locants != tuple(locants[atom] for atom in expected_hydrogenated_atoms)
+                or operation.bond_ids != expected_hydrogenated_bonds
+            ):
+                errors.append("typed hydro operation does not exactly represent hydrogenated parent edges")
+    elif state.hydro_operations:
+        errors.append("typed hydro operations exist without hydrogenated parent edges")
+
+    expected_unsaturation = {
+        (
+            bond_id,
+            mol.bonds[bond_id].order,
+            frozenset((mol.bonds[bond_id].u, mol.bonds[bond_id].v)),
+        )
+        for bond_id in delta.additional_multiple_bond_ids
+    }
+    observed_unsaturation = {
+        (operation.bond_id, operation.bond_order, frozenset(operation.atom_ids))
+        for operation in state.unsaturation_operations
+    }
+    if observed_unsaturation != expected_unsaturation:
+        errors.append("typed unsaturation operations do not represent the parent bond delta")
+    if any(
+        operation.locants != tuple(locants[atom] for atom in operation.atom_ids)
+        for operation in state.unsaturation_operations
+    ):
+        errors.append("typed unsaturation operation locants do not match completed-system numbering")
+
+    expected_oxo = {
+        (parent_atom, neighbor, bond.idx, locants[parent_atom])
+        for parent_atom in parent_atoms
+        for neighbor in mol.get_neighbors(parent_atom)
+        if neighbor not in parent_atoms
+        and mol.atoms[neighbor].symbol == "O"
+        and (bond := mol.get_bond(parent_atom, neighbor)) is not None
+        and bond.order == 2
+    }
+    observed_oxo = {
+        (operation.parent_atom_id, operation.oxygen_atom_id, operation.bond_id, operation.locant)
+        for operation in state.oxo_operations
+    }
+    if observed_oxo != expected_oxo:
+        errors.append("typed oxo operations do not represent every exocyclic parent oxo group")
 
 
 def _error(message: str, *, checks: Iterable[str] = ()) -> FusionAuditResult:

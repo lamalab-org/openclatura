@@ -91,6 +91,7 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
                 role=operation.operation_kind,
                 term="indicated hydrogen" if operation.operation_kind == "indicated_hydrogen" else "hydro",
                 atom_ids=set(operation.atom_ids),
+                bond_ids=set(operation.bond_ids),
                 locants=tuple(str(locant) for locant in operation.locants),
                 emitted_tokens=_hydro_operation_tokens(operation),
             )
@@ -573,6 +574,7 @@ def _parent_token_variants(token: str) -> tuple[str, ...]:
 
 def _hydro_operation_tokens(operation) -> tuple[NameTokenBinding, ...]:
     atoms = set(operation.atom_ids)
+    bonds = set(operation.bond_ids)
     locants = tuple(str(locant) for locant in operation.locants)
     tokens: list[NameTokenBinding] = []
     if locants:
@@ -584,6 +586,7 @@ def _hydro_operation_tokens(operation) -> tuple[NameTokenBinding, ...]:
                 grammar_role=operation.operation_kind,
                 binding_key=f"hydro:{operation.operation_kind}",
                 atom_ids=set(atoms),
+                bond_ids=set(bonds),
                 locants=locants,
             )
         )
@@ -596,6 +599,7 @@ def _hydro_operation_tokens(operation) -> tuple[NameTokenBinding, ...]:
             grammar_role=operation.operation_kind,
             binding_key=f"hydro:{operation.operation_kind}",
             atom_ids=set(atoms),
+            bond_ids=set(bonds),
             locants=locants,
         )
     )
