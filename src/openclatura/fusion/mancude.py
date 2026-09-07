@@ -109,7 +109,8 @@ def _nitrogen_composition_parent_model(
 ) -> ParentBondModel:
     """Resolve neutral fusion-N valence and cited N-H before the bond delta."""
 
-    sites = frozenset(
+    saturated_h_sites = saturated_nitrogen_hydrogen_sites(mol, atoms, indicated_hydrogen_atom_ids)
+    sites = saturated_h_sites | frozenset(
         atom
         for atom in atoms
         if mol.atoms[atom].symbol == "N"
@@ -126,6 +127,62 @@ def _nitrogen_composition_parent_model(
     if not sites or not any(sites.intersection(edge) for edge in model.pi_eligible_edges | model.required_double_bonds):
         return model
     return _single_site_parent_model(model, sites)
+
+
+def saturated_nitrogen_hydrogen_sites(
+    mol: Molecule,
+    atoms: frozenset[int],
+    indicated_hydrogen_atom_ids: set[int] | frozenset[int],
+) -> frozenset[int]:
+    """Prove cited N-H sites in a completely saturated C/N parent.
+
+    Indicated H fixes the nitrogen's parent valence; it does not hydrogenate
+    an adjacent carbon. Resolve all such sites together before assigning pi
+    bonds, including cationic N whose extra proton belongs to the charge op.
+    """
+
+    sites = frozenset(indicated_hydrogen_atom_ids)
+    if len(sites) < 2 or not sites <= atoms or any(mol.atoms[atom].symbol != "N" for atom in sites):
+        return frozenset()
+    for atom_id in atoms:
+        atom = mol.atoms[atom_id]
+        if atom.is_aromatic or (atom.symbol, atom.charge) not in {("C", 0), ("N", 0), ("N", 1)}:
+            return frozenset()
+        neighbors = mol.get_neighbors(atom_id)
+        if any(mol.get_bond(atom_id, neighbor).order != 1 for neighbor in neighbors):
+            return frozenset()
+        valence = 4 if atom.symbol == "C" else 3 + atom.charge
+        if atom.total_h_count != valence - len(neighbors):
+            return frozenset()
+    return sites
+
+
+def has_complete_saturated_hydrogenation(
+    mol: Molecule,
+    atoms: frozenset[int],
+    state: ParentDerivativeState,
+) -> bool:
+    """Prove full hydrogenation, including N-H owned by hydro rather than H.
+
+    Every parent atom must belong to exactly one hydrogenated pi pair. This
+    excludes assignments with uncovered carbon sites or intrinsic parent H.
+    The ordinary derivative audit still binds each pair to its typed operation.
+    """
+
+    nitrogens = frozenset(atom for atom in atoms if mol.atoms[atom].symbol == "N")
+    if not saturated_nitrogen_hydrogen_sites(mol, atoms, nitrogens):
+        return False
+    if state.oxo_operations or state.unsaturation_operations or not state.hydro_operations:
+        return False
+    edges = frozenset(state.bond_delta.hydrogenated_edges)
+    return (
+        state.bond_delta.compatible
+        and not state.added_hydrogen_operations
+        and not state.intrinsic_hydro_operations
+        and len(edges) * 2 == len(atoms)
+        and state.bond_delta.hydrogenated_atom_ids == atoms
+        and all(order == 1 or (order == 2 and edge in edges) for edge, order in state.bond_delta.assignment.orders)
+    )
 
 
 def _five_membered_single_nitrogen(mol: Molecule, atoms: frozenset[int], atom: int) -> bool:

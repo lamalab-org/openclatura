@@ -24,7 +24,12 @@ from .indicated_hydrogen import (
     intrinsic_carbon_parent_model,
 )
 from .layout import LayoutSearchBudgetExceeded, preferred_intrinsic_layouts
-from .mancude import indicated_hydrogen_parent_bond_model, parent_derivative_state
+from .mancude import (
+    has_complete_saturated_hydrogenation,
+    indicated_hydrogen_parent_bond_model,
+    parent_derivative_state,
+    saturated_nitrogen_hydrogen_sites,
+)
 from .model import (
     AuditStatus,
     FusionAuditFailed,
@@ -196,6 +201,23 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
             dict(numbering.input_locant_maps[0]),
             indicated_hydrogen_atom_ids=indicated_h_atoms,
         )
+        if (
+            derivative_state is not None
+            and indicated_h_atoms
+            and len(atoms) % 2 == 0
+            and not any(spec.template.default_indicated_h for spec in specs.values())
+            and (
+                len(atoms - indicated_h_atoms - derivative_state.bond_delta.hydrogenated_atom_ids) > 1
+                or any(mol.atoms[atom].symbol == "N" for atom in derivative_state.bond_delta.hydrogenated_atom_ids)
+            )
+            and saturated_nitrogen_hydrogen_sites(mol, atoms, {atom for atom in atoms if mol.atoms[atom].symbol == "N"})
+        ):
+            # Multiple saturated N-H citations can strand carbon positions.
+            # A complete pi-pair cover instead owns all H through hydro ops.
+            complete_state = parent_derivative_state(mol, atoms, bond_model, input_locants)
+            if complete_state is not None and has_complete_saturated_hydrogenation(mol, atoms, complete_state):
+                derivative_state = complete_state
+                indicated_h = ()
     except MancudeSearchBudgetExceeded as exc:
         return FusionUnsupported("derivative parent assignment search budget exhausted", (str(exc),))
     if derivative_state is None:

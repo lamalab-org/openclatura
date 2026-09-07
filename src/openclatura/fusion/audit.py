@@ -28,7 +28,9 @@ from .indicated_hydrogen import (
 from .mancude import (
     ParentDerivativeState,
     compare_actual_parent_to_implied_parent,
+    has_complete_saturated_hydrogenation,
     indicated_hydrogen_parent_bond_model,
+    saturated_nitrogen_hydrogen_sites,
 )
 from .model import (
     AuditStatus,
@@ -292,7 +294,16 @@ def audit_fusion_plan(
                 errors,
             )
         checks.append("parent_derivative_state")
-        _audit_indicated_hydrogens(mol, numbering, bond_model, indicated_hydrogens, errors, intrinsic_c_h)
+        hydro_owned_h = (
+            parent_atoms
+            if not indicated_hydrogens
+            and derivative_state is not None
+            and has_complete_saturated_hydrogenation(mol, parent_atoms, derivative_state)
+            else frozenset()
+        )
+        _audit_indicated_hydrogens(
+            mol, numbering, bond_model, indicated_hydrogens, errors, intrinsic_c_h, hydro_owned_h
+        )
         checks.append("indicated_hydrogens")
         _audit_lambda_descriptors(mol, parent_atoms, numbering, lambda_descriptors, errors)
         checks.append("lambda_descriptors")
@@ -512,7 +523,7 @@ def _audited_pin_composition_errors(
         mol, ast, specs, numbering, indicated_hydrogens, derivative_state
     ):
         return ()
-    if _has_complete_neutral_hydrogenation(mol, numbering, indicated_hydrogens, derivative_state):
+    if _has_complete_hydrogenation(mol, numbering, indicated_hydrogens, derivative_state):
         return ()
     if intrinsic_carbon_composition:
         return ()
@@ -626,7 +637,7 @@ def _has_separate_nitrogen_h_and_carbon_derivatives(
     )
 
 
-def _has_complete_neutral_hydrogenation(
+def _has_complete_hydrogenation(
     mol: Molecule,
     numbering: FusionNumberingProof,
     indicated_hydrogens: tuple[SystemLocant, ...],
@@ -634,18 +645,35 @@ def _has_complete_neutral_hydrogenation(
 ) -> bool:
     """Complete hydrogenation belongs to the whole parent, not one component.
 
-    Neutral fusion nitrogen is already single-bonded in the parent model.
+    Fusion nitrogen and proved saturated N-H sites are single in the model.
     Only the remaining parent double bonds contribute hydrogenation pairs;
     the derivative audit independently checks their exact locants and bonds.
     """
 
-    if indicated_hydrogens or state.unsaturation_operations or state.oxo_operations or not state.hydro_operations:
+    if state.unsaturation_operations or state.oxo_operations or not state.hydro_operations:
         return False
-    atoms = {atom for atom, _ in numbering.input_locant_maps[0]}
+    atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
+    atoms = frozenset(atom_by_locant.values())
     hydrogenated = frozenset(state.bond_delta.hydrogenated_edges)
+    if indicated_hydrogens:
+        sites = saturated_nitrogen_hydrogen_sites(
+            mol, atoms, {atom_by_locant.get(locant) for locant in indicated_hydrogens}
+        )
+        if not sites or any(mol.atoms[atom].symbol == "N" and atom not in sites for atom in atoms):
+            return False
+        covered = {atom for edge in hydrogenated for atom in edge}
+        # An odd-atom mancude parent can have one residual carbon H site.
+        # Additional uncovered positions need explicit typed H operations.
+        if len(covered) != 2 * len(hydrogenated) or len(atoms - sites - covered) > 1 or sites & covered:
+            return False
+        if any(order != 1 for edge, order in state.bond_delta.assignment.orders if sites.intersection(edge)):
+            return False
+    elif not has_complete_saturated_hydrogenation(mol, atoms, state) and not all(
+        mol.atoms[atom].charge == 0 and mol.atoms[atom].symbol in {"C", "N", "O", "S"} for atom in atoms
+    ):
+        return False
     return (
-        all(mol.atoms[atom].charge == 0 and mol.atoms[atom].symbol in {"C", "N", "O", "S"} for atom in atoms)
-        and not any(
+        not any(
             neighbor not in atoms and mol.get_bond(atom, neighbor).order > 1
             for atom in atoms
             for neighbor in mol.get_neighbors(atom)
@@ -1293,6 +1321,7 @@ def _audit_indicated_hydrogens(
     cited: tuple[SystemLocant, ...],
     errors: list[str],
     intrinsic_carbon_atoms: frozenset[int] = frozenset(),
+    hydro_owned_atoms: frozenset[int] = frozenset(),
 ) -> None:
     """Audit fusion indicated-H citations against graph and bond-model state."""
 
@@ -1311,7 +1340,7 @@ def _audit_indicated_hydrogens(
     required = {atom for atom in candidates if mol.atoms[atom].symbol != "C"}
     required.update(bond_model_indicated_hydrogen_atoms(mol, model, candidates))
     required.update(intrinsic_carbon_atoms)
-    if not required <= cited_atoms:
+    if not required <= cited_atoms | hydro_owned_atoms:
         errors.append("fusion indicated-hydrogen citations omit a graph-required site")
 
 
