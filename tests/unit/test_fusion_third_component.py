@@ -48,6 +48,18 @@ def _cactus_third_component_graph() -> Molecule:
     return mol
 
 
+def _cactus_with_pendant_face() -> Molecule:
+    """Extend the cactus by a pentagon outside either cyclic cover block."""
+
+    mol = _cactus_third_component_graph()
+    for atom_id in (15, 16, 17):
+        mol.add_atom("C", idx=atom_id, is_aromatic=True)
+    next_bond = max(mol.bonds) + 1
+    for offset, (left, right) in enumerate(((13, 15), (15, 16), (16, 17), (17, 14))):
+        mol.add_bond(left, right, idx=next_bond + offset)
+    return mol
+
+
 def test_cyclic_component_cover_becomes_audited_skeletal_replacement_parent():
     mol = read_smiles(THIRD_COMPONENT_PARENT)
 
@@ -94,6 +106,23 @@ def test_cactus_component_cover_uses_the_same_replacement_parent_route():
     assert plan is not None
     assert plan.cover_topology == "cactus"
     assert plan.ring_sizes == (5, 5, 5, 5, 5)
+    assert plan.parent.is_skeletal_replacement_fusion
+    assert plan.parent.audit_ok
+    assert len(plan.prohibited_citation.citation_plan.cycle_closing_join_indices) == 2
+
+
+def test_cactus_cover_with_a_pendant_component_uses_the_same_proof_route():
+    mol = _cactus_with_pendant_face()
+
+    plan = plan_third_component_fusion_parent(
+        mol,
+        mol.atoms,
+        mode=FusionMode.GENERAL,
+    )
+
+    assert plan is not None
+    assert plan.cover_topology == "cactus"
+    assert plan.ring_sizes == (5, 5, 5, 5, 5, 5)
     assert plan.parent.is_skeletal_replacement_fusion
     assert plan.parent.audit_ok
     assert len(plan.prohibited_citation.citation_plan.cycle_closing_join_indices) == 2

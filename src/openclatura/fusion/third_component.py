@@ -176,6 +176,10 @@ def _prohibited_pairwise_citation(
             registry,
             cover_kinds=("multiparent",),
             join_kinds=("ortho", "ortho_peri", "higher_order"),
+            # This cyclic AST is an applicability certificate and is never
+            # rendered. Parser interoperability limits apply only to emitted
+            # fusion citations; exact cover/interface search budgets remain.
+            enforce_interoperability_limits=False,
         )
     except FusionDescriptorError:
         return None
