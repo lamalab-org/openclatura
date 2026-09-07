@@ -4464,7 +4464,7 @@ def test_pyopsin_regression_names_preserve_positive_nitrogen_charge():
         "OC1C[NH2+]C1C([O-])=O": "3-hydroxyazetidinium-2-carboxylate",
         "C[NH+](C)C(C#C)C([O-])=O": "2-(dimethylammonio)but-3-ynoate",
         "[O-]C(=O)C1[NH2+]CC2CC12": "3-azoniabicyclo[3.1.0]hexane-2-carboxylate",
-        "CC(C)(C)/C=C/C(=O)N1CCC[C@@H]2[C@H]1C[NH2+]C2": "(2E)-1-((1S,6S)-2,8-diazabicyclo[4.3.0]nonan-8-ium-2-yl)-4,4-dimethylpent-2-en-1-one",
+        "CC(C)(C)/C=C/C(=O)N1CCC[C@@H]2[C@H]1C[NH2+]C2": "(2E)-1-((4aS,7aS)-2,3,4,4a,7,7a-hexahydro-6H-pyrrolo[3,4-b]pyridin-6-ium-1-yl)-4,4-dimethylpent-2-en-1-one",
         "C[C@H]1C[NH+](CCN1c2[nH]c3ccccc3n2)C": "2-((2S)-2,4-dimethylpiperazin-4-ium-1-yl)-1H-benzimidazole",
         "Cc1cn2c(cccc2[nH+]1)c3cccc(c3F)C[NH+]4CCCCC4": "5-(2-fluoro-3-(piperidinium-1-ylmethyl)phenyl)-2-methylimidazo[1,2-a]pyridin-1-ium",
         "Cc1cn2c(cccc2[nH+]1)c3ccc(cc3F)N4CCCCC4": "5-(2-fluoro-4-(piperidin-1-yl)phenyl)-2-methylimidazo[1,2-a]pyridin-1-ium",
@@ -4879,7 +4879,7 @@ def test_pyopsin_regression_names_preserve_retained_ring_cations():
     cases = {
         "CC(=C(C)C(=O)NCCc1[nH+]ccn1C)C": "2,3-dimethyl-N-(2-(1-methyl-1H-imidazol-3-ium-2-yl)ethyl)but-2-enamide",
         "CC[C@@H](C(=O)CC)Oc1[nH]c(c[nH+]1)C(=O)OC": "methyl 2-(((3S)-4-oxohexan-3-yl)oxy)-1H-imidazol-3-ium-5-carboxylate",
-        "Cn1c(ccn1)C[NH+]2CCc3c(cc[nH]c3=O)C2": "8-((1-methyl-1H-pyrazol-5-yl)methyl)-3,8-diazabicyclo[4.4.0]deca-1(6),4-dien-8-ium-2-one",
+        "Cn1c(ccn1)C[NH+]2CCc3c(cc[nH]c3=O)C2": "2-((1-methyl-1H-pyrazol-5-yl)methyl)-3,4-dihydro-2H,6H-pyrido[4,3-c]pyridin-2-ium-5-one",
     }
 
     for smiles, expected in cases.items():

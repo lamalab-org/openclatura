@@ -1107,26 +1107,24 @@ def _ordered_renderer_native_token_spans(
 ) -> list[tuple[int, int, int, NameTokenBinding]]:
     """Place explicitly ordered renderer tokens once within each owning binding.
 
-    ``render_order`` is local renderer provenance, not a global order shared by
-    unrelated parent, suffix, and substituent operations.  Keeping each
-    sequence scoped to its binding prevents repeated locants in one operation
-    from consuming identically spelled tokens emitted by another operation.
+    ``render_order`` is scoped to one renderer stream, identified by assembly
+    stage and token source. This preserves order across several bindings
+    emitted by the same renderer without allowing unrelated operations to
+    consume identically spelled tokens.
     """
 
-    ordered_groups: list[tuple[int, list[tuple[int, int, NameTokenBinding]]]] = []
+    ordered_groups: dict[tuple[str, str], list[tuple[int, int, int, NameTokenBinding]]] = {}
     for binding_idx, binding in enumerate(bindings):
-        ordered = [
-            (token.render_order, token_idx, token)
-            for token_idx, token in enumerate(binding.emitted_tokens)
-            if token.render_order is not None
-        ]
-        if ordered:
-            ordered_groups.append((binding_idx, sorted(ordered, key=lambda item: (item[0], item[1]))))
+        for token_idx, token in enumerate(binding.emitted_tokens):
+            if token.render_order is None:
+                continue
+            stream_key = (binding.stage, token.source)
+            ordered_groups.setdefault(stream_key, []).append((token.render_order, binding_idx, token_idx, token))
     spans: list[tuple[int, int, int, NameTokenBinding]] = []
-    for binding_idx, ordered_tokens in ordered_groups:
+    for ordered_tokens in ordered_groups.values():
         cursor = 0
         placed: list[tuple[int, int, int, NameTokenBinding]] = []
-        for _render_order, _token_idx, token_binding in ordered_tokens:
+        for _render_order, binding_idx, _token_idx, token_binding in sorted(ordered_tokens):
             token = token_binding.text.strip().lower()
             if not token:
                 continue

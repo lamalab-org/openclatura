@@ -612,6 +612,7 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
 
             fusion_paths = _confirmed_fusion_numbering_paths(mol, comp_nodes)
             if fusion_paths:
+                fusion_xyz = _confirmed_fusion_bicycle_descriptor(mol, comp_nodes) if E == V + 1 else (0, 0, 0)
                 # The cached planner proof owns the component decomposition,
                 # completed numbering, and reconstruction. Descriptor engines
                 # are only fallbacks after fusion has abstained.
@@ -620,6 +621,9 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                         atoms=comp_nodes,
                         is_bicycle=E == V + 1,
                         is_polycycle=E >= V + 2,
+                        x=fusion_xyz[0],
+                        y=fusion_xyz[1],
+                        z=fusion_xyz[2],
                         paths=fusion_paths,
                     )
                 )
@@ -766,6 +770,23 @@ def _confirmed_fusion_numbering_paths(mol: Molecule, atoms: set[int]) -> list[li
         sorted(locant_map, key=lambda atom: retained_locant_sort_key(str(locant_map[atom])))
         for locant_map in locant_maps
     ]
+
+
+def _confirmed_fusion_bicycle_descriptor(mol: Molecule, atoms: set[int]) -> tuple[int, int, int]:
+    """Derive rank-two explanatory topology from the cached fusion face proof."""
+
+    from .fusion.context import current_fusion_mode
+    from .fusion.model import FusionConfirmed
+    from .fusion.planner import plan_fusion_parent
+
+    result = plan_fusion_parent(mol, atoms, mode=current_fusion_mode())
+    if not isinstance(result, FusionConfirmed):
+        return (0, 0, 0)
+    faces = result.plan.numbering.selected_face_model.faces
+    if len(faces) != 2:
+        return (0, 0, 0)
+    longer, shorter = sorted((face.size - 2 for face in faces), reverse=True)
+    return longer, shorter, 0
 
 
 def _ring_block(edges: set[tuple[int, int]] | frozenset[tuple[int, int]]) -> dict:
