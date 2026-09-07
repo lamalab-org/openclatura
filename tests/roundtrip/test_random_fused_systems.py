@@ -1,4 +1,4 @@
-"""Strict 100-case fusion stress suite; run with -m 'slow and opsin'.
+"""Strict two-seed fusion stress suite; run with -m 'slow and opsin'.
 
 Inputs are generated from graphs, never selected according to naming success.
 Failures expose coverage gaps rather than being xfailed or silently discarded.
@@ -17,6 +17,7 @@ from openclatura import opsin_available
 from roundtrip.random_fusion_helpers import random_fusion_cases, validate_case
 
 CASES = random_fusion_cases()
+ADDITIONAL_CASES = random_fusion_cases(count=30, seed=20260908)
 WORKER = """
 import json, sys
 from rdkit import Chem
@@ -47,9 +48,21 @@ def test_random_fusion_generator_is_neutral_unique_and_reproducible():
         validate_case(case)
 
 
+def test_second_seed_adds_independent_neutral_graphs():
+    assert ADDITIONAL_CASES == random_fusion_cases(count=30, seed=20260908)
+    assert len({case.smiles for case in ADDITIONAL_CASES}) == 30
+    assert not {case.smiles for case in CASES}.intersection(case.smiles for case in ADDITIONAL_CASES)
+    for case in ADDITIONAL_CASES:
+        validate_case(case)
+
+
 @pytest.mark.slow
 @pytest.mark.opsin
-@pytest.mark.parametrize("case", CASES, ids=lambda case: case.id)
+@pytest.mark.parametrize(
+    "case",
+    [*CASES, *(pytest.param(case, id=f"seed-20260908-{case.id}") for case in ADDITIONAL_CASES)],
+    ids=lambda case: case.id,
+)
 def test_random_fused_system_uses_fusion_and_roundtrips(case, record_property):
     if not opsin_available():
         pytest.skip("OPSIN requires py2opsin and Java")
