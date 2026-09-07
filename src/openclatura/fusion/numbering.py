@@ -14,7 +14,8 @@ from ..molecule import Molecule
 from ..polycycle_topology import normalize_edge
 from ..retained_graph_model import RetainedGraphTemplate
 from .config import fusion_nomenclature_config
-from .faces import BoundedFaceModel
+from .faces import BoundedFaceModel, typed_face_model
+from .layout import preferred_intrinsic_layouts
 from .model import (
     BondAssignment,
     Face,
@@ -154,38 +155,23 @@ def completed_system_numbering_selection(
 
 
 def _graph_numbering_candidates(mol: Molecule, faces: BoundedFaceModel) -> tuple[CompletedNumbering, ...]:
-    boundary = faces.outer_boundary.atoms
-    if set(boundary) != set(faces.atom_ids):
+    """Derive peripheral maps with the same orientation rules as the planner.
+
+    No caller-owned layout indices are exposed on this compatibility path.
+    Unsupported layouts abstain; layout search budget exhaustion propagates
+    rather than falling back to an unproved perimeter orientation.
+    """
+
+    if faces.interior_atoms or faces.cycle_rank < 2:
         return ()
-    fusion_atoms = _fusion_atoms(faces)
-    candidates: list[CompletedNumbering] = []
-    for oriented in _cycle_orientations(boundary):
-        locant_map = _number_completed_system(mol, faces, oriented, fusion_atoms)
-        if locant_map is None:
-            continue
-        candidates.append(
-            CompletedNumbering(
-                perimeter=oriented,
-                atom_to_locant=_ordered_locant_items(locant_map),
-                score=_numbering_score(mol, locant_map, fusion_atoms),
-            )
-        )
-    if not candidates:
+    face_model = typed_face_model(mol, faces)
+    layouts = preferred_intrinsic_layouts(face_model)
+    if not layouts:
         return ()
-    # A fused perimeter starts at the first nonfusion atom after a fusion
-    # junction and traverses the uninterrupted nonfusion run before assigning
-    # the first lettered junction locant. Without a drawing-derived seed this
-    # intrinsic run length is the graph-invariant orientation criterion.
-    longest_initial_run = max(_first_fusion_base(candidate) for candidate in candidates)
-    candidates = [candidate for candidate in candidates if _first_fusion_base(candidate) == longest_initial_run]
-    best = min(candidate.score for candidate in candidates)
-    unique: dict[tuple[tuple[int, str], ...], CompletedNumbering] = {}
-    for candidate in candidates:
-        if candidate.score != best:
-            continue
-        key = tuple(sorted((atom, str(locant)) for atom, locant in candidate.atom_to_locant))
-        unique[key] = candidate
-    return tuple(unique.values())
+    selection = completed_system_numbering_selection(mol, faces, face_model=face_model, layouts=layouts)
+    return tuple(
+        replace(candidate, layout_index=None, start_face_id=None, start_atom=None) for candidate in selection.accepted
+    )
 
 
 def _numbering_from_layout(
@@ -455,14 +441,6 @@ def observed_parent_matches_bond_model(mol: Molecule, model: ParentBondModel) ->
     return any(dict(assignment.orders) == observed for assignment in model.allowed_kekule_assignments)
 
 
-def _cycle_orientations(cycle: tuple[int, ...]) -> tuple[tuple[int, ...], ...]:
-    variants = []
-    for direction in (cycle, tuple(reversed(cycle))):
-        for offset in range(len(direction)):
-            variants.append(direction[offset:] + direction[:offset])
-    return tuple(dict.fromkeys(variants))
-
-
 def _number_perimeter(
     mol: Molecule,
     perimeter: tuple[int, ...],
@@ -663,10 +641,6 @@ def _is_indicated_hydrogen_candidate(
 
 def _locant_key(locant: SystemLocant) -> tuple[int, str, int]:
     return locant.base, locant.fusion_suffix, locant.interior_distance or 0
-
-
-def _first_fusion_base(numbering: CompletedNumbering) -> int:
-    return min(locant.base for _, locant in numbering.atom_to_locant if locant.fusion_suffix)
 
 
 def _maximum_matchings(

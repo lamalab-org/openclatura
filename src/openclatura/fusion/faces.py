@@ -8,7 +8,7 @@ for the selected molecular subgraph.
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
 from itertools import combinations
@@ -25,6 +25,7 @@ from ..polycycle_topology import (
     normalize_edge,
 )
 from .config import fusion_nomenclature_config
+from .model import Face, FaceModel
 
 _CONFIG = fusion_nomenclature_config()
 
@@ -98,6 +99,32 @@ class BoundedFaceModel:
     @property
     def fusion_atoms(self) -> frozenset[int]:
         return frozenset(atom for atom, face_ids in self.face_membership_by_atom if len(face_ids) > 1)
+
+
+def typed_face_model(mol: Molecule, bounded: BoundedFaceModel) -> FaceModel:
+    """Translate a bounded-face proof into the bond-ID model used by layouts."""
+
+    owners: dict[int, list[int]] = defaultdict(list)
+    faces = []
+    for face_id, cycle in enumerate(bounded.faces):
+        edge_cycle = tuple(mol.get_bond(left, right).idx for left, right in cycle_edges(cycle.atoms))
+        faces.append(Face(face_id, cycle.atoms, edge_cycle, len(cycle.atoms)))
+        for edge_id in edge_cycle:
+            owners[edge_id].append(face_id)
+    perimeter = frozenset(edge for edge, face_ids in owners.items() if len(face_ids) == 1)
+    fusion = frozenset(edge for edge, face_ids in owners.items() if len(face_ids) == 2)
+    adjacency = []
+    for edge, face_ids in sorted(owners.items()):
+        if len(face_ids) == 2:
+            adjacency.append((face_ids[0], face_ids[1], edge))
+    return FaceModel(
+        faces=tuple(faces),
+        edge_to_faces=tuple(sorted((edge, tuple(sorted(face_ids))) for edge, face_ids in owners.items())),
+        perimeter_edges=perimeter,
+        fusion_edges=fusion,
+        outer_boundary=bounded.outer_boundary.atoms,
+        face_adjacency=tuple(sorted(adjacency)),
+    )
 
 
 @dataclass(slots=True)
