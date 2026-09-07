@@ -511,11 +511,8 @@ def parent_stem_and_terminal(parts: AssemblyParts) -> tuple[str, str]:
 
 
 def apply_replacement_prefix(stem_str: str, a_prefix_str: str) -> str:
-    if a_prefix_str:
-        if elision.is_vowel_start(stem_str) and a_prefix_str.endswith("a"):
-            a_prefix_str = a_prefix_str[:-1]
-        stem_str = a_prefix_str + stem_str
-    return stem_str
+    """Join skeletal replacement prefixes without vowel elision (P-16.7.2(b))."""
+    return a_prefix_str + stem_str
 
 
 def format_unsaturations(parts: AssemblyParts, stem_str: str, *, omit_locants: bool = False) -> tuple[str, str]:
