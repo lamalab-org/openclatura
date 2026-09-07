@@ -371,6 +371,7 @@ def render_fusion_name_parts(
                 _render_descriptor(
                     descriptor,
                     omit_attached_locants=len(descriptors) == 1
+                    and not node.children
                     and _omit_attached_locants(registry, spec.key, descriptor.kind),
                 )
                 for descriptor in descriptors
@@ -1134,11 +1135,9 @@ def _build_candidate(
         if join_data is None:
             return None
         join, side_rank[child] = join_data
-        if (
-            cover_kind == "multiparent"
-            and topology.order_by_occurrence[child] > 1
-            and "higher_order" in supported_joins
-        ):
+        if topology.order_by_occurrence[child] > 1:
+            if "higher_order" not in supported_joins:
+                return None
             join = replace(
                 join,
                 interface=replace(
@@ -1186,6 +1185,9 @@ def _build_candidate(
 
     child_order = _ordered_children(topology.parent_by_child, specs, primary_joins, side_rank)
     prime_depths, groups = _multiplicative_groups(child_order, specs, primary_joins)
+    for occurrence, order in topology.order_by_occurrence.items():
+        if order > 1:
+            prime_depths[occurrence] = max(prime_depths.get(occurrence, 0), order - 1)
     if len(topology.roots) > 1:
         groups = ()
         prime_depths.update({root: depth for depth, root in enumerate(topology.roots)})

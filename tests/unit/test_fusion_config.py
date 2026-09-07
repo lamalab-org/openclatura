@@ -15,7 +15,7 @@ def test_checked_in_fusion_configuration_is_complete_and_data_backed():
     assert config.graph_source == "retained_graph_templates"
     assert config.rules.planner_tier == "bounded-polycomponent-v3"
     assert config.rules.support.cover_kinds == ("tree",)
-    assert config.rules.support.join_kinds == ("ortho", "ortho_peri")
+    assert config.rules.support.join_kinds == ("ortho", "ortho_peri", "higher_order")
     assert config.rules.support.multiparent_parents
     assert config.rules.support.maximum_tree_component_occurrences == 3
     assert config.rules.support.maximum_multiparent_component_occurrences == 3

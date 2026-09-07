@@ -159,15 +159,18 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         bond_model = parent_bond_model(graph)
     except MancudeSearchBudgetExceeded as exc:
         return FusionUnsupported("mancude assignment search budget exhausted", (str(exc),))
+    indicated_h = _cited_indicated_hydrogens(mol, ast, registry, numbering, bond_model)
+    input_atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
+    indicated_h_atoms = {input_atom_by_locant[locant] for locant in indicated_h}
     derivative_state = parent_derivative_state(
         mol,
         atoms,
         bond_model,
         dict(numbering.input_locant_maps[0]),
+        indicated_hydrogen_atom_ids=indicated_h_atoms,
     )
     if derivative_state is None:
         return FusionUnsupported("observed bond state cannot be expressed from the fused parent hydride")
-    indicated_h = _cited_indicated_hydrogens(mol, ast, registry, numbering, bond_model)
     if SUPPORT.maximum_indicated_hydrogens is not None and len(indicated_h) > SUPPORT.maximum_indicated_hydrogens:
         return FusionUnsupported("multiple indicated-hydrogen fusion parents require a later additive tier")
     rendered_parts = render_fusion_name_parts(ast, registry, mol=mol)

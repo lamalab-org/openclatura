@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 
 import pytest
 
+from openclatura.chains import find_ring_systems
 from openclatura.fusion.audit import audit_fusion_plan
 from openclatura.fusion.faces import select_bounded_face_model
 from openclatura.fusion.mancude import parent_derivative_state
@@ -481,6 +482,42 @@ def test_audit_rejects_a_wrong_parent_side_letter():
 
     assert result.status is AuditStatus.MISMATCH
     assert any("host sides disagree" in error for error in result.errors)
+
+
+def test_audit_rejects_wrong_higher_order_intermediate_prime_depths():
+    mol = read_smiles("C=C1C(=O)O[C@H]2[C@H]1CCC(C)=C1CCC(=O)O[C@]12C")
+    parent_atoms = find_ring_systems(mol)[0].atoms
+    planned = plan_fusion_parent(mol, parent_atoms, mode=FusionMode.AUDITED_PIN)
+    assert isinstance(planned, FusionConfirmed)
+    plan = planned.plan
+    index = next(index for index, join in enumerate(plan.ast.joins) if join.kind is FusionJoinKind.HIGHER_ORDER)
+    join = plan.ast.joins[index]
+    corrupted_join = replace(
+        join,
+        interface=replace(
+            join.interface,
+            host_locants=tuple(replace(locant, prime_depth=1) for locant in join.host_locants),
+        ),
+    )
+    joins = list(plan.ast.joins)
+    joins[index] = corrupted_join
+    descriptors = list(plan.ast.descriptors)
+    descriptors[index] = FusionDescriptor.from_interface(corrupted_join.interface)
+    corrupted_ast = replace(plan.ast, joins=tuple(joins), descriptors=tuple(descriptors))
+
+    result = audit_fusion_plan(
+        mol,
+        parent_atoms,
+        ast=corrupted_ast,
+        abstract_parent_graph=plan.abstract_parent_graph,
+        numbering=plan.numbering,
+        bond_model=plan.bond_model,
+        derivative_state=plan.derivative_state,
+        mode=FusionMode.AUDITED_PIN,
+    )
+
+    assert result.status is AuditStatus.MISMATCH
+    assert any("intermediate-component prime depths" in error for error in result.errors)
 
 
 def test_audit_rejects_an_incomplete_ortho_peri_parent_side_path():

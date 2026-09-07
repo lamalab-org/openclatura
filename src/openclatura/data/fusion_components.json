@@ -6,7 +6,7 @@
     "planner_tier": "bounded-polycomponent-v3",
     "support": {
       "cover_kinds": ["tree"],
-      "join_kinds": ["ortho", "ortho_peri"],
+      "join_kinds": ["ortho", "ortho_peri", "higher_order"],
       "multiparent_parents": true,
       "maximum_tree_component_occurrences": 3,
       "maximum_multiparent_component_occurrences": 3,

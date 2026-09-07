@@ -43,6 +43,7 @@ def compare_actual_parent_to_implied_parent(
     bond_model: ParentBondModel,
     *,
     externally_unsaturated_atom_ids: set[int] | frozenset[int] = frozenset(),
+    indicated_hydrogen_atom_ids: set[int] | frozenset[int] = frozenset(),
 ) -> ParentBondDelta | None:
     """Select the allowed Kekulé form requiring the smallest observed delta.
 
@@ -50,9 +51,10 @@ def compare_actual_parent_to_implied_parent(
     bonds where the parent permits a double bond are hydrogenation sites;
     explicit multiple bonds where the selected parent has a single bond are
     additional unsaturation. A missing internal double bond incident to an
-    externally unsaturated parent atom is consumed by that typed operation
-    rather than misclassified as hydrogenation. The function only compares
-    graph data and does not infer nomenclature from rendered text.
+    externally unsaturated parent atom or an indicated-hydrogen atom is
+    consumed by that typed operation rather than misclassified as additive
+    hydrogenation. The function only compares graph data and does not infer
+    nomenclature from rendered text.
     """
 
     atoms = frozenset(atom_ids)
@@ -96,8 +98,11 @@ def compare_actual_parent_to_implied_parent(
                 additional_ids.add(bond.idx)
             else:
                 incompatible += 1
+        after_indicated_h = tuple(
+            edge for edge in hydrogenated if not set(edge) & indicated_hydrogen_atom_ids
+        )
         residual_hydrogenated = tuple(
-            sorted(edge for edge in hydrogenated if not set(edge) & externally_unsaturated_atom_ids)
+            sorted(edge for edge in after_indicated_h if not set(edge) & externally_unsaturated_atom_ids)
         )
         delta = ParentBondDelta(
             assignment=assignment,
@@ -109,7 +114,13 @@ def compare_actual_parent_to_implied_parent(
         rank = (
             incompatible,
             len(additional_ids),
-            len(residual_hydrogenated),
+            # Select the closest parent Kekule form before allowing an
+            # exocyclic operation to consume an incident pi bond. Otherwise
+            # the assignment can move a missing bond onto an oxo atom merely
+            # to suppress a required hydro citation elsewhere in the parent.
+            len(hydrogenated),
+            len(after_indicated_h),
+            len(after_indicated_h) - len(residual_hydrogenated),
             tuple(assignment.orders),
         )
         candidates.append((rank, delta))
@@ -121,6 +132,8 @@ def parent_derivative_state(
     atom_ids: set[int] | frozenset[int],
     bond_model: ParentBondModel,
     atom_to_locant: Mapping[int, str | SystemLocant],
+    *,
+    indicated_hydrogen_atom_ids: set[int] | frozenset[int] = frozenset(),
 ) -> ParentDerivativeState | None:
     """Describe every supported bond-state difference from a parent hydride.
 
@@ -158,6 +171,7 @@ def parent_derivative_state(
         atoms,
         bond_model,
         externally_unsaturated_atom_ids={operation.parent_atom_id for operation in oxo},
+        indicated_hydrogen_atom_ids=indicated_hydrogen_atom_ids,
     )
     if delta is None or not delta.compatible:
         return None

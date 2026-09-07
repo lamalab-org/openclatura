@@ -35,7 +35,7 @@ class FusionSupportConfig:
 
 
 _IMPLEMENTED_COVER_KINDS = ("tree",)
-_IMPLEMENTED_JOIN_KINDS = ("ortho", "ortho_peri")
+_IMPLEMENTED_JOIN_KINDS = ("ortho", "ortho_peri", "higher_order")
 
 
 @dataclass(frozen=True, slots=True)

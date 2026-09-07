@@ -250,18 +250,9 @@ def test_partly_hydrogenated_hw_component_uses_fusion_nomenclature():
     ("smiles", "expected"),
     [
         (
-            "CSc1ccc(C2c3c(oc4ccccc4c3=O)C(=O)N2c2ncccn2)cc1",
-            "6-(4-(methylsulfanyl)phenyl)-5-(pyrimidin-2-yl)-2-oxa-5-azatricyclo[7.4.0.0^{3,7}]"
-            "trideca-1(13),3(7),9,11-tetraene-4,8-dione",
-        ),
-        (
             "CC(=O)OC1Oc2ccc(C)cc2-c2oc(=O)c([Se]c3ccccc3)cc21",
             "13-methyl-4-oxo-5-(phenylselanyl)-3,9-dioxatricyclo[8.4.0.0^{2,7}]"
             "tetradeca-1(10),2(7),5,11,13-pentaen-8-yl acetate",
-        ),
-        (
-            "C=C1C(=O)O[C@H]2[C@H]1CCC(C)=C1CCC(=O)O[C@]12C",
-            "(1R,2S,6S)-1,9-dimethyl-5-methylidene-3,14-dioxatricyclo[8.4.0.0^{2,6}]tetradec-9-ene-4,13-dione",
         ),
         (
             "O=C(Nc1ccc2nc(=O)n3c(c2c1)NCC3)c1cc(Cl)ccc1Cl",
@@ -285,7 +276,6 @@ def test_partly_hydrogenated_hw_component_uses_fusion_nomenclature():
         ),
         ("C1CC2OCC=CC2O1", "2,7-dioxabicyclo[4.3.0]non-4-ene"),
         ("CN1CCC2=C1C=NN2", "6-methyl-2,3,6-triazabicyclo[3.3.0]octa-1(5),3-diene"),
-        ("C1CNC2=C(N1)ON=N2", "7-oxa-2,5,8,9-tetraazabicyclo[4.3.0]nona-1(6),8-diene"),
         ("C1N=COC2=NON=C12", "2,8-dioxa-4,7,9-triazabicyclo[4.3.0]nona-1(9),3,6-triene"),
     ],
 )
@@ -297,12 +287,83 @@ def test_audited_pin_abstains_from_unproved_fusion_composition_grammar(smiles, e
     assert result.opsin_check is not None and result.opsin_check.status == "matched"
 
 
-def test_general_mode_keeps_experimental_polycomponent_indicated_h_fusion():
+def test_higher_order_fusion_composes_completed_hydro_and_oxo_operations():
+    smiles = "C=C1C(=O)O[C@H]2[C@H]1CCC(C)=C1CCC(=O)O[C@]12C"
+    expected = (
+        "(3aS,10aR,10bS)-6,10a-dimethyl-3-methylidene-3a,4,5,7,8,10b-hexahydro"
+        "furo[2',3':1,2]cyclohepta[7,6-b]pyran-2,9-dione"
+    )
+
+    result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True, include_trace=True)
+
+    assert result.name == expected
+    assert result.parent_nomenclature == "systematic_fusion"
+    assert result.opsin_check is not None and result.opsin_check.status == "matched"
+    selected = next(step for step in result.decisions if step.decision == "selected audited systematic fusion parent")
+    assert selected.data["base_name"] == "furo[2',3':1,2]cyclohepta[7,6-b]pyran"
+    assert selected.data["joins"] == [
+        {
+            "attached": 0,
+            "host": 2,
+            "order": 2,
+            "kind": "higher_order",
+            "attached_locants": ["2'", "3'"],
+            "host_sides": [],
+            "host_locants": ["1", "2"],
+        },
+        {
+            "attached": 2,
+            "host": 1,
+            "order": 1,
+            "kind": "ortho",
+            "attached_locants": ["7", "6"],
+            "host_sides": ["b"],
+            "host_locants": [],
+        },
+    ]
+    assert selected.data["derivative_operations"]["hydro"] == [
+        {
+            "locants": ["3a", "4", "5", "7", "8", "10b"],
+            "atom_ids": [6, 7, 8, 12, 13, 5],
+            "bond_ids": [6, 8, 13],
+        }
+    ]
+    assert [operation["locant"] for operation in selected.data["derivative_operations"]["oxo"]] == ["2", "9"]
+
+    mol = Chem.MolFromSmiles(smiles)
+    renumbered = Chem.RenumberAtoms(mol, list(reversed(range(mol.GetNumAtoms()))))
+    reordered = name_mol(renumbered, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True)
+    assert reordered.name == expected
+    assert reordered.opsin_check is not None and reordered.opsin_check.status == "matched"
+
+
+def test_higher_order_component_indicated_hydrogen_composition_roundtrips():
     smiles = "CSc1ccc(C2c3c(oc4ccccc4c3=O)C(=O)N2c2ncccn2)cc1"
+    expected = (
+        "1-(4-(methylsulfanyl)phenyl)-2-(pyrimidin-2-yl)-1,2-dihydro"
+        "benzo[1',2':2,3]pyrano[5,6-c]pyrrole-3,9-dione"
+    )
 
-    result = name(smiles, fusion_mode=FusionMode.GENERAL)
+    result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True)
 
-    assert "benzo[b]pyrano[5,6-c]pyrrole" in result.name
+    assert result.name == expected
+    assert result.parent_nomenclature == "systematic_fusion"
+    assert result.opsin_check is not None and result.opsin_check.status == "matched"
+
+
+def test_multiple_indicated_hydrogens_compose_with_additive_hydrogenation():
+    smiles = "C1CNC2=C(N1)ON=N2"
+    expected = "5,6-dihydro-4H,7H-[1,2,3]oxadiazolo[4,5-b]pyrazine"
+
+    result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True, include_trace=True)
+
+    assert result.name == expected
+    assert result.parent_nomenclature == "systematic_fusion"
+    assert result.opsin_check is not None and result.opsin_check.status == "matched"
+    selected = next(step for step in result.decisions if step.decision == "selected audited systematic fusion parent")
+    assert selected.data["base_name"] == "4H,7H-[1,2,3]oxadiazolo[4,5-b]pyrazine"
+    assert selected.data["atom_to_locant"][2] == "4"
+    assert selected.data["atom_to_locant"][5] == "7"
 
 
 def test_fusion_derivative_state_separates_carbonyl_changes_from_hydrogenation():

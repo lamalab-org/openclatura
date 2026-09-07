@@ -124,8 +124,11 @@ def resolve_systematic_fusion_parent(
                 {
                     "attached": join.attached_occurrence,
                     "host": join.host_occurrence,
+                    "order": join.order,
+                    "kind": join.kind.value,
                     "attached_locants": [str(locant) for locant in join.attached_locants],
                     "host_sides": [str(side) for side in join.host_sides],
+                    "host_locants": [str(locant) for locant in join.host_locants],
                 }
                 for join in plan.ast.joins
             ],

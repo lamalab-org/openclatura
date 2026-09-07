@@ -391,7 +391,7 @@ def test_long_five_membered_ring_chain_abstains_outside_interoperable_grammar():
     assert result.reason == "no supported audited fusion-component decomposition"
 
 
-def test_second_order_pairwise_component_keeps_ordinary_fusion_descriptor():
+def test_second_order_component_uses_primed_numeric_higher_order_descriptor():
     components = ("furan", "thiophene", "pyridine")
     interfaces = (
         ((0, "2"), (1, "4")),
@@ -410,13 +410,80 @@ def test_second_order_pairwise_component_keeps_ordinary_fusion_descriptor():
     )
 
     assert first_name == second_name
+    assert first_name == "furo[3',2':2,3]thieno[5,4-b]pyridine"
     higher = tuple(join for join in first_ast.joins if join.order == 2)
     assert len(higher) == 1
-    assert higher[0].kind is FusionJoinKind.ORTHO
-    assert higher[0].host_sides
-    assert not higher[0].host_locants
-    assert all(descriptor.kind is not FusionJoinKind.HIGHER_ORDER for descriptor in first_ast.descriptors)
-    assert all(descriptor.kind is not FusionJoinKind.HIGHER_ORDER for descriptor in second_ast.descriptors)
+    assert higher[0].kind is FusionJoinKind.HIGHER_ORDER
+    assert not higher[0].host_sides
+    assert tuple(str(locant) for locant in higher[0].host_locants) == ("2", "3")
+    assert tuple(str(locant) for locant in higher[0].attached_locants) == ("3'", "2'")
+    assert any(descriptor.kind is FusionJoinKind.HIGHER_ORDER for descriptor in first_ast.descriptors)
+    assert any(descriptor.kind is FusionJoinKind.HIGHER_ORDER for descriptor in second_ast.descriptors)
+
+
+def test_third_order_component_numbers_each_intermediate_component_independently():
+    components = ("furan", "thiophene", "pyrrole", "pyridine")
+    interfaces = (
+        ((0, "2"), (1, "4")),
+        ((0, "3"), (1, "5")),
+        ((1, "2"), (2, "4")),
+        ((1, "3"), (2, "5")),
+        ((2, "2"), (3, "2")),
+        ((2, "3"), (3, "3")),
+    )
+
+    first_mol, first_ast, first_name = _build(
+        components,
+        interfaces,
+        experimental=True,
+        atomic_components_only=True,
+        enforce_interoperability_limits=False,
+    )
+    arbitrary_ids = tuple(900 + 29 * index for index in reversed(range(len(first_mol.atoms))))
+    _second_mol, second_ast, second_name = _build(
+        components,
+        interfaces,
+        atom_id_order=arbitrary_ids,
+        experimental=True,
+        atomic_components_only=True,
+        enforce_interoperability_limits=False,
+    )
+
+    assert first_name == second_name
+    assert first_name == "furo[3'',2'':2',3']thieno[4',5':2,3]pyrrolo[5,4-b]pyridine"
+    assert tuple(join.order for join in first_ast.joins) == (3, 2, 1)
+    assert tuple(join.kind for join in first_ast.joins) == (
+        FusionJoinKind.HIGHER_ORDER,
+        FusionJoinKind.HIGHER_ORDER,
+        FusionJoinKind.ORTHO,
+    )
+    third_order = first_ast.joins[0]
+    assert {locant.prime_depth for locant in third_order.attached_locants} == {2}
+    assert {locant.prime_depth for locant in third_order.host_locants} == {1}
+    assert tuple(descriptor.render() for descriptor in first_ast.descriptors) == tuple(
+        descriptor.render() for descriptor in second_ast.descriptors
+    )
+
+
+@pytest.mark.skipif(not opsin_available(), reason="py2opsin/Java is unavailable")
+def test_third_order_intermediate_component_citation_is_opsin_compatible():
+    _mol, _ast, rendered = _build(
+        ("furan", "thiophene", "pyrrole", "pyridine"),
+        (
+            ((0, "2"), (1, "4")),
+            ((0, "3"), (1, "5")),
+            ((1, "2"), (2, "4")),
+            ((1, "3"), (2, "5")),
+            ((2, "2"), (3, "2")),
+            ((2, "3"), (3, "3")),
+        ),
+        experimental=True,
+        atomic_components_only=True,
+        enforce_interoperability_limits=False,
+    )
+
+    expected_smiles = "O1CC=C2SC=3C(N=C4N=CC=CC43)=C21"
+    assert verify_with_opsin(rendered, expected_smiles).ok
 
 
 def test_identical_leaf_components_form_one_primed_multiplicative_group():

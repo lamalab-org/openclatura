@@ -24,6 +24,7 @@ from .model import (
     ComponentLocant,
     FusionAuditResult,
     FusionChargeOperation,
+    FusionCitationNode,
     FusionCitationPlan,
     FusionComponentMatch,
     FusionComponentSpec,
@@ -76,6 +77,37 @@ class _DisjointSet:
         right_root = self.find(right)
         if left_root != right_root:
             self._parent[right_root] = left_root
+
+
+def _unrepresented_component_indicated_hydrogens(
+    ast: FusionNameAst,
+    specs: Mapping[int, FusionComponentSpec],
+    indicated_hydrogens: tuple[SystemLocant, ...],
+    numbering: FusionNumberingProof,
+) -> tuple[tuple[int, str], ...]:
+    """Return component H sites neither consumed by fusion nor cited.
+
+    Indicated hydrogen belongs initially to an independently named component.
+    Fusion through that atom consumes the component-local state; otherwise the
+    completed parent must cite the corresponding completed-system locant.
+    """
+
+    matches = {match.occurrence_id: match for match in ast.component_occurrences}
+    fusion_atoms = frozenset(atom for join in ast.joins for atom in join.shared_input_atoms)
+    completed_locants = {
+        atom: str(locant)
+        for atom, locant in numbering.input_locant_maps[0]
+    }
+    cited = {str(locant) for locant in indicated_hydrogens}
+    unresolved = []
+    for occurrence, spec in specs.items():
+        local = matches[occurrence].input_atom_by_locant
+        for locant in spec.template.default_indicated_h:
+            atom = local[locant]
+            if atom in fusion_atoms or completed_locants.get(atom) in cited:
+                continue
+            unresolved.append((occurrence, locant))
+    return tuple(sorted(unresolved))
 
 
 def audit_fusion_plan(
@@ -132,21 +164,19 @@ def audit_fusion_plan(
                 errors=(f"component occurrences are not PIN-eligible: {non_pin}",),
             )
 
-        # In a polycomponent citation fusion can consume or relocate the
-        # indicated-hydrogen site of an individual component.  The current
-        # completed-system hydrogen proof handles the assembled parent, but it
-        # does not yet prove that a bare attached-component prefix communicates
-        # that component-state transition unambiguously.  Keep verified binary
-        # fusions available and leave this broader grammar to GENERAL mode.
-        indicated_h_components = sorted(
-            occurrence for occurrence, spec in specs.items() if spec.template.default_indicated_h
+        unresolved_component_h = _unrepresented_component_indicated_hydrogens(
+            ast,
+            specs,
+            indicated_hydrogens,
+            numbering,
         )
-        if len(specs) > 2 and indicated_h_components:
+        if unresolved_component_h:
             return FusionAuditResult(
                 AuditStatus.ABSTAIN,
                 checks=("fusion_ring_size_gate", "pin_component_policy", "component_indicated_h_composition"),
                 errors=(
-                    f"polycomponent fusion contains intrinsic indicated-hydrogen components: {indicated_h_components}",
+                    "polycomponent fusion has unrepresented intrinsic indicated-hydrogen sites: "
+                    f"{unresolved_component_h}",
                 ),
             )
 
@@ -210,7 +240,15 @@ def audit_fusion_plan(
         if derivative_state is None:
             errors.append("fusion parent has no typed derivative-state proof")
         else:
-            _audit_derivative_state(mol, parent_atoms, numbering, bond_model, derivative_state, errors)
+            _audit_derivative_state(
+                mol,
+                parent_atoms,
+                numbering,
+                bond_model,
+                indicated_hydrogens,
+                derivative_state,
+                errors,
+            )
         checks.append("parent_derivative_state")
         _audit_indicated_hydrogens(mol, numbering, bond_model, indicated_hydrogens, errors)
         checks.append("indicated_hydrogens")
@@ -404,6 +442,14 @@ def _audited_pin_composition_errors(
     )
     if indicated_hydrogens and has_bond_or_oxo_derivative:
         return ("combined indicated-hydrogen and bond/oxo derivative fusion grammar is not audited",)
+
+    # Existing first-order fusion names only admit additive hydrogenation when
+    # one operation exactly owns the non-fused carbon positions of a component.
+    # A higher-order citation instead names a completed intermediate component;
+    # its typed operation locants are audited against the completed-system map.
+    has_higher_order_join = any(join.kind is FusionJoinKind.HIGHER_ORDER for join in ast.joins)
+    if has_higher_order_join:
+        return ()
 
     atom_occurrences = Counter(atom for match in matches.values() for atom in match.input_atom_by_locant.values())
     for operation in derivative_state.hydro_operations:
@@ -770,6 +816,37 @@ def _audit_descriptors(
     closing = set(citation.cycle_closing_join_indices)
     if any(ast.joins[index].kind is not FusionJoinKind.HIGHER_ORDER for index in closing):
         errors.append("citation-plan join classes disagree with descriptor kinds")
+
+    expected_primary: dict[int, tuple[int, int]] = {}
+
+    def collect_primary_orders(node: FusionCitationNode, depth: int) -> None:
+        for child in node.children:
+            expected_primary[child.occurrence_id] = (node.occurrence_id, depth + 1)
+            collect_primary_orders(child, depth + 1)
+
+    for root in citation.roots:
+        collect_primary_orders(root, 0)
+    for index in citation.primary_join_indices:
+        join = ast.joins[index]
+        expected = expected_primary.get(join.attached_occurrence)
+        if expected is None:
+            errors.append(f"primary join {index} is absent from the citation tree")
+            continue
+        expected_host, expected_order = expected
+        if join.host_occurrence != expected_host or join.order != expected_order:
+            errors.append(f"primary join {index} disagrees with its citation-tree order")
+        if expected_order == 1:
+            if join.kind is FusionJoinKind.HIGHER_ORDER:
+                errors.append(f"first-order primary join {index} incorrectly uses numeric host locants")
+            continue
+        if join.kind is not FusionJoinKind.HIGHER_ORDER:
+            errors.append(f"higher-order primary join {index} lacks numeric host locants")
+            continue
+        attached_depths = {locant.prime_depth for locant in join.attached_locants}
+        host_depths = {locant.prime_depth for locant in join.host_locants}
+        if attached_depths != {expected_order - 1} or host_depths != {expected_order - 2}:
+            errors.append(f"higher-order primary join {index} has incorrect intermediate-component prime depths")
+
     if any(ast.joins[index].kind is FusionJoinKind.HIGHER_ORDER for index in citation.interparent_join_indices):
         errors.append("interparent joins must retain parent-side descriptors")
     interparents = set(citation.interparent_occurrences)
@@ -1035,16 +1112,20 @@ def _audit_derivative_state(
     parent_atoms: frozenset[int],
     numbering: FusionNumberingProof,
     model: ParentBondModel,
+    indicated_hydrogens: tuple[SystemLocant, ...],
     state: ParentDerivativeState,
     errors: list[str],
 ) -> None:
     """Verify typed hydro, unsaturation, and oxo operations against the graph."""
 
+    atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
+    indicated_h_atoms = {atom_by_locant[locant] for locant in indicated_hydrogens}
     delta = compare_actual_parent_to_implied_parent(
         mol,
         parent_atoms,
         model,
         externally_unsaturated_atom_ids={operation.parent_atom_id for operation in state.oxo_operations},
+        indicated_hydrogen_atom_ids=indicated_h_atoms,
     )
     if delta is None or not delta.compatible:
         errors.append("observed parent bond state is incompatible with the parent hydride")
