@@ -172,7 +172,9 @@ def _ordinary_large_bicycle_layouts(
                     face_positions=tuple((face, *point) for face, point in sorted(oriented_centers.items())),
                     atom_positions=tuple((atom, *point) for atom, point in sorted(oriented.items())),
                     face_shapes=tuple((face.id, f"ordinary-bicycle-{face.size}") for face in model.faces),
-                    orientation_score=_orientation_score(oriented_centers, {}, adjacent, distortion=1),
+                    orientation_score=_orientation_score(
+                        oriented_centers, {}, adjacent, distortion=1, orders=orders, positions=oriented
+                    ),
                     audit_evidence=(
                         "two convex faces share only their vertical common edge",
                         "shared edge coordinates agree",
@@ -569,12 +571,6 @@ def _materialize_layouts(
                     )
                     for face, (x, y) in centers.items()
                 }
-                score = _orientation_score(oriented_centers, shapes, adjacent, distortion=distortion)
-                if best_score is not None and score > best_score:
-                    continue
-                if best_score is None or score < best_score:
-                    best_score = score
-                    candidates.clear()
                 oriented = {
                     atom: (
                         x_sign * (metric_x * x * dx + y * dy),
@@ -582,6 +578,19 @@ def _materialize_layouts(
                     )
                     for atom, (x, y) in integer.items()
                 }
+                score = _orientation_score(
+                    oriented_centers,
+                    shapes,
+                    adjacent,
+                    distortion=distortion,
+                    orders=placed_orders,
+                    positions=oriented,
+                )
+                if best_score is not None and score > best_score:
+                    continue
+                if best_score is None or score < best_score:
+                    best_score = score
+                    candidates.clear()
                 oriented, oriented_centers = _normalize_integer_layout(oriented, oriented_centers)
                 layout = FusedLayout(
                     face_positions=tuple((face, *oriented_centers[face]) for face in sorted(oriented_centers)),
@@ -735,6 +744,8 @@ def _orientation_score(
     adjacent: frozenset[frozenset[int]],
     *,
     distortion: int | None = None,
+    orders: dict[int, tuple[int, ...]],
+    positions: dict[int, Point],
 ) -> tuple[int, ...]:
     rows: list[list[int]] = []
     for face in sorted(centers, key=lambda face: (centers[face][1], centers[face][0])):
@@ -742,10 +753,13 @@ def _orientation_score(
             rows.append([])
         rows[-1].append(face)
     row_count = max(map(len, rows))
+    bounds = []
+    for order in orders.values():
+        xs = [2 * positions[atom][0] for atom in order]
+        ys = [positions[atom][1] for atom in order]
+        bounds.append((min(xs), max(xs), min(ys), max(ys)))
     orientation = min(
-        _row_orientation_score(tuple(centers.values()), centers[row[0]][1], centers[row[0]][0] + centers[row[-1]][0])
-        for row in rows
-        if len(row) == row_count
+        _bounded_row_orientation_score(centers, row, orders, positions, bounds) for row in rows if len(row) == row_count
     )
     if distortion is None:
         distortion = sum(shape.distortion_rank for shape in shapes.values())
@@ -754,26 +768,36 @@ def _orientation_score(
     return distortion, -row_count, *orientation
 
 
-def _row_orientation_score(
-    centers: tuple[tuple[int, int], ...], axis_y: int, doubled_axis_x: int
+def _bounded_row_orientation_score(
+    centers: dict[int, Point],
+    row: list[int],
+    orders: dict[int, tuple[int, ...]],
+    positions: dict[int, Point],
+    bounds: list[tuple[int, int, int, int]],
 ) -> tuple[int, int, int]:
-    upper_right = sum(_quadrant_units(x, y, doubled_axis_x, axis_y, upper=True) for x, y in centers)
-    lower_left = sum(_quadrant_units(x, y, doubled_axis_x, axis_y, upper=False) for x, y in centers)
-    above = sum(4 if y > axis_y else 2 if y == axis_y else 0 for _, y in centers)
+    """FR-5.2: bisect the middle ring/bond, counting divided rings as halves."""
+
+    middle = len(row) // 2
+    if len(row) % 2:
+        doubled_axis_x = 2 * centers[row[middle]][0]
+    else:
+        shared = set(orders[row[middle - 1]]) & set(orders[row[middle]])
+        doubled_axis_x = sum(positions[atom][0] for atom in shared)
+    axis_y = centers[row[0]][1]
+    upper_right = lower_left = above = 0
+    for min_x, max_x, min_y, max_y in bounds:
+        right = _positive_half_units(min_x, max_x, doubled_axis_x)
+        upper = _positive_half_units(min_y, max_y, axis_y)
+        upper_right += right * upper
+        lower_left += (2 - right) * (2 - upper)
+        above += 2 * upper
     return -upper_right, lower_left, -above
 
 
-def _quadrant_units(x: int, y: int, doubled_axis_x: int, axis_y: int, *, upper: bool) -> int:
-    doubled_x = 2 * x
-    x_match = doubled_x > doubled_axis_x if upper else doubled_x < doubled_axis_x
-    y_match = y > axis_y if upper else y < axis_y
-    if x_match and y_match:
-        return 4
-    if (doubled_x == doubled_axis_x and y_match) or (y == axis_y and x_match):
-        return 2
-    if doubled_x == doubled_axis_x and y == axis_y:
+def _positive_half_units(low: int, high: int, axis: int) -> int:
+    if low < axis < high:
         return 1
-    return 0
+    return 2 if low >= axis else 0
 
 
 def _layout_sort_key(layout: FusedLayout) -> tuple:

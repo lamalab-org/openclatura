@@ -5,6 +5,7 @@ from openclatura.fusion.layout import (
     RING_SHAPE_TEMPLATES,
     LayoutSearchBudgetExceeded,
     _orientation_score,
+    _positive_half_units,
     _ring_axis_center,
     intrinsic_fused_layouts,
     preferred_intrinsic_layout,
@@ -74,12 +75,51 @@ def test_horizontal_rows_require_consecutive_fusions_and_use_their_own_midpoint(
     centers = {0: (0, 0), 1: (2, 0), 2: (4, 0), 3: (6, 0), 4: (3, 2)}
     adjacent = frozenset(frozenset(pair) for pair in ((0, 1), (1, 4), (4, 2), (2, 3)))
     shape = next(shape for shape in RING_SHAPE_TEMPLATES if shape.ring_size == 6)
+    vertices = {}
+    orders = {}
+    for face, (x, y) in centers.items():
+        orders[face] = tuple(
+            vertices.setdefault(point, len(vertices))
+            for point in ((x - 1, y - 1), (x + 1, y - 1), (x + 1, y + 1), (x - 1, y + 1))
+        )
 
-    score = _orientation_score(centers, dict.fromkeys(centers, shape), adjacent)
+    score = _orientation_score(
+        centers,
+        dict.fromkeys(centers, shape),
+        adjacent,
+        orders=orders,
+        positions={atom: point for point, atom in vertices.items()},
+    )
 
     # Two separate two-ring rows, not one four-ring row. The preferred
     # quadrant origin is the midpoint of the left pair, not all four centers.
     assert score == (0, -2, -10, 2, -12)
+
+
+@pytest.mark.parametrize("reflection", (-1, 1))
+def test_unequal_ring_widths_do_not_break_quadrant_reflection_ties(reflection):
+    positions = dict(enumerate(((-4, -2), (0, -2), (0, 0), (-4, 0), (6, -2), (6, 0), (1, 4))))
+    orders = {0: (0, 1, 2, 3), 1: (1, 4, 5, 2), 2: (3, 2, 5, 6)}
+    centers = {0: (-2, -1), 1: (3, -1), 2: (1, 1)}
+    adjacent = frozenset(frozenset(pair) for pair in ((0, 1), (0, 2), (1, 2)))
+
+    score = _orientation_score(
+        {face: (reflection * x, y) for face, (x, y) in centers.items()},
+        {},
+        adjacent,
+        distortion=0,
+        orders=orders,
+        positions={atom: (reflection * x, y) for atom, (x, y) in positions.items()},
+    )
+
+    # The vertical axis is the central shared bond at x=0, not the
+    # midpoint of the two centers. It bisects the upper ring in both views.
+    assert score == (0, -2, -4, 2, -8)
+
+
+@pytest.mark.parametrize("low,high,expected", [(-2, 2, 1), (0, 2, 2), (-2, 0, 0), (1, 2, 2), (-2, -1, 0)])
+def test_axis_crossing_counts_half_but_tangency_does_not(low, high, expected):
+    assert _positive_half_units(low, high, 0) == expected
 
 
 @pytest.mark.parametrize("reverse", (False, True))
