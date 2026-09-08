@@ -363,7 +363,7 @@ def test_generated_carbocycle_policy_is_separate_from_shared_graph_construction(
     assert component.spec.attached_prefix == prefix
     assert component.omit_attached_locants
     assert component.omit_ortho_peri_attached_locants
-    assert component.spec.rule_reference == "P-25.2.2"
+    assert component.spec.rule_reference == ("P-25.2.2" if ring_size == 5 else "P-25.3.2.1.1")
 
 
 def test_registration_rejects_duplicate_keys_and_template_names():

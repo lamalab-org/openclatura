@@ -100,9 +100,18 @@ class WrapperParentPlan:
 
         entries = self.locant_maps[index]
         model = self.bond_models[index]
+        hydride = self.hydride
+        if self.fusion_plan is not None and self.fusion_plan.numbering_variants:
+            variant = self.fusion_plan.numbering_variants[index]
+            if (
+                tuple(sorted(variant.numbering.string_input_locant_maps()[0].items())) != entries
+                or variant.bond_model != model
+            ):
+                raise ValueError("wrapper numbering must select the aligned fusion proof and bond model")
+            hydride = RingParent.from_fusion_plan(variant, pin_decision=self.hydride.pin_decision)
         return replace(
             self,
-            hydride=replace(self.hydride, parent_bond_model=model),
+            hydride=replace(hydride, parent_bond_model=model),
             bond_models=(model,),
             selected_locant_map=entries,
             selected_bond_model=model,
@@ -533,7 +542,12 @@ def _systematic_fusion_parent(
                 ("fusion_rules_satisfied", *result.plan.audit.checks),
             ),
         ),
-        bond_models=tuple(result.plan.bond_model for _ in result.plan.numbering.input_locant_maps),
+        bond_models=tuple(
+            variant.bond_model
+            for variant in (
+                result.plan.numbering_variants or (result.plan,) * len(result.plan.numbering.input_locant_maps)
+            )
+        ),
     )
 
 

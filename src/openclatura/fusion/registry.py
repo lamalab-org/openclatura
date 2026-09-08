@@ -33,6 +33,8 @@ from ..retained_fused_templates import (
     validate_retained_fused_template,
 )
 from ..retained_graph_model import monocyclic_graph_template
+from ..rules.stems import stem_for
+from .config import annulene_ring_sizes_from_data
 from .model import FusionComponentMatch, FusionComponentSpec
 
 SUPPORTED_SCHEMA_VERSION = 1
@@ -115,14 +117,36 @@ class FusionComponentRegistry:
         if not isinstance(rows, list):
             raise ValueError("fusion component data must contain a components list")
         generated = _generated_component_templates(data.get("generated_components", ()))
+        existing_carbon_sizes = {
+            len(template.atoms)
+            for template in generated
+            if len(template.rings) == 1 and all(atom.symbol == "C" for atom in template.atoms)
+        }
+        annulenes = tuple(
+            monocyclic_graph_template(name=f"[{size}]annulene", ring_size=size)
+            for size in annulene_ring_sizes_from_data(data)
+            if size not in existing_carbon_sizes
+        )
         registry = cls(
             _required_text(data, "registry_version"),
-            templates=(*retained_graph_templates(include_disabled=True), *generated),
+            templates=(*retained_graph_templates(include_disabled=True), *generated, *annulenes),
         )
         for row in rows:
             if not isinstance(row, Mapping):
                 raise ValueError("every fusion component must be a mapping")
             registry.register(row)
+        for template in annulenes:
+            registry.register(
+                {
+                    "key": template.name,
+                    "parent_name": template.name,
+                    "attached_prefix": f"cyclo{stem_for(len(template.atoms))}a",
+                    "allow_as_parent": True,
+                    "allow_as_attached": True,
+                    "omit_attached_locants": True,
+                    "rule": "P-25.3.2.1.1",
+                }
+            )
         registry._register_retained_families(data.get("retained_component_generators", ()))
         registry._generated_hw_policy = _generated_hw_policy(data.get("systematic_component_generators", ()))
         return registry

@@ -242,7 +242,7 @@ def select_bounded_face_model(
     atom_ids: Iterable[int],
     *,
     min_ring_size: int = _CONFIG.search.minimum_ring_size,
-    max_ring_size: int = _CONFIG.search.maximum_ring_size,
+    max_ring_size: int | None = None,
     cycle_search_budget: int = _CONFIG.search.cycle_states,
     model_search_budget: int = _CONFIG.search.face_model_states,
 ) -> BoundedFaceModel | None:
@@ -252,8 +252,12 @@ def select_bounded_face_model(
     order.  This favors elementary bounded faces without relying on geometry.
     ``None`` means that the completed search found no proven model; budget
     exhaustion remains an exception and is never conflated with no model.
+    An explicit ring-size override confines the ordinary cycle search; only
+    the default policy enables the separate linear two-carbon-ring proof.
     """
 
+    if cycle_search_budget < 1 or model_search_budget < 1:
+        raise ValueError("face search budgets must be positive")
     atoms = frozenset(atom_ids)
     graph_edges = frozenset(edges_within_atoms(mol, set(atoms)))
     try:
@@ -262,11 +266,15 @@ def select_bounded_face_model(
         return None
     if rank < 1:
         return None
+    if rank == 2 and min_ring_size == _CONFIG.search.minimum_ring_size and max_ring_size is None:
+        ordinary = _larger_carbon_bicycle(mol, atoms, graph_edges)
+        if ordinary is not None:
+            return ordinary
     cycles = enumerate_chordless_cycles(
         mol,
         atoms,
         min_size=min_ring_size,
-        max_size=max_ring_size,
+        max_size=_CONFIG.search.maximum_ring_size if max_ring_size is None else max_ring_size,
         search_budget=cycle_search_budget,
     )
     budget = _Budget("face-model selection", model_search_budget)
@@ -296,12 +304,61 @@ def select_bounded_face_model(
     return best[0] if len(distinct) == 1 else None
 
 
+def _larger_carbon_bicycle(mol: Molecule, atoms: frozenset[int], edges: frozenset[Edge]) -> BoundedFaceModel | None:
+    """Walk the two degree-two paths beside one shared edge in linear time."""
+
+    if not _CONFIG.annulene_ring_sizes or any(
+        mol.atoms[atom].symbol != "C" or mol.atoms[atom].charge for atom in atoms
+    ):
+        return None
+    adjacency = adjacency_from_edges(atoms, edges)
+    junctions = [atom for atom, neighbors in adjacency.items() if len(neighbors) == 3]
+    if len(junctions) != 2 or any(len(neighbors) not in {2, 3} for neighbors in adjacency.values()):
+        return None
+    start, end = junctions
+    if end not in adjacency[start]:
+        return None
+    paths = []
+    seen = {start, end}
+    for first in adjacency[start]:
+        if first == end:
+            continue
+        path = [start]
+        previous, current = start, first
+        while current != end:
+            if current in seen:
+                return None
+            seen.add(current)
+            path.append(current)
+            following = [atom for atom in adjacency[current] if atom != previous]
+            if len(following) != 1:
+                return None
+            previous, current = current, following[0]
+        paths.append((*path, end))
+    sizes = tuple(map(len, paths))
+    if (
+        seen != atoms
+        or len(paths) != 2
+        or max(sizes) not in _CONFIG.annulene_ring_sizes
+        or max(sizes) <= _CONFIG.search.maximum_ring_size
+        or min(sizes) < _CONFIG.rules.minimum_ring_size
+    ):
+        return None
+    faces = tuple(
+        sorted((GraphCycle.from_atoms(path) for path in paths), key=lambda face: (len(face.atoms), face.atoms))
+    )
+    audit = audit_bounded_face_model(mol, atoms, faces)
+    if not audit.ok:
+        return None
+    return BoundedFaceModel(atoms, edges, faces, GraphCycle.from_atoms(audit.outer_boundary), 2, audit)
+
+
 def cached_bounded_face_model(
     mol: Molecule,
     atom_ids: Iterable[int],
     *,
     min_ring_size: int = _CONFIG.search.minimum_ring_size,
-    max_ring_size: int = _CONFIG.search.maximum_ring_size,
+    max_ring_size: int | None = None,
     cycle_search_budget: int = _CONFIG.search.cycle_states,
     model_search_budget: int = _CONFIG.search.face_model_states,
 ) -> BoundedFaceModel | None:

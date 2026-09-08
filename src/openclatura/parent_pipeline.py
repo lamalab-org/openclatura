@@ -487,6 +487,23 @@ def build_parent_assembly_plan(
         locant_maps = audited_maps or None
         if locant_maps:
             locant_map_source = LocantMapSource.PROOF
+    numbered_fusion_plans = {}
+    proven_hydrogen_locants = None
+    if parent_hydride is not None and parent_hydride.is_systematic_fusion:
+        numbered_fusion_plans = {
+            frozenset(plan.numbering.string_input_locant_maps()[0].items()): plan
+            for plan in parent_hydride.fusion_plan.numbering_variants
+        }
+        if numbered_fusion_plans:
+            proven_hydrogen_locants = {
+                key: (
+                    tuple(str(locant) for locant in plan.indicated_hydrogens),
+                    tuple(
+                        locant for operation in plan.derivative_state.hydro_operations for locant in operation.locants
+                    ),
+                )
+                for key, plan in numbered_fusion_plans.items()
+            }
     numbered_path, locant_map = choose_parent_numbering(
         mol,
         selection.paths,
@@ -499,7 +516,13 @@ def build_parent_assembly_plan(
         selection.is_polycycle,
         retained_name,
         fixed_start=intent.fixed_start,
+        proven_hydrogen_locants=proven_hydrogen_locants,
     )
+    if numbered_fusion_plans:
+        parent_hydride = RingParent.from_fusion_plan(
+            numbered_fusion_plans[frozenset(locant_map.items())],
+            pin_decision=parent_hydride.pin_decision,
+        )
     get_loc = subgraph_locant_getter(numbered_path, locant_map)
     parts = build_parent_parts(
         mol,

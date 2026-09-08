@@ -34,6 +34,7 @@
     "locant_map_combinations": 4096,
     "mancude_states": 100000
   },
+  "annulene_series": {"minimum_ring_size": 7, "maximum_ring_size": 20},
   "ring_shapes": [
     {"ring_size": 3, "id": "triangle", "vertices": [[0, 0], [4, 0], [2, 4]], "edge_directions": [0, 1, 2], "horizontal_axis_class": "vertex"},
     {"ring_size": 4, "id": "square", "vertices": [[0, 0], [4, 0], [4, 4], [0, 4]], "edge_directions": [0, 1, 2, 3], "horizontal_axis_class": "edge"},
@@ -64,8 +65,8 @@
   ],
   "components": [
     {"key": "cyclopentadiene", "parent_name": "cyclopentadiene", "attached_prefix": "cyclopenta", "omit_attached_locants": true, "omit_ortho_peri_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
-    {"key": "cycloheptatriene", "parent_name": "cycloheptatriene", "attached_prefix": "cyclohepta", "omit_attached_locants": true, "omit_ortho_peri_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
-    {"key": "cyclooctatetraene", "parent_name": "cyclooctatetraene", "attached_prefix": "cycloocta", "omit_attached_locants": true, "omit_ortho_peri_attached_locants": true, "allow_as_parent": false, "allow_as_attached": true, "rule": "P-25.2.2"},
+    {"key": "cycloheptatriene", "parent_name": "[7]annulene", "attached_prefix": "cyclohepta", "omit_attached_locants": true, "omit_ortho_peri_attached_locants": true, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.3.2.1.1"},
+    {"key": "cyclooctatetraene", "parent_name": "[8]annulene", "attached_prefix": "cycloocta", "omit_attached_locants": true, "omit_ortho_peri_attached_locants": true, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.3.2.1.1"},
     {"key": "benzene", "attached_prefix": "benzo", "omit_attached_locants": true, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "naphthalene", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "azulene", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},

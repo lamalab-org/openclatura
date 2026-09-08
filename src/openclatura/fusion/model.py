@@ -858,6 +858,7 @@ class FusionParentPlan:
     charge_operations: tuple[FusionChargeOperation, ...] = ()
     lambda_descriptors: tuple[FusionLambdaDescriptor, ...] = ()
     rendered_parts: tuple[NameTokenBinding, ...] = ()
+    numbering_variants: tuple[FusionParentPlan, ...] = ()
 
     def __post_init__(self) -> None:
         _require_nonempty(self.rendered_base_name, "rendered fusion base name")
@@ -875,6 +876,20 @@ class FusionParentPlan:
             raise ValueError("fusion numbering must completely cover the abstract parent graph")
         if self.pin_eligibility != "fusion_rules_satisfied":
             raise ValueError("fusion parent plans must record fusion-rule eligibility")
+        if self.numbering_variants:
+            if any(
+                variant.numbering_variants
+                or len(variant.numbering.input_locant_maps) != 1
+                or variant.ast != self.ast
+                or variant.abstract_parent_graph != self.abstract_parent_graph
+                for variant in self.numbering_variants
+            ):
+                raise ValueError("fusion numbering variants must be single-map leaves for the same parent graph")
+            if (
+                tuple(variant.numbering.input_locant_maps[0] for variant in self.numbering_variants)
+                != self.numbering.input_locant_maps
+            ):
+                raise ValueError("fusion numbering variants must cover every and only the retained locant maps")
 
     @property
     def pin_status(self) -> PinStatus:

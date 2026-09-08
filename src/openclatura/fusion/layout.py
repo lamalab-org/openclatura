@@ -63,7 +63,7 @@ def intrinsic_fused_layouts(
     if search_budget < 1 or max_layouts < 1:
         raise ValueError("layout search budget and result limit must be positive")
     if any(face.size not in _SHAPES_BY_SIZE for face in model.faces):
-        return ()
+        return _ordinary_large_bicycle_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
     face_by_id = {face.id: face for face in model.faces}
     if not _valid_face_adjacency(model, face_by_id):
         return ()
@@ -107,6 +107,84 @@ def intrinsic_fused_layouts(
         if completed:
             break
     return tuple(sorted(completed.values(), key=_layout_sort_key))
+
+
+def _ordinary_large_bicycle_layouts(
+    model: FaceModel, *, search_budget: int, max_layouts: int
+) -> tuple[FusedLayout, ...]:
+    """Embed one edge-fused pair, without extending the general shape search.
+
+    A vertical common edge and two symmetric convex arcs prove a horizontal
+    two-ring row. Its four reflections exhaust the possible numbering starts;
+    the existing completed-system locant criteria decide between them. These
+    coordinates are an orientation witness, not a general ring-shape template.
+    """
+
+    if (
+        len(model.faces) != 2
+        or len(model.fusion_edges) != 1
+        or len(model.face_adjacency) != 1
+        or max(face.size for face in model.faces) not in _CONFIG.annulene_ring_sizes
+        or min(face.size for face in model.faces) < _CONFIG.rules.minimum_ring_size
+        or not _valid_face_adjacency(model, {face.id: face for face in model.faces})
+    ):
+        return ()
+    left, right = model.faces
+    edge = next(iter(model.fusion_edges))
+    endpoints = _edge_endpoints(left, edge)
+    if endpoints is None or set(endpoints) != set(_edge_endpoints(right, edge) or ()):
+        return ()
+    if set(left.atom_cycle) & set(right.atom_cycle) != set(endpoints):
+        return ()
+    start, end = endpoints
+    scale = lcm(*((face.size - 1) ** 2 * face.size for face in model.faces))
+    positions = {start: (0, -scale), end: (0, scale)}
+    orders = {}
+    for sign, face in zip((-1, 1), model.faces):
+        offset = face.atom_cycle.index(start)
+        order = face.atom_cycle[offset:] + face.atom_cycle[:offset]
+        if order[1] == end:
+            order = (start, *reversed(order[1:]))
+        if order[-1] != end:
+            return ()
+        steps = face.size - 1
+        for index, atom in enumerate(order[1:-1], start=1):
+            positions[atom] = (
+                sign * 4 * index * (steps - index) * scale // steps**2,
+                (2 * index - steps) * scale // steps,
+            )
+        orders[face.id] = order
+    if not _audit_layout(model, orders, positions):
+        return ()
+    centers = {face.id: (sum(positions[atom][0] for atom in face.atom_cycle) // face.size, 0) for face in model.faces}
+    adjacent = frozenset((frozenset(centers),))
+    budget = _Budget(search_budget)
+    layouts = []
+    for x_sign in (-1, 1):
+        for y_sign in (-1, 1):
+            budget.spend()
+            oriented, oriented_centers = _normalize_integer_layout(
+                {atom: (x_sign * x, y_sign * y) for atom, (x, y) in positions.items()},
+                {face: (x_sign * x, y_sign * y) for face, (x, y) in centers.items()},
+            )
+            layouts.append(
+                FusedLayout(
+                    face_positions=tuple((face, *point) for face, point in sorted(oriented_centers.items())),
+                    atom_positions=tuple((atom, *point) for atom, point in sorted(oriented.items())),
+                    face_shapes=tuple((face.id, f"ordinary-bicycle-{face.size}") for face in model.faces),
+                    orientation_score=_orientation_score(oriented_centers, {}, adjacent, distortion=1),
+                    audit_evidence=(
+                        "two convex faces share only their vertical common edge",
+                        "shared edge coordinates agree",
+                        "unrelated edges do not cross",
+                        "geometric and topological perimeters agree",
+                        "four reflected horizontal-row orientation witnesses",
+                    ),
+                )
+            )
+            if len(layouts) > max_layouts:
+                raise LayoutSearchBudgetExceeded(max_layouts, resource="layouts")
+    return tuple(sorted(layouts, key=_layout_sort_key))
 
 
 def preferred_intrinsic_layout(

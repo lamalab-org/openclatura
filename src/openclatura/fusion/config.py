@@ -7,6 +7,7 @@ deterministic search limits, and intrinsic layout vocabulary.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from functools import cache
 
@@ -86,6 +87,22 @@ class FusionNomenclatureConfig:
     rules: FusionRuleConfig
     search: FusionSearchLimits
     ring_shapes: tuple[RingShapeSpec, ...]
+    annulene_ring_sizes: tuple[int, ...] = ()
+
+
+def annulene_ring_sizes_from_data(data: Mapping) -> tuple[int, ...]:
+    """Bound the separate two-carbon-ring tier, not general cycle searches."""
+
+    policy = data.get("annulene_series")
+    if policy is None:
+        return ()
+    if not isinstance(policy, dict):
+        raise ValueError("annulene_series must be a mapping")
+    minimum = _positive_int(policy, "minimum_ring_size")
+    maximum = _positive_int(policy, "maximum_ring_size")
+    if not 7 <= minimum <= maximum:
+        raise ValueError("annulene series must be an ordered interval starting at size seven or larger")
+    return tuple(range(minimum, maximum + 1))
 
 
 @cache
@@ -143,6 +160,7 @@ def fusion_nomenclature_config_from_data(data: dict) -> FusionNomenclatureConfig
         rules=rules,
         search=search,
         ring_shapes=shapes,
+        annulene_ring_sizes=annulene_ring_sizes_from_data(data),
     )
 
 

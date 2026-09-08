@@ -94,6 +94,7 @@ def completed_system_numbering_selection(
     *,
     face_model: FaceModel | None = None,
     layouts: tuple[FusedLayout, ...] = (),
+    defer_indicated_hydrogen: bool = False,
 ) -> CompletedNumberingSelection:
     """Select completed-system maps, optionally proving starts from layouts.
 
@@ -130,7 +131,9 @@ def completed_system_numbering_selection(
                 )
             )
             continue
-        candidates.append(derived)
+        # A parent-model proof can resolve indicated H after the topological
+        # map selection; observed CH2 sites must not preempt that proof.
+        candidates.append(replace(derived, score=derived.score[:-1]) if defer_indicated_hydrogen else derived)
     if not candidates:
         return CompletedNumberingSelection((), tuple(rejected))
     best_score = min(candidate.score for candidate in candidates)

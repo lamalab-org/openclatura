@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import replace
 
 from ..assembly_parts import NameTokenBinding
 from ..locants import SystemLocant, system_locant_sort_key
@@ -137,15 +138,54 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         return FusionUnsupported("intrinsic fused-layout search budget exhausted", (str(exc),))
     if not layouts:
         return FusionUnsupported("no consistent audited intrinsic fused-ring layout")
+    specs = {match.occurrence_id: registry.spec_for_match(match) for match in ast.component_occurrences}
+    prove_carbon_h = intrinsic_carbon_fusion_scope(ast, specs) and all(
+        atom.symbol == "C" and atom.charge == 0 for spec in specs.values() for atom in spec.atoms
+    )
     numbering_selection = completed_system_numbering_selection(
         mol,
         bounded,
         face_model=face_model,
         layouts=layouts,
+        defer_indicated_hydrogen=prove_carbon_h,
     )
     numberings = numbering_selection.accepted
     if not numberings:
         return FusionUnsupported("no layout-derived peripheral system numbering was proven")
+    if prove_carbon_h:
+        alternatives = []
+        for candidate in numberings:
+            if candidate.layout_index is None:
+                return FusionUnsupported("completed-system numbering lacks intrinsic-layout provenance")
+            layout = layouts[candidate.layout_index]
+            proof = FusionNumberingProof(
+                selected_face_model=face_model,
+                selected_layout=layout,
+                orientation_score=(layout.orientation_score, candidate.score),
+                abstract_atom_to_locant=candidate.atom_to_locant,
+                input_locant_maps=(candidate.atom_to_locant,),
+                rejected_numberings=numbering_selection.rejected,
+            )
+            result = _complete_fusion_plan(mol, atoms, mode, ast, registry, proof)
+            if isinstance(result, FusionConfirmed):
+                alternatives.append(result.plan)
+        if not alternatives:
+            return result
+        best_h = min(tuple(map(system_locant_sort_key, plan.indicated_hydrogens)) for plan in alternatives)
+        preferred = tuple(
+            plan for plan in alternatives if tuple(map(system_locant_sort_key, plan.indicated_hydrogens)) == best_h
+        )
+        plan = replace(
+            preferred[0],
+            numbering=replace(
+                preferred[0].numbering,
+                input_locant_maps=tuple(plan.numbering.input_locant_maps[0] for plan in preferred),
+            ),
+            numbering_variants=preferred,
+        )
+        # Each map keeps its own audited H sites, bond model, renderer bindings,
+        # and derivative delta. Assembly must select them together.
+        return FusionConfirmed(plan)
     selected = numberings[0]
     if selected.layout_index is None:
         return FusionUnsupported("completed-system numbering lacks intrinsic-layout provenance")
@@ -158,6 +198,19 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         input_locant_maps=tuple(numbering.atom_to_locant for numbering in numberings),
         rejected_numberings=numbering_selection.rejected,
     )
+    return _complete_fusion_plan(mol, atoms, mode, ast, registry, numbering)
+
+
+def _complete_fusion_plan(
+    mol: Molecule,
+    atoms: frozenset[int],
+    mode: FusionMode,
+    ast: FusionNameAst,
+    registry: FusionComponentRegistry,
+    numbering: FusionNumberingProof,
+) -> FusionPlanningResult:
+    """Prove chemistry and rendering against one specific numbered parent."""
+
     try:
         graph = _abstract_graph(ast, registry)
     except ValueError as exc:

@@ -196,6 +196,202 @@
       ]
     },
     {
+      "accepted_general_prefixes": [],
+      "parent_name": "[10]annulene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cyclodeca",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.1",
+      "template_names": [
+        "[10]annulene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[11]annulene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cycloundeca",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.1",
+      "template_names": [
+        "[11]annulene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[12]annulene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cyclododeca",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.1",
+      "template_names": [
+        "[12]annulene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[13]annulene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cyclotrideca",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.1",
+      "template_names": [
+        "[13]annulene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[14]annulene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cyclotetradeca",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.1",
+      "template_names": [
+        "[14]annulene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[15]annulene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cyclopentadeca",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.1",
+      "template_names": [
+        "[15]annulene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[16]annulene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cyclohexadeca",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.1",
+      "template_names": [
+        "[16]annulene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[17]annulene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cycloheptadeca",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.1",
+      "template_names": [
+        "[17]annulene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[18]annulene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cyclooctadeca",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.1",
+      "template_names": [
+        "[18]annulene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[19]annulene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cyclononadeca",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.1",
+      "template_names": [
+        "[19]annulene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[20]annulene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cycloicosa",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.1",
+      "template_names": [
+        "[20]annulene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[7]annulene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cyclohepta",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.1",
+      "template_names": [
+        "cycloheptatriene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[8]annulene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cycloocta",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.1",
+      "template_names": [
+        "cyclooctatetraene"
+      ]
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[9]annulene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "cyclonona",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.1",
+      "template_names": [
+        "[9]annulene"
+      ]
+    },
+    {
       "accepted_general_prefixes": [
         "anthraceno"
       ],
@@ -303,32 +499,6 @@
       "rule": "P-25.3.5",
       "template_names": [
         "cinnoline"
-      ]
-    },
-    {
-      "accepted_general_prefixes": [],
-      "parent_name": "cycloheptatriene",
-      "parser_visible_forms": [],
-      "preferred_fusion_prefix": "cyclohepta",
-      "roles": [
-        "attached"
-      ],
-      "rule": "P-25.2.2",
-      "template_names": [
-        "cycloheptatriene"
-      ]
-    },
-    {
-      "accepted_general_prefixes": [],
-      "parent_name": "cyclooctatetraene",
-      "parser_visible_forms": [],
-      "preferred_fusion_prefix": "cycloocta",
-      "roles": [
-        "attached"
-      ],
-      "rule": "P-25.2.2",
-      "template_names": [
-        "cyclooctatetraene"
       ]
     },
     {
@@ -725,7 +895,7 @@
   "runtime_dependency": false,
   "schema_version": 1,
   "source_sha256": {
-    "src/openclatura/data/fusion_components.json": "3fdc39167e8ec2cb1796a351122146bacd223ab63254cf163174917f253e8335",
+    "src/openclatura/data/fusion_components.json": "611b859680fbe9480d0aee76e7ada72ec433733280361e2abd351527f8a53a03",
     "src/openclatura/data/retained_fused_graph_templates.json": "ef1b6363ac355c18cb6eb13579fc4109b1622db59da045b2e8241ed72037b36d",
     "src/openclatura/hantzsch_widman.py": "8d28a90442764eab283fa867e4efbf44f143eb3bc70d175552a59d087dd325bc",
     "tests/data/parser_xml_resources/fusionComponents.json": "6f6465633bcbc26e30be994c7711f8fc40df807f16f780e993c0e60db39e9723"

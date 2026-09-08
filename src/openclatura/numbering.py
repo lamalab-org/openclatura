@@ -146,6 +146,7 @@ def choose_parent_numbering(
     retained_name: str | None,
     *,
     fixed_start: bool = False,
+    proven_hydrogen_locants: dict[frozenset[tuple[int, str]], tuple[tuple[str, ...], tuple[str, ...]]] | None = None,
 ) -> tuple[list[int], dict[int, str] | None]:
     """Choose parent numbering from retained locant maps or normal rules."""
 
@@ -184,6 +185,10 @@ def choose_parent_numbering(
                 )
                 if idx in lmap
             )
+            if proven_hydrogen_locants is not None:
+                indicated, hydro = proven_hydrogen_locants[frozenset(lmap.items())]
+                indicated_h_eval = sorted(parse_locant(locant) for locant in indicated)
+                hydro_eval = sorted(parse_locant(locant) for locant in hydro)
             return heteroatom_eval + (tuple(indicated_h_eval), principal_eval, hydro_eval, substituent_eval)
 
         locant_map = min(locant_maps, key=evaluate_map)

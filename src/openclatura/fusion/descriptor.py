@@ -328,6 +328,16 @@ def render_fusion_name_parts(
     """Render ordered text parts while preserving component/interface scope."""
 
     matches = {match.occurrence_id: match for match in ast.component_occurrences}
+    # P-25.3.8.1 omits the entire join for two monocyclic hydrocarbons.
+    omit_monocyclic_join = (
+        len(matches) == 2
+        and len(ast.joins) == 1
+        and ast.joins[0].kind is FusionJoinKind.ORTHO
+        and all(
+            len(spec.rings) == 1 and all(atom.symbol == "C" for atom in spec.atoms)
+            for spec in (_spec_for_match(registry, match) for match in matches.values())
+        )
+    )
     descriptors_by_attached: dict[int, list[FusionDescriptor]] = defaultdict(list)
     for join, descriptor in zip(ast.joins, ast.descriptors, strict=True):
         descriptors_by_attached[join.attached_occurrence].append(descriptor)
@@ -384,6 +394,8 @@ def render_fusion_name_parts(
     def attachment(node: FusionCitationNode) -> list[NameTokenBinding]:
         descendants = render_children(node)
         spec = _spec_for_match(registry, matches[node.occurrence_id])
+        if omit_monocyclic_join:
+            return [component_part(spec.attached_prefix, "attached_component", (node.occurrence_id,))]
         descriptors = tuple(descriptors_by_attached[node.occurrence_id])
         descriptor_text = _combine_rendered_descriptors(
             tuple(
