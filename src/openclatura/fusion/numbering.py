@@ -335,6 +335,71 @@ def _numbering_key(numbering: CompletedNumbering) -> tuple[tuple[int, str], ...]
     return tuple(sorted((atom, str(locant)) for atom, locant in numbering.atom_to_locant))
 
 
+def _parent_bond_graph(parent: FusionGraph | Molecule, atom_ids: Iterable[int] | None) -> FusionGraph:
+    if isinstance(parent, FusionGraph):
+        return parent
+    if atom_ids is None:
+        raise TypeError("atom_ids are required for the Molecule compatibility path")
+    atoms = frozenset(atom_ids)
+    return FusionGraph(
+        atoms=tuple(
+            FusionGraphAtom(
+                atom,
+                parent.atoms[atom].symbol,
+                parent.atoms[atom].charge,
+                forced_single=parent.atoms[atom].element.mancude_forced_single,
+            )
+            for atom in sorted(atoms)
+        ),
+        # Observed orders and external substituents do not define parent-hydride orders.
+        bonds=tuple(
+            FusionGraphBond(normalize_edge(bond.u, bond.v))
+            for bond in parent.bonds.values()
+            if bond.u in atoms and bond.v in atoms
+        ),
+    )
+
+
+def _parent_bond_loads(graph: FusionGraph, assignment: BondAssignment) -> Counter[int]:
+    expected = {normalize_edge(*bond.atoms) for bond in graph.bonds}
+    if {normalize_edge(*edge) for edge, _ in assignment.orders} != expected:
+        raise ValueError("parent valence assignment must cover every parent bond exactly once")
+    loads: Counter[int] = Counter()
+    for edge, order in assignment.orders:
+        if type(order) is not int or order not in {1, 2}:
+            raise ValueError("parent valence assignment requires single or double bond orders")
+        for atom in edge:
+            loads[atom] += order
+    return loads
+
+
+def validate_parent_bond_valence(
+    parent: FusionGraph | Molecule,
+    assignment: BondAssignment,
+    atom_ids: Iterable[int] | None = None,
+) -> None:
+    """Raise ValueError if a complete parent assignment exceeds fixed site limits.
+
+    Atom ids are in the supplied parent's namespace; Molecule callers must pass
+    the parent atom subset. Only internal assigned bond orders are counted, not
+    observed hydrogen or external substituent loads. Required double bonds must
+    therefore be present with order two in the supplied assignment. This checks
+    valence, not model membership, non-cumulation, or donor/lambda proofs; audit
+    callers must retain those independent checks. Undeclared charged states of
+    fixed-valence elements are rejected, not given the neutral limit.
+    """
+
+    graph = _parent_bond_graph(parent, atom_ids)
+    loads = _parent_bond_loads(graph, assignment)
+    for site in graph.atoms:
+        limit = elements.get(site.symbol).mancude_limit_for_charge(site.formal_charge)
+        if limit is not None and loads[site.id] > limit:
+            raise ValueError(
+                f"parent atom {site.id} ({site.symbol}, charge {site.formal_charge:+d}) "
+                f"has bond-order load {loads[site.id]} above fixed-valence limit {limit}"
+            )
+
+
 def parent_bond_model(
     parent: FusionGraph | Molecule,
     atom_ids: Iterable[int] | None = None,
@@ -343,51 +408,38 @@ def parent_bond_model(
 ) -> ParentBondModel:
     """Build all maximum non-cumulative Kekule assignments for a parent graph."""
 
-    if isinstance(parent, FusionGraph):
-        sites = {atom.id: atom for atom in parent.atoms}
-        edges = tuple(sorted(normalize_edge(*bond.atoms) for bond in parent.bonds))
-        bond_classes = {normalize_edge(*bond.atoms): bond.bond_class for bond in parent.bonds}
-        skeletal_degrees = Counter(atom for edge in edges for atom in edge)
-        # Fixed-valence sites may exhaust their bonding capacity at a fusion
-        # junction. Donor/charge/lambda sites retain their separate proofs.
-        saturated_sites = {
-            atom
-            for atom, site in sites.items()
-            if (limit := elements.get(site.symbol).mancude_bonding_limit) is not None
-            and skeletal_degrees[atom] >= limit
-        }
-        required_double = frozenset(edge for edge in edges if bond_classes[edge] == "double")
-        occupied = frozenset(atom for edge in required_double for atom in edge)
-        eligible = frozenset(
-            edge
-            for edge in edges
-            if bond_classes[edge] in {"aromatic", "mancude", "fusion"}
-            and not occupied.intersection(edge)
-            and all(sites[atom].pi_capacity and not sites[atom].forced_single for atom in edge)
-            and not saturated_sites.intersection(edge)
-        )
-    else:
-        if atom_ids is None:
-            raise TypeError("atom_ids are required for the Molecule compatibility path")
-        atoms = frozenset(atom_ids)
-        edges = tuple(
-            sorted(
-                normalize_edge(bond.u, bond.v) for bond in parent.bonds.values() if bond.u in atoms and bond.v in atoms
-            )
-        )
-        eligible = frozenset(
-            edge
-            for edge in edges
-            if not parent.atoms[edge[0]].element.mancude_forced_single
-            and not parent.atoms[edge[1]].element.mancude_forced_single
-        )
-        required_double = frozenset()
+    graph = _parent_bond_graph(parent, atom_ids)
+    sites = {atom.id: atom for atom in graph.atoms}
+    edges = tuple(sorted(normalize_edge(*bond.atoms) for bond in graph.bonds))
+    bond_classes = {normalize_edge(*bond.atoms): bond.bond_class for bond in graph.bonds}
+    required_double = frozenset(edge for edge in edges if bond_classes[edge] == "double")
+    baseline = BondAssignment(tuple((edge, 2 if edge in required_double else 1) for edge in edges))
+    # Mandatory loads must be feasible before any optional matching is searched.
+    validate_parent_bond_valence(graph, baseline)
+    loads = _parent_bond_loads(graph, baseline)
+    saturated_sites = {
+        atom
+        for atom, site in sites.items()
+        if (limit := elements.get(site.symbol).mancude_limit_for_charge(site.formal_charge)) is not None
+        and loads[atom] >= limit
+    }
+    occupied = frozenset(atom for edge in required_double for atom in edge)
+    eligible = frozenset(
+        edge
+        for edge in edges
+        if bond_classes[edge] in {"aromatic", "mancude", "fusion"}
+        and not occupied.intersection(edge)
+        and all(sites[atom].pi_capacity and not sites[atom].forced_single for atom in edge)
+        and not saturated_sites.intersection(edge)
+    )
     required = frozenset(edges) - eligible - required_double
     matchings = _maximum_matchings(eligible, search_budget=search_budget)
     assignments = tuple(
         BondAssignment(tuple((edge, 2 if edge in matching or edge in required_double else 1) for edge in edges))
         for matching in matchings
     )
+    for assignment in assignments:
+        validate_parent_bond_valence(graph, assignment)
     return ParentBondModel(
         allowed_kekule_assignments=assignments,
         required_single_bonds=required,
