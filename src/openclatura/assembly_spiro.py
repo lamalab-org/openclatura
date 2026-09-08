@@ -1,7 +1,7 @@
 """Spiro-specific assembly formatting."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .assembly_parts import AssemblyParts, SubstituentItem
 from .formatting import strip_outer_parentheses
@@ -131,19 +131,23 @@ def _hoist_side_substituent_prefixes(parts: AssemblyParts, spiro: SpiroAssembly)
                 kept.append(f"{locants}-{name}" if locants else name)
                 continue
             locant_list = locants.split(",")
-            parts.substituents.append(
-                SubstituentItem(name=_unmultiplied_prefix_name(name, len(locant_list)), locants=locant_list)
+            source = next(
+                (item for item in spiro.side_substituents if item.locants == locant_list and item.name == name), None
             )
+            item = source if source is not None else SubstituentItem(name=name, locants=locant_list)
+            item = replace(item, name=_unmultiplied_prefix_name(name, len(locant_list)))
+            parts.substituents.append(item)
+            if source is not None and parts.name_atom_bindings:
+                from .name_bindings import refresh_name_atom_bindings
+
+                branch_parts = AssemblyParts(parent_length=0, substituents=[item])
+                parts.name_atom_bindings.extend(refresh_name_atom_bindings(branch_parts))
             hoisted = True
     if not hoisted:
         return spiro
-    return SpiroAssembly(
-        parent_locant=spiro.parent_locant,
-        side_locant=spiro.side_locant,
-        side_parent_name=spiro.side_parent_name,
+    return replace(
+        spiro,
         side_prefixes=tuple(kept),
-        side_suffixes=spiro.side_suffixes,
-        side_stereo=spiro.side_stereo,
     )
 
 
@@ -153,9 +157,8 @@ def _normalize_spiro_assembly(spiro: SpiroAssembly) -> SpiroAssembly:
     side_prefixes, side_parent_name, side_suffixes, side_stereo = extract_spiro_side_prefixes(spiro.side_parent_name)
     if not side_prefixes and side_parent_name == spiro.side_parent_name and not side_suffixes and not side_stereo:
         return spiro
-    return SpiroAssembly(
-        parent_locant=spiro.parent_locant,
-        side_locant=spiro.side_locant,
+    return replace(
+        spiro,
         side_parent_name=side_parent_name,
         side_prefixes=tuple(spiro.side_prefixes) + tuple(side_prefixes),
         side_suffixes=tuple(spiro.side_suffixes) + tuple(side_suffixes),
@@ -190,13 +193,9 @@ def format_spiro_core(
             side_prefixes.extend(extracted_prefixes)
             side_suffixes.extend(_prime_side_suffixes(extracted_suffixes, "'"))
             s_name = extracted_parent
-            spiro = SpiroAssembly(
-                parent_locant=spiro.parent_locant,
-                side_locant=spiro.side_locant,
+            spiro = replace(
+                spiro,
                 side_parent_name=s_name,
-                side_prefixes=spiro.side_prefixes,
-                side_suffixes=spiro.side_suffixes,
-                side_stereo=spiro.side_stereo,
             )
         if core_name.startswith("spiro["):
             continue

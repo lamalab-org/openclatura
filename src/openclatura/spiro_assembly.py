@@ -1,6 +1,10 @@
 """Structured spiro assembly data shared by planning and rendering."""
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .assembly_parts import SubstituentItem
 
 
 @dataclass(frozen=True)
@@ -13,3 +17,4 @@ class SpiroAssembly:
     # (primed locant, descriptor) pairs the side component contributes to the
     # whole name's leading stereo group.
     side_stereo: tuple[tuple[str, str], ...] = ()
+    side_substituents: tuple["SubstituentItem", ...] = ()

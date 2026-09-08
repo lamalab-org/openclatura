@@ -314,16 +314,16 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
     # map.  Consume that proof directly instead of changing the junction atom
     # to silicon and recovering its locant from rendered text.
     from .fusion.context import current_fusion_mode
-    from .fusion.wrappers import plan_fusion_spiro_side
+    from .spiro_subgraph import plan_substituted_fusion_spiro_side
 
-    fusion_side = plan_fusion_spiro_side(
+    fusion_side = plan_substituted_fusion_spiro_side(
         mol,
         sub_comp,
         c_idx,
         mode=current_fusion_mode(),
     )
     if fusion_side is not None:
-        return fusion_side.to_spiro_assembly()
+        return fusion_side
 
     heteroaromatic_side = _heteroaromatic_spiro_side_assembly(mol, c_idx, sub_comp)
     if heteroaromatic_side is not None:
