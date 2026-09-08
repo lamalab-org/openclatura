@@ -19,6 +19,7 @@ from ..retained_graph_model import merge_parent_bond_classes
 from ..rules import multipliers
 from .cover import audit_component_cover, component_scope
 from .indicated_hydrogen import (
+    aromatic_fusion_carbon_sites,
     component_carbon_h_relocation_scope,
     component_parent_atoms,
     intrinsic_carbon_candidate_atoms,
@@ -268,7 +269,8 @@ def audit_fusion_plan(
         intrinsic_n_h = intrinsic_parent_lone_pair_sites(mol, abstract_parent_graph)
         carbon_candidates = intrinsic_carbon_candidate_atoms(ast, specs, mol)
         intrinsic_c_h = frozenset()
-        if intrinsic_n_h or carbon_candidates:
+        aromatic_c_junctions = aromatic_fusion_carbon_sites(mol, abstract_parent_graph, carbon_candidates)
+        if intrinsic_n_h or carbon_candidates or aromatic_c_junctions:
             expected_model = (
                 indicated_hydrogen_parent_bond_model(abstract_parent_graph, intrinsic_n_h)
                 if intrinsic_n_h
@@ -282,7 +284,7 @@ def audit_fusion_plan(
                 carbon_candidates,
                 intrinsic_hydrogen_atom_ids=intrinsic_n_h,
             )
-            if (intrinsic_n_h or intrinsic_c_h) and bond_model != expected_model:
+            if (intrinsic_n_h or intrinsic_c_h or aromatic_c_junctions) and bond_model != expected_model:
                 errors.append("parent bond model does not preserve the proved intrinsic-hydrogen sites")
         _audit_bond_model(abstract_parent_graph, bond_model, errors)
         checks.append("parent_bond_model")
@@ -532,6 +534,10 @@ def _audited_pin_composition_errors(
         return ()
     if _has_complete_hydrogenation(mol, numbering, indicated_hydrogens, derivative_state):
         return ()
+    if indicated_hydrogens and (
+        derivative_state.hydro_operations or derivative_state.unsaturation_operations or derivative_state.oxo_operations
+    ):
+        return ("combined indicated-hydrogen and bond/oxo derivative fusion grammar is not audited",)
     return ("combined fusion derivative operations lack independent applicable atom scopes",)
 
 
@@ -567,8 +573,21 @@ def _has_consistent_derivative_operations(
         return True
     if h_atoms & (hydro | oxo | added | intrinsic) or hydro & (oxo | added | intrinsic) or added & (oxo | intrinsic):
         return False
-    if any(mol.atoms[atom].symbol != "C" for atom in hydro | oxo | added | intrinsic):
+    if any(mol.atoms[atom].symbol != "C" for atom in added | intrinsic):
         return False
+    for atom in hydro:
+        value = mol.atoms[atom]
+        if value.symbol == "C":
+            continue
+        neighbors = mol.get_neighbors(atom)
+        if (
+            value.symbol != "N"
+            or value.charge
+            or value.is_aromatic
+            or any(mol.get_bond(atom, other).order != 1 for other in neighbors)
+            or value.total_h_count + len(neighbors) != 3
+        ):
+            return False
     if any(mol.atoms[atom].charge for atom in added | intrinsic):
         return False
     # Mixed extra unsaturation and hydrogen operations need a redistribution
@@ -582,11 +601,10 @@ def _has_consistent_derivative_operations(
     if sum(not mol.atoms[atom].is_aromatic for atom in nitrogen_h) > 1:
         return False
     if carbon_h:
-        # Carbon indicated-H plus oxo, added H, or non-aromatic N-H has no
-        # established rendering tier merely because the atom scopes are disjoint.
+        # Oxo may consume a separate parent pi bond next to a CH2 site. Added
+        # H and non-aromatic N-H still need their own composition proof.
         if (
-            oxo
-            or added
+            added
             or intrinsic
             or any(
                 not mol.atoms[atom].is_aromatic or mol.atoms[atom].charge or mol.atoms[atom].total_h_count != 1
@@ -600,14 +618,62 @@ def _has_consistent_derivative_operations(
             return False
         if any(order != 1 for edge, order in state.bond_delta.assignment.orders if carbon_h.intersection(edge)):
             return False
+        if oxo and not _has_carbon_h_oxo_bond_consumption(mol, atoms, state):
+            return False
     represented_external = {operation.bond_id for operation in state.oxo_operations}
-    return not any(
-        neighbor not in atoms
-        and mol.get_bond(atom, neighbor).order > 1
-        and mol.get_bond(atom, neighbor).idx not in represented_external
+    unrepresented_external = [
+        (atom, neighbor)
         for atom in atoms
         for neighbor in mol.get_neighbors(atom)
+        if neighbor not in atoms
+        and mol.get_bond(atom, neighbor).order > 1
+        and mol.get_bond(atom, neighbor).idx not in represented_external
+    ]
+    if not unrepresented_external:
+        return True
+    # External suffix chemistry is separate from the parent operations. Admit
+    # it only with nonempty, disjoint ordinary hydro already checked
+    # above; independent replay still verifies every atom, bond and locant.
+    if not hydro or h_atoms or added or intrinsic or unsaturated:
+        return False
+    return all(
+        mol.atoms[atom].symbol == "C"
+        and not mol.atoms[atom].charge
+        and atom not in hydro | oxo
+        and mol.get_bond(atom, neighbor).order == 2
+        and mol.atoms[neighbor].symbol in {"C", "N"}
+        and not mol.atoms[neighbor].charge
+        and mol.atoms[neighbor].total_h_count
+        + sum(mol.get_bond(neighbor, other).order for other in mol.get_neighbors(neighbor))
+        == mol.atoms[neighbor].element.standard_valence
+        for atom, neighbor in unrepresented_external
     )
+
+
+def _has_carbon_h_oxo_bond_consumption(mol: Molecule, atoms: frozenset[int], state: ParentDerivativeState) -> bool:
+    """Prove carbon-H/oxo composition without counting oxo-consumed pi as hydro.
+
+    A carbonyl replaces the parent double bond at its carbon; the other end
+    must be an independent CH2 site (possibly bearing single-bond branches).
+    The indicated-H model and derivative replay establish the remaining sites.
+    """
+
+    for operation in state.oxo_operations:
+        atom = operation.parent_atom_id
+        if (
+            mol.atoms[atom].symbol != "C"
+            or mol.atoms[atom].charge
+            or len(atoms.intersection(mol.get_neighbors(atom))) != 2
+            or any(mol.get_bond(atom, other).order != 1 for other in mol.get_neighbors(atom) if other in atoms)
+        ):
+            return False
+        consumed = [edge for edge, order in state.bond_delta.assignment.orders if order == 2 and atom in edge]
+        if len(consumed) != 1:
+            return False
+        other = next(site for site in consumed[0] if site != atom)
+        if not is_intrinsic_carbon_h_site(mol, other, atoms):
+            return False
+    return bool(state.oxo_operations)
 
 
 def _has_complete_hydrogenation(

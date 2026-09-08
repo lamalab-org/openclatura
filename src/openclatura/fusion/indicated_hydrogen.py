@@ -8,14 +8,16 @@ from functools import lru_cache
 
 from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule
-from ..retained_graph_model import RetainedGraphAtomTemplate
+from ..retained_graph_model import RetainedGraphAtomTemplate, merge_parent_bond_classes
 from .charges import fusion_charge_lone_pair_sites
 from .mancude import (
     _nitrogen_composition_parent_model,
     _single_site_parent_model,
     compare_actual_parent_to_implied_parent,
+    indicated_hydrogen_parent_bond_model,
 )
 from .model import (
+    FusionComponentMatch,
     FusionComponentSpec,
     FusionGraph,
     FusionGraphAtom,
@@ -163,8 +165,73 @@ def component_carbon_h_relocation_scope(ast: FusionNameAst, specs: Mapping[int, 
     explicit component pi budgets before additive operations.
     """
 
-    return intrinsic_carbon_fusion_scope(ast, specs) or all(
+    eligible = intrinsic_carbon_fusion_scope(ast, specs) or all(
         atom.symbol == "C" and atom.charge == 0 for spec in specs.values() for atom in spec.atoms
+    )
+    if not eligible:
+        return False
+    if all(component_parent_atoms(spec) == spec.atoms for spec in specs.values()):
+        return True
+    # Component-local tautomer equivalence must also preserve the completed
+    # parent's pi budget. Fusion can otherwise turn released H into extra hydro.
+    components = tuple((match, specs[match.occurrence_id]) for match in ast.component_occurrences)
+    return _completed_carbon_h_budget(components, False) == _completed_carbon_h_budget(components, True)
+
+
+@lru_cache(maxsize=512)
+def _completed_carbon_h_budget(
+    components: tuple[tuple[FusionComponentMatch, FusionComponentSpec], ...], relaxed: bool
+) -> int:
+    return parent_bond_model(_component_parent_graph(components, relaxed)).maximum_non_cumulative_double_bonds
+
+
+def component_parent_graph(
+    ast: FusionNameAst, specs: Mapping[int, FusionComponentSpec], *, relocate_carbon_h: bool
+) -> FusionGraph:
+    """Project component roles once, shared by planning and the relocation proof."""
+
+    components = tuple((match, specs[match.occurrence_id]) for match in ast.component_occurrences)
+    return _component_parent_graph(components, relocate_carbon_h)
+
+
+@lru_cache(maxsize=512)
+def _component_parent_graph(
+    components: tuple[tuple[FusionComponentMatch, FusionComponentSpec], ...], relaxed: bool
+) -> FusionGraph:
+    labels = {}
+    edges = {}
+    for match, spec in components:
+        local_map = match.input_atom_by_locant
+        for atom in component_parent_atoms(spec) if relaxed else spec.atoms:
+            atom_id = local_map[atom.locant]
+            site = FusionGraphAtom(
+                atom_id,
+                atom.symbol,
+                atom.charge,
+                pi_capacity=atom.resolved_pi_capacity,
+                forced_single=atom.forced_single,
+                indicated_h_site=atom.indicated_h_site or atom.default_h,
+                saturated=atom.saturated,
+            )
+            previous = labels.get(atom_id, site)
+            if previous.symbol != site.symbol or previous.formal_charge != site.formal_charge:
+                raise ValueError("component atom identities disagree at a shared fusion site")
+            labels[atom_id] = replace(
+                site,
+                pi_capacity=min(previous.pi_capacity, site.pi_capacity),
+                forced_single=previous.forced_single or site.forced_single,
+                indicated_h_site=previous.indicated_h_site or site.indicated_h_site,
+                saturated=previous.saturated or site.saturated,
+            )
+        for bond in spec.bonds:
+            edge = tuple(sorted(local_map[locant] for locant in bond.locants))
+            merged = merge_parent_bond_classes(edges.get(edge, bond.bond_class), bond.bond_class)
+            if merged is None:
+                raise ValueError("component bond classes disagree on a shared fusion edge")
+            edges[edge] = merged
+    return FusionGraph(
+        atoms=tuple(labels[atom] for atom in sorted(labels)),
+        bonds=tuple(FusionGraphBond(edge, edges[edge]) for edge in sorted(edges)),
     )
 
 
@@ -175,16 +242,33 @@ def intrinsic_carbon_candidate_atoms(
 ) -> frozenset[int]:
     """Map component-local carbon H capacity into a demonstrated fusion class."""
 
-    if not intrinsic_carbon_fusion_scope(ast, specs):
-        return frozenset()
     parent_atoms = {atom for match in ast.component_occurrences for atom in match.input_atom_by_locant.values()}
+    blocked = set()
+    movable_defaults = set()
+    for match in ast.component_occurrences:
+        spec = specs[match.occurrence_id]
+        relaxed = {atom.locant: atom for atom in component_parent_atoms(spec)}
+        for atom in spec.atoms:
+            atom_id = match.input_atom_by_locant[atom.locant]
+            role = relaxed[atom.locant]
+            if not role.resolved_pi_capacity or role.saturated or role.forced_single:
+                blocked.add(atom_id)
+            elif atom.saturated and not role.saturated:
+                movable_defaults.add(atom_id)
+    aromatic_junctions = frozenset(
+        atom
+        for atom in movable_defaults - blocked
+        if mol.atoms[atom].is_aromatic and len(parent_atoms.intersection(mol.get_neighbors(atom))) == 3
+    )
+    if not intrinsic_carbon_fusion_scope(ast, specs) or not component_carbon_h_relocation_scope(ast, specs):
+        return aromatic_junctions
     if not any(is_intrinsic_carbon_h_site(mol, atom, parent_atoms) for atom in parent_atoms):
-        return frozenset()
+        return aromatic_junctions
     candidates = set()
     for match in ast.component_occurrences:
         spec = specs[match.occurrence_id]
         candidates.update(match.input_atom_by_locant[locant] for locant in _component_carbon_h_locants(spec))
-    return frozenset(candidates)
+    return frozenset(candidates - blocked) | aromatic_junctions
 
 
 def is_intrinsic_carbon_h_site(mol: Molecule, atom: int, parent_atoms: set[int] | frozenset[int]) -> bool:
@@ -217,6 +301,20 @@ def intrinsic_carbon_parent_model(
     an operation deleting a double bond from an otherwise chosen assignment.
     """
 
+    aromatic_junctions = aromatic_fusion_carbon_sites(mol, graph, candidates)
+    if aromatic_junctions:
+        # Fusion consumes the component's movable CH2 convention at an
+        # aromatic junction. It must not become a localized extra double bond.
+        graph = replace(
+            graph,
+            atoms=tuple(
+                replace(atom, pi_capacity=1, saturated=False, indicated_h_site=False)
+                if atom.id in aromatic_junctions
+                else atom
+                for atom in graph.atoms
+            ),
+        )
+        model = indicated_hydrogen_parent_bond_model(graph, intrinsic_hydrogen_atom_ids)
     if not candidates or any(
         mol.atoms[atom].symbol != "C" and mol.atoms[atom].total_h_count and atom not in intrinsic_hydrogen_atom_ids
         for atom in locants
@@ -227,12 +325,29 @@ def intrinsic_carbon_parent_model(
     parent_atoms = frozenset(locants)
     model = _nitrogen_composition_parent_model(mol, parent_atoms, model, intrinsic_hydrogen_atom_ids)
     eligible = {atom for atom in candidates if is_intrinsic_carbon_h_site(mol, atom, parent_atoms)}
+    oxo_sites = {
+        atom
+        for atom in candidates
+        if mol.atoms[atom].symbol == "C"
+        and not mol.atoms[atom].charge
+        and len(parent_atoms.intersection(mol.get_neighbors(atom))) == 2
+        and all(
+            mol.get_bond(atom, other).order == 1 or (mol.atoms[atom].is_aromatic and mol.atoms[other].is_aromatic)
+            for other in mol.get_neighbors(atom)
+            if other in parent_atoms
+        )
+        and any(
+            other not in parent_atoms and mol.atoms[other].symbol == "O" and mol.get_bond(atom, other).order == 2
+            for other in mol.get_neighbors(atom)
+        )
+    }
+    eligible.update(oxo_sites)
     carbon_atoms = {
         atom.id
         for atom in graph.atoms
         if atom.symbol == "C" and atom.pi_capacity and not atom.saturated and not atom.forced_single
     }
-    groups = {}
+    groups = set()
     for assignment in model.allowed_kekule_assignments:
         paired = {atom for edge, order in assignment.orders if order == 2 for atom in edge}
         unpaired = carbon_atoms - paired
@@ -241,29 +356,55 @@ def intrinsic_carbon_parent_model(
         if intrinsic_hydrogen_atom_ids and carbon_atoms <= paired:
             return model, frozenset()
         if unpaired and unpaired <= eligible:
-            unpaired = frozenset(unpaired)
-            groups.setdefault(unpaired, []).append(assignment)
+            groups.add(frozenset(unpaired))
     choices = []
-    for sites, assignments in groups.items():
-        constrained = replace(model, allowed_kekule_assignments=tuple(assignments))
+    for sites in groups:
+        constrained = _single_site_parent_model(model, sites)
+        if constrained.maximum_non_cumulative_double_bonds != model.maximum_non_cumulative_double_bonds:
+            continue
         delta = compare_actual_parent_to_implied_parent(
             mol,
             parent_atoms,
             constrained,
             atom_to_locant=locants,
             indicated_hydrogen_atom_ids=intrinsic_hydrogen_atom_ids,
+            externally_unsaturated_atom_ids=oxo_sites,
         )
         if delta is None or not delta.compatible or delta.additional_multiple_bond_ids:
             continue
+        # Nitrogen recomposition must not pay for a carbon tautomer by deleting
+        # another parent pi bond or hydrogenating an aromatic boundary atom.
+        if sum(order == 2 for _, order in delta.assignment.orders) != model.maximum_non_cumulative_double_bonds:
+            continue
+        if any(mol.atoms[atom].is_aromatic for edge in delta.hydrogenated_edges for atom in edge):
+            continue
+        if sites & oxo_sites and not delta.intrinsic_hydro_operations:
+            continue
         rank = (len(delta.hydrogenated_edges), tuple(sorted(system_locant_sort_key(locants[atom]) for atom in sites)))
-        choices.append((rank, constrained, sites))
+        choices.append((rank, constrained, frozenset() if delta.intrinsic_hydro_operations else sites))
     if not choices:
         return model, frozenset()
     _, constrained, sites = min(choices, key=lambda choice: choice[0])
-    result = _single_site_parent_model(model, sites)
-    if result.maximum_non_cumulative_double_bonds != model.maximum_non_cumulative_double_bonds:
-        return model, frozenset()
-    return result, sites
+    return constrained, sites
+
+
+def aromatic_fusion_carbon_sites(
+    mol: Molecule, graph: FusionGraph, movable_candidates: frozenset[int]
+) -> frozenset[int]:
+    """Bind component-proved movability to an observed aromatic C junction."""
+
+    atoms = frozenset(atom.id for atom in graph.atoms)
+    return frozenset(
+        atom.id
+        for atom in graph.atoms
+        if atom.id in movable_candidates
+        and atom.symbol == "C"
+        and not atom.formal_charge
+        and atom.saturated
+        and not atom.forced_single
+        and mol.atoms[atom.id].is_aromatic
+        and len(atoms.intersection(mol.get_neighbors(atom.id))) == 3
+    )
 
 
 def intrinsic_parent_lone_pair_sites(mol: Molecule, graph: FusionGraph) -> frozenset[int]:

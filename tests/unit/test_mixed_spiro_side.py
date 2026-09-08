@@ -4,11 +4,11 @@ import pytest
 from rdkit import Chem
 
 from openclatura import name, name_mol, opsin_available, verify_with_opsin
-from openclatura.assembler import assemble_name_result
+from openclatura.assembler import assemble_name_raw, assemble_name_result
 from openclatura.assembly_parts import AssemblyParts, SubstituentItem
 from openclatura.assembly_spiro import split_spiro_substituents
 from openclatura.fusion.model import FusionMode
-from openclatura.graph_io import read_smiles
+from openclatura.graph_io import read_rdkit_mol, read_smiles
 from openclatura.spiro_subgraph import plan_substituted_fusion_spiro_side
 
 SMILES = "Cc1nc(N2CCC3(CC2)Cc2ncccc2[C@H]3N)c(CO)nc1Sc1ccnc(N)c1Cl"
@@ -142,3 +142,30 @@ def test_fusion_side_adapter_preserves_oxo_operation_and_attachment():
     assert mol.atoms[operation.oxygen_atom_id].symbol == "O"
     assert mol.bonds[operation.bond_id].order == 2
     assert any(operation.oxygen_atom_id in item.atom_ids for item in side.side_substituents)
+
+
+@pytest.mark.parametrize("substitution", [None, (1, "C"), (4, "F")])
+def test_graph_built_fused_ketone_sides_keep_exact_hydrogenation(substitution):
+    if not opsin_available():
+        pytest.skip("OPSIN and Java are required")
+    graph = Chem.RWMol(Chem.MolFromSmiles("C1Cc2ncccc2C1=O"))
+    if substitution is not None:
+        parent, symbol = substitution
+        added = graph.AddAtom(Chem.Atom(symbol))
+        graph.AddBond(parent, added, Chem.BondType.SINGLE)
+    Chem.SanitizeMol(graph)
+    original = Chem.MolToSmiles(graph)
+    orders = [list(range(graph.GetNumAtoms())), list(reversed(range(graph.GetNumAtoms())))]
+    names = []
+    for order in orders:
+        mol = read_rdkit_mol(Chem.RenumberAtoms(graph, order))
+        side = plan_substituted_fusion_spiro_side(mol, set(mol.atoms), order.index(0), mode=FusionMode.AUDITED_PIN)
+        assert side is not None
+        assert side.side_parts.parent_hydride.is_systematic_fusion
+        assert side.side_parts.parent_atom_ids_by_locant[side.side_locant] == order.index(0)
+        generated = assemble_name_raw(side.side_parts)
+        check = verify_with_opsin(generated, original, standardize_smiles=False)
+        assert check.ok, check.to_dict()
+        assert check.canonical_roundtrip == original
+        names.append(generated)
+    assert names[0] == names[1]

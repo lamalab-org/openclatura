@@ -5,11 +5,15 @@ from dataclasses import replace
 import pytest
 from test_fusion_audit import _two_fused_rings
 
+from openclatura.chains import find_ring_systems
 from openclatura.fusion import indicated_hydrogen as intrinsic
 from openclatura.fusion.audit import _audit_derivative_state, _has_consistent_derivative_operations
 from openclatura.fusion.mancude import parent_derivative_state
-from openclatura.fusion.model import FusionGraph, FusionGraphAtom, FusionGraphBond
+from openclatura.fusion.model import FusionConfirmed, FusionGraph, FusionGraphAtom, FusionGraphBond
 from openclatura.fusion.numbering import MancudeSearchBudgetExceeded, parent_bond_model
+from openclatura.fusion.planner import plan_fusion_parent
+from openclatura.fusion.registry import fusion_component_registry
+from openclatura.graph_io import read_smiles
 from openclatura.locants import SystemLocant
 from openclatura.molecule import Molecule
 
@@ -58,6 +62,27 @@ def test_unproved_unpaired_carbon_cannot_be_silently_ignored():
     model, sites = intrinsic.intrinsic_carbon_parent_model(mol, graph, original, locants, frozenset({0}))
     assert not sites
     assert model == original
+
+
+def test_oxo_converts_joint_carbon_h_sites_without_deleting_parent_pi_bonds():
+    mol, graph, locants = _two_carbon_h_domains()
+    mol.update_atom(0, total_h_count=0)
+    mol.add_atom("O", idx=10)
+    mol.add_bond(0, 10, idx=11, order=2)
+    original = parent_bond_model(graph)
+    model, sites = intrinsic.intrinsic_carbon_parent_model(mol, graph, original, locants, frozenset({0, 5}))
+    assert not sites
+    assert model.maximum_non_cumulative_double_bonds == original.maximum_non_cumulative_double_bonds == 4
+    state = parent_derivative_state(mol, frozenset(locants), model, locants)
+    assert state is not None
+    assert not state.hydro_operations
+    assert not state.added_hydrogen_operations
+    assert not state.unsaturation_operations
+    (operation,) = state.intrinsic_hydro_operations
+    assert operation.locants == ("1", "6")
+    assert operation.atom_ids == (0, 5)
+    assert operation.bond_ids == ()
+    assert state.oxo_operations[0].parent_atom_id == 0
 
 
 def test_carbon_site_constraint_propagates_matching_budget(monkeypatch):
@@ -131,6 +156,130 @@ def test_duplicate_oxo_is_rejected_by_independent_replay():
         errors,
     )
     assert "typed oxo operations duplicate an exocyclic parent oxo group" in errors
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    (
+        "C=C1C(=O)O[C@H]2[C@H]1CCC(C)=C1CCC(=O)O[C@]12C",
+        "O=S1(=O)CCc2c1scc/c2=N\\NC",
+    ),
+)
+@pytest.mark.parametrize("corruption", ("empty_hydro", "overlapping_added_h", "outside_parent"))
+def test_external_derivative_composition_requires_nonempty_independent_hydro(smiles, corruption):
+    mol = read_smiles(smiles)
+    atoms = max(find_ring_systems(mol), key=lambda system: len(system.atoms)).atoms
+    result = plan_fusion_parent(mol, atoms, mode="audited_pin")
+    assert isinstance(result, FusionConfirmed)
+    plan = result.plan
+    registry = fusion_component_registry()
+    specs = {match.occurrence_id: registry.spec_for_match(match) for match in plan.ast.component_occurrences}
+    state = plan.derivative_state
+    assert _has_consistent_derivative_operations(mol, plan.ast, specs, plan.numbering, (), state)
+    if corruption == "empty_hydro":
+        state = replace(state, hydro_operations=())
+    elif corruption == "overlapping_added_h":
+        state = replace(state, bond_delta=replace(state.bond_delta, added_hydrogen_operations=state.hydro_operations))
+    else:
+        state = replace(state, hydro_operations=(replace(state.hydro_operations[0], atom_ids=(-1, -2)),))
+    assert not _has_consistent_derivative_operations(mol, plan.ast, specs, plan.numbering, (), state)
+
+
+def test_higher_order_join_does_not_admit_an_unproved_external_multiple_bond():
+    mol = read_smiles("C=C1C(=O)O[C@H]2[C@H]1CCC(C)=C1CCC(=O)O[C@]12C")
+    atoms = max(find_ring_systems(mol), key=lambda system: len(system.atoms)).atoms
+    result = plan_fusion_parent(mol, atoms, mode="audited_pin")
+    assert isinstance(result, FusionConfirmed)
+    plan = result.plan
+    registry = fusion_component_registry()
+    specs = {match.occurrence_id: registry.spec_for_match(match) for match in plan.ast.component_occurrences}
+    assert _has_consistent_derivative_operations(mol, plan.ast, specs, plan.numbering, (), plan.derivative_state)
+    mol.update_atom(0, symbol="S", total_h_count=0)
+    assert not _has_consistent_derivative_operations(mol, plan.ast, specs, plan.numbering, (), plan.derivative_state)
+
+
+@pytest.mark.parametrize("corruption", ("charged", "triple", "valence", "hydro_overlap"))
+def test_component_owned_hydro_cannot_bypass_external_bond_checks(corruption):
+    mol = read_smiles("O=S1(=O)CCc2c1scc/c2=N\\NC")
+    atoms = max(find_ring_systems(mol), key=lambda system: len(system.atoms)).atoms
+    result = plan_fusion_parent(mol, atoms, mode="audited_pin")
+    assert isinstance(result, FusionConfirmed)
+    plan = result.plan
+    registry = fusion_component_registry()
+    specs = {match.occurrence_id: registry.spec_for_match(match) for match in plan.ast.component_occurrences}
+    occurrences = [atom for match in plan.ast.component_occurrences for atom in match.input_atom_by_locant.values()]
+    scopes = [
+        {
+            match.input_atom_by_locant[atom.locant]
+            for atom in specs[match.occurrence_id].atoms
+            if atom.symbol == "C" and occurrences.count(match.input_atom_by_locant[atom.locant]) == 1
+        }
+        for match in plan.ast.component_occurrences
+    ]
+    state = plan.derivative_state
+    assert state.hydro_operations
+    assert all(set(operation.atom_ids) in scopes for operation in state.hydro_operations)
+    assert _has_consistent_derivative_operations(mol, plan.ast, specs, plan.numbering, (), state)
+    ((parent, external),) = [
+        (atom, other)
+        for atom in atoms
+        for other in mol.get_neighbors(atom)
+        if other not in atoms and mol.atoms[other].symbol == "N" and mol.get_bond(atom, other).order == 2
+    ]
+    if corruption == "charged":
+        mol.update_atom(external, charge=1)
+    elif corruption == "triple":
+        mol.update_bond(mol.get_bond(parent, external).idx, order=3)
+    elif corruption == "valence":
+        mol.update_atom(external, total_h_count=1)
+    else:
+        carbon = max(mol.atoms) + 1
+        mol.add_atom("C", idx=carbon, total_h_count=2)
+        atom = state.hydro_operations[0].atom_ids[0]
+        mol.update_atom(atom, total_h_count=0)
+        mol.add_bond(atom, carbon, order=2, idx=max(mol.bonds) + 1)
+    assert not _has_consistent_derivative_operations(mol, plan.ast, specs, plan.numbering, (), state)
+
+
+@pytest.mark.parametrize("restriction", ("undeclared_h", "shared_saturation", "shared_zero_capacity"))
+def test_aromatic_junction_cannot_release_an_unproved_component_role(restriction):
+    mol = read_smiles("CSc1ccc(C2c3c(oc4ccccc4c3=O)C(=O)N2c2ncccn2)cc1")
+    atoms = max(find_ring_systems(mol), key=lambda system: len(system.atoms)).atoms
+    result = plan_fusion_parent(mol, atoms, mode="audited_pin")
+    assert isinstance(result, FusionConfirmed)
+    plan = result.plan
+    assert not plan.derivative_state.unsaturation_operations
+    registry = fusion_component_registry()
+    specs = {match.occurrence_id: registry.spec_for_match(match) for match in plan.ast.component_occurrences}
+    candidates = intrinsic.intrinsic_carbon_candidate_atoms(plan.ast, specs, mol)
+    (junction,) = intrinsic.aromatic_fusion_carbon_sites(mol, plan.abstract_parent_graph, candidates)
+    assert not intrinsic.aromatic_fusion_carbon_sites(mol, plan.abstract_parent_graph, frozenset())
+    for match in plan.ast.component_occurrences:
+        spec = specs[match.occurrence_id]
+        local = next((atom for atom in spec.atoms if match.input_atom_by_locant[atom.locant] == junction), None)
+        if local is None or local.saturated != (restriction == "undeclared_h"):
+            continue
+        if restriction == "undeclared_h":
+            template = replace(spec.template, default_indicated_h=())
+        else:
+            change = {"saturated": True} if restriction == "shared_saturation" else {"pi_capacity": 0}
+            template = replace(
+                spec.template,
+                atoms=tuple(replace(atom, **change) if atom.locant == local.locant else atom for atom in spec.atoms),
+            )
+        specs[match.occurrence_id] = replace(spec, template=template)
+        break
+    else:
+        pytest.fail("no component contribution was restricted")
+    candidates = intrinsic.intrinsic_carbon_candidate_atoms(plan.ast, specs, mol)
+    assert junction not in candidates
+    graph = intrinsic.component_parent_graph(plan.ast, specs, relocate_carbon_h=False)
+    original = parent_bond_model(graph)
+    model, _ = intrinsic.intrinsic_carbon_parent_model(
+        mol, graph, original, dict(plan.numbering.input_locant_maps[0]), candidates
+    )
+    assert all(edge in model.required_single_bonds for edge in original.required_single_bonds if junction in edge)
+    assert not intrinsic.aromatic_fusion_carbon_sites(mol, graph, candidates)
 
 
 def test_intrinsic_carbon_scope_accepts_ortho_peri_but_requires_pi_budgets():

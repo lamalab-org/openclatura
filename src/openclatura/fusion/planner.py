@@ -9,7 +9,6 @@ from ..assembly_parts import NameTokenBinding
 from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule
 from ..polycycle_topology import ring_system_topology
-from ..retained_graph_model import merge_parent_bond_classes
 from .audit import audit_fusion_plan
 from .charges import fusion_charge_operations as _fusion_charge_operations
 from .charges import fusion_component_charge_parent
@@ -20,6 +19,7 @@ from .faces import typed_face_model as _typed_face_model
 from .indicated_hydrogen import (
     component_carbon_h_relocation_scope,
     component_parent_atoms,
+    component_parent_graph,
     intrinsic_carbon_candidate_atoms,
     intrinsic_carbon_parent_model,
     intrinsic_parent_lone_pair_sites,
@@ -39,8 +39,6 @@ from .model import (
     FusionComponentSpec,
     FusionConfirmed,
     FusionGraph,
-    FusionGraphAtom,
-    FusionGraphBond,
     FusionMode,
     FusionNameAst,
     FusionNotApplicable,
@@ -204,6 +202,8 @@ def _plan_numbered_candidate(
         return FusionUnsupported("no layout-derived peripheral system numbering was proven")
     try:
         graph = _abstract_graph(ast, registry)
+    except MancudeSearchBudgetExceeded as exc:
+        return FusionUnsupported("mancude assignment search budget exhausted", (str(exc),))
     except ValueError as exc:
         return FusionAuditFailed("fusion component graphs could not be merged consistently", (str(exc),))
     try:
@@ -271,6 +271,8 @@ def _complete_fusion_plan(
     try:
         if graph is None:
             graph = _abstract_graph(ast, registry)
+    except MancudeSearchBudgetExceeded as exc:
+        return FusionUnsupported("mancude assignment search budget exhausted", (str(exc),))
     except ValueError as exc:
         return FusionAuditFailed(
             "fusion component graphs could not be merged consistently",
@@ -523,46 +525,5 @@ def _standard_valence_parent(mol: Molecule, atoms: frozenset[int]) -> bool:
 
 
 def _abstract_graph(ast, registry) -> FusionGraph:
-    labels: dict[int, FusionGraphAtom] = {}
-    edges: dict[tuple[int, int], str] = {}
     specs = {match.occurrence_id: registry.spec_for_match(match) for match in ast.component_occurrences}
-    relocate_carbon_h = component_carbon_h_relocation_scope(ast, specs)
-    for match in ast.component_occurrences:
-        spec = registry.spec_for_match(match)
-        local_map = match.input_atom_by_locant
-        for atom in component_parent_atoms(spec) if relocate_carbon_h else spec.atoms:
-            input_atom = local_map[atom.locant]
-            site = FusionGraphAtom(
-                input_atom,
-                atom.symbol,
-                atom.charge,
-                pi_capacity=atom.resolved_pi_capacity,
-                forced_single=atom.forced_single,
-                indicated_h_site=atom.indicated_h_site or atom.default_h,
-                saturated=atom.saturated,
-            )
-            previous_site = labels.setdefault(input_atom, site)
-            if previous_site.symbol != site.symbol or previous_site.formal_charge != site.formal_charge:
-                raise ValueError("component atom identities disagree at a shared fusion site")
-            if previous_site != site:
-                labels[input_atom] = FusionGraphAtom(
-                    input_atom,
-                    site.symbol,
-                    site.formal_charge,
-                    pi_capacity=min(previous_site.pi_capacity, site.pi_capacity),
-                    forced_single=previous_site.forced_single or site.forced_single,
-                    indicated_h_site=previous_site.indicated_h_site or site.indicated_h_site,
-                    saturated=previous_site.saturated or site.saturated,
-                )
-        for bond in spec.bonds:
-            left, right = (local_map[locant] for locant in bond.locants)
-            edge = (left, right) if left < right else (right, left)
-            previous = edges.setdefault(edge, bond.bond_class)
-            merged = merge_parent_bond_classes(previous, bond.bond_class)
-            if merged is None:
-                raise ValueError("component bond classes disagree on a shared fusion edge")
-            edges[edge] = merged
-    return FusionGraph(
-        atoms=tuple(labels[atom] for atom in sorted(labels)),
-        bonds=tuple(FusionGraphBond(edge, edges[edge]) for edge in sorted(edges)),
-    )
+    return component_parent_graph(ast, specs, relocate_carbon_h=component_carbon_h_relocation_scope(ast, specs))

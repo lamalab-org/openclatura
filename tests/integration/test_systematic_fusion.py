@@ -904,13 +904,14 @@ def test_face_search_budget_exhaustion_becomes_a_typed_abstention(monkeypatch):
     assert "cycle enumeration" in result.details[0]
 
 
-def test_mancude_search_budget_exhaustion_becomes_a_typed_abstention(monkeypatch):
+@pytest.mark.parametrize("stage", ["parent_bond_model", "_abstract_graph"])
+def test_mancude_search_budget_exhaustion_becomes_a_typed_abstention(monkeypatch, stage):
     mol = read_smiles("O1C2=C(C=C1)C=CS2")
 
     def exhausted(*args, **kwargs):
         raise MancudeSearchBudgetExceeded(1)
 
-    monkeypatch.setattr("openclatura.fusion.planner.parent_bond_model", exhausted)
+    monkeypatch.setattr(f"openclatura.fusion.planner.{stage}", exhausted)
     result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
 
     assert isinstance(result, FusionUnsupported)
