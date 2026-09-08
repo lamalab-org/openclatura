@@ -123,7 +123,22 @@ def test_side_adapter_respects_fusion_policy(mode):
     assert plan_substituted_fusion_spiro_side(mol, set(mol.atoms), 0, mode=mode) is None
 
 
-@pytest.mark.parametrize("smiles", ["C1CC(N)CCC1", "C1Cc2ncccc2C1=O"])
-def test_side_adapter_declines_unsupported_sides(smiles):
-    mol = read_smiles(smiles)
+def test_fusion_side_adapter_declines_a_single_ring():
+    mol = read_smiles("C1CC(N)CCC1")
     assert plan_substituted_fusion_spiro_side(mol, set(mol.atoms), 0, mode=FusionMode.AUDITED_PIN) is None
+
+
+def test_fusion_side_adapter_preserves_oxo_operation_and_attachment():
+    mol = read_smiles("C1Cc2ncccc2C1=O")
+    side = plan_substituted_fusion_spiro_side(mol, set(mol.atoms), 0, mode=FusionMode.AUDITED_PIN)
+    assert side is not None
+    parts = side.side_parts
+    assert parts.parent_atom_ids_by_locant[side.side_locant] == 0
+    plan = parts.parent_hydride.fusion_plan
+    assert plan is not None
+    assert len(plan.derivative_state.oxo_operations) == 1
+    operation = plan.derivative_state.oxo_operations[0]
+    assert parts.parent_atom_ids_by_locant[str(operation.locant)] == operation.parent_atom_id
+    assert mol.atoms[operation.oxygen_atom_id].symbol == "O"
+    assert mol.bonds[operation.bond_id].order == 2
+    assert any(operation.oxygen_atom_id in item.atom_ids for item in side.side_substituents)

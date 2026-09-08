@@ -1,6 +1,8 @@
 """Spiro-specific assembly formatting."""
 
 import re
+from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass, replace
 
 from .assembly_parts import AssemblyParts, SubstituentItem
@@ -15,6 +17,73 @@ AMBIGUOUS_CONNECTION_SUBSTITUENT_STEMS = RULES.assembly.ambiguous_connection_sub
 
 _SIDE_STEREO_RE = re.compile(r"^\((?P<body>\d+[A-Za-z']*(?:[RS]|[EZ])(?:,\d+[A-Za-z']*(?:[RS]|[EZ]))*)\)-?")
 _SIDE_STEREO_TERM_RE = re.compile(r"^(?P<locant>\d+[a-z']*)(?P<descriptor>[RSEZ])$")
+
+
+def _prime_side_locant(locant: str) -> str:
+    return str(locant) if not str(locant) or str(locant).endswith("'") else f"{locant}'"
+
+
+def spiro_assembly_from_parts(
+    parts: AssemblyParts, junction_locant: str, *, render_parent: Callable[[AssemblyParts], str] | None = None
+) -> SpiroAssembly | None:
+    """Project a component-owned snapshot without parsing its prefix names.
+
+    The returned side owns ``parts``; callers must not mutate it afterwards.
+    A separate working copy isolates the shared renderer's mutations.
+    """
+
+    from .assembler import assemble_name_raw
+    from .assembly_parent import format_principal_suffix, parent_stem_and_terminal
+
+    # Only the established ol/one suffix merger supports cross-component
+    # hoisting. Added hydrogen without a principal suffix remains local and
+    # is handled normally by the shared assembler.
+    group = parts.principal_group
+    if render_parent is None and (parts.parent_charges or any(parts.parent_atom_charges_by_locant.values())):
+        # Raw assembly alone cannot apply graph-dependent ionic rewrites.
+        return None
+    # Hoisting another spiro wrapper would require a new component namespace,
+    # not an ordinary detachable-prefix locant. Do not silently drop it.
+    if any(item.spiro is not None for item in parts.substituents):
+        return None
+    if group is not None and (
+        group.key not in {"ketone", "alcohol"}
+        or parts.principal_suffix_modifiers
+        or any(operation.key == "added_hydrogen" for operation in parts.hydro_operations)
+    ):
+        return None
+    local = deepcopy(parts)
+    local.substituents = []
+    local.stereo_features = []
+    local.name_atom_bindings = []
+    _, parent_terminal = parent_stem_and_terminal(local)
+    name = render_parent(local) if render_parent is not None else assemble_name_raw(local)
+    suffixes = ()
+    if local.principal_group is not None and not local.retained_absorbs_principal_group:
+        terminal, suffix = format_principal_suffix(local, parent_terminal, [])
+        if not suffix or not name.endswith(suffix):
+            raise ValueError("spiro side suffix must match shared parent assembly")
+        name = name[: -len(suffix)] + (parent_terminal if not terminal else "")
+        group = local.principal_group
+        word = "one" if group.key == "ketone" else "ol"
+        suffixes = tuple((str(locant), word) for locant in group.locants)
+    substituents = tuple(
+        replace(item, locants=[_prime_side_locant(locant) for locant in item.locants]) for item in parts.substituents
+    )
+    return SpiroAssembly(
+        parent_locant="",
+        side_locant=junction_locant,
+        side_parent_name=name,
+        side_prefixes=tuple(f"{','.join(item.locants)}-{item.name}" for item in substituents),
+        side_suffixes=suffixes,
+        side_stereo=tuple(
+            (_prime_side_locant(locant), descriptor)
+            for locant, descriptor in parts.stereo_features
+            if str(locant) != junction_locant
+        ),
+        side_substituents=substituents,
+        side_parts=parts,
+    )
 
 
 def split_spiro_substituents(parts: AssemblyParts) -> list[SpiroAssembly]:
@@ -125,6 +194,15 @@ def _hoist_side_substituent_prefixes(parts: AssemblyParts, spiro: SpiroAssembly)
 
     kept = []
     hoisted = False
+    if spiro.side_parts is not None:
+        for item in spiro.side_substituents:
+            parts.substituents.append(deepcopy(item))
+            if parts.name_atom_bindings:
+                from .name_bindings import refresh_name_atom_bindings
+
+                branch_parts = AssemblyParts(parent_length=0, substituents=[item])
+                parts.name_atom_bindings.extend(refresh_name_atom_bindings(branch_parts))
+        return replace(spiro, side_prefixes=())
     for prefix in spiro.side_prefixes:
         for locants, name in _split_side_prefix_run(prefix):
             if not locants or _is_replacement_prefix(name):
@@ -154,6 +232,8 @@ def _hoist_side_substituent_prefixes(parts: AssemblyParts, spiro: SpiroAssembly)
 def _normalize_spiro_assembly(spiro: SpiroAssembly) -> SpiroAssembly:
     """Extract side-component prefixes/suffixes before spiro rendering."""
 
+    if spiro.side_parts is not None:
+        return spiro
     side_prefixes, side_parent_name, side_suffixes, side_stereo = extract_spiro_side_prefixes(spiro.side_parent_name)
     if not side_prefixes and side_parent_name == spiro.side_parent_name and not side_suffixes and not side_stereo:
         return spiro
@@ -186,8 +266,8 @@ def format_spiro_core(
         s_name = spiro.side_parent_name
         side_prefixes.extend(spiro.side_prefixes)
         side_suffixes.extend(_prime_side_suffixes(spiro.side_suffixes, "'"))
-        extracted_prefixes, extracted_parent, extracted_suffixes, _extracted_stereo = extract_spiro_side_prefixes(
-            s_name
+        extracted_prefixes, extracted_parent, extracted_suffixes, _extracted_stereo = (
+            ([], s_name, (), ()) if spiro.side_parts is not None else extract_spiro_side_prefixes(s_name)
         )
         if extracted_prefixes or extracted_parent != s_name or extracted_suffixes:
             side_prefixes.extend(extracted_prefixes)
@@ -258,6 +338,8 @@ def _spiro_side_name(side_parent_name: str) -> str:
 def _spiro_side_locant(spiro: SpiroAssembly) -> str:
     """Return the displayed side-component spiro locant."""
 
+    if spiro.side_parts is not None:
+        return spiro.side_locant
     retained = _retained_saturated_n_ring_info(spiro.side_parent_name)
     if spiro.side_locant == retained.n_locant and retained.ring_size:
         return str(retained.opposite_carbon_locant)
@@ -321,7 +403,7 @@ def _spiro_names_its_components(core_name: str) -> bool:
 
 
 def _prime_side_suffixes(suffixes: tuple[tuple[str, str], ...], prime: str) -> list[tuple[str, str]]:
-    return [(f"{locant}{prime}", suffix) for locant, suffix in suffixes]
+    return [(f"{locant.rstrip(chr(39))}{prime}", suffix) for locant, suffix in suffixes]
 
 
 def _merge_terminal_and_side_suffixes(terminal_e: str, side_suffixes: list[tuple[str, str]]) -> str:

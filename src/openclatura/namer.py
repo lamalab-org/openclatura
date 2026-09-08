@@ -15,7 +15,6 @@ from .assembly_parts import (
     rendered_substituent_text,
     split_rendered_substituent_name,
 )
-from .assembly_spiro import extract_spiro_side_prefixes
 from .chains import find_ring_systems, get_cyclic_atoms
 from .component_namer import name_component as _name_component_impl
 from .engine import DEFAULT_NAMING_ENGINE
@@ -310,61 +309,18 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
     if simple_side_ring is not None:
         return simple_side_ring
 
-    # An audited systematic-fusion side already owns a complete atom-to-locant
-    # map.  Consume that proof directly instead of changing the junction atom
-    # to silicon and recovering its locant from rendered text.
-    from .fusion.context import current_fusion_mode
-    from .spiro_subgraph import plan_substituted_fusion_spiro_side
-
-    fusion_side = plan_substituted_fusion_spiro_side(
-        mol,
-        sub_comp,
-        c_idx,
-        mode=current_fusion_mode(),
-    )
-    if fusion_side is not None:
-        return fusion_side
-
     heteroaromatic_side = _heteroaromatic_spiro_side_assembly(mol, c_idx, sub_comp)
     if heteroaromatic_side is not None:
         return heteroaromatic_side
 
-    # Compatibility fallback for side-parent classes that do not yet expose a
-    # typed locant proof.
-    sub_mol = mol.subgraph(sub_comp, symbols={c_idx: "Si"})
+    # One shared pipeline pass supplies the numbered parent for both fusion
+    # and nonfusion topology, without a marker or a second planning pass.
+    from .spiro_subgraph import plan_graph_spiro_side
 
-    sub_name_raw = name_component(sub_mol, sub_comp, is_substituent=False)
-    match = re.search(r"(?:(^|-)(\d+)-)?sil[a]?", sub_name_raw)
-    if not match:
-        side_prefixes, side_parent_name, side_suffixes, side_stereo = extract_spiro_side_prefixes(sub_name_raw)
-        return SpiroAssembly(
-            parent_locant="",
-            side_locant="1",
-            side_parent_name=side_parent_name,
-            side_prefixes=tuple(side_prefixes),
-            side_suffixes=tuple(side_suffixes),
-            side_stereo=side_stereo,
-        )
-
-    loc = match.group(2) if match.group(2) else "1"
-    if match.group(2):
-        sub_name_clean = re.sub(rf"(^|-){loc}-sil[a]?-?", r"\1", sub_name_raw)
-    else:
-        sub_name_clean = re.sub(r"sil[a]?-?", "", sub_name_raw)
-
-    sub_name_clean = sub_name_clean.replace("--", "-").strip("-")
-    sub_name_clean = sub_name_clean.replace("-cyclo", "cyclo")
-    if not sub_name_clean:
-        raise ValueError("spiro side component marker removal left no named parent")
-    side_prefixes, side_parent_name, side_suffixes, side_stereo = extract_spiro_side_prefixes(sub_name_clean)
-    return SpiroAssembly(
-        parent_locant="",
-        side_locant=loc,
-        side_parent_name=side_parent_name,
-        side_prefixes=tuple(side_prefixes),
-        side_suffixes=tuple(side_suffixes),
-        side_stereo=side_stereo,
-    )
+    graph_side = plan_graph_spiro_side(mol, sub_comp, c_idx)
+    if graph_side is None:
+        raise ValueError("spiro side component has no complete graph-numbered parent containing its junction")
+    return graph_side
 
 
 def _ring_is_isolated(mol: Molecule, ring: list[int], component_atoms: set[int]) -> bool:

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .assembly_parts import SubstituentItem
+    from .assembly_parts import AssemblyParts, SubstituentItem
 
 
 @dataclass(frozen=True)
@@ -18,3 +18,5 @@ class SpiroAssembly:
     # whole name's leading stereo group.
     side_stereo: tuple[tuple[str, str], ...] = ()
     side_substituents: tuple["SubstituentItem", ...] = ()
+    # Unprimed component-local proof and typed operations, before projection.
+    side_parts: "AssemblyParts | None" = None
