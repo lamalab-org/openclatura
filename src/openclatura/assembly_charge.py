@@ -1,6 +1,6 @@
 """Charge-aware parent assembly helpers."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .assembly_parts import AssemblyParts, ParentChargeItem, SubstituentItem
 from .assembly_utils import parse_locant
@@ -105,6 +105,20 @@ def fusion_parent_charge_name_operations(parts: AssemblyParts) -> list[ParentSuf
     operations = parent.fusion_plan.charge_operations
     if not any(operation.observed_charge == -1 for operation in operations):
         return None
+    # Assembly can select a symmetry-equivalent numbering after the charge
+    # audit. Rebind by graph identity only within the proved complete maps.
+    selected = {atom_id: locant for locant, atom_id in parts.parent_atom_ids_by_locant.items()}
+    approved = next(
+        (
+            dict(mapping)
+            for mapping in parent.fusion_plan.numbering.input_locant_maps
+            if {atom_id: str(locant) for atom_id, locant in mapping} == selected
+        ),
+        None,
+    )
+    if approved is None:
+        raise ValueError("fusion parent charge spelling requires an audited complete numbering")
+    operations = tuple(replace(operation, locant=approved[operation.atom_id]) for operation in operations)
     expected = {
         (operation.atom_id, str(operation.locant), operation.symbol, operation.observed_charge)
         for operation in operations
