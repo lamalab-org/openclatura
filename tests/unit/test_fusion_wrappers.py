@@ -229,7 +229,7 @@ def test_bridge_wrapper_renders_a_graph_derived_retained_parent_hydro_operation(
         ),
         (
             "C12C(C=C(C3=CC=CC=C13)O2)=O",
-            "1,2-dihydro-1,4-epoxynaphthalen-2-one",
+            "1,4-epoxynaphthalen-2-one",
             [],
             ["2"],
         ),

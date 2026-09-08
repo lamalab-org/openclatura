@@ -815,6 +815,12 @@ def _build_parent(parts) -> tuple[Chem.RWMol, dict[str, int], bool]:
 
     if _has_systematic_fusion_parent(parts):
         return _build_systematic_fusion_parent(parts)
+    parent = getattr(parts, "parent_hydride", None)
+    if parent is not None and parent.is_bridged_fusion:
+        # The legacy topology descriptor has a different locant namespace.
+        # Until this independent audit can replay nondetachable bridges, it
+        # must not rebuild that descriptor using completed fusion locants.
+        raise _Abstain("bridged fusion parent reconstruction not modelled")
 
     if parts.retained_name is not None and not _is_retained_chain_parent(parts.retained_name):
         template = _lookup_parent_template(parts.retained_name)

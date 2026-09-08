@@ -13,14 +13,18 @@ def _implied_parent_multiple_bonds(mol: Molecule, parts: AssemblyParts) -> froze
     if parent is None or parent.bond_model is None:
         return frozenset()
     delta = (
-        parent.fusion_plan.derivative_state.bond_delta
-        if parent.uses_fusion_plan and parent.fusion_plan is not None
+        parent.derivative_state.bond_delta
+        if parent.derivative_state is not None
         else compare_actual_parent_to_implied_parent(
             mol, parts.parent_atom_ids, parent.bond_model, preserve_retained_parent_state=True
         )
     )
     parts.parent_bond_delta = delta
-    return delta.implied_multiple_bond_ids if delta is not None and delta.compatible else frozenset()
+    implied = delta.implied_multiple_bond_ids if delta is not None and delta.compatible else frozenset()
+    if parent.is_bridged_fusion:
+        # Internal bridge bonds are already expressed by its typed prefix.
+        implied |= frozenset(bond for bridge in parent.fusion_wrapper_plan.bridges for bond in bridge.bond_ids)
+    return implied
 
 
 def add_unsaturations(

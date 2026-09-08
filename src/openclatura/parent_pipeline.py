@@ -232,6 +232,7 @@ def resolve_bridged_fusion_parent(
             "base_name": plan.rendered_name,
             "parent_kind": plan.parent.kind.value,
             "parent_atoms": sorted(plan.parent.atom_ids),
+            "atom_to_locant": plan.atom_to_locant,
             "bridges": [
                 {
                     "kind": bridge.kind.value,

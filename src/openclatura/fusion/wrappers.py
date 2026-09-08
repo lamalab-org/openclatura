@@ -14,7 +14,7 @@ from itertools import combinations
 
 from ..assembly_parts import NameTokenBinding
 from ..assembly_utils import needs_hyphen
-from ..locants import retained_locant_sort_key
+from ..locants import parse_system_locant, retained_locant_sort_key, system_locant_sort_key
 from ..molecule import Molecule, bond_ids_within, edges_within_atoms
 from ..name_operations import UnsaturationOperation
 from ..polycycle_topology import connected_components, ring_system_topology
@@ -157,6 +157,31 @@ class BridgedFusionWrapperPlan:
     search_states: int = 0
     bridge_unsaturation_operations: tuple[UnsaturationOperation, ...] = ()
     saturated_bridge_precursor: NondetachableBridgeOperation | None = None
+
+    @property
+    def atom_to_locant(self) -> dict[int, str]:
+        """Number independent path bridges after the fused parent (P-25.4.4-5).
+
+        Bridge prefix orientation is independent of completed-system numbering:
+        the latter starts at the higher parent endpoint, highest bridges first.
+        Stable sorting preserves citation order for identical endpoint pairs.
+        """
+
+        locants = dict(self.parent.locant_maps[0])
+        next_locant = max(parse_system_locant(value).base for value in locants.values()) + 1
+        bridges = sorted(
+            self.bridges,
+            key=lambda bridge: tuple(sorted(map(system_locant_sort_key, bridge.endpoint_locants), reverse=True)),
+            reverse=True,
+        )
+        for bridge in bridges:
+            path = bridge.atom_ids
+            if system_locant_sort_key(bridge.endpoint_locants[0]) < system_locant_sort_key(bridge.endpoint_locants[1]):
+                path = tuple(reversed(path))
+            for atom in path:
+                locants[atom] = str(next_locant)
+                next_locant += 1
+        return locants
 
     def __post_init__(self) -> None:
         if not self.bridges:

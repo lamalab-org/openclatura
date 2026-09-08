@@ -17,6 +17,7 @@ from .polycycle_topology import RingNumbering
 from .ring_renderer import is_von_baeyer_descriptor
 
 if TYPE_CHECKING:
+    from .fusion.mancude import ParentDerivativeState
     from .fusion.model import FusionParentPlan, ParentBondModel, PinDecision
     from .fusion.wrappers import BridgedFusionWrapperPlan
 
@@ -266,11 +267,21 @@ class RingParent:
         return self.fusion_plan.bond_model if self.uses_fusion_plan else None
 
     @property
+    def derivative_state(self) -> ParentDerivativeState | None:
+        """Return the derivative proof belonging to the selected parent model."""
+
+        if self.uses_fusion_plan:
+            return self.fusion_plan.derivative_state
+        if self.is_bridged_fusion:
+            return self.fusion_wrapper_plan.derivative_state
+        return None
+
+    @property
     def proof_locant_maps(self) -> tuple[dict[int, str], ...]:
         if self.uses_fusion_plan:
             return self.fusion_plan.numbering.string_input_locant_maps()
         if self.is_bridged_fusion:
-            return tuple(dict(entries) for entries in self.fusion_wrapper_plan.parent.locant_maps)
+            return (self.fusion_wrapper_plan.atom_to_locant,)
         if self.retained_locant_maps:
             return self.retained_locant_maps
         return tuple(numbering.locant_map for numbering in self.numbering_candidates if numbering.audit_ok)

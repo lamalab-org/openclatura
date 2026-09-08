@@ -117,8 +117,8 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         delta = parts.parent_bond_delta
         if delta is None:
             delta = (
-                parent.fusion_plan.derivative_state.bond_delta
-                if parent.uses_fusion_plan and parent.fusion_plan is not None
+                parent.derivative_state.bond_delta
+                if parent.derivative_state is not None
                 else compare_actual_parent_to_implied_parent(
                     mol, parts.parent_atom_ids, parent.bond_model, preserve_retained_parent_state=True
                 )
@@ -129,10 +129,10 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             parts.hydro_operations.extend(delta.intrinsic_hydro_operations)
             if delta.intrinsic_hydro_operations:
                 return
-            if parent.uses_fusion_plan and parent.fusion_plan.derivative_state.hydro_operations:
+            if parent.derivative_state is not None and parent.derivative_state.hydro_operations:
                 # Keep the audited operation, including conjugated bond
                 # redistribution; deleted pi edges alone overcount its H sites.
-                for operation in parent.fusion_plan.derivative_state.hydro_operations:
+                for operation in parent.derivative_state.hydro_operations:
                     atoms = tuple(sorted(operation.atom_ids, key=lambda atom: parse_locant(str(get_loc(atom)))))
                     parts.hydro_operations.append(
                         replace(operation, atom_ids=atoms, locants=tuple(str(get_loc(atom)) for atom in atoms))
