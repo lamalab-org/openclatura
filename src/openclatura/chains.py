@@ -152,6 +152,11 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
         if not bridges:
             continue
 
+        # A component returning to the same ring atom is not a bridge between
+        # two bridgeheads. Splitting the main ring there repeats that atom.
+        if any(bridge["endpoints"][0] == bridge["endpoints"][1] for bridge in bridges):
+            continue
+
         bridges.sort(key=lambda b: b["length"], reverse=True)
         main_bridge_len = bridges[0]["length"]
 
