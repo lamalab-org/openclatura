@@ -26,6 +26,7 @@ from .config import fusion_nomenclature_config
 from .mancude import ParentDerivativeState, parent_derivative_state
 from .model import FusionConfirmed, FusionMode, ParentBondModel, PinDecision, PinStatus
 from .numbering import retained_template_parent_bond_model
+from .rules import fusion_ring_size_gate
 
 _WRAPPER_SEARCH_STATES = fusion_nomenclature_config().search.component_selection_states
 
@@ -488,6 +489,11 @@ def _retained_wrapper_parent(mol: Molecule, atoms: frozenset[int]) -> WrapperPar
             allow_nonaromatic=True,
             allow_relocated_indicated_h=True,
         )
+    if not matches:
+        return None
+    # The shared retained registry also contains monocyclic parents.  A bridge
+    # wrapper requires an eligible fused base, not merely a retained match.
+    matches = [match for match in matches if fusion_ring_size_gate(tuple(map(len, match.template.rings)))]
     if not matches:
         return None
     first = matches[0]

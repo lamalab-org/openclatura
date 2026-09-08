@@ -254,7 +254,7 @@ def test_bridge_wrapper_composes_with_shared_parent_derivative_operations(
     assert result.opsin_check is not None and result.opsin_check.ok
 
 
-def test_bridge_wrapper_does_not_invent_hydro_for_a_saturated_retained_parent():
+def test_bridge_wrapper_does_not_use_a_saturated_retained_monocycle_as_fused_base():
     smiles = "OC12CC3C1CN3C2"
     mol = read_smiles(smiles)
     parent_atoms = max(find_ring_systems(mol), key=lambda system: len(system.atoms)).atoms
@@ -262,12 +262,8 @@ def test_bridge_wrapper_does_not_invent_hydro_for_a_saturated_retained_parent():
     plan = plan_bridged_fusion_wrapper(mol, parent_atoms, mode=FusionMode.AUDITED_PIN)
     result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True)
 
-    assert plan is not None
-    assert plan.parent.name == "pyrrolidine"
-    assert plan.parent.selected_bond_model is not None
-    assert plan.parent.selected_bond_model.maximum_non_cumulative_double_bonds == 0
-    assert plan.derivative_state.hydro_operations == ()
-    assert result.name == "1,3-methano-2,4-methanopyrrolidin-4-ol"
+    assert plan is None
+    assert result.name == "3-azatricyclo[3.2.0.0^{3,6}]heptan-1-ol"
     assert result.opsin_check is not None and result.opsin_check.ok
 
 
