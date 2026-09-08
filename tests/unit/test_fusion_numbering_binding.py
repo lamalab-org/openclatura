@@ -86,6 +86,8 @@ def test_numbering_alternatives_survive_molecule_cache_clear_and_plan_copy():
 
 def test_numbering_variants_cannot_drop_maps_or_nest_aggregate_plans():
     _, _, plan, alternatives = _plans("CC1CCCCCC2CCCC2C1")
+    with pytest.raises(ValueError, match="chemical plan for every numbering"):
+        replace(plan, numbering_variants=())
     with pytest.raises(ValueError, match="every and only"):
         replace(plan, numbering_variants=alternatives[:1])
     with pytest.raises(ValueError, match="single-map leaves"):

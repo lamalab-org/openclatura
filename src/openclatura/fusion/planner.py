@@ -11,18 +11,18 @@ from ..molecule import Molecule
 from ..polycycle_topology import ring_system_topology
 from ..retained_graph_model import merge_parent_bond_classes
 from .audit import audit_fusion_plan
-from .charges import fusion_charge_lone_pair_sites, fusion_component_charge_parent
 from .charges import fusion_charge_operations as _fusion_charge_operations
+from .charges import fusion_component_charge_parent
 from .config import fusion_nomenclature_config
-from .descriptor import FusionDescriptorError, build_fusion_name_ast, render_fusion_name_parts
-from .faces import FaceSearchBudgetExceeded, cached_bounded_face_model
+from .descriptor import FusionDescriptorError, iter_fusion_name_asts, render_fusion_name_parts
+from .faces import BoundedFaceModel, FaceSearchBudgetExceeded, cached_bounded_face_model
 from .faces import typed_face_model as _typed_face_model
 from .indicated_hydrogen import (
-    aromatic_nitrogen_hydrogen_atoms,
     component_carbon_h_relocation_scope,
     component_parent_atoms,
     intrinsic_carbon_candidate_atoms,
     intrinsic_carbon_parent_model,
+    intrinsic_parent_lone_pair_sites,
 )
 from .layout import LayoutSearchBudgetExceeded, preferred_intrinsic_layouts
 from .mancude import (
@@ -33,6 +33,8 @@ from .mancude import (
 )
 from .model import (
     AuditStatus,
+    FaceModel,
+    FusedLayout,
     FusionAuditFailed,
     FusionComponentSpec,
     FusionConfirmed,
@@ -50,6 +52,7 @@ from .model import (
     ParentBondModel,
 )
 from .numbering import (
+    CompletedNumberingSelection,
     MancudeSearchBudgetExceeded,
     bond_model_indicated_hydrogen_atoms,
     completed_system_numbering_selection,
@@ -126,11 +129,6 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     except ValueError as exc:
         return FusionUnsupported("fused-parent charge operation is outside the audited production tier", (str(exc),))
     matches = registry.match_faces(matching_parent, bounded)
-    try:
-        ast = build_fusion_name_ast(mol, matches, registry)
-    except FusionDescriptorError as exc:
-        return FusionUnsupported("no supported audited fusion-component decomposition", (str(exc),))
-
     face_model = _typed_face_model(mol, bounded)
     try:
         layouts = preferred_intrinsic_layouts(face_model)
@@ -138,68 +136,118 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         return FusionUnsupported("intrinsic fused-layout search budget exhausted", (str(exc),))
     if not layouts:
         return FusionUnsupported("no consistent audited intrinsic fused-ring layout")
+    rejected = []
+    numbering_cache: dict[bool, CompletedNumberingSelection] = {}
+    try:
+        for ast in iter_fusion_name_asts(mol, matches, registry):
+            result = _plan_numbered_candidate(
+                mol, atoms, mode, ast, registry, bounded, face_model, layouts, numbering_cache=numbering_cache
+            )
+            if isinstance(result, FusionConfirmed):
+                return result
+            rejected.append(result)
+    except FusionDescriptorError as exc:
+        return FusionUnsupported("no supported audited fusion-component decomposition", (str(exc),))
+    if rejected:
+        reasons = []
+        for result in rejected:
+            reasons.append(result.reason)
+            if isinstance(result, FusionUnsupported):
+                reasons.extend(result.details)
+            elif isinstance(result, FusionAuditFailed):
+                reasons.extend(result.candidate_summary)
+        details = tuple(dict.fromkeys(reasons))
+        if isinstance(rejected[0], FusionAuditFailed):
+            return FusionAuditFailed("ranked fusion candidates failed reconstruction", details)
+        return FusionUnsupported("ranked fusion candidates have no supported chemical plan", details)
+    return FusionUnsupported("no supported audited fusion-component decomposition")
+
+
+def _plan_numbered_candidate(
+    mol: Molecule,
+    atoms: frozenset[int],
+    mode: FusionMode,
+    ast: FusionNameAst,
+    registry: FusionComponentRegistry,
+    bounded: BoundedFaceModel,
+    face_model: FaceModel,
+    layouts: tuple[FusedLayout, ...],
+    *,
+    numbering_cache: dict[bool, CompletedNumberingSelection] | None = None,
+) -> FusionPlanningResult:
+    """Keep chemistry local to each numbering, sharing topology discovery."""
     specs = {match.occurrence_id: registry.spec_for_match(match) for match in ast.component_occurrences}
-    prove_carbon_h = bool(intrinsic_carbon_candidate_atoms(ast, specs, mol)) or (
-        any(component_parent_atoms(spec) != spec.atoms for spec in specs.values())
-        and all(atom.symbol == "C" and atom.charge == 0 for spec in specs.values() for atom in spec.atoms)
-    )
-    numbering_selection = completed_system_numbering_selection(
-        mol,
-        bounded,
-        face_model=face_model,
-        layouts=layouts,
-        defer_indicated_hydrogen=prove_carbon_h,
-    )
+    try:
+        prove_carbon_h = bool(intrinsic_carbon_candidate_atoms(ast, specs, mol)) or (
+            any(component_parent_atoms(spec) != spec.atoms for spec in specs.values())
+            and all(atom.symbol == "C" and atom.charge == 0 for spec in specs.values() for atom in spec.atoms)
+        )
+    except MancudeSearchBudgetExceeded as exc:
+        return FusionUnsupported("component hydrogen assignment search budget exhausted", (str(exc),))
+    except ValueError as exc:
+        return FusionAuditFailed("component hydrogen constraints are inconsistent", (str(exc),))
+    numbering_selection = numbering_cache.get(prove_carbon_h) if numbering_cache is not None else None
+    if numbering_selection is None:
+        numbering_selection = completed_system_numbering_selection(
+            mol,
+            bounded,
+            face_model=face_model,
+            layouts=layouts,
+            defer_indicated_hydrogen=prove_carbon_h,
+        )
+        if numbering_cache is not None:
+            numbering_cache[prove_carbon_h] = numbering_selection
     numberings = numbering_selection.accepted
     if not numberings:
         return FusionUnsupported("no layout-derived peripheral system numbering was proven")
+    try:
+        graph = _abstract_graph(ast, registry)
+        intrinsic_sites = intrinsic_parent_lone_pair_sites(mol, graph)
+        initial_model = (
+            indicated_hydrogen_parent_bond_model(graph, intrinsic_sites)
+            if intrinsic_sites
+            else parent_bond_model(graph)
+        )
+    except MancudeSearchBudgetExceeded as exc:
+        return FusionUnsupported("mancude assignment search budget exhausted", (str(exc),))
+    except ValueError as exc:
+        return FusionAuditFailed("fusion component constraints are inconsistent", (str(exc),))
+    alternatives = []
+    for candidate in numberings:
+        if candidate.layout_index is None:
+            return FusionUnsupported("completed-system numbering lacks intrinsic-layout provenance")
+        layout = layouts[candidate.layout_index]
+        proof = FusionNumberingProof(
+            selected_face_model=face_model,
+            selected_layout=layout,
+            orientation_score=(layout.orientation_score, candidate.score),
+            abstract_atom_to_locant=candidate.atom_to_locant,
+            input_locant_maps=(candidate.atom_to_locant,),
+            rejected_numberings=numbering_selection.rejected,
+        )
+        result = _complete_fusion_plan(
+            mol, atoms, mode, ast, registry, proof, graph=graph, initial_bond_model=initial_model
+        )
+        if isinstance(result, FusionConfirmed):
+            alternatives.append(result.plan)
+    if not alternatives:
+        return result
     if prove_carbon_h:
-        alternatives = []
-        for candidate in numberings:
-            if candidate.layout_index is None:
-                return FusionUnsupported("completed-system numbering lacks intrinsic-layout provenance")
-            layout = layouts[candidate.layout_index]
-            proof = FusionNumberingProof(
-                selected_face_model=face_model,
-                selected_layout=layout,
-                orientation_score=(layout.orientation_score, candidate.score),
-                abstract_atom_to_locant=candidate.atom_to_locant,
-                input_locant_maps=(candidate.atom_to_locant,),
-                rejected_numberings=numbering_selection.rejected,
-            )
-            result = _complete_fusion_plan(mol, atoms, mode, ast, registry, proof)
-            if isinstance(result, FusionConfirmed):
-                alternatives.append(result.plan)
-        if not alternatives:
-            return result
         best_h = min(tuple(map(system_locant_sort_key, plan.indicated_hydrogens)) for plan in alternatives)
         preferred = tuple(
             plan for plan in alternatives if tuple(map(system_locant_sort_key, plan.indicated_hydrogens)) == best_h
         )
-        plan = replace(
-            preferred[0],
-            numbering=replace(
-                preferred[0].numbering,
-                input_locant_maps=tuple(plan.numbering.input_locant_maps[0] for plan in preferred),
-            ),
-            numbering_variants=preferred,
-        )
-        # Each map keeps its own audited H sites, bond model, renderer bindings,
-        # and derivative delta. Assembly must select them together.
-        return FusionConfirmed(plan)
-    selected = numberings[0]
-    if selected.layout_index is None:
-        return FusionUnsupported("completed-system numbering lacks intrinsic-layout provenance")
-    layout = layouts[selected.layout_index]
-    numbering = FusionNumberingProof(
-        selected_face_model=face_model,
-        selected_layout=layout,
-        orientation_score=(layout.orientation_score, numberings[0].score),
-        abstract_atom_to_locant=numberings[0].atom_to_locant,
-        input_locant_maps=tuple(numbering.atom_to_locant for numbering in numberings),
-        rejected_numberings=numbering_selection.rejected,
+    else:
+        preferred = tuple(alternatives)
+    plan = replace(
+        preferred[0],
+        numbering=replace(
+            preferred[0].numbering,
+            input_locant_maps=tuple(plan.numbering.input_locant_maps[0] for plan in preferred),
+        ),
+        numbering_variants=preferred,
     )
-    return _complete_fusion_plan(mol, atoms, mode, ast, registry, numbering)
+    return FusionConfirmed(plan)
 
 
 def _complete_fusion_plan(
@@ -209,11 +257,15 @@ def _complete_fusion_plan(
     ast: FusionNameAst,
     registry: FusionComponentRegistry,
     numbering: FusionNumberingProof,
+    *,
+    graph: FusionGraph | None = None,
+    initial_bond_model: ParentBondModel | None = None,
 ) -> FusionPlanningResult:
     """Prove chemistry and rendering against one specific numbered parent."""
 
     try:
-        graph = _abstract_graph(ast, registry)
+        if graph is None:
+            graph = _abstract_graph(ast, registry)
     except ValueError as exc:
         return FusionAuditFailed(
             "fusion component graphs could not be merged consistently",
@@ -224,9 +276,15 @@ def _complete_fusion_plan(
     except ValueError as exc:
         return FusionUnsupported("fused-parent charge operation is outside the audited production tier", (str(exc),))
     try:
-        intrinsic_n_h = aromatic_nitrogen_hydrogen_atoms(mol, graph) | fusion_charge_lone_pair_sites(mol, graph)
+        intrinsic_n_h = intrinsic_parent_lone_pair_sites(mol, graph)
         bond_model = (
-            indicated_hydrogen_parent_bond_model(graph, intrinsic_n_h) if intrinsic_n_h else parent_bond_model(graph)
+            initial_bond_model
+            if initial_bond_model is not None
+            else (
+                indicated_hydrogen_parent_bond_model(graph, intrinsic_n_h)
+                if intrinsic_n_h
+                else parent_bond_model(graph)
+            )
         )
         specs = {match.occurrence_id: registry.spec_for_match(match) for match in ast.component_occurrences}
         bond_model, intrinsic_carbon_h = intrinsic_carbon_parent_model(

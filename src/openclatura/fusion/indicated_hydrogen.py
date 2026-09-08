@@ -9,6 +9,7 @@ from functools import lru_cache
 from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule
 from ..retained_graph_model import RetainedGraphAtomTemplate
+from .charges import fusion_charge_lone_pair_sites
 from .mancude import (
     _nitrogen_composition_parent_model,
     _single_site_parent_model,
@@ -19,7 +20,6 @@ from .model import (
     FusionGraph,
     FusionGraphAtom,
     FusionGraphBond,
-    FusionJoinKind,
     FusionNameAst,
     ParentBondModel,
 )
@@ -64,7 +64,7 @@ def component_parent_atoms(spec: FusionComponentSpec) -> tuple[RetainedGraphAtom
         and not atom.forced_single
         and atom.pi_capacity != 0
     }
-    if len(movable) != 1 or any(bond.bond_class not in {"aromatic", "mancude", "fusion"} for bond in spec.bonds):
+    if not movable or any(bond.bond_class not in {"aromatic", "mancude", "fusion"} for bond in spec.bonds):
         return atoms
     relaxed = tuple(
         replace(atom, saturated=False, default_h=False) if atom.locant in movable else atom for atom in atoms
@@ -89,31 +89,56 @@ def _component_carbon_h_locants(spec: FusionComponentSpec) -> frozenset[str]:
     atoms = component_parent_atoms(spec)
     graph = _component_graph(spec, atoms)
     model = parent_bond_model(graph)
+    if model.maximum_non_cumulative_double_bonds != spec.template.mancude_double_bonds:
+        return frozenset()
     candidates = set()
     for assignment in model.allowed_kekule_assignments:
         paired = {atom for edge, order in assignment.orders if order == 2 for atom in edge}
         candidates.update(
             atoms[atom.id].locant
             for atom in graph.atoms
-            if atom.symbol == "C" and atom.pi_capacity and atom.id not in paired
+            if atom.symbol == "C"
+            and atom.pi_capacity
+            and not atom.forced_single
+            and not atom.saturated
+            and atom.id not in paired
         )
     return frozenset(candidates)
 
 
 def intrinsic_carbon_fusion_scope(ast: FusionNameAst, specs: Mapping[int, FusionComponentSpec]) -> bool:
-    return (
-        len(ast.component_occurrences) == 2
-        and len(ast.joins) == 1
-        and ast.joins[0].kind is FusionJoinKind.ORTHO
-        and all(len(spec.rings) == 1 for spec in specs.values())
-    )
+    """Require a connected composition of components with proved pi budgets.
+
+    Join order and component ring count do not establish hydrogen capacity.
+    Component and completed-parent maximum matchings establish it instead.
+    """
+
+    occurrences = {match.occurrence_id for match in ast.component_occurrences}
+    if len(occurrences) < 2 or occurrences != set(specs):
+        return False
+    if any(spec.template.mancude_double_bonds is None for spec in specs.values()):
+        return False
+    neighbors = {occurrence: set() for occurrence in occurrences}
+    for join in ast.joins:
+        if join.host_occurrence not in neighbors or join.attached_occurrence not in neighbors:
+            return False
+        neighbors[join.host_occurrence].add(join.attached_occurrence)
+        neighbors[join.attached_occurrence].add(join.host_occurrence)
+    visited = set()
+    pending = [next(iter(occurrences))]
+    while pending:
+        occurrence = pending.pop()
+        if occurrence not in visited:
+            visited.add(occurrence)
+            pending.extend(neighbors[occurrence] - visited)
+    return visited == occurrences
 
 
 def component_carbon_h_relocation_scope(ast: FusionNameAst, specs: Mapping[int, FusionComponentSpec]) -> bool:
     """Carbon-only composition preserves the proved component pi capacities.
 
-    Heteroatom donor composition needs its separate intrinsic-H proof; the
-    existing two-monocycle tier supplies that proof before additive operations.
+    Heteroatom donor composition needs its separate intrinsic-H proof and
+    explicit component pi budgets before additive operations.
     """
 
     return intrinsic_carbon_fusion_scope(ast, specs) or all(
@@ -164,7 +189,7 @@ def intrinsic_carbon_parent_model(
     *,
     intrinsic_hydrogen_atom_ids: frozenset[int] = frozenset(),
 ) -> tuple[ParentBondModel, frozenset[int]]:
-    """Choose one intrinsic CH2 site without consuming additive hydrogenation.
+    """Choose jointly proved intrinsic CH2 sites without consuming hydro bonds.
 
     Intrinsic H restricts the maximum-bond assignments themselves. It is not
     an operation deleting a double bond from an otherwise chosen assignment.
@@ -180,16 +205,21 @@ def intrinsic_carbon_parent_model(
     parent_atoms = frozenset(locants)
     model = _nitrogen_composition_parent_model(mol, parent_atoms, model, intrinsic_hydrogen_atom_ids)
     eligible = {atom for atom in candidates if is_intrinsic_carbon_h_site(mol, atom, parent_atoms)}
-    carbon_atoms = {atom.id for atom in graph.atoms if atom.symbol == "C"}
+    carbon_atoms = {
+        atom.id
+        for atom in graph.atoms
+        if atom.symbol == "C" and atom.pi_capacity and not atom.saturated and not atom.forced_single
+    }
     groups = {}
     for assignment in model.allowed_kekule_assignments:
         paired = {atom for edge, order in assignment.orders if order == 2 for atom in edge}
-        unpaired = candidates - paired
+        unpaired = carbon_atoms - paired
         # A proved N-H donor can already account for the unpaired parent
         # valence. Do not introduce a competing carbon tautomer in that case.
         if intrinsic_hydrogen_atom_ids and carbon_atoms <= paired:
             return model, frozenset()
-        if len(unpaired) == 1 and unpaired <= eligible:
+        if unpaired and unpaired <= eligible:
+            unpaired = frozenset(unpaired)
             groups.setdefault(unpaired, []).append(assignment)
     choices = []
     for sites, assignments in groups.items():
@@ -208,7 +238,16 @@ def intrinsic_carbon_parent_model(
     if not choices:
         return model, frozenset()
     _, constrained, sites = min(choices, key=lambda choice: choice[0])
-    return _single_site_parent_model(model, sites), sites
+    result = _single_site_parent_model(model, sites)
+    if result.maximum_non_cumulative_double_bonds != model.maximum_non_cumulative_double_bonds:
+        return model, frozenset()
+    return result, sites
+
+
+def intrinsic_parent_lone_pair_sites(mol: Molecule, graph: FusionGraph) -> frozenset[int]:
+    """Shared planner/auditor intrinsic donors, including charged derivatives."""
+
+    return aromatic_nitrogen_hydrogen_atoms(mol, graph) | fusion_charge_lone_pair_sites(mol, graph)
 
 
 def aromatic_nitrogen_hydrogen_atoms(mol: Molecule, graph: FusionGraph) -> frozenset[int]:

@@ -19,11 +19,11 @@ from ..retained_graph_model import merge_parent_bond_classes
 from ..rules import multipliers
 from .cover import audit_component_cover, component_scope
 from .indicated_hydrogen import (
-    aromatic_nitrogen_hydrogen_atoms,
     component_carbon_h_relocation_scope,
     component_parent_atoms,
     intrinsic_carbon_candidate_atoms,
     intrinsic_carbon_parent_model,
+    intrinsic_parent_lone_pair_sites,
     is_intrinsic_carbon_h_site,
 )
 from .mancude import (
@@ -58,6 +58,7 @@ from .numbering import (
     bond_model_indicated_hydrogen_atoms,
     indicated_hydrogen_candidate_atoms,
     parent_bond_model,
+    validate_parent_bond_valence,
 )
 from .rules import (
     component_parent_eligible,
@@ -264,7 +265,7 @@ def audit_fusion_plan(
         _audit_charge_operations(mol, parent_atoms, abstract_parent_graph, numbering, charge_operations, errors)
         checks.append("charge_operations")
 
-        intrinsic_n_h = aromatic_nitrogen_hydrogen_atoms(mol, abstract_parent_graph)
+        intrinsic_n_h = intrinsic_parent_lone_pair_sites(mol, abstract_parent_graph)
         carbon_candidates = intrinsic_carbon_candidate_atoms(ast, specs, mol)
         intrinsic_c_h = frozenset()
         if intrinsic_n_h or carbon_candidates:
@@ -514,9 +515,12 @@ def _audited_pin_composition_errors(
     AST as proof of the rendered name.
     """
 
-    matches = {match.occurrence_id: match for match in ast.component_occurrences}
-    intrinsic_carbon_composition = derivative_state is not None and _has_separate_intrinsic_carbon_h_and_hydro(
+    consistent = derivative_state is not None and _has_consistent_derivative_operations(
         mol, ast, specs, numbering, indicated_hydrogens, derivative_state
+    )
+    atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
+    intrinsic_carbon_composition = consistent and any(
+        mol.atoms[atom_by_locant[locant]].symbol == "C" for locant in indicated_hydrogens
     )
     if (
         specs
@@ -524,55 +528,14 @@ def _audited_pin_composition_errors(
         and not intrinsic_carbon_composition
     ):
         return ("fusion of exclusively generated Hantzsch-Widman components lacks an audited orientation anchor",)
-    if derivative_state is None:
-        return ()
-
-    if _has_separate_carbon_hydrogen_operations(mol, derivative_state):
-        return ()
-
-    if _has_separate_nitrogen_h_and_carbon_derivatives(
-        mol, ast, specs, numbering, indicated_hydrogens, derivative_state
-    ):
+    if derivative_state is None or consistent:
         return ()
     if _has_complete_hydrogenation(mol, numbering, indicated_hydrogens, derivative_state):
         return ()
-    if intrinsic_carbon_composition:
-        return ()
-
-    has_bond_or_oxo_derivative = bool(
-        derivative_state.hydro_operations or derivative_state.unsaturation_operations or derivative_state.oxo_operations
-    )
-    if indicated_hydrogens and has_bond_or_oxo_derivative:
-        return ("combined indicated-hydrogen and bond/oxo derivative fusion grammar is not audited",)
-
-    # Existing first-order fusion names only admit additive hydrogenation when
-    # one operation exactly owns the non-fused carbon positions of a component.
-    # A higher-order citation instead names a completed intermediate component;
-    # its typed operation locants are audited against the completed-system map.
-    has_higher_order_join = any(join.kind is FusionJoinKind.HIGHER_ORDER for join in ast.joins)
-    if has_higher_order_join:
-        return ()
-
-    atom_occurrences = Counter(atom for match in matches.values() for atom in match.input_atom_by_locant.values())
-    for operation in derivative_state.hydro_operations:
-        operation_atoms = set(operation.atom_ids)
-        has_exact_component_owner = False
-        for occurrence, match in matches.items():
-            template_symbols = {atom.locant: atom.symbol for atom in specs[occurrence].template.atoms}
-            nonfused_carbons = {
-                atom_id
-                for locant, atom_id in match.input_atom_by_locant.items()
-                if template_symbols.get(locant) == "C" and atom_occurrences[atom_id] == 1
-            }
-            if operation_atoms == nonfused_carbons:
-                has_exact_component_owner = True
-                break
-        if not has_exact_component_owner:
-            return ("additive hydrogenation does not exactly cover one component's non-fused carbon positions",)
-    return ()
+    return ("combined fusion derivative operations lack independent applicable atom scopes",)
 
 
-def _has_separate_intrinsic_carbon_h_and_hydro(
+def _has_consistent_derivative_operations(
     mol: Molecule,
     ast: FusionNameAst,
     specs: Mapping[int, FusionComponentSpec],
@@ -580,83 +543,70 @@ def _has_separate_intrinsic_carbon_h_and_hydro(
     indicated_hydrogens: tuple[SystemLocant, ...],
     state: ParentDerivativeState,
 ) -> bool:
-    """Admit intrinsic carbon H alongside proven aromatic N-H and disjoint hydro."""
+    """Check chemical operation scopes; independent replay proves their contents.
 
-    if not indicated_hydrogens or state.oxo_operations or state.unsaturation_operations:
-        return False
-    atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
-    h_atoms = {atom_by_locant.get(locant) for locant in indicated_hydrogens}
-    if None in h_atoms:
-        return False
-    carbon_sites = {atom for atom in h_atoms if mol.atoms[atom].symbol == "C"}
-    if len(carbon_sites) != 1:
-        return False
-    atom = next(iter(carbon_sites))
-    if any(
-        mol.atoms[site].symbol != "N"
-        or mol.atoms[site].charge
-        or not mol.atoms[site].is_aromatic
-        or mol.atoms[site].total_h_count != 1
-        for site in h_atoms - carbon_sites
-    ):
-        return False
-    if atom not in intrinsic_carbon_candidate_atoms(ast, specs, mol):
-        return False
-    hydro_atoms = {site for operation in state.hydro_operations for site in operation.atom_ids}
-    return (
-        is_intrinsic_carbon_h_site(mol, atom, set(atom_by_locant.values()))
-        and not h_atoms & hydro_atoms
-        and all(mol.atoms[site].symbol == "C" for site in hydro_atoms)
-        and all(order == 1 for edge, order in state.bond_delta.assignment.orders if h_atoms.intersection(edge))
-    )
-
-
-def _has_separate_nitrogen_h_and_carbon_derivatives(
-    mol: Molecule,
-    ast: FusionNameAst,
-    specs: Mapping[int, FusionComponentSpec],
-    numbering: FusionNumberingProof,
-    indicated_hydrogens: tuple[SystemLocant, ...],
-    state: ParentDerivativeState,
-) -> bool:
-    """Admit carbon derivatives with optional independent nitrogen H sites.
-
-    Carbon hydrogenation may span the fusion edge or only part of a component:
-    its ownership is the completed parent, not an independently named ring.
-    The derivative audit below still proves every operation against the graph.
-    Multiple non-aromatic H sites can consume separate missing pi bonds without
-    proving the resulting hydrogen count, so only one is admitted. Aromatic H
-    sites do not consume a missing bond. Heteroatom hydrogenation and additional
-    unsaturation remain outside this tier.
+    Carbon operations belong to the completed graph, irrespective of component
+    boundaries. Non-aromatic N-H can consume missing pi valence, so multiple
+    such sites still require the separate complete-hydrogenation proof.
     """
-
-    if state.unsaturation_operations:
-        return False
-    symbols = {
-        match.input_atom_by_locant[atom.locant]: atom.symbol
-        for match in ast.component_occurrences
-        for atom in specs[match.occurrence_id].template.atoms
-    }
     atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
-    h_atoms = {atom_by_locant.get(locant) for locant in indicated_hydrogens}
-    hydro_atoms = {atom for operation in state.hydro_operations for atom in operation.atom_ids}
-    oxo_atoms = {operation.parent_atom_id for operation in state.oxo_operations}
-    if not indicated_hydrogens:
-        represented_external = {operation.bond_id for operation in state.oxo_operations}
-        if any(
-            neighbor not in symbols
-            and mol.get_bond(atom, neighbor).order > 1
-            and mol.get_bond(atom, neighbor).idx not in represented_external
-            for atom in symbols
-            for neighbor in mol.get_neighbors(atom)
+    atoms = frozenset(atom_by_locant.values())
+    if any(locant not in atom_by_locant for locant in indicated_hydrogens):
+        return False
+    h_atoms = {atom_by_locant[locant] for locant in indicated_hydrogens}
+    hydro = {atom for operation in state.hydro_operations for atom in operation.atom_ids}
+    oxo = {operation.parent_atom_id for operation in state.oxo_operations}
+    added = {atom for operation in state.added_hydrogen_operations for atom in operation.atom_ids}
+    intrinsic = {atom for operation in state.intrinsic_hydro_operations for atom in operation.atom_ids}
+    unsaturated = {atom for operation in state.unsaturation_operations for atom in operation.atom_ids}
+    if not (h_atoms | hydro | oxo | added | intrinsic | unsaturated) <= atoms:
+        return False
+    if not (hydro or oxo or added or intrinsic or unsaturated) and all(
+        mol.atoms[atom].symbol != "C" for atom in h_atoms
+    ):
+        return True
+    if h_atoms & (hydro | oxo | added | intrinsic) or hydro & (oxo | added | intrinsic) or added & (oxo | intrinsic):
+        return False
+    if any(mol.atoms[atom].symbol != "C" for atom in hydro | oxo | added | intrinsic):
+        return False
+    if any(mol.atoms[atom].charge for atom in added | intrinsic):
+        return False
+    # Mixed extra unsaturation and hydrogen operations need a redistribution
+    # proof; replay represents a proved redistribution without raw unsaturation.
+    if state.unsaturation_operations and (h_atoms or hydro or oxo or added or intrinsic):
+        return False
+    carbon_h = {atom for atom in h_atoms if mol.atoms[atom].symbol == "C"}
+    nitrogen_h = h_atoms - carbon_h
+    if any(mol.atoms[atom].symbol != "N" for atom in nitrogen_h):
+        return False
+    if sum(not mol.atoms[atom].is_aromatic for atom in nitrogen_h) > 1:
+        return False
+    if carbon_h:
+        # Carbon indicated-H plus oxo, added H, or non-aromatic N-H has no
+        # established rendering tier merely because the atom scopes are disjoint.
+        if (
+            oxo
+            or added
+            or intrinsic
+            or any(
+                not mol.atoms[atom].is_aromatic or mol.atoms[atom].charge or mol.atoms[atom].total_h_count != 1
+                for atom in nitrogen_h
+            )
         ):
             return False
-    return (
-        all(symbols.get(atom) == "N" for atom in h_atoms)
-        and sum(not mol.atoms[atom].is_aromatic for atom in h_atoms) <= 1
-        and all(symbols.get(atom) == "C" for atom in hydro_atoms | oxo_atoms)
-        and not h_atoms & (hydro_atoms | oxo_atoms)
-        and not hydro_atoms & oxo_atoms
+        if not carbon_h <= intrinsic_carbon_candidate_atoms(ast, specs, mol):
+            return False
+        if not all(is_intrinsic_carbon_h_site(mol, atom, atoms) for atom in carbon_h):
+            return False
+        if any(order != 1 for edge, order in state.bond_delta.assignment.orders if carbon_h.intersection(edge)):
+            return False
+    represented_external = {operation.bond_id for operation in state.oxo_operations}
+    return not any(
+        neighbor not in atoms
+        and mol.get_bond(atom, neighbor).order > 1
+        and mol.get_bond(atom, neighbor).idx not in represented_external
+        for atom in atoms
+        for neighbor in mol.get_neighbors(atom)
     )
 
 
@@ -706,30 +656,6 @@ def _has_complete_hydrogenation(
             set(edge) <= atoms and (order != 2 or edge in hydrogenated)
             for edge, order in state.bond_delta.assignment.orders
         )
-    )
-
-
-def _has_separate_carbon_hydrogen_operations(mol: Molecule, state: ParentDerivativeState) -> bool:
-    """Check operation scopes before the independent bond-delta audit.
-
-    Added H is distinct from ordinary hydrogenation and oxo sites. Intrinsic
-    parent-H conversion may include an oxo site, but cannot count an ordinary
-    hydrogenation site twice. The comparison audit validates the operations'
-    locants, atoms, bonds, and parent assignments rather than their spelling.
-    """
-
-    if state.unsaturation_operations:
-        return False
-    added = {atom for operation in state.added_hydrogen_operations for atom in operation.atom_ids}
-    intrinsic = {atom for operation in state.intrinsic_hydro_operations for atom in operation.atom_ids}
-    if not added and not intrinsic:
-        return False
-    hydro = {atom for operation in state.hydro_operations for atom in operation.atom_ids}
-    oxo = {operation.parent_atom_id for operation in state.oxo_operations}
-    return (
-        not added & (intrinsic | hydro | oxo)
-        and not intrinsic & hydro
-        and all(mol.atoms[atom].symbol == "C" and mol.atoms[atom].charge == 0 for atom in added | intrinsic)
     )
 
 
@@ -1379,6 +1305,10 @@ def _audit_bond_model(abstract: FusionGraph, model: ParentBondModel, errors: lis
 
     maximum = 0
     for assignment in model.allowed_kekule_assignments:
+        try:
+            validate_parent_bond_valence(abstract, assignment)
+        except ValueError as exc:
+            errors.append(f"parent bond assignment violates fixed valence: {exc}")
         orders = {normalize_edge(*edge): order for edge, order in assignment.orders}
         if set(orders) != abstract_edges:
             errors.append("parent bond assignment is incomplete")
@@ -1469,6 +1399,8 @@ def _audit_derivative_state(
         (operation.bond_id, operation.bond_order, frozenset(operation.atom_ids))
         for operation in state.unsaturation_operations
     }
+    if len(observed_unsaturation) != len(state.unsaturation_operations):
+        errors.append("typed unsaturation operations duplicate a parent bond")
     if observed_unsaturation != expected_unsaturation:
         errors.append("typed unsaturation operations do not represent the parent bond delta")
     if any(
@@ -1490,6 +1422,8 @@ def _audit_derivative_state(
         (operation.parent_atom_id, operation.oxygen_atom_id, operation.bond_id, operation.locant)
         for operation in state.oxo_operations
     }
+    if len(observed_oxo) != len(state.oxo_operations):
+        errors.append("typed oxo operations duplicate an exocyclic parent oxo group")
     if observed_oxo != expected_oxo:
         errors.append("typed oxo operations do not represent every exocyclic parent oxo group")
 

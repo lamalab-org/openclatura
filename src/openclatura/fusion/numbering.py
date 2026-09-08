@@ -438,8 +438,9 @@ def parent_bond_model(
         BondAssignment(tuple((edge, 2 if edge in matching or edge in required_double else 1) for edge in edges))
         for matching in matchings
     )
-    for assignment in assignments:
-        validate_parent_bond_valence(graph, assignment)
+    # A matching adds at most one bond-order unit per unoccupied site; the
+    # capacity filter above proves every generated assignment fits. The audit
+    # independently checks complete assignments, including caller-built ones.
     return ParentBondModel(
         allowed_kekule_assignments=assignments,
         required_single_bonds=required,

@@ -11,7 +11,7 @@ descriptor construction.
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from itertools import combinations
 from typing import Protocol
@@ -146,6 +146,31 @@ def build_fusion_name_ast(
     multiparent_parents: bool | None = None,
     enforce_interoperability_limits: bool = True,
 ) -> FusionNameAst:
+    """Return the preferred citation; chemical planning consumes the iterator."""
+
+    return next(
+        iter_fusion_name_asts(
+            mol,
+            component_matches,
+            registry,
+            cover_kinds=cover_kinds,
+            join_kinds=join_kinds,
+            multiparent_parents=multiparent_parents,
+            enforce_interoperability_limits=enforce_interoperability_limits,
+        )
+    )
+
+
+def iter_fusion_name_asts(
+    mol: Molecule,
+    component_matches: Sequence[FusionComponentMatch],
+    registry: _Registry | Mapping[str, FusionComponentSpec],
+    *,
+    cover_kinds: Iterable[str] | None = None,
+    join_kinds: Iterable[str] | None = None,
+    multiparent_parents: bool | None = None,
+    enforce_interoperability_limits: bool = True,
+) -> Iterator[FusionNameAst]:
     """Build the preferred bounded fusion citation from exact component maps.
 
     Selected components must cover every face exactly once and reconstruct
@@ -200,8 +225,9 @@ def build_fusion_name_ast(
         ):
             selections_by_preference[preference].append(prepared)
 
-    candidates: list[_Candidate] = []
+    emitted: list[FusionNameAst] = []
     for preference in sorted(selections_by_preference):
+        candidates: list[_Candidate] = []
         parent_seniority, _location_prefix = preference
         for prepared in selections_by_preference[preference]:
             try:
@@ -218,16 +244,17 @@ def build_fusion_name_ast(
                 )
             except _LocantMapBudgetExceeded:
                 budget_exhausted += 1
-        if candidates:
-            break
-    if not candidates:
+        for candidate in sorted(candidates, key=lambda candidate: (candidate.score, candidate.rendered)):
+            if candidate.ast not in emitted:
+                emitted.append(candidate.ast)
+                yield candidate.ast
+    if not emitted:
         if budget_exhausted:
             raise FusionDescriptorError(
                 f"all viable component covers exceeded the locant-map budget of {MAX_LOCANT_MAP_COMBINATIONS} states"
             )
         tier = "tree-cover" if supported_covers == {"tree"} else "supported-cover"
         raise FusionDescriptorError(f"no exact {tier} fusion citation was found")
-    return min(candidates, key=lambda candidate: (candidate.score, candidate.rendered)).ast
 
 
 def _selection_preference_tiers(

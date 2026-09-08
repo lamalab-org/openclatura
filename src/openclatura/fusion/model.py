@@ -877,6 +877,8 @@ class FusionParentPlan:
             raise ValueError("fusion numbering must completely cover the abstract parent graph")
         if self.pin_eligibility != "fusion_rules_satisfied":
             raise ValueError("fusion parent plans must record fusion-rule eligibility")
+        if len(self.numbering.input_locant_maps) > 1 and not self.numbering_variants:
+            raise ValueError("multiple fusion locant maps require a chemical plan for every numbering")
         if self.numbering_variants:
             if any(
                 variant.numbering_variants

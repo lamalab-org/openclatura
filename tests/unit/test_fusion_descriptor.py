@@ -160,6 +160,56 @@ def test_component_side_letters_follow_the_directed_peripheral_walk():
     )
 
 
+def test_ranked_descriptor_iterator_preserves_first_choice():
+    from openclatura.fusion.descriptor import iter_fusion_name_asts
+
+    mol, faces = _component_graph(("benzene", "benzene"), (((0, "1"), (1, "1")), ((0, "2"), (1, "2"))))
+    registry = fusion_component_registry()
+    matches = registry.match_faces(mol, faces)
+    assert next(iter_fusion_name_asts(mol, matches, registry)) == build_fusion_name_ast(mol, matches, registry)
+
+
+def test_planner_checks_next_descriptor_after_chemical_rejection(monkeypatch):
+    from openclatura.fusion import planner
+
+    mol, _ = _component_graph(("benzene", "benzene"), (((0, "1"), (1, "1")), ((0, "2"), (1, "2"))))
+    atoms = frozenset(mol.atoms)
+    confirmed = planner._plan_uncached(mol, atoms, FusionMode.AUDITED_PIN)
+    assert isinstance(confirmed, FusionConfirmed)
+    first, second = object(), object()
+    attempted = []
+
+    def candidates(*args):
+        yield first
+        yield second
+        pytest.fail("candidate generation must stop once a chemical plan is confirmed")
+
+    def complete(mol, atoms, mode, ast, *args, **kwargs):
+        attempted.append(ast)
+        return FusionUnsupported("incompatible bond model") if ast is first else confirmed
+
+    monkeypatch.setattr(planner, "iter_fusion_name_asts", candidates)
+    monkeypatch.setattr(planner, "_plan_numbered_candidate", complete)
+    assert planner._plan_uncached(mol, atoms, FusionMode.AUDITED_PIN) is confirmed
+    assert attempted == [first, second]
+
+
+def test_every_numbering_has_a_chemical_leaf_without_carbon_indicated_h():
+    mol, _ = _component_graph(("benzene", "benzene"), (((0, "1"), (1, "1")), ((0, "2"), (1, "2"))))
+    result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.AUDITED_PIN)
+    assert isinstance(result, FusionConfirmed)
+    plan = result.plan
+    assert not plan.indicated_hydrogens
+    assert plan.numbering_variants
+    assert (
+        tuple(leaf.numbering.input_locant_maps[0] for leaf in plan.numbering_variants)
+        == plan.numbering.input_locant_maps
+    )
+    assert all(
+        len(leaf.numbering.input_locant_maps) == 1 and not leaf.numbering_variants for leaf in plan.numbering_variants
+    )
+
+
 @pytest.mark.parametrize(
     ("component_keys", "fused_atoms", "expected", "parent_key"),
     [

@@ -589,12 +589,7 @@ def _systematic_fusion_parent(
                 ("fusion_rules_satisfied", *result.plan.audit.checks),
             ),
         ),
-        bond_models=tuple(
-            variant.bond_model
-            for variant in (
-                result.plan.numbering_variants or (result.plan,) * len(result.plan.numbering.input_locant_maps)
-            )
-        ),
+        bond_models=tuple(variant.bond_model for variant in (result.plan.numbering_variants or (result.plan,))),
     )
 
 
