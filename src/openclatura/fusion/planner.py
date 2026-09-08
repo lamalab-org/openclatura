@@ -19,6 +19,7 @@ from .faces import FaceSearchBudgetExceeded, cached_bounded_face_model
 from .faces import typed_face_model as _typed_face_model
 from .indicated_hydrogen import (
     aromatic_nitrogen_hydrogen_atoms,
+    component_carbon_h_relocation_scope,
     component_parent_atoms,
     intrinsic_carbon_candidate_atoms,
     intrinsic_carbon_fusion_scope,
@@ -139,9 +140,10 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     if not layouts:
         return FusionUnsupported("no consistent audited intrinsic fused-ring layout")
     specs = {match.occurrence_id: registry.spec_for_match(match) for match in ast.component_occurrences}
-    prove_carbon_h = intrinsic_carbon_fusion_scope(ast, specs) and all(
-        atom.symbol == "C" and atom.charge == 0 for spec in specs.values() for atom in spec.atoms
-    )
+    prove_carbon_h = (
+        intrinsic_carbon_fusion_scope(ast, specs)
+        or any(component_parent_atoms(spec) != spec.atoms for spec in specs.values())
+    ) and all(atom.symbol == "C" and atom.charge == 0 for spec in specs.values() for atom in spec.atoms)
     numbering_selection = completed_system_numbering_selection(
         mol,
         bounded,
@@ -461,7 +463,7 @@ def _abstract_graph(ast, registry) -> FusionGraph:
     labels: dict[int, FusionGraphAtom] = {}
     edges: dict[tuple[int, int], str] = {}
     specs = {match.occurrence_id: registry.spec_for_match(match) for match in ast.component_occurrences}
-    relocate_carbon_h = intrinsic_carbon_fusion_scope(ast, specs)
+    relocate_carbon_h = component_carbon_h_relocation_scope(ast, specs)
     for match in ast.component_occurrences:
         spec = registry.spec_for_match(match)
         local_map = match.input_atom_by_locant

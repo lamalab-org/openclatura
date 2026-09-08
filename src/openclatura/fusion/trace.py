@@ -125,6 +125,26 @@ def trace_confirmed_fusion_plan(
                 "descriptor": descriptor.render(),
             },
         )
+    redistribution = plan.derivative_state.pi_redistribution
+    if redistribution is not None:
+        trace_decision(
+            trace,
+            TracePhase.ASSEMBLY,
+            "proved fusion hydrogenation with pi redistribution",
+            "Alternating bond changes cancel at internal atoms; only net endpoints gain hydrogen. "
+            "The resulting bond assignment is proven against the completed parent model.",
+            atoms=redistribution.hydrogenated_atom_ids,
+            bonds=redistribution.removed_bond_ids | redistribution.added_bond_ids,
+            data={
+                "removed_pi_bond_ids": sorted(redistribution.removed_bond_ids),
+                "added_pi_bond_ids": sorted(redistribution.added_bond_ids),
+                "hydrogenated_atom_ids": sorted(redistribution.hydrogenated_atom_ids),
+                "final_bond_orders": [
+                    {"atom_ids": list(edge), "bond_order": order}
+                    for edge, order in redistribution.final_assignment.orders
+                ],
+            },
+        )
     if plan.lambda_descriptors:
         trace_decision(
             trace,

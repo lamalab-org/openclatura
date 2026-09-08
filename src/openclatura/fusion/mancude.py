@@ -31,6 +31,16 @@ class ParentBondDelta:
 
 
 @dataclass(frozen=True, slots=True)
+class PiRedistribution:
+    """Exact bond redistribution supporting net additive hydrogenation."""
+
+    removed_bond_ids: frozenset[int]
+    added_bond_ids: frozenset[int]
+    hydrogenated_atom_ids: frozenset[int]
+    final_assignment: BondAssignment
+
+
+@dataclass(frozen=True, slots=True)
 class ParentDerivativeState:
     """Typed graph operations separating a parent skeleton from its derivative."""
 
@@ -38,6 +48,7 @@ class ParentDerivativeState:
     hydro_operations: tuple[HydroOperation, ...] = ()
     unsaturation_operations: tuple[UnsaturationOperation, ...] = ()
     oxo_operations: tuple[OxoOperation, ...] = ()
+    pi_redistribution: PiRedistribution | None = None
 
     @property
     def added_hydrogen_operations(self) -> tuple[HydroOperation, ...]:
@@ -107,7 +118,12 @@ def _nitrogen_composition_parent_model(
     model: ParentBondModel,
     indicated_hydrogen_atom_ids: set[int] | frozenset[int],
 ) -> ParentBondModel:
-    """Resolve neutral fusion-N valence and cited N-H before the bond delta."""
+    """Resolve fusion-N valence and cited N-H before the delta.
+
+    An aromatic junction N can acquire its observed donor valence through an
+    oxo derivative. Forcing that atom single in the parent would relocate a
+    parent pi bond onto an adjacent aromatic junction and falsely hydrogenate it.
+    """
 
     saturated_h_sites = saturated_nitrogen_hydrogen_sites(mol, atoms, indicated_hydrogen_atom_ids)
     sites = saturated_h_sites | frozenset(
@@ -126,7 +142,29 @@ def _nitrogen_composition_parent_model(
     )
     if not sites or not any(sites.intersection(edge) for edge in model.pi_eligible_edges | model.required_double_bonds):
         return model
-    return _single_site_parent_model(model, sites)
+    constrained = _single_site_parent_model(model, sites)
+    aromatic_sites = frozenset(atom for atom in sites if mol.atoms[atom].is_aromatic)
+    aromatic_single_boundary = (
+        frozenset(
+            normalize_edge(bond.u, bond.v)
+            for bond in mol.bonds.values()
+            if bond.u in atoms
+            and bond.v in atoms
+            and bond.order == 1
+            and mol.atoms[bond.u].is_aromatic != mol.atoms[bond.v].is_aromatic
+        )
+        if aromatic_sites
+        else frozenset()
+    )
+    if aromatic_sites and all(
+        any(order == 2 and edge in aromatic_single_boundary for edge, order in assignment.orders)
+        for assignment in constrained.allowed_kekule_assignments
+    ):
+        # A donor constraint is not intrinsic if every resulting maximum
+        # matching requires hydrogenating an observed aromatic boundary atom.
+        remaining = sites - aromatic_sites
+        return _single_site_parent_model(model, remaining) if remaining else model
+    return constrained
 
 
 def saturated_nitrogen_hydrogen_sites(
@@ -324,6 +362,82 @@ def compare_actual_parent_to_implied_parent(
         mol, atoms, bond_model, delta, externally_unsaturated_atom_ids, indicated_hydrogen_atom_ids, atom_to_locant
     )
     return replace(delta, intrinsic_hydro_operations=intrinsic) if intrinsic else delta
+
+
+def prove_pi_redistribution(
+    mol: Molecule,
+    atoms: frozenset[int],
+    model: ParentBondModel,
+    delta: ParentBondDelta,
+) -> PiRedistribution | None:
+    """Prove hydro endpoints of alternating pi paths in a neutral carbon parent.
+
+    Keep the raw edge delta intact. Internal path vertices lose and gain one
+    pi bond, so only endpoints gain hydrogen. The observed assignment must also
+    be a maximum matching of the original bond domain with these endpoints
+    blocked; net hydrogen count alone cannot establish the implicit pi state.
+    """
+
+    if (
+        not delta.compatible
+        or not delta.hydrogenated_edges
+        or delta.added_hydrogen_operations
+        or delta.intrinsic_hydro_operations
+        or delta.assignment not in model.allowed_kekule_assignments
+    ):
+        return None
+    for atom in atoms:
+        value = mol.atoms[atom]
+        neighbors = mol.get_neighbors(atom)
+        if (
+            value.symbol != "C"
+            or value.charge
+            or len(atoms.intersection(neighbors)) not in {2, 3}
+            or any(mol.get_bond(atom, other).order != 1 for other in neighbors if other not in atoms)
+            or value.total_h_count + sum(mol.get_bond(atom, other).order for other in neighbors) != 4
+        ):
+            return None
+    observed = {
+        normalize_edge(bond.u, bond.v): bond for bond in mol.bonds.values() if bond.u in atoms and bond.v in atoms
+    }
+    expected = dict(delta.assignment.orders)
+    if set(observed) != set(expected) or any(bond.order not in {1, 2} for bond in observed.values()):
+        return None
+    parent_pi = {atom: 0 for atom in atoms}
+    actual_pi = dict(parent_pi)
+    removed, added = set(), set()
+    for edge, bond in observed.items():
+        if expected[edge] not in {1, 2}:
+            return None
+        for atom in edge:
+            parent_pi[atom] += expected[edge] - 1
+            actual_pi[atom] += bond.order - 1
+        if expected[edge] > bond.order:
+            removed.add(bond.idx)
+        elif expected[edge] < bond.order:
+            added.add(bond.idx)
+    if any(parent_pi[atom] > 1 or actual_pi[atom] > parent_pi[atom] for atom in atoms):
+        return None
+    sites = frozenset(atom for atom in atoms if parent_pi[atom] - actual_pi[atom] == 1)
+    if not sites or len(sites) % 2 or 2 * (len(removed) - len(added)) != len(sites):
+        return None
+    if not added or (sites == delta.hydrogenated_atom_ids and not delta.additional_multiple_bond_ids):
+        return None
+    if not delta.additional_multiple_bond_ids <= added:
+        return None
+    try:
+        implicit_model = _single_site_parent_model(model, sites)
+    except ValueError:
+        return None
+    final = BondAssignment(orders=tuple(sorted((edge, bond.order) for edge, bond in observed.items())))
+    if final not in implicit_model.allowed_kekule_assignments:
+        return None
+    if (
+        implicit_model.maximum_non_cumulative_double_bonds
+        != model.maximum_non_cumulative_double_bonds - len(sites) // 2
+    ):
+        return None
+    return PiRedistribution(frozenset(removed), frozenset(added), sites, final)
 
 
 def _spiro_carbon_sites(mol: Molecule, atoms: frozenset[int]) -> frozenset[int]:
@@ -533,18 +647,29 @@ def parent_derivative_state(
     if delta is None or not delta.compatible:
         return None
 
+    redistribution = (
+        prove_pi_redistribution(mol, atoms, bond_model, delta)
+        if not preserve_retained_parent_state and not oxo and not indicated_hydrogen_atom_ids
+        else None
+    )
     hydrogenated_atoms = sorted(
-        delta.hydrogenated_atom_ids,
+        redistribution.hydrogenated_atom_ids if redistribution else delta.hydrogenated_atom_ids,
         key=lambda atom: system_locant_sort_key(locants[atom]),
     )
     hydrogenated_bonds = tuple(
         sorted(mol.get_bond(*edge).idx for edge in delta.hydrogenated_edges if mol.get_bond(*edge) is not None)
     )
+    if redistribution:
+        hydrogenated_bonds = tuple(sorted(redistribution.removed_bond_ids | redistribution.added_bond_ids))
     hydro = (
         (
             HydroOperation(
                 key="additive_hydrogen",
-                reason="Observed single bonds replace parent-hydride double bonds.",
+                reason=(
+                    "Alternating pi redistribution leaves graph-proved net hydrogenation endpoints."
+                    if redistribution
+                    else "Observed single bonds replace parent-hydride double bonds."
+                ),
                 locants=tuple(locants[atom] for atom in hydrogenated_atoms),
                 atom_ids=tuple(hydrogenated_atoms),
                 bond_ids=hydrogenated_bonds,
@@ -556,7 +681,7 @@ def parent_derivative_state(
     )
 
     unsaturation = []
-    for bond_id in sorted(delta.additional_multiple_bond_ids):
+    for bond_id in sorted(delta.additional_multiple_bond_ids if redistribution is None else ()):
         bond = mol.bonds[bond_id]
         ordered_atoms = tuple(sorted((bond.u, bond.v), key=lambda atom: system_locant_sort_key(locants[atom])))
         unsaturation.append(
@@ -575,12 +700,15 @@ def parent_derivative_state(
         hydro_operations=hydro,
         unsaturation_operations=tuple(unsaturation),
         oxo_operations=tuple(oxo),
+        pi_redistribution=redistribution,
     )
 
 
 __all__ = [
     "ParentBondDelta",
     "ParentDerivativeState",
+    "PiRedistribution",
+    "prove_pi_redistribution",
     "indicated_hydrogen_parent_bond_model",
     "compare_actual_parent_to_implied_parent",
     "parent_derivative_state",

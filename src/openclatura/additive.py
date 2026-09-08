@@ -1,4 +1,5 @@
 import re
+from dataclasses import replace
 
 from .assembly_parts import AssemblyParts, SubstituentItem
 from .fusion.mancude import compare_actual_parent_to_implied_parent
@@ -127,6 +128,15 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             parts.hydro_operations.extend(delta.added_hydrogen_operations)
             parts.hydro_operations.extend(delta.intrinsic_hydro_operations)
             if delta.intrinsic_hydro_operations:
+                return
+            if parent.uses_fusion_plan and parent.fusion_plan.derivative_state.hydro_operations:
+                # Keep the audited operation, including conjugated bond
+                # redistribution; deleted pi edges alone overcount its H sites.
+                for operation in parent.fusion_plan.derivative_state.hydro_operations:
+                    atoms = tuple(sorted(operation.atom_ids, key=lambda atom: parse_locant(str(get_loc(atom)))))
+                    parts.hydro_operations.append(
+                        replace(operation, atom_ids=atoms, locants=tuple(str(get_loc(atom)) for atom in atoms))
+                    )
                 return
         if delta is not None and delta.compatible and delta.hydrogenated_edges:
             indicated_locants = (

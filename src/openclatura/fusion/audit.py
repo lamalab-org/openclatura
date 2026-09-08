@@ -20,9 +20,9 @@ from ..rules import multipliers
 from .cover import audit_component_cover, component_scope
 from .indicated_hydrogen import (
     aromatic_nitrogen_hydrogen_atoms,
+    component_carbon_h_relocation_scope,
     component_parent_atoms,
     intrinsic_carbon_candidate_atoms,
-    intrinsic_carbon_fusion_scope,
     intrinsic_carbon_parent_model,
 )
 from .mancude import (
@@ -30,6 +30,7 @@ from .mancude import (
     compare_actual_parent_to_implied_parent,
     has_complete_saturated_hydrogenation,
     indicated_hydrogen_parent_bond_model,
+    prove_pi_redistribution,
     saturated_nitrogen_hydrogen_sites,
 )
 from .model import (
@@ -1141,7 +1142,7 @@ def _audit_component_pi_constraints(
     errors: list[str],
 ) -> None:
     expected = defaultdict(list)
-    relocate_carbon_h = intrinsic_carbon_fusion_scope(ast, specs)
+    relocate_carbon_h = component_carbon_h_relocation_scope(ast, specs)
     for match in ast.component_occurrences:
         spec = specs[match.occurrence_id]
         for atom in component_parent_atoms(spec) if relocate_carbon_h else spec.atoms:
@@ -1404,12 +1405,21 @@ def _audit_derivative_state(
     if state.bond_delta != delta:
         errors.append("typed derivative state does not carry the selected parent bond delta")
 
+    redistribution = (
+        prove_pi_redistribution(mol, parent_atoms, model, delta)
+        if not state.oxo_operations and not indicated_hydrogens
+        else None
+    )
+    if state.pi_redistribution != redistribution:
+        errors.append("pi redistribution does not reconstruct the raw delta and final implicit parent state")
     locants = {atom: str(locant) for atom, locant in numbering.input_locant_maps[0]}
     expected_hydrogenated_atoms = sorted(
-        delta.hydrogenated_atom_ids,
+        redistribution.hydrogenated_atom_ids if redistribution else delta.hydrogenated_atom_ids,
         key=lambda atom: system_locant_sort_key(locants[atom]),
     )
     expected_hydrogenated_bonds = tuple(sorted(mol.get_bond(*edge).idx for edge in delta.hydrogenated_edges))
+    if redistribution:
+        expected_hydrogenated_bonds = tuple(sorted(redistribution.removed_bond_ids | redistribution.added_bond_ids))
     if expected_hydrogenated_atoms:
         if len(state.hydro_operations) != 1:
             errors.append("hydrogenated parent edges require one typed hydro operation")
@@ -1431,7 +1441,7 @@ def _audit_derivative_state(
             mol.bonds[bond_id].order,
             frozenset((mol.bonds[bond_id].u, mol.bonds[bond_id].v)),
         )
-        for bond_id in delta.additional_multiple_bond_ids
+        for bond_id in (delta.additional_multiple_bond_ids if redistribution is None else ())
     }
     observed_unsaturation = {
         (operation.bond_id, operation.bond_order, frozenset(operation.atom_ids))

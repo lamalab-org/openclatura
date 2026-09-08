@@ -358,6 +358,7 @@ def _valid_face_adjacency(model: FaceModel, face_by_id: dict[int, Face]) -> bool
 
 def _next_face(model: FaceModel, placed: dict[int, tuple[int, ...]]) -> tuple[int | None, int | None, int | None]:
     options = []
+    placement_rank = {face: rank for rank, face in enumerate(placed)}
     for left, right, edge in model.face_adjacency:
         if (left in placed) == (right in placed):
             continue
@@ -365,10 +366,13 @@ def _next_face(model: FaceModel, placed: dict[int, tuple[int, ...]]) -> tuple[in
         placed_neighbors = sum(
             1 for a, b, _ in model.face_adjacency if unplaced in (a, b) and (b if a == unplaced else a) in placed
         )
-        options.append((-placed_neighbors, unplaced, neighbor, edge))
+        # Grow from the enumerated seed before using face IDs to break ties.
+        # Otherwise every seed can use the same ID-selected entrance edge
+        # of an asymmetric ring shape, losing symmetry-related embeddings.
+        options.append((-placed_neighbors, placement_rank[neighbor], unplaced, neighbor, edge))
     if not options:
         return None, None, None
-    _, face, neighbor, edge = min(options)
+    _, _, face, neighbor, edge = min(options)
     return face, neighbor, edge
 
 

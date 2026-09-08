@@ -237,7 +237,7 @@ def test_partly_hydrogenated_hw_component_uses_fusion_nomenclature():
     assert result.substituent_tree[0]["hydro_operations"] == [
         {
             "key": "additive_hydrogen",
-            "reason": "Observed parent bond orders require hydrogenation of the proved mancude parent.",
+            "reason": "Observed single bonds replace parent-hydride double bonds.",
             "locants": ["5", "6"],
             "atom_ids": [0, 1],
             "bond_ids": [1],

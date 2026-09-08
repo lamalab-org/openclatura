@@ -1,4 +1,4 @@
-"""Component-proved intrinsic carbon H for ordinary ortho bicycles."""
+"""Component-proved carbon hydrogen conventions and fusion relocation."""
 
 from __future__ import annotations
 
@@ -9,7 +9,11 @@ from functools import lru_cache
 from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule
 from ..retained_graph_model import RetainedGraphAtomTemplate
-from .mancude import compare_actual_parent_to_implied_parent, indicated_hydrogen_parent_bond_model
+from .mancude import (
+    _nitrogen_composition_parent_model,
+    _single_site_parent_model,
+    compare_actual_parent_to_implied_parent,
+)
 from .model import (
     FusionComponentSpec,
     FusionGraph,
@@ -44,11 +48,11 @@ def _component_graph(spec: FusionComponentSpec, atoms: tuple[RetainedGraphAtomTe
 
 @lru_cache(maxsize=512)
 def component_parent_atoms(spec: FusionComponentSpec) -> tuple[RetainedGraphAtomTemplate, ...]:
-    """Release only a declared carbon H tautomer of a monocyclic mancude template."""
+    """Release a declared carbon H tautomer without changing component pi capacity."""
 
     atoms = spec.atoms
     template = spec.template
-    if len(spec.rings) != 1 or template.mancude_double_bonds is None:
+    if template.mancude_double_bonds is None:
         return atoms
     movable = {
         atom.locant
@@ -105,6 +109,18 @@ def intrinsic_carbon_fusion_scope(ast: FusionNameAst, specs: Mapping[int, Fusion
     )
 
 
+def component_carbon_h_relocation_scope(ast: FusionNameAst, specs: Mapping[int, FusionComponentSpec]) -> bool:
+    """Carbon-only composition preserves the proved component pi capacities.
+
+    Heteroatom donor composition needs its separate intrinsic-H proof; the
+    existing two-monocycle tier supplies that proof before additive operations.
+    """
+
+    return intrinsic_carbon_fusion_scope(ast, specs) or all(
+        atom.symbol == "C" and atom.charge == 0 for spec in specs.values() for atom in spec.atoms
+    )
+
+
 def intrinsic_carbon_candidate_atoms(
     ast: FusionNameAst,
     specs: Mapping[int, FusionComponentSpec],
@@ -145,6 +161,9 @@ def intrinsic_carbon_parent_model(
 
     if not candidates or any(mol.atoms[atom].symbol != "C" and mol.atoms[atom].total_h_count for atom in locants):
         return model, frozenset()
+    # Resolve fusion-N valence before deciding whether a carbon is intrinsically
+    # unpaired. Reassigning N afterwards can turn an additive pair into false H.
+    model = _nitrogen_composition_parent_model(mol, frozenset(locants), model, frozenset())
     eligible = {
         atom
         for atom in candidates
@@ -171,7 +190,7 @@ def intrinsic_carbon_parent_model(
     if not choices:
         return model, frozenset()
     _, constrained, sites = min(choices, key=lambda choice: choice[0])
-    return indicated_hydrogen_parent_bond_model(graph, sites), sites
+    return _single_site_parent_model(model, sites), sites
 
 
 def aromatic_nitrogen_hydrogen_atoms(mol: Molecule, graph: FusionGraph) -> frozenset[int]:

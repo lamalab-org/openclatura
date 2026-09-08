@@ -498,7 +498,7 @@ def render_fusion_name_parts(
                 )
             )
         root_specs = tuple(_spec_for_match(registry, matches[root.occurrence_id]) for root in plan.roots)
-        parent_names = {spec.parent_name for spec in root_specs}
+        parent_names = {_parent_component_name(spec) for spec in root_specs}
         if len(parent_names) != 1:
             raise FusionDescriptorError("multiparent rendering requires identical parent components")
         multiplier_styles = {spec.multiplicative_prefix_style for spec in root_specs}
@@ -535,9 +535,23 @@ def render_fusion_name_parts(
     return tuple(
         [
             *render_children(root),
-            component_part(root_spec.parent_name, "parent_component", (root.occurrence_id,)),
+            component_part(_parent_component_name(root_spec), "parent_component", (root.occurrence_id,)),
         ]
     )
+
+
+def _parent_component_name(spec: FusionComponentSpec) -> str:
+    """Omit component-local indicated H from the completed fusion citation.
+
+    The template retains its hydrogen metadata. The planner, not the
+    component renderer, assigns indicated H using completed-system locants.
+    """
+
+    locants = spec.template.default_indicated_h
+    if not locants:
+        return spec.parent_name
+    prefix = ",".join(f"{locant}H" for locant in locants) + "-"
+    return spec.parent_name.removeprefix(prefix)
 
 
 def _occurrence_options(
