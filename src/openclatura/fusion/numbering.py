@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import deque
+from collections import Counter, deque
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from fractions import Fraction
@@ -13,6 +13,7 @@ from ..locants import system_locant_sort_key
 from ..molecule import Molecule
 from ..polycycle_topology import normalize_edge
 from ..retained_graph_model import RetainedGraphTemplate
+from ..rules import elements
 from .config import fusion_nomenclature_config
 from .faces import BoundedFaceModel, typed_face_model
 from .layout import preferred_intrinsic_layouts
@@ -346,6 +347,15 @@ def parent_bond_model(
         sites = {atom.id: atom for atom in parent.atoms}
         edges = tuple(sorted(normalize_edge(*bond.atoms) for bond in parent.bonds))
         bond_classes = {normalize_edge(*bond.atoms): bond.bond_class for bond in parent.bonds}
+        skeletal_degrees = Counter(atom for edge in edges for atom in edge)
+        # Fixed-valence sites may exhaust their bonding capacity at a fusion
+        # junction. Donor/charge/lambda sites retain their separate proofs.
+        saturated_sites = {
+            atom
+            for atom, site in sites.items()
+            if (limit := elements.get(site.symbol).mancude_bonding_limit) is not None
+            and skeletal_degrees[atom] >= limit
+        }
         required_double = frozenset(edge for edge in edges if bond_classes[edge] == "double")
         occupied = frozenset(atom for edge in required_double for atom in edge)
         eligible = frozenset(
@@ -354,6 +364,7 @@ def parent_bond_model(
             if bond_classes[edge] in {"aromatic", "mancude", "fusion"}
             and not occupied.intersection(edge)
             and all(sites[atom].pi_capacity and not sites[atom].forced_single for atom in edge)
+            and not saturated_sites.intersection(edge)
         )
     else:
         if atom_ids is None:

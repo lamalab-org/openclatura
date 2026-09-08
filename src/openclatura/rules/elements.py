@@ -17,6 +17,7 @@ class Element:
     fusion_general_priority: int | None = None
     mancude_forced_single: bool = False
     fusion_supported: bool = False
+    mancude_bonding_limit: int | None = None
 
 
 def _load_elements() -> dict[str, Element]:
@@ -26,6 +27,8 @@ def _load_elements() -> dict[str, Element]:
     result: dict[str, Element] = {}
     for row in table["elements"]:
         element = Element(**row)
+        if element.mancude_bonding_limit is not None and element.mancude_bonding_limit < element.standard_valence:
+            raise ValueError(f"mancude bonding limit is below standard valence for {element.symbol}")
         if element.symbol in result:
             raise ValueError(f"duplicate element symbol {element.symbol!r}")
         result[element.symbol] = element
