@@ -602,16 +602,20 @@ def test_unmatched_retained_parent_morphology_uses_operation_scope():
     assert set(dioxolan["atoms"]) == {1, 2, 3, 4, 5}
 
 
-def test_unmatched_spiro_parent_morphology_uses_operation_scope_not_broad_fallback():
+def test_spiro_side_prefix_has_exact_graph_ownership_not_broad_fallback():
     analysis = analyze_smiles("CN1CC11C2C3CC2C13")
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
-    methylspiro = next(token for token in assembly.data["name_token_spans"] if token["text"] == "methylspiro")
+    methyl = next(token for token in assembly.data["name_token_spans"] if token["text"] == "methyl")
 
     assert analysis.name == "1'-methylspiro[tricyclo[2.2.0.0^{2,5}]hexane-6,2'-aziridine]"
-    assert methylspiro["source"] == "operation_trace"
-    assert methylspiro["confidence"] == "derived"
-    assert methylspiro["ownership"] == "operation_scope"
-    assert methylspiro["token_kind"] == "prefix"
+    assert methyl["source"] == "substituent_renderer"
+    assert methyl["confidence"] == "derived"
+    assert methyl["ownership"] == "exact"
+    assert methyl["token_kind"] == "prefix"
+    assert methyl["atoms"] == [0]
+    substituent = next(segment for segment in analysis.trace_segments if segment["key"] == "substituent:methyl")
+    assert substituent["atoms"] == [0]
+    assert substituent["bonds"] == [1]
 
 
 def test_primed_spiro_component_locant_uses_component_scope_not_broad_fallback():
@@ -4651,6 +4655,10 @@ def test_spiro_side_heteroaromatic_branch_uses_graph_numbered_side_ring():
 
 
 def test_spiro_side_hantzsch_widman_branch_requires_aromatic_ring_metadata():
+    from openclatura import opsin_available, verify_with_opsin
+    from openclatura.assembler import assemble_name_raw
+    from openclatura.namer import _simple_monocyclic_spiro_side_assembly
+
     mol = Molecule()
     for idx, symbol in {
         0: "C",
@@ -4678,10 +4686,23 @@ def test_spiro_side_hantzsch_widman_branch_requires_aromatic_ring_metadata():
     ):
         mol.add_bond(u, v, order=order)
 
+    assert _simple_monocyclic_spiro_side_assembly(mol, 0, set(mol.atoms)) is None
     spiro = _spiro_subgraph_assembly(mol, 0, set(mol.atoms))
 
-    assert spiro.side_parent_name != "cyclopropane"
-    assert not any("oxadiazol" in prefix for prefix in spiro.side_prefixes)
+    # The shortcut needs aromatic flags; ordinary branch naming can establish
+    # the heterocycle from its Kekule bonds without losing the spiro junction.
+    assert spiro.side_locant == "1"
+    assert spiro.side_parent_name == "cyclopropane"
+    assert spiro.side_prefixes == ("2'-(3-methyl-1,2,4-oxadiazol-5-yl)",)
+    assert spiro.side_parts.parent_atom_ids == {0, 1, 2}
+    assert spiro.side_parts.parent_atom_ids_by_locant == {"1": 0, "2": 1, "3": 2}
+    assert spiro.side_substituents[0].atom_ids == {3, 4, 5, 6, 7, 8}
+    assert spiro.side_substituents[0].bond_ids == set(range(4, 11))
+    generated = assemble_name_raw(spiro.side_parts)
+    assert generated == "2-(3-methyl-1,2,4-oxadiazol-5-yl)cyclopropane"
+    if opsin_available():
+        check = verify_with_opsin(generated, "C1CC1C2=NC(=NO2)C", standardize_smiles=False)
+        assert check.ok, check.to_dict()
 
 
 def test_mixed_spiro_bicyclo_side_suffixes_and_replacement_locants_are_component_scoped():

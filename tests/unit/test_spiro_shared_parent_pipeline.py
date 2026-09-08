@@ -1,4 +1,4 @@
-"""Spiro parent-pipeline regressions. Intentionally added without execution."""
+"""Spiro parent-pipeline regressions."""
 
 from copy import deepcopy
 from dataclasses import replace
@@ -19,7 +19,13 @@ from openclatura.spiro_assembly import SpiroAssembly
 from openclatura.spiro_subgraph import plan_graph_spiro_side, plan_substituted_fusion_spiro_side
 
 
-def test_typed_side_hoisting_does_not_parse_nested_prefix_names():
+def test_typed_side_hoisting_does_not_parse_nested_prefix_names(monkeypatch):
+    import openclatura.assembly_spiro as assembly
+
+    def reject_parse(*args, **kwargs):
+        pytest.fail("typed side prefixes must not be recovered from rendered text")
+
+    monkeypatch.setattr(assembly, "_split_side_prefix_run", reject_parse)
     branch = SubstituentItem(
         name="(2,6-difluoro-3-methylphenyl)",
         locants=["3a"],
@@ -43,6 +49,30 @@ def test_typed_side_hoisting_does_not_parse_nested_prefix_names():
     assert parts.substituents[0].substituent_tree == branch.substituent_tree
     assert split_spiro_substituents(parts) == []
     assert len(parts.substituents) == 1
+
+
+def test_typed_replacements_are_projected_from_parts_without_parsing(monkeypatch):
+    import openclatura.assembly_spiro as assembly
+
+    def reject_parse(*args, **kwargs):
+        pytest.fail("typed replacements must not be recovered from rendered text")
+
+    monkeypatch.setattr(assembly, "_split_side_prefix_run", reject_parse)
+    local = AssemblyParts(
+        parent_length=5,
+        is_ring=True,
+        a_prefixes=[SubstituentItem("aza", ["1", "3"])],
+        substituents=[SubstituentItem("methyl", ["2"], atom_ids={8})],
+    )
+    original = deepcopy(local)
+    side = spiro_assembly_from_parts(local, "4")
+    assert side.side_parent_name == "cyclopentane"
+    assert side.side_prefixes == ("2'-methyl", "1',3'-diaza")
+    parts = AssemblyParts(parent_length=3, substituents=[SubstituentItem("", ["1"], spiro=side)])
+    normalized = split_spiro_substituents(parts)[0]
+    assert normalized.side_prefixes == ("1',3'-diaza",)
+    assert parts.substituents == [replace(original.substituents[0], locants=["2'"])]
+    assert local == original
 
 
 def test_typed_suffixes_and_stereo_are_projected_once():
@@ -160,19 +190,21 @@ def test_fused_side_uses_selected_nonfirst_numbering(monkeypatch):
 
     original = pipeline.choose_parent_numbering
     selected_maps = []
+    first_maps = []
 
     def choose_last(mol, paths, principal, branches, maps, *args, **kwargs):
         if maps and len(maps) > 1:
+            first_maps.append(maps[0])
             selected_maps.append(maps[-1])
             maps = [maps[-1]]
         return original(mol, paths, principal, branches, maps, *args, **kwargs)
 
     monkeypatch.setattr(pipeline, "choose_parent_numbering", choose_last)
-    mol = read_smiles("C1Cc2ncccc2[C@H]1N")
+    mol = read_smiles("C1Cc2nccnc2[C@H]1N")
     side = plan_substituted_fusion_spiro_side(mol, set(mol.atoms), 0, mode=FusionMode.AUDITED_PIN)
     assert side is not None
-    if not selected_maps:
-        pytest.skip("planner retained only one numbering for this fixture")
+    assert len(selected_maps) == len(first_maps) == 1
+    assert selected_maps[0] != first_maps[0]
     mapping = {atom: locant for locant, atom in side.side_parts.parent_atom_ids_by_locant.items()}
     assert mapping == selected_maps[-1]
     assert side.side_locant == mapping[0]
@@ -180,6 +212,8 @@ def test_fused_side_uses_selected_nonfirst_numbering(monkeypatch):
     assert parent.is_systematic_fusion
     assert list(parent.fusion_plan.numbering.string_input_locant_maps()) == [mapping]
     assert not parent.fusion_plan.numbering_variants
+    assert side.side_prefixes == ("5'-amino",)
+    assert side.side_stereo == (("5'", "S"),)
 
 
 @pytest.mark.parametrize("smiles", ["C1Cc2ncccc2C1=O", "C1Cc2ncccc2[C@H]1N"])
@@ -225,3 +259,32 @@ def test_shortcut_without_numbered_parts_does_not_invent_junction(monkeypatch):
     monkeypatch.setattr(component_namer, "name_component", lambda *args, **kwargs: "silacyclohexane")
     mol = read_smiles("C1CCCCC1")
     assert plan_graph_spiro_side(mol, set(mol.atoms), 0) is None
+
+
+def test_junction_intent_numbers_once_before_suffix_feature_assembly(monkeypatch):
+    import openclatura.component_namer as component
+    import openclatura.parent_pipeline as pipeline
+
+    original = pipeline.choose_parent_numbering
+    original_features = component.add_component_principal_group
+    numbering = []
+    features = []
+
+    def choose(mol, paths, principal, *args, **kwargs):
+        numbering.append(tuple(principal))
+        return original(mol, paths, principal, *args, **kwargs)
+
+    def add_group(mol, parts, groups, key, principal, path, get_loc):
+        features.append(dict(parts.parent_atom_ids_by_locant))
+        return original_features(mol, parts, groups, key, principal, path, get_loc)
+
+    monkeypatch.setattr(pipeline, "choose_parent_numbering", choose)
+    monkeypatch.setattr(component, "add_component_principal_group", add_group)
+    mol = read_smiles("C1CC1O")
+    side = plan_graph_spiro_side(mol, set(mol.atoms), 0)
+    assert side is not None
+    assert numbering == [(0,)]
+    assert features == [side.side_parts.parent_atom_ids_by_locant]
+    assert side.side_locant == "1"
+    assert side.side_suffixes == (("2", "ol"),)
+    assert side.side_parts.parent_atom_ids_by_locant["2"] == 2

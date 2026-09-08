@@ -23,6 +23,21 @@ def _prime_side_locant(locant: str) -> str:
     return str(locant) if not str(locant) or str(locant).endswith("'") else f"{locant}'"
 
 
+def _side_replacement_prefixes(parts: AssemblyParts) -> tuple[str, ...]:
+    from .assembly_prefixes import format_replacement_prefixes
+
+    replacements = format_replacement_prefixes(
+        AssemblyParts(
+            parent_length=parts.parent_length,
+            a_prefixes=[
+                replace(item, locants=[_prime_side_locant(locant) for locant in item.locants])
+                for item in parts.a_prefixes
+            ],
+        )
+    )
+    return (replacements,) if replacements else ()
+
+
 def spiro_assembly_from_parts(
     parts: AssemblyParts, junction_locant: str, *, render_parent: Callable[[AssemblyParts], str] | None = None
 ) -> SpiroAssembly | None:
@@ -54,6 +69,7 @@ def spiro_assembly_from_parts(
         return None
     local = deepcopy(parts)
     local.substituents = []
+    local.a_prefixes = []
     local.stereo_features = []
     local.name_atom_bindings = []
     _, parent_terminal = parent_stem_and_terminal(local)
@@ -74,7 +90,8 @@ def spiro_assembly_from_parts(
         parent_locant="",
         side_locant=junction_locant,
         side_parent_name=name,
-        side_prefixes=tuple(f"{','.join(item.locants)}-{item.name}" for item in substituents),
+        side_prefixes=tuple(f"{','.join(item.locants)}-{item.name}" for item in substituents)
+        + _side_replacement_prefixes(parts),
         side_suffixes=suffixes,
         side_stereo=tuple(
             (_prime_side_locant(locant), descriptor)
@@ -202,7 +219,7 @@ def _hoist_side_substituent_prefixes(parts: AssemblyParts, spiro: SpiroAssembly)
 
                 branch_parts = AssemblyParts(parent_length=0, substituents=[item])
                 parts.name_atom_bindings.extend(refresh_name_atom_bindings(branch_parts))
-        return replace(spiro, side_prefixes=())
+        return replace(spiro, side_prefixes=_side_replacement_prefixes(spiro.side_parts))
     for prefix in spiro.side_prefixes:
         for locants, name in _split_side_prefix_run(prefix):
             if not locants or _is_replacement_prefix(name):

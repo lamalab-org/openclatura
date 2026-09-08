@@ -86,6 +86,12 @@ def select_component_parent(mol: Molecule, exclude_atoms: set[int], principal_ca
     return select_principal_parent(mol, chains, ring_systems, principal_carbons)
 
 
+def build_component_parent_plan(mol, selection, intent, substituents, **parent_options):
+    """Resolve and number the parent before perceiving its assembly features."""
+    parent = resolve_parent_hydride_plan(mol, selection, **parent_options)
+    return build_parent_assembly_plan(mol, selection, intent, substituents, parent_hydride=parent)
+
+
 def collect_component_branch_substituents(
     mol: Molecule,
     parent_path: list[int],
@@ -280,6 +286,8 @@ def name_component(
     assemble_parent_name: ParentAssembler,
     token_debug: bool = False,
     omit_redundant_locants: bool = True,
+    parent_plan_builder: Callable | None = None,
+    parent_selector: Callable | None = None,
 ):
     """Name one connected component or recursive component of a molecule."""
 
@@ -430,7 +438,9 @@ def name_component(
     state.principal_carbons, _ = partition_principal_and_prefix_groups(state.perceived_groups, state.principal_key)
     exclude_nonparent_group_atoms(mol, state.perceived_groups, state.exclude_atoms, state.cyclic_atoms_all)
 
-    state.parent_selection = select_component_parent(mol, state.exclude_atoms, state.principal_carbons)
+    state.parent_selection = (parent_selector or select_component_parent)(
+        mol, state.exclude_atoms, state.principal_carbons
+    )
     if state.parent_selection is None:
         trace_decision(
             decision_trace,
@@ -546,25 +556,18 @@ def name_component(
     ):
         state.retained_name = None
 
-    state.parent_hydride = resolve_parent_hydride_plan(
+    parent_plan = (parent_plan_builder or build_component_parent_plan)(
         mol,
         state.parent_selection,
+        NamingIntent.component(state.principal_carbons, omit_redundant_locants=omit_redundant_locants),
+        subst_mapping,
         retained_name=state.retained_name,
         locant_maps=state.locant_maps,
         retained_parent_metadata=state.retained_parent_metadata,
         decision_trace=decision_trace,
         retained_proof_source=("retained_graph_template" if retained_fused is not None else "retained_template"),
     )
-    parent_plan = build_parent_assembly_plan(
-        mol,
-        state.parent_selection,
-        NamingIntent.component(
-            state.principal_carbons,
-            omit_redundant_locants=omit_redundant_locants,
-        ),
-        subst_mapping,
-        parent_hydride=state.parent_hydride,
-    )
+    state.parent_hydride = parent_plan.parent_hydride
     numbered_path = parent_plan.numbered_path
     locant_map = parent_plan.locant_map
     get_loc = parent_plan.get_loc

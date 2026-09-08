@@ -309,6 +309,13 @@ def _spiro_subgraph_assembly(mol: Molecule, c_idx: int, sub_comp: set[int]) -> S
     if simple_side_ring is not None:
         return simple_side_ring
 
+    from .fusion.context import current_fusion_mode
+    from .spiro_subgraph import plan_substituted_fusion_spiro_side
+
+    fusion_side = plan_substituted_fusion_spiro_side(mol, sub_comp, c_idx, mode=current_fusion_mode())
+    if fusion_side is not None:
+        return fusion_side
+
     heteroaromatic_side = _heteroaromatic_spiro_side_assembly(mol, c_idx, sub_comp)
     if heteroaromatic_side is not None:
         return heteroaromatic_side
