@@ -29,7 +29,7 @@
     {"smiles": "c1oc2nc3sccc3cc2c1", "name": "furo[2,3-b]thieno[3,2-e]pyridine"},
     {"smiles": "c1sc2nc3occc3cc2c1", "name": "furo[2,3-b]thieno[3,2-e]pyridine"},
     {"smiles": "O1CC2=CC=CC3=C2C1=CC=C3", "name": "benzo[1,2,3-cd]1-benzofuran"},
-    {"smiles": "N1CC2=CC=CC3=C2C1=CC=C3", "name": "1H-naphtho[1,8a,8-bc]pyrrole"},
+    {"smiles": "N1CC2=CC=CC3=C2C1=CC=C3", "name": "1H-benzo[1,2,3-cd]indole"},
     {"smiles": "S1CC2=CC=CC3=C2C1=CC=C3", "name": "benzo[1,2,3-cd]1-benzothiophene"},
     {"smiles": "Cc1oc2ncccc2c1", "name": "2-methylfuro[2,3-b]pyridine"},
     {"smiles": "Oc1oc2ncccc2c1", "name": "furo[2,3-b]pyridin-2-ol"},

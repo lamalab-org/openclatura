@@ -27,6 +27,23 @@ def _reordered_reported_graph(offset):
     return Chem.RenumberAtoms(graph, order[offset:] + order[:offset])
 
 
+@pytest.mark.parametrize("mode", (FusionMode.GENERAL, FusionMode.AUDITED_PIN))
+def test_peri_indole_selects_the_larger_nitrogen_containing_parent(mode):
+    mol = read_rdkit_mol(Chem.MolFromSmiles("N1CC2=CC=CC3=C2C1=CC=C3"))
+    planned = plan_fusion_parent(mol, set(mol.atoms), mode=mode)
+    assert isinstance(planned, FusionConfirmed), planned
+    assert planned.plan.audit.confirmed
+    (parent,) = [
+        match
+        for match in planned.plan.ast.component_occurrences
+        if match.occurrence_id in planned.plan.ast.parent_occurrences
+    ]
+    spec = fusion_component_registry().spec_for_match(parent)
+    # P-25.3.2.4: among nitrogen-containing components, more rings wins.
+    assert spec.parent_name == "indole"
+    assert len(spec.rings) == 2
+
+
 @pytest.mark.opsin
 def test_peri_indole_citation_scopes_hydrogen_to_completed_parent():
     if not opsin_available():
