@@ -25,13 +25,15 @@ def charged_parts(monkeypatch):
     return captured[0]
 
 
-def test_charge_operations_rebind_without_mutating_audited_plan(charged_parts):
+def test_charge_operations_follow_selected_leaf_without_mutating_audited_plan(charged_parts):
     plan = charged_parts.parent_hydride.fusion_plan
     before = plan.charge_operations
     operation = before[0]
     charge = charged_parts.parent_charges[0]
     assert operation.atom_id == charge.atom_id
-    assert str(operation.locant) != charge.locant
+    assert len(plan.numbering.input_locant_maps) == 1
+    assert str(operation.locant) == charge.locant
+    assert charged_parts.parent_atom_ids_by_locant[charge.locant] == operation.atom_id
     rendered = assembly_charge.fusion_parent_charge_name_operations(charged_parts)
     assert rendered[0].locants == (charge.locant,)
     assert rendered[0].suffix == "ide"

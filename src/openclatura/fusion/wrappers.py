@@ -402,14 +402,12 @@ def _prefer_completed_system_bridge_unsaturation(parent: WrapperParentPlan) -> b
 
     if parent.kind is WrapperParentKind.RETAINED:
         return False
-    from .indicated_hydrogen import _component_carbon_h_locants, intrinsic_carbon_fusion_scope
+    from .indicated_hydrogen import _component_carbon_h_locants
     from .registry import fusion_component_registry
 
     plan = parent.fusion_plan
     registry = fusion_component_registry()
     specs = {match.occurrence_id: registry.spec_for_match(match) for match in plan.ast.component_occurrences}
-    if intrinsic_carbon_fusion_scope(plan.ast, specs):
-        return False
     # P-25.4.3.4.1 assigns pi bonds after bridge insertion. Localizing the
     # bridge double bonds can prevent OPSIN from resolving these components;
     # dehydrogenation lets it assign pi bonds over the completed system.

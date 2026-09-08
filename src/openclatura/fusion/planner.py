@@ -149,6 +149,8 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     except FusionDescriptorError as exc:
         return FusionUnsupported("no supported audited fusion-component decomposition", (str(exc),))
     if rejected:
+        if all(result == rejected[0] for result in rejected):
+            return rejected[0]
         reasons = []
         for result in rejected:
             reasons.append(result.reason)
@@ -202,6 +204,9 @@ def _plan_numbered_candidate(
         return FusionUnsupported("no layout-derived peripheral system numbering was proven")
     try:
         graph = _abstract_graph(ast, registry)
+    except ValueError as exc:
+        return FusionAuditFailed("fusion component graphs could not be merged consistently", (str(exc),))
+    try:
         intrinsic_sites = intrinsic_parent_lone_pair_sites(mol, graph)
         initial_model = (
             indicated_hydrogen_parent_bond_model(graph, intrinsic_sites)
