@@ -24,6 +24,7 @@ from .indicated_hydrogen import (
     component_parent_atoms,
     intrinsic_carbon_candidate_atoms,
     intrinsic_carbon_parent_model,
+    is_intrinsic_carbon_h_site,
 )
 from .mancude import (
     ParentDerivativeState,
@@ -278,6 +279,7 @@ def audit_fusion_plan(
                 expected_model,
                 dict(numbering.input_locant_maps[0]),
                 carbon_candidates,
+                intrinsic_hydrogen_atom_ids=intrinsic_n_h,
             )
             if (intrinsic_n_h or intrinsic_c_h) and bond_model != expected_model:
                 errors.append("parent bond model does not preserve the proved intrinsic-hydrogen sites")
@@ -578,22 +580,34 @@ def _has_separate_intrinsic_carbon_h_and_hydro(
     indicated_hydrogens: tuple[SystemLocant, ...],
     state: ParentDerivativeState,
 ) -> bool:
-    """Admit one component-proved intrinsic CH2 with disjoint carbon hydro pairs."""
+    """Admit intrinsic carbon H alongside proven aromatic N-H and disjoint hydro."""
 
-    if len(indicated_hydrogens) != 1 or state.oxo_operations or state.unsaturation_operations:
+    if not indicated_hydrogens or state.oxo_operations or state.unsaturation_operations:
         return False
     atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
-    atom = atom_by_locant.get(indicated_hydrogens[0])
+    h_atoms = {atom_by_locant.get(locant) for locant in indicated_hydrogens}
+    if None in h_atoms:
+        return False
+    carbon_sites = {atom for atom in h_atoms if mol.atoms[atom].symbol == "C"}
+    if len(carbon_sites) != 1:
+        return False
+    atom = next(iter(carbon_sites))
+    if any(
+        mol.atoms[site].symbol != "N"
+        or mol.atoms[site].charge
+        or not mol.atoms[site].is_aromatic
+        or mol.atoms[site].total_h_count != 1
+        for site in h_atoms - carbon_sites
+    ):
+        return False
     if atom not in intrinsic_carbon_candidate_atoms(ast, specs, mol):
         return False
     hydro_atoms = {site for operation in state.hydro_operations for site in operation.atom_ids}
     return (
-        mol.atoms[atom].symbol == "C"
-        and mol.atoms[atom].charge == 0
-        and mol.atoms[atom].total_h_count == 2
-        and atom not in hydro_atoms
+        is_intrinsic_carbon_h_site(mol, atom, set(atom_by_locant.values()))
+        and not h_atoms & hydro_atoms
         and all(mol.atoms[site].symbol == "C" for site in hydro_atoms)
-        and all(order == 1 for edge, order in state.bond_delta.assignment.orders if atom in edge)
+        and all(order == 1 for edge, order in state.bond_delta.assignment.orders if h_atoms.intersection(edge))
     )
 
 
@@ -1342,7 +1356,7 @@ def _audit_indicated_hydrogens(
     if any(locant not in atom_by_locant for locant in cited):
         errors.append("fusion indicated-hydrogen citation is outside the completed numbering")
         return
-    candidates = set(indicated_hydrogen_candidate_atoms(mol, selected_map))
+    candidates = set(indicated_hydrogen_candidate_atoms(mol, selected_map)) | set(intrinsic_carbon_atoms)
     cited_atoms = {atom_by_locant[locant] for locant in cited}
     if not cited_atoms <= candidates:
         errors.append("fusion indicated-hydrogen citation points to an ineligible graph atom")

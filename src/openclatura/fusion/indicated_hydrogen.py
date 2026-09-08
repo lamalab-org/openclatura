@@ -131,13 +131,7 @@ def intrinsic_carbon_candidate_atoms(
     if not intrinsic_carbon_fusion_scope(ast, specs):
         return frozenset()
     parent_atoms = {atom for match in ast.component_occurrences for atom in match.input_atom_by_locant.values()}
-    if not any(
-        mol.atoms[atom].symbol == "C"
-        and mol.atoms[atom].total_h_count == 2
-        and not mol.atoms[atom].is_aromatic
-        and mol.atoms[atom].charge == 0
-        for atom in parent_atoms
-    ):
+    if not any(is_intrinsic_carbon_h_site(mol, atom, parent_atoms) for atom in parent_atoms):
         return frozenset()
     candidates = set()
     for match in ast.component_occurrences:
@@ -146,12 +140,29 @@ def intrinsic_carbon_candidate_atoms(
     return frozenset(candidates)
 
 
+def is_intrinsic_carbon_h_site(mol: Molecule, atom: int, parent_atoms: set[int] | frozenset[int]) -> bool:
+    """Recognize a parent CH2 site, including H replaced by branches or bridges."""
+
+    site = mol.atoms[atom]
+    if site.symbol != "C" or site.charge or site.is_aromatic:
+        return False
+    neighbors = mol.get_neighbors(atom)
+    external_count = sum(neighbor not in parent_atoms for neighbor in neighbors)
+    return (
+        len(neighbors) - external_count == 2
+        and site.total_h_count + external_count == 2
+        and all(mol.get_bond(atom, neighbor).order == 1 for neighbor in neighbors)
+    )
+
+
 def intrinsic_carbon_parent_model(
     mol: Molecule,
     graph: FusionGraph,
     model: ParentBondModel,
     locants: Mapping[int, SystemLocant],
     candidates: frozenset[int],
+    *,
+    intrinsic_hydrogen_atom_ids: frozenset[int] = frozenset(),
 ) -> tuple[ParentBondModel, frozenset[int]]:
     """Choose one intrinsic CH2 site without consuming additive hydrogenation.
 
@@ -159,30 +170,37 @@ def intrinsic_carbon_parent_model(
     an operation deleting a double bond from an otherwise chosen assignment.
     """
 
-    if not candidates or any(mol.atoms[atom].symbol != "C" and mol.atoms[atom].total_h_count for atom in locants):
+    if not candidates or any(
+        mol.atoms[atom].symbol != "C" and mol.atoms[atom].total_h_count and atom not in intrinsic_hydrogen_atom_ids
+        for atom in locants
+    ):
         return model, frozenset()
     # Resolve fusion-N valence before deciding whether a carbon is intrinsically
     # unpaired. Reassigning N afterwards can turn an additive pair into false H.
-    model = _nitrogen_composition_parent_model(mol, frozenset(locants), model, frozenset())
-    eligible = {
-        atom
-        for atom in candidates
-        if mol.atoms[atom].charge == 0
-        and mol.atoms[atom].total_h_count == 2
-        and not mol.atoms[atom].is_aromatic
-        and len([neighbor for neighbor in mol.get_neighbors(atom) if neighbor in locants]) == 2
-        and all(mol.get_bond(atom, neighbor).order == 1 for neighbor in mol.get_neighbors(atom))
-    }
+    parent_atoms = frozenset(locants)
+    model = _nitrogen_composition_parent_model(mol, parent_atoms, model, intrinsic_hydrogen_atom_ids)
+    eligible = {atom for atom in candidates if is_intrinsic_carbon_h_site(mol, atom, parent_atoms)}
+    carbon_atoms = {atom.id for atom in graph.atoms if atom.symbol == "C"}
     groups = {}
     for assignment in model.allowed_kekule_assignments:
         paired = {atom for edge, order in assignment.orders if order == 2 for atom in edge}
         unpaired = candidates - paired
+        # A proved N-H donor can already account for the unpaired parent
+        # valence. Do not introduce a competing carbon tautomer in that case.
+        if intrinsic_hydrogen_atom_ids and carbon_atoms <= paired:
+            return model, frozenset()
         if len(unpaired) == 1 and unpaired <= eligible:
             groups.setdefault(unpaired, []).append(assignment)
     choices = []
     for sites, assignments in groups.items():
         constrained = replace(model, allowed_kekule_assignments=tuple(assignments))
-        delta = compare_actual_parent_to_implied_parent(mol, frozenset(locants), constrained, atom_to_locant=locants)
+        delta = compare_actual_parent_to_implied_parent(
+            mol,
+            parent_atoms,
+            constrained,
+            atom_to_locant=locants,
+            indicated_hydrogen_atom_ids=intrinsic_hydrogen_atom_ids,
+        )
         if delta is None or not delta.compatible or delta.additional_multiple_bond_ids:
             continue
         rank = (len(delta.hydrogenated_edges), tuple(sorted(system_locant_sort_key(locants[atom]) for atom in sites)))

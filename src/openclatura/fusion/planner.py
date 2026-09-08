@@ -22,7 +22,6 @@ from .indicated_hydrogen import (
     component_carbon_h_relocation_scope,
     component_parent_atoms,
     intrinsic_carbon_candidate_atoms,
-    intrinsic_carbon_fusion_scope,
     intrinsic_carbon_parent_model,
 )
 from .layout import LayoutSearchBudgetExceeded, preferred_intrinsic_layouts
@@ -140,10 +139,10 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     if not layouts:
         return FusionUnsupported("no consistent audited intrinsic fused-ring layout")
     specs = {match.occurrence_id: registry.spec_for_match(match) for match in ast.component_occurrences}
-    prove_carbon_h = (
-        intrinsic_carbon_fusion_scope(ast, specs)
-        or any(component_parent_atoms(spec) != spec.atoms for spec in specs.values())
-    ) and all(atom.symbol == "C" and atom.charge == 0 for spec in specs.values() for atom in spec.atoms)
+    prove_carbon_h = bool(intrinsic_carbon_candidate_atoms(ast, specs, mol)) or (
+        any(component_parent_atoms(spec) != spec.atoms for spec in specs.values())
+        and all(atom.symbol == "C" and atom.charge == 0 for spec in specs.values() for atom in spec.atoms)
+    )
     numbering_selection = completed_system_numbering_selection(
         mol,
         bounded,
@@ -236,6 +235,7 @@ def _complete_fusion_plan(
             bond_model,
             dict(numbering.input_locant_maps[0]),
             intrinsic_carbon_candidate_atoms(ast, specs, mol),
+            intrinsic_hydrogen_atom_ids=intrinsic_n_h,
         )
     except MancudeSearchBudgetExceeded as exc:
         return FusionUnsupported("mancude assignment search budget exhausted", (str(exc),))

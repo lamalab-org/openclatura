@@ -14,6 +14,7 @@ from itertools import combinations
 
 from ..assembly_parts import NameTokenBinding
 from ..assembly_utils import needs_hyphen
+from ..canonical_ranks import canonical_ranks
 from ..locants import parse_system_locant, retained_locant_sort_key, system_locant_sort_key
 from ..molecule import Molecule, bond_ids_within, edges_within_atoms
 from ..name_operations import UnsaturationOperation
@@ -377,7 +378,22 @@ def plan_bridged_fusion_wrapper(
             if candidates:
                 break
         if candidates:
-            return min(candidates, key=lambda item: item[0])[1]
+            best = min(rank for rank, _ in candidates)
+            tied = [plan for rank, plan in candidates if rank == best]
+            if len(tied) == 1:
+                return tied[0]
+            # Equivalent bridge choices must not depend on input atom IDs or
+            # candidate enumeration order. Reuse the graph's cached ranks.
+            ranks = canonical_ranks(mol)
+            return min(
+                tied,
+                key=lambda plan: tuple(
+                    ranks[atom]
+                    for atom, locant in sorted(
+                        plan.atom_to_locant.items(), key=lambda item: system_locant_sort_key(item[1])
+                    )
+                ),
+            )
     return None
 
 
