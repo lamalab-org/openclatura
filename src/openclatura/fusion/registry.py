@@ -33,6 +33,7 @@ from ..retained_fused_templates import (
     validate_retained_fused_template,
 )
 from ..retained_graph_model import monocyclic_graph_template
+from ..retained_name_policy import retained_parent_name_policy
 from ..rules.stems import stem_for
 from .config import annulene_ring_sizes_from_data
 from .model import FusionComponentMatch, FusionComponentSpec
@@ -167,11 +168,18 @@ class FusionComponentRegistry:
                 # inside the parent-component citation. Its atoms remain on
                 # the template for the existing parent-bond-model machinery.
                 hydrogen_prefix = ",".join(f"{locant}H" for locant in template.default_indicated_h) + "-"
+                name_policy = retained_parent_name_policy(template.name)
+                parent_name = (
+                    dict(name_policy.context_names).get("fusion_component", template.output_name)
+                    if name_policy is not None
+                    else template.output_name
+                )
                 self.register(
                     {
                         "key": template.name,
-                        "parent_name": template.output_name.removeprefix(hydrogen_prefix),
+                        "parent_name": parent_name.removeprefix(hydrogen_prefix),
                         "allow_as_parent": allow_parent,
+                        "allow_as_peri_parent": policy.get("allow_as_peri_parent", False),
                         "allow_as_attached": allow_attached,
                         "horizontal_ring_count": len(template.rings),
                         "rule": rule,
@@ -228,6 +236,7 @@ class FusionComponentRegistry:
 
         allow_parent = _required_bool(row, "allow_as_parent")
         allow_attached = _required_bool(row, "allow_as_attached")
+        allow_peri_parent = _required_bool({"allow_as_peri_parent": False, **row}, "allow_as_peri_parent")
         if not allow_parent and not allow_attached:
             raise ValueError(f"fusion component {key!r} is not eligible for any role")
         primary = templates[0]
@@ -256,6 +265,7 @@ class FusionComponentRegistry:
             attached_prefix=attached_prefix or "",
             template=primary,
             usable_as_parent=allow_parent,
+            usable_as_peri_parent=allow_peri_parent,
             usable_as_attached=allow_attached,
             rule_reference=rule,
             accepted_general_prefixes=_optional_text_tuple(row, "accepted_general_prefixes"),
@@ -436,6 +446,7 @@ def _component_spec(
     accepted_general_prefixes: tuple[str, ...],
     horizontal_ring_count: int,
     multiplicative_prefix_style: str = "basic",
+    usable_as_peri_parent: bool = False,
 ) -> FusionComponentSpec:
     return FusionComponentSpec(
         key=key,
@@ -443,6 +454,7 @@ def _component_spec(
         attached_prefix=attached_prefix,
         template=template,
         usable_as_parent=usable_as_parent,
+        usable_as_peri_parent=usable_as_peri_parent,
         usable_as_attached=usable_as_attached,
         rule_reference=rule_reference,
         accepted_general_prefixes=accepted_general_prefixes,

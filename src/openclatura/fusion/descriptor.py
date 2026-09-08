@@ -40,6 +40,7 @@ from .model import (
 )
 from .rules import (
     component_canonicalization_key,
+    component_parent_eligible,
     component_spec_seniority_key,
     component_variant_identity,
     multiplicative_attachment_key,
@@ -175,7 +176,7 @@ def build_fusion_name_ast(
     parent_scopes: dict[tuple, set[frozenset[int]]] = defaultdict(set)
     for option in options:
         spec = _spec_for_match(registry, option.mappings[0])
-        if spec.usable_as_parent:
+        if component_parent_eligible(option.mappings[0], spec, component_matches):
             parent_scopes[component_variant_identity(spec)].add(option.atom_ids)
     parent_scopes = {variant: scopes for variant, scopes in parent_scopes.items() if len(scopes) > 1}
 
@@ -243,7 +244,7 @@ def _selection_preference_tiers(
     roots_by_seniority: dict[tuple, list[int]] = defaultdict(list)
     for match in prepared.matches:
         spec = specs[match.occurrence_id]
-        if spec.usable_as_parent:
+        if component_parent_eligible(match, spec, prepared.matches):
             roots_by_seniority[component_spec_seniority_key(spec).as_tuple()].append(match.occurrence_id)
 
     result = []
@@ -632,7 +633,11 @@ def _candidates_for_component_selection(
     required_parent_seniority: tuple | None = None,
 ) -> list[_Candidate]:
     specs = prepared.specs
-    eligible_roots = [match for match in prepared.matches if specs[match.occurrence_id].usable_as_parent]
+    eligible_roots = [
+        match
+        for match in prepared.matches
+        if component_parent_eligible(match, specs[match.occurrence_id], prepared.matches)
+    ]
     if not eligible_roots:
         return []
 

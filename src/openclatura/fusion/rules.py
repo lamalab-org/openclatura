@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -55,9 +55,9 @@ class ChemicalComponentSeniorityKey:
     heteroatom_kind_count: int
     heteroatom_counts_by_priority: tuple[int, ...]
     horizontal_row_count: int
-    all_heteroatom_locants: tuple[tuple[int, str], ...]
-    per_element_locants: tuple[tuple[tuple[int, str], ...], ...]
-    peripheral_fusion_carbon_locants: tuple[tuple[int, str], ...]
+    all_heteroatom_locants: tuple[tuple[int, int, str, int], ...]
+    per_element_locants: tuple[tuple[tuple[int, int, str, int], ...], ...]
+    peripheral_fusion_carbon_locants: tuple[tuple[int, int, str, int], ...]
 
     def as_tuple(self) -> tuple:
         return (
@@ -200,6 +200,33 @@ def component_seniority_key(
     """Return the explainable P-25.3.2.4 key for one matched occurrence."""
 
     return component_spec_seniority_key(_component_spec(component, registry))
+
+
+def component_parent_eligible(
+    component: FusionComponentMatch,
+    spec: FusionComponentSpec,
+    components: Sequence[FusionComponentMatch],
+) -> bool:
+    """Include a benzoheterocycle when a peri attachment spans its rings.
+
+    The attached-only P-25.3.5 family policy applies to ordinary benzo
+    attachments. A component fused across the shared ring junction cannot
+    be described as attached to either constituent ring alone (P-25.5).
+    Its parent role is contextual; the registry policy is not mutated.
+    """
+
+    if spec.usable_as_parent:
+        return True
+    if not spec.usable_as_peri_parent or not spec.usable_as_attached or len(spec.rings) < 2:
+        return False
+    for other in components:
+        if not component.covered_face_ids.isdisjoint(other.covered_face_ids):
+            continue
+        other_atoms = {atom for _, atom in other.local_to_input_atom}
+        shared = {locant for locant, atom in component.local_to_input_atom if atom in other_atoms}
+        if len(shared) >= 3 and not any(shared <= set(ring) for ring in spec.rings):
+            return True
+    return False
 
 
 def component_spec_seniority_key(spec: FusionComponentSpec) -> ChemicalComponentSeniorityKey:

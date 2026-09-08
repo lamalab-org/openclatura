@@ -13,6 +13,7 @@ from openclatura.fusion.registry import FusionComponentRegistry
 ROOT = Path(__file__).resolve().parents[1]
 POLICY_PATH = ROOT / "src/openclatura/data/fusion_components.json"
 TEMPLATE_PATH = ROOT / "src/openclatura/data/retained_fused_graph_templates.json"
+NAME_POLICY_PATH = ROOT / "src/openclatura/data/retained_parent_name_policy.json"
 HW_PATH = ROOT / "src/openclatura/hantzsch_widman.py"
 PARSER_PATH = ROOT / "tests/data/parser_xml_resources/fusionComponents.json"
 DEFAULT_OUTPUT = ROOT / "src/openclatura/data/generated_fusion_components.json"
@@ -65,6 +66,7 @@ def compiled_registry() -> dict[str, Any]:
                     if enabled
                 ],
                 "rule": spec.rule_reference,
+                "usable_as_peri_parent": spec.usable_as_peri_parent,
                 "parser_visible_forms": sorted(form for form in parser_forms if form in parser_tokens),
             }
         )
@@ -74,7 +76,8 @@ def compiled_registry() -> dict[str, Any]:
         "generated_by": "scripts/build_fusion_component_registry.py",
         "runtime_dependency": False,
         "source_sha256": {
-            str(path.relative_to(ROOT)): _sha256(path) for path in (POLICY_PATH, TEMPLATE_PATH, HW_PATH, PARSER_PATH)
+            str(path.relative_to(ROOT)): _sha256(path)
+            for path in (POLICY_PATH, TEMPLATE_PATH, NAME_POLICY_PATH, HW_PATH, PARSER_PATH)
         },
         "components": components,
     }

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 
 from .assembly_utils import parse_locant as parse_locant
 from .molecule import Molecule
@@ -117,17 +118,24 @@ def get_bond_locants(
     return sorted(double_locs), sorted(triple_locs)
 
 
-def retained_locant_sort_key(locant: str) -> tuple[int, str]:
-    """Sort retained-ring locants numerically first, then by letter suffix (``4a`` after ``4``)."""
+@lru_cache(maxsize=1024)
+def retained_locant_sort_key(locant: str) -> tuple[int, int, str, int]:
+    """Sort system locants canonically, retaining support for legacy labels."""
+
+    try:
+        return system_locant_sort_key(locant)
+    except ValueError:
+        # Retained labels may include component primes or nonnumeric labels.
+        pass
 
     digits = ""
     suffix = ""
     for char in str(locant):
-        if char.isdigit() and not suffix:
+        if char in "0123456789" and not suffix:
             digits += char
         else:
             suffix += char
-    return (int(digits) if digits else 10_000, suffix)
+    return (int(digits) if digits else 10_000, int(bool(suffix)), suffix, 0)
 
 
 def parse_system_locant(value: object):

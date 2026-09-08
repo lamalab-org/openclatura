@@ -1,7 +1,12 @@
 import pytest
 
 from openclatura.fusion.model import SystemLocant
-from openclatura.locants import canonical_locant_pair, parse_system_locant, system_locant_sort_key
+from openclatura.locants import (
+    canonical_locant_pair,
+    parse_system_locant,
+    retained_locant_sort_key,
+    system_locant_sort_key,
+)
 from openclatura.molecule import Molecule
 
 
@@ -46,3 +51,19 @@ def test_graph_mutation_invalidates_fusion_plans():
     mol.add_atom("N", idx=1)
 
     assert not mol._fusion_plan_cache
+
+
+@pytest.mark.parametrize("text", ["5¹", "5^1", "5¹⁰", "5^10", "5a²", "5a^2", "4a", "10"])
+def test_retained_sorter_uses_completed_system_locant_order(text):
+    assert retained_locant_sort_key(text) == system_locant_sort_key(text)
+
+
+def test_retained_sorter_orders_interior_distances_numerically():
+    values = ["6", "5a²", "5¹⁰", "5a", "5²", "5", "5¹"]
+    assert sorted(values, key=retained_locant_sort_key) == ["5", "5¹", "5²", "5¹⁰", "5a", "5a²", "6"]
+    assert retained_locant_sort_key("5¹") == retained_locant_sort_key("5^1")
+
+
+def test_retained_sorter_preserves_legacy_label_support():
+    values = ["N", "10", "4a'", "4a", "4'", "4", "O"]
+    assert sorted(values, key=retained_locant_sort_key) == ["4", "4'", "4a", "4a'", "10", "N", "O"]

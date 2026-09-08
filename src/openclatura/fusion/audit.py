@@ -59,6 +59,7 @@ from .numbering import (
     parent_bond_model,
 )
 from .rules import (
+    component_parent_eligible,
     component_spec_seniority_key,
     component_variant_identity,
     fusion_ring_size_gate,
@@ -425,7 +426,11 @@ def _audit_nomenclature_selection(
     if any(parent not in matches for parent in ast.parent_occurrences):
         errors.append("a declared fusion parent is absent from component occurrences")
         return
-    eligible = [match for occurrence, match in matches.items() if specs[occurrence].usable_as_parent]
+    eligible = [
+        match
+        for occurrence, match in matches.items()
+        if component_parent_eligible(match, specs[occurrence], ast.component_occurrences)
+    ]
     if not eligible:
         errors.append("fusion plan has no component eligible as a parent")
         return
@@ -478,9 +483,12 @@ def _component_role_errors(
     specs: Mapping[int, FusionComponentSpec],
 ) -> tuple[str, ...]:
     parents = set(ast.parent_occurrences)
+    matches = {match.occurrence_id: match for match in ast.component_occurrences}
     errors = []
     for occurrence, spec in specs.items():
-        if occurrence in parents and not spec.usable_as_parent:
+        if occurrence in parents and not component_parent_eligible(
+            matches[occurrence], spec, ast.component_occurrences
+        ):
             errors.append(f"component occurrence {occurrence} is not allowed as a fusion parent")
         if occurrence not in parents and not spec.usable_as_attached:
             errors.append(f"component occurrence {occurrence} is not allowed as an attached component")

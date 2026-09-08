@@ -6,8 +6,26 @@
       "preferred_name": "1H-indole",
       "preferred_contexts": ["all"],
       "accepted_aliases": ["indole"],
-      "context_names": {"wrapped_parent": "indole"},
+      "context_names": {"wrapped_parent": "indole", "fusion_component": "indole"},
       "reason": "A nondetachable bridge supplies the cited hydrogen state of the indole framework."
+    },
+    {
+      "template_name": "2H-isoindole",
+      "preferred_name": "2H-isoindole",
+      "context_names": {"fusion_component": "isoindole"},
+      "reason": "Fusion component citations leave indicated hydrogen to the completed system."
+    },
+    {
+      "template_name": "1H-benzotriazole",
+      "preferred_name": "1H-benzotriazole",
+      "context_names": {"fusion_component": "benzotriazole"},
+      "reason": "Fusion component citations leave indicated hydrogen to the completed system."
+    },
+    {
+      "template_name": "1H-1,5-benzodiazepine",
+      "preferred_name": "1H-1,5-benzodiazepine",
+      "context_names": {"fusion_component": "1,5-benzodiazepine"},
+      "reason": "Fusion component citations leave indicated hydrogen to the completed system."
     },
     {
       "template_name": "indane",

@@ -239,6 +239,7 @@ class FusionComponentSpec:
     accepted_general_prefixes: tuple[str, ...] = ()
     horizontal_ring_count: int = 0
     multiplicative_prefix_style: str = "basic"
+    usable_as_peri_parent: bool = False
     _seniority_key: ChemicalComponentSeniorityKey | None = field(default=None, init=False, compare=False, repr=False)
 
     def __post_init__(self) -> None:

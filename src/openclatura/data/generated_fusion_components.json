@@ -11,7 +11,22 @@
       "rule": "P-25.3.5",
       "template_names": [
         "1,4-benzodioxine"
-      ]
+      ],
+      "usable_as_peri_parent": true
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "1,5-benzodiazepine",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "[1,5]benzodiazepino",
+      "roles": [
+        "attached"
+      ],
+      "rule": "P-25.3.5",
+      "template_names": [
+        "1H-1,5-benzodiazepine"
+      ],
+      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -25,7 +40,8 @@
       "rule": "P-25.2",
       "template_names": [
         "1-benzofuran"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -39,33 +55,8 @@
       "rule": "P-25.2",
       "template_names": [
         "1-benzothiophene"
-      ]
-    },
-    {
-      "accepted_general_prefixes": [],
-      "parent_name": "1H-1,5-benzodiazepine",
-      "parser_visible_forms": [],
-      "preferred_fusion_prefix": "[1,5]benzodiazepino",
-      "roles": [
-        "attached"
       ],
-      "rule": "P-25.3.5",
-      "template_names": [
-        "1H-1,5-benzodiazepine"
-      ]
-    },
-    {
-      "accepted_general_prefixes": [],
-      "parent_name": "1H-benzotriazole",
-      "parser_visible_forms": [],
-      "preferred_fusion_prefix": "benzotriazolo",
-      "roles": [
-        "attached"
-      ],
-      "rule": "P-25.3.5",
-      "template_names": [
-        "1H-benzotriazole"
-      ]
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -81,22 +72,8 @@
       "rule": "P-25.2",
       "template_names": [
         "1H-indene"
-      ]
-    },
-    {
-      "accepted_general_prefixes": [],
-      "parent_name": "1H-indole",
-      "parser_visible_forms": [
-        "indolo"
       ],
-      "preferred_fusion_prefix": "indolo",
-      "roles": [
-        "attached"
-      ],
-      "rule": "P-25.3.5",
-      "template_names": [
-        "1H-indole"
-      ]
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -109,7 +86,8 @@
       "rule": "P-25.3.5",
       "template_names": [
         "2,1,3-benzothiadiazole"
-      ]
+      ],
+      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -122,7 +100,8 @@
       "rule": "P-25.3.5",
       "template_names": [
         "2,1,3-benzoxadiazole"
-      ]
+      ],
+      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -137,7 +116,8 @@
       "rule": "P-25.3.5",
       "template_names": [
         "2-benzofuran"
-      ]
+      ],
+      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -150,22 +130,8 @@
       "rule": "P-25.3.5",
       "template_names": [
         "2-benzothiophene"
-      ]
-    },
-    {
-      "accepted_general_prefixes": [],
-      "parent_name": "2H-isoindole",
-      "parser_visible_forms": [
-        "isoindolo"
       ],
-      "preferred_fusion_prefix": "isoindolo",
-      "roles": [
-        "attached"
-      ],
-      "rule": "P-25.3.5",
-      "template_names": [
-        "2H-isoindole"
-      ]
+      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -179,7 +145,8 @@
       "rule": "P-25.2",
       "template_names": [
         "1,3-oxazole"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -193,7 +160,8 @@
       "rule": "P-25.2",
       "template_names": [
         "1,3-thiazole"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -207,7 +175,8 @@
       "rule": "P-25.3.2.1.1",
       "template_names": [
         "[10]annulene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -221,7 +190,8 @@
       "rule": "P-25.3.2.1.1",
       "template_names": [
         "[11]annulene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -235,7 +205,8 @@
       "rule": "P-25.3.2.1.1",
       "template_names": [
         "[12]annulene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -249,7 +220,8 @@
       "rule": "P-25.3.2.1.1",
       "template_names": [
         "[13]annulene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -263,7 +235,8 @@
       "rule": "P-25.3.2.1.1",
       "template_names": [
         "[14]annulene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -277,7 +250,8 @@
       "rule": "P-25.3.2.1.1",
       "template_names": [
         "[15]annulene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -291,7 +265,8 @@
       "rule": "P-25.3.2.1.1",
       "template_names": [
         "[16]annulene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -305,7 +280,8 @@
       "rule": "P-25.3.2.1.1",
       "template_names": [
         "[17]annulene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -319,7 +295,8 @@
       "rule": "P-25.3.2.1.1",
       "template_names": [
         "[18]annulene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -333,7 +310,8 @@
       "rule": "P-25.3.2.1.1",
       "template_names": [
         "[19]annulene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -347,7 +325,8 @@
       "rule": "P-25.3.2.1.1",
       "template_names": [
         "[20]annulene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -361,7 +340,8 @@
       "rule": "P-25.3.2.1.1",
       "template_names": [
         "cycloheptatriene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -375,7 +355,8 @@
       "rule": "P-25.3.2.1.1",
       "template_names": [
         "cyclooctatetraene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -389,7 +370,8 @@
       "rule": "P-25.3.2.1.1",
       "template_names": [
         "[9]annulene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [
@@ -408,7 +390,8 @@
       "rule": "P-25.3.2.2.3",
       "template_names": [
         "anthracene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -422,7 +405,8 @@
       "rule": "P-25.2",
       "template_names": [
         "arsole"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -438,7 +422,8 @@
       "rule": "P-25.2",
       "template_names": [
         "azulene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -454,7 +439,22 @@
       "rule": "P-25.2",
       "template_names": [
         "benzene"
-      ]
+      ],
+      "usable_as_peri_parent": false
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "benzotriazole",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "benzotriazolo",
+      "roles": [
+        "attached"
+      ],
+      "rule": "P-25.3.5",
+      "template_names": [
+        "1H-benzotriazole"
+      ],
+      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -468,7 +468,8 @@
       "rule": "P-25.2",
       "template_names": [
         "borole"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -484,7 +485,8 @@
       "rule": "P-25.2",
       "template_names": [
         "carbazole"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -499,7 +501,8 @@
       "rule": "P-25.3.5",
       "template_names": [
         "cinnoline"
-      ]
+      ],
+      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -512,7 +515,8 @@
       "rule": "P-25.2.2",
       "template_names": [
         "cyclopentadiene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -528,7 +532,8 @@
       "rule": "P-25.2",
       "template_names": [
         "furan"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -544,7 +549,8 @@
       "rule": "P-25.2",
       "template_names": [
         "imidazole"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -559,7 +565,40 @@
       "rule": "P-25.3.5",
       "template_names": [
         "indazole"
-      ]
+      ],
+      "usable_as_peri_parent": true
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "indole",
+      "parser_visible_forms": [
+        "indolo"
+      ],
+      "preferred_fusion_prefix": "indolo",
+      "roles": [
+        "attached"
+      ],
+      "rule": "P-25.3.5",
+      "template_names": [
+        "1H-indole"
+      ],
+      "usable_as_peri_parent": true
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "isoindole",
+      "parser_visible_forms": [
+        "isoindolo"
+      ],
+      "preferred_fusion_prefix": "isoindolo",
+      "roles": [
+        "attached"
+      ],
+      "rule": "P-25.3.5",
+      "template_names": [
+        "2H-isoindole"
+      ],
+      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -574,7 +613,8 @@
       "rule": "P-25.3.5",
       "template_names": [
         "isoquinoline"
-      ]
+      ],
+      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -590,7 +630,8 @@
       "rule": "P-25.2",
       "template_names": [
         "1,2-thiazole"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -606,7 +647,8 @@
       "rule": "P-25.2",
       "template_names": [
         "1,2-oxazole"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -622,7 +664,8 @@
       "rule": "P-25.2",
       "template_names": [
         "naphthalene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -636,7 +679,8 @@
       "rule": "P-25.2",
       "template_names": [
         "pentalene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -652,7 +696,8 @@
       "rule": "P-25.2",
       "template_names": [
         "phenanthrene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -666,7 +711,8 @@
       "rule": "P-25.2",
       "template_names": [
         "phosphole"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -681,7 +727,8 @@
       "rule": "P-25.3.5",
       "template_names": [
         "phthalazine"
-      ]
+      ],
+      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -697,7 +744,8 @@
       "rule": "P-25.2",
       "template_names": [
         "pyran"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -713,7 +761,8 @@
       "rule": "P-25.2",
       "template_names": [
         "pyrazine"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -729,7 +778,8 @@
       "rule": "P-25.2",
       "template_names": [
         "pyrazole"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -745,7 +795,8 @@
       "rule": "P-25.2",
       "template_names": [
         "pyridazine"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -761,7 +812,8 @@
       "rule": "P-25.2",
       "template_names": [
         "pyridine"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -777,7 +829,8 @@
       "rule": "P-25.2",
       "template_names": [
         "pyrimidine"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -793,7 +846,8 @@
       "rule": "P-25.2",
       "template_names": [
         "pyrrole"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -808,7 +862,8 @@
       "rule": "P-25.3.5",
       "template_names": [
         "quinazoline"
-      ]
+      ],
+      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -824,7 +879,8 @@
       "rule": "P-25.2",
       "template_names": [
         "quinoline"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -839,7 +895,8 @@
       "rule": "P-25.3.5",
       "template_names": [
         "quinoxaline"
-      ]
+      ],
+      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -855,7 +912,8 @@
       "rule": "P-25.2",
       "template_names": [
         "selenophene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -871,7 +929,8 @@
       "rule": "P-25.2",
       "template_names": [
         "tellurophene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     },
     {
       "accepted_general_prefixes": [],
@@ -887,7 +946,8 @@
       "rule": "P-25.2",
       "template_names": [
         "thiophene"
-      ]
+      ],
+      "usable_as_peri_parent": false
     }
   ],
   "generated_by": "scripts/build_fusion_component_registry.py",
@@ -895,8 +955,9 @@
   "runtime_dependency": false,
   "schema_version": 1,
   "source_sha256": {
-    "src/openclatura/data/fusion_components.json": "611b859680fbe9480d0aee76e7ada72ec433733280361e2abd351527f8a53a03",
+    "src/openclatura/data/fusion_components.json": "739ab1dc9c76086514f582f3248edd51dc36be160d4bf5b0b0df2a7999741800",
     "src/openclatura/data/retained_fused_graph_templates.json": "ef1b6363ac355c18cb6eb13579fc4109b1622db59da045b2e8241ed72037b36d",
+    "src/openclatura/data/retained_parent_name_policy.json": "ec633e4718f128bd0211c6df91d250e8bc6d149f27e89cc623a96b9dabddd549",
     "src/openclatura/hantzsch_widman.py": "8d28a90442764eab283fa867e4efbf44f143eb3bc70d175552a59d087dd325bc",
     "tests/data/parser_xml_resources/fusionComponents.json": "6f6465633bcbc26e30be994c7711f8fc40df807f16f780e993c0e60db39e9723"
   }
