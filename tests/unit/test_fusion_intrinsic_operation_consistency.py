@@ -252,8 +252,8 @@ def test_aromatic_junction_cannot_release_an_unproved_component_role(restriction
     registry = fusion_component_registry()
     specs = {match.occurrence_id: registry.spec_for_match(match) for match in plan.ast.component_occurrences}
     candidates = intrinsic.intrinsic_carbon_candidate_atoms(plan.ast, specs, mol)
-    (junction,) = intrinsic.aromatic_fusion_carbon_sites(mol, plan.abstract_parent_graph, candidates)
-    assert not intrinsic.aromatic_fusion_carbon_sites(mol, plan.abstract_parent_graph, frozenset())
+    (junction,) = intrinsic.pi_bearing_fusion_carbon_sites(mol, plan.abstract_parent_graph, candidates)
+    assert not intrinsic.pi_bearing_fusion_carbon_sites(mol, plan.abstract_parent_graph, frozenset())
     for match in plan.ast.component_occurrences:
         spec = specs[match.occurrence_id]
         local = next((atom for atom in spec.atoms if match.input_atom_by_locant[atom.locant] == junction), None)
@@ -279,7 +279,7 @@ def test_aromatic_junction_cannot_release_an_unproved_component_role(restriction
         mol, graph, original, dict(plan.numbering.input_locant_maps[0]), candidates
     )
     assert all(edge in model.required_single_bonds for edge in original.required_single_bonds if junction in edge)
-    assert not intrinsic.aromatic_fusion_carbon_sites(mol, graph, candidates)
+    assert not intrinsic.pi_bearing_fusion_carbon_sites(mol, graph, candidates)
 
 
 def test_intrinsic_carbon_scope_accepts_ortho_peri_but_requires_pi_budgets():

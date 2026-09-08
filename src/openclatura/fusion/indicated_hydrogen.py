@@ -255,20 +255,18 @@ def intrinsic_carbon_candidate_atoms(
                 blocked.add(atom_id)
             elif atom.saturated and not role.saturated:
                 movable_defaults.add(atom_id)
-    aromatic_junctions = frozenset(
-        atom
-        for atom in movable_defaults - blocked
-        if mol.atoms[atom].is_aromatic and len(parent_atoms.intersection(mol.get_neighbors(atom))) == 3
+    pi_junctions = frozenset(
+        atom for atom in movable_defaults - blocked if _is_pi_bearing_carbon_junction(mol, atom, parent_atoms)
     )
     if not intrinsic_carbon_fusion_scope(ast, specs) or not component_carbon_h_relocation_scope(ast, specs):
-        return aromatic_junctions
+        return pi_junctions
     if not any(is_intrinsic_carbon_h_site(mol, atom, parent_atoms) for atom in parent_atoms):
-        return aromatic_junctions
+        return pi_junctions
     candidates = set()
     for match in ast.component_occurrences:
         spec = specs[match.occurrence_id]
         candidates.update(match.input_atom_by_locant[locant] for locant in _component_carbon_h_locants(spec))
-    return frozenset(candidates - blocked) | aromatic_junctions
+    return frozenset(candidates - blocked) | pi_junctions
 
 
 def is_intrinsic_carbon_h_site(mol: Molecule, atom: int, parent_atoms: set[int] | frozenset[int]) -> bool:
@@ -301,15 +299,15 @@ def intrinsic_carbon_parent_model(
     an operation deleting a double bond from an otherwise chosen assignment.
     """
 
-    aromatic_junctions = aromatic_fusion_carbon_sites(mol, graph, candidates)
-    if aromatic_junctions:
+    pi_junctions = pi_bearing_fusion_carbon_sites(mol, graph, candidates)
+    if pi_junctions:
         # Fusion consumes the component's movable CH2 convention at an
-        # aromatic junction. It must not become a localized extra double bond.
+        # observed pi-bearing junction, not through an external substituent.
         graph = replace(
             graph,
             atoms=tuple(
                 replace(atom, pi_capacity=1, saturated=False, indicated_h_site=False)
-                if atom.id in aromatic_junctions
+                if atom.id in pi_junctions
                 else atom
                 for atom in graph.atoms
             ),
@@ -388,10 +386,21 @@ def intrinsic_carbon_parent_model(
     return constrained, sites
 
 
-def aromatic_fusion_carbon_sites(
+def _is_pi_bearing_carbon_junction(mol: Molecule, atom: int, parent_atoms: set[int] | frozenset[int]) -> bool:
+    value = mol.atoms[atom]
+    neighbors = parent_atoms.intersection(mol.get_neighbors(atom))
+    return (
+        value.symbol == "C"
+        and not value.charge
+        and len(neighbors) == 3
+        and (value.is_aromatic or any(mol.get_bond(atom, other).order == 2 for other in neighbors))
+    )
+
+
+def pi_bearing_fusion_carbon_sites(
     mol: Molecule, graph: FusionGraph, movable_candidates: frozenset[int]
 ) -> frozenset[int]:
-    """Bind component-proved movability to an observed aromatic C junction."""
+    """Bind component-proved movability to an observed parent-pi C junction."""
 
     atoms = frozenset(atom.id for atom in graph.atoms)
     return frozenset(
@@ -402,8 +411,7 @@ def aromatic_fusion_carbon_sites(
         and not atom.formal_charge
         and atom.saturated
         and not atom.forced_single
-        and mol.atoms[atom.id].is_aromatic
-        and len(atoms.intersection(mol.get_neighbors(atom.id))) == 3
+        and _is_pi_bearing_carbon_junction(mol, atom.id, atoms)
     )
 
 
