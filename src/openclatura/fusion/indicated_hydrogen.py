@@ -89,7 +89,8 @@ def _component_carbon_h_locants(spec: FusionComponentSpec) -> frozenset[str]:
     atoms = component_parent_atoms(spec)
     graph = _component_graph(spec, atoms)
     model = parent_bond_model(graph)
-    if model.maximum_non_cumulative_double_bonds != spec.template.mancude_double_bonds:
+    declared_count = spec.template.mancude_double_bonds
+    if declared_count is not None and model.maximum_non_cumulative_double_bonds != declared_count:
         return frozenset()
     candidates = set()
     for assignment in model.allowed_kekule_assignments:
@@ -106,6 +107,27 @@ def _component_carbon_h_locants(spec: FusionComponentSpec) -> frozenset[str]:
     return frozenset(candidates)
 
 
+def _has_component_pi_budget(spec: FusionComponentSpec) -> bool:
+    """Accept declared counts or an unmodified carbocyclic matching domain.
+
+    Generated mancude carbocycles need no stored double-bond count: their
+    neutral carbon roles and eligible edges define it through maximum matching.
+    Missing metadata must not promote fixed saturation into movable carbon H.
+    """
+
+    return spec.template.mancude_double_bonds is not None or (
+        all(
+            atom.symbol == "C"
+            and atom.charge == 0
+            and atom.resolved_pi_capacity == 1
+            and not atom.saturated
+            and not atom.forced_single
+            for atom in spec.atoms
+        )
+        and all(bond.bond_class in {"aromatic", "mancude", "fusion"} for bond in spec.bonds)
+    )
+
+
 def intrinsic_carbon_fusion_scope(ast: FusionNameAst, specs: Mapping[int, FusionComponentSpec]) -> bool:
     """Require a connected composition of components with proved pi budgets.
 
@@ -116,7 +138,7 @@ def intrinsic_carbon_fusion_scope(ast: FusionNameAst, specs: Mapping[int, Fusion
     occurrences = {match.occurrence_id for match in ast.component_occurrences}
     if len(occurrences) < 2 or occurrences != set(specs):
         return False
-    if any(spec.template.mancude_double_bonds is None for spec in specs.values()):
+    if not all(_has_component_pi_budget(spec) for spec in specs.values()):
         return False
     neighbors = {occurrence: set() for occurrence in occurrences}
     for join in ast.joins:
