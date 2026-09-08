@@ -955,7 +955,7 @@
   "runtime_dependency": false,
   "schema_version": 1,
   "source_sha256": {
-    "src/openclatura/data/fusion_components.json": "739ab1dc9c76086514f582f3248edd51dc36be160d4bf5b0b0df2a7999741800",
+    "src/openclatura/data/fusion_components.json": "6e3fc18c89ad033cc798f072c3b3b3684eb2fa8369525f3d4620d58f1ddff0b2",
     "src/openclatura/data/retained_fused_graph_templates.json": "ef1b6363ac355c18cb6eb13579fc4109b1622db59da045b2e8241ed72037b36d",
     "src/openclatura/data/retained_parent_name_policy.json": "ec633e4718f128bd0211c6df91d250e8bc6d149f27e89cc623a96b9dabddd549",
     "src/openclatura/hantzsch_widman.py": "8d28a90442764eab283fa867e4efbf44f143eb3bc70d175552a59d087dd325bc",

@@ -37,6 +37,7 @@
   "annulene_series": {"minimum_ring_size": 7, "maximum_ring_size": 20},
   "ring_shapes": [
     {"ring_size": 3, "id": "triangle", "vertices": [[0, 0], [4, 0], [2, 4]], "edge_directions": [0, 1, 2], "horizontal_axis_class": "vertex"},
+    {"ring_size": 3, "id": "triangle-eisenstein", "vertices": [[0, 0], [4, 0], [0, 4]], "edge_directions": [0, 2, 4], "horizontal_axis_class": "vertex", "coordinate_system": "eisenstein"},
     {"ring_size": 4, "id": "square", "vertices": [[0, 0], [4, 0], [4, 4], [0, 4]], "edge_directions": [0, 1, 2, 3], "horizontal_axis_class": "edge"},
     {"ring_size": 5, "id": "pentagon-symmetric", "vertices": [[0, 0], [4, 0], [6, 3], [3, 6], [0, 4]], "edge_directions": [0, 1, 2, 3, 4], "horizontal_axis_class": "vertex"},
     {"ring_size": 5, "id": "pentagon-shoulder", "vertices": [[0, 0], [4, 0], [7, 4], [4, 7], [0, 4]], "edge_directions": [0, 1, 2, 3, 4], "horizontal_axis_class": "edge", "distortion_rank": 1},
