@@ -96,7 +96,7 @@ def test_local_h_removal_preserves_every_rendered_token_binding(indene_citations
     assert specs[key].template.default_indicated_h == locants
 
 
-@pytest.mark.parametrize("style,ending", [("basic", "difuran"), ("complex", "bis(furan)")])
+@pytest.mark.parametrize("style,ending", [("basic", "difuran"), ("complex", "bisfuran")])
 def test_multiparent_citations_use_the_same_component_h_scope(style, ending):
     mol = read_smiles("O1C=2C(C=C1)=CC=1OC=CC1C2")
     registry = fusion_component_registry()

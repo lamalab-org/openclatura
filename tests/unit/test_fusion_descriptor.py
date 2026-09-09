@@ -860,7 +860,47 @@ def test_locanted_hw_multiparents_use_data_selected_complex_multiplier():
     )
 
     assert ast.plan_kind == "multiparent"
-    assert rendered == "benzo[1,2-c:3,4-c']bis([1,2,5]oxadiazole)"
+    assert rendered == "benzo[1,2-c:3,4-c']bis[1,2,5]oxadiazole"
     planned = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
     assert isinstance(planned, FusionConfirmed)
     assert planned.plan.rendered_base_name == rendered
+
+
+@pytest.mark.skipif(not opsin_available(), reason="py2opsin/Java is unavailable")
+@pytest.mark.parametrize(
+    "component,edge,second_edge",
+    [
+        ("oxazole", ("4", "5"), ("3", "4")),
+        ("oxazole", ("4", "5"), ("4", "5")),
+        ("thiazole", ("4", "5"), ("3", "4")),
+        ("thiazole", ("4", "5"), ("4", "5")),
+        ("generated-hw:O.N.C.C.N", ("3", "4"), ("3", "4")),
+    ],
+)
+def test_complex_multiparents_roundtrip_graph_built_heterocycles(component, edge, second_edge):
+    from rdkit import Chem
+
+    mol, ast, rendered = _build(
+        (component, "benzene", component),
+        (
+            ((0, edge[0]), (1, "1")),
+            ((0, edge[1]), (1, "2")),
+            ((2, edge[0]), (1, second_edge[0])),
+            ((2, edge[1]), (1, second_edge[1])),
+        ),
+        atomic_components_only=True,
+    )
+    assert ast.plan_kind == "multiparent"
+    assert "bis[" in rendered
+    # These neutral mancude component graphs have an aromatic realization.
+    graph = Chem.RWMol()
+    positions = {}
+    for atom_id, atom in mol.atoms.items():
+        rd_atom = Chem.Atom(atom.symbol)
+        rd_atom.SetIsAromatic(True)
+        positions[atom_id] = graph.AddAtom(rd_atom)
+    for bond in mol.bonds.values():
+        graph.AddBond(positions[bond.u], positions[bond.v], Chem.BondType.AROMATIC)
+    Chem.SanitizeMol(graph)
+    check = verify_with_opsin(rendered, Chem.MolToSmiles(graph), standardize_smiles=False)
+    assert check.ok, check.to_dict()

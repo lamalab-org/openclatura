@@ -544,11 +544,9 @@ def render_fusion_name_parts(
                 )
             except KeyError as exc:
                 raise FusionDescriptorError("unsupported multiparent multiplicity") from exc
-            rendered_parent = (
-                f"{multiplier}({parent_name})"
-                if next(iter(multiplier_styles)) == "complex"
-                else f"{multiplier}{parent_name}"
-            )
+            # Fusion multipliers precede the parent directly, including its
+            # bracketed replacement locants; substituent brackets do not apply.
+            rendered_parent = f"{multiplier}{parent_name}"
             pieces.append(
                 component_part(
                     rendered_parent,
