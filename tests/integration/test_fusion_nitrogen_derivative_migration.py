@@ -20,7 +20,7 @@ CASES = (
     ),
     (
         "CC1(CO)CN(Cc2ccccc2)CC2CN(Cc3ccc(F)cc3)CCN21",
-        ("(8-benzyl-2-((4-fluorophenyl)methyl)-6-methyloctahydropyrazino[1,2-a]pyrazin-6-yl)methanol",),
+        ("(2-benzyl-8-((4-fluorophenyl)methyl)-4-methyloctahydro-4H-pyrazino[1,2-a]pyrazin-4-yl)methanol",),
         8,
     ),
 )
@@ -40,6 +40,7 @@ def test_generator_composes_intrinsic_nitrogen_and_hydro(smiles, expected, hydro
     assert result.error is None
     if opsin_available():
         assert result.opsin_check.status == "matched"
+        assert Chem.MolToSmiles(Chem.MolFromSmiles(result.opsin_check.opsin_smiles)) == Chem.MolToSmiles(mol)
 
     graph = read_smiles(Chem.MolToSmiles(mol, canonical=False))
     atoms = max(find_ring_systems(graph), key=lambda system: len(system.atoms)).atoms
@@ -66,7 +67,11 @@ def test_fully_saturated_fusion_nitrogen_variants_round_trip(alkyl):
     smiles = f"{alkyl}N1CCN2CCN({alkyl})CC2C1"
     result = name_mol(Chem.MolFromSmiles(smiles), fusion_mode=FusionMode.GENERAL, verify_opsin=opsin_available())
     assert result.error is None
-    assert "octahydropyrazino[1,2-a]pyrazine" in result.name
+    # P-58.2.1: retain the intrinsic H citation even in a hydrogenated parent.
+    assert "octahydro-4H-pyrazino[1,2-a]pyrazine" in result.name
     assert "decahydro" not in result.name
     if opsin_available():
         assert result.opsin_check.status == "matched"
+        assert Chem.MolToSmiles(Chem.MolFromSmiles(result.opsin_check.opsin_smiles)) == Chem.MolToSmiles(
+            Chem.MolFromSmiles(smiles)
+        )

@@ -22,9 +22,9 @@ CARBON_CASES = (
     ),
     (
         "CC1=C2CC3C(C)(C=CC(=O)C34CO4)CC2OC1=O",
-        "3,8a-dimethyl-4,4a,8a,9-tetrahydrospiro[benzo[f]1-benzofuran-5,2'-oxirane]-2,6(9aH)-dione",
+        "3,8a-dimethyl-4a,8a,9,9a-tetrahydrospiro[benzo[f]1-benzofuran-5,2'-oxirane]-2,6(4H)-dione",
         "added_hydrogen_operations",
-        ("9a",),
+        ("4",),
     ),
 )
 
@@ -61,18 +61,20 @@ def test_carbon_composition_is_generated_and_atom_order_invariant(smiles, expect
     assert result.error is None
     if opsin_available():
         assert result.opsin_check.status == "matched"
+        assert Chem.MolToSmiles(Chem.MolFromSmiles(result.opsin_check.opsin_smiles)) == Chem.MolToSmiles(rd_mol)
     _, _, plan = _plan(Chem.MolToSmiles(rd_mol, canonical=False), mode)
     state = plan.derivative_state
     (operation,) = getattr(state, field)
     assert operation.locants == locants
     assert not state.unsaturation_operations
     if field == "added_hydrogen_operations":
-        assert state.hydro_operations[0].locants == ("4", "4a", "8a", "9")
+        # P-58.2.2.2: added-H locants take precedence over hydro locants.
+        assert state.hydro_operations[0].locants == ("4a", "8a", "9", "9a")
         assert not set(operation.atom_ids).intersection(state.hydro_operations[0].atom_ids)
         selected = next(
             step for step in result.decisions if step.decision == "selected audited systematic fusion parent"
         )
-        assert selected.data["derivative_operations"]["added_hydrogen"][0]["locants"] == ["9a"]
+        assert selected.data["derivative_operations"]["added_hydrogen"][0]["locants"] == ["4"]
     else:
         assert not state.hydro_operations
         assert set(operation.atom_ids).intersection(op.parent_atom_id for op in state.oxo_operations)
@@ -118,6 +120,9 @@ def test_carbon_composition_substituent_variants_round_trip(smiles):
     assert result.error is None
     if opsin_available():
         assert result.opsin_check.status == "matched"
+        assert Chem.MolToSmiles(Chem.MolFromSmiles(result.opsin_check.opsin_smiles)) == Chem.MolToSmiles(
+            Chem.MolFromSmiles(smiles)
+        )
     _, _, plan = _plan(smiles)
     assert plan.derivative_state.added_hydrogen_operations or plan.derivative_state.intrinsic_hydro_operations
 
