@@ -112,6 +112,8 @@ def _declared_sites_are_unambiguous(mol: Molecule, numbered_path: list[int], get
 def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     """Add indicated hydrogen locants for retained ring names."""
 
+    if _apply_retained_oxo_carbon_hydrogen(mol, parts, numbered_path, get_loc):
+        return
     parent = parts.parent_hydride
     if parent is not None and parent.bond_model is not None:
         delta = parts.parent_bond_delta
@@ -432,6 +434,47 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         )
     if oxo_derivative and not added_h_needed:
         _recast_ring_ketone_hydrogens(mol, parts, numbered_path, get_loc)
+
+
+def _apply_retained_oxo_carbon_hydrogen(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> bool:
+    from .retained_derivative_hydrogen import prove_retained_oxo_carbon_hydrogen
+    from .retained_fused_templates import retained_graph_templates
+    from .retained_name_policy import render_retained_hydrogen_state
+
+    metadata = parts.retained_parent_metadata
+    parent = parts.parent_hydride
+    if (
+        not parts.retained_name
+        or metadata is None
+        or not metadata.relocated_indicated_h
+        or not metadata.default_indicated_h
+        or parts.principal_group is None
+        or parts.principal_group.key != "ketone"
+        or (parent is not None and parent.is_fusion_parent)
+    ):
+        return False
+    template = next((t for t in retained_graph_templates() if parts.retained_name in {t.name, t.output_name}), None)
+    if template is None:
+        return False
+    locants = {str(get_loc(index)): index for index in numbered_path}
+    proof = prove_retained_oxo_carbon_hydrogen(mol, template, locants)
+    if (
+        proof is None
+        or proof.indicated_h != metadata.default_indicated_h
+        or proof.oxo_atom_ids != parts.parent_atom_ids.intersection(parts.principal_group.atom_ids)
+    ):
+        return False
+    # Keep intrinsic carbon H in the parent citation. Only the other endpoint
+    # of each suffix-consumed pi bond is added H, not another hydro prefix.
+    parts.retained_name = render_retained_hydrogen_state(
+        parts.retained_name,
+        tuple(sorted(_name_indicated_hydrogen_locants(parts.retained_name), key=parse_locant)),
+        proof.indicated_h,
+    )
+    parts.hydro_operations.append(proof.added_hydrogen)
+    if parent is not None:
+        parts.parent_hydride = replace(parent, parent_name=parts.retained_name, parent_bond_model=proof.model)
+    return True
 
 
 def _recast_ring_ketone_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
