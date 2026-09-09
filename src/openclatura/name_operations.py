@@ -75,3 +75,18 @@ class IminoOperation(NameOperation):
     @property
     def external_atom_id(self) -> int:
         return self.nitrogen_atom_id
+
+
+@dataclass(frozen=True)
+class AlkylideneOperation(NameOperation):
+    """A parent-to-carbon double bond; carbon ligands retain separate ownership."""
+
+    external_atom_symbol: ClassVar[str] = "C"
+    locant: str = ""
+    parent_atom_id: int = 0
+    carbon_atom_id: int = 0
+    bond_id: int = 0
+
+    @property
+    def external_atom_id(self) -> int:
+        return self.carbon_atom_id

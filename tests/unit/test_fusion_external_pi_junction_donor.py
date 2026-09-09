@@ -10,7 +10,7 @@ from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.graph_io import read_rdkit_mol
 
 
-@pytest.mark.parametrize("external", ("O", "N"))
+@pytest.mark.parametrize("external", ("O", "N", "C"))
 @pytest.mark.parametrize("arene_atom", ("C", "N"))
 @pytest.mark.parametrize("side_length", (0, 2))
 @pytest.mark.parametrize("reverse", (False, True))

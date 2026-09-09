@@ -581,13 +581,13 @@ def _has_consistent_derivative_operations(
     """
     atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
     atoms = frozenset(atom_by_locant.values())
-    for operation in state.imino_operations:
-        parent, external = operation.parent_atom_id, operation.nitrogen_atom_id
+    for operation in state.imino_operations + state.alkylidene_operations:
+        parent, external = operation.parent_atom_id, operation.external_atom_id
         if (
             parent not in atoms
             or external not in mol.atoms
             or external in atoms
-            or mol.atoms[external].symbol != "N"
+            or mol.atoms[external].symbol != operation.external_atom_symbol
             or not is_neutral_external_pi_ligand(mol, parent, external)
             or mol.get_bond(parent, external).idx != operation.bond_id
             or not any(
@@ -1486,6 +1486,7 @@ def _audit_derivative_state(
         indicated_hydrogen_atom_ids=indicated_h_atoms,
         oxo_operations=state.oxo_operations,
         imino_operations=state.imino_operations,
+        alkylidene_operations=state.alkylidene_operations,
     )
     if state.pi_redistribution != redistribution:
         errors.append("pi redistribution does not reconstruct the raw delta and final implicit parent state")
@@ -1552,20 +1553,21 @@ def _audit_derivative_state(
     if observed_oxo != expected_oxo:
         errors.append("typed oxo operations do not represent every exocyclic parent oxo group")
 
-    expected_imino = {
-        (parent, neighbor, mol.get_bond(parent, neighbor).idx, locants[parent])
-        for parent in parent_atoms
-        for neighbor in mol.get_neighbors(parent)
-        if neighbor not in parent_atoms
-        and mol.atoms[neighbor].symbol == "N"
-        and is_neutral_external_pi_ligand(mol, parent, neighbor)
-    }
-    observed_imino = {
-        (operation.parent_atom_id, operation.nitrogen_atom_id, operation.bond_id, operation.locant)
-        for operation in state.imino_operations
-    }
-    if len(observed_imino) != len(state.imino_operations) or observed_imino != expected_imino:
-        errors.append("typed imino operations do not represent every supported exocyclic imino bond")
+    for symbol, operations in (("N", state.imino_operations), ("C", state.alkylidene_operations)):
+        expected = {
+            (parent, neighbor, mol.get_bond(parent, neighbor).idx, locants[parent])
+            for parent in parent_atoms
+            for neighbor in mol.get_neighbors(parent)
+            if neighbor not in parent_atoms
+            and mol.atoms[neighbor].symbol == symbol
+            and is_neutral_external_pi_ligand(mol, parent, neighbor)
+        }
+        observed = {
+            (operation.parent_atom_id, operation.external_atom_id, operation.bond_id, operation.locant)
+            for operation in operations
+        }
+        if len(observed) != len(operations) or observed != expected:
+            errors.append(f"typed external {symbol} operations do not represent every supported exocyclic bond")
 
 
 def _error(message: str, *, checks: Iterable[str] = ()) -> FusionAuditResult:

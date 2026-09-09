@@ -1,19 +1,19 @@
 """Graph-bound external pi bonds supported by fused-parent composition."""
 
 from ..molecule import Molecule
-from ..name_operations import IminoOperation, OxoOperation
+from ..name_operations import AlkylideneOperation, IminoOperation, OxoOperation
 
-ExternalPiOperation = OxoOperation | IminoOperation
+ExternalPiOperation = OxoOperation | IminoOperation | AlkylideneOperation
 
 
 def is_neutral_external_pi_ligand(mol: Molecule, parent: int, ligand: int) -> bool:
-    """Check a carbonyl or imino ligand without changing its charge or H state."""
+    """Check a neutral external pi ligand without changing charge or H state."""
     atom = mol.atoms[ligand]
     bond = mol.get_bond(parent, ligand)
     return (
         mol.atoms[parent].symbol == "C"
         and not mol.atoms[parent].charge
-        and atom.symbol in {"O", "N"}
+        and atom.symbol in {"O", "N", "C"}
         and not atom.charge
         and bond is not None
         and bond.order == 2

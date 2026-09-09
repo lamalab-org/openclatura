@@ -184,6 +184,7 @@ def resolve_systematic_fusion_parent(
                     for operation in plan.derivative_state.oxo_operations
                 ],
                 "imino": [asdict(operation) for operation in plan.derivative_state.imino_operations],
+                "alkylidene": [asdict(operation) for operation in plan.derivative_state.alkylidene_operations],
             },
             "locant_map_count": len(plan.numbering.input_locant_maps),
             "atom_to_locant": {atom: str(locant) for atom, locant in plan.numbering.input_locant_maps[0]},
@@ -301,6 +302,7 @@ def resolve_bridged_fusion_parent(
                     for operation in plan.derivative_state.oxo_operations
                 ],
                 "imino": [asdict(operation) for operation in plan.derivative_state.imino_operations],
+                "alkylidene": [asdict(operation) for operation in plan.derivative_state.alkylidene_operations],
             },
             "search_states": plan.search_states,
         },

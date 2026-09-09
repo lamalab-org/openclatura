@@ -8,7 +8,7 @@ from functools import lru_cache
 
 from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule
-from ..name_operations import HydroOperation, IminoOperation, OxoOperation, UnsaturationOperation
+from ..name_operations import AlkylideneOperation, HydroOperation, IminoOperation, OxoOperation, UnsaturationOperation
 from ..polycycle_topology import normalize_edge
 from .exocyclic import ExternalPiOperation, is_neutral_external_pi_ligand
 from .model import BondAssignment, FusionGraph, FusionGraphAtom, FusionGraphBond, ParentBondModel
@@ -51,10 +51,11 @@ class ParentDerivativeState:
     oxo_operations: tuple[OxoOperation, ...] = ()
     pi_redistribution: PiRedistribution | None = None
     imino_operations: tuple[IminoOperation, ...] = ()
+    alkylidene_operations: tuple[AlkylideneOperation, ...] = ()
 
     @property
     def external_pi_operations(self) -> tuple[ExternalPiOperation, ...]:
-        return self.oxo_operations + self.imino_operations
+        return self.oxo_operations + self.imino_operations + self.alkylidene_operations
 
     @property
     def added_hydrogen_operations(self) -> tuple[HydroOperation, ...]:
@@ -408,6 +409,7 @@ def prove_pi_redistribution(
     indicated_hydrogen_atom_ids: set[int] | frozenset[int] = frozenset(),
     oxo_operations: tuple[OxoOperation, ...] = (),
     imino_operations: tuple[IminoOperation, ...] = (),
+    alkylidene_operations: tuple[AlkylideneOperation, ...] = (),
 ) -> PiRedistribution | None:
     """Prove hydro endpoints with pi-conserving heteroatom spectators.
 
@@ -439,7 +441,7 @@ def prove_pi_redistribution(
         return None
     oxo_bond_ids = set()
     oxo_sites = set()
-    for operation in oxo_operations + imino_operations:
+    for operation in oxo_operations + imino_operations + alkylidene_operations:
         parent, oxygen = operation.parent_atom_id, operation.external_atom_id
         bond = mol.bonds.get(operation.bond_id)
         if (
@@ -740,12 +742,26 @@ def parent_derivative_state(
 
     oxo = []
     imino = []
+    alkylidene = []
     for parent_atom in sorted(atoms, key=lambda atom: system_locant_sort_key(locants[atom])):
         for neighbor in mol.get_neighbors(parent_atom):
-            if neighbor in atoms or mol.atoms[neighbor].symbol not in {"O", "N"}:
+            if neighbor in atoms or mol.atoms[neighbor].symbol not in {"O", "N", "C"}:
                 continue
             bond = mol.get_bond(parent_atom, neighbor)
             if bond is None or bond.order != 2:
+                continue
+            if mol.atoms[neighbor].symbol == "C":
+                if is_neutral_external_pi_ligand(mol, parent_atom, neighbor):
+                    alkylidene.append(
+                        AlkylideneOperation(
+                            key="alkylidene",
+                            reason="An external carbon double bond consumes parent pi valence.",
+                            locant=locants[parent_atom],
+                            parent_atom_id=parent_atom,
+                            carbon_atom_id=neighbor,
+                            bond_id=bond.idx,
+                        )
+                    )
                 continue
             if mol.atoms[neighbor].symbol == "N":
                 if is_neutral_external_pi_ligand(mol, parent_atom, neighbor):
@@ -775,7 +791,7 @@ def parent_derivative_state(
         mol,
         atoms,
         bond_model,
-        externally_unsaturated_atom_ids={operation.parent_atom_id for operation in (*oxo, *imino)},
+        externally_unsaturated_atom_ids={operation.parent_atom_id for operation in (*oxo, *imino, *alkylidene)},
         indicated_hydrogen_atom_ids=indicated_hydrogen_atom_ids,
         atom_to_locant=atom_to_locant,
         preserve_retained_parent_state=preserve_retained_parent_state,
@@ -792,6 +808,7 @@ def parent_derivative_state(
             indicated_hydrogen_atom_ids=indicated_hydrogen_atom_ids,
             oxo_operations=tuple(oxo),
             imino_operations=tuple(imino),
+            alkylidene_operations=tuple(alkylidene),
         )
         if (allow_pi_redistribution if allow_pi_redistribution is not None else not preserve_retained_parent_state)
         else None
@@ -846,6 +863,7 @@ def parent_derivative_state(
         oxo_operations=tuple(oxo),
         pi_redistribution=redistribution,
         imino_operations=tuple(imino),
+        alkylidene_operations=tuple(alkylidene),
     )
 
 
