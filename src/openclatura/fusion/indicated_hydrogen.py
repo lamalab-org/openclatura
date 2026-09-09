@@ -295,8 +295,19 @@ def intrinsic_carbon_candidate_atoms(
     pi_junctions = frozenset(
         atom for atom in movable_defaults - blocked if _is_pi_bearing_carbon_junction(mol, atom, parent_atoms)
     )
-    if not intrinsic_carbon_fusion_scope(ast, specs) or not component_carbon_h_relocation_scope(ast, specs):
+    if not intrinsic_carbon_fusion_scope(ast, specs):
         return pi_junctions
+    if not component_carbon_h_relocation_scope(ast, specs):
+        # A default carbon H consumed at a pi-bearing junction may relocate
+        # within that same component. The completed matching still has to
+        # prove the observed replacement H site without losing a pi bond.
+        relocated = {
+            match.input_atom_by_locant[locant]
+            for match in ast.component_occurrences
+            if pi_junctions.intersection(match.input_atom_by_locant.values())
+            for locant in _component_carbon_h_locants(specs[match.occurrence_id])
+        }
+        return pi_junctions | frozenset(relocated - blocked)
     if not any(is_intrinsic_carbon_h_site(mol, atom, parent_atoms) for atom in parent_atoms):
         return pi_junctions
     candidates = set()
