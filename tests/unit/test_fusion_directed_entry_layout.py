@@ -139,6 +139,21 @@ def test_directed_plan_does_not_pay_for_unused_intrinsic_search(monkeypatch):
     assert isinstance(plan_fusion_parent(mol, atoms, mode=FusionMode.AUDITED_PIN), FusionConfirmed)
 
 
+def test_unrelated_unsupported_layout_still_stops_before_component_enumeration(monkeypatch):
+    from openclatura.fusion import planner
+
+    mol = read_rdkit_mol(Chem.MolFromSmiles("c1ccc2ccccc2c1"))
+    atoms = frozenset(mol.atoms)
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("unsupported intrinsic layout must stop before component enumeration")
+
+    monkeypatch.setattr(planner, "preferred_intrinsic_layouts", lambda *_: ())
+    monkeypatch.setattr(planner, "iter_fusion_name_asts", forbidden)
+    result = plan_fusion_parent(mol, atoms, mode=FusionMode.AUDITED_PIN)
+    assert not isinstance(result, FusionConfirmed)
+
+
 def test_failed_directed_audit_does_not_restart_unrestricted_numbering(monkeypatch):
     from openclatura.fusion import planner
 

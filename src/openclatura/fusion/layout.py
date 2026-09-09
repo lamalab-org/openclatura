@@ -66,6 +66,20 @@ def _symmetric_terminal_shape(size: int) -> RingShapeSpec | None:
     return shapes[0] if len(shapes) == 1 else None
 
 
+def can_use_component_entry_layout(model: FaceModel) -> bool:
+    """Cheap topology gate, before potentially expensive component enumeration."""
+    return (
+        len(model.faces) == 4
+        and len(model.face_adjacency) == 3
+        and any(
+            face.size == shape.ring_size and all(face.id in (a, b) for a, b, _ in model.face_adjacency)
+            for shape in RING_SHAPE_TEMPLATES
+            if shape.directed_entry_port is not None
+            for face in model.faces
+        )
+    )
+
+
 def component_entry_layouts(
     model: FaceModel,
     ast: FusionNameAst,
@@ -82,7 +96,7 @@ def component_entry_layouts(
     """
     if search_budget < 1:
         raise ValueError("layout search budget must be positive")
-    if len(model.faces) != 4 or len(model.face_adjacency) != 3:
+    if not can_use_component_entry_layout(model):
         return None
     faces = {face.id: face for face in model.faces}
     if not _valid_face_adjacency(model, faces):

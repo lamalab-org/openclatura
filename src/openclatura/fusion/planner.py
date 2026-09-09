@@ -26,7 +26,12 @@ from .indicated_hydrogen import (
     intrinsic_carbon_parent_model,
     intrinsic_parent_lone_pair_sites,
 )
-from .layout import LayoutSearchBudgetExceeded, component_entry_layouts, preferred_intrinsic_layouts
+from .layout import (
+    LayoutSearchBudgetExceeded,
+    can_use_component_entry_layout,
+    component_entry_layouts,
+    preferred_intrinsic_layouts,
+)
 from .mancude import (
     has_complete_saturated_hydrogenation,
     indicated_hydrogen_parent_bond_model,
@@ -137,12 +142,22 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         except LayoutSearchBudgetExceeded as exc:
             return FusionUnsupported("intrinsic fused-layout search budget exhausted", (str(exc),))
 
+    layouts: tuple[FusedLayout, ...] | FusionUnsupported | Callable[[], tuple[FusedLayout, ...] | FusionUnsupported] = (
+        intrinsic_layouts
+    )
+    if not can_use_component_entry_layout(face_model):
+        layouts = intrinsic_layouts()
+        if isinstance(layouts, FusionUnsupported):
+            return layouts
+        if not layouts:
+            return FusionUnsupported("no consistent audited intrinsic fused-ring layout")
+
     rejected = []
     numbering_cache: dict[bool, CompletedNumberingSelection] = {}
     try:
         for ast in iter_fusion_name_asts(mol, matches, registry):
             result = _plan_numbered_candidate(
-                mol, atoms, mode, ast, registry, bounded, face_model, intrinsic_layouts, numbering_cache=numbering_cache
+                mol, atoms, mode, ast, registry, bounded, face_model, layouts, numbering_cache=numbering_cache
             )
             if isinstance(result, FusionConfirmed):
                 return result
