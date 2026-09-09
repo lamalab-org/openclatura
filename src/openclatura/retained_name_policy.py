@@ -91,9 +91,29 @@ def retained_parent_name_policy(template_name: str) -> RetainedParentNamePolicy 
     return _policies_by_template_name().get(template_name)
 
 
-def retained_parent_output_name(template_name: str, context: str) -> str:
+def retained_parent_output_name(
+    template_name: str,
+    context: str,
+    *,
+    default_indicated_h: tuple[str, ...] = (),
+    indicated_h: tuple[str, ...] | None = None,
+) -> str:
     policy = retained_parent_name_policy(template_name)
-    return policy.output_name(context) if policy is not None else template_name
+    name = policy.output_name(context) if policy is not None else template_name
+    return render_retained_hydrogen_state(name, default_indicated_h, indicated_h)
+
+
+def render_retained_hydrogen_state(
+    name: str, default_indicated_h: tuple[str, ...], indicated_h: tuple[str, ...] | None
+) -> str:
+    """Render a matched H state using declared citation metadata, not lexical inference."""
+    if indicated_h is None or indicated_h == default_indicated_h:
+        return name
+    old_prefix = ",".join(f"{locant}H" for locant in default_indicated_h) + "-" if default_indicated_h else ""
+    if old_prefix and name.startswith(old_prefix):
+        name = name[len(old_prefix) :]
+    prefix = ",".join(f"{locant}H" for locant in indicated_h) + "-" if indicated_h else ""
+    return prefix + name
 
 
 def _policy_from_data(row: dict) -> RetainedParentNamePolicy:

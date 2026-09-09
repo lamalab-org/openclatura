@@ -465,6 +465,7 @@ def retained_template_parent_bond_model(
     locant_to_input_atom: Mapping[str, int],
     *,
     search_budget: int = _CONFIG.search.mancude_states,
+    indicated_h: tuple[str, ...] | None = None,
 ) -> ParentBondModel:
     """Build the parent-hydride bond model for one retained-template mapping.
 
@@ -477,6 +478,26 @@ def retained_template_parent_bond_model(
     if set(locant_to_input_atom) != set(template.locants):
         raise ValueError("retained parent bond model requires a complete locant map")
     saturated_parent = template.mancude_double_bonds is None
+    atoms = template.atoms
+    if indicated_h is not None and indicated_h != template.default_indicated_h:
+        from ..retained_fused_templates import _relocatable_atom_by_locant
+
+        if not set(indicated_h) <= set(template.locants) or len(indicated_h) != template.indicated_hydrogen_count:
+            raise ValueError("retained indicated H must preserve template count and locant domain")
+        atoms = tuple(
+            replace(atom, saturated=True, default_h=True) if atom.locant in indicated_h else atom
+            for atom in _relocatable_atom_by_locant(template).values()
+        )
+        degrees = {locant: 0 for locant in template.locants}
+        for bond in template.bonds:
+            for locant in bond.locants:
+                degrees[locant] += 1
+        atoms = tuple(
+            replace(atom, forced_single=True)
+            if atom.symbol == "N" and atom.charge == 0 and degrees[atom.locant] == 3
+            else atom
+            for atom in atoms
+        )
     graph = FusionGraph(
         atoms=tuple(
             FusionGraphAtom(
@@ -488,7 +509,7 @@ def retained_template_parent_bond_model(
                 indicated_h_site=atom.indicated_h_site or atom.default_h,
                 saturated=atom.saturated,
             )
-            for atom in template.atoms
+            for atom in atoms
         ),
         bonds=tuple(
             FusionGraphBond(

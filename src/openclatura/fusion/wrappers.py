@@ -20,7 +20,7 @@ from ..molecule import Molecule, bond_ids_within, edges_within_atoms
 from ..name_operations import UnsaturationOperation
 from ..polycycle_topology import connected_components, ring_system_topology
 from ..retained_fused_templates import match_retained_fused_templates, retained_parent_metadata
-from ..retained_name_policy import retained_parent_output_name
+from ..retained_name_policy import render_retained_hydrogen_state, retained_parent_output_name
 from ..ring_parent import ParentHydrideKind, ParentHydrideMetadata, RingParent
 from ..rules import multipliers, stems
 from .config import fusion_nomenclature_config
@@ -542,31 +542,72 @@ def _retained_wrapper_parent(mol: Molecule, atoms: frozenset[int]) -> WrapperPar
     matches = [match for match in matches if fusion_ring_size_gate(tuple(map(len, match.template.rings)))]
     if not matches:
         return None
+    # Moving a carbon H site preserves the parent-hydride electron roles.
+    # Moving it onto a heteroatom also changes donor/oxo composition and must
+    # keep the established template state until that operation is proved.
+    matches = [
+        match
+        if match.template.default_indicated_h
+        and all(
+            match.template.atom_by_locant[locant].symbol == "C"
+            for locant in (*match.template.default_indicated_h, *match.indicated_h)
+        )
+        else replace(match, indicated_h=match.template.default_indicated_h)
+        for match in matches
+    ]
     first = matches[0]
     template_name = first.template.name
-    same_parent = [match for match in matches if match.template.name == template_name]
+    same_parent = [
+        match for match in matches if match.template.name == template_name and match.indicated_h == first.indicated_h
+    ]
     candidates: dict[tuple[tuple[int, str], ...], ParentBondModel] = {}
     for match in same_parent:
         entries = tuple(sorted((atom, str(locant)) for atom, locant in match.atom_to_locant.items()))
         if entries not in candidates:
-            candidates[entries] = retained_template_parent_bond_model(match.template, match.locant_to_atom)
+            candidates[entries] = retained_template_parent_bond_model(
+                match.template, match.locant_to_atom, indicated_h=match.indicated_h
+            )
     maps = tuple(candidates)
     metadata = retained_parent_metadata(template_name)
     return WrapperParentPlan(
         hydride=RingParent.from_retained_locant_maps(
             atoms=atoms,
             locant_maps=[dict(entries) for entries in maps],
-            name=retained_parent_output_name(template_name, "wrapped_parent"),
+            name=retained_parent_output_name(
+                template_name,
+                "wrapped_parent",
+                default_indicated_h=first.template.default_indicated_h,
+                indicated_h=first.indicated_h,
+            ),
             metadata=(
                 None
                 if metadata is None
                 else ParentHydrideMetadata(
-                    default_indicated_h=metadata.default_indicated_h,
+                    default_indicated_h=first.indicated_h,
                     fusion_locants=metadata.fusion_locants,
-                    derivative_stem=metadata.derivative_stem,
+                    derivative_stem=(
+                        render_retained_hydrogen_state(
+                            metadata.derivative_stem, first.template.default_indicated_h, first.indicated_h
+                        )
+                        if metadata.derivative_stem
+                        else metadata.derivative_stem
+                    ),
                     indicated_hydrogen_count=metadata.indicated_hydrogen_count,
                     mancude_double_bonds=metadata.mancude_double_bonds,
-                    inherent_saturated_locants=metadata.inherent_saturated_locants,
+                    inherent_saturated_locants=metadata.inherent_saturated_locants
+                    if first.indicated_h == first.template.default_indicated_h
+                    else tuple(
+                        sorted(
+                            (set(metadata.inherent_saturated_locants) - set(first.template.default_indicated_h))
+                            | {
+                                locant
+                                for locant in first.indicated_h
+                                if first.template.atom_by_locant[locant].symbol == "C"
+                            },
+                            key=retained_locant_sort_key,
+                        )
+                    ),
+                    relocated_indicated_h=first.indicated_h != first.template.default_indicated_h,
                 )
             ),
         ),
