@@ -579,16 +579,19 @@ def _oxo_parent_delta(
         constrained = _single_site_parent_model(model, forced)
     except ValueError:
         return None
-    always_paired = set.intersection(
-        *(
-            {atom for edge, order in assignment.orders if order == 2 for atom in edge}
-            for assignment in model.allowed_kekule_assignments
-        )
-    )
+    parent_pi_atoms = {atom for edge in model.pi_eligible_edges | model.required_double_bonds for atom in edge}
     candidates = []
-    for assignment in constrained.allowed_kekule_assignments:
+    # Direct consumption preserves intrinsic parent H; remaximized assignments
+    # also permit suffix-induced pi redistribution. Exact comparison below
+    # selects a witness before deriving the remaining hydro and added-H sites.
+    assignments = {
+        BondAssignment(tuple((edge, 1 if forced.intersection(edge) else order) for edge, order in assignment.orders))
+        for assignment in model.allowed_kekule_assignments
+    }
+    assignments.update(constrained.allowed_kekule_assignments)
+    for assignment in sorted(assignments, key=lambda value: value.orders):
         paired = {atom for edge, order in assignment.orders if order == 2 for atom in edge}
-        added = always_paired - paired - forced
+        added = parent_pi_atoms - paired - forced
         if any(
             mol.atoms[atom].symbol != "C"
             or mol.atoms[atom].charge
@@ -607,8 +610,6 @@ def _oxo_parent_delta(
             preserve_retained_parent_state=True,
         )
         if delta is None or not delta.compatible or delta.additional_multiple_bond_ids:
-            continue
-        if not spiro and delta.hydrogenated_edges:
             continue
         ordered = tuple(sorted(added, key=lambda atom: system_locant_sort_key(str(locants[atom]))))
         operations = (

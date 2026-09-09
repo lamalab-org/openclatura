@@ -1,16 +1,19 @@
 """Oxo substitution can relocate a parent pi bond and leave carbon added H."""
 
+from dataclasses import replace
+
 import pytest
 from rdkit import Chem
 
 from openclatura import name_mol, opsin_available, verify_with_opsin
 from openclatura.chains import find_ring_systems
-from openclatura.fusion.model import FusionConfirmed
+from openclatura.fusion.audit import audit_fusion_plan
+from openclatura.fusion.model import AuditStatus, FusionConfirmed
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.graph_io import read_rdkit_mol
 
 
-def _fused_oxo_graph(heteroatom, alkyl_length):
+def _fused_oxo_graph(heteroatom, alkyl_length, *, hydrogenated=False):
     graph = Chem.RWMol()
     for symbol in ("C", heteroatom, "C", "C", "C", "C", "C", "N", "O"):
         graph.AddAtom(Chem.Atom(symbol))
@@ -26,6 +29,8 @@ def _fused_oxo_graph(heteroatom, alkyl_length):
         (7, 3, 1),
         (0, 8, 2),
     ):
+        if hydrogenated and (u, v) == (5, 6):
+            order = 1
         graph.AddBond(u, v, Chem.BondType.DOUBLE if order == 2 else Chem.BondType.SINGLE)
     last = 7
     for _ in range(alkyl_length):
@@ -61,3 +66,69 @@ def test_oxo_and_donor_constraints_emit_added_h_not_junction_hydro(heteroatom, a
     if opsin_available():
         check = verify_with_opsin(named.name, Chem.MolToSmiles(rd_mol), standardize_smiles=False)
         assert check.status == "matched", check.to_dict()
+
+
+@pytest.mark.parametrize("heteroatom", ("O", "N"))
+@pytest.mark.parametrize("alkyl_length", (0, 1, 2))
+@pytest.mark.parametrize("reverse", (False, True))
+def test_oxo_added_h_composes_with_partial_hydrogenation(heteroatom, alkyl_length, reverse):
+    rd_mol = _fused_oxo_graph(heteroatom, alkyl_length, hydrogenated=True)
+    order = list(range(rd_mol.GetNumAtoms()))
+    if reverse:
+        order.reverse()
+        rd_mol = Chem.RenumberAtoms(rd_mol, order)
+    mol = read_rdkit_mol(rd_mol)
+    atoms = max(find_ring_systems(mol), key=lambda ring: len(ring.atoms)).atoms
+    plan = plan_fusion_parent(mol, atoms, mode="audited_pin")
+    assert isinstance(plan, FusionConfirmed), plan
+    state = plan.plan.derivative_state
+    assert state.hydro_operations
+    assert not state.unsaturation_operations
+    assert len(state.oxo_operations) == 1
+    added = {atom for operation in state.added_hydrogen_operations for atom in operation.atom_ids}
+    hydro = {atom for operation in state.hydro_operations for atom in operation.atom_ids}
+    assert added
+    assert not added & hydro
+    assert order.index(0) not in added | hydro
+    assert all(mol.atoms[atom].symbol == "C" for atom in added)
+    named = name_mol(rd_mol, include_trace=True)
+    assert named.error is None
+    assert named.parent_nomenclature == "systematic_fusion"
+    if opsin_available():
+        check = verify_with_opsin(named.name, Chem.MolToSmiles(rd_mol), standardize_smiles=False)
+        assert check.status == "matched", check.to_dict()
+
+
+@pytest.mark.parametrize("corruption", ("missing_h", "donor_pi", "overlapping_hydro", "oxo_bond"))
+def test_multiple_nh_partial_oxo_rejects_corrupted_operations(corruption):
+    mol = read_rdkit_mol(_fused_oxo_graph("N", 0, hydrogenated=True))
+    atoms = max(find_ring_systems(mol), key=lambda ring: len(ring.atoms)).atoms
+    result = plan_fusion_parent(mol, atoms, mode="audited_pin")
+    assert isinstance(result, FusionConfirmed), result
+    plan = result.plan
+    state = plan.derivative_state
+    hydrogens = plan.indicated_hydrogens
+    if corruption == "missing_h":
+        hydrogens = hydrogens[1:]
+    elif corruption == "donor_pi":
+        assignment = replace(
+            state.bond_delta.assignment,
+            orders=tuple((edge, 2 if 1 in edge else order) for edge, order in state.bond_delta.assignment.orders),
+        )
+        state = replace(state, bond_delta=replace(state.bond_delta, assignment=assignment))
+    elif corruption == "overlapping_hydro":
+        state = replace(state, hydro_operations=state.hydro_operations + state.added_hydrogen_operations)
+    else:
+        state = replace(state, oxo_operations=(replace(state.oxo_operations[0], bond_id=-1),))
+    audit = audit_fusion_plan(
+        mol,
+        atoms,
+        ast=plan.ast,
+        abstract_parent_graph=plan.abstract_parent_graph,
+        numbering=plan.numbering,
+        bond_model=plan.bond_model,
+        indicated_hydrogens=hydrogens,
+        derivative_state=state,
+        mode="audited_pin",
+    )
+    assert audit.status is not AuditStatus.CONFIRMED

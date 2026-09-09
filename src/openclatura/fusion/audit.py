@@ -617,7 +617,17 @@ def _has_consistent_derivative_operations(
     nitrogen_h = h_atoms - carbon_h
     if any(mol.atoms[atom].symbol != "N" for atom in nitrogen_h):
         return False
-    if sum(not mol.atoms[atom].is_aromatic for atom in nitrogen_h) > 1:
+    # Each nonaromatic N-H citation must be a neutral single-bond donor
+    # in both the input and the composed parent witness, regardless of count.
+    if any(
+        mol.atoms[atom].charge
+        or mol.atoms[atom].total_h_count != 1
+        or len(mol.get_neighbors(atom)) != 2
+        or any(neighbor not in atoms or mol.get_bond(atom, neighbor).order != 1 for neighbor in mol.get_neighbors(atom))
+        or any(order != 1 for edge, order in state.bond_delta.assignment.orders if atom in edge)
+        for atom in nitrogen_h
+        if not mol.atoms[atom].is_aromatic
+    ):
         return False
     if carbon_h:
         # Neutral N-H must retain its observed single-bond valence. The
