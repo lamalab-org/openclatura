@@ -18,6 +18,7 @@ from ..polycycle_topology import normalize_edge
 from ..retained_graph_model import merge_parent_bond_classes
 from ..rules import multipliers
 from .cover import audit_component_cover, component_scope
+from .exocyclic import is_neutral_external_pi_ligand
 from .indicated_hydrogen import (
     component_carbon_h_relocation_scope,
     component_parent_atoms,
@@ -554,7 +555,9 @@ def _audited_pin_composition_errors(
     if _has_complete_hydrogenation(mol, numbering, indicated_hydrogens, derivative_state):
         return ()
     if indicated_hydrogens and (
-        derivative_state.hydro_operations or derivative_state.unsaturation_operations or derivative_state.oxo_operations
+        derivative_state.hydro_operations
+        or derivative_state.unsaturation_operations
+        or derivative_state.external_pi_operations
     ):
         return ("combined indicated-hydrogen and bond/oxo derivative fusion grammar is not audited",)
     return ("combined fusion derivative operations lack independent applicable atom scopes",)
@@ -576,11 +579,31 @@ def _has_consistent_derivative_operations(
     """
     atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
     atoms = frozenset(atom_by_locant.values())
+    for operation in state.imino_operations:
+        parent, external = operation.parent_atom_id, operation.nitrogen_atom_id
+        if (
+            parent not in atoms
+            or external not in mol.atoms
+            or external in atoms
+            or mol.atoms[external].symbol != "N"
+            or not is_neutral_external_pi_ligand(mol, parent, external)
+            or mol.get_bond(parent, external).idx != operation.bond_id
+            or not any(
+                atom == parent and str(locant) == operation.locant for atom, locant in numbering.input_locant_maps[0]
+            )
+        ):
+            return False
+    if (
+        state.bond_delta.hydrogenated_edges
+        and not state.hydro_operations
+        and (state.pi_redistribution is None or state.pi_redistribution.hydrogenated_atom_ids)
+    ):
+        return False
     if any(locant not in atom_by_locant for locant in indicated_hydrogens):
         return False
     h_atoms = {atom_by_locant[locant] for locant in indicated_hydrogens}
     hydro = {atom for operation in state.hydro_operations for atom in operation.atom_ids}
-    oxo = {operation.parent_atom_id for operation in state.oxo_operations}
+    oxo = {operation.parent_atom_id for operation in state.external_pi_operations}
     added = {atom for operation in state.added_hydrogen_operations for atom in operation.atom_ids}
     intrinsic = {atom for operation in state.intrinsic_hydro_operations for atom in operation.atom_ids}
     unsaturated = {atom for operation in state.unsaturation_operations for atom in operation.atom_ids}
@@ -656,7 +679,7 @@ def _has_consistent_derivative_operations(
             return False
         if oxo and not _has_carbon_h_oxo_bond_consumption(mol, atoms, state):
             return False
-    represented_external = {operation.bond_id for operation in state.oxo_operations}
+    represented_external = {operation.bond_id for operation in state.external_pi_operations}
     unrepresented_external = [
         (atom, neighbor)
         for atom in atoms
@@ -694,7 +717,7 @@ def _has_carbon_h_oxo_bond_consumption(mol: Molecule, atoms: frozenset[int], sta
     The indicated-H model and derivative replay establish the remaining sites.
     """
 
-    for operation in state.oxo_operations:
+    for operation in state.external_pi_operations:
         atom = operation.parent_atom_id
         if (
             mol.atoms[atom].symbol != "C"
@@ -709,7 +732,7 @@ def _has_carbon_h_oxo_bond_consumption(mol: Molecule, atoms: frozenset[int], sta
         other = next(site for site in consumed[0] if site != atom)
         if not is_intrinsic_carbon_h_site(mol, other, atoms):
             return False
-    return bool(state.oxo_operations)
+    return bool(state.external_pi_operations)
 
 
 def _has_complete_hydrogenation(
@@ -725,7 +748,7 @@ def _has_complete_hydrogenation(
     the derivative audit independently checks their exact locants and bonds.
     """
 
-    if state.unsaturation_operations or state.oxo_operations or not state.hydro_operations:
+    if state.unsaturation_operations or state.external_pi_operations or not state.hydro_operations:
         return False
     atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
     atoms = frozenset(atom_by_locant.values())
@@ -1449,7 +1472,7 @@ def _audit_derivative_state(
         mol,
         parent_atoms,
         model,
-        externally_unsaturated_atom_ids={operation.parent_atom_id for operation in state.oxo_operations},
+        externally_unsaturated_atom_ids={operation.parent_atom_id for operation in state.external_pi_operations},
         indicated_hydrogen_atom_ids=indicated_h_atoms,
         atom_to_locant=dict(numbering.input_locant_maps[0]),
     )
@@ -1466,6 +1489,7 @@ def _audit_derivative_state(
         delta,
         indicated_hydrogen_atom_ids=indicated_h_atoms,
         oxo_operations=state.oxo_operations,
+        imino_operations=state.imino_operations,
     )
     if state.pi_redistribution != redistribution:
         errors.append("pi redistribution does not reconstruct the raw delta and final implicit parent state")
@@ -1531,6 +1555,21 @@ def _audit_derivative_state(
         errors.append("typed oxo operations duplicate an exocyclic parent oxo group")
     if observed_oxo != expected_oxo:
         errors.append("typed oxo operations do not represent every exocyclic parent oxo group")
+
+    expected_imino = {
+        (parent, neighbor, mol.get_bond(parent, neighbor).idx, locants[parent])
+        for parent in parent_atoms
+        for neighbor in mol.get_neighbors(parent)
+        if neighbor not in parent_atoms
+        and mol.atoms[neighbor].symbol == "N"
+        and is_neutral_external_pi_ligand(mol, parent, neighbor)
+    }
+    observed_imino = {
+        (operation.parent_atom_id, operation.nitrogen_atom_id, operation.bond_id, operation.locant)
+        for operation in state.imino_operations
+    }
+    if len(observed_imino) != len(state.imino_operations) or observed_imino != expected_imino:
+        errors.append("typed imino operations do not represent every supported exocyclic imino bond")
 
 
 def _error(message: str, *, checks: Iterable[str] = ()) -> FusionAuditResult:

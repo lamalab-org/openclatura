@@ -10,6 +10,7 @@ from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule
 from ..retained_graph_model import RetainedGraphAtomTemplate, merge_parent_bond_classes
 from .charges import fusion_charge_lone_pair_sites, protonated_pi_nitrogen_atoms
+from .exocyclic import is_neutral_external_pi_ligand
 from .mancude import (
     _nitrogen_composition_parent_model,
     _single_site_parent_model,
@@ -397,7 +398,7 @@ def intrinsic_carbon_parent_model(
             if other in parent_atoms
         )
         and any(
-            other not in parent_atoms and mol.atoms[other].symbol == "O" and mol.get_bond(atom, other).order == 2
+            other not in parent_atoms and is_neutral_external_pi_ligand(mol, atom, other)
             for other in mol.get_neighbors(atom)
         )
     }
@@ -564,13 +565,7 @@ def aromatic_nitrogen_lone_pair_sites(mol: Molecule, graph: FusionGraph) -> froz
     if external_multiple and any(mol.atoms[atom].charge for atom in atoms):
         return frozenset()
     if any(
-        mol.atoms[atom].symbol != "C"
-        or mol.atoms[neighbor].symbol != "O"
-        or mol.atoms[atom].charge
-        or mol.atoms[neighbor].charge
-        or mol.get_bond(atom, neighbor).order != 2
-        or len(mol.get_neighbors(neighbor)) != 1
-        or mol.atoms[neighbor].total_h_count
+        not is_neutral_external_pi_ligand(mol, atom, neighbor)
         or mol.atoms[atom].total_h_count + sum(mol.get_bond(atom, other).order for other in mol.get_neighbors(atom))
         != mol.atoms[atom].element.standard_valence
         for atom, neighbor in external_multiple

@@ -8,8 +8,9 @@ from functools import lru_cache
 
 from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule
-from ..name_operations import HydroOperation, OxoOperation, UnsaturationOperation
+from ..name_operations import HydroOperation, IminoOperation, OxoOperation, UnsaturationOperation
 from ..polycycle_topology import normalize_edge
+from .exocyclic import ExternalPiOperation, is_neutral_external_pi_ligand
 from .model import BondAssignment, FusionGraph, FusionGraphAtom, FusionGraphBond, ParentBondModel
 
 
@@ -49,6 +50,11 @@ class ParentDerivativeState:
     unsaturation_operations: tuple[UnsaturationOperation, ...] = ()
     oxo_operations: tuple[OxoOperation, ...] = ()
     pi_redistribution: PiRedistribution | None = None
+    imino_operations: tuple[IminoOperation, ...] = ()
+
+    @property
+    def external_pi_operations(self) -> tuple[ExternalPiOperation, ...]:
+        return self.oxo_operations + self.imino_operations
 
     @property
     def added_hydrogen_operations(self) -> tuple[HydroOperation, ...]:
@@ -219,7 +225,7 @@ def has_complete_saturated_hydrogenation(
     nitrogens = frozenset(atom for atom in atoms if mol.atoms[atom].symbol == "N")
     if not saturated_nitrogen_hydrogen_sites(mol, atoms, nitrogens):
         return False
-    if state.oxo_operations or state.unsaturation_operations or not state.hydro_operations:
+    if state.external_pi_operations or state.unsaturation_operations or not state.hydro_operations:
         return False
     edges = frozenset(state.bond_delta.hydrogenated_edges)
     return (
@@ -375,8 +381,16 @@ def compare_actual_parent_to_implied_parent(
     delta = min(candidates, key=lambda item: item[0])[1]
     if preserve_retained_parent_state or atom_to_locant is None or not delta.compatible:
         return delta
-    if externally_unsaturated_atom_ids and (delta.additional_multiple_bond_ids or delta.hydrogenated_edges):
-        composed = _oxo_parent_delta(mol, atoms, bond_model, externally_unsaturated_atom_ids, atom_to_locant)
+    # A cited donor can remove the missing pi edge from the parent domain
+    # itself. Even a zero edge delta must then account for residual carbon H.
+    # Explicit carbon-H witnesses have their separate intrinsic proof below.
+    donor_constrained = bool(indicated_hydrogen_atom_ids) and all(
+        mol.atoms[atom].symbol == "N" for atom in indicated_hydrogen_atom_ids
+    )
+    if externally_unsaturated_atom_ids and (
+        delta.additional_multiple_bond_ids or delta.hydrogenated_edges or donor_constrained
+    ):
+        composed = _external_pi_parent_delta(mol, atoms, bond_model, externally_unsaturated_atom_ids, atom_to_locant)
         if composed is not None:
             return composed
     intrinsic = _fixed_carbon_hydro_operations(
@@ -393,6 +407,7 @@ def prove_pi_redistribution(
     *,
     indicated_hydrogen_atom_ids: set[int] | frozenset[int] = frozenset(),
     oxo_operations: tuple[OxoOperation, ...] = (),
+    imino_operations: tuple[IminoOperation, ...] = (),
 ) -> PiRedistribution | None:
     """Prove hydro endpoints with pi-conserving heteroatom spectators.
 
@@ -403,7 +418,7 @@ def prove_pi_redistribution(
     A neutral heteroatom may exchange incident pi bonds but must retain its
     total pi occupancy unless it is a proved neutral amine endpoint. Cited
     intrinsic-H sites keep their exact bond orders.
-    Typed terminal oxo groups may be spectators only when their carbon keeps
+    Typed neutral oxo/imino groups may be spectators only when their carbon keeps
     every internal bond single in both the parent and the observed assignment.
     """
 
@@ -424,8 +439,8 @@ def prove_pi_redistribution(
         return None
     oxo_bond_ids = set()
     oxo_sites = set()
-    for operation in oxo_operations:
-        parent, oxygen = operation.parent_atom_id, operation.oxygen_atom_id
+    for operation in oxo_operations + imino_operations:
+        parent, oxygen = operation.parent_atom_id, operation.external_atom_id
         bond = mol.bonds.get(operation.bond_id)
         if (
             parent not in atoms
@@ -435,11 +450,8 @@ def prove_pi_redistribution(
             or bond.order != 2
             or normalize_edge(bond.u, bond.v) != normalize_edge(parent, oxygen)
             or operation.bond_id in oxo_bond_ids
-            or mol.atoms[parent].symbol != "C"
-            or mol.atoms[oxygen].symbol != "O"
-            or mol.atoms[oxygen].charge
-            or mol.atoms[oxygen].total_h_count
-            or len(mol.get_neighbors(oxygen)) != 1
+            or mol.atoms[oxygen].symbol != operation.external_atom_symbol
+            or not is_neutral_external_pi_ligand(mol, parent, oxygen)
             or parent in indicated_hydrogen_atom_ids
         ):
             return None
@@ -562,19 +574,19 @@ def _spiro_carbon_sites(mol: Molecule, atoms: frozenset[int]) -> frozenset[int]:
     return frozenset(sites)
 
 
-def _oxo_parent_delta(
+def _external_pi_parent_delta(
     mol: Molecule,
     atoms: frozenset[int],
     model: ParentBondModel,
-    oxo_atoms: set[int] | frozenset[int],
+    external_pi_atoms: set[int] | frozenset[int],
     locants: Mapping[int, str | SystemLocant],
 ) -> ParentBondDelta | None:
-    """Compose oxo valence constraints with graph-derived residual carbon H."""
+    """Compose external pi valence with graph-derived residual carbon H."""
 
     spiro = _spiro_carbon_sites(mol, atoms)
-    if any(mol.atoms[atom].symbol != "C" or mol.atoms[atom].charge for atom in oxo_atoms):
+    if any(mol.atoms[atom].symbol != "C" or mol.atoms[atom].charge for atom in external_pi_atoms):
         return None
-    forced = frozenset(oxo_atoms) | spiro
+    forced = frozenset(external_pi_atoms) | spiro
     try:
         constrained = _single_site_parent_model(model, forced)
     except ValueError:
@@ -712,12 +724,26 @@ def parent_derivative_state(
         return None
 
     oxo = []
+    imino = []
     for parent_atom in sorted(atoms, key=lambda atom: system_locant_sort_key(locants[atom])):
         for neighbor in mol.get_neighbors(parent_atom):
-            if neighbor in atoms or mol.atoms[neighbor].symbol != "O":
+            if neighbor in atoms or mol.atoms[neighbor].symbol not in {"O", "N"}:
                 continue
             bond = mol.get_bond(parent_atom, neighbor)
             if bond is None or bond.order != 2:
+                continue
+            if mol.atoms[neighbor].symbol == "N":
+                if is_neutral_external_pi_ligand(mol, parent_atom, neighbor):
+                    imino.append(
+                        IminoOperation(
+                            key="imino",
+                            reason="Exocyclic imino bonding consumes fused-parent carbon pi valence.",
+                            locant=locants[parent_atom],
+                            parent_atom_id=parent_atom,
+                            nitrogen_atom_id=neighbor,
+                            bond_id=bond.idx,
+                        )
+                    )
                 continue
             oxo.append(
                 OxoOperation(
@@ -734,7 +760,7 @@ def parent_derivative_state(
         mol,
         atoms,
         bond_model,
-        externally_unsaturated_atom_ids={operation.parent_atom_id for operation in oxo},
+        externally_unsaturated_atom_ids={operation.parent_atom_id for operation in (*oxo, *imino)},
         indicated_hydrogen_atom_ids=indicated_hydrogen_atom_ids,
         atom_to_locant=atom_to_locant,
         preserve_retained_parent_state=preserve_retained_parent_state,
@@ -750,6 +776,7 @@ def parent_derivative_state(
             delta,
             indicated_hydrogen_atom_ids=indicated_hydrogen_atom_ids,
             oxo_operations=tuple(oxo),
+            imino_operations=tuple(imino),
         )
         if (allow_pi_redistribution if allow_pi_redistribution is not None else not preserve_retained_parent_state)
         else None
@@ -803,6 +830,7 @@ def parent_derivative_state(
         unsaturation_operations=tuple(unsaturation),
         oxo_operations=tuple(oxo),
         pi_redistribution=redistribution,
+        imino_operations=tuple(imino),
     )
 
 
