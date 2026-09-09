@@ -19,6 +19,7 @@ from .rules import bonds, multipliers, stems
 
 
 class NamingTreeMetadata(TypedDict, total=False):
+    front_modifiers: list[dict]
     """Optional, non-invariant fields supported by naming-tree nodes."""
 
     name_atom_bindings: list[dict]
@@ -225,9 +226,9 @@ def assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
     """Convert populated AssemblyParts metadata into visualizer annotations."""
 
     segments = []
-    if parts.substituents:
+    if parts.substituents or parts.front_modifier_items:
         grouped: dict[str, SubstituentItem] = {}
-        for item in parts.substituents:
+        for item in (*parts.substituents, *parts.front_modifier_items):
             target = grouped.setdefault(
                 item.name,
                 SubstituentItem(name=item.name, locants=[], atom_ids=set(), bond_ids=set()),
@@ -496,6 +497,7 @@ def assembly_substituent_tree(
         trace_segments=trace_segments,
         nested_decisions=decisions,
         metadata={
+            "front_modifiers": _substituent_tree_nodes(parts.front_modifier_items),
             "stereo_features": [
                 {"descriptor": descriptor, "locant": locant} for descriptor, locant in parts.stereo_features
             ],

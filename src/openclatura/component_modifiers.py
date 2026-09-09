@@ -21,6 +21,8 @@ def add_component_front_modifiers(
     sub_exclude: set[int],
     branch_namer: RecursiveSubgraphNamer,
     get_loc=None,
+    *,
+    include_trace: bool = False,
 ) -> None:
     """Add ester/sulfonate front modifiers such as the alcohol component name."""
 
@@ -35,7 +37,20 @@ def add_component_front_modifiers(
         r_group_c = next((n for n in mol.get_neighbors(single_o) if n not in group.atoms_involved), None)
         if r_group_c is None:
             continue
-        branch_name = branch_namer(mol, r_group_c, sub_exclude | {single_o}, upstream_atom=single_o)
+        branch_exclude = sub_exclude | {single_o}
+        if include_trace:
+            branch_decisions = DecisionTrace()
+            branch_name, branch_trace, branch_tree = branch_namer(
+                mol,
+                r_group_c,
+                branch_exclude,
+                upstream_atom=single_o,
+                return_trace=True,
+                return_tree=True,
+                decision_trace=branch_decisions,
+            )
+        else:
+            branch_name = branch_namer(mol, r_group_c, branch_exclude, upstream_atom=single_o)
         if branch_name:
             modifier_atoms = subgraph_component(mol, r_group_c, sub_exclude | {single_o})
             parts.front_modifiers.append(strip_outer_parentheses(branch_name))
@@ -43,6 +58,19 @@ def add_component_front_modifiers(
             parts.front_modifier_locants.append(locant)
             parts.front_modifier_atom_ids.update(modifier_atoms)
             parts.front_modifier_charge_atom_ids.update(charged_atoms(mol, modifier_atoms))
+            if include_trace:
+                parts.front_modifier_items.append(
+                    SubstituentItem(
+                        name=strip_outer_parentheses(branch_name),
+                        locants=[locant] if locant is not None else [],
+                        atom_ids=modifier_atoms,
+                        bond_ids=bond_ids_within(mol, modifier_atoms),
+                        charge_atom_ids=charged_atoms(mol, modifier_atoms),
+                        trace_segments=branch_trace,
+                        nested_decisions=decision_trace_data(branch_decisions),
+                        substituent_tree=branch_tree,
+                    )
+                )
 
 
 def n_substituent_locant(

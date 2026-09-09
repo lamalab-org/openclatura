@@ -147,6 +147,7 @@ class AssemblyParts:
     parent_hydride: RingParent | None = None
     parent_bond_delta: ParentBondDelta | None = None
     front_modifiers: list[str] = field(default_factory=list)
+    front_modifier_items: list[SubstituentItem] = field(default_factory=list)
     front_modifier_locants: list[str | None] = field(default_factory=list)
     front_modifier_atom_ids: set[int] = field(default_factory=set)
     front_modifier_charge_atom_ids: set[int] = field(default_factory=set)

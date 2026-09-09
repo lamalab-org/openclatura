@@ -1,13 +1,14 @@
 """OPSIN witnesses for the five formerly unproved fusion compositions.
 
 These names are round-trip evidence, not assertions of preferred-name status.
-Generator promotion belongs in integration coverage after the independent
-numbering and atom-level derivative proofs have been completed.
+Production coverage independently checks the generator and its nested fusion
+selection metadata; the witnesses do not prescribe the generated spelling.
 """
 
 import pytest
+from rdkit import Chem
 
-from openclatura import opsin_available
+from openclatura import name_mol, opsin_available
 from openclatura.opsin_verify import verify_with_opsin
 
 FUSION_COMPOSITION_WITNESSES = (
@@ -48,3 +49,29 @@ FUSION_COMPOSITION_WITNESSES = (
 def test_remaining_fusion_composition_has_opsin_witness(case_id, smiles, fusion_name):
     check = verify_with_opsin(fusion_name, smiles)
     assert check.status == "matched", (case_id, check.to_dict())
+
+
+@pytest.mark.skipif(not opsin_available(), reason="py2opsin/Java is unavailable")
+@pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.parametrize(
+    "case_id,smiles,fusion_name",
+    FUSION_COMPOSITION_WITNESSES,
+    ids=[case[0] for case in FUSION_COMPOSITION_WITNESSES],
+)
+def test_remaining_composition_generator_uses_proved_fusion(case_id, smiles, fusion_name, reverse):
+    mol = Chem.MolFromSmiles(smiles)
+    if reverse:
+        mol = Chem.RenumberAtoms(mol, list(reversed(range(mol.GetNumAtoms()))))
+    result = name_mol(mol, include_trace=True)
+    assert result.error is None, (case_id, result.error)
+    check = verify_with_opsin(result.name, smiles, standardize_smiles=False)
+    assert check.status == "matched", (case_id, result.name, check.to_dict())
+    assert check.canonical_original == check.canonical_roundtrip
+
+    nested_selections = [
+        decision
+        for segment in result.trace_segments
+        for decision in segment.get("nested_decisions", [])
+        if decision["decision"] == "selected audited systematic fusion parent"
+    ]
+    assert result.parent_nomenclature == "systematic_fusion" or nested_selections, (case_id, result.name)
