@@ -349,7 +349,12 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
 
     # P-14.7: a mancude parent that the -one saturates cites the extra hydrogen
     # after the suffix locant -- quinolin-4(1H)-one, 1,3-benzoxazol-2(3H)-one.
-    added_h_needed = oxo_derivative and supported == 0 and _name_spells_no_hydrogen(parts.retained_name)
+    added_h_needed = (
+        oxo_derivative
+        and supported == 0
+        and not name_declared_indicated_h
+        and _name_spells_no_hydrogen(parts.retained_name)
+    )
     if (
         metadata is not None
         and oxo_derivative
@@ -362,6 +367,9 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             # 3a,4,7,7a-tetrahydro-1H-isoindole-1,3(2H)-dione: one site beside a ketone is added
             # hydrogen cited with the suffix, the even remainder a hydro prefix.
             pool = sorted(candidates[supported:] + hydro_only, key=lambda item: parse_locant(item[0]))
+            pool = [item for item in pool if item[0] not in name_declared_indicated_h]
+            if not pool:
+                return
             ketone_atoms = {idx for idx in numbered_path if _is_oxo_ring_site(mol, idx, numbered_path)}
             beside = [item for item in pool if any(n in ketone_atoms for n in mol.get_neighbors(item[1]))]
             added = (beside or pool)[0]
@@ -428,6 +436,11 @@ def _recast_ring_ketone_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_
 
     group = parts.principal_group
     if group is None:
+        return
+    parent = parts.parent_hydride
+    if parent is not None and parent.uses_fusion_plan and parent.derivative_state is not None:
+        # The fusion proof already distinguishes intrinsic parent H from H
+        # added by an oxo operation. Matching their counts cannot recast it.
         return
     indicated = [op for op in parts.hydro_operations if op.key == "indicated_hydrogen"]
     if not indicated or any(op.key == "added_hydrogen" for op in parts.hydro_operations):
