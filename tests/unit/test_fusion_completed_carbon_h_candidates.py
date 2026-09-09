@@ -54,7 +54,7 @@ def test_completed_matching_finds_unpaired_carbons_with_no_local_h_candidates():
     eligible_h = {
         atom for atom in candidates if intrinsic.is_intrinsic_carbon_h_site(case.mol, atom, case.parent_atoms)
     }
-    assert eligible_h == {0, 2, 5, 7}
+    assert eligible_h == {0, 2, 3, 4, 5, 7}
     graph = intrinsic.component_parent_graph(case.ast, specs, relocate_carbon_h=True)
     original = parent_bond_model(graph)
     model, sites = intrinsic.intrinsic_carbon_parent_model(
@@ -62,7 +62,9 @@ def test_completed_matching_finds_unpaired_carbons_with_no_local_h_candidates():
     )
     assert model.maximum_non_cumulative_double_bonds == original.maximum_non_cumulative_double_bonds == 2
     assert len(sites) == 2
-    assert sites <= eligible_h
+    # Saturated junctions are candidates too, but this matching still proves
+    # only the original nonjunction H sites.
+    assert sites <= {0, 2, 5, 7}
     assert all(intrinsic.is_intrinsic_carbon_h_site(case.mol, atom, case.parent_atoms) for atom in sites)
     assert all(
         frozenset(atom for edge, order in assignment.orders if order == 2 for atom in edge)

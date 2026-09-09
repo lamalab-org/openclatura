@@ -332,16 +332,22 @@ def intrinsic_carbon_candidate_atoms(
 
 
 def is_intrinsic_carbon_h_site(mol: Molecule, atom: int, parent_atoms: set[int] | frozenset[int]) -> bool:
-    """Recognize a parent CH2 site, including H replaced by branches or bridges."""
+    """Recognize saturated CH2/CH roles, including substituted fusion junctions.
+
+    Three skeletal sigma bonds leave one hydrogen role at a carbon junction.
+    This only nominates a site: the completed matching must still prove that
+    the carbon is intrinsically unpaired without spending a parent pi bond.
+    """
 
     site = mol.atoms[atom]
     if site.symbol != "C" or site.charge or site.is_aromatic:
         return False
     neighbors = mol.get_neighbors(atom)
     external_count = sum(neighbor not in parent_atoms for neighbor in neighbors)
+    skeletal_degree = len(neighbors) - external_count
     return (
-        len(neighbors) - external_count == 2
-        and site.total_h_count + external_count == 2
+        skeletal_degree in {2, 3}
+        and site.total_h_count + external_count == 4 - skeletal_degree
         and all(mol.get_bond(atom, neighbor).order == 1 for neighbor in neighbors)
     )
 
