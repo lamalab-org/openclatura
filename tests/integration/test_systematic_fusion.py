@@ -255,7 +255,7 @@ def test_partly_hydrogenated_hw_component_uses_fusion_nomenclature():
         ),
         (
             "CC1=C2CC3C(C)(C=CC(=O)C34CO4)CC2OC1=O",
-            "3,8a-dimethyl-4,4a,8a,9-tetrahydrospiro[benzo[f]1-benzofuran-5,2'-oxirane]-2,6(9aH)-dione",
+            "3,8a-dimethyl-4a,8a,9,9a-tetrahydrospiro[benzo[f]1-benzofuran-5,2'-oxirane]-2,6(4H)-dione",
         ),
     ],
 )
@@ -265,6 +265,9 @@ def test_audited_pin_composes_intrinsic_carbon_h_and_spiro_oxo(smiles, expected)
 
     assert result.name == expected
     assert result.opsin_check is not None and result.opsin_check.status == "matched"
+    assert Chem.MolToSmiles(Chem.MolFromSmiles(result.opsin_check.opsin_smiles)) == Chem.MolToSmiles(
+        Chem.MolFromSmiles(smiles)
+    )
 
 
 @pytest.mark.parametrize(
@@ -292,8 +295,8 @@ def test_intrinsic_h_parent_state_replaces_von_baeyer_fallback(smiles, expected)
 def test_higher_order_fusion_composes_completed_hydro_and_oxo_operations():
     smiles = "C=C1C(=O)O[C@H]2[C@H]1CCC(C)=C1CCC(=O)O[C@]12C"
     expected = (
-        "(3aS,10aR,10bS)-6,10a-dimethyl-3-methylidene-3a,4,5,7,8,10b-hexahydro"
-        "furo[2',3':1,2]cyclohepta[7,6-b]pyran-2,9-dione"
+        "(3aS,10aR,10bS)-6,10a-dimethyl-3-methylidene-3a,4,5,10b-tetrahydro"
+        "furo[2',3':1,2]cyclohepta[7,6-b]pyran-2,9(7H,8H)-dione"
     )
 
     result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True, include_trace=True)
@@ -301,6 +304,9 @@ def test_higher_order_fusion_composes_completed_hydro_and_oxo_operations():
     assert result.name == expected
     assert result.parent_nomenclature == "systematic_fusion"
     assert result.opsin_check is not None and result.opsin_check.status == "matched"
+    assert Chem.MolToSmiles(Chem.MolFromSmiles(result.opsin_check.opsin_smiles)) == Chem.MolToSmiles(
+        Chem.MolFromSmiles(smiles)
+    )
     selected = next(step for step in result.decisions if step.decision == "selected audited systematic fusion parent")
     assert selected.data["base_name"] == "furo[2',3':1,2]cyclohepta[7,6-b]pyran"
     assert selected.data["joins"] == [
@@ -325,11 +331,18 @@ def test_higher_order_fusion_composes_completed_hydro_and_oxo_operations():
     ]
     assert selected.data["derivative_operations"]["hydro"] == [
         {
-            "locants": ["3a", "4", "5", "7", "8", "10b"],
-            "atom_ids": [6, 7, 8, 12, 13, 5],
-            "bond_ids": [6, 8, 13],
+            "locants": ["3a", "4", "5", "10b"],
+            "atom_ids": [6, 7, 8, 5],
+            "bond_ids": [6, 8],
         }
     ]
+    assert selected.data["derivative_operations"]["added_hydrogen"] == [
+        {"locants": ["7", "8"], "atom_ids": [12, 13], "bond_ids": [12, 13, 14]}
+    ]
+    alkylidene = selected.data["derivative_operations"]["alkylidene"]
+    assert len(alkylidene) == 1
+    assert (alkylidene[0]["locant"], alkylidene[0]["parent_atom_id"], alkylidene[0]["carbon_atom_id"]) == ("3", 1, 0)
+    assert alkylidene[0]["bond_id"] == 1
     assert [operation["locant"] for operation in selected.data["derivative_operations"]["oxo"]] == ["2", "9"]
 
     mol = Chem.MolFromSmiles(smiles)

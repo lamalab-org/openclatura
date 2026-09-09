@@ -4,6 +4,7 @@ from dataclasses import replace
 
 import pytest
 
+from openclatura import opsin_available, verify_with_opsin
 from openclatura.chains import find_ring_systems
 from openclatura.fusion.audit import audit_fusion_plan
 from openclatura.fusion.mancude import parent_derivative_state
@@ -103,8 +104,9 @@ def test_uncovered_saturated_carbon_h_sites_use_complete_typed_hydrogenation():
     assert _audit(mol, mol.atoms, plan).status is AuditStatus.CONFIRMED
 
 
-def test_incomplete_nh_constrained_state_still_fails_composition_audit():
-    mol = read_smiles("N1CCCC2C1CC[NH2+]C2")
+def test_nh_constrained_state_requires_complete_hydro_operations():
+    smiles = "N1CCCC2C1CC[NH2+]C2"
+    mol = read_smiles(smiles)
     plan = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.AUDITED_PIN).plan
     sites = {atom for atom in mol.atoms if mol.atoms[atom].symbol == "N"}
     locants = dict(plan.numbering.input_locant_maps[0])
@@ -112,8 +114,24 @@ def test_incomplete_nh_constrained_state_still_fails_composition_audit():
     result = _audit(
         mol, mol.atoms, plan, derivative_state=state, indicated_hydrogens=tuple(locants[atom] for atom in sites)
     )
+    assert result.status is AuditStatus.CONFIRMED
+    if opsin_available():
+        check = verify_with_opsin(
+            "3,4,4a,7,8,8a-hexahydro-1H,6H-pyrido[4,3-b]pyridin-6-ium",
+            smiles,
+            standardize_smiles=False,
+        )
+        assert check.status == "matched", check.to_dict()
+        assert check.canonical_original == check.canonical_roundtrip
+    result = _audit(
+        mol,
+        mol.atoms,
+        plan,
+        derivative_state=replace(state, hydro_operations=()),
+        indicated_hydrogens=tuple(locants[atom] for atom in sites),
+    )
     assert result.status is AuditStatus.ABSTAIN
-    assert "combined indicated-hydrogen and bond/oxo derivative fusion grammar is not audited" in result.errors
+    assert "combined fusion derivative operations lack independent applicable atom scopes" in result.errors
 
 
 @pytest.mark.parametrize("field", ["atom_ids", "bond_ids", "locants"])
