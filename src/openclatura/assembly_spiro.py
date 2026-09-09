@@ -7,6 +7,8 @@ from dataclasses import dataclass, replace
 
 from .assembly_parts import AssemblyParts, NameAtomBinding, NameTokenBinding, SubstituentItem
 from .formatting import strip_outer_parentheses
+from .locants import parse_locant
+from .name_operations import HydroOperation
 from .nomenclature import RULES
 from .rules import elision, multipliers, stems
 from .spiro_assembly import SpiroAssembly
@@ -52,13 +54,13 @@ def _side_replacement_prefixes(parts: AssemblyParts) -> tuple[str, ...]:
     return (replacements,) if replacements else ()
 
 
-def _side_lambda_bindings(parts: AssemblyParts) -> tuple[NameAtomBinding, ...]:
+def _side_lambda_bindings(parts: AssemblyParts, prime: str = "'") -> tuple[NameAtomBinding, ...]:
     parent = parts.parent_hydride
     if parent is None or not parent.is_systematic_fusion:
         return ()
     bindings = []
     for descriptor in parent.fusion_plan.lambda_descriptors:
-        locant = _prime_side_locant(descriptor.locant)
+        locant = str(descriptor.locant) + prime
         annotation = f"lambda^{descriptor.bonding_number}"
         token = NameTokenBinding(
             text=locant + annotation,
@@ -111,10 +113,23 @@ def spiro_assembly_from_parts(
     if render_parent is None and (parts.parent_charges or any(parts.parent_atom_charges_by_locant.values())):
         # Raw assembly alone cannot apply graph-dependent ionic rewrites.
         return None
-    # Hoisting another spiro wrapper would require a new component namespace,
-    # not an ordinary detachable-prefix locant. Do not silently drop it.
-    if any(item.spiro is not None for item in parts.substituents):
-        return None
+    nested = [item.spiro for item in parts.substituents if item.spiro is not None]
+    continuation = None
+    if nested:
+        if len(nested) != 1 or nested[0].side_parts is None or nested[0].continuation is not None:
+            return None
+        continuation = nested[0]
+        shared = parts.parent_atom_ids_by_locant.get(continuation.parent_locant)
+        other = continuation.side_parts
+        if (
+            shared is None
+            or continuation.parent_locant == junction_locant
+            or other.parent_atom_ids_by_locant.get(continuation.side_locant) != shared
+            or parts.parent_atom_ids.intersection(other.parent_atom_ids) != {shared}
+            or set(other.parent_atom_ids_by_locant.values()) != other.parent_atom_ids
+            or len(other.parent_atom_ids_by_locant) != len(other.parent_atom_ids)
+        ):
+            return None
     if group is not None and (
         group.key not in {"ketone", "alcohol"}
         or parts.principal_suffix_modifiers
@@ -123,18 +138,37 @@ def spiro_assembly_from_parts(
         return None
     local = deepcopy(parts)
     parent = local.parent_hydride
-    if parent is not None and parent.is_systematic_fusion and parent.fusion_plan.lambda_descriptors:
+    if parent is not None and parent.is_systematic_fusion:
         plan = parent.fusion_plan
+        omitted_roles = set()
+        if plan.lambda_descriptors:
+            omitted_roles.add("fusion_lambda_descriptor")
+        if (
+            local.principal_group is None
+            and plan.indicated_hydrogens
+            and any(item.operation_kind == "indicated_hydrogen" for item in local.hydro_operations)
+        ):
+            omitted_roles.update({"fusion_indicated_hydrogen", "fusion_indicated_hydrogen_separator"})
+            locants = tuple(str(locant) for locant in plan.indicated_hydrogens)
+            local.hydro_operations.append(
+                HydroOperation(
+                    key="indicated_hydrogen",
+                    locants=locants,
+                    atom_ids=tuple(local.parent_atom_ids_by_locant[locant] for locant in locants),
+                    reason="Combine the audited component H with derivative H in one local citation.",
+                )
+            )
         # Lambda locants address the completed spiro system, unlike local
         # hydro locants. Hoist their typed tokens, preserving the audited plan.
-        if not parent.audit_ok or parent.base_name != "".join(token.text for token in plan.rendered_parts):
-            return None
-        local.parent_hydride = replace(
-            parent,
-            parent_name="".join(
-                token.text for token in plan.rendered_parts if token.grammar_role != "fusion_lambda_descriptor"
-            ),
-        )
+        if omitted_roles:
+            if not parent.audit_ok or parent.base_name != "".join(token.text for token in plan.rendered_parts):
+                return None
+            local.parent_hydride = replace(
+                parent,
+                parent_name="".join(
+                    token.text for token in plan.rendered_parts if token.grammar_role not in omitted_roles
+                ),
+            )
     local.substituents = []
     local.a_prefixes = []
     local.stereo_features = []
@@ -155,7 +189,9 @@ def spiro_assembly_from_parts(
         word = "one" if group.key == "ketone" else "ol"
         suffixes = tuple((str(locant), word) for locant in group.locants)
     substituents = tuple(
-        replace(item, locants=[_prime_side_locant(locant) for locant in item.locants]) for item in parts.substituents
+        replace(item, locants=[_prime_side_locant(locant) for locant in item.locants])
+        for item in parts.substituents
+        if item.spiro is None
     )
     return SpiroAssembly(
         parent_locant="",
@@ -171,6 +207,7 @@ def spiro_assembly_from_parts(
         ),
         side_substituents=substituents,
         side_parts=parts,
+        continuation=continuation,
     )
 
 
@@ -198,18 +235,90 @@ def split_spiro_substituents(parts: AssemblyParts) -> list[SpiroAssembly]:
             )
         else:
             normal_subs.append(sub)
+    if len(spiro_subs) > 2 or (len(spiro_subs) > 1 and any(side.continuation for side in spiro_subs)):
+        raise ValueError("spiro assembly requires a graph-numbered path of at most three components")
     parts.substituents = normal_subs
+    if len(spiro_subs) == 2 and not any(side.continuation for side in spiro_subs):
+        spiro_subs.sort(key=lambda side: (parse_locant(side.parent_locant), side.side_parent_name))
+        _prime_central_spiro_parts(parts)
+        spiro_subs = [_rescope_spiro_side(spiro_subs[0], ""), _rescope_spiro_side(spiro_subs[1], "''")]
+    elif len(spiro_subs) == 1 and spiro_subs[0].continuation is not None:
+        side = spiro_subs[0]
+        spiro_subs = [replace(side, continuation=_rescope_spiro_side(side.continuation, "''"))]
     spiro_subs = [_hoist_side_substituent_prefixes(parts, spiro) for spiro in spiro_subs]
     # The side component's descriptors belong in the whole name's leading
     # stereo group; only the assembler can put them there.
-    for spiro in spiro_subs:
+    for spiro in _spiro_sides_in_order(spiro_subs):
         # The spiro atom itself is cited once, at its parent locant; the side
         # component's own descriptor for it would name the same centre twice.
-        junction = f"{spiro.side_locant}'"
+        junction = f"{spiro.side_locant}{spiro.side_prime}"
         for feature in spiro.side_stereo:
             if feature[0] != junction and feature not in parts.stereo_features:
                 parts.stereo_features.append(feature)
     return spiro_subs
+
+
+def _spiro_sides_in_order(sides: list[SpiroAssembly]) -> list[SpiroAssembly]:
+    return [item for side in sides for item in ((side, side.continuation) if side.continuation else (side,))]
+
+
+def _rescope_spiro_side(side: SpiroAssembly, prime: str) -> SpiroAssembly:
+    return replace(
+        side,
+        side_prime=prime,
+        side_prefixes=tuple(_reprime_side_prefixes(side.side_prefixes, prime)),
+        side_stereo=tuple((locant.rstrip("'") + prime, stereo) for locant, stereo in side.side_stereo),
+        side_substituents=tuple(
+            replace(item, locants=[str(locant).rstrip("'") + prime for locant in item.locants])
+            for item in side.side_substituents
+        ),
+    )
+
+
+def _prime_central_spiro_parts(parts: AssemblyParts) -> None:
+    """Project detachable operations of the middle dispiro component once."""
+    prime = _prime_side_locant
+    for attribute in ("substituents", "a_prefixes", "principal_suffix_modifiers"):
+        setattr(
+            parts,
+            attribute,
+            [replace(item, locants=[prime(locant) for locant in item.locants]) for item in getattr(parts, attribute)],
+        )
+    if parts.principal_group is not None:
+        parts.principal_group = replace(
+            parts.principal_group, locants=[prime(locant) for locant in parts.principal_group.locants]
+        )
+    parts.hydro_operations = [
+        replace(item, locants=tuple(prime(locant) for locant in item.locants)) for item in parts.hydro_operations
+    ]
+    parts.unsaturations = [
+        replace(item, locants=[prime(locant) for locant in item.locants]) for item in parts.unsaturations
+    ]
+    parts.indicated_hydrogens = [prime(locant) for locant in parts.indicated_hydrogens]
+    parts.stereo_features = [(prime(locant), stereo) for locant, stereo in parts.stereo_features]
+    parts.attachment_locant = prime(parts.attachment_locant)
+    parts.parent_charges = [replace(item, locant=prime(item.locant)) for item in parts.parent_charges]
+    parts.front_modifier_locants = [
+        prime(locant) if locant is not None else None for locant in parts.front_modifier_locants
+    ]
+    for attribute in (
+        "parent_atom_ids_by_locant",
+        "parent_atom_symbols_by_locant",
+        "parent_atom_charges_by_locant",
+        "parent_atom_isotopes_by_locant",
+    ):
+        setattr(parts, attribute, {prime(locant): value for locant, value in getattr(parts, attribute).items()})
+    for attribute in ("parent_bond_orders_by_locants", "parent_bond_ids_by_locants"):
+        setattr(
+            parts,
+            attribute,
+            {tuple(prime(locant) for locant in edge): value for edge, value in getattr(parts, attribute).items()},
+        )
+    parts.elided_substituent_locants = {prime(locant) for locant in parts.elided_substituent_locants}
+    if parts.name_atom_bindings:
+        from .name_bindings import refresh_name_atom_bindings
+
+        refresh_name_atom_bindings(parts)
 
 
 _SIDE_LOCANTS_RE = re.compile(r"^[0-9]+[a-z]*'+(?:,[0-9]+[a-z]*'+)*$")
@@ -284,7 +393,7 @@ def _hoist_side_substituent_prefixes(parts: AssemblyParts, spiro: SpiroAssembly)
     hoisted = False
     if spiro.side_parts is not None:
         if parts.name_atom_bindings:
-            parts.name_atom_bindings.extend(_side_lambda_bindings(spiro.side_parts))
+            parts.name_atom_bindings.extend(_side_lambda_bindings(spiro.side_parts, spiro.side_prime))
         for item in spiro.side_substituents:
             parts.substituents.append(deepcopy(item))
             if parts.name_atom_bindings:
@@ -292,7 +401,12 @@ def _hoist_side_substituent_prefixes(parts: AssemblyParts, spiro: SpiroAssembly)
 
                 branch_parts = AssemblyParts(parent_length=0, substituents=[item])
                 parts.name_atom_bindings.extend(refresh_name_atom_bindings(branch_parts))
-        return replace(spiro, side_prefixes=_side_replacement_prefixes(spiro.side_parts))
+        continuation = _hoist_side_substituent_prefixes(parts, spiro.continuation) if spiro.continuation else None
+        return replace(
+            spiro,
+            side_prefixes=tuple(_reprime_side_prefixes(_side_replacement_prefixes(spiro.side_parts), spiro.side_prime)),
+            continuation=continuation,
+        )
     for prefix in spiro.side_prefixes:
         for locants, name in _split_side_prefix_run(prefix):
             if not locants or _is_replacement_prefix(name):
@@ -355,7 +469,7 @@ def format_spiro_core(
     for spiro in spiro_subs:
         s_name = spiro.side_parent_name
         side_prefixes.extend(spiro.side_prefixes)
-        side_suffixes.extend(_prime_side_suffixes(spiro.side_suffixes, "'"))
+        side_suffixes.extend(_prime_side_suffixes(spiro.side_suffixes, spiro.side_prime))
         extracted_prefixes, extracted_parent, extracted_suffixes, _extracted_stereo = (
             ([], s_name, (), ()) if spiro.side_parts is not None else extract_spiro_side_prefixes(s_name)
         )
@@ -373,7 +487,16 @@ def format_spiro_core(
             s_name_str = f"({s_name})"
         else:
             s_name_str = s_name
-        core_name = f"spiro[{core_name}-{spiro.parent_locant},{_spiro_side_locant(spiro)}'-{s_name_str}]"
+        if spiro.continuation is not None:
+            tail = spiro.continuation
+            side_prefixes.extend(tail.side_prefixes)
+            side_suffixes.extend(_prime_side_suffixes(tail.side_suffixes, tail.side_prime))
+            core_name = (
+                f"dispiro[{_spiro_side_name(core_name)}-{spiro.parent_locant},{spiro.side_locant}'-"
+                f"{s_name_str}-{tail.parent_locant}',{tail.side_locant}''-{_spiro_side_name(tail.side_parent_name)}]"
+            )
+        else:
+            core_name = f"spiro[{core_name}-{spiro.parent_locant},{_spiro_side_locant(spiro)}'-{s_name_str}]"
 
     if terminal_e and terminal_e != "e":
         if ("yl" in terminal_e or elision.is_vowel_start(terminal_e.lstrip("-0123456789,"))) and core_name.endswith(
@@ -394,19 +517,19 @@ def format_spiro_core(
 
 
 def _format_dispiro_core(core_name: str, terminal_e: str, spiro_subs: list[SpiroAssembly]) -> str:
-    first, second = sorted(spiro_subs, key=lambda spiro: (int(spiro.parent_locant), spiro.side_parent_name))
+    first, second = sorted(spiro_subs, key=lambda spiro: (parse_locant(spiro.parent_locant), spiro.side_parent_name))
     first_side = _spiro_side_name(first.side_parent_name)
     second_side = _spiro_side_name(second.side_parent_name)
     core = (
         f"dispiro[{first_side}-{_spiro_side_locant(first)},{first.parent_locant}'-"
-        f"{core_name}-{second.parent_locant}',{_spiro_side_locant(second)}''-{second_side}]"
+        f"{_spiro_side_name(core_name)}-{second.parent_locant}',{_spiro_side_locant(second)}''-{second_side}]"
     )
     side_prefixes = []
     side_suffixes = []
-    side_prefixes.extend(_reprime_side_prefixes(first.side_prefixes, "'"))
-    side_prefixes.extend(_reprime_side_prefixes(second.side_prefixes, "''"))
-    side_suffixes.extend(_prime_side_suffixes(first.side_suffixes, "'"))
-    side_suffixes.extend(_prime_side_suffixes(second.side_suffixes, "''"))
+    side_prefixes.extend(first.side_prefixes)
+    side_prefixes.extend(second.side_prefixes)
+    side_suffixes.extend(_prime_side_suffixes(first.side_suffixes, first.side_prime))
+    side_suffixes.extend(_prime_side_suffixes(second.side_suffixes, second.side_prime))
     if terminal_e and terminal_e != "e":
         if ("yl" in terminal_e or elision.is_vowel_start(terminal_e.lstrip("-0123456789,"))) and core.endswith("e"):
             core = core[:-1]
@@ -499,6 +622,8 @@ def _prime_side_suffixes(suffixes: tuple[tuple[str, str], ...], prime: str) -> l
 def _merge_terminal_and_side_suffixes(terminal_e: str, side_suffixes: list[tuple[str, str]]) -> str:
     if not side_suffixes:
         return terminal_e
+    if terminal_e.endswith("yl"):
+        return elision.elide_terminal_e(_format_side_suffixes(side_suffixes), terminal_e)
     match = re.fullmatch(r"-([0-9,']+)-(ol|one)", terminal_e)
     if not match:
         return terminal_e + _format_side_suffixes(side_suffixes)
@@ -535,7 +660,13 @@ def _merge_principal_and_side_suffixes(
 
 
 def _format_side_suffixes(side_suffixes: list[tuple[str, str]]) -> str:
-    return "".join(f"-{locant}-{suffix}" for locant, suffix in side_suffixes)
+    grouped: dict[str, list[str]] = {}
+    for locant, suffix in side_suffixes:
+        grouped.setdefault(suffix, []).append(locant)
+    return "".join(
+        f"-{','.join(sorted(locants, key=parse_locant))}-{multipliers.basic(len(locants)) if len(locants) > 1 else ''}{suffix}"
+        for suffix, locants in grouped.items()
+    )
 
 
 def extract_spiro_side_prefixes(

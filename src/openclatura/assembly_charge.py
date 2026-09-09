@@ -23,7 +23,15 @@ def positive_parent_n_charges(parts: AssemblyParts) -> list[ParentChargeItem]:
 def positive_parent_ium_charges(parts: AssemblyParts) -> list[ParentChargeItem]:
     """Return parent atoms whose positive charge is represented by an ium suffix."""
 
-    return [charge for charge in parts.parent_charges if charge.symbol in {"N", "O"} and charge.charge > 0]
+    return [
+        charge
+        for charge in parts.parent_charges
+        if charge.charge > 0
+        and (
+            charge.symbol in {"N", "O"}
+            or (charge.charge == 1 and f"{charge.symbol}:+" in RULES.charges.parent_charge_suffixes)
+        )
+    ]
 
 
 def has_ionic_retained_parent(parts: AssemblyParts) -> bool:
@@ -79,14 +87,18 @@ def parent_charge_name_operations(parts: AssemblyParts) -> list[ParentSuffixOper
     if not suffix_locs:
         return []
     rule = RULES.charges.parent_charge_suffixes["N:+"]
+    symbols = tuple(sorted({charge.symbol for charge in positive_parent_ium_charges(parts)}))
+    reasons = tuple(
+        dict.fromkeys(RULES.charges.parent_charge_suffixes.get(f"{symbol}:+", rule).reason for symbol in symbols)
+    )
     return [
         ParentSuffixOperation(
             key="parent-n-cation-suffix",
             locants=suffix_locs,
             suffix=rule.suffix,
-            reason=rule.reason,
+            reason=" ".join(reasons),
             charge=1,
-            atom_symbols=tuple(sorted({charge.symbol for charge in positive_parent_ium_charges(parts)})),
+            atom_symbols=symbols,
         )
     ]
 

@@ -5416,7 +5416,7 @@ def test_sulfur_imide_substituents_preserve_double_bonded_nitrogen():
 
 
 def test_sulfonimidoyl_substituents_keep_imino_n_ligand():
-    assert name_smiles("CC(C)N=S(C)(=O)c1ccc(N)cc1") == "4-(N-propan-2-yl-S-methylsulfonimidoyl)aniline"
+    assert name_smiles("CC(C)N=S(C)(=O)c1ccc(N)cc1") == "4-(N-(propan-2-yl)-S-methylsulfonimidoyl)aniline"
     assert name_smiles("CN=S(=O)(CC(C)N)NOC") == "1-(N-methyl-S-methoxyaminosulfonimidoyl)propan-2-amine"
 
 

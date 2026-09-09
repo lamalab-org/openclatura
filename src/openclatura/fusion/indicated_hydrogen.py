@@ -426,13 +426,27 @@ def intrinsic_carbon_parent_model(
         if mol.get_bond(*edge).order > 1
         for atom in edge
     }
+    # A substituted sigma N that still belongs to the pi domain can exchange
+    # the parent's implicit N-H role with carbon H. A fully carbon-paired
+    # assignment alone does not resolve that choice in a hydrogenated ring.
+    unresolved_sigma_n = any(
+        mol.atoms[atom].symbol == "N"
+        and not mol.atoms[atom].charge
+        and not mol.atoms[atom].is_aromatic
+        and not mol.atoms[atom].total_h_count
+        and len(neighbors := mol.get_neighbors(atom)) == 3
+        and len(parent_atoms.intersection(neighbors)) == 2
+        and all(mol.get_bond(atom, other).order == 1 for other in neighbors)
+        and any(atom in edge for edge in model.pi_eligible_edges)
+        for atom in parent_atoms
+    )
     groups = set()
     for assignment in model.allowed_kekule_assignments:
         paired = {atom for edge, order in assignment.orders if order == 2 for atom in edge}
         unpaired = carbon_atoms - paired
         # A donor can account for the unpaired parent valence only if the
         # assignment also pairs heteroatoms carrying an observed pi bond.
-        if intrinsic_hydrogen_atom_ids and occupied_pi_atoms <= paired:
+        if intrinsic_hydrogen_atom_ids and occupied_pi_atoms <= paired and not unresolved_sigma_n:
             return no_carbon_model, frozenset()
         if unpaired and unpaired <= eligible:
             groups.add(frozenset(unpaired))

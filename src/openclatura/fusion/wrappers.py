@@ -554,8 +554,7 @@ def _retained_wrapper_parent(mol: Molecule, atoms: frozenset[int]) -> WrapperPar
         match
         if match.template.default_indicated_h
         and all(
-            match.template.atom_by_locant[locant].symbol == "C"
-            or mol.atoms[match.locant_to_atom[locant]].is_aromatic
+            match.template.atom_by_locant[locant].symbol == "C" or mol.atoms[match.locant_to_atom[locant]].is_aromatic
             for locant in (*match.template.default_indicated_h, *match.indicated_h)
         )
         else replace(match, indicated_h=match.template.default_indicated_h)

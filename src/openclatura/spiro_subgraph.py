@@ -52,7 +52,12 @@ def _plan_spiro_parent(mol, selection, intent, substituents, *, junction, requir
 
 
 def plan_graph_spiro_side(
-    mol: Molecule, side_atoms: set[int], junction: int, *, required_core: set[int] | None = None
+    mol: Molecule,
+    side_atoms: set[int],
+    junction: int,
+    *,
+    required_core: set[int] | None = None,
+    _prefix_only: bool = False,
 ) -> SpiroAssembly | None:
     """Project one shared component pipeline with junction-aware numbering."""
     from .assembly_spiro import spiro_assembly_from_parts
@@ -98,7 +103,8 @@ def plan_graph_spiro_side(
         name_component(
             side_mol,
             set(side_atoms),
-            is_substituent=required_core is not None
+            is_substituent=_prefix_only
+            or required_core is not None
             or _polycyclic_side_core(side_mol, side_atoms, junction) is not None,
             name_subgraph=name_subgraph,
             name_spiro_subgraph=_spiro_subgraph_assembly,
@@ -120,7 +126,22 @@ def plan_graph_spiro_side(
     junction_locant = next((locant for locant, atom in locants.items() if atom == junction), None)
     if junction_locant is None:
         return None
-    return spiro_assembly_from_parts(parts, junction_locant, render_parent=render_parent)
+    for item in parts.substituents:
+        if item.spiro is None or item.spiro.side_parts is not None or len(item.locants) != 1:
+            continue
+        nested_junction = locants.get(str(item.locants[0]))
+        if nested_junction is None:
+            return None
+        nested = plan_graph_spiro_side(side_mol, set(item.atom_ids) | {nested_junction}, nested_junction)
+        if nested is None:
+            return None
+        item.spiro = replace(nested, parent_locant=str(item.locants[0]))
+    result = spiro_assembly_from_parts(parts, junction_locant, render_parent=render_parent)
+    if result is None and parts.principal_group is not None and not _prefix_only:
+        # A side suffix that cannot join the whole spiro suffix set must be
+        # re-perceived as prefixes, including its attached ligands and H state.
+        return plan_graph_spiro_side(mol, side_atoms, junction, required_core=required_core, _prefix_only=True)
+    return result
 
 
 def _project_spiro_side_molecule(mol: Molecule, side_atoms: set[int], junction: int) -> Molecule:

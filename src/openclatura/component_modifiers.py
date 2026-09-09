@@ -85,6 +85,8 @@ def n_substituent_locant(
 
     if principal_key == "hydrazine":
         return "N" if nitrogen_index == 0 else "N'"
+    if principal_key in {"amidine", "ring_amidine"} and principal_group_count > 1:
+        return "N" + "'" * (nitrogen_index * principal_group_count + group_index)
     if principal_key in RULES.functional_groups.keys_with_family("hydrazone"):
         # Only the terminal nitrogen of a hydrazone takes substituents, so the
         # prime distinguishes one hydrazone from the next rather than one

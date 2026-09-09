@@ -126,6 +126,7 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
 
     Chem.AssignStereochemistry(rdmol, force=True, cleanIt=True)
     chiral_centers = dict(Chem.FindMolChiralCenters(rdmol, includeUnassigned=False))
+    mol.legacy_cip = dict(chiral_centers)
     # Which atoms *are* assigned stereocentres comes from RDKit's legacy
     # perception, because the namer's choice between per-atom descriptors and a
     # relative ``cis``/``trans`` word keys off that set.  What each centre is

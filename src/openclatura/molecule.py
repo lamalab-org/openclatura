@@ -168,6 +168,7 @@ class Molecule:
         self._fusion_plan_cache: dict[tuple, object] = {}
         self.audit_rdmol = None
         self.accurate_cip: dict[int, str] = {}
+        self.legacy_cip: dict[int, str] = {}
         self.substituted_symbols: frozenset[int] = frozenset()
 
     def _invalidate_graph_caches(self) -> None:
@@ -316,6 +317,7 @@ class Molecule:
                         cip=bond.cip,
                     )
         fragment.accurate_cip = {idx: value for idx, value in self.accurate_cip.items() if idx in fragment.atoms}
+        fragment.legacy_cip = {idx: value for idx, value in self.legacy_cip.items() if idx in fragment.atoms}
         fragment.substituted_symbols = frozenset(
             idx for idx, symbol in (symbols or {}).items() if idx in fragment.atoms and symbol != self.atoms[idx].symbol
         )

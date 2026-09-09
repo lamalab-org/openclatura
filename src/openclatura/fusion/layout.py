@@ -356,13 +356,16 @@ def _terminal_ring_proxy_layouts(
 def _two_port_large_ring_layouts(
     model: FaceModel, *, search_budget: int, max_layouts: int, face_id: int | None = None
 ) -> tuple[FusedLayout, ...]:
-    """Expand an angular hexagon witness into one two-port ring.
+    """Expand a hexagon direction witness into one two-port ring.
 
     OPSIN's even-ring direction rule assigns distances n/2 - 1 and n/2 + 1
     the same directions as hexagon distances 2 and 4. Only this signature is
     supported for even rings: other separations must not acquire an unproved
     layout. A seven-member ring also admits this undistorted witness for ports
     separated by two edges, with an extra vertex on its nonfusion long arc.
+    Supported seven/eight-member rings additionally admit the straight
+    witness at their maximum port separation. Unsupported macrocycle
+    signatures remain outside this tier.
     Nonfusion paths subdivide the proxy polygon without moving its corners,
     fusion sides, or ring-axis centers. The standard bounded search therefore
     still owns the orientation alternatives; no large shape search is added.
@@ -389,34 +392,58 @@ def _two_port_large_ring_layouts(
     entrance = _edge_endpoints(face, min(ports))
     if entrance is None:
         return ()
-    distance = face.size // 2 - 1
+    distances = (face.size // 2 - 1,)
+    if face_id is not None and face.size in {7, 8}:
+        distances += (face.size // 2,)
     order = None
-    for endpoints in (entrance, tuple(reversed(entrance))):
-        candidate = _orders_starting_with_edge(face.atom_cycle, endpoints)[0]
-        exit_edge = frozenset(candidate[distance : distance + 2])
-        if exit_edge == frozenset(_edge_endpoints(face, next(iter(ports - {min(ports)}))) or ()):
-            order = candidate
+    for distance in distances:
+        for endpoints in (entrance, tuple(reversed(entrance))):
+            candidate = _orders_starting_with_edge(face.atom_cycle, endpoints)[0]
+            exit_edge = frozenset(candidate[distance : distance + 2])
+            if exit_edge == frozenset(_edge_endpoints(face, next(iter(ports - {min(ports)}))) or ()):
+                order = candidate
+                break
+        if order is not None:
             break
     if order is None:
         return ()
 
     short_path = order[1 : distance + 1]
     long_path = order[distance + 1 :] + order[:1]
-    steps = len(long_path) - 1
-    shoulder = (steps + 1) // 3
-    middle = steps - 2 * shoulder
-    # Symmetric subdivisions retain reflection equivalence even when the
-    # longer path does not divide evenly over the three hexagon sides.
-    paths = (
-        short_path,
-        long_path[: shoulder + 1],
-        long_path[shoulder : shoulder + middle + 1],
-        long_path[shoulder + middle :],
-    )
+    straight = distance == face.size // 2
+    if straight:
+        short_middle = (len(short_path) - 1) // 2
+        long_middle = (len(long_path) - 1) // 2
+        paths = (
+            short_path[: short_middle + 1],
+            short_path[short_middle:],
+            long_path[: long_middle + 1],
+            long_path[long_middle:],
+        )
+        proxy_order = (
+            order[0],
+            order[1],
+            short_path[short_middle],
+            order[distance],
+            *long_path[:1],
+            long_path[long_middle],
+        )
+    else:
+        steps = len(long_path) - 1
+        shoulder = (steps + 1) // 3
+        middle = steps - 2 * shoulder
+        # Symmetric subdivisions retain reflection equivalence even when the
+        # longer path does not divide evenly over the three hexagon sides.
+        paths = (
+            short_path,
+            long_path[: shoulder + 1],
+            long_path[shoulder : shoulder + middle + 1],
+            long_path[shoulder + middle :],
+        )
+        proxy_order = (order[0], order[1], order[distance], *(path[0] for path in paths[1:]))
     removed = {atom for path in paths for atom in path[1:-1]}
     if removed & {atom for other in model.faces if other.id != face.id for atom in other.atom_cycle}:
         return ()
-    proxy_order = (order[0], order[1], order[distance], *(path[0] for path in paths[1:]))
     original_edges = {
         frozenset((left, right)): edge
         for left, right, edge in zip(face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1], face.edge_cycle)
@@ -439,7 +466,7 @@ def _two_port_large_ring_layouts(
         layouts,
         paths,
         {face.id: f"two-port-{face.size}:"},
-        ("two-port fusion distances have an angular hexagon direction witness",),
+        (f"two-port fusion distances have a {'straight' if straight else 'angular'} hexagon direction witness",),
     )
 
 

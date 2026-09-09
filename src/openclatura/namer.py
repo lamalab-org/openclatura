@@ -1043,13 +1043,13 @@ def _assemble_parent_name(
 def _simple_rooted_carbanion_substituent_name(
     mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc
 ) -> str:
-    """Render simple C- substituent roots as methanidyl ligand names.  Deliberately narrow: only an
+    """Render simple C- roots with the observed attachment multiplicity. Deliberately narrow: only an
     acyclic all-carbon substituent whose charged carbon is locant 1; anything else needs a role template."""
 
     if parts.substituents or parts.principal_group is not None or parts.unsaturations:
         return ""
     charged = [
-        atom_idx for atom_idx in numbered_path if mol.atoms[atom_idx].is_carbon and mol.atoms[atom_idx].charge < 0
+        atom_idx for atom_idx in numbered_path if mol.atoms[atom_idx].is_carbon and mol.atoms[atom_idx].charge == -1
     ]
     if len(charged) != 1 or str(get_loc(charged[0])) != "1":
         return ""
@@ -1062,12 +1062,16 @@ def _simple_rooted_carbanion_substituent_name(
     ):
         return ""
     side_len = len(numbered_path) - 1
+    bond_kind = "triple" if parts.is_triple_attach else "double" if parts.is_double_attach else "single"
+    prefix = RULES.charges.heteroatom_charge_prefixes.get(f"C:-:{bond_kind}")
+    if prefix is None:
+        return ""
     if side_len == 0:
-        return "methanidyl"
+        return prefix
     side_stem = stems.stem_for(side_len)
     if not side_stem:
         return ""
-    return f"{side_stem}ylmethanidyl"
+    return f"{side_stem}yl{prefix}"
 
 
 _MULTI_ACID_ENDINGS = tuple(

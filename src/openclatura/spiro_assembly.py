@@ -20,3 +20,5 @@ class SpiroAssembly:
     side_substituents: tuple["SubstituentItem", ...] = ()
     # Unprimed component-local proof and typed operations, before projection.
     side_parts: "AssemblyParts | None" = None
+    side_prime: str = "'"
+    continuation: "SpiroAssembly | None" = None

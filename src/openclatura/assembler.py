@@ -194,7 +194,7 @@ def _add_front_modifiers(parts: AssemblyParts, final_word: str) -> str:
             group_locants = sorted(by_name[name], key=lambda loc: (len(loc), loc))
             locant_str = ",".join(group_locants)
             count = len(group_locants)
-            rendered = format_multiplier(name, count, safe_enclose=True) if count > 1 else name
+            rendered = format_multiplier(name, count)
             entries.append(f"{locant_str}-{rendered}")
         return f"{' '.join(entries)} {final_word}"
     counts: dict[str, int] = {}

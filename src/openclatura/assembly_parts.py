@@ -9,6 +9,7 @@ from .locant_sources import LocantMapSource
 from .name_operations import HydroOperation
 from .ring_parent import ParentHydrideMetadata
 from .spiro_assembly import SpiroAssembly
+from .stereo_descriptors import AbsoluteStereoCitation
 
 if TYPE_CHECKING:
     from .fusion.mancude import ParentBondDelta
@@ -116,6 +117,7 @@ class NameAtomBinding:
     charge_atom_ids: set[int] = field(default_factory=set)
     locants: tuple[str, ...] = ()
     emitted_tokens: tuple[NameTokenBinding, ...] = ()
+    stereo_citation: AbsoluteStereoCitation | None = None
 
 
 # Historical import name retained while the canonical metadata lives beside
@@ -171,6 +173,7 @@ class AssemblyParts:
     parent_bond_ids_by_locants: dict[tuple[str, str], int] = field(default_factory=dict)
     locant_map_source: LocantMapSource = LocantMapSource.GENERATED
     name_atom_bindings: list[NameAtomBinding] = field(default_factory=list)
+    absolute_stereo_citations: dict[int, AbsoluteStereoCitation] = field(default_factory=dict)
     name_token_spans: list[dict] = field(default_factory=list)
     name_rewrite_history: list[dict] = field(default_factory=list)
     stereo_audit_issues: list[str] = field(default_factory=list)
