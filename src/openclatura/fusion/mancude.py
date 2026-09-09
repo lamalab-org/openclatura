@@ -369,8 +369,10 @@ def prove_pi_redistribution(
     atoms: frozenset[int],
     model: ParentBondModel,
     delta: ParentBondDelta,
+    *,
+    indicated_hydrogen_atom_ids: set[int] | frozenset[int] = frozenset(),
 ) -> PiRedistribution | None:
-    """Prove hydro endpoints of alternating pi paths in a neutral carbon parent.
+    """Prove carbon hydro endpoints with unchanged neutral heteroatom spectators.
 
     Keep the raw edge delta intact. Internal path vertices lose and gain one
     pi bond, so only endpoints gain hydrogen. The observed assignment must also
@@ -379,30 +381,37 @@ def prove_pi_redistribution(
     """
 
     if (
-        not delta.compatible
+        not set(indicated_hydrogen_atom_ids) <= atoms
+        or not delta.compatible
         or not delta.hydrogenated_edges
         or delta.added_hydrogen_operations
         or delta.intrinsic_hydro_operations
         or delta.assignment not in model.allowed_kekule_assignments
     ):
         return None
-    for atom in atoms:
-        value = mol.atoms[atom]
-        neighbors = mol.get_neighbors(atom)
-        if (
-            value.symbol != "C"
-            or value.charge
-            or len(atoms.intersection(neighbors)) not in {2, 3}
-            or any(mol.get_bond(atom, other).order != 1 for other in neighbors if other not in atoms)
-            or value.total_h_count + sum(mol.get_bond(atom, other).order for other in neighbors) != 4
-        ):
-            return None
     observed = {
         normalize_edge(bond.u, bond.v): bond for bond in mol.bonds.values() if bond.u in atoms and bond.v in atoms
     }
     expected = dict(delta.assignment.orders)
     if set(observed) != set(expected) or any(bond.order not in {1, 2} for bond in observed.values()):
         return None
+    for atom in atoms:
+        value = mol.atoms[atom]
+        neighbors = mol.get_neighbors(atom)
+        if (
+            value.charge
+            or len(atoms.intersection(neighbors)) not in {2, 3}
+            or any(mol.get_bond(atom, other).order != 1 for other in neighbors if other not in atoms)
+            or value.total_h_count + sum(mol.get_bond(atom, other).order for other in neighbors)
+            != value.element.standard_valence
+        ):
+            return None
+        if (value.symbol != "C" or atom in indicated_hydrogen_atom_ids) and any(
+            expected[normalize_edge(atom, other)] != mol.get_bond(atom, other).order
+            for other in neighbors
+            if other in atoms
+        ):
+            return None
     parent_pi = {atom: 0 for atom in atoms}
     actual_pi = dict(parent_pi)
     removed, added = set(), set()
@@ -420,6 +429,8 @@ def prove_pi_redistribution(
         return None
     sites = frozenset(atom for atom in atoms if parent_pi[atom] - actual_pi[atom] == 1)
     if not sites or len(sites) % 2 or 2 * (len(removed) - len(added)) != len(sites):
+        return None
+    if any(mol.atoms[atom].symbol != "C" for atom in sites):
         return None
     if not added or (sites == delta.hydrogenated_atom_ids and not delta.additional_multiple_bond_ids):
         return None
@@ -648,8 +659,8 @@ def parent_derivative_state(
         return None
 
     redistribution = (
-        prove_pi_redistribution(mol, atoms, bond_model, delta)
-        if not preserve_retained_parent_state and not oxo and not indicated_hydrogen_atom_ids
+        prove_pi_redistribution(mol, atoms, bond_model, delta, indicated_hydrogen_atom_ids=indicated_hydrogen_atom_ids)
+        if not preserve_retained_parent_state and not oxo
         else None
     )
     hydrogenated_atoms = sorted(

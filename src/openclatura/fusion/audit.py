@@ -1424,8 +1424,8 @@ def _audit_derivative_state(
         errors.append("typed derivative state does not carry the selected parent bond delta")
 
     redistribution = (
-        prove_pi_redistribution(mol, parent_atoms, model, delta)
-        if not state.oxo_operations and not indicated_hydrogens
+        prove_pi_redistribution(mol, parent_atoms, model, delta, indicated_hydrogen_atom_ids=indicated_h_atoms)
+        if not state.oxo_operations
         else None
     )
     if state.pi_redistribution != redistribution:

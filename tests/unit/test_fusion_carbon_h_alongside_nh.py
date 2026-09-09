@@ -13,6 +13,8 @@ CORES = (
     pytest.param("C1C=CC2=C1N=CN2", id="5651"),
     pytest.param("C1CC2=C(C1)C=CN2", id="5684"),
     pytest.param("C1C2CC1C1=CNC=C21", id="24212"),
+    pytest.param("C1C=CC2=C1C=NN2", id="20338-pyridine-like-n"),
+    pytest.param("C1CC2=C(C1)C=NN2", id="20378-pyridine-like-n"),
 )
 ORDERINGS = ("original", "reverse", "rotate")
 

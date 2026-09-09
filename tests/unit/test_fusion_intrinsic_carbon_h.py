@@ -138,4 +138,5 @@ def test_no_ch2_skips_component_candidate_model_search(monkeypatch):
         pytest.fail("aromatic parents without CH2 must not prepare carbon-H component models")
 
     monkeypatch.setattr(intrinsic, "_component_carbon_h_locants", unexpected)
+    monkeypatch.setattr(intrinsic, "_component_carbon_pi_locants", unexpected)
     assert not intrinsic.intrinsic_carbon_candidate_atoms(plan.ast, specs, mol)

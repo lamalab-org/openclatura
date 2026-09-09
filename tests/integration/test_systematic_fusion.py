@@ -566,10 +566,22 @@ def test_saturated_carbon_uses_the_correct_completed_system_proof_locant():
     assert numbering.data["atom_to_locant"][saturated_carbon] == "1"
 
 
-def test_carbon_indicated_hydrogen_is_not_added_to_two_monocycle_fusion():
+def test_completed_carbon_hydrogen_is_cited_for_two_monocycle_fusion():
     result = name("O1C=2C(=CC1)C=CC2", fusion_mode=FusionMode.GENERAL)
 
-    assert result.name == "cyclopenta[b]furan"
+    assert result.name == "2H-cyclopenta[b]furan"
+
+
+@pytest.mark.opsin
+def test_explicit_completed_carbon_hydrogen_preserves_implicit_parent_graph():
+    from openclatura.opsin_verify import verify_with_opsin
+
+    if not opsin_available():
+        pytest.skip("OPSIN and Java are required")
+    smiles = "O1C=2C(=CC1)C=CC2"
+    for spelling in ("cyclopenta[b]furan", "2H-cyclopenta[b]furan"):
+        check = verify_with_opsin(spelling, smiles, standardize_smiles=False)
+        assert check.status == "matched", check.to_dict()
 
 
 def test_retained_parent_precedes_systematic_fusion():

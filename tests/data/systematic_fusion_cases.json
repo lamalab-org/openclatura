@@ -29,7 +29,7 @@
   {
     "id": "cyclopentafuran",
     "smiles": "O1C=2C(=CC1)C=CC2",
-    "name": "cyclopenta[b]furan",
+    "name": "2H-cyclopenta[b]furan",
     "parent_nomenclature": "systematic_fusion",
     "pin_status": "confirmed",
     "support_tier": "bounded-polycomponent-v3",
