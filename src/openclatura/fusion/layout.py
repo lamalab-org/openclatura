@@ -9,7 +9,7 @@ have all been audited.
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from math import gcd, lcm
 
 from .config import RingShapeSpec, fusion_nomenclature_config
@@ -57,13 +57,15 @@ def intrinsic_fused_layouts(
     """Enumerate audited intrinsic layouts in nomenclatural preference order.
 
     An empty tuple is an explicit abstention: the face model is unsupported or
-    inconsistent with the standard 3--8 member shape vocabulary.
+    inconsistent with the standard shapes and bounded large-ring reductions.
     """
 
     if search_budget < 1 or max_layouts < 1:
         raise ValueError("layout search budget and result limit must be positive")
     if any(face.size not in _SHAPES_BY_SIZE for face in model.faces):
-        return _ordinary_large_bicycle_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
+        if len(model.faces) == 2:
+            return _ordinary_large_bicycle_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
+        return _two_port_large_ring_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
     face_by_id = {face.id: face for face in model.faces}
     if not _valid_face_adjacency(model, face_by_id):
         return ()
@@ -107,6 +109,122 @@ def intrinsic_fused_layouts(
         if completed:
             break
     return tuple(sorted(completed.values(), key=_layout_sort_key))
+
+
+def _two_port_large_ring_layouts(model: FaceModel, *, search_budget: int, max_layouts: int) -> tuple[FusedLayout, ...]:
+    """Expand an angular hexagon witness into one even, two-port large ring.
+
+    OPSIN's even-ring direction rule assigns distances n/2 - 1 and n/2 + 1
+    the same directions as hexagon distances 2 and 4. Only this signature is
+    supported here: other separations must not acquire an unproved layout.
+    Nonfusion paths subdivide the proxy polygon without moving its corners,
+    fusion sides, or ring-axis centers. The standard bounded search therefore
+    still owns the orientation alternatives; no large shape search is added.
+    """
+
+    large = [face for face in model.faces if face.size not in _SHAPES_BY_SIZE]
+    if (
+        len(large) != 1
+        or large[0].size not in _CONFIG.annulene_ring_sizes
+        or large[0].size % 2
+        or len(model.face_adjacency) != len(model.faces) - 1
+        or not _valid_face_adjacency(model, {face.id: face for face in model.faces})
+        or set(model.outer_boundary) != {atom for face in model.faces for atom in face.atom_cycle}
+    ):
+        return ()
+    face = large[0]
+    ports = set(face.edge_cycle) & model.fusion_edges
+    if len(ports) != 2:
+        return ()
+    entrance = _edge_endpoints(face, min(ports))
+    if entrance is None:
+        return ()
+    distance = face.size // 2 - 1
+    order = None
+    for endpoints in (entrance, tuple(reversed(entrance))):
+        candidate = _orders_starting_with_edge(face.atom_cycle, endpoints)[0]
+        exit_edge = frozenset(candidate[distance : distance + 2])
+        if exit_edge == frozenset(_edge_endpoints(face, next(iter(ports - {min(ports)}))) or ()):
+            order = candidate
+            break
+    if order is None:
+        return ()
+
+    short_path = order[1 : distance + 1]
+    long_path = order[distance + 1 :] + order[:1]
+    steps = len(long_path) - 1
+    shoulder = (steps + 1) // 3
+    middle = steps - 2 * shoulder
+    # Symmetric subdivisions retain reflection equivalence even when the
+    # longer path does not divide evenly over the three hexagon sides.
+    paths = (
+        short_path,
+        long_path[: shoulder + 1],
+        long_path[shoulder : shoulder + middle + 1],
+        long_path[shoulder + middle :],
+    )
+    removed = {atom for path in paths for atom in path[1:-1]}
+    if removed & {atom for other in model.faces if other.id != face.id for atom in other.atom_cycle}:
+        return ()
+    proxy_order = (order[0], order[1], order[distance], *(path[0] for path in paths[1:]))
+    original_edges = {
+        frozenset((left, right)): edge
+        for left, right, edge in zip(face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1], face.edge_cycle)
+    }
+    next_edge = max(edge for other in model.faces for edge in other.edge_cycle) + 1
+    proxy_edges = []
+    for left, right in zip(proxy_order, proxy_order[1:] + proxy_order[:1]):
+        edge = original_edges.get(frozenset((left, right)))
+        if edge is None:
+            edge = next_edge
+            next_edge += 1
+        proxy_edges.append(edge)
+    proxy_faces = tuple(
+        Face(face.id, proxy_order, tuple(proxy_edges), 6) if other.id == face.id else other for other in model.faces
+    )
+    owners: dict[int, list[int]] = defaultdict(list)
+    for other in proxy_faces:
+        for edge in other.edge_cycle:
+            owners[edge].append(other.id)
+    proxy = replace(
+        model,
+        faces=proxy_faces,
+        edge_to_faces=tuple((edge, tuple(sorted(ids))) for edge, ids in sorted(owners.items())),
+        perimeter_edges=frozenset(edge for edge, ids in owners.items() if len(ids) == 1),
+        outer_boundary=tuple(atom for atom in model.outer_boundary if atom not in removed),
+    )
+    layouts = intrinsic_fused_layouts(proxy, search_budget=search_budget, max_layouts=max_layouts)
+    scale = lcm(*(len(path) - 1 for path in paths))
+    expanded = []
+    for layout in layouts:
+        positions = {atom: (x * scale, y * scale) for atom, x, y in layout.atom_positions}
+        centers = {key: (x * scale, y * scale) for key, x, y in layout.face_positions}
+        for path in paths:
+            start, end = positions[path[0]], positions[path[-1]]
+            count = len(path) - 1
+            for index, atom in enumerate(path[1:-1], start=1):
+                positions[atom] = tuple(left + index * (right - left) // count for left, right in zip(start, end))
+        if not _audit_layout(model, {other.id: other.atom_cycle for other in model.faces}, positions):
+            continue
+        positions, centers = _normalize_integer_layout(positions, centers)
+        expanded.append(
+            replace(
+                layout,
+                atom_positions=tuple((atom, *point) for atom, point in sorted(positions.items())),
+                face_positions=tuple((key, *point) for key, point in sorted(centers.items())),
+                face_shapes=tuple(
+                    (key, f"two-port-{face.size}:{shape}" if key == face.id else shape)
+                    for key, shape in layout.face_shapes
+                ),
+                audit_evidence=(
+                    *layout.audit_evidence,
+                    "even large-ring fusion distances have the angular hexagon direction signature",
+                    "only nonfusion paths subdivided; proxy polygon and ring-axis centers preserved",
+                    "expanded original face model passes the complete geometry audit",
+                ),
+            )
+        )
+    return tuple(sorted(expanded, key=_layout_sort_key))
 
 
 def _ordinary_large_bicycle_layouts(
