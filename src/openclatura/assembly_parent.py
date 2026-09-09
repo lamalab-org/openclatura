@@ -711,6 +711,8 @@ def _parent_unsaturation_locants_are_redundant(parts: AssemblyParts) -> bool:
     """P-31.1.4.2.4: ``ethene``, ``ethyne`` and an unsubstituted monounsaturated monocycle
     (``cyclohexene``) have only one place for their bond."""
 
+    if parts.is_spiro_component:
+        return False
     if len(parts.unsaturations) != 1 or len(parts.unsaturations[0].locants) != 1 or parts.a_prefixes:
         return False
     if not parts.is_ring:

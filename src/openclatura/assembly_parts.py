@@ -178,6 +178,8 @@ class AssemblyParts:
     elided_unsaturation_locants: set[str] = field(default_factory=set)
     elide_principal_group_locants: bool = False
     locant_elision_decisions: list[dict] = field(default_factory=list)
+    # A component junction fixes numbering even when its prefixes are hoisted.
+    is_spiro_component: bool = False
 
     def __post_init__(self) -> None:
         """Project immutable parent-hydride facts into mutable assembly state."""

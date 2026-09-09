@@ -72,6 +72,10 @@ def spiro_assembly_from_parts(
     local.a_prefixes = []
     local.stereo_features = []
     local.name_atom_bindings = []
+    local.is_spiro_component = True
+    local.omit_redundant_locants = False
+    # Discard isolated-parent elision decisions, not the typed operations.
+    local.elided_unsaturation_locants.clear()
     _, parent_terminal = parent_stem_and_terminal(local)
     name = render_parent(local) if render_parent is not None else assemble_name_raw(local)
     suffixes = ()
