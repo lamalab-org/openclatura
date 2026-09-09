@@ -299,8 +299,24 @@ def intrinsic_carbon_candidate_atoms(
     ) | _hydrogenation_junctions(mol, parent_atoms, movable_defaults - blocked)
     if not intrinsic_carbon_fusion_scope(ast, specs):
         return pi_junctions
-    if not component_carbon_h_relocation_scope(ast, specs) and not pi_junctions:
-        return frozenset()
+    if not component_carbon_h_relocation_scope(ast, specs):
+        if not pi_junctions:
+            return frozenset()
+        if any(
+            neighbor not in parent_atoms and mol.get_bond(atom, neighbor).order > 1
+            for atom in parent_atoms
+            for neighbor in mol.get_neighbors(atom)
+        ):
+            # Cross-component relocation uses a closed skeletal pi budget.
+            # External pi consumption retains the component-local H domain
+            # until a joint external-pi relocation proof is available.
+            relocated = {
+                match.input_atom_by_locant[locant]
+                for match in ast.component_occurrences
+                if pi_junctions.intersection(match.input_atom_by_locant.values())
+                for locant in _component_carbon_h_locants(specs[match.occurrence_id])
+            }
+            return pi_junctions | frozenset(relocated - blocked)
     if not any(is_intrinsic_carbon_h_site(mol, atom, parent_atoms) for atom in parent_atoms):
         return pi_junctions
     candidates = set()
@@ -547,10 +563,12 @@ def aromatic_nitrogen_lone_pair_sites(mol: Molecule, graph: FusionGraph) -> froz
     """Prove neutral aromatic donors from local sigma valence.
 
     Replacing donor H with a ligand does not create another parent pi bond.
-    Terminal carbonyls compose with non-junction donors through the oxo
-    derivative proof. Junction donors and other exocyclic classes retain
-    separate proofs.
+    Terminal carbonyls and graph-proved lambda-oxo spectators compose with
+    non-junction donors through the derivative proof. Junction donors and
+    other exocyclic classes retain separate proofs.
     """
+
+    from .exocyclic import neutral_lambda_oxo_bonding_number
 
     atoms = {atom.id for atom in graph.atoms}
     external_multiple = tuple(
@@ -564,7 +582,7 @@ def aromatic_nitrogen_lone_pair_sites(mol: Molecule, graph: FusionGraph) -> froz
     if any(
         not is_neutral_external_pi_ligand(mol, atom, neighbor)
         or mol.atoms[atom].total_h_count + sum(mol.get_bond(atom, other).order for other in mol.get_neighbors(atom))
-        != mol.atoms[atom].element.standard_valence
+        != (neutral_lambda_oxo_bonding_number(mol, atom) or mol.atoms[atom].element.standard_valence)
         for atom, neighbor in external_multiple
     ):
         return frozenset()

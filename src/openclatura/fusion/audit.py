@@ -18,7 +18,7 @@ from ..polycycle_topology import normalize_edge
 from ..retained_graph_model import merge_parent_bond_classes
 from ..rules import multipliers
 from .cover import audit_component_cover, component_scope
-from .exocyclic import is_neutral_external_pi_ligand
+from .exocyclic import is_neutral_external_pi_ligand, neutral_lambda_oxo_bonding_number
 from .indicated_hydrogen import (
     component_carbon_h_relocation_scope,
     component_parent_atoms,
@@ -710,11 +710,36 @@ def _has_carbon_h_oxo_bond_consumption(mol: Molecule, atoms: frozenset[int], sta
 
     A carbonyl replaces the parent double bond at its carbon; the other end
     must be an independent CH2 site (possibly bearing single-bond branches).
+    A neutral lambda-oxo spectator instead preserves both skeletal single
+    bonds and requires complete, graph-bound oxo ligand ownership.
     The indicated-H model and derivative replay establish the remaining sites.
     """
 
     for operation in state.external_pi_operations:
         atom = operation.parent_atom_id
+        if neutral_lambda_oxo_bonding_number(mol, atom) is not None:
+            neighbors = atoms.intersection(mol.get_neighbors(atom))
+            expected = dict(state.bond_delta.assignment.orders)
+            if (
+                operation not in state.oxo_operations
+                or len(neighbors) != mol.atoms[atom].element.standard_valence
+                or any(
+                    expected.get(normalize_edge(atom, other)) != 1 or mol.get_bond(atom, other).order != 1
+                    for other in neighbors
+                )
+            ):
+                return False
+            actual_oxo = {
+                mol.get_bond(atom, other).idx: other
+                for other in mol.get_neighbors(atom)
+                if other not in atoms and mol.get_bond(atom, other).order == 2
+            }
+            cited_oxo = tuple(
+                (item.bond_id, item.oxygen_atom_id) for item in state.oxo_operations if item.parent_atom_id == atom
+            )
+            if len(cited_oxo) != len(actual_oxo) or dict(cited_oxo) != actual_oxo:
+                return False
+            continue
         if (
             mol.atoms[atom].symbol != "C"
             or mol.atoms[atom].charge

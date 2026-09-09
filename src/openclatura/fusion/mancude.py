@@ -10,7 +10,7 @@ from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule
 from ..name_operations import AlkylideneOperation, HydroOperation, IminoOperation, OxoOperation, UnsaturationOperation
 from ..polycycle_topology import normalize_edge
-from .exocyclic import ExternalPiOperation, is_neutral_external_pi_ligand
+from .exocyclic import ExternalPiOperation, is_neutral_external_pi_ligand, neutral_lambda_oxo_bonding_number
 from .model import BondAssignment, FusionGraph, FusionGraphAtom, FusionGraphBond, ParentBondModel
 
 
@@ -452,8 +452,9 @@ def prove_pi_redistribution(
     A neutral heteroatom may exchange incident pi bonds but must retain its
     total pi occupancy unless it is a proved neutral amine endpoint. Cited
     intrinsic-H sites keep their exact bond orders.
-    Typed neutral oxo/imino groups may be spectators only when their carbon keeps
-    every internal bond single in both the parent and the observed assignment.
+    Typed neutral external-pi groups may be spectators only when their parent
+    atom keeps every internal bond single in both assignments. A chalcogen-oxo
+    spectator must separately prove its complete neutral lambda bonding number.
     """
 
     if delta.composition_model is not None:
@@ -506,7 +507,7 @@ def prove_pi_redistribution(
                 if other not in atoms
             )
             or value.total_h_count + sum(mol.get_bond(atom, other).order for other in neighbors)
-            != value.element.standard_valence
+            != (neutral_lambda_oxo_bonding_number(mol, atom) or value.element.standard_valence)
         ):
             return None
         if parent_degree == 4 and (
