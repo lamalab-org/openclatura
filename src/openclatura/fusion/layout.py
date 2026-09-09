@@ -62,6 +62,17 @@ def intrinsic_fused_layouts(
 
     if search_budget < 1 or max_layouts < 1:
         raise ValueError("layout search budget and result limit must be positive")
+    terminal = _terminal_ring_proxy_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
+    if terminal is not None:
+        return terminal
+    if len(model.faces) > 2:
+        for face in model.faces:
+            if face.size in {7, 8}:
+                angular = _two_port_large_ring_layouts(
+                    model, search_budget=search_budget, max_layouts=max_layouts, face_id=face.id
+                )
+                if angular:
+                    return angular
     if any(face.size not in _SHAPES_BY_SIZE for face in model.faces):
         if len(model.faces) == 2:
             return _ordinary_large_bicycle_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
@@ -111,22 +122,89 @@ def intrinsic_fused_layouts(
     return tuple(sorted(completed.values(), key=_layout_sort_key))
 
 
-def _two_port_large_ring_layouts(model: FaceModel, *, search_budget: int, max_layouts: int) -> tuple[FusedLayout, ...]:
-    """Expand an angular hexagon witness into one even, two-port large ring.
+def _terminal_ring_proxy_layouts(
+    model: FaceModel, *, search_budget: int, max_layouts: int
+) -> tuple[FusedLayout, ...] | None:
+    """Subdivide a standard terminal hexagon without changing its fusion axis.
+
+    A one-port ring cannot bend a row. Its nonfusion arc therefore must not
+    change the direction or distortion of neighboring rings merely because a
+    seven/eight-member polygon has an off-center vertex average.
+    """
+
+    if len(model.faces) < 3 or len(model.face_adjacency) != len(model.faces) - 1:
+        return None
+    targets = [
+        face for face in model.faces if face.size in {7, 8} and len(set(face.edge_cycle) & model.fusion_edges) == 1
+    ]
+    if not targets:
+        return None
+    faces = {face.id: face for face in model.faces}
+    if not _valid_face_adjacency(model, faces):
+        return ()
+    paths = []
+    next_edge = max(edge for face in model.faces for edge in face.edge_cycle) + 1
+    removed = set()
+    for face in targets:
+        edge = next(iter(set(face.edge_cycle) & model.fusion_edges))
+        endpoints = _edge_endpoints(face, edge)
+        order = _orders_starting_with_edge(face.atom_cycle, endpoints)[0]
+        edge_by_endpoints = {
+            frozenset((left, right)): edge_id
+            for left, right, edge_id in zip(face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1], face.edge_cycle)
+        }
+        indices = (0, 1, *(1 + index * (face.size - 1) // 5 for index in range(1, 5)))
+        cycle = tuple(order[index] for index in indices)
+        edges = []
+        face_removed = set()
+        for start, end in zip(indices, (*indices[1:], face.size)):
+            path = tuple(order[index % face.size] for index in range(start, end + 1))
+            paths.append(path)
+            face_removed.update(path[1:-1])
+            if end == start + 1:
+                edges.append(edge_by_endpoints[frozenset(path)])
+            else:
+                edges.append(next_edge)
+                next_edge += 1
+        if face_removed & {atom for other in model.faces if other.id != face.id for atom in other.atom_cycle}:
+            return None
+        removed.update(face_removed)
+        faces[face.id] = Face(face.id, cycle, tuple(edges), 6)
+    proxy = _subdivided_face_model(model, tuple(faces.values()), removed)
+    layouts = intrinsic_fused_layouts(proxy, search_budget=search_budget, max_layouts=max_layouts)
+    return _expand_proxy_layouts(
+        model,
+        layouts,
+        tuple(paths),
+        {face.id: f"terminal-{face.size}:" for face in targets},
+        ("terminal nonfusion arcs subdivided without changing fusion axes",),
+    )
+
+
+def _two_port_large_ring_layouts(
+    model: FaceModel, *, search_budget: int, max_layouts: int, face_id: int | None = None
+) -> tuple[FusedLayout, ...]:
+    """Expand an angular hexagon witness into one two-port ring.
 
     OPSIN's even-ring direction rule assigns distances n/2 - 1 and n/2 + 1
     the same directions as hexagon distances 2 and 4. Only this signature is
-    supported here: other separations must not acquire an unproved layout.
+    supported for even rings: other separations must not acquire an unproved
+    layout. A seven-member ring also admits this undistorted witness for ports
+    separated by two edges, with an extra vertex on its nonfusion long arc.
     Nonfusion paths subdivide the proxy polygon without moving its corners,
     fusion sides, or ring-axis centers. The standard bounded search therefore
     still owns the orientation alternatives; no large shape search is added.
     """
 
-    large = [face for face in model.faces if face.size not in _SHAPES_BY_SIZE]
+    large = (
+        [face for face in model.faces if face.id == face_id]
+        if face_id is not None
+        else [face for face in model.faces if face.size not in _SHAPES_BY_SIZE]
+    )
     if (
         len(large) != 1
         or large[0].size not in _CONFIG.annulene_ring_sizes
-        or large[0].size % 2
+        or (large[0].size % 2 and not (face_id is not None and large[0].size == 7))
         or len(model.face_adjacency) != len(model.faces) - 1
         or not _valid_face_adjacency(model, {face.id: face for face in model.faces})
         or set(model.outer_boundary) != {atom for face in model.faces for atom in face.atom_cycle}
@@ -182,18 +260,42 @@ def _two_port_large_ring_layouts(model: FaceModel, *, search_budget: int, max_la
     proxy_faces = tuple(
         Face(face.id, proxy_order, tuple(proxy_edges), 6) if other.id == face.id else other for other in model.faces
     )
+    proxy = _subdivided_face_model(model, proxy_faces, removed)
+    layouts = intrinsic_fused_layouts(proxy, search_budget=search_budget, max_layouts=max_layouts)
+    return _expand_proxy_layouts(
+        model,
+        layouts,
+        paths,
+        {face.id: f"two-port-{face.size}:"},
+        ("two-port fusion distances have an angular hexagon direction witness",),
+    )
+
+
+def _subdivided_face_model(model: FaceModel, faces: tuple[Face, ...], removed: set[int]) -> FaceModel:
+    """Rebuild edge ownership after contracting only nonfusion paths."""
+
     owners: dict[int, list[int]] = defaultdict(list)
-    for other in proxy_faces:
+    for other in faces:
         for edge in other.edge_cycle:
             owners[edge].append(other.id)
-    proxy = replace(
+    return replace(
         model,
-        faces=proxy_faces,
+        faces=faces,
         edge_to_faces=tuple((edge, tuple(sorted(ids))) for edge, ids in sorted(owners.items())),
         perimeter_edges=frozenset(edge for edge, ids in owners.items() if len(ids) == 1),
         outer_boundary=tuple(atom for atom in model.outer_boundary if atom not in removed),
     )
-    layouts = intrinsic_fused_layouts(proxy, search_budget=search_budget, max_layouts=max_layouts)
+
+
+def _expand_proxy_layouts(
+    model: FaceModel,
+    layouts: tuple[FusedLayout, ...],
+    paths: tuple[tuple[int, ...], ...],
+    shape_prefixes: dict[int, str],
+    evidence: tuple[str, ...],
+) -> tuple[FusedLayout, ...]:
+    """Restore the original graph while retaining the audited proxy axes."""
+
     scale = lcm(*(len(path) - 1 for path in paths))
     expanded = []
     for layout in layouts:
@@ -212,13 +314,10 @@ def _two_port_large_ring_layouts(model: FaceModel, *, search_budget: int, max_la
                 layout,
                 atom_positions=tuple((atom, *point) for atom, point in sorted(positions.items())),
                 face_positions=tuple((key, *point) for key, point in sorted(centers.items())),
-                face_shapes=tuple(
-                    (key, f"two-port-{face.size}:{shape}" if key == face.id else shape)
-                    for key, shape in layout.face_shapes
-                ),
+                face_shapes=tuple((key, shape_prefixes.get(key, "") + shape) for key, shape in layout.face_shapes),
                 audit_evidence=(
                     *layout.audit_evidence,
-                    "even large-ring fusion distances have the angular hexagon direction signature",
+                    *evidence,
                     "only nonfusion paths subdivided; proxy polygon and ring-axis centers preserved",
                     "expanded original face model passes the complete geometry audit",
                 ),
@@ -660,6 +759,10 @@ def _materialize_layouts(
         for left, right in zip(order, order[1:] + order[:1]):
             edge_owners[tuple(sorted((left, right)))].append(face)
     adjacent = frozenset(frozenset(owners) for owners in edge_owners.values() if len(owners) == 2)
+    # Preserve half-grid midpoints without introducing rational predicates.
+    integer = {atom: (2 * x, 2 * y) for atom, (x, y) in integer.items()}
+    centers = {face: (2 * x, 2 * y) for face, (x, y) in centers.items()}
+    centers = _two_port_pentagon_axes(placed_orders, centers, adjacent)
     directions = {(1, 0)}
     for pair in adjacent:
         left, right = pair
@@ -709,6 +812,9 @@ def _materialize_layouts(
                 if best_score is None or score < best_score:
                     best_score = score
                     candidates.clear()
+                # Numbering must choose its starting face on the same axes
+                # that won the row/quadrant comparison, not polygon centroids.
+                oriented_centers = _direction_grid_centers(oriented_centers, adjacent) or oriented_centers
                 oriented, oriented_centers = _normalize_integer_layout(oriented, oriented_centers)
                 layout = FusedLayout(
                     face_positions=tuple((face, *oriented_centers[face]) for face in sorted(oriented_centers)),
@@ -727,6 +833,45 @@ def _materialize_layouts(
                 candidates.setdefault(_layout_geometry_key(layout), layout)
 
     return tuple(sorted(candidates.values(), key=_layout_sort_key))
+
+
+def _two_port_pentagon_axes(
+    orders: dict[int, tuple[int, ...]], centers: dict[int, Point], adjacent: frozenset[frozenset[int]]
+) -> dict[int, Point]:
+    """Keep an isolated two-port house pentagon on its permitted straight axis.
+
+    The house direction rules allow opposite exits at cyclic distance two
+    (or three in reverse). A polygon's off-axis center must not bend that
+    row. Only independent constraints on an acyclic face graph are applied.
+    """
+
+    if len(adjacent) != len(orders) - 1:
+        return centers
+    neighbors: dict[int, list[int]] = defaultdict(list)
+    for left, right in adjacent:
+        neighbors[left].append(right)
+        neighbors[right].append(left)
+    edges = {face: {frozenset((a, b)) for a, b in zip(order, order[1:] + order[:1])} for face, order in orders.items()}
+    targets = {}
+    for face, order in orders.items():
+        if len(order) != 5 or len(neighbors[face]) != 2:
+            continue
+        ports = [
+            index
+            for index, (a, b) in enumerate(zip(order, order[1:] + order[:1]))
+            if any(frozenset((a, b)) in edges[other] for other in neighbors[face])
+        ]
+        if len(ports) == 2 and (ports[0] - ports[1]) % 5 in (2, 3):
+            targets[face] = neighbors[face]
+    result = dict(centers)
+    for face, (left, right) in targets.items():
+        if left in targets or right in targets:
+            continue
+        # Exact midpoint coordinates are retained by the caller's scale.
+        if any((centers[left][axis] + centers[right][axis]) % 2 for axis in (0, 1)):
+            continue
+        result[face] = tuple((centers[left][axis] + centers[right][axis]) // 2 for axis in (0, 1))
+    return result if len(set(result.values())) == len(result) else centers
 
 
 def _layout_distortion(
