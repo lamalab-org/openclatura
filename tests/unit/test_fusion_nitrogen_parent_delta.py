@@ -28,11 +28,15 @@ def test_five_membered_indicated_nh_keeps_both_carbon_hydro_pairs():
     assert all(order == 1 for edge, order in delta.assignment.orders if 0 in edge)
 
 
-def test_six_membered_indicated_nh_preserves_existing_additive_state():
+def test_six_membered_indicated_nh_constrains_parent_before_additive_state():
     mol = read_smiles("N1CCCCC1")
     model = _mancude_model(mol)
     delta = compare_actual_parent_to_implied_parent(mol, mol.atoms, model, indicated_hydrogen_atom_ids={0})
-    assert delta.assignment in model.allowed_kekule_assignments
+    constrained = _single_site_parent_model(model, frozenset({0}))
+    assert delta.assignment in constrained.allowed_kekule_assignments
+    assert all(order == 1 for edge, order in delta.assignment.orders if 0 in edge)
+    assert 0 not in delta.hydrogenated_atom_ids
+    assert len(delta.hydrogenated_atom_ids) == 4
     assert len(delta.hydrogenated_edges) == 2
 
 

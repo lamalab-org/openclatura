@@ -388,7 +388,20 @@ def compare_actual_parent_to_implied_parent(
     donor_constrained = bool(indicated_hydrogen_atom_ids) and all(
         mol.atoms[atom].symbol == "N" for atom in indicated_hydrogen_atom_ids
     )
-    if externally_unsaturated_atom_ids and (
+    paired_external_sites = (
+        {
+            atom
+            for edge, order in delta.assignment.orders
+            if order == 2 and any(site in indicated_hydrogen_atom_ids for site in edge)
+            for atom in edge
+            if atom in externally_unsaturated_atom_ids
+        }
+        if externally_unsaturated_atom_ids and indicated_hydrogen_atom_ids
+        else set()
+    )
+    # Indicated H and an external pi operation can consume the same parent
+    # double bond. Remaximizing that already-owned pair would invent added H.
+    if externally_unsaturated_atom_ids - paired_external_sites and (
         delta.additional_multiple_bond_ids or delta.hydrogenated_edges or donor_constrained
     ):
         composed = _external_pi_parent_delta(mol, atoms, bond_model, externally_unsaturated_atom_ids, atom_to_locant)
