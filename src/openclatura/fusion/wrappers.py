@@ -547,14 +547,15 @@ def _retained_wrapper_parent(mol: Molecule, atoms: frozenset[int]) -> WrapperPar
     matches = [match for match in matches if fusion_ring_size_gate(tuple(map(len, match.template.rings)))]
     if not matches:
         return None
-    # Moving a carbon H site preserves the parent-hydride electron roles.
-    # Moving it onto a heteroatom also changes donor/oxo composition and must
-    # keep the established template state until that operation is proved.
+    # A relocated aromatic donor has an observed electronic-state witness.
+    # Nonaromatic oxo derivatives still need the template's donor convention;
+    # a permissive skeleton match alone does not prove their H relocation.
     matches = [
         match
         if match.template.default_indicated_h
         and all(
             match.template.atom_by_locant[locant].symbol == "C"
+            or mol.atoms[match.locant_to_atom[locant]].is_aromatic
             for locant in (*match.template.default_indicated_h, *match.indicated_h)
         )
         else replace(match, indicated_h=match.template.default_indicated_h)
