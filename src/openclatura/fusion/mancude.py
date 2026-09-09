@@ -25,6 +25,8 @@ class ParentBondDelta:
     compatible: bool
     added_hydrogen_operations: tuple[HydroOperation, ...] = ()
     intrinsic_hydro_operations: tuple[HydroOperation, ...] = ()
+    # Proved parent domain after external pi and added-H constraints, before hydro.
+    composition_model: ParentBondModel | None = None
 
     @property
     def hydrogenated_atom_ids(self) -> frozenset[int]:
@@ -454,11 +456,13 @@ def prove_pi_redistribution(
     every internal bond single in both the parent and the observed assignment.
     """
 
+    if delta.composition_model is not None:
+        model = delta.composition_model
     if (
         not set(indicated_hydrogen_atom_ids) <= atoms
         or not delta.compatible
         or not delta.hydrogenated_edges
-        or delta.added_hydrogen_operations
+        or (delta.added_hydrogen_operations and delta.composition_model is None)
         or delta.intrinsic_hydro_operations
         or delta.assignment not in model.allowed_kekule_assignments
     ):
@@ -700,7 +704,18 @@ def _external_pi_parent_delta(
             tuple(sorted(system_locant_sort_key(str(locants[site])) for site in delta.hydrogenated_atom_ids)),
         )
         candidates.append((rank, replace(delta, added_hydrogen_operations=operations)))
-    return min(candidates, key=lambda item: item[0])[1] if candidates else None
+    if not candidates:
+        return None
+    selected = min(candidates, key=lambda item: item[0])[1]
+    if not selected.hydrogenated_edges:
+        return selected
+    added_sites = frozenset(atom for operation in selected.added_hydrogen_operations for atom in operation.atom_ids)
+    # Build this witness only for the winning candidate. Redistribution must
+    # compare against the composed domain, not the unmodified parent hydride.
+    composition_model = _single_site_parent_model(model, forced | added_sites)
+    if selected.assignment not in composition_model.allowed_kekule_assignments:
+        return selected
+    return replace(selected, composition_model=composition_model)
 
 
 def _fixed_carbon_hydro_operations(
