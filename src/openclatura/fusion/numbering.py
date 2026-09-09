@@ -584,6 +584,11 @@ def _number_completed_system(
     interior = set(faces.atom_ids) - set(perimeter)
     if not interior:
         return result
+    if len(interior) == 1:
+        # A unique interior vertex has an unambiguous place after the
+        # perimeter in completed fusion numbering. Continue the final fusion
+        # letter (or integer for a heteroatom), not a distance superscript.
+        return _number_perimeter(mol, perimeter + tuple(interior), fusion_atoms | interior)
 
     distance, anchors = _interior_distances_and_anchors(mol, faces.atom_ids, perimeter)
     if set(distance) != set(faces.atom_ids):
