@@ -74,7 +74,7 @@ def test_large_bicycle_maps_are_invariant_under_graph_atom_relabelling():
     assert maps[0] == maps[1]
 
 
-@pytest.mark.parametrize("kind", ["oversized", "hetero", "charged", "bridged", "spiro", "third_face"])
+@pytest.mark.parametrize("kind", ["oversized", "hetero", "charged", "bridged", "spiro"])
 def test_large_carbon_extension_rejects_other_topologies(kind):
     mol = _bicycle(21 if kind == "oversized" else 9, 5)
     if kind == "hetero":
@@ -85,8 +85,6 @@ def test_large_carbon_extension_rejects_other_topologies(kind):
         mol = read_smiles("C1CCCC2CCCCCC1CC2")
     elif kind == "spiro":
         mol = read_smiles("C1CCCCCCC2(C1)CCCC2")
-    elif kind == "third_face":
-        mol = read_smiles("C1CCCCCCC2CCC3CCCC3C12")
     assert face_search.select_bounded_face_model(mol, mol.atoms) is None
 
 

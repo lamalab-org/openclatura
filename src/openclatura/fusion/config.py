@@ -91,7 +91,7 @@ class FusionNomenclatureConfig:
 
 
 def annulene_ring_sizes_from_data(data: Mapping) -> tuple[int, ...]:
-    """Bound the separate two-carbon-ring tier, not general cycle searches."""
+    """Bound generated carbon-ring components, not ordinary cycle searches."""
 
     policy = data.get("annulene_series")
     if policy is None:

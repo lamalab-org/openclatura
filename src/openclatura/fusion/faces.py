@@ -253,7 +253,8 @@ def select_bounded_face_model(
     ``None`` means that the completed search found no proven model; budget
     exhaustion remains an exception and is never conflated with no model.
     An explicit ring-size override confines the ordinary cycle search; only
-    the default policy enables the separate linear two-carbon-ring proof.
+    the default policy enables the linear carbon bicycle proof and bounded
+    carbon-face completion of otherwise uncovered edges.
     """
 
     if cycle_search_budget < 1 or model_search_budget < 1:
@@ -277,6 +278,8 @@ def select_bounded_face_model(
         max_size=_CONFIG.search.maximum_ring_size if max_ring_size is None else max_ring_size,
         search_budget=cycle_search_budget,
     )
+    if rank > 2 and min_ring_size == _CONFIG.search.minimum_ring_size and max_ring_size is None:
+        cycles = _complete_large_carbon_faces(mol, atoms, graph_edges, cycles, cycle_search_budget)
     budget = _Budget("face-model selection", model_search_budget)
     ranks = canonical_ranks(mol, atoms)
     valid: list[tuple[tuple, BoundedFaceModel]] = []
@@ -302,6 +305,44 @@ def select_bounded_face_model(
     best = [model for score, model in valid if score == best_score]
     distinct = {frozenset(face.edges for face in model.faces) for model in best}
     return best[0] if len(distinct) == 1 else None
+
+
+def _complete_large_carbon_faces(
+    mol: Molecule,
+    atoms: frozenset[int],
+    edges: frozenset[Edge],
+    cycles: tuple[GraphCycle, ...],
+    search_budget: int,
+) -> tuple[GraphCycle, ...]:
+    """Complete uncovered edges with bounded, edge-seeded annulene candidates.
+
+    Small-ring coverage is unchanged. A missing edge must lie on a supported
+    neutral carbon face; the full face-set reconstruction still decides whether
+    any candidate is actually a face rather than a larger perimeter cycle.
+    """
+
+    if not _CONFIG.annulene_ring_sizes:
+        return cycles
+    missing = edges - frozenset(edge for cycle in cycles for edge in cycle.edges)
+    if not missing:
+        return cycles
+    carbon_atoms = {atom for atom in atoms if mol.atoms[atom].symbol == "C" and not mol.atoms[atom].charge}
+    if any(not set(edge) <= carbon_atoms for edge in missing):
+        return cycles
+    adjacency = _adjacency(carbon_atoms, (edge for edge in edges if set(edge) <= carbon_atoms))
+    found: dict[tuple[int, ...], GraphCycle] = {}
+    budget = _Budget("large carbon face completion", search_budget)
+    for start, neighbor in sorted(missing):
+        _enumerate_from_start(
+            start,
+            adjacency,
+            _CONFIG.search.maximum_ring_size + 1,
+            max(_CONFIG.annulene_ring_sizes),
+            budget,
+            found,
+            seed_neighbor=neighbor,
+        )
+    return tuple(sorted((*cycles, *found.values()), key=lambda cycle: (len(cycle.atoms), cycle.atoms)))
 
 
 def _larger_carbon_bicycle(mol: Molecule, atoms: frozenset[int], edges: frozenset[Edge]) -> BoundedFaceModel | None:
@@ -494,9 +535,11 @@ def _enumerate_from_start(
     max_size: int,
     budget: _Budget,
     found: dict[tuple[int, ...], GraphCycle],
+    *,
+    seed_neighbor: int | None = None,
 ) -> None:
-    path = [start]
-    visited = {start}
+    path = [start] if seed_neighbor is None else [start, seed_neighbor]
+    visited = set(path)
 
     def search(current: int) -> None:
         budget.spend()
@@ -509,7 +552,9 @@ def _enumerate_from_start(
                 continue
             # Making ``start`` the smallest cycle atom removes rotational
             # duplicates before canonicalization and prunes the search.
-            if neighbor < start or neighbor in visited or len(path) >= max_size:
+            if (seed_neighbor is None and neighbor < start) or neighbor in visited or len(path) >= max_size:
+                continue
+            if seed_neighbor is not None and any(atom in visited - {current, start} for atom in adjacency[neighbor]):
                 continue
             visited.add(neighbor)
             path.append(neighbor)
@@ -517,7 +562,7 @@ def _enumerate_from_start(
             path.pop()
             visited.remove(neighbor)
 
-    search(start)
+    search(path[-1])
 
 
 def _is_chordless(cycle: GraphCycle, adjacency: dict[int, tuple[int, ...]]) -> bool:
