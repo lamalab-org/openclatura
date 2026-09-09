@@ -326,7 +326,9 @@ def audit_fusion_plan(
         )
         if derivative_state is not None:
             hydro_owned_h |= frozenset(
-                atom for operation in derivative_state.hydro_operations for atom in operation.atom_ids
+                atom
+                for operation in derivative_state.hydro_operations + derivative_state.added_hydrogen_operations
+                for atom in operation.atom_ids
             )
         _audit_indicated_hydrogens(
             mol, numbering, bond_model, indicated_hydrogens, errors, intrinsic_c_h, hydro_owned_h
@@ -615,7 +617,19 @@ def _has_consistent_derivative_operations(
         return True
     if h_atoms & (hydro | oxo | added | intrinsic) or hydro & (oxo | added | intrinsic) or added & (oxo | intrinsic):
         return False
-    if any(mol.atoms[atom].symbol != "C" for atom in added | intrinsic):
+    if any(mol.atoms[atom].symbol != "C" for atom in intrinsic):
+        return False
+    neutral_nh_witnesses = {
+        atom
+        for atom in h_atoms | added
+        if mol.atoms[atom].symbol == "N"
+        and not mol.atoms[atom].charge
+        and mol.atoms[atom].total_h_count == 1
+        and len(neighbors := mol.get_neighbors(atom)) == 2
+        and all(neighbor in atoms and mol.get_bond(atom, neighbor).order == 1 for neighbor in neighbors)
+        and all(order == 1 for edge, order in state.bond_delta.assignment.orders if atom in edge)
+    }
+    if any(mol.atoms[atom].symbol != "C" and atom not in neutral_nh_witnesses for atom in added):
         return False
     for atom in hydro:
         value = mol.atoms[atom]
@@ -640,36 +654,18 @@ def _has_consistent_derivative_operations(
     nitrogen_h = h_atoms - carbon_h
     if any(mol.atoms[atom].symbol != "N" for atom in nitrogen_h):
         return False
-    # Each nonaromatic N-H citation must be a neutral single-bond donor
-    # in both the input and the composed parent witness, regardless of count.
+    # Neutral nonaromatic citations must retain a single-bond donor witness.
+    # Charged nitrogen has its separate charge-operation reconstruction.
     if any(
-        mol.atoms[atom].charge
-        or mol.atoms[atom].total_h_count != 1
-        or len(mol.get_neighbors(atom)) != 2
-        or any(neighbor not in atoms or mol.get_bond(atom, neighbor).order != 1 for neighbor in mol.get_neighbors(atom))
-        or any(order != 1 for edge, order in state.bond_delta.assignment.orders if atom in edge)
+        atom not in neutral_nh_witnesses
         for atom in nitrogen_h
-        if not mol.atoms[atom].is_aromatic
+        if not mol.atoms[atom].is_aromatic and not mol.atoms[atom].charge
     ):
         return False
     if carbon_h:
         # Neutral N-H must retain its observed single-bond valence. The
         # completed carbon witness is independently replayed below.
-        if (
-            added
-            or intrinsic
-            or any(
-                mol.atoms[atom].charge
-                or mol.atoms[atom].total_h_count != 1
-                or len(mol.get_neighbors(atom)) != 2
-                or any(
-                    neighbor not in atoms or mol.get_bond(atom, neighbor).order != 1
-                    for neighbor in mol.get_neighbors(atom)
-                )
-                or any(order != 1 for edge, order in state.bond_delta.assignment.orders if atom in edge)
-                for atom in nitrogen_h
-            )
-        ):
+        if added or intrinsic or not nitrogen_h <= neutral_nh_witnesses:
             return False
         if not carbon_h <= intrinsic_carbon_candidate_atoms(ast, specs, mol):
             return False

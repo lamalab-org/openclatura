@@ -605,7 +605,11 @@ def _external_pi_parent_delta(
         paired = {atom for edge, order in assignment.orders if order == 2 for atom in edge}
         added = parent_pi_atoms - paired - forced
         if any(
-            mol.atoms[atom].symbol != "C"
+            mol.atoms[atom].symbol not in {"C", "N"}
+            or (
+                mol.atoms[atom].symbol == "N"
+                and (mol.atoms[atom].total_h_count != 1 or not _single_bonded_parent_nitrogen(mol, atoms, atom))
+            )
             or mol.atoms[atom].charge
             or mol.atoms[atom].is_aromatic
             or len(atoms.intersection(mol.get_neighbors(atom))) not in {2, 3}
@@ -628,7 +632,7 @@ def _external_pi_parent_delta(
             (
                 HydroOperation(
                     key="added_hydrogen",
-                    reason="Oxo and skeletal valence constraints leave carbon added-H sites in the composed parent.",
+                    reason="External pi and skeletal valence constraints leave graph-proved added-H sites.",
                     locants=tuple(str(locants[atom]) for atom in ordered),
                     atom_ids=ordered,
                     bond_ids=tuple(
