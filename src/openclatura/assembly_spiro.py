@@ -20,7 +20,12 @@ _SIDE_STEREO_TERM_RE = re.compile(r"^(?P<locant>\d+[a-z']*)(?P<descriptor>[RSEZ]
 
 
 def _prime_side_locant(locant: str) -> str:
-    return str(locant) if not str(locant) or str(locant).endswith("'") else f"{locant}'"
+    # Replacement locants may carry a lambda annotation; the component prime
+    # belongs to the locant, not to the following bonding number.
+    base, annotation, bonding_number = str(locant).partition("lambda^")
+    if base and not base.endswith("'"):
+        base += "'"
+    return base + annotation + bonding_number
 
 
 def _side_replacement_prefixes(parts: AssemblyParts) -> tuple[str, ...]:
