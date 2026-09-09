@@ -93,7 +93,7 @@ def plan_graph_spiro_side(
 
         return _assemble_parent_name(component_mol, parts, path, get_loc, **kwargs)
 
-    side_mol = mol.subgraph(side_atoms)
+    side_mol = _project_spiro_side_molecule(mol, side_atoms, junction)
     try:
         name_component(
             side_mol,
@@ -121,6 +121,28 @@ def plan_graph_spiro_side(
     if junction_locant is None:
         return None
     return spiro_assembly_from_parts(parts, junction_locant, render_parent=render_parent)
+
+
+def _project_spiro_side_molecule(mol: Molecule, side_atoms: set[int], junction: int) -> Molecule:
+    """Cap the isolated parent at a neutral carbon spiro boundary."""
+
+    side = mol.subgraph(side_atoms)
+    atom = mol.atoms[junction]
+    neighbors = set(mol.get_neighbors(junction))
+    if (
+        atom.is_carbon
+        and not atom.charge
+        and not atom.is_aromatic
+        and not atom.total_h_count
+        and not atom.explicit_h_count
+        and len(neighbors & side_atoms) == 2
+        and len(neighbors - side_atoms) == 2
+        and all(mol.get_bond(junction, other).order == 1 for other in neighbors)
+    ):
+        # The isolated hydride owns two H in place of the other spiro ring.
+        # Keeping the original zero H would invalidate its bond-state proof.
+        side.atoms[junction] = replace(side.atoms[junction], total_h_count=2)
+    return side
 
 
 def _polycyclic_side_core(mol: Molecule, side_atoms: set[int], junction: int) -> set[int] | None:
