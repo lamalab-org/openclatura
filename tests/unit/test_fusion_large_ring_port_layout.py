@@ -107,7 +107,9 @@ def test_macro88584_base_passes_the_full_existing_planner_audit():
 
 
 @pytest.mark.parametrize("seed", [None, 0, 17, 53, 91, 137])
-def test_large_ring_ports_are_invariant_to_atom_and_bond_relabelling(seed):
+@pytest.mark.parametrize("reverse_bond_ids", [False, True])
+@pytest.mark.parametrize("reverse_bond_insertion", [False, True])
+def test_large_ring_ports_are_invariant_to_atom_and_bond_relabelling(seed, reverse_bond_ids, reverse_bond_insertion):
     graph = Chem.MolFromSmiles(ORIGINAL)
     order = list(range(graph.GetNumAtoms()))
     if seed is None:
@@ -116,14 +118,22 @@ def test_large_ring_ports_are_invariant_to_atom_and_bond_relabelling(seed):
         random.Random(seed).shuffle(order)
     inverse = {old: new for new, old in enumerate(order)}
     original = read_rdkit_mol(Chem.RenumberAtoms(graph, order))
-    # Also change which fusion bond is selected as the proxy entrance.
+    # Vary the minimum-ID fusion port independently of adjacency insertion order.
     mol = Molecule()
     for atom in original.atoms.values():
         mol.add_atom(**asdict(atom))
-    for bond in original.bonds.values():
-        mol.add_bond(**{**asdict(bond), "idx": 1000 - bond.idx})
-    bounded, _, _, selection = _selection(mol, {inverse[atom] for atom in BASE_ATOMS})
+    bonds = tuple(original.bonds.values())
+    for bond in reversed(bonds) if reverse_bond_insertion else bonds:
+        mol.add_bond(**{**asdict(bond), "idx": 1000 - bond.idx if reverse_bond_ids else bond.idx})
+    bounded, model, layouts, selection = _selection(mol, {inverse[atom] for atom in BASE_ATOMS})
     assert bounded.audit.ok
+    assert {layout.orientation_score for layout in layouts} == {(0, -2, -6, 2, -8)}
+    candidates = [
+        _numbering_from_layout(mol, bounded, model, layout, index, set(bounded.fusion_atoms))
+        for index, layout in enumerate(layouts)
+    ]
+    assert all(candidate is not None for candidate in candidates)
+    assert {tuple(order[atom] for atom in candidate.perimeter) for candidate in candidates} == OPSIN_PATHS
     assert [{old: candidate.string_map[inverse[old]] for old in BASE_ATOMS} for candidate in selection.accepted] == [
         EXPECTED
     ]
