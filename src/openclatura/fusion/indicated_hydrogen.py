@@ -9,7 +9,7 @@ from functools import lru_cache
 from ..locants import SystemLocant, system_locant_sort_key
 from ..molecule import Molecule
 from ..retained_graph_model import RetainedGraphAtomTemplate, merge_parent_bond_classes
-from .charges import fusion_charge_lone_pair_sites
+from .charges import fusion_charge_lone_pair_sites, protonated_pi_nitrogen_atoms
 from .mancude import (
     _nitrogen_composition_parent_model,
     _single_site_parent_model,
@@ -360,9 +360,9 @@ def intrinsic_carbon_parent_model(
         )
         model = indicated_hydrogen_parent_bond_model(graph, intrinsic_hydrogen_atom_ids)
     hydrogen_atoms = intrinsic_hydrogen_atom_ids | cited_nitrogen_hydrogen_atom_ids
+    owned_h = hydrogen_atoms | protonated_pi_nitrogen_atoms(mol, graph)
     if not candidates or any(
-        mol.atoms[atom].symbol != "C" and mol.atoms[atom].total_h_count and atom not in hydrogen_atoms
-        for atom in locants
+        mol.atoms[atom].symbol != "C" and mol.atoms[atom].total_h_count and atom not in owned_h for atom in locants
     ):
         return model, frozenset()
     # Resolve fusion-N valence before deciding whether a carbon is intrinsically

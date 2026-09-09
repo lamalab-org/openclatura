@@ -43,11 +43,12 @@ def _require_deprotonation_valence(mol: Molecule, atom_id: int) -> None:
 
 
 def fusion_charge_lone_pair_sites(mol: Molecule, graph: FusionGraph) -> frozenset[int]:
-    """Preserve neutral aromatic N donors when a charged derivative has oxo.
+    """Preserve aromatic N donors through proton removal and oxo composition.
 
     Deprotonation and external oxo do not turn a neutral aromatic N lone pair
     into a parent pi-bond site. NH and N-substitution have the same valence
-    constraint; charged nitrogen H remains separate.
+    constraint. Deprotonated donors retain the neutral parent's lone pair;
+    positively charged nitrogen H remains separate.
     """
 
     if not any(mol.atoms[atom.id].charge == -1 for atom in graph.atoms):
@@ -56,10 +57,27 @@ def fusion_charge_lone_pair_sites(mol: Molecule, graph: FusionGraph) -> frozense
         atom.id
         for atom in graph.atoms
         if mol.atoms[atom.id].symbol == "N"
-        and mol.atoms[atom.id].charge == 0
+        and mol.atoms[atom.id].charge in {-1, 0}
         and mol.atoms[atom.id].is_aromatic
-        and len(mol.get_neighbors(atom.id)) + mol.atoms[atom.id].total_h_count == 3
+        and len(mol.get_neighbors(atom.id)) + mol.atoms[atom.id].total_h_count == 3 + mol.atoms[atom.id].charge
         and all(mol.get_bond(atom.id, neighbor).order == 1 for neighbor in mol.get_neighbors(atom.id))
+    )
+
+
+def protonated_pi_nitrogen_atoms(mol: Molecule, graph: FusionGraph) -> frozenset[int]:
+    """N-H owned by cationization, without consuming the parent's N pi bond."""
+
+    atoms = frozenset(site.id for site in graph.atoms)
+    return frozenset(
+        site.id
+        for site in graph.atoms
+        if site.symbol == "N"
+        and site.formal_charge == 0
+        and mol.atoms[site.id].charge == 1
+        and mol.atoms[site.id].total_h_count == 1
+        and len(neighbors := mol.get_neighbors(site.id)) == 2
+        and set(neighbors) <= atoms
+        and sorted(mol.get_bond(site.id, other).order for other in neighbors) == [1, 2]
     )
 
 
