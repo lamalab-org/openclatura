@@ -66,8 +66,11 @@ def test_intrinsic_component_donor_does_not_become_adjacent_hydro_pair():
     assert result.name == "2H,4H,5H,6H-pyrrolo[3,4-d][1,2,3]triazole"
     if opsin_available():
         assert verify_with_opsin(result.name, Chem.MolToSmiles(mol), standardize_smiles=False).status == "matched"
-        assert verify_with_opsin(
-            "4,6-dihydro-2H,5H-pyrrolo[3,4-d][1,2,3]triazole",
-            Chem.MolToSmiles(mol),
-            standardize_smiles=False,
-        ).status == "matched"
+        assert (
+            verify_with_opsin(
+                "4,6-dihydro-2H,5H-pyrrolo[3,4-d][1,2,3]triazole",
+                Chem.MolToSmiles(mol),
+                standardize_smiles=False,
+            ).status
+            == "matched"
+        )
