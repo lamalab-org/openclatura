@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from rdkit import Chem
 
-from openclatura import FusionMode, name, name_many, name_mol, opsin_available
+from openclatura import FusionMode, name, name_many, name_mol, opsin_available, verify_with_opsin
 from openclatura.chains import find_ring_systems
 from openclatura.fusion.audit import audit_fusion_plan
 from openclatura.fusion.context import current_fusion_mode, reset_fusion_mode, set_fusion_mode
@@ -352,17 +352,43 @@ def test_higher_order_fusion_composes_completed_hydro_and_oxo_operations():
     assert reordered.opsin_check is not None and reordered.opsin_check.status == "matched"
 
 
-def test_higher_order_component_indicated_hydrogen_composition_roundtrips():
+@pytest.mark.parametrize("order", ("original", "reversed", "shuffled"))
+def test_higher_order_component_indicated_hydrogen_composition_roundtrips(order):
     smiles = "CSc1ccc(C2c3c(oc4ccccc4c3=O)C(=O)N2c2ncccn2)cc1"
-    expected = (
-        "1-(4-(methylsulfanyl)phenyl)-2-(pyrimidin-2-yl)-1,2-dihydrobenzo[1',2':2,3]pyrano[5,6-c]pyrrole-3,9-dione"
-    )
+    expected = "1-(4-(methylsulfanyl)phenyl)-2-(pyrimidin-2-yl)benzo[1',2':2,3]pyrano[5,6-c]pyrrole-3,9(1H)-dione"
+    rd_mol = Chem.MolFromSmiles(smiles)
+    indices = list(range(rd_mol.GetNumAtoms()))
+    if order == "reversed":
+        indices.reverse()
+    elif order == "shuffled":
+        random.Random(53).shuffle(indices)
+    rd_mol = Chem.RenumberAtoms(rd_mol, indices)
 
-    result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True)
+    result = name_mol(rd_mol, fusion_mode=FusionMode.AUDITED_PIN, include_trace=True, verify_self=True)
 
     assert result.name == expected
     assert result.parent_nomenclature == "systematic_fusion"
-    assert result.opsin_check is not None and result.opsin_check.status == "matched"
+    assert result.self_audit is not None and result.self_audit.verdict == "confirmed"
+    selected = next(step for step in result.decisions if step.decision == "selected audited systematic fusion parent")
+    operations = selected.data["derivative_operations"]
+    assert operations["hydro"] == []
+    assert operations["unsaturation"] == []
+    (added,) = operations["added_hydrogen"]
+    assert added["locants"] == ["1"]
+    assert added["atom_ids"] == [indices.index(6)]
+    assert selected.data["atom_to_locant"][indices.index(6)] == "1"
+    assert {operation["parent_atom_id"] for operation in operations["oxo"]} == {indices.index(16), indices.index(18)}
+    parent_atoms = set(selected.data["atom_to_locant"])
+    parent_h_atom = rd_mol.GetAtomWithIdx(indices.index(6))
+    assert parent_h_atom.GetTotalNumHs() == 1
+    assert set(added["bond_ids"]) == {
+        bond.GetIdx() + 1
+        for bond in parent_h_atom.GetBonds()
+        if bond.GetOtherAtomIdx(parent_h_atom.GetIdx()) in parent_atoms
+    }
+    if opsin_available():
+        check = verify_with_opsin(result.name, Chem.MolToSmiles(rd_mol), standardize_smiles=False)
+        assert check.status == "matched", check.to_dict()
 
 
 def test_multiple_indicated_hydrogens_compose_with_additive_hydrogenation():
