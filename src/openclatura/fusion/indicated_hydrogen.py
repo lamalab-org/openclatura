@@ -299,17 +299,8 @@ def intrinsic_carbon_candidate_atoms(
     ) | _hydrogenation_junctions(mol, parent_atoms, movable_defaults - blocked)
     if not intrinsic_carbon_fusion_scope(ast, specs):
         return pi_junctions
-    if not component_carbon_h_relocation_scope(ast, specs):
-        # A default carbon H consumed at a pi-bearing junction may relocate
-        # within that same component. The completed matching still has to
-        # prove the observed replacement H site without losing a pi bond.
-        relocated = {
-            match.input_atom_by_locant[locant]
-            for match in ast.component_occurrences
-            if pi_junctions.intersection(match.input_atom_by_locant.values())
-            for locant in _component_carbon_h_locants(specs[match.occurrence_id])
-        }
-        return pi_junctions | frozenset(relocated - blocked)
+    if not component_carbon_h_relocation_scope(ast, specs) and not pi_junctions:
+        return frozenset()
     if not any(is_intrinsic_carbon_h_site(mol, atom, parent_atoms) for atom in parent_atoms):
         return pi_junctions
     candidates = set()
@@ -319,6 +310,8 @@ def intrinsic_carbon_candidate_atoms(
     # These are roles, not assigned H sites. Nitrogen donor constraints are
     # resolved by the completed-parent proof; filtering against an earlier
     # matching would discard carbons that become unpaired during composition.
+    # A component H released at a proved junction can relocate outside that
+    # component only if the same completed matching and pi-budget proof passes.
     return frozenset(candidates - blocked) | pi_junctions
 
 
@@ -445,6 +438,7 @@ def intrinsic_carbon_parent_model(
                 indicated_hydrogen_atom_ids=hydrogen_atoms | sites,
             )
             if delta.additional_multiple_bond_ids
+            or any(mol.atoms[atom].is_aromatic for atom in delta.hydrogenated_atom_ids)
             else None
         )
         if delta.additional_multiple_bond_ids and redistribution is None:
@@ -456,7 +450,10 @@ def intrinsic_carbon_parent_model(
         paired = {atom for edge, order in delta.assignment.orders if order == 2 for atom in edge}
         if carbon_atoms - paired != sites or not occupied_pi_atoms - sites <= paired:
             continue
-        if any(mol.atoms[atom].is_aromatic for edge in delta.hydrogenated_edges for atom in edge):
+        hydro_atoms = (
+            redistribution.hydrogenated_atom_ids if redistribution is not None else delta.hydrogenated_atom_ids
+        )
+        if any(mol.atoms[atom].is_aromatic for atom in hydro_atoms):
             continue
         if sites & oxo_sites and not delta.intrinsic_hydro_operations:
             continue
