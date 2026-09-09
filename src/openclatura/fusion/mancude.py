@@ -388,6 +388,21 @@ def compare_actual_parent_to_implied_parent(
     donor_constrained = bool(indicated_hydrogen_atom_ids) and all(
         mol.atoms[atom].symbol == "N" for atom in indicated_hydrogen_atom_ids
     )
+    consumed_external_pi = (
+        any(
+            order == 2
+            and observed[normalize_edge(*edge)].order == 1
+            and any(atom in externally_unsaturated_atom_ids for atom in edge)
+            for edge, order in delta.assignment.orders
+        )
+        if externally_unsaturated_atom_ids
+        else False
+    )
+    if consumed_external_pi:
+        pi_atoms = {atom for edge in bond_model.pi_eligible_edges | bond_model.required_double_bonds for atom in edge}
+        # Fixed-single carbon sites belong to the intrinsic parent-H proof.
+        # Do not remaximise that parent to account for a suffix-consumed bond.
+        consumed_external_pi = all(mol.atoms[atom].symbol != "C" or atom in pi_atoms for atom in atoms)
     paired_external_sites = (
         {
             atom
@@ -401,8 +416,10 @@ def compare_actual_parent_to_implied_parent(
     )
     # Indicated H and an external pi operation can consume the same parent
     # double bond. Remaximizing that already-owned pair would invent added H.
+    # Otherwise even a zero residual edge delta can leave the other endpoint
+    # of an externally consumed double bond requiring an added-H citation.
     if externally_unsaturated_atom_ids - paired_external_sites and (
-        delta.additional_multiple_bond_ids or delta.hydrogenated_edges or donor_constrained
+        delta.additional_multiple_bond_ids or delta.hydrogenated_edges or donor_constrained or consumed_external_pi
     ):
         composed = _external_pi_parent_delta(mol, atoms, bond_model, externally_unsaturated_atom_ids, atom_to_locant)
         if composed is not None:
