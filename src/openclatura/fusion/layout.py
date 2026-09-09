@@ -747,6 +747,9 @@ def _orientation_score(
     orders: dict[int, tuple[int, ...]],
     positions: dict[int, Point],
 ) -> tuple[int, ...]:
+    direction_centers = _direction_grid_centers(centers, adjacent)
+    if direction_centers is not None:
+        centers = direction_centers
     rows: list[list[int]] = []
     for face in sorted(centers, key=lambda face: (centers[face][1], centers[face][0])):
         if not rows or centers[rows[-1][-1]][1] != centers[face][1] or frozenset((rows[-1][-1], face)) not in adjacent:
@@ -759,13 +762,58 @@ def _orientation_score(
         ys = [positions[atom][1] for atom in order]
         bounds.append((min(xs), max(xs), min(ys), max(ys)))
     orientation = min(
-        _bounded_row_orientation_score(centers, row, orders, positions, bounds) for row in rows if len(row) == row_count
+        _center_row_orientation_score(centers, row)
+        if direction_centers is not None
+        else _bounded_row_orientation_score(centers, row, orders, positions, bounds)
+        for row in rows
+        if len(row) == row_count
     )
     if distortion is None:
         distortion = sum(shape.distortion_rank for shape in shapes.values())
     # Distorted shapes are disfavored before applying the ordinary P-25
     # orientation criteria; see the separate distortion precedence rule.
     return distortion, -row_count, *orientation
+
+
+def _direction_grid_centers(centers: dict[int, Point], adjacent: frozenset[frozenset[int]]) -> dict[int, Point] | None:
+    """Separate ring-center direction from the scale of individual polygons."""
+    neighbors: dict[int, list[int]] = {face: [] for face in centers}
+    for edge in adjacent:
+        left, right = sorted(edge)
+        neighbors[left].append(right)
+        neighbors[right].append(left)
+    root = min(centers)
+    result = {root: (0, 0)}
+    queue = deque([root])
+    while queue:
+        face = queue.popleft()
+        for other in neighbors[face]:
+            dx = centers[other][0] - centers[face][0]
+            dy = centers[other][1] - centers[face][1]
+            sx, sy = (dx > 0) - (dx < 0), (dy > 0) - (dy < 0)
+            step = (4 * sx, 0) if not sy else (0, 2 * sy) if not sx else (2 * sx, sy)
+            point = (result[face][0] + step[0], result[face][1] + step[1])
+            if other in result:
+                if result[other] != point:
+                    return None
+            else:
+                result[other] = point
+                queue.append(other)
+    return result if len(result) == len(centers) and len(set(result.values())) == len(result) else None
+
+
+def _center_row_orientation_score(centers: dict[int, Point], row: list[int]) -> tuple[int, int, int]:
+    middle = len(row) // 2
+    axis_x = 2 * centers[row[middle]][0] if len(row) % 2 else centers[row[middle - 1]][0] + centers[row[middle]][0]
+    axis_y = centers[row[0]][1]
+    upper_right = lower_left = above = 0
+    for x, y in centers.values():
+        right = 1 if 2 * x == axis_x else 2 if 2 * x > axis_x else 0
+        upper = 1 if y == axis_y else 2 if y > axis_y else 0
+        upper_right += right * upper
+        lower_left += (2 - right) * (2 - upper)
+        above += 2 * upper
+    return -upper_right, lower_left, -above
 
 
 def _bounded_row_orientation_score(

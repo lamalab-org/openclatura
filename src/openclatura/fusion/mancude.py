@@ -144,7 +144,8 @@ def _nitrogen_composition_parent_model(
                     )
                 )
                 and not mol.atoms[atom].is_aromatic
-                and _five_membered_single_nitrogen(mol, atoms, atom)
+                and _single_bonded_parent_nitrogen(mol, atoms, atom)
+                and (atom in indicated_hydrogen_atom_ids or _five_membered_single_nitrogen(mol, atoms, atom))
             )
         )
     )
@@ -231,12 +232,24 @@ def has_complete_saturated_hydrogenation(
     )
 
 
-def _five_membered_single_nitrogen(mol: Molecule, atoms: frozenset[int], atom: int) -> bool:
-    """Prove a two-connected single-bonded N in a five-membered parent ring."""
-
+def _single_bonded_parent_nitrogen(mol: Molecule, atoms: frozenset[int], atom: int) -> bool:
+    """Check the sigma valence of a neutral, two-connected parent N."""
     neighbors = atoms.intersection(mol.get_neighbors(atom))
-    if len(neighbors) != 2 or any(mol.get_bond(atom, other).order != 1 for other in neighbors):
+    return (
+        mol.atoms[atom].symbol == "N"
+        and mol.atoms[atom].charge == 0
+        and len(neighbors) == 2
+        and mol.atoms[atom].total_h_count + len(mol.get_neighbors(atom)) == 3
+        and all(mol.get_bond(atom, other).order == 1 for other in mol.get_neighbors(atom))
+    )
+
+
+def _five_membered_single_nitrogen(mol: Molecule, atoms: frozenset[int], atom: int) -> bool:
+    """Prove the uncited donor role in a five-membered parent ring."""
+
+    if not _single_bonded_parent_nitrogen(mol, atoms, atom):
         return False
+    neighbors = atoms.intersection(mol.get_neighbors(atom))
     first, last = sorted(neighbors)
     return any(
         mol.get_bond(second, third) is not None
@@ -435,9 +448,10 @@ def prove_pi_redistribution(
     for atom in atoms:
         value = mol.atoms[atom]
         neighbors = mol.get_neighbors(atom)
+        parent_degree = len(atoms.intersection(neighbors))
         if (
             value.charge
-            or len(atoms.intersection(neighbors)) not in {2, 3}
+            or parent_degree not in {2, 3, 4}
             or any(
                 mol.get_bond(atom, other).order != 1 and mol.get_bond(atom, other).idx not in oxo_bond_ids
                 for other in neighbors
@@ -445,6 +459,11 @@ def prove_pi_redistribution(
             )
             or value.total_h_count + sum(mol.get_bond(atom, other).order for other in neighbors)
             != value.element.standard_valence
+        ):
+            return None
+        if parent_degree == 4 and (
+            value.symbol != "C"
+            or any(expected[normalize_edge(atom, other)] != 1 for other in neighbors if other in atoms)
         ):
             return None
         if atom in oxo_sites and any(

@@ -15,6 +15,7 @@ from .mancude import (
     _single_site_parent_model,
     compare_actual_parent_to_implied_parent,
     indicated_hydrogen_parent_bond_model,
+    prove_pi_redistribution,
     saturated_nitrogen_hydrogen_sites,
 )
 from .model import (
@@ -311,18 +312,13 @@ def intrinsic_carbon_candidate_atoms(
     if not any(is_intrinsic_carbon_h_site(mol, atom, parent_atoms) for atom in parent_atoms):
         return pi_junctions
     candidates = set()
-    local_candidates = set()
     for match in ast.component_occurrences:
         spec = specs[match.occurrence_id]
         candidates.update(match.input_atom_by_locant[locant] for locant in _component_carbon_pi_locants(spec))
-        local_candidates.update(match.input_atom_by_locant[locant] for locant in _component_carbon_h_locants(spec))
-    components = tuple((match, specs[match.occurrence_id]) for match in ast.component_occurrences)
-    model = _completed_carbon_h_model(components, True)
-    unpaired_candidates = set()
-    for assignment in model.allowed_kekule_assignments:
-        paired = {atom for edge, order in assignment.orders if order == 2 for atom in edge}
-        unpaired_candidates.update(candidates - blocked - paired)
-    return frozenset((local_candidates | unpaired_candidates) - blocked) | pi_junctions
+    # These are roles, not assigned H sites. Nitrogen donor constraints are
+    # resolved by the completed-parent proof; filtering against an earlier
+    # matching would discard carbons that become unpaired during composition.
+    return frozenset(candidates - blocked) | pi_junctions
 
 
 def is_intrinsic_carbon_h_site(mol: Molecule, atom: int, parent_atoms: set[int] | frozenset[int]) -> bool:
@@ -437,7 +433,20 @@ def intrinsic_carbon_parent_model(
             indicated_hydrogen_atom_ids=hydrogen_atoms,
             externally_unsaturated_atom_ids=oxo_sites,
         )
-        if delta is None or not delta.compatible or delta.additional_multiple_bond_ids:
+        if delta is None or not delta.compatible:
+            continue
+        redistribution = (
+            prove_pi_redistribution(
+                mol,
+                parent_atoms,
+                constrained,
+                delta,
+                indicated_hydrogen_atom_ids=hydrogen_atoms | sites,
+            )
+            if delta.additional_multiple_bond_ids
+            else None
+        )
+        if delta.additional_multiple_bond_ids and redistribution is None:
             continue
         # Nitrogen recomposition must not pay for a carbon tautomer by deleting
         # another parent pi bond or hydrogenating an aromatic boundary atom.
@@ -561,6 +570,9 @@ def aromatic_nitrogen_lone_pair_sites(mol: Molecule, graph: FusionGraph) -> froz
         or mol.atoms[neighbor].charge
         or mol.get_bond(atom, neighbor).order != 2
         or len(mol.get_neighbors(neighbor)) != 1
+        or mol.atoms[neighbor].total_h_count
+        or mol.atoms[atom].total_h_count + sum(mol.get_bond(atom, other).order for other in mol.get_neighbors(atom))
+        != mol.atoms[atom].element.standard_valence
         for atom, neighbor in external_multiple
     ):
         return frozenset()
