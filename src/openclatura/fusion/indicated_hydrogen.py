@@ -294,7 +294,7 @@ def intrinsic_carbon_candidate_atoms(
                 movable_defaults.add(atom_id)
     pi_junctions = frozenset(
         atom for atom in movable_defaults - blocked if _is_pi_bearing_carbon_junction(mol, atom, parent_atoms)
-    )
+    ) | _hydrogenation_junctions(mol, parent_atoms, movable_defaults - blocked)
     if not intrinsic_carbon_fusion_scope(ast, specs):
         return pi_junctions
     if not component_carbon_h_relocation_scope(ast, specs):
@@ -356,15 +356,15 @@ def intrinsic_carbon_parent_model(
     an operation deleting a double bond from an otherwise chosen assignment.
     """
 
-    pi_junctions = pi_bearing_fusion_carbon_sites(mol, graph, candidates)
-    if pi_junctions:
-        # Fusion consumes the component's movable CH2 convention at an
-        # observed pi-bearing junction, not through an external substituent.
+    released_junctions = released_fusion_carbon_sites(mol, graph, candidates)
+    if released_junctions:
+        # A proved junction role releases the component's movable CH2
+        # convention before assigning parent H and hydrogenation operations.
         graph = replace(
             graph,
             atoms=tuple(
                 replace(atom, pi_capacity=1, saturated=False, indicated_h_site=False)
-                if atom.id in pi_junctions
+                if atom.id in released_junctions
                 else atom
                 for atom in graph.atoms
             ),
@@ -485,6 +485,42 @@ def pi_bearing_fusion_carbon_sites(
         and not atom.forced_single
         and _is_pi_bearing_carbon_junction(mol, atom.id, atoms)
     )
+
+
+def _hydrogenation_junctions(
+    mol: Molecule, atoms: set[int] | frozenset[int], candidates: set[int] | frozenset[int]
+) -> frozenset[int]:
+    """Release movable junction H for neutral, sigma-substituted hydrogenation.
+
+    External multiple-bond operations have their own composed-parent proof;
+    their constraints must not be replaced by this hydrogenation-only model.
+    """
+    if not candidates or any(
+        mol.atoms[atom].charge
+        or any(other not in atoms and mol.get_bond(atom, other).order > 1 for other in mol.get_neighbors(atom))
+        for atom in atoms
+    ):
+        return frozenset()
+    return frozenset(
+        atom
+        for atom in candidates
+        if mol.atoms[atom].symbol == "C"
+        and not mol.atoms[atom].is_aromatic
+        and len(atoms.intersection(neighbors := mol.get_neighbors(atom))) == 3
+        and mol.atoms[atom].total_h_count + len(neighbors) == 4
+        and all(mol.get_bond(atom, other).order == 1 for other in neighbors)
+    )
+
+
+def released_fusion_carbon_sites(mol: Molecule, graph: FusionGraph, candidates: frozenset[int]) -> frozenset[int]:
+    """Shared planner/auditor release sites, each with a graph-role witness."""
+    movable = frozenset(
+        site.id
+        for site in graph.atoms
+        if site.id in candidates and site.saturated and not site.forced_single and not site.formal_charge
+    )
+    atoms = frozenset(site.id for site in graph.atoms)
+    return pi_bearing_fusion_carbon_sites(mol, graph, candidates) | _hydrogenation_junctions(mol, atoms, movable)
 
 
 def intrinsic_parent_lone_pair_sites(mol: Molecule, graph: FusionGraph) -> frozenset[int]:

@@ -25,7 +25,7 @@ from .indicated_hydrogen import (
     intrinsic_carbon_parent_model,
     intrinsic_parent_lone_pair_sites,
     is_intrinsic_carbon_h_site,
-    pi_bearing_fusion_carbon_sites,
+    released_fusion_carbon_sites,
 )
 from .mancude import (
     ParentDerivativeState,
@@ -283,8 +283,8 @@ def audit_fusion_plan(
         )
         carbon_candidates = intrinsic_carbon_candidate_atoms(ast, specs, mol)
         intrinsic_c_h = frozenset()
-        pi_c_junctions = pi_bearing_fusion_carbon_sites(mol, abstract_parent_graph, carbon_candidates)
-        if intrinsic_n_h or carbon_candidates or pi_c_junctions:
+        released_c_junctions = released_fusion_carbon_sites(mol, abstract_parent_graph, carbon_candidates)
+        if intrinsic_n_h or carbon_candidates or released_c_junctions:
             expected_model = (
                 indicated_hydrogen_parent_bond_model(abstract_parent_graph, intrinsic_n_h)
                 if intrinsic_n_h
@@ -299,7 +299,7 @@ def audit_fusion_plan(
                 intrinsic_hydrogen_atom_ids=intrinsic_n_h,
                 cited_nitrogen_hydrogen_atom_ids=cited_n_h,
             )
-            if (intrinsic_n_h or intrinsic_c_h or pi_c_junctions) and bond_model != expected_model:
+            if (intrinsic_n_h or intrinsic_c_h or released_c_junctions) and bond_model != expected_model:
                 errors.append("parent bond model does not preserve the proved intrinsic-hydrogen sites")
         _audit_bond_model(abstract_parent_graph, bond_model, errors)
         checks.append("parent_bond_model")
