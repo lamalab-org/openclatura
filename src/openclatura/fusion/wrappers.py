@@ -27,7 +27,7 @@ from .composite_bridges import CompositeBridgeConstruction, composite_bridge_con
 from .config import fusion_nomenclature_config
 from .mancude import ParentDerivativeState, parent_derivative_state
 from .model import FusionConfirmed, FusionMode, FusionParentPlan, ParentBondModel, PinDecision, PinStatus
-from .numbering import retained_template_parent_bond_model
+from .numbering import RetainedParentBondCapacityError, retained_template_parent_bond_model
 from .rules import fusion_ring_size_gate
 
 _WRAPPER_SEARCH_STATES = fusion_nomenclature_config().search.component_selection_states
@@ -565,7 +565,21 @@ def _retained_wrapper_parent(mol: Molecule, atoms: frozenset[int]) -> WrapperPar
     same_parent = [
         match for match in matches if match.template.name == template_name and match.indicated_h == first.indicated_h
     ]
-    candidates: dict[tuple[tuple[int, str], ...], ParentBondModel] = {}
+    try:
+        first_model = retained_template_parent_bond_model(
+            first.template, first.locant_to_atom, indicated_h=first.indicated_h
+        )
+    except RetainedParentBondCapacityError:
+        if first.indicated_h == first.template.default_indicated_h:
+            raise
+        # A locally saturated site is not necessarily a valid parent tautomer.
+        # Keep the original parent state and let typed hydro/bridge operations
+        # describe the derivative; never relabel a model with a different H site.
+        same_parent = [replace(match, indicated_h=match.template.default_indicated_h) for match in same_parent]
+        first = same_parent[0]
+        first_model = retained_template_parent_bond_model(first.template, first.locant_to_atom)
+    first_entries = tuple(sorted((atom, str(locant)) for atom, locant in first.atom_to_locant.items()))
+    candidates: dict[tuple[tuple[int, str], ...], ParentBondModel] = {first_entries: first_model}
     for match in same_parent:
         entries = tuple(sorted((atom, str(locant)) for atom, locant in match.atom_to_locant.items()))
         if entries not in candidates:

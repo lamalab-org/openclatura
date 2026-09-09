@@ -40,6 +40,10 @@ class MancudeSearchBudgetExceeded(RuntimeError):
         self.budget = budget
 
 
+class RetainedParentBondCapacityError(ValueError):
+    """A proposed retained hydrogen state cannot preserve parent pi capacity."""
+
+
 _CONFIG = fusion_nomenclature_config()
 
 
@@ -522,7 +526,9 @@ def retained_template_parent_bond_model(
     model = parent_bond_model(graph, search_budget=search_budget)
     expected_double_bonds = template.mancude_double_bonds or 0
     if model.maximum_non_cumulative_double_bonds != expected_double_bonds:
-        raise ValueError("retained template and derived parent bond model disagree on mancude capacity")
+        raise RetainedParentBondCapacityError(
+            "retained template and derived parent bond model disagree on mancude capacity"
+        )
     return model
 
 
