@@ -314,6 +314,7 @@ def plan_bridged_fusion_wrapper(
                             selected_parent.selected_bond_model,
                             locants,
                             preserve_retained_parent_state=True,
+                            allow_pi_redistribution=True,
                         )
                     )
                     if derivative_state is None:
@@ -339,6 +340,7 @@ def plan_bridged_fusion_wrapper(
                         bridge_unsaturation,
                         precursor,
                         fusion_plan=selected_parent.fusion_plan,
+                        retained_parent_redistribution=selected_parent.fusion_plan is None,
                     )
                     if audit_checks is None:
                         continue
@@ -846,6 +848,7 @@ def _audit_bridge_plan(
     saturated_bridge_precursor: NondetachableBridgeOperation | None = None,
     *,
     fusion_plan: FusionParentPlan | None = None,
+    retained_parent_redistribution: bool = False,
 ) -> tuple[str, ...] | None:
     if set(parent_locants) != set(parent_atoms) or len(set(parent_locants.values())) != len(parent_atoms):
         return None
@@ -902,6 +905,7 @@ def _audit_bridge_plan(
             parent_locants,
             indicated_hydrogen_atom_ids=indicated_h_atoms,
             preserve_retained_parent_state=fusion_plan is None,
+            allow_pi_redistribution=True if retained_parent_redistribution else None,
         )
         != derivative_state
     ):

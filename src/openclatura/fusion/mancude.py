@@ -677,6 +677,7 @@ def parent_derivative_state(
     *,
     indicated_hydrogen_atom_ids: set[int] | frozenset[int] = frozenset(),
     preserve_retained_parent_state: bool = False,
+    allow_pi_redistribution: bool | None = None,
 ) -> ParentDerivativeState | None:
     """Describe every supported bond-state difference from a parent hydride.
 
@@ -730,7 +731,7 @@ def parent_derivative_state(
             indicated_hydrogen_atom_ids=indicated_hydrogen_atom_ids,
             oxo_operations=tuple(oxo),
         )
-        if not preserve_retained_parent_state
+        if (allow_pi_redistribution if allow_pi_redistribution is not None else not preserve_retained_parent_state)
         else None
     )
     hydrogenated_atoms = sorted(
