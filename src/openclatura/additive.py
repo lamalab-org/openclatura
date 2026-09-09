@@ -129,6 +129,15 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             parts.hydro_operations.extend(delta.intrinsic_hydro_operations)
             if delta.intrinsic_hydro_operations:
                 return
+            if (
+                parent.uses_fusion_plan
+                and delta.added_hydrogen_operations
+                and not delta.hydrogenated_edges
+                and not delta.additional_multiple_bond_ids
+            ):
+                # The proved oxo composition already owns the remaining H;
+                # count-based inference would add it again as hydrogenation.
+                return
             if parent.derivative_state is not None and parent.derivative_state.hydro_operations:
                 # Keep the audited operation, including conjugated bond
                 # redistribution; deleted pi edges alone overcount its H sites.

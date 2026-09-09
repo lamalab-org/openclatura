@@ -362,8 +362,8 @@ def compare_actual_parent_to_implied_parent(
     delta = min(candidates, key=lambda item: item[0])[1]
     if preserve_retained_parent_state or atom_to_locant is None or not delta.compatible:
         return delta
-    if delta.additional_multiple_bond_ids and externally_unsaturated_atom_ids and not indicated_hydrogen_atom_ids:
-        composed = _spiro_oxo_parent_delta(mol, atoms, bond_model, externally_unsaturated_atom_ids, atom_to_locant)
+    if externally_unsaturated_atom_ids and (delta.additional_multiple_bond_ids or delta.hydrogenated_edges):
+        composed = _oxo_parent_delta(mol, atoms, bond_model, externally_unsaturated_atom_ids, atom_to_locant)
         if composed is not None:
             return composed
     intrinsic = _fixed_carbon_hydro_operations(
@@ -543,17 +543,17 @@ def _spiro_carbon_sites(mol: Molecule, atoms: frozenset[int]) -> frozenset[int]:
     return frozenset(sites)
 
 
-def _spiro_oxo_parent_delta(
+def _oxo_parent_delta(
     mol: Molecule,
     atoms: frozenset[int],
     model: ParentBondModel,
     oxo_atoms: set[int] | frozenset[int],
     locants: Mapping[int, str | SystemLocant],
 ) -> ParentBondDelta | None:
-    """Compose spiro cyclic ketones with graph-derived residual carbon H sites."""
+    """Compose oxo valence constraints with graph-derived residual carbon H."""
 
     spiro = _spiro_carbon_sites(mol, atoms)
-    if not spiro or any(mol.atoms[atom].symbol != "C" or mol.atoms[atom].charge for atom in oxo_atoms):
+    if any(mol.atoms[atom].symbol != "C" or mol.atoms[atom].charge for atom in oxo_atoms):
         return None
     forced = frozenset(oxo_atoms) | spiro
     try:
@@ -589,12 +589,14 @@ def _spiro_oxo_parent_delta(
         )
         if delta is None or not delta.compatible or delta.additional_multiple_bond_ids:
             continue
+        if not spiro and delta.hydrogenated_edges:
+            continue
         ordered = tuple(sorted(added, key=lambda atom: system_locant_sort_key(str(locants[atom]))))
         operations = (
             (
                 HydroOperation(
                     key="added_hydrogen",
-                    reason="Oxo and spiro valence constraints leave carbon added-H sites in the composed parent.",
+                    reason="Oxo and skeletal valence constraints leave carbon added-H sites in the composed parent.",
                     locants=tuple(str(locants[atom]) for atom in ordered),
                     atom_ids=ordered,
                     bond_ids=tuple(

@@ -396,11 +396,7 @@ def intrinsic_carbon_parent_model(
     }
     eligible.update(oxo_sites)
     capable_sites = parent_pi_capable_atom_ids(graph)
-    carbon_atoms = {
-        atom.id
-        for atom in graph.atoms
-        if atom.symbol == "C" and atom.id in capable_sites
-    }
+    carbon_atoms = {atom.id for atom in graph.atoms if atom.symbol == "C" and atom.id in capable_sites}
     occupied_pi_atoms = carbon_atoms | {
         atom
         for edge in model.pi_eligible_edges | model.required_double_bonds
@@ -488,21 +484,37 @@ def intrinsic_parent_lone_pair_sites(mol: Molecule, graph: FusionGraph) -> froze
 
 def aromatic_nitrogen_hydrogen_atoms(mol: Molecule, graph: FusionGraph) -> frozenset[int]:
     """Hydrogen-bearing subset of the neutral aromatic donor roles."""
-    return frozenset(atom for atom in aromatic_nitrogen_lone_pair_sites(mol, graph) if mol.atoms[atom].total_h_count == 1)
+    return frozenset(
+        atom for atom in aromatic_nitrogen_lone_pair_sites(mol, graph) if mol.atoms[atom].total_h_count == 1
+    )
 
 
 def aromatic_nitrogen_lone_pair_sites(mol: Molecule, graph: FusionGraph) -> frozenset[int]:
     """Prove neutral aromatic donors from local sigma valence.
 
     Replacing donor H with a ligand does not create another parent pi bond.
-    Saturated nitrogen and exocyclic multiple bonds retain separate proofs.
+    Terminal carbonyls compose with non-junction donors through the oxo
+    derivative proof. Junction donors and other exocyclic classes retain
+    separate proofs.
     """
 
     atoms = {atom.id for atom in graph.atoms}
-    if any(
-        neighbor not in atoms and mol.get_bond(atom, neighbor).order > 1
+    external_multiple = tuple(
+        (atom, neighbor)
         for atom in atoms
         for neighbor in mol.get_neighbors(atom)
+        if neighbor not in atoms and mol.get_bond(atom, neighbor).order > 1
+    )
+    if external_multiple and any(mol.atoms[atom].charge for atom in atoms):
+        return frozenset()
+    if any(
+        mol.atoms[atom].symbol != "C"
+        or mol.atoms[neighbor].symbol != "O"
+        or mol.atoms[atom].charge
+        or mol.atoms[neighbor].charge
+        or mol.get_bond(atom, neighbor).order != 2
+        or len(mol.get_neighbors(neighbor)) != 1
+        for atom, neighbor in external_multiple
     ):
         return frozenset()
     return frozenset(
@@ -513,5 +525,6 @@ def aromatic_nitrogen_lone_pair_sites(mol: Molecule, graph: FusionGraph) -> froz
         and mol.atoms[atom.id].charge == 0
         and len(neighbors := mol.get_neighbors(atom.id)) + mol.atoms[atom.id].total_h_count == 3
         and len(atoms.intersection(neighbors)) in {2, 3}
+        and (not external_multiple or len(atoms.intersection(neighbors)) == 2)
         and all(mol.get_bond(atom.id, neighbor).order == 1 for neighbor in neighbors)
     )
