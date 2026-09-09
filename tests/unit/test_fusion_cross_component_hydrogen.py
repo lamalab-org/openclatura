@@ -7,6 +7,7 @@ from rdkit import Chem
 
 from openclatura import name_mol, opsin_available
 from openclatura.chains import find_ring_systems
+from openclatura.fusion.audit import audit_fusion_plan
 from openclatura.fusion.model import FusionConfirmed, FusionMode
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.graph_io import read_rdkit_mol
@@ -55,6 +56,18 @@ def test_completed_hydrogen_sites_have_conserved_pi_budget(order, ligand):
     hydro = {atom for op in plan.derivative_state.hydro_operations for atom in op.atom_ids}
     assert not hydro.intersection(sites)
     assert not any(mol.atoms[atom].is_aromatic for atom in hydro)
+    missing_h = audit_fusion_plan(
+        mol,
+        atoms,
+        ast=plan.ast,
+        abstract_parent_graph=plan.abstract_parent_graph,
+        numbering=plan.numbering,
+        bond_model=plan.bond_model,
+        indicated_hydrogens=(),
+        derivative_state=plan.derivative_state,
+        mode=FusionMode.AUDITED_PIN,
+    )
+    assert not missing_h.confirmed
 
 
 @pytest.mark.skipif(not opsin_available(), reason="OPSIN is unavailable")
