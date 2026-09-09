@@ -134,7 +134,15 @@ def _nitrogen_composition_parent_model(
         and (
             len(atoms.intersection(mol.get_neighbors(atom))) == 3
             or (
-                atom in indicated_hydrogen_atom_ids
+                (
+                    atom in indicated_hydrogen_atom_ids
+                    or (
+                        not mol.atoms[atom].total_h_count
+                        and len(mol.get_neighbors(atom)) == 3
+                        and len(atoms.intersection(mol.get_neighbors(atom))) == 2
+                        and all(mol.get_bond(atom, neighbor).order == 1 for neighbor in mol.get_neighbors(atom))
+                    )
+                )
                 and not mol.atoms[atom].is_aromatic
                 and _five_membered_single_nitrogen(mol, atoms, atom)
             )
