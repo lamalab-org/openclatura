@@ -23,6 +23,7 @@ from ..retained_fused_templates import match_retained_fused_templates, retained_
 from ..retained_name_policy import render_retained_hydrogen_state, retained_parent_output_name
 from ..ring_parent import ParentHydrideKind, ParentHydrideMetadata, RingParent
 from ..rules import multipliers, stems
+from .composite_bridges import CompositeBridgeConstruction, composite_bridge_constructions
 from .config import fusion_nomenclature_config
 from .mancude import ParentDerivativeState, parent_derivative_state
 from .model import FusionConfirmed, FusionMode, FusionParentPlan, ParentBondModel, PinDecision, PinStatus
@@ -30,6 +31,7 @@ from .numbering import retained_template_parent_bond_model
 from .rules import fusion_ring_size_gate
 
 _WRAPPER_SEARCH_STATES = fusion_nomenclature_config().search.component_selection_states
+_COMPOSITE_BRIDGES = composite_bridge_constructions()
 
 
 class WrapperParentKind(StrEnum):
@@ -46,6 +48,7 @@ class NondetachableBridgeKind(StrEnum):
     EPOXY = "epoxy"
     EPITHIO = "epithio"
     EPIMINO = "epimino"
+    COMPOSITE = "composite"
 
 
 @dataclass(frozen=True, slots=True)
@@ -323,7 +326,9 @@ def plan_bridged_fusion_wrapper(
                     if operations is None:
                         continue
                     operations = tuple(
-                        sorted(operations, key=lambda operation: (operation.prefix, operation.endpoint_locants))
+                        sorted(
+                            operations, key=lambda operation: (operation.prefix.lstrip("("), operation.endpoint_locants)
+                        )
                     )
                     bridge_unsaturation = ()
                     if prefer_bridge_dehydro:
@@ -752,6 +757,12 @@ def _orient_bridge_path(
     reverse_path = tuple(reversed(path))
     reverse_endpoints = tuple(reversed(forward_endpoints))
 
+    # Composite attachment order follows the senior fragment's actual prefix
+    # (P-25.4.2.3 / P-25.4.3.2.2), ahead of endpoint or double-bond locants.
+    for candidate_path, endpoints in ((path, forward_endpoints), (reverse_path, reverse_endpoints)):
+        if _composite_bridge_construction(mol, candidate_path) is not None:
+            return candidate_path, endpoints
+
     def orientation_key(candidate_path: tuple[int, ...], endpoints: tuple[int, int]) -> tuple:
         double_locants = tuple(
             index
@@ -770,6 +781,20 @@ def _orient_bridge_path(
     )
 
 
+def _composite_bridge_construction(
+    mol: Molecule,
+    path: tuple[int, ...],
+) -> CompositeBridgeConstruction | None:
+    if len(path) < 2 or mol.atoms[path[0]].symbol == "C":
+        return None
+    symbols = tuple(mol.atoms[atom].symbol for atom in path)
+    orders = tuple(mol.get_bond(left, right).order for left, right in zip(path, path[1:]))
+    construction = _COMPOSITE_BRIDGES.get((symbols, orders))
+    if construction is not None and not any(mol.atoms[atom].charge for atom in path):
+        return construction
+    return None
+
+
 def _bridge_class(
     mol: Molecule,
     path: tuple[int, ...],
@@ -782,6 +807,9 @@ def _bridge_class(
             return None
         prefix = _carbo_bridge_prefix(len(symbols), double_locants)
         return NondetachableBridgeKind.CARBO, prefix, internal_orders, double_locants
+    composite = _composite_bridge_construction(mol, path)
+    if composite is not None:
+        return NondetachableBridgeKind.COMPOSITE, composite.prefix, internal_orders, composite.unsaturation_locants
     if internal_orders:
         return None
     if symbols == ("O",):
