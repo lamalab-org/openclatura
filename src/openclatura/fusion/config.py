@@ -64,6 +64,9 @@ class RingShapeSpec:
     horizontal_axis_class: str
     distortion_rank: int = 0
     coordinate_system: str = "cartesian"
+    directed_entry_port: int | None = None
+    opposite_ports: tuple[int, ...] = ()
+    entry_component_size: int = 0
 
     def __post_init__(self) -> None:
         if not 3 <= self.ring_size <= 8:
@@ -78,6 +81,30 @@ class RingShapeSpec:
             raise ValueError("shape distortion rank must be non-negative")
         if self.coordinate_system not in {"cartesian", "eisenstein"}:
             raise ValueError("ring shape coordinate_system must be cartesian or eisenstein")
+        if self.directed_entry_port is None:
+            if self.opposite_ports or self.entry_component_size:
+                raise ValueError("directed shape metadata requires an entry port")
+        else:
+            ports = (self.directed_entry_port, *self.opposite_ports)
+            if (
+                len(ports) != 3
+                or len(set(ports)) != 3
+                or any(type(port) is not int or not 0 <= port < self.ring_size for port in ports)
+                or self.coordinate_system != "cartesian"
+                or self.entry_component_size < 3
+            ):
+                raise ValueError("directed shape requires three distinct ports and a component size")
+            vectors = tuple(
+                tuple(self.vertices[(port + 1) % self.ring_size][axis] - self.vertices[port][axis] for axis in (0, 1))
+                for port in ports
+            )
+            entry, left, right = vectors
+            if (
+                left[0] * right[1] != left[1] * right[0]
+                or sum(a * b for a, b in zip(left, right)) >= 0
+                or any(sum(a * b for a, b in zip(entry, other)) for other in (left, right))
+            ):
+                raise ValueError("directed shape exits must be opposite and perpendicular to entry")
 
 
 @dataclass(frozen=True, slots=True)
@@ -175,6 +202,11 @@ def _ring_shape(row: object) -> RingShapeSpec:
         horizontal_axis_class=_text(row, "horizontal_axis_class"),
         distortion_rank=_nonnegative_int(row, "distortion_rank", default=0),
         coordinate_system=row.get("coordinate_system", "cartesian"),
+        directed_entry_port=None
+        if row.get("directed_entry_port") is None
+        else _integer(row["directed_entry_port"], "entry port"),
+        opposite_ports=tuple(_integer(value, "opposite port") for value in row.get("opposite_ports", ())),
+        entry_component_size=_nonnegative_int(row, "entry_component_size", default=0),
     )
 
 

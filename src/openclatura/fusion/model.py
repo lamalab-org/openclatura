@@ -623,6 +623,7 @@ class FusedLayout:
     face_shapes: tuple[tuple[int, str], ...] = ()
     orientation_score: tuple[int, ...] = ()
     audit_evidence: tuple[str, ...] = ()
+    component_entry_edge: tuple[int, int] | None = None
 
     def __post_init__(self) -> None:
         face_ids = [face for face, _, _ in self.face_positions]
@@ -631,6 +632,12 @@ class FusedLayout:
         atom_ids = [atom for atom, _, _ in self.atom_positions]
         if len(atom_ids) != len(set(atom_ids)):
             raise ValueError("fused layout contains duplicate atom positions")
+        if self.component_entry_edge is not None and (
+            len(self.component_entry_edge) != 2
+            or len(set(self.component_entry_edge)) != 2
+            or not set(self.component_entry_edge) <= set(atom_ids)
+        ):
+            raise ValueError("component entry must reference two distinct positioned atoms")
         shape_faces = [face for face, _ in self.face_shapes]
         if len(shape_faces) != len(set(shape_faces)):
             raise ValueError("fused layout assigns more than one shape to a face")

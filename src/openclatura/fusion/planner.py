@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import replace
+from functools import cache
 
 from ..assembly_parts import NameTokenBinding
 from ..locants import SystemLocant, system_locant_sort_key
@@ -25,7 +26,7 @@ from .indicated_hydrogen import (
     intrinsic_carbon_parent_model,
     intrinsic_parent_lone_pair_sites,
 )
-from .layout import LayoutSearchBudgetExceeded, preferred_intrinsic_layouts
+from .layout import LayoutSearchBudgetExceeded, component_entry_layouts, preferred_intrinsic_layouts
 from .mancude import (
     has_complete_saturated_hydrogenation,
     indicated_hydrogen_parent_bond_model,
@@ -128,18 +129,20 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
         return FusionUnsupported("fused-parent charge operation is outside the audited production tier", (str(exc),))
     matches = registry.match_faces(matching_parent, bounded)
     face_model = _typed_face_model(mol, bounded)
-    try:
-        layouts = preferred_intrinsic_layouts(face_model)
-    except LayoutSearchBudgetExceeded as exc:
-        return FusionUnsupported("intrinsic fused-layout search budget exhausted", (str(exc),))
-    if not layouts:
-        return FusionUnsupported("no consistent audited intrinsic fused-ring layout")
+
+    @cache
+    def intrinsic_layouts() -> tuple[FusedLayout, ...] | FusionUnsupported:
+        try:
+            return preferred_intrinsic_layouts(face_model)
+        except LayoutSearchBudgetExceeded as exc:
+            return FusionUnsupported("intrinsic fused-layout search budget exhausted", (str(exc),))
+
     rejected = []
     numbering_cache: dict[bool, CompletedNumberingSelection] = {}
     try:
         for ast in iter_fusion_name_asts(mol, matches, registry):
             result = _plan_numbered_candidate(
-                mol, atoms, mode, ast, registry, bounded, face_model, layouts, numbering_cache=numbering_cache
+                mol, atoms, mode, ast, registry, bounded, face_model, intrinsic_layouts, numbering_cache=numbering_cache
             )
             if isinstance(result, FusionConfirmed):
                 return result
@@ -171,12 +174,27 @@ def _plan_numbered_candidate(
     registry: FusionComponentRegistry,
     bounded: BoundedFaceModel,
     face_model: FaceModel,
-    layouts: tuple[FusedLayout, ...],
+    layouts: tuple[FusedLayout, ...] | Callable[[], tuple[FusedLayout, ...] | FusionUnsupported],
     *,
     numbering_cache: dict[bool, CompletedNumberingSelection] | None = None,
 ) -> FusionPlanningResult:
     """Keep chemistry local to each numbering, sharing topology discovery."""
     specs = {match.occurrence_id: registry.spec_for_match(match) for match in ast.component_occurrences}
+    try:
+        directed = component_entry_layouts(face_model, ast, specs)
+    except LayoutSearchBudgetExceeded as exc:
+        return FusionUnsupported("component-entry layout budget exhausted", (str(exc),))
+    if directed is not None:
+        if not directed:
+            return FusionAuditFailed("component-entry layout failed its geometry audit")
+        layouts = directed
+        numbering_cache = None
+    elif callable(layouts):
+        layouts = layouts()
+    if isinstance(layouts, FusionUnsupported):
+        return layouts
+    if not layouts:
+        return FusionUnsupported("no consistent audited intrinsic fused-ring layout")
     try:
         prove_carbon_h = bool(intrinsic_carbon_candidate_atoms(ast, specs, mol)) or (
             any(component_parent_atoms(spec) != spec.atoms for spec in specs.values())

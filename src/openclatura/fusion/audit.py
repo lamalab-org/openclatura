@@ -17,6 +17,7 @@ from ..molecule import Molecule, edges_within_atoms
 from ..polycycle_topology import normalize_edge
 from ..retained_graph_model import merge_parent_bond_classes
 from ..rules import multipliers
+from .config import fusion_nomenclature_config
 from .cover import audit_component_cover, component_scope
 from .exocyclic import is_neutral_external_pi_ligand, neutral_lambda_oxo_bonding_number
 from .indicated_hydrogen import (
@@ -71,6 +72,10 @@ from .rules import (
     multiplicative_member_order_key,
 )
 from .valence import FusionLambdaDescriptor
+
+_DIRECTED_SHAPE_IDS = frozenset(
+    shape.shape_id for shape in fusion_nomenclature_config().ring_shapes if shape.directed_entry_port is not None
+)
 
 _Node = tuple[int, str]
 _Edge = tuple[int, int]
@@ -267,7 +272,7 @@ def audit_fusion_plan(
         checks.extend(("abstract_graph_reconstruction", "input_graph_identity"))
         _audit_component_pi_constraints(ast, specs, abstract_parent_graph, errors)
 
-        _audit_numbering(mol, parent_atoms, abstract_parent_graph, numbering, charge_operations, errors)
+        _audit_numbering(mol, parent_atoms, abstract_parent_graph, numbering, charge_operations, errors, ast=ast)
         checks.append("completed_numbering")
 
         _audit_charge_operations(mol, parent_atoms, abstract_parent_graph, numbering, charge_operations, errors)
@@ -1258,6 +1263,8 @@ def _audit_numbering(
     numbering: FusionNumberingProof,
     charge_operations: tuple[FusionChargeOperation, ...],
     errors: list[str],
+    *,
+    ast: FusionNameAst | None = None,
 ) -> None:
     abstract_map = dict(numbering.abstract_atom_to_locant)
     abstract_labels = {atom.id: (atom.symbol, atom.formal_charge) for atom in abstract.atoms}
@@ -1266,7 +1273,7 @@ def _audit_numbering(
         errors.append("completed abstract numbering is not a bijection over the parent graph")
 
     _audit_face_model(mol, parent_atoms, numbering, errors)
-    _audit_layout_numbering_compatibility(parent_atoms, numbering, errors)
+    _audit_layout_numbering_compatibility(parent_atoms, numbering, errors, ast=ast)
     face_membership = Counter(atom for face in numbering.selected_face_model.faces for atom in face.atom_cycle)
     fusion_atoms = {atom for atom, count in face_membership.items() if count > 1}
 
@@ -1313,6 +1320,8 @@ def _audit_layout_numbering_compatibility(
     parent_atoms: frozenset[int],
     numbering: FusionNumberingProof,
     errors: list[str],
+    *,
+    ast: FusionNameAst | None = None,
 ) -> None:
     """Verify that the selected layout yields the stored completed numbering."""
 
@@ -1331,6 +1340,24 @@ def _audit_layout_numbering_compatibility(
         errors.append("selected layout does not position every and only selected face")
     if len(set(atom_positions.values())) != len(atom_positions):
         errors.append("selected layout assigns the same position to multiple parent atoms")
+
+    needs_entry = any(shape in _DIRECTED_SHAPE_IDS for _, shape in layout.face_shapes)
+    entry = layout.component_entry_edge
+    if needs_entry and entry is None:
+        errors.append("directed layout is missing its component entry")
+    if entry is not None:
+        left, right = (atom_positions[atom] for atom in entry)
+        if left[1] != right[1] or left[0] <= right[0]:
+            errors.append("component entry direction is incompatible with the layout orientation")
+        ownership = sum(
+            frozenset(entry)
+            in {frozenset(pair) for pair in zip(face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1])}
+            for face in numbering.selected_face_model.faces
+        )
+        if ownership != 2:
+            errors.append("component entry is not a shared fusion edge")
+        if ast is not None and entry not in {join.interface.ordered_input_atoms for join in ast.joins}:
+            errors.append("component entry does not match an ordered fusion interface")
 
     boundary = numbering.selected_face_model.outer_boundary
     signed_area = sum(
