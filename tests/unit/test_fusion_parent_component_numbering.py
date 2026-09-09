@@ -51,7 +51,14 @@ def test_peri_indole_citation_scopes_hydrogen_to_completed_parent():
     smiles = "N1CC2=CC=CC3=C2C1=CC=C3"
     result = name_mol(Chem.MolFromSmiles(smiles), include_trace=True)
     assert result.ok, result.error
-    assert result.name == "1H-benzo[1,2,3-cd]indole"
+    assert result.name == "1H,2H-benzo[1,2,3-cd]indole"
+    mol = read_rdkit_mol(Chem.MolFromSmiles(smiles))
+    plan = plan_fusion_parent(mol, set(mol.atoms), mode=FusionMode.AUDITED_PIN).plan
+    sites = {
+        str(locant): atom for atom, locant in plan.numbering.input_locant_maps[0] if locant in plan.indicated_hydrogens
+    }
+    assert {locant: mol.atoms[atom].symbol for locant, atom in sites.items()} == {"1": "N", "2": "C"}
+    assert mol.atoms[sites["2"]].total_h_count == 2
     check = verify_with_opsin(result.name, smiles, standardize_smiles=False)
     assert check.ok, check.to_dict()
     assert check.canonical_roundtrip == check.canonical_original
@@ -115,12 +122,22 @@ def test_inherited_bicycle_wins_parent_seniority_without_changing_peripheral_num
 def test_reported_stereochemical_fusion_name_roundtrips_under_atom_permutations(offset, mode):
     if not opsin_available():
         pytest.skip("OPSIN requires py2opsin and Java")
-    result = name_mol(_reordered_reported_graph(offset), fusion_mode=mode, include_trace=True)
+    graph = _reordered_reported_graph(offset)
+    result = name_mol(graph, fusion_mode=mode, include_trace=True)
     assert result.ok, result.error
     assert result.parent_nomenclature == "systematic_fusion"
     assert result.name.startswith("(3S)-")
     assert "-3-methoxy-" in result.name
-    assert "[1,4]thiazepino[2,3,4-ij]quinazolin-6-one" in result.name
+    assert "[1,4]thiazepino[2,3,4-ij]quinazolin-6(2H)-one" in result.name
+    mol = read_rdkit_mol(graph)
+    atoms = max(find_ring_systems(mol), key=lambda system: len(system.atoms)).atoms
+    plan = plan_fusion_parent(mol, atoms, mode=mode).plan
+    (added_h,) = plan.derivative_state.added_hydrogen_operations
+    assert added_h.locants == ("2",)
+    (atom,) = added_h.atom_ids
+    assert str(dict(plan.numbering.input_locant_maps[0])[atom]) == "2"
+    assert mol.atoms[atom].symbol == "C" and mol.atoms[atom].total_h_count == 2
+    assert not set(added_h.atom_ids).intersection(plan.derivative_state.bond_delta.hydrogenated_atom_ids)
     check = verify_with_opsin(result.name, REPORTED_SMILES, standardize_smiles=False)
     assert check.ok, check.to_dict()
     assert check.canonical_roundtrip == check.canonical_original

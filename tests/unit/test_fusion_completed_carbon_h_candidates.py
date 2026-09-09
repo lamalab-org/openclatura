@@ -49,7 +49,12 @@ def test_completed_matching_finds_unpaired_carbons_with_no_local_h_candidates():
     assert intrinsic.intrinsic_carbon_fusion_scope(case.ast, specs)
     assert intrinsic.component_carbon_h_relocation_scope(case.ast, specs)
     candidates = intrinsic.intrinsic_carbon_candidate_atoms(case.ast, specs, case.mol)
-    assert candidates == {0, 2, 5, 7}
+    # Candidates are component pi-capable roles, not the H assignment.
+    assert candidates == {0, 2, 3, 4, 5, 7}
+    eligible_h = {
+        atom for atom in candidates if intrinsic.is_intrinsic_carbon_h_site(case.mol, atom, case.parent_atoms)
+    }
+    assert eligible_h == {0, 2, 5, 7}
     graph = intrinsic.component_parent_graph(case.ast, specs, relocate_carbon_h=True)
     original = parent_bond_model(graph)
     model, sites = intrinsic.intrinsic_carbon_parent_model(
@@ -57,7 +62,7 @@ def test_completed_matching_finds_unpaired_carbons_with_no_local_h_candidates():
     )
     assert model.maximum_non_cumulative_double_bonds == original.maximum_non_cumulative_double_bonds == 2
     assert len(sites) == 2
-    assert sites <= candidates
+    assert sites <= eligible_h
     assert all(intrinsic.is_intrinsic_carbon_h_site(case.mol, atom, case.parent_atoms) for atom in sites)
     assert all(
         frozenset(atom for edge, order in assignment.orders if order == 2 for atom in edge)
@@ -66,7 +71,7 @@ def test_completed_matching_finds_unpaired_carbons_with_no_local_h_candidates():
     )
 
 
-def test_completed_fully_paired_carbon_roles_do_not_enable_carbon_h_planning():
+def test_completed_fully_paired_carbon_roles_do_not_assign_carbon_h():
     case = _two_fused_rings(6, 6)
     for atom in case.mol.atoms:
         case.mol.update_atom(atom, total_h_count=4 - len(case.mol.get_neighbors(atom)))
@@ -91,7 +96,13 @@ def test_completed_fully_paired_carbon_roles_do_not_enable_carbon_h_planning():
         {atom for edge, order in assignment.orders if order == 2 for atom in edge} == case.parent_atoms
         for assignment in model.allowed_kekule_assignments
     )
-    assert not intrinsic.intrinsic_carbon_candidate_atoms(case.ast, specs, case.mol)
+    candidates = intrinsic.intrinsic_carbon_candidate_atoms(case.ast, specs, case.mol)
+    assert candidates == case.parent_atoms
+    selected_model, sites = intrinsic.intrinsic_carbon_parent_model(
+        case.mol, graph, model, dict(case.numbering.input_locant_maps[0]), candidates
+    )
+    assert not sites
+    assert selected_model == model
 
 
 def test_local_candidates_survive_completed_perfect_matching():
