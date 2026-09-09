@@ -10,16 +10,16 @@ from openclatura import FusionMode, name_mol
 CASES = [
     (
         "O=C(COc1ccc2nc3n(c(=O)c2c1)CCC3)Nc1ccc(F)cc1",
-        "N-(4-fluorophenyl)-2-((9-oxo-2,3-dihydropyrrolo[1,2-a]benzo[d]pyrimidin-7-yl)oxy)acetamide",
+        "N-(4-fluorophenyl)-2-((9-oxo-2,3-dihydro-1H-pyrrolo[1,2-a]benzo[d]pyrimidin-7-yl)oxy)acetamide",
     ),
     (
         "O=C(NCc1ccccc1)Nc1ccc(C2=CSC3=NCCN23)cc1",
         "N-benzyl-N'-(4-(5,6-dihydroimidazo[2,1-b][1,3]thiazol-3-yl)phenyl)urea",
     ),
-    ("O=c1c2ccccc2nc2n1CCC2", "2,3-dihydropyrrolo[1,2-a]benzo[d]pyrimidin-9-one"),
+    ("O=c1c2ccccc2nc2n1CCC2", "2,3-dihydropyrrolo[1,2-a]benzo[d]pyrimidin-9(1H)-one"),
     ("C1=CSC2=NCCN12", "5,6-dihydroimidazo[2,1-b][1,3]thiazole"),
-    ("O=c1c2ccccc2nc2n1CC(C)C2", "2-methyl-2,3-dihydropyrrolo[1,2-a]benzo[d]pyrimidin-9-one"),
-    ("CC1CN2C(=NC1)SC=C2", "6-methyl-6,7-dihydrothiazolo[3,2-a]pyrimidine"),
+    ("O=c1c2ccccc2nc2n1CC(C)C2", "2-methyl-2,3-dihydropyrrolo[1,2-a]benzo[d]pyrimidin-9(1H)-one"),
+    ("CC1CN2C(=NC1)SC=C2", "6-methyl-6,7-dihydro-5H-thiazolo[3,2-a]pyrimidine"),
     ("O=c1c2ccccc2nc2n1CC=C2", "pyrrolo[1,2-a]benzo[d]pyrimidin-9(1H)-one"),
 ]
 
@@ -94,8 +94,12 @@ def test_full_branch_tree_retains_graph_bound_hydrogenation(case, locants):
     operations = [
         operation for node in nodes(result.substituent_tree) for operation in node.get("hydro_operations", [])
     ]
-    assert len(operations) == 1
-    operation = operations[0]
+    hydro = [operation for operation in operations if operation["operation_kind"] == "additive_hydrogen"]
+    added = [operation for operation in operations if operation["key"] == "added_hydrogen"]
+    assert len(hydro) == 1
+    assert len(operations) == 1 + (case == 0)
+    assert len(added) == (case == 0)
+    operation = hydro[0]
     assert operation["locants"] == locants
     assert operation["operation_kind"] == "additive_hydrogen"
     assert len(operation["atom_ids"]) == 2
@@ -105,3 +109,14 @@ def test_full_branch_tree_retains_graph_bound_hydrogenation(case, locants):
     assert bond.GetBondType() == Chem.BondType.SINGLE
     # Internal graph bond IDs are one-based, unlike RDKit's bond indices.
     assert operation["bond_ids"] == [bond.GetIdx() + 1]
+    if added:
+        assert added[0]["locants"] == ["1"]
+        assert added[0]["operation_kind"] == "indicated_hydrogen"
+        (atom,) = added[0]["atom_ids"]
+        assert atom not in operation["atom_ids"]
+        assert mol.GetAtomWithIdx(atom).GetSymbol() == "C"
+        assert all(
+            atom in (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())
+            for bond_id in added[0]["bond_ids"]
+            for bond in (mol.GetBondWithIdx(bond_id - 1),)
+        )

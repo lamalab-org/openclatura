@@ -586,7 +586,17 @@ def _external_pi_parent_delta(
     spiro = _spiro_carbon_sites(mol, atoms)
     if any(mol.atoms[atom].symbol != "C" or mol.atoms[atom].charge for atom in external_pi_atoms):
         return None
-    forced = frozenset(external_pi_atoms) | spiro
+    donor_sites = frozenset(
+        atom
+        for atom in atoms
+        if mol.atoms[atom].symbol == "N"
+        and not mol.atoms[atom].charge
+        and not mol.atoms[atom].total_h_count
+        and len(neighbors := mol.get_neighbors(atom)) == 3
+        and len(atoms.intersection(neighbors)) == 3
+        and all(mol.get_bond(atom, neighbor).order == 1 for neighbor in neighbors)
+    )
+    forced = frozenset(external_pi_atoms) | spiro | donor_sites
     try:
         constrained = _single_site_parent_model(model, forced)
     except ValueError:
@@ -653,8 +663,9 @@ def _external_pi_parent_delta(
         )
         rank = (
             len(delta.hydrogenated_edges),
-            tuple(sorted(system_locant_sort_key(str(locants[site])) for site in delta.hydrogenated_atom_ids)),
+            # P-58.2.2.2: added-H locants precede hydro-prefix locants.
             tuple(system_locant_sort_key(str(locants[atom])) for atom in ordered),
+            tuple(sorted(system_locant_sort_key(str(locants[site])) for site in delta.hydrogenated_atom_ids)),
         )
         candidates.append((rank, replace(delta, added_hydrogen_operations=operations)))
     return min(candidates, key=lambda item: item[0])[1] if candidates else None
