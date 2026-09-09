@@ -141,7 +141,7 @@ def _project_spiro_side_molecule(mol: Molecule, side_atoms: set[int], junction: 
     ):
         # The isolated hydride owns two H in place of the other spiro ring.
         # Keeping the original zero H would invalidate its bond-state proof.
-        side.atoms[junction] = replace(side.atoms[junction], total_h_count=2)
+        side.update_atom(junction, total_h_count=2)
     return side
 
 
