@@ -3,7 +3,7 @@
 import pytest
 from rdkit import Chem
 
-from openclatura import chains, name_smiles, opsin_available, verify_with_opsin
+from openclatura import chains, name_mol, name_smiles, opsin_available, verify_with_opsin
 from openclatura.graph_io import read_smiles
 from openclatura.molecule import Molecule
 from openclatura.polycycle_topology import audit_von_baeyer_descriptor, build_von_baeyer_numbering
@@ -137,7 +137,14 @@ def test_index88584_public_name_exact_opsin_roundtrip(variant):
         smiles = Chem.MolToSmiles(mol, isomericSmiles=False)
     elif variant == "ethyl":
         smiles = smiles.replace("C=C(C)", "C=C(CC)", 1)
-    name = name_smiles(smiles)
+    result = name_mol(Chem.MolFromSmiles(smiles), include_trace=True)
+    assert result.error is None
+    assert result.parent_nomenclature == "bridged_fusion"
+    selected = next(step for step in result.decisions if step.decision == "selected audited bridged fusion parent")
+    assert "complete_wrapper_graph_reconstruction" in selected.data["audit_checks"]
+    assert [bridge["kind"] for bridge in selected.data["bridges"]] == ["composite"]
+    name = result.name
+    assert name == name_smiles(smiles)
     check = verify_with_opsin(name, smiles, standardize_smiles=False)
     assert check.status == "matched", check.to_dict()
     assert check.canonical_original == check.canonical_roundtrip

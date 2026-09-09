@@ -3,7 +3,7 @@ from dataclasses import replace
 import pytest
 from rdkit import Chem
 
-from openclatura import name_mol
+from openclatura import name_mol, opsin_available
 from openclatura.fusion.composite_bridges import composite_bridge_constructions_from_data
 from openclatura.fusion.model import FusionMode
 from openclatura.fusion.wrappers import (
@@ -47,6 +47,8 @@ def _bridged_quinoline(heteroatom, carbon_orders, endpoints=("5", "2"), *, oxo=F
 @pytest.mark.parametrize("heteroatom,carbon_orders,prefix,unsaturation", CASES)
 @pytest.mark.parametrize("endpoints", [("5", "2"), ("2", "5")])
 @pytest.mark.parametrize("reverse", [False, True])
+@pytest.mark.opsin
+@pytest.mark.skipif(not opsin_available(), reason="OPSIN and Java are required")
 def test_composite_bridge_graph_built_exact_roundtrip(
     heteroatom, carbon_orders, prefix, unsaturation, endpoints, reverse
 ):
@@ -79,6 +81,8 @@ def test_composite_bridge_graph_built_exact_roundtrip(
 
 
 @pytest.mark.parametrize("endpoints,carbon_locant", [(("5", "2"), "10"), (("2", "5"), "9")])
+@pytest.mark.opsin
+@pytest.mark.skipif(not opsin_available(), reason="OPSIN and Java are required")
 def test_composite_bridge_carbonyl_uses_completed_system_map(endpoints, carbon_locant):
     source, path, _ = _bridged_quinoline("O", (), endpoints, oxo=True)
     mol = read_rdkit_mol(source)
@@ -121,6 +125,8 @@ def test_charged_composite_path_abstains():
     assert plan_bridged_fusion_wrapper(mol, frozenset(mol.atoms), mode=FusionMode.AUDITED_PIN) is None
 
 
+@pytest.mark.opsin
+@pytest.mark.skipif(not opsin_available(), reason="OPSIN and Java are required")
 def test_composite_brackets_do_not_change_mixed_bridge_citation_order():
     source, _, atom_by_locant = _bridged_quinoline("O", ())
     editable = Chem.RWMol(source)
