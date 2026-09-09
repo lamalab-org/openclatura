@@ -56,7 +56,7 @@ def test_lambda_projection_uses_component_metadata_without_mutating_it(monkeypat
 CASES = (
     pytest.param(
         "[C-]#[N+]c1cccc(-c2ccc3c(c2)C2(CC(c4ccccc4)S3(=O)=O)N=C(N)N(C)C2=O)c1",
-        "2'lambda^6-thia",
+        "1'lambda^6-spiro[imidazole-4,4'-(3,4-dihydro-2H-benzo[b]thiine)]",
         id="pubchem-2579-sulfone",
     ),
     pytest.param(

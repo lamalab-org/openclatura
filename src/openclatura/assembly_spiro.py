@@ -5,11 +5,12 @@ from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass, replace
 
-from .assembly_parts import AssemblyParts, SubstituentItem
+from .assembly_parts import AssemblyParts, NameAtomBinding, NameTokenBinding, SubstituentItem
 from .formatting import strip_outer_parentheses
 from .nomenclature import RULES
 from .rules import elision, multipliers, stems
 from .spiro_assembly import SpiroAssembly
+from .token_grammar import lexical_token_spans
 
 SPIRO_SUBSTITUENT_RE = re.compile(r"^\[SPIRO\]-(\d+)-(.*)$")
 AMBIGUOUS_CONNECTION_SUBSTITUENT_STEMS = RULES.assembly.ambiguous_connection_substituent_stems
@@ -40,7 +41,55 @@ def _side_replacement_prefixes(parts: AssemblyParts) -> tuple[str, ...]:
             ],
         )
     )
+    parent = parts.parent_hydride
+    if parent is not None and parent.is_systematic_fusion and parent.fusion_plan.lambda_descriptors:
+        descriptors = parent.fusion_plan.lambda_descriptors
+        replacements = (
+            ",".join(f"{_prime_side_locant(item.locant)}lambda^{item.bonding_number}" for item in descriptors)
+            + "-"
+            + replacements
+        )
     return (replacements,) if replacements else ()
+
+
+def _side_lambda_bindings(parts: AssemblyParts) -> tuple[NameAtomBinding, ...]:
+    parent = parts.parent_hydride
+    if parent is None or not parent.is_systematic_fusion:
+        return ()
+    bindings = []
+    for descriptor in parent.fusion_plan.lambda_descriptors:
+        locant = _prime_side_locant(descriptor.locant)
+        annotation = f"lambda^{descriptor.bonding_number}"
+        token = NameTokenBinding(
+            text=locant + annotation,
+            token_kind="replacement",
+            source="spiro_renderer",
+            grammar_role="fusion_lambda_descriptor",
+            binding_key=f"spiro:lambda:{descriptor.atom_id}",
+            atom_ids={descriptor.atom_id},
+            locants=(locant,),
+            match_priority=100,
+        )
+        bindings.append(
+            NameAtomBinding(
+                stage="replacement",
+                role="fusion_lambda_descriptor",
+                term=locant + annotation,
+                atom_ids={descriptor.atom_id},
+                locants=(locant,),
+                emitted_tokens=tuple(
+                    replace(
+                        token,
+                        text=span.text,
+                        token_kind="locant" if span.start < len(locant) else "replacement",
+                        left_context=token.text[: span.start],
+                        right_context=token.text[span.end :],
+                    )
+                    for span in lexical_token_spans(token.text)
+                ),
+            )
+        )
+    return tuple(bindings)
 
 
 def spiro_assembly_from_parts(
@@ -73,6 +122,19 @@ def spiro_assembly_from_parts(
     ):
         return None
     local = deepcopy(parts)
+    parent = local.parent_hydride
+    if parent is not None and parent.is_systematic_fusion and parent.fusion_plan.lambda_descriptors:
+        plan = parent.fusion_plan
+        # Lambda locants address the completed spiro system, unlike local
+        # hydro locants. Hoist their typed tokens, preserving the audited plan.
+        if not parent.audit_ok or parent.base_name != "".join(token.text for token in plan.rendered_parts):
+            return None
+        local.parent_hydride = replace(
+            parent,
+            parent_name="".join(
+                token.text for token in plan.rendered_parts if token.grammar_role != "fusion_lambda_descriptor"
+            ),
+        )
     local.substituents = []
     local.a_prefixes = []
     local.stereo_features = []
@@ -221,6 +283,8 @@ def _hoist_side_substituent_prefixes(parts: AssemblyParts, spiro: SpiroAssembly)
     kept = []
     hoisted = False
     if spiro.side_parts is not None:
+        if parts.name_atom_bindings:
+            parts.name_atom_bindings.extend(_side_lambda_bindings(spiro.side_parts))
         for item in spiro.side_substituents:
             parts.substituents.append(deepcopy(item))
             if parts.name_atom_bindings:
