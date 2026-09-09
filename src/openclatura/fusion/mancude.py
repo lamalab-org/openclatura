@@ -371,13 +371,19 @@ def prove_pi_redistribution(
     delta: ParentBondDelta,
     *,
     indicated_hydrogen_atom_ids: set[int] | frozenset[int] = frozenset(),
+    oxo_operations: tuple[OxoOperation, ...] = (),
 ) -> PiRedistribution | None:
-    """Prove carbon hydro endpoints with unchanged neutral heteroatom spectators.
+    """Prove hydro endpoints with pi-conserving heteroatom spectators.
 
     Keep the raw edge delta intact. Internal path vertices lose and gain one
     pi bond, so only endpoints gain hydrogen. The observed assignment must also
     be a maximum matching of the original bond domain with these endpoints
     blocked; net hydrogen count alone cannot establish the implicit pi state.
+    A neutral heteroatom may exchange incident pi bonds but must retain its
+    total pi occupancy unless it is a proved neutral amine endpoint. Cited
+    intrinsic-H sites keep their exact bond orders.
+    Typed terminal oxo groups may be spectators only when their carbon keeps
+    every internal bond single in both the parent and the observed assignment.
     """
 
     if (
@@ -395,18 +401,51 @@ def prove_pi_redistribution(
     expected = dict(delta.assignment.orders)
     if set(observed) != set(expected) or any(bond.order not in {1, 2} for bond in observed.values()):
         return None
+    oxo_bond_ids = set()
+    oxo_sites = set()
+    for operation in oxo_operations:
+        parent, oxygen = operation.parent_atom_id, operation.oxygen_atom_id
+        bond = mol.bonds.get(operation.bond_id)
+        if (
+            parent not in atoms
+            or oxygen in atoms
+            or oxygen not in mol.atoms
+            or bond is None
+            or bond.order != 2
+            or normalize_edge(bond.u, bond.v) != normalize_edge(parent, oxygen)
+            or operation.bond_id in oxo_bond_ids
+            or mol.atoms[parent].symbol != "C"
+            or mol.atoms[oxygen].symbol != "O"
+            or mol.atoms[oxygen].charge
+            or mol.atoms[oxygen].total_h_count
+            or len(mol.get_neighbors(oxygen)) != 1
+            or parent in indicated_hydrogen_atom_ids
+        ):
+            return None
+        oxo_bond_ids.add(operation.bond_id)
+        oxo_sites.add(parent)
     for atom in atoms:
         value = mol.atoms[atom]
         neighbors = mol.get_neighbors(atom)
         if (
             value.charge
             or len(atoms.intersection(neighbors)) not in {2, 3}
-            or any(mol.get_bond(atom, other).order != 1 for other in neighbors if other not in atoms)
+            or any(
+                mol.get_bond(atom, other).order != 1 and mol.get_bond(atom, other).idx not in oxo_bond_ids
+                for other in neighbors
+                if other not in atoms
+            )
             or value.total_h_count + sum(mol.get_bond(atom, other).order for other in neighbors)
             != value.element.standard_valence
         ):
             return None
-        if (value.symbol != "C" or atom in indicated_hydrogen_atom_ids) and any(
+        if atom in oxo_sites and any(
+            expected[normalize_edge(atom, other)] != 1 or mol.get_bond(atom, other).order != 1
+            for other in neighbors
+            if other in atoms
+        ):
+            return None
+        if atom in indicated_hydrogen_atom_ids and any(
             expected[normalize_edge(atom, other)] != mol.get_bond(atom, other).order
             for other in neighbors
             if other in atoms
@@ -430,8 +469,22 @@ def prove_pi_redistribution(
     sites = frozenset(atom for atom in atoms if parent_pi[atom] - actual_pi[atom] == 1)
     if not sites or len(sites) % 2 or 2 * (len(removed) - len(added)) != len(sites):
         return None
-    if any(mol.atoms[atom].symbol != "C" for atom in sites):
-        return None
+    for atom in sites:
+        value = mol.atoms[atom]
+        if value.symbol == "C":
+            continue
+        neighbors = mol.get_neighbors(atom)
+        # N may lose its one parent pi bond only to become a neutral, saturated
+        # two-connected amine site; one external sigma ligand may replace N-H.
+        if (
+            value.symbol != "N"
+            or value.charge
+            or value.is_aromatic
+            or len(atoms.intersection(neighbors)) != 2
+            or value.total_h_count + len(neighbors) != 3
+            or any(mol.get_bond(atom, other).order != 1 for other in neighbors)
+        ):
+            return None
     if not added or (sites == delta.hydrogenated_atom_ids and not delta.additional_multiple_bond_ids):
         return None
     if not delta.additional_multiple_bond_ids <= added:
@@ -659,8 +712,15 @@ def parent_derivative_state(
         return None
 
     redistribution = (
-        prove_pi_redistribution(mol, atoms, bond_model, delta, indicated_hydrogen_atom_ids=indicated_hydrogen_atom_ids)
-        if not preserve_retained_parent_state and not oxo
+        prove_pi_redistribution(
+            mol,
+            atoms,
+            bond_model,
+            delta,
+            indicated_hydrogen_atom_ids=indicated_hydrogen_atom_ids,
+            oxo_operations=tuple(oxo),
+        )
+        if not preserve_retained_parent_state
         else None
     )
     hydrogenated_atoms = sorted(

@@ -15,6 +15,7 @@ from .mancude import (
     _single_site_parent_model,
     compare_actual_parent_to_implied_parent,
     indicated_hydrogen_parent_bond_model,
+    saturated_nitrogen_hydrogen_sites,
 )
 from .model import (
     FusionComponentMatch,
@@ -25,7 +26,7 @@ from .model import (
     FusionNameAst,
     ParentBondModel,
 )
-from .numbering import parent_bond_model
+from .numbering import parent_bond_model, parent_pi_capable_atom_ids
 
 
 def _component_graph(spec: FusionComponentSpec, atoms: tuple[RetainedGraphAtomTemplate, ...]) -> FusionGraph:
@@ -87,7 +88,8 @@ def component_parent_atoms(spec: FusionComponentSpec) -> tuple[RetainedGraphAtom
 
 
 @lru_cache(maxsize=512)
-def _component_carbon_h_locants(spec: FusionComponentSpec) -> frozenset[str]:
+def component_h_locants(spec: FusionComponentSpec, symbol: str) -> frozenset[str]:
+    """Eligible intrinsic H roles from the isolated component's pi budget."""
     atoms = component_parent_atoms(spec)
     graph = _component_graph(spec, atoms)
     model = parent_bond_model(graph)
@@ -100,13 +102,17 @@ def _component_carbon_h_locants(spec: FusionComponentSpec) -> frozenset[str]:
         candidates.update(
             atoms[atom.id].locant
             for atom in graph.atoms
-            if atom.symbol == "C"
+            if atom.symbol == symbol
             and atom.pi_capacity
             and not atom.forced_single
             and not atom.saturated
             and atom.id not in paired
         )
     return frozenset(candidates)
+
+
+def _component_carbon_h_locants(spec: FusionComponentSpec) -> frozenset[str]:
+    return component_h_locants(spec, "C")
 
 
 @lru_cache(maxsize=512)
@@ -192,10 +198,14 @@ def component_carbon_h_relocation_scope(ast: FusionNameAst, specs: Mapping[int, 
         return False
     if all(component_parent_atoms(spec) == spec.atoms for spec in specs.values()):
         return True
-    # Component-local tautomer equivalence must also preserve the completed
-    # parent's pi budget. Fusion can otherwise turn released H into extra hydro.
+    # Preserve the completed pi budget unless every local maximum matching
+    # proves that fusion consumes the released H at a shared junction.
     components = tuple((match, specs[match.occurrence_id]) for match in ast.component_occurrences)
-    return _completed_carbon_h_budget(components, False) == _completed_carbon_h_budget(components, True)
+    if _completed_carbon_h_budget(components, False) == _completed_carbon_h_budget(components, True):
+        return True
+    from .component_hydrogen import component_hydrogen_consumption
+
+    return component_hydrogen_consumption(ast, specs) is not None
 
 
 @lru_cache(maxsize=512)
@@ -327,6 +337,7 @@ def intrinsic_carbon_parent_model(
     candidates: frozenset[int],
     *,
     intrinsic_hydrogen_atom_ids: frozenset[int] = frozenset(),
+    cited_nitrogen_hydrogen_atom_ids: frozenset[int] = frozenset(),
 ) -> tuple[ParentBondModel, frozenset[int]]:
     """Choose jointly proved intrinsic CH2 sites without consuming hydro bonds.
 
@@ -348,15 +359,24 @@ def intrinsic_carbon_parent_model(
             ),
         )
         model = indicated_hydrogen_parent_bond_model(graph, intrinsic_hydrogen_atom_ids)
+    hydrogen_atoms = intrinsic_hydrogen_atom_ids | cited_nitrogen_hydrogen_atom_ids
     if not candidates or any(
-        mol.atoms[atom].symbol != "C" and mol.atoms[atom].total_h_count and atom not in intrinsic_hydrogen_atom_ids
+        mol.atoms[atom].symbol != "C" and mol.atoms[atom].total_h_count and atom not in hydrogen_atoms
         for atom in locants
     ):
         return model, frozenset()
     # Resolve fusion-N valence before deciding whether a carbon is intrinsically
     # unpaired. Reassigning N afterwards can turn an additive pair into false H.
     parent_atoms = frozenset(locants)
-    model = _nitrogen_composition_parent_model(mol, parent_atoms, model, intrinsic_hydrogen_atom_ids)
+    if saturated_nitrogen_hydrogen_sites(mol, parent_atoms, hydrogen_atoms):
+        # Complete saturated C/N composition owns its hydrogenation already;
+        # constraining its donors must not add a competing carbon tautomer.
+        return model, frozenset()
+    original_model = model
+    model = _nitrogen_composition_parent_model(mol, parent_atoms, model, hydrogen_atoms)
+    # Cited N informs the carbon witness; without a witness its composition
+    # remains owned by the derivative step, not a changed parent bond domain.
+    no_carbon_model = original_model if cited_nitrogen_hydrogen_atom_ids - intrinsic_hydrogen_atom_ids else model
     eligible = {atom for atom in candidates if is_intrinsic_carbon_h_site(mol, atom, parent_atoms)}
     oxo_sites = {
         atom
@@ -375,10 +395,11 @@ def intrinsic_carbon_parent_model(
         )
     }
     eligible.update(oxo_sites)
+    capable_sites = parent_pi_capable_atom_ids(graph)
     carbon_atoms = {
         atom.id
         for atom in graph.atoms
-        if atom.symbol == "C" and atom.pi_capacity and not atom.saturated and not atom.forced_single
+        if atom.symbol == "C" and atom.id in capable_sites
     }
     occupied_pi_atoms = carbon_atoms | {
         atom
@@ -393,7 +414,7 @@ def intrinsic_carbon_parent_model(
         # A donor can account for the unpaired parent valence only if the
         # assignment also pairs heteroatoms carrying an observed pi bond.
         if intrinsic_hydrogen_atom_ids and occupied_pi_atoms <= paired:
-            return model, frozenset()
+            return no_carbon_model, frozenset()
         if unpaired and unpaired <= eligible:
             groups.add(frozenset(unpaired))
     choices = []
@@ -406,7 +427,7 @@ def intrinsic_carbon_parent_model(
             parent_atoms,
             constrained,
             atom_to_locant=locants,
-            indicated_hydrogen_atom_ids=intrinsic_hydrogen_atom_ids,
+            indicated_hydrogen_atom_ids=hydrogen_atoms,
             externally_unsaturated_atom_ids=oxo_sites,
         )
         if delta is None or not delta.compatible or delta.additional_multiple_bond_ids:
@@ -425,7 +446,7 @@ def intrinsic_carbon_parent_model(
         rank = (len(delta.hydrogenated_edges), tuple(sorted(system_locant_sort_key(locants[atom]) for atom in sites)))
         choices.append((rank, constrained, frozenset() if delta.intrinsic_hydro_operations else sites))
     if not choices:
-        return model, frozenset()
+        return no_carbon_model, frozenset()
     _, constrained, sites = min(choices, key=lambda choice: choice[0])
     return constrained, sites
 
@@ -462,15 +483,19 @@ def pi_bearing_fusion_carbon_sites(
 def intrinsic_parent_lone_pair_sites(mol: Molecule, graph: FusionGraph) -> frozenset[int]:
     """Shared planner/auditor intrinsic donors, including charged derivatives."""
 
-    return aromatic_nitrogen_hydrogen_atoms(mol, graph) | fusion_charge_lone_pair_sites(mol, graph)
+    return aromatic_nitrogen_lone_pair_sites(mol, graph) | fusion_charge_lone_pair_sites(mol, graph)
 
 
 def aromatic_nitrogen_hydrogen_atoms(mol: Molecule, graph: FusionGraph) -> frozenset[int]:
-    """Prove neutral aromatic N-H donors independently of saturated N-H sites.
+    """Hydrogen-bearing subset of the neutral aromatic donor roles."""
+    return frozenset(atom for atom in aromatic_nitrogen_lone_pair_sites(mol, graph) if mol.atoms[atom].total_h_count == 1)
 
-    A separate non-aromatic N-H does not change this donor's valence. Require
-    its two parent bonds to be single before excluding it from pi matching;
-    saturated nitrogen and exocyclic multiple bonds retain separate proofs.
+
+def aromatic_nitrogen_lone_pair_sites(mol: Molecule, graph: FusionGraph) -> frozenset[int]:
+    """Prove neutral aromatic donors from local sigma valence.
+
+    Replacing donor H with a ligand does not create another parent pi bond.
+    Saturated nitrogen and exocyclic multiple bonds retain separate proofs.
     """
 
     atoms = {atom.id for atom in graph.atoms}
@@ -486,7 +511,7 @@ def aromatic_nitrogen_hydrogen_atoms(mol: Molecule, graph: FusionGraph) -> froze
         if atom.symbol == "N"
         and mol.atoms[atom.id].is_aromatic
         and mol.atoms[atom.id].charge == 0
-        and mol.atoms[atom.id].total_h_count == 1
-        and len(neighbors := mol.get_neighbors(atom.id)) == 2
-        and all(neighbor in atoms and mol.get_bond(atom.id, neighbor).order == 1 for neighbor in neighbors)
+        and len(neighbors := mol.get_neighbors(atom.id)) + mol.atoms[atom.id].total_h_count == 3
+        and len(atoms.intersection(neighbors)) in {2, 3}
+        and all(mol.get_bond(atom.id, neighbor).order == 1 for neighbor in neighbors)
     )

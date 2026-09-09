@@ -25,7 +25,7 @@ from ..ring_parent import ParentHydrideKind, ParentHydrideMetadata, RingParent
 from ..rules import multipliers, stems
 from .config import fusion_nomenclature_config
 from .mancude import ParentDerivativeState, parent_derivative_state
-from .model import FusionConfirmed, FusionMode, ParentBondModel, PinDecision, PinStatus
+from .model import FusionConfirmed, FusionMode, FusionParentPlan, ParentBondModel, PinDecision, PinStatus
 from .numbering import retained_template_parent_bond_model
 from .rules import fusion_ring_size_gate
 
@@ -305,12 +305,16 @@ def plan_bridged_fusion_wrapper(
                 for map_index, entries in enumerate(parent.locant_maps):
                     locants = dict(entries)
                     selected_parent = parent.select(map_index)
-                    derivative_state = parent_derivative_state(
-                        mol,
-                        parent_atoms,
-                        selected_parent.selected_bond_model,
-                        locants,
-                        preserve_retained_parent_state=True,
+                    derivative_state = (
+                        selected_parent.fusion_plan.derivative_state
+                        if selected_parent.fusion_plan is not None
+                        else parent_derivative_state(
+                            mol,
+                            parent_atoms,
+                            selected_parent.selected_bond_model,
+                            locants,
+                            preserve_retained_parent_state=True,
+                        )
                     )
                     if derivative_state is None:
                         continue
@@ -334,6 +338,7 @@ def plan_bridged_fusion_wrapper(
                         derivative_state,
                         bridge_unsaturation,
                         precursor,
+                        fusion_plan=selected_parent.fusion_plan,
                     )
                     if audit_checks is None:
                         continue
@@ -839,6 +844,8 @@ def _audit_bridge_plan(
     derivative_state: ParentDerivativeState,
     bridge_unsaturation: tuple[UnsaturationOperation, ...] = (),
     saturated_bridge_precursor: NondetachableBridgeOperation | None = None,
+    *,
+    fusion_plan: FusionParentPlan | None = None,
 ) -> tuple[str, ...] | None:
     if set(parent_locants) != set(parent_atoms) or len(set(parent_locants.values())) != len(parent_atoms):
         return None
@@ -877,9 +884,24 @@ def _audit_bridge_plan(
             return None
     if expected_edges != set(edges_within_atoms(mol, set(all_atoms))):
         return None
+    indicated_h_atoms = frozenset()
+    if fusion_plan is not None:
+        if (
+            fusion_plan.bond_model != parent_bond_model
+            or fusion_plan.numbering.string_input_locant_maps()[0] != parent_locants
+            or fusion_plan.derivative_state != derivative_state
+        ):
+            return None
+        cited_locants = {str(locant) for locant in fusion_plan.indicated_hydrogens}
+        indicated_h_atoms = frozenset(atom for atom, locant in parent_locants.items() if locant in cited_locants)
     if (
         parent_derivative_state(
-            mol, parent_atoms, parent_bond_model, parent_locants, preserve_retained_parent_state=True
+            mol,
+            parent_atoms,
+            parent_bond_model,
+            parent_locants,
+            indicated_hydrogen_atom_ids=indicated_h_atoms,
+            preserve_retained_parent_state=fusion_plan is None,
         )
         != derivative_state
     ):

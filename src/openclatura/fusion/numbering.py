@@ -400,6 +400,25 @@ def validate_parent_bond_valence(
             )
 
 
+def parent_pi_capable_atom_ids(graph: FusionGraph) -> frozenset[int]:
+    """Return sites with room for pi bonding after mandatory parent loads."""
+    baseline = BondAssignment(
+        tuple(sorted((normalize_edge(*bond.atoms), 2 if bond.bond_class == "double" else 1) for bond in graph.bonds))
+    )
+    validate_parent_bond_valence(graph, baseline)
+    loads = _parent_bond_loads(graph, baseline)
+    return frozenset(
+        site.id
+        for site in graph.atoms
+        if site.pi_capacity
+        and not site.forced_single
+        and (
+            (limit := elements.get(site.symbol).mancude_limit_for_charge(site.formal_charge)) is None
+            or loads[site.id] < limit
+        )
+    )
+
+
 def parent_bond_model(
     parent: FusionGraph | Molecule,
     atom_ids: Iterable[int] | None = None,
@@ -409,28 +428,18 @@ def parent_bond_model(
     """Build all maximum non-cumulative Kekule assignments for a parent graph."""
 
     graph = _parent_bond_graph(parent, atom_ids)
-    sites = {atom.id: atom for atom in graph.atoms}
     edges = tuple(sorted(normalize_edge(*bond.atoms) for bond in graph.bonds))
     bond_classes = {normalize_edge(*bond.atoms): bond.bond_class for bond in graph.bonds}
     required_double = frozenset(edge for edge in edges if bond_classes[edge] == "double")
-    baseline = BondAssignment(tuple((edge, 2 if edge in required_double else 1) for edge in edges))
     # Mandatory loads must be feasible before any optional matching is searched.
-    validate_parent_bond_valence(graph, baseline)
-    loads = _parent_bond_loads(graph, baseline)
-    saturated_sites = {
-        atom
-        for atom, site in sites.items()
-        if (limit := elements.get(site.symbol).mancude_limit_for_charge(site.formal_charge)) is not None
-        and loads[atom] >= limit
-    }
+    capable_sites = parent_pi_capable_atom_ids(graph)
     occupied = frozenset(atom for edge in required_double for atom in edge)
     eligible = frozenset(
         edge
         for edge in edges
         if bond_classes[edge] in {"aromatic", "mancude", "fusion"}
         and not occupied.intersection(edge)
-        and all(sites[atom].pi_capacity and not sites[atom].forced_single for atom in edge)
-        and not saturated_sites.intersection(edge)
+        and all(atom in capable_sites for atom in edge)
     )
     required = frozenset(edges) - eligible - required_double
     matchings = _maximum_matchings(eligible, search_budget=search_budget)
@@ -681,9 +690,14 @@ def bond_model_indicated_hydrogen_atoms(
             if order != 1 or allowed[edge] != 2:
                 compatible = False
                 break
-            endpoints = {atom for atom in set(edge) & candidates if mol.atoms[atom].symbol != "C"}
+            endpoints = (set(edge) & candidates) | {
+                atom
+                for atom in edge
+                if mol.atoms[atom].symbol == "C"
+                and all(mol.get_bond(atom, neighbor).order == 1 for neighbor in mol.get_neighbors(atom))
+            }
             if len(endpoints) == 1:
-                indicated.update(endpoints)
+                indicated.update(atom for atom in endpoints if mol.atoms[atom].symbol != "C")
             elif len(endpoints) != 2:
                 compatible = False
                 break

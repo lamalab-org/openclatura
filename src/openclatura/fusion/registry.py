@@ -332,7 +332,7 @@ class FusionComponentRegistry:
                 for exact in match_retained_graph_template_maps(
                     mol,
                     atom_ids,
-                    template,
+                    _component_matching_template(component.spec_for_template(template.name)),
                     allow_nonaromatic=True,
                 ):
                     if not _template_rings_match_faces(template, exact.locant_to_atom, subset):
@@ -511,6 +511,23 @@ def _validate_fusion_component_template(template: RetainedGraphTemplate) -> None
         raise ValueError(f"fusion component template {template.name!r} peripheral walk does not follow declared bonds")
     if set(template.interior_atoms) & set(peripheral):
         raise ValueError(f"fusion component template {template.name!r} interior and peripheral atoms overlap")
+
+
+@cache
+def _component_matching_template(spec: FusionComponentSpec) -> RetainedGraphTemplate:
+    """Use the proved component-parent atoms, not an isolated H tautomer.
+
+    Keep the registered template intact for citation and completed-system
+    hydrogen proofs. Matching must accept the same movable sites that the
+    component parent graph already admits.
+    """
+
+    if not spec.template.default_indicated_h:
+        return spec.template
+    from .indicated_hydrogen import component_parent_atoms
+
+    atoms = component_parent_atoms(spec)
+    return spec.template if atoms == spec.atoms else replace(spec.template, atoms=atoms)
 
 
 def _with_ordered_fusion_perimeter(template: RetainedGraphTemplate) -> RetainedGraphTemplate:

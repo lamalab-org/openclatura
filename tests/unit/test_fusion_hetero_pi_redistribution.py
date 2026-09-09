@@ -151,7 +151,7 @@ def test_spectator_extension_preserves_fixed_single_constraints():
     assert state.unsaturation_operations
 
 
-def test_hydrogenated_nitrogen_is_not_a_carbon_redistribution_endpoint():
+def test_neutral_amine_and_carbon_are_proved_hydrogenation_endpoints():
     mol = Molecule()
     for atom in range(6):
         mol.add_atom("N" if atom == 0 else "C", idx=atom, total_h_count=1 if atom == 0 else 2 if atom == 3 else 1)
@@ -164,6 +164,13 @@ def test_hydrogenated_nitrogen_is_not_a_carbon_redistribution_endpoint():
     model = parent_bond_model(graph)
     delta = compare_actual_parent_to_implied_parent(mol, mol.atoms, model, preserve_retained_parent_state=True)
     assert delta is not None
+    proof = prove_pi_redistribution(mol, frozenset(mol.atoms), model, delta)
+    assert proof is not None
+    assert proof.hydrogenated_atom_ids == {0, 3}
+    assert dict(proof.final_assignment.orders) == {
+        tuple(sorted((bond.u, bond.v))): bond.order for bond in mol.bonds.values()
+    }
+    mol.update_atom(0, charge=1)
     assert prove_pi_redistribution(mol, frozenset(mol.atoms), model, delta) is None
 
 

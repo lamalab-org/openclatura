@@ -18,6 +18,7 @@ from .faces import BoundedFaceModel, FaceSearchBudgetExceeded, cached_bounded_fa
 from .faces import typed_face_model as _typed_face_model
 from .indicated_hydrogen import (
     component_carbon_h_relocation_scope,
+    component_h_locants,
     component_parent_atoms,
     component_parent_graph,
     intrinsic_carbon_candidate_atoms,
@@ -52,7 +53,6 @@ from .model import (
 from .numbering import (
     CompletedNumberingSelection,
     MancudeSearchBudgetExceeded,
-    bond_model_indicated_hydrogen_atoms,
     completed_system_numbering_selection,
     indicated_hydrogen_candidate_atoms,
     observed_parent_matches_bond_model,
@@ -294,6 +294,15 @@ def _complete_fusion_plan(
             )
         )
         specs = {match.occurrence_id: registry.spec_for_match(match) for match in ast.component_occurrences}
+        initial_citations = set(_cited_indicated_hydrogens(mol, ast, registry, numbering, bond_model))
+        cited_n_h = frozenset(
+            atom
+            for atom, locant in numbering.input_locant_maps[0]
+            if locant in initial_citations
+            and mol.atoms[atom].symbol == "N"
+            and not mol.atoms[atom].charge
+            and mol.atoms[atom].total_h_count == 1
+        )
         bond_model, intrinsic_carbon_h = intrinsic_carbon_parent_model(
             mol,
             graph,
@@ -301,6 +310,7 @@ def _complete_fusion_plan(
             dict(numbering.input_locant_maps[0]),
             intrinsic_carbon_candidate_atoms(ast, specs, mol),
             intrinsic_hydrogen_atom_ids=intrinsic_n_h,
+            cited_nitrogen_hydrogen_atom_ids=cited_n_h,
         )
     except MancudeSearchBudgetExceeded as exc:
         return FusionUnsupported("mancude assignment search budget exhausted", (str(exc),))
@@ -467,8 +477,26 @@ def _cited_indicated_hydrogens(
 
     locants = dict(numbering.abstract_atom_to_locant)
     candidates = indicated_hydrogen_candidate_atoms(mol, locants)
-    cited_atoms = {atom for atom in candidates if mol.atoms[atom].symbol != "C"}
-    cited_atoms.update(bond_model_indicated_hydrogen_atoms(mol, bond_model, set(candidates)))
+    candidate_atoms = set(candidates)
+    unpaired = set()
+    for assignment in bond_model.allowed_kekule_assignments:
+        paired = {atom for edge, order in assignment.orders if order == 2 for atom in edge}
+        unpaired.update(candidate_atoms - paired)
+    component_h_roles = set()
+    for match in ast.component_occurrences:
+        spec = registry.spec_for_match(match)
+        component_h_roles.update(match.input_atom_by_locant[locant] for locant in component_h_locants(spec, "N"))
+    cited_atoms = {
+        atom
+        for atom in candidates
+        if mol.atoms[atom].symbol != "C"
+        and (mol.atoms[atom].is_aromatic or mol.atoms[atom].charge or atom in unpaired or atom in component_h_roles)
+    }
+    cited_atoms.update(
+        saturated_nitrogen_hydrogen_sites(
+            mol, frozenset(locants), {atom for atom in candidates if mol.atoms[atom].symbol == "N"}
+        )
+    )
 
     root_ids = set(ast.parent_occurrences)
     roots = [match for match in ast.component_occurrences if match.occurrence_id in root_ids]

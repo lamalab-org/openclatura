@@ -117,6 +117,10 @@ def _unrepresented_component_indicated_hydrogens(
     completed parent must cite the corresponding completed-system locant.
     """
 
+    from .component_hydrogen import component_hydrogen_consumption
+
+    consumption = component_hydrogen_consumption(ast, specs)
+    consumed_defaults = consumption.default_sites if consumption is not None else frozenset()
     matches = {match.occurrence_id: match for match in ast.component_occurrences}
     fusion_atoms = frozenset(atom for join in ast.joins for atom in join.shared_input_atoms)
     completed_locants = {atom: str(locant) for atom, locant in numbering.input_locant_maps[0]}
@@ -131,6 +135,8 @@ def _unrepresented_component_indicated_hydrogens(
         local = matches[occurrence].input_atom_by_locant
         for locant in spec.template.default_indicated_h:
             atom = local[locant]
+            if (occurrence, locant) in consumed_defaults:
+                continue
             if atom in fusion_atoms or atom in converted or completed_locants.get(atom) in cited:
                 continue
             unresolved.append((occurrence, locant))
@@ -267,6 +273,14 @@ def audit_fusion_plan(
         checks.append("charge_operations")
 
         intrinsic_n_h = intrinsic_parent_lone_pair_sites(mol, abstract_parent_graph)
+        cited_n_h = frozenset(
+            atom
+            for atom, locant in numbering.input_locant_maps[0]
+            if locant in indicated_hydrogens
+            and mol.atoms[atom].symbol == "N"
+            and not mol.atoms[atom].charge
+            and mol.atoms[atom].total_h_count == 1
+        )
         carbon_candidates = intrinsic_carbon_candidate_atoms(ast, specs, mol)
         intrinsic_c_h = frozenset()
         pi_c_junctions = pi_bearing_fusion_carbon_sites(mol, abstract_parent_graph, carbon_candidates)
@@ -283,6 +297,7 @@ def audit_fusion_plan(
                 dict(numbering.input_locant_maps[0]),
                 carbon_candidates,
                 intrinsic_hydrogen_atom_ids=intrinsic_n_h,
+                cited_nitrogen_hydrogen_atom_ids=cited_n_h,
             )
             if (intrinsic_n_h or intrinsic_c_h or pi_c_junctions) and bond_model != expected_model:
                 errors.append("parent bond model does not preserve the proved intrinsic-hydrogen sites")
@@ -308,6 +323,10 @@ def audit_fusion_plan(
             and has_complete_saturated_hydrogenation(mol, parent_atoms, derivative_state)
             else frozenset()
         )
+        if derivative_state is not None:
+            hydro_owned_h |= frozenset(
+                atom for operation in derivative_state.hydro_operations for atom in operation.atom_ids
+            )
         _audit_indicated_hydrogens(
             mol, numbering, bond_model, indicated_hydrogens, errors, intrinsic_c_h, hydro_owned_h
         )
@@ -601,13 +620,20 @@ def _has_consistent_derivative_operations(
     if sum(not mol.atoms[atom].is_aromatic for atom in nitrogen_h) > 1:
         return False
     if carbon_h:
-        # Oxo may consume a separate parent pi bond next to a CH2 site. Added
-        # H and non-aromatic N-H still need their own composition proof.
+        # Neutral N-H must retain its observed single-bond valence. The
+        # completed carbon witness is independently replayed below.
         if (
             added
             or intrinsic
             or any(
-                not mol.atoms[atom].is_aromatic or mol.atoms[atom].charge or mol.atoms[atom].total_h_count != 1
+                mol.atoms[atom].charge
+                or mol.atoms[atom].total_h_count != 1
+                or len(mol.get_neighbors(atom)) != 2
+                or any(
+                    neighbor not in atoms or mol.get_bond(atom, neighbor).order != 1
+                    for neighbor in mol.get_neighbors(atom)
+                )
+                or any(order != 1 for edge, order in state.bond_delta.assignment.orders if atom in edge)
                 for atom in nitrogen_h
             )
         ):
@@ -1423,10 +1449,13 @@ def _audit_derivative_state(
     if state.bond_delta != delta:
         errors.append("typed derivative state does not carry the selected parent bond delta")
 
-    redistribution = (
-        prove_pi_redistribution(mol, parent_atoms, model, delta, indicated_hydrogen_atom_ids=indicated_h_atoms)
-        if not state.oxo_operations
-        else None
+    redistribution = prove_pi_redistribution(
+        mol,
+        parent_atoms,
+        model,
+        delta,
+        indicated_hydrogen_atom_ids=indicated_h_atoms,
+        oxo_operations=state.oxo_operations,
     )
     if state.pi_redistribution != redistribution:
         errors.append("pi redistribution does not reconstruct the raw delta and final implicit parent state")

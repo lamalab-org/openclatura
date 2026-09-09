@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 from rdkit import Chem
 
-from openclatura import FusionMode, name_mol, opsin_available
+from openclatura import FusionMode, name_mol, opsin_available, verify_with_opsin
 from openclatura.chains import find_ring_systems
 from openclatura.fusion.audit import audit_fusion_plan
 from openclatura.fusion.mancude import _spiro_carbon_sites
@@ -16,7 +16,7 @@ from openclatura.graph_io import read_smiles
 CARBON_CASES = (
     (
         "CC(=O)OC1Oc2ccc(C)cc2-c2oc(=O)c([Se]c3ccccc3)cc21",
-        "9-methyl-2-oxo-3-(phenylselanyl)-2,5-dihydropyrano[5,6-c]benzo[e]pyran-5-yl acetate",
+        "9-methyl-2-oxo-3-(phenylselanyl)-2,5-dihydropyrano[3,2-c]benzo[e]pyran-5-yl acetate",
         "intrinsic_hydro_operations",
         ("2", "5"),
     ),
@@ -27,6 +27,18 @@ CARBON_CASES = (
         ("9a",),
     ),
 )
+
+
+@pytest.mark.skipif(not opsin_available(), reason="OPSIN and Java are required")
+def test_pyran_orientation_preserves_exact_old_citation_equivalence():
+    smiles, preferred, _, _ = CARBON_CASES[0]
+    previous = "9-methyl-2-oxo-3-(phenylselanyl)-2,5-dihydropyrano[5,6-c]benzo[e]pyran-5-yl acetate"
+    original = Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
+    # Movable component H admits the lower attached-locant orientation.
+    for citation in (previous, preferred):
+        check = verify_with_opsin(citation, smiles, standardize_smiles=False)
+        assert check.status == "matched", check.to_dict()
+        assert check.canonical_roundtrip == check.canonical_original == original, check.to_dict()
 
 
 def _plan(smiles, mode=FusionMode.GENERAL):

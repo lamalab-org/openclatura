@@ -251,7 +251,7 @@ def test_partly_hydrogenated_hw_component_uses_fusion_nomenclature():
     [
         (
             "CC(=O)OC1Oc2ccc(C)cc2-c2oc(=O)c([Se]c3ccccc3)cc21",
-            "9-methyl-2-oxo-3-(phenylselanyl)-2,5-dihydropyrano[5,6-c]benzo[e]pyran-5-yl acetate",
+            "9-methyl-2-oxo-3-(phenylselanyl)-2,5-dihydropyrano[3,2-c]benzo[e]pyran-5-yl acetate",
         ),
         (
             "CC1=C2CC3C(C)(C=CC(=O)C34CO4)CC2OC1=O",
@@ -354,7 +354,7 @@ def test_higher_order_component_indicated_hydrogen_composition_roundtrips():
 
 def test_multiple_indicated_hydrogens_compose_with_additive_hydrogenation():
     smiles = "C1CNC2=C(N1)ON=N2"
-    expected = "5,6-dihydro-4H,7H-[1,2,3]oxadiazolo[4,5-b]pyrazine"
+    expected = "4,5,6,7-tetrahydro[1,2,3]oxadiazolo[4,5-b]pyrazine"
 
     result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True, include_trace=True)
 
@@ -362,7 +362,8 @@ def test_multiple_indicated_hydrogens_compose_with_additive_hydrogenation():
     assert result.parent_nomenclature == "systematic_fusion"
     assert result.opsin_check is not None and result.opsin_check.status == "matched"
     selected = next(step for step in result.decisions if step.decision == "selected audited systematic fusion parent")
-    assert selected.data["base_name"] == "4H,7H-[1,2,3]oxadiazolo[4,5-b]pyrazine"
+    assert selected.data["base_name"] == "[1,2,3]oxadiazolo[4,5-b]pyrazine"
+    assert selected.data["derivative_operations"]["hydro"][0]["locants"] == ["4", "5", "6", "7"]
     assert selected.data["atom_to_locant"][2] == "4"
     assert selected.data["atom_to_locant"][5] == "7"
 
