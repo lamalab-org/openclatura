@@ -41,7 +41,7 @@ def ordered_hexagonal_construction(
         or ast.multiplicative_groups
         or any(face.size != 6 for face in model.faces)
         or any(atom.symbol != "C" for spec in specs.values() for atom in spec.template.atoms)
-        or any(spec.template.numbering_policy != "retained_template" for spec in specs.values())
+        or any(spec.construction_order is None or spec.construction_order.version != "2.9.0" for spec in specs.values())
     ):
         return None
     matches = {match.occurrence_id: match for match in ast.component_occurrences}
@@ -52,14 +52,13 @@ def ordered_hexagonal_construction(
     for occurrence in (*citation.parent_occurrences, *reversed(citation.render_order)):
         local = matches[occurrence].input_atom_by_locant
         shared = set(local.values()) & seen
-        edges = [tuple(local[locant] for locant in bond.locants) for bond in specs[occurrence].bonds]
-        # Retained CML bond records preserve component construction order;
-        # numeric locant sorting does not. Generated-series graph templates
-        # do not provide this provenance and are excluded above.
-        for edge in edges:
-            for atom in edge:
-                if atom not in seen and atom not in atom_order:
-                    atom_order.append(atom)
+        construction = specs[occurrence].construction_order
+        assert construction is not None
+        edges = [tuple(local[locant] for locant in edge) for edge in construction.directed_bond_locants]
+        for locant in construction.atom_locants:
+            atom = local[locant]
+            if atom not in seen:
+                atom_order.append(atom)
         joins = [join for join in ast.joins if join.attached_occurrence == occurrence]
         if len(joins) > 1 or shared != set().union(*(join.shared_input_atoms for join in joins)):
             return None

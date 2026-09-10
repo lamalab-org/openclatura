@@ -36,7 +36,7 @@ from ..retained_graph_model import monocyclic_graph_template
 from ..retained_name_policy import retained_parent_name_policy
 from ..rules.stems import stem_for
 from .config import annulene_ring_sizes_from_data
-from .model import FusionComponentMatch, FusionComponentSpec
+from .model import FusionComponentConstructionOrder, FusionComponentMatch, FusionComponentSpec
 
 SUPPORTED_SCHEMA_VERSION = 1
 
@@ -70,7 +70,9 @@ class RegisteredFusionComponent:
         template = next((item for item in self.templates if item.name == template_name), None)
         if template is None:
             raise KeyError(f"component {self.spec.key!r} has no template {template_name!r}")
-        return replace(self.spec, template=template)
+        return replace(
+            self.spec, template=template, construction_order=_component_construction_orders().get(template.name)
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -434,6 +436,22 @@ class FusionComponentRegistry:
         return RegisteredFusionComponent(spec, (generated.template.name,), (generated.template,))
 
 
+@cache
+def _component_construction_orders() -> Mapping[str, FusionComponentConstructionOrder]:
+    data = load_json_table("fusion_component_construction.json")
+    if data.get("schema_version") != 1:
+        raise ValueError("unsupported fusion component construction schema")
+    result = {}
+    for key, row in data["components"].items():
+        result[key] = FusionComponentConstructionOrder(
+            atom_locants=tuple(row["atom_locants"]),
+            directed_bond_locants=tuple(tuple(edge) for edge in row["directed_bond_locants"]),
+            source=data["source"],
+            version=data["version"],
+        )
+    return MappingProxyType(result)
+
+
 def _component_spec(
     *,
     key: str,
@@ -460,6 +478,7 @@ def _component_spec(
         accepted_general_prefixes=accepted_general_prefixes,
         horizontal_ring_count=horizontal_ring_count,
         multiplicative_prefix_style=multiplicative_prefix_style,
+        construction_order=_component_construction_orders().get(template.name),
     )
 
 

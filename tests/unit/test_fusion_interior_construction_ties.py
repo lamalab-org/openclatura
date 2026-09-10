@@ -206,7 +206,11 @@ def test_generated_graph_without_construction_provenance_preserves_ambiguity(mon
 
     def generated(ast, specs, model, positions, search_budget):
         specs = {
-            occurrence: replace(spec, template=replace(spec.template, numbering_policy="generated_acene_series"))
+            occurrence: replace(
+                spec,
+                template=replace(spec.template, numbering_policy="generated_acene_series"),
+                construction_order=None,
+            )
             for occurrence, spec in specs.items()
         }
         result = original(ast, specs, model, positions, search_budget)
@@ -216,3 +220,102 @@ def test_generated_graph_without_construction_provenance_preserves_ambiguity(mon
     monkeypatch.setattr(construction_order, "ordered_hexagonal_construction", generated)
     _, _, result = _plan(Chem.MolFromSmiles(SMILES))
     assert isinstance(result, FusionUnsupported)
+
+
+@pytest.mark.parametrize("seed", (7, 73))
+@pytest.mark.parametrize("parent", ("pyrene", "benzo[ghi]perylene"))
+def test_graph_record_reordering_preserves_construction_witness(seed, parent, monkeypatch):
+    from openclatura.fusion import construction_order
+    from openclatura.retained_fused_templates import retained_graph_templates
+
+    original = construction_order.ordered_hexagonal_construction
+    checked = []
+
+    def reordered(ast, specs, model, positions, search_budget):
+        expected = original(ast, specs, model, positions, search_budget)
+        changed = {}
+        for occurrence, spec in specs.items():
+            atoms = list(spec.template.atoms)
+            bonds = [replace(bond, locants=tuple(reversed(bond.locants))) for bond in spec.template.bonds]
+            Random(seed).shuffle(atoms)
+            Random(seed).shuffle(bonds)
+            changed[occurrence] = replace(
+                spec,
+                template=replace(spec.template, atoms=tuple(atoms), bonds=tuple(bonds), locants=spec.locants[::-1]),
+            )
+        actual = original(ast, changed, model, positions, search_budget)
+        assert actual == expected
+        if actual is not None:
+            checked.append(True)
+        return actual
+
+    monkeypatch.setattr(construction_order, "ordered_hexagonal_construction", reordered)
+    template = next(template for template in retained_graph_templates(include_disabled=True) if template.name == parent)
+    graph = Chem.RWMol()
+    ids = {}
+    for atom in template.atoms:
+        rd_atom = Chem.Atom(atom.symbol)
+        rd_atom.SetIsAromatic(True)
+        ids[atom.locant] = graph.AddAtom(rd_atom)
+    for bond in template.bonds:
+        graph.AddBond(*(ids[locant] for locant in bond.locants), Chem.BondType.AROMATIC)
+    Chem.SanitizeMol(graph)
+    _, _, result = _plan(graph)
+    assert isinstance(result, FusionConfirmed)
+    if parent == "pyrene":
+        assert result.plan.rendered_base_name == BASE
+    assert checked
+
+
+def test_missing_construction_metadata_preserves_ambiguity(monkeypatch):
+    from openclatura.fusion import construction_order
+
+    original = construction_order.ordered_hexagonal_construction
+
+    def missing(ast, specs, model, positions, search_budget):
+        specs = {occurrence: replace(spec, construction_order=None) for occurrence, spec in specs.items()}
+        assert original(ast, specs, model, positions, search_budget) is None
+        return None
+
+    monkeypatch.setattr(construction_order, "ordered_hexagonal_construction", missing)
+    _, _, result = _plan(Chem.MolFromSmiles(SMILES))
+    assert isinstance(result, FusionUnsupported)
+
+
+@pytest.mark.parametrize("defect", ("missing_edge", "extra_vertex", "missing_source", "missing_version"))
+def test_invalid_component_construction_metadata_is_rejected(defect):
+    from openclatura.fusion.registry import fusion_component_registry
+
+    spec = next(item.spec for item in fusion_component_registry().components if item.spec.key == "phenanthrene")
+    order = spec.construction_order
+    assert order is not None
+    with pytest.raises(ValueError):
+        if defect == "missing_edge":
+            order = replace(order, directed_bond_locants=order.directed_bond_locants[:-1])
+        elif defect == "extra_vertex":
+            order = replace(order, atom_locants=(*order.atom_locants, "100"))
+        elif defect == "missing_source":
+            order = replace(order, source="")
+        else:
+            order = replace(order, version="")
+        replace(spec, construction_order=order)
+
+
+def test_registry_construction_provenance_is_explicit_and_immutable():
+    from dataclasses import FrozenInstanceError
+
+    from openclatura.fusion.registry import fusion_component_registry
+
+    certified = {}
+    for component in fusion_component_registry().components:
+        spec = component.spec
+        order = spec.construction_order
+        if order is None:
+            continue
+        assert order.covers(spec.template)
+        assert order.version == "2.9.0"
+        assert order.source.endswith("/fusionComponents.xml")
+        certified[spec.key] = order
+    assert set(certified) == {"benzene", "naphthalene", "anthracene", "phenanthrene"}
+    with pytest.raises(FrozenInstanceError):
+        certified["benzene"].source = "changed"

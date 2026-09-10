@@ -226,6 +226,44 @@ class OrderedFusionInterface:
 
 
 @dataclass(frozen=True, slots=True)
+class FusionComponentConstructionOrder:
+    """Source-certified parser order, independent of graph record ordering."""
+
+    atom_locants: tuple[str, ...]
+    directed_bond_locants: tuple[tuple[str, str], ...]
+    source: str
+    version: str
+
+    def __post_init__(self) -> None:
+        _require_nonempty(self.source, "construction source")
+        _require_nonempty(self.version, "construction version")
+        if not isinstance(self.atom_locants, tuple) or not self.atom_locants:
+            raise ValueError("construction atom locants must be a nonempty immutable sequence")
+        for locant in self.atom_locants:
+            _require_nonempty(locant, "construction atom locant")
+        if len(set(self.atom_locants)) != len(self.atom_locants):
+            raise ValueError("construction atom locants must be unique")
+        if not isinstance(self.directed_bond_locants, tuple) or not self.directed_bond_locants:
+            raise ValueError("construction bonds must be a nonempty immutable sequence")
+        edges = set()
+        for edge in self.directed_bond_locants:
+            if not isinstance(edge, tuple) or len(edge) != 2 or edge[0] == edge[1]:
+                raise ValueError("construction bonds must have two distinct endpoints")
+            if not set(edge) <= set(self.atom_locants) or frozenset(edge) in edges:
+                raise ValueError("construction bonds must be unique and use known locants")
+            edges.add(frozenset(edge))
+
+    def covers(self, template: RetainedGraphTemplate) -> bool:
+        return (
+            len(self.atom_locants) == len(template.locants) == len(template.atoms)
+            and len(self.directed_bond_locants) == len(template.bonds)
+            and set(self.atom_locants) == set(template.locants) == {atom.locant for atom in template.atoms}
+            and {frozenset(edge) for edge in self.directed_bond_locants}
+            == {frozenset(bond.locants) for bond in template.bonds}
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class FusionComponentSpec:
     """Fusion policy layered over the shared retained graph template."""
 
@@ -240,6 +278,7 @@ class FusionComponentSpec:
     horizontal_ring_count: int = 0
     multiplicative_prefix_style: str = "basic"
     usable_as_peri_parent: bool = False
+    construction_order: FusionComponentConstructionOrder | None = None
     _seniority_key: ChemicalComponentSeniorityKey | None = field(default=None, init=False, compare=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -255,6 +294,8 @@ class FusionComponentSpec:
             raise ValueError("horizontal_ring_count must be non-negative")
         if self.multiplicative_prefix_style not in {"basic", "complex"}:
             raise ValueError("fusion component multiplicative prefix style must be basic or complex")
+        if self.construction_order is not None and not self.construction_order.covers(self.template):
+            raise ValueError("construction order must cover the exact component vertex and edge sets")
 
     @property
     def derivative_stem(self) -> str | None:
