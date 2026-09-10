@@ -486,6 +486,35 @@ def _apply_retained_oxo_carbon_hydrogen(mol: Molecule, parts: AssemblyParts, num
     return True
 
 
+def parent_indicated_hydrogen_quota(parts: AssemblyParts) -> int | None:
+    """How much indicated hydrogen the parent hydride itself carries.
+
+    P-31.1.4.2.1 fixes this from the ring system alone: one sp3 site for every
+    pi-capable skeletal atom that the parent's maximum matching cannot pair. A
+    name may not cite more than this -- further saturation is added hydrogen
+    (P-31.1.4.2.4) or a hydro prefix. Returns ``None`` when the parent does not
+    expose enough structure to say, so callers leave such names alone.
+    """
+
+    parent = parts.parent_hydride
+    if parent is None:
+        return None
+    if parent.uses_fusion_plan and parent.fusion_plan is not None:
+        from .fusion.numbering import MancudeSearchBudgetExceeded, parent_bond_model, parent_pi_capable_atom_ids
+
+        graph = parent.fusion_plan.abstract_parent_graph
+        try:
+            model = parent_bond_model(graph)
+            capable = parent_pi_capable_atom_ids(graph)
+        except (MancudeSearchBudgetExceeded, ValueError):
+            return None
+        return max(0, len(capable) - 2 * model.maximum_non_cumulative_double_bonds)
+    metadata = parts.retained_parent_metadata
+    if metadata is not None and metadata.mancude_double_bonds:
+        return metadata.indicated_hydrogen_count
+    return None
+
+
 def _recast_ring_ketone_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     """P-31.1.4.2.4: spell a mancude ring ketone's saturation the way the rules do.
 

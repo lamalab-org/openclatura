@@ -51,7 +51,7 @@ def test_peri_indole_citation_scopes_hydrogen_to_completed_parent():
     smiles = "N1CC2=CC=CC3=C2C1=CC=C3"
     result = name_mol(Chem.MolFromSmiles(smiles), include_trace=True)
     assert result.ok, result.error
-    assert result.name == "1H,2H-benzo[1,2,3-cd]indole"
+    assert result.name == "1,2-dihydrobenzo[1,2,3-cd]indole"
     mol = read_rdkit_mol(Chem.MolFromSmiles(smiles))
     plan = plan_fusion_parent(mol, set(mol.atoms), mode=FusionMode.AUDITED_PIN).plan
     sites = {

@@ -19,7 +19,7 @@ def test_saturated_nitrogen_h_does_not_hide_intrinsic_carbon_h(mode, reverse):
         graph = Chem.RenumberAtoms(graph, list(reversed(range(graph.GetNumAtoms()))))
     result = name_mol(graph, fusion_mode=mode, verify_opsin=opsin_available())
     assert result.parent_nomenclature == "systematic_fusion"
-    assert result.name == "6,6a-dihydro-3H,5H-pyrrolo[2,3-d]imidazole"
+    assert result.name == "3,5,6,6a-tetrahydropyrrolo[2,3-d]imidazole"
     if opsin_available():
         assert result.opsin_check.status == "matched"
         assert Chem.MolToSmiles(Chem.MolFromSmiles(result.opsin_check.opsin_smiles)) == Chem.MolToSmiles(graph)

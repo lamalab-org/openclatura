@@ -12,10 +12,10 @@ from openclatura.opsin_verify import verify_with_opsin
 
 # These expected names were checked with OPSIN without standardization.
 CASES = (
-    ("C1CC2=C(N1)C=CN2", "2,3-dihydro-1H,4H-pyrrolo[3,2-b]pyrrole"),
-    ("c1cc2c([nH]1)CCN2", "2,3-dihydro-1H,4H-pyrrolo[3,2-b]pyrrole"),
-    ("C1CC2=CNC=C2N1", "2,3-dihydro-1H,5H-pyrrolo[3,4-b]pyrrole"),
-    ("c1[nH]cc2c1CCN2", "2,3-dihydro-1H,5H-pyrrolo[3,4-b]pyrrole"),
+    ("C1CC2=C(N1)C=CN2", "1,2,3,4-tetrahydropyrrolo[3,2-b]pyrrole"),
+    ("c1cc2c([nH]1)CCN2", "1,2,3,4-tetrahydropyrrolo[3,2-b]pyrrole"),
+    ("C1CC2=CNC=C2N1", "1,2,3,5-tetrahydropyrrolo[3,4-b]pyrrole"),
+    ("c1[nH]cc2c1CCN2", "1,2,3,5-tetrahydropyrrolo[3,4-b]pyrrole"),
 )
 SMILES = tuple(smiles for smiles, _ in CASES)
 

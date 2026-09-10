@@ -61,8 +61,8 @@ def test_graph_built_fusion_ketone_keeps_intrinsic_h_before_parent(branch, rever
     "smiles,expected",
     (
         ("O=C1C=CC2=C1NC=C2", "1H-cyclopenta[b]pyrrol-6-one"),
-        ("O=C1NC2=C(O1)C=CO2", "3H-furo[2,3-d][1,3]oxazol-2-one"),
-        ("O=C1NC2=C(OC=C2)O1", "1H-furo[3,2-d][1,3]oxazol-2-one"),
+        ("O=C1NC2=C(O1)C=CO2", "furo[2,3-d][1,3]oxazol-2(3H)-one"),
+        ("O=C1NC2=C(OC=C2)O1", "furo[3,2-d][1,3]oxazol-2(1H)-one"),
         ("O=C1OC2=C(O1)C=CN2", "4H-[1,3]dioxolo[4,5-b]pyrrol-2-one"),
     ),
 )

@@ -493,11 +493,19 @@ def test_partly_hydrogenated_hw_fusion_is_atom_order_invariant():
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [
-        ("N1C=NC2=C1N=CN2", "1H,4H-imidazo[4,5-d]imidazole"),
-        ("N1N=CC=2C1=CNN2", "1H,5H-pyrazolo[4,3-c]pyrazole"),
+        ("C1OCC2COCC12", "tetrahydro-1H,3H-furo[3,4-c]furan"),
+        ("C1SCC2CSCC12", "tetrahydro-1H,3H-thieno[3,4-c]thiophene"),
     ],
 )
 def test_multiple_indicated_hydrogens_are_graph_derived_and_roundtrip(smiles, expected):
+    """These ring systems really do hold two indicated hydrogens.
+
+    Both bridging heteroatoms are divalent, so the maximum matching leaves two
+    carbons unpaired and P-31.1.4.2.1 gives the parent a quota of two. Parents
+    whose quota is smaller spell the extra saturation as hydro prefixes instead
+    -- see ``test_saturation_past_the_quota_is_spelled_as_hydro``.
+    """
+
     result = name(
         smiles,
         fusion_mode=FusionMode.AUDITED_PIN,
@@ -517,6 +525,28 @@ def test_multiple_indicated_hydrogens_are_graph_derived_and_roundtrip(smiles, ex
     ]
     assert len({tuple(token["atoms"]) for token in hydrogen_tokens}) == 2
     assert all(len(token["atoms"]) == 1 for token in hydrogen_tokens)
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("N1C=NC2=C1N=CN2", "1,4-dihydroimidazo[4,5-d]imidazole"),
+        ("N1N=CC=2C1=CNN2", "1,5-dihydropyrazolo[4,3-c]pyrazole"),
+    ],
+)
+def test_saturation_past_the_quota_is_spelled_as_hydro(smiles, expected):
+    """P-31.1.4.2.1 caps indicated hydrogen; the rest is a hydro prefix.
+
+    Both ring systems are fully mancude -- their maximum matching pairs every
+    pi-capable atom, so the parent holds no indicated hydrogen at all and the
+    two NH sites are hydro, not an ``xH-`` citation.
+    """
+
+    result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True, include_trace=True)
+
+    assert result.name == expected
+    assert result.opsin_check is not None and result.opsin_check.status == "matched"
+    assert result.parent_nomenclature == "systematic_fusion"
 
 
 def test_fusion_audit_rejects_an_omitted_indicated_hydrogen_site():

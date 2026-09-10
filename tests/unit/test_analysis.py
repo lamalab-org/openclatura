@@ -4900,7 +4900,7 @@ def test_pyopsin_regression_names_preserve_retained_ring_cations():
     cases = {
         "CC(=C(C)C(=O)NCCc1[nH+]ccn1C)C": "2,3-dimethyl-N-(2-(1-methyl-1H-imidazol-3-ium-2-yl)ethyl)but-2-enamide",
         "CC[C@@H](C(=O)CC)Oc1[nH]c(c[nH+]1)C(=O)OC": "methyl 2-(((3S)-4-oxohexan-3-yl)oxy)-1H-imidazol-3-ium-5-carboxylate",
-        "Cn1c(ccn1)C[NH+]2CCc3c(cc[nH]c3=O)C2": "2-((1-methyl-1H-pyrazol-5-yl)methyl)-3,4-dihydro-2H,6H-pyrido[4,3-c]pyridin-2-ium-5-one",
+        "Cn1c(ccn1)C[NH+]2CCc3c(cc[nH]c3=O)C2": "2-((1-methyl-1H-pyrazol-5-yl)methyl)-2,3,4,6-tetrahydropyrido[4,3-c]pyridin-2-ium-5-one",
     }
 
     for smiles, expected in cases.items():
@@ -4953,7 +4953,7 @@ def test_pyopsin_regression_names_preserve_carbanion_suffix_locants():
 
 def test_pyopsin_regression_names_preserve_zwitterionic_parent_suffix_order():
     cases = {
-        "[NH3+]C1=CC(=O)NC(=O)[CH-]1": "2,6-dioxo-1H,3H-pyridin-3-ide-4-aminium",
+        "[NH3+]C1=CC(=O)NC(=O)[CH-]1": "2,6-dioxo-1,3-dihydropyridin-3-ide-4-aminium",
         "NC1=NC(N)=[NH+][N-]C1=N": "6-imino-1H-1,2,4-triazin-2-ium-1-ide-3,5-diamine",
         "[NH3+][C-]1C=CC2=C1N=NO2": "cyclopenta[d][1,2,3]oxadiazol-4-ide-4-aminium",
     }
@@ -5149,7 +5149,7 @@ def test_anionic_ketone_parent_names_keep_parent_descriptor_intact():
     cases = {
         "O=C1[CH-][NH+]2CCC2=C1": "3-oxo-1-azoniabicyclo[3.2.0]hept-4-en-2-ide",
         "O=C1C=C[NH+]2CC[C-]12": "4-oxo-1-azoniabicyclo[3.2.0]hept-2-en-5-ide",
-        "O=C1[CH-]NC2=C1C[NH2+]C2": "3-oxo-4,6-dihydro-1H,5H-pyrrolo[3,4-b]pyrrol-5-ium-2-ide",
+        "O=C1[CH-]NC2=C1C[NH2+]C2": "3-oxo-1,4,5,6-tetrahydropyrrolo[3,4-b]pyrrol-5-ium-2-ide",
         # The demoted ketone prefix goes in front of the whole prefix run rather
         # than sorting with it, as in ``3-oxo-4-methyl…``.
         "CC(=O)[C-]1C[NH2+]CC1=O": "3-oxo-4-acetylpyrrolidin-1-ium-4-ide",

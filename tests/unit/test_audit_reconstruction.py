@@ -762,7 +762,7 @@ def test_self_audit_abstains_on_unmodelled(smiles):
         # several indicated hydrogens instead
         ("O=c1[nH]cnc2nc[nH]c12", "1,7-dihydro-6H-purin-6-one"),  # hypoxanthine
         ("Nc1nc2[nH]cnc2c(=O)[nH]1", "2-amino-1,9-dihydro-6H-purin-6-one"),  # guanine
-        ("O=c1[nH]c(=O)c2[nH]c(=O)[nH]c2[nH]1", "1H,3H,7H,9H-purine-2,6,8-trione"),  # uric acid
+        ("O=c1[nH]c(=O)c2[nH]c(=O)[nH]c2[nH]1", "1H-purine-2,6,8(3H,7H,9H)-trione"),  # uric acid
         # a six-ring left untouched has two placements, but they are only its two
         # Kekulé forms — one structure, so still attributable
         (

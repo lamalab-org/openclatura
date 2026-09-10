@@ -218,7 +218,7 @@ def test_furan_pyrazole_cites_every_intrinsic_carbon_h(mode, reverse):
     assert not plan.derivative_state.hydro_operations
     assert not plan.derivative_state.unsaturation_operations
     generated = name_mol(graph, fusion_mode=mode).name
-    assert generated == "2H,4H,6H-furo[3,4-c]pyrazole"
+    assert generated == "4,6-dihydro-2H-furo[3,4-c]pyrazole"
     if opsin_available():
         assert verify_with_opsin(generated, smiles, standardize_smiles=False).status == "matched"
 

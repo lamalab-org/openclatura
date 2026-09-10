@@ -63,7 +63,7 @@ def test_partially_hydrogenated_ring_nh_is_owned_by_hydro_operation(symbol, meth
 def test_intrinsic_component_donor_does_not_become_adjacent_hydro_pair():
     mol = Chem.MolFromSmiles("C1NCC2=NNN=C12")
     result = name_mol(mol)
-    assert result.name == "2H,4H,5H,6H-pyrrolo[3,4-d][1,2,3]triazole"
+    assert result.name == "2,4,5,6-tetrahydropyrrolo[3,4-d][1,2,3]triazole"
     if opsin_available():
         assert verify_with_opsin(result.name, Chem.MolToSmiles(mol), standardize_smiles=False).status == "matched"
         assert (

@@ -23,7 +23,7 @@ WITNESSES = [
     ("[N-]1[NH+]=CN=C2N=CN=C12", "imidazo[4,5-e][1,2,4]triazin-1-ide-2-ium"),
     ("[N-]1[NH+]=NC=C2N=CN=C12", "imidazo[4,5-d][1,2,3]triazin-1-ide-2-ium"),
     ("[NH3+][C-]1C=CC2=C1N=NO2", "cyclopenta[d][1,2,3]oxadiazol-4-ide-4-aminium"),
-    ("O=C1[CH-]NC2=C1C[NH2+]C2", "3-oxo-4,6-dihydro-1H,5H-pyrrolo[3,4-b]pyrrol-5-ium-2-ide"),
+    ("O=C1[CH-]NC2=C1C[NH2+]C2", "3-oxo-1,4,5,6-tetrahydropyrrolo[3,4-b]pyrrol-5-ium-2-ide"),
 ]
 
 
@@ -71,7 +71,7 @@ def test_charged_fusion_witness_is_opsin_graph_exact(smiles, expected, reverse):
         ),
         (
             "O=C1[CH-]NC2=C1C[NH+](C)C2",
-            "5-methyl-3-oxo-4,6-dihydro-1H,5H-pyrrolo[3,4-b]pyrrol-5-ium-2-ide",
+            "5-methyl-3-oxo-1,4,5,6-tetrahydropyrrolo[3,4-b]pyrrol-5-ium-2-ide",
         ),
     ],
 )
