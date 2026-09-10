@@ -71,6 +71,7 @@ RULE_GROUPS: tuple[RuleGroupSpec, ...] = (
             "saturated_n_ring_ionic_parents",
             "parent_charge_suffixes",
             "replacement_charge_prefixes",
+            "replacement_charge_states",
             "heteroatom_charge_prefixes",
             "anion_suffix_placements",
         ),

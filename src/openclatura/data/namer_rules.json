@@ -343,6 +343,13 @@
       "aza:+": "azonia"
     }
   },
+  "replacement_charge_states": {
+    "bluebook_rule": "P-22.2; charged skeletal replacement with specified bonding state",
+    "values": [
+      {"symbol": "B", "charge": -1, "valence": 4, "prefix": "boranuida"},
+      {"symbol": "Si", "charge": -1, "valence": 5, "prefix": "silanuida"}
+    ]
+  },
   "heteroatom_charge_prefixes": {
     "bluebook_rule": "P-61 and P-72; charged heteroatom substituent prefixes",
     "values": {

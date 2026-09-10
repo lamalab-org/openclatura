@@ -7,6 +7,7 @@ from .locants import parse_locant
 from .molecule import Molecule
 from .name_operations import HydroOperation
 from .namer_config import INDICATED_H_ELEMENTS, cites_indicated_hydrogen
+from .nomenclature import RULES
 from .rules.retained import mancude_monocycle_hydro_plan
 
 _STEM_HYDRO_RE = re.compile(r"^(\d+[a-z]?(?:,\d+[a-z]?)*)-(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)hydro-")
@@ -670,7 +671,17 @@ def add_replacement_prefixes(mol: Molecule, parts: AssemblyParts, numbered_path:
         if not hw_stem:
             continue
         valence = sum(mol.get_bond(atom_idx, n).order for n in mol.get_neighbors(atom_idx))
+        charged_prefix = RULES.charges.replacement_charge_states.get(
+            (atom.symbol, atom.charge, valence + atom.total_h_count)
+        )
         loc = get_loc(atom_idx)
         if atom.charge == 0 and valence > atom.element.standard_valence:
             loc = f"{loc}lambda^{valence}"
-        parts.a_prefixes.append(SubstituentItem(name=hw_stem, locants=[loc], atom_ids={atom_idx}))
+        parts.a_prefixes.append(
+            SubstituentItem(
+                name=charged_prefix or hw_stem,
+                locants=[loc],
+                atom_ids={atom_idx},
+                charge_atom_ids={atom_idx} if charged_prefix else set(),
+            )
+        )

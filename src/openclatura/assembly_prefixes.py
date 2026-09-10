@@ -9,10 +9,16 @@ from .formatting import is_complex_prefix, needs_complex_multiplier
 from .locant_elision import retained_parent_attachment_is_ambiguous, substituent_locant_set_is_unique
 from .nomenclature import RULES
 from .retained_specs import retained_parent_spec
-from .rules import multipliers
+from .rules import elements, multipliers
 
 SUBSTITUENT_SORT_PREFIX_RE = re.compile(RULES.assembly.substituent_sort_prefix_pattern)
-A_PREFIX_ORDER = RULES.assembly.replacement_prefix_order
+A_PREFIX_ORDER = {
+    **RULES.assembly.replacement_prefix_order,
+    **{
+        prefix: RULES.assembly.replacement_prefix_order.get(elements.get(symbol).hw_stem, 99)
+        for (symbol, _charge, _valence), prefix in RULES.charges.replacement_charge_states.items()
+    },
+}
 
 
 def _groups_offering_a_second_position() -> frozenset[str]:
