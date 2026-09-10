@@ -16,7 +16,7 @@ from ..retained_graph_model import RetainedGraphTemplate
 from ..rules import elements
 from .config import fusion_nomenclature_config
 from .faces import BoundedFaceModel, typed_face_model
-from .layout import preferred_intrinsic_layouts
+from .layout import OpsinConstructionLayout, preferred_intrinsic_layouts
 from .model import (
     BondAssignment,
     Face,
@@ -117,7 +117,7 @@ def completed_system_numbering_selection(
     candidates: list[CompletedNumbering] = []
     rejected: list[RejectedNumbering] = []
     fusion_atoms = _fusion_atoms(faces)
-    perimeter_cache: dict[tuple[int, ...], CompletedNumbering | None] = {}
+    perimeter_cache: dict[tuple[tuple[int, ...], tuple[int, ...] | None], CompletedNumbering | None] = {}
     for layout_index, layout in enumerate(layouts):
         derived = _numbering_from_layout(
             mol,
@@ -190,7 +190,7 @@ def _numbering_from_layout(
     layout_index: int,
     fusion_atoms: set[int],
     *,
-    perimeter_cache: dict[tuple[int, ...], CompletedNumbering | None] | None = None,
+    perimeter_cache: dict[tuple[tuple[int, ...], tuple[int, ...] | None], CompletedNumbering | None] | None = None,
 ) -> CompletedNumbering | None:
     positions = {atom: (x, y) for atom, x, y in layout.atom_positions}
     centers = {face: (x, y) for face, x, y in layout.face_positions}
@@ -225,11 +225,16 @@ def _numbering_from_layout(
         return None
     offset = clockwise.index(start_atom)
     perimeter = clockwise[offset:] + clockwise[:offset]
-    # Only graph-derived data is shared; each layout keeps its own provenance.
-    if perimeter_cache is not None and perimeter in perimeter_cache:
-        numbered = perimeter_cache[perimeter]
+    construction_order = layout.construction_atom_order if isinstance(layout, OpsinConstructionLayout) else None
+    cache_key = perimeter, construction_order
+    if perimeter_cache is not None and cache_key in perimeter_cache:
+        numbered = perimeter_cache[cache_key]
     else:
-        locant_map = _number_completed_system(mol, faces, perimeter, fusion_atoms)
+        locant_map = (
+            _number_completed_system(mol, faces, perimeter, fusion_atoms, opsin_atom_order=construction_order)
+            if construction_order is not None
+            else _number_completed_system(mol, faces, perimeter, fusion_atoms)
+        )
         numbered = (
             CompletedNumbering(
                 perimeter=perimeter,
@@ -240,7 +245,7 @@ def _numbering_from_layout(
             else None
         )
         if perimeter_cache is not None:
-            perimeter_cache[perimeter] = numbered
+            perimeter_cache[cache_key] = numbered
     if numbered is None:
         return None
     return replace(
@@ -575,6 +580,8 @@ def _number_completed_system(
     faces: BoundedFaceModel,
     perimeter: tuple[int, ...],
     fusion_atoms: set[int],
+    *,
+    opsin_atom_order: tuple[int, ...] | None = None,
 ) -> dict[int, SystemLocant] | None:
     """Number the perimeter, then extend the map to interior atoms."""
 
@@ -584,6 +591,12 @@ def _number_completed_system(
     interior = set(faces.atom_ids) - set(perimeter)
     if not interior:
         return result
+    if opsin_atom_order is not None:
+        if len(set(opsin_atom_order)) != len(opsin_atom_order) or set(opsin_atom_order) != set(faces.atom_ids):
+            return None
+        return _number_perimeter(
+            mol, perimeter + tuple(atom for atom in opsin_atom_order if atom in interior), fusion_atoms | interior
+        )
     if len(interior) == 1:
         # A unique interior vertex has an unambiguous place after the
         # perimeter in completed fusion numbering. Continue the final fusion

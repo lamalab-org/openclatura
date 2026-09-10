@@ -9,15 +9,98 @@ have all been audited.
 from __future__ import annotations
 
 from collections import defaultdict, deque
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, fields, replace
 from math import gcd, lcm
 
+from ..locants import system_locant_sort_key
 from .config import RingShapeSpec, fusion_nomenclature_config
-from .model import Face, FaceModel, FusedLayout, FusionComponentSpec, FusionNameAst
+from .model import Face, FaceModel, FusedLayout, FusionCitationPlan, FusionComponentSpec, FusionNameAst
 
 Point = tuple[int, int]
 Edge = tuple[int, int]
 _SHAPE_EDGE_SCALE = 4
+OPSIN_CONSTRUCTION_NUMBERING = "opsin_component_construction_order"
+
+
+@dataclass(frozen=True, slots=True)
+class OpsinConstructionLayout(FusedLayout):
+    """An explicit parser-compatibility numbering witness on an audited layout.
+
+    Atom identities remain in the input graph namespace. Ordinary intrinsic
+    layouts carry no such witness and retain IUPAC distance-based numbering.
+    """
+
+    construction_atom_order: tuple[int, ...] = ()
+
+    def __post_init__(self) -> None:
+        FusedLayout.__post_init__(self)
+        if len(set(self.construction_atom_order)) != len(self.construction_atom_order):
+            raise ValueError("construction atom order must not repeat merged atoms")
+        if set(self.construction_atom_order) != {atom for atom, _, _ in self.atom_positions}:
+            raise ValueError("construction atom order must cover the positioned graph")
+
+
+def opsin_construction_atom_order(ast: FusionNameAst, specs: dict[int, FusionComponentSpec]) -> tuple[int, ...] | None:
+    """Project component incorporation and fusion-atom survival onto the graph.
+
+    OPSIN 2.9.0 incorporates the parent then prefixes from right to left,
+    retaining host atoms at fusion interfaces. Its incomplete interior
+    numbering uses this surviving fragment order, not a geometric traversal.
+    """
+    plan = ast.citation_plan
+    if plan is None:
+        if ast.citation_tree is None:
+            return None
+        plan = FusionCitationPlan.from_tree(ast.citation_tree, ast.joins)
+    if len(plan.roots) != 1 or plan.interparent_occurrences or plan.cycle_closing_join_indices:
+        return None
+    matches = {match.occurrence_id: match for match in ast.component_occurrences}
+    groups = {
+        occurrence: group.occurrence_ids for group in ast.multiplicative_groups for occurrence in group.occurrence_ids
+    }
+    blocks = []
+    emitted = set()
+    for occurrence in plan.render_order:
+        if occurrence not in emitted:
+            block = groups.get(occurrence, (occurrence,))
+            blocks.append(block)
+            emitted.update(block)
+    # Multipliers are consumed right to left as a block, but copies inside
+    # each block are incorporated in descriptor order, not reversed.
+    order = (*plan.parent_occurrences, *(occurrence for block in reversed(blocks) for occurrence in block))
+    if len(order) != len(matches) or set(order) != set(matches):
+        return None
+    result = []
+    seen = set()
+    incorporated = set()
+    for occurrence in order:
+        spec = specs.get(occurrence)
+        if spec is None:
+            return None
+        local = matches[occurrence].input_atom_by_locant
+        if set(local) != set(spec.template.locants):
+            return None
+        joins = [join for join in ast.joins if join.attached_occurrence == occurrence]
+        if any(join.host_occurrence not in incorporated for join in joins):
+            return None
+        overlap = set(local.values()) & seen
+        if overlap != set().union(*(join.shared_input_atoms for join in joins)):
+            return None
+        for join in joins:
+            interface = join.interface
+            host = matches[join.host_occurrence].input_atom_by_locant
+            if (
+                tuple(local.get(locant.text) for locant in interface.attached_path) != interface.ordered_input_atoms
+                or tuple(host.get(locant.text) for locant in interface.host_path) != interface.ordered_input_atoms
+            ):
+                return None
+        for locant in sorted(local, key=system_locant_sort_key):
+            atom = local[locant]
+            if atom not in seen:
+                result.append(atom)
+                seen.add(atom)
+        incorporated.add(occurrence)
+    return tuple(result)
 
 
 class LayoutSearchBudgetExceeded(RuntimeError):
@@ -87,15 +170,41 @@ def component_entry_layouts(
     *,
     search_budget: int = _CONFIG.search.layout_states,
 ) -> tuple[FusedLayout, ...] | None:
-    """Use the composed interface direction for configured three-port witnesses.
+    """Bind construction-dependent numbering or directed entry to audited geometry.
 
-    This bounded tree tier requires a unique smallest terminal component and
-    undistorted symmetric opposite terminals. Other face graphs continue to
+    Multi-interior systems carry explicit OPSIN construction-order numbering;
+    geometry and the graph-only numbering API remain independent of that
+    compatibility convention. The directed-entry tree tier requires a unique
+    smallest terminal component and undistorted symmetric opposite terminals.
+    Other face graphs continue to
     use intrinsic layout search. An applicable but invalid witness is rejected,
     not replaced with unrestricted peripheral numbering.
     """
     if search_budget < 1:
         raise ValueError("layout search budget must be positive")
+    atoms = {atom for face in model.faces for atom in face.atom_cycle}
+    if len(atoms - set(model.outer_boundary)) > 1:
+        construction_order = opsin_construction_atom_order(ast, specs)
+        if construction_order is None:
+            return None
+        if set(construction_order) != atoms:
+            return ()
+        return tuple(
+            OpsinConstructionLayout(
+                **{
+                    field.name: getattr(layout, field.name)
+                    for field in fields(FusedLayout)
+                    if field.name != "audit_evidence"
+                },
+                audit_evidence=(
+                    *layout.audit_evidence,
+                    OPSIN_CONSTRUCTION_NUMBERING,
+                    "interior numbering compatibility only; IUPAC distance-rule PIN not certified",
+                ),
+                construction_atom_order=construction_order,
+            )
+            for layout in preferred_intrinsic_layouts(model, search_budget=search_budget)
+        )
     if not can_use_component_entry_layout(model):
         return None
     faces = {face.id: face for face in model.faces}
