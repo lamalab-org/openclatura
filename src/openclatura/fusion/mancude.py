@@ -665,15 +665,20 @@ def _external_pi_parent_delta(
             continue
         if any(mol.get_bond(atom, neighbor).order != 1 for atom in added for neighbor in mol.get_neighbors(atom)):
             continue
-        delta = compare_actual_parent_to_implied_parent(
+        # Preserve the composed domain while proving any alternating shift.
+        # Retained-state comparison prevents recursive external-pi composition;
+        # the explicit flag still enables the exact redistribution proof.
+        state = parent_derivative_state(
             mol,
             atoms,
             replace(constrained, allowed_kekule_assignments=(assignment,)),
-            atom_to_locant=locants,
+            locants,
             preserve_retained_parent_state=True,
+            allow_pi_redistribution=True,
         )
-        if delta is None or not delta.compatible or delta.additional_multiple_bond_ids:
+        if state is None or state.unsaturation_operations:
             continue
+        delta = state.bond_delta
         ordered = tuple(sorted(added, key=lambda atom: system_locant_sort_key(str(locants[atom]))))
         operations = (
             (
@@ -699,6 +704,9 @@ def _external_pi_parent_delta(
             else ()
         )
         rank = (
+            # Keep established direct-consumption witnesses ahead of newly
+            # admitted shifts; their added-H ownership is already explicit.
+            bool(delta.additional_multiple_bond_ids),
             len(delta.hydrogenated_edges),
             # P-58.2.2.2: added-H locants precede hydro-prefix locants.
             tuple(system_locant_sort_key(str(locants[atom])) for atom in ordered),
