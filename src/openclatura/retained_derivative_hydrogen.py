@@ -21,7 +21,11 @@ class RetainedOxoHydrogenProof:
 
 
 def prove_retained_oxo_carbon_hydrogen(
-    mol: Molecule, template: RetainedGraphTemplate, locant_to_atom: dict[str, int]
+    mol: Molecule,
+    template: RetainedGraphTemplate,
+    locant_to_atom: dict[str, int],
+    *,
+    declared_indicated_h: tuple[str, ...] = (),
 ) -> RetainedOxoHydrogenProof | None:
     """Locate intrinsic carbon H only when oxo substitution explains every delta.
 
@@ -32,9 +36,13 @@ def prove_retained_oxo_carbon_hydrogen(
 
     from .fusion.numbering import RetainedParentBondCapacityError, retained_template_parent_bond_model
 
-    if template.default_indicated_h or template.indicated_hydrogen_count <= 0:
+    if (template.default_indicated_h and not declared_indicated_h) or template.indicated_hydrogen_count <= 0:
         return None
     if set(locant_to_atom) != set(template.locants):
+        return None
+    if len(set(declared_indicated_h)) != len(declared_indicated_h) or not set(declared_indicated_h) <= set(
+        template.locants
+    ):
         return None
     atoms = frozenset(locant_to_atom.values())
     if len(atoms) != len(template.locants) or not atoms <= mol.atoms.keys():
@@ -66,7 +74,7 @@ def prove_retained_oxo_carbon_hydrogen(
             oxo_sites.add(index)
     if not oxo_sites:
         return None
-    indicated = tuple(
+    indicated = declared_indicated_h or tuple(
         sorted(
             (
                 locant

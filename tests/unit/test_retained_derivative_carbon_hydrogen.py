@@ -60,6 +60,46 @@ def _orders(graph):
     return original, original[::-1], shuffled
 
 
+@pytest.mark.parametrize("branch", (None, "1", "4", "6"))
+def test_declared_parent_hydrogen_and_oxo_added_hydrogen_have_separate_proofs(branch):
+    template = _template("1H-pyrrolo[3,2-b]pyridine")
+    graph = Chem.RWMol()
+    mapping = {a.locant: graph.AddAtom(Chem.Atom(a.symbol)) for a in template.atoms}
+    model = retained_template_parent_bond_model(template, mapping, indicated_h=("1",))
+    consumed = tuple(sorted((mapping["4"], mapping["5"])))
+    assignment = next(a for a in model.allowed_kekule_assignments if dict(a.orders)[consumed] == 2)
+    for edge, order in assignment.orders:
+        graph.AddBond(*edge, Chem.BondType.DOUBLE if order == 2 and edge != consumed else Chem.BondType.SINGLE)
+    oxygen = graph.AddAtom(Chem.Atom("O"))
+    graph.AddBond(mapping["5"], oxygen, Chem.BondType.DOUBLE)
+    if branch:
+        methyl = graph.AddAtom(Chem.Atom("C"))
+        graph.AddBond(mapping[branch], methyl, Chem.BondType.SINGLE)
+    Chem.SanitizeMol(graph)
+    for order in _orders(graph):
+        mol = read_rdkit_mol(Chem.RenumberAtoms(graph, order))
+        locants = {loc: order.index(atom) for loc, atom in mapping.items()}
+        proof = prove_retained_oxo_carbon_hydrogen(mol, template, locants, declared_indicated_h=("1",))
+        assert proof is not None
+        assert proof.indicated_h == ("1",)
+        assert proof.added_hydrogen.locants == ("4",)
+        assert proof.added_hydrogen.atom_ids == (locants["4"],)
+        assert prove_retained_oxo_carbon_hydrogen(mol, template, locants, declared_indicated_h=("99",)) is None
+
+
+@pytest.mark.opsin
+def test_declared_fused_donor_and_oxo_suffix_roundtrip():
+    if not opsin_available():
+        pytest.skip("OPSIN and Java are required")
+    graph = Chem.MolFromSmiles("O=c1ccc2c(ccn2Cc2nnc3ccc(-c4ccccc4)nn23)[nH]1")
+    original = Chem.MolToSmiles(graph)
+    for order in _orders(graph):
+        result = name_mol(Chem.RenumberAtoms(graph, order), include_trace=True)
+        assert result.error is None
+        assert "1H-pyrrolo[3,2-b]pyridin-5(4H)-one" in result.name
+        assert verify_with_opsin(result.name, original, standardize_smiles=False).ok
+
+
 @pytest.mark.parametrize("parent", ["1H-1,4-benzodiazepine", "1H-1,5-benzodiazepine"])
 @pytest.mark.parametrize("substitution", [None, "N-methyl", "fluoro", "C-methyl", "C-dimethyl", "methoxy"])
 def test_graph_proof_preserves_capacity_and_reconstructs_all_bonds(parent, substitution):

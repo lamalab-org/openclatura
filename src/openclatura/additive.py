@@ -446,21 +446,25 @@ def _apply_retained_oxo_carbon_hydrogen(mol: Molecule, parts: AssemblyParts, num
     if (
         not parts.retained_name
         or metadata is None
-        or not metadata.relocated_indicated_h
-        or not metadata.default_indicated_h
         or parts.principal_group is None
         or parts.principal_group.key != "ketone"
         or (parent is not None and parent.is_fusion_parent)
     ):
         return False
+    declared = tuple(sorted(_name_indicated_hydrogen_locants(parts.retained_name), key=parse_locant))
+    relocated = metadata.relocated_indicated_h and metadata.default_indicated_h
+    if not relocated and not declared:
+        return False
     template = next((t for t in retained_graph_templates() if parts.retained_name in {t.name, t.output_name}), None)
     if template is None:
         return False
     locants = {str(get_loc(index)): index for index in numbered_path}
-    proof = prove_retained_oxo_carbon_hydrogen(mol, template, locants)
+    proof = prove_retained_oxo_carbon_hydrogen(
+        mol, template, locants, declared_indicated_h=() if relocated else declared
+    )
     if (
         proof is None
-        or proof.indicated_h != metadata.default_indicated_h
+        or proof.indicated_h != (metadata.default_indicated_h if relocated else declared)
         or proof.oxo_atom_ids != parts.parent_atom_ids.intersection(parts.principal_group.atom_ids)
     ):
         return False
