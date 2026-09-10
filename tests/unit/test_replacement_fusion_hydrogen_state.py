@@ -10,7 +10,7 @@ from rdkit import Chem
 from openclatura import name_mol, opsin_available
 from openclatura.chains import find_ring_systems
 from openclatura.fusion.model import FusionMode
-from openclatura.fusion.replacement_state import prove_replacement_state
+from openclatura.fusion.replacement_state import _hydrogen_balances, prove_replacement_state
 from openclatura.fusion.third_component import plan_third_component_fusion_parent
 from openclatura.graph_io import read_rdkit_mol
 from openclatura.opsin_verify import verify_with_opsin
@@ -23,6 +23,8 @@ CASES = (
         id="pubchem-40352",
     ),
 )
+
+EXTERNAL_PI_SMILES = "C/C=C1/C(=O)O[C@@]23C=C[C@@H]4C[C@@H](O)O[C@@H](O[C@@H]12)[C@H]43"
 
 
 def _plan(graph):
@@ -168,3 +170,53 @@ def test_restored_chalcogen_capacity_is_not_oxygen_specific():
         assert check.canonical_original == check.canonical_roundtrip
         names.add(result.name)
     assert len(names) == 1
+
+
+def test_replacement_oxygen_has_no_pi_or_hydrogen_roles_with_external_pi():
+    graph = Chem.MolFromSmiles(EXTERNAL_PI_SMILES)
+    for order in _orders(graph.GetNumAtoms()):
+        mol, parent = _plan(Chem.RenumberAtoms(graph, order))
+        proof = parent.replacement_fusion_state
+        state = proof.derivative_state
+        oxygen = {atom for atom in parent.atoms if mol.atoms[atom].symbol == "O"}
+        assert len(oxygen) == 3
+        assert all(atom.pi_capacity == 0 and atom.forced_single for atom in proof.graph.atoms if atom.id in oxygen)
+        assert not any(oxygen.intersection(edge) for edge in proof.bond_model.pi_eligible_edges)
+        assert len(state.oxo_operations) == len(state.alkylidene_operations) == 1
+        assert len(state.bond_delta.implied_multiple_bond_ids) == 1
+        assert len(state.bond_delta.hydrogenated_edges) == 2
+        assert not state.unsaturation_operations
+        hydrogen_sites = {
+            atom for op in (*state.hydro_operations, *state.added_hydrogen_operations) for atom in op.atom_ids
+        }
+        hydrogen_sites.update(
+            atom for atom, locant in parent.proof_locant_maps[0].items() if locant in proof.indicated_hydrogens
+        )
+        assert not oxygen.intersection(hydrogen_sites)
+        assert all(row.exact for row in proof.hydrogen_balances)
+        assert all(
+            row.parent_hydrogens == row.additive_hydrogens == 0
+            for row in proof.hydrogen_balances
+            if row.atom_id in oxygen
+        )
+
+
+@pytest.mark.parametrize("corruption", ["missing_oxo", "missing_alkylidene", "oxygen_added_h"])
+def test_replacement_proof_rejects_incomplete_external_pi_roles(corruption):
+    mol, parent = _plan(Chem.MolFromSmiles(EXTERNAL_PI_SMILES))
+    proof = parent.replacement_fusion_state
+    state = proof.derivative_state
+    if corruption == "missing_oxo":
+        state = replace(state, oxo_operations=())
+    elif corruption == "missing_alkylidene":
+        state = replace(state, alkylidene_operations=())
+    else:
+        oxygen = next(atom for atom in parent.atoms if mol.atoms[atom].symbol == "O")
+        operation = state.hydro_operations[0]
+        operations = (
+            replace(
+                operation, key="added_hydrogen", atom_ids=(oxygen,), locants=(parent.proof_locant_maps[0][oxygen],)
+            ),
+        )
+        state = replace(state, bond_delta=replace(state.bond_delta, added_hydrogen_operations=operations))
+    assert _hydrogen_balances(mol, parent.atoms, proof.bond_model, state) is None

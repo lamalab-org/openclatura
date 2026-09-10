@@ -58,17 +58,20 @@ class ReplacementFusionState:
         )
 
 
-def saturated_replacement_scope(mol: Molecule, atoms: frozenset[int]) -> bool:
-    """The supported composition domain has standard, neutral sigma valence."""
+def replacement_state_scope(mol: Molecule, atoms: frozenset[int]) -> bool:
+    """Support neutral standard valence with carbon pi and sigma-only donors."""
     for atom_id in atoms:
         atom = mol.atoms[atom_id]
         neighbors = mol.get_neighbors(atom_id)
-        if atom.charge or atom.is_aromatic or any(mol.get_bond(atom_id, other).order != 1 for other in neighbors):
+        orders = [mol.get_bond(atom_id, other).order for other in neighbors]
+        if atom.charge or atom.is_aromatic or any(order not in {1, 2} for order in orders):
             return False
-        if atom.total_h_count != atom.element.standard_valence - len(neighbors):
+        if atom.total_h_count != atom.element.standard_valence - sum(orders):
             return False
         if atom.is_carbon:
             continue
+        if any(order != 1 for order in orders):
+            return False
         ring_degree = len(atoms.intersection(neighbors))
         if not (
             (atom.element.mancude_forced_single and ring_degree == 2)
@@ -87,7 +90,7 @@ def prove_replacement_state(mol: Molecule, carbon_plan: FusionParentPlan) -> Rep
     """
     locants = carbon_plan.numbering.string_input_locant_maps()[0]
     atoms = frozenset(locants)
-    if not carbon_plan.audit.confirmed or not saturated_replacement_scope(mol, atoms):
+    if not carbon_plan.audit.confirmed or not replacement_state_scope(mol, atoms):
         return None
     graph = replace(
         carbon_plan.abstract_parent_graph,
@@ -105,18 +108,26 @@ def prove_replacement_state(mol: Molecule, carbon_plan: FusionParentPlan) -> Rep
     candidates = []
     for assignment in initial.allowed_kekule_assignments:
         paired = {atom for edge, order in assignment.orders if order == 2 for atom in edge}
-        intrinsic = {atom for atom in atoms - paired if mol.atoms[atom].is_carbon}
-        if any(len(atoms.intersection(mol.get_neighbors(atom))) != 2 for atom in intrinsic):
-            continue
+        intrinsic = {
+            atom
+            for atom in atoms - paired
+            if mol.atoms[atom].is_carbon and len(atoms.intersection(mol.get_neighbors(atom))) < 4
+        }
         model = indicated_hydrogen_parent_bond_model(graph, intrinsic)
         if model.maximum_non_cumulative_double_bonds != initial.maximum_non_cumulative_double_bonds:
             continue
         state = parent_derivative_state(
-            mol, atoms, model, locants, indicated_hydrogen_atom_ids=intrinsic, preserve_retained_parent_state=True
+            mol,
+            atoms,
+            model,
+            locants,
+            indicated_hydrogen_atom_ids=intrinsic,
+            preserve_retained_parent_state=True,
+            compose_retained_external_pi=True,
         )
-        if state is None or state.unsaturation_operations or state.external_pi_operations:
+        if state is None or state.unsaturation_operations:
             continue
-        balances = _hydrogen_balances(mol, atoms, state)
+        balances = _hydrogen_balances(mol, atoms, model, state)
         if balances is None:
             continue
         indicated = tuple(sorted((locants[atom] for atom in intrinsic), key=system_locant_sort_key))
@@ -175,12 +186,28 @@ def prove_replacement_state(mol: Molecule, carbon_plan: FusionParentPlan) -> Rep
 
 
 def _hydrogen_balances(
-    mol: Molecule, atoms: frozenset[int], state: ParentDerivativeState
+    mol: Molecule, atoms: frozenset[int], model: ParentBondModel, state: ParentDerivativeState
 ) -> tuple[ReplacementHydrogenBalance, ...] | None:
     delta = state.bond_delta
     assignment = dict(delta.assignment.orders)
+    external_pi = {
+        mol.get_bond(atom, other).idx
+        for atom in atoms
+        for other in mol.get_neighbors(atom)
+        if other not in atoms and mol.get_bond(atom, other).order == 2
+    }
+    if external_pi != {op.bond_id for op in state.external_pi_operations}:
+        return None
+    pi_atoms = {atom for edge in model.pi_eligible_edges | model.required_double_bonds for atom in edge}
+    paired = {atom for edge, order in assignment.items() if order == 2 for atom in edge}
+    consumed = {op.parent_atom_id for op in state.external_pi_operations}
+    added = [atom for op in state.added_hydrogen_operations for atom in op.atom_ids]
+    if len(added) != len(set(added)) or set(added) != pi_atoms - paired - consumed:
+        return None
+    if any(not mol.atoms[atom].is_carbon for atom in added):
+        return None
     hydro = set(delta.hydrogenated_edges)
-    if hydro != {edge for edge, order in assignment.items() if order == 2}:
+    if not hydro <= {edge for edge, order in assignment.items() if order == 2}:
         return None
     if len(delta.hydrogenated_atom_ids) != 2 * len(hydro):
         return None

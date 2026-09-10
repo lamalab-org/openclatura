@@ -97,9 +97,9 @@ def _plan_uncached(
     if parent is None or not parent.audit_ok:
         return None
     replacement_state = None
-    from .replacement_state import saturated_replacement_scope
+    from .replacement_state import replacement_state_scope
 
-    if parent.fusion_plan is not None and saturated_replacement_scope(mol, atoms):
+    if parent.fusion_plan is not None and replacement_state_scope(mol, atoms):
         composed = _select_replacement_state(mol, carbon, atoms, mode, parent)
         if composed is None:
             return None
