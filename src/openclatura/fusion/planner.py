@@ -13,6 +13,7 @@ from ..polycycle_topology import ring_system_topology
 from .audit import audit_fusion_plan
 from .charges import fusion_charge_operations as _fusion_charge_operations
 from .charges import fusion_component_charge_parent
+from .citation_numbering import numbered_parent_graphs_agree
 from .citation_pi import citation_pi_dead_end
 from .citation_pi_donor import charged_donor_citation_pi_dead_end
 from .config import fusion_nomenclature_config
@@ -235,6 +236,10 @@ def _plan_numbered_candidate(
     numberings = numbering_selection.accepted
     if not numberings:
         return FusionUnsupported("no layout-derived peripheral system numbering was proven")
+    if len(numberings) > 1 and not numbered_parent_graphs_agree(
+        mol, (dict(candidate.atom_to_locant) for candidate in numberings)
+    ):
+        return FusionUnsupported("tied fusion numberings identify different locant-labelled parent graphs")
     try:
         graph = _abstract_graph(ast, registry)
     except MancudeSearchBudgetExceeded as exc:

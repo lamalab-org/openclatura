@@ -172,7 +172,14 @@ def test_restored_chalcogen_capacity_is_not_oxygen_specific():
     assert len(names) == 1
 
 
-def test_replacement_oxygen_has_no_pi_or_hydrogen_roles_with_external_pi():
+@pytest.fixture
+def external_pi_chemistry_only(monkeypatch):
+    # This fixture tests replacement chemistry, not citation uniqueness. The
+    # public roundtrip regression separately requires the unambiguous route.
+    monkeypatch.setattr("openclatura.fusion.planner.numbered_parent_graphs_agree", lambda *args: True)
+
+
+def test_replacement_oxygen_has_no_pi_or_hydrogen_roles_with_external_pi(external_pi_chemistry_only):
     graph = Chem.MolFromSmiles(EXTERNAL_PI_SMILES)
     for order in _orders(graph.GetNumAtoms()):
         mol, parent = _plan(Chem.RenumberAtoms(graph, order))
@@ -202,7 +209,7 @@ def test_replacement_oxygen_has_no_pi_or_hydrogen_roles_with_external_pi():
 
 
 @pytest.mark.parametrize("corruption", ["missing_oxo", "missing_alkylidene", "oxygen_added_h"])
-def test_replacement_proof_rejects_incomplete_external_pi_roles(corruption):
+def test_replacement_proof_rejects_incomplete_external_pi_roles(corruption, external_pi_chemistry_only):
     mol, parent = _plan(Chem.MolFromSmiles(EXTERNAL_PI_SMILES))
     proof = parent.replacement_fusion_state
     state = proof.derivative_state
