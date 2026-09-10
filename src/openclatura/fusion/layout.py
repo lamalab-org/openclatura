@@ -21,6 +21,7 @@ Edge = tuple[int, int]
 _SHAPE_EDGE_SCALE = 4
 OPSIN_CONSTRUCTION_NUMBERING = "opsin_component_construction_order"
 OPSIN_RING_MAP_NUMBERING = "opsin_ring_map_occupied_rows"
+OPSIN_COUPLED_PENTAGON_AXES = "opsin_coupled_two_port_pentagon_axes"
 
 
 @dataclass(frozen=True, slots=True)
@@ -166,7 +167,10 @@ def can_use_component_entry_layout(model: FaceModel) -> bool:
 
 def _opsin_ring_map_tree(model: FaceModel) -> bool:
     """Bound compatibility to hexagonal trees with terminal small polygons."""
-    return (
+    return _opsin_pentagon_chain(
+        {face.id: face.atom_cycle for face in model.faces},
+        frozenset(frozenset((left, right)) for left, right, _ in model.face_adjacency),
+    ) is not None or (
         len(model.face_adjacency) == len(model.faces) - 1
         and any(face.size == 3 for face in model.faces)
         and any(face.size == 6 for face in model.faces)
@@ -176,6 +180,58 @@ def _opsin_ring_map_tree(model: FaceModel) -> bool:
             for face in model.faces
         )
     )
+
+
+def _opsin_pentagon_chain(
+    orders: dict[int, tuple[int, ...]], adjacent: frozenset[frozenset[int]]
+) -> tuple[int, ...] | None:
+    """Prove a complete linear chain of opposite-port pentagons between hexagons."""
+    if len(adjacent) != len(orders) - 1:
+        return None
+    neighbors: dict[int, list[int]] = {face: [] for face in orders}
+    for left, right in adjacent:
+        if left not in neighbors or right not in neighbors:
+            return None
+        neighbors[left].append(right)
+        neighbors[right].append(left)
+    terminals = [face for face in orders if len(neighbors[face]) == 1]
+    if len(terminals) != 2 or any(len(group) not in {1, 2} for group in neighbors.values()):
+        return None
+    path = [terminals[0]]
+    while path[-1] != terminals[1]:
+        following = [face for face in neighbors[path[-1]] if face not in path]
+        if len(following) != 1:
+            return None
+        path.append(following[0])
+    if len(path) != len(orders) or len(path) < 4 or any(len(orders[face]) != 6 for face in terminals):
+        return None
+    for face in path[1:-1]:
+        order = orders[face]
+        if len(order) != 5:
+            return None
+        neighbor_edges = {
+            frozenset((a, b))
+            for neighbor in neighbors[face]
+            for a, b in zip(orders[neighbor], orders[neighbor][1:] + orders[neighbor][:1])
+        }
+        ports = [
+            index for index, (a, b) in enumerate(zip(order, order[1:] + order[:1]))
+            if frozenset((a, b)) in neighbor_edges
+        ]
+        if len(ports) != 2 or (ports[0] - ports[1]) % 5 not in {2, 3}:
+            return None
+    return tuple(path)
+
+
+def _coupled_pentagon_axis_centers(path: tuple[int, ...], centers: dict[int, Point]) -> dict[int, Point]:
+    # Solve 2*c[i] = c[i-1] + c[i+1] jointly, with fixed terminal centers.
+    # A common integer scale avoids rounding and is removed on normalization.
+    left, right = centers[path[0]], centers[path[-1]]
+    length = len(path) - 1
+    return {
+        face: tuple((length - index) * left[axis] + index * right[axis] for axis in (0, 1))
+        for index, face in enumerate(path)
+    }
 
 
 def component_entry_layouts(
@@ -1100,6 +1156,9 @@ def _materialize_layouts(
     integer = {atom: (2 * x, 2 * y) for atom, (x, y) in integer.items()}
     centers = {face: (2 * x, 2 * y) for face, (x, y) in centers.items()}
     centers = _two_port_pentagon_axes(placed_orders, centers, adjacent)
+    pentagon_chain = _opsin_pentagon_chain(placed_orders, adjacent) if opsin_ring_map else None
+    if pentagon_chain is not None:
+        centers = _coupled_pentagon_axis_centers(pentagon_chain, centers)
     directions = {(1, 0)}
     for pair in adjacent:
         left, right = pair
@@ -1169,6 +1228,7 @@ def _materialize_layouts(
                         "geometric and topological perimeters agree",
                         "preferred axis derived from ring-center rows",
                         *((OPSIN_RING_MAP_NUMBERING,) if opsin_ring_map else ()),
+                        *((OPSIN_COUPLED_PENTAGON_AXES,) if pentagon_chain is not None else ()),
                     ),
                 )
                 candidates.setdefault(_layout_geometry_key(layout), layout)
