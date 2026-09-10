@@ -684,10 +684,7 @@ def _external_pi_parent_delta(
         added = parent_pi_atoms - paired - forced
         if any(
             mol.atoms[atom].symbol not in {"C", "N"}
-            or (
-                mol.atoms[atom].symbol == "N"
-                and not is_added_hydrogen_nitrogen(mol, atoms, atom)
-            )
+            or (mol.atoms[atom].symbol == "N" and not is_added_hydrogen_nitrogen(mol, atoms, atom))
             or mol.atoms[atom].charge
             or mol.atoms[atom].is_aromatic
             or len(atoms.intersection(mol.get_neighbors(atom))) not in {2, 3}

@@ -273,9 +273,11 @@ def _plan_numbered_candidate(
         result = _complete_fusion_plan(
             mol, atoms, mode, ast, registry, proof, graph=graph, initial_bond_model=initial_model
         )
-        if isinstance(result, FusionConfirmed) and (
-            edge := citation_pi_dead_end(result.plan) or charged_donor_citation_pi_dead_end(mol, result.plan)
-        ) is not None:
+        if (
+            isinstance(result, FusionConfirmed)
+            and (edge := citation_pi_dead_end(result.plan) or charged_donor_citation_pi_dead_end(mol, result.plan))
+            is not None
+        ):
             result = FusionUnsupported(
                 "fusion citation forces an uncompletable pi assignment",
                 (f"surviving child edge {edge} precedes the recreated fusion bond",),
