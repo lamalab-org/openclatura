@@ -70,6 +70,79 @@ CASES = (
         "OC1=CC2SC3=C(C2C=C1)C(O)(c1ccc(OCCN2CCCCC2)cc1)c1ccccc13",
         "indeno[1,2-b]1-benzothiophene",
     ),
+    (
+        11029,
+        "CC[C@@H]1CN2CC[C@@]34c5ccccc5N5C(=O)CC=C([C@H]1C[C@@H]23)[C@@H]54",
+        "pyrido[3,2,1-jk]pyrrolo[3,2-f]carbazole",
+    ),
+    (11954, "Clc1ccc2c(c1)C1SC2c2c1n1c3ccccc3c3cccc2c31", "indolo[3,2,1-jk]benzo[b]carbazole"),
+    (12963, "COc1ccc2c3c1O[C@H]1CCC=C[C@@]31CCN(CC=C(C)C)C2", "benzo[1',2':2,3]benzofuro[4,3a,3-cd]azepine"),
+    (
+        19452,
+        "CC1CCc2cccc3c2N1C(=O)c1cc(NC(=S)Nc2ccccc2)ccc1O3",
+        "benzo[1',2':6,7][1,4]oxazepino[2,3,4-ij]quinoline",
+    ),
+    (
+        20380,
+        "CN1c2cc(C#N)ccc2N2CC[C@@H](NC(=O)C(F)(F)F)C[C@@H]2c2c(C#N)cccc21",
+        "pyrido[1,2-d]dibenzo[b,f][1,4]diazepine",
+    ),
+    (28506, "O=C1C=C[C@@H]2[C@H]3c4cccc5cccc(c45)[C@H]3[C@H]1N2c1ccccc1", "naphtho[1,8a,8-ab]azulene"),
+    (
+        31042,
+        "COc1ccc(CN2c3ccccc3[C@@]34CCN5C=C[C@@H]6OCC[C@]6(CC[C@H]23)[C@H]54)cc1",
+        "indolo[2,3-h]pyrrolo[3,2,1-ij]furo[2,3-d]quinoline",
+    ),
+    (45607, "CC1=C[C@H]2C[C@H](C)[C@H]3CC[C@H](C)C4=C3[C@@H](OC4=O)[C@@]2(C)C1", "azuleno[4,5,6-cd]2-benzofuran"),
+    (52973, "O=C1C=CC(=O)C2=C3C1=CC=CC3N1C=CCN21", "pyrazolo[1,2-a]cyclohepta[cd]indazole"),
+    (53931, "N#CC(C#N)=C1c2cc(F)ccc2-c2cc3c(cc21)C(=C(C#N)C#N)C1C=C(F)C=CC31", "indeno[1,2-f]benzo[b]indene"),
+    (59172, "CCO[C@@H]1C=C2[C@H](O)CN3CCCc4cc(OC)c(OC)cc4[C@]23C[C@H]1OC", "indolo[1,7a-a]benzo[c]azepine"),
+    (
+        59728,
+        "CC(C)C1=C2[C@H]3CC=C4[C@@H]5[C@@H](O[C@@H]6OC[C@@](O)(C(=O)[C@@]65O)[C@@H]4O)[C@]3(C)CC[C@]2(C)CC1",
+        "cyclopenta[1'',2'':1',2']benzo[3',4':1,2]cyclohepta[3,4,5-cd]2-benzofuran",
+    ),
+    (
+        64746,
+        "COc1ccc2c(c1)C13CCNC1C1c4[nH]c5ccc(OC)cc5c4CCN1C3N2",
+        "benzo[1',2':2,3]pyrrolo[4,5-d]indolo[2',3':2,3]pyrrolo[3',2':3,4]pyrrolo[5,1-f]pyridine",
+    ),
+    (67508, "CNCCC(=O)N1c2ccccc2N2CCc3cccc(c32)C1C", "[1,5]benzodiazepino[3,2,1-hi]indole"),
+    (75694, "O=C(O)N1CCc2c(n3c4c(cccc24)CCC3)CC1", "azepino[4',5':2,3]pyrrolo[4,5,1-ij]quinoline"),
+    (78522, "c1ccc(-c2ccccc2-c2c3ccccc3cc3c2c2cccc4c5ccccc5n3c42)cc1", "indolo[3,2,1-jk]benzo[b]carbazole"),
+    (
+        81443,
+        "C[C@@H]1C(=O)O[C@@H]2[C@H]1[C@@]13O[C@@H]4OC(=O)[C@H](O)[C@@]45[C@H](C(C)(C)C)[C@@H](O)[C@@H](OC1=O)[C@]53[C@H]2O",
+        "furo[2,3-b]cyclopenta[c]furo[2',3':1,2]cyclopenta[4,3-d]furan",
+    ),
+    (
+        81754,
+        "COC1=CC23CCCN2CCc2cc4c(cc2C3(O)C1O)OCO4",
+        "pyrrolo[1,2-a][1,3]dioxolo[4',5':1,2]benzo[4,5-d]cyclopenta[b]azepine",
+    ),
+    (88969, "COc1ccc2c3c1OC1C[C@@H](OC(=O)c4ccc(C(C)(C)C)cc4)C=C[C@@]31CCN2C", "benzofuro[3a,3,2-de]quinoline"),
+    (89309, "CN1CCN(C2=Nc3cc(Cl)cc4ccn(c34)-c3ccccc32)CC1", "pyrrolo[1,2,3-ef]benzo[c]1,5-benzodiazepine"),
+    (90198, "COc1ccc2c3c1OC1C[C@@H](OC(=O)c4ccc(Cl)cc4Cl)C=C[C@@]31CCN2C", "benzofuro[3a,3,2-de]quinoline"),
+    (
+        98468,
+        "Fc1ccc(-c2ccc3[nH]c4c(c3c2)-c2cccc3cccc-4c23)cc1",
+        "benzo[b]naphtho[1',8a',8':1,2,3]cyclopenta[4,5-d]pyrrole",
+    ),
+    (
+        30704,
+        "COc1ccc2c(c1)-c1nnc(COc3ccc(F)cc3)n1Cc1c(-c3noc(C)n3)ncn1-2",
+        "[1,2,4]triazolo[4,3-d]imidazo[1,5-a]benzo[f][1,4]diazepine",
+    ),
+    (
+        49858,
+        "COCc1nnc2n1Cc1c(C3=N[C@H](C)CO3)ncn1-c1ccc(Cl)cc1-2",
+        "[1,2,4]triazolo[4,3-d]imidazo[1,5-a]benzo[f][1,4]diazepine",
+    ),
+    (
+        52446,
+        "CC(C)(Oc1cccnc1)c1nc(-c2ncn3c2Cn2ncnc2-c2cc(F)ccc2-3)no1",
+        "[1,2,4]triazolo[1,5-d]imidazo[1,5-a]benzo[f][1,4]diazepine",
+    ),
 )
 
 
@@ -94,6 +167,11 @@ def _opsin_labelled_graph(base, tmp_path):
     root = ET.fromstring(cml)
     ns = {"c": "http://www.xml-cml.org/schema"}
     atoms = root.findall(".//c:atom", ns)
+    if not atoms:
+        cml = py2opsin("perhydro" + base, output_format="CML", tmp_fpath=str(tmp_path / "saturated.txt"))
+        root = ET.fromstring(cml)
+        atoms = root.findall(".//c:atom", ns)
+    assert atoms, f"OPSIN did not provide a labelled skeleton for {base}"
     labels = {
         atom.attrib["id"]: atom.find("c:label", ns).attrib["value"]
         for atom in atoms
@@ -151,7 +229,15 @@ def test_exact_structures_and_complete_locant_graphs_under_permutations(index, s
             } == expected_edges
             assert set(witness.construction_atom_order) == set(locants)
             maps[-1].add(tuple(sorted((indices[atom], str(locant)) for atom, locant in locants.items())))
-            constructions[-1].add(tuple(indices[atom] for atom in witness.construction_atom_order))
+            # Symmetric component embeddings may reorder peripheral construction
+            # atoms. Only the surviving interior order participates in numbering.
+            constructions[-1].add(
+                tuple(
+                    indices[atom]
+                    for atom in witness.construction_atom_order
+                    if atom not in proof.selected_face_model.outer_boundary
+                )
+            )
     assert names[0] == names[1] == names[2]
     assert maps[0] == maps[1] == maps[2]
     assert constructions[0] == constructions[1] == constructions[2]
@@ -230,7 +316,7 @@ def test_coupled_pentagon_axis_proof_is_topological_and_reversible():
     solved = _coupled_pentagon_axis_centers(path, centers)
     assert solved == _coupled_pentagon_axis_centers(tuple(reversed(path)), centers)
     for index in (1, 2):
-        assert all(2 * solved[index][axis] == solved[index-1][axis] + solved[index+1][axis] for axis in (0, 1))
+        assert all(2 * solved[index][axis] == solved[index - 1][axis] + solved[index + 1][axis] for axis in (0, 1))
     assert _opsin_pentagon_chain(orders, adjacent | {frozenset((0, 3))}) is None
     assert _opsin_pentagon_chain({**orders, 3: (7, 9, 12, 13, 14, 15)}, adjacent) is None
 
@@ -314,8 +400,92 @@ def test_distinguishable_interior_substituents_roundtrip_without_example_lookup(
 
 
 def test_compatibility_witness_reaches_the_existing_accepted_orientation_trace():
-    result = name_mol(Chem.MolFromSmiles(CASES[1][1]), fusion_mode=FusionMode.AUDITED_PIN, include_trace=True)
+    index = 32572
+    smiles = next(smiles for case, smiles, _ in CASES if case == index)
+    result = name_mol(Chem.MolFromSmiles(smiles), fusion_mode=FusionMode.AUDITED_PIN, include_trace=True)
     assert result.error is None
     orientation = next(step for step in result.decisions if step.decision == "selected preferred fusion orientation")
     assert OPSIN_CONSTRUCTION_NUMBERING in orientation.data["audit_evidence"]
     assert any("PIN not certified" in evidence for evidence in orientation.data["audit_evidence"])
+
+
+def test_entry_compatibility_witness_projects_through_existing_plan_trace(monkeypatch):
+    from openclatura.fusion.trace import trace_confirmed_fusion_plan
+    from openclatura.molecule import DecisionTrace
+
+    _, smiles, base = next(case for case in CASES if case[0] == 67508)
+    plans = _capture_plans(monkeypatch, base)
+    graph = Chem.MolFromSmiles(smiles)
+    assert name_mol(graph, fusion_mode=FusionMode.AUDITED_PIN).error is None
+    plan = plans[0]
+    trace = DecisionTrace()
+    trace_confirmed_fusion_plan(trace, read_rdkit_mol(graph), plan, dict(plan.numbering.input_locant_maps[0]))
+    orientation = next(step for step in trace.steps if step.decision == "selected preferred fusion orientation")
+    assert OPSIN_CONSTRUCTION_NUMBERING in orientation.data["audit_evidence"]
+    assert any("PIN not certified" in evidence for evidence in orientation.data["audit_evidence"])
+
+
+@pytest.mark.skipif(not opsin_available(), reason="OPSIN is unavailable")
+def test_partial_construction_coverage_does_not_break_a_previously_passing_parent():
+    smiles = "CC[C@]12CCC3C4=C(C=C(N)CC4)C4(CC4)CC3C1C1CC1[C@@]21CCC(=O)O1"
+    result = name_mol(Chem.MolFromSmiles(smiles), fusion_mode=FusionMode.AUDITED_PIN)
+    assert result.error is None
+    assert verify_with_opsin(result.name, smiles, standardize_smiles=False).status == "matched"
+
+
+def test_entry_witness_rejects_invalid_perimeters_and_ring_positions(monkeypatch):
+    from openclatura.fusion.layout import OpsinEntryLayout
+
+    _, smiles, base = next(case for case in CASES if case[0] == 67508)
+    plans = _capture_plans(monkeypatch, base)
+    graph = Chem.MolFromSmiles(smiles)
+    assert name_mol(graph, fusion_mode=FusionMode.AUDITED_PIN).error is None
+    plan = plans[0]
+    witness = plan.numbering.selected_layout
+    assert isinstance(witness, OpsinEntryLayout)
+    with pytest.raises(ValueError, match="injective"):
+        replace(witness, entry_perimeter=witness.entry_perimeter + witness.entry_perimeter[:1])
+    with pytest.raises(ValueError, match="every positioned face"):
+        replace(witness, entry_ring_positions=witness.entry_ring_positions[:-1])
+    invalid = list(witness.entry_perimeter)
+    invalid[1], invalid[3] = invalid[3], invalid[1]
+    mol = read_rdkit_mol(graph)
+    bounded = select_bounded_face_model(mol, dict(plan.numbering.abstract_atom_to_locant))
+    assert (
+        _numbering_from_layout(
+            mol,
+            bounded,
+            plan.numbering.selected_face_model,
+            replace(witness, entry_perimeter=tuple(invalid)),
+            0,
+            set(bounded.fusion_atoms),
+        )
+        is None
+    )
+
+
+def test_entry_direction_search_is_bounded_and_cached(monkeypatch):
+    from openclatura.fusion.entry_geometry import entry_direction_geometry
+    from openclatura.fusion.layout import LayoutSearchBudgetExceeded
+
+    _, smiles, base = next(case for case in CASES if case[0] == 67508)
+    plans = _capture_plans(monkeypatch, base)
+    assert name_mol(Chem.MolFromSmiles(smiles), fusion_mode=FusionMode.AUDITED_PIN).error is None
+    model = plans[0].numbering.selected_face_model
+    with pytest.raises(LayoutSearchBudgetExceeded):
+        entry_direction_geometry(model, 1)
+    first = entry_direction_geometry(model, 100000)
+    hits = entry_direction_geometry.cache_info().hits
+    assert entry_direction_geometry(model, 100000) is first
+    assert entry_direction_geometry.cache_info().hits == hits + 1
+
+
+@pytest.mark.skipif(not opsin_available(), reason="OPSIN is unavailable")
+def test_cited_terminal_entry_tracks_a_graph_variant():
+    _, smiles, _ = next(case for case in CASES if case[0] == 30704)
+    graph = Chem.RWMol(Chem.MolFromSmiles(smiles))
+    next(atom for atom in graph.GetAtoms() if atom.GetAtomicNum() == 9).SetAtomicNum(17)
+    Chem.SanitizeMol(graph)
+    result = name_mol(graph, fusion_mode=FusionMode.AUDITED_PIN)
+    assert result.error is None
+    assert verify_with_opsin(result.name, Chem.MolToSmiles(graph), standardize_smiles=False).status == "matched"

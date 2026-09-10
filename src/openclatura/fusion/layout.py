@@ -22,6 +22,7 @@ _SHAPE_EDGE_SCALE = 4
 OPSIN_CONSTRUCTION_NUMBERING = "opsin_component_construction_order"
 OPSIN_RING_MAP_NUMBERING = "opsin_ring_map_occupied_rows"
 OPSIN_COUPLED_PENTAGON_AXES = "opsin_coupled_two_port_pentagon_axes"
+OPSIN_ENTRY_DIRECTIONS = "opsin_entry_relative_ring_directions"
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +41,134 @@ class OpsinConstructionLayout(FusedLayout):
             raise ValueError("construction atom order must not repeat merged atoms")
         if set(self.construction_atom_order) != {atom for atom, _, _ in self.atom_positions}:
             raise ValueError("construction atom order must cover the positioned graph")
+
+
+@dataclass(frozen=True, slots=True)
+class OpsinEntryLayout(OpsinConstructionLayout):
+    """A graph-bound parser perimeter, separate from audited polygon geometry."""
+
+    entry_perimeter: tuple[int, ...] = ()
+    entry_face_id: int = -1
+    entry_ring_positions: tuple[tuple[int, int, int], ...] = ()
+    entry_direction_conflicts: tuple[tuple[int, int], ...] = ()
+
+    def __post_init__(self) -> None:
+        OpsinConstructionLayout.__post_init__(self)
+        if not self.entry_perimeter or len(set(self.entry_perimeter)) != len(self.entry_perimeter):
+            raise ValueError("entry perimeter must be nonempty and injective")
+        if not set(self.entry_perimeter) <= set(self.construction_atom_order):
+            raise ValueError("entry perimeter must remain in the constructed graph")
+        if self.entry_face_id not in {face for face, _, _ in self.entry_ring_positions}:
+            raise ValueError("entry face must have a direction position")
+        if len(self.entry_ring_positions) != len(self.face_positions) or {
+            face for face, _, _ in self.entry_ring_positions
+        } != {face for face, _, _ in self.face_positions}:
+            raise ValueError("entry directions must cover every positioned face exactly once")
+        if len({(x, y) for _, x, y in self.entry_ring_positions}) != len(self.entry_ring_positions):
+            raise ValueError("entry ring positions must be injective")
+
+
+def _entry_direction_layouts(model, ast, specs, search_budget):
+    from .entry_geometry import entry_direction_geometry
+
+    if (
+        len(model.faces) < 4
+        or not any(face.size in {5, 7} for face in model.faces)
+        or any(face.size > 7 for face in model.faces)
+    ):
+        return None
+    order = opsin_construction_atom_order(ast, specs)
+    if order is None:
+        return None
+    if set(order) != {atom for face in model.faces for atom in face.atom_cycle}:
+        return None
+    terminal_cycle = _cited_terminal_cycle(model, ast, specs)
+    geometry = entry_direction_geometry(model, search_budget, terminal_cycle)
+    if geometry is None:
+        return None
+    reference, candidates = geometry
+    if set(order) != {atom for atom, _, _ in reference.atom_positions}:
+        return None
+    positions = {atom: (x, y) for atom, x, y in reference.atom_positions}
+
+    def oriented_reference(candidate):
+        signed_area = sum(
+            positions[a][0] * positions[b][1] - positions[b][0] * positions[a][1]
+            for a, b in zip(candidate.perimeter, candidate.perimeter[1:] + candidate.perimeter[:1])
+        )
+        x_sign = -1 if signed_area > 0 else 1
+        return {
+            **{
+                field.name: getattr(reference, field.name)
+                for field in fields(FusedLayout)
+                if field.name not in {"audit_evidence", "orientation_score", "atom_positions", "face_positions"}
+            },
+            "atom_positions": tuple((atom, x_sign * x, y) for atom, x, y in reference.atom_positions),
+            "face_positions": tuple((face, x_sign * x, y) for face, x, y in reference.face_positions),
+        }
+
+    return tuple(
+        OpsinEntryLayout(
+            **oriented_reference(candidate),
+            orientation_score=candidate.orientation_score,
+            audit_evidence=(
+                *reference.audit_evidence,
+                OPSIN_ENTRY_DIRECTIONS,
+                OPSIN_CONSTRUCTION_NUMBERING,
+                *(("terminal entry follows first cited component perimeter",) if terminal_cycle else ()),
+                "complete perimeter follows entry-relative ring directions",
+                *(
+                    ("nonreciprocal parser directions projected from unique terminal",)
+                    if candidate.direction_conflicts
+                    else ("reciprocal entry directions and closed ring map",)
+                ),
+                "OPSIN numbering compatibility only; IUPAC PIN not certified",
+            ),
+            construction_atom_order=order,
+            entry_perimeter=candidate.perimeter,
+            entry_face_id=candidate.start_face,
+            entry_ring_positions=candidate.ring_positions,
+            entry_direction_conflicts=candidate.direction_conflicts,
+        )
+        for candidate in candidates
+    )
+
+
+def _cited_terminal_cycle(model, ast, specs):
+    """Bind the ambiguous small-terminal star to its component construction."""
+    if len(model.faces) != 4 or len(model.face_adjacency) != 3 or ast.citation_plan is None:
+        return None
+    centers = [
+        face for face in model.faces if face.size == 7 and all(face.id in (a, b) for a, b, _ in model.face_adjacency)
+    ]
+    if len(centers) != 1:
+        return None
+    terminals = {face.id: face for face in model.faces if face.id != centers[0].id}
+    if sorted(face.size for face in terminals.values()) != [5, 5, 6]:
+        return None
+    matches = {match.occurrence_id: match for match in ast.component_occurrences}
+    first = next(
+        (
+            matches[occurrence]
+            for occurrence in ast.citation_plan.render_order
+            if len(matches[occurrence].covered_face_ids) == 1
+            and matches[occurrence].covered_face_ids <= terminals.keys()
+        ),
+        None,
+    )
+    if first is None:
+        return None
+    face = terminals[next(iter(first.covered_face_ids))]
+    if face.size != 5:
+        return None
+    local = first.input_atom_by_locant
+    cycle = tuple(local[locant] for locant in specs[first.occurrence_id].template.peripheral_atoms)
+    if len(cycle) != face.size or set(cycle) != set(face.atom_cycle):
+        return None
+    edges = {frozenset((a, b)) for a, b in zip(face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1])}
+    if any(frozenset((a, b)) not in edges for a, b in zip(cycle, cycle[1:] + cycle[:1])):
+        return None
+    return tuple(reversed(cycle))
 
 
 def opsin_construction_atom_order(ast: FusionNameAst, specs: dict[int, FusionComponentSpec]) -> tuple[int, ...] | None:
@@ -175,8 +304,7 @@ def _opsin_ring_map_tree(model: FaceModel) -> bool:
         and any(face.size == 3 for face in model.faces)
         and any(face.size == 6 for face in model.faces)
         and all(
-            face.size == 6
-            or (face.size in {3, 5} and len(set(face.edge_cycle) & model.fusion_edges) == 1)
+            face.size == 6 or (face.size in {3, 5} and len(set(face.edge_cycle) & model.fusion_edges) == 1)
             for face in model.faces
         )
     )
@@ -215,7 +343,8 @@ def _opsin_pentagon_chain(
             for a, b in zip(orders[neighbor], orders[neighbor][1:] + orders[neighbor][:1])
         }
         ports = [
-            index for index, (a, b) in enumerate(zip(order, order[1:] + order[:1]))
+            index
+            for index, (a, b) in enumerate(zip(order, order[1:] + order[:1]))
             if frozenset((a, b)) in neighbor_edges
         ]
         if len(ports) != 2 or (ports[0] - ports[1]) % 5 not in {2, 3}:
@@ -243,7 +372,8 @@ def component_entry_layouts(
 ) -> tuple[FusedLayout, ...] | None:
     """Bind construction-dependent numbering or directed entry to audited geometry.
 
-    Multi-interior systems carry explicit OPSIN construction-order numbering;
+    Multi-interior systems combine parser entry geometry with explicit OPSIN
+    construction-order numbering when both witnesses are available. Physical
     geometry and the graph-only numbering API remain independent of that
     compatibility convention. The directed-entry tree tier requires a unique
     smallest terminal component and undistorted symmetric opposite terminals.
@@ -255,6 +385,10 @@ def component_entry_layouts(
         raise ValueError("layout search budget must be positive")
     atoms = {atom for face in model.faces for atom in face.atom_cycle}
     ring_map_compatibility = _opsin_ring_map_tree(model)
+    if len(atoms - set(model.outer_boundary)) > 1 and not ring_map_compatibility:
+        entry_layouts = _entry_direction_layouts(model, ast, specs, search_budget)
+        if entry_layouts is not None:
+            return entry_layouts
     if len(atoms - set(model.outer_boundary)) > 1 or ring_map_compatibility:
         construction_order = opsin_construction_atom_order(ast, specs)
         if construction_order is None:
@@ -280,7 +414,7 @@ def component_entry_layouts(
             )
         )
     if not can_use_component_entry_layout(model):
-        return None
+        return _entry_direction_layouts(model, ast, specs, search_budget)
     faces = {face.id: face for face in model.faces}
     if not _valid_face_adjacency(model, faces):
         return None
@@ -400,7 +534,7 @@ def component_entry_layouts(
                     ),
                 ),
             )
-    return None
+    return _entry_direction_layouts(model, ast, specs, search_budget)
 
 
 def intrinsic_fused_layouts(

@@ -16,7 +16,7 @@ from ..retained_graph_model import RetainedGraphTemplate
 from ..rules import elements
 from .config import fusion_nomenclature_config
 from .faces import BoundedFaceModel, typed_face_model
-from .layout import OpsinConstructionLayout, preferred_intrinsic_layouts
+from .layout import OpsinConstructionLayout, OpsinEntryLayout, preferred_intrinsic_layouts
 from .model import (
     BondAssignment,
     Face,
@@ -225,6 +225,24 @@ def _numbering_from_layout(
         return None
     offset = clockwise.index(start_atom)
     perimeter = clockwise[offset:] + clockwise[:offset]
+    if isinstance(layout, OpsinEntryLayout):
+        perimeter = layout.entry_perimeter
+        outer_edges = {
+            frozenset((a, b))
+            for a, b in zip(faces.outer_boundary.atoms, faces.outer_boundary.atoms[1:] + faces.outer_boundary.atoms[:1])
+        }
+        if set(perimeter) != set(faces.outer_boundary.atoms) or any(
+            frozenset((a, b)) not in outer_edges for a, b in zip(perimeter, perimeter[1:] + perimeter[:1])
+        ):
+            return None
+        start_face_id = layout.entry_face_id
+        start_atom = perimeter[0]
+        if (
+            start_face_id not in face_by_id
+            or start_atom not in face_by_id[start_face_id].atom_cycle
+            or start_atom in fusion_atoms
+        ):
+            return None
     construction_order = layout.construction_atom_order if isinstance(layout, OpsinConstructionLayout) else None
     cache_key = perimeter, construction_order
     if perimeter_cache is not None and cache_key in perimeter_cache:
