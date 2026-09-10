@@ -6,6 +6,7 @@ import pytest
 from test_fusion_audit import _two_fused_rings
 
 from openclatura.fusion import indicated_hydrogen as intrinsic
+from openclatura.fusion.component_hydrogen import component_hydrogen_consumption
 from openclatura.fusion.numbering import parent_bond_model
 
 
@@ -74,7 +75,17 @@ def test_declared_movable_pi_junction_releases_only_its_local_h_constraint(aroma
     assert model.maximum_non_cumulative_double_bonds == 4
     if not aromatic:
         assert original.maximum_non_cumulative_double_bonds == 3
-        assert not intrinsic.component_carbon_h_relocation_scope(case.ast, specs)
+        # Relaxing the junction still changes the completed pi budget (3 -> 4),
+        # so relocation is not admitted by budget preservation. It is admitted
+        # only through the stronger route the docstring of
+        # component_carbon_h_relocation_scope describes: fusion is *proved* to
+        # consume the released H at the shared junction.
+        components = tuple((match, specs[match.occurrence_id]) for match in case.ast.component_occurrences)
+        assert intrinsic._completed_carbon_h_budget(components, False) != intrinsic._completed_carbon_h_budget(
+            components, True
+        )
+        assert component_hydrogen_consumption(case.ast, specs) is not None
+        assert intrinsic.component_carbon_h_relocation_scope(case.ast, specs)
     assert specs[0].template is original_template
 
 

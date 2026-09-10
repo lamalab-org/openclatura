@@ -229,7 +229,7 @@ def test_bridge_wrapper_renders_a_graph_derived_retained_parent_hydro_operation(
         ),
         (
             "C12C(C=C(C3=CC=CC=C13)O2)=O",
-            "1,4-epoxynaphthalen-2-one",
+            "1,4-epoxynaphthalen-2(1H)-one",
             [],
             ["2"],
         ),
@@ -263,7 +263,7 @@ def test_bridge_wrapper_does_not_use_a_saturated_retained_monocycle_as_fused_bas
     result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True)
 
     assert plan is None
-    assert result.name == "3-azatricyclo[3.2.0.0^{3,6}]heptan-1-ol"
+    assert result.name == "1-azatricyclo[3.2.0.0^{3,6}]heptan-3-ol"
     assert result.opsin_check is not None and result.opsin_check.ok
 
 

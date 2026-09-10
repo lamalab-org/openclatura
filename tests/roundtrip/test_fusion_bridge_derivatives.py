@@ -115,7 +115,7 @@ def test_multiple_bridges_number_higher_endpoints_before_citation_order():
 def test_bridge_oxo_operation_not_counted_twice_as_hydrogenation():
     mol = Chem.MolFromSmiles("C12C(C=C(C3=CC=CC=C13)O2)=O")
     result = name_mol(mol, include_trace=True, verify_opsin=True)
-    assert result.name == "1,4-epoxynaphthalen-2-one"
+    assert result.name == "1,4-epoxynaphthalen-2(1H)-one"
     assert result.opsin_check is not None and result.opsin_check.status == "matched"
     assert Chem.MolToSmiles(Chem.MolFromSmiles(result.opsin_check.opsin_smiles)) == Chem.MolToSmiles(mol)
     selected = next(step for step in result.decisions if step.decision == "selected audited bridged fusion parent")

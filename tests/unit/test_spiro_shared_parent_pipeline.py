@@ -212,8 +212,10 @@ def test_fused_side_uses_selected_nonfirst_numbering(monkeypatch):
     assert parent.is_systematic_fusion
     assert list(parent.fusion_plan.numbering.string_input_locant_maps()) == [mapping]
     assert not parent.fusion_plan.numbering_variants
-    assert side.side_prefixes == ("5'-amino",)
-    assert side.side_stereo == (("5'", "S"),)
+    # The monkeypatch above forces the LAST candidate numbering map, under which
+    # the amine-bearing atom takes locant 7 (the canonical first map gives 5).
+    assert side.side_prefixes == ("7'-amino",)
+    assert side.side_stereo == (("7'", "S"),)
 
 
 @pytest.mark.parametrize("smiles", ["C1Cc2ncccc2C1=O", "C1Cc2ncccc2[C@H]1N"])

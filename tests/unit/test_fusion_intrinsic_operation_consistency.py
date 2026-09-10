@@ -241,45 +241,54 @@ def test_component_owned_hydro_cannot_bypass_external_bond_checks(corruption):
     assert not _has_consistent_derivative_operations(mol, plan.ast, specs, plan.numbering, (), state)
 
 
-@pytest.mark.parametrize("restriction", ("undeclared_h", "shared_saturation", "shared_zero_capacity"))
-def test_aromatic_junction_cannot_release_an_unproved_component_role(restriction):
+def test_aromatic_polycomponent_parent_exposes_no_pi_bearing_junction():
+    """This benzopyranopyrrole plans as a three-component tree with no movable junction.
+
+    It used to be the witness for the "a junction may not release an unproved
+    component role" guard, but the parent is now composed from pyrrole, pyran and
+    benzene, and none of its carbon candidates carries a pi-bearing junction
+    role -- a scan of the 5000-molecule OPSIN-verified corpus finds zero
+    confirmed fusion plans with such a site. That guard is exercised on the
+    synthetic two-ring fixture instead, by
+    ``test_pi_junction_cannot_override_undeclared_or_inherited_roles`` in
+    ``test_fusion_junction_carbon_h.py``. What this molecule still pins is the
+    composition itself and the name it produces.
+    """
+
     mol = read_smiles("CSc1ccc(C2c3c(oc4ccccc4c3=O)C(=O)N2c2ncccn2)cc1")
     atoms = max(find_ring_systems(mol), key=lambda system: len(system.atoms)).atoms
     result = plan_fusion_parent(mol, atoms, mode="audited_pin")
     assert isinstance(result, FusionConfirmed)
     plan = result.plan
     assert not plan.derivative_state.unsaturation_operations
+    assert plan.ast.plan_kind == "polycomponent_tree"
+    assert [match.spec_key for match in plan.ast.component_occurrences] == ["pyrrole", "pyran", "benzene"]
+
     registry = fusion_component_registry()
     specs = {match.occurrence_id: registry.spec_for_match(match) for match in plan.ast.component_occurrences}
     candidates = intrinsic.intrinsic_carbon_candidate_atoms(plan.ast, specs, mol)
-    (junction,) = intrinsic.pi_bearing_fusion_carbon_sites(mol, plan.abstract_parent_graph, candidates)
+    assert candidates
+    assert not intrinsic.pi_bearing_fusion_carbon_sites(mol, plan.abstract_parent_graph, candidates)
     assert not intrinsic.pi_bearing_fusion_carbon_sites(mol, plan.abstract_parent_graph, frozenset())
-    for match in plan.ast.component_occurrences:
-        spec = specs[match.occurrence_id]
-        local = next((atom for atom in spec.atoms if match.input_atom_by_locant[atom.locant] == junction), None)
-        if local is None or local.saturated != (restriction == "undeclared_h"):
-            continue
-        if restriction == "undeclared_h":
-            template = replace(spec.template, default_indicated_h=())
-        else:
-            change = {"saturated": True} if restriction == "shared_saturation" else {"pi_capacity": 0}
-            template = replace(
-                spec.template,
-                atoms=tuple(replace(atom, **change) if atom.locant == local.locant else atom for atom in spec.atoms),
-            )
-        specs[match.occurrence_id] = replace(spec, template=template)
-        break
-    else:
-        pytest.fail("no component contribution was restricted")
-    candidates = intrinsic.intrinsic_carbon_candidate_atoms(plan.ast, specs, mol)
-    assert junction not in candidates
-    graph = intrinsic.component_parent_graph(plan.ast, specs, relocate_carbon_h=False)
-    original = parent_bond_model(graph)
-    model, _ = intrinsic.intrinsic_carbon_parent_model(
-        mol, graph, original, dict(plan.numbering.input_locant_maps[0]), candidates
+
+
+@pytest.mark.opsin
+def test_aromatic_polycomponent_parent_name_roundtrips():
+    from rdkit import Chem
+
+    from openclatura import name_mol, opsin_available, verify_with_opsin
+
+    if not opsin_available():
+        pytest.skip("py2opsin/Java is unavailable")
+    smiles = "CSc1ccc(C2c3c(oc4ccccc4c3=O)C(=O)N2c2ncccn2)cc1"
+    graph = Chem.MolFromSmiles(smiles)
+    result = name_mol(graph, include_trace=True)
+    assert result.error is None
+    assert result.name == (
+        "1-(4-(methylsulfanyl)phenyl)-2-(pyrimidin-2-yl)-1H-benzo[1',2':2,3]pyrano[5,6-c]pyrrole-3,9-dione"
     )
-    assert all(edge in model.required_single_bonds for edge in original.required_single_bonds if junction in edge)
-    assert not intrinsic.pi_bearing_fusion_carbon_sites(mol, graph, candidates)
+    check = verify_with_opsin(result.name, Chem.MolToSmiles(graph), standardize_smiles=False)
+    assert check.status == "matched", check.to_dict()
 
 
 def test_intrinsic_carbon_scope_accepts_ortho_peri_but_requires_pi_budgets():

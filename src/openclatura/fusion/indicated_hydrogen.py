@@ -428,7 +428,26 @@ def intrinsic_carbon_parent_model(
     capable_sites = parent_pi_capable_atom_ids(graph)
     # At an oxo-adjacent intrinsic donor, external pi bonding already owns
     # the carbon's unpaired parent valence. It is not another carbon-H site.
-    externally_owned = {atom for atom in oxo_sites if intrinsic_hydrogen_atom_ids.intersection(mol.get_neighbors(atom))}
+    #
+    # That holds only while the carbon keeps another pi-capable parent neighbour
+    # its parent double bond could have occupied. When the donor is the carbon's
+    # only pi-capable parent neighbour -- C2 of cyclopenta[d][1,3]oxazole, whose
+    # other ring neighbour is the ring oxygen -- the parent bond that the oxo
+    # replaced must have been C=donor, so the donor hydrogen is the suffix's
+    # added hydrogen and this carbon still owns a citation. Dropping it there
+    # leaves the released hydrogen to be re-spelled as a second indicated
+    # hydrogen, which overstates the parent: '3H,4H-cyclopenta[d][1,3]oxazol-2-
+    # one' claims two indicated hydrogens where the mancude quota is one.
+    externally_owned = {
+        atom
+        for atom in oxo_sites
+        if intrinsic_hydrogen_atom_ids.intersection(mol.get_neighbors(atom))
+        and any(
+            other in capable_sites and other not in intrinsic_hydrogen_atom_ids
+            for other in mol.get_neighbors(atom)
+            if other in parent_atoms
+        )
+    }
     eligible.difference_update(externally_owned)
     carbon_atoms = {
         atom.id
