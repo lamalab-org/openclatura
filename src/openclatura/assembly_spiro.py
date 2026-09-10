@@ -5,12 +5,12 @@ from collections.abc import Callable
 from copy import deepcopy
 from dataclasses import dataclass, replace
 
-from .assembly_parts import AssemblyParts, NameAtomBinding, NameTokenBinding, SubstituentItem
+from .assembly_parts import AssemblyParts, NameAtomBinding, NameTokenBinding, SubstituentItem, UnsaturationItem
 from .formatting import strip_outer_parentheses
 from .locants import parse_locant
 from .name_operations import HydroOperation
 from .nomenclature import RULES
-from .rules import elision, multipliers, stems
+from .rules import elements, elision, multipliers, stems
 from .spiro_assembly import SpiroAssembly
 from .token_grammar import lexical_token_spans
 
@@ -20,6 +20,178 @@ AMBIGUOUS_CONNECTION_SUBSTITUENT_STEMS = RULES.assembly.ambiguous_connection_sub
 
 _SIDE_STEREO_RE = re.compile(r"^\((?P<body>\d+[A-Za-z']*(?:[RS]|[EZ])(?:,\d+[A-Za-z']*(?:[RS]|[EZ]))*)\)-?")
 _SIDE_STEREO_TERM_RE = re.compile(r"^(?P<locant>\d+[a-z']*)(?P<descriptor>[RSEZ])$")
+
+
+def _refresh_component_bindings(parts: AssemblyParts, stages: set[str]) -> None:
+    if not parts.name_atom_bindings:
+        return
+    from .name_bindings import refresh_name_atom_bindings
+
+    # Spiro substituents have already left parts.substituents. Their original
+    # bindings still own the side skeleton and must survive a local refresh.
+    preserved = [binding for binding in parts.name_atom_bindings if binding.stage not in stages]
+    refreshed = refresh_name_atom_bindings(parts)
+    parts.name_atom_bindings = preserved + [binding for binding in refreshed if binding.stage in stages]
+
+
+def _project_locanted_hw_component(parts: AssemblyParts) -> None:
+    """Give explicit HW heteroatom locants replacement scope in a spiro parent."""
+    from .hantzsch_widman import hw_name
+
+    if (
+        not parts.retained_name
+        or not parts.is_ring
+        or parts.is_bicycle
+        or parts.is_polycycle
+        or parts.is_spiro
+        or parts.a_prefixes
+        or parts.parent_charges
+        or any(parts.parent_atom_charges_by_locant.values())
+    ):
+        return
+    size = parts.parent_length
+    locants = [str(index) for index in range(1, size + 1)]
+    mapping = parts.parent_atom_ids_by_locant
+    symbols = parts.parent_atom_symbols_by_locant
+    if (
+        set(mapping) != set(locants)
+        or set(symbols) != set(locants)
+        or len(set(mapping.values())) != size
+        or set(mapping.values()) != parts.parent_atom_ids
+    ):
+        return
+    hetero = [(int(locant), symbols[locant]) for locant in locants if symbols[locant] != "C"]
+    if len(hetero) < 2:
+        return
+    if parts.retained_name not in (hw_name(size, False, hetero), hw_name(size, True, hetero)):
+        return
+    edges = {frozenset((left, right)) for left, right in zip(locants, locants[1:] + locants[:1])}
+    orders = parts.parent_bond_orders_by_locants
+    if (
+        {frozenset(edge) for edge in orders} != edges
+        or any(order not in (1, 2) for order in orders.values())
+        or 2 not in orders.values()
+    ):
+        return
+    # The observed cycle replaces the mancude hydride and its hydro delta;
+    # suffixes and substituents keep their already selected component locants.
+    parts.retained_name = None
+    parts.retained_parent_metadata = None
+    parts.parent_hydride = None
+    parts.parent_bond_delta = None
+    parts.hydro_operations = []
+    parts.indicated_hydrogens = []
+    parts.unsaturations = []
+    for edge, order in orders.items():
+        if order == 2:
+            numbers = sorted(map(int, edge))
+            locant = str(numbers[0]) if numbers != [1, size] else str(size)
+            parts.unsaturations.append(
+                UnsaturationItem(
+                    "double",
+                    [locant],
+                    atom_ids={mapping[item] for item in edge},
+                    bond_ids={parts.parent_bond_ids_by_locants[edge]}
+                    if edge in parts.parent_bond_ids_by_locants
+                    else set(),
+                )
+            )
+    parts.a_prefixes = [
+        SubstituentItem(elements.get(symbol).hw_stem, [str(locant)], atom_ids={mapping[str(locant)]})
+        for locant, symbol in hetero
+    ]
+    parts.elided_unsaturation_locants.clear()
+    _refresh_component_bindings(parts, {"parent", "replacement", "unsaturation", "hydro"})
+
+
+def _deduplicate_shared_replacements(parts: AssemblyParts, side: SpiroAssembly) -> SpiroAssembly:
+    other = side.side_parts
+    if other is None:
+        return side
+    atom = parts.parent_atom_ids_by_locant.get(side.parent_locant)
+    if atom is None or other.parent_atom_ids_by_locant.get(side.side_locant) != atom:
+        return side
+    if parts.parent_atom_ids & other.parent_atom_ids != {atom}:
+        return side
+    for component in (parts, other):
+        mapping = component.parent_atom_ids_by_locant
+        if set(mapping.values()) != component.parent_atom_ids or len(mapping) != len(component.parent_atom_ids):
+            return side
+        if any(not set(edge) <= mapping.keys() for edge in component.parent_bond_orders_by_locants):
+            return side
+    owned = [item for item in parts.a_prefixes if atom in item.atom_ids]
+    repeated = [item for item in other.a_prefixes if atom in item.atom_ids]
+    if not owned or not repeated:
+        return side
+    other = deepcopy(other)
+    symbol = parts.parent_atom_symbols_by_locant.get(side.parent_locant)
+    charge = parts.parent_atom_charges_by_locant.get(side.parent_locant, 0)
+    if symbol is None or other.parent_atom_symbols_by_locant.get(side.side_locant) != symbol:
+        return side
+    element = elements.get(symbol)
+    bonding = sum(
+        order
+        for component in (parts, other)
+        for edge, order in component.parent_bond_orders_by_locants.items()
+        if atom in {component.parent_atom_ids_by_locant[locant] for locant in edge}
+    )
+    hydride = RULES.components.mononuclear_parent_hydrides.get(symbol)
+    if (
+        charge == -1
+        and other.parent_atom_charges_by_locant.get(side.side_locant) == charge
+        and hydride
+        and bonding == element.standard_valence + 1
+        and (charge, bonding) in element.mancude_charged_bonding_limits
+    ):
+        # Hydride addition gives -uide; its replacement prefix ends in -uida.
+        replacements = []
+        for item in other.a_prefixes:
+            shared_locants = [
+                locant for locant in item.locants if other.parent_atom_ids_by_locant.get(str(locant)) == atom
+            ]
+            remaining = [locant for locant in item.locants if locant not in shared_locants]
+            if remaining:
+                replacements.append(
+                    replace(
+                        item,
+                        locants=remaining,
+                        atom_ids=item.atom_ids - {atom},
+                        charge_atom_ids=item.charge_atom_ids - {atom},
+                        emitted_tokens=(),
+                    )
+                )
+            if shared_locants:
+                replacements.append(
+                    replace(
+                        item,
+                        name=hydride[:-1] + "uida",
+                        locants=shared_locants,
+                        atom_ids={atom},
+                        charge_atom_ids={atom},
+                        emitted_tokens=(),
+                    )
+                )
+        other.a_prefixes = replacements
+    kept = []
+    for item in parts.a_prefixes:
+        locants = [
+            locant
+            for locant in item.locants
+            if parts.parent_atom_ids_by_locant.get(str(locant).partition("lambda^")[0]) != atom
+        ]
+        if locants:
+            kept.append(
+                replace(
+                    item,
+                    locants=locants,
+                    atom_ids=item.atom_ids - {atom},
+                    charge_atom_ids=item.charge_atom_ids - {atom},
+                    emitted_tokens=(),
+                )
+            )
+    parts.a_prefixes = kept
+    _refresh_component_bindings(parts, {"replacement"})
+    return replace(side, side_parts=other)
 
 
 def _prime_side_locant(locant: str) -> str:
@@ -105,6 +277,9 @@ def spiro_assembly_from_parts(
 
     from .assembler import assemble_name_raw
     from .assembly_parent import format_principal_suffix, parent_stem_and_terminal
+
+    parts = deepcopy(parts)
+    _project_locanted_hw_component(parts)
 
     # Only the established ol/one suffix merger supports cross-component
     # hoisting. Added hydrogen without a principal suffix remains local and
@@ -238,6 +413,9 @@ def split_spiro_substituents(parts: AssemblyParts) -> list[SpiroAssembly]:
     if len(spiro_subs) > 2 or (len(spiro_subs) > 1 and any(side.continuation for side in spiro_subs)):
         raise ValueError("spiro assembly requires a graph-numbered path of at most three components")
     parts.substituents = normal_subs
+    if spiro_subs:
+        _project_locanted_hw_component(parts)
+        spiro_subs = [_deduplicate_shared_replacements(parts, side) for side in spiro_subs]
     if len(spiro_subs) == 2 and not any(side.continuation for side in spiro_subs):
         spiro_subs.sort(key=lambda side: (parse_locant(side.parent_locant), side.side_parent_name))
         _prime_central_spiro_parts(parts)
