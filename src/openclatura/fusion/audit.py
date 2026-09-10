@@ -23,6 +23,7 @@ from .exocyclic import is_neutral_external_pi_ligand, neutral_lambda_oxo_bonding
 from .indicated_hydrogen import (
     component_carbon_h_relocation_scope,
     component_parent_atoms,
+    component_parent_graph,
     intrinsic_carbon_candidate_atoms,
     intrinsic_carbon_parent_model,
     intrinsic_parent_lone_pair_sites,
@@ -678,8 +679,11 @@ def _has_consistent_derivative_operations(
             return False
         if any(order != 1 for edge, order in state.bond_delta.assignment.orders if carbon_h.intersection(edge)):
             return False
-        if oxo and not _has_carbon_h_oxo_bond_consumption(mol, atoms, state):
-            return False
+        if oxo:
+            donor_graph = component_parent_graph(ast, specs, relocate_carbon_h=True)
+            donors = intrinsic_parent_lone_pair_sites(mol, donor_graph)
+            if not _has_carbon_h_oxo_bond_consumption(mol, atoms, state, intrinsic_donors=donors):
+                return False
     represented_external = {operation.bond_id for operation in state.external_pi_operations}
     unrepresented_external = [
         (atom, neighbor)
@@ -710,7 +714,13 @@ def _has_consistent_derivative_operations(
     )
 
 
-def _has_carbon_h_oxo_bond_consumption(mol: Molecule, atoms: frozenset[int], state: ParentDerivativeState) -> bool:
+def _has_carbon_h_oxo_bond_consumption(
+    mol: Molecule,
+    atoms: frozenset[int],
+    state: ParentDerivativeState,
+    *,
+    intrinsic_donors: frozenset[int] = frozenset(),
+) -> bool:
     """Prove carbon-H/oxo composition without counting oxo-consumed pi as hydro.
 
     A carbonyl replaces the parent double bond at its carbon; the other end
@@ -753,6 +763,11 @@ def _has_carbon_h_oxo_bond_consumption(mol: Molecule, atoms: frozenset[int], sta
         ):
             return False
         consumed = [edge for edge, order in state.bond_delta.assignment.orders if order == 2 and atom in edge]
+        if not consumed and intrinsic_donors.intersection(mol.get_neighbors(atom)):
+            # Intrinsic donor composition already makes both skeletal bonds
+            # single. The independently replayed external pi operation owns
+            # this carbon valence without inventing another carbon-H citation.
+            continue
         if len(consumed) != 1:
             return False
         other = next(site for site in consumed[0] if site != atom)

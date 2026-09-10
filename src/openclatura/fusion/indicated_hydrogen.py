@@ -419,7 +419,15 @@ def intrinsic_carbon_parent_model(
     }
     eligible.update(oxo_sites)
     capable_sites = parent_pi_capable_atom_ids(graph)
-    carbon_atoms = {atom.id for atom in graph.atoms if atom.symbol == "C" and atom.id in capable_sites}
+    # At an oxo-adjacent intrinsic donor, external pi bonding already owns
+    # the carbon's unpaired parent valence. It is not another carbon-H site.
+    externally_owned = {atom for atom in oxo_sites if intrinsic_hydrogen_atom_ids.intersection(mol.get_neighbors(atom))}
+    eligible.difference_update(externally_owned)
+    carbon_atoms = {
+        atom.id
+        for atom in graph.atoms
+        if atom.symbol == "C" and atom.id in capable_sites and atom.id not in externally_owned
+    }
     occupied_pi_atoms = carbon_atoms | {
         atom
         for edge in model.pi_eligible_edges | model.required_double_bonds
