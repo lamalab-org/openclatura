@@ -47,11 +47,6 @@ def citation_pi_dead_end(plan: FusionParentPlan) -> tuple[int, int] | None:
     indicated = {atom for atom, locant in locants.items() if locant in set(map(str, plan.indicated_hydrogens))}
     if any(symbols[atom] != "C" for atom in indicated):
         return None
-    neighbors = {atom: set() for atom in symbols}
-    for bond in graph.bonds:
-        left, right = bond.atoms
-        neighbors[left].add(right)
-        neighbors[right].add(left)
     model = plan.bond_model
     active = set(symbols) - indicated
     if model.required_double_bonds or any(not indicated.intersection(edge) for edge in model.required_single_bonds):
@@ -61,6 +56,24 @@ def citation_pi_dead_end(plan: FusionParentPlan) -> tuple[int, int] | None:
         for assignment in model.allowed_kekule_assignments
     ):
         return None
+    return forced_surviving_child_edge(plan, frozenset(active))
+
+
+def forced_surviving_child_edge(plan: FusionParentPlan, active: frozenset[int]) -> tuple[int, int] | None:
+    """Prove the first leaf-edge choice is absent from every parent matching.
+
+    Callers certify the chemical scope and the complete active pi domain.
+    Only an untouched, neutral imine N can anchor this parent-only scan:
+    external substitution at carbon can change the parser's visit order.
+    """
+    ast, model, graph = plan.ast, plan.bond_model, plan.abstract_parent_graph
+    symbols = {atom.id: atom.symbol for atom in graph.atoms}
+    neighbors = {atom: set() for atom in symbols}
+    for bond in graph.bonds:
+        left, right = bond.atoms
+        neighbors[left].add(right)
+        neighbors[right].add(left)
+    locants = plan.numbering.string_input_locant_maps()[0]
     # No terminal pair may preempt the first nonfusion choice.
     if any(len(neighbors[atom] & active) < 2 for atom in active):
         return None
@@ -69,23 +82,27 @@ def citation_pi_dead_end(plan: FusionParentPlan) -> tuple[int, int] | None:
         key=lambda atom: system_locant_sort_key(locants[atom]),
         default=None,
     )
-    # A neutral imine N cannot acquire an external sigma substituent. Carbon
-    # substitution can change the parser's nonfusion-atom scan and is not
-    # certified by this parent-only witness.
-    if first is None or symbols[first] != "N":
+    if first is None or symbols[first] != "N" or first in {operation.atom_id for operation in plan.charge_operations}:
         return None
-    join = ast.joins[0]
-    child = next(match for match in ast.component_occurrences if match.occurrence_id == join.attached_occurrence)
-    child_atoms = set(child.input_atom_by_locant.values())
-    shared = set(join.shared_input_atoms)
-    if first not in child_atoms - shared or not neighbors[first] <= child_atoms:
-        return None
-    retained = neighbors[first] - shared
-    if len(retained) != 1 or len(neighbors[first] & shared) != 1:
-        return None
-    edge = tuple(sorted((first, next(iter(retained)))))
-    if edge not in model.pi_eligible_edges:
-        return None
-    if any(dict(assignment.orders)[edge] == 2 for assignment in model.allowed_kekule_assignments):
-        return None
-    return edge
+    all_shared = frozenset().union(*(join.shared_input_atoms for join in ast.joins))
+    matches = {match.occurrence_id: match for match in ast.component_occurrences}
+    for join in ast.joins:
+        child = matches[join.attached_occurrence]
+        child_atoms = set(child.input_atom_by_locant.values())
+        if (
+            first not in child_atoms - all_shared
+            or not neighbors[first] <= child_atoms
+            or any(other.host_occurrence == child.occurrence_id for other in ast.joins)
+        ):
+            continue
+        retained = neighbors[first] - all_shared
+        if len(retained) != 1 or len(neighbors[first] & set(join.shared_input_atoms)) != 1:
+            continue
+        edge = tuple(sorted((first, next(iter(retained)))))
+        if (
+            edge in model.pi_eligible_edges
+            and model.allowed_kekule_assignments
+            and all(dict(assignment.orders)[edge] == 1 for assignment in model.allowed_kekule_assignments)
+        ):
+            return edge
+    return None

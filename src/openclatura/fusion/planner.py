@@ -14,6 +14,7 @@ from .audit import audit_fusion_plan
 from .charges import fusion_charge_operations as _fusion_charge_operations
 from .charges import fusion_component_charge_parent
 from .citation_pi import citation_pi_dead_end
+from .citation_pi_donor import charged_donor_citation_pi_dead_end
 from .config import fusion_nomenclature_config
 from .descriptor import FusionDescriptorError, iter_fusion_name_asts, render_fusion_name_parts
 from .faces import BoundedFaceModel, FaceSearchBudgetExceeded, cached_bounded_face_model
@@ -267,7 +268,9 @@ def _plan_numbered_candidate(
         result = _complete_fusion_plan(
             mol, atoms, mode, ast, registry, proof, graph=graph, initial_bond_model=initial_model
         )
-        if isinstance(result, FusionConfirmed) and (edge := citation_pi_dead_end(result.plan)) is not None:
+        if isinstance(result, FusionConfirmed) and (
+            edge := citation_pi_dead_end(result.plan) or charged_donor_citation_pi_dead_end(mol, result.plan)
+        ) is not None:
             result = FusionUnsupported(
                 "fusion citation forces an uncompletable pi assignment",
                 (f"surviving child edge {edge} precedes the recreated fusion bond",),
