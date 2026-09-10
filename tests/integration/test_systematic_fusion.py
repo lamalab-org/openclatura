@@ -292,11 +292,41 @@ def test_intrinsic_h_parent_state_replaces_von_baeyer_fallback(smiles, expected)
         assert result.opsin_check is not None and result.opsin_check.status == "matched"
 
 
+@pytest.mark.skipif(not opsin_available(), reason="py2opsin/Java is unavailable")
+@pytest.mark.parametrize("order", ("original", "reversed", "shuffled"))
+def test_furopyran_explicit_parent_h_has_exact_roundtrip_and_atom_ownership(order):
+    smiles = "O1C=CC2OC=CC=C21"
+    graph = Chem.MolFromSmiles(smiles)
+    indices = list(range(graph.GetNumAtoms()))
+    if order == "reversed":
+        indices.reverse()
+    elif order == "shuffled":
+        random.Random(53).shuffle(indices)
+    graph = Chem.RenumberAtoms(graph, indices)
+    result = name_mol(graph, include_trace=True, verify_self=True)
+    assert result.error is None
+    assert result.name == "3aH-furo[3,2-b]pyran"
+    assert result.parent_nomenclature == "systematic_fusion"
+    assert result.self_audit.verdict == "confirmed"
+    assert not result.self_audit.coverage.unnamed_atoms
+    selected = next(step for step in result.decisions if step.decision == "selected audited systematic fusion parent")
+    assert selected.data["atom_to_locant"][indices.index(3)] == "3a"
+    atom = graph.GetAtomWithIdx(indices.index(3))
+    assert atom.GetSymbol() == "C" and atom.GetTotalNumHs() == 1
+    assert all(bond.GetBondType() == Chem.BondType.SINGLE for bond in atom.GetBonds())
+    assert selected.data["derivative_operations"]["hydro"] == []
+    assert selected.data["derivative_operations"]["oxo"] == []
+    for spelling in ("furo[3,2-b]pyran", result.name):
+        check = verify_with_opsin(spelling, smiles, standardize_smiles=False)
+        assert check.status == "matched", check.to_dict()
+        assert check.canonical_original == check.canonical_roundtrip
+
+
 def test_higher_order_fusion_composes_completed_hydro_and_oxo_operations():
     smiles = "C=C1C(=O)O[C@H]2[C@H]1CCC(C)=C1CCC(=O)O[C@]12C"
     expected = (
-        "(3aS,10aR,10bS)-6,10a-dimethyl-3-methylidene-3a,4,5,10b-tetrahydro"
-        "furo[2',3':1,2]cyclohepta[7,6-b]pyran-2,9(7H,8H)-dione"
+        "(3aS,10aR,10bS)-6,10a-dimethyl-3-methylidene-4,5,7,8,10a,10b-hexahydro"
+        "furo[2',3':1,2]cyclohepta[7,6-b]pyran-2,9(3aH)-dione"
     )
 
     result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True, include_trace=True)
@@ -304,6 +334,9 @@ def test_higher_order_fusion_composes_completed_hydro_and_oxo_operations():
     assert result.name == expected
     assert result.parent_nomenclature == "systematic_fusion"
     assert result.opsin_check is not None and result.opsin_check.status == "matched"
+    check = verify_with_opsin(result.name, smiles, standardize_smiles=False)
+    assert check.status == "matched", check.to_dict()
+    assert check.canonical_original == check.canonical_roundtrip
     assert Chem.MolToSmiles(Chem.MolFromSmiles(result.opsin_check.opsin_smiles)) == Chem.MolToSmiles(
         Chem.MolFromSmiles(smiles)
     )
@@ -331,13 +364,13 @@ def test_higher_order_fusion_composes_completed_hydro_and_oxo_operations():
     ]
     assert selected.data["derivative_operations"]["hydro"] == [
         {
-            "locants": ["3a", "4", "5", "10b"],
-            "atom_ids": [6, 7, 8, 5],
-            "bond_ids": [6, 8],
+            "locants": ["4", "5", "7", "8", "10a", "10b"],
+            "atom_ids": [7, 8, 12, 13, 17, 5],
+            "bond_ids": [8, 13, 21],
         }
     ]
     assert selected.data["derivative_operations"]["added_hydrogen"] == [
-        {"locants": ["7", "8"], "atom_ids": [12, 13], "bond_ids": [12, 13, 14]}
+        {"locants": ["3a"], "atom_ids": [6], "bond_ids": [6, 7, 19]}
     ]
     alkylidene = selected.data["derivative_operations"]["alkylidene"]
     assert len(alkylidene) == 1
@@ -350,6 +383,9 @@ def test_higher_order_fusion_composes_completed_hydro_and_oxo_operations():
     reordered = name_mol(renumbered, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True)
     assert reordered.name == expected
     assert reordered.opsin_check is not None and reordered.opsin_check.status == "matched"
+    check = verify_with_opsin(reordered.name, Chem.MolToSmiles(renumbered), standardize_smiles=False)
+    assert check.status == "matched", check.to_dict()
+    assert check.canonical_original == check.canonical_roundtrip
 
 
 @pytest.mark.parametrize("order", ("original", "reversed", "shuffled"))

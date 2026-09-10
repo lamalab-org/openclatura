@@ -20,7 +20,7 @@
   {
     "id": "furopyran",
     "smiles": "O1C=CC2OC=CC=C21",
-    "name": "furo[3,2-b]pyran",
+    "name": "3aH-furo[3,2-b]pyran",
     "parent_nomenclature": "systematic_fusion",
     "pin_status": "confirmed",
     "support_tier": "bounded-polycomponent-v3",
