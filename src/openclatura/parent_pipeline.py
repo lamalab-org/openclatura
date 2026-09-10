@@ -496,12 +496,16 @@ def build_parent_assembly_plan(
             locant_map_source = LocantMapSource.PROOF
     numbered_fusion_plans = {}
     proven_hydrogen_locants = None
-    if parent_hydride is not None and parent_hydride.is_systematic_fusion:
+    if (
+        parent_hydride is not None
+        and parent_hydride.uses_fusion_plan
+        and parent_hydride.replacement_fusion_state is None
+    ):
         numbered_fusion_plans = {
             frozenset(plan.numbering.string_input_locant_maps()[0].items()): plan
             for plan in parent_hydride.fusion_plan.numbering_variants
         }
-        if numbered_fusion_plans:
+        if numbered_fusion_plans and parent_hydride.is_systematic_fusion:
             proven_hydrogen_locants = {
                 key: (
                     tuple(str(locant) for locant in plan.indicated_hydrogens),
@@ -526,10 +530,18 @@ def build_parent_assembly_plan(
         proven_hydrogen_locants=proven_hydrogen_locants,
     )
     if numbered_fusion_plans:
+        previous_parent = parent_hydride
         parent_hydride = RingParent.from_fusion_plan(
             numbered_fusion_plans[frozenset(locant_map.items())],
             pin_decision=parent_hydride.pin_decision,
         )
+        if previous_parent.is_skeletal_replacement_fusion:
+            # Numbering and its graph-bound derivative operations are one plan.
+            # Preserve the replacement role when selecting another carbon map.
+            parent_hydride = parent_hydride.as_skeletal_replacement_fusion(
+                replacement_atom_ids=previous_parent.skeletal_replacement_atom_ids,
+                audit_checks=previous_parent.skeletal_replacement_audit_checks,
+            )
     get_loc = subgraph_locant_getter(numbered_path, locant_map)
     parts = build_parent_parts(
         mol,
