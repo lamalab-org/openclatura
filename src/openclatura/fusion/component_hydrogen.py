@@ -107,15 +107,24 @@ def _component_hydrogen_consumption(
         assignment_consumed = set()
         for occurrence, edges, assignments, local_pi, carbon_h in local_domains:
             local_doubles = doubles & edges
-            # Keep a joint resonance witness projecting to an allowed maximum
-            # matching of every component. Other completed resonance forms
-            # need not localize their pi bonds along the same component edges.
-            if local_doubles not in assignments:
+            # Pi bonds may cross the boundary or shift along alternating paths.
+            # A local maximum must preserve every nonjunction atom's occupancy:
+            # only fusion junctions may be paired outside this component.
+            local_paired = frozenset(atom for edge in local_doubles for atom in edge)
+            local_witnesses = tuple(
+                candidate
+                for candidate in assignments
+                if local_paired.symmetric_difference(atom for edge in candidate for atom in edge) <= junctions
+            )
+            if not local_witnesses:
                 break
-            unpaired = local_pi - {atom for edge in local_doubles for atom in edge}
-            if not unpaired <= carbon_h & junctions:
+            unpaired = local_pi - local_paired
+            if not any(
+                unpaired - {atom for edge in candidate for atom in edge} <= carbon_h & junctions
+                for candidate in local_witnesses
+            ):
                 break
-            assignment_consumed.update((occurrence, atom) for atom in unpaired)
+            assignment_consumed.update((occurrence, atom) for atom in unpaired & carbon_h)
         else:
             witnesses.append(assignment)
             consumed.update(assignment_consumed)
