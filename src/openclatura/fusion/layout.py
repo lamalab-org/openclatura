@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from dataclasses import dataclass, fields, replace
+from functools import lru_cache
 from math import gcd, lcm
 
 from ..locants import system_locant_sort_key
@@ -955,6 +956,15 @@ def preferred_intrinsic_layouts(
     locant criteria are applied after preferred orientation and may select a
     reflected embedding without changing the preferred layout score.
     """
+
+    return _preferred_intrinsic_layouts(model, search_budget, max_layouts, opsin_ring_map)
+
+
+@lru_cache(maxsize=128)
+def _preferred_intrinsic_layouts(
+    model: FaceModel, search_budget: int, max_layouts: int, opsin_ring_map: bool
+) -> tuple[FusedLayout, ...]:
+    """Normalize implicit/explicit defaults before caching immutable layouts."""
 
     layouts = intrinsic_fused_layouts(
         model,

@@ -77,6 +77,22 @@ def _absolute_direction(relative: int, previous: int) -> int:
     return 4 if direction == -4 else direction
 
 
+def _linear_face_chain(neighbors: dict[int, list[int]]) -> bool:
+    """Certify one complete path, excluding branches and detached cycles."""
+    ends = [face for face, group in neighbors.items() if len(group) == 1]
+    if len(ends) != 2 or any(len(group) not in {1, 2} for group in neighbors.values()):
+        return False
+    visited = set()
+    pending = [ends[0]]
+    while pending:
+        face = pending.pop()
+        if face in visited:
+            continue
+        visited.add(face)
+        pending.extend(neighbors[face])
+    return visited == neighbors.keys()
+
+
 @lru_cache(maxsize=128)
 def entry_direction_geometry(
     model: FaceModel,
@@ -154,6 +170,9 @@ def entry_direction_geometry(
         return entry_direction_geometry(model, search_budget, terminal_cycle, True)
     budget = _Budget(search_budget)
     tables = set()
+    linear_chain = (
+        not allow_distorted and len(model.face_adjacency) == len(cycles) - 1 and _linear_face_chain(neighbors)
+    )
 
     def visit(pending, visited, directions):
         budget.spend()
@@ -172,6 +191,12 @@ def entry_direction_geometry(
                 other: _absolute_direction(4 if distance == 0 else table[distance - 1], incoming)
                 for other, distance in distances.items()
             }
+            if (
+                straight_only
+                and len(neighbors[face]) == 2
+                and any(value != incoming for other, value in outgoing.items() if distances[other] != 0)
+            ):
+                continue
             following = [
                 (other, outgoing[other], ports[other, face]) for other in neighbors[face] if other not in visited
             ]
@@ -181,102 +206,112 @@ def entry_direction_geometry(
                 {**directions, **{(face, other): value for other, value in outgoing.items()}},
             )
 
-    for root in terminals:
-        fused_atoms = set().union(*(edges[root][ports[root, other]] for other in neighbors[root]))
-        entries = [index for index, edge in enumerate(edges[root]) if not edge & fused_atoms]
-        if not entries:
-            entries = [
-                index
-                for index in range(len(edges[root]))
-                if index not in {ports[root, other] for other in neighbors[root]}
-            ]
-        for entry in entries:
-            visit([(root, 0, entry)], set(), {})
-
-    outer_clockwise = _clockwise_boundary(tuple(model.outer_boundary), positions)
-    if outer_clockwise is None:
-        return None
-    if reverse_winding:
-        outer_clockwise = tuple(reversed(outer_clockwise))
-    fusion_atoms = set().union(*(edges[left][ports[left, right]] for left, right, _ in model.face_adjacency))
-    candidates = {}
-    best_score = None
-    for items in sorted(tables):
-        directions = dict(items)
-        distortion = sum(_absolute_direction(direction, 4) != directions[b, a] for (a, b), direction in items) // 2
-        for axis in sorted(set(directions.values())):
-            budget.spend()
-            directed = {(a, b): _absolute_direction(direction, -axis) for (a, b), direction in items}
-            centers = {terminals[0] if allow_distorted else next(iter(cycles)): (0, 0)}
-            queue = deque(centers)
-            consistent = True
-            conflicts = set()
-            while queue and consistent:
-                left = queue.popleft()
-                for right in neighbors[left]:
-                    dx, dy = steps[directed[left, right]]
-                    point = (centers[left][0] + dx, centers[left][1] + dy)
-                    if right in centers:
-                        if centers[right] != point:
-                            if allow_distorted:
-                                conflicts.add(tuple(sorted((left, right))))
-                            else:
-                                consistent = False
-                                break
-                    else:
-                        centers[right] = point
-                        queue.append(right)
-            if not consistent or len(centers) != len(cycles) or len(set(centers.values())) != len(cycles):
-                continue
-            connections = [(left, right) for left, right, _ in model.face_adjacency]
-            if any(
-                not {a, b} & {c, d} and _segments_intersect(centers[a], centers[b], centers[c], centers[d])
-                for index, (a, b) in enumerate(connections)
-                for c, d in connections[index + 1 :]
-            ):
-                continue
-            longest = 1
-            for face in cycles:
-                seen = {face}
-                while True:
-                    following = [other for other in neighbors[face] if directed[face, other] == 0 and other not in seen]
-                    if len(following) != 1:
-                        break
-                    face = following[0]
-                    seen.add(face)
-                longest = max(longest, len(seen))
-            for sx, sy in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
-                oriented = {face: (sx * x, sy * y) for face, (x, y) in centers.items()}
-                # OPSIN ranks the original connection table before rotating it.
-                # Discrete rotation can close a map without removing that rank.
-                score = (distortion, -longest, *_opsin_occupied_row_orientation(oriented))
-                if best_score is not None and score > best_score:
-                    continue
-                boundary = outer_clockwise if sx * sy == 1 else tuple(reversed(outer_clockwise))
-                eligible = [face for face in cycles if (set(cycles[face]) & set(boundary)) - fusion_atoms]
-                if not eligible:
-                    continue
-                top = min(eligible, key=lambda face: (-oriented[face][1], -oriented[face][0]))
-                starts = [
-                    atom
-                    for index, atom in enumerate(boundary)
-                    if atom in cycles[top] and atom not in fusion_atoms and boundary[index - 1] in fusion_atoms
+    # Zero distortion and an n-ring axis attain the global score bound. Any
+    # equally ranked table on a path is straight-through from either terminal.
+    # Keep every tied perimeter; failed proofs continue under the same budget.
+    for straight_only in (True, False) if linear_chain else (False,):
+        tables.clear()
+        for root in terminals:
+            fused_atoms = set().union(*(edges[root][ports[root, other]] for other in neighbors[root]))
+            entries = [index for index, edge in enumerate(edges[root]) if not edge & fused_atoms]
+            if not entries:
+                entries = [
+                    index
+                    for index in range(len(edges[root]))
+                    if index not in {ports[root, other] for other in neighbors[root]}
                 ]
-                if len(starts) != 1:
+            for entry in entries:
+                visit([(root, 0, entry)], set(), {})
+
+        outer_clockwise = _clockwise_boundary(tuple(model.outer_boundary), positions)
+        if outer_clockwise is None:
+            return None
+        if reverse_winding:
+            outer_clockwise = tuple(reversed(outer_clockwise))
+        fusion_atoms = set().union(*(edges[left][ports[left, right]] for left, right, _ in model.face_adjacency))
+        candidates = {}
+        best_score = None
+        for items in sorted(tables):
+            directions = dict(items)
+            distortion = sum(_absolute_direction(direction, 4) != directions[b, a] for (a, b), direction in items) // 2
+            for axis in sorted(set(directions.values())):
+                budget.spend()
+                directed = {(a, b): _absolute_direction(direction, -axis) for (a, b), direction in items}
+                centers = {terminals[0] if allow_distorted else next(iter(cycles)): (0, 0)}
+                queue = deque(centers)
+                consistent = True
+                conflicts = set()
+                while queue and consistent:
+                    left = queue.popleft()
+                    for right in neighbors[left]:
+                        dx, dy = steps[directed[left, right]]
+                        point = (centers[left][0] + dx, centers[left][1] + dy)
+                        if right in centers:
+                            if centers[right] != point:
+                                if allow_distorted:
+                                    conflicts.add(tuple(sorted((left, right))))
+                                else:
+                                    consistent = False
+                                    break
+                        else:
+                            centers[right] = point
+                            queue.append(right)
+                if not consistent or len(centers) != len(cycles) or len(set(centers.values())) != len(cycles):
                     continue
-                offset = boundary.index(starts[0])
-                perimeter = boundary[offset:] + boundary[:offset]
-                if best_score is None or score < best_score:
-                    best_score = score
-                    candidates.clear()
-                candidates.setdefault(
-                    perimeter,
-                    EntryDirectionWitness(
+                connections = [(left, right) for left, right, _ in model.face_adjacency]
+                if any(
+                    not {a, b} & {c, d} and _segments_intersect(centers[a], centers[b], centers[c], centers[d])
+                    for index, (a, b) in enumerate(connections)
+                    for c, d in connections[index + 1 :]
+                ):
+                    continue
+                longest = 1
+                for face in cycles:
+                    seen = {face}
+                    while True:
+                        following = [
+                            other for other in neighbors[face] if directed[face, other] == 0 and other not in seen
+                        ]
+                        if len(following) != 1:
+                            break
+                        face = following[0]
+                        seen.add(face)
+                    longest = max(longest, len(seen))
+                for sx, sy in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+                    oriented = {face: (sx * x, sy * y) for face, (x, y) in centers.items()}
+                    # OPSIN ranks the original connection table before rotating it.
+                    # Discrete rotation can close a map without removing that rank.
+                    score = (distortion, -longest, *_opsin_occupied_row_orientation(oriented))
+                    if best_score is not None and score > best_score:
+                        continue
+                    boundary = outer_clockwise if sx * sy == 1 else tuple(reversed(outer_clockwise))
+                    eligible = [face for face in cycles if (set(cycles[face]) & set(boundary)) - fusion_atoms]
+                    if not eligible:
+                        continue
+                    top = min(eligible, key=lambda face: (-oriented[face][1], -oriented[face][0]))
+                    starts = [
+                        atom
+                        for index, atom in enumerate(boundary)
+                        if atom in cycles[top] and atom not in fusion_atoms and boundary[index - 1] in fusion_atoms
+                    ]
+                    if len(starts) != 1:
+                        continue
+                    offset = boundary.index(starts[0])
+                    perimeter = boundary[offset:] + boundary[:offset]
+                    if best_score is None or score < best_score:
+                        best_score = score
+                        candidates.clear()
+                    candidates.setdefault(
                         perimeter,
-                        top,
-                        tuple((face, *oriented[face]) for face in sorted(oriented)),
-                        score,
-                        tuple(sorted(conflicts)),
-                    ),
-                )
-    return (reference, tuple(candidates[key] for key in sorted(candidates))) if candidates else None
+                        EntryDirectionWitness(
+                            perimeter,
+                            top,
+                            tuple((face, *oriented[face]) for face in sorted(oriented)),
+                            score,
+                            tuple(sorted(conflicts)),
+                        ),
+                    )
+        count = len(cycles)
+        if not straight_only or (candidates and best_score == (0, -count, -count, count, -2 * count)):
+            return (reference, tuple(candidates[key] for key in sorted(candidates))) if candidates else None
+    return None
