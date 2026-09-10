@@ -14,6 +14,7 @@ from ..molecule import Molecule
 from ..polycycle_topology import normalize_edge
 from ..retained_graph_model import RetainedGraphTemplate
 from ..rules import elements
+from .citation_numbering import numbered_parent_graphs_agree
 from .config import fusion_nomenclature_config
 from .faces import BoundedFaceModel, typed_face_model
 from .layout import OpsinConstructionLayout, OpsinEntryLayout, preferred_intrinsic_layouts
@@ -159,7 +160,50 @@ def completed_system_numbering_selection(
             )
             continue
         accepted.setdefault(_numbering_key(candidate), candidate)
-    return CompletedNumberingSelection(tuple(accepted.values()), tuple(rejected))
+    tied = tuple(accepted.values())
+    selected = _construction_ordered_numberings(mol, layouts, tied)
+    if selected != tied:
+        rejected.extend(
+            RejectedNumbering(
+                orientation_score=candidate.score,
+                reason="stable construction enumeration distinguishes locant-labelled graphs",
+            )
+            for candidate in tied
+            if candidate not in selected
+        )
+    return CompletedNumberingSelection(selected, tuple(rejected))
+
+
+def _construction_ordered_numberings(
+    mol: Molecule,
+    layouts: tuple[FusedLayout, ...],
+    candidates: tuple[CompletedNumbering, ...],
+) -> tuple[CompletedNumbering, ...]:
+    if len(candidates) < 2:
+        return candidates
+    ranked = []
+    for candidate in candidates:
+        if candidate.layout_index is None:
+            return candidates
+        layout = layouts[candidate.layout_index]
+        if type(layout) is not OpsinConstructionLayout:
+            return candidates
+        if layout.construction_numbering_priority is not None:
+            ranked.append((layout.construction_numbering_priority, candidate))
+    if not ranked:
+        return candidates
+    if numbered_parent_graphs_agree(mol, (dict(candidate.atom_to_locant) for candidate in candidates)):
+        return candidates
+    best = min(priority for priority, _ in ranked)
+    first = [candidate for priority, candidate in ranked if priority == best]
+    if not numbered_parent_graphs_agree(mol, (dict(candidate.atom_to_locant) for candidate in first)):
+        return candidates
+    reference = dict(first[0].atom_to_locant)
+    return tuple(
+        candidate
+        for candidate in candidates
+        if numbered_parent_graphs_agree(mol, (reference, dict(candidate.atom_to_locant)))
+    )
 
 
 def _graph_numbering_candidates(mol: Molecule, faces: BoundedFaceModel) -> tuple[CompletedNumbering, ...]:

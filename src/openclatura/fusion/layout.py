@@ -35,6 +35,7 @@ class OpsinConstructionLayout(FusedLayout):
     """
 
     construction_atom_order: tuple[int, ...] = ()
+    construction_numbering_priority: int | None = None
 
     def __post_init__(self) -> None:
         FusedLayout.__post_init__(self)
@@ -42,6 +43,8 @@ class OpsinConstructionLayout(FusedLayout):
             raise ValueError("construction atom order must not repeat merged atoms")
         if set(self.construction_atom_order) != {atom for atom, _, _ in self.atom_positions}:
             raise ValueError("construction atom order must cover the positioned graph")
+        if self.construction_numbering_priority is not None and self.construction_numbering_priority < 0:
+            raise ValueError("construction numbering priority must be nonnegative")
 
 
 @dataclass(frozen=True, slots=True)
@@ -364,6 +367,58 @@ def _coupled_pentagon_axis_centers(path: tuple[int, ...], centers: dict[int, Poi
     }
 
 
+def _ordered_construction_layouts(
+    model: FaceModel,
+    ast: FusionNameAst,
+    specs: dict[int, FusionComponentSpec],
+    layouts: tuple[OpsinConstructionLayout, ...],
+    search_budget: int,
+) -> tuple[OpsinConstructionLayout, ...]:
+    from .construction_order import ordered_hexagonal_construction
+
+    atoms = {atom for face in model.faces for atom in face.atom_cycle}
+    if not layouts or len(atoms - set(model.outer_boundary)) < 2 or any(face.size != 6 for face in model.faces):
+        return layouts
+    reference = {atom: (x, y) for atom, x, y in layouts[0].atom_positions}
+    witness = ordered_hexagonal_construction(ast, specs, model, reference, search_budget)
+    if witness is None:
+        return layouts
+
+    def area(positions: dict[int, Point]) -> int:
+        cycle = model.outer_boundary
+        return sum(
+            positions[a][0] * positions[b][1] - positions[b][0] * positions[a][1]
+            for a, b in zip(cycle, cycle[1:] + cycle[:1])
+        )
+
+    reference_area = area(reference)
+    result = []
+    witnessed_entries = set()
+    for layout in layouts:
+        top = max(layout.face_positions, key=lambda row: (row[2], row[1]))[0]
+        layout_area = area({atom: (x, y) for atom, x, y in layout.atom_positions})
+        # Numbering traverses clockwise in each physical layout. Express
+        # that winding in the common reference used by the source witness.
+        winding = -1 if layout_area * reference_area > 0 else 1
+        entry = top, winding
+        priority = witness.entries.index(entry) if entry in witness.entries else None
+        if priority is not None:
+            witnessed_entries.add(entry)
+        result.append(
+            replace(
+                layout,
+                construction_atom_order=witness.atom_order,
+                construction_numbering_priority=priority,
+                audit_evidence=(*layout.audit_evidence, "ordered hexagonal construction enumeration"),
+            )
+        )
+    # Do not silently skip an earlier parser path absent from physical
+    # geometry: the stable first-path proof would then be incomplete.
+    if witnessed_entries != set(witness.entries):
+        return layouts
+    return tuple(result)
+
+
 def component_entry_layouts(
     model: FaceModel,
     ast: FusionNameAst,
@@ -396,7 +451,7 @@ def component_entry_layouts(
             return None
         if set(construction_order) != atoms:
             return ()
-        return tuple(
+        layouts = tuple(
             OpsinConstructionLayout(
                 **{
                     field.name: getattr(layout, field.name)
@@ -414,6 +469,7 @@ def component_entry_layouts(
                 model, search_budget=search_budget, opsin_ring_map=ring_map_compatibility
             )
         )
+        return _ordered_construction_layouts(model, ast, specs, layouts, search_budget)
     if not can_use_component_entry_layout(model):
         return _entry_direction_layouts(model, ast, specs, search_budget)
     faces = {face.id: face for face in model.faces}

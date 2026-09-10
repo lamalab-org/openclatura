@@ -389,10 +389,18 @@ def test_higher_order_fusion_composes_completed_hydro_and_oxo_operations():
 
 
 @pytest.mark.parametrize("order", ("original", "reversed", "shuffled"))
-def test_higher_order_component_indicated_hydrogen_composition_roundtrips(order):
+@pytest.mark.parametrize("extend_sidechain", (False, True))
+def test_higher_order_component_indicated_hydrogen_composition_roundtrips(order, extend_sidechain):
     smiles = "CSc1ccc(C2c3c(oc4ccccc4c3=O)C(=O)N2c2ncccn2)cc1"
-    expected = "1-(4-(methylsulfanyl)phenyl)-2-(pyrimidin-2-yl)benzo[1',2':2,3]pyrano[5,6-c]pyrrole-3,9(1H)-dione"
+    expected = "1-(4-(methylsulfanyl)phenyl)-2-(pyrimidin-2-yl)-1H-benzo[1',2':2,3]pyrano[5,6-c]pyrrole-3,9-dione"
     rd_mol = Chem.MolFromSmiles(smiles)
+    if extend_sidechain:
+        editable = Chem.RWMol(rd_mol)
+        carbon = editable.AddAtom(Chem.Atom("C"))
+        editable.AddBond(0, carbon, Chem.BondType.SINGLE)
+        rd_mol = editable.GetMol()
+        Chem.SanitizeMol(rd_mol)
+        expected = expected.replace("methylsulfanyl", "ethylsulfanyl")
     indices = list(range(rd_mol.GetNumAtoms()))
     if order == "reversed":
         indices.reverse()
@@ -409,22 +417,20 @@ def test_higher_order_component_indicated_hydrogen_composition_roundtrips(order)
     operations = selected.data["derivative_operations"]
     assert operations["hydro"] == []
     assert operations["unsaturation"] == []
-    (added,) = operations["added_hydrogen"]
-    assert added["locants"] == ["1"]
-    assert added["atom_ids"] == [indices.index(6)]
+    assert operations.get("added_hydrogen", []) == []
+    assert selected.data["base_name"] == "1H-benzo[1',2':2,3]pyrano[5,6-c]pyrrole"
+    assert "paired_external_pi_consumption" in selected.data["audit_checks"]
     assert selected.data["atom_to_locant"][indices.index(6)] == "1"
     assert {operation["parent_atom_id"] for operation in operations["oxo"]} == {indices.index(16), indices.index(18)}
     parent_atoms = set(selected.data["atom_to_locant"])
     parent_h_atom = rd_mol.GetAtomWithIdx(indices.index(6))
     assert parent_h_atom.GetTotalNumHs() == 1
-    assert set(added["bond_ids"]) == {
-        bond.GetIdx() + 1
-        for bond in parent_h_atom.GetBonds()
-        if bond.GetOtherAtomIdx(parent_h_atom.GetIdx()) in parent_atoms
-    }
+    assert len([neighbor for neighbor in parent_h_atom.GetNeighbors() if neighbor.GetIdx() in parent_atoms]) == 2
+    assert all(bond.GetBondType() == Chem.BondType.SINGLE for bond in parent_h_atom.GetBonds())
     if opsin_available():
         check = verify_with_opsin(result.name, Chem.MolToSmiles(rd_mol), standardize_smiles=False)
         assert check.status == "matched", check.to_dict()
+        assert check.canonical_original == check.canonical_roundtrip
 
 
 def test_multiple_indicated_hydrogens_compose_with_additive_hydrogenation():
@@ -1030,7 +1036,7 @@ def test_ortho_peri_parent_with_interior_atoms_receives_a_complete_audited_numbe
     assert result.plan.rendered_base_name == "benzo[1,2,3,4-def]phenanthrene"
     assert any(join.kind.value == "ortho_peri" for join in result.plan.ast.joins)
     assert set(dict(result.plan.numbering.input_locant_maps[0])) == set(mol.atoms)
-    assert any(locant.interior_distance is not None for _, locant in result.plan.numbering.input_locant_maps[0])
+    assert {str(locant) for _, locant in result.plan.numbering.input_locant_maps[0]} >= {"10b", "10c"}
 
 
 def test_complex_multiparent_interior_system_still_abstains_safely():
