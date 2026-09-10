@@ -20,11 +20,17 @@ from ..molecule import Molecule, bond_ids_within, edges_within_atoms
 from ..name_operations import UnsaturationOperation
 from ..polycycle_topology import connected_components, ring_system_topology
 from ..retained_fused_templates import match_retained_fused_templates, retained_parent_metadata
-from ..retained_name_policy import render_retained_hydrogen_state, retained_parent_output_name
+from ..retained_graph_model import RetainedGraphTemplateMatch
+from ..retained_name_policy import (
+    render_retained_hydrogen_state,
+    retained_parent_name_policy,
+    retained_parent_output_name,
+)
 from ..ring_parent import ParentHydrideKind, ParentHydrideMetadata, RingParent
 from ..rules import multipliers, stems
 from .composite_bridges import CompositeBridgeConstruction, composite_bridge_constructions
 from .config import fusion_nomenclature_config
+from .exocyclic import is_neutral_external_pi_ligand
 from .mancude import ParentDerivativeState, parent_derivative_state
 from .model import FusionConfirmed, FusionMode, FusionParentPlan, ParentBondModel, PinDecision, PinStatus
 from .numbering import RetainedParentBondCapacityError, retained_template_parent_bond_model
@@ -531,6 +537,60 @@ def _junction_path_interiors(
     return tuple(sorted(interiors, key=lambda path: (len(path), tuple(sorted(path)))))
 
 
+def _oxo_wrapper_hydrogen_state(mol: Molecule, match: RetainedGraphTemplateMatch) -> RetainedGraphTemplateMatch:
+    """Prefer a capacity-preserving oxo tautomer that already implies observed pi bonds."""
+    if not match.indicated_h:
+        return match
+    atoms = match.matched_atoms
+    oxo_locants = tuple(
+        locant
+        for locant, atom in match.locant_to_atom.items()
+        if mol.atoms[atom].is_carbon
+        and any(
+            neighbor not in atoms
+            and mol.atoms[neighbor].symbol == "O"
+            and mol.get_bond(atom, neighbor).order == 2
+            and is_neutral_external_pi_ligand(mol, atom, neighbor)
+            for neighbor in mol.get_neighbors(atom)
+        )
+    )
+    if not oxo_locants:
+        return match
+
+    def additional_pi(citation: tuple[str, ...]) -> int | None:
+        try:
+            model = retained_template_parent_bond_model(match.template, match.locant_to_atom, indicated_h=citation)
+        except RetainedParentBondCapacityError:
+            return None
+        state = parent_derivative_state(
+            mol,
+            atoms,
+            model,
+            match.atom_to_locant,
+            preserve_retained_parent_state=True,
+            allow_pi_redistribution=True,
+        )
+        return None if state is None else len(state.unsaturation_operations)
+
+    best = additional_pi(match.indicated_h)
+    if not best:
+        return match
+    selected = match.indicated_h
+    # Only replace a movable carbon-H site; fixed heteroatom donors retain
+    # their identity. Each candidate is replayed by the existing bond model.
+    for old in match.indicated_h:
+        if not mol.atoms[match.locant_to_atom[old]].is_carbon:
+            continue
+        for new in oxo_locants:
+            if new in match.indicated_h:
+                continue
+            citation = tuple(sorted((set(match.indicated_h) - {old}) | {new}, key=retained_locant_sort_key))
+            count = additional_pi(citation)
+            if count is not None and count < best:
+                selected, best = citation, count
+    return replace(match, indicated_h=selected)
+
+
 def _retained_wrapper_parent(mol: Molecule, atoms: frozenset[int]) -> WrapperParentPlan | None:
     matches = match_retained_fused_templates(mol, set(atoms))
     if not matches:
@@ -544,7 +604,16 @@ def _retained_wrapper_parent(mol: Molecule, atoms: frozenset[int]) -> WrapperPar
         return None
     # The shared retained registry also contains monocyclic parents.  A bridge
     # wrapper requires an eligible fused base, not merely a retained match.
-    matches = [match for match in matches if fusion_ring_size_gate(tuple(map(len, match.template.rings)))]
+    matches = [
+        match
+        for match in matches
+        if fusion_ring_size_gate(tuple(map(len, match.template.rings)))
+        and not (
+            match.indicated_h != match.template.default_indicated_h
+            and (policy := retained_parent_name_policy(match.template.name)) is not None
+            and policy.hydrogenation is not None
+        )
+    ]
     if not matches:
         return None
     # A relocated aromatic donor has an observed electronic-state witness.
@@ -560,6 +629,7 @@ def _retained_wrapper_parent(mol: Molecule, atoms: frozenset[int]) -> WrapperPar
         else replace(match, indicated_h=match.template.default_indicated_h)
         for match in matches
     ]
+    matches = [_oxo_wrapper_hydrogen_state(mol, match) for match in matches]
     first = matches[0]
     template_name = first.template.name
     same_parent = [
