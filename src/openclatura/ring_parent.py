@@ -19,6 +19,7 @@ from .ring_renderer import is_von_baeyer_descriptor
 if TYPE_CHECKING:
     from .fusion.mancude import ParentDerivativeState
     from .fusion.model import FusionParentPlan, ParentBondModel, PinDecision
+    from .fusion.replacement_state import ReplacementFusionState
     from .fusion.wrappers import BridgedFusionWrapperPlan
 
 
@@ -69,6 +70,7 @@ class RingParent:
     pin_decision: PinDecision | None = None
     skeletal_replacement_atom_ids: tuple[int, ...] = ()
     skeletal_replacement_audit_checks: tuple[str, ...] = ()
+    replacement_fusion_state: ReplacementFusionState | None = None
 
     @property
     def hydride_kind(self) -> ParentHydrideKind:
@@ -118,6 +120,7 @@ class RingParent:
                 bool(self.skeletal_replacement_atom_ids)
                 and set(self.skeletal_replacement_atom_ids) <= set(self.atoms)
                 and bool(self.skeletal_replacement_audit_checks)
+                and (self.replacement_fusion_state is None or self.replacement_fusion_state.audit_ok)
                 and all(
                     set(locant_map) == set(self.atoms) and len(set(locant_map.values())) == len(self.atoms)
                     for locant_map in self.retained_locant_maps
@@ -197,6 +200,8 @@ class RingParent:
 
     @property
     def base_name(self) -> str | None:
+        if self.is_skeletal_replacement_fusion and self.replacement_fusion_state is not None:
+            return self.replacement_fusion_state.rendered_name
         if self.parent_name is not None:
             return self.parent_name
         if self.uses_fusion_plan:
@@ -260,6 +265,8 @@ class RingParent:
 
     @property
     def bond_model(self) -> ParentBondModel | None:
+        if self.is_skeletal_replacement_fusion and self.replacement_fusion_state is not None:
+            return self.replacement_fusion_state.bond_model
         if self.parent_bond_model is not None:
             return self.parent_bond_model
         if self.is_bridged_fusion:
@@ -270,6 +277,8 @@ class RingParent:
     def derivative_state(self) -> ParentDerivativeState | None:
         """Return the derivative proof belonging to the selected parent model."""
 
+        if self.is_skeletal_replacement_fusion and self.replacement_fusion_state is not None:
+            return self.replacement_fusion_state.derivative_state
         if self.uses_fusion_plan:
             return self.fusion_plan.derivative_state
         if self.is_bridged_fusion:

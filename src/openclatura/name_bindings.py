@@ -449,6 +449,16 @@ def _operation_emitted_tokens(binding: NameAtomBinding) -> tuple[NameTokenBindin
 
 
 def _parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]:
+    if parts.parent_hydride is not None and parts.parent_hydride.is_skeletal_replacement_fusion:
+        state = parts.parent_hydride.replacement_fusion_state
+        if state is not None:
+            tokens = _structured_parent_emitted_tokens(state.rendered_name, state.rendered_parts)
+            # Keep a complete locant-H token: an isolated digit/H could bind
+            # to preceding stereo or substituent text in another renderer stream.
+            role = "replacement_indicated_hydrogen"
+            return tuple(token for token in tokens if token.grammar_role != role) + tuple(
+                token for token in state.rendered_parts if token.grammar_role == role
+            )
     if parts.parent_hydride is not None and parts.parent_hydride.is_bridged_fusion:
         plan = parts.parent_hydride.fusion_wrapper_plan
         assert plan is not None

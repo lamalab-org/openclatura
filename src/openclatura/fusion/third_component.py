@@ -10,9 +10,11 @@ replacement.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
+from ..canonical_ranks import canonical_ranks
+from ..locants import system_locant_sort_key
 from ..molecule import Molecule
 from ..retained_fused_templates import match_retained_fused_templates, retained_parent_metadata
 from ..ring_parent import RingParent
@@ -94,6 +96,14 @@ def _plan_uncached(
     parent = _carbon_parent(carbon, atoms, mode)
     if parent is None or not parent.audit_ok:
         return None
+    replacement_state = None
+    from .replacement_state import saturated_replacement_scope
+
+    if parent.fusion_plan is not None and saturated_replacement_scope(mol, atoms):
+        composed = _select_replacement_state(mol, carbon, atoms, mode, parent)
+        if composed is None:
+            return None
+        parent, replacement_state = composed
     maps = parent.proof_locant_maps
     if not maps or any(set(locant_map) != set(atoms) for locant_map in maps):
         return None
@@ -106,11 +116,22 @@ def _plan_uncached(
         "corresponding_carbon_graph_identity",
         "carbon_parent_audit",
         "complete_replacement_locants",
-    )
+    ) + (replacement_state.audit_checks if replacement_state is not None else ())
     replacement_parent = parent.as_skeletal_replacement_fusion(
         replacement_atom_ids=replacement_atoms,
         audit_checks=checks,
     )
+    if replacement_state is not None:
+        replacement_parent = replace(
+            replacement_parent,
+            replacement_fusion_state=replacement_state,
+            hydride_metadata=replace(
+                replacement_parent.hydride_metadata,
+                default_indicated_h=replacement_state.indicated_hydrogens,
+                indicated_hydrogen_count=len(replacement_state.indicated_hydrogens),
+                mancude_double_bonds=replacement_state.bond_model.maximum_non_cumulative_double_bonds,
+            ),
+        )
     return ThirdComponentFusionPlan(
         parent=replacement_parent,
         prohibited_citation=prohibited_ast,
@@ -119,6 +140,67 @@ def _plan_uncached(
         ring_sizes=ring_sizes,
         audit_checks=checks,
     )
+
+
+def _select_replacement_state(mol, carbon, atoms, mode, first_parent):
+    """Select equivalent carbon constructions only after their replacement proof."""
+    from .descriptor import iter_fusion_name_asts, render_fusion_name_parts
+    from .faces import typed_face_model
+    from .layout import preferred_intrinsic_layouts
+    from .planner import _plan_numbered_candidate
+    from .replacement_state import prove_replacement_state
+
+    bounded = cached_bounded_face_model(carbon, atoms)
+    registry = fusion_component_registry()
+    matches = registry.match_faces(carbon, bounded)
+    face_model = typed_face_model(carbon, bounded)
+    layouts = preferred_intrinsic_layouts(face_model)
+    numbering_cache = {}
+    first_core = "".join(
+        part.text
+        for part in first_parent.fusion_plan.rendered_parts
+        if part.grammar_role not in {"fusion_indicated_hydrogen", "fusion_indicated_hydrogen_separator"}
+    )
+    candidates = []
+    ranks = canonical_ranks(mol)
+    for ast in iter_fusion_name_asts(carbon, matches, registry):
+        # Different atom embeddings of this same preferred construction need
+        # joint proofs. Do not substitute a lower-priority carbon parent.
+        if "".join(part.text for part in render_fusion_name_parts(ast, registry, mol=carbon)) != first_core:
+            break
+        result = _plan_numbered_candidate(
+            carbon, atoms, mode, ast, registry, bounded, face_model, layouts, numbering_cache=numbering_cache
+        )
+        if not isinstance(result, FusionConfirmed):
+            continue
+        for plan in result.plan.numbering_variants or (result.plan,):
+            state = prove_replacement_state(mol, plan)
+            if state is None or not state.audit_ok:
+                continue
+            mapping = plan.numbering.string_input_locant_maps()[0]
+            priorities = sorted(
+                {mol.atoms[atom].element.hw_priority for atom in atoms if not mol.atoms[atom].is_carbon}
+            )
+            rank = (
+                tuple(
+                    tuple(
+                        sorted(
+                            system_locant_sort_key(mapping[atom])
+                            for atom in atoms
+                            if not mol.atoms[atom].is_carbon and mol.atoms[atom].element.hw_priority == priority
+                        )
+                    )
+                    for priority in priorities
+                ),
+                tuple(map(system_locant_sort_key, state.indicated_hydrogens)),
+                tuple(ranks[atom] for atom in sorted(atoms, key=lambda atom: system_locant_sort_key(mapping[atom]))),
+            )
+            parent = RingParent.from_fusion_plan(plan, pin_decision=first_parent.pin_decision)
+            candidates.append((rank, parent, state))
+    if not candidates:
+        return None
+    _, parent, state = min(candidates, key=lambda candidate: candidate[0])
+    return parent, state
 
 
 def _corresponding_carbon_graph_is_exact(
