@@ -16,6 +16,7 @@ from .mancude import (
     _single_site_parent_model,
     compare_actual_parent_to_implied_parent,
     indicated_hydrogen_parent_bond_model,
+    is_added_hydrogen_nitrogen,
     prove_pi_redistribution,
     saturated_nitrogen_hydrogen_sites,
 )
@@ -384,8 +385,14 @@ def intrinsic_carbon_parent_model(
         model = indicated_hydrogen_parent_bond_model(graph, intrinsic_hydrogen_atom_ids)
     hydrogen_atoms = intrinsic_hydrogen_atom_ids | cited_nitrogen_hydrogen_atom_ids
     owned_h = hydrogen_atoms | protonated_pi_nitrogen_atoms(mol, graph)
+    hydro_n_h = frozenset(
+        atom
+        for atom in locants
+        if mol.atoms[atom].symbol != "C" and mol.atoms[atom].total_h_count and atom not in owned_h
+    )
     if not candidates or any(
-        mol.atoms[atom].symbol != "C" and mol.atoms[atom].total_h_count and atom not in owned_h for atom in locants
+        mol.atoms[atom].total_h_count != 1 or not is_added_hydrogen_nitrogen(mol, frozenset(locants), atom)
+        for atom in hydro_n_h
     ):
         return model, frozenset()
     # Resolve fusion-N valence before deciding whether a carbon is intrinsically
@@ -497,6 +504,10 @@ def intrinsic_carbon_parent_model(
         hydro_atoms = (
             redistribution.hydrogenated_atom_ids if redistribution is not None else delta.hydrogenated_atom_ids
         )
+        # Uncited N-H may belong to additive hydrogenation, not the intrinsic
+        # donor domain. Accept it only when this exact witness owns that gain.
+        if not hydro_n_h <= hydro_atoms:
+            continue
         if any(mol.atoms[atom].is_aromatic for atom in hydro_atoms):
             continue
         if sites & oxo_sites and not delta.intrinsic_hydro_operations:
