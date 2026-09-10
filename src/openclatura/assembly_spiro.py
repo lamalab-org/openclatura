@@ -34,6 +34,84 @@ def _refresh_component_bindings(parts: AssemblyParts, stages: set[str]) -> None:
     parts.name_atom_bindings = preserved + [binding for binding in refreshed if binding.stage in stages]
 
 
+def _scope_spiro_oxo_hydrogens(parts: AssemblyParts, junction_locants: set[str]) -> None:
+    """Cite unpaired carbonyl-induced saturation as suffix-level added H."""
+    parent = parts.parent_hydride
+    group = parts.principal_group
+    if (
+        parent is None
+        or not parent.is_systematic_fusion
+        or not parent.audit_ok
+        or group is None
+        or group.key != "ketone"
+    ):
+        return
+    plan = parent.fusion_plan
+    delta = plan.derivative_state.bond_delta
+    if delta is None or not delta.compatible:
+        return
+    operations = [item for item in parts.hydro_operations if item.operation_kind == "additive_hydrogen"]
+    if sum(len(item.locants) for item in operations) % 2 != 1:
+        return
+    mapping = parts.parent_atom_ids_by_locant
+    if any(
+        len(item.locants) != len(item.atom_ids)
+        or any(mapping.get(locant) != atom for locant, atom in zip(item.locants, item.atom_ids))
+        for item in operations
+    ):
+        return
+    oxo_atoms = {item.parent_atom_id for item in plan.derivative_state.oxo_operations}
+    suffix_atoms = {mapping.get(str(locant)) for locant in group.locants} & oxo_atoms
+    assigned = {frozenset(edge): order for edge, order in delta.assignment.orders}
+    eligible = set()
+    for item in operations:
+        for locant, atom in zip(item.locants, item.atom_ids):
+            if (
+                locant in junction_locants
+                or parts.parent_atom_symbols_by_locant.get(locant) != "C"
+                or parts.parent_atom_charges_by_locant.get(locant, 0)
+            ):
+                continue
+            incident = [(edge, order) for edge, order in parts.parent_bond_orders_by_locants.items() if locant in edge]
+            if len(incident) != 2 or any(order != 1 for _, order in incident):
+                continue
+            for edge, _ in incident:
+                atoms = {mapping[site] for site in edge}
+                if atoms & suffix_atoms and assigned.get(frozenset(atoms)) == 2:
+                    eligible.add(atom)
+    if len(eligible) % 2 != 1:
+        return
+    # A suffix oxo consumes one end of the parent pi bond. Its saturated
+    # neighbour is added H, not half of an additive hydrogenation pair.
+    projected = []
+    for item in parts.hydro_operations:
+        if item.operation_kind != "additive_hydrogen":
+            projected.append(item)
+            continue
+        for added in (False, True):
+            sites = [(locant, atom) for locant, atom in zip(item.locants, item.atom_ids) if (atom in eligible) == added]
+            if sites:
+                projected.append(
+                    replace(
+                        item,
+                        key="added_hydrogen" if added else item.key,
+                        operation_kind="indicated_hydrogen" if added else item.operation_kind,
+                        locants=tuple(locant for locant, _ in sites),
+                        atom_ids=tuple(atom for _, atom in sites),
+                        reason="The suffix oxo replaces the adjacent parent pi bond; cite its neighbour as added H."
+                        if added
+                        else item.reason,
+                    )
+                )
+    parts.hydro_operations = projected
+    for item in projected:
+        if item.key == "added_hydrogen":
+            for locant in item.locants:
+                if locant not in parts.indicated_hydrogens:
+                    parts.indicated_hydrogens.append(locant)
+    _refresh_component_bindings(parts, {"hydro"})
+
+
 def _project_locanted_hw_component(parts: AssemblyParts) -> None:
     """Give explicit HW heteroatom locants replacement scope in a spiro parent."""
     from .hantzsch_widman import hw_name
@@ -279,6 +357,7 @@ def spiro_assembly_from_parts(
     from .assembly_parent import format_principal_suffix, parent_stem_and_terminal
 
     parts = deepcopy(parts)
+    _scope_spiro_oxo_hydrogens(parts, {junction_locant})
     _project_locanted_hw_component(parts)
 
     # Only the established ol/one suffix merger supports cross-component
@@ -414,6 +493,7 @@ def split_spiro_substituents(parts: AssemblyParts) -> list[SpiroAssembly]:
         raise ValueError("spiro assembly requires a graph-numbered path of at most three components")
     parts.substituents = normal_subs
     if spiro_subs:
+        _scope_spiro_oxo_hydrogens(parts, {side.parent_locant for side in spiro_subs})
         _project_locanted_hw_component(parts)
         spiro_subs = [_deduplicate_shared_replacements(parts, side) for side in spiro_subs]
     if len(spiro_subs) == 2 and not any(side.continuation for side in spiro_subs):
