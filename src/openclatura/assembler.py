@@ -38,6 +38,7 @@ def _post_process_name(name: str) -> str:
 
 
 _STEM_INDICATED_H = re.compile(r"^((?:\d+[a-z]?H,)*\d+[a-z]?H)-")
+_PI_CONSUMING_PREFIXES = frozenset({"oxo", "thioxo", "sulfanylidene", "selanylidene", "imino"})
 
 
 def _normalize_indicated_hydrogen_quota(parts: AssemblyParts, core_name: str) -> str:
@@ -58,6 +59,13 @@ def _normalize_indicated_hydrogen_quota(parts: AssemblyParts, core_name: str) ->
 
     quota = parent_indicated_hydrogen_quota(parts)
     if quota is None:
+        return core_name
+    parent_term = parts.parent_hydride.binding_term if parts.parent_hydride is not None else None
+    if "lambda" in core_name or (parent_term and "lambda" in parent_term):
+        # A lambda parent is a different parent hydride from the one the quota
+        # is measured on, and its oxo takes expanded valence rather than a ring
+        # pi bond -- the sulfur of a 5lambda^6 sulfone was never pi-capable, so
+        # its position is not hydrogenated.
         return core_name
     stem_match = _STEM_INDICATED_H.match(core_name)
     stem_cited = stem_match.group(1).split(",") if stem_match else []
@@ -98,6 +106,24 @@ def _normalize_indicated_hydrogen_quota(parts: AssemblyParts, core_name: str) ->
     }
     if surplus & claimed:
         return core_name
+
+    # A pi-consuming prefix -- oxo, thioxo, an ylidene -- takes a parent double
+    # bond just as a suffix does, but it is cited as a prefix and so has no
+    # locant parenthesis to carry added hydrogen. Its own ring atom is saturated
+    # too, so it joins the hydro set together with the hydrogen it displaced:
+    # 6-oxo-1H-pyridine-3-carboxamide -> 6-oxo-1,6-dihydropyridine-3-carboxamide.
+    prefix_locants = (
+        {
+            locant
+            for item in parts.substituents
+            if item.name in _PI_CONSUMING_PREFIXES or item.name.endswith("ylidene")
+            for locant in item.locants
+        }
+        - claimed
+        if not parts.parent_charges
+        else set()
+    )
+    hydro |= {locant for site in hydro for locant in bonded.get(site, set()) & prefix_locants}
     # Hydro prefixes come in pairs, so only respell what is spellable.
     existing_hydro = sum(
         len(operation.locants)
