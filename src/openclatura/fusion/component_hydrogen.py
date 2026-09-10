@@ -30,13 +30,6 @@ def component_hydrogen_consumption(
         return None
     components = tuple((match, specs[match.occurrence_id]) for match in ast.component_occurrences)
     junctions = frozenset(atom for join in ast.joins for atom in join.shared_input_atoms)
-    # Junction-local defaults already have a separate observed-state proof.
-    if not any(
-        spec.template.atom_by_locant[locant].symbol == "C" and match.input_atom_by_locant[locant] not in junctions
-        for match, spec in components
-        for locant in spec.template.default_indicated_h
-    ):
-        return None
     return _component_hydrogen_consumption(components, junctions)
 
 
@@ -67,7 +60,7 @@ def _component_hydrogen_consumption(
     model = parent_bond_model(graph)
     if not model.allowed_kekule_assignments:
         return None
-    pi_atoms = {atom.id for atom in graph.atoms if atom.pi_capacity and not atom.forced_single}
+    pi_atoms = {atom for edge in model.pi_eligible_edges | model.required_double_bonds for atom in edge}
     local_domains = []
     defaults = set()
     for match, spec in components:
@@ -86,7 +79,14 @@ def _component_hydrogen_consumption(
             )
             for assignment in local_model.allowed_kekule_assignments
         )
-        local_pi = frozenset(mapping[atom.locant] for atom in atoms if atom.resolved_pi_capacity)
+        # A carbon between two fixed single-bond heteroatoms cannot take part
+        # in any pi assignment. Its implicit saturation is not a hydrogen
+        # obligation consumed by fusion (for example an acetal carbon).
+        local_pi = frozenset(
+            mapping[atoms[atom].locant]
+            for edge in local_model.pi_eligible_edges | local_model.required_double_bonds
+            for atom in edge
+        )
         carbon_h = frozenset(mapping[locant] for locant in component_h_locants(spec, "C"))
         for locant in spec.template.default_indicated_h:
             # Never use this proof to waive a heteroatom H obligation.
