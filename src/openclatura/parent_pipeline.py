@@ -496,6 +496,8 @@ def build_parent_assembly_plan(
             locant_map_source = LocantMapSource.PROOF
     numbered_fusion_plans = {}
     proven_hydrogen_locants = None
+    # A joint replacement-state proof already selects a single chemical map.
+    # Other fusion parents still expose numbered variants for parent ranking.
     if (
         parent_hydride is not None
         and parent_hydride.uses_fusion_plan
