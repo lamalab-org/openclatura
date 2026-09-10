@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 
+from .canonical_ranks import canonical_ranks
 from .graph_kernel import biconnected_edge_components
 from .locants import retained_locant_sort_key
 from .molecule import Molecule, edges_within_atoms
@@ -1132,7 +1133,16 @@ def _polyspiro_or_von_baeyer_candidate(
     if dispiro is not None:
         descriptor, paths = dispiro
         return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
-    legacy_descriptor, legacy_paths = get_von_baeyer_descriptor_and_path(atoms, edges)
+    # The cycle traversal contains equivalent decomposition ties. Give it
+    # canonical graph identities, then restore the caller's original atom IDs.
+    ranks = canonical_ranks(mol)
+    ordered_atoms = sorted(atoms, key=ranks.__getitem__)
+    canonical_ids = {atom: position for position, atom in enumerate(ordered_atoms)}
+    canonical_edges = {tuple(sorted((canonical_ids[u], canonical_ids[v]))) for u, v in edges}
+    legacy_descriptor, canonical_paths = get_von_baeyer_descriptor_and_path(
+        set(canonical_ids.values()), canonical_edges
+    )
+    legacy_paths = [[ordered_atoms[position] for position in path] for path in canonical_paths]
     if legacy_descriptor and is_von_baeyer_descriptor(legacy_descriptor):
         legacy_numberings = tuple(
             _audited_von_baeyer_numberings(mol, legacy_descriptor, legacy_paths, frozenset(edges))
@@ -1149,7 +1159,7 @@ def _polyspiro_or_von_baeyer_candidate(
     # not a real replacement heteroatom and must not participate in the new
     # von Baeyer numbering tie-breakers.
     if any(mol.atoms[atom].symbol == "Si" for atom in atoms):
-        descriptor, paths = get_von_baeyer_descriptor_and_path(atoms, edges)
+        descriptor, paths = legacy_descriptor, legacy_paths
         if not descriptor or not is_von_baeyer_descriptor(descriptor):
             return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
         numberings = tuple(_audited_von_baeyer_numberings(mol, descriptor, paths, frozenset(edges)))
