@@ -329,6 +329,7 @@ def plan_bridged_fusion_wrapper(
                             locants,
                             preserve_retained_parent_state=True,
                             allow_pi_redistribution=True,
+                            compose_retained_external_pi=True,
                         )
                     )
                     if derivative_state is None:
@@ -1066,6 +1067,7 @@ def _audit_bridge_plan(
             indicated_hydrogen_atom_ids=indicated_h_atoms,
             preserve_retained_parent_state=fusion_plan is None,
             allow_pi_redistribution=True if retained_parent_redistribution else None,
+            compose_retained_external_pi=fusion_plan is None,
         )
         != derivative_state
     ):

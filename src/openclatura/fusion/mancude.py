@@ -276,6 +276,7 @@ def compare_actual_parent_to_implied_parent(
     indicated_hydrogen_atom_ids: set[int] | frozenset[int] = frozenset(),
     atom_to_locant: Mapping[int, str | SystemLocant] | None = None,
     preserve_retained_parent_state: bool = False,
+    compose_retained_external_pi: bool = False,
 ) -> ParentBondDelta | None:
     """Select the allowed Kekulé form requiring the smallest observed delta.
 
@@ -382,7 +383,20 @@ def compare_actual_parent_to_implied_parent(
     if not candidates:
         return None
     delta = min(candidates, key=lambda item: item[0])[1]
-    if preserve_retained_parent_state or atom_to_locant is None or not delta.compatible:
+    if atom_to_locant is None or not delta.compatible:
+        return delta
+    if preserve_retained_parent_state:
+        if compose_retained_external_pi and externally_unsaturated_atom_ids:
+            composed = _external_pi_parent_delta(
+                mol,
+                atoms,
+                replace(bond_model, allowed_kekule_assignments=(delta.assignment,)),
+                externally_unsaturated_atom_ids,
+                atom_to_locant,
+                preserve_assignment=True,
+            )
+            if composed is not None:
+                return composed
         return delta
     # A cited donor can remove the missing pi edge from the parent domain
     # itself. Even a zero edge delta must then account for residual carbon H.
@@ -617,6 +631,8 @@ def _external_pi_parent_delta(
     model: ParentBondModel,
     external_pi_atoms: set[int] | frozenset[int],
     locants: Mapping[int, str | SystemLocant],
+    *,
+    preserve_assignment: bool = False,
 ) -> ParentBondDelta | None:
     """Compose external pi valence with graph-derived residual carbon H."""
 
@@ -647,7 +663,8 @@ def _external_pi_parent_delta(
         BondAssignment(tuple((edge, 1 if forced.intersection(edge) else order) for edge, order in assignment.orders))
         for assignment in model.allowed_kekule_assignments
     }
-    assignments.update(constrained.allowed_kekule_assignments)
+    if not preserve_assignment:
+        assignments.update(constrained.allowed_kekule_assignments)
     for assignment in sorted(assignments, key=lambda value: value.orders):
         paired = {atom for edge, order in assignment.orders if order == 2 for atom in edge}
         added = parent_pi_atoms - paired - forced
@@ -781,6 +798,7 @@ def parent_derivative_state(
     indicated_hydrogen_atom_ids: set[int] | frozenset[int] = frozenset(),
     preserve_retained_parent_state: bool = False,
     allow_pi_redistribution: bool | None = None,
+    compose_retained_external_pi: bool = False,
 ) -> ParentDerivativeState | None:
     """Describe every supported bond-state difference from a parent hydride.
 
@@ -849,6 +867,7 @@ def parent_derivative_state(
         indicated_hydrogen_atom_ids=indicated_hydrogen_atom_ids,
         atom_to_locant=atom_to_locant,
         preserve_retained_parent_state=preserve_retained_parent_state,
+        compose_retained_external_pi=compose_retained_external_pi,
     )
     if delta is None or not delta.compatible:
         return None
