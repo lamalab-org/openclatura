@@ -28,7 +28,11 @@ from ..retained_name_policy import (
 )
 from ..ring_parent import ParentHydrideKind, ParentHydrideMetadata, RingParent
 from ..rules import multipliers, stems
-from .composite_bridges import CompositeBridgeConstruction, composite_bridge_constructions
+from .composite_bridges import (
+    CompositeBridgeConstruction,
+    composite_bridge_constructions,
+    localized_carbon_bridge_bond_orders,
+)
 from .config import fusion_nomenclature_config
 from .exocyclic import is_neutral_external_pi_ligand
 from .mancude import ParentDerivativeState, parent_derivative_state
@@ -38,6 +42,7 @@ from .rules import fusion_ring_size_gate
 
 _WRAPPER_SEARCH_STATES = fusion_nomenclature_config().search.component_selection_states
 _COMPOSITE_BRIDGES = composite_bridge_constructions()
+_LOCALIZED_CARBON_BRIDGES = localized_carbon_bridge_bond_orders()
 
 
 class WrapperParentKind(StrEnum):
@@ -337,7 +342,13 @@ def plan_bridged_fusion_wrapper(
                         )
                     )
                     bridge_unsaturation = ()
-                    if prefer_bridge_dehydro:
+                    unlocalized_bridge = (
+                        len(operations) == 1
+                        and operations[0].kind is NondetachableBridgeKind.CARBO
+                        and operations[0].unsaturation_locants
+                        and operations[0].internal_bond_orders not in _LOCALIZED_CARBON_BRIDGES
+                    )
+                    if prefer_bridge_dehydro or unlocalized_bridge:
                         bridge_unsaturation = _bridge_dehydrogenation(mol, operations, locants) or ()
                     precursor = _saturated_bridge_precursor(operations[0]) if bridge_unsaturation else None
                     audit_checks = _audit_bridge_plan(
@@ -437,16 +448,12 @@ def _bridge_dehydrogenation(
     bridges: tuple[NondetachableBridgeOperation, ...],
     parent_locants: dict[int, str],
 ) -> tuple[UnsaturationOperation, ...] | None:
-    """Express a conjugated carbon path as dehydrogenation of its saturated bridge."""
+    """Express a noncumulative carbon path as dehydrogenation of its saturated bridge."""
 
     if len(bridges) != 1:
         return None
     bridge = bridges[0]
     if bridge.kind is not NondetachableBridgeKind.CARBO or not bridge.unsaturation_locants:
-        return None
-    if not all(mol.atoms[atom].is_aromatic for atom in (*bridge.atom_ids, *bridge.endpoint_atom_ids)):
-        return None
-    if not all(mol.atoms[atom].symbol == "C" and mol.atoms[atom].is_aromatic for atom in parent_locants):
         return None
     # Bridge numbering continues the parent integers from the higher bridgehead.
     next_locant = max(retained_locant_sort_key(locant)[0] for locant in parent_locants.values()) + 1
@@ -466,7 +473,7 @@ def _bridge_dehydrogenation(
         result.append(
             UnsaturationOperation(
                 key=f"fusion:bridge:dehydro:{locants[left]},{locants[right]}",
-                reason="completed-system conjugated bridge unsaturation",
+                reason="completed-system bridge unsaturation",
                 locants=(locants[left], locants[right]),
                 atom_ids=(left, right),
                 bond_id=bond.idx,
@@ -1076,9 +1083,13 @@ def _audit_bridge_plan(
         for edge in double_edges:
             for atom in edge:
                 pi_degrees[atom] += 1
-        # A perfect matching reaches the carbon graph's upper bound and proves
-        # the maximum noncumulative pi count without a second matching search.
-        if any(degree != 1 for degree in pi_degrees.values()):
+        # A wholly aromatic carbon system requires a perfect matching. Other
+        # parents keep their already-proved donor and hydrogenation state;
+        # the bridge adds exactly its observed, noncumulative double bonds.
+        aromatic_carbon = all(mol.atoms[atom].is_carbon and mol.atoms[atom].is_aromatic for atom in all_atoms)
+        if any(degree > 1 for degree in pi_degrees.values()) or (
+            aromatic_carbon and any(degree != 1 for degree in pi_degrees.values())
+        ):
             return None
     return (
         "complete_bijective_parent_locants",

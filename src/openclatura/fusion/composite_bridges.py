@@ -16,6 +16,17 @@ from ..naming_data import load_json_table
 ConstructionKey = tuple[tuple[str, ...], tuple[int, ...]]
 
 
+@cache
+def localized_carbon_bridge_bond_orders() -> frozenset[tuple[int, ...]]:
+    """Finite localized bridge grammar; other paths use completed-system dehydro."""
+    rows = load_json_table("fusion_composite_bridges.json")["localized_carbon_bridge_bond_orders"]
+    if any(
+        not row or 2 not in row or any(type(order) is not int or order not in {1, 2} for order in row) for row in rows
+    ):
+        raise ValueError("localized carbon bridges require single/double path bond orders")
+    return frozenset(tuple(row) for row in rows)
+
+
 @dataclass(frozen=True, slots=True)
 class CompositeBridgeConstruction:
     heteroatom: str

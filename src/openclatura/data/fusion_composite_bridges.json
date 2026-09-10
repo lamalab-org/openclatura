@@ -2,6 +2,7 @@
   "schema_version": 1,
   "rule": "P-25.4.2.3 / P-25.4.3.2.2",
   "verification": "OPSIN 2.9.0 exact round trips; terminal senior heteroatom plus carbon fragment only",
+  "localized_carbon_bridge_bond_orders": [[2], [2, 1], [2, 1, 1], [1, 2, 1], [2, 1, 2]],
   "constructions": [
     {
       "heteroatom": "O",
