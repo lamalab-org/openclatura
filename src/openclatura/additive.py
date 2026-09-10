@@ -498,7 +498,12 @@ def _recast_ring_ketone_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_
         # The fusion proof already distinguishes intrinsic parent H from H
         # added by an oxo operation. Matching their counts cannot recast it.
         return
-    indicated = [op for op in parts.hydro_operations if op.key == "indicated_hydrogen"]
+    declared = _name_indicated_hydrogen_locants(parts.retained_name)
+    indicated = [
+        op
+        for op in parts.hydro_operations
+        if op.key == "indicated_hydrogen" and not set(op.locants).intersection(declared)
+    ]
     if not indicated or any(op.key == "added_hydrogen" for op in parts.hydro_operations):
         return
     ketone_locants = [str(locant) for locant in group.locants]

@@ -188,6 +188,41 @@ def test_existing_nh_recast_is_preserved():
     assert parts.hydro_operations[0].atom_ids == (site,)
 
 
+@pytest.mark.parametrize("parent, site", [("3H-1,4-benzodiazepine", "3"), ("4H-1,4-benzodiazepine", "4")])
+def test_declared_parent_h_is_not_recast_as_another_suffix_h(parent, site):
+    graph, _, mapping = _graph()
+    mol = read_rdkit_mol(graph)
+    operation = HydroOperation(
+        key="indicated_hydrogen",
+        reason="intrinsic parent H",
+        locants=(site,),
+        atom_ids=(mapping[site],),
+        operation_kind="indicated_hydrogen",
+    )
+    parts = AssemblyParts(
+        parent_length=len(mapping),
+        retained_name=parent,
+        principal_group=PrincipalGroupItem("ketone", ["5"]),
+        hydro_operations=[operation],
+    )
+    inverse = {index: locant for locant, index in mapping.items()}
+    _recast_ring_ketone_hydrogens(mol, parts, list(mapping.values()), inverse.__getitem__)
+    assert parts.hydro_operations == [operation]
+
+
+@pytest.mark.opsin
+def test_hydrogenated_retained_ketone_does_not_duplicate_declared_h():
+    if not opsin_available():
+        pytest.skip("OPSIN and Java are required")
+    graph = Chem.MolFromSmiles("O=C(C/C(=C1/CCCc2ccccc2C1=O)c1ccccc1)c1ccccc1")
+    original = Chem.MolToSmiles(graph)
+    for order in _orders(graph):
+        result = name_mol(Chem.RenumberAtoms(graph, order), include_trace=True)
+        assert result.error is None
+        assert "5H-benzo[7]annulen-9-one" in result.name
+        assert verify_with_opsin(result.name, original, standardize_smiles=False).ok
+
+
 def test_proved_carbon_hydrogen_bypasses_count_based_recast(monkeypatch):
     import openclatura.additive as additive
 
