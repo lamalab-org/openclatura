@@ -1,7 +1,7 @@
 """Exact component-matching witnesses for carbon H consumed by fusion."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import lru_cache
 
 from .model import FusionComponentMatch, FusionComponentSpec, FusionNameAst, ParentBondModel
@@ -9,6 +9,8 @@ from .model import FusionComponentMatch, FusionComponentSpec, FusionNameAst, Par
 
 @dataclass(frozen=True)
 class ComponentHydrogenConsumption:
+    """Completed maximum assignments witnessing all local component budgets."""
+
     default_sites: frozenset[tuple[int, str]]
     junction_sites: frozenset[tuple[int, int]]
     parent_model: ParentBondModel
@@ -96,21 +98,29 @@ def _component_hydrogen_consumption(
         local_domains.append((match.occurrence_id, edges, assignments, local_pi, carbon_h))
 
     consumed = set()
+    witnesses = []
     for assignment in model.allowed_kekule_assignments:
         doubles = frozenset(edge for edge, order in assignment.orders if order == 2)
         paired = {atom for edge in doubles for atom in edge}
         if paired != pi_atoms:
             return None
+        assignment_consumed = set()
         for occurrence, edges, assignments, local_pi, carbon_h in local_domains:
             local_doubles = doubles & edges
-            # The completed matching must project to an allowed *maximum*
-            # matching of every isolated component, not just match its count.
+            # Keep a joint resonance witness projecting to an allowed maximum
+            # matching of every component. Other completed resonance forms
+            # need not localize their pi bonds along the same component edges.
             if local_doubles not in assignments:
-                return None
+                break
             unpaired = local_pi - {atom for edge in local_doubles for atom in edge}
             if not unpaired <= carbon_h & junctions:
-                return None
-            consumed.update((occurrence, atom) for atom in unpaired)
-    if not defaults or not consumed:
+                break
+            assignment_consumed.update((occurrence, atom) for atom in unpaired)
+        else:
+            witnesses.append(assignment)
+            consumed.update(assignment_consumed)
+    if not defaults or not consumed or not witnesses:
         return None
-    return ComponentHydrogenConsumption(frozenset(defaults), frozenset(consumed), model)
+    return ComponentHydrogenConsumption(
+        frozenset(defaults), frozenset(consumed), replace(model, allowed_kekule_assignments=tuple(witnesses))
+    )
