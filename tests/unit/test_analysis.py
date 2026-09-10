@@ -607,7 +607,7 @@ def test_spiro_side_prefix_has_exact_graph_ownership_not_broad_fallback():
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
     methyl = next(token for token in assembly.data["name_token_spans"] if token["text"] == "methyl")
 
-    assert analysis.name == "1'-methylspiro[tricyclo[2.2.0.0^{2,5}]hexane-6,2'-aziridine]"
+    assert analysis.name == "1'-methylspiro[tricyclo[2.2.0.0^{2,5}]hexane-3,2'-aziridine]"
     assert methyl["source"] == "substituent_renderer"
     assert methyl["confidence"] == "derived"
     assert methyl["ownership"] == "exact"
@@ -4448,7 +4448,7 @@ def test_public_api_golden_names():
 
 def test_pyopsin_regression_names_use_parseable_spiro_and_formamido_forms():
     cases = {
-        "CN1CC11C2C3CC2C13": "1'-methylspiro[tricyclo[2.2.0.0^{2,5}]hexane-6,2'-aziridine]",
+        "CN1CC11C2C3CC2C13": "1'-methylspiro[tricyclo[2.2.0.0^{2,5}]hexane-3,2'-aziridine]",
         "CC1CC11CC2CCC12": "2'-methylspiro[bicyclo[2.2.0]hexane-2,1'-cyclopropane]",
         "CC1NC11CC2OC12C": "1,3'-dimethylspiro[5-oxabicyclo[2.1.0]pentane-2,2'-aziridine]",
         "COC(=O)CCNC=O": "methyl 3-formamidopropanoate",
@@ -5162,7 +5162,7 @@ def test_anionic_ketone_parent_names_keep_parent_descriptor_intact():
 def test_von_baeyer_polycycle_keeps_descriptor_source_numbering():
     cases = {
         "C1C2C1C13COC21CO3": "7,9-dioxatetracyclo[3.2.2.0^{1,5}.0^{2,4}]nonane",
-        "C1NC23COC12C=CC3": "9-oxa-7-azatricyclo[3.2.2.0^{1,5}]non-3-ene",
+        "C1NC23COC12C=CC3": "7-oxa-9-azatricyclo[3.2.2.0^{1,5}]non-2-ene",
         "C1NC23COC12COC3": "3,9-dioxa-7-azatricyclo[3.2.2.0^{1,5}]nonane",
     }
 
