@@ -14,7 +14,10 @@ from .model import FaceModel, FusedLayout
 def _entry_direction_tables():
     data = load_json_table("fusion_entry_geometry.json")
     tables = {
-        int(size): tuple((tuple(row["relative"]), tuple(row["forbidden_ports"])) for row in rows)
+        int(size): tuple(
+            (tuple(row["relative"]), tuple(row["forbidden_ports"]), tuple(row.get("required_ports", ())))
+            for row in rows
+        )
         for size, rows in data["directions"].items()
     }
     steps = {int(direction): tuple(point) for direction, point in data["steps"].items()}
@@ -28,11 +31,31 @@ def _entry_direction_tables():
                 len(relative) != size - 1
                 or any(value not in steps for value in relative)
                 or any(not 1 <= port < size for port in forbidden)
-                for relative, forbidden in rows
+                or any(not 1 <= port < size for port in required)
+                for relative, forbidden, required in rows
             )
         ):
             raise ValueError("entry direction table does not cover its ring ports")
     return tables, steps
+
+
+@lru_cache(maxsize=512)
+def _allowed_entry_directions(size: int, occupied_ports: frozenset[int]) -> tuple[tuple[int, ...], ...]:
+    """Project OPSIN shape admission and degeneracy onto the occupied ports."""
+    tables, _ = _entry_direction_tables()
+    options = tables[size]
+    if size in {5, 7} and len(occupied_ports) == 1:
+        return (options[0][0],)
+    if size == 5 and len(occupied_ports) == size:
+        return tuple(row[0] for row in options[:3])
+    accepted = {}
+    for relative, forbidden, required in options:
+        if occupied_ports.intersection(forbidden) or not occupied_ports.issuperset(required):
+            continue
+        # Entry port zero always points back to the preceding ring.
+        signature = tuple(relative[port - 1] for port in sorted(occupied_ports - {0}))
+        accepted.setdefault(signature, relative)
+    return tuple(accepted.values())
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,12 +167,7 @@ def entry_direction_geometry(
             return
         size = len(cycles[face])
         distances = {other: (ports[face, other] - entry) % size for other in neighbors[face]}
-        options = direction_tables[size]
-        if len(neighbors[face]) == 1 and size in {5, 7}:
-            options = options[:1]
-        for table, forbidden in options:
-            if set(distances.values()) & set(forbidden):
-                continue
+        for table in _allowed_entry_directions(size, frozenset(distances.values())):
             outgoing = {
                 other: _absolute_direction(4 if distance == 0 else table[distance - 1], incoming)
                 for other, distance in distances.items()

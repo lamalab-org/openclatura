@@ -480,6 +480,33 @@ def test_entry_direction_search_is_bounded_and_cached(monkeypatch):
     assert entry_direction_geometry.cache_info().hits == hits + 1
 
 
+@pytest.mark.parametrize(
+    "size,ports,expected",
+    (
+        (5, {1}, ((-2, 0, 1, 3),)),
+        (5, {0, 1, 4}, ((-3, -1, 1, 3),)),
+        (5, {0, 2}, ((-2, 0, 1, 3), (-3, -1, 0, 2))),
+        (5, {0, 3}, ((-2, 0, 1, 3), (-3, -1, 0, 2))),
+        (5, {0, 1}, ((-3, -1, 0, 2),)),
+        (5, {0, 1, 2, 3, 4}, ((-2, 0, 1, 3), (-3, -1, 0, 2), (-3, -1, 1, 3))),
+        (7, {0, 2}, ((-3, -1, 0, 1, 2, 3), (-3, -2, -1, 1, 2, 3))),
+    ),
+)
+def test_parser_shape_admission_preserves_order_and_removes_port_degeneracy(size, ports, expected):
+    from openclatura.fusion.entry_geometry import _allowed_entry_directions
+
+    assert _allowed_entry_directions(size, frozenset(ports)) == expected
+
+
+def test_pentagon_top_right_shape_requires_top_left_to_be_disallowed():
+    from openclatura.fusion.entry_geometry import _entry_direction_tables
+
+    tables, _ = _entry_direction_tables()
+    _, top_left_forbidden, _ = tables[5][2]
+    _, _, top_right_required = tables[5][3]
+    assert top_left_forbidden == top_right_required == (2,)
+
+
 @pytest.mark.skipif(not opsin_available(), reason="OPSIN is unavailable")
 def test_cited_terminal_entry_tracks_a_graph_variant():
     _, smiles, _ = next(case for case in CASES if case[0] == 30704)
