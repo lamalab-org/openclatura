@@ -267,6 +267,16 @@ def _five_membered_single_nitrogen(mol: Molecule, atoms: frozenset[int], atom: i
     )
 
 
+def is_added_hydrogen_nitrogen(mol: Molecule, atoms: frozenset[int], atom: int) -> bool:
+    """Prove an N-H parent site, including replacement of that H by a ligand.
+
+    Added H describes the parent hydride before substitution. A neutral
+    two-connected ring nitrogen may therefore have either one observed H or
+    one external single-bond ligand, but must retain exactly sigma valence 3.
+    """
+    return atom in atoms and not mol.atoms[atom].is_aromatic and _single_bonded_parent_nitrogen(mol, atoms, atom)
+
+
 def compare_actual_parent_to_implied_parent(
     mol: Molecule,
     atom_ids: set[int] | frozenset[int],
@@ -637,7 +647,11 @@ def _external_pi_parent_delta(
     """Compose external pi valence with graph-derived residual carbon H."""
 
     spiro = _spiro_carbon_sites(mol, atoms)
-    if any(mol.atoms[atom].symbol != "C" or mol.atoms[atom].charge for atom in external_pi_atoms):
+    if any(
+        mol.atoms[atom].charge
+        or (mol.atoms[atom].symbol != "C" and neutral_lambda_oxo_bonding_number(mol, atom) is None)
+        for atom in external_pi_atoms
+    ):
         return None
     donor_sites = frozenset(
         atom
@@ -672,7 +686,7 @@ def _external_pi_parent_delta(
             mol.atoms[atom].symbol not in {"C", "N"}
             or (
                 mol.atoms[atom].symbol == "N"
-                and (mol.atoms[atom].total_h_count != 1 or not _single_bonded_parent_nitrogen(mol, atoms, atom))
+                and not is_added_hydrogen_nitrogen(mol, atoms, atom)
             )
             or mol.atoms[atom].charge
             or mol.atoms[atom].is_aromatic
@@ -685,10 +699,14 @@ def _external_pi_parent_delta(
         # Preserve the composed domain while proving any alternating shift.
         # Retained-state comparison prevents recursive external-pi composition;
         # the explicit flag still enables the exact redistribution proof.
+        # Added-H endpoints cannot acquire another pi bond while proving an
+        # alternating shift. Keep them constrained in the candidate domain,
+        # rather than applying that constraint only after witness selection.
+        candidate_model = _single_site_parent_model(model, forced | frozenset(added)) if added else constrained
         state = parent_derivative_state(
             mol,
             atoms,
-            replace(constrained, allowed_kekule_assignments=(assignment,)),
+            replace(candidate_model, allowed_kekule_assignments=(assignment,)),
             locants,
             preserve_retained_parent_state=True,
             allow_pi_redistribution=True,

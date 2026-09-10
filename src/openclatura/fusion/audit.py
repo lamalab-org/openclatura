@@ -35,6 +35,7 @@ from .mancude import (
     compare_actual_parent_to_implied_parent,
     has_complete_saturated_hydrogenation,
     indicated_hydrogen_parent_bond_model,
+    is_added_hydrogen_nitrogen,
     prove_pi_redistribution,
     saturated_nitrogen_hydrogen_sites,
 )
@@ -635,7 +636,13 @@ def _has_consistent_derivative_operations(
         and all(neighbor in atoms and mol.get_bond(atom, neighbor).order == 1 for neighbor in neighbors)
         and all(order == 1 for edge, order in state.bond_delta.assignment.orders if atom in edge)
     }
-    if any(mol.atoms[atom].symbol != "C" and atom not in neutral_nh_witnesses for atom in added):
+    added_n_witnesses = {
+        atom
+        for atom in added
+        if is_added_hydrogen_nitrogen(mol, atoms, atom)
+        and all(order == 1 for edge, order in state.bond_delta.assignment.orders if atom in edge)
+    }
+    if any(mol.atoms[atom].symbol != "C" and atom not in added_n_witnesses for atom in added):
         return False
     for atom in hydro:
         value = mol.atoms[atom]

@@ -10,6 +10,7 @@ from openclatura import name_mol, opsin_available, verify_with_opsin
 from openclatura.chains import find_ring_systems
 from openclatura.fusion.mancude import prove_pi_redistribution
 from openclatura.fusion.model import BondAssignment, FusionConfirmed
+from openclatura.fusion.numbering import parent_bond_model
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.graph_io import read_rdkit_mol
 
@@ -173,11 +174,19 @@ def test_alternating_composition_still_requires_exact_valence_and_bond_domain(co
     state = plan.derivative_state
     delta = state.bond_delta
     _assert_witness(mol, atoms, plan)
+    # Intrinsic-H completion may already constrain plan.bond_model. Use the
+    # original component domain to test loss of the external-pi domain witness.
+    uncomposed_model = parent_bond_model(plan.abstract_parent_graph)
+    assert (
+        prove_pi_redistribution(mol, atoms, uncomposed_model, delta, oxo_operations=state.oxo_operations)
+        == state.pi_redistribution
+    )
     if corruption == "charged_donor":
         mol.update_atom(10, charge=1)
     elif corruption == "external_bond":
         mol.update_bond(state.oxo_operations[0].bond_id, order=1)
     elif corruption == "missing_model":
+        assert delta.assignment not in uncomposed_model.allowed_kekule_assignments
         delta = replace(delta, composition_model=None)
     else:
         model = delta.composition_model
@@ -194,7 +203,7 @@ def test_alternating_composition_still_requires_exact_valence_and_bond_domain(co
         prove_pi_redistribution(
             mol,
             atoms,
-            plan.bond_model,
+            uncomposed_model,
             delta,
             oxo_operations=state.oxo_operations,
         )
