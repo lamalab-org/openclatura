@@ -94,6 +94,22 @@ def test_corresponding_carbon_certificate_rejects_graph_corruption():
     assert not _corresponding_carbon_graph_is_exact(mol, carbon, atoms, replacements)
 
 
+def test_carbon_surrogate_owns_its_valence_hydrogens():
+    mol = Molecule()
+    for atom, symbol in enumerate(("N", "O", "C", "C", "C")):
+        mol.add_atom(symbol, idx=atom)
+    for left, right in ((0, 1), (0, 2), (0, 3), (1, 4)):
+        mol.add_bond(left, right)
+    atoms = frozenset(mol.atoms)
+    carbon = _carbon_skeleton(mol, atoms)
+    assert carbon.atoms[0].total_h_count == 1
+    assert carbon.atoms[1].total_h_count == 2
+    assert carbon.atoms[2].total_h_count == 3
+    assert _corresponding_carbon_graph_is_exact(mol, carbon, atoms, (0, 1))
+    carbon.update_atom(0, total_h_count=0)
+    assert not _corresponding_carbon_graph_is_exact(mol, carbon, atoms, (0, 1))
+
+
 def test_cactus_component_cover_uses_the_same_replacement_parent_route():
     mol = _cactus_third_component_graph()
 

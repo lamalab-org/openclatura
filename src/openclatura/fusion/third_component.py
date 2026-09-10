@@ -139,6 +139,9 @@ def _corresponding_carbon_graph_is_exact(
         original_atom = original.atoms[atom_id]
         if carbon_atom.symbol != "C" or carbon_atom.charge != 0:
             return False
+        valence = sum(original.get_bond(atom_id, neighbor).order for neighbor in original.get_neighbors(atom_id))
+        if carbon_atom.explicit_h_count != 0 or carbon_atom.total_h_count != max(0, 4 - valence):
+            return False
         restored_symbol = original_atom.symbol if atom_id in replacement else carbon_atom.symbol
         if restored_symbol != original_atom.symbol:
             return False
@@ -226,7 +229,15 @@ def _carbon_skeleton(mol: Molecule, parent_atoms: frozenset[int]) -> Molecule:
             cip=atom.cip,
             is_aromatic=atom.is_aromatic,
             explicit_h_count=0 if replace else atom.explicit_h_count,
-            total_h_count=0 if replace else atom.total_h_count,
+            # Skeletal replacement changes the valence deficit: a neutral
+            # sigma nitrogen becomes CH and a two-connected oxygen becomes
+            # CH2. The corresponding carbon graph must carry those hydrogens
+            # before its parent/derivative state is proved.
+            total_h_count=(
+                max(0, 4 - sum(mol.get_bond(atom.idx, n).order for n in mol.get_neighbors(atom.idx)))
+                if replace
+                else atom.total_h_count
+            ),
         )
     for bond in mol.bonds.values():
         carbon.add_bond(
