@@ -128,6 +128,10 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
             )
             parts.parent_bond_delta = delta
         if delta is not None and delta.compatible:
+            if parent.uses_fusion_plan and "paired_external_pi_consumption" in parent.fusion_plan.audit.checks:
+                # Paired external pi consumption preserves all remaining H;
+                # retained-parent counting would invent another H site.
+                return
             parts.hydro_operations.extend(delta.added_hydrogen_operations)
             parts.hydro_operations.extend(delta.intrinsic_hydro_operations)
             if delta.intrinsic_hydro_operations:

@@ -608,9 +608,30 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
     if parts.parent_charges:
         raise _Abstain("parent charges not modelled")
     saturated = _saturated_locants(parts)
+    paired_external_pi = False
+    if _has_systematic_fusion_parent(parts):
+        plan = parts.parent_hydride.fusion_plan
+        paired_external_pi = "paired_external_pi_consumption" in plan.audit.checks
+        if paired_external_pi:
+            if set(saturated) - {str(locant) for locant in plan.indicated_hydrogens}:
+                raise _Abstain("hydrogen declaration is not owned by the paired external-pi proof")
+            # Keep the proved parent's unpaired sites fixed while the existing
+            # matcher places skeletal pi bonds around the named external ligands.
+            assignment = plan.derivative_state.bond_delta.assignment
+            paired = {atom for edge, order in assignment.orders if order == 2 for atom in edge}
+            saturated = tuple(
+                dict.fromkeys(
+                    (
+                        *saturated,
+                        *(str(locant) for atom, locant in plan.numbering.input_locant_maps[0] if atom not in paired),
+                    )
+                )
+            )
     ring_ketone = parts.principal_group is not None and parts.principal_group.key == "ketone"
     rebuild_unsaturation = has_template and (
-        len(saturated) > 1 or any(op.operation_kind == "additive_hydrogen" for op in parts.hydro_operations)
+        paired_external_pi
+        or len(saturated) > 1
+        or any(op.operation_kind == "additive_hydrogen" for op in parts.hydro_operations)
     )
     if saturated and not has_template:
         raise _Abstain("saturated ring positions without a retained template")

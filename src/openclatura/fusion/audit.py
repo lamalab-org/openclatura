@@ -324,6 +324,11 @@ def audit_fusion_plan(
                 errors,
             )
         checks.append("parent_derivative_state")
+        if derivative_state is not None:
+            from .external_pi_consumption import has_paired_external_pi_consumption
+
+            if has_paired_external_pi_consumption(mol, parent_atoms, derivative_state):
+                checks.append("paired_external_pi_consumption")
         hydro_owned_h = (
             parent_atoms
             if not indicated_hydrogens
@@ -737,6 +742,10 @@ def _has_carbon_h_oxo_bond_consumption(
     The indicated-H model and derivative replay establish the remaining sites.
     """
 
+    from .external_pi_consumption import has_paired_external_pi_consumption
+
+    if has_paired_external_pi_consumption(mol, atoms, state):
+        return True
     for operation in state.external_pi_operations:
         atom = operation.parent_atom_id
         if neutral_lambda_oxo_bonding_number(mol, atom) is not None:
