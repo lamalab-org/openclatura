@@ -462,6 +462,17 @@ def render_fusion_name_parts(
             prefixes = {_spec_for_match(registry, matches[member.occurrence_id]).attached_prefix for member in members}
             if len(prefixes) != 1:
                 raise FusionDescriptorError("a multiplicative group must use one attached prefix")
+            member_specs = tuple(_spec_for_match(registry, matches[member.occurrence_id]) for member in members)
+            # HW heteroatom prefixes consume basic multipliers (e.g. tri + ox).
+            # Keep component multiplication distinct from heteroatom replacement.
+            multiplier = (
+                multipliers.complex_(len(members))
+                if any(
+                    spec.multiplicative_prefix_style == "complex" or spec.template.family == "generated_hw_monocycle"
+                    for spec in member_specs
+                )
+                else group.multiplier
+            )
             member_descriptors = tuple(descriptors_by_attached[member.occurrence_id][0] for member in members)
             omitted_locants = tuple(
                 _omit_attached_locants(
@@ -484,7 +495,7 @@ def render_fusion_name_parts(
             pieces.extend(
                 (
                     NameTokenBinding(
-                        text=group.multiplier,
+                        text=multiplier,
                         token_kind="grammar",
                         source="fusion_renderer",
                         grammar_role="fusion_multiplier",
