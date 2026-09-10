@@ -6,7 +6,7 @@ from collections import Counter, deque
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from fractions import Fraction
-from functools import cmp_to_key
+from functools import cmp_to_key, lru_cache
 
 from ..canonical_ranks import canonical_ranks
 from ..locants import system_locant_sort_key
@@ -455,6 +455,16 @@ def parent_bond_model(
     """Build all maximum non-cumulative Kekule assignments for a parent graph."""
 
     graph = _parent_bond_graph(parent, atom_ids)
+    policies = tuple(elements.get(symbol) for symbol in sorted({atom.symbol for atom in graph.atoms}))
+    return _parent_graph_bond_model(graph, search_budget, policies)
+
+
+@lru_cache(maxsize=128)
+def _parent_graph_bond_model(
+    graph: FusionGraph, search_budget: int, _element_policies: tuple[elements.Element, ...]
+) -> ParentBondModel:
+    """Reuse immutable candidate models, including the active policy in the key."""
+
     edges = tuple(sorted(normalize_edge(*bond.atoms) for bond in graph.bonds))
     bond_classes = {normalize_edge(*bond.atoms): bond.bond_class for bond in graph.bonds}
     required_double = frozenset(edge for edge in edges if bond_classes[edge] == "double")
