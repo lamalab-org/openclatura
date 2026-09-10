@@ -12,8 +12,13 @@ from openclatura.fusion import planner
 from openclatura.fusion.faces import select_bounded_face_model
 from openclatura.fusion.layout import (
     OPSIN_CONSTRUCTION_NUMBERING,
+    OPSIN_RING_MAP_NUMBERING,
+    RING_SHAPE_TEMPLATES,
     OpsinConstructionLayout,
+    _opsin_occupied_row_orientation,
+    _orientation_score,
     opsin_construction_atom_order,
+    preferred_intrinsic_layouts,
 )
 from openclatura.fusion.model import FusedLayout, FusionConfirmed, FusionMode
 from openclatura.fusion.numbering import _number_completed_system, _numbering_from_layout
@@ -41,6 +46,16 @@ CASES = (
         79496,
         "O=c1nc2c3ccccc3nc3sc4cccc1c4n32",
         "benzo[a]cyclopenta[def]phenanthrene",
+    ),
+    (
+        4582,
+        "CCCCCC(=O)O[C@@H]1[C@@]2(C(C)C)O[C@H]2[C@@H]2O[C@]23[C@]12O[C@H]2C[C@H]1C2=C(CC[C@@]13C)C(=O)OC2",
+        "trisoxireno[2',3':2,3;2'',3'':4,4a;2''',3''':10,10a]phenanthro[7,8-c]furan",
+    ),
+    (
+        58492,
+        "CC(C)[C@]12O[C@H]1[C@@H]1O[C@]13[C@]1(O[C@H]1C[C@H]1C4=C(C(=O)c5ccccc5)OC(=O)C4CC[C@@]13C)[C@@H]2O",
+        "trisoxireno[2',3':2,3;2'',3'':4,4a;2''',3''':10,10a]phenanthro[7,8-c]furan",
     ),
 )
 
@@ -107,6 +122,8 @@ def test_exact_structures_and_complete_locant_graphs_under_permutations(index, s
             witness = proof.selected_layout
             assert isinstance(witness, OpsinConstructionLayout)
             assert OPSIN_CONSTRUCTION_NUMBERING in witness.audit_evidence
+            if index in {4582, 58492}:
+                assert OPSIN_RING_MAP_NUMBERING in witness.audit_evidence
             locants = dict(proof.abstract_atom_to_locant)
             assert set(locants) == {atom.id for atom in plan.abstract_parent_graph.atoms}
             assert len(set(locants.values())) == len(locants)
@@ -157,6 +174,34 @@ def test_compatibility_is_explicit_and_preserves_graph_only_numbering(carbon_con
     assert all(original[atom] == compatible[atom] for atom in perimeter)
     assert all(original[atom].interior_distance == 1 for atom in bounded.interior_atoms)
     assert all(compatible[atom].interior_distance is None for atom in bounded.interior_atoms)
+
+
+def test_ring_map_compatibility_abstains_outside_the_proved_tree_family(carbon_context):
+    _, _, plan = carbon_context
+    assert preferred_intrinsic_layouts(plan.numbering.selected_face_model, opsin_ring_map=True) == ()
+
+
+def test_ring_map_quadrants_preserve_the_connected_axis_length():
+    centers = {0: (0, 0), 1: (2, 0), 2: (4, 0), 3: (6, 0), 4: (3, 2)}
+    adjacent = frozenset(frozenset(pair) for pair in ((0, 1), (1, 4), (4, 2), (2, 3)))
+    shape = next(shape for shape in RING_SHAPE_TEMPLATES if shape.ring_size == 6)
+    orders = {face: (face,) for face in centers}
+    ordinary = _orientation_score(centers, dict.fromkeys(centers, shape), adjacent, orders=orders, positions=centers)
+    compatible = _orientation_score(
+        centers, dict.fromkeys(centers, shape), adjacent, orders=orders, positions=centers, opsin_ring_map=True
+    )
+    assert ordinary == (0, -2, -10, 2, -12)
+    # Two right-axis rings contribute two units each; the upper bisected
+    # ring contributes two more. The connected longest row still has two rings.
+    assert compatible == (0, -2, -6, 4, -12)
+
+
+def test_occupied_rows_preserve_gaps_parity_and_storage_independence():
+    centers = {0: (0, 0), 1: (4, 0), 2: (12, 0), 3: (2, 0), 4: (2, 1)}
+    expected = _opsin_occupied_row_orientation(centers)
+    assert expected == (-7, 3, -12)
+    transformed = {100 - face: (x + 7, y - 3) for face, (x, y) in reversed(centers.items())}
+    assert _opsin_occupied_row_orientation(transformed) == expected
 
 
 def test_construction_does_not_depend_on_component_or_mapping_storage_order(carbon_context):

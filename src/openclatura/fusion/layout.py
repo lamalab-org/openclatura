@@ -20,6 +20,7 @@ Point = tuple[int, int]
 Edge = tuple[int, int]
 _SHAPE_EDGE_SCALE = 4
 OPSIN_CONSTRUCTION_NUMBERING = "opsin_component_construction_order"
+OPSIN_RING_MAP_NUMBERING = "opsin_ring_map_occupied_rows"
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +164,20 @@ def can_use_component_entry_layout(model: FaceModel) -> bool:
     )
 
 
+def _opsin_ring_map_tree(model: FaceModel) -> bool:
+    """Bound compatibility to hexagonal trees with terminal small polygons."""
+    return (
+        len(model.face_adjacency) == len(model.faces) - 1
+        and any(face.size == 3 for face in model.faces)
+        and any(face.size == 6 for face in model.faces)
+        and all(
+            face.size == 6
+            or (face.size in {3, 5} and len(set(face.edge_cycle) & model.fusion_edges) == 1)
+            for face in model.faces
+        )
+    )
+
+
 def component_entry_layouts(
     model: FaceModel,
     ast: FusionNameAst,
@@ -183,7 +198,8 @@ def component_entry_layouts(
     if search_budget < 1:
         raise ValueError("layout search budget must be positive")
     atoms = {atom for face in model.faces for atom in face.atom_cycle}
-    if len(atoms - set(model.outer_boundary)) > 1:
+    ring_map_compatibility = _opsin_ring_map_tree(model)
+    if len(atoms - set(model.outer_boundary)) > 1 or ring_map_compatibility:
         construction_order = opsin_construction_atom_order(ast, specs)
         if construction_order is None:
             return None
@@ -199,11 +215,13 @@ def component_entry_layouts(
                 audit_evidence=(
                     *layout.audit_evidence,
                     OPSIN_CONSTRUCTION_NUMBERING,
-                    "interior numbering compatibility only; IUPAC distance-rule PIN not certified",
+                    "OPSIN numbering compatibility only; IUPAC PIN not certified",
                 ),
                 construction_atom_order=construction_order,
             )
-            for layout in preferred_intrinsic_layouts(model, search_budget=search_budget)
+            for layout in preferred_intrinsic_layouts(
+                model, search_budget=search_budget, opsin_ring_map=ring_map_compatibility
+            )
         )
     if not can_use_component_entry_layout(model):
         return None
@@ -334,6 +352,7 @@ def intrinsic_fused_layouts(
     *,
     search_budget: int = _CONFIG.search.layout_states,
     max_layouts: int = _CONFIG.search.maximum_layouts,
+    opsin_ring_map: bool = False,
 ) -> tuple[FusedLayout, ...]:
     """Enumerate audited intrinsic layouts in nomenclatural preference order.
 
@@ -343,6 +362,8 @@ def intrinsic_fused_layouts(
 
     if search_budget < 1 or max_layouts < 1:
         raise ValueError("layout search budget and result limit must be positive")
+    if opsin_ring_map and not _opsin_ring_map_tree(model):
+        return ()
     terminal = _terminal_ring_proxy_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
     if terminal is not None:
         return terminal
@@ -394,6 +415,7 @@ def intrinsic_fused_layouts(
                             max_layouts,
                             coordinate_system,
                             best_distortion,
+                            opsin_ring_map=opsin_ring_map,
                         )
         # Exact hexagonal geometry is preferred. Closely folded systems can
         # require the existing deformable vocabulary to avoid atom overlaps;
@@ -735,6 +757,7 @@ def preferred_intrinsic_layouts(
     *,
     search_budget: int = _CONFIG.search.layout_states,
     max_layouts: int = _CONFIG.search.maximum_layouts,
+    opsin_ring_map: bool = False,
 ) -> tuple[FusedLayout, ...]:
     """Return every layout tied on the intrinsic orientation criteria.
 
@@ -747,6 +770,7 @@ def preferred_intrinsic_layouts(
         model,
         search_budget=search_budget,
         max_layouts=max_layouts,
+        opsin_ring_map=opsin_ring_map,
     )
     if not layouts:
         return ()
@@ -766,6 +790,8 @@ def _search_layouts(
     max_layouts: int,
     coordinate_system: str,
     best_distortion: list[int | None],
+    *,
+    opsin_ring_map: bool = False,
 ) -> None:
     current_distortion = _layout_distortion(placed_orders, placed_shapes, atom_positions, coordinate_system)
     if best_distortion[0] is not None and current_distortion > best_distortion[0]:
@@ -789,6 +815,7 @@ def _search_layouts(
                 placed_shapes,
                 atom_positions,
                 coordinate_system=coordinate_system,
+                opsin_ring_map=opsin_ring_map,
             ):
                 completed.setdefault(_layout_geometry_key(layout), layout)
             if len(completed) > max_layouts:
@@ -852,6 +879,7 @@ def _search_layouts(
                     max_layouts,
                     coordinate_system,
                     best_distortion,
+                    opsin_ring_map=opsin_ring_map,
                 )
 
 
@@ -1050,6 +1078,7 @@ def _materialize_layouts(
     positions: dict[int, Point],
     *,
     coordinate_system: str = "cartesian",
+    opsin_ring_map: bool = False,
 ) -> tuple[FusedLayout, ...]:
     distortion = _layout_distortion(placed_orders, shapes, positions, coordinate_system)
     integer, centers = _normalized_embedding_geometry(
@@ -1107,6 +1136,8 @@ def _materialize_layouts(
                     )
                     for atom, (x, y) in integer.items()
                 }
+                if opsin_ring_map and _direction_grid_centers(oriented_centers, adjacent) is None:
+                    continue
                 score = _orientation_score(
                     oriented_centers,
                     shapes,
@@ -1114,6 +1145,7 @@ def _materialize_layouts(
                     distortion=distortion,
                     orders=placed_orders,
                     positions=oriented,
+                    opsin_ring_map=opsin_ring_map,
                 )
                 if best_score is not None and score > best_score:
                     continue
@@ -1136,6 +1168,7 @@ def _materialize_layouts(
                         "nonadjacent face interiors do not overlap",
                         "geometric and topological perimeters agree",
                         "preferred axis derived from ring-center rows",
+                        *((OPSIN_RING_MAP_NUMBERING,) if opsin_ring_map else ()),
                     ),
                 )
                 candidates.setdefault(_layout_geometry_key(layout), layout)
@@ -1317,6 +1350,7 @@ def _orientation_score(
     distortion: int | None = None,
     orders: dict[int, tuple[int, ...]],
     positions: dict[int, Point],
+    opsin_ring_map: bool = False,
 ) -> tuple[int, ...]:
     direction_centers = _direction_grid_centers(centers, adjacent)
     if direction_centers is not None:
@@ -1339,11 +1373,37 @@ def _orientation_score(
         for row in rows
         if len(row) == row_count
     )
+    if opsin_ring_map:
+        if direction_centers is None:
+            raise ValueError("OPSIN ring-map orientation requires a consistent direction grid")
+        orientation = _opsin_occupied_row_orientation(direction_centers)
     if distortion is None:
         distortion = sum(shape.distortion_rank for shape in shapes.values())
     # Distorted shapes are disfavored before applying the ordinary P-25
     # orientation criteria; see the separate distortion precedence rule.
     return distortion, -row_count, *orientation
+
+
+def _opsin_occupied_row_orientation(centers: dict[int, Point]) -> tuple[int, int, int]:
+    """OPSIN's quadrant pass scans occupied cells, after connected-axis selection.
+
+    This deliberately differs from the ordinary fused-row rule: neighboring
+    occupied cells need not represent adjacent rings. Keep it compatibility-only.
+    """
+    groups: dict[tuple[int, int], list[int]] = defaultdict(list)
+    for face, (x, y) in centers.items():
+        groups[y, x % 4].append(face)
+    rows: list[list[int]] = []
+    for group in groups.values():
+        row: list[int] = []
+        for face in sorted(group, key=lambda face: centers[face][0]):
+            if row and centers[face][0] - centers[row[-1]][0] != 4:
+                rows.append(row)
+                row = []
+            row.append(face)
+        rows.append(row)
+    longest = max(map(len, rows))
+    return min(_center_row_orientation_score(centers, row) for row in rows if len(row) == longest)
 
 
 def _direction_grid_centers(centers: dict[int, Point], adjacent: frozenset[frozenset[int]]) -> dict[int, Point] | None:
