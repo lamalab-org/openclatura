@@ -34,7 +34,7 @@ def _post_process_name(name: str) -> str:
     return apply_data_postprocessing(name)
 
 
-def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
+def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str, *, allow_locant_elision: bool = True) -> str:
     additive_hydrogens = [
         locant
         for operation in parts.hydro_operations
@@ -96,7 +96,7 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str) -> str:
         if (
             fully_hydrogenated_fusion
             or len(additive_hydrogens) + max(len(indicated_hydrogens), stated) == parts.parent_length
-        ) and not core_name.startswith("spiro["):
+        ) and allow_locant_elision:
             return f"{hydro}{separator}{core_name}"
         core_name = f"{','.join(additive_hydrogens)}-{hydro}{separator}{core_name}"
     return core_name
@@ -253,7 +253,7 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
         core_name, terminal_e, suffix_str = format_spiro_core(
             stem_str, unsat_str, terminal_e, spiro_subs, suffix_str, parent_terminal_e=spiro_parent_terminal
         )
-        core_name = _add_indicated_hydrogen_prefix(parts, core_name)
+        core_name = _add_indicated_hydrogen_prefix(parts, core_name, allow_locant_elision=not spiro_subs)
         core_name, suffix_str = _move_added_hydrogen_to_suffix(parts, core_name, suffix_str)
         core_name += suffix_str
     parent_needs_prefix_hyphen = bool(
