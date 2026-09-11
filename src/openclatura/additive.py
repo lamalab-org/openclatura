@@ -286,7 +286,20 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
                 and len(ring_bonds) == 3
                 and _is_saturated_ring_site(mol, idx, numbered_path)
             )
-            indicated_h_site = sum(b.order for b in ring_bonds) == 2 and (
+            # A bond-order sum of two assumes a non-fusion atom, so a declared
+            # indicated hydrogen sitting on a ring-fusion atom never counted,
+            # the surplus came out one short, and the rule that cites the
+            # remaining saturated site never fired:
+            # 6aH-cyclopenta[d][1,3]oxazol-4-one dropped the hydrogen on C-3a
+            # and read back as another tautomer. A fusion site counts only when
+            # it actually holds hydrogen -- a bridgehead nitrogen has three
+            # single ring bonds and none.
+            saturated_fusion_h = (
+                len(ring_bonds) == 3
+                and sum(b.order for b in ring_bonds) == 3
+                and (atom.total_h_count or atom.explicit_h_count)
+            )
+            indicated_h_site = (sum(b.order for b in ring_bonds) == 2 or saturated_fusion_h) and (
                 not atom.is_carbon
                 or _is_saturated_ring_site(mol, idx, numbered_path)
                 or (locant in default_indicated_h and _exocyclic_double_bond_site(mol, idx, numbered_path))
@@ -304,8 +317,12 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         # particular spelling (indane, benzodioxole, xanthene, ...).
         supported -= len(default_indicated_h & inherent_saturated_locants)
         supported = max(0, supported)
+    # A fusion carbon the name already declares is spelled; it is not a site
+    # still wanting a hydro prefix, and counting it as one splits the pool as
+    # though the declared hydrogen were surplus.
     additive_hydrogen = any(
-        mol.atoms[atom_idx].is_carbon and locant in fusion_locants for locant, atom_idx in candidates
+        mol.atoms[atom_idx].is_carbon and locant in fusion_locants and locant not in name_declared_indicated_h
+        for locant, atom_idx in candidates
     )
     if additive_hydrogen and len(candidates) > 1:
         pool = sorted(candidates + hydro_only, key=lambda item: parse_locant(item[0]))
