@@ -363,16 +363,33 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     if additive_hydrogen and len(candidates) > 1:
         pool = sorted(candidates + hydro_only, key=lambda item: parse_locant(item[0]))
         held = supported if (len(pool) - supported) % 2 == 0 else 0
-        candidates, surplus = pool[:held], pool[held:]
-        parts.hydro_operations.append(
-            HydroOperation(
-                key="additive_hydrogen",
-                reason="Retained parent requires an additive hydrogen prefix.",
-                locants=tuple(locant for locant, _ in surplus),
-                atom_ids=tuple(atom_idx for _, atom_idx in surplus),
-                operation_kind="additive_hydrogen",
+        # Hold the site the stem already spells, exactly as the surplus split
+        # below does. Taking the lowest locant instead leaves the spelt one in
+        # the hydro prefix, so the name cites one position twice and OPSIN
+        # rejects it: "3,4,6,7,8,8a-hexahydro-4H-1,4-benzothiazine" hydrogenates
+        # N-4 that the 4H already saturates.
+        declared = (
+            _declared_indicated_hydrogen_split(
+                pool, name_declared_indicated_h, held, name_states_indicated_h=name_states_indicated_h
             )
+            if held
+            else None
         )
+        candidates, surplus = declared if declared is not None else (pool[:held], pool[held:])
+        # The parent's own indicated hydrogen can account for every saturated
+        # site, leaving nothing to hydrogenate. A prefix citing no locant is not
+        # a prefix: it reaches the multiplier table as "hydro" of zero and
+        # raises, so 2H,8aH-1,3-benzodioxine got no name at all.
+        if surplus:
+            parts.hydro_operations.append(
+                HydroOperation(
+                    key="additive_hydrogen",
+                    reason="Retained parent requires an additive hydrogen prefix.",
+                    locants=tuple(locant for locant, _ in surplus),
+                    atom_ids=tuple(atom_idx for _, atom_idx in surplus),
+                    operation_kind="additive_hydrogen",
+                )
+            )
         if not name_states_indicated_h:
             for locant, atom_idx in candidates:
                 parts.indicated_hydrogens.append(locant)
