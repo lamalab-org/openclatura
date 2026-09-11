@@ -573,6 +573,9 @@ def _match_all_retained_fused_template(
                 ring_atoms=atom_set,
                 allow_nonaromatic=allow_nonaromatic,
                 charge_policy=template.charge_policy,
+                # Only a template that fixes saturation of its own pins its
+                # hydrogen population; a mancude one may relocate indicated H.
+                fixed_hydrogenation=any(atom.saturated for atom in template.atoms),
             )
             and molecule_degrees[atom_idx] == template_degrees[locant]
         ]
@@ -1181,6 +1184,7 @@ def _atom_matches_template(
     ring_atoms: frozenset[int] | set[int] | None = None,
     allow_nonaromatic: bool = False,
     charge_policy: str = "charge_layer",
+    fixed_hydrogenation: bool = False,
 ) -> bool:
     atom = mol.atoms[atom_idx]
     if atom.symbol != atom_template.symbol:
@@ -1208,7 +1212,33 @@ def _atom_matches_template(
     # Tells 2H- from 4H-1-benzopyran: the position must really be saturated.
     if atom_template.saturated and not _is_saturated_site(mol, atom_idx, ring_atoms):
         return False
+    # P-3: a retained partially saturated parent such as indoline states a fixed
+    # hydrogen population. Every parent hydrogen stays unless a named operation
+    # replaces or consumes it -- substitution and suffixes do, dehydrogenation
+    # does not. So its donor may not arrive as an imine: `indolin-7-one` names
+    # C8H9NO, and using it for the two-hydrogen-poorer C8H7NO states a
+    # dehydrogenation the name never expresses. A mancude parent is exempt,
+    # because P-58.2.3.1 lets its indicated hydrogen move to accommodate a
+    # suffix, even onto the suffix carbon: 1H-carbazol-1-one has an imine N-9.
+    if (
+        fixed_hydrogenation
+        and not atom_template.aromatic
+        and not atom_template.saturated
+        and atom_template.symbol != "C"
+        and _has_ring_double_bond(mol, atom_idx, ring_atoms)
+    ):
+        return False
     return True
+
+
+def _has_ring_double_bond(mol: Molecule, atom_idx: int, ring_atoms=None) -> bool:
+    """Whether a ring bond at this atom is an explicit double bond."""
+
+    return any(
+        bond.order == 2
+        for neighbor in mol.get_neighbors(atom_idx)
+        if (ring_atoms is None or neighbor in ring_atoms) and (bond := mol.get_bond(atom_idx, neighbor)) is not None
+    )
 
 
 def _cumulated_ring_site(mol: Molecule, atom_idx: int, ring_atoms=None) -> bool:
