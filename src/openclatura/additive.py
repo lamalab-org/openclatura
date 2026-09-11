@@ -215,6 +215,42 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
     ):
         default_indicated_h = observed_saturated
 
+    if parts.retained_name:
+        # P-58.2.3.1: a mancude parent's indicated hydrogen may be cited at
+        # another position to accommodate the structure. A name that spells it
+        # where the molecule carries a ring double bond asserts a hydrogen that
+        # is not there -- 4H-1,4-benzothiazine over an imine N-4 renders
+        # 3,4-dihydro-1,4-benzothiazin-5(2H)-one for a compound whose only
+        # saturated positions are C-2 and C-3. Move the citation to a position
+        # the structure can bear.
+        atom_by_locant = {str(get_loc(idx)): idx for idx in numbered_path}
+        spelled = _name_indicated_hydrogen_locants(parts.retained_name)
+        stranded = [
+            locant
+            for locant in spelled
+            if locant in atom_by_locant and not _is_saturated_ring_site(mol, atom_by_locant[locant], numbered_path)
+        ]
+        if stranded:
+            free = [
+                locant
+                for locant in sorted(atom_by_locant, key=parse_locant)
+                if locant not in spelled
+                and _is_saturated_ring_site(mol, atom_by_locant[locant], numbered_path)
+                and not _is_oxo_ring_site(mol, atom_by_locant[locant], numbered_path)
+                and locant not in inherent_saturated_locants
+                # A divalent chalcogen is a donor with no room for hydrogen, so
+                # it can never hold the citation.
+                and mol.atoms[atom_by_locant[locant]].symbol not in {"O", "S", "Se", "Te"}
+            ]
+            if len(free) >= len(stranded):
+                relocated = (spelled - set(stranded)) | set(free[: len(stranded)])
+                parts.retained_name = _respell_indicated_hydrogen(parts.retained_name, relocated)
+                name_declared_indicated_h = relocated
+                if not default_indicated_h:
+                    # The stem now spells these, so the hydro pass has to treat
+                    # them as declared or it cites the same locant twice, as in
+                    # "2,4a,5,8a-tetrahydro-2H-...".
+                    default_indicated_h = set(relocated)
     if parts.retained_name and default_indicated_h:
         cited = _name_indicated_hydrogen_locants(parts.retained_name)
         if cited and cited != default_indicated_h and len(cited) == len(default_indicated_h):
