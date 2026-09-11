@@ -7,6 +7,7 @@ import subprocess
 import sys
 import types
 import warnings
+from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as distribution_version
 
 import pytest
@@ -30,11 +31,18 @@ from openclatura import (
 )
 
 
-def test_public_version_comes_from_installed_package_metadata():
-    assert __version__ == distribution_version("openclatura")
+def _expected_package_version() -> str:
+    try:
+        return distribution_version("openclatura")
+    except PackageNotFoundError:
+        return "unknown"
 
 
-def test_cli_version_matches_installed_package_metadata():
+def test_public_version_matches_available_package_metadata():
+    assert __version__ == _expected_package_version()
+
+
+def test_cli_version_matches_available_package_metadata():
     result = subprocess.run(
         [sys.executable, "-m", "openclatura.cli", "--version"],
         capture_output=True,
@@ -42,7 +50,7 @@ def test_cli_version_matches_installed_package_metadata():
         check=False,
     )
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == f"openclatura {distribution_version('openclatura')}"
+    assert result.stdout.strip() == f"openclatura {_expected_package_version()}"
 
 
 def test_name_smiles_legacy_still_returns_string():
