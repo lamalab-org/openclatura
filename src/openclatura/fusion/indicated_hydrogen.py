@@ -188,41 +188,29 @@ def intrinsic_carbon_fusion_scope(ast: FusionNameAst, specs: Mapping[int, Fusion
 
 
 def component_carbon_h_relocation_scope(ast: FusionNameAst, specs: Mapping[int, FusionComponentSpec]) -> bool:
-    """Carbon-only composition preserves the proved component pi capacities.
+    """P-25.7.1.3: a component never carries its indicated hydrogen into a fusion.
 
-    Heteroatom donor composition needs its separate intrinsic-H proof and
-    explicit component pi budgets before additive operations.
+    Indicated hydrogen belongs to the completed ring system, assigned after
+    maximising non-cumulative double bonds over the whole skeleton. A component
+    name only records which tautomer of the *isolated* component was cited, so
+    `pyran` contributes a ring, not the sp3 carbon that `2H-pyran` spells.
+
+    Holding that carbon saturated is not merely a worse tautomer when it lands
+    on a ring fusion, as pyran's C-2 does in furo[3,4-b]pyran: a fusion atom
+    with no pi capacity strands every bond incident on it, so the whole furan
+    half of the parent leaves the pi system, and each derivative silently drops
+    the hydrogen on C-7a -- furo[3,4-b]pyran-4(4aH,5H)-one for a compound whose
+    furan ring is fully saturated.
+
+    `component_parent_atoms` releases only a declared carbon H that leaves the
+    component's own mancude bond count intact, so the component keeps its
+    identity. Heteroatom donor composition still needs its separate intrinsic-H
+    proof and explicit component pi budgets before additive operations.
     """
 
-    eligible = intrinsic_carbon_fusion_scope(ast, specs) or all(
+    return intrinsic_carbon_fusion_scope(ast, specs) or all(
         atom.symbol == "C" and atom.charge == 0 for spec in specs.values() for atom in spec.atoms
     )
-    if not eligible:
-        return False
-    if all(component_parent_atoms(spec) == spec.atoms for spec in specs.values()):
-        return True
-    # Preserve the completed pi budget unless every local maximum matching
-    # proves that fusion consumes the released H at a shared junction.
-    components = tuple((match, specs[match.occurrence_id]) for match in ast.component_occurrences)
-    if _completed_carbon_h_budget(components, False) == _completed_carbon_h_budget(components, True):
-        return True
-    from .component_hydrogen import component_hydrogen_consumption
-
-    return component_hydrogen_consumption(ast, specs) is not None
-
-
-@lru_cache(maxsize=512)
-def _completed_carbon_h_budget(
-    components: tuple[tuple[FusionComponentMatch, FusionComponentSpec], ...], relaxed: bool
-) -> int:
-    return _completed_carbon_h_model(components, relaxed).maximum_non_cumulative_double_bonds
-
-
-@lru_cache(maxsize=512)
-def _completed_carbon_h_model(
-    components: tuple[tuple[FusionComponentMatch, FusionComponentSpec], ...], relaxed: bool
-) -> ParentBondModel:
-    return parent_bond_model(_component_parent_graph(components, relaxed))
 
 
 def component_parent_graph(

@@ -1,17 +1,4 @@
 {
  "comment": "Ortho-fused bicycles with an oxo beside a ring-fusion atom whose generated name does not round-trip through OPSIN. Enumerated by tests/roundtrip/test_fused_oxo_family.py, not drawn from any dataset. Shrinking this list is progress; growing it is a regression.",
- "known_failures": [
-  "O=C1C=COC2COCC12",
-  "O=C1C=COC2CSCC12",
-  "O=C1CCOC2COC=C12",
-  "O=C1CCOC2COCC12",
-  "O=C1CCOC2CSC=C12",
-  "O=C1CCOC2CSCC12",
-  "O=C1OCC2OC=CCC12",
-  "O=C1OCC2OCCC=C12",
-  "O=C1OCC2OCCCC12",
-  "O=C1SCC2OC=CCC12",
-  "O=C1SCC2OCCC=C12",
-  "O=C1SCC2OCCCC12"
- ]
+ "known_failures": []
 }

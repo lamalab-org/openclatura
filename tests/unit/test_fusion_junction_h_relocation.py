@@ -5,7 +5,11 @@ from rdkit import Chem
 
 from openclatura import name_mol, opsin_available, verify_with_opsin
 from openclatura.chains import find_ring_systems
-from openclatura.fusion.indicated_hydrogen import intrinsic_carbon_candidate_atoms, released_fusion_carbon_sites
+from openclatura.fusion.indicated_hydrogen import (
+    component_parent_graph,
+    intrinsic_carbon_candidate_atoms,
+    released_fusion_carbon_sites,
+)
 from openclatura.fusion.model import FusionConfirmed
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.fusion.registry import fusion_component_registry
@@ -103,7 +107,14 @@ def test_hydrogenation_release_does_not_override_other_operation_roles(competing
     registry = fusion_component_registry()
     specs = {match.occurrence_id: registry.spec_for_match(match) for match in plan.ast.component_occurrences}
     candidates = intrinsic_carbon_candidate_atoms(plan.ast, specs, mol)
-    assert released_fusion_carbon_sites(mol, plan.abstract_parent_graph, candidates)
+    # The unrelaxed projection, not plan.abstract_parent_graph. Since a
+    # component's indicated hydrogen is released at projection (P-25.7.1.3, see
+    # component_carbon_h_relocation_scope), the planner hands this molecule a
+    # graph with nothing left saturated, so there is no site for this guard to
+    # refuse. The state it guards is the one component_parent_graph still builds
+    # on request: pyran's C-2 held saturated on the ring fusion.
+    graph = component_parent_graph(plan.ast, specs, relocate_carbon_h=False)
+    assert released_fusion_carbon_sites(mol, graph, candidates)
     if competing_operation == "missing_component_role":
         candidates = frozenset()
     elif competing_operation == "charge":
@@ -112,4 +123,4 @@ def test_hydrogenation_release_does_not_override_other_operation_roles(competing
         mol.add_atom("O", idx=99)
         mol.add_bond(0, 99, order=2, idx=99)
         mol.update_atom(0, total_h_count=0)
-    assert not released_fusion_carbon_sites(mol, plan.abstract_parent_graph, candidates)
+    assert not released_fusion_carbon_sites(mol, graph, candidates)
