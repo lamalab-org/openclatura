@@ -29,6 +29,7 @@ import pytest
 from rdkit import Chem
 
 from openclatura import name_mol, opsin_available
+from openclatura.resonance_compare import equivalent_smiles
 
 pytestmark = pytest.mark.opsin
 
@@ -109,13 +110,6 @@ def _sample(family: list[str]) -> list[str]:
     return family[::step][:DEFAULT_SAMPLE]
 
 
-def _canonical(smiles: str) -> str | None:
-    if not smiles:
-        return None
-    mol = Chem.MolFromSmiles(smiles)
-    return Chem.MolToSmiles(mol) if mol else None
-
-
 def test_family_is_large_and_stable():
     family = enumerate_family()
     assert len(family) == 9426, "the generator changed; regenerate the known-failure baseline"
@@ -139,7 +133,11 @@ def test_no_member_outside_the_known_failures_loses_its_round_trip():
 
     regressions = []
     for smiles, name, roundtrip in zip(members, names, roundtrips):
-        if _canonical(roundtrip) == _canonical(smiles):
+        # The same comparison verify_with_opsin applies, so the sweep asks
+        # exactly what a user asks: would the engine call this name verified?
+        # It is Kekule-tolerant and tautomer-strict -- a resonance form never
+        # moves a hydrogen, charge or radical, so a wrong tautomer still fails.
+        if roundtrip and equivalent_smiles(smiles, roundtrip):
             continue
         if smiles in known:
             continue

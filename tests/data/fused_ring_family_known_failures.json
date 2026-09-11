@@ -1,10 +1,4 @@
 {
  "comment": "Ortho-fused bicycles at every hydrogenation level, no oxo, whose generated name does not round-trip through OPSIN. Enumerated by tests/roundtrip/test_fused_ring_family.py, not drawn from any dataset. Shrinking this list is progress; growing it is a regression.",
- "note": "All four remaining entries are fully mancude systems with no indicated hydrogen, where several maximum non-cumulative double-bond arrangements of the same skeleton exist. IUPAC names the ring system, not one arrangement, so the name cannot distinguish them and OPSIN returns a different Kekule form of the same named compound. Verify before removing: the generated name may already be correct.",
- "known_failures": [
-  "C1=CC2=CC=NC2=C1",
-  "C1=CC2=NN=CC2=C1",
-  "C1=NC2=CC=NC2=C1",
-  "C1=NC=C2N=CC=C12"
- ]
+ "known_failures": []
 }
