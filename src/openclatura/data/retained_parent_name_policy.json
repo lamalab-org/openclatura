@@ -31,7 +31,7 @@
       "template_name": "indane",
       "preferred_name": "2,3-dihydro-1H-indene",
       "preferred_contexts": [
-        "unsubstituted_parent"
+        "all"
       ],
       "accepted_aliases": [
         "indane",
@@ -53,7 +53,7 @@
       "template_name": "indoline",
       "preferred_name": "2,3-dihydro-1H-indole",
       "preferred_contexts": [
-        "unsubstituted_parent"
+        "all"
       ],
       "accepted_aliases": [
         "indoline"

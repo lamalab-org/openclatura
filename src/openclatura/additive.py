@@ -110,9 +110,49 @@ def _declared_sites_are_unambiguous(mol: Molecule, numbered_path: list[int], get
     return True
 
 
+def _relocate_preferred_hydrogenation(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
+    """Cite a non-PIN retained parent's hydrogen where the suffix leaves it.
+
+    P-54.4.3.2 spells indoline as its mancude parent plus hydro prefixes, and
+    P-58.2.3.1 then places the indicated hydrogen on the suffix carbon, so
+    oxindole is 1,3-dihydro-2H-indol-2-one rather than 2,3-dihydro-1H-indol-2-one.
+    The policy already declares the hydrogenated set; only its split between the
+    citation and the prefix moves, so this respells and never recounts.
+    """
+
+    from .retained_name_policy import retained_parent_name_policies
+
+    group = parts.principal_group
+    if not parts.retained_name or group is None:
+        return
+    policy = next(
+        (
+            candidate
+            for candidate in retained_parent_name_policies()
+            if candidate.hydrogenation is not None and candidate.preferred_name == parts.retained_name
+        ),
+        None,
+    )
+    if policy is None:
+        return
+    # Only a suffix that actually takes the position's hydrogen moves the
+    # citation. A ring ketone does (C-2 becomes C=O); a carboxylic acid hangs
+    # off C-2 and leaves its hydrogen alone, so indoline-2-carboxylic acid
+    # stays 2,3-dihydro-1H-.
+    suffix_locants = frozenset(
+        str(get_loc(atom))
+        for atom in parts.parent_atom_ids & group.atom_ids
+        if _exocyclic_double_bond_site(mol, atom, numbered_path)
+    )
+    relocated = policy.hydrogenation.relocated(suffix_locants)
+    if relocated is not policy.hydrogenation:
+        parts.retained_name = relocated.render()
+
+
 def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     """Add indicated hydrogen locants for retained ring names."""
 
+    _relocate_preferred_hydrogenation(mol, parts, numbered_path, get_loc)
     if _apply_retained_oxo_carbon_hydrogen(mol, parts, numbered_path, get_loc):
         return
     parent = parts.parent_hydride

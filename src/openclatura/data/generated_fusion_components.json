@@ -957,7 +957,7 @@
   "source_sha256": {
     "src/openclatura/data/fusion_components.json": "349575e6d83c3233dbe37d79e5faa0ed4c439e70311e26c07fe79df4fe964d8c",
     "src/openclatura/data/retained_fused_graph_templates.json": "ef1b6363ac355c18cb6eb13579fc4109b1622db59da045b2e8241ed72037b36d",
-    "src/openclatura/data/retained_parent_name_policy.json": "ec633e4718f128bd0211c6df91d250e8bc6d149f27e89cc623a96b9dabddd549",
+    "src/openclatura/data/retained_parent_name_policy.json": "8f3c1d572abccc55e6c7b25f8a774048898c35f220fe9100edb1c9228d3cdfec",
     "src/openclatura/hantzsch_widman.py": "8d28a90442764eab283fa867e4efbf44f143eb3bc70d175552a59d087dd325bc",
     "tests/data/parser_xml_resources/fusionComponents.json": "6f6465633bcbc26e30be994c7711f8fc40df807f16f780e993c0e60db39e9723"
   }

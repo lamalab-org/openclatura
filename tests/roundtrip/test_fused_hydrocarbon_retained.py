@@ -190,12 +190,19 @@ def test_hydrogenated_parent_uses_data_backed_preferred_name():
     policy = retained_parent_name_policy("indoline")
     assert policy is not None
     assert policy.preferred_name == "2,3-dihydro-1H-indole"
+    # P-54.4.3.2: indoline is not a PIN in any context, so a derivative is
+    # spelt from the mancude parent too, not only the bare ring system.
     assert policy.output_name("unsubstituted_parent") == policy.preferred_name
-    assert policy.output_name("composite_parent") == "indoline"
+    assert policy.output_name("composite_parent") == policy.preferred_name
     assert policy.hydrogenation is not None
     assert policy.hydrogenation.base_parent == "1H-indole"
     assert policy.hydrogenation.hydro_locants == ("2", "3")
     assert name_smiles("c1ccc2c(c1)CCN2") == policy.preferred_name
+    assert name_smiles("CN1CCc2ccccc21") == "1-methyl-2,3-dihydro-1H-indole"
+    # P-58.2.3.1: the suffix takes the citation off N-1 and onto C-2.
+    assert name_smiles("O=C1Cc2ccccc2N1") == "1,3-dihydro-2H-indol-2-one"
+    # A suffix that only hangs off C-2 leaves its hydrogen, and the citation, alone.
+    assert name_smiles("OC(=O)C1Cc2ccccc2N1") == "2,3-dihydro-1H-indole-2-carboxylic acid"
 
 
 def test_hydrogenated_hydrocarbon_uses_data_backed_preferred_name():
@@ -203,8 +210,12 @@ def test_hydrogenated_hydrocarbon_uses_data_backed_preferred_name():
     assert policy is not None
     assert policy.accepted_names == ("2,3-dihydro-1H-indene", "indane", "indan")
     assert policy.output_name("unsubstituted_parent") == "2,3-dihydro-1H-indene"
-    assert policy.output_name("composite_parent") == "indane"
+    assert policy.output_name("composite_parent") == "2,3-dihydro-1H-indene"
     assert name_smiles("c1ccc2c(c1)CCC2") == policy.preferred_name
+    assert name_smiles("NC1CCc2ccccc21") == "2,3-dihydro-1H-inden-1-amine"
+    # The suffix already stands where the parent cites its hydrogen, so nothing moves.
+    assert name_smiles("O=C1CCc2ccccc21") == "2,3-dihydro-1H-inden-1-one"
+    assert name_smiles("O=C1Cc2ccccc2C1") == "1,3-dihydro-2H-inden-2-one"
 
 
 def test_retained_parent_policy_separates_preferred_name_from_accepted_spelling():

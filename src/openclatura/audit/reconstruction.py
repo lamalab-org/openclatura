@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Literal
 
 from rdkit import Chem
@@ -220,10 +221,38 @@ def _is_retained_chain_parent(retained_name: str) -> bool:
     return retained_name in set(RETAINED_CHAIN_PARENTS.values())
 
 
+@lru_cache(maxsize=1)
+def _preferred_hydrogenation_aliases() -> dict[str, str]:
+    """Map a non-PIN retained parent's rendered PIN back to its own template.
+
+    P-54.4.3.2 spells indoline as 2,3-dihydro-1H-indole, and P-58.2.3.1 moves
+    the citation when a suffix stands on a hydrogenated position, so the same
+    skeleton reaches this audit under several names. They all denote the
+    template's structure, so resolve them to it rather than abstaining.
+    """
+
+    from ..retained_name_policy import retained_parent_name_policies
+
+    aliases: dict[str, str] = {}
+    for policy in retained_parent_name_policies():
+        hydrogenation = policy.hydrogenation
+        if hydrogenation is None or policy.template_name not in _ALL_PARENT_TEMPLATES:
+            continue
+        renderings = {policy.preferred_name, hydrogenation.render()}
+        for locant in hydrogenation.hydro_locants:
+            renderings.add(hydrogenation.relocated(frozenset({locant})).render())
+        for rendering in renderings:
+            aliases.setdefault(rendering, policy.template_name)
+    return aliases
+
+
 def _lookup_parent_template(retained_name: str) -> tuple[str, list[str]] | None:
     template = _ALL_PARENT_TEMPLATES.get(retained_name)
     if template is not None:
         return template
+    alias = _preferred_hydrogenation_aliases().get(retained_name)
+    if alias is not None:
+        return _ALL_PARENT_TEMPLATES[alias]
     hydride = _functional_parent_hydrides().get(retained_name)
     if hydride is not None and hydride in _ALL_PARENT_TEMPLATES:
         return _ALL_PARENT_TEMPLATES[hydride]

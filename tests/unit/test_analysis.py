@@ -1934,16 +1934,16 @@ def test_two_nitrogen_chain_uses_its_retained_name():
 def test_a_named_spiro_component_primes_its_replacement_prefixes():
     # The side ring is the primed component, so its heteroatom locants are
     # primed too.  Unprimed, they read back on the other ring entirely.
-    assert name_smiles("N1CC2(C3=CC=CC=C13)NCNC2") == "1',3'-diazaspiro[indoline-3,4'-cyclopentane]"
-    assert name_smiles("O=C1NC2(CN1)c1ccccc1NC2=O") == "1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2,2'-dione"
+    assert name_smiles("N1CC2(C3=CC=CC=C13)NCNC2") == "1',3'-diazaspiro[2,3-dihydro-1H-indole-3,4'-cyclopentane]"
+    assert name_smiles("O=C1NC2(CN1)c1ccccc1NC2=O") == "1',3'-diazaspiro[1,3-dihydro-2H-indole-3,4'-cyclopentane]-2,2'-dione"
 
 
 def test_every_side_ring_substituent_survives_and_is_primed():
     assert name_smiles("CCC/C=C1/N(CCCC)C(=O)NC12C(=O)N(C)c1ccccc12") == (
-        "(5'E)-1'-butyl-5'-butylidene-1-methyl-1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2,2'-dione"
+        "(5'E)-1'-butyl-5'-butylidene-1-methyl-1',3'-diazaspiro[1,3-dihydro-2H-indole-3,4'-cyclopentane]-2,2'-dione"
     )
     assert name_smiles("C=C1N(C)C(=O)NC12C(=O)N(C)c1ccccc12") == (
-        "1,1'-dimethyl-5'-methylidene-1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2,2'-dione"
+        "1,1'-dimethyl-5'-methylidene-1',3'-diazaspiro[1,3-dihydro-2H-indole-3,4'-cyclopentane]-2,2'-dione"
     )
 
 
@@ -1963,7 +1963,7 @@ def test_a_counted_spiro_keeps_its_replacement_prefixes_unprimed():
     assert name_smiles("C1CC2(CC1)OCCO2") == "1,4-dioxaspiro[4.4]nonane"
     both = name_smiles("Cc1noc(C2CC3(C2)CN(C2CCC4(CC2)C(=O)Nc2ccccc24)C3)n1")
     assert "2-azaspiro[3.3]heptan" in both
-    assert "spiro[indoline-3,1'-cyclohexane]" in both
+    assert "spiro[1,3-dihydro-2H-indole-3,1'-cyclohexane]" in both
 
 
 def test_homonuclear_chain_names_are_reconstructed_by_the_audit():
@@ -2015,7 +2015,7 @@ def test_tetraazene_parent_takes_an_ylidene_ligand():
 def test_a_short_or_charged_nitrogen_chain_leaves_its_own_group_alone():
     # Diazo and hydrazone each own their nitrogens and name them better than a
     # bare chain parent would; an azoxy is the chain itself plus an oxide.
-    assert name_smiles("[N-]=[N+]=C1CCc2ccccc21") == "1-(diazo)indane"
+    assert name_smiles("[N-]=[N+]=C1CCc2ccccc21") == "1-(diazo)-2,3-dihydro-1H-indene"
     assert name_smiles("COc1ccc(N=[N+]([O-])c2ccccc2)cc1") == "2-(4-methoxyphenyl)-1-phenyldiazene 1-oxide"
     # A principal group outside the chain keeps its own parent and suffix.
     assert name_smiles("OCCNN=NN") == "2-(hydrazonohydrazinyl)ethan-1-ol"
@@ -5455,7 +5455,7 @@ def test_azine_retained_and_simple_ring_sides_are_graph_bound():
 
 def test_a_spiro_side_component_keeps_its_stereo_descriptors():
     cases = {
-        "O=C1Nc2ccccc2[C@@]12CCN(C)[C@H]2C": "(2'S,3R)-1',2'-dimethylspiro[indoline-3,3'-pyrrolidine]-2-one",
+        "O=C1Nc2ccccc2[C@@]12CCN(C)[C@H]2C": "(2'S,3R)-1',2'-dimethylspiro[1,3-dihydro-2H-indole-3,3'-pyrrolidine]-2-one",
         "CC[C@@H]1CCC[C@]2(CC[C@@H]3C[C@@H]3CO2)C1": (
             "(1S,3'R,4S,7R)-3'-ethylspiro[3-oxabicyclo[5.1.0]octane-4,1'-cyclohexane]"
         ),
