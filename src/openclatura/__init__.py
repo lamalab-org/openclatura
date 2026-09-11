@@ -4,6 +4,7 @@ from collections.abc import Iterable
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
+from ._version import __version__
 from .describer import DescribedComponent, Description, DescriptionTokenSummary, describe
 from .engine import DEFAULT_NAMING_ENGINE, NamingEngine, NamingRequest, NamingResult
 from .functional_groups import register_group_detector
@@ -131,11 +132,6 @@ def name_many(
         chunksize=chunksize,
     )
 
-
-try:
-    __version__ = version("openclatura")
-except PackageNotFoundError:  # pragma: no cover - editable source without installed metadata
-    __version__ = "0+unknown"
 
 __all__ = [
     "AtomBinding",
