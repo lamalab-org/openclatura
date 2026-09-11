@@ -7,6 +7,7 @@ import subprocess
 import sys
 import types
 import warnings
+from importlib.metadata import version as distribution_version
 
 import pytest
 
@@ -16,6 +17,7 @@ from openclatura import (
     NamingRequest,
     NamingResult,
     OpsinCheck,
+    __version__,
     analyze_rdkit_mol,
     analyze_smiles,
     name,
@@ -26,6 +28,21 @@ from openclatura import (
     name_smiles,
     name_smiles_with_trace,
 )
+
+
+def test_public_version_comes_from_installed_package_metadata():
+    assert __version__ == distribution_version("openclatura")
+
+
+def test_cli_version_matches_installed_package_metadata():
+    result = subprocess.run(
+        [sys.executable, "-m", "openclatura.cli", "--version"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == f"openclatura {distribution_version('openclatura')}"
 
 
 def test_name_smiles_legacy_still_returns_string():

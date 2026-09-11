@@ -1,6 +1,8 @@
 """openclatura — deterministic SMILES → IUPAC name generator."""
 
 from collections.abc import Iterable
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as _distribution_version
 from typing import Any
 
 from .describer import DescribedComponent, Description, DescriptionTokenSummary, describe
@@ -122,7 +124,11 @@ def name_many(
     )
 
 
-__version__ = "0.3.1"
+try:
+    __version__ = _distribution_version("openclatura")
+except PackageNotFoundError:
+    # The package may be imported directly from an unpacked source tree.
+    __version__ = "unknown"
 
 __all__ = [
     "AtomBinding",
