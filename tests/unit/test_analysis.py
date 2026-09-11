@@ -3270,7 +3270,9 @@ def test_indicated_hydrogen_follows_graph_tautomer_but_not_hydrogen_free_spiro_c
     cases = {
         "c1ccc2c(c1)CN=C2C1=NCc2ccccc21": "3-(1H-isoindol-3-yl)-1H-isoindole",
         "O=C(OCCNC1=NCc2ccccc21)c1ccccc1": "2-((1H-isoindol-3-yl)amino)ethyl benzoate",
-        "FN1CCC2(C=Nc3ccccc32)CC1": "1'-fluorospiro[3H-indole-3,4'-piperidine]",
+        # The spiro carbon is C-3 itself, so no indicated hydrogen is carried in;
+        # the dihydro isomer is distinguished as spiro[indoline-3,4'-piperidine].
+        "FN1CCC2(C=Nc3ccccc32)CC1": "1'-fluorospiro[indole-3,4'-piperidine]",
     }
 
     for smiles, expected in cases.items():

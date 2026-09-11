@@ -493,6 +493,8 @@ def split_spiro_substituents(parts: AssemblyParts) -> list[SpiroAssembly]:
         raise ValueError("spiro assembly requires a graph-numbered path of at most three components")
     parts.substituents = normal_subs
     if spiro_subs:
+        _retire_parent_junction_indicated_hydrogen(parts, {side.parent_locant for side in spiro_subs})
+        spiro_subs = [_retire_side_junction_indicated_hydrogen(parts, side) for side in spiro_subs]
         _scope_spiro_oxo_hydrogens(parts, {side.parent_locant for side in spiro_subs})
         _project_locanted_hw_component(parts)
         spiro_subs = [_deduplicate_shared_replacements(parts, side) for side in spiro_subs]
@@ -706,6 +708,100 @@ def _normalize_spiro_assembly(spiro: SpiroAssembly) -> SpiroAssembly:
         side_suffixes=tuple(spiro.side_suffixes) + tuple(side_suffixes),
         side_stereo=tuple(spiro.side_stereo) + tuple(side_stereo),
     )
+
+
+_COMPONENT_INDICATED_H = re.compile(r"^((?:\d+[a-z]?H,)*\d+[a-z]?H)-")
+
+
+def drop_junction_indicated_hydrogen(name: str, locant: str) -> str:
+    """P-24.5: a component keeps no indicated hydrogen at the spiro atom.
+
+    Indicated hydrogen belonging to an individual ring component is not carried
+    into the completed spiro system unless the final structure actually needs
+    it, and the spiro atom never does -- it is the junction, so it bears no
+    hydrogen. ``9H-fluorene`` spiro-joined at C-9 is cited as ``fluorene``.
+    """
+
+    match = _COMPONENT_INDICATED_H.match(name)
+    if match is None:
+        return name
+    cited = match.group(1).split(",")
+    remaining = [token for token in cited if token[:-1] != locant]
+    if len(remaining) == len(cited):
+        return name
+    rest = name[match.end() :]
+    return f"{','.join(remaining)}-{rest}" if remaining else rest
+
+
+def _retire_side_junction_indicated_hydrogen(parts: AssemblyParts, side: SpiroAssembly) -> SpiroAssembly:
+    """Drop the side component's indicated hydrogen at the spiro atom.
+
+    Its binding term is the side's own name, so the term has to be respelled
+    with it or the final audit looks for text the name no longer carries.
+    """
+
+    respelled = drop_junction_indicated_hydrogen(side.side_parent_name, side.side_locant)
+    if respelled == side.side_parent_name:
+        return side
+    parts.name_atom_bindings = [
+        replace(binding, term=respelled)
+        if binding.role == "spiro_substituent" and binding.term == side.side_parent_name
+        else binding
+        for binding in parts.name_atom_bindings
+    ]
+    return replace(side, side_parent_name=respelled)
+
+
+def _retire_parent_junction_indicated_hydrogen(parts: AssemblyParts, junctions: set[str]) -> None:
+    """Drop the parent component's indicated hydrogen at each spiro atom."""
+
+    retired = [
+        operation
+        for operation in parts.hydro_operations
+        if operation.operation_kind == "indicated_hydrogen"
+        and operation.key != "added_hydrogen"
+        and set(operation.locants) <= junctions
+    ]
+    for operation in retired:
+        parts.hydro_operations.remove(operation)
+    parts.indicated_hydrogens = [locant for locant in parts.indicated_hydrogens if locant not in junctions]
+
+    def respell(name):
+        for locant in junctions:
+            name = drop_junction_indicated_hydrogen(name, locant) if name else name
+        return name
+
+    parts.retained_name = respell(parts.retained_name)
+    parent = parts.parent_hydride
+    if parent is not None and parent.base_name:
+        metadata = parent.metadata
+        if metadata is not None:
+            kept = tuple(locant for locant in metadata.default_indicated_h if locant not in junctions)
+            metadata = replace(
+                metadata,
+                default_indicated_h=kept,
+                indicated_hydrogen_count=min(metadata.indicated_hydrogen_count, len(kept)),
+            )
+            parts.retained_parent_metadata = metadata
+        parts.parent_hydride = replace(parent, parent_name=respell(parent.base_name), hydride_metadata=metadata)
+    if parts.name_atom_bindings:
+        from .name_bindings import refresh_parent_binding
+
+        # Drop the retired citation's own binding, then rebuild just the parent
+        # term. A full refresh here would rebuild from parts whose spiro sides
+        # have already been split out, losing their atoms. The spiro atom itself
+        # stays bound by the parent binding, which covers every parent atom.
+        parts.name_atom_bindings = [
+            binding
+            for binding in parts.name_atom_bindings
+            if not (
+                binding.stage == "hydro"
+                and binding.role == "indicated_hydrogen"
+                and binding.locants
+                and set(binding.locants) <= junctions
+            )
+        ]
+        refresh_parent_binding(parts)
 
 
 def format_spiro_core(
