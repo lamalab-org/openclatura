@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import types
 import warnings
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as distribution_version
+from pathlib import Path
 
 import pytest
+import tomllib
 
 from openclatura import (
     DEFAULT_NAMING_ENGINE,
@@ -30,12 +31,12 @@ from openclatura import (
     name_smiles_with_trace,
 )
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
 
 def _expected_package_version() -> str:
-    try:
-        return distribution_version("openclatura")
-    except PackageNotFoundError:
-        return "unknown"
+    with (PROJECT_ROOT / "pyproject.toml").open("rb") as handle:
+        return tomllib.load(handle)["project"]["version"]
 
 
 def test_public_version_matches_available_package_metadata():
@@ -51,6 +52,36 @@ def test_cli_version_matches_available_package_metadata():
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == f"openclatura {_expected_package_version()}"
+
+
+def test_source_checkout_version_wins_over_unrelated_distribution(tmp_path):
+    dist_info = tmp_path / "openclatura-99.0.dist-info"
+    dist_info.mkdir()
+    (dist_info / "METADATA").write_text(
+        "Metadata-Version: 2.1\nName: openclatura\nVersion: 99.0\n",
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join((str(tmp_path), str(PROJECT_ROOT / "src")))
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from importlib.metadata import version; "
+                "import openclatura; "
+                "print(version('openclatura')); "
+                "print(openclatura.__version__)"
+            ),
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+        cwd=tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == ["99.0", _expected_package_version()]
 
 
 def test_name_smiles_legacy_still_returns_string():

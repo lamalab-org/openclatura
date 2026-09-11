@@ -1,10 +1,9 @@
 """openclatura — deterministic SMILES → IUPAC name generator."""
 
 from collections.abc import Iterable
-from importlib.metadata import PackageNotFoundError
-from importlib.metadata import version as _distribution_version
 from typing import Any
 
+from ._version import __version__
 from .describer import DescribedComponent, Description, DescriptionTokenSummary, describe
 from .engine import DEFAULT_NAMING_ENGINE, NamingEngine, NamingRequest, NamingResult
 from .functional_groups import register_group_detector
@@ -123,12 +122,6 @@ def name_many(
         chunksize=chunksize,
     )
 
-
-try:
-    __version__ = _distribution_version("openclatura")
-except PackageNotFoundError:
-    # The package may be imported directly from an unpacked source tree.
-    __version__ = "unknown"
 
 __all__ = [
     "AtomBinding",
