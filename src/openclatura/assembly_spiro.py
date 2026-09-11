@@ -870,13 +870,40 @@ def format_spiro_core(
     return core_name, "", suffix_str
 
 
+_INLINE_REPLACEMENT_PREFIX = re.compile(
+    r"^((?:\d+[a-z]?'*,)*\d+[a-z]?'*)-"
+    r"((?:di|tri|tetra|penta|hexa)?"
+    r"(?:oxa|aza|thia|selena|tellura|phospha|sila|bora|germa|stanna|magnesa|calca|litha|natra|potassa))"
+)
+
+
+def unprime_inline_replacement_prefix(name: str) -> str:
+    """Strip primes from a replacement prefix carried inside a component name.
+
+    A spiro assembly primes the locants of its non-first components, but a
+    component cited inside the brackets keeps its own name, and that name was
+    built from the component's own numbering: the middle component of
+    ``dispiro[cyclopropane-1,2'-1-azabicyclo[2.1.0]pentane-3',1''-cyclopropane]``
+    is ``1-azabicyclo[2.1.0]pentane``. Priming the prefix there detaches it from
+    the name it belongs to and leaves the whole name unreadable. Only the spiro
+    junction locants around it carry the primes.
+    """
+
+    match = _INLINE_REPLACEMENT_PREFIX.match(name)
+    if match is None or "'" not in match.group(1):
+        return name
+    locants = ",".join(locant.replace("'", "") for locant in match.group(1).split(","))
+    return f"{locants}-{match.group(2)}{name[match.end() :]}"
+
+
 def _format_dispiro_core(core_name: str, terminal_e: str, spiro_subs: list[SpiroAssembly]) -> str:
     first, second = sorted(spiro_subs, key=lambda spiro: (parse_locant(spiro.parent_locant), spiro.side_parent_name))
     first_side = _spiro_side_name(first.side_parent_name)
     second_side = _spiro_side_name(second.side_parent_name)
     core = (
         f"dispiro[{first_side}-{_spiro_side_locant(first)},{first.parent_locant}'-"
-        f"{_spiro_side_name(core_name)}-{second.parent_locant}',{_spiro_side_locant(second)}''-{second_side}]"
+        f"{_spiro_side_name(unprime_inline_replacement_prefix(core_name))}-"
+        f"{second.parent_locant}',{_spiro_side_locant(second)}''-{second_side}]"
     )
     side_prefixes = []
     side_suffixes = []

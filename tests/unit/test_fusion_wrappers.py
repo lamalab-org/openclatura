@@ -208,13 +208,13 @@ def test_bridge_wrapper_renders_a_graph_derived_retained_parent_hydro_operation(
     result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, verify_opsin=True, include_trace=True)
     assert plan is not None
     assert plan.rendered_name == "3,5-methano-1H-pyrrolizine"
-    assert [operation.locants for operation in plan.derivative_state.hydro_operations] == [("3", "4")]
-    assert result.name == "3,4-dihydro-3,5-methano-1H-pyrrolizine"
+    assert [operation.locants for operation in plan.derivative_state.hydro_operations] == [("2", "3")]
+    assert result.name == "2,3-dihydro-3,5-methano-1H-pyrrolizine"
     assert result.parent_nomenclature == "bridged_fusion"
     assert result.opsin_check is not None and result.opsin_check.ok
     selected = next(step for step in result.decisions if step.decision == "selected audited bridged fusion parent")
     assert selected.data["derivative_operations"]["hydro"] == [
-        {"locants": ["3", "4"], "atom_ids": [1, 8], "bond_ids": [10]}
+        {"locants": ["2", "3"], "atom_ids": [2, 1], "bond_ids": [2]}
     ]
 
 

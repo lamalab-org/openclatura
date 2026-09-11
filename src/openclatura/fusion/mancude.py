@@ -429,6 +429,25 @@ def compare_actual_parent_to_implied_parent(
         # Fixed-single carbon sites belong to the intrinsic parent-H proof.
         # Do not remaximise that parent to account for a suffix-consumed bond.
         consumed_external_pi = all(mol.atoms[atom].symbol != "C" or atom in pi_atoms for atom in atoms)
+        # Unless the far endpoint of the consumed bond is itself left holding a
+        # hydrogen that nothing else in the plan cites. An intrinsic-H carbon
+        # elsewhere in the ring must not strand it: without the composition its
+        # hydrogen goes unnamed and the name states a different tautomer.
+        consumed_external_pi = consumed_external_pi or any(
+            atom not in externally_unsaturated_atom_ids
+            and atom not in indicated_hydrogen_atom_ids
+            and atom in pi_atoms
+            and mol.atoms[atom].symbol == "C"
+            and mol.atoms[atom].total_h_count == 1
+            # A ring-fusion endpoint has no hydro partner to pair with, so
+            # nothing else in the plan can pick its hydrogen up.
+            and len(atoms.intersection(mol.get_neighbors(atom))) >= 3
+            for edge, order in delta.assignment.orders
+            if order == 2
+            and observed[normalize_edge(*edge)].order == 1
+            and any(site in externally_unsaturated_atom_ids for site in edge)
+            for atom in edge
+        )
     paired_external_sites = (
         {
             atom

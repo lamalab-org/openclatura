@@ -88,7 +88,7 @@ def test_benchmark_bridged_parent_names_and_preserves_stereochemistry(trace, ord
     source = Chem.RenumberAtoms(source, order)
     result = name_mol(source, include_trace=trace)
     assert result.error is None
-    assert result.name == ("(1R,4S,6R,9aS)-9a-methyl-5,6,7,8,9,9a-hexahydro-1,6-ethano-4,6-propano-4H-quinolizine")
+    assert result.name == ("(1R,4S,6R,9aS)-9a-methyl-1,6,7,8,9,9a-hexahydro-1,6-ethano-4,6-propano-4H-quinolizine")
     if trace:
         assert result.parent_nomenclature == "bridged_fusion"
     if opsin_available():

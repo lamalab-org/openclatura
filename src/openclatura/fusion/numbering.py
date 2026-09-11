@@ -569,16 +569,22 @@ def retained_template_parent_bond_model(
             replace(atom, saturated=True, default_h=True) if atom.locant in indicated_h else atom
             for atom in _relocatable_atom_by_locant(template).values()
         )
-        degrees = {locant: 0 for locant in template.locants}
-        for bond in template.bonds:
-            for locant in bond.locants:
-                degrees[locant] += 1
-        atoms = tuple(
-            replace(atom, forced_single=True)
-            if atom.symbol == "N" and atom.charge == 0 and degrees[atom.locant] == 3
-            else atom
-            for atom in atoms
-        )
+    # A neutral ring nitrogen already holding three skeletal bonds has no
+    # valence left for a parent pi bond, whichever indicated hydrogen the
+    # template carries. Leaving it pi-capable lets the model offer a double bond
+    # at a bridgehead N -- pyrrolizine's N-4 -- so an oxo beside it looks as
+    # though it consumed that bond and the added hydrogen is cited on an atom
+    # that cannot hold one, as in the unreadable ``pyrrolizin-5(4H)-one``.
+    degrees: dict[str, int] = dict.fromkeys(template.locants, 0)
+    for bond in template.bonds:
+        for locant in bond.locants:
+            degrees[locant] += 1
+    atoms = tuple(
+        replace(atom, forced_single=True)
+        if atom.symbol == "N" and atom.charge == 0 and degrees[atom.locant] == 3
+        else atom
+        for atom in atoms
+    )
     graph = FusionGraph(
         atoms=tuple(
             FusionGraphAtom(
