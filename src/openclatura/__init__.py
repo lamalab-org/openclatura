@@ -3,6 +3,7 @@
 from collections.abc import Iterable
 from typing import Any
 
+from ._version import __version__
 from .describer import DescribedComponent, Description, DescriptionTokenSummary, describe
 from .engine import DEFAULT_NAMING_ENGINE, NamingEngine, NamingRequest, NamingResult
 from .functional_groups import register_group_detector
@@ -121,8 +122,6 @@ def name_many(
         chunksize=chunksize,
     )
 
-
-__version__ = "0.3.1"
 
 __all__ = [
     "AtomBinding",
