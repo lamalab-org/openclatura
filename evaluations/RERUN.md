@@ -8,19 +8,33 @@ same standardized structure.
 
 ## Results (standardized + tautomer-canonical OPSIN match)
 
-OpenClatura numbers are for **v0.3.1**; STOUT is unchanged (v2.0.5).
+OpenClatura numbers are for **v0.3.3**; STOUT is unchanged (v2.0.5).
 
 | dataset | molecules | **OpenClatura** | **STOUT** |
 |---------|-----------|-----------------|-----------|
 | QM9     | 133,885   | **100.00%**       | 92.55%          |
-| PubChem | 5×100,000 | **99.43% ± 0.02** | 97.90% ± 0.04   |
-| ZINC22  | 5×100,000 | **97.65% ± 0.06** | 92.27% ± 0.09   |
-| **Total** | **1,133,885** | **98.71%** (1,119,266) | **94.78%** (1,074,733) |
+| PubChem | 5×100,000 | **99.52% ± 0.02** | 97.90% ± 0.04   |
+| ZINC22  | 5×100,000 | **97.67% ± 0.06** | 92.27% ± 0.09   |
+| **Total** | **1,133,885** | **98.76%** (1,119,791) | **94.78%** (1,074,733) |
 
 Mean ± sample standard deviation across the five 100k seed subsets (PubChem,
 ZINC22); QM9 is a single set. OpenClatura wins on every dataset (largest
 margins: QM9 +7.5, ZINC22 +5.4), and both models are highly stable across seeds
 (std ≤ 0.09).
+
+## Refresh the OpenClatura baselines
+
+Regenerate and rescore all eleven OpenClatura datasets used by the
+paper-evaluation CI:
+
+```bash
+conda activate stout-pypi-eval
+./refresh_openclatura_baselines.sh
+```
+
+The script rewrites each prediction through a temporary file, then runs the
+standardized OPSIN scorer. Its concurrency can be adjusted with
+`PARALLEL_SHARDS`, `WORKERS_PER_SHARD`, and `OPSIN_WORKERS`.
 
 ## Environment (one-time)
 
@@ -62,6 +76,7 @@ Edit the GPU list in `run_all_evals.sh` (`GPUS=(1 2 3)`) to match free GPUs
 | script | role |
 |--------|------|
 | `predict.py`          | run ONE model on ONE input → one jsonl (`--model stout|openclatura`) |
+| `refresh_openclatura_baselines.sh` | regenerate and rescore every OpenClatura CI baseline |
 | `run_all_evals.sh`    | predictions for all datasets, STOUT sharded across GPUs by est. time |
 | `score_opsin_std.py`  | OPSIN round-trip + standardized match, multicore; writes summaries + failures |
 | `stout_parity.py`     | sanity check: batched GPU STOUT == single-item CPU (50/50 on PubChem) |
