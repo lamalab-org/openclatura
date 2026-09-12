@@ -602,7 +602,7 @@ def _nitrogen_central_tokens(term: str) -> tuple[str, ...]:
 
 def _heteroatom_center_tokens(symbol: str, term: str) -> tuple[str, ...]:
     candidates = {
-        "O": ("hydroperoxy", "peroxy", "hydroxy", "oxy", "oxido"),
+        "O": ("oxidaniumylidene", "oxidaniumyl", "hydroperoxy", "peroxy", "hydroxy", "oxy", "oxido"),
         "S": (
             "sulfonimidoyl",
             "sulfanylidene",

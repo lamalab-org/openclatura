@@ -5,14 +5,20 @@ import re
 from .assembly_charge import inferred_ionic_retained_parent, single_charged_replacement_locants
 from .assembly_parts import AssemblyParts, SubstituentItem
 from .assembly_utils import is_fully_enclosed, needs_hyphen, parse_locant
-from .formatting import is_complex_prefix
+from .formatting import is_complex_prefix, needs_complex_multiplier
 from .locant_elision import retained_parent_attachment_is_ambiguous, substituent_locant_set_is_unique
 from .nomenclature import RULES
 from .retained_specs import retained_parent_spec
-from .rules import multipliers
+from .rules import elements, multipliers
 
 SUBSTITUENT_SORT_PREFIX_RE = re.compile(RULES.assembly.substituent_sort_prefix_pattern)
-A_PREFIX_ORDER = RULES.assembly.replacement_prefix_order
+A_PREFIX_ORDER = {
+    **RULES.assembly.replacement_prefix_order,
+    **{
+        prefix: RULES.assembly.replacement_prefix_order.get(elements.get(symbol).hw_stem, 99)
+        for (symbol, _charge, _valence), prefix in RULES.charges.replacement_charge_states.items()
+    },
+}
 
 
 def _groups_offering_a_second_position() -> frozenset[str]:
@@ -112,7 +118,7 @@ def format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:
         attachments_per_group = 2 if ("diyl" in name and "ylidene" not in name) else 1
         count_raw = len(locs) if locs else len(items)
         count = max(1, count_raw // attachments_per_group)
-        is_complex = is_complex_prefix(name)
+        is_complex = is_complex_prefix(name) or (count > 1 and needs_complex_multiplier(name))
         mult = (multipliers.complex_(count) if is_complex else multipliers.basic(count)) if count > 1 else ""
         loc_str = substituent_locant_string(parts, name, locs, len(grouped), spiro_subs)
 

@@ -42,6 +42,7 @@ def test_candidate_splits_are_longest_first():
         (12, "adodecaen"),
         (14, "atetradecaen"),
         (20, "aicosaen"),
+        (27, "aheptacosaen"),
     ],
 )
 def test_unsaturation_infix_spans_the_whole_multiplier_table(count: int, expected: str):
@@ -62,9 +63,30 @@ def test_a_single_bond_has_no_multiplicity():
         bonds.unsaturation_infix("single", 2)
 
 
-def test_a_count_beyond_the_table_reports_itself():
+@pytest.mark.parametrize(
+    ("count", "basic", "complex_prefix"),
+    (
+        (21, "henicosa", "henicosakis"),
+        (27, "heptacosa", "heptacosakis"),
+        (1000, "kilia", "kiliakis"),
+    ),
+)
+def test_generated_multipliers_round_trip(count: int, basic: str, complex_prefix: str):
+    assert multipliers.basic(count) == basic
+    assert multipliers.complex_(count) == complex_prefix
+    assert multipliers.count_for(basic) == count
+    assert multipliers.count_for(complex_prefix) == count
+
+
+def test_every_supported_generated_multiplier_reads_back():
+    for count in range(multipliers.MIN_MULTIPLIER_COUNT, multipliers.MAX_MULTIPLIER_COUNT + 1):
+        assert multipliers.count_for(multipliers.basic(count)) == count
+        assert multipliers.count_for(multipliers.complex_(count)) == count
+
+
+def test_a_count_beyond_the_supported_numerical_range_reports_itself():
     with pytest.raises(ValueError, match="no multiplicative prefix"):
-        bonds.unsaturation_infix("double", max(multipliers.MULTIPLIERS) + 1)
+        bonds.unsaturation_infix("double", multipliers.MAX_MULTIPLIER_COUNT + 1)
 
 
 def test_every_replacement_prefix_maps_to_its_element():
@@ -93,6 +115,41 @@ def test_hw_priorities_are_unique_and_ordered_by_seniority():
     ]  # fmt: skip
     priorities = [e.hw_priority for e in ranked]
     assert len(priorities) == len(set(priorities))
+
+
+def test_fusion_priorities_and_mancude_roles_share_typed_element_data():
+    from openclatura.fusion.rules import (
+        EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE,
+        GENERAL_HETEROATOM_COUNT_PRECEDENCE,
+    )
+
+    special = sorted(
+        (element for element in elements.ELEMENTS.values() if element.fusion_special_priority is not None),
+        key=lambda element: element.fusion_special_priority,
+    )
+    general = sorted(
+        (element for element in elements.ELEMENTS.values() if element.fusion_general_priority is not None),
+        key=lambda element: element.fusion_general_priority,
+    )
+    assert tuple(element.symbol for element in special) == EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE
+    assert tuple(element.symbol for element in general) == GENERAL_HETEROATOM_COUNT_PRECEDENCE
+    assert EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE[:6] == ("N", "F", "Cl", "Br", "I", "O")
+    assert GENERAL_HETEROATOM_COUNT_PRECEDENCE[:9] == ("F", "Cl", "Br", "I", "O", "S", "Se", "Te", "N")
+    assert EARLIEST_SPECIAL_HETEROATOM_PRECEDENCE != GENERAL_HETEROATOM_COUNT_PRECEDENCE
+    assert len({element.fusion_special_priority for element in special}) == len(special)
+    assert len({element.fusion_general_priority for element in general}) == len(general)
+    assert {element.symbol for element in elements.ELEMENTS.values() if element.mancude_forced_single} >= {
+        "O",
+        "S",
+        "Se",
+        "Te",
+    }
+    assert not {"C", "N", "P"} & {
+        element.symbol for element in elements.ELEMENTS.values() if element.mancude_forced_single
+    }
+    assert elements.MANCUDE_FORCED_SINGLE_SYMBOLS == {
+        element.symbol for element in elements.ELEMENTS.values() if element.mancude_forced_single
+    }
 
 
 def test_audit_parsers_share_the_canonical_tables():

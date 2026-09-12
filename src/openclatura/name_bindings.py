@@ -22,8 +22,11 @@ def refresh_parent_binding(parts: AssemblyParts) -> None:
 
     if not parts.parent_atom_ids:
         return
+    parent_tokens = _parent_emitted_tokens(parts)
     atom_ids = set(parts.parent_atom_ids)
     bond_ids = set(parts.parent_bond_ids)
+    atom_ids.update(atom for token in parent_tokens for atom in token.atom_ids)
+    bond_ids.update(bond for token in parent_tokens for bond in token.bond_ids)
     if parts.retained_absorbs_principal_group and parts.principal_group is not None:
         atom_ids |= set(parts.principal_group.atom_ids)
         bond_ids |= set(parts.principal_group.bond_ids)
@@ -33,10 +36,15 @@ def refresh_parent_binding(parts: AssemblyParts) -> None:
     rebuilt = NameAtomBinding(
         stage="parent",
         role="parent",
-        term=parts.retained_substituent_name or parts.retained_name or _parent_term(parts),
+        term=(
+            parts.retained_substituent_name
+            or parts.retained_name
+            or (parts.parent_hydride.binding_term if parts.parent_hydride is not None else None)
+            or _parent_term(parts)
+        ),
         atom_ids=atom_ids,
         bond_ids=bond_ids,
-        emitted_tokens=_parent_emitted_tokens(parts),
+        emitted_tokens=parent_tokens,
     )
     for index, binding in enumerate(parts.name_atom_bindings):
         if binding.stage == "parent" and binding.role == "parent":
@@ -54,8 +62,11 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
     ]
     bindings: list[NameAtomBinding] = []
     if parts.parent_atom_ids:
+        parent_tokens = _parent_emitted_tokens(parts)
         parent_atom_ids = set(parts.parent_atom_ids)
         parent_bond_ids = set(parts.parent_bond_ids)
+        parent_atom_ids.update(atom for token in parent_tokens for atom in token.atom_ids)
+        parent_bond_ids.update(bond for token in parent_tokens for bond in token.bond_ids)
         if parts.retained_absorbs_principal_group and parts.principal_group is not None:
             # ``phenol`` spells the ring *and* its oxygen, so the suffix binding has
             # no text of its own left for the audit to find.
@@ -68,7 +79,7 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
                 term=parts.retained_name or _parent_term(parts),
                 atom_ids=parent_atom_ids,
                 bond_ids=parent_bond_ids,
-                emitted_tokens=_parent_emitted_tokens(parts),
+                emitted_tokens=parent_tokens,
             )
         )
     for operation in parts.hydro_operations:
@@ -80,6 +91,7 @@ def refresh_name_atom_bindings(parts: AssemblyParts) -> list[NameAtomBinding]:
                 role=operation.operation_kind,
                 term="indicated hydrogen" if operation.operation_kind == "indicated_hydrogen" else "hydro",
                 atom_ids=set(operation.atom_ids),
+                bond_ids=set(operation.bond_ids),
                 locants=tuple(str(locant) for locant in operation.locants),
                 emitted_tokens=_hydro_operation_tokens(operation),
             )
@@ -437,6 +449,22 @@ def _operation_emitted_tokens(binding: NameAtomBinding) -> tuple[NameTokenBindin
 
 
 def _parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]:
+    if parts.parent_hydride is not None and parts.parent_hydride.is_skeletal_replacement_fusion:
+        state = parts.parent_hydride.replacement_fusion_state
+        if state is not None:
+            tokens = _structured_parent_emitted_tokens(state.rendered_name, state.rendered_parts)
+            # Keep a complete locant-H token: an isolated digit/H could bind
+            # to preceding stereo or substituent text in another renderer stream.
+            role = "replacement_indicated_hydrogen"
+            return tuple(token for token in tokens if token.grammar_role != role) + tuple(
+                token for token in state.rendered_parts if token.grammar_role == role
+            )
+    if parts.parent_hydride is not None and parts.parent_hydride.is_bridged_fusion:
+        plan = parts.parent_hydride.fusion_wrapper_plan
+        assert plan is not None
+        return _structured_parent_emitted_tokens(plan.rendered_name, plan.rendered_parts)
+    if parts.parent_hydride is not None and parts.parent_hydride.uses_fusion_plan:
+        return _fusion_parent_emitted_tokens(parts)
     tokens = _parent_display_tokens(parts)
     atom_ids = set(parts.parent_atom_ids)
     bond_ids = set(parts.parent_bond_ids)
@@ -463,6 +491,49 @@ def _parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]
         for token in tokens
         if token
     )
+
+
+def _fusion_parent_emitted_tokens(parts: AssemblyParts) -> tuple[NameTokenBinding, ...]:
+    """Adapt graph ownership already emitted by the fusion renderer."""
+
+    plan = parts.parent_hydride.fusion_plan
+    assert plan is not None
+
+    return _structured_parent_emitted_tokens(plan.rendered_base_name, plan.rendered_parts)
+
+
+def _structured_parent_emitted_tokens(
+    rendered_name: str,
+    rendered_parts: tuple[NameTokenBinding, ...],
+) -> tuple[NameTokenBinding, ...]:
+    """Split already-owned parent segments without rediscovering graph scope."""
+
+    result: list[NameTokenBinding] = []
+    render_order = 0
+    assert "".join(part.text for part in rendered_parts) == rendered_name
+    for part in rendered_parts:
+        for text in binding_term_tokens(part.text):
+            result.append(
+                NameTokenBinding(
+                    text=text,
+                    token_kind=part.token_kind,
+                    ownership=part.ownership,
+                    confidence=part.confidence,
+                    source=part.source,
+                    grammar_role=part.grammar_role,
+                    binding_key=part.binding_key,
+                    atom_ids=set(part.atom_ids),
+                    bond_ids=set(part.bond_ids),
+                    charge_atom_ids=set(part.charge_atom_ids),
+                    locants=tuple(part.locants),
+                    render_order=render_order,
+                    match_priority=part.match_priority,
+                    left_context=part.left_context,
+                    right_context=part.right_context,
+                )
+            )
+            render_order += 1
+    return tuple(result)
 
 
 def _parent_display_tokens(parts: AssemblyParts) -> tuple[str, ...]:
@@ -513,6 +584,7 @@ def _parent_token_variants(token: str) -> tuple[str, ...]:
 
 def _hydro_operation_tokens(operation) -> tuple[NameTokenBinding, ...]:
     atoms = set(operation.atom_ids)
+    bonds = set(operation.bond_ids)
     locants = tuple(str(locant) for locant in operation.locants)
     tokens: list[NameTokenBinding] = []
     if locants:
@@ -524,6 +596,7 @@ def _hydro_operation_tokens(operation) -> tuple[NameTokenBinding, ...]:
                 grammar_role=operation.operation_kind,
                 binding_key=f"hydro:{operation.operation_kind}",
                 atom_ids=set(atoms),
+                bond_ids=set(bonds),
                 locants=locants,
             )
         )
@@ -536,6 +609,7 @@ def _hydro_operation_tokens(operation) -> tuple[NameTokenBinding, ...]:
             grammar_role=operation.operation_kind,
             binding_key=f"hydro:{operation.operation_kind}",
             atom_ids=set(atoms),
+            bond_ids=set(bonds),
             locants=locants,
         )
     )
@@ -1473,6 +1547,8 @@ _EXACT_CHARGE_RENDERER_KEYS = frozenset(
 
 
 def _parent_term(parts: AssemblyParts) -> str:
+    if parts.parent_hydride is not None and parts.parent_hydride.binding_term is not None:
+        return parts.parent_hydride.binding_term
     if parts.is_spiro:
         return "spiro parent"
     if parts.is_bicycle:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 import tempfile
 import warnings
 import xml.etree.ElementTree as ET
@@ -11,12 +10,15 @@ import pytest
 from rdkit import Chem
 
 from openclatura import name_many, name_smiles
+from openclatura.opsin_verify import _opsin_error_message, opsin_available
 from openclatura.retained_fused_templates import (
+    _acene_template_from_data,
     _generated_acene_templates,
     _generated_polyaphene_templates,
     retained_fused_graph_templates,
 )
 from openclatura.retained_name_policy import retained_parent_name_policy
+from openclatura.rules import multipliers
 from openclatura.utils import standardize_mol
 
 try:
@@ -138,6 +140,35 @@ def test_higher_acene_series_extends_without_new_graph_templates(expected_name, 
     assert name_smiles(smiles) == expected_name
 
 
+def test_higher_acene_series_is_synthesized_on_demand_beyond_eager_registry():
+    smiles = (
+        "C1C=CC2C=C3C=C4C=C5C=C6C=C7C=C8C=C9C=C%10C=C%11C=C%12C=C%13C=CC=CC%13=CC%12="
+        "CC%11=CC%10=CC9=CC8=CC7=CC6=CC5=CC4=CC3=CC=2C=1"
+    )
+    assert name_smiles(smiles) == "tridecacene"
+
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None
+    for _ in range(2):
+        reordered = Chem.MolToSmiles(mol, canonical=False, doRandom=True)
+        assert name_smiles(reordered) == "tridecacene"
+
+
+def test_generated_acene_name_uses_shared_numerical_terms_beyond_explicit_multiplier_table():
+    template = _acene_template_from_data({"ring_count": 21, "name": f"{multipliers.basic(21)}cene"})
+    assert template.name == "henicosacene"
+    assert len(template.atoms) == 86
+    assert len(template.rings) == 21
+
+
+def test_higher_polyaphene_series_is_synthesized_on_demand_beyond_eager_registry():
+    smiles = (
+        "C1=CC=CC2=CC3=CC4=CC5=CC6=CC7=CC=C8C=C9C=C%10C=C%11C=C%12C=C%13C=CC=CC%13=CC%12="
+        "CC%11=CC%10=CC9=CC8=C7C=C6C=C5C=C4C=C3C=C12"
+    )
+    assert name_smiles(smiles) == "tridecaphene"
+
+
 def test_polyaphene_series_generates_standard_locant_graphs():
     generated = {template.name: template for template in _generated_polyaphene_templates()}
     expected_sizes = {
@@ -159,12 +190,19 @@ def test_hydrogenated_parent_uses_data_backed_preferred_name():
     policy = retained_parent_name_policy("indoline")
     assert policy is not None
     assert policy.preferred_name == "2,3-dihydro-1H-indole"
+    # P-54.4.3.2: indoline is not a PIN in any context, so a derivative is
+    # spelt from the mancude parent too, not only the bare ring system.
     assert policy.output_name("unsubstituted_parent") == policy.preferred_name
-    assert policy.output_name("composite_parent") == "indoline"
+    assert policy.output_name("composite_parent") == policy.preferred_name
     assert policy.hydrogenation is not None
     assert policy.hydrogenation.base_parent == "1H-indole"
     assert policy.hydrogenation.hydro_locants == ("2", "3")
     assert name_smiles("c1ccc2c(c1)CCN2") == policy.preferred_name
+    assert name_smiles("CN1CCc2ccccc21") == "1-methyl-2,3-dihydro-1H-indole"
+    # P-58.2.3.1: the suffix takes the citation off N-1 and onto C-2.
+    assert name_smiles("O=C1Cc2ccccc2N1") == "1,3-dihydro-2H-indol-2-one"
+    # A suffix that only hangs off C-2 leaves its hydrogen, and the citation, alone.
+    assert name_smiles("OC(=O)C1Cc2ccccc2N1") == "2,3-dihydro-1H-indole-2-carboxylic acid"
 
 
 def test_hydrogenated_hydrocarbon_uses_data_backed_preferred_name():
@@ -172,8 +210,12 @@ def test_hydrogenated_hydrocarbon_uses_data_backed_preferred_name():
     assert policy is not None
     assert policy.accepted_names == ("2,3-dihydro-1H-indene", "indane", "indan")
     assert policy.output_name("unsubstituted_parent") == "2,3-dihydro-1H-indene"
-    assert policy.output_name("composite_parent") == "indane"
+    assert policy.output_name("composite_parent") == "2,3-dihydro-1H-indene"
     assert name_smiles("c1ccc2c(c1)CCC2") == policy.preferred_name
+    assert name_smiles("NC1CCc2ccccc21") == "2,3-dihydro-1H-inden-1-amine"
+    # The suffix already stands where the parent cites its hydrogen, so nothing moves.
+    assert name_smiles("O=C1CCc2ccccc21") == "2,3-dihydro-1H-inden-1-one"
+    assert name_smiles("O=C1Cc2ccccc2C1") == "1,3-dihydro-2H-inden-2-one"
 
 
 def test_retained_parent_policy_separates_preferred_name_from_accepted_spelling():
@@ -189,7 +231,7 @@ def test_retained_parent_policy_separates_preferred_name_from_accepted_spelling(
 def _require_opsin() -> None:
     if py2opsin is None:
         pytest.skip("py2opsin is not available")
-    if shutil.which("java") is None:
+    if not opsin_available():
         pytest.skip("Java runtime not found (OPSIN requires Java)")
 
 
@@ -198,7 +240,12 @@ def _opsin(name: str, output_format: str = "SMILES") -> str:
     with tempfile.TemporaryDirectory(prefix="openclatura_fused_opsin_") as tmpdir:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", RuntimeWarning)
-            return py2opsin.py2opsin(name, output_format=output_format, tmp_fpath=f"{tmpdir}/input.txt")
+            try:
+                result = py2opsin.py2opsin(name, output_format=output_format, tmp_fpath=f"{tmpdir}/input.txt")
+            except Exception as exc:
+                pytest.fail(f"OPSIN failed for {name!r} ({output_format}): {_opsin_error_message(exc)}")
+            assert result, f"OPSIN could not parse {name!r} ({output_format})"
+            return result
 
 
 @pytest.mark.opsin
@@ -233,6 +280,24 @@ def test_requested_fused_names_roundtrip_through_opsin_one_by_one():
         standardize_mol(original) == standardize_mol(back)
         for original, back in zip(expected_smiles, roundtripped, strict=True)
     )
+
+
+@pytest.mark.opsin
+def test_on_demand_tridecacene_roundtrips_through_opsin():
+    original = _opsin("tridecacene")
+    generated = name_smiles(original)
+    assert generated == "tridecacene"
+    assert standardize_mol(_opsin(generated)) == standardize_mol(original)
+
+    derivative = _opsin("1-methyltridecacene")
+    derivative_name = name_smiles(derivative)
+    assert derivative_name == "1-methyltridecacene"
+    assert standardize_mol(_opsin(derivative_name)) == standardize_mol(derivative)
+
+    angular = _opsin("tridecaphene")
+    angular_name = name_smiles(angular)
+    assert angular_name == "tridecaphene"
+    assert standardize_mol(_opsin(angular_name)) == standardize_mol(angular)
 
 
 @pytest.mark.opsin

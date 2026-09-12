@@ -50,9 +50,8 @@ def unsaturation_infix(bond_key: str, count: int) -> str:
     One bond is just the bare suffix (``hex`` + ``en`` -> ``hex-1-ene``); several
     take the multiplicative prefix, joined to the stem by the interfix ``a``
     (``hexa-1,3-dien``).  The prefix is read off the shared multiplier table
-    rather than a private copy, so every count the rest of the namer can spell
-    (through ``icosa``, 20) is spellable here too -- a long cumulene like
-    ``octadeca-4,...,17-tetradecaene`` needs 14.
+    rather than a private copy, so every count supported by the shared
+    P-14.2.1 numerical-term generator is spellable here too.
     """
 
     bt = BONDS[bond_key]

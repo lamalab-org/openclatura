@@ -1,8 +1,18 @@
 """Round-trip tests for test_fused_parents.py."""
 
-import pytest
+import json
+from collections import Counter
+from pathlib import Path
 
+import pytest
+from rdkit import Chem
+
+from openclatura import FusionMode, name, opsin_available, verify_with_opsin
 from roundtrip.roundtrip_helpers import roundtrip_smiles
+
+PIN_CASE_DATA = json.loads((Path(__file__).parents[1] / "data" / "fusion_pin_cases.json").read_text(encoding="utf-8"))
+SUITE_PIN_CASES = tuple(PIN_CASE_DATA["suite_cases"])
+OPSIN_GENERATED_PIN_CASES = tuple(PIN_CASE_DATA["opsin_generated_cases"])
 
 SMILES = [
     "c1cnc2cc[nH]c2c1",
@@ -147,3 +157,95 @@ def test_roundtrip(smiles):
 def test_has_smiles():
     if not SMILES:
         pytest.skip("No SMILES literals found.")
+
+
+def _pin_route(result) -> str:
+    if result.parent_nomenclature == "systematic_fusion":
+        assert result.pin_status == "confirmed"
+        assert result.proof_source == "fusion_reconstruction"
+        selected = [step for step in result.decisions if step.decision == "selected audited systematic fusion parent"]
+        assert len(selected) == 1
+        assert "input_graph_identity" in selected[0].data["audit_checks"]
+        return "systematic_fusion"
+
+    decisions = {step.decision for step in result.decisions}
+    assert result.pin_status is None
+    if "used retained parent name" in decisions:
+        return "retained_parent"
+    if "named structural replacement parent" in decisions:
+        return "principal_parent_shortcut"
+    assert "systematic fusion fallback" in decisions
+    return "unverified_fallback"
+
+
+def test_fused_parent_suite_pin_claims_are_explicit_and_evidence_backed():
+    expected_pin_smiles = {case["smiles"] for case in SUITE_PIN_CASES}
+    assert expected_pin_smiles <= set(SMILES)
+
+    routes = Counter()
+    observed_pin_smiles = set()
+    for smiles in SMILES:
+        result = name(smiles, fusion_mode=FusionMode.AUDITED_PIN, include_trace=True)
+        assert result.error is None
+        route = _pin_route(result)
+        routes[route] += 1
+        if route == "systematic_fusion":
+            observed_pin_smiles.add(smiles)
+
+    assert observed_pin_smiles == expected_pin_smiles
+    assert routes == Counter(PIN_CASE_DATA["expected_suite_routes"])
+
+
+def test_opsin_generated_pin_graphs_are_unique_additions_to_the_suite():
+    suite_graphs = {Chem.MolToSmiles(Chem.MolFromSmiles(smiles)) for smiles in SMILES}
+    generated_graphs = [Chem.MolToSmiles(Chem.MolFromSmiles(case["smiles"])) for case in OPSIN_GENERATED_PIN_CASES]
+
+    assert len(generated_graphs) == len(set(generated_graphs))
+    assert not suite_graphs.intersection(generated_graphs)
+
+
+@pytest.mark.parametrize(
+    "case",
+    SUITE_PIN_CASES,
+    ids=[case["name"] for case in SUITE_PIN_CASES],
+)
+def test_fused_parent_suite_confirmed_pin_names(case):
+    result = name(case["smiles"], fusion_mode=FusionMode.AUDITED_PIN, include_trace=True)
+
+    assert result.name == case["name"]
+    assert _pin_route(result) == "systematic_fusion"
+
+
+@pytest.mark.parametrize(
+    "case",
+    OPSIN_GENERATED_PIN_CASES,
+    ids=[case["name"] for case in OPSIN_GENERATED_PIN_CASES],
+)
+def test_opsin_generated_fusion_graphs_are_valid_confirmed_pins(case):
+    assert Chem.MolFromSmiles(case["smiles"]) is not None
+
+    result = name(case["smiles"], fusion_mode=FusionMode.AUDITED_PIN, include_trace=True)
+    assert result.error is None
+    assert result.name == case["name"]
+    assert _pin_route(result) == "systematic_fusion"
+
+
+@pytest.mark.opsin
+@pytest.mark.skipif(not opsin_available(), reason="py2opsin/Java is unavailable")
+@pytest.mark.parametrize(
+    "case",
+    OPSIN_GENERATED_PIN_CASES,
+    ids=[case["name"] for case in OPSIN_GENERATED_PIN_CASES],
+)
+def test_opsin_generated_fusion_sources_and_openclatura_names_roundtrip(case):
+    source_check = verify_with_opsin(case["source_name"], case["smiles"])
+    assert source_check.ok, source_check.to_dict()
+
+    result = name(
+        case["smiles"],
+        fusion_mode=FusionMode.AUDITED_PIN,
+        verify_opsin=True,
+    )
+    assert result.name == case["name"]
+    assert result.opsin_check is not None
+    assert result.opsin_check.ok, result.opsin_check.to_dict()

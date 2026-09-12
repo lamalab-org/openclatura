@@ -74,6 +74,7 @@ class ChargeRules:
     saturated_n_ring_ionic_parents: dict[int, str]
     parent_charge_suffixes: dict[str, ParentChargeSuffixRule]
     replacement_charge_prefixes: dict[str, str]
+    replacement_charge_states: dict[tuple[str, int, int], str]
     heteroatom_charge_prefixes: dict[str, str]
     anion_suffix_placements: tuple[AnionSuffixPlacementRule, ...]
 
@@ -294,6 +295,10 @@ def _charge_rules() -> ChargeRules:
             for key, value in group.mapping("parent_charge_suffixes").items()
         },
         replacement_charge_prefixes=group.mapping("replacement_charge_prefixes"),
+        replacement_charge_states={
+            (row["symbol"], row["charge"], row["valence"]): row["prefix"]
+            for row in group.values("replacement_charge_states")
+        },
         heteroatom_charge_prefixes=group.mapping("heteroatom_charge_prefixes"),
         anion_suffix_placements=tuple(
             AnionSuffixPlacementRule(

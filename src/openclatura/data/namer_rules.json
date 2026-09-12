@@ -323,6 +323,14 @@
         "suffix": "ium",
         "reason": "Positive parent nitrogen charges are rendered as parent suffix operations."
       },
+      "P:+": {
+        "suffix": "ium",
+        "reason": "Monocationic parent phosphorus is rendered as a parent ium suffix operation."
+      },
+      "S:+": {
+        "suffix": "ium",
+        "reason": "Monocationic parent sulfur is rendered as a parent ium suffix operation."
+      },
       "*:-": {
         "suffix": "ide",
         "reason": "Negative parent atoms are rendered as parent anion suffix operations."
@@ -335,13 +343,28 @@
       "aza:+": "azonia"
     }
   },
+  "replacement_charge_states": {
+    "bluebook_rule": "P-22.2; charged skeletal replacement with specified bonding state",
+    "values": [
+      {"symbol": "B", "charge": -1, "valence": 4, "prefix": "boranuida"},
+      {"symbol": "Si", "charge": -1, "valence": 5, "prefix": "silanuida"}
+    ]
+  },
   "heteroatom_charge_prefixes": {
     "bluebook_rule": "P-61 and P-72; charged heteroatom substituent prefixes",
     "values": {
       "O:-:single": "oxido",
+      "O:+:single": "oxidaniumyl",
+      "O:+:double": "oxidaniumylidene",
       "N:+:single": "ammonio",
       "N:+:double": "iminio",
-      "N:-:single": "azanidyl"
+      "N:+:triple": "azaniumylidyne",
+      "N:-:double": "azanidylidene",
+      "N:-:single": "azanidyl",
+      "S:-:single": "sulfido",
+      "C:-:single": "methanidyl",
+      "C:-:double": "methanidylidene",
+      "C:-:triple": "methanidylidyne"
     }
   },
   "anion_suffix_placements": {
@@ -608,6 +631,7 @@
       "thioether",
       "amine",
       "aminium",
+      "aminide",
       "anhydride",
       "hydrazone",
       "imine",
@@ -1463,6 +1487,19 @@
           ]
         },
         "seniority": 5,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "aminide": {
+        "role": "principal",
+        "prefix": "azanidyl",
+        "suffix": "aminide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 17,
         "suffix_with_locant": true,
         "needs_locant": true
       },

@@ -1,0 +1,1790 @@
+"""Intrinsic, graph-derived layouts for bounded fused-ring face models.
+
+The layout search uses exact rational arithmetic and fixed shape templates. It
+never reads molecular drawing coordinates. A candidate is exposed only after
+its shared edges, graph edges, crossings, overlaps, and topological perimeter
+have all been audited.
+"""
+
+from __future__ import annotations
+
+from collections import defaultdict, deque
+from dataclasses import dataclass, fields, replace
+from functools import lru_cache
+from math import gcd, lcm
+
+from ..locants import system_locant_sort_key
+from .config import RingShapeSpec, fusion_nomenclature_config
+from .model import Face, FaceModel, FusedLayout, FusionCitationPlan, FusionComponentSpec, FusionNameAst
+
+Point = tuple[int, int]
+Edge = tuple[int, int]
+_SHAPE_EDGE_SCALE = 4
+OPSIN_CONSTRUCTION_NUMBERING = "opsin_component_construction_order"
+OPSIN_RING_MAP_NUMBERING = "opsin_ring_map_occupied_rows"
+OPSIN_COUPLED_PENTAGON_AXES = "opsin_coupled_two_port_pentagon_axes"
+OPSIN_ENTRY_DIRECTIONS = "opsin_entry_relative_ring_directions"
+
+
+@dataclass(frozen=True, slots=True)
+class OpsinConstructionLayout(FusedLayout):
+    """An explicit parser-compatibility numbering witness on an audited layout.
+
+    Atom identities remain in the input graph namespace. Ordinary intrinsic
+    layouts carry no such witness and retain IUPAC distance-based numbering.
+    """
+
+    construction_atom_order: tuple[int, ...] = ()
+    construction_numbering_priority: int | None = None
+
+    def __post_init__(self) -> None:
+        FusedLayout.__post_init__(self)
+        if len(set(self.construction_atom_order)) != len(self.construction_atom_order):
+            raise ValueError("construction atom order must not repeat merged atoms")
+        if set(self.construction_atom_order) != {atom for atom, _, _ in self.atom_positions}:
+            raise ValueError("construction atom order must cover the positioned graph")
+        if self.construction_numbering_priority is not None and self.construction_numbering_priority < 0:
+            raise ValueError("construction numbering priority must be nonnegative")
+
+
+@dataclass(frozen=True, slots=True)
+class OpsinEntryLayout(OpsinConstructionLayout):
+    """A graph-bound parser perimeter, separate from audited polygon geometry."""
+
+    entry_perimeter: tuple[int, ...] = ()
+    entry_face_id: int = -1
+    entry_ring_positions: tuple[tuple[int, int, int], ...] = ()
+    entry_direction_conflicts: tuple[tuple[int, int], ...] = ()
+
+    def __post_init__(self) -> None:
+        OpsinConstructionLayout.__post_init__(self)
+        if not self.entry_perimeter or len(set(self.entry_perimeter)) != len(self.entry_perimeter):
+            raise ValueError("entry perimeter must be nonempty and injective")
+        if not set(self.entry_perimeter) <= set(self.construction_atom_order):
+            raise ValueError("entry perimeter must remain in the constructed graph")
+        if self.entry_face_id not in {face for face, _, _ in self.entry_ring_positions}:
+            raise ValueError("entry face must have a direction position")
+        if len(self.entry_ring_positions) != len(self.face_positions) or {
+            face for face, _, _ in self.entry_ring_positions
+        } != {face for face, _, _ in self.face_positions}:
+            raise ValueError("entry directions must cover every positioned face exactly once")
+        if len({(x, y) for _, x, y in self.entry_ring_positions}) != len(self.entry_ring_positions):
+            raise ValueError("entry ring positions must be injective")
+
+
+def _entry_direction_layouts(model, ast, specs, search_budget):
+    from .entry_geometry import entry_direction_geometry
+
+    if (
+        len(model.faces) < 4
+        or not any(face.size in {5, 7} for face in model.faces)
+        or any(face.size > 7 for face in model.faces)
+    ):
+        return None
+    order = opsin_construction_atom_order(ast, specs)
+    if order is None:
+        return None
+    if set(order) != {atom for face in model.faces for atom in face.atom_cycle}:
+        return None
+    terminal_cycle = _cited_terminal_cycle(model, ast, specs)
+    geometry = entry_direction_geometry(model, search_budget, terminal_cycle)
+    if geometry is None:
+        return None
+    reference, candidates = geometry
+    if set(order) != {atom for atom, _, _ in reference.atom_positions}:
+        return None
+    positions = {atom: (x, y) for atom, x, y in reference.atom_positions}
+
+    def oriented_reference(candidate):
+        signed_area = sum(
+            positions[a][0] * positions[b][1] - positions[b][0] * positions[a][1]
+            for a, b in zip(candidate.perimeter, candidate.perimeter[1:] + candidate.perimeter[:1])
+        )
+        x_sign = -1 if signed_area > 0 else 1
+        return {
+            **{
+                field.name: getattr(reference, field.name)
+                for field in fields(FusedLayout)
+                if field.name not in {"audit_evidence", "orientation_score", "atom_positions", "face_positions"}
+            },
+            "atom_positions": tuple((atom, x_sign * x, y) for atom, x, y in reference.atom_positions),
+            "face_positions": tuple((face, x_sign * x, y) for face, x, y in reference.face_positions),
+        }
+
+    return tuple(
+        OpsinEntryLayout(
+            **oriented_reference(candidate),
+            orientation_score=candidate.orientation_score,
+            audit_evidence=(
+                *reference.audit_evidence,
+                OPSIN_ENTRY_DIRECTIONS,
+                OPSIN_CONSTRUCTION_NUMBERING,
+                *(("terminal entry follows first cited component perimeter",) if terminal_cycle else ()),
+                "complete perimeter follows entry-relative ring directions",
+                *(
+                    ("nonreciprocal parser directions projected from unique terminal",)
+                    if candidate.direction_conflicts
+                    else ("reciprocal entry directions and closed ring map",)
+                ),
+                "OPSIN numbering compatibility only; IUPAC PIN not certified",
+            ),
+            construction_atom_order=order,
+            entry_perimeter=candidate.perimeter,
+            entry_face_id=candidate.start_face,
+            entry_ring_positions=candidate.ring_positions,
+            entry_direction_conflicts=candidate.direction_conflicts,
+        )
+        for candidate in candidates
+    )
+
+
+def _cited_terminal_cycle(model, ast, specs):
+    """Bind the ambiguous small-terminal star to its component construction."""
+    if len(model.faces) != 4 or len(model.face_adjacency) != 3 or ast.citation_plan is None:
+        return None
+    centers = [
+        face for face in model.faces if face.size == 7 and all(face.id in (a, b) for a, b, _ in model.face_adjacency)
+    ]
+    if len(centers) != 1:
+        return None
+    terminals = {face.id: face for face in model.faces if face.id != centers[0].id}
+    if sorted(face.size for face in terminals.values()) != [5, 5, 6]:
+        return None
+    matches = {match.occurrence_id: match for match in ast.component_occurrences}
+    first = next(
+        (
+            matches[occurrence]
+            for occurrence in ast.citation_plan.render_order
+            if len(matches[occurrence].covered_face_ids) == 1
+            and matches[occurrence].covered_face_ids <= terminals.keys()
+        ),
+        None,
+    )
+    if first is None:
+        return None
+    face = terminals[next(iter(first.covered_face_ids))]
+    if face.size != 5:
+        return None
+    local = first.input_atom_by_locant
+    cycle = tuple(local[locant] for locant in specs[first.occurrence_id].template.peripheral_atoms)
+    if len(cycle) != face.size or set(cycle) != set(face.atom_cycle):
+        return None
+    edges = {frozenset((a, b)) for a, b in zip(face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1])}
+    if any(frozenset((a, b)) not in edges for a, b in zip(cycle, cycle[1:] + cycle[:1])):
+        return None
+    return tuple(reversed(cycle))
+
+
+def opsin_construction_atom_order(ast: FusionNameAst, specs: dict[int, FusionComponentSpec]) -> tuple[int, ...] | None:
+    """Project component incorporation and fusion-atom survival onto the graph.
+
+    OPSIN 2.9.0 incorporates the parent then prefixes from right to left,
+    retaining host atoms at fusion interfaces. Its incomplete interior
+    numbering uses this surviving fragment order, not a geometric traversal.
+    """
+    plan = ast.citation_plan
+    if plan is None:
+        if ast.citation_tree is None:
+            return None
+        plan = FusionCitationPlan.from_tree(ast.citation_tree, ast.joins)
+    if len(plan.roots) != 1 or plan.interparent_occurrences or plan.cycle_closing_join_indices:
+        return None
+    matches = {match.occurrence_id: match for match in ast.component_occurrences}
+    groups = {
+        occurrence: group.occurrence_ids for group in ast.multiplicative_groups for occurrence in group.occurrence_ids
+    }
+    blocks = []
+    emitted = set()
+    for occurrence in plan.render_order:
+        if occurrence not in emitted:
+            block = groups.get(occurrence, (occurrence,))
+            blocks.append(block)
+            emitted.update(block)
+    # Multipliers are consumed right to left as a block, but copies inside
+    # each block are incorporated in descriptor order, not reversed.
+    order = (*plan.parent_occurrences, *(occurrence for block in reversed(blocks) for occurrence in block))
+    if len(order) != len(matches) or set(order) != set(matches):
+        return None
+    result = []
+    seen = set()
+    incorporated = set()
+    for occurrence in order:
+        spec = specs.get(occurrence)
+        if spec is None:
+            return None
+        local = matches[occurrence].input_atom_by_locant
+        if set(local) != set(spec.template.locants):
+            return None
+        joins = [join for join in ast.joins if join.attached_occurrence == occurrence]
+        if any(join.host_occurrence not in incorporated for join in joins):
+            return None
+        overlap = set(local.values()) & seen
+        if overlap != set().union(*(join.shared_input_atoms for join in joins)):
+            return None
+        for join in joins:
+            interface = join.interface
+            host = matches[join.host_occurrence].input_atom_by_locant
+            if (
+                tuple(local.get(locant.text) for locant in interface.attached_path) != interface.ordered_input_atoms
+                or tuple(host.get(locant.text) for locant in interface.host_path) != interface.ordered_input_atoms
+            ):
+                return None
+        for locant in sorted(local, key=system_locant_sort_key):
+            atom = local[locant]
+            if atom not in seen:
+                result.append(atom)
+                seen.add(atom)
+        incorporated.add(occurrence)
+    return tuple(result)
+
+
+class LayoutSearchBudgetExceeded(RuntimeError):
+    """Raised instead of returning a partial intrinsic-layout search."""
+
+    def __init__(self, budget: int, *, resource: str = "states") -> None:
+        super().__init__(f"intrinsic layout search exceeded its budget of {budget} {resource}")
+        self.budget = budget
+        self.resource = resource
+
+
+@dataclass(slots=True)
+class _Budget:
+    limit: int
+    used: int = 0
+
+    def spend(self) -> None:
+        self.used += 1
+        if self.used > self.limit:
+            raise LayoutSearchBudgetExceeded(self.limit)
+
+
+_CONFIG = fusion_nomenclature_config()
+RING_SHAPE_TEMPLATES: tuple[RingShapeSpec, ...] = _CONFIG.ring_shapes
+_SHAPES_BY_SIZE = {
+    size: tuple(
+        shape for shape in RING_SHAPE_TEMPLATES if shape.ring_size == size and shape.directed_entry_port is None
+    )
+    for size in range(_CONFIG.search.minimum_ring_size, _CONFIG.search.maximum_ring_size + 1)
+}
+
+
+def _symmetric_terminal_shape(size: int) -> RingShapeSpec | None:
+    if size % 2:
+        return None
+    shapes = []
+    for shape in _SHAPES_BY_SIZE.get(size, ()):
+        if shape.coordinate_system != "cartesian" or shape.distortion_rank:
+            continue
+        centers = {
+            tuple(shape.vertices[i][axis] + shape.vertices[i + size // 2][axis] for axis in (0, 1))
+            for i in range(size // 2)
+        }
+        if len(centers) == 1:
+            shapes.append(shape)
+    return shapes[0] if len(shapes) == 1 else None
+
+
+def can_use_component_entry_layout(model: FaceModel) -> bool:
+    """Cheap topology gate, before potentially expensive component enumeration."""
+    return (
+        len(model.faces) == 4
+        and len(model.face_adjacency) == 3
+        and any(
+            face.size == shape.ring_size and all(face.id in (a, b) for a, b, _ in model.face_adjacency)
+            for shape in RING_SHAPE_TEMPLATES
+            if shape.directed_entry_port is not None
+            for face in model.faces
+        )
+    )
+
+
+def _opsin_ring_map_tree(model: FaceModel) -> bool:
+    """Bound compatibility to hexagonal trees with terminal small polygons."""
+    return _opsin_pentagon_chain(
+        {face.id: face.atom_cycle for face in model.faces},
+        frozenset(frozenset((left, right)) for left, right, _ in model.face_adjacency),
+    ) is not None or (
+        len(model.face_adjacency) == len(model.faces) - 1
+        and any(face.size == 3 for face in model.faces)
+        and any(face.size == 6 for face in model.faces)
+        and all(
+            face.size == 6 or (face.size in {3, 5} and len(set(face.edge_cycle) & model.fusion_edges) == 1)
+            for face in model.faces
+        )
+    )
+
+
+def _opsin_pentagon_chain(
+    orders: dict[int, tuple[int, ...]], adjacent: frozenset[frozenset[int]]
+) -> tuple[int, ...] | None:
+    """Prove a complete linear chain of opposite-port pentagons between hexagons."""
+    if len(adjacent) != len(orders) - 1:
+        return None
+    neighbors: dict[int, list[int]] = {face: [] for face in orders}
+    for left, right in adjacent:
+        if left not in neighbors or right not in neighbors:
+            return None
+        neighbors[left].append(right)
+        neighbors[right].append(left)
+    terminals = [face for face in orders if len(neighbors[face]) == 1]
+    if len(terminals) != 2 or any(len(group) not in {1, 2} for group in neighbors.values()):
+        return None
+    path = [terminals[0]]
+    while path[-1] != terminals[1]:
+        following = [face for face in neighbors[path[-1]] if face not in path]
+        if len(following) != 1:
+            return None
+        path.append(following[0])
+    if len(path) != len(orders) or len(path) < 4 or any(len(orders[face]) != 6 for face in terminals):
+        return None
+    for face in path[1:-1]:
+        order = orders[face]
+        if len(order) != 5:
+            return None
+        neighbor_edges = {
+            frozenset((a, b))
+            for neighbor in neighbors[face]
+            for a, b in zip(orders[neighbor], orders[neighbor][1:] + orders[neighbor][:1])
+        }
+        ports = [
+            index
+            for index, (a, b) in enumerate(zip(order, order[1:] + order[:1]))
+            if frozenset((a, b)) in neighbor_edges
+        ]
+        if len(ports) != 2 or (ports[0] - ports[1]) % 5 not in {2, 3}:
+            return None
+    return tuple(path)
+
+
+def _coupled_pentagon_axis_centers(path: tuple[int, ...], centers: dict[int, Point]) -> dict[int, Point]:
+    # Solve 2*c[i] = c[i-1] + c[i+1] jointly, with fixed terminal centers.
+    # A common integer scale avoids rounding and is removed on normalization.
+    left, right = centers[path[0]], centers[path[-1]]
+    length = len(path) - 1
+    return {
+        face: tuple((length - index) * left[axis] + index * right[axis] for axis in (0, 1))
+        for index, face in enumerate(path)
+    }
+
+
+def _ordered_construction_layouts(
+    model: FaceModel,
+    ast: FusionNameAst,
+    specs: dict[int, FusionComponentSpec],
+    layouts: tuple[OpsinConstructionLayout, ...],
+    search_budget: int,
+) -> tuple[OpsinConstructionLayout, ...]:
+    from .construction_order import ordered_hexagonal_construction
+
+    atoms = {atom for face in model.faces for atom in face.atom_cycle}
+    if not layouts or len(atoms - set(model.outer_boundary)) < 2 or any(face.size != 6 for face in model.faces):
+        return layouts
+    reference = {atom: (x, y) for atom, x, y in layouts[0].atom_positions}
+    witness = ordered_hexagonal_construction(ast, specs, model, reference, search_budget)
+    if witness is None:
+        return layouts
+
+    def area(positions: dict[int, Point]) -> int:
+        cycle = model.outer_boundary
+        return sum(
+            positions[a][0] * positions[b][1] - positions[b][0] * positions[a][1]
+            for a, b in zip(cycle, cycle[1:] + cycle[:1])
+        )
+
+    reference_area = area(reference)
+    result = []
+    witnessed_entries = set()
+    for layout in layouts:
+        top = max(layout.face_positions, key=lambda row: (row[2], row[1]))[0]
+        layout_area = area({atom: (x, y) for atom, x, y in layout.atom_positions})
+        # Numbering traverses clockwise in each physical layout. Express
+        # that winding in the common reference used by the source witness.
+        winding = -1 if layout_area * reference_area > 0 else 1
+        entry = top, winding
+        priority = witness.entries.index(entry) if entry in witness.entries else None
+        if priority is not None:
+            witnessed_entries.add(entry)
+        result.append(
+            replace(
+                layout,
+                construction_atom_order=witness.atom_order,
+                construction_numbering_priority=priority,
+                audit_evidence=(*layout.audit_evidence, "ordered hexagonal construction enumeration"),
+            )
+        )
+    # Do not silently skip an earlier parser path absent from physical
+    # geometry: the stable first-path proof would then be incomplete.
+    if witnessed_entries != set(witness.entries):
+        return layouts
+    return tuple(result)
+
+
+def component_entry_layouts(
+    model: FaceModel,
+    ast: FusionNameAst,
+    specs: dict[int, FusionComponentSpec],
+    *,
+    search_budget: int = _CONFIG.search.layout_states,
+) -> tuple[FusedLayout, ...] | None:
+    """Bind construction-dependent numbering or directed entry to audited geometry.
+
+    Multi-interior systems combine parser entry geometry with explicit OPSIN
+    construction-order numbering when both witnesses are available. Physical
+    geometry and the graph-only numbering API remain independent of that
+    compatibility convention. The directed-entry tree tier requires a unique
+    smallest terminal component and undistorted symmetric opposite terminals.
+    Other face graphs continue to
+    use intrinsic layout search. An applicable but invalid witness is rejected,
+    not replaced with unrestricted peripheral numbering.
+    """
+    if search_budget < 1:
+        raise ValueError("layout search budget must be positive")
+    atoms = {atom for face in model.faces for atom in face.atom_cycle}
+    ring_map_compatibility = _opsin_ring_map_tree(model)
+    if len(atoms - set(model.outer_boundary)) > 1 and not ring_map_compatibility:
+        entry_layouts = _entry_direction_layouts(model, ast, specs, search_budget)
+        if entry_layouts is not None:
+            return entry_layouts
+    if len(atoms - set(model.outer_boundary)) > 1 or ring_map_compatibility:
+        construction_order = opsin_construction_atom_order(ast, specs)
+        if construction_order is None:
+            return None
+        if set(construction_order) != atoms:
+            return ()
+        layouts = tuple(
+            OpsinConstructionLayout(
+                **{
+                    field.name: getattr(layout, field.name)
+                    for field in fields(FusedLayout)
+                    if field.name != "audit_evidence"
+                },
+                audit_evidence=(
+                    *layout.audit_evidence,
+                    OPSIN_CONSTRUCTION_NUMBERING,
+                    "OPSIN numbering compatibility only; IUPAC PIN not certified",
+                ),
+                construction_atom_order=construction_order,
+            )
+            for layout in preferred_intrinsic_layouts(
+                model, search_budget=search_budget, opsin_ring_map=ring_map_compatibility
+            )
+        )
+        return _ordered_construction_layouts(model, ast, specs, layouts, search_budget)
+    if not can_use_component_entry_layout(model):
+        return _entry_direction_layouts(model, ast, specs, search_budget)
+    faces = {face.id: face for face in model.faces}
+    if not _valid_face_adjacency(model, faces):
+        return None
+    for shape in RING_SHAPE_TEMPLATES:
+        if shape.directed_entry_port is None:
+            continue
+        for central in model.faces:
+            if central.size != shape.ring_size or any(central.id not in (a, b) for a, b, _ in model.face_adjacency):
+                continue
+            terminals = [face for face in model.faces if face.id != central.id]
+            roots = [face for face in terminals if face.size == shape.entry_component_size]
+            if len(roots) != 1 or any(face.size < shape.entry_component_size for face in terminals):
+                continue
+            root = roots[0]
+            terminal_shapes = {face.id: _symmetric_terminal_shape(face.size) for face in terminals if face != root}
+            if any(value is None for value in terminal_shapes.values()):
+                continue
+            matches = [match for match in ast.component_occurrences if match.covered_face_ids == frozenset({root.id})]
+            if len(matches) != 1:
+                continue
+            match = matches[0]
+            local = dict(match.local_to_input_atom)
+            perimeter = specs[match.occurrence_id].template.peripheral_atoms
+            if not all(locant in local for locant in perimeter):
+                continue
+            cycle = tuple(local[locant] for locant in perimeter)
+            if len(cycle) != root.size or set(cycle) != set(root.atom_cycle):
+                continue
+            edges = {frozenset(pair) for pair in zip(root.atom_cycle, root.atom_cycle[1:] + root.atom_cycle[:1])}
+            if any(frozenset(pair) not in edges for pair in zip(cycle, cycle[1:] + cycle[:1])):
+                continue
+            shared = set(central.atom_cycle) & set(cycle)
+            # Fusion may reverse a component's standalone perimeter. The
+            # ordered interface, including multiplied occurrences, owns the
+            # direction used to enter the completed ring system.
+            interfaces = [
+                join.interface
+                for join in ast.joins
+                if join.interface.attached_occurrence == match.occurrence_id
+                and set(join.interface.ordered_input_atoms) == shared
+            ]
+            entry = interfaces[0].ordered_input_atoms if len(interfaces) == 1 else None
+            if entry is None or {cycle[-1], cycle[0]} & shared:
+                continue
+            orders = _orders_starting_with_edge(central.atom_cycle, entry)
+            if len(orders) != 1:
+                continue
+            port = shape.directed_entry_port
+            order = orders[0][-port:] + orders[0][:-port] if port else orders[0]
+            ports = {
+                index
+                for index, pair in enumerate(zip(order, order[1:] + order[:1]))
+                if any(set(pair) <= set(face.atom_cycle) for face in terminals)
+            }
+            if ports != {port, *shape.opposite_ports}:
+                continue
+            root_shapes = [
+                item
+                for item in _SHAPES_BY_SIZE[root.size]
+                if item.coordinate_system == "cartesian" and not item.distortion_rank
+            ]
+            if len(root_shapes) != 1:
+                continue
+            terminal_shapes[root.id] = root_shapes[0]
+            budget = _Budget(search_budget)
+            budget.spend()
+            dx, dy = (
+                shape.vertices[(port + 1) % shape.ring_size][axis] - shape.vertices[port][axis] for axis in (0, 1)
+            )
+            scale = lcm(*(face.size for face in model.faces))
+            positions = {
+                atom: ((-dx * x - dy * y) * scale, (dy * x - dx * y) * scale)
+                for atom, (x, y) in zip(order, shape.vertices)
+            }
+            placed = {central.id: order}
+            for face in terminals:
+                budget.spend()
+                edge = next(pair for pair in zip(order, order[1:] + order[:1]) if set(pair) <= set(face.atom_cycle))
+                endpoints = tuple(reversed(edge))
+                face_order = _orders_starting_with_edge(face.atom_cycle, endpoints)[0]
+                positions = {atom: (x * _SHAPE_EDGE_SCALE, y * _SHAPE_EDGE_SCALE) for atom, (x, y) in positions.items()}
+                positions.update(
+                    _place_shape(
+                        terminal_shapes[face.id],
+                        face_order,
+                        positions[endpoints[0]],
+                        positions[endpoints[1]],
+                        coordinate_system="cartesian",
+                    )
+                )
+                placed[face.id] = face_order
+            if not _audit_layout(model, placed, positions):
+                return ()
+            centers = {face: _ring_axis_center(cycle, positions) for face, cycle in placed.items()}
+            positions, centers = _normalize_integer_layout(positions, centers)
+            adjacent = frozenset(frozenset((a, b)) for a, b, _ in model.face_adjacency)
+            return (
+                FusedLayout(
+                    face_positions=tuple((face, *point) for face, point in sorted(centers.items())),
+                    atom_positions=tuple((atom, *point) for atom, point in sorted(positions.items())),
+                    face_shapes=tuple(
+                        sorted(
+                            (
+                                (central.id, shape.shape_id),
+                                *((face, item.shape_id) for face, item in terminal_shapes.items()),
+                            )
+                        )
+                    ),
+                    orientation_score=_orientation_score(
+                        centers, {}, adjacent, distortion=shape.distortion_rank, orders=placed, positions=positions
+                    ),
+                    component_entry_edge=entry,
+                    audit_evidence=(
+                        "configured opposite-port direction witness",
+                        "entry follows the graph-bound ordered fusion interface",
+                        "complete original face geometry audited",
+                    ),
+                ),
+            )
+    return _entry_direction_layouts(model, ast, specs, search_budget)
+
+
+def intrinsic_fused_layouts(
+    model: FaceModel,
+    *,
+    search_budget: int = _CONFIG.search.layout_states,
+    max_layouts: int = _CONFIG.search.maximum_layouts,
+    opsin_ring_map: bool = False,
+) -> tuple[FusedLayout, ...]:
+    """Enumerate audited intrinsic layouts in nomenclatural preference order.
+
+    An empty tuple is an explicit abstention: the face model is unsupported or
+    inconsistent with the standard shapes and bounded large-ring reductions.
+    """
+
+    if search_budget < 1 or max_layouts < 1:
+        raise ValueError("layout search budget and result limit must be positive")
+    if opsin_ring_map and not _opsin_ring_map_tree(model):
+        return ()
+    terminal = _terminal_ring_proxy_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
+    if terminal is not None:
+        return terminal
+    if len(model.faces) > 2:
+        for face in model.faces:
+            if face.size in {7, 8}:
+                angular = _two_port_large_ring_layouts(
+                    model, search_budget=search_budget, max_layouts=max_layouts, face_id=face.id
+                )
+                if angular:
+                    return angular
+    if any(face.size not in _SHAPES_BY_SIZE for face in model.faces):
+        if len(model.faces) == 2:
+            return _ordinary_large_bicycle_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
+        return _two_port_large_ring_layouts(model, search_budget=search_budget, max_layouts=max_layouts)
+    face_by_id = {face.id: face for face in model.faces}
+    if not _valid_face_adjacency(model, face_by_id):
+        return ()
+    budget = _Budget(search_budget)
+    completed: dict[tuple, FusedLayout] = {}
+    materialized_embeddings: set[tuple] = set()
+    best_distortion: list[int | None] = [None]
+
+    coordinate_systems = set.intersection(
+        *(set(shape.coordinate_system for shape in _SHAPES_BY_SIZE[face.size]) for face in model.faces)
+    )
+    # Enumerating every seed avoids making the selected geometry depend on the
+    # input atom IDs used to assign face IDs. The hard state/result budgets keep
+    # this bounded for larger fused systems.
+    for coordinate_system in sorted(coordinate_systems, key=lambda system: (system != "eisenstein", system)):
+        for root in sorted(model.faces, key=lambda face: (face.size, face.id)):
+            for shape in _shapes_for(root.size, coordinate_system):
+                if best_distortion[0] is not None and shape.distortion_rank > best_distortion[0]:
+                    continue
+                for offset in range(root.size):
+                    for reverse in (False, True):
+                        budget.spend()
+                        order = _oriented_cycle(root.atom_cycle, offset, reverse)
+                        atom_positions = {atom: point for atom, point in zip(order, shape.vertices)}
+                        _search_layouts(
+                            model,
+                            face_by_id,
+                            {root.id: order},
+                            {root.id: shape},
+                            atom_positions,
+                            budget,
+                            completed,
+                            materialized_embeddings,
+                            max_layouts,
+                            coordinate_system,
+                            best_distortion,
+                            opsin_ring_map=opsin_ring_map,
+                        )
+        # Exact hexagonal geometry is preferred. Closely folded systems can
+        # require the existing deformable vocabulary to avoid atom overlaps;
+        # it still has to pass every geometry audit under the same budget.
+        if completed:
+            break
+    return tuple(sorted(completed.values(), key=_layout_sort_key))
+
+
+def _terminal_ring_proxy_layouts(
+    model: FaceModel, *, search_budget: int, max_layouts: int
+) -> tuple[FusedLayout, ...] | None:
+    """Subdivide a standard terminal hexagon without changing its fusion axis.
+
+    A one-port ring cannot bend a row. Its nonfusion arc therefore must not
+    change the direction or distortion of neighboring rings merely because a
+    seven/eight-member polygon has an off-center vertex average.
+    """
+
+    if len(model.faces) < 3 or len(model.face_adjacency) != len(model.faces) - 1:
+        return None
+    targets = [
+        face for face in model.faces if face.size in {7, 8} and len(set(face.edge_cycle) & model.fusion_edges) == 1
+    ]
+    if not targets:
+        return None
+    faces = {face.id: face for face in model.faces}
+    if not _valid_face_adjacency(model, faces):
+        return ()
+    paths = []
+    next_edge = max(edge for face in model.faces for edge in face.edge_cycle) + 1
+    removed = set()
+    for face in targets:
+        edge = next(iter(set(face.edge_cycle) & model.fusion_edges))
+        endpoints = _edge_endpoints(face, edge)
+        order = _orders_starting_with_edge(face.atom_cycle, endpoints)[0]
+        edge_by_endpoints = {
+            frozenset((left, right)): edge_id
+            for left, right, edge_id in zip(face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1], face.edge_cycle)
+        }
+        indices = (0, 1, *(1 + index * (face.size - 1) // 5 for index in range(1, 5)))
+        cycle = tuple(order[index] for index in indices)
+        edges = []
+        face_removed = set()
+        for start, end in zip(indices, (*indices[1:], face.size)):
+            path = tuple(order[index % face.size] for index in range(start, end + 1))
+            paths.append(path)
+            face_removed.update(path[1:-1])
+            if end == start + 1:
+                edges.append(edge_by_endpoints[frozenset(path)])
+            else:
+                edges.append(next_edge)
+                next_edge += 1
+        if face_removed & {atom for other in model.faces if other.id != face.id for atom in other.atom_cycle}:
+            return None
+        removed.update(face_removed)
+        faces[face.id] = Face(face.id, cycle, tuple(edges), 6)
+    proxy = _subdivided_face_model(model, tuple(faces.values()), removed)
+    layouts = intrinsic_fused_layouts(proxy, search_budget=search_budget, max_layouts=max_layouts)
+    return _expand_proxy_layouts(
+        model,
+        layouts,
+        tuple(paths),
+        {face.id: f"terminal-{face.size}:" for face in targets},
+        ("terminal nonfusion arcs subdivided without changing fusion axes",),
+    )
+
+
+def _two_port_large_ring_layouts(
+    model: FaceModel, *, search_budget: int, max_layouts: int, face_id: int | None = None
+) -> tuple[FusedLayout, ...]:
+    """Expand a hexagon direction witness into one two-port ring.
+
+    OPSIN's even-ring direction rule assigns distances n/2 - 1 and n/2 + 1
+    the same directions as hexagon distances 2 and 4. Only this signature is
+    supported for even rings: other separations must not acquire an unproved
+    layout. A seven-member ring also admits this undistorted witness for ports
+    separated by two edges, with an extra vertex on its nonfusion long arc.
+    Supported seven/eight-member rings additionally admit the straight
+    witness at their maximum port separation. Unsupported macrocycle
+    signatures remain outside this tier.
+    Nonfusion paths subdivide the proxy polygon without moving its corners,
+    fusion sides, or ring-axis centers. The standard bounded search therefore
+    still owns the orientation alternatives; no large shape search is added.
+    """
+
+    large = (
+        [face for face in model.faces if face.id == face_id]
+        if face_id is not None
+        else [face for face in model.faces if face.size not in _SHAPES_BY_SIZE]
+    )
+    if (
+        len(large) != 1
+        or large[0].size not in _CONFIG.annulene_ring_sizes
+        or (large[0].size % 2 and not (face_id is not None and large[0].size == 7))
+        or len(model.face_adjacency) != len(model.faces) - 1
+        or not _valid_face_adjacency(model, {face.id: face for face in model.faces})
+        or set(model.outer_boundary) != {atom for face in model.faces for atom in face.atom_cycle}
+    ):
+        return ()
+    face = large[0]
+    ports = set(face.edge_cycle) & model.fusion_edges
+    if len(ports) != 2:
+        return ()
+    entrance = _edge_endpoints(face, min(ports))
+    if entrance is None:
+        return ()
+    distances = (face.size // 2 - 1,)
+    if face_id is not None and face.size in {7, 8}:
+        distances += (face.size // 2,)
+    order = None
+    for distance in distances:
+        for endpoints in (entrance, tuple(reversed(entrance))):
+            candidate = _orders_starting_with_edge(face.atom_cycle, endpoints)[0]
+            exit_edge = frozenset(candidate[distance : distance + 2])
+            if exit_edge == frozenset(_edge_endpoints(face, next(iter(ports - {min(ports)}))) or ()):
+                order = candidate
+                break
+        if order is not None:
+            break
+    if order is None:
+        return ()
+
+    short_path = order[1 : distance + 1]
+    long_path = order[distance + 1 :] + order[:1]
+    straight = distance == face.size // 2
+    if straight:
+        short_middle = (len(short_path) - 1) // 2
+        long_middle = (len(long_path) - 1) // 2
+        paths = (
+            short_path[: short_middle + 1],
+            short_path[short_middle:],
+            long_path[: long_middle + 1],
+            long_path[long_middle:],
+        )
+        proxy_order = (
+            order[0],
+            order[1],
+            short_path[short_middle],
+            order[distance],
+            *long_path[:1],
+            long_path[long_middle],
+        )
+    else:
+        steps = len(long_path) - 1
+        shoulder = (steps + 1) // 3
+        middle = steps - 2 * shoulder
+        # Symmetric subdivisions retain reflection equivalence even when the
+        # longer path does not divide evenly over the three hexagon sides.
+        paths = (
+            short_path,
+            long_path[: shoulder + 1],
+            long_path[shoulder : shoulder + middle + 1],
+            long_path[shoulder + middle :],
+        )
+        proxy_order = (order[0], order[1], order[distance], *(path[0] for path in paths[1:]))
+    removed = {atom for path in paths for atom in path[1:-1]}
+    if removed & {atom for other in model.faces if other.id != face.id for atom in other.atom_cycle}:
+        return ()
+    original_edges = {
+        frozenset((left, right)): edge
+        for left, right, edge in zip(face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1], face.edge_cycle)
+    }
+    next_edge = max(edge for other in model.faces for edge in other.edge_cycle) + 1
+    proxy_edges = []
+    for left, right in zip(proxy_order, proxy_order[1:] + proxy_order[:1]):
+        edge = original_edges.get(frozenset((left, right)))
+        if edge is None:
+            edge = next_edge
+            next_edge += 1
+        proxy_edges.append(edge)
+    proxy_faces = tuple(
+        Face(face.id, proxy_order, tuple(proxy_edges), 6) if other.id == face.id else other for other in model.faces
+    )
+    proxy = _subdivided_face_model(model, proxy_faces, removed)
+    layouts = intrinsic_fused_layouts(proxy, search_budget=search_budget, max_layouts=max_layouts)
+    return _expand_proxy_layouts(
+        model,
+        layouts,
+        paths,
+        {face.id: f"two-port-{face.size}:"},
+        (f"two-port fusion distances have a {'straight' if straight else 'angular'} hexagon direction witness",),
+    )
+
+
+def _subdivided_face_model(model: FaceModel, faces: tuple[Face, ...], removed: set[int]) -> FaceModel:
+    """Rebuild edge ownership after contracting only nonfusion paths."""
+
+    owners: dict[int, list[int]] = defaultdict(list)
+    for other in faces:
+        for edge in other.edge_cycle:
+            owners[edge].append(other.id)
+    return replace(
+        model,
+        faces=faces,
+        edge_to_faces=tuple((edge, tuple(sorted(ids))) for edge, ids in sorted(owners.items())),
+        perimeter_edges=frozenset(edge for edge, ids in owners.items() if len(ids) == 1),
+        outer_boundary=tuple(atom for atom in model.outer_boundary if atom not in removed),
+    )
+
+
+def _expand_proxy_layouts(
+    model: FaceModel,
+    layouts: tuple[FusedLayout, ...],
+    paths: tuple[tuple[int, ...], ...],
+    shape_prefixes: dict[int, str],
+    evidence: tuple[str, ...],
+) -> tuple[FusedLayout, ...]:
+    """Restore the original graph while retaining the audited proxy axes."""
+
+    scale = lcm(*(len(path) - 1 for path in paths))
+    expanded = []
+    for layout in layouts:
+        positions = {atom: (x * scale, y * scale) for atom, x, y in layout.atom_positions}
+        centers = {key: (x * scale, y * scale) for key, x, y in layout.face_positions}
+        for path in paths:
+            start, end = positions[path[0]], positions[path[-1]]
+            count = len(path) - 1
+            for index, atom in enumerate(path[1:-1], start=1):
+                positions[atom] = tuple(left + index * (right - left) // count for left, right in zip(start, end))
+        if not _audit_layout(model, {other.id: other.atom_cycle for other in model.faces}, positions):
+            continue
+        positions, centers = _normalize_integer_layout(positions, centers)
+        expanded.append(
+            replace(
+                layout,
+                atom_positions=tuple((atom, *point) for atom, point in sorted(positions.items())),
+                face_positions=tuple((key, *point) for key, point in sorted(centers.items())),
+                face_shapes=tuple((key, shape_prefixes.get(key, "") + shape) for key, shape in layout.face_shapes),
+                audit_evidence=(
+                    *layout.audit_evidence,
+                    *evidence,
+                    "only nonfusion paths subdivided; proxy polygon and ring-axis centers preserved",
+                    "expanded original face model passes the complete geometry audit",
+                ),
+            )
+        )
+    return tuple(sorted(expanded, key=_layout_sort_key))
+
+
+def _ordinary_large_bicycle_layouts(
+    model: FaceModel, *, search_budget: int, max_layouts: int
+) -> tuple[FusedLayout, ...]:
+    """Embed one edge-fused pair, without extending the general shape search.
+
+    A vertical common edge and two symmetric convex arcs prove a horizontal
+    two-ring row. Its four reflections exhaust the possible numbering starts;
+    the existing completed-system locant criteria decide between them. These
+    coordinates are an orientation witness, not a general ring-shape template.
+    """
+
+    if (
+        len(model.faces) != 2
+        or len(model.fusion_edges) != 1
+        or len(model.face_adjacency) != 1
+        or max(face.size for face in model.faces) not in _CONFIG.annulene_ring_sizes
+        or min(face.size for face in model.faces) < _CONFIG.rules.minimum_ring_size
+        or not _valid_face_adjacency(model, {face.id: face for face in model.faces})
+    ):
+        return ()
+    left, right = model.faces
+    edge = next(iter(model.fusion_edges))
+    endpoints = _edge_endpoints(left, edge)
+    if endpoints is None or set(endpoints) != set(_edge_endpoints(right, edge) or ()):
+        return ()
+    if set(left.atom_cycle) & set(right.atom_cycle) != set(endpoints):
+        return ()
+    start, end = endpoints
+    scale = lcm(*((face.size - 1) ** 2 * face.size for face in model.faces))
+    positions = {start: (0, -scale), end: (0, scale)}
+    orders = {}
+    for sign, face in zip((-1, 1), model.faces):
+        offset = face.atom_cycle.index(start)
+        order = face.atom_cycle[offset:] + face.atom_cycle[:offset]
+        if order[1] == end:
+            order = (start, *reversed(order[1:]))
+        if order[-1] != end:
+            return ()
+        steps = face.size - 1
+        for index, atom in enumerate(order[1:-1], start=1):
+            positions[atom] = (
+                sign * 4 * index * (steps - index) * scale // steps**2,
+                (2 * index - steps) * scale // steps,
+            )
+        orders[face.id] = order
+    if not _audit_layout(model, orders, positions):
+        return ()
+    centers = {face.id: (sum(positions[atom][0] for atom in face.atom_cycle) // face.size, 0) for face in model.faces}
+    adjacent = frozenset((frozenset(centers),))
+    budget = _Budget(search_budget)
+    layouts = []
+    for x_sign in (-1, 1):
+        for y_sign in (-1, 1):
+            budget.spend()
+            oriented, oriented_centers = _normalize_integer_layout(
+                {atom: (x_sign * x, y_sign * y) for atom, (x, y) in positions.items()},
+                {face: (x_sign * x, y_sign * y) for face, (x, y) in centers.items()},
+            )
+            layouts.append(
+                FusedLayout(
+                    face_positions=tuple((face, *point) for face, point in sorted(oriented_centers.items())),
+                    atom_positions=tuple((atom, *point) for atom, point in sorted(oriented.items())),
+                    face_shapes=tuple((face.id, f"ordinary-bicycle-{face.size}") for face in model.faces),
+                    orientation_score=_orientation_score(
+                        oriented_centers, {}, adjacent, distortion=1, orders=orders, positions=oriented
+                    ),
+                    audit_evidence=(
+                        "two convex faces share only their vertical common edge",
+                        "shared edge coordinates agree",
+                        "unrelated edges do not cross",
+                        "geometric and topological perimeters agree",
+                        "four reflected horizontal-row orientation witnesses",
+                    ),
+                )
+            )
+            if len(layouts) > max_layouts:
+                raise LayoutSearchBudgetExceeded(max_layouts, resource="layouts")
+    return tuple(sorted(layouts, key=_layout_sort_key))
+
+
+def preferred_intrinsic_layout(
+    model: FaceModel,
+    *,
+    search_budget: int = _CONFIG.search.layout_states,
+    max_layouts: int = _CONFIG.search.maximum_layouts,
+) -> FusedLayout | None:
+    """Return the preferred audited layout, or ``None`` to abstain."""
+
+    layouts = preferred_intrinsic_layouts(
+        model,
+        search_budget=search_budget,
+        max_layouts=max_layouts,
+    )
+    return layouts[0] if layouts else None
+
+
+def preferred_intrinsic_layouts(
+    model: FaceModel,
+    *,
+    search_budget: int = _CONFIG.search.layout_states,
+    max_layouts: int = _CONFIG.search.maximum_layouts,
+    opsin_ring_map: bool = False,
+) -> tuple[FusedLayout, ...]:
+    """Return every layout tied on the intrinsic orientation criteria.
+
+    Retaining the tied embeddings is essential: completed-system heteroatom
+    locant criteria are applied after preferred orientation and may select a
+    reflected embedding without changing the preferred layout score.
+    """
+
+    return _preferred_intrinsic_layouts(model, search_budget, max_layouts, opsin_ring_map)
+
+
+@lru_cache(maxsize=128)
+def _preferred_intrinsic_layouts(
+    model: FaceModel, search_budget: int, max_layouts: int, opsin_ring_map: bool
+) -> tuple[FusedLayout, ...]:
+    """Normalize implicit/explicit defaults before caching immutable layouts."""
+
+    layouts = intrinsic_fused_layouts(
+        model,
+        search_budget=search_budget,
+        max_layouts=max_layouts,
+        opsin_ring_map=opsin_ring_map,
+    )
+    if not layouts:
+        return ()
+    best_score = layouts[0].orientation_score
+    return tuple(layout for layout in layouts if layout.orientation_score == best_score)
+
+
+def _search_layouts(
+    model: FaceModel,
+    face_by_id: dict[int, Face],
+    placed_orders: dict[int, tuple[int, ...]],
+    placed_shapes: dict[int, RingShapeSpec],
+    atom_positions: dict[int, Point],
+    budget: _Budget,
+    completed: dict[tuple, FusedLayout],
+    materialized_embeddings: set[tuple],
+    max_layouts: int,
+    coordinate_system: str,
+    best_distortion: list[int | None],
+    *,
+    opsin_ring_map: bool = False,
+) -> None:
+    current_distortion = _layout_distortion(placed_orders, placed_shapes, atom_positions, coordinate_system)
+    if best_distortion[0] is not None and current_distortion > best_distortion[0]:
+        return
+    if len(placed_orders) == len(model.faces):
+        if _audit_layout(model, placed_orders, atom_positions):
+            embedding_key = _intrinsic_embedding_key(
+                placed_orders,
+                placed_shapes,
+                atom_positions,
+                coordinate_system=coordinate_system,
+            )
+            if embedding_key in materialized_embeddings:
+                return
+            materialized_embeddings.add(embedding_key)
+            if best_distortion[0] is None or current_distortion < best_distortion[0]:
+                best_distortion[0] = current_distortion
+                completed.clear()
+            for layout in _materialize_layouts(
+                placed_orders,
+                placed_shapes,
+                atom_positions,
+                coordinate_system=coordinate_system,
+                opsin_ring_map=opsin_ring_map,
+            ):
+                completed.setdefault(_layout_geometry_key(layout), layout)
+            if len(completed) > max_layouts:
+                raise LayoutSearchBudgetExceeded(max_layouts, resource="completed layouts")
+        return
+
+    next_face, placed_neighbor, shared_edge = _next_face(model, placed_orders)
+    if next_face is None or placed_neighbor is None or shared_edge is None:
+        return
+    face = face_by_id[next_face]
+    shared_endpoints = _edge_endpoints(face_by_id[placed_neighbor], shared_edge)
+    if shared_endpoints is None or any(atom not in atom_positions for atom in shared_endpoints):
+        return
+    # A newly attached template can introduce quarter-unit coordinates when
+    # its entrance edge is not horizontal. Scale the complete partial layout
+    # once at this depth so all subsequent geometric predicates stay exact
+    # integer operations. Layout normalization removes this common scale.
+    scaled_positions = {atom: (x * _SHAPE_EDGE_SCALE, y * _SHAPE_EDGE_SCALE) for atom, (x, y) in atom_positions.items()}
+    existing_side = _face_side_point(placed_orders[placed_neighbor], shared_endpoints, scaled_positions)
+    if existing_side is None:
+        return
+
+    for endpoints in (shared_endpoints, tuple(reversed(shared_endpoints))):
+        for order in _orders_starting_with_edge(face.atom_cycle, endpoints):
+            for shape in _shapes_for(face.size, coordinate_system):
+                if best_distortion[0] is not None and current_distortion + shape.distortion_rank > best_distortion[0]:
+                    continue
+                budget.spend()
+                candidate = _place_shape(
+                    shape,
+                    order,
+                    scaled_positions[endpoints[0]],
+                    scaled_positions[endpoints[1]],
+                    coordinate_system=coordinate_system,
+                )
+                if not _opposite_side(
+                    scaled_positions[endpoints[0]],
+                    scaled_positions[endpoints[1]],
+                    existing_side,
+                    candidate[order[2]],
+                ):
+                    continue
+                if any(
+                    atom in scaled_positions and scaled_positions[atom] != point for atom, point in candidate.items()
+                ):
+                    continue
+                merged = dict(scaled_positions)
+                merged.update(candidate)
+                new_orders = {**placed_orders, face.id: order}
+                if not _partial_layout_is_valid(model, new_orders, merged):
+                    continue
+                _search_layouts(
+                    model,
+                    face_by_id,
+                    new_orders,
+                    {**placed_shapes, face.id: shape},
+                    merged,
+                    budget,
+                    completed,
+                    materialized_embeddings,
+                    max_layouts,
+                    coordinate_system,
+                    best_distortion,
+                    opsin_ring_map=opsin_ring_map,
+                )
+
+
+def _shapes_for(ring_size: int, coordinate_system: str) -> tuple[RingShapeSpec, ...]:
+    return tuple(shape for shape in _SHAPES_BY_SIZE[ring_size] if shape.coordinate_system == coordinate_system)
+
+
+def _valid_face_adjacency(model: FaceModel, face_by_id: dict[int, Face]) -> bool:
+    known = set(face_by_id)
+    seen_edges: set[int] = set()
+    for left, right, edge in model.face_adjacency:
+        if left not in known or right not in known or left == right or edge in seen_edges:
+            return False
+        if edge not in face_by_id[left].edge_cycle or edge not in face_by_id[right].edge_cycle:
+            return False
+        seen_edges.add(edge)
+    adjacency = defaultdict(set)
+    for left, right, _ in model.face_adjacency:
+        adjacency[left].add(right)
+        adjacency[right].add(left)
+    reached = {min(known)}
+    pending = deque(reached)
+    while pending:
+        current = pending.popleft()
+        for neighbor in adjacency[current]:
+            if neighbor not in reached:
+                reached.add(neighbor)
+                pending.append(neighbor)
+    return reached == known
+
+
+def _next_face(model: FaceModel, placed: dict[int, tuple[int, ...]]) -> tuple[int | None, int | None, int | None]:
+    options = []
+    placement_rank = {face: rank for rank, face in enumerate(placed)}
+    for left, right, edge in model.face_adjacency:
+        if (left in placed) == (right in placed):
+            continue
+        unplaced, neighbor = (right, left) if left in placed else (left, right)
+        placed_neighbors = sum(
+            1 for a, b, _ in model.face_adjacency if unplaced in (a, b) and (b if a == unplaced else a) in placed
+        )
+        # Grow from the enumerated seed before using face IDs to break ties.
+        # Otherwise every seed can use the same ID-selected entrance edge
+        # of an asymmetric ring shape, losing symmetry-related embeddings.
+        options.append((-placed_neighbors, placement_rank[neighbor], unplaced, neighbor, edge))
+    if not options:
+        return None, None, None
+    _, _, face, neighbor, edge = min(options)
+    return face, neighbor, edge
+
+
+def _edge_endpoints(face: Face, edge_id: int) -> Edge | None:
+    try:
+        index = face.edge_cycle.index(edge_id)
+    except ValueError:
+        return None
+    return face.atom_cycle[index], face.atom_cycle[(index + 1) % face.size]
+
+
+def _oriented_cycle(cycle: tuple[int, ...], offset: int, reverse: bool) -> tuple[int, ...]:
+    order = tuple(reversed(cycle)) if reverse else cycle
+    return order[offset:] + order[:offset]
+
+
+def _orders_starting_with_edge(cycle: tuple[int, ...], endpoints: Edge) -> tuple[tuple[int, ...], ...]:
+    variants = []
+    for reverse in (False, True):
+        order = tuple(reversed(cycle)) if reverse else cycle
+        for offset in range(len(order)):
+            candidate = order[offset:] + order[:offset]
+            if candidate[:2] == endpoints:
+                variants.append(candidate)
+    return tuple(variants)
+
+
+def _place_shape(
+    shape: RingShapeSpec,
+    order: tuple[int, ...],
+    start: Point,
+    end: Point,
+    *,
+    coordinate_system: str = "cartesian",
+) -> dict[int, Point]:
+    dx, dy = end[0] - start[0], end[1] - start[1]
+    if dx % _SHAPE_EDGE_SCALE or dy % _SHAPE_EDGE_SCALE:
+        raise ValueError("scaled fusion entrance edge must have integral template coordinates")
+    if coordinate_system == "eisenstein":
+        return {
+            atom: (
+                start[0] + (x * dx - y * dy) // _SHAPE_EDGE_SCALE,
+                start[1] + (x * dy + y * dx + y * dy) // _SHAPE_EDGE_SCALE,
+            )
+            for atom, (x, y) in zip(order, shape.vertices)
+        }
+    return {
+        atom: (
+            start[0] + x * dx // _SHAPE_EDGE_SCALE - y * dy // _SHAPE_EDGE_SCALE,
+            start[1] + x * dy // _SHAPE_EDGE_SCALE + y * dx // _SHAPE_EDGE_SCALE,
+        )
+        for atom, (x, y) in zip(order, shape.vertices)
+    }
+
+
+def _face_side_point(
+    order: tuple[int, ...],
+    shared_endpoints: Edge,
+    positions: dict[int, Point],
+) -> Point | None:
+    """Return any non-interface vertex, sufficient to identify face side."""
+
+    endpoints = frozenset(shared_endpoints)
+    return next((positions[atom] for atom in order if atom not in endpoints), None)
+
+
+def _opposite_side(start: Point, end: Point, left: Point, right: Point) -> bool:
+    left_cross = _cross(start, end, left)
+    right_cross = _cross(start, end, right)
+    return left_cross != 0 and right_cross != 0 and (left_cross > 0) != (right_cross > 0)
+
+
+def _partial_layout_is_valid(
+    model: FaceModel,
+    placed_orders: dict[int, tuple[int, ...]],
+    positions: dict[int, Point],
+) -> bool:
+    if len(set(positions.values())) != len(positions):
+        return False
+    drawn_edges: dict[frozenset[int], tuple[Point, Point]] = {}
+    for face_id, order in placed_orders.items():
+        face = next(face for face in model.faces if face.id == face_id)
+        for edge_id, left, right in zip(face.edge_cycle, face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1]):
+            if left not in positions or right not in positions:
+                return False
+            key = frozenset((left, right))
+            segment = (positions[left], positions[right])
+            previous = drawn_edges.setdefault(key, segment)
+            if set(previous) != set(segment):
+                return False
+    edges = list(drawn_edges.items())
+    for index, (left_atoms, left_segment) in enumerate(edges):
+        for right_atoms, right_segment in edges[index + 1 :]:
+            if left_atoms & right_atoms:
+                continue
+            if _segments_intersect(*left_segment, *right_segment):
+                return False
+    polygons = [(face_id, tuple(positions[atom] for atom in order)) for face_id, order in placed_orders.items()]
+    for index, (left_id, left_polygon) in enumerate(polygons):
+        for right_id, right_polygon in polygons[index + 1 :]:
+            if _face_ids_adjacent(model, left_id, right_id):
+                continue
+            if _polygon_center_strictly_inside(left_polygon, right_polygon):
+                return False
+            if _polygon_center_strictly_inside(right_polygon, left_polygon):
+                return False
+    return True
+
+
+def _audit_layout(
+    model: FaceModel,
+    placed_orders: dict[int, tuple[int, ...]],
+    positions: dict[int, Point],
+) -> bool:
+    if set(placed_orders) != {face.id for face in model.faces} or not _partial_layout_is_valid(
+        model, placed_orders, positions
+    ):
+        return False
+    graph_edges = {
+        frozenset((left, right))
+        for face in model.faces
+        for left, right in zip(face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1])
+    }
+    perimeter_edges = {
+        frozenset(_edge_endpoints(face, edge) or ())
+        for face in model.faces
+        for edge in face.edge_cycle
+        if edge in model.perimeter_edges
+    }
+    face_edges = [
+        {frozenset((left, right)) for left, right in zip(face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1])}
+        for face in model.faces
+    ]
+    geometric_perimeter = {edge for edge in graph_edges if sum(edge in edges for edges in face_edges) == 1}
+    declared_perimeter = {
+        frozenset((left, right))
+        for left, right in zip(
+            model.outer_boundary,
+            model.outer_boundary[1:] + model.outer_boundary[:1],
+        )
+    }
+    return perimeter_edges == geometric_perimeter == declared_perimeter and all(len(edge) == 2 for edge in graph_edges)
+
+
+def _materialize_layouts(
+    placed_orders: dict[int, tuple[int, ...]],
+    shapes: dict[int, RingShapeSpec],
+    positions: dict[int, Point],
+    *,
+    coordinate_system: str = "cartesian",
+    opsin_ring_map: bool = False,
+) -> tuple[FusedLayout, ...]:
+    distortion = _layout_distortion(placed_orders, shapes, positions, coordinate_system)
+    integer, centers = _normalized_embedding_geometry(
+        placed_orders,
+        positions,
+        coordinate_system=coordinate_system,
+    )
+
+    # A generated embedding has an arbitrary horizontal seed edge.  P-25
+    # orientation instead chooses the axis that contains the greatest row of
+    # consecutively fused rings. Nonadjacent collinear centers do not form a
+    # row. Thus only directions between edge-sharing faces are needed.
+    edge_owners: dict[Edge, list[int]] = defaultdict(list)
+    for face, order in placed_orders.items():
+        for left, right in zip(order, order[1:] + order[:1]):
+            edge_owners[tuple(sorted((left, right)))].append(face)
+    adjacent = frozenset(frozenset(owners) for owners in edge_owners.values() if len(owners) == 2)
+    # Preserve half-grid midpoints without introducing rational predicates.
+    integer = {atom: (2 * x, 2 * y) for atom, (x, y) in integer.items()}
+    centers = {face: (2 * x, 2 * y) for face, (x, y) in centers.items()}
+    centers = _two_port_pentagon_axes(placed_orders, centers, adjacent)
+    pentagon_chain = _opsin_pentagon_chain(placed_orders, adjacent) if opsin_ring_map else None
+    if pentagon_chain is not None:
+        centers = _coupled_pentagon_axis_centers(pentagon_chain, centers)
+    directions = {(1, 0)}
+    for pair in adjacent:
+        left, right = pair
+        left_x, left_y = centers[left]
+        right_x, right_y = centers[right]
+        dx, dy = right_x - left_x, right_y - left_y
+        divisor = gcd(abs(dx), abs(dy))
+        if divisor == 0:
+            continue
+        dx, dy = dx // divisor, dy // divisor
+        if dx < 0 or (dx == 0 and dy < 0):
+            dx, dy = -dx, -dy
+        directions.add((dx, dy))
+
+    candidates: dict[tuple, FusedLayout] = {}
+    best_score: tuple[int, ...] | None = None
+    # Integer Eisenstein coordinates are (2*x+y, 3*y), so their squared
+    # Euclidean length is proportional to 3*X**2 + Y**2, not X**2 + Y**2.
+    metric_x = 3 if coordinate_system == "eisenstein" else 1
+    for dx, dy in sorted(directions):
+        for x_sign in (-1, 1):
+            for y_sign in (-1, 1):
+                oriented_centers = {
+                    face: (
+                        x_sign * (metric_x * x * dx + y * dy),
+                        y_sign * (-x * dy + y * dx),
+                    )
+                    for face, (x, y) in centers.items()
+                }
+                oriented = {
+                    atom: (
+                        x_sign * (metric_x * x * dx + y * dy),
+                        y_sign * (-x * dy + y * dx),
+                    )
+                    for atom, (x, y) in integer.items()
+                }
+                if opsin_ring_map and _direction_grid_centers(oriented_centers, adjacent) is None:
+                    continue
+                score = _orientation_score(
+                    oriented_centers,
+                    shapes,
+                    adjacent,
+                    distortion=distortion,
+                    orders=placed_orders,
+                    positions=oriented,
+                    opsin_ring_map=opsin_ring_map,
+                )
+                if best_score is not None and score > best_score:
+                    continue
+                if best_score is None or score < best_score:
+                    best_score = score
+                    candidates.clear()
+                # Numbering must choose its starting face on the same axes
+                # that won the row/quadrant comparison, not polygon centroids.
+                oriented_centers = _direction_grid_centers(oriented_centers, adjacent) or oriented_centers
+                oriented, oriented_centers = _normalize_integer_layout(oriented, oriented_centers)
+                layout = FusedLayout(
+                    face_positions=tuple((face, *oriented_centers[face]) for face in sorted(oriented_centers)),
+                    atom_positions=tuple((atom, *oriented[atom]) for atom in sorted(oriented)),
+                    face_shapes=tuple((face, shapes[face].shape_id) for face in sorted(shapes)),
+                    orientation_score=score,
+                    audit_evidence=(
+                        "all face boundaries represented",
+                        "shared edge coordinates agree",
+                        "unrelated edges do not cross",
+                        "nonadjacent face interiors do not overlap",
+                        "geometric and topological perimeters agree",
+                        "preferred axis derived from ring-center rows",
+                        *((OPSIN_RING_MAP_NUMBERING,) if opsin_ring_map else ()),
+                        *((OPSIN_COUPLED_PENTAGON_AXES,) if pentagon_chain is not None else ()),
+                    ),
+                )
+                candidates.setdefault(_layout_geometry_key(layout), layout)
+
+    return tuple(sorted(candidates.values(), key=_layout_sort_key))
+
+
+def _two_port_pentagon_axes(
+    orders: dict[int, tuple[int, ...]], centers: dict[int, Point], adjacent: frozenset[frozenset[int]]
+) -> dict[int, Point]:
+    """Keep an isolated two-port house pentagon on its permitted straight axis.
+
+    The house direction rules allow opposite exits at cyclic distance two
+    (or three in reverse). A polygon's off-axis center must not bend that
+    row. Only independent constraints on an acyclic face graph are applied.
+    """
+
+    if len(adjacent) != len(orders) - 1:
+        return centers
+    neighbors: dict[int, list[int]] = defaultdict(list)
+    for left, right in adjacent:
+        neighbors[left].append(right)
+        neighbors[right].append(left)
+    edges = {face: {frozenset((a, b)) for a, b in zip(order, order[1:] + order[:1])} for face, order in orders.items()}
+    targets = {}
+    for face, order in orders.items():
+        if len(order) != 5 or len(neighbors[face]) != 2:
+            continue
+        ports = [
+            index
+            for index, (a, b) in enumerate(zip(order, order[1:] + order[:1]))
+            if any(frozenset((a, b)) in edges[other] for other in neighbors[face])
+        ]
+        if len(ports) == 2 and (ports[0] - ports[1]) % 5 in (2, 3):
+            targets[face] = neighbors[face]
+    result = dict(centers)
+    for face, (left, right) in targets.items():
+        if left in targets or right in targets:
+            continue
+        # Exact midpoint coordinates are retained by the caller's scale.
+        if any((centers[left][axis] + centers[right][axis]) % 2 for axis in (0, 1)):
+            continue
+        result[face] = tuple((centers[left][axis] + centers[right][axis]) // 2 for axis in (0, 1))
+    return result if len(set(result.values())) == len(result) else centers
+
+
+def _layout_distortion(
+    orders: dict[int, tuple[int, ...]],
+    shapes: dict[int, RingShapeSpec],
+    positions: dict[int, Point],
+    coordinate_system: str,
+) -> int:
+    """Count template distortion and relatively enlarged rings.
+
+    Each order starts with its template's entrance edge. Attaching that edge
+    to an elongated side can resize a whole ring, even with an undistorted
+    template. Exact squared scale ratios expose this without penalizing a
+    common rescaling of the drawing. The smallest scale sets the reference;
+    adding a face cannot lower the number of enlarged rings or this bound.
+    """
+
+    scales = []
+    for face, order in orders.items():
+        left, right = (positions[atom] for atom in order[:2])
+        start, end = shapes[face].vertices[:2]
+        dx, dy = right[0] - left[0], right[1] - left[1]
+        sx, sy = end[0] - start[0], end[1] - start[1]
+        placed_length = dx * dx + dy * dy
+        template_length = sx * sx + sy * sy
+        if coordinate_system == "eisenstein":
+            placed_length += dx * dy
+            template_length += sx * sy
+        scales.append((placed_length, template_length))
+    smallest = scales[0]
+    for numerator, denominator in scales[1:]:
+        if numerator * smallest[1] < smallest[0] * denominator:
+            smallest = numerator, denominator
+    enlarged = sum(numerator * smallest[1] > smallest[0] * denominator for numerator, denominator in scales)
+    return sum(shape.distortion_rank for shape in shapes.values()) + enlarged
+
+
+def _normalized_embedding_geometry(
+    placed_orders: dict[int, tuple[int, ...]],
+    positions: dict[int, Point],
+    *,
+    coordinate_system: str,
+) -> tuple[dict[int, Point], dict[int, Point]]:
+    """Return scale-normalized Cartesian atom and face coordinates."""
+
+    if coordinate_system == "eisenstein":
+        positions = {atom: (2 * x + y, 3 * y) for atom, (x, y) in positions.items()}
+    scale = lcm(4, *(len(order) for order in placed_orders.values()))
+    integer = {atom: (x * scale, y * scale) for atom, (x, y) in positions.items()}
+    centers = {face: _ring_axis_center(order, integer) for face, order in placed_orders.items()}
+    return _normalize_integer_layout(integer, centers)
+
+
+def _ring_axis_center(order: tuple[int, ...], positions: dict[int, Point]) -> Point:
+    """Keep opposite parallel fusion sides on one ring-centre axis.
+
+    An odd ring's vertex average is displaced towards its extra vertex.
+    Equal, oppositely directed sides instead define the centre of a linear
+    fusion row. Use that centre when all such pairs agree; otherwise retain
+    the vertex average. Coordinates are scaled for exact division by four.
+    """
+
+    edges = tuple((positions[left], positions[right]) for left, right in zip(order, order[1:] + order[:1]))
+    centers = set()
+    for index, (left, right) in enumerate(edges):
+        for other_left, other_right in edges[index + 1 :]:
+            if (right[0] - left[0], right[1] - left[1]) == (
+                other_left[0] - other_right[0],
+                other_left[1] - other_right[1],
+            ):
+                centers.add(
+                    (
+                        (left[0] + right[0] + other_left[0] + other_right[0]) // 4,
+                        (left[1] + right[1] + other_left[1] + other_right[1]) // 4,
+                    )
+                )
+    if len(centers) == 1:
+        return centers.pop()
+    return (
+        sum(positions[atom][0] for atom in order) // len(order),
+        sum(positions[atom][1] for atom in order) // len(order),
+    )
+
+
+def _intrinsic_embedding_key(
+    placed_orders: dict[int, tuple[int, ...]],
+    shapes: dict[int, RingShapeSpec],
+    positions: dict[int, Point],
+    *,
+    coordinate_system: str,
+) -> tuple:
+    """Identify embeddings modulo translation, rotation, and reflection."""
+
+    integer, _centers = _normalized_embedding_geometry(
+        placed_orders,
+        positions,
+        coordinate_system=coordinate_system,
+    )
+    atoms = tuple(sorted(integer))
+    metric_x = 3 if coordinate_system == "eisenstein" else 1
+    squared_distances = tuple(
+        metric_x * (integer[left][0] - integer[right][0]) ** 2 + (integer[left][1] - integer[right][1]) ** 2
+        for position, left in enumerate(atoms)
+        for right in atoms[position + 1 :]
+    )
+    return (
+        tuple((face, shapes[face].shape_id) for face in sorted(shapes)),
+        squared_distances,
+    )
+
+
+def _normalize_integer_layout(
+    positions: dict[int, tuple[int, int]],
+    centers: dict[int, tuple[int, int]],
+) -> tuple[dict[int, tuple[int, int]], dict[int, tuple[int, int]]]:
+    min_x = min(x for x, _ in positions.values())
+    min_y = min(y for _, y in positions.values())
+    positions = {atom: (x - min_x, y - min_y) for atom, (x, y) in positions.items()}
+    centers = {face: (x - min_x, y - min_y) for face, (x, y) in centers.items()}
+    divisor = 0
+    for point in (*positions.values(), *centers.values()):
+        divisor = gcd(divisor, point[0])
+        divisor = gcd(divisor, point[1])
+    if divisor > 1:
+        positions = {atom: (x // divisor, y // divisor) for atom, (x, y) in positions.items()}
+        centers = {face: (x // divisor, y // divisor) for face, (x, y) in centers.items()}
+    return positions, centers
+
+
+def _orientation_score(
+    centers: dict[int, Point],
+    shapes: dict[int, RingShapeSpec],
+    adjacent: frozenset[frozenset[int]],
+    *,
+    distortion: int | None = None,
+    orders: dict[int, tuple[int, ...]],
+    positions: dict[int, Point],
+    opsin_ring_map: bool = False,
+) -> tuple[int, ...]:
+    direction_centers = _direction_grid_centers(centers, adjacent)
+    if direction_centers is not None:
+        centers = direction_centers
+    rows: list[list[int]] = []
+    for face in sorted(centers, key=lambda face: (centers[face][1], centers[face][0])):
+        if not rows or centers[rows[-1][-1]][1] != centers[face][1] or frozenset((rows[-1][-1], face)) not in adjacent:
+            rows.append([])
+        rows[-1].append(face)
+    row_count = max(map(len, rows))
+    bounds = []
+    for order in orders.values():
+        xs = [2 * positions[atom][0] for atom in order]
+        ys = [positions[atom][1] for atom in order]
+        bounds.append((min(xs), max(xs), min(ys), max(ys)))
+    orientation = min(
+        _center_row_orientation_score(centers, row)
+        if direction_centers is not None
+        else _bounded_row_orientation_score(centers, row, orders, positions, bounds)
+        for row in rows
+        if len(row) == row_count
+    )
+    if opsin_ring_map:
+        if direction_centers is None:
+            raise ValueError("OPSIN ring-map orientation requires a consistent direction grid")
+        orientation = _opsin_occupied_row_orientation(direction_centers)
+    if distortion is None:
+        distortion = sum(shape.distortion_rank for shape in shapes.values())
+    # Distorted shapes are disfavored before applying the ordinary P-25
+    # orientation criteria; see the separate distortion precedence rule.
+    return distortion, -row_count, *orientation
+
+
+def _opsin_occupied_row_orientation(centers: dict[int, Point]) -> tuple[int, int, int]:
+    """OPSIN's quadrant pass scans occupied cells, after connected-axis selection.
+
+    This deliberately differs from the ordinary fused-row rule: neighboring
+    occupied cells need not represent adjacent rings. Keep it compatibility-only.
+    """
+    groups: dict[tuple[int, int], list[int]] = defaultdict(list)
+    for face, (x, y) in centers.items():
+        groups[y, x % 4].append(face)
+    rows: list[list[int]] = []
+    for group in groups.values():
+        row: list[int] = []
+        for face in sorted(group, key=lambda face: centers[face][0]):
+            if row and centers[face][0] - centers[row[-1]][0] != 4:
+                rows.append(row)
+                row = []
+            row.append(face)
+        rows.append(row)
+    longest = max(map(len, rows))
+    return min(_center_row_orientation_score(centers, row) for row in rows if len(row) == longest)
+
+
+def _direction_grid_centers(centers: dict[int, Point], adjacent: frozenset[frozenset[int]]) -> dict[int, Point] | None:
+    """Separate ring-center direction from the scale of individual polygons."""
+    neighbors: dict[int, list[int]] = {face: [] for face in centers}
+    for edge in adjacent:
+        left, right = sorted(edge)
+        neighbors[left].append(right)
+        neighbors[right].append(left)
+    root = min(centers)
+    result = {root: (0, 0)}
+    queue = deque([root])
+    while queue:
+        face = queue.popleft()
+        for other in neighbors[face]:
+            dx = centers[other][0] - centers[face][0]
+            dy = centers[other][1] - centers[face][1]
+            sx, sy = (dx > 0) - (dx < 0), (dy > 0) - (dy < 0)
+            step = (4 * sx, 0) if not sy else (0, 2 * sy) if not sx else (2 * sx, sy)
+            point = (result[face][0] + step[0], result[face][1] + step[1])
+            if other in result:
+                if result[other] != point:
+                    return None
+            else:
+                result[other] = point
+                queue.append(other)
+    return result if len(result) == len(centers) and len(set(result.values())) == len(result) else None
+
+
+def _center_row_orientation_score(centers: dict[int, Point], row: list[int]) -> tuple[int, int, int]:
+    middle = len(row) // 2
+    axis_x = 2 * centers[row[middle]][0] if len(row) % 2 else centers[row[middle - 1]][0] + centers[row[middle]][0]
+    axis_y = centers[row[0]][1]
+    upper_right = lower_left = above = 0
+    for x, y in centers.values():
+        right = 1 if 2 * x == axis_x else 2 if 2 * x > axis_x else 0
+        upper = 1 if y == axis_y else 2 if y > axis_y else 0
+        upper_right += right * upper
+        lower_left += (2 - right) * (2 - upper)
+        above += 2 * upper
+    return -upper_right, lower_left, -above
+
+
+def _bounded_row_orientation_score(
+    centers: dict[int, Point],
+    row: list[int],
+    orders: dict[int, tuple[int, ...]],
+    positions: dict[int, Point],
+    bounds: list[tuple[int, int, int, int]],
+) -> tuple[int, int, int]:
+    """FR-5.2: bisect the middle ring/bond, counting divided rings as halves."""
+
+    middle = len(row) // 2
+    if len(row) % 2:
+        doubled_axis_x = 2 * centers[row[middle]][0]
+    else:
+        shared = set(orders[row[middle - 1]]) & set(orders[row[middle]])
+        doubled_axis_x = sum(positions[atom][0] for atom in shared)
+    axis_y = centers[row[0]][1]
+    upper_right = lower_left = above = 0
+    for min_x, max_x, min_y, max_y in bounds:
+        right = _positive_half_units(min_x, max_x, doubled_axis_x)
+        upper = _positive_half_units(min_y, max_y, axis_y)
+        upper_right += right * upper
+        lower_left += (2 - right) * (2 - upper)
+        above += 2 * upper
+    return -upper_right, lower_left, -above
+
+
+def _positive_half_units(low: int, high: int, axis: int) -> int:
+    if low < axis < high:
+        return 1
+    return 2 if low >= axis else 0
+
+
+def _layout_sort_key(layout: FusedLayout) -> tuple:
+    shape_signature = tuple(sorted(shape for _, shape in layout.face_shapes))
+    geometry = tuple(sorted((x, y) for _, x, y in layout.atom_positions))
+    return layout.orientation_score, shape_signature, geometry
+
+
+def _layout_geometry_key(layout: FusedLayout) -> tuple:
+    return layout.atom_positions, layout.face_shapes
+
+
+def _cross(start: Point, end: Point, point: Point) -> int:
+    return (end[0] - start[0]) * (point[1] - start[1]) - (end[1] - start[1]) * (point[0] - start[0])
+
+
+def _segments_intersect(a: Point, b: Point, c: Point, d: Point) -> bool:
+    one, two = _cross(a, b, c), _cross(a, b, d)
+    three, four = _cross(c, d, a), _cross(c, d, b)
+    if one == 0 and _on_segment(a, b, c):
+        return True
+    if two == 0 and _on_segment(a, b, d):
+        return True
+    if three == 0 and _on_segment(c, d, a):
+        return True
+    if four == 0 and _on_segment(c, d, b):
+        return True
+    return (one > 0) != (two > 0) and (three > 0) != (four > 0)
+
+
+def _on_segment(start: Point, end: Point, point: Point) -> bool:
+    return min(start[0], end[0]) <= point[0] <= max(start[0], end[0]) and min(start[1], end[1]) <= point[1] <= max(
+        start[1], end[1]
+    )
+
+
+def _polygon_center_strictly_inside(source: tuple[Point, ...], polygon: tuple[Point, ...]) -> bool:
+    """Test a source centroid against a polygon without constructing fractions."""
+
+    count = len(source)
+    center_x = sum(x for x, _ in source)
+    center_y = sum(y for _, y in source)
+    signs = [
+        (right[0] - left[0]) * (center_y - count * left[1]) - (right[1] - left[1]) * (center_x - count * left[0])
+        for left, right in zip(polygon, polygon[1:] + polygon[:1])
+    ]
+    return all(value > 0 for value in signs) or all(value < 0 for value in signs)
+
+
+def _face_ids_adjacent(model: FaceModel, left: int, right: int) -> bool:
+    return any({left, right} == {first, second} for first, second, _ in model.face_adjacency)

@@ -141,6 +141,32 @@ def _hydrazone_allows_unlocanted_stereo(mol: Molecule, group: PerceivedGroup, ca
         bond = mol.get_bond(terminal_n, neighbor)
         if bond is not None and bond.order != 1:
             return False
-        if mol.atoms[neighbor].symbol not in {"C", "H"}:
+        if mol.atoms[neighbor].symbol not in {"C", "H"} and not _is_neutral_sulfonyl_ligand(mol, neighbor, terminal_n):
             return False
     return True
+
+
+def _is_neutral_sulfonyl_ligand(mol: Molecule, sulfur: int, nitrogen: int) -> bool:
+    """A singly bound R-S(=O)2-N substituent leaves hydrazone E/Z in scope."""
+
+    atom = mol.atoms[sulfur]
+    if atom.symbol != "S" or atom.charge or mol.atoms[nitrogen].charge:
+        return False
+    neighbors = mol.get_neighbors(sulfur)
+    if len(neighbors) != 4 or nitrogen not in neighbors or mol.get_bond(sulfur, nitrogen).order != 1:
+        return False
+    ligands = [neighbor for neighbor in neighbors if neighbor != nitrogen]
+    oxo = [
+        neighbor
+        for neighbor in ligands
+        if mol.atoms[neighbor].symbol == "O"
+        and mol.atoms[neighbor].charge == 0
+        and mol.degree(neighbor) == 1
+        and mol.get_bond(sulfur, neighbor).order == 2
+    ]
+    carbon = [
+        neighbor
+        for neighbor in ligands
+        if mol.atoms[neighbor].symbol == "C" and mol.get_bond(sulfur, neighbor).order == 1
+    ]
+    return len(oxo) == 2 and len(carbon) == 1

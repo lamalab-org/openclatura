@@ -8,6 +8,7 @@ from openclatura.retained_graph_templates import match_retained_graph_templates
 from openclatura.retained_graph_templates import (
     retained_parent_metadata as graph_retained_parent_metadata,
 )
+from openclatura.rules.elements import ELEMENTS
 
 
 def parent_metadata(parent_name: str) -> RetainedParentMetadata | None:
@@ -283,7 +284,7 @@ def _generated_monocycle_name(mol: Molecule, path: list[int], double_bonds: int,
 
 
 # Single-bonded in the mancude parent itself, so never a hydro position.
-FIXED_SATURATED_RING_ELEMENTS = ("O", "S", "Se", "Te")
+FIXED_SATURATED_RING_ELEMENTS = tuple(element.symbol for element in ELEMENTS.values() if element.mancude_forced_single)
 
 
 def mancude_monocycle_hydro_plan(

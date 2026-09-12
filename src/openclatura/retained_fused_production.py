@@ -1,10 +1,11 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .assembly_parts import RetainedParentMetadata, SubstituentItem
 from .grammar_snapshot_data import retained_fused_derivative_gate
 from .molecule import Molecule
 from .namer_config import INDICATED_H_RETAINED_NAMES
 from .perception import PerceivedGroup
+from .retained_derivative_hydrogen import prove_retained_oxo_carbon_hydrogen
 from .retained_fused_templates import RetainedGraphTemplateMatch, match_retained_fused_templates
 from .retained_name_policy import retained_parent_name_policy
 
@@ -59,6 +60,15 @@ def production_retained_fused_parent(
             feature_atoms.add(group.attachment_carbon)
 
     def eligible(matches: list[RetainedGraphTemplateMatch]) -> list[RetainedGraphTemplateMatch]:
+        if principal_key == "ketone":
+            # Resolve derivative H only at complete-parent selection. Fusion
+            # components must retain the registry's original electron roles.
+            matches = [
+                replace(match, indicated_h=proof.indicated_h)
+                if (proof := prove_retained_oxo_carbon_hydrogen(mol, match.template, match.locant_to_atom)) is not None
+                else match
+                for match in matches
+            ]
         # A match that places the indicated hydrogen spells its saturation; prefer it.
         matches = sorted(matches, key=lambda match: not match.indicated_h)
         return [

@@ -165,8 +165,10 @@ class Molecule:
         self._perception_cache: tuple | None = None  # perceived functional groups; invalidated on mutation
         self._canonical_rank_cache: dict[int, int] | None = None
         self._retained_fused_cache: dict[tuple, tuple] = {}
+        self._fusion_plan_cache: dict[tuple, object] = {}
         self.audit_rdmol = None
         self.accurate_cip: dict[int, str] = {}
+        self.legacy_cip: dict[int, str] = {}
         self.substituted_symbols: frozenset[int] = frozenset()
 
     def _invalidate_graph_caches(self) -> None:
@@ -176,6 +178,7 @@ class Molecule:
         self._perception_cache = None
         self._canonical_rank_cache = None
         self._retained_fused_cache.clear()
+        self._fusion_plan_cache.clear()
 
     def add_atom(
         self,
@@ -283,7 +286,7 @@ class Molecule:
         return len(self.get_neighbors(atom_idx))
 
     def subgraph(self, atom_ids, *, symbols: dict[int, str] | None = None) -> "Molecule":
-        """Return the induced subgraph over atom_ids, keeping the original indices."""
+        """Return an induced subgraph, preserving atom/bond IDs and chemical metadata."""
 
         fragment = Molecule()
         for idx in atom_ids:
@@ -292,8 +295,10 @@ class Molecule:
                 symbol=(symbols or {}).get(idx, atom.symbol),
                 idx=idx,
                 charge=atom.charge,
+                isotope=atom.isotope,
                 stereo=atom.stereo,
                 raw_stereo=atom.raw_stereo,
+                cip=atom.cip,
                 is_aromatic=atom.is_aromatic,
                 explicit_h_count=atom.explicit_h_count,
                 total_h_count=atom.total_h_count,
@@ -303,8 +308,16 @@ class Molecule:
                 if neighbor in atom_ids and idx < neighbor:
                     bond = self.get_bond(idx, neighbor)
                     fragment.add_bond(
-                        u=idx, v=neighbor, order=bond.order, stereo=bond.stereo, in_small_ring=bond.in_small_ring
+                        u=bond.u,
+                        v=bond.v,
+                        idx=bond.idx,
+                        order=bond.order,
+                        stereo=bond.stereo,
+                        in_small_ring=bond.in_small_ring,
+                        cip=bond.cip,
                     )
+        fragment.accurate_cip = {idx: value for idx, value in self.accurate_cip.items() if idx in fragment.atoms}
+        fragment.legacy_cip = {idx: value for idx, value in self.legacy_cip.items() if idx in fragment.atoms}
         fragment.substituted_symbols = frozenset(
             idx for idx, symbol in (symbols or {}).items() if idx in fragment.atoms and symbol != self.atoms[idx].symbol
         )
