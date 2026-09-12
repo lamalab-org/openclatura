@@ -71,8 +71,8 @@ def test_elided_parent_locant_drops_redundant_complex_prefix_wrapper():
     assert _name("C#CCOC1CC1").name == "(prop-2-yn-1-yl)oxycyclopropane"
 
 
-def test_unlocanted_multiplied_ligand_prefix_keeps_disambiguating_wrapper():
-    assert _name("CO[Si](C)(C)C1CC1").name == "(methoxydi(methyl)silyl)cyclopropane"
+def test_unlocanted_multiplied_ligand_prefix_uses_clear_single_word():
+    assert _name("CO[Si](C)(C)C1CC1").name == "methoxydimethylsilylcyclopropane"
     assert (
         _name("c1ccc([Se](c2ccccc2)(c2ccccc2)c2ccccc2)cc1").name
         == "(triphenyl-lambda^4-selanyl)benzene"

@@ -1763,7 +1763,7 @@ def test_repeated_substituent_with_internal_multiplier_uses_complex_multiplier()
 def test_distinct_center_ligands_only_group_ligands_after_the_first():
     assert format_center_ligands(["hydroxy", "ethyl"]) == "ethyl(hydroxy)"
     assert format_center_ligands(["methyl", "methyl"]) == "dimethyl"
-    assert format_center_ligands(["methoxy", "methyl", "methyl"]) == "methoxydi(methyl)"
+    assert format_center_ligands(["methoxy", "methyl", "methyl"]) == "methoxydimethyl"
 
 
 def test_charge_vocabulary_is_registry_backed():
@@ -5388,7 +5388,7 @@ def test_hypervalent_sulfur_ester_keeps_every_ligand():
     assert name_smiles("CCOS(C)=O") == "1-(methylsulfinyloxy)ethane"
     assert (
         name_smiles("CCCCCCOS(=O)(CCCCCC)(CCCCCC)OCCCCCC")
-        == "1-(((hexyloxy)di(hexyl)(oxo)-lambda^6-sulfanyl)oxy)hexane"
+        == "1-(((hexyloxy)dihexyl(oxo)-lambda^6-sulfanyl)oxy)hexane"
     )
 
 
@@ -5420,7 +5420,7 @@ def test_charge_separated_terminal_n3_renders_as_azido_role():
         "[N-]=[N+]=Nn1cncn1": "1-azido-1H-1,2,4-triazole",
         # Four ligands on a singly bonded P is a lambda^5 centre; `phosphanyl`
         # on its own spells the trivalent one.
-        "CCP(CC)(CC)(CC)N=[N+]=[N-]": "1-(azidotri(ethyl)-lambda^5-phosphanyl)ethane",
+        "CCP(CC)(CC)(CC)N=[N+]=[N-]": "1-(azidotriethyl-lambda^5-phosphanyl)ethane",
     }
 
     for smiles, expected in cases.items():
@@ -5565,7 +5565,7 @@ def test_central_hydride_alkoxy_ligands_are_graph_derived():
         "CC(C)OP(OC(C)C)OC(C)C": "tris(propan-2-yl) phosphite",
         "CC(C)(C)O[PH](OC(C)(C)C)OC(C)(C)C": "tris(tert-butoxy)-lambda4-phosphane",
         # ``tert-`` is italic, so tert-butoxy files under ``b``, before methoxy.
-        "CO[Si](OC)(OC(C)(C)C)OC(C)(C)C": "bis(tert-butoxy)di(methoxy)silane",
+        "CO[Si](OC)(OC(C)(C)C)OC(C)(C)C": "bis(tert-butoxy)dimethoxysilane",
     }
 
     for smiles, expected in cases.items():
