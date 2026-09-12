@@ -5387,8 +5387,7 @@ def test_hypervalent_sulfur_ester_keeps_every_ligand():
     # lambda^6 sulfur has three, and used to lose two of them silently.
     assert name_smiles("CCOS(C)=O") == "1-(methylsulfinyloxy)ethane"
     assert (
-        name_smiles("CCCCCCOS(=O)(CCCCCC)(CCCCCC)OCCCCCC")
-        == "1-(((hexyloxy)dihexyl(oxo)-lambda^6-sulfanyl)oxy)hexane"
+        name_smiles("CCCCCCOS(=O)(CCCCCC)(CCCCCC)OCCCCCC") == "1-(((hexyloxy)dihexyl(oxo)-lambda^6-sulfanyl)oxy)hexane"
     )
 
 

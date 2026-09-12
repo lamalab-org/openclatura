@@ -74,10 +74,7 @@ def test_elided_parent_locant_drops_redundant_complex_prefix_wrapper():
 
 def test_unlocanted_multiplied_ligand_prefix_uses_clear_single_word():
     assert _name("CO[Si](C)(C)C1CC1").name == "methoxydimethylsilylcyclopropane"
-    assert (
-        _name("c1ccc([Se](c2ccccc2)(c2ccccc2)c2ccccc2)cc1").name
-        == "(triphenyl-lambda^4-selanyl)benzene"
-    )
+    assert _name("c1ccc([Se](c2ccccc2)(c2ccccc2)c2ccccc2)cc1").name == "(triphenyl-lambda^4-selanyl)benzene"
 
 
 def test_unlocanted_outer_wrapper_is_removed_only_when_renderer_marks_it_optional():
@@ -85,9 +82,7 @@ def test_unlocanted_outer_wrapper_is_removed_only_when_renderer_marks_it_optiona
     parts.substituents = [SubstituentItem(name="(propan-2-yl)", locants=[])]
     assert format_substituent_prefixes(parts, []) == "(propan-2-yl)"
 
-    parts.substituents = [
-        SubstituentItem(name="(propan-2-yl)", locants=[], outer_parentheses_optional=True)
-    ]
+    parts.substituents = [SubstituentItem(name="(propan-2-yl)", locants=[], outer_parentheses_optional=True)]
     assert format_substituent_prefixes(parts, []) == "propan-2-yl"
 
 

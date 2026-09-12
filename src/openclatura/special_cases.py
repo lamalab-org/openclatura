@@ -1347,9 +1347,7 @@ def sulfamic_acid_result(
     if represented != component_atoms:
         return None
 
-    prefix = (
-        format_center_ligands([name for _atoms, name in ligands], sort_key=substituent_sort_key) if ligands else ""
-    )
+    prefix = format_center_ligands([name for _atoms, name in ligands], sort_key=substituent_sort_key) if ligands else ""
     name = f"{prefix}sulfamic acid"
     bindings = [
         NameAtomBinding(
