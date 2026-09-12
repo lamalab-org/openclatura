@@ -72,7 +72,7 @@ def test_elided_parent_locant_drops_redundant_complex_prefix_wrapper():
 
 
 def test_unlocanted_multiplied_ligand_prefix_keeps_disambiguating_wrapper():
-    assert _name("CO[Si](C)(C)C1CC1").name == "((methoxy)dimethylsilyl)cyclopropane"
+    assert _name("CO[Si](C)(C)C1CC1").name == "(methoxydi(methyl)silyl)cyclopropane"
     assert (
         _name("c1ccc([Se](c2ccccc2)(c2ccccc2)c2ccccc2)cc1").name
         == "(triphenyl-lambda^4-selanyl)benzene"

@@ -279,7 +279,7 @@ def format_amino_from_branches(
             return charged_heteroatom_prefix("N", -1, "single") or "azanidyl"
         branch_names = [strip_outer_parentheses(branch) for branch in branches]
         prefix = charged_heteroatom_prefix("N", -1, "single") or "azanidyl"
-        return f"({format_counted_prefixes(branch_names)}{prefix})"
+        return f"({format_center_ligands(branch_names)}{prefix})"
 
     counts = count_names(branches)
     if len(counts) == 1 and list(counts.values())[0] == 1:
@@ -300,7 +300,7 @@ def format_n_substituted_amino_prefix(branches: list[str]) -> str:
     if len(branch_names) > 1 and len(set(branch_names)) == 1 and branch_names[0] == "formyl":
         locants = ",".join("N" for _ in branch_names)
         return f"{locants}-{format_counted_prefixes(branch_names)}"
-    return format_counted_prefixes(branches)
+    return format_center_ligands(branches)
 
 
 def format_lambda_substituent(
@@ -311,7 +311,7 @@ def format_lambda_substituent(
     base_suffix: str,
 ) -> str:
     valence = substituent_bonding_number(mol, start_idx)
-    return f"({stereo_prefix_text}{format_counted_prefixes(branches)}-lambda^{valence}-{base_suffix})"
+    return f"({stereo_prefix_text}{format_center_ligands(branches)}-lambda^{valence}-{base_suffix})"
 
 
 def substituent_bonding_number(mol: Molecule, atom_idx: int) -> int:
@@ -732,7 +732,7 @@ def name_sulfur_subgraph(
         else:
             branches = [f"{multipliers.basic(len(s_nitrogens))}imino", *branches]
         if not is_double and len(next_atoms) == 1 and len(s_nitrogens) == 1:
-            return f"({stereo_prefix_text}{format_counted_prefixes(branches)}{base})"
+            return f"({stereo_prefix_text}{format_center_ligands(branches)}{base})"
         return format_lambda_substituent(mol, start_idx, branches, stereo_prefix_text, base)
 
     if not next_atoms:
@@ -759,7 +759,7 @@ def name_sulfur_subgraph(
         if (br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx))
     ]
     if not is_double and mol.atoms[start_idx].charge > 0:
-        return f"({stereo_prefix_text}{format_counted_prefixes(branches)}sulfaniumyl)"
+        return f"({stereo_prefix_text}{format_center_ligands(branches)}sulfaniumyl)"
     return format_lambda_substituent(
         mol, start_idx, branches, stereo_prefix_text, "sulfanylidene" if is_double else "sulfanyl"
     )
@@ -899,7 +899,7 @@ def name_group_13_14_subgraph(
         for nxt in next_atoms
         if (br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx))
     ]
-    return f"({format_counted_prefixes(branches)}{suffix})"
+    return f"({format_center_ligands(branches)}{suffix})"
 
 
 def name_halogen_subgraph(
@@ -919,7 +919,7 @@ def name_halogen_subgraph(
         if (br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx))
     ]
     valence = sum(mol.get_bond(start_idx, n).order for n in mol.get_neighbors(start_idx))
-    return f"({format_counted_prefixes(branches)}lambda^{valence}-{HALOGEN_LAMBDA_SUFFIXES[symbol]})"
+    return f"({format_center_ligands(branches)}lambda^{valence}-{HALOGEN_LAMBDA_SUFFIXES[symbol]})"
 
 
 def name_heteroatom_subgraph(

@@ -1763,6 +1763,7 @@ def test_repeated_substituent_with_internal_multiplier_uses_complex_multiplier()
 def test_distinct_center_ligands_only_group_ligands_after_the_first():
     assert format_center_ligands(["hydroxy", "ethyl"]) == "ethyl(hydroxy)"
     assert format_center_ligands(["methyl", "methyl"]) == "dimethyl"
+    assert format_center_ligands(["methoxy", "methyl", "methyl"]) == "methoxydi(methyl)"
 
 
 def test_charge_vocabulary_is_registry_backed():
@@ -1911,7 +1912,7 @@ def test_charge_normalized_halogen_peroxy_roles_use_common_peroxyhalate_template
 
 
 def test_mixed_central_hydride_ligands_are_boundary_protected():
-    assert name_smiles("CCOSCl") == "(chloro)(ethoxy)sulfane"
+    assert name_smiles("CCOSCl") == "chloro(ethoxy)sulfane"
 
 
 def test_homonuclear_chain_parent_survives_a_ligand_bigger_than_methyl():
@@ -4890,7 +4891,7 @@ def test_pyopsin_regression_names_preserve_retained_ring_cations():
 def test_pyopsin_regression_names_use_substituted_carbamoyl_prefixes():
     cases = {
         "CNC(=O)NC(C)=O": "N-acetyl-N'-methylurea",
-        "CC(C)(C(=O)N(C)C1CCC1)NC(=O)OC": "methyl (2-((cyclobutyl)(methyl)carbamoyl)propan-2-yl)carbamate",
+        "CC(C)(C(=O)N(C)C1CCC1)NC(=O)OC": "methyl (2-(cyclobutyl(methyl)carbamoyl)propan-2-yl)carbamate",
     }
 
     for smiles, expected in cases.items():
@@ -5386,13 +5387,14 @@ def test_hypervalent_sulfur_ester_keeps_every_ligand():
     # lambda^6 sulfur has three, and used to lose two of them silently.
     assert name_smiles("CCOS(C)=O") == "1-(methylsulfinyloxy)ethane"
     assert (
-        name_smiles("CCCCCCOS(=O)(CCCCCC)(CCCCCC)OCCCCCC") == "1-(((hexyloxy)dihexyl(oxo)-lambda^6-sulfanyl)oxy)hexane"
+        name_smiles("CCCCCCOS(=O)(CCCCCC)(CCCCCC)OCCCCCC")
+        == "1-(((hexyloxy)di(hexyl)(oxo)-lambda^6-sulfanyl)oxy)hexane"
     )
 
 
 def test_sulfur_imide_substituents_preserve_double_bonded_nitrogen():
-    assert name_smiles("N=S(Cl)CF") == "((chloro)(imino)sulfanyl)fluoromethane"
-    assert name_smiles("CSC(=O)S(C)=N") == "((imino)(methyl)sulfanyl)(methylsulfanyl)methanone"
+    assert name_smiles("N=S(Cl)CF") == "(chloro(imino)sulfanyl)fluoromethane"
+    assert name_smiles("CSC(=O)S(C)=N") == "(imino(methyl)sulfanyl)(methylsulfanyl)methanone"
 
 
 def test_sulfonimidoyl_substituents_keep_imino_n_ligand():
@@ -5418,7 +5420,7 @@ def test_charge_separated_terminal_n3_renders_as_azido_role():
         "[N-]=[N+]=Nn1cncn1": "1-azido-1H-1,2,4-triazole",
         # Four ligands on a singly bonded P is a lambda^5 centre; `phosphanyl`
         # on its own spells the trivalent one.
-        "CCP(CC)(CC)(CC)N=[N+]=[N-]": "1-((azido)triethyl-lambda^5-phosphanyl)ethane",
+        "CCP(CC)(CC)(CC)N=[N+]=[N-]": "1-(azidotri(ethyl)-lambda^5-phosphanyl)ethane",
     }
 
     for smiles, expected in cases.items():
@@ -5563,7 +5565,7 @@ def test_central_hydride_alkoxy_ligands_are_graph_derived():
         "CC(C)OP(OC(C)C)OC(C)C": "tris(propan-2-yl) phosphite",
         "CC(C)(C)O[PH](OC(C)(C)C)OC(C)(C)C": "tris(tert-butoxy)-lambda4-phosphane",
         # ``tert-`` is italic, so tert-butoxy files under ``b``, before methoxy.
-        "CO[Si](OC)(OC(C)(C)C)OC(C)(C)C": "bis(tert-butoxy)dimethoxysilane",
+        "CO[Si](OC)(OC(C)(C)C)OC(C)(C)C": "bis(tert-butoxy)di(methoxy)silane",
     }
 
     for smiles, expected in cases.items():
@@ -5689,7 +5691,7 @@ def test_charge_separated_sulfonyl_on_a_nitrogen_keeps_its_ligand():
     # A three-coordinate sulfinate's charge is real and stays.
     assert "oxidosulfinylamino" in name_smiles("COc1ccc(NS(=O)[O-])cc1[N+]1(N)C=NCC1")
     # Sulfur imides keep their own spelling.
-    assert name_smiles("N=S(Cl)CF") == "((chloro)(imino)sulfanyl)fluoromethane"
+    assert name_smiles("N=S(Cl)CF") == "(chloro(imino)sulfanyl)fluoromethane"
 
 
 def test_chlorosulfate_and_sulfamate_esters_are_not_sulfonate_parents():

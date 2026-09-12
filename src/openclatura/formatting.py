@@ -1,5 +1,7 @@
 """Name-fragment formatting helpers used by the naming pipeline."""
 
+from collections.abc import Callable
+
 from .assembly_parts import RenderedSubstituentName, rendered_substituent_text
 from .assembly_utils import is_fully_enclosed as is_fully_enclosed
 from .namer_config import ALKYL_OXY_PREFIXES
@@ -73,20 +75,27 @@ def format_counted_prefixes(names: list[str]) -> str:
     return "".join(format_multiplier(name, count, safe_enclose=safe) for name, count in sorted(counts.items()))
 
 
-def format_center_ligands(names: list[str]) -> str:
+def format_center_ligands(names: list[str], *, sort_key: Callable[[str], str] | None = None) -> str:
     """Format ligands cited on one central atom.
 
     The first ligand establishes the ligand list and is written normally;
     subsequent distinct ligands are parenthesised to keep them attached to the
-    same centre.  Repeated ligands are still collapsed with a multiplier.  For
-    example, ``ethyl`` + ``hydroxy`` becomes ``ethyl(hydroxy)``, while two
-    methyl ligands remain ``dimethyl``.
+    same centre.  Repeated ligands are collapsed with a multiplier; when such
+    a ligand follows another ligand, the multiplier remains outside its
+    parentheses.  For example, ``ethyl`` + ``hydroxy`` becomes
+    ``ethyl(hydroxy)``, while ``methoxy`` + two ``methyl`` ligands becomes
+    ``methoxydi(methyl)``.
     """
 
     rendered = []
-    for index, (name, count) in enumerate(sorted(count_names(names).items())):
-        ligand = format_multiplier(name, count)
-        if index and not is_fully_enclosed(ligand):
+    counts = count_names(names)
+    for index, name in enumerate(sorted(counts, key=sort_key)):
+        count = counts[name]
+        if index and count > 1 and not is_complex_prefix(name):
+            ligand = f"{multipliers.basic(count)}({name})"
+        else:
+            ligand = format_multiplier(name, count)
+        if index and count == 1 and not is_fully_enclosed(ligand):
             ligand = f"({ligand})"
         rendered.append(ligand)
     return "".join(rendered)
