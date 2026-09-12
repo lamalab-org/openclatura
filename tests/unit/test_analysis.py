@@ -636,9 +636,7 @@ def test_spiro_component_replacement_locant_binds_its_own_atom_not_broad_fallbac
     assert replacement_locant["ownership"] == "exact"
     assert replacement_locant["confidence"] == "derived"
     assert replacement_locant["atoms"] == [6]
-    binding = next(
-        item for item in assembly.data["name_atom_bindings"] if item["role"] == "replacement_prefix"
-    )
+    binding = next(item for item in assembly.data["name_atom_bindings"] if item["role"] == "replacement_prefix")
     assert binding["locants"] == ["5"]
     assert binding["atoms"] == [6]
 
@@ -1947,7 +1945,9 @@ def test_a_named_spiro_component_primes_its_replacement_prefixes():
     # The side ring is the primed component, so its heteroatom locants are
     # primed too.  Unprimed, they read back on the other ring entirely.
     assert name_smiles("N1CC2(C3=CC=CC=C13)NCNC2") == "1,3-diazaspiro[cyclopentane-4,3'-2,3-dihydro-1H-indole]"
-    assert name_smiles("O=C1NC2(CN1)c1ccccc1NC2=O") == "1,3-diazaspiro[cyclopentane-4,3'-1,3-dihydro-2H-indole]-2',2-dione"
+    assert (
+        name_smiles("O=C1NC2(CN1)c1ccccc1NC2=O") == "1,3-diazaspiro[cyclopentane-4,3'-1,3-dihydro-2H-indole]-2',2-dione"
+    )
 
 
 def test_every_side_ring_substituent_survives_and_is_primed():
@@ -3086,9 +3086,7 @@ def test_spiro_marker_is_converted_to_structural_assembly_item():
 
     # P-24.5.1 cites aziridine before the parent, so it is the unprimed component
     # and keeps its own substituent rather than hoisting a primed one.
-    assert spiro_subs == [
-        SpiroAssembly("1", "2", "aziridine", ("3-methyl",), side_prime="", cited_first=True)
-    ]
+    assert spiro_subs == [SpiroAssembly("1", "2", "aziridine", ("3-methyl",), side_prime="", cited_first=True)]
     assert parts.substituents == []
 
 
@@ -3108,9 +3106,7 @@ def test_structural_spiro_substituent_bypasses_marker_text():
 
     # P-24.5.1 cites aziridine before the parent, so it is the unprimed component
     # and keeps its own substituent rather than hoisting a primed one.
-    assert spiro_subs == [
-        SpiroAssembly("1", "2", "aziridine", ("3-methyl",), side_prime="", cited_first=True)
-    ]
+    assert spiro_subs == [SpiroAssembly("1", "2", "aziridine", ("3-methyl",), side_prime="", cited_first=True)]
     assert parts.substituents == []
 
 

@@ -108,8 +108,7 @@ def test_side_prefix_hoisting_preserves_graph_metadata_and_bindings():
     # P-24.5.1 cites this component first, so its locants lose the prime. Every
     # other thing the side carries has to survive that untouched.
     assert [
-        replace(item, locants=[str(locant).rstrip("'") for locant in item.locants])
-        for item in side.side_substituents
+        replace(item, locants=[str(locant).rstrip("'") for locant in item.locants]) for item in side.side_substituents
     ] == list(normalized.side_substituents)
 
 
