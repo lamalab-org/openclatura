@@ -1764,6 +1764,9 @@ def test_distinct_center_ligands_only_group_ligands_after_the_first():
     assert format_center_ligands(["hydroxy", "ethyl"]) == "ethyl(hydroxy)"
     assert format_center_ligands(["methyl", "methyl"]) == "dimethyl"
     assert format_center_ligands(["methoxy", "methyl", "methyl"]) == "methoxydimethyl"
+    assert format_center_ligands(["chlorofluoromethyl", "methyl", "methyl", "methyl"]) == (
+        "(chlorofluoromethyl)trimethyl"
+    )
 
 
 def test_charge_vocabulary_is_registry_backed():
@@ -5557,6 +5560,7 @@ def test_substituted_alkoxy_prefixes_preserve_imino_ether_connectivity():
 
 def test_central_hydride_alkoxy_ligands_are_graph_derived():
     cases = {
+        "C[Si](C)(C)C(F)Cl": "(chlorofluoromethyl)trimethylsilane",
         # The hyphen belongs to a lambda descriptor, not to the prefix boundary,
         # so only the last of these carries one.
         "COP(OC)OC": "trimethyl phosphite",

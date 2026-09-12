@@ -81,16 +81,24 @@ def format_center_ligands(names: list[str], *, sort_key: Callable[[str], str] | 
     The first ligand establishes the ligand list and is written normally;
     subsequent distinct ligands are parenthesised to keep them attached to the
     same centre.  Repeated ligands remain a single multiplied word and do not
-    need another enclosure.  For example, ``ethyl`` + ``hydroxy`` becomes
-    ``ethyl(hydroxy)``, while ``methoxy`` + two ``methyl`` ligands becomes
-    ``methoxydimethyl``.
+    need another enclosure.  A preceding singleton is enclosed when it ends
+    with that repeated ligand, preventing e.g. ``chlorofluoromethyl`` plus
+    ``trimethyl`` from merging ambiguously.  Otherwise, ``ethyl`` + ``hydroxy``
+    becomes ``ethyl(hydroxy)``, while ``methoxy`` + two ``methyl`` ligands
+    becomes ``methoxydimethyl``.
     """
 
     rendered = []
     counts = count_names(names)
-    for index, name in enumerate(sorted(counts, key=sort_key)):
+    ordered_names = sorted(counts, key=sort_key)
+    for index, name in enumerate(ordered_names):
         count = counts[name]
         ligand = format_multiplier(name, count)
+        merges_with_multiplied_ligand = count == 1 and any(
+            counts[later_name] > 1 and name.endswith(later_name) for later_name in ordered_names[index + 1 :]
+        )
+        if merges_with_multiplied_ligand and not is_fully_enclosed(ligand):
+            ligand = f"({ligand})"
         if index and count == 1 and not is_fully_enclosed(ligand):
             ligand = f"({ligand})"
         rendered.append(ligand)
