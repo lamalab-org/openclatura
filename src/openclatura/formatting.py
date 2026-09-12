@@ -93,7 +93,10 @@ def format_center_ligands(names: list[str], *, sort_key: Callable[[str], str] | 
     ordered_names = sorted(counts, key=sort_key)
     for index, name in enumerate(ordered_names):
         count = counts[name]
-        ligand = format_multiplier(name, count)
+        if count > 1 and _is_substituted_alkyl_ligand(name) and not is_fully_enclosed(name):
+            ligand = f"{multipliers.complex_(count)}({name})"
+        else:
+            ligand = format_multiplier(name, count)
         merges_with_multiplied_ligand = count == 1 and any(
             counts[later_name] > 1 and name.endswith(later_name) for later_name in ordered_names[index + 1 :]
         )
@@ -103,6 +106,22 @@ def format_center_ligands(names: list[str], *, sort_key: Callable[[str], str] | 
             ligand = f"({ligand})"
         rendered.append(ligand)
     return "".join(rendered)
+
+
+def _is_substituted_alkyl_ligand(name: str) -> bool:
+    """Return whether a bare ligand contains modifiers before its alkyl root.
+
+    Such ligands require complex multipliers: two ``chloromethyl`` groups are
+    ``bis(chloromethyl)``, because ``dichloromethyl`` denotes one differently
+    substituted methyl group.  Unsubstituted acyclic and cycloalkyl ligands
+    retain compact basic multipliers.
+    """
+
+    stem = stems.terminal_stem(name)
+    if stem is None:
+        return False
+    simple_name = f"{stem.stem}yl"
+    return name not in {simple_name, f"cyclo{simple_name}"}
 
 
 def oxy_prefix_from_branch(branch: str) -> str:

@@ -84,6 +84,36 @@ LIGAND_BOUNDARY_CASES = (
         "B(C)(CCl)CCl",
         "bis(chloromethyl)(methyl)borane",
     ),
+    (
+        "substituted-carbamoyl-functional-prefix",
+        "O=C(O)CC(C(=O)N(CCl)CCl)",
+        "3-(bis(chloromethyl)carbamoyl)propanoic acid",
+    ),
+    (
+        "substituted-ammonio-functional-prefix",
+        "[N+](CCl)(CCl)(C)CC(=O)[O-]",
+        "2-(bis(chloromethyl)(methyl)ammonio)acetate",
+    ),
+    (
+        "substituted-phosphanium-functional-prefix",
+        "[BH3-][P+](CCl)(CCl)C",
+        "(bis(chloromethyl)(methyl)phosphaniumyl)boranuide",
+    ),
+    (
+        "substituted-borinic-functional-parent",
+        "OB(CCl)CCl",
+        "bis(chloromethyl)borinic acid",
+    ),
+    (
+        "mixed-sulfanyl-functional-prefix",
+        "N=S(CCl)C(F)Cl",
+        "chloro((chloromethyl)(imino)sulfanyl)fluoromethane",
+    ),
+    (
+        "substituted-sulfamic-functional-parent",
+        "CN(C)S(=O)(=O)O",
+        "dimethylsulfamic acid",
+    ),
 )
 
 
