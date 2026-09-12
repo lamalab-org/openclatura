@@ -2698,7 +2698,11 @@ def _hydrocarbyl_ligand_name(
     name = branch_namer(mol, neighbor, set(mol.atoms) - ligand_atoms, upstream_atom=central)
     if isinstance(name, tuple):
         name = name[0]
-    return strip_outer_parentheses(str(name)) if name else ""
+    # Recursive branch naming already decides whether a substituted ligand
+    # needs a protective boundary.  Preserve that decision here: stripping it
+    # turns two ``(chloromethyl)`` ligands into the structurally different
+    # ``dichloromethyl`` when the central-atom formatter applies a multiplier.
+    return str(name) if name else ""
 
 
 def _terminal_ligand_name(mol: Molecule, atom_idx: int, parent_idx: int) -> str:

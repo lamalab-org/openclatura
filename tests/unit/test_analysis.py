@@ -1764,6 +1764,9 @@ def test_distinct_center_ligands_only_group_ligands_after_the_first():
     assert format_center_ligands(["hydroxy", "ethyl"]) == "ethyl(hydroxy)"
     assert format_center_ligands(["methyl", "methyl"]) == "dimethyl"
     assert format_center_ligands(["methoxy", "methyl", "methyl"]) == "methoxydimethyl"
+    assert format_center_ligands(["(chloromethyl)", "(chloromethyl)", "methyl", "methyl"]) == (
+        "bis(chloromethyl)dimethyl"
+    )
     assert format_center_ligands(["chlorofluoromethyl", "methyl", "methyl", "methyl"]) == (
         "(chlorofluoromethyl)trimethyl"
     )
