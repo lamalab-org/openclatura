@@ -304,6 +304,35 @@ def _side_replacement_prefixes(parts: AssemblyParts) -> tuple[str, ...]:
     return (replacements,) if replacements else ()
 
 
+def _side_replacement_bindings(parts: AssemblyParts, prime: str = "'") -> tuple[NameAtomBinding, ...]:
+    """Bind a side component's replacement prefixes to the atoms they name.
+
+    The prefix reaches the name as a bare string, so the locant in "5-aza..."
+    has no binding to resolve against and the token resolver falls back to a
+    punctuation rule: a locant followed by a prime addresses the other
+    component. That rule reports the whole molecule as soon as the components
+    are cited in the other order and the prime moves, and it was only ever
+    standing in for the provenance recorded here.
+    """
+
+    bindings = []
+    for item in parts.a_prefixes:
+        if not item.atom_ids:
+            continue
+        locants = tuple(str(locant).rstrip("'") + prime for locant in item.locants)
+        bindings.append(
+            NameAtomBinding(
+                stage="replacement",
+                role="replacement_prefix",
+                term=item.name,
+                atom_ids=set(item.atom_ids),
+                bond_ids=set(item.bond_ids),
+                locants=locants,
+            )
+        )
+    return tuple(bindings)
+
+
 def _side_lambda_bindings(parts: AssemblyParts, prime: str = "'") -> tuple[NameAtomBinding, ...]:
     parent = parts.parent_hydride
     if parent is None or not parent.is_systematic_fusion:
@@ -505,6 +534,13 @@ def split_spiro_substituents(parts: AssemblyParts) -> list[SpiroAssembly]:
     elif len(spiro_subs) == 1 and spiro_subs[0].continuation is not None:
         side = spiro_subs[0]
         spiro_subs = [replace(side, continuation=_rescope_spiro_side(side.continuation, "''"))]
+    elif len(spiro_subs) == 1 and _spiro_side_is_cited_first(parts, spiro_subs[0]):
+        # P-24.5.1 cites the two components alphanumerically, and the order
+        # decides which one is primed. Settled here, before the side's
+        # operations are hoisted into the parent's record already primed and
+        # before any tail is rendered.
+        _prime_central_spiro_parts(parts, keep_name_internals=True)
+        spiro_subs = [replace(_rescope_spiro_side(spiro_subs[0], ""), cited_first=True)]
     spiro_subs = [_hoist_side_substituent_prefixes(parts, spiro) for spiro in spiro_subs]
     # The side component's descriptors belong in the whole name's leading
     # stereo group; only the assembler can put them there.
@@ -516,6 +552,84 @@ def split_spiro_substituents(parts: AssemblyParts) -> list[SpiroAssembly]:
             if feature[0] != junction and feature not in parts.stereo_features:
                 parts.stereo_features.append(feature)
     return spiro_subs
+
+
+_SPIRO_ORDER_LOCANTS = re.compile(r"^(?:\d+[a-z]?'*,)*\d+[a-z]?'*-")
+_SPIRO_ORDER_HYDRO = re.compile(r"^(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?hydro-?")
+_SPIRO_ORDER_INDICATED_H = re.compile(r"^(?:\d+[a-z]?'*H,)*\d+[a-z]?'*H-")
+
+
+def spiro_component_sort_key(name: str) -> tuple[str, tuple[int, ...]]:
+    """Alphanumerical key for one cited spiro component (P-24.5.1).
+
+    The components are ordered before the spiro parent exists, so the key is the
+    component parent hydride's own name. Indicated hydrogen and hydro prefixes
+    describe the *completed* system and are cited outside the brackets once it
+    is built -- P-24.5.1's own ``1'H-spiro[imidazolidine-4,2'-quinoxaline]`` and
+    P-31.2.3.3.3's ``4'a,5',6',7',8',8'a-hexahydro-1'H-spiro[imidazolidine-4,2'-
+    quinoxaline]`` -- so neither can decide which component is cited first.
+    ``1H-pyrrolo[3,2-b]pyridine`` therefore sorts under "p", not under "1".
+
+    P-14.5 compares nonitalic Roman letters first and admits locants only when
+    those fail to separate the candidates, so the key is a pair: the letters,
+    then the locants as a tie-break. The further P-24.5.3 discriminators (italic
+    fusion letters, heteroatom locants, von Baeyer descriptors) are not modelled;
+    they only matter once the Roman letters and locants both tie.
+    """
+
+    stripped = name.strip()
+    while stripped[:1] in {"(", "["} and stripped[-1:] in {")", "]"}:
+        stripped = stripped[1:-1].strip()
+    locants: list[int] = []
+    while True:
+        leading = _SPIRO_ORDER_LOCANTS.match(stripped)
+        if leading:
+            locants.extend(int(digits) for digits in re.findall(r"\d+", leading.group(0)))
+            stripped = stripped[leading.end() :]
+            continue
+        for pattern in (_SPIRO_ORDER_HYDRO, _SPIRO_ORDER_INDICATED_H):
+            match = pattern.match(stripped)
+            if match:
+                stripped = stripped[match.end() :]
+                break
+        else:
+            break
+    return stripped.lower(), tuple(locants)
+
+
+def _spiro_side_is_cited_first(parts: AssemblyParts, side: SpiroAssembly) -> bool:
+    """Whether P-24.5.1 cites the side component before the parent.
+
+    Decided from the parent's own component name, which ``parent_stem_and_terminal``
+    renders before any operation is projected.
+    """
+
+    from .assembly_parent import parent_stem_and_terminal
+
+    if side.continuation is not None:
+        return False
+    # A component of a larger assembly keeps parent-first: the enclosing spiro
+    # numbers against the name produced for it.
+    if parts.is_spiro_component or parts.is_spiro_side_projection:
+        return False
+    # A replacement or lambda prefix is projected into the name through its own
+    # binding roles, built from the unprimed record before this point. Reordering
+    # such an assembly renders a correct name but strands those bindings, and the
+    # final metadata audit then reports the component's atoms as unnamed.
+    # A replacement or lambda prefix is projected into the name through its own
+    # binding roles, built from the unprimed record before this point. Reordering
+    # such an assembly renders a correct name but strands those bindings, and the
+    # final metadata audit then reports the component's atoms as unnamed.
+    if parts.a_prefixes or any("lambda^" in prefix for prefix in side.side_prefixes):
+        return False
+    try:
+        stem, terminal = parent_stem_and_terminal(parts)
+    except Exception:  # pragma: no cover - the parent is rendered again later anyway
+        return False
+    parent_name = stem + (terminal if terminal and terminal != "e" else "e")
+    if parent_name.startswith(("spiro[", "dispiro[")):
+        return False
+    return spiro_component_sort_key(side.side_parent_name) < spiro_component_sort_key(parent_name)
 
 
 def _spiro_sides_in_order(sides: list[SpiroAssembly]) -> list[SpiroAssembly]:
@@ -535,10 +649,37 @@ def _rescope_spiro_side(side: SpiroAssembly, prime: str) -> SpiroAssembly:
     )
 
 
-def _prime_central_spiro_parts(parts: AssemblyParts) -> None:
-    """Project detachable operations of the middle dispiro component once."""
-    prime = _prime_side_locant
-    for attribute in ("substituents", "a_prefixes", "principal_suffix_modifiers"):
+def _ring_only_prime_side_locant(locant: str) -> str:
+    """Prime ring locants but leave an italic element locant alone.
+
+    A component prime says which ring a locant belongs to. The N of an
+    N-methylcarboxamide is the suffix's own nitrogen, not a position on either
+    ring, so priming it names an atom no component has and OPSIN reports no such
+    locant in scope.
+    """
+
+    text = str(locant)
+    if text and not text[0].isdigit():
+        return text
+    return _prime_side_locant(text)
+
+
+def _prime_central_spiro_parts(parts: AssemblyParts, *, keep_name_internals: bool = False) -> None:
+    """Project detachable operations of the middle dispiro component once.
+
+    ``keep_name_internals`` leaves alone the operations spelt inside the
+    component's own name -- its unsaturation locants and the replacement prefixes
+    of its skeleton. Those were built from the component's own numbering and are
+    cited within the brackets, so a prime there detaches them from the name they
+    belong to.
+    """
+    prime = _ring_only_prime_side_locant if keep_name_internals else _prime_side_locant
+    attributes = (
+        ("substituents", "principal_suffix_modifiers")
+        if keep_name_internals
+        else ("substituents", "a_prefixes", "principal_suffix_modifiers")
+    )
+    for attribute in attributes:
         setattr(
             parts,
             attribute,
@@ -551,9 +692,10 @@ def _prime_central_spiro_parts(parts: AssemblyParts) -> None:
     parts.hydro_operations = [
         replace(item, locants=tuple(prime(locant) for locant in item.locants)) for item in parts.hydro_operations
     ]
-    parts.unsaturations = [
-        replace(item, locants=[prime(locant) for locant in item.locants]) for item in parts.unsaturations
-    ]
+    if not keep_name_internals:
+        parts.unsaturations = [
+            replace(item, locants=[prime(locant) for locant in item.locants]) for item in parts.unsaturations
+        ]
     parts.indicated_hydrogens = [prime(locant) for locant in parts.indicated_hydrogens]
     parts.stereo_features = [(prime(locant), stereo) for locant, stereo in parts.stereo_features]
     parts.attachment_locant = prime(parts.attachment_locant)
@@ -576,9 +718,19 @@ def _prime_central_spiro_parts(parts: AssemblyParts) -> None:
         )
     parts.elided_substituent_locants = {prime(locant) for locant in parts.elided_substituent_locants}
     if parts.name_atom_bindings:
-        from .name_bindings import refresh_name_atom_bindings
+        if keep_name_internals:
+            # Rebuilding here would read a record whose spiro substituent has
+            # already been split out, leaving the side component's own atoms
+            # unbound and the final metadata audit calling them unnamed. The
+            # bindings are already correct; only their locants move.
+            parts.name_atom_bindings = [
+                replace(binding, locants=tuple(prime(locant) for locant in binding.locants))
+                for binding in parts.name_atom_bindings
+            ]
+        else:
+            from .name_bindings import refresh_name_atom_bindings
 
-        refresh_name_atom_bindings(parts)
+            refresh_name_atom_bindings(parts)
 
 
 _SIDE_LOCANTS_RE = re.compile(r"^[0-9]+[a-z]*'+(?:,[0-9]+[a-z]*'+)*$")
@@ -654,6 +806,7 @@ def _hoist_side_substituent_prefixes(parts: AssemblyParts, spiro: SpiroAssembly)
     if spiro.side_parts is not None:
         if parts.name_atom_bindings:
             parts.name_atom_bindings.extend(_side_lambda_bindings(spiro.side_parts, spiro.side_prime))
+            parts.name_atom_bindings.extend(_side_replacement_bindings(spiro.side_parts, spiro.side_prime))
         for item in spiro.side_substituents:
             parts.substituents.append(deepcopy(item))
             if parts.name_atom_bindings:
@@ -849,6 +1002,10 @@ def format_spiro_core(
                 f"dispiro[{_spiro_side_name(core_name)}-{spiro.parent_locant},{spiro.side_locant}'-"
                 f"{s_name_str}-{tail.parent_locant}',{tail.side_locant}''-{_spiro_side_name(tail.side_parent_name)}]"
             )
+        elif spiro.cited_first:
+            # The first component is cited bare: the enclosing marks a side
+            # component needs in second position make the name unreadable here.
+            core_name = f"spiro[{s_name}-{_spiro_side_locant(spiro)},{spiro.parent_locant}'-{core_name}]"
         else:
             core_name = f"spiro[{core_name}-{spiro.parent_locant},{_spiro_side_locant(spiro)}'-{s_name_str}]"
 
@@ -863,10 +1020,16 @@ def format_spiro_core(
         # beside the parent's ``-2-one`` is cited once as ``-2,2'-dione``.
         suffix_str, side_suffixes = _merge_principal_and_side_suffixes(suffix_str, side_suffixes)
         core_name += _format_side_suffixes(side_suffixes)
+    # Both steps assume the side ring is the primed component. When P-24.5.1
+    # cites the side first that is inverted: its prefixes are the unprimed ones,
+    # and the parent's were primed before rendering.
+    side_cited_first = any(spiro.cited_first for spiro in spiro_subs)
     if side_prefixes:
-        side_prefixes = _prime_replacement_prefixes_for_primed_component(core_name, side_prefixes)
+        if not side_cited_first:
+            side_prefixes = _prime_replacement_prefixes_for_primed_component(core_name, side_prefixes)
         core_name = "-".join(side_prefixes) + core_name
-    core_name = _prime_inline_replacement_prefixes_for_primed_component(core_name)
+    if not side_cited_first:
+        core_name = _prime_inline_replacement_prefixes_for_primed_component(core_name)
     return core_name, "", suffix_str
 
 

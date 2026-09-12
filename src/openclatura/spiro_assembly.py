@@ -21,4 +21,8 @@ class SpiroAssembly:
     # Unprimed component-local proof and typed operations, before projection.
     side_parts: "AssemblyParts | None" = None
     side_prime: str = "'"
+    # P-24.5.1 cited this component before the parent, so the parent carries the
+    # primes. Distinct from ``side_prime == ""``, which a dispiro's first
+    # component also has.
+    cited_first: bool = False
     continuation: "SpiroAssembly | None" = None

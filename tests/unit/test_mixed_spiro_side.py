@@ -13,8 +13,8 @@ from openclatura.spiro_subgraph import plan_substituted_fusion_spiro_side
 
 SMILES = "Cc1nc(N2CCC3(CC2)Cc2ncccc2[C@H]3N)c(CO)nc1Sc1ccnc(N)c1Cl"
 EXPECTED = (
-    "(3-((5'S)-5'-aminospiro[piperidine-4,6'-(6,7-dihydro-5H-cyclopenta[b]pyridine)]-1-yl)"
-    "-6-((2-amino-3-chloropyridin-4-yl)sulfanyl)-5-methylpyrazin-2-yl)methanol"
+    "(6-((2-amino-3-chloropyridin-4-yl)sulfanyl)-3-((5S)-5-aminospiro[6,7-dihydro-"
+    "5H-cyclopenta[b]pyridine-6,4'-piperidine]-1'-yl)-5-methylpyrazin-2-yl)methanol"
 )
 
 
@@ -99,12 +99,18 @@ def test_side_prefix_hoisting_preserves_graph_metadata_and_bindings():
     binding = next(binding for binding in rendered.bindings if binding.term == "amino")
     assert binding.atom_ids == amino.atom_ids
     assert binding.bond_ids == amino.bond_ids
-    assert binding.locants == ("5'",)
+    # P-24.5.1 cites this component first, so its locant is unprimed.
+    assert binding.locants == ("5",)
     assert binding.emitted_tokens
 
     parts = AssemblyParts(parent_length=6, substituents=[SubstituentItem(name="", locants=["4"], spiro=side)])
     normalized = split_spiro_substituents(parts)[0]
-    assert normalized.side_substituents == side.side_substituents
+    # P-24.5.1 cites this component first, so its locants lose the prime. Every
+    # other thing the side carries has to survive that untouched.
+    assert [
+        replace(item, locants=[str(locant).rstrip("'") for locant in item.locants])
+        for item in side.side_substituents
+    ] == list(normalized.side_substituents)
 
 
 def test_public_trace_keeps_side_amino_ownership():

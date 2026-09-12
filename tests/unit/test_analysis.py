@@ -607,7 +607,7 @@ def test_spiro_side_prefix_has_exact_graph_ownership_not_broad_fallback():
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
     methyl = next(token for token in assembly.data["name_token_spans"] if token["text"] == "methyl")
 
-    assert analysis.name == "1'-methylspiro[tricyclo[2.2.0.0^{2,5}]hexane-3,2'-aziridine]"
+    assert analysis.name == "1-methylspiro[aziridine-2,3'-tricyclo[2.2.0.0^{2,5}]hexane]"
     assert methyl["source"] == "substituent_renderer"
     assert methyl["confidence"] == "derived"
     assert methyl["ownership"] == "exact"
@@ -618,17 +618,29 @@ def test_spiro_side_prefix_has_exact_graph_ownership_not_broad_fallback():
     assert substituent["bonds"] == [1]
 
 
-def test_primed_spiro_component_locant_uses_component_scope_not_broad_fallback():
+def test_spiro_component_replacement_locant_binds_its_own_atom_not_broad_fallback():
+    """A side component's replacement prefix carries its own provenance.
+
+    This used to resolve through a punctuation rule -- a locant followed by a
+    prime addresses the other component -- which could only ever hand back that
+    whole component, and stopped working when P-24.5.1 cited the components in
+    the other order and the prime moved. The prefix now binds the atom it names,
+    so the locant resolves exactly and whichever order the components are in.
+    """
+
     analysis = analyze_smiles("OC1CC11CC2NC12")
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
-    primed_locant = next(token for token in assembly.data["name_token_spans"] if token["text"] == "5")
+    replacement_locant = next(token for token in assembly.data["name_token_spans"] if token["text"] == "5")
 
-    assert analysis.name == "5'-azaspiro[cyclopropane-2,2'-bicyclo[2.1.0]pentane]-1-ol"
-    assert primed_locant["source"] == "primed_component_locant_fallback"
-    assert primed_locant["confidence"] == "derived"
-    assert primed_locant["ownership"] == "component_locant"
-    assert primed_locant["token_kind"] == "locant"
-    assert primed_locant["atoms"] == [4, 5, 6, 7]
+    assert analysis.name == "5-azaspiro[bicyclo[2.1.0]pentane-2,2'-cyclopropane]-1'-ol"
+    assert replacement_locant["ownership"] == "exact"
+    assert replacement_locant["confidence"] == "derived"
+    assert replacement_locant["atoms"] == [6]
+    binding = next(
+        item for item in assembly.data["name_atom_bindings"] if item["role"] == "replacement_prefix"
+    )
+    assert binding["locants"] == ["5"]
+    assert binding["atoms"] == [6]
 
 
 def test_analysis_carries_name_atom_bindings():
@@ -1934,16 +1946,16 @@ def test_two_nitrogen_chain_uses_its_retained_name():
 def test_a_named_spiro_component_primes_its_replacement_prefixes():
     # The side ring is the primed component, so its heteroatom locants are
     # primed too.  Unprimed, they read back on the other ring entirely.
-    assert name_smiles("N1CC2(C3=CC=CC=C13)NCNC2") == "1',3'-diazaspiro[2,3-dihydro-1H-indole-3,4'-cyclopentane]"
-    assert name_smiles("O=C1NC2(CN1)c1ccccc1NC2=O") == "1',3'-diazaspiro[1,3-dihydro-2H-indole-3,4'-cyclopentane]-2,2'-dione"
+    assert name_smiles("N1CC2(C3=CC=CC=C13)NCNC2") == "1,3-diazaspiro[cyclopentane-4,3'-2,3-dihydro-1H-indole]"
+    assert name_smiles("O=C1NC2(CN1)c1ccccc1NC2=O") == "1,3-diazaspiro[cyclopentane-4,3'-1,3-dihydro-2H-indole]-2',2-dione"
 
 
 def test_every_side_ring_substituent_survives_and_is_primed():
     assert name_smiles("CCC/C=C1/N(CCCC)C(=O)NC12C(=O)N(C)c1ccccc12") == (
-        "(5'E)-1'-butyl-5'-butylidene-1-methyl-1',3'-diazaspiro[1,3-dihydro-2H-indole-3,4'-cyclopentane]-2,2'-dione"
+        "(5E)-1-butyl-5-butylidene-1'-methyl-1,3-diazaspiro[cyclopentane-4,3'-1,3-dihydro-2H-indole]-2',2-dione"
     )
     assert name_smiles("C=C1N(C)C(=O)NC12C(=O)N(C)c1ccccc12") == (
-        "1,1'-dimethyl-5'-methylidene-1',3'-diazaspiro[1,3-dihydro-2H-indole-3,4'-cyclopentane]-2,2'-dione"
+        "1,1'-dimethyl-5-methylidene-1,3-diazaspiro[cyclopentane-4,3'-1,3-dihydro-2H-indole]-2',2-dione"
     )
 
 
@@ -1963,7 +1975,8 @@ def test_a_counted_spiro_keeps_its_replacement_prefixes_unprimed():
     assert name_smiles("C1CC2(CC1)OCCO2") == "1,4-dioxaspiro[4.4]nonane"
     both = name_smiles("Cc1noc(C2CC3(C2)CN(C2CCC4(CC2)C(=O)Nc2ccccc24)C3)n1")
     assert "2-azaspiro[3.3]heptan" in both
-    assert "spiro[1,3-dihydro-2H-indole-3,1'-cyclohexane]" in both
+    # P-24.5.1 cites cyclohexane before the indole, so the indole is primed.
+    assert "spiro[cyclohexane-1,3'-1,3-dihydro-2H-indole]" in both
 
 
 def test_homonuclear_chain_names_are_reconstructed_by_the_audit():
@@ -3071,8 +3084,12 @@ def test_spiro_marker_is_converted_to_structural_assembly_item():
 
     spiro_subs = split_spiro_substituents(parts)
 
-    assert spiro_subs == [SpiroAssembly("1", "2", "aziridine")]
-    assert parts.substituents == [SubstituentItem(name="methyl", locants=["3'"])]
+    # P-24.5.1 cites aziridine before the parent, so it is the unprimed component
+    # and keeps its own substituent rather than hoisting a primed one.
+    assert spiro_subs == [
+        SpiroAssembly("1", "2", "aziridine", ("3-methyl",), side_prime="", cited_first=True)
+    ]
+    assert parts.substituents == []
 
 
 def test_structural_spiro_substituent_bypasses_marker_text():
@@ -3089,8 +3106,12 @@ def test_structural_spiro_substituent_bypasses_marker_text():
 
     spiro_subs = split_spiro_substituents(parts)
 
-    assert spiro_subs == [SpiroAssembly("1", "2", "aziridine")]
-    assert parts.substituents == [SubstituentItem(name="methyl", locants=["3'"])]
+    # P-24.5.1 cites aziridine before the parent, so it is the unprimed component
+    # and keeps its own substituent rather than hoisting a primed one.
+    assert spiro_subs == [
+        SpiroAssembly("1", "2", "aziridine", ("3-methyl",), side_prime="", cited_first=True)
+    ]
+    assert parts.substituents == []
 
 
 def test_spiro_side_retained_ionic_ring_locants_are_registry_derived():
@@ -4450,7 +4471,7 @@ def test_public_api_golden_names():
 
 def test_pyopsin_regression_names_use_parseable_spiro_and_formamido_forms():
     cases = {
-        "CN1CC11C2C3CC2C13": "1'-methylspiro[tricyclo[2.2.0.0^{2,5}]hexane-3,2'-aziridine]",
+        "CN1CC11C2C3CC2C13": "1-methylspiro[aziridine-2,3'-tricyclo[2.2.0.0^{2,5}]hexane]",
         "CC1CC11CC2CCC12": "2'-methylspiro[bicyclo[2.2.0]hexane-2,1'-cyclopropane]",
         "CC1NC11CC2OC12C": "1,3'-dimethylspiro[5-oxabicyclo[2.1.0]pentane-2,2'-aziridine]",
         "COC(=O)CCNC=O": "methyl 3-formamidopropanoate",
@@ -4593,9 +4614,9 @@ def test_ambiguous_ring_connection_stems_keep_attachment_locants():
 
 def test_spiro_substituent_radicals_keep_attachment_locants():
     cases = {
-        "OCC12CC(C1)C21CN1": "(spiro[bicyclo[1.1.1]pentane-2,2'-aziridine]-1-yl)methanol",
-        "OCC12CC1C1(CN1)C2": "(spiro[bicyclo[2.1.0]pentane-3,2'-aziridine]-1-yl)methanol",
-        "OCC1CC11C2CC1C2": "(spiro[cyclopropane-2,2'-bicyclo[1.1.1]pentane]-1-yl)methanol",
+        "OCC12CC(C1)C21CN1": "(spiro[aziridine-2,2'-bicyclo[1.1.1]pentane]-1'-yl)methanol",
+        "OCC12CC1C1(CN1)C2": "(spiro[aziridine-2,3'-bicyclo[2.1.0]pentane]-1'-yl)methanol",
+        "OCC1CC11C2CC1C2": "(spiro[bicyclo[1.1.1]pentane-2,2'-cyclopropane]-1'-yl)methanol",
     }
 
     for smiles, expected in cases.items():
@@ -4711,8 +4732,8 @@ def test_mixed_spiro_bicyclo_side_suffixes_and_replacement_locants_are_component
     cases = {
         "OC1CC11C2CC1(O)C2": "spiro[bicyclo[1.1.1]pentane-2,1'-cyclopropane]-1,2'-diol",
         "OC1CC11C2CC1C2=O": "spiro[bicyclo[1.1.1]pentane-4,1'-cyclopropane]-2'-ol-2-one",
-        "CC12CC(O1)C21CC1O": "1'-methyl-2'-oxaspiro[cyclopropane-2,4'-bicyclo[1.1.1]pentane]-1-ol",
-        "CC12CN(C1)C21CC1O": "3'-methyl-1'-azaspiro[cyclopropane-2,2'-bicyclo[1.1.1]pentane]-1-ol",
+        "CC12CC(O1)C21CC1O": "1-methyl-2-oxaspiro[bicyclo[1.1.1]pentane-4,2'-cyclopropane]-1'-ol",
+        "CC12CN(C1)C21CC1O": "3-methyl-1-azaspiro[bicyclo[1.1.1]pentane-2,2'-cyclopropane]-1'-ol",
     }
 
     for smiles, expected in cases.items():

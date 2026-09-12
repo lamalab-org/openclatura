@@ -88,6 +88,10 @@ def plan_graph_spiro_side(
         nonlocal captured, render_parent
         # Assembly mutates parts. Keep the component-local proof before any
         # rendering, not the parts of a recursively assembled acid fragment.
+        # The enclosing spiro numbers its components against the name this
+        # projection returns, so the name must not be re-ordered here (P-24.5.1
+        # applies to the completed assembly, not to a component of one).
+        parts.is_spiro_side_projection = True
         if set(component_mol.atoms) == side_atoms:
             captured = deepcopy(parts)
 

@@ -45,7 +45,7 @@ def test_typed_side_hoisting_does_not_parse_nested_prefix_names(monkeypatch):
     parts = AssemblyParts(parent_length=3, substituents=[SubstituentItem("", ["1"], spiro=side)])
     normalized = split_spiro_substituents(parts)[0]
     assert normalized.side_prefixes == ()
-    assert parts.substituents == [replace(branch, locants=["3a'"])]
+    assert parts.substituents == [replace(branch, locants=["3a"])]
     assert parts.substituents[0].substituent_tree == branch.substituent_tree
     assert split_spiro_substituents(parts) == []
     assert len(parts.substituents) == 1
@@ -70,8 +70,10 @@ def test_typed_replacements_are_projected_from_parts_without_parsing(monkeypatch
     assert side.side_prefixes == ("2'-methyl", "1',3'-diaza")
     parts = AssemblyParts(parent_length=3, substituents=[SubstituentItem("", ["1"], spiro=side)])
     normalized = split_spiro_substituents(parts)[0]
-    assert normalized.side_prefixes == ("1',3'-diaza",)
-    assert parts.substituents == [replace(original.substituents[0], locants=["2'"])]
+    # P-24.5.1 cites this component first, so its replacement prefix is unprimed.
+    assert normalized.side_prefixes == ("1,3-diaza",)
+    # P-24.5.1 cites this component first, so the hoisted locant is unprimed.
+    assert parts.substituents == [replace(original.substituents[0], locants=["2"])]
     assert local == original
 
 

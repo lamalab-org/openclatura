@@ -184,6 +184,9 @@ class AssemblyParts:
     locant_elision_decisions: list[dict] = field(default_factory=list)
     # A component junction fixes numbering even when its prefixes are hoisted.
     is_spiro_component: bool = False
+    # This record is being assembled as the side component of an enclosing spiro
+    # system, whose numbering is computed against the name produced here.
+    is_spiro_side_projection: bool = False
 
     def __post_init__(self) -> None:
         """Project immutable parent-hydride facts into mutable assembly state."""
