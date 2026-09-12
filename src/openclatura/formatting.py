@@ -73,6 +73,25 @@ def format_counted_prefixes(names: list[str]) -> str:
     return "".join(format_multiplier(name, count, safe_enclose=safe) for name, count in sorted(counts.items()))
 
 
+def format_center_ligands(names: list[str]) -> str:
+    """Format ligands cited on one central atom.
+
+    The first ligand establishes the ligand list and is written normally;
+    subsequent distinct ligands are parenthesised to keep them attached to the
+    same centre.  Repeated ligands are still collapsed with a multiplier.  For
+    example, ``ethyl`` + ``hydroxy`` becomes ``ethyl(hydroxy)``, while two
+    methyl ligands remain ``dimethyl``.
+    """
+
+    rendered = []
+    for index, (name, count) in enumerate(sorted(count_names(names).items())):
+        ligand = format_multiplier(name, count)
+        if index and not is_fully_enclosed(ligand):
+            ligand = f"({ligand})"
+        rendered.append(ligand)
+    return "".join(rendered)
+
+
 def oxy_prefix_from_branch(branch: str) -> str:
     """Return an oxy prefix for a named branch."""
 

@@ -40,7 +40,7 @@ from openclatura.assembly_spiro import (
 )
 from openclatura.chains import RingSystem, find_all_carbon_paths, find_ring_systems
 from openclatura.charge_pair_roles import charge_pair_roles
-from openclatura.formatting import format_counted_prefixes
+from openclatura.formatting import format_center_ligands, format_counted_prefixes
 from openclatura.functional_groups import (
     PERCEPTION_DETECTORS,
     register_group_detector,
@@ -1758,6 +1758,11 @@ def test_final_assembly_audit_rejects_unbound_name_tokens():
 
 def test_repeated_substituent_with_internal_multiplier_uses_complex_multiplier():
     assert format_counted_prefixes(["dihydroxyphosphoryl", "dihydroxyphosphoryl"]) == "bis(dihydroxyphosphoryl)"
+
+
+def test_distinct_center_ligands_only_group_ligands_after_the_first():
+    assert format_center_ligands(["hydroxy", "ethyl"]) == "ethyl(hydroxy)"
+    assert format_center_ligands(["methyl", "methyl"]) == "dimethyl"
 
 
 def test_charge_vocabulary_is_registry_backed():
@@ -5443,7 +5448,7 @@ def test_an_oxidised_pnictogen_prefix_cites_two_ligands_or_says_inoyl():
     cases = {
         "CCOP(=O)c1ccccc1": "ethoxyphosphinoylbenzene",
         "FCCCP(=O)O": "1-fluoro-3-(hydroxyphosphinoyl)propane",
-        "CCP(=O)(O)CC": "1-((ethyl)(hydroxy)phosphoryl)ethane",
+        "CCP(=O)(O)CC": "1-(ethyl(hydroxy)phosphoryl)ethane",
         "CO[P+]([O-])(OC)c1ccccc1": "dimethyl phenylphosphonate",
         "CCP(=O)([O-])CCC": "1-(ethyloxido(oxo)phosphanyl)propane",
     }

@@ -3,6 +3,7 @@
 from .assembly_parts import split_rendered_substituent_name
 from .formatting import (
     count_names,
+    format_center_ligands,
     format_counted_prefixes,
     format_element_substituent,
     format_multiplier,
@@ -875,7 +876,7 @@ def name_pnictogen_subgraph(
         and substituent_bonding_number(mol, start_idx) > atom.element.standard_valence
     ):
         return format_lambda_substituent(mol, start_idx, branches, stereo_prefix_text, suffix)
-    return f"({stereo_prefix_text}{format_counted_prefixes(branches)}{suffix})"
+    return f"({stereo_prefix_text}{format_center_ligands(branches)}{suffix})"
 
 
 def name_group_13_14_subgraph(
