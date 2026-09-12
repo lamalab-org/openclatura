@@ -107,7 +107,6 @@ def format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:
     prefix_parts = []
     for name in sorted(grouped.keys(), key=substituent_sort_key):
         items = grouped[name]
-        outer_parentheses_optional = all(item.outer_parentheses_optional for item in items)
         locs = sorted([loc for item in items for loc in item.locants], key=parse_locant)
         attachments_per_group = 2 if ("diyl" in name and "ylidene" not in name) else 1
         count_raw = len(locs) if locs else len(items)
@@ -116,13 +115,12 @@ def format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:
         mult = (multipliers.complex_(count) if is_complex else multipliers.basic(count)) if count > 1 else ""
         loc_str = substituent_locant_string(parts, name, locs, len(grouped), spiro_subs)
 
-        name_to_use = _omit_optional_outer_parentheses(
+        name_to_use = _omit_unlocanted_outer_parentheses(
             parts,
             name,
             count,
             loc_str,
             len(grouped),
-            outer_parentheses_optional=outer_parentheses_optional,
         )
         if is_complex and not is_fully_enclosed(name_to_use):
             if count > 1 or loc_str:
@@ -138,27 +136,65 @@ def format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:
     return prefix_str
 
 
-def _omit_optional_outer_parentheses(
+def _omit_unlocanted_outer_parentheses(
     parts: AssemblyParts,
     name: str,
     count: int,
     locant_text: str,
     grouped_count: int,
-    *,
-    outer_parentheses_optional: bool,
 ) -> str:
-    """Unwrap a directly rendered fragment when its parent boundary is clear."""
+    """Unwrap a lone prefix when no printed locant needs a boundary.
+
+    Complex substituent names arrive protected by an outer pair of
+    parentheses.  Once their only parent locant is elided, retaining that pair
+    produces awkward spellings such as ``(propan-2-yl)cyclopropane``.  The
+    ``yl`` prefix ending already marks the parent boundary for plain prefixes
+    and prefixes built around one leading nested branch.  Multi-ligand forms
+    keep their grouping because dropping it can change which parent receives
+    a ligand.
+    """
 
     if (
         parts.is_substituent
+        or parts.principal_group is not None
         or count != 1
         or locant_text
         or grouped_count != 1
-        or not outer_parentheses_optional
         or not is_fully_enclosed(name)
+        or not _outer_parentheses_are_redundant(name)
     ):
         return name
     return name[1:-1]
+
+
+def _outer_parentheses_are_redundant(name: str) -> bool:
+    """Return whether one outer pair can be removed without exposing sibling groups."""
+
+    inner = name[1:-1]
+    depth = 0
+    top_level_groups: list[list[int]] = []
+    for index, character in enumerate(inner):
+        if character == "(":
+            if depth == 0:
+                top_level_groups.append([index, -1])
+            depth += 1
+        elif character == ")":
+            depth -= 1
+            if depth < 0:
+                return False
+            if depth == 0:
+                top_level_groups[-1][1] = index
+    if depth or len(top_level_groups) > 1:
+        return False
+    if not top_level_groups:
+        return not _starts_with_multiplier(inner)
+    opening, closing = top_level_groups[0]
+    prefix_is_only_locants = opening == 0 or inner[:opening].rstrip("0123456789,'-") == ""
+    return prefix_is_only_locants and not _starts_with_multiplier(inner[closing + 1 :])
+
+
+def _starts_with_multiplier(text: str) -> bool:
+    return any(text.startswith(multiplier.basic) for multiplier in multipliers.MULTIPLIERS.values())
 
 
 def format_replacement_prefixes(parts: AssemblyParts) -> str:
