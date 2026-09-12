@@ -150,12 +150,10 @@ def _omit_unlocanted_outer_parentheses(
     """Unwrap a lone prefix when no printed locant needs a boundary.
 
     Complex substituent names arrive protected by an outer pair of
-    parentheses.  Once their only parent locant is elided, retaining that pair
-    produces awkward spellings such as ``(propan-2-yl)cyclopropane``.  The
-    ``yl`` prefix ending already marks the parent boundary for plain prefixes
-    and prefixes built around one leading nested branch.  Multi-ligand forms
-    keep their grouping because dropping it can change which parent receives
-    a ligand.
+    parentheses.  Remove that pair only when the renderer explicitly marks it
+    optional and the remaining structure is unambiguous.  Required boundaries
+    and multi-ligand forms stay grouped because dropping them can change which
+    parent receives a ligand.
     """
 
     if (

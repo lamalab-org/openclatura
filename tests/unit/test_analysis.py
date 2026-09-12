@@ -2001,7 +2001,7 @@ def test_homonuclear_chain_names_are_reconstructed_by_the_audit():
 def test_a_charge_separated_chalcogenido_is_not_a_hydride():
     # `sulfanyl` spells an S-H; a terminal [S-] on a positive centre has none,
     # so the charge-separated form must name as its neutral equivalent.
-    assert name_smiles("CO[P+](=S)[S-]") == name_smiles("COP(=S)=S") == "(dithioxophosphanyl)oxymethane"
+    assert name_smiles("CO[P+](=S)[S-]") == name_smiles("COP(=S)=S") == "((dithioxophosphanyl)oxy)methane"
     # An ordinary thiolate keeps its charge -- the centre beside it is neutral.
     assert name_smiles("CC[S-]") == "ethanethiolate"
     assert name_smiles("C[N+](C)(C)CC[S-]") == "2-(trimethylammonio)ethane-1-thiolate"
@@ -5351,7 +5351,7 @@ def test_high_risk_polycycle_audit_fails_closed_without_proof_candidate():
 
 def test_charge_separated_sulfonium_ylide_requires_single_bond():
     assert name_smiles("C[S+](C)[CH-]C") == "1-(dimethylsulfaniumyl)ethan-1-ide"
-    assert name_smiles("C[SH+](C)=[C-]c1ccccc1") == "(dimethyl-lambda^4-sulfanylidene)methylbenzene"
+    assert name_smiles("C[SH+](C)=[C-]c1ccccc1") == "((dimethyl-lambda^4-sulfanylidene)methyl)benzene"
 
 
 def test_sulfur_ylide_resonance_compare_accepts_lambda_fallback_graph():
@@ -5447,7 +5447,7 @@ def test_a_spiro_side_component_keeps_its_stereo_descriptors():
 
 def test_an_oxidised_pnictogen_prefix_cites_two_ligands_or_says_inoyl():
     cases = {
-        "CCOP(=O)c1ccccc1": "ethoxyphosphinoylbenzene",
+        "CCOP(=O)c1ccccc1": "(ethoxyphosphinoyl)benzene",
         "FCCCP(=O)O": "1-fluoro-3-(hydroxyphosphinoyl)propane",
         "CCP(=O)(O)CC": "1-(ethyl(hydroxy)phosphoryl)ethane",
         "CO[P+]([O-])(OC)c1ccccc1": "dimethyl phenylphosphonate",
