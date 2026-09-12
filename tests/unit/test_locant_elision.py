@@ -1,7 +1,8 @@
 """Configurable constitutional locant-elision regressions."""
 
 from openclatura import DEFAULT_NAMING_ENGINE, NamingRequest, name_many, name_smiles
-from openclatura.assembly_parts import AssemblyParts, PrincipalGroupItem
+from openclatura.assembly_parts import AssemblyParts, PrincipalGroupItem, SubstituentItem
+from openclatura.assembly_prefixes import format_substituent_prefixes
 from openclatura.locant_elision import apply_redundant_locant_elision
 
 
@@ -77,6 +78,17 @@ def test_unlocanted_multiplied_ligand_prefix_uses_clear_single_word():
         _name("c1ccc([Se](c2ccccc2)(c2ccccc2)c2ccccc2)cc1").name
         == "(triphenyl-lambda^4-selanyl)benzene"
     )
+
+
+def test_unlocanted_outer_wrapper_is_removed_only_when_renderer_marks_it_optional():
+    parts = AssemblyParts(parent_length=3)
+    parts.substituents = [SubstituentItem(name="(propan-2-yl)", locants=[])]
+    assert format_substituent_prefixes(parts, []) == "(propan-2-yl)"
+
+    parts.substituents = [
+        SubstituentItem(name="(propan-2-yl)", locants=[], outer_parentheses_optional=True)
+    ]
+    assert format_substituent_prefixes(parts, []) == "propan-2-yl"
 
 
 def test_nonconstitutional_and_unsupported_parent_locants_are_unchanged():
