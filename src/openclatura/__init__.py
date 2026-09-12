@@ -1,7 +1,6 @@
 """openclatura — deterministic SMILES → IUPAC name generator."""
 
 from collections.abc import Iterable
-from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 from ._version import __version__
