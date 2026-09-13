@@ -20,7 +20,7 @@ from .chains import find_ring_systems, get_cyclic_atoms
 from .component_namer import name_component as _name_component_impl
 from .engine import DEFAULT_NAMING_ENGINE
 from .formatting import (
-    format_counted_prefixes,
+    format_center_ligands,
     format_multiplier,
     is_complex_prefix,
     is_composite_prefix,
@@ -231,7 +231,7 @@ def _direct_amide_subgraph_prefix(
             ligand_decisions.extend(decision_trace_data(branch_decisions))
             if branch_tree:
                 ligand_trees.append(branch_tree)
-    name = base if not branch_names else f"({format_counted_prefixes(branch_names)}{base})"
+    name = base if not branch_names else f"({format_center_ligands(branch_names)}{base})"
     return DirectSubgraphPrefix(
         name=name,
         group_key=group.key,

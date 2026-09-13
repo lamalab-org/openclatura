@@ -10,7 +10,7 @@ from .chains import get_cyclic_atoms
 from .charge_pair_roles import charge_pair_roles
 from .formatting import (
     count_names,
-    format_counted_prefixes,
+    format_center_ligands,
     format_multiplier,
     is_complex_prefix,
     oxy_prefix_from_branch,
@@ -628,7 +628,7 @@ def phosphane_borane_zwitterion_result(
     if ligand_atoms_seen | core_atoms != component_atoms:
         return None
     ligand_names = [name for name, _atoms in ligands]
-    prefix = format_counted_prefixes(ligand_names)
+    prefix = format_center_ligands(ligand_names, sort_key=substituent_sort_key)
     name = f"({prefix}phosphaniumyl)boranuide"
     bindings = tuple(
         NameAtomBinding(
@@ -1066,7 +1066,7 @@ def sulfonium_ylide_name(
     represented_atoms = {sulfur, ylide_carbon} | sulfur_ligand_atoms | ylide_sub_atoms
     if represented_atoms != component_atoms:
         return ""
-    sulfur_prefix = format_counted_prefixes(sulfur_ligand_names)
+    sulfur_prefix = format_center_ligands(sulfur_ligand_names, sort_key=substituent_sort_key)
     sulfaniumyl = f"{sulfur_prefix}sulfaniumyl"
     ylide_parent = _sulfonium_ylide_carbanion_parent_name(
         mol,
@@ -1347,7 +1347,7 @@ def sulfamic_acid_result(
     if represented != component_atoms:
         return None
 
-    prefix = format_counted_prefixes([name for _atoms, name in ligands]) if ligands else ""
+    prefix = format_center_ligands([name for _atoms, name in ligands], sort_key=substituent_sort_key) if ligands else ""
     name = f"{prefix}sulfamic acid"
     bindings = [
         NameAtomBinding(
@@ -1962,12 +1962,13 @@ def organoboronic_acid_result(
             mol, root, (set(mol.atoms) - component_atoms) | {central}
         )
     word = "boronic acid" if len(carbon_roots) == 1 else "borinic acid"
-    name = f"{format_counted_prefixes(ligands)}{word}"
+    ligand_prefix = format_center_ligands(ligands, sort_key=substituent_sort_key)
+    name = f"{ligand_prefix}{word}"
     bindings = (
         NameAtomBinding(
             stage="shortcut",
             role="organoboronic_ligand",
-            term=format_counted_prefixes(ligands),
+            term=ligand_prefix,
             atom_ids=set(ligand_atoms),
             bond_ids=bond_ids_within(mol, set(ligand_atoms)),
         ),
@@ -2697,7 +2698,11 @@ def _hydrocarbyl_ligand_name(
     name = branch_namer(mol, neighbor, set(mol.atoms) - ligand_atoms, upstream_atom=central)
     if isinstance(name, tuple):
         name = name[0]
-    return strip_outer_parentheses(str(name)) if name else ""
+    # Recursive branch naming already decides whether a substituted ligand
+    # needs a protective boundary.  Preserve that decision here: stripping it
+    # turns two ``(chloromethyl)`` ligands into the structurally different
+    # ``dichloromethyl`` when the central-atom formatter applies a multiplier.
+    return str(name) if name else ""
 
 
 def _terminal_ligand_name(mol: Molecule, atom_idx: int, parent_idx: int) -> str:
@@ -2734,19 +2739,7 @@ def _alkoxy_ligand_name(mol: Molecule, component_atoms: set[int], oxygen: int, c
 
 
 def _grouped_ligand_prefix(names: list[str]) -> str:
-    groups = {}
-    for name in names:
-        groups[name] = groups.get(name, 0) + 1
-    parts = []
-    mixed_single_ligands = len(groups) > 1
-
-    for name in sorted(groups, key=substituent_sort_key):
-        count = groups[name]
-        if count == 1:
-            parts.append(format_multiplier(name, 1, safe_enclose=mixed_single_ligands))
-        else:
-            parts.append(format_multiplier(name, count))
-    return "".join(parts)
+    return format_center_ligands(names, sort_key=substituent_sort_key)
 
 
 def _lambda_text(mol: Molecule, atom_idx: int) -> str:
