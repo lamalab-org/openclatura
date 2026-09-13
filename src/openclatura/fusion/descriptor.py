@@ -1640,6 +1640,7 @@ def _with_prime_depths(join: FusionJoin, depths: Mapping[int, int]) -> FusionJoi
     host_depth = depths.get(join.host_occurrence, 0)
     if attached_depth == 0 and host_depth == 0:
         return join
+
     # Re-stamping the depth on every locant of every candidate is the hottest
     # allocation in fusion naming. dataclasses.replace re-derives the field list
     # per call; these two carry three fields each, so name them directly. The
