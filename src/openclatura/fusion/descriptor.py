@@ -122,10 +122,12 @@ class _PreparedComponentSelection:
 def component_sides(spec: FusionComponentSpec) -> tuple[ComponentSide, ...]:
     """Return the component's directed sides in ``a``, ``b``, ... order."""
 
+    if spec._sides is not None:
+        return spec._sides
     order = spec.peripheral_order
     if len(order) < 3:
         raise FusionDescriptorError(f"component {spec.key!r} has no usable peripheral walk")
-    return tuple(
+    sides = tuple(
         ComponentSide(
             letter=_alphabetic_index(index),
             start_locant=left,
@@ -133,6 +135,8 @@ def component_sides(spec: FusionComponentSpec) -> tuple[ComponentSide, ...]:
         )
         for index, (left, right) in enumerate(zip(order, order[1:] + order[:1]))
     )
+    object.__setattr__(spec, "_sides", sides)
+    return sides
 
 
 def build_fusion_name_ast(
@@ -1433,7 +1437,6 @@ def classify_ordered_fusion_interface(
     if not interface.shared_edges:
         return None
     host_map = host.input_atom_by_locant
-    attached_inverse = {atom: locant for locant, atom in attached.local_to_input_atom}
     sides = component_sides(host_spec)
     side_edges = tuple(normalize_edge(host_map[side.start_locant], host_map[side.end_locant]) for side in sides)
     selected_indices = frozenset(index for index, edge in enumerate(side_edges) if edge in interface.shared_edges)
@@ -1455,6 +1458,9 @@ def classify_ordered_fusion_interface(
         return None
     if frozenset(ordered_atoms) != interface.shared_atom_ids:
         return None
+    # Built here rather than on entry: four of the checks above reject the
+    # interface outright, and this inverse map is only read once past them.
+    attached_inverse = {atom: locant for locant, atom in attached.local_to_input_atom}
     try:
         attached_text = tuple(attached_inverse[atom] for atom in ordered_atoms)
     except KeyError:

@@ -150,8 +150,10 @@ def multiplicative_attachment_key(
 def component_variant_identity(spec: FusionComponentSpec) -> tuple:
     """Stable typed identity of one exact component-policy/template variant."""
 
+    if spec._variant_identity is not None:
+        return spec._variant_identity
     template = spec.template
-    return (
+    identity = (
         template.name,
         tuple(
             (atom.locant, atom.symbol, atom.charge, atom.aromatic, atom.fusion, atom.saturated, atom.interior)
@@ -161,6 +163,8 @@ def component_variant_identity(spec: FusionComponentSpec) -> tuple:
         tuple(sorted(tuple(sorted(ring, key=retained_locant_sort_key)) for ring in template.rings)),
         spec.multiplicative_prefix_style,
     )
+    object.__setattr__(spec, "_variant_identity", identity)
+    return identity
 
 
 def component_canonicalization_key(spec: FusionComponentSpec) -> tuple:

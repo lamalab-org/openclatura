@@ -280,6 +280,15 @@ class FusionComponentSpec:
     usable_as_peri_parent: bool = False
     construction_order: FusionComponentConstructionOrder | None = None
     _seniority_key: ChemicalComponentSeniorityKey | None = field(default=None, init=False, compare=False, repr=False)
+    # The directed peripheral sides derive from peripheral_order alone. They are
+    # read once per interface classification -- tens of thousands of times for a
+    # large system -- so an immutable spec retains them, exactly as it retains
+    # its seniority key; dataclass replacement resets both.
+    _sides: tuple | None = field(default=None, init=False, compare=False, repr=False)
+    # The variant identity derives from the template's own atoms, bonds and
+    # rings. It keys several groupings per citation candidate, so it is retained
+    # on the same terms as the seniority key above.
+    _variant_identity: tuple | None = field(default=None, init=False, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         for value, label in (
