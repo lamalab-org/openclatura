@@ -289,6 +289,11 @@ class FusionComponentSpec:
     # rings. It keys several groupings per citation candidate, so it is retained
     # on the same terms as the seniority key above.
     _variant_identity: tuple | None = field(default=None, init=False, compare=False, repr=False)
+    # The undirected local bond set derives from the template's bonds alone. It
+    # is rebuilt once per interface classification to test attached-path
+    # adjacency, so an immutable spec retains it on the same terms as the sides
+    # above; dataclass replacement resets it with them.
+    _bond_locant_sets: frozenset | None = field(default=None, init=False, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         for value, label in (
