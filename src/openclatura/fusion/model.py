@@ -653,6 +653,12 @@ class FaceModel:
     fusion_edges: frozenset[int]
     outer_boundary: tuple[int, ...]
     face_adjacency: tuple[tuple[int, int, int], ...]
+    # The face index and the undirected adjacency set derive from the fields
+    # above and from nothing else. The layout search consults both on every
+    # partial extension it tries, so an immutable model retains them on the
+    # same terms as the component values in FusionComponentSpec above.
+    _face_by_id: dict | None = field(default=None, init=False, compare=False, repr=False)
+    _adjacent_faces: frozenset | None = field(default=None, init=False, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         face_ids = [face.id for face in self.faces]

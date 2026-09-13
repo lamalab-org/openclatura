@@ -1265,8 +1265,14 @@ def _partial_layout_is_valid(
         return False
     # The search calls this on every partial extension, so the model's own
     # lookups are built once per model rather than rescanned per call.
-    face_by_id = {face.id: face for face in model.faces}
-    adjacent_faces = frozenset(frozenset((first, second)) for first, second, _ in model.face_adjacency)
+    face_by_id = model._face_by_id
+    if face_by_id is None:
+        face_by_id = {face.id: face for face in model.faces}
+        object.__setattr__(model, "_face_by_id", face_by_id)
+    adjacent_faces = model._adjacent_faces
+    if adjacent_faces is None:
+        adjacent_faces = frozenset(frozenset((first, second)) for first, second, _ in model.face_adjacency)
+        object.__setattr__(model, "_adjacent_faces", adjacent_faces)
     drawn_edges: dict[frozenset[int], tuple[Point, Point]] = {}
     for face_id, order in placed_orders.items():
         face = face_by_id[face_id]

@@ -963,6 +963,13 @@ def _best_tree_mapping_candidate(
                 host_projection = host_side_projection(selected[node], specs[node])
             except FusionDescriptorError:
                 host_projection = None
+        # select_direct_child walks the Cartesian product of the children's
+        # mappings, but a child's join is proved from its own mapping and the
+        # host's, never from a sibling's, so the same proof is re-derived once
+        # per combination of the siblings before it. Each mapping is proved on
+        # the first combination that reaches it and the result is reused for
+        # the rest of this visit, which is scoped to one selected[node].
+        proved_joins: dict[int, dict[int, tuple[FusionJoin, int] | None]] = {}
 
         def select_direct_child(position: int) -> None:
             nonlocal visited_states
@@ -983,22 +990,27 @@ def _best_tree_mapping_candidate(
 
             child = child_ids[position]
             interface = interface_by_pair[frozenset((child, node))]
-            for mapping in projected[child]:
+            proved = proved_joins.setdefault(child, {})
+            for index, mapping in enumerate(projected[child]):
                 visited_states += 1
                 if visited_states > MAX_LOCANT_MAP_COMBINATIONS:
                     raise _LocantMapBudgetExceeded(
                         f"tree locant-map search exceeds bounded limit {MAX_LOCANT_MAP_COMBINATIONS} states"
                     )
-                classified = _classified_join(
-                    mapping,
-                    selected[node],
-                    specs[child],
-                    specs[node],
-                    interface,
-                    topology.order_by_occurrence[child],
-                    mol,
-                    host_projection,
-                )
+                if index in proved:
+                    classified = proved[index]
+                else:
+                    classified = _classified_join(
+                        mapping,
+                        selected[node],
+                        specs[child],
+                        specs[node],
+                        interface,
+                        topology.order_by_occurrence[child],
+                        mol,
+                        host_projection,
+                    )
+                    proved[index] = classified
                 if classified is None:
                     continue
                 join, side_rank = classified
@@ -1515,7 +1527,9 @@ def classify_ordered_fusion_interface(
         return None
     # Recomputed only when the caller has no hoisted projection to hand over,
     # which keeps component_sides' error behind this guard for those callers.
-    host_map, sides, side_edges = host_projection if host_projection is not None else host_side_projection(host, host_spec)
+    host_map, sides, side_edges = (
+        host_projection if host_projection is not None else host_side_projection(host, host_spec)
+    )
     selected_indices = frozenset(index for index, edge in enumerate(side_edges) if edge in interface.shared_edges)
     if len(selected_indices) != len(interface.shared_edges) or len(selected_indices) == len(sides):
         return None

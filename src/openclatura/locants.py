@@ -166,8 +166,15 @@ def parse_system_locant(value: object):
     )
 
 
+@lru_cache(maxsize=4096)
 def system_locant_sort_key(value: object) -> tuple[int, int, str, int]:
-    """Return the single canonical ordering key for completed-system locants."""
+    """Return the single canonical ordering key for completed-system locants.
+
+    Fusion numbering sorts locant labels constantly, so this runs on the order
+    of a hundred times per fused molecule while drawing on the handful of
+    labels one ring system can spell. It is memoised on the same terms as
+    ``retained_locant_sort_key`` below, which wraps it for the same reason.
+    """
 
     locant = parse_system_locant(value)
     return (

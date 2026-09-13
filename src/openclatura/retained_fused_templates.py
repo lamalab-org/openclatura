@@ -554,6 +554,11 @@ def _match_all_retained_fused_template(
     }
     template_neighbors = _template_neighbors(template)
     template_bond_classes = {frozenset(bond.locants): bond.bond_class for bond in template.bonds}
+    # Only a template that fixes saturation of its own pins its hydrogen
+    # population; a mancude one may relocate indicated H. This asks the
+    # template, not the candidate pair, so it is settled once per match
+    # instead of once per locant-atom pair the comprehension below tries.
+    fixed_hydrogenation = any(atom.saturated for atom in template.atoms)
     locants_by_constraint = sorted(
         template.locants,
         key=lambda locant: (
@@ -573,9 +578,7 @@ def _match_all_retained_fused_template(
                 ring_atoms=atom_set,
                 allow_nonaromatic=allow_nonaromatic,
                 charge_policy=template.charge_policy,
-                # Only a template that fixes saturation of its own pins its
-                # hydrogen population; a mancude one may relocate indicated H.
-                fixed_hydrogenation=any(atom.saturated for atom in template.atoms),
+                fixed_hydrogenation=fixed_hydrogenation,
             )
             and molecule_degrees[atom_idx] == template_degrees[locant]
         ]
