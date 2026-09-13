@@ -65,7 +65,7 @@ class RegisteredFusionComponent:
     def spec_for_template(self, template_name: str) -> FusionComponentSpec:
         """Bind this component policy to the exact matched graph variant."""
 
-        if not template_name:
+        if not template_name or template_name == self.spec.template.name:
             return self.spec
         template = next((item for item in self.templates if item.name == template_name), None)
         if template is None:

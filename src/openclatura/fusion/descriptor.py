@@ -94,7 +94,6 @@ class _OccurrenceOption:
 class _Candidate:
     ast: FusionNameAst
     score: tuple
-    rendered: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -244,7 +243,11 @@ def iter_fusion_name_asts(
                 )
             except _LocantMapBudgetExceeded:
                 budget_exhausted += 1
-        for candidate in sorted(candidates, key=lambda candidate: (candidate.score, candidate.rendered)):
+        # The rendered name orders candidates that every structural criterion
+        # leaves tied, so it is only needed within a tie. Ranking the whole set
+        # by it meant rendering thousands of citations per system when the
+        # caller stops at the first one that passes its audit.
+        for candidate in _candidates_in_citation_order(candidates, registry):
             if candidate.ast not in emitted:
                 emitted.append(candidate.ast)
                 yield candidate.ast
@@ -656,6 +659,29 @@ def _exact_component_covers(
     if not covers:
         raise FusionDescriptorError("no bounded exact component cover was found")
     return tuple(covers)
+
+
+def _candidates_in_citation_order(candidates, registry):
+    """Yield candidates in (score, rendered name) order, rendering lazily.
+
+    Ordering by the structural score and then by the rendered name is the same
+    ordering the eager form produced, because the name was the score's own last
+    element. Rendering is deferred into each tied group, so a caller that takes
+    the first candidate never pays for the rest.
+    """
+
+    ordered = sorted(candidates, key=lambda candidate: candidate.score)
+    index = 0
+    while index < len(ordered):
+        end = index + 1
+        score = ordered[index].score
+        while end < len(ordered) and ordered[end].score == score:
+            end += 1
+        group = ordered[index:end]
+        if len(group) > 1:
+            group = sorted(group, key=lambda candidate: render_fusion_name(candidate.ast, registry))
+        yield from group
+        index = end
 
 
 def _candidates_for_component_selection(
@@ -1339,7 +1365,6 @@ def _build_candidate(
         descriptors=descriptors,
         citation_plan=citation_plan,
     )
-    rendered = render_fusion_name(ast, registry)
     exact_location_key = replace(
         topology.location_key,
         multiplicative_grouping_score=tuple(
@@ -1354,9 +1379,8 @@ def _build_candidate(
         max(topology.order_by_occurrence.values(), default=0),
         tuple(_join_preference_key(joins_by_child[child], side_rank[child]) for child in citation_children),
         tuple(component_spec_seniority_key(specs[child]).as_tuple() for child in citation_children),
-        rendered,
     )
-    return _Candidate(ast, score, rendered)
+    return _Candidate(ast, score)
 
 
 def _closing_join_direction(
@@ -1608,17 +1632,30 @@ def _multiplicative_groups(
 def _with_prime_depths(join: FusionJoin, depths: Mapping[int, int]) -> FusionJoin:
     attached_depth = depths.get(join.attached_occurrence, 0)
     host_depth = depths.get(join.host_occurrence, 0)
+    if attached_depth == 0 and host_depth == 0:
+        return join
+    # Re-stamping the depth on every locant of every candidate is the hottest
+    # allocation in fusion naming. dataclasses.replace re-derives the field list
+    # per call; these two carry three fields each, so name them directly. The
+    # class and __post_init__ are unchanged, so the objects are identical.
+    def _locant(locant: ComponentLocant, depth: int) -> ComponentLocant:
+        return ComponentLocant(locant.component_id, locant.text, depth)
+
+    def _side(side: FusionSide, depth: int) -> FusionSide:
+        return FusionSide(side.component_id, side.letter, depth)
+
+    interface = join.interface
     return replace(
         join,
         interface=replace(
-            join.interface,
-            attached_path=tuple(replace(locant, prime_depth=attached_depth) for locant in join.interface.attached_path),
+            interface,
+            attached_path=tuple(_locant(locant, attached_depth) for locant in interface.attached_path),
             cited_attached_locants=tuple(
-                replace(locant, prime_depth=attached_depth) for locant in join.interface.cited_attached_locants
+                _locant(locant, attached_depth) for locant in interface.cited_attached_locants
             ),
-            host_path=tuple(replace(locant, prime_depth=host_depth) for locant in join.interface.host_path),
-            host_sides=tuple(replace(side, prime_depth=host_depth) for side in join.interface.host_sides),
-            host_locants=tuple(replace(locant, prime_depth=host_depth) for locant in join.interface.host_locants),
+            host_path=tuple(_locant(locant, host_depth) for locant in interface.host_path),
+            host_sides=tuple(_side(side, host_depth) for side in interface.host_sides),
+            host_locants=tuple(_locant(locant, host_depth) for locant in interface.host_locants),
         ),
     )
 
