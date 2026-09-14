@@ -46,6 +46,22 @@ from this bug by bug 1 firing first on the same molecules (the ether in
 ``CO[Si](C)(C)C1CC1`` tripped ``_has_principal_group`` for the wrong
 reason, which happened to also produce the ring-correct fallback), so
 fixing bug 1 alone made them visibly regress until this second fix.
+
+Bug 2, take 2 -- the first fix for bug 2 only checked centre's DIRECT
+neighbours for ring membership, missing a ring reachable only through a
+longer branch (found by a large-scale pubchem corpus comparison after
+that first fix shipped): ``CC[C@H](C)C[P@](C)(=O)COCc1ccccc1`` has its
+phenyl ring two bonds away from phosphorus through a -CH2-O-CH2- ether
+linker, not directly bonded to it, so the direct-neighbour check let
+simple_central_parent_hydride_result fire anyway -- silently dropping the
+phosphorus stereocentre's descriptor in the process, since the "phosphane
+oxide" parent style this shortcut produces has no stereo-descriptor
+machinery the general ring-aware pipeline's substituent-prefix style has.
+Fixed by checking for ANY cyclic atom anywhere in the component instead
+of just the centre's immediate neighbours -- component_atoms is always
+one connected piece, so a ring anywhere in it is reachable from the
+centre regardless of distance, making the broader check both correct and
+strictly simpler than the neighbour-only one it replaced.
 """
 
 from __future__ import annotations
@@ -196,6 +212,11 @@ RING_LIGAND_CASES = (
         "C1CC1[Si](C1CC1)(C)C",
         "(cyclopropyldimethylsilyl)cyclopropane",
     ),
+    (
+        "ring-two-bonds-away-through-an-ether-linker-pubchem-corpus-regression",
+        "CP(C)(=O)COCc1ccccc1",
+        "((((dimethyloxophosphanyl)methyl)oxy)methyl)benzene",
+    ),
 )
 
 
@@ -214,3 +235,27 @@ def test_simple_central_parent_hydride_result_refuses_a_ring_ligand_directly():
 
     mol = read_smiles("C[Si](C)(C)C1CC1")
     assert simple_central_parent_hydride_result(mol, set(mol.atoms)) is None
+
+
+def test_simple_central_parent_hydride_result_refuses_a_distant_ring_ligand_directly():
+    """Same check, but for a ring reachable only through a longer branch --
+    this is the shape the neighbour-only version of the guard missed."""
+
+    from openclatura.graph_io import read_smiles
+    from openclatura.special_cases import simple_central_parent_hydride_result
+
+    mol = read_smiles("CP(C)(=O)COCc1ccccc1")
+    assert simple_central_parent_hydride_result(mol, set(mol.atoms)) is None
+
+
+def test_phosphorus_stereocentre_survives_when_a_distant_ring_forces_it_into_a_prefix():
+    """The exact pubchem-corpus regression: a chiral phosphine oxide whose
+    only ring is two bonds away through a -CH2-O-CH2- ether linker. Before
+    the distance-independent fix, the ring-ligand guard's direct-neighbour
+    check missed this, letting the "phosphane oxide" mononuclear-parent
+    style fire -- and that style has no stereo-descriptor machinery, so the
+    (S) configuration at phosphorus was silently dropped from the name."""
+
+    result = name_one("CC[C@H](C)C[P@](C)(=O)COCc1ccccc1", verify_opsin=True)
+    assert "(S)" in result.name
+    assert result.opsin_check.status == "matched", (result.name, result.opsin_check.status)

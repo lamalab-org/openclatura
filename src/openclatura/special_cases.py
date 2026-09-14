@@ -2520,15 +2520,16 @@ def simple_central_parent_hydride_result(
         return None
     central = central_candidates[0]
     cyclic_atoms = get_cyclic_atoms(mol)
-    if central in cyclic_atoms:
-        return None
     # P-44.1.1: a ring or ring system is always senior to a chain, and a
     # mononuclear parent hydride like silane/germane/borane/phosphane counts
-    # as one for this purpose. A ligand that is itself part of a ring means
-    # that ring -- not this hydride -- is the correct parent (e.g. a
-    # cyclopropyl ligand on silicon must come out as "(...)cyclopropane",
-    # not "cyclopropyl...silane"), so this shortcut must not fire at all.
-    if any(neighbor in cyclic_atoms for neighbor in mol.get_neighbors(central) if neighbor in component_atoms):
+    # as one for this purpose. A ring ANYWHERE in this component -- whether a
+    # ligand directly bonded to the centre (cyclopropyl on silicon) or one
+    # reached only through a longer branch (a benzyl group two atoms further
+    # out through an ether linkage) -- means that ring, not this hydride, is
+    # the correct parent, so this shortcut must not fire at all. component_atoms
+    # is a single connected component, so any ring atom in it is necessarily
+    # reachable from central regardless of distance.
+    if cyclic_atoms & component_atoms:
         return None
     central_symbol = mol.atoms[central].symbol
     charge_separated_oxide = (
