@@ -2519,6 +2519,15 @@ def simple_central_parent_hydride_result(
     if len(central_candidates) != 1:
         return None
     central = central_candidates[0]
+    if mol.atoms[central].stereo or mol.atoms[central].raw_stereo:
+        # A configured centre (e.g. a chiral phosphine oxide) needs a
+        # stereo-descriptor this "phosphane oxide"-style spelling has no
+        # machinery to carry -- organophosphonic_acid_result refuses to fire
+        # for the exact same reason. Falling through lets the general
+        # substituent-prefix pipeline express it instead (e.g.
+        # "(R)-(chloro)(ethyl)oxophosphanyl" as a prefix on the O-alkyl
+        # chain), rather than silently dropping the configuration.
+        return None
     cyclic_atoms = get_cyclic_atoms(mol)
     # P-44.1.1: a ring or ring system is always senior to a chain, and a
     # mononuclear parent hydride like silane/germane/borane/phosphane counts

@@ -978,6 +978,27 @@ def _finalize_subgraph_name(name: str, parts: AssemblyParts) -> str:
     """Apply recursive-substituent wrapping rules to an assembled name.
     P-13.6 and P-16.5 for substituent suffix citation and parentheses around complex prefixes."""
 
+    # "nitrilo" (heteroatom_subgraphs.py's word for a branch that starts by
+    # walking into the terminal nitrogen of a triple-bonded C#N) is an
+    # internal placeholder for "cyano" ONLY when this component's own
+    # principal group is itself the nitrile (the whole-molecule
+    # "-carbonitrile"/"-nitrile" suffix case, where the replacement is a
+    # pure spelling fix with no atom-counting consequence). A blanket,
+    # unconditional replacement is NOT safe: "cyano" and "nitrilo" are not
+    # interchangeable spellings of the same count once a locant/chain is
+    # involved -- "cyano" always implies its own separate carbon beyond the
+    # chain it's cited on (2-cyanoethyl = 3 carbons total), whereas
+    # "nitrilo" (as OPSIN parses it back) folds the nitrile's carbon INTO
+    # the counted chain (2-nitriloethyl = 2 carbons total, matching e.g.
+    # O=COCC#N's real 2-carbon alcohol fragment). Confirmed by round-tripping
+    # both spellings through OPSIN: "2-nitriloethyl formate" matches,
+    # "2-cyanoethyl formate" does not (gains a phantom carbon); the correct
+    # PIN-style spelling for that exact shape is "cyanomethyl formate" (one
+    # fewer counted chain carbon, not just a different word). The
+    # isolated-nitrile-as-its-own-substituent gap this was trying to patch
+    # (e.g. a ring-C#N wrongly rendering as "nitrilomethyl"/"cyanomethyl"
+    # instead of plain "cyano") is fixed at its actual root instead: see
+    # direct_group_prefixes' "ring_nitrile"/"ring_carboxylic_acid" entries.
     if parts.principal_group is not None and parts.principal_group.key in {"nitrile", "ring_nitrile"}:
         name = name.replace("nitrilo", "cyano")
     if name == "phenyl" and not parts.substituents:
