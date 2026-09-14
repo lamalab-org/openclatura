@@ -860,8 +860,9 @@ def match_retained_graph_templates(
         return []
 
     atom_set = set(atom_indices)
+    atom_key = frozenset(atom_set)
     cache_key = (
-        frozenset(atom_set),
+        atom_key,
         include_disabled,
         allow_nonaromatic,
         allow_relocated_indicated_h,
@@ -871,7 +872,13 @@ def match_retained_graph_templates(
     cached = mol._retained_fused_cache.get(cache_key)
     if cached is not None:
         return list(cached)
-    topology_key = _molecule_topology_key(mol, atom_set)
+    # The topology key reads the graph alone, so the family and the admission
+    # flags above do not enter it. Keyed on the atoms it is shared across all
+    # of those variants instead of rebuilt once per combination.
+    topology_key = mol._retained_topology_cache.get(atom_key)
+    if topology_key is None:
+        topology_key = _molecule_topology_key(mol, atom_set)
+        mol._retained_topology_cache[atom_key] = topology_key
     candidates = list(_templates_by_topology(include_disabled, pre_descriptor_only, families).get(topology_key, ()))
     candidate_names = {template.name for template in candidates}
     candidates.extend(
