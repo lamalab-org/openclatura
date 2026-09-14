@@ -89,25 +89,22 @@ def number_parent(
         candidates.append(path)
         candidates.append(path[::-1])
 
-    def compare_paths(p1, p2):
-        def evaluate(oriented_path):
-            preference = _numbering_preference(
-                mol,
-                oriented_path,
-                principal_carbons,
-                substituent_mapping,
-                is_bicycle=is_bicycle,
-                is_spiro=is_spiro,
-                is_polycycle=is_polycycle,
-                retained_name=retained_name,
-            )
-            if is_ring:
-                return preference.ring_key()
-            return preference.chain_key()
+    def evaluate(oriented_path):
+        preference = _numbering_preference(
+            mol,
+            oriented_path,
+            principal_carbons,
+            substituent_mapping,
+            is_bicycle=is_bicycle,
+            is_spiro=is_spiro,
+            is_polycycle=is_polycycle,
+            retained_name=retained_name,
+        )
+        if is_ring:
+            return preference.ring_key()
+        return preference.chain_key()
 
-        ev1 = evaluate(p1)
-        ev2 = evaluate(p2)
-
+    def compare_evaluations(ev1, ev2):
         for v1, v2 in zip(ev1, ev2):
             if not v1 and not v2:
                 continue
@@ -126,10 +123,16 @@ def number_parent(
                 return 1
         return 0
 
+    # Each candidate is scored once. Comparing paths rather than scores made
+    # the running best pay for a fresh evaluation on every comparison, which
+    # was half of all the scoring this function did.
     best = candidates[0]
+    best_evaluation = evaluate(best)
     for c in candidates[1:]:
-        if compare_paths(c, best) < 0:
+        evaluation = evaluate(c)
+        if compare_evaluations(evaluation, best_evaluation) < 0:
             best = c
+            best_evaluation = evaluation
     return best
 
 

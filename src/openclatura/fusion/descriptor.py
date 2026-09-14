@@ -970,6 +970,16 @@ def _best_tree_mapping_candidate(
         # the first combination that reaches it and the result is reused for
         # the rest of this visit, which is scoped to one selected[node].
         proved_joins: dict[int, dict[int, tuple[FusionJoin, int] | None]] = {}
+        # Two of the four citation-order criteria ask only about a child's own
+        # spec, which nothing in this search varies, so they are settled once
+        # per visit rather than rebuilt for every element of every leaf sort.
+        spec_order_keys = {
+            child: (
+                component_spec_seniority_key(specs[child]).as_tuple(),
+                component_canonicalization_key(specs[child]),
+            )
+            for child in child_ids
+        }
 
         def select_direct_child(position: int) -> None:
             nonlocal visited_states
@@ -978,10 +988,10 @@ def _best_tree_mapping_candidate(
                     sorted(
                         child_ids,
                         key=lambda child: (
-                            component_spec_seniority_key(specs[child]).as_tuple(),
+                            spec_order_keys[child][0],
                             side_ranks[child],
                             _attached_locant_key(selected_joins[child]),
-                            component_canonicalization_key(specs[child]),
+                            spec_order_keys[child][1],
                         ),
                     )
                 )

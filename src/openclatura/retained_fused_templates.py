@@ -567,11 +567,16 @@ def _match_all_retained_fused_template(
             locant,
         ),
     )
+    # Both tests are pure, so the order is ours to choose. The degree test is
+    # two dict lookups and rejects most of the pairs; the chemistry test walks
+    # the atom's bonds and its element policy. Asking the cheap one first
+    # leaves the same candidates.
     candidates = {
         locant: [
             atom_idx
             for atom_idx in atom_set
-            if _atom_matches_template(
+            if molecule_degrees[atom_idx] == template_degrees[locant]
+            and _atom_matches_template(
                 mol,
                 atom_idx,
                 atom_by_locant[locant],
@@ -580,7 +585,6 @@ def _match_all_retained_fused_template(
                 charge_policy=template.charge_policy,
                 fixed_hydrogenation=fixed_hydrogenation,
             )
-            and molecule_degrees[atom_idx] == template_degrees[locant]
         ]
         for locant in template.locants
     }
