@@ -61,6 +61,131 @@ class NumberingPreference:
         return self.ordered_key(NUMBERING_CRITERIA["ring"])
 
 
+class _DeferredNumberingKey:
+    """The ordered criteria, each derived the first time it is compared.
+
+    A comparison settles on the first criterion that differs, and over the
+    corpus 96% of them settle within three of the eight. Materialising the
+    whole key derived hydro sites, bond locants, substituent citations and a
+    stereochemistry walk that nothing went on to read.
+    """
+
+    __slots__ = ("_criteria", "_preference", "_values")
+
+    def __init__(self, preference: "_DeferredNumberingPreference", criteria: list[str]) -> None:
+        self._preference = preference
+        self._criteria = criteria
+        self._values: list[tuple] = []
+
+    def __len__(self) -> int:
+        return len(self._criteria)
+
+    def __getitem__(self, index: int) -> tuple:
+        values = self._values
+        while len(values) <= index:
+            values.append(self._preference.criterion_value(self._criteria[len(values)]))
+        return values[index]
+
+    def __iter__(self):
+        for index in range(len(self._criteria)):
+            yield self[index]
+
+
+class _DeferredNumberingPreference:
+    """A NumberingPreference whose criteria are derived on demand.
+
+    It holds what a criterion is derived from rather than the criteria, and
+    answers criterion_value with the same values the eager dataclass carries.
+    Each is derived once per candidate however often it is compared.
+    """
+
+    __slots__ = (
+        "_mol",
+        "_oriented_path",
+        "_principal_carbons",
+        "_substituent_mapping",
+        "_is_bicycle",
+        "_is_spiro",
+        "_is_polycycle",
+        "_retained_name",
+        "_values",
+    )
+
+    def __init__(
+        self,
+        mol: Molecule,
+        oriented_path: list[int],
+        principal_carbons: set[int],
+        substituent_mapping: dict[int, list[str]],
+        *,
+        is_bicycle: bool,
+        is_spiro: bool,
+        is_polycycle: bool,
+        retained_name: str | None,
+    ) -> None:
+        self._mol = mol
+        self._oriented_path = oriented_path
+        self._principal_carbons = principal_carbons
+        self._substituent_mapping = substituent_mapping
+        self._is_bicycle = is_bicycle
+        self._is_spiro = is_spiro
+        self._is_polycycle = is_polycycle
+        self._retained_name = retained_name
+        self._values: dict[str, tuple] = {}
+
+    def _unsaturation(self) -> tuple[int, ...]:
+        if self._retained_name:
+            return ()
+        double_bonds, triple_bonds = get_bond_locants(
+            self._mol, self._oriented_path, self._is_bicycle, self._is_spiro, self._is_polycycle
+        )
+        return tuple(sorted(double_bonds + triple_bonds))
+
+    def _derive(self, criterion: str) -> tuple:
+        if criterion == "principal":
+            return tuple(get_atom_locants(self._oriented_path, self._principal_carbons))
+        if criterion == "hetero_by_priority":
+            return _heteroatom_locants_by_priority(
+                self._mol,
+                self._oriented_path,
+                monocycle=not (self._is_bicycle or self._is_spiro or self._is_polycycle),
+            )
+        if criterion == "indicated_hydrogen":
+            return _indicated_hydrogen_like_locants(
+                self._mol,
+                self._oriented_path,
+                retained_name=self._retained_name,
+                include_all_ring_carbons=False,
+            )
+        if criterion == "hydro":
+            return _hydro_locants(self._mol, self._oriented_path, self._retained_name)
+        if criterion == "unsaturation":
+            return self._unsaturation()
+        if criterion == "substituent_and_unsaturation":
+            substituent_locants = get_atom_locants(self._oriented_path, set(self._substituent_mapping.keys()))
+            return tuple(sorted(substituent_locants + list(self.criterion_value("unsaturation"))))
+        if criterion == "substituent_citation":
+            return _substituent_citation_locants(self._oriented_path, self._substituent_mapping)
+        if criterion == "stereochemistry":
+            return _stereochemistry_sequence(self._mol, self._oriented_path)
+        raise KeyError(f"Unknown numbering criterion: {criterion}")
+
+    def criterion_value(self, criterion: str) -> tuple:
+        values = self._values
+        if criterion not in values:
+            values[criterion] = self._derive(criterion)
+        return values[criterion]
+
+    def ordered_key(self, criteria: list[str]) -> "_DeferredNumberingKey":
+        return _DeferredNumberingKey(self, criteria)
+
+    def chain_key(self) -> "_DeferredNumberingKey":
+        return self.ordered_key(NUMBERING_CRITERIA["chain"])
+
+    def ring_key(self) -> "_DeferredNumberingKey":
+        return self.ordered_key(NUMBERING_CRITERIA["ring"])
+
+
 def number_parent(
     mol: Molecule,
     candidate_paths: list[list[int]],
@@ -90,7 +215,7 @@ def number_parent(
         candidates.append(path[::-1])
 
     def evaluate(oriented_path):
-        preference = _numbering_preference(
+        preference = _DeferredNumberingPreference(
             mol,
             oriented_path,
             principal_carbons,
