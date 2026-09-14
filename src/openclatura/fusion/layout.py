@@ -1264,32 +1264,41 @@ def _partial_layout_is_valid(
     if len(set(positions.values())) != len(positions):
         return False
     # The search calls this on every partial extension, so the model's own
-    # lookups are built once per model rather than rescanned per call.
+    # lookups are built once per model rather than rescanned per call. Both
+    # index an undirected pair as the ordered tuple of its ends, which answers
+    # the same question as a frozenset without allocating one per lookup.
     face_by_id = model._face_by_id
     if face_by_id is None:
         face_by_id = {face.id: face for face in model.faces}
         object.__setattr__(model, "_face_by_id", face_by_id)
     adjacent_faces = model._adjacent_faces
     if adjacent_faces is None:
-        adjacent_faces = frozenset(frozenset((first, second)) for first, second, _ in model.face_adjacency)
+        adjacent_faces = frozenset(
+            (first, second) if first < second else (second, first) for first, second, _ in model.face_adjacency
+        )
         object.__setattr__(model, "_adjacent_faces", adjacent_faces)
-    drawn_edges: dict[frozenset[int], tuple[Point, Point]] = {}
+    drawn_edges: dict[tuple[int, int], tuple[Point, Point]] = {}
     for face_id, order in placed_orders.items():
-        face = face_by_id[face_id]
-        for edge_id, left, right in zip(face.edge_cycle, face.atom_cycle, face.atom_cycle[1:] + face.atom_cycle[:1]):
+        cycle = face_by_id[face_id].atom_cycle
+        size = len(cycle)
+        for index, left in enumerate(cycle):
+            right = cycle[index + 1] if index + 1 < size else cycle[0]
             if left not in positions or right not in positions:
                 return False
-            key = frozenset((left, right))
+            key = (left, right) if left < right else (right, left)
             segment = (positions[left], positions[right])
             previous = drawn_edges.setdefault(key, segment)
-            if set(previous) != set(segment):
+            # The same edge drawn twice must span the same two points; the ends
+            # may be visited in either order by the two faces that share it.
+            if previous is not segment and previous != segment and (previous[1], previous[0]) != segment:
                 return False
     # Pair every drawn edge with its bounding box once. Two segments whose boxes
     # are disjoint cannot cross, and that rejects almost every pair before the
     # exact predicate runs -- the same answer, with the cross products skipped.
     edges = [
         (
-            atoms,
+            atoms[0],
+            atoms[1],
             segment,
             min(segment[0][0], segment[1][0]),
             max(segment[0][0], segment[1][0]),
@@ -1298,18 +1307,25 @@ def _partial_layout_is_valid(
         )
         for atoms, segment in drawn_edges.items()
     ]
-    for index, (left_atoms, left_segment, left_x0, left_x1, left_y0, left_y1) in enumerate(edges):
-        for right_atoms, right_segment, right_x0, right_x1, right_y0, right_y1 in edges[index + 1 :]:
+    count = len(edges)
+    for index in range(count):
+        left_start, left_end, left_segment, left_x0, left_x1, left_y0, left_y1 = edges[index]
+        for other in range(index + 1, count):
+            right_start, right_end, right_segment, right_x0, right_x1, right_y0, right_y1 = edges[other]
             if left_x1 < right_x0 or right_x1 < left_x0 or left_y1 < right_y0 or right_y1 < left_y0:
                 continue
-            if left_atoms & right_atoms:
+            if left_start == right_start or left_start == right_end or left_end == right_start or left_end == right_end:
                 continue
             if _segments_intersect(*left_segment, *right_segment):
                 return False
     polygons = [(face_id, tuple(positions[atom] for atom in order)) for face_id, order in placed_orders.items()]
-    for index, (left_id, left_polygon) in enumerate(polygons):
-        for right_id, right_polygon in polygons[index + 1 :]:
-            if frozenset((left_id, right_id)) in adjacent_faces:
+    count = len(polygons)
+    for index in range(count):
+        left_id, left_polygon = polygons[index]
+        for other in range(index + 1, count):
+            right_id, right_polygon = polygons[other]
+            pair = (left_id, right_id) if left_id < right_id else (right_id, left_id)
+            if pair in adjacent_faces:
                 continue
             if _polygon_center_strictly_inside(left_polygon, right_polygon):
                 return False
