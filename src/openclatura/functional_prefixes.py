@@ -73,7 +73,7 @@ def amide_prefix_from_group(
         rendered_substituent_text(branch_namer(mol, x, sub_exclude | {single_n}, upstream_atom=single_n))
         for x in n_subs
     ]
-    return f"({format_center_ligands(sub_names)}{base})"
+    return f"({format_center_ligands(sub_names, sort_key=substituent_sort_key)}{base})"
 
 
 def peroxy_ester_prefix_from_group(
@@ -200,7 +200,7 @@ def iminium_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str
         )
         for n_sub in n_subs
     ]
-    return f"({format_center_ligands(sub_names)}iminio)"
+    return f"({format_center_ligands(sub_names, sort_key=substituent_sort_key)}iminio)"
 
 
 def hydrazine_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:

@@ -62,7 +62,7 @@ LIGAND_BOUNDARY_CASES = (
     (
         "nested-methoxymethyl-ligands",
         "CC[Si](CC)(COC)COC",
-        "1-(bis(methoxymethyl)(ethyl)silyl)ethane",
+        "diethylbis(methoxymethyl)silane",
     ),
     (
         "repeated-substituted-germanium-ligands",

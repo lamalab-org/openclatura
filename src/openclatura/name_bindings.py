@@ -1447,6 +1447,7 @@ def _exact_charge_renderer_atom_ids(key: str, atom_ids: set[int]) -> set[int]:
 
 _EXACT_CHARGE_RENDERER_KEYS = frozenset(
     {
+        "aminide",
         "aminium",
         "ammonio",
         "azido",

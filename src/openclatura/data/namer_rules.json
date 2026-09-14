@@ -758,6 +758,19 @@
         "suffix_with_locant": true,
         "needs_locant": true
       },
+      "aminide": {
+        "role": "principal",
+        "prefix": "azanido",
+        "suffix": "aminide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 17,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
       "carboxylic_acid": {
         "role": "principal",
         "prefix": "carboxy",

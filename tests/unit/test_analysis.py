@@ -4908,7 +4908,7 @@ def test_pyopsin_regression_names_preserve_anionic_carbamoylamino_and_thio_charg
     cases = {
         "CC(C)CSCCCOC(=O)[N-]C(=O)N": "3-((2-methylpropyl)sulfanyl)propyl (carbamoylazanidyl)formate",
         "CCOC(=O)[N-]C(=S)NC(C)(C)C1CC1": "ethyl (((2-cyclopropylpropan-2-yl)carbamothioyl)azanidyl)formate",
-        "CCOC(=O)[N-]C(=S)N(C)[C@H]1CCCOC1": "ethyl ((((3S)-oxan-3-yl)(methyl)carbamothioyl)azanidyl)formate",
+        "CCOC(=O)[N-]C(=S)N(C)[C@H]1CCCOC1": "ethyl ((methyl((3S)-oxan-3-yl)carbamothioyl)azanidyl)formate",
     }
 
     for smiles, expected in cases.items():
@@ -5393,7 +5393,7 @@ def test_hypervalent_sulfur_ester_keeps_every_ligand():
     # lambda^6 sulfur has three, and used to lose two of them silently.
     assert name_smiles("CCOS(C)=O") == "1-(methylsulfinyloxy)ethane"
     assert (
-        name_smiles("CCCCCCOS(=O)(CCCCCC)(CCCCCC)OCCCCCC") == "1-(((hexyloxy)dihexyl(oxo)-lambda^6-sulfanyl)oxy)hexane"
+        name_smiles("CCCCCCOS(=O)(CCCCCC)(CCCCCC)OCCCCCC") == "1-((dihexyl(hexyloxy)(oxo)-lambda^6-sulfanyl)oxy)hexane"
     )
 
 
@@ -5453,9 +5453,16 @@ def test_a_spiro_side_component_keeps_its_stereo_descriptors():
 
 def test_an_oxidised_pnictogen_prefix_cites_two_ligands_or_says_inoyl():
     cases = {
-        "CCOP(=O)c1ccccc1": "(ethoxyphosphinoyl)benzene",
-        "FCCCP(=O)O": "1-fluoro-3-(hydroxyphosphinoyl)propane",
-        "CCP(=O)(O)CC": "1-(ethyl(hydroxy)phosphoryl)ethane",
+        # These three used to fall back to the substituent-prefix spelling
+        # because organophosphinic_acid_result only recognised the acid form
+        # (R-P(=O)(OH)H, one ligand + one retained P-H). It now also covers
+        # ester oxygens and a second carbon ligand (P-67.1.1.2/P-67.1.3.2:
+        # phosphinic acid's parent has two substitutable central hydrogens,
+        # and its single acid oxygen esterifies the same way phosphonic
+        # acid's do), so these resolve to the acid/ester parent directly.
+        "CCOP(=O)c1ccccc1": "ethyl phenylphosphinate",
+        "FCCCP(=O)O": "(3-fluoropropyl)phosphinic acid",
+        "CCP(=O)(O)CC": "diethylphosphinic acid",
         "CO[P+]([O-])(OC)c1ccccc1": "dimethyl phenylphosphonate",
         "CCP(=O)([O-])CCC": "1-(ethyloxido(oxo)phosphanyl)propane",
     }
@@ -5680,7 +5687,7 @@ def test_enclosed_prefix_keeps_its_parentheses_beside_another_substituent():
     # the two N-substituents together into one chained prefix.
     assert (
         name_smiles("C=CN(c1nncs1)C(=O)CCNC(=O)OC")
-        == "methyl (3-oxo-3-((1,3,4-thiadiazol-2-yl)(ethenyl)amino)propyl)carbamate"
+        == "methyl (3-(ethenyl(1,3,4-thiadiazol-2-yl)amino)-3-oxopropyl)carbamate"
     )
     # A standalone prefix still loses them.
     assert name_smiles("C=Cc1ccccc1") == "ethenylbenzene"

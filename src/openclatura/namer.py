@@ -15,6 +15,7 @@ from .assembly_parts import (
     rendered_substituent_text,
     split_rendered_substituent_name,
 )
+from .assembly_prefixes import substituent_sort_key
 from .assembly_spiro import extract_spiro_side_prefixes
 from .chains import find_ring_systems, get_cyclic_atoms
 from .component_namer import name_component as _name_component_impl
@@ -231,7 +232,7 @@ def _direct_amide_subgraph_prefix(
             ligand_decisions.extend(decision_trace_data(branch_decisions))
             if branch_tree:
                 ligand_trees.append(branch_tree)
-    name = base if not branch_names else f"({format_center_ligands(branch_names)}{base})"
+    name = base if not branch_names else f"({format_center_ligands(branch_names, sort_key=substituent_sort_key)}{base})"
     return DirectSubgraphPrefix(
         name=name,
         group_key=group.key,
