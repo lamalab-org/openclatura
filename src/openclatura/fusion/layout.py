@@ -1121,7 +1121,9 @@ def _search_layouts(
                 merged = dict(scaled_positions)
                 merged.update(candidate)
                 new_orders = {**placed_orders, face.id: order}
-                if not _partial_layout_is_valid(model, new_orders, merged):
+                # placed_orders reached this depth proved valid, and merged
+                # rescales it by one positive factor, so only face.id is open.
+                if not _partial_layout_is_valid(model, new_orders, merged, extending_face=face.id):
                     continue
                 _search_layouts(
                     model,
@@ -1260,7 +1262,19 @@ def _partial_layout_is_valid(
     model: FaceModel,
     placed_orders: dict[int, tuple[int, ...]],
     positions: dict[int, Point],
+    *,
+    extending_face: int | None = None,
 ) -> bool:
+    """Decide whether a partial layout draws a plane graph.
+
+    ``extending_face`` names the face the caller has just added to an
+    arrangement that was already proved valid. The faces below it keep that
+    proof: scaling every position by one positive factor, which is all the
+    search does between depths, moves no crossing and no containment. Only the
+    pairs the new face introduces are still open, so they are the only ones
+    tested. Omit it to prove the whole arrangement from nothing.
+    """
+
     if len(set(positions.values())) != len(positions):
         return False
     # The search calls this on every partial extension, so the model's own
@@ -1277,8 +1291,10 @@ def _partial_layout_is_valid(
             (first, second) if first < second else (second, first) for first, second, _ in model.face_adjacency
         )
         object.__setattr__(model, "_adjacent_faces", adjacent_faces)
+
     drawn_edges: dict[tuple[int, int], tuple[Point, Point]] = {}
-    for face_id, order in placed_orders.items():
+
+    def draw(face_id: int) -> bool:
         cycle = face_by_id[face_id].atom_cycle
         size = len(cycle)
         for index, left in enumerate(cycle):
@@ -1292,6 +1308,28 @@ def _partial_layout_is_valid(
             # may be visited in either order by the two faces that share it.
             if previous is not segment and previous != segment and (previous[1], previous[0]) != segment:
                 return False
+        return True
+
+    # Settled faces first, so the edges and polygons the new face contributes
+    # are the tail of each list and the open pairs are a suffix range.
+    settled_polygons: list[tuple[int, tuple[Point, ...]]] = []
+    for face_id, order in placed_orders.items():
+        if face_id == extending_face:
+            continue
+        if not draw(face_id):
+            return False
+        settled_polygons.append((face_id, tuple(positions[atom] for atom in order)))
+    settled_edges = len(drawn_edges) if extending_face is not None else 0
+    polygons = settled_polygons
+    if extending_face is not None:
+        if not draw(extending_face):
+            return False
+        polygons = [
+            *settled_polygons,
+            (extending_face, tuple(positions[atom] for atom in placed_orders[extending_face])),
+        ]
+    settled_faces = len(settled_polygons) if extending_face is not None else 0
+
     # Pair every drawn edge with its bounding box once. Two segments whose boxes
     # are disjoint cannot cross, and that rejects almost every pair before the
     # exact predicate runs -- the same answer, with the cross products skipped.
@@ -1310,7 +1348,7 @@ def _partial_layout_is_valid(
     count = len(edges)
     for index in range(count):
         left_start, left_end, left_segment, left_x0, left_x1, left_y0, left_y1 = edges[index]
-        for other in range(index + 1, count):
+        for other in range(max(index + 1, settled_edges), count):
             right_start, right_end, right_segment, right_x0, right_x1, right_y0, right_y1 = edges[other]
             if left_x1 < right_x0 or right_x1 < left_x0 or left_y1 < right_y0 or right_y1 < left_y0:
                 continue
@@ -1318,11 +1356,10 @@ def _partial_layout_is_valid(
                 continue
             if _segments_intersect(*left_segment, *right_segment):
                 return False
-    polygons = [(face_id, tuple(positions[atom] for atom in order)) for face_id, order in placed_orders.items()]
     count = len(polygons)
     for index in range(count):
         left_id, left_polygon = polygons[index]
-        for other in range(index + 1, count):
+        for other in range(max(index + 1, settled_faces), count):
             right_id, right_polygon = polygons[other]
             pair = (left_id, right_id) if left_id < right_id else (right_id, left_id)
             if pair in adjacent_faces:

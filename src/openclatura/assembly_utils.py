@@ -1,6 +1,7 @@
 """Small grammar utilities shared by assembly formatters."""
 
 import re
+from functools import lru_cache
 
 
 def parse_locant(locant):
@@ -12,6 +13,18 @@ def parse_locant(locant):
 
     display = getattr(locant, "display", None)
     text = str(locant) if display is None else str(display)
+    return _parse_locant_text(text)
+
+
+@lru_cache(maxsize=4096)
+def _parse_locant_text(text: str):
+    """Parse the rendered form, which is all the result depends on.
+
+    Memoising the caller instead would be wrong: DisplayLocant is an int
+    subclass, so DisplayLocant(4, "4a") is equal to and hashes like 4 while
+    parsing differently. The rendered text is the real argument.
+    """
+
     match = re.match(r"^(\d+)([a-zA-Z]*)$", text.split("(")[0])
     if match:
         return (1, float(match.group(1)), match.group(2))
