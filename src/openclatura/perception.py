@@ -132,7 +132,7 @@ def _closes_ring_back_to(mol: Molecule, carbon: int, hetero: int, double_o: int,
 
 
 CATIONIC_SUFFIX_GROUP_KEYS = frozenset({"aminium", "iminium", "diazonio"})
-ANIONIC_SUFFIX_GROUP_KEYS = frozenset({"olate", "thiolate", "carboxylate", "ring_carboxylate", "sulfonate"})
+ANIONIC_SUFFIX_GROUP_KEYS = frozenset({"olate", "thiolate", "aminide", "carboxylate", "ring_carboxylate", "sulfonate"})
 
 
 def _connected_component(mol: Molecule, idx: int) -> set[int]:
@@ -779,7 +779,7 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
         if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
             adj_atoms = mol.get_neighbors(atom.idx)
             if len(adj_atoms) > 0:
-                key = "aminium" if atom.charge > 0 else "amine"
+                key = "aminium" if atom.charge > 0 else "aminide" if atom.charge < 0 else "amine"
 
                 principal = key != "aminium" or all(mol.get_bond(atom.idx, n).order == 1 for n in adj_atoms)
                 for c in adj_atoms:

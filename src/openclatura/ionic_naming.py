@@ -9,7 +9,8 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from .formatting import format_counted_prefixes
+from .assembly_prefixes import substituent_sort_key
+from .formatting import format_center_ligands
 from .molecule import Molecule
 from .name_operations import ParentSuffixOperation
 from .nomenclature import RULES
@@ -75,7 +76,7 @@ def ammonio_prefix(branches: list[str]) -> str:
         return "ammonio"
     if any(re.match(r"^[A-Z][a-z]?-", branch) for branch in branches):
         return f"({''.join(branches)}ammonio)"
-    return f"({format_counted_prefixes(branches)}ammonio)"
+    return f"({format_center_ligands(branches, sort_key=substituent_sort_key)}ammonio)"
 
 
 def apply_parent_charge_names(

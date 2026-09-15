@@ -181,7 +181,7 @@ def _canonical(mol) -> str | None:
         ("(2H-indazol-5-yl)", "*c1ccc2n[nH]cc2c1"),
         ("(4H-1,2,4-triazol-3-yl)", "*c1nnc[nH]1"),
         # heteroatom hubs carrying a ligand list
-        ("((ethoxy)(methyl)phosphoryl)", "*P(=O)(OCC)C"),
+        ("(ethoxy(methyl)phosphoryl)", "*P(=O)(OCC)C"),
         ("(dimethyloxophosphanyl)", "*P(C)(C)=O"),
         ("((2-(formyl)phenyl)(4-chlorophenyl)(methyl)silyl)", "*[Si](C)(c1ccc(Cl)cc1)c1ccccc1C=O"),
         # multiplied unsaturation, whose locant count must match the multiplier

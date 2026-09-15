@@ -40,7 +40,7 @@ from openclatura.assembly_spiro import (
 )
 from openclatura.chains import RingSystem, find_all_carbon_paths, find_ring_systems
 from openclatura.charge_pair_roles import charge_pair_roles
-from openclatura.formatting import format_counted_prefixes
+from openclatura.formatting import format_center_ligands, format_counted_prefixes
 from openclatura.functional_groups import (
     PERCEPTION_DETECTORS,
     register_group_detector,
@@ -1760,6 +1760,18 @@ def test_repeated_substituent_with_internal_multiplier_uses_complex_multiplier()
     assert format_counted_prefixes(["dihydroxyphosphoryl", "dihydroxyphosphoryl"]) == "bis(dihydroxyphosphoryl)"
 
 
+def test_distinct_center_ligands_only_group_ligands_after_the_first():
+    assert format_center_ligands(["hydroxy", "ethyl"]) == "ethyl(hydroxy)"
+    assert format_center_ligands(["methyl", "methyl"]) == "dimethyl"
+    assert format_center_ligands(["methoxy", "methyl", "methyl"]) == "methoxydimethyl"
+    assert format_center_ligands(["(chloromethyl)", "(chloromethyl)", "methyl", "methyl"]) == (
+        "bis(chloromethyl)dimethyl"
+    )
+    assert format_center_ligands(["chlorofluoromethyl", "methyl", "methyl", "methyl"]) == (
+        "(chlorofluoromethyl)trimethyl"
+    )
+
+
 def test_charge_vocabulary_is_registry_backed():
     assert RULES.charges.retained_ionic_n_parents["pyrrolidine"] == "pyrrolidinium"
     assert RULES.charges.saturated_n_ring_ionic_parents[5] == "pyrrolidinium"
@@ -1906,7 +1918,7 @@ def test_charge_normalized_halogen_peroxy_roles_use_common_peroxyhalate_template
 
 
 def test_mixed_central_hydride_ligands_are_boundary_protected():
-    assert name_smiles("CCOSCl") == "(chloro)(ethoxy)sulfane"
+    assert name_smiles("CCOSCl") == "chloro(ethoxy)sulfane"
 
 
 def test_homonuclear_chain_parent_survives_a_ligand_bigger_than_methyl():
@@ -4885,7 +4897,7 @@ def test_pyopsin_regression_names_preserve_retained_ring_cations():
 def test_pyopsin_regression_names_use_substituted_carbamoyl_prefixes():
     cases = {
         "CNC(=O)NC(C)=O": "N-acetyl-N'-methylurea",
-        "CC(C)(C(=O)N(C)C1CCC1)NC(=O)OC": "methyl (2-((cyclobutyl)(methyl)carbamoyl)propan-2-yl)carbamate",
+        "CC(C)(C(=O)N(C)C1CCC1)NC(=O)OC": "methyl (2-(cyclobutyl(methyl)carbamoyl)propan-2-yl)carbamate",
     }
 
     for smiles, expected in cases.items():
@@ -4896,7 +4908,7 @@ def test_pyopsin_regression_names_preserve_anionic_carbamoylamino_and_thio_charg
     cases = {
         "CC(C)CSCCCOC(=O)[N-]C(=O)N": "3-((2-methylpropyl)sulfanyl)propyl (carbamoylazanidyl)formate",
         "CCOC(=O)[N-]C(=S)NC(C)(C)C1CC1": "ethyl (((2-cyclopropylpropan-2-yl)carbamothioyl)azanidyl)formate",
-        "CCOC(=O)[N-]C(=S)N(C)[C@H]1CCCOC1": "ethyl ((((3S)-oxan-3-yl)(methyl)carbamothioyl)azanidyl)formate",
+        "CCOC(=O)[N-]C(=S)N(C)[C@H]1CCCOC1": "ethyl ((methyl((3S)-oxan-3-yl)carbamothioyl)azanidyl)formate",
     }
 
     for smiles, expected in cases.items():
@@ -5381,13 +5393,13 @@ def test_hypervalent_sulfur_ester_keeps_every_ligand():
     # lambda^6 sulfur has three, and used to lose two of them silently.
     assert name_smiles("CCOS(C)=O") == "1-(methylsulfinyloxy)ethane"
     assert (
-        name_smiles("CCCCCCOS(=O)(CCCCCC)(CCCCCC)OCCCCCC") == "1-(((hexyloxy)dihexyl(oxo)-lambda^6-sulfanyl)oxy)hexane"
+        name_smiles("CCCCCCOS(=O)(CCCCCC)(CCCCCC)OCCCCCC") == "1-((dihexyl(hexyloxy)(oxo)-lambda^6-sulfanyl)oxy)hexane"
     )
 
 
 def test_sulfur_imide_substituents_preserve_double_bonded_nitrogen():
-    assert name_smiles("N=S(Cl)CF") == "((chloro)(imino)sulfanyl)fluoromethane"
-    assert name_smiles("CSC(=O)S(C)=N") == "((imino)(methyl)sulfanyl)(methylsulfanyl)methanone"
+    assert name_smiles("N=S(Cl)CF") == "(chloro(imino)sulfanyl)fluoromethane"
+    assert name_smiles("CSC(=O)S(C)=N") == "(imino(methyl)sulfanyl)(methylsulfanyl)methanone"
 
 
 def test_sulfonimidoyl_substituents_keep_imino_n_ligand():
@@ -5413,7 +5425,7 @@ def test_charge_separated_terminal_n3_renders_as_azido_role():
         "[N-]=[N+]=Nn1cncn1": "1-azido-1H-1,2,4-triazole",
         # Four ligands on a singly bonded P is a lambda^5 centre; `phosphanyl`
         # on its own spells the trivalent one.
-        "CCP(CC)(CC)(CC)N=[N+]=[N-]": "1-((azido)triethyl-lambda^5-phosphanyl)ethane",
+        "CCP(CC)(CC)(CC)N=[N+]=[N-]": "1-(azidotriethyl-lambda^5-phosphanyl)ethane",
     }
 
     for smiles, expected in cases.items():
@@ -5441,9 +5453,16 @@ def test_a_spiro_side_component_keeps_its_stereo_descriptors():
 
 def test_an_oxidised_pnictogen_prefix_cites_two_ligands_or_says_inoyl():
     cases = {
-        "CCOP(=O)c1ccccc1": "(ethoxyphosphinoyl)benzene",
-        "FCCCP(=O)O": "1-fluoro-3-(hydroxyphosphinoyl)propane",
-        "CCP(=O)(O)CC": "1-((ethyl)(hydroxy)phosphoryl)ethane",
+        # These three used to fall back to the substituent-prefix spelling
+        # because organophosphinic_acid_result only recognised the acid form
+        # (R-P(=O)(OH)H, one ligand + one retained P-H). It now also covers
+        # ester oxygens and a second carbon ligand (P-67.1.1.2/P-67.1.3.2:
+        # phosphinic acid's parent has two substitutable central hydrogens,
+        # and its single acid oxygen esterifies the same way phosphonic
+        # acid's do), so these resolve to the acid/ester parent directly.
+        "CCOP(=O)c1ccccc1": "ethyl phenylphosphinate",
+        "FCCCP(=O)O": "(3-fluoropropyl)phosphinic acid",
+        "CCP(=O)(O)CC": "diethylphosphinic acid",
         "CO[P+]([O-])(OC)c1ccccc1": "dimethyl phenylphosphonate",
         "CCP(=O)([O-])CCC": "1-(ethyloxido(oxo)phosphanyl)propane",
     }
@@ -5551,6 +5570,7 @@ def test_substituted_alkoxy_prefixes_preserve_imino_ether_connectivity():
 
 def test_central_hydride_alkoxy_ligands_are_graph_derived():
     cases = {
+        "C[Si](C)(C)C(F)Cl": "(chlorofluoromethyl)trimethylsilane",
         # The hyphen belongs to a lambda descriptor, not to the prefix boundary,
         # so only the last of these carries one.
         "COP(OC)OC": "trimethyl phosphite",
@@ -5667,7 +5687,7 @@ def test_enclosed_prefix_keeps_its_parentheses_beside_another_substituent():
     # the two N-substituents together into one chained prefix.
     assert (
         name_smiles("C=CN(c1nncs1)C(=O)CCNC(=O)OC")
-        == "methyl (3-oxo-3-((1,3,4-thiadiazol-2-yl)(ethenyl)amino)propyl)carbamate"
+        == "methyl (3-(ethenyl(1,3,4-thiadiazol-2-yl)amino)-3-oxopropyl)carbamate"
     )
     # A standalone prefix still loses them.
     assert name_smiles("C=Cc1ccccc1") == "ethenylbenzene"
@@ -5684,7 +5704,7 @@ def test_charge_separated_sulfonyl_on_a_nitrogen_keeps_its_ligand():
     # A three-coordinate sulfinate's charge is real and stays.
     assert "oxidosulfinylamino" in name_smiles("COc1ccc(NS(=O)[O-])cc1[N+]1(N)C=NCC1")
     # Sulfur imides keep their own spelling.
-    assert name_smiles("N=S(Cl)CF") == "((chloro)(imino)sulfanyl)fluoromethane"
+    assert name_smiles("N=S(Cl)CF") == "(chloro(imino)sulfanyl)fluoromethane"
 
 
 def test_chlorosulfate_and_sulfamate_esters_are_not_sulfonate_parents():
