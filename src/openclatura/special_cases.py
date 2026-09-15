@@ -96,23 +96,40 @@ def single_atom_component_name(mol: Molecule, component_atoms: set[int]) -> str:
     if len(component_atoms) != 1:
         return ""
     atom = mol.atoms[list(component_atoms)[0]]
-    if atom.symbol in RULES.ions.single_atom_cations:
+    if atom.symbol in RULES.ions.single_atom_cations and atom.charge > 0:
         return atom.element.name
-    if atom.symbol in RULES.ions.single_atom_anions:
+    if atom.symbol in RULES.ions.single_atom_anions and atom.charge < 0:
         return RULES.ions.single_atom_anions[atom.symbol]
     ion_name = SINGLE_ATOM_HYDRIDE_IONS.get((atom.symbol, atom.charge, atom.total_h_count))
     if ion_name:
         return ion_name
-    if atom.charge == 0 and atom.symbol in RETAINED_MONONUCLEAR_HYDRIDE_NAMES:
-        # P-21.1.1.1: ammonia and water are the retained names of the unsubstituted hydrides.
+    if (
+        atom.charge == 0
+        and atom.symbol in RETAINED_MONONUCLEAR_HYDRIDE_NAMES
+        and atom.total_h_count == atom.element.standard_valence
+    ):
+        # P-21.1.1.1: ammonia, water and the hydrogen halides are the
+        # retained names of the unsubstituted hydrides -- only when the atom
+        # actually carries its full complement of hydrogens (a bare, H-less
+        # "[N]"/"[Cl]" is not a real, complete molecule and must not match).
         return RETAINED_MONONUCLEAR_HYDRIDE_NAMES[atom.symbol]
-    hydride_name = RULES.components.mononuclear_parent_hydrides.get(atom.symbol)
-    if hydride_name:
-        return hydride_name
+    if atom.charge == 0 and atom.total_h_count == atom.element.standard_valence:
+        # Same reasoning as the retained-name branch above: a bare, H-less
+        # atom (e.g. "[Si]") is not a real silane and must not match.
+        hydride_name = RULES.components.mononuclear_parent_hydrides.get(atom.symbol)
+        if hydride_name:
+            return hydride_name
     return ""
 
 
-RETAINED_MONONUCLEAR_HYDRIDE_NAMES = {"N": "ammonia", "O": "water"}
+RETAINED_MONONUCLEAR_HYDRIDE_NAMES = {
+    "N": "ammonia",
+    "O": "water",
+    "F": "hydrogen fluoride",
+    "Cl": "hydrogen chloride",
+    "Br": "hydrogen bromide",
+    "I": "hydrogen iodide",
+}
 
 # P-72/P-73: mononuclear hydride ions, keyed by (element, charge, hydrogen count).
 SINGLE_ATOM_HYDRIDE_IONS = {
@@ -599,6 +616,10 @@ def phosphane_borane_zwitterion_result(
         return None
     phosphorus = role.positive_atom
     boron = role.negative_atom
+    if mol.atoms[phosphorus].stereo or mol.atoms[phosphorus].raw_stereo:
+        # A configured P+ (three distinct carbon ligands plus the boranuide)
+        # needs a descriptor this spelling has no machinery to carry.
+        return None
     ligand_roots = [
         neighbor
         for neighbor in mol.get_neighbors(phosphorus)
@@ -1000,6 +1021,11 @@ def sulfonium_ylide_name(
         return ""
     sulfur = sulfurs[0]
     ylide_carbon = carbanions[0]
+    if mol.atoms[sulfur].stereo or mol.atoms[sulfur].raw_stereo:
+        # A configured sulfonium S+ (two distinct carbon ligands plus the
+        # ylide carbon) needs a descriptor this spelling has no machinery to
+        # carry -- defer to whatever the general pipeline does for it.
+        return ""
     role = next(
         (
             role
@@ -1435,6 +1461,7 @@ def azinic_acid_result(
             term="azinic acid",
             atom_ids=set(core_atoms),
             bond_ids=bond_ids_within(mol, set(core_atoms)),
+            charge_atom_ids={a for a in core_atoms if mol.atoms[a].charge},
         ),
         NameAtomBinding(
             stage="shortcut",
@@ -1500,6 +1527,19 @@ def oxoacid_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialCo
         return None
     if {role.central, *role.oxygen_atoms} != component_atoms:
         return None
+    # NOTE: a mixed hydroxy/oxido sulfurous/selenous-acid-type anion centre
+    # CAN genuinely be a stereocentre (confirmed: mol.atoms[role.central].stereo
+    # is perceived for e.g. O=[S@](O)[O-]), and this fixed spec name has no
+    # machinery to carry that descriptor -- matching the same gap already
+    # fixed in the sibling oxoacid_ester_result. However, unlike that sibling,
+    # deferring here (returning None) currently produces NO name at all for
+    # this shape rather than a worse-but-present one: the general pipeline
+    # has no other mechanism that covers it, likely entangled with a separate,
+    # pre-existing bug where this same anion shape already drops its formal
+    # charge from the name independently of stereo. Trading a wrong-but-present
+    # name for a hard failure is not a net improvement, so this guard is
+    # deliberately NOT added here until that separate gap is understood and
+    # fixed too -- left as a documented, confirmed-but-deferred finding.
     spec = _matching_oxoacid_spec_for_role(mol, role)
     if spec is None:
         return None
@@ -1520,6 +1560,11 @@ def oxoacid_ester_result(
 
     matches = []
     for role in central_oxo_roles(mol, component_atoms):
+        if mol.atoms[role.central].stereo or mol.atoms[role.central].raw_stereo:
+            # A configured centre (e.g. an unsymmetric phosphate/phosphonate
+            # diester with two different alkoxy ligands) needs a descriptor
+            # this fixed spec name has no machinery to carry.
+            continue
         spec = _matching_oxoacid_spec_for_role(mol, role)
         template = oxoacid_role_template(mol, role)
         if template is not None and template.kind == OxoacidTemplateKind.UNSUPPORTED:
@@ -2319,6 +2364,18 @@ def homonuclear_chain_parent_result(
     if backbone is None:
         return None
     symbol, chain = backbone
+    # NOTE: a non-terminal chain atom (e.g. a trisilane's middle Si with two
+    # different chain arms and two different substituents) CAN genuinely be a
+    # stereocentre (confirmed perceived for Cl[SiH2][Si@H](C)[SiH2]F), and this
+    # fixed backbone-numbering scheme has no machinery to carry that
+    # descriptor -- the same class of gap already fixed in several sibling
+    # functions. Unlike those siblings, deferring here (returning None) was
+    # tried and does NOT help: the general pipeline's own fallback for this
+    # shape (picking the lone methyl substituent as parent instead) ALSO
+    # fails to express the silicon stereocentre, while additionally choosing
+    # a much less natural parent -- confirmed both @ and @@ still collapse to
+    # an identical, still stereo-blind name either way. Left unguarded,
+    # documented as a confirmed-but-currently-unfixable-by-deferral finding.
     chain_set = set(chain)
     oxide_oxygens = _chain_oxide_oxygens(mol, chain, component_atoms)
 
@@ -2528,18 +2585,25 @@ def simple_central_parent_hydride_result(
         # "(R)-(chloro)(ethyl)oxophosphanyl" as a prefix on the O-alkyl
         # chain), rather than silently dropping the configuration.
         return None
-    cyclic_atoms = get_cyclic_atoms(mol)
-    # P-44.1.1: a ring or ring system is always senior to a chain, and a
-    # mononuclear parent hydride like silane/germane/borane/phosphane counts
-    # as one for this purpose. A ring ANYWHERE in this component -- whether a
-    # ligand directly bonded to the centre (cyclopropyl on silicon) or one
-    # reached only through a longer branch (a benzyl group two atoms further
-    # out through an ether linkage) -- means that ring, not this hydride, is
-    # the correct parent, so this shortcut must not fire at all. component_atoms
-    # is a single connected component, so any ring atom in it is necessarily
-    # reachable from central regardless of distance.
-    if cyclic_atoms & component_atoms:
-        return None
+    # NOTE: a ring-containing ligand (e.g. cyclopropyl or phenyl on silicon
+    # or phosphorus) does NOT disqualify this shortcut. An earlier version of
+    # this guard assumed P-44.1.1's "a ring is senior to a chain" extends to
+    # a mononuclear parent hydride with a ring SUBSTITUENT, and added a check
+    # here to defer to the ring as parent instead. That premise was wrong,
+    # proven by extremely well-established, universally-accepted nomenclature
+    # this guard silently broke: triphenylphosphine (not
+    # "(diphenylphosphanyl)benzene"), phenylsilane (not "silylbenzene"),
+    # phenylphosphine, dimethylphenylphosphine, etc. are all standard,
+    # correct names with the mononuclear hydride as parent regardless of an
+    # attached ring. This is also consistent with the sibling
+    # homonuclear_chain_parent_result, which likewise keeps a homonuclear
+    # element chain (e.g. disulfane, disilane) as parent even with ring
+    # ligands on it -- confirmed for both symmetric (1,2-diphenyldisulfane,
+    # a pre-existing test) and asymmetric cases (1-cyclopropyl-2-
+    # phenyldisulfane). P-44.1.1's ring-vs-chain seniority evidently governs
+    # choices among candidate organic (all-carbon) parent structures, not a
+    # heteroatom mononuclear/homonuclear element hydride versus a ring
+    # substituent on it.
     central_symbol = mol.atoms[central].symbol
     charge_separated_oxide = (
         mol.atoms[central].charge == 1

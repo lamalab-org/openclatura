@@ -1,8 +1,8 @@
-"""Regression tests for two parent-selection bugs in
-``simple_central_parent_hydride_result`` (special_cases.py), both found
-while investigating why ``CC[Si](CC)(COC)COC`` (two ethyl + two
-methoxymethyl on silicon) named as ``1-(ethylbis(methoxymethyl)silyl)ethane``
-instead of ``diethylbis(methoxymethyl)silane``.
+"""Regression tests for parent-selection bugs in
+``simple_central_parent_hydride_result`` (special_cases.py), found while
+investigating why ``CC[Si](CC)(COC)COC`` (two ethyl + two methoxymethyl on
+silicon) named as ``1-(ethylbis(methoxymethyl)silyl)ethane`` instead of
+``diethylbis(methoxymethyl)silane``.
 
 Bug 1 -- ether ligands wrongly blocked the shortcut entirely (FIXED):
 a Group 14/13/15 hydride centre (silane, germane, borane, phosphane, ...)
@@ -34,34 +34,45 @@ other groups whose perception detector hardcodes
 thiocyanato, cyanato, isocyano, thioether) are all registered
 ``role: "prefix"`` or unregistered, so this bug never affected them.
 
-Bug 2 -- ring ligands were never checked at all (FIXED, found while
-fixing bug 1): fixing bug 1 unmasked a second, older, entirely unrelated
-gap that predates it -- confirmed present even with NO ether at all, e.g.
-``C[Si](C)(C)C1CC1`` (trimethyl + cyclopropyl, no ether) already named as
-``cyclopropyltrimethylsilane`` before this fix, not the ring-parent
-``(trimethylsilyl)cyclopropane`` P-44.1.1 requires (a ring or ring system
-is always senior to a chain, and a mononuclear parent hydride counts as
-one for this purpose). Two existing tests had been accidentally shielded
-from this bug by bug 1 firing first on the same molecules (the ether in
-``CO[Si](C)(C)C1CC1`` tripped ``_has_principal_group`` for the wrong
-reason, which happened to also produce the ring-correct fallback), so
-fixing bug 1 alone made them visibly regress until this second fix.
+Bug 2 -- a ring-ligand guard was ADDED then RETRACTED as based on a false
+premise: an earlier draft of this fix set (motivated by
+``C[Si](C)(C)C1CC1`` naming as ``cyclopropyltrimethylsilane`` rather than
+``(trimethylsilyl)cyclopropane``) assumed P-44.1.1's "a ring is senior to
+a chain" extends to a mononuclear parent hydride (silane/germane/borane/
+phosphane/...) with a ring SUBSTITUENT, and added a guard making
+``simple_central_parent_hydride_result`` refuse to fire whenever any ring
+was present anywhere in the component. That premise is WRONG, proven by
+extremely well-established, universally-accepted nomenclature it silently
+broke: "triphenylphosphine"/"triphenylphosphane" (not
+"(diphenylphosphanyl)benzene"), "dimethylphenylphosphine" (not
+"(dimethylphosphanyl)benzene") are standard, correct names with the
+mononuclear hydride as parent despite the attached ring(s). This is also
+consistent with the sibling ``homonuclear_chain_parent_result``, which
+keeps a homonuclear element chain (disulfane, disilane, ...) as parent
+even with ring ligands on it, confirmed for both a pre-existing symmetric
+case ("1,2-diphenyldisulfane") and an asymmetric one
+("1-cyclopropyl-2-phenyldisulfane"). P-44.1.1's ring-vs-chain seniority
+evidently governs choices among candidate all-carbon parent structures,
+not a heteroatom mononuclear/homonuclear element hydride versus a ring
+substituent attached to it. The guard was removed; ``cyclopropyltrimethyl
+silane`` (chain-as-parent) is the correct, restored behaviour. See the
+retracted RING_LIGAND_CASES below, now asserting the original hydride-as-
+parent naming instead.
 
-Bug 2, take 2 -- the first fix for bug 2 only checked centre's DIRECT
-neighbours for ring membership, missing a ring reachable only through a
-longer branch (found by a large-scale pubchem corpus comparison after
-that first fix shipped): ``CC[C@H](C)C[P@](C)(=O)COCc1ccccc1`` has its
-phenyl ring two bonds away from phosphorus through a -CH2-O-CH2- ether
-linker, not directly bonded to it, so the direct-neighbour check let
-simple_central_parent_hydride_result fire anyway -- silently dropping the
-phosphorus stereocentre's descriptor in the process, since the "phosphane
-oxide" parent style this shortcut produces has no stereo-descriptor
-machinery the general ring-aware pipeline's substituent-prefix style has.
-Fixed by checking for ANY cyclic atom anywhere in the component instead
-of just the centre's immediate neighbours -- component_atoms is always
-one connected piece, so a ring anywhere in it is reachable from the
-centre regardless of distance, making the broader check both correct and
-strictly simpler than the neighbour-only one it replaced.
+Bug 3 -- a stereocentre on the shortcut's own central atom was silently
+dropped (FIXED, unrelated to bug 2): this special case names a mononuclear
+hydride centre with its ligands as prefixes -- e.g. "chloro(ethyl)
+(isopropoxy)phosphane oxide" -- but has no machinery to express a
+stereo-descriptor on the CENTRE itself. When the centre is a genuine
+stereocentre (e.g. a chiral phosphine oxide/phosphonochloridate,
+CC[P@](=O)(Cl)OC(C)C), firing this shortcut silently drops the
+configuration, since the general substituent-prefix pipeline that WOULD
+express it never gets a chance to run. Fixed by refusing to fire when the
+centre has a stereo/raw_stereo tag, regardless of whether a ring is
+anywhere in the component -- confirmed the stereo guard alone (with no
+ring-ligand guard at all) is sufficient even when the only ring is
+several bonds away through an ether linker (see
+test_phosphorus_stereocentre_survives_a_distant_ring_regardless below).
 """
 
 from __future__ import annotations
@@ -181,41 +192,43 @@ def test_atom_order_invariance():
 
 
 # ---------------------------------------------------------------------------
-# Bug 2: a ring-containing ligand must always defer to the ring as parent
-# (P-44.1.1), never let the mononuclear hydride win instead -- regardless
-# of whether an ether is also present.
+# Retracted bug 2: a ring-containing ligand does NOT disqualify the
+# mononuclear hydride as parent. These cases previously asserted the
+# opposite (ring-as-parent) under the now-disproven premise above; they now
+# assert the original, correct, hydride-as-parent naming, confirmed against
+# standard nomenclature (triphenylphosphine et al.) and OPSIN round-trip.
 # ---------------------------------------------------------------------------
 
 RING_LIGAND_CASES = (
     (
-        "plain-cyclopropyl-no-ether-the-bug-predates-bug-1",
+        "plain-cyclopropyl-no-ether",
         "C[Si](C)(C)C1CC1",
-        "(trimethylsilyl)cyclopropane",
+        "cyclopropyltrimethylsilane",
     ),
     (
-        "cyclopropyl-plus-ether-the-originally-reported-shape",
+        "cyclopropyl-plus-ether",
         "CO[Si](C)(C)C1CC1",
-        "(methoxydimethylsilyl)cyclopropane",
+        "cyclopropyl(methoxy)dimethylsilane",
     ),
     (
         "two-phenyl-ligands-on-silicon",
         "c1ccccc1[Si](c1ccccc1)(C)C",
-        "(dimethyl(phenyl)silyl)benzene",
+        "dimethyldiphenylsilane",
     ),
     (
         "three-phenyl-ligands-on-phosphorus",
         "c1ccccc1P(c1ccccc1)c1ccccc1",
-        "(diphenylphosphanyl)benzene",
+        "triphenylphosphane",
     ),
     (
         "two-cyclopropyl-ligands-on-silicon",
         "C1CC1[Si](C1CC1)(C)C",
-        "(cyclopropyldimethylsilyl)cyclopropane",
+        "dicyclopropyldimethylsilane",
     ),
     (
-        "ring-two-bonds-away-through-an-ether-linker-pubchem-corpus-regression",
+        "ring-two-bonds-away-through-an-ether-linker",
         "CP(C)(=O)COCc1ccccc1",
-        "((((dimethyloxophosphanyl)methyl)oxy)methyl)benzene",
+        "((benzyloxy)methyl)dimethylphosphane oxide",
     ),
 )
 
@@ -225,37 +238,25 @@ RING_LIGAND_CASES = (
     RING_LIGAND_CASES,
     ids=[c for c, _s, _n in RING_LIGAND_CASES],
 )
-def test_ring_ligand_always_outranks_the_mononuclear_hydride_parent(_case, smiles, expected_name):
+def test_ring_ligand_does_not_outrank_the_mononuclear_hydride_parent(_case, smiles, expected_name):
     _assert_matched(smiles, expected_name)
 
 
-def test_simple_central_parent_hydride_result_refuses_a_ring_ligand_directly():
-    from openclatura.graph_io import read_smiles
-    from openclatura.special_cases import simple_central_parent_hydride_result
-
-    mol = read_smiles("C[Si](C)(C)C1CC1")
-    assert simple_central_parent_hydride_result(mol, set(mol.atoms)) is None
-
-
-def test_simple_central_parent_hydride_result_refuses_a_distant_ring_ligand_directly():
-    """Same check, but for a ring reachable only through a longer branch --
-    this is the shape the neighbour-only version of the guard missed."""
-
-    from openclatura.graph_io import read_smiles
-    from openclatura.special_cases import simple_central_parent_hydride_result
-
-    mol = read_smiles("CP(C)(=O)COCc1ccccc1")
-    assert simple_central_parent_hydride_result(mol, set(mol.atoms)) is None
-
-
-def test_phosphorus_stereocentre_survives_when_a_distant_ring_forces_it_into_a_prefix():
-    """The exact pubchem-corpus regression: a chiral phosphine oxide whose
-    only ring is two bonds away through a -CH2-O-CH2- ether linker. Before
-    the distance-independent fix, the ring-ligand guard's direct-neighbour
-    check missed this, letting the "phosphane oxide" mononuclear-parent
-    style fire -- and that style has no stereo-descriptor machinery, so the
-    (S) configuration at phosphorus was silently dropped from the name."""
+def test_phosphorus_stereocentre_survives_a_distant_ring_regardless():
+    """A chiral phosphine oxide whose only ring is two bonds away through a
+    -CH2-O-CH2- ether linker. The stereo guard alone (no ring-ligand guard)
+    must still refuse the shortcut, since the "phosphane oxide" mononuclear-
+    parent style has no stereo-descriptor machinery -- (S) must survive via
+    the general, ring-agnostic substituent-prefix pipeline instead."""
 
     result = name_one("CC[C@H](C)C[P@](C)(=O)COCc1ccccc1", verify_opsin=True)
     assert "(S)" in result.name
     assert result.opsin_check.status == "matched", (result.name, result.opsin_check.status)
+
+
+def test_simple_central_parent_hydride_result_refuses_a_stereocentre_regardless_of_rings():
+    from openclatura.graph_io import read_smiles
+    from openclatura.special_cases import simple_central_parent_hydride_result
+
+    mol = read_smiles("CC[C@H](C)C[P@](C)(=O)COCc1ccccc1")
+    assert simple_central_parent_hydride_result(mol, set(mol.atoms)) is None

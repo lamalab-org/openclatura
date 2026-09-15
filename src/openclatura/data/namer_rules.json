@@ -321,7 +321,7 @@
     "values": {
       "N:+": {
         "suffix": "ium",
-        "reason": "Positive parent nitrogen charges are rendered as parent suffix operations."
+        "reason": "Positive parent heteroatom charges (N, O, S, Se, Te, P, As, Sb, Bi) are rendered as parent suffix operations."
       },
       "*:-": {
         "suffix": "ide",

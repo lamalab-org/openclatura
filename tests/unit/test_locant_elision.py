@@ -73,7 +73,12 @@ def test_elided_parent_locant_keeps_required_complex_prefix_wrapper():
 
 
 def test_unlocanted_multiplied_ligand_prefix_uses_clear_single_word():
-    assert _name("CO[Si](C)(C)C1CC1").name == "(methoxydimethylsilyl)cyclopropane"
+    # A mononuclear hydride ligand (methoxydimethylsilyl) is not itself
+    # senior to a ring, so a genuine principal group elsewhere (the acid)
+    # is needed here to force the ring to be the parent -- see
+    # tests/exploratory/test_group14_ether_ligand_parent_selection.py for
+    # why a ring ligand alone no longer forces this.
+    assert _name("OC(=O)c1ccc(cc1)[Si](C)(C)OC").name == "4-(methoxydimethylsilyl)benzoic acid"
     assert _name("c1ccc([Se](c2ccccc2)(c2ccccc2)c2ccccc2)cc1").name == "(triphenyl-lambda^4-selanyl)benzene"
 
 
