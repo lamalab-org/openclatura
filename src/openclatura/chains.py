@@ -81,6 +81,23 @@ def _bridge_interior_path(adj, nodes, start: int, end: int) -> list[int]:
     return []
 
 
+class _CycleWalkExhausted(RuntimeError):
+    """Raised inside the main-ring walk when its bounded budget runs out."""
+
+
+# The walk below enumerates every simple cycle from every atom, which is
+# exponential in the block's cycle rank. Every other search in the naming
+# engine is bounded and this one was not, so a large fused block that fusion
+# nomenclature declines -- a pericondensed nanographene, say -- ran without
+# end instead of abstaining. The widest block in the 5000-molecule corpus
+# spends 332k states, so this leaves a sixfold margin over anything von
+# Baeyer nomenclature is actually asked to describe, and caps the pathological
+# case at a couple of seconds. Exhausting it abstains exactly the way finding
+# no cycle does, and the caller already reads a missing descriptor as a reason
+# to try another strategy.
+_MAIN_RING_WALK_STATES = 2_000_000
+
+
 def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
     adj = {n: set() for n in comp_nodes}
     for u, v in comp_edges:
@@ -88,16 +105,24 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
         adj[v].add(u)
 
     cycles = []
+    states = 0
 
     def dfs(curr, start, path, visited):
+        nonlocal states
+        states += 1
+        if states > _MAIN_RING_WALK_STATES:
+            raise _CycleWalkExhausted
         for n in adj[curr]:
             if n == start and len(path) >= 3:
                 cycles.append(path)
             elif n not in visited:
                 dfs(n, start, path + [n], visited | {n})
 
-    for n in comp_nodes:
-        dfs(n, n, [n], {n})
+    try:
+        for n in comp_nodes:
+            dfs(n, n, [n], {n})
+    except _CycleWalkExhausted:
+        return None, [list(comp_nodes)]
 
     if not cycles:
         return None, [list(comp_nodes)]

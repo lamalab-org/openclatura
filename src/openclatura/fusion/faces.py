@@ -470,26 +470,35 @@ def _independent_face_sets(
         if len(selected) > target_rank:
             return
 
-        uncovered = all_edges_mask ^ covered_once
-        if not uncovered:
-            return
-        uncovered_positions = tuple(position for position in range(len(edge_order)) if uncovered & (1 << position))
-        pivot = min(
-            uncovered_positions,
-            key=lambda position: (
-                sum(index not in selected for index in candidates_by_edge[position]),
-                position,
-            ),
-        )
-        choices = tuple(index for index in candidates_by_edge[pivot] if index not in selected)
-        if not choices:
-            return
         remaining_slots = target_rank - len(selected)
-        possible = 0
-        for index, mask in enumerate(masks):
-            if index not in selected:
-                possible |= mask
-        if uncovered & ~possible:
+        uncovered = all_edges_mask ^ covered_once
+        if uncovered:
+            uncovered_positions = tuple(position for position in range(len(edge_order)) if uncovered & (1 << position))
+            pivot = min(
+                uncovered_positions,
+                key=lambda position: (
+                    sum(index not in selected for index in candidates_by_edge[position]),
+                    position,
+                ),
+            )
+            choices = tuple(index for index in candidates_by_edge[pivot] if index not in selected)
+            possible = 0
+            for index, mask in enumerate(masks):
+                if index not in selected:
+                    possible |= mask
+            if uncovered & ~possible:
+                return
+        else:
+            # Every edge is drawn and the face set is still short. A face of a
+            # pericondensed system can be enclosed by its neighbours, sharing
+            # every one of its edges and contributing none of its own, so a
+            # complete cover is reached before the last faces are chosen --
+            # coronene's central ring is the smallest case. There is no
+            # uncovered edge to pivot on, so the remaining faces are the
+            # candidates, and the independence and twice-covered tests below
+            # still decide which of them can belong to the model.
+            choices = tuple(index for index in range(len(cycles)) if index not in selected)
+        if not choices:
             return
 
         for index in choices:
