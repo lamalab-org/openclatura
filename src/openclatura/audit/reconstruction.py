@@ -29,11 +29,13 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Literal
 
 from rdkit import Chem
 
 from ..hantzsch_widman import hw_parent_template
+from ..locants import parse_system_locant, system_locant_sort_key
 from ..molecule import Molecule
 from ..rules import elements as _elements
 from ..rules import multipliers as _multipliers
@@ -219,10 +221,38 @@ def _is_retained_chain_parent(retained_name: str) -> bool:
     return retained_name in set(RETAINED_CHAIN_PARENTS.values())
 
 
+@lru_cache(maxsize=1)
+def _preferred_hydrogenation_aliases() -> dict[str, str]:
+    """Map a non-PIN retained parent's rendered PIN back to its own template.
+
+    P-54.4.3.2 spells indoline as 2,3-dihydro-1H-indole, and P-58.2.3.1 moves
+    the citation when a suffix stands on a hydrogenated position, so the same
+    skeleton reaches this audit under several names. They all denote the
+    template's structure, so resolve them to it rather than abstaining.
+    """
+
+    from ..retained_name_policy import retained_parent_name_policies
+
+    aliases: dict[str, str] = {}
+    for policy in retained_parent_name_policies():
+        hydrogenation = policy.hydrogenation
+        if hydrogenation is None or policy.template_name not in _ALL_PARENT_TEMPLATES:
+            continue
+        renderings = {policy.preferred_name, hydrogenation.render()}
+        for locant in hydrogenation.hydro_locants:
+            renderings.add(hydrogenation.relocated(frozenset({locant})).render())
+        for rendering in renderings:
+            aliases.setdefault(rendering, policy.template_name)
+    return aliases
+
+
 def _lookup_parent_template(retained_name: str) -> tuple[str, list[str]] | None:
     template = _ALL_PARENT_TEMPLATES.get(retained_name)
     if template is not None:
         return template
+    alias = _preferred_hydrogenation_aliases().get(retained_name)
+    if alias is not None:
+        return _ALL_PARENT_TEMPLATES[alias]
     hydride = _functional_parent_hydrides().get(retained_name)
     if hydride is not None and hydride in _ALL_PARENT_TEMPLATES:
         return _ALL_PARENT_TEMPLATES[hydride]
@@ -597,7 +627,9 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
     """Rebuild the component skeleton from ``parts``; raise ``_Abstain`` if any
     construct is not modelled."""
 
-    has_template = parts.retained_name is not None and _lookup_parent_template(parts.retained_name) is not None
+    has_template = (
+        parts.retained_name is not None and _lookup_parent_template(parts.retained_name) is not None
+    ) or _has_systematic_fusion_parent(parts)
     if getattr(parts, "is_substituent", False):
         raise _Abstain("substituent component (audited via recursion, not here)")
     if parts.front_modifiers and not _is_ester_component(parts):
@@ -605,9 +637,30 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
     if parts.parent_charges:
         raise _Abstain("parent charges not modelled")
     saturated = _saturated_locants(parts)
+    paired_external_pi = False
+    if _has_systematic_fusion_parent(parts):
+        plan = parts.parent_hydride.fusion_plan
+        paired_external_pi = "paired_external_pi_consumption" in plan.audit.checks
+        if paired_external_pi:
+            if set(saturated) - {str(locant) for locant in plan.indicated_hydrogens}:
+                raise _Abstain("hydrogen declaration is not owned by the paired external-pi proof")
+            # Keep the proved parent's unpaired sites fixed while the existing
+            # matcher places skeletal pi bonds around the named external ligands.
+            assignment = plan.derivative_state.bond_delta.assignment
+            paired = {atom for edge, order in assignment.orders if order == 2 for atom in edge}
+            saturated = tuple(
+                dict.fromkeys(
+                    (
+                        *saturated,
+                        *(str(locant) for atom, locant in plan.numbering.input_locant_maps[0] if atom not in paired),
+                    )
+                )
+            )
     ring_ketone = parts.principal_group is not None and parts.principal_group.key == "ketone"
     rebuild_unsaturation = has_template and (
-        len(saturated) > 1 or any(op.operation_kind == "additive_hydrogen" for op in parts.hydro_operations)
+        paired_external_pi
+        or len(saturated) > 1
+        or any(op.operation_kind == "additive_hydrogen" for op in parts.hydro_operations)
     )
     if saturated and not has_template:
         raise _Abstain("saturated ring positions without a retained template")
@@ -698,7 +751,9 @@ def _open_mancude_template(
     return template_idxs, saturated_idxs
 
 
-_MANCUDE_SINGLE_BONDED = frozenset({8, 16, 34, 52})
+_MANCUDE_SINGLE_BONDED = frozenset(
+    element.atomic_number for element in _elements.ELEMENTS.values() if element.mancude_forced_single
+)
 
 
 def _implied_ketone_saturation(rw: Chem.RWMol, locants: dict[str, int], parts) -> set[int]:
@@ -808,6 +863,15 @@ def _placement_structure(rw: Chem.RWMol, solution: tuple[int, ...]) -> str | Non
 def _build_parent(parts) -> tuple[Chem.RWMol, dict[str, int], bool]:
     """Return (editable mol, locant->idx, is_aromatic_template)."""
 
+    if _has_systematic_fusion_parent(parts):
+        return _build_systematic_fusion_parent(parts)
+    parent = getattr(parts, "parent_hydride", None)
+    if parent is not None and parent.is_bridged_fusion:
+        # The legacy topology descriptor has a different locant namespace.
+        # Until this independent audit can replay nondetachable bridges, it
+        # must not rebuild that descriptor using completed fusion locants.
+        raise _Abstain("bridged fusion parent reconstruction not modelled")
+
     if parts.retained_name is not None and not _is_retained_chain_parent(parts.retained_name):
         template = _lookup_parent_template(parts.retained_name)
         if template is None:
@@ -863,6 +927,40 @@ def _build_parent(parts) -> tuple[Chem.RWMol, dict[str, int], bool]:
     return rw, {str(i + 1): idxs[i] for i in range(n)}, False
 
 
+def _has_systematic_fusion_parent(parts) -> bool:
+    parent = getattr(parts, "parent_hydride", None)
+    return parent is not None and parent.uses_fusion_plan
+
+
+def _build_systematic_fusion_parent(parts) -> tuple[Chem.RWMol, dict[str, int], bool]:
+    """Build an audited fusion parent from its graph proof, not its name text."""
+
+    parent = parts.parent_hydride
+    plan = parent.fusion_plan
+    if plan is None or not plan.audit.confirmed or not plan.numbering.input_locant_maps:
+        raise _Abstain("systematic fusion parent has no confirmed graph proof")
+
+    graph_atoms = {atom.id: atom for atom in plan.abstract_parent_graph.atoms}
+    input_locants = dict(plan.numbering.input_locant_maps[0])
+    if set(graph_atoms) != set(input_locants):
+        raise _Abstain("systematic fusion graph and numbering use different atoms")
+
+    rw = Chem.RWMol()
+    output_by_atom = {atom_id: rw.AddAtom(Chem.Atom(graph_atoms[atom_id].symbol)) for atom_id in sorted(graph_atoms)}
+    for atom_id, output_idx in output_by_atom.items():
+        rw.GetAtomWithIdx(output_idx).SetFormalCharge(graph_atoms[atom_id].formal_charge)
+
+    delta = getattr(parts, "parent_bond_delta", None)
+    assignment = (
+        delta.assignment if delta is not None and delta.compatible else plan.bond_model.allowed_kekule_assignments[0]
+    )
+    for (left, right), order in assignment.orders:
+        rw.AddBond(output_by_atom[left], output_by_atom[right], _BOND_TYPES[order])
+
+    locants = {str(locant): output_by_atom[atom_id] for atom_id, locant in input_locants.items()}
+    return rw, locants, False
+
+
 _LAMBDA_RE = re.compile(r"lambda\^?\{?\d+\}?")
 
 
@@ -912,22 +1010,30 @@ def _apply_unsaturations(rw: Chem.RWMol, locants: dict[str, int], parts, aromati
 
 def _parse_unsaturation_locant(token: str) -> tuple[str | None, str | None]:
     """Split an unsaturation locant into (start, explicit-partner). ``4`` -> the
-    bond 4→5 (partner ``None``); ``1(10)`` -> the fusion bond 1→10."""
-    m = re.fullmatch(r"(\d+)(?:\((\d+)\))?", token)
-    if m is None:
+    bond 4→5 (partner ``None``); ``3a(7a)`` cites a fusion bond."""
+    start, separator, partner = token.partition("(")
+    if separator and not partner.endswith(")"):
         return None, None
-    return m.group(1), m.group(2)
+    partner = partner[:-1] if separator else ""
+    try:
+        parse_system_locant(start)
+        if partner:
+            parse_system_locant(partner)
+    except ValueError:
+        return None, None
+    return start, partner or None
 
 
 def _next_locant_idx(locants: dict[str, int], locant: str, is_ring: bool) -> int | None:
     try:
-        nxt = str(int(locant) + 1)
-    except ValueError:
+        ordered = sorted(locants, key=system_locant_sort_key)
+        position = ordered.index(locant)
+    except (TypeError, ValueError):
         return None
-    if nxt in locants:
-        return locants[nxt]
-    if is_ring:  # wrap N -> 1
-        return locants.get("1")
+    if position + 1 < len(ordered):
+        return locants[ordered[position + 1]]
+    if is_ring and ordered:
+        return locants[ordered[0]]
     return None
 
 

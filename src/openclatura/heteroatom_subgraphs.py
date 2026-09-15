@@ -90,6 +90,8 @@ def _is_charge_normalized_chalcogenido(mol: Molecule, center_idx: int | None, li
 
     if center_idx is None or mol.atoms[center_idx].charge <= 0:
         return False
+    if mol.atoms[center_idx].symbol not in {"P", "S", "Se", "Te", "Cl", "Br", "I"}:
+        return False
     bond = mol.get_bond(center_idx, ligand_idx)
     return (
         bond is not None
@@ -152,7 +154,7 @@ def _single_imino_n_substituent_name(
     branch = name_branch_or_none(mol, roots[0], exclude_atoms | {nitrogen}, nitrogen, branch_namer)
     if not branch:
         return ""
-    return f"N-{strip_outer_parentheses(branch)}-"
+    return f"N-{format_multiplier(strip_outer_parentheses(branch), 1)}-"
 
 
 def central_oxo_ligand_atoms(mol: Molecule, atom_idx: int, exclude_atoms: set[int]) -> list[int]:
@@ -283,7 +285,7 @@ def format_amino_from_branches(
     counts = count_names(branches)
     if len(counts) == 1 and list(counts.values())[0] == 1:
         branch = strip_outer_parentheses(branches[0])
-        if branch.endswith(("carbonyl", "sulfonyl", "sulfinyl", "carbonothioyl")):
+        if branch.endswith(("carbonyl", "sulfonyl", "sulfinyl", "carbonothioyl")) and not branch.startswith("("):
             return f"{branch}amino"
         if is_complex_prefix(branch):
             return f"(({branch})amino)"
@@ -346,9 +348,17 @@ def name_oxygen_subgraph(
     upstream_atom: int | None,
     branch_namer: RecursiveSubgraphNamer,
 ) -> str:
-    is_double = upstream_bond_order(mol, start_idx, upstream_atom) == 2
+    upstream_order = upstream_bond_order(mol, start_idx, upstream_atom)
+    is_double = upstream_order == 2
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
     start_atom = mol.atoms[start_idx]
+    if start_atom.charge == 1 and upstream_order in {1, 2}:
+        prefix = charged_heteroatom_prefix("O", 1, "double" if is_double else "single")
+        branches = [
+            _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx) for nxt in next_atoms
+        ]
+        if prefix is not None and all(branches):
+            return f"({format_counted_prefixes(branches)}{prefix})" if branches else prefix
     if not next_atoms:
         if is_double:
             return "oxo"
@@ -421,6 +431,18 @@ def name_nitrogen_subgraph(
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
     is_cation = mol.atoms[start_idx].charge > 0
     is_anion = mol.atoms[start_idx].charge < 0
+    if is_triple and mol.atoms[start_idx].charge == 1:
+        prefix = charged_heteroatom_prefix("N", 1, "triple")
+        if (
+            prefix is not None
+            and len(next_atoms) <= 1
+            and all(mol.get_bond(start_idx, nxt).order == 1 for nxt in next_atoms)
+        ):
+            branches = [
+                _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx) for nxt in next_atoms
+            ]
+            if all(branches):
+                return f"({format_counted_prefixes(branches)}{prefix})" if branches else prefix
     terminal_n3 = terminal_n3_prefix(mol, start_idx, exclude_atoms, upstream_atom)
     if terminal_n3:
         return terminal_n3
@@ -445,6 +467,10 @@ def name_nitrogen_subgraph(
             return "nitro"
     if not next_atoms:
         if is_double:
+            if is_cation or is_anion:
+                prefix = charged_heteroatom_prefix("N", 1 if is_cation else -1, "double")
+                if prefix is not None:
+                    return prefix
             return "imino"
         if is_triple:
             return "nitrilo"
@@ -453,6 +479,29 @@ def name_nitrogen_subgraph(
         if is_anion:
             return charged_heteroatom_prefix("N", -1, "single") or "azanidyl"
         return unsubstituted_prefix("N") or "amino"
+
+    if (
+        upstream_order == 1
+        and upstream_atom is not None
+        and mol.atoms[upstream_atom].is_carbon
+        and not is_cation
+        and not is_anion
+        and len(next_atoms) == 1
+    ):
+        terminal = next_atoms[0]
+        bond = mol.get_bond(start_idx, terminal)
+        if mol.atoms[terminal].symbol == "N" and mol.atoms[terminal].charge == 0 and bond.order == 2:
+            ligands = [n for n in mol.get_neighbors(terminal) if n != start_idx and mol.atoms[n].symbol != "H"]
+            if len(ligands) <= 1 and all(mol.get_bond(terminal, n).order == 1 for n in ligands):
+                branch = (
+                    _branch_name_text(branch_namer, mol, ligands[0], exclude_atoms | {start_idx, terminal}, terminal)
+                    if ligands
+                    else ""
+                )
+                if branch or not ligands:
+                    stereo = f"({bond.stereo})-" if bond.stereo in {"E", "Z"} else ""
+                    modifier = format_multiplier(strip_outer_parentheses(branch), 1) if branch else ""
+                    return f"({stereo}{modifier}diazenyl)"
 
     guanidino = _guanidino_prefix(mol, start_idx, next_atoms, exclude_atoms, branch_namer)
     if guanidino:
@@ -740,6 +789,8 @@ def name_sulfur_subgraph(
 
         if is_double or _is_charge_normalized_chalcogenido(mol, upstream_atom, start_idx):
             return "thioxo"
+        if mol.atoms[start_idx].charge == -1:
+            return charged_heteroatom_prefix("S", -1, "single") or "sulfido"
         return f"{stereo_prefix_text}{unsubstituted_prefix('S') or 'sulfanyl'}"
 
     if len(next_atoms) == 1:
@@ -912,12 +963,25 @@ def name_halogen_subgraph(
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom)
     if not next_atoms:
         return HALOGEN_PREFIXES[symbol]
+    # An oxohalogen's charge-separated terminal oxygens are oxo ligands in
+    # the neutral lambda hydride. Convert only a completely balanced set.
+    oxo_atoms = {
+        nxt
+        for nxt in next_atoms
+        if mol.atoms[nxt].symbol == "O" and _is_charge_normalized_chalcogenido(mol, start_idx, nxt)
+    }
+    if len(oxo_atoms) != mol.atoms[start_idx].charge:
+        oxo_atoms = set()
     branches = [
         br
         for nxt in next_atoms
-        if (br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx))
+        if (
+            br := "oxo"
+            if nxt in oxo_atoms
+            else _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx)
+        )
     ]
-    valence = sum(mol.get_bond(start_idx, n).order for n in mol.get_neighbors(start_idx))
+    valence = sum(mol.get_bond(start_idx, n).order for n in mol.get_neighbors(start_idx)) + len(oxo_atoms)
     return f"({format_counted_prefixes(branches)}lambda^{valence}-{HALOGEN_LAMBDA_SUFFIXES[symbol]})"
 
 
@@ -1025,4 +1089,6 @@ def _guanidino_prefix(
         parts.append(
             f"{','.join(locants)}-{format_multiplier(name, len(locants), safe_enclose=is_complex_prefix(name))}"
         )
-    return f"({'-'.join(parts)}guanidino)"
+    bond = mol.get_bond(carbon, imino)
+    stereo = f"({bond.stereo})-" if bond.stereo in {"E", "Z"} else ""
+    return f"({stereo}{'-'.join(parts)}guanidino)"

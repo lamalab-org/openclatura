@@ -7,6 +7,24 @@ except for descriptor/audit data that can be proven from the graph.
 import re
 from dataclasses import dataclass
 
+from .graph_kernel import (
+    adjacency_from_edges as adjacency_from_edges,
+)
+from .graph_kernel import (
+    canonical_cycle,
+)
+from .graph_kernel import (
+    connected_components as connected_components,
+)
+from .graph_kernel import (
+    cycle_edges as cycle_edges,
+)
+from .graph_kernel import (
+    normalize_edge as normalize_edge,
+)
+from .graph_kernel import (
+    normalize_edges as normalize_edges,
+)
 from .molecule import Molecule, edges_within_atoms
 from .ring_renderer import render_ring_descriptor, von_baeyer_cycle_count, von_baeyer_kind
 
@@ -349,6 +367,8 @@ def audit_von_baeyer_descriptor(
         errors.append("numbering path contains duplicate atoms")
     if set(numbered_path) != set(atom for edge in normalized_edges for atom in edge):
         errors.append("numbering path does not cover the ring graph atoms")
+    if errors:
+        return VonBaeyerAudit(descriptor, numbered_path, False, tuple(errors), frozenset())
     expected_edges = _von_baeyer_edges_from_numbering(base_numbers, extra_bridges, numbered_path)
     if not expected_edges:
         errors.append("descriptor could not be reconstructed from locants")
@@ -375,6 +395,8 @@ def _parse_von_baeyer_descriptor(
         base_numbers = tuple(int(part) for part in parts[:3])
     except ValueError:
         return None
+    if any(length < 0 for length in base_numbers):
+        return None
     extra_bridges = []
     for part in parts[3:]:
         bridge = re.fullmatch(r"(?P<length>\d+)\^\{(?P<first>\d+),(?P<second>\d+)\}", part)
@@ -394,7 +416,7 @@ def _von_baeyer_edges_from_numbering(
     numbered_path: tuple[int, ...],
 ) -> frozenset[tuple[int, int]]:
     locant_to_atom = {locant: atom for locant, atom in enumerate(numbered_path, start=1)}
-    if len(locant_to_atom) != len(numbered_path):
+    if len(set(numbered_path)) != len(numbered_path):
         return frozenset()
     base_count = sum(base_numbers) + 2
     if base_count > len(numbered_path):
@@ -409,6 +431,8 @@ def _von_baeyer_edges_from_numbering(
             continue
         bridge_locants = tuple(range(next_bridge_locant, next_bridge_locant + length))
         if any(locant not in locant_to_atom for locant in bridge_locants):
+            return frozenset()
+        if first_locant in bridge_locants or second_locant in bridge_locants:
             return frozenset()
         locant_chain = (first_locant, *bridge_locants, second_locant)
         for left, right in zip(locant_chain, locant_chain[1:]):
@@ -698,26 +722,6 @@ def simple_cycles_from_edges(atoms: frozenset[int], edges: set[tuple[int, int]])
     return [tuple(cycle) for cycle in sorted(cycles)]
 
 
-def connected_components(atoms: set[int], edges: frozenset[tuple[int, int]]) -> list[set[int]]:
-    components = []
-    seen = set()
-    for atom in sorted(atoms):
-        if atom in seen:
-            continue
-        queue = [atom]
-        seen.add(atom)
-        component = set()
-        while queue:
-            current = queue.pop(0)
-            component.add(current)
-            for neighbor in adjacent_atoms(current, edges):
-                if neighbor in atoms and neighbor not in seen:
-                    seen.add(neighbor)
-                    queue.append(neighbor)
-        components.append(component)
-    return components
-
-
 def _component_path_between_attachment_atoms(
     component: frozenset[int], attachment_centers: set[int], edges: frozenset[tuple[int, int]]
 ) -> tuple[int, ...]:
@@ -784,16 +788,6 @@ def _dedupe_paths(paths: list[tuple[int, ...]]) -> list[tuple[int, ...]]:
     return deduped
 
 
-def adjacency_from_edges(
-    nodes: set[int] | frozenset[int], edges: set[tuple[int, int]] | frozenset[tuple[int, int]]
-) -> dict[int, set[int]]:
-    adjacency: dict[int, set[int]] = {node: set() for node in nodes}
-    for first, second in edges:
-        adjacency[first].add(second)
-        adjacency[second].add(first)
-    return adjacency
-
-
 def adjacent_atoms(atom: int, edges: frozenset[tuple[int, int]]) -> set[int]:
     adjacent = set()
     for first, second in edges:
@@ -804,14 +798,5 @@ def adjacent_atoms(atom: int, edges: frozenset[tuple[int, int]]) -> set[int]:
     return adjacent
 
 
-def normalize_edges(edges) -> set[tuple[int, int]]:
-    return {tuple(sorted((first, second))) for first, second in edges}
-
-
 def _canonical_cycle(path: list[int]) -> tuple[int, ...]:
-    variants = []
-    for seq in (path, list(reversed(path))):
-        for idx in range(len(seq)):
-            rotated = tuple(seq[idx:] + seq[:idx])
-            variants.append(rotated)
-    return min(variants)
+    return canonical_cycle(path)

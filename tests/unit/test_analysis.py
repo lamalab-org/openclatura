@@ -602,29 +602,43 @@ def test_unmatched_retained_parent_morphology_uses_operation_scope():
     assert set(dioxolan["atoms"]) == {1, 2, 3, 4, 5}
 
 
-def test_unmatched_spiro_parent_morphology_uses_operation_scope_not_broad_fallback():
+def test_spiro_side_prefix_has_exact_graph_ownership_not_broad_fallback():
     analysis = analyze_smiles("CN1CC11C2C3CC2C13")
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
-    methylspiro = next(token for token in assembly.data["name_token_spans"] if token["text"] == "methylspiro")
+    methyl = next(token for token in assembly.data["name_token_spans"] if token["text"] == "methyl")
 
-    assert analysis.name == "1'-methylspiro[tricyclo[2.2.0.0^{2,5}]hexane-6,2'-aziridine]"
-    assert methylspiro["source"] == "operation_trace"
-    assert methylspiro["confidence"] == "derived"
-    assert methylspiro["ownership"] == "operation_scope"
-    assert methylspiro["token_kind"] == "prefix"
+    assert analysis.name == "1-methylspiro[aziridine-2,3'-tricyclo[2.2.0.0^{2,5}]hexane]"
+    assert methyl["source"] == "substituent_renderer"
+    assert methyl["confidence"] == "derived"
+    assert methyl["ownership"] == "exact"
+    assert methyl["token_kind"] == "prefix"
+    assert methyl["atoms"] == [0]
+    substituent = next(segment for segment in analysis.trace_segments if segment["key"] == "substituent:methyl")
+    assert substituent["atoms"] == [0]
+    assert substituent["bonds"] == [1]
 
 
-def test_primed_spiro_component_locant_uses_component_scope_not_broad_fallback():
+def test_spiro_component_replacement_locant_binds_its_own_atom_not_broad_fallback():
+    """A side component's replacement prefix carries its own provenance.
+
+    This used to resolve through a punctuation rule -- a locant followed by a
+    prime addresses the other component -- which could only ever hand back that
+    whole component, and stopped working when P-24.5.1 cited the components in
+    the other order and the prime moved. The prefix now binds the atom it names,
+    so the locant resolves exactly and whichever order the components are in.
+    """
+
     analysis = analyze_smiles("OC1CC11CC2NC12")
     assembly = next(step for step in analysis.decisions if step.decision == "assembled component name")
-    primed_locant = next(token for token in assembly.data["name_token_spans"] if token["text"] == "5")
+    replacement_locant = next(token for token in assembly.data["name_token_spans"] if token["text"] == "5")
 
-    assert analysis.name == "5'-azaspiro[cyclopropane-2,2'-bicyclo[2.1.0]pentane]-1-ol"
-    assert primed_locant["source"] == "primed_component_locant_fallback"
-    assert primed_locant["confidence"] == "derived"
-    assert primed_locant["ownership"] == "component_locant"
-    assert primed_locant["token_kind"] == "locant"
-    assert primed_locant["atoms"] == [4, 5, 6, 7]
+    assert analysis.name == "5-azaspiro[bicyclo[2.1.0]pentane-2,2'-cyclopropane]-1'-ol"
+    assert replacement_locant["ownership"] == "exact"
+    assert replacement_locant["confidence"] == "derived"
+    assert replacement_locant["atoms"] == [6]
+    binding = next(item for item in assembly.data["name_atom_bindings"] if item["role"] == "replacement_prefix")
+    assert binding["locants"] == ["5"]
+    assert binding["atoms"] == [6]
 
 
 def test_analysis_carries_name_atom_bindings():
@@ -1110,6 +1124,7 @@ def test_additive_hydrogen_capacity_excludes_inherent_retained_sites():
             "reason": "Saturation beyond the parent's indicated hydrogen is added hydrogen.",
             "locants": ["2", "3", "3a", "4", "5", "6", "7", "7a"],
             "atom_ids": [0, 2, 3, 4, 5, 6, 7, 8],
+            "bond_ids": [],
             "operation_kind": "additive_hydrogen",
         }
     ]
@@ -1125,12 +1140,11 @@ def test_additive_hydrogen_does_not_relocate_an_inherent_site():
     ]
 
 
-def test_relaxed_retained_topology_keeps_audited_polycycle_fallback():
+def test_relaxed_retained_topology_uses_deterministic_audited_polycycle_numbering():
     smiles = "CCC1CCc2c(cc(OC)c3c2C(=O)c2cccc(OC)c2C3=O)C1"
+    expected_name = "3-ethyl-6,8-dimethoxy-1,2,3,4-tetrahydrobenzo[a]anthracene-7,12-dione"
 
-    assert name_smiles(smiles) == (
-        "16-ethyl-8,12-dimethoxytetracyclo[12.4.0.0^{2,11}.0^{4,9}]octadeca-1,4,6,8,11,13-hexaene-3,10-dione"
-    )
+    assert name_smiles(smiles) == expected_name
 
 
 def test_n_substituent_locant_survives_retained_suffix_postprocessing():
@@ -1930,16 +1944,18 @@ def test_two_nitrogen_chain_uses_its_retained_name():
 def test_a_named_spiro_component_primes_its_replacement_prefixes():
     # The side ring is the primed component, so its heteroatom locants are
     # primed too.  Unprimed, they read back on the other ring entirely.
-    assert name_smiles("N1CC2(C3=CC=CC=C13)NCNC2") == "1',3'-diazaspiro[indoline-3,4'-cyclopentane]"
-    assert name_smiles("O=C1NC2(CN1)c1ccccc1NC2=O") == "1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2,2'-dione"
+    assert name_smiles("N1CC2(C3=CC=CC=C13)NCNC2") == "1,3-diazaspiro[cyclopentane-4,3'-2,3-dihydro-1H-indole]"
+    assert (
+        name_smiles("O=C1NC2(CN1)c1ccccc1NC2=O") == "1,3-diazaspiro[cyclopentane-4,3'-1,3-dihydro-2H-indole]-2',2-dione"
+    )
 
 
 def test_every_side_ring_substituent_survives_and_is_primed():
     assert name_smiles("CCC/C=C1/N(CCCC)C(=O)NC12C(=O)N(C)c1ccccc12") == (
-        "(5'E)-1'-butyl-5'-butylidene-1-methyl-1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2,2'-dione"
+        "(5E)-1-butyl-5-butylidene-1'-methyl-1,3-diazaspiro[cyclopentane-4,3'-1,3-dihydro-2H-indole]-2',2-dione"
     )
     assert name_smiles("C=C1N(C)C(=O)NC12C(=O)N(C)c1ccccc12") == (
-        "1,1'-dimethyl-5'-methylidene-1',3'-diazaspiro[indoline-3,4'-cyclopentane]-2,2'-dione"
+        "1,1'-dimethyl-5-methylidene-1,3-diazaspiro[cyclopentane-4,3'-1,3-dihydro-2H-indole]-2',2-dione"
     )
 
 
@@ -1959,7 +1975,8 @@ def test_a_counted_spiro_keeps_its_replacement_prefixes_unprimed():
     assert name_smiles("C1CC2(CC1)OCCO2") == "1,4-dioxaspiro[4.4]nonane"
     both = name_smiles("Cc1noc(C2CC3(C2)CN(C2CCC4(CC2)C(=O)Nc2ccccc24)C3)n1")
     assert "2-azaspiro[3.3]heptan" in both
-    assert "spiro[indoline-3,1'-cyclohexane]" in both
+    # P-24.5.1 cites cyclohexane before the indole, so the indole is primed.
+    assert "spiro[cyclohexane-1,3'-1,3-dihydro-2H-indole]" in both
 
 
 def test_homonuclear_chain_names_are_reconstructed_by_the_audit():
@@ -2011,7 +2028,7 @@ def test_tetraazene_parent_takes_an_ylidene_ligand():
 def test_a_short_or_charged_nitrogen_chain_leaves_its_own_group_alone():
     # Diazo and hydrazone each own their nitrogens and name them better than a
     # bare chain parent would; an azoxy is the chain itself plus an oxide.
-    assert name_smiles("[N-]=[N+]=C1CCc2ccccc21") == "1-(diazo)indane"
+    assert name_smiles("[N-]=[N+]=C1CCc2ccccc21") == "1-(diazo)-2,3-dihydro-1H-indene"
     assert name_smiles("COc1ccc(N=[N+]([O-])c2ccccc2)cc1") == "2-(4-methoxyphenyl)-1-phenyldiazene 1-oxide"
     # A principal group outside the chain keeps its own parent and suffix.
     assert name_smiles("OCCNN=NN") == "2-(hydrazonohydrazinyl)ethan-1-ol"
@@ -3067,8 +3084,10 @@ def test_spiro_marker_is_converted_to_structural_assembly_item():
 
     spiro_subs = split_spiro_substituents(parts)
 
-    assert spiro_subs == [SpiroAssembly("1", "2", "aziridine")]
-    assert parts.substituents == [SubstituentItem(name="methyl", locants=["3'"])]
+    # P-24.5.1 cites aziridine before the parent, so it is the unprimed component
+    # and keeps its own substituent rather than hoisting a primed one.
+    assert spiro_subs == [SpiroAssembly("1", "2", "aziridine", ("3-methyl",), side_prime="", cited_first=True)]
+    assert parts.substituents == []
 
 
 def test_structural_spiro_substituent_bypasses_marker_text():
@@ -3085,8 +3104,10 @@ def test_structural_spiro_substituent_bypasses_marker_text():
 
     spiro_subs = split_spiro_substituents(parts)
 
-    assert spiro_subs == [SpiroAssembly("1", "2", "aziridine")]
-    assert parts.substituents == [SubstituentItem(name="methyl", locants=["3'"])]
+    # P-24.5.1 cites aziridine before the parent, so it is the unprimed component
+    # and keeps its own substituent rather than hoisting a primed one.
+    assert spiro_subs == [SpiroAssembly("1", "2", "aziridine", ("3-methyl",), side_prime="", cited_first=True)]
+    assert parts.substituents == []
 
 
 def test_spiro_side_retained_ionic_ring_locants_are_registry_derived():
@@ -3266,7 +3287,9 @@ def test_indicated_hydrogen_follows_graph_tautomer_but_not_hydrogen_free_spiro_c
     cases = {
         "c1ccc2c(c1)CN=C2C1=NCc2ccccc21": "3-(1H-isoindol-3-yl)-1H-isoindole",
         "O=C(OCCNC1=NCc2ccccc21)c1ccccc1": "2-((1H-isoindol-3-yl)amino)ethyl benzoate",
-        "FN1CCC2(C=Nc3ccccc32)CC1": "1'-fluorospiro[3H-indole-3,4'-piperidine]",
+        # The spiro carbon is C-3 itself, so no indicated hydrogen is carried in;
+        # the dihydro isomer is distinguished as spiro[indoline-3,4'-piperidine].
+        "FN1CCC2(C=Nc3ccccc32)CC1": "1'-fluorospiro[indole-3,4'-piperidine]",
     }
 
     for smiles, expected in cases.items():
@@ -4335,21 +4358,25 @@ def test_dense_polycyclic_cage_fails_closed_without_von_baeyer_path_explosion():
     assert name_smiles("C1C2CC34CC5CC67CC8CC9%10CC%11CC1%12C9C(C2)(C36)C58C(C%11)(C%124)C%107") == ""
 
 
-@pytest.mark.xfail(
-    reason=(
-        "Output depends on RDKit's aromaticity perception. On rdkit 2026.x "
-        "(used in CI) the namer emits the expected "
-        "nona-1(6),2,4-trien-8-one; on older rdkit 2025.x it emits "
-        "nona-1,3,5-trien-8-one. strict=False so the test passes either "
-        "way until the underlying rdkit-version sensitivity is addressed."
-    ),
-    strict=False,
-)
 def test_charged_ammonio_substituent_keeps_all_n_ligands_explicit():
-    assert (
-        name_smiles("CCCC1CCC(CC1)[NH+](C)Cc2ccc3c(c2)oc(=O)o3")
-        == "3-(((4-propylcyclohexyl)(methyl)ammonio)methyl)-7,9-dioxabicyclo[4.3.0]nona-1(6),2,4-trien-8-one"
-    )
+    made = name_smiles("CCCC1CCC(CC1)[NH+](C)Cc2ccc3c(c2)oc(=O)o3")
+
+    # RDKit releases have produced different, graph-equivalent Kekule forms
+    # for the benzodioxole ring. All accepted renderings explicitly retain the
+    # cyclohexyl, methyl, and benzodioxolylmethyl ligands on charged nitrogen.
+    assert made in {
+        "N-methyl-N-((2-oxo-1,3-benzodioxol-5-yl)methyl)-4-propylcyclohexanaminium",
+        "3-(((4-propylcyclohexyl)(methyl)ammonio)methyl)-7,9-dioxabicyclo[4.3.0]nona-1(6),2,4-trien-8-one",
+        "3-(((4-propylcyclohexyl)(methyl)ammonio)methyl)-7,9-dioxabicyclo[4.3.0]nona-1,3,5-trien-8-one",
+    }
+
+
+def test_gonane_retained_stereo_requires_only_the_configurations_implied_by_the_parent():
+    specified = "C1C[C@H]2CC[C@H]3[C@@H](CCC4CCCC[C@H]34)[C@@H]2C1"
+    one_required_center_unspecified = "C1CC2CC[C@H]3[C@@H](CCC4CCCC[C@H]34)[C@@H]2C1"
+
+    assert name_smiles(specified) == "(8S,9R,10S,13S,14R)-gonane"
+    assert "gonane" not in name_smiles(one_required_center_unspecified)
 
 
 def test_zinc_multi_locant_cation_suffixes_render_with_multiplier():
@@ -4440,7 +4467,7 @@ def test_public_api_golden_names():
 
 def test_pyopsin_regression_names_use_parseable_spiro_and_formamido_forms():
     cases = {
-        "CN1CC11C2C3CC2C13": "1'-methylspiro[tricyclo[2.2.0.0^{2,5}]hexane-6,2'-aziridine]",
+        "CN1CC11C2C3CC2C13": "1-methylspiro[aziridine-2,3'-tricyclo[2.2.0.0^{2,5}]hexane]",
         "CC1CC11CC2CCC12": "2'-methylspiro[bicyclo[2.2.0]hexane-2,1'-cyclopropane]",
         "CC1NC11CC2OC12C": "1,3'-dimethylspiro[5-oxabicyclo[2.1.0]pentane-2,2'-aziridine]",
         "COC(=O)CCNC=O": "methyl 3-formamidopropanoate",
@@ -4460,7 +4487,7 @@ def test_pyopsin_regression_names_preserve_positive_nitrogen_charge():
         "OC1C[NH2+]C1C([O-])=O": "3-hydroxyazetidinium-2-carboxylate",
         "C[NH+](C)C(C#C)C([O-])=O": "2-(dimethylammonio)but-3-ynoate",
         "[O-]C(=O)C1[NH2+]CC2CC12": "3-azoniabicyclo[3.1.0]hexane-2-carboxylate",
-        "CC(C)(C)/C=C/C(=O)N1CCC[C@@H]2[C@H]1C[NH2+]C2": "(2E)-1-((1S,6S)-2,8-diazabicyclo[4.3.0]nonan-8-ium-2-yl)-4,4-dimethylpent-2-en-1-one",
+        "CC(C)(C)/C=C/C(=O)N1CCC[C@@H]2[C@H]1C[NH2+]C2": "(2E)-1-((4aS,7aS)-2,3,4,4a,7,7a-hexahydro-6H-pyrrolo[3,4-b]pyridin-6-ium-1-yl)-4,4-dimethylpent-2-en-1-one",
         "C[C@H]1C[NH+](CCN1c2[nH]c3ccccc3n2)C": "2-((2S)-2,4-dimethylpiperazin-4-ium-1-yl)-1H-benzimidazole",
         "Cc1cn2c(cccc2[nH+]1)c3cccc(c3F)C[NH+]4CCCCC4": "5-(2-fluoro-3-(piperidinium-1-ylmethyl)phenyl)-2-methylimidazo[1,2-a]pyridin-1-ium",
         "Cc1cn2c(cccc2[nH+]1)c3ccc(cc3F)N4CCCCC4": "5-(2-fluoro-4-(piperidin-1-yl)phenyl)-2-methylimidazo[1,2-a]pyridin-1-ium",
@@ -4583,9 +4610,9 @@ def test_ambiguous_ring_connection_stems_keep_attachment_locants():
 
 def test_spiro_substituent_radicals_keep_attachment_locants():
     cases = {
-        "OCC12CC(C1)C21CN1": "(spiro[bicyclo[1.1.1]pentane-2,2'-aziridine]-1-yl)methanol",
-        "OCC12CC1C1(CN1)C2": "(spiro[bicyclo[2.1.0]pentane-3,2'-aziridine]-1-yl)methanol",
-        "OCC1CC11C2CC1C2": "(spiro[cyclopropane-2,2'-bicyclo[1.1.1]pentane]-1-yl)methanol",
+        "OCC12CC(C1)C21CN1": "(spiro[aziridine-2,2'-bicyclo[1.1.1]pentane]-1'-yl)methanol",
+        "OCC12CC1C1(CN1)C2": "(spiro[aziridine-2,3'-bicyclo[2.1.0]pentane]-1'-yl)methanol",
+        "OCC1CC11C2CC1C2": "(spiro[bicyclo[1.1.1]pentane-2,2'-cyclopropane]-1'-yl)methanol",
     }
 
     for smiles, expected in cases.items():
@@ -4647,6 +4674,10 @@ def test_spiro_side_heteroaromatic_branch_uses_graph_numbered_side_ring():
 
 
 def test_spiro_side_hantzsch_widman_branch_requires_aromatic_ring_metadata():
+    from openclatura import opsin_available, verify_with_opsin
+    from openclatura.assembler import assemble_name_raw
+    from openclatura.namer import _simple_monocyclic_spiro_side_assembly
+
     mol = Molecule()
     for idx, symbol in {
         0: "C",
@@ -4674,18 +4705,31 @@ def test_spiro_side_hantzsch_widman_branch_requires_aromatic_ring_metadata():
     ):
         mol.add_bond(u, v, order=order)
 
+    assert _simple_monocyclic_spiro_side_assembly(mol, 0, set(mol.atoms)) is None
     spiro = _spiro_subgraph_assembly(mol, 0, set(mol.atoms))
 
-    assert spiro.side_parent_name != "cyclopropane"
-    assert not any("oxadiazol" in prefix for prefix in spiro.side_prefixes)
+    # The shortcut needs aromatic flags; ordinary branch naming can establish
+    # the heterocycle from its Kekule bonds without losing the spiro junction.
+    assert spiro.side_locant == "1"
+    assert spiro.side_parent_name == "cyclopropane"
+    assert spiro.side_prefixes == ("2'-(3-methyl-1,2,4-oxadiazol-5-yl)",)
+    assert spiro.side_parts.parent_atom_ids == {0, 1, 2}
+    assert spiro.side_parts.parent_atom_ids_by_locant == {"1": 0, "2": 1, "3": 2}
+    assert spiro.side_substituents[0].atom_ids == {3, 4, 5, 6, 7, 8}
+    assert spiro.side_substituents[0].bond_ids == set(range(4, 11))
+    generated = assemble_name_raw(spiro.side_parts)
+    assert generated == "2-(3-methyl-1,2,4-oxadiazol-5-yl)cyclopropane"
+    if opsin_available():
+        check = verify_with_opsin(generated, "C1CC1C2=NC(=NO2)C", standardize_smiles=False)
+        assert check.ok, check.to_dict()
 
 
 def test_mixed_spiro_bicyclo_side_suffixes_and_replacement_locants_are_component_scoped():
     cases = {
         "OC1CC11C2CC1(O)C2": "spiro[bicyclo[1.1.1]pentane-2,1'-cyclopropane]-1,2'-diol",
         "OC1CC11C2CC1C2=O": "spiro[bicyclo[1.1.1]pentane-4,1'-cyclopropane]-2'-ol-2-one",
-        "CC12CC(O1)C21CC1O": "1'-methyl-2'-oxaspiro[cyclopropane-2,4'-bicyclo[1.1.1]pentane]-1-ol",
-        "CC12CN(C1)C21CC1O": "3'-methyl-1'-azaspiro[cyclopropane-2,2'-bicyclo[1.1.1]pentane]-1-ol",
+        "CC12CC(O1)C21CC1O": "1-methyl-2-oxaspiro[bicyclo[1.1.1]pentane-4,2'-cyclopropane]-1'-ol",
+        "CC12CN(C1)C21CC1O": "3-methyl-1-azaspiro[bicyclo[1.1.1]pentane-2,2'-cyclopropane]-1'-ol",
     }
 
     for smiles, expected in cases.items():
@@ -4875,7 +4919,7 @@ def test_pyopsin_regression_names_preserve_retained_ring_cations():
     cases = {
         "CC(=C(C)C(=O)NCCc1[nH+]ccn1C)C": "2,3-dimethyl-N-(2-(1-methyl-1H-imidazol-3-ium-2-yl)ethyl)but-2-enamide",
         "CC[C@@H](C(=O)CC)Oc1[nH]c(c[nH+]1)C(=O)OC": "methyl 2-(((3S)-4-oxohexan-3-yl)oxy)-1H-imidazol-3-ium-5-carboxylate",
-        "Cn1c(ccn1)C[NH+]2CCc3c(cc[nH]c3=O)C2": "8-((1-methyl-1H-pyrazol-5-yl)methyl)-3,8-diazabicyclo[4.4.0]deca-1(6),4-dien-8-ium-2-one",
+        "Cn1c(ccn1)C[NH+]2CCc3c(cc[nH]c3=O)C2": "2-((1-methyl-1H-pyrazol-5-yl)methyl)-2,3,4,6-tetrahydropyrido[4,3-c]pyridin-2-ium-5-one",
     }
 
     for smiles, expected in cases.items():
@@ -4928,9 +4972,9 @@ def test_pyopsin_regression_names_preserve_carbanion_suffix_locants():
 
 def test_pyopsin_regression_names_preserve_zwitterionic_parent_suffix_order():
     cases = {
-        "[NH3+]C1=CC(=O)NC(=O)[CH-]1": "2,6-dioxo-1H,3H-pyridin-3-ide-4-aminium",
+        "[NH3+]C1=CC(=O)NC(=O)[CH-]1": "2,6-dioxo-1,3-dihydropyridin-3-ide-4-aminium",
         "NC1=NC(N)=[NH+][N-]C1=N": "6-imino-1H-1,2,4-triazin-2-ium-1-ide-3,5-diamine",
-        "[NH3+][C-]1C=CC2=C1N=NO2": "2-oxa-3,4-diazabicyclo[3.3.0]octa-1(5),3,7-trien-6-ide-6-aminium",
+        "[NH3+][C-]1C=CC2=C1N=NO2": "cyclopenta[d][1,2,3]oxadiazol-4-ide-4-aminium",
     }
 
     for smiles, expected in cases.items():
@@ -5029,12 +5073,12 @@ def test_pyopsin_regression_names_preserve_cationic_imino_charge():
 
 def test_charged_fused_heteroaromatic_bicycles_spell_nitrogen_zwitterion():
     cases = {
-        "[N-]1[NH+]=CC=C2C=CN=C12": "2,3,9-triazabicyclo[4.3.0]nona-1(9),3,5,7-tetraen-2-ide-3-ium",
-        "[N-]1[NH+]=CC=C2N=CC=C12": "2,3,7-triazabicyclo[4.3.0]nona-1(9),3,5,7-tetraen-2-ide-3-ium",
-        "[N-]1[NH+]=CC=C2N=CN=C12": "2,3,7,9-tetraazabicyclo[4.3.0]nona-1(9),3,5,7-tetraen-2-ide-3-ium",
-        "[N-]1[NH+]=CN=C2C=CN=C12": "2,3,5,9-tetraazabicyclo[4.3.0]nona-1(9),3,5,7-tetraen-2-ide-3-ium",
-        "[N-]1[NH+]=CN=C2N=CN=C12": "2,3,5,7,9-pentaazabicyclo[4.3.0]nona-1(9),3,5,7-tetraen-2-ide-3-ium",
-        "[N-]1[NH+]=NC=C2N=CN=C12": "2,3,4,7,9-pentaazabicyclo[4.3.0]nona-1(9),3,5,7-tetraen-2-ide-3-ium",
+        "[N-]1[NH+]=CC=C2C=CN=C12": "pyrrolo[2,3-c]pyridazin-1-ide-2-ium",
+        "[N-]1[NH+]=CC=C2N=CC=C12": "pyrrolo[3,2-c]pyridazin-1-ide-2-ium",
+        "[N-]1[NH+]=CC=C2N=CN=C12": "imidazo[4,5-c]pyridazin-1-ide-2-ium",
+        "[N-]1[NH+]=CN=C2C=CN=C12": "pyrrolo[3,2-e][1,2,4]triazin-1-ide-2-ium",
+        "[N-]1[NH+]=CN=C2N=CN=C12": "imidazo[4,5-e][1,2,4]triazin-1-ide-2-ium",
+        "[N-]1[NH+]=NC=C2N=CN=C12": "imidazo[4,5-d][1,2,3]triazin-1-ide-2-ium",
     }
 
     for smiles, expected in cases.items():
@@ -5124,7 +5168,7 @@ def test_anionic_ketone_parent_names_keep_parent_descriptor_intact():
     cases = {
         "O=C1[CH-][NH+]2CCC2=C1": "3-oxo-1-azoniabicyclo[3.2.0]hept-4-en-2-ide",
         "O=C1C=C[NH+]2CC[C-]12": "4-oxo-1-azoniabicyclo[3.2.0]hept-2-en-5-ide",
-        "O=C1[CH-]NC2=C1C[NH2+]C2": "4-oxo-2,7-diazabicyclo[3.3.0]oct-1(5)-en-7-ium-3-ide",
+        "O=C1[CH-]NC2=C1C[NH2+]C2": "3-oxo-1,4,5,6-tetrahydropyrrolo[3,4-b]pyrrol-5-ium-2-ide",
         # The demoted ketone prefix goes in front of the whole prefix run rather
         # than sorting with it, as in ``3-oxo-4-methyl…``.
         "CC(=O)[C-]1C[NH2+]CC1=O": "3-oxo-4-acetylpyrrolidin-1-ium-4-ide",
@@ -5137,7 +5181,7 @@ def test_anionic_ketone_parent_names_keep_parent_descriptor_intact():
 def test_von_baeyer_polycycle_keeps_descriptor_source_numbering():
     cases = {
         "C1C2C1C13COC21CO3": "7,9-dioxatetracyclo[3.2.2.0^{1,5}.0^{2,4}]nonane",
-        "C1NC23COC12C=CC3": "9-oxa-7-azatricyclo[3.2.2.0^{1,5}]non-3-ene",
+        "C1NC23COC12C=CC3": "7-oxa-9-azatricyclo[3.2.2.0^{1,5}]non-2-ene",
         "C1NC23COC12COC3": "3,9-dioxa-7-azatricyclo[3.2.2.0^{1,5}]nonane",
     }
 
@@ -5391,7 +5435,7 @@ def test_sulfur_imide_substituents_preserve_double_bonded_nitrogen():
 
 
 def test_sulfonimidoyl_substituents_keep_imino_n_ligand():
-    assert name_smiles("CC(C)N=S(C)(=O)c1ccc(N)cc1") == "4-(N-propan-2-yl-S-methylsulfonimidoyl)aniline"
+    assert name_smiles("CC(C)N=S(C)(=O)c1ccc(N)cc1") == "4-(N-(propan-2-yl)-S-methylsulfonimidoyl)aniline"
     assert name_smiles("CN=S(=O)(CC(C)N)NOC") == "1-(N-methyl-S-methoxyaminosulfonimidoyl)propan-2-amine"
 
 
@@ -5428,7 +5472,7 @@ def test_azine_retained_and_simple_ring_sides_are_graph_bound():
 
 def test_a_spiro_side_component_keeps_its_stereo_descriptors():
     cases = {
-        "O=C1Nc2ccccc2[C@@]12CCN(C)[C@H]2C": "(2'S,3R)-1',2'-dimethylspiro[indoline-3,3'-pyrrolidine]-2-one",
+        "O=C1Nc2ccccc2[C@@]12CCN(C)[C@H]2C": "(2'S,3R)-1',2'-dimethylspiro[1,3-dihydro-2H-indole-3,3'-pyrrolidine]-2-one",
         "CC[C@@H]1CCC[C@]2(CC[C@@H]3C[C@@H]3CO2)C1": (
             "(1S,3'R,4S,7R)-3'-ethylspiro[3-oxabicyclo[5.1.0]octane-4,1'-cyclohexane]"
         ),
@@ -5537,7 +5581,7 @@ def test_cyclic_peroxy_esters_render_as_oxo_dioxacycles():
         # is past that range and stays on replacement nomenclature.
         "O=C1OOCCCCC1C1CCCCCCC1": "4-cyclooctyl-1,2-dioxocan-3-one",
         "O=C1CCCCCCC(=O)OOCC1": "1,2-dioxacyclododecane-3,10-dione",
-        "Cc1ccc2c(c1)C=CC(=O)OO2": "9-methyl-2,3-dioxabicyclo[5.4.0]undeca-1(7),5,8,10-tetraen-4-one",
+        "Cc1ccc2c(c1)C=CC(=O)OO2": "7-methylbenzo[c][1,2]dioxepin-3-one",
         "CC(C)=CCC/C(C)=C1\\OOC1=O": "(4Z)-4-(6-methylhept-5-en-2-ylidene)-1,2-dioxetan-3-one",
     }
 

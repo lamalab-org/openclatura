@@ -45,7 +45,7 @@ def _starts_with_multiplier(name: str) -> bool:
 def format_multiplier(name: str, count: int, safe_enclose: bool = False) -> str:
     """Apply simple or complex multiplicative prefixes to a substituent name."""
 
-    is_complex = is_complex_prefix(name)
+    is_complex = is_complex_prefix(name) or (count > 1 and needs_complex_multiplier(name))
     if count == 1:
         if (safe_enclose or is_complex) and not is_fully_enclosed(name):
             return f"({name})"
@@ -54,6 +54,16 @@ def format_multiplier(name: str, count: int, safe_enclose: bool = False) -> str:
     if is_complex and not is_fully_enclosed(name):
         return f"{mult}({name})"
     return f"{mult}{name}"
+
+
+def needs_complex_multiplier(name: str) -> bool:
+    """Keep repeated compound ligands distinct from chains such as disulfanyl."""
+
+    return (
+        is_composite_prefix(name)
+        or (name.endswith("yl") and "oxy" in name)
+        or name in {"sulfanyl", "selanyl", "tellanyl", "phosphanyl", "arsanyl"}
+    )
 
 
 def count_names(names: list[str]) -> dict[str, int]:
