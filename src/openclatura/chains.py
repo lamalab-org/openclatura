@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 
 from .canonical_ranks import canonical_ranks
-from .graph_kernel import biconnected_edge_components
+from .graph_kernel import biconnected_edge_components, normalize_edge
 from .locants import retained_locant_sort_key
 from .molecule import Molecule, edges_within_atoms
 from .polycycle_topology import (
@@ -98,6 +98,133 @@ class _CycleWalkExhausted(RuntimeError):
 _MAIN_RING_WALK_STATES = 2_000_000
 
 
+# Enumerating the cycle space is bounded by 2**rank rather than by the number
+# of cycles, but it is still exponential. Rank 28 is about 2.7e8 iterations of
+# one exclusive-or, which is tens of seconds; past that a caller is better
+# served by an honest abstention than by an unbounded wait.
+_MAX_CYCLE_SPACE_RANK = 28
+_MAX_LONGEST_CYCLES = 4096
+
+
+def _fundamental_cycle_masks(comp_nodes, comp_edges, adj, edge_index):
+    """Return one edge mask per fundamental cycle of a spanning forest.
+
+    Every cycle of a graph is a GF(2) sum of these, so they span exactly the
+    cycles the walk above enumerates one at a time.
+    """
+
+    parent: dict[int, int] = {}
+    depth: dict[int, int] = {}
+    tree: set[tuple[int, int]] = set()
+    seen: set[int] = set()
+    for root in sorted(comp_nodes):
+        if root in seen:
+            continue
+        seen.add(root)
+        depth[root] = 0
+        stack = [root]
+        while stack:
+            current = stack.pop()
+            for neighbor in sorted(adj[current]):
+                if neighbor in seen:
+                    continue
+                seen.add(neighbor)
+                parent[neighbor] = current
+                depth[neighbor] = depth[current] + 1
+                tree.add(normalize_edge(current, neighbor))
+                stack.append(neighbor)
+
+    masks = []
+    for edge in sorted(edge_index):
+        if edge in tree:
+            continue
+        left, right = edge
+        ring = {edge}
+        while left != right:
+            if depth[left] >= depth[right]:
+                ring.add(normalize_edge(left, parent[left]))
+                left = parent[left]
+            else:
+                ring.add(normalize_edge(right, parent[right]))
+                right = parent[right]
+        masks.append(sum(1 << edge_index[member] for member in ring))
+    return masks
+
+
+def _cycle_path_from_edges(mask, edge_by_index):
+    """Order one cycle's edge set into a node path, or None if it is not one cycle."""
+
+    adjacency: dict[int, list[int]] = {}
+    remaining = mask
+    while remaining:
+        lowest = remaining & -remaining
+        left, right = edge_by_index[lowest.bit_length() - 1]
+        remaining ^= lowest
+        adjacency.setdefault(left, []).append(right)
+        adjacency.setdefault(right, []).append(left)
+    if not adjacency or any(len(ends) != 2 for ends in adjacency.values()):
+        return None
+    start = min(adjacency)
+    path = [start]
+    previous = None
+    current = start
+    while True:
+        first, second = adjacency[current]
+        following = first if first != previous else second
+        if following == start:
+            break
+        path.append(following)
+        previous, current = current, following
+        if len(path) > len(adjacency):
+            return None
+    # A disconnected even-degree edge set is two or more cycles, not one.
+    return path if len(path) == len(adjacency) else None
+
+
+def _largest_cycles_from_cycle_space(comp_nodes, comp_edges, adj):
+    """Return every longest simple cycle, found through the cycle space.
+
+    The walk above visits each cycle separately, which costs about twice as
+    much per added ring; a fused block of twenty-one rings needs on the order
+    of 1e9 states. The cycle space has one dimension per ring, so every cycle
+    is reached by exclusive-or over 2**rank subsets of a spanning forest's
+    fundamental cycles -- 2e6 for that same block, and a subset is only
+    inspected when it beats the longest cycle already proved. This is the same
+    answer, not an approximation: the basis spans the whole cycle space, and a
+    subset is kept only when its edges really do form one simple cycle.
+    """
+
+    edges = sorted(normalize_edge(u, v) for u, v in comp_edges)
+    rank = len(edges) - len(comp_nodes) + 1
+    if rank < 1 or rank > _MAX_CYCLE_SPACE_RANK:
+        return []
+    edge_index = {edge: position for position, edge in enumerate(edges)}
+    edge_by_index = {position: edge for edge, position in edge_index.items()}
+    masks = _fundamental_cycle_masks(comp_nodes, comp_edges, adj, edge_index)
+    if not masks:
+        return []
+
+    best_length = 0
+    best_masks: list[int] = []
+    current = 0
+    for step in range(1, 1 << len(masks)):
+        current ^= masks[(step & -step).bit_length() - 1]
+        length = current.bit_count()
+        if length < best_length:
+            continue
+        if length == best_length and (not best_masks or len(best_masks) >= _MAX_LONGEST_CYCLES):
+            continue
+        if _cycle_path_from_edges(current, edge_by_index) is None:
+            continue
+        if length > best_length:
+            best_length = length
+            best_masks = [current]
+        else:
+            best_masks.append(current)
+    paths = [_cycle_path_from_edges(mask, edge_by_index) for mask in best_masks]
+    return sorted((path for path in paths if path is not None), key=lambda path: (len(path), path))
+
+
 def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
     adj = {n: set() for n in comp_nodes}
     for u, v in comp_edges:
@@ -122,13 +249,16 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
         for n in comp_nodes:
             dfs(n, n, [n], {n})
     except _CycleWalkExhausted:
-        return None, [list(comp_nodes)]
-
-    if not cycles:
-        return None, [list(comp_nodes)]
-
-    max_len = max(len(c) for c in cycles)
-    largest_cycles = [c for c in cycles if len(c) == max_len]
+        # The walk is exponential in the number of cycles; the cycle space is
+        # only as wide as the cycle rank. Fall through to that.
+        largest_cycles = _largest_cycles_from_cycle_space(comp_nodes, comp_edges, adj)
+        if not largest_cycles:
+            return None, [list(comp_nodes)]
+    else:
+        if not cycles:
+            return None, [list(comp_nodes)]
+        max_len = max(len(c) for c in cycles)
+        largest_cycles = [c for c in cycles if len(c) == max_len]
 
     best_main_ring = None
     best_bridges = None
