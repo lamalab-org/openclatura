@@ -165,3 +165,18 @@ def test_equal_length_secondary_bridges_reconstruct_the_graph():
 def test_descriptor_rebuilds_its_own_graph_for_large_clusters(hexagons):
     nodes, edges = _benzenoid(hexagons)
     assert _audit_ok(nodes, edges)
+
+
+def test_main_bridge_divides_the_main_ring_as_symmetrically_as_possible():
+    """P-23.2.5.1: symmetry settles a main bridge that length leaves open.
+
+    Both readings of this skeleton have a five-atom main ring and a
+    zero-length main bridge, so the size criteria cannot separate them; the
+    bridge that splits the ring 3/2 is preferred over the one that splits it
+    4/1. Both names parse back to this structure, so nothing here is about
+    validity -- only about which of two valid names is the preferred one.
+    """
+
+    from openclatura import name_smiles
+
+    assert name_smiles("CC=C1C2C3CC(CC)C3C12") == "6-ethyl-3-ethylidenetricyclo[3.2.0.0^{2,4}]heptane"

@@ -225,6 +225,48 @@ def _largest_cycles_from_cycle_space(comp_nodes, comp_edges, adj):
     return sorted((path for path in paths if path is not None), key=lambda path: (len(path), path))
 
 
+def _secondary_bridge_numbering_key(length, first_locant, second_locant):
+    """The order secondary bridge interiors take their locants.
+
+    Longer bridges are numbered first, and equally long ones from the highest
+    bridgehead down. This is not the order they are cited in -- a descriptor
+    names each bridge's bridgeheads outright, so citing them in one order and
+    numbering them in another is consistent, and reading a descriptor back
+    confirms it: the same bridge set numbers its interiors identically however
+    the bracket happens to list it.
+    """
+
+    lower, higher = sorted((first_locant, second_locant))
+    return (-length, -higher, -lower)
+
+
+def _main_ring_division(bridge, position, ring_size):
+    """How unevenly a bridge splits the main ring, or None if it cannot.
+
+    The bridgeheads sit ``span`` apart around the ring, leaving branches of
+    ``span - 1`` and ``ring_size - span - 1`` atoms. The gap between those two
+    is what P-23.2.5.1 asks to make small, and it is zero when the bridge cuts
+    the ring in half.
+    """
+
+    first, second = bridge["endpoints"]
+    if first not in position or second not in position:
+        return None
+    span = abs(position[first] - position[second])
+    span = min(span, ring_size - span)
+    return abs(ring_size - 2 * span)
+
+
+def _main_bridge_order(bridge, position, ring_size):
+    """Rank equally long main-bridge candidates by P-23.2.5.1, then by locant."""
+
+    first, second = bridge["endpoints"]
+    return (
+        _main_ring_division(bridge, position, ring_size),
+        *sorted((position[first], position[second])),
+    )
+
+
 def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
     adj = {n: set() for n in comp_nodes}
     for u, v in comp_edges:
@@ -262,7 +304,7 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
 
     best_main_ring = None
     best_bridges = None
-    best_main_bridge_len = -1
+    best_selection_key = None
 
     for main_ring in largest_cycles:
         main_ring_set = set(main_ring)
@@ -315,9 +357,25 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
 
         bridges.sort(key=lambda b: b["length"], reverse=True)
         main_bridge_len = bridges[0]["length"]
+        # P-23.2.5.1: once the main bridge is as large as possible it must
+        # divide the main ring as symmetrically as possible. Length alone
+        # leaves that open whenever two bridges are the same size -- and a
+        # fused block offers many bridges of length zero, so the division was
+        # settled by whichever chord happened to be discovered first.
+        position = {atom: index for index, atom in enumerate(main_ring)}
+        divisible = [
+            bridge
+            for bridge in bridges
+            if bridge["length"] == main_bridge_len and _main_ring_division(bridge, position, len(main_ring)) is not None
+        ]
+        if divisible:
+            main_bridge = min(divisible, key=lambda bridge: _main_bridge_order(bridge, position, len(main_ring)))
+            bridges = [main_bridge, *(bridge for bridge in bridges if bridge is not main_bridge)]
+        division = _main_ring_division(bridges[0], position, len(main_ring))
+        selection_key = (main_bridge_len, -(len(main_ring) if division is None else division))
 
-        if main_bridge_len > best_main_bridge_len:
-            best_main_bridge_len = main_bridge_len
+        if best_selection_key is None or selection_key > best_selection_key:
+            best_selection_key = selection_key
             best_main_ring = main_ring
             best_bridges = bridges
 
@@ -365,34 +423,25 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
     path2.extend(branch2[1:-1])
     path2.extend(bridge_path[::-1])
 
-    def _secondary_bridge_citation_key(bridge, numbering):
-        """The order build_desc cites a secondary bridge in.
-
-        Its bridgeheads are main-ring atoms, so their locants are already
-        fixed by the base path and do not move when interiors are appended.
-        """
-
-        first, second = bridge["endpoints"]
-        lower, higher = sorted([numbering.get(first, 1), numbering.get(second, 1)])
-        return (bridge["length"], higher, lower)
-
     def add_extra_nodes(base_path):
         path = list(base_path)
         visited = set(path)
-        # The descriptor cites secondary bridges in decreasing length, then
-        # decreasing bridgehead locants, and the reconstruction reads each
-        # bridge's interior atoms out of the numbering in that same order.
-        # Appending them in the bridge list's order instead agreed only while
-        # no two secondary bridges were the same length: the list breaks
-        # length ties by discovery, the descriptor breaks them by locant. Two
-        # equally long bridges then entered the numbering in the opposite
-        # sequence from the one the descriptor named, and the reconstruction
-        # joined each one's interior to the other's bridgeheads.
+        # Interiors take their locants longest-bridge-first and, among equals,
+        # from the highest bridgehead down. Appending them in the bridge
+        # list's order instead agreed with that only while no two secondary
+        # bridges were the same length: the list breaks length ties by the
+        # order components were discovered, not by locant, so two equally long
+        # bridges could enter the numbering the wrong way round and the
+        # descriptor would rebuild each one's interior onto the other's
+        # bridgeheads.
         base_numbering = {node: index + 1 for index, node in enumerate(base_path)}
         cited = sorted(
             (bridge for bridge in bridges[1:] if bridge["length"] > 0),
-            key=lambda bridge: _secondary_bridge_citation_key(bridge, base_numbering),
-            reverse=True,
+            key=lambda bridge: _secondary_bridge_numbering_key(
+                bridge["length"],
+                base_numbering.get(bridge["endpoints"][0], 1),
+                base_numbering.get(bridge["endpoints"][1], 1),
+            ),
         )
         for br in cited:
             if br["length"] > 0:
@@ -425,7 +474,13 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
             b_ep1, b_ep2 = br["endpoints"]
             loc1, loc2 = sorted([pos.get(b_ep1, 1), pos.get(b_ep2, 1)])
             extra_chords_data.append((br["length"], loc2, loc1))
-        extra_chords_data.sort(key=lambda entry: (entry[0], entry[1], entry[2]), reverse=True)
+        # Cited in the order the interiors are numbered. P-23.2.5.1.1 asks for
+        # increasing bridgehead locants among equal-length bridges instead,
+        # which a descriptor can express -- it names each bridge's bridgeheads
+        # outright -- but audit_von_baeyer_descriptor reads interiors out of
+        # the numbering in cited order, so the two have to agree until it
+        # learns the same highest-bridgehead-first rule.
+        extra_chords_data.sort(key=lambda entry: _secondary_bridge_numbering_key(entry[0], entry[2], entry[1]))
 
         comp_seq = []
         extra_chords = []
