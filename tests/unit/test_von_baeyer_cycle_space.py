@@ -129,3 +129,39 @@ def test_cycle_space_reaches_a_block_the_walk_cannot():
     assert descriptor is not None
     assert descriptor.endswith("]")
     assert paths and len(paths[0]) == len(nodes)
+
+
+def _audit_ok(nodes, edges) -> bool:
+    from openclatura.molecule import Molecule
+    from openclatura.polycycle_topology import build_von_baeyer_numbering
+
+    mol = Molecule()
+    for node in sorted(nodes):
+        mol.add_atom("C", idx=node)
+    for index, (left, right) in enumerate(sorted(edges), start=1):
+        mol.add_bond(left, right, idx=index)
+    descriptor, paths = chains.get_von_baeyer_descriptor_and_path(set(nodes), set(edges))
+    if descriptor is None:
+        return False
+    return build_von_baeyer_numbering(descriptor, paths[0], frozenset(edges), mol).audit_ok
+
+
+def test_equal_length_secondary_bridges_reconstruct_the_graph():
+    """Two secondary bridges of the same length must not swap interiors.
+
+    The descriptor cites secondary bridges by decreasing length and then by
+    decreasing bridgehead locant; the numbering used to take on the bridge
+    list's own order, which breaks length ties by discovery instead. Seventeen
+    fused hexagons is the smallest cluster here that leaves two secondary
+    bridges of equal length, and its descriptor used to rebuild six bonds
+    between the wrong atoms.
+    """
+
+    nodes, edges = _benzenoid(17)
+    assert _audit_ok(nodes, edges)
+
+
+@pytest.mark.parametrize("hexagons", [13, 15, 17, 19, 21, 23])
+def test_descriptor_rebuilds_its_own_graph_for_large_clusters(hexagons):
+    nodes, edges = _benzenoid(hexagons)
+    assert _audit_ok(nodes, edges)

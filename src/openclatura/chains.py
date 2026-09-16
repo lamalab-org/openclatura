@@ -365,10 +365,36 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
     path2.extend(branch2[1:-1])
     path2.extend(bridge_path[::-1])
 
+    def _secondary_bridge_citation_key(bridge, numbering):
+        """The order build_desc cites a secondary bridge in.
+
+        Its bridgeheads are main-ring atoms, so their locants are already
+        fixed by the base path and do not move when interiors are appended.
+        """
+
+        first, second = bridge["endpoints"]
+        lower, higher = sorted([numbering.get(first, 1), numbering.get(second, 1)])
+        return (bridge["length"], higher, lower)
+
     def add_extra_nodes(base_path):
         path = list(base_path)
         visited = set(path)
-        for br in bridges[1:]:
+        # The descriptor cites secondary bridges in decreasing length, then
+        # decreasing bridgehead locants, and the reconstruction reads each
+        # bridge's interior atoms out of the numbering in that same order.
+        # Appending them in the bridge list's order instead agreed only while
+        # no two secondary bridges were the same length: the list breaks
+        # length ties by discovery, the descriptor breaks them by locant. Two
+        # equally long bridges then entered the numbering in the opposite
+        # sequence from the one the descriptor named, and the reconstruction
+        # joined each one's interior to the other's bridgeheads.
+        base_numbering = {node: index + 1 for index, node in enumerate(base_path)}
+        cited = sorted(
+            (bridge for bridge in bridges[1:] if bridge["length"] > 0),
+            key=lambda bridge: _secondary_bridge_citation_key(bridge, base_numbering),
+            reverse=True,
+        )
+        for br in cited:
             if br["length"] > 0:
                 b_ep1, b_ep2 = br["endpoints"]
                 found = _bridge_interior_path(adj, br["nodes"], b_ep1, b_ep2)
@@ -395,11 +421,11 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
     def build_desc(path):
         pos = {n: i + 1 for i, n in enumerate(path)}
         extra_chords_data = []
-        for b_idx, br in enumerate(bridges[1:]):
+        for br in bridges[1:]:
             b_ep1, b_ep2 = br["endpoints"]
             loc1, loc2 = sorted([pos.get(b_ep1, 1), pos.get(b_ep2, 1)])
             extra_chords_data.append((br["length"], loc2, loc1))
-        extra_chords_data.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)
+        extra_chords_data.sort(key=lambda entry: (entry[0], entry[1], entry[2]), reverse=True)
 
         comp_seq = []
         extra_chords = []

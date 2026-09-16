@@ -4354,8 +4354,19 @@ def test_scoped_small_ring_stereo_defers_to_cis_trans_for_mono_substituted_cente
     assert name_smiles("CC(=O)N[C@H]1CC[C@H](C)CC1") == "N-(trans-4-methylcyclohexyl)acetamide"
 
 
-def test_dense_polycyclic_cage_fails_closed_without_von_baeyer_path_explosion():
-    assert name_smiles("C1C2CC34CC5CC67CC8CC9%10CC%11CC1%12C9C(C2)(C36)C58C(C%11)(C%124)C%107") == ""
+def test_dense_polycyclic_cage_is_named_without_von_baeyer_path_explosion():
+    """A cage too dense for the cycle walk is now named from the cycle space.
+
+    This used to abstain. The main-ring walk enumerates every simple cycle, so
+    a rank-12 cage exhausts its state budget and returns no descriptor; the
+    cycle space has one dimension per ring, which is 4096 subsets here. The
+    name OPSIN parses back to exactly this structure.
+    """
+
+    assert name_smiles("C1C2CC34CC5CC67CC8CC9%10CC%11CC1%12C9C(C2)(C36)C58C(C%11)(C%124)C%107") == (
+        "dodecacyclo[15.3.1.1^{3,17}.1^{7,11}.1^{5,9}.1^{3,7}.0^{19,25}.0^{9,22}.0^{10,19}"
+        ".0^{13,18}.0^{10,15}.0^{8,13}]pentacosane"
+    )
 
 
 def test_charged_ammonio_substituent_keeps_all_n_ligands_explicit():
