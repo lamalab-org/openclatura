@@ -111,6 +111,23 @@ def _canonicalize(smiles: str) -> str | None:
     return canonical_smiles(smiles)
 
 
+def _opsin_error_message(exc: BaseException) -> str:
+    """Keep subprocess diagnostics even when py2opsin masks the original error."""
+
+    messages = []
+    seen = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        messages.append(f"{type(exc).__name__}: {exc}")
+        if isinstance(exc, subprocess.CalledProcessError) and exc.stderr:
+            stderr = exc.stderr
+            if isinstance(stderr, bytes):
+                stderr = stderr.decode("utf-8", errors="replace")
+            messages.append(f"OPSIN stderr: {stderr.strip()}")
+        exc = exc.__cause__ if exc.__cause__ is not None else exc.__context__
+    return "\n".join(messages)
+
+
 def verify_with_opsin(name: str, smiles: str, standardize_smiles: bool = True) -> OpsinCheck:
     """Round-trip ``name`` through OPSIN and compare to ``smiles``.
 
@@ -142,12 +159,12 @@ def verify_with_opsin(name: str, smiles: str, standardize_smiles: bool = True) -
         # path.
         with tempfile.TemporaryDirectory(prefix="openclatura_opsin_") as tmpdir:
             decoded = py2opsin.py2opsin([name], tmp_fpath=str(Path(tmpdir) / "input.txt"))
-    except Exception as exc:  # pragma: no cover - py2opsin internal
+    except Exception as exc:
         return OpsinCheck(
             status="error",
             name=name,
             canonical_original=canonical_original,
-            error_message=str(exc),
+            error_message=_opsin_error_message(exc),
         )
 
     if not decoded or not decoded[0]:

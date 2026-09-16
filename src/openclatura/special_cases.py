@@ -12,7 +12,6 @@ from .formatting import (
     count_names,
     format_counted_prefixes,
     format_multiplier,
-    is_complex_prefix,
     oxy_prefix_from_branch,
     strip_outer_parentheses,
 )
@@ -88,6 +87,30 @@ def _component_name_result(
             ),
         )
     return SpecialComponentName(name=name, role=role, bindings=bindings)
+
+
+def _center_stereo_bindings(mol: Molecule, center: int) -> tuple[NameAtomBinding, ...]:
+    descriptor = mol.atoms[center].stereo
+    if descriptor not in {"R", "S"}:
+        return ()
+    return (
+        NameAtomBinding(
+            stage="shortcut",
+            role="absolute_stereo",
+            term=descriptor,
+            atom_ids={center},
+            emitted_tokens=(
+                NameTokenBinding(
+                    text=descriptor,
+                    token_kind="stereo",
+                    source="renderer_stereo",
+                    grammar_role="absolute_stereo",
+                    binding_key="shortcut:absolute_stereo",
+                    atom_ids={center},
+                ),
+            ),
+        ),
+    )
 
 
 def single_atom_component_name(mol: Molecule, component_atoms: set[int]) -> str:
@@ -560,8 +583,19 @@ def simple_azine_parent_name(
             # hang both sides on it as ylidene substituents.
             amidino = [_is_amidino_carbon(mol, c1, n1), _is_amidino_carbon(mol, c2, n2)]
             aldehyde = [_is_aldehyde_side_carbon(mol, c1, n1), _is_aldehyde_side_carbon(mol, c2, n2)]
-            if sum(amidino) == 1 and not any(
-                is_aldehyde and not is_amidino for is_aldehyde, is_amidino in zip(aldehyde, amidino)
+            substituted_amidino = any(
+                is_amidino
+                and any(
+                    mol.atoms[ligand].symbol == "N"
+                    and ligand != nitrogen
+                    and any(other != carbon and mol.atoms[other].symbol != "H" for other in mol.get_neighbors(ligand))
+                    for ligand in mol.get_neighbors(carbon)
+                )
+                for carbon, nitrogen, is_amidino in ((c1, n1, amidino[0]), (c2, n2, amidino[1]))
+            )
+            if sum(amidino) == 1 and (
+                substituted_amidino
+                or not any(is_aldehyde and not is_amidino for is_aldehyde, is_amidino in zip(aldehyde, amidino))
             ):
                 ylidenes = [
                     strip_outer_parentheses(
@@ -1557,8 +1591,11 @@ def oxoacid_ester_result(
             continue
         # P-65.6.3.3: several ester groups are cited alphabetically, identical ones multiplied.
         ester_name = _ester_modifier_phrase([name for name, _ in ester_groups])
-        name = f"{ester_name} {suffix}"
+        stereo_bindings = _center_stereo_bindings(mol, role.central)
+        stereo = f"({stereo_bindings[0].term})-" if stereo_bindings else ""
+        name = f"{ester_name} {stereo}{suffix}"
         bindings = (
+            *stereo_bindings,
             *(
                 NameAtomBinding(
                     stage="shortcut",
@@ -1700,10 +1737,8 @@ def _ester_modifier_phrase(names: list[str]) -> str:
         count = counts[name]
         if count == 1:
             words.append(name)
-        elif is_complex_prefix(name):
-            words.append(f"{multipliers.complex_(count)}({name})")
         else:
-            words.append(f"{multipliers.basic(count)}{name}")
+            words.append(format_multiplier(name, count))
     return " ".join(words)
 
 
@@ -2279,12 +2314,38 @@ def homonuclear_chain_parent_result(
     prefixes = _locanted_ligand_prefix([(locant, ligand.name) for locant, ligand in placed])
     name = f"{prefixes}{parent}" if prefixes else parent
     name = _with_chain_oxide_suffix(name, placed_chain, oxide_oxygens)
+    stereo_bindings = tuple(
+        NameAtomBinding(
+            stage="shortcut",
+            role="bond_stereo",
+            term=f"{locant}{bond.stereo}",
+            atom_ids={left, right},
+            bond_ids={bond.idx},
+            locants=(str(locant),),
+        )
+        for locant, (left, right) in enumerate(zip(placed_chain, placed_chain[1:]), 1)
+        if (bond := mol.get_bond(left, right)).order == 2 and bond.stereo in {"E", "Z"}
+    )
+    if stereo_bindings:
+        name = f"({','.join(binding.term for binding in stereo_bindings)})-{name}"
     parent_binding = NameAtomBinding(
         stage="shortcut",
         role="homonuclear_chain_parent",
         term=parent,
-        atom_ids=set(chain) | oxide_atoms,
-        bond_ids=bond_ids_within(mol, set(chain) | oxide_atoms),
+        atom_ids=set(chain),
+        bond_ids=bond_ids_within(mol, set(chain)),
+    )
+    oxide_bindings = tuple(
+        NameAtomBinding(
+            stage="shortcut",
+            role="homonuclear_chain_oxide",
+            term="oxide",
+            atom_ids={central, oxygen},
+            bond_ids={mol.get_bond(central, oxygen).idx},
+            charge_atom_ids={central, oxygen},
+            locants=(str(placed_chain.index(central) + 1),),
+        )
+        for central, oxygen in oxide_oxygens.items()
     )
     ligand_bindings = tuple(
         NameAtomBinding(
@@ -2302,7 +2363,7 @@ def homonuclear_chain_parent_result(
         component_atoms,
         name,
         "homonuclear_chain_parent",
-        bindings=(parent_binding, *ligand_bindings),
+        bindings=(parent_binding, *oxide_bindings, *ligand_bindings, *stereo_bindings),
     )
     return replace(
         result,
@@ -2505,6 +2566,9 @@ def simple_central_parent_hydride_result(
         parent = f"{parent[:-1]}ium" if parent.endswith("e") else f"{parent}ium"
 
     name = f"{prefix}-{parent}" if prefix and lambda_text else f"{prefix}{parent}"
+    stereo_bindings = _center_stereo_bindings(mol, central)
+    if stereo_bindings:
+        name = f"({stereo_bindings[0].term})-{name}"
     core_atoms = {central} if oxide_oxygen is None else {central, oxide_oxygen}
     core_binding = NameAtomBinding(
         stage="shortcut",
@@ -2519,7 +2583,7 @@ def simple_central_parent_hydride_result(
         component_atoms,
         name,
         "simple_central_parent_hydride",
-        bindings=(core_binding, *ligand_bindings),
+        bindings=(core_binding, *ligand_bindings, *stereo_bindings),
     )
 
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Protocol
 
 ELEMENT_LOCANTS = frozenset({"N", "O", "P", "S"})
@@ -51,8 +52,15 @@ def lexical_token_spans(text: str, offset: int = 0) -> tuple[LexicalToken, ...]:
     )
 
 
+@lru_cache(maxsize=8192)
 def lexical_tokens(text: str) -> tuple[str, ...]:
-    """Return visible lexical token strings from ``text``."""
+    """Return visible lexical token strings from ``text``.
+
+    Assembly re-tokenises the same stems, prefixes and rendered fragments
+    constantly while composing one name, so this runs on the order of two
+    hundred times per molecule over a far smaller pool of strings. The result
+    is an immutable tuple of a pure function of the text.
+    """
 
     return tuple(token.text for token in lexical_token_spans(text))
 

@@ -454,7 +454,7 @@
         "1,5-benzodiazepin"
       ],
       "fusion_stems": [
-        "benzodiazepino"
+        "[1,5]benzodiazepino"
       ],
       "derivative_status": "production_safe"
     },
@@ -653,7 +653,7 @@
       ],
       "derivative_status": "production_safe",
       "fusion_stems": [
-        "benzothiadiazolo"
+        "[2,1,3]benzothiadiazolo"
       ]
     },
     "2,1,3-benzoxadiazole": {
@@ -665,7 +665,7 @@
       ],
       "derivative_status": "production_safe",
       "fusion_stems": [
-        "benzoxadiazolo"
+        "[2,1,3]benzoxadiazolo"
       ]
     },
     "2,6-naphthyridine": {
@@ -737,7 +737,7 @@
       ],
       "derivative_status": "production_safe",
       "fusion_stems": [
-        "isobenzothieno"
+        "[2]benzothieno"
       ]
     },
     "2H-1,3-benzoxazine": {
