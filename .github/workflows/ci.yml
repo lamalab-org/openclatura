@@ -99,7 +99,7 @@ jobs:
 
   single-thread-performance:
     if: github.event_name == 'pull_request' && github.base_ref == 'tests'
-    needs: [lint, test]
+    needs: [lint, test, rdkit-compat]
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -170,11 +170,21 @@ jobs:
           - pubchem/pubchem_seed42_100000
           - pubchem/pubchem_seed63_100000
           - pubchem/pubchem_seed87_100000
+          - pubchem/pubchem_hf_seed101_100000
+          - pubchem/pubchem_hf_seed211_100000
+          - pubchem/pubchem_hf_seed307_100000
+          - pubchem/pubchem_hf_seed401_100000
+          - pubchem/pubchem_hf_seed503_100000
           - zinc22/zinc22_seed5_100000
           - zinc22/zinc22_seed17_100000
           - zinc22/zinc22_seed42_100000
           - zinc22/zinc22_seed63_100000
           - zinc22/zinc22_seed87_100000
+          - zinc22/zinc22_hf_seed101_100000
+          - zinc22/zinc22_hf_seed211_100000
+          - zinc22/zinc22_hf_seed307_100000
+          - zinc22/zinc22_hf_seed401_100000
+          - zinc22/zinc22_hf_seed503_100000
 
     steps:
       - uses: actions/checkout@v4

@@ -20,8 +20,8 @@ evaluations/
 ├── stout_parity.py     # modified-vendored STOUT vs PyPI STOUT output diff
 ├── data/               # input SMILES subsets (index, smiles per line)
 │   ├── qm9/            # qm9_all_input.jsonl (368 mols)
-│   ├── zinc22/         # 5 × 100k seeded subsets + manifest
-│   └── pubchem/        # 5 × 100k seeded subsets + manifest
+│   ├── zinc22/         # 5 × 100k paper subsets + 5 × 100k pinned-HF samples
+│   └── pubchem/        # 5 × 100k paper subsets + 5 × 100k pinned-HF samples
 └── results/            # reference outputs (see "Results" below)
     ├── qm9/            # full run produced by evaluate.py (both backends)
     ├── pubchem/        # existing seed-42 outputs + all-seed summaries
@@ -80,6 +80,30 @@ old `openblue`).
 
 Run the full 5×100k subsets by pointing `--input` at each seeded file under
 `data/pubchem/` and `data/zinc22/`.
+
+## Deterministic HF regression samples
+
+The ten `*_hf_seed*_100000_input.jsonl` files add five 100,000-molecule samples
+from PubChem and five from ZINC22. Their Hugging Face repository revisions,
+source splits or Parquet files, source rows, seeds, and content hashes are
+committed alongside each input in `*_manifest.json`.
+
+Regenerate them from the pinned revisions with:
+
+```bash
+python evaluations/sample_hf_regression.py
+```
+
+The sampler uses seeds `101`, `211`, `307`, `401`, and `503`, samples without
+replacement, excludes molecules already present in the paper evaluation
+shards, and rejects duplicates between the new shards. PubChem is sampled by
+dataset row index; ZINC22 records its source Parquet file and row.
+
+CI stores the locally generated OpenClatura name and OPSIN result for every
+sample. `check_regression.py` recomputes names for the PR, reuses the stored
+OPSIN status when a name is unchanged, and calls OPSIN only for changed names.
+These checks and the single-thread timing comparison run only for pull requests
+targeting `tests`, after lint, fast tests, and RDKit compatibility pass.
 
 ## Batched GPU STOUT
 

@@ -24,7 +24,7 @@ margins: QM9 +7.5, ZINC22 +5.4), and both models are highly stable across seeds
 
 ## Refresh the OpenClatura baselines
 
-Regenerate and rescore all eleven OpenClatura datasets used by the
+Regenerate and rescore all 21 OpenClatura datasets used by the
 paper-evaluation CI:
 
 ```bash
@@ -89,3 +89,15 @@ Edit the GPU list in `run_all_evals.sh` (`GPUS=(1 2 3)`) to match free GPUs
 - `<stem>_<model>_opsin_failures.csv` — misses with `std_original` / `std_opsin`
 
 Data subsets: `data/{qm9,pubchem,zinc22}/*_input.jsonl` (`{index, smiles}` per line).
+
+The pinned-Hugging-Face regression shards can be regenerated separately
+with `python sample_hf_regression.py`. Running
+`refresh_openclatura_baselines.sh` afterward refreshes their committed name and
+OPSIN caches together with the paper baselines.
+
+To refresh only selected inputs, pass them as arguments:
+
+```bash
+./evaluations/refresh_openclatura_baselines.sh \
+  evaluations/data/{pubchem,zinc22}/*_hf_*_input.jsonl
+```
