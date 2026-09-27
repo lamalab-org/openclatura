@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare single-thread naming speed for two OpenClatura source trees."""
+"""Compare single-thread naming speed for two openclatura source trees."""
 
 from __future__ import annotations
 

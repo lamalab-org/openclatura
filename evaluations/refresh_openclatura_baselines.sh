@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate every OpenClatura prediction used by the paper-evaluation CI and
+# Regenerate every openclatura prediction used by the paper-evaluation CI and
 # rescore the generated names through OPSIN. Run from any directory.
 set -euo pipefail
 

@@ -1,6 +1,6 @@
 # evaluations
 
-STOUT-vs-OpenClatura evaluation on QM9, ZINC22, and PubChem, plus a parity
+STOUT-vs-openclatura evaluation on QM9, ZINC22, and PubChem, plus a parity
 check that the repo's locally-modified STOUT still reproduces the upstream
 PyPI STOUT outputs.
 
@@ -99,7 +99,7 @@ replacement, excludes molecules already present in the paper evaluation
 shards, and rejects duplicates between the new shards. PubChem is sampled by
 dataset row index; ZINC22 records its source Parquet file and row.
 
-CI stores the locally generated OpenClatura name and OPSIN result for every
+CI stores the locally generated openclatura name and OPSIN result for every
 sample. `check_regression.py` recomputes names for the PR, reuses the stored
 OPSIN status when a name is unchanged, and calls OPSIN only for changed names.
 These checks and the single-thread timing comparison run only for pull requests

@@ -1,6 +1,6 @@
 # Rerunning the evals
 
-STOUT vs OpenClatura on QM9, PubChem, and ZINC22. Two models name every SMILES;
+STOUT vs openclatura on QM9, PubChem, and ZINC22. Two models name every SMILES;
 each IUPAC name is round-tripped back to SMILES with OPSIN and compared to the
 input after full RDKit standardization (Cleanup → normalize → reionize →
 uncharge → tautomer-canonicalize). Accuracy = fraction that round-trips to the
@@ -8,9 +8,9 @@ same standardized structure.
 
 ## Results (standardized + tautomer-canonical OPSIN match)
 
-OpenClatura numbers are for **v0.3.3**; STOUT is unchanged (v2.0.5).
+openclatura numbers are for **v0.3.3**; STOUT is unchanged (v2.0.5).
 
-| dataset | molecules | **OpenClatura** | **STOUT** |
+| dataset | molecules | **openclatura** | **STOUT** |
 |---------|-----------|-----------------|-----------|
 | QM9     | 133,885   | **100.00%**       | 92.55%          |
 | PubChem | 5×100,000 | **99.52% ± 0.02** | 97.90% ± 0.04   |
@@ -18,13 +18,13 @@ OpenClatura numbers are for **v0.3.3**; STOUT is unchanged (v2.0.5).
 | **Total** | **1,133,885** | **98.76%** (1,119,791) | **94.78%** (1,074,733) |
 
 Mean ± sample standard deviation across the five 100k seed subsets (PubChem,
-ZINC22); QM9 is a single set. OpenClatura wins on every dataset (largest
+ZINC22); QM9 is a single set. openclatura wins on every dataset (largest
 margins: QM9 +7.5, ZINC22 +5.4), and both models are highly stable across seeds
 (std ≤ 0.09).
 
-## Refresh the OpenClatura baselines
+## Refresh the openclatura baselines
 
-Regenerate and rescore all 21 OpenClatura datasets used by the
+Regenerate and rescore all 21 openclatura datasets used by the
 paper-evaluation CI:
 
 ```bash
@@ -76,7 +76,7 @@ Edit the GPU list in `run_all_evals.sh` (`GPUS=(1 2 3)`) to match free GPUs
 | script | role |
 |--------|------|
 | `predict.py`          | run ONE model on ONE input → one jsonl (`--model stout|openclatura`) |
-| `refresh_openclatura_baselines.sh` | regenerate and rescore every OpenClatura CI baseline |
+| `refresh_openclatura_baselines.sh` | regenerate and rescore every openclatura CI baseline |
 | `run_all_evals.sh`    | predictions for all datasets, STOUT sharded across GPUs by est. time |
 | `score_opsin_std.py`  | OPSIN round-trip + standardized match, multicore; writes summaries + failures |
 | `stout_parity.py`     | sanity check: batched GPU STOUT == single-item CPU (50/50 on PubChem) |
