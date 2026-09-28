@@ -1,1 +1,1 @@
-"""Performance benchmark tooling for OpenClatura."""
+"""Performance benchmark tooling for openclatura."""

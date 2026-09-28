@@ -4,7 +4,7 @@
 The source CSV is expected to contain an ``input`` SMILES column. Candidates
 are deduplicated by canonical isomeric SMILES and ordered by a seeded stable
 hash, giving a reproducible sample independent of source-file ordering. Only
-rows whose OpenClatura name round-trips to the input structure through OPSIN
+rows whose openclatura name round-trips to the input structure through OPSIN
 are written to the output corpus.
 """
 
