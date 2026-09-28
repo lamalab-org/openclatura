@@ -1,0 +1,12 @@
+{
+  "dataset": "zinc22",
+  "repo_id": "chandar-lab/ZINC_22",
+  "revision": "f13c8b4132037e38102499e07741dc9a71431ea5",
+  "seed": 401,
+  "sampling": "deterministic seeded sampling without replacement; paper regression rows excluded",
+  "rows": 100000,
+  "sources": [
+    "data/train-01128-of-01212.parquet"
+  ],
+  "sha256": "a41d096d2b50a91e837d7e9eb8df98cd4bc4f64589684b8a7102659e24be8757"
+}

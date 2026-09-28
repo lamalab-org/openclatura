@@ -208,7 +208,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Renamed the package to OpenClatura and adopted a `src` layout.
+- Renamed the package to openclatura and adopted a `src` layout.
 - Made OPSIN integration tolerate unavailable Java installations.
 
 ## [0.1.0] - 2026-05-08

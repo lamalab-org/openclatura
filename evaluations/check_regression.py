@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check OpenClatura accuracy against a precomputed evaluation shard.
+"""Check openclatura accuracy against a precomputed evaluation shard.
 
 Names equal to the stored result reuse the stored OPSIN pass/fail outcome.
 Only changed names are round-tripped through OPSIN.  This keeps the check

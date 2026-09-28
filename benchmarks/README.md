@@ -11,7 +11,7 @@ more than one second slower. Raw measurements are written to
 `performance-report.json` and uploaded as a workflow artifact.
 
 The tracked corpus was selected deterministically from `test_100000.csv` and
-contains only structures whose generated OpenClatura name round-tripped to the
+contains only structures whose generated openclatura name round-tripped to the
 input through OPSIN. Its selection metadata and checksum are recorded in
 `data/opsin_verified_5000.manifest.json`.
 
