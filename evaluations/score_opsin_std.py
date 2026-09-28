@@ -115,7 +115,11 @@ def _score_file(path: Path, name_key: str, smiles_key: str, chunk: int, pool: Pr
     counts = {"rows": 0, "original_valid": 0, "opsin_nonempty": 0, "opsin_valid": 0, "matches": 0, "failures": 0}
     failures_csv = path.with_name(f"{path.stem}_opsin_failures.csv")
     with failures_csv.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=["index", "smiles", "name", "opsin_smiles", "std_original", "std_opsin"])
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["index", "smiles", "name", "opsin_smiles", "std_original", "std_opsin"],
+            lineterminator="\n",
+        )
         writer.writeheader()
         for c, fails in pool.map(_process_chunk, payloads):
             for k in counts:
@@ -129,7 +133,9 @@ def _score_file(path: Path, name_key: str, smiles_key: str, chunk: int, pool: Pr
         "match_method": "standardize_and_canonicalize_tautomer",
         "failures_csv": str(failures_csv),
     }
-    (path.with_name(f"{path.stem}_opsin_summary.json")).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+    (path.with_name(f"{path.stem}_opsin_summary.json")).write_text(
+        json.dumps(summary, indent=2) + "\n", encoding="utf-8"
+    )
     return summary
 
 

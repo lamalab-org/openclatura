@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install everything for the STOUT-vs-OpenClatura evaluation into the active
+# Install everything for the STOUT-vs-openclatura evaluation into the active
 # conda environment (create it first with `conda env create -f environment.yml
 # && conda activate stout-pypi-eval`). Run from the evaluations/ directory.
 #

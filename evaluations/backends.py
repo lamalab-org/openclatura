@@ -1,4 +1,4 @@
-"""Naming backends used by the STOUT-vs-OpenClatura evaluation.
+"""Naming backends used by the STOUT-vs-openclatura evaluation.
 
 Two backends are exposed, both of which map a SMILES string to an IUPAC name:
 

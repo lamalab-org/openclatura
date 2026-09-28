@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Regenerate every OpenClatura prediction used by the paper-evaluation CI and
+# Regenerate every openclatura prediction used by the paper-evaluation CI and
 # rescore the generated names through OPSIN. Run from any directory.
 set -euo pipefail
 
@@ -20,11 +20,15 @@ fi
 printf 'running\n' > "$STATUS_FILE"
 trap 'status=$?; if [[ $status -ne 0 ]]; then printf "failed (%s)\n" "$status" > "$STATUS_FILE"; fi' EXIT
 
-inputs=(
-    evaluations/data/pubchem/*_input.jsonl
-    evaluations/data/qm9/*_input.jsonl
-    evaluations/data/zinc22/*_input.jsonl
-)
+if [[ $# -gt 0 ]]; then
+    inputs=("$@")
+else
+    inputs=(
+        evaluations/data/pubchem/*_input.jsonl
+        evaluations/data/qm9/*_input.jsonl
+        evaluations/data/zinc22/*_input.jsonl
+    )
+fi
 
 run_prediction() {
     local input_path="$1"
@@ -45,6 +49,12 @@ run_prediction() {
 }
 
 echo "Regenerating ${#inputs[@]} prediction datasets ($PARALLEL_SHARDS shards in parallel)"
+outputs=()
+for input_path in "${inputs[@]}"; do
+    dataset_name="$(basename "$(dirname "$input_path")")"
+    stem_name="$(basename "$input_path" _input.jsonl)"
+    outputs+=("results/$dataset_name/${stem_name}_openclatura.jsonl")
+done
 pids=()
 for input_path in "${inputs[@]}"; do
     run_prediction "$input_path" &
@@ -64,7 +74,7 @@ echo "Rescoring regenerated predictions with OPSIN"
 (
     cd evaluations
     PYTHONWARNINGS=ignore PYTHONPATH=../src "$PYTHON_BIN" score_opsin_std.py \
-        results/*/*_openclatura.jsonl \
+        "${outputs[@]}" \
         --name-key openclatura_iupac \
         --workers "$OPSIN_WORKERS" \
         --chunk 1000

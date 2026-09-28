@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""STOUT-vs-OpenClatura evaluation driver.
+"""STOUT-vs-openclatura evaluation driver.
 
 Given a JSONL file of ``{"index": ..., "smiles": ...}`` rows (see
 ``evaluations/data/``), this script:
@@ -294,7 +294,7 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     if not args.no_validate and len(backends) > 1:
-        print("\n=== STOUT vs OpenClatura ===")
+        print("\n=== STOUT vs openclatura ===")
         header = f"{'backend':<14}{'accuracy':>10}{'matches':>12}{'rows':>10}"
         print(header)
         print("-" * len(header))

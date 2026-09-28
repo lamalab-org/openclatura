@@ -1,4 +1,4 @@
-# Base conda environment for the STOUT-vs-OpenClatura evaluation.
+# Base conda environment for the STOUT-vs-openclatura evaluation.
 #
 #   conda env create -f environment.yml
 #   conda activate stout-pypi-eval
