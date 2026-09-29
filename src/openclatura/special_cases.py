@@ -2592,18 +2592,33 @@ def _homonuclear_backbone(mol: Molecule, component_atoms: set[int]) -> tuple[str
     Return the parent-hydride element and its ordered backbone chain.
     """
 
-    backbone_symbols = {
+    # Oxygen forms parent-hydride chains like the others -- dioxidane,
+    # trioxidane, tetraoxidane (P-21.1.1) -- so it is not excluded here the way
+    # the halogens are. It is far more common than they are as a lone
+    # substituent atom, though, so a candidate element has to actually carry a
+    # chain before it counts: a methoxy oxygen beside a hydrazine must not make
+    # the parent ambiguous and cost the molecule its N-N chain.
+    chains = {}
+    for symbol in {
         mol.atoms[idx].symbol
         for idx in component_atoms
         if mol.atoms[idx].symbol in RULES.components.mononuclear_parent_hydrides
-        and mol.atoms[idx].symbol not in {"O", "F", "Cl", "Br", "I"}
-    }
-    if len(backbone_symbols) == 1:
-        symbol = next(iter(backbone_symbols))
+        and mol.atoms[idx].symbol not in {"F", "Cl", "Br", "I"}
+    }:
         backbone = [idx for idx in component_atoms if mol.atoms[idx].symbol == symbol]
-        chain = _ordered_backbone_chain(mol, backbone) if len(backbone) >= 2 else None
+        if len(backbone) < 2:
+            continue
+        chain = _ordered_backbone_chain(mol, backbone)
         if chain is not None:
-            return symbol, chain
+            chains[symbol] = chain
+    if chains:
+        # More than one element can carry a chain -- HOO-NH-NH2 has both a
+        # peroxide and a hydrazine. The parent hydride is the senior element's
+        # (P-41), which is the same order parent selection already uses.
+        from .parent_selection import ELEMENT_SENIORITY
+
+        symbol = min(chains, key=lambda element: (ELEMENT_SENIORITY.get(element, len(ELEMENT_SENIORITY) + 1), element))
+        return symbol, chains[symbol]
 
     return _oxide_backbone(mol, component_atoms)
 
