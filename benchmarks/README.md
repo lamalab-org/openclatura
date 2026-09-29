@@ -26,7 +26,7 @@ python benchmarks/build_corpus.py \
   benchmarks/data/opsin_verified_5000.csv
 ```
 
-To regenerate the PubChem verified pool and its 5,000-molecule speed corpus:
+To regenerate the PubChem verified pool and its 100,000-molecule speed corpus:
 
 ```bash
 python benchmarks/build_pubchem_hf_corpus.py
@@ -36,7 +36,8 @@ This uses pinned revision
 `cd46fb8a3110cc12d6a669ad0d8e260b3acf6d0b`, sampling seed `20260929`,
 and benchmark-selection seed `20260930`. The full successful pool is retained
 as `data/pubchem_hf_seed20260929_verified.csv`; CI benchmarks the deterministic
-5,000-row subset so both three-pair comparisons fit within the job timeout.
+100,000-row subset. The performance job has a five-hour timeout to accommodate
+three base/PR measurement pairs over the larger corpus.
 
 To compare two local checkouts:
 

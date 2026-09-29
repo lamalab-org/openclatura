@@ -21,7 +21,7 @@ PUBCHEM_REVISION = "cd46fb8a3110cc12d6a669ad0d8e260b3acf6d0b"
 SAMPLE_SEED = 20260929
 SELECTION_SEED = 20260930
 SAMPLE_SIZE = 200_000
-CORPUS_SIZE = 5_000
+CORPUS_SIZE = 100_000
 FIELDS = (
     "source_index",
     "smiles",
@@ -220,12 +220,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--corpus-output",
         type=Path,
-        default=Path("benchmarks/data/pubchem_hf_seed20260929_opsin_verified_5000.csv"),
+        default=Path("benchmarks/data/pubchem_hf_seed20260929_opsin_verified_100000.csv"),
     )
     parser.add_argument(
         "--manifest",
         type=Path,
-        default=Path("benchmarks/data/pubchem_hf_seed20260929_opsin_verified_5000.manifest.json"),
+        default=Path("benchmarks/data/pubchem_hf_seed20260929_opsin_verified_100000.manifest.json"),
     )
     args = parser.parse_args()
     if min(args.sample_size, args.corpus_size, args.workers, args.chunk_size) < 1:

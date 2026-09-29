@@ -101,7 +101,7 @@ jobs:
     if: github.event_name == 'pull_request' && github.base_ref == 'tests'
     needs: [lint, test, rdkit-compat]
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 300
     steps:
       - name: Check out PR revision
         uses: actions/checkout@v4
@@ -145,7 +145,7 @@ jobs:
           python head/benchmarks/single_thread_benchmark.py \
             --base-src base/src \
             --head-src head/src \
-            --corpus head/benchmarks/data/pubchem_hf_seed20260929_opsin_verified_5000.csv \
+            --corpus head/benchmarks/data/pubchem_hf_seed20260929_opsin_verified_100000.csv \
             --label "PubChem HF seed 20260929" \
             --repetitions 3 \
             --threshold-percent 15 \
