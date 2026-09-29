@@ -20,18 +20,13 @@ def positive_parent_n_charges(parts: AssemblyParts) -> list[ParentChargeItem]:
     return [charge for charge in parts.parent_charges if charge.symbol == "N" and charge.charge > 0]
 
 
+_IUM_SUFFIX_ELEMENTS = frozenset({"N", "O", "S", "Se", "Te", "P", "As", "Sb", "Bi"})
+
+
 def positive_parent_ium_charges(parts: AssemblyParts) -> list[ParentChargeItem]:
     """Return parent atoms whose positive charge is represented by an ium suffix."""
 
-    return [
-        charge
-        for charge in parts.parent_charges
-        if charge.charge > 0
-        and (
-            charge.symbol in {"N", "O"}
-            or (charge.charge == 1 and f"{charge.symbol}:+" in RULES.charges.parent_charge_suffixes)
-        )
-    ]
+    return [charge for charge in parts.parent_charges if charge.symbol in _IUM_SUFFIX_ELEMENTS and charge.charge > 0]
 
 
 def has_ionic_retained_parent(parts: AssemblyParts) -> bool:

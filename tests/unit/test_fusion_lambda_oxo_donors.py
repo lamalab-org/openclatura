@@ -29,7 +29,12 @@ CASES = (
     (
         3924,
         "Cn1nc(C(=O)NCCN(Cc2ccco2)C2CCCC2)c2c1-c1ccccc1S(=O)(=O)C2",
-        "N-(2-(((furan-2-yl)methyl)(cyclopentyl)amino)ethyl)-1-methyl-5,5-dioxo-4H-"
+        # Ligands on the central nitrogen are cited alphanumerically, so
+        # cyclopentyl precedes (furan-2-yl)methyl. This expectation predated
+        # the fix on tests for format_center_ligands sorting its ligands by
+        # raw string, where a parenthesised one outranked every bare one
+        # because "(" precedes every letter.
+        "N-(2-(cyclopentyl((furan-2-yl)methyl)amino)ethyl)-1-methyl-5,5-dioxo-4H-"
         "5lambda^6-benzo[1',2':2,3]thiino[4,5-c]pyrazole-3-carboxamide",
         ("4",),
         6,
