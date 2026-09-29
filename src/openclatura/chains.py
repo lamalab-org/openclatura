@@ -268,6 +268,20 @@ def _main_bridge_order(bridge, position, ring_size):
 
 
 def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
+    """Return the preferred descriptor alone, for callers that cannot audit."""
+
+    return next(iter(get_von_baeyer_descriptor_candidates(comp_nodes, comp_edges)), (None, [list(comp_nodes)]))
+
+
+def get_von_baeyer_descriptor_candidates(comp_nodes, comp_edges):
+    """Yield every (descriptor, numbering) choice, most preferred first.
+
+    Rendering one means building a descriptor and walking a numbering, and a
+    symmetric skeleton offers many equally preferred main rings, so they are
+    rendered as they are asked for. A caller that audits stops at the first
+    that reconstructs, which for almost every molecule is the first it sees.
+    """
+
     adj = {n: set() for n in comp_nodes}
     for u, v in comp_edges:
         adj[u].add(v)
@@ -295,16 +309,14 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
         # only as wide as the cycle rank. Fall through to that.
         largest_cycles = _largest_cycles_from_cycle_space(comp_nodes, comp_edges, adj)
         if not largest_cycles:
-            return None, [list(comp_nodes)]
+            return iter([(None, [list(comp_nodes)])])
     else:
         if not cycles:
-            return None, [list(comp_nodes)]
+            return iter([(None, [list(comp_nodes)])])
         max_len = max(len(c) for c in cycles)
         largest_cycles = [c for c in cycles if len(c) == max_len]
 
-    best_main_ring = None
-    best_bridges = None
-    best_selection_key = None
+    candidates: list[tuple[tuple, list[int], list[dict]]] = []
 
     for main_ring in largest_cycles:
         main_ring_set = set(main_ring)
@@ -372,18 +384,28 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
             main_bridge = min(divisible, key=lambda bridge: _main_bridge_order(bridge, position, len(main_ring)))
             bridges = [main_bridge, *(bridge for bridge in bridges if bridge is not main_bridge)]
         division = _main_ring_division(bridges[0], position, len(main_ring))
-        selection_key = (main_bridge_len, -(len(main_ring) if division is None else division))
+        selection_key = (-main_bridge_len, len(main_ring) if division is None else division)
+        candidates.append((selection_key, main_ring, bridges))
 
-        if best_selection_key is None or selection_key > best_selection_key:
-            best_selection_key = selection_key
-            best_main_ring = main_ring
-            best_bridges = bridges
+    if not candidates:
+        return iter([(None, [largest_cycles[0]])])
 
-    if not best_bridges:
-        return None, [largest_cycles[0]]
+    # P-23.2.5.1 ranks these -- largest main bridge, then the most symmetric
+    # division of the main ring -- but a ranking is not a proof that the
+    # descriptor it produces rebuilds the graph. The caller audits each in
+    # turn, so they are all returned in preference order rather than the
+    # first being treated as the only one.
+    candidates.sort(key=lambda candidate: candidate[0])
+    return (
+        rendered
+        for _, main_ring, bridges in candidates
+        for rendered in _von_baeyer_from_candidate(main_ring, bridges, comp_nodes, adj)
+    )
 
-    main_ring = best_main_ring
-    bridges = best_bridges
+
+def _von_baeyer_from_candidate(main_ring, bridges, comp_nodes, adj):
+    """Render one (main ring, bridge set) choice, both traversals, preferred first."""
+
     main_bridge = bridges[0]
 
     ep1, ep2 = main_bridge["endpoints"]
@@ -494,21 +516,15 @@ def get_von_baeyer_descriptor_and_path(comp_nodes, comp_edges):
     desc1_str, comp1 = build_desc(path1)
     desc2_str, comp2 = build_desc(path2)
 
-    if comp1 < comp2:
-        best_desc = desc1_str
-        valid_paths = [path1]
-    elif comp2 < comp1:
-        best_desc = desc2_str
-        valid_paths = [path2]
-    else:
-        best_desc = desc1_str
-        # The descriptor and its superscript bridge locants are built from
-        # this source orientation.  The mirrored path can have lower
-        # heteroatom or unsaturation locants, but those locants no longer
-        # describe the emitted von Baeyer descriptor graph.
-        valid_paths = [path1]
-
-    return render_von_baeyer_descriptor(len(bridges), best_desc), valid_paths
+    # The two orientations traverse the bridges from opposite ends. Their
+    # superscript sequences decide which is preferred, but a bridge interior
+    # numbered from the wrong end still describes a different graph, and the
+    # preferred sequence does not always carry the right one -- discarding the
+    # other left some skeletons with no numbering that reconstructs at all.
+    # Both are offered, preferred first, and the caller's audit settles it.
+    orientations = [(comp1, desc1_str, path1), (comp2, desc2_str, path2)]
+    orientations.sort(key=lambda orientation: orientation[0])
+    return [(render_von_baeyer_descriptor(len(bridges), descriptor), [path]) for _, descriptor, path in orientations]
 
 
 def get_linear_dispiro_descriptor_and_paths(mol: Molecule, comp_nodes, comp_edges):
@@ -1351,6 +1367,13 @@ def _fallback_monospiro_or_bicyclo_system(
     return RingSystem(atoms=comp_nodes, is_bicycle=True, x=len(p1), y=len(p2), z=len(p3), paths=vb_paths)
 
 
+# A symmetric skeleton can offer a hundred equally preferred main rings, and
+# each has to be rendered before its reconstruction can be audited. This bounds
+# that work; every molecule in the corpora settles far inside it, nearly always
+# on the first candidate.
+_MAX_VON_BAEYER_CANDIDATES = 256
+
+
 def _polyspiro_or_von_baeyer_candidate(
     mol: Molecule,
     atoms: set[int],
@@ -1362,24 +1385,57 @@ def _polyspiro_or_von_baeyer_candidate(
         return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
     # The cycle traversal contains equivalent decomposition ties. Give it
     # canonical graph identities, then restore the caller's original atom IDs.
+    # Canonical ranks keep the choice from following the input atom order, but
+    # a relabelling can leave a skeleton whose every candidate numbering fails
+    # to rebuild the graph, so the atom order is kept as a second source: a
+    # reconstructable name that owes its numbering to the input order beats no
+    # name at all. Almost every molecule is settled by the first candidate of
+    # the first ordering and never reaches the second.
     ranks = canonical_ranks(mol)
-    ordered_atoms = sorted(atoms, key=ranks.__getitem__)
-    canonical_ids = {atom: position for position, atom in enumerate(ordered_atoms)}
-    canonical_edges = {tuple(sorted((canonical_ids[u], canonical_ids[v]))) for u, v in edges}
-    legacy_descriptor, canonical_paths = get_von_baeyer_descriptor_and_path(
-        set(canonical_ids.values()), canonical_edges
-    )
-    legacy_paths = [[ordered_atoms[position] for position in path] for path in canonical_paths]
-    if legacy_descriptor and is_von_baeyer_descriptor(legacy_descriptor):
-        legacy_numberings = tuple(
-            _audited_von_baeyer_numberings(mol, legacy_descriptor, legacy_paths, frozenset(edges))
-        )
-        if legacy_numberings:
+    orderings = (sorted(atoms, key=ranks.__getitem__), sorted(atoms))
+    legacy_descriptor = None
+    legacy_paths = [sorted(atoms)]
+    for ordering_index, ordered_atoms in enumerate(orderings):
+        accepted_descriptor = None
+        accepted_numberings: list = []
+        canonical_ids = {atom: position for position, atom in enumerate(ordered_atoms)}
+        canonical_edges = {tuple(sorted((canonical_ids[u], canonical_ids[v]))) for u, v in edges}
+        # Equally preferred main rings are the rule in a symmetric skeleton, and
+        # the preference order ranks them without proving that the descriptor
+        # each one yields rebuilds the graph. Take the first that its own
+        # reconstruction audit accepts rather than letting the leading one speak
+        # for all of them: abandoning the whole parent because the first choice
+        # failed is what left these skeletons unnamed.
+        for index, (descriptor, candidate_paths) in enumerate(
+            get_von_baeyer_descriptor_candidates(set(canonical_ids.values()), canonical_edges)
+        ):
+            if index == 0 and ordering_index == 0:
+                legacy_descriptor = descriptor
+                legacy_paths = [[ordered_atoms[position] for position in path] for path in candidate_paths]
+            if index >= _MAX_VON_BAEYER_CANDIDATES:
+                break
+            if not descriptor or not is_von_baeyer_descriptor(descriptor):
+                continue
+            paths = [[ordered_atoms[position] for position in path] for path in candidate_paths]
+            numberings = tuple(_audited_von_baeyer_numberings(mol, descriptor, paths, frozenset(edges)))
+            if not numberings:
+                continue
+            if accepted_descriptor is None:
+                accepted_descriptor = descriptor
+            if descriptor == accepted_descriptor:
+                accepted_numberings.extend(numberings)
+        if accepted_descriptor is not None:
+            # Every numbering of the accepted descriptor is kept, not just the
+            # first to reconstruct. They differ in where the numbering starts
+            # and which way it runs, and the heteroatom, hydro and substituent
+            # criteria downstream choose between them; handing over only one
+            # settles by reconstruction order what those rules should settle.
+            numberings = _dedupe_ring_numberings(accepted_numberings)
             return PolycycleDescriptorCandidate(
-                descriptor=legacy_descriptor,
-                paths=_dedupe_numbering_paths([list(numbering.path) for numbering in legacy_numberings]),
+                descriptor=accepted_descriptor,
+                paths=_dedupe_numbering_paths([list(numbering.path) for numbering in numberings]),
                 is_von_baeyer=True,
-                numberings=legacy_numberings,
+                numberings=tuple(numberings),
             )
     # Spiro side-component discovery temporarily marks the shared atom as Si so
     # the locant can be recovered from the generated side name.  That marker is
