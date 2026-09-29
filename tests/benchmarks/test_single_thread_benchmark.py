@@ -45,6 +45,8 @@ def test_compare_applies_relative_and_absolute_thresholds(
         lambda source, _corpus, _warmup: _measurement(10.0 if source == Path("base") else head_seconds),
     )
     report_path = tmp_path / "report.json"
+    summary_path = tmp_path / "step-summary.md"
+    monkeypatch.setenv("GITHUB_STEP_SUMMARY", str(summary_path))
     args = Namespace(
         base_src=Path("base"),
         head_src=Path("head"),
@@ -53,11 +55,15 @@ def test_compare_applies_relative_and_absolute_thresholds(
         warmup_rows=10,
         threshold_percent=15.0,
         minimum_absolute_seconds=1.0,
+        label="threshold fixture",
         report=report_path,
     )
 
     assert benchmark.compare(args) == expected_exit
     assert f'"passed": {str(expected_passed).lower()}' in report_path.read_text()
+    summary = summary_path.read_text()
+    assert "Single-thread performance benchmark: threshold fixture" in summary
+    assert f"**{'PASS' if expected_passed else 'FAIL'}**" in summary
 
 
 def test_load_smiles_requires_nonempty_corpus(tmp_path: Path) -> None:
