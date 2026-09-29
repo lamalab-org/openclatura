@@ -95,7 +95,7 @@ def _run_measurement(source_tree: Path, corpus: Path, warmup_rows: int) -> dict[
 def _summary_markdown(report: dict[str, Any]) -> str:
     status = "PASS" if report["passed"] else "FAIL"
     lines = [
-        "## Single-thread performance benchmark",
+        f"## Single-thread performance benchmark: {report['label']}",
         "",
         f"**{status}** — paired median change: **{report['regression_percent']:+.2f}%**",
         "",
@@ -142,6 +142,7 @@ def compare(args: argparse.Namespace) -> int:
     passed = not (regression_percent > args.threshold_percent and paired_delta > args.minimum_absolute_seconds)
     rows = measurements["head"][0]["rows"]
     report = {
+        "label": args.label or args.corpus.stem,
         "passed": passed,
         "rows": rows,
         "repetitions": args.repetitions,
@@ -176,6 +177,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--warmup-rows", type=int, default=100)
     parser.add_argument("--threshold-percent", type=float, default=15.0)
     parser.add_argument("--minimum-absolute-seconds", type=float, default=1.0)
+    parser.add_argument("--label", help="label shown in the JSON report and GitHub summary")
     parser.add_argument("--report", type=Path, default=Path("performance-report.json"))
     args = parser.parse_args()
     if not args.measure and (args.base_src is None or args.head_src is None):

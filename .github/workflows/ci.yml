@@ -128,23 +128,36 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e head
 
-      - name: Compare PR single-thread performance with target
+      - name: Compare PR performance on the original corpus
         run: |
           python head/benchmarks/single_thread_benchmark.py \
             --base-src base/src \
             --head-src head/src \
             --corpus head/benchmarks/data/opsin_verified_5000.csv \
+            --label "Original verified corpus" \
             --repetitions 3 \
             --threshold-percent 15 \
             --minimum-absolute-seconds 1 \
-            --report performance-report.json
+            --report performance-report-original.json
+
+      - name: Compare PR performance on the PubChem HF corpus
+        run: |
+          python head/benchmarks/single_thread_benchmark.py \
+            --base-src base/src \
+            --head-src head/src \
+            --corpus head/benchmarks/data/pubchem_hf_seed20260929_opsin_verified_5000.csv \
+            --label "PubChem HF seed 20260929" \
+            --repetitions 3 \
+            --threshold-percent 15 \
+            --minimum-absolute-seconds 1 \
+            --report performance-report-pubchem-hf-20260929.json
 
       - name: Upload performance report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: single-thread-performance
-          path: performance-report.json
+          path: performance-report-*.json
           if-no-files-found: warn
 
   docker:
