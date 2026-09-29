@@ -1,5 +1,7 @@
 """Name-fragment formatting helpers used by the naming pipeline."""
 
+from collections.abc import Callable
+
 from .assembly_parts import RenderedSubstituentName, rendered_substituent_text
 from .assembly_utils import is_fully_enclosed as is_fully_enclosed
 from .namer_config import ALKYL_OXY_PREFIXES
@@ -71,6 +73,55 @@ def format_counted_prefixes(names: list[str]) -> str:
     counts = count_names(names)
     safe = len(counts) > 1 or any(is_complex_prefix(name) for name in counts)
     return "".join(format_multiplier(name, count, safe_enclose=safe) for name, count in sorted(counts.items()))
+
+
+def format_center_ligands(names: list[str], *, sort_key: Callable[[str], str] | None = None) -> str:
+    """Format ligands cited on one central atom.
+
+    The first ligand establishes the ligand list and is written normally;
+    subsequent distinct ligands are parenthesised to keep them attached to the
+    same centre.  Repeated ligands remain a single multiplied word and do not
+    need another enclosure.  A preceding singleton is enclosed when it ends
+    with that repeated ligand, preventing e.g. ``chlorofluoromethyl`` plus
+    ``trimethyl`` from merging ambiguously.  Otherwise, ``ethyl`` + ``hydroxy``
+    becomes ``ethyl(hydroxy)``, while ``methoxy`` + two ``methyl`` ligands
+    becomes ``methoxydimethyl``.
+    """
+
+    rendered = []
+    counts = count_names(names)
+    ordered_names = sorted(counts, key=sort_key)
+    for index, name in enumerate(ordered_names):
+        count = counts[name]
+        if count > 1 and _is_substituted_alkyl_ligand(name) and not is_fully_enclosed(name):
+            ligand = f"{multipliers.complex_(count)}({name})"
+        else:
+            ligand = format_multiplier(name, count)
+        merges_with_multiplied_ligand = count == 1 and any(
+            counts[later_name] > 1 and name.endswith(later_name) for later_name in ordered_names[index + 1 :]
+        )
+        if merges_with_multiplied_ligand and not is_fully_enclosed(ligand):
+            ligand = f"({ligand})"
+        if index and count == 1 and not is_fully_enclosed(ligand):
+            ligand = f"({ligand})"
+        rendered.append(ligand)
+    return "".join(rendered)
+
+
+def _is_substituted_alkyl_ligand(name: str) -> bool:
+    """Return whether a bare ligand contains modifiers before its alkyl root.
+
+    Such ligands require complex multipliers: two ``chloromethyl`` groups are
+    ``bis(chloromethyl)``, because ``dichloromethyl`` denotes one differently
+    substituted methyl group.  Unsubstituted acyclic and cycloalkyl ligands
+    retain compact basic multipliers.
+    """
+
+    stem = stems.terminal_stem(name)
+    if stem is None:
+        return False
+    simple_name = f"{stem.stem}yl"
+    return name not in {simple_name, f"cyclo{simple_name}"}
 
 
 def oxy_prefix_from_branch(branch: str) -> str:

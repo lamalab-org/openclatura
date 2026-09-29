@@ -321,7 +321,7 @@
     "values": {
       "N:+": {
         "suffix": "ium",
-        "reason": "Positive parent nitrogen charges are rendered as parent suffix operations."
+        "reason": "Positive parent heteroatom charges (N, O, S, Se, Te, P, As, Sb, Bi) are rendered as parent suffix operations."
       },
       "*:-": {
         "suffix": "ide",
@@ -560,7 +560,9 @@
       "sulfonic_acid": "sulfo",
       "isocyano": "isocyano",
       "nitrile": "cyano",
+      "ring_nitrile": "cyano",
       "carboxylic_acid": "carboxy",
+      "ring_carboxylic_acid": "carboxy",
       "amide": "carbamoyl",
       "acid_fluoride": "fluorocarbonyl",
       "acid_chloride": "chlorocarbonyl",
@@ -755,6 +757,19 @@
           ]
         },
         "seniority": 16,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "aminide": {
+        "role": "principal",
+        "prefix": "azanido",
+        "suffix": "aminide",
+        "multi_suffix": {
+          "multiplier_positions": [
+            0
+          ]
+        },
+        "seniority": 17,
         "suffix_with_locant": true,
         "needs_locant": true
       },
