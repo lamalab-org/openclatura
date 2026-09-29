@@ -609,8 +609,16 @@ def get_linear_dispiro_descriptor_and_paths(mol: Molecule, comp_nodes, comp_edge
 
 
 def _terminal_dispiro_sort_key(mol: Molecule, component: set[int]) -> tuple:
+    """Order the two terminal rings the way P-24.2.4.1.1 numbers them.
+
+    Numbering starts in the smaller terminal ring, at the atom next to its
+    spiro atom, so the smaller component sorts first. This used to sort on
+    the negated size, which began the numbering in the larger ring and moved
+    every locant in the name with it.
+    """
+
     hetero_positions = [idx for idx in component if mol.atoms[idx].symbol != "C"]
-    return (0 if hetero_positions else 1, -len(component), sorted(component))
+    return (0 if hetero_positions else 1, len(component), sorted(component))
 
 
 def _component_path_between_spiro_neighbors(
