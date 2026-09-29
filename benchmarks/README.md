@@ -7,13 +7,15 @@ are measured, with the order reversed for the middle pair to reduce runner
 warm-up and drift bias.
 
 The gate fails only when the median paired result is both more than 15% and
-more than one second slower. Raw measurements are written to
-`performance-report.json` and uploaded as a workflow artifact.
+more than one second slower. Raw measurements are written to separate
+`performance-report-*.json` files and uploaded together as a workflow artifact.
 
-The tracked corpus was selected deterministically from `test_100000.csv` and
-contains only structures whose generated openclatura name round-tripped to the
-input through OPSIN. Its selection metadata and checksum are recorded in
-`data/opsin_verified_5000.manifest.json`.
+The original tracked corpus was selected deterministically from
+`test_100000.csv`. A second corpus is selected from a new deterministic
+200,000-molecule sample of the pinned PubChem Hugging Face dataset. Both
+contain only structures whose generated openclatura name round-tripped to the
+input through OPSIN. Selection metadata and checksums are recorded in their
+adjacent manifest files.
 
 To rebuild the corpus locally with the optional OPSIN dependency and Java
 available:
@@ -23,6 +25,19 @@ python benchmarks/build_corpus.py \
   /path/to/test_100000.csv \
   benchmarks/data/opsin_verified_5000.csv
 ```
+
+To regenerate the PubChem verified pool and its 100,000-molecule speed corpus:
+
+```bash
+python benchmarks/build_pubchem_hf_corpus.py
+```
+
+This uses pinned revision
+`cd46fb8a3110cc12d6a669ad0d8e260b3acf6d0b`, sampling seed `20260929`,
+and benchmark-selection seed `20260930`. The full successful pool is retained
+as `data/pubchem_hf_seed20260929_verified.csv`; CI benchmarks the deterministic
+100,000-row subset. The performance job has a five-hour timeout to accommodate
+three base/PR measurement pairs over the larger corpus.
 
 To compare two local checkouts:
 
