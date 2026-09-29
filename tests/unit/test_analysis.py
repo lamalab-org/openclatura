@@ -5206,7 +5206,11 @@ def test_von_baeyer_polycycle_keeps_descriptor_source_numbering():
     cases = {
         "C1C2C1C13COC21CO3": "7,9-dioxatetracyclo[3.2.2.0^{1,5}.0^{2,4}]nonane",
         "C1NC23COC12C=CC3": "7-oxa-9-azatricyclo[3.2.2.0^{1,5}]non-2-ene",
-        "C1NC23COC12COC3": "3,9-dioxa-7-azatricyclo[3.2.2.0^{1,5}]nonane",
+        # Oxygen outranks nitrogen for low locants (hw_priority 5 against 9),
+        # so the oxygens take 3 and 7 rather than 3 and 9. Every numbering of
+        # the accepted descriptor now reaches that criterion, where only the
+        # first to reconstruct used to.
+        "C1NC23COC12COC3": "3,7-dioxa-9-azatricyclo[3.2.2.0^{1,5}]nonane",
     }
 
     for smiles, expected in cases.items():
@@ -5399,16 +5403,26 @@ def test_parent_pipeline_uses_audited_von_baeyer_locant_maps():
     )
 
 
-def test_high_risk_polycycle_audit_fails_closed_without_proof_candidate():
+def test_high_risk_polycycle_is_named_once_a_proof_candidate_reconstructs():
+    """This skeleton used to abstain, and now has a descriptor that rebuilds it.
+
+    The abstention was never about this molecule being unnameable: the ranked
+    candidate the search offered first failed its reconstruction audit, and the
+    parent was abandoned with it. Later candidates reconstruct, and OPSIN reads
+    the name back to this structure. Failing closed when nothing reconstructs is
+    still required, and test_polycycle_without_descriptor_fails_closed holds
+    that guarantee at the assembly layer.
+    """
+
     result = NamingEngine().run(NamingRequest(smiles="C1Oc2c3c(c(c4c2C4)O1)C3"))
 
-    assert result.name == ""
-    assert result.error is not None
+    assert result.error is None
+    assert result.name == "9,11-dioxatetracyclo[3.3.3.0^{6,8}.0^{2,4}]undeca-1,4,6(8)-triene"
 
     mol = read_smiles("C1Oc2c3c(c(c4c2C4)O1)C3")
     rings = [system for system in find_ring_systems(mol, set()) if system.is_polycycle]
     assert rings
-    assert not any(ring.polycycle_descriptor for ring in rings)
+    assert any(ring.polycycle_descriptor for ring in rings)
 
 
 def test_charge_separated_sulfonium_ylide_requires_single_bond():
