@@ -53,6 +53,7 @@ class FusionSearchLimits:
     component_selection_states: int
     locant_map_combinations: int
     mancude_states: int
+    maximum_name_candidates: int
 
 
 @dataclass(frozen=True, slots=True)
