@@ -1371,15 +1371,19 @@ def _partial_layout_is_valid(
     return True
 
 
-def _audit_layout(
-    model: FaceModel,
-    placed_orders: dict[int, tuple[int, ...]],
-    positions: dict[int, Point],
-) -> bool:
-    if set(placed_orders) != {face.id for face in model.faces} or not _partial_layout_is_valid(
-        model, placed_orders, positions
-    ):
-        return False
+def _model_boundary_is_consistent(model: FaceModel) -> bool:
+    """Check the face model's own boundary bookkeeping, before any drawing.
+
+    The cited perimeter, the perimeter implied by face membership, and the
+    declared outer boundary are all read off the face cycles, so no placement
+    can change this verdict. The search reaches the same model for every
+    completed drawing, so the model retains the answer on the same terms as
+    its face index above.
+    """
+
+    consistent = model._boundary_consistent
+    if consistent is not None:
+        return consistent
     graph_edges = {
         frozenset((left, right))
         for face in model.faces
@@ -1403,7 +1407,23 @@ def _audit_layout(
             model.outer_boundary[1:] + model.outer_boundary[:1],
         )
     }
-    return perimeter_edges == geometric_perimeter == declared_perimeter and all(len(edge) == 2 for edge in graph_edges)
+    consistent = perimeter_edges == geometric_perimeter == declared_perimeter and all(
+        len(edge) == 2 for edge in graph_edges
+    )
+    object.__setattr__(model, "_boundary_consistent", consistent)
+    return consistent
+
+
+def _audit_layout(
+    model: FaceModel,
+    placed_orders: dict[int, tuple[int, ...]],
+    positions: dict[int, Point],
+) -> bool:
+    if set(placed_orders) != {face.id for face in model.faces} or not _partial_layout_is_valid(
+        model, placed_orders, positions
+    ):
+        return False
+    return _model_boundary_is_consistent(model)
 
 
 def _materialize_layouts(
