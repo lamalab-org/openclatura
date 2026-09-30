@@ -167,6 +167,7 @@ class Molecule:
         self._retained_fused_cache: dict[tuple, tuple] = {}
         self._retained_topology_cache: dict[frozenset, tuple] = {}
         self._fusion_plan_cache: dict[tuple, object] = {}
+        self._fusion_interface_cache: dict[tuple, object] = {}
         self.audit_rdmol = None
         self.accurate_cip: dict[int, str] = {}
         self.legacy_cip: dict[int, str] = {}
@@ -181,6 +182,7 @@ class Molecule:
         self._retained_fused_cache.clear()
         self._retained_topology_cache.clear()
         self._fusion_plan_cache.clear()
+        self._fusion_interface_cache.clear()
 
     def add_atom(
         self,

@@ -1516,7 +1516,41 @@ def host_side_projection(
     return host_map, sides, side_edges
 
 
+_INTERFACE_NOT_CACHED = object()
+
+
 def classify_ordered_fusion_interface(
+    attached: FusionComponentMatch,
+    host: FusionComponentMatch,
+    attached_spec: FusionComponentSpec,
+    host_spec: FusionComponentSpec,
+    interface: FusionInterface[int],
+    mol: Molecule,
+    host_projection: tuple[dict[str, int], tuple[ComponentSide, ...], tuple[tuple[int, int], ...]] | None = None,
+) -> tuple[OrderedFusionInterface, int] | None:
+    """Memoize one join's proof for the molecule that supplied its atoms.
+
+    Candidate trees revisit the same component pair across many partial
+    decompositions, so the same join is proven repeatedly while naming one
+    molecule. The matches carry their own local numbering and the specs
+    their own template, so those five values fix the result; the projection
+    is recomputed from the host pair and never widens it. The cache lives on
+    the molecule and is dropped with the other derived values whenever its
+    chemistry is mutated.
+    """
+
+    key = (attached, host, attached_spec, host_spec, interface)
+    cached = mol._fusion_interface_cache.get(key, _INTERFACE_NOT_CACHED)
+    if cached is not _INTERFACE_NOT_CACHED:
+        return cached  # type: ignore[return-value]
+    classified = _classify_ordered_fusion_interface(
+        attached, host, attached_spec, host_spec, interface, mol, host_projection
+    )
+    mol._fusion_interface_cache[key] = classified
+    return classified
+
+
+def _classify_ordered_fusion_interface(
     attached: FusionComponentMatch,
     host: FusionComponentMatch,
     attached_spec: FusionComponentSpec,
