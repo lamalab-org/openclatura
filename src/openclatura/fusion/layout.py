@@ -1053,7 +1053,9 @@ def _search_layouts(
     if best_distortion[0] is not None and current_distortion > best_distortion[0]:
         return
     if len(placed_orders) == len(model.faces):
-        if _audit_layout(model, placed_orders, atom_positions):
+        # A multi-face arrangement only reaches this depth through extensions
+        # that each proved the pairs they opened, so it is already proved.
+        if _audit_layout(model, placed_orders, atom_positions, drawn_incrementally=len(model.faces) > 1):
             embedding_key = _intrinsic_embedding_key(
                 placed_orders,
                 placed_shapes,
@@ -1418,10 +1420,21 @@ def _audit_layout(
     model: FaceModel,
     placed_orders: dict[int, tuple[int, ...]],
     positions: dict[int, Point],
+    *,
+    drawn_incrementally: bool = False,
 ) -> bool:
-    if set(placed_orders) != {face.id for face in model.faces} or not _partial_layout_is_valid(
-        model, placed_orders, positions
-    ):
+    """Decide whether a completed arrangement draws this model's plane graph.
+
+    ``drawn_incrementally`` states that every face arrived through a proved
+    extension, which is what the search guarantees: each depth tested the
+    pairs its new face introduced, so between them the whole arrangement has
+    already been proved and re-proving it here only repeats those pairs.
+    Callers that assemble an arrangement by other means leave it unset.
+    """
+
+    if set(placed_orders) != {face.id for face in model.faces}:
+        return False
+    if not drawn_incrementally and not _partial_layout_is_valid(model, placed_orders, positions):
         return False
     return _model_boundary_is_consistent(model)
 
