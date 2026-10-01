@@ -43,9 +43,9 @@ individual structures and molecular datasets.
 Round-trip accuracy against public datasets (details and rerun instructions in
 [`evaluations/`](https://github.com/lamalab-org/openclatura/tree/main/evaluations)):
 
-| dataset  | QM9       | PubChem  | ZINC22   |
-| -------- | --------- | -------- | -------- |
-| coverage | 100.0000% | 99.7632% | 97.6973% |
+| dataset  | QM9     | PubChem | ZINC22 |
+| -------- | ------- | ------- | ------ |
+| coverage | 100.00% | 99.76%  | 97.70% |
 
 The package is in **beta**. Naming is solid across common organic chemistry;
 exotic corners of the Blue Book — and stereodescriptor edge cases — are still
