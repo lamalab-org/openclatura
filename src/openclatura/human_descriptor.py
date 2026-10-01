@@ -142,12 +142,52 @@ def _next_smiles_atom_token(smiles: str, pos: int) -> tuple[str | None, int]:
     return None, pos
 
 
+def _joined_ring_atoms(parent: dict[str, Any], mol: Molecule) -> list[int]:
+    """Return ring atoms joined to the named parent but outside it.
+
+    A spiro assembly is named from one of its rings, so the tree records that
+    ring as the parent. The other ring still shares the junction atom with it,
+    which is what distinguishes a joined framework from an ordinary substituent
+    hanging off the parent by a single bond.
+    """
+
+    from .chains import find_ring_systems
+
+    covered = {int(atom) for atom in parent.get("atoms") or ()}
+    if not covered:
+        return []
+    joined: set[int] = set()
+    for system in find_ring_systems(mol):
+        atoms = {int(atom) for atom in system.atoms}
+        if atoms & covered and not atoms <= covered:
+            joined.update(atoms - covered)
+    return sorted(joined)
+
+
+def _assembled_framework_sentence(parent: dict[str, Any], mol: Molecule) -> str:
+    """State that the named parent is one component of a larger ring system."""
+
+    remainder = _joined_ring_atoms(parent, mol)
+    if not remainder:
+        return ""
+    ids = ", ".join(str(atom) for atom in remainder)
+    return (
+        f"That parent is one component of the fragment's ring system; its remaining ring atoms "
+        f"(atom ids {ids}) belong to the component it is joined to, and the positions below are "
+        f"numbered across the whole system."
+    )
+
+
 def _describe_node(node: dict[str, Any], mol: Molecule, *, subject: str, depth: int) -> str:
     sentences: list[str] = []
     parent = node.get("parent") or {}
     parent_sentence = _parent_sentence(subject, parent)
     if parent_sentence:
         sentences.append(parent_sentence)
+
+    assembled_sentence = _assembled_framework_sentence(parent, mol)
+    if assembled_sentence:
+        sentences.append(assembled_sentence)
 
     fusion_sentence = _fusion_components_sentence(parent)
     if fusion_sentence:
@@ -453,14 +493,29 @@ def _substituent_summary_sentence(node: dict[str, Any], mol: Molecule) -> str:
         return ""
     phrases = []
     has_plural = False
+    # Identical groups the assembler kept as separate unlocanted items are one
+    # fact about the framework, so they are counted rather than repeated.
+    unlocanted: dict[str, int] = {}
+    ordered: list[tuple[str, list[str], int]] = []
     for child in children:
         name = _display_substituent_name(child, mol)
         locants = [str(loc) for loc in child.get("locants") or ()]
         count = _child_instance_count(child)
+        if not locants and name in unlocanted:
+            ordered[unlocanted[name]] = (name, [], ordered[unlocanted[name]][2] + count)
+            continue
+        if not locants:
+            unlocanted[name] = len(ordered)
+        ordered.append((name, locants, count))
+    for name, locants, count in ordered:
         has_plural = has_plural or count > 1
         display_name = _pluralized_substituent_name(name, count)
         if locants:
             phrases.append(f"{display_name} at {_positions(locants, node.get('parent') or {})}")
+        elif count > 1:
+            # Nothing else in the phrase carries the count once the positions
+            # are gone, so it is stated.
+            phrases.append(f"{_count_word(count)} {display_name}")
         else:
             phrases.append(display_name)
     verb = "are" if has_plural or len(phrases) > 1 else "is"
@@ -511,6 +566,13 @@ def _child_instance_count(child: dict[str, Any]) -> int:
     return int(child.get("instance_count") or 1)
 
 
+_COUNT_WORDS = ("", "", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten")
+
+
+def _count_word(count: int) -> str:
+    return _COUNT_WORDS[count] if count < len(_COUNT_WORDS) else str(count)
+
+
 def _pluralized_substituent_name(name: str, count: int) -> str:
     if count <= 1:
         return f"{_article_for(name)} {name} group"
@@ -529,6 +591,13 @@ def _display_substituent_name(child: dict[str, Any], mol: Molecule) -> str:
             if isinstance(instance, dict):
                 return _display_substituent_name(instance, mol)
 
+    # The assembled prefix is the engine's own answer for this fragment, so a
+    # plain one is used as it stands. Deriving a label from the parent skeleton
+    # alone would drop whatever the fragment carries outside it, naming an
+    # acetyl group after its two carbons.
+    recorded = _plain_prefix_name(child)
+    if recorded:
+        return recorded
     parent = child.get("parent") if isinstance(child.get("parent"), dict) else {}
     parent_label = _parent_substituent_label(parent)
     if parent_label:
@@ -537,6 +606,30 @@ def _display_substituent_name(child: dict[str, Any], mol: Molecule) -> str:
     if graph_label:
         return graph_label
     return _readable_key(str(child.get("kind") or "substituent"))
+
+
+def _plain_prefix_name(child: dict[str, Any]) -> str:
+    """Return the fragment's assembled prefix when the skeleton cannot say it.
+
+    Only a bare alphabetic prefix qualifies; anything carrying locants, stereo
+    descriptors or nesting is a composite the sentences below take apart. It is
+    used only when the fragment reaches past the skeleton it was numbered on,
+    which is exactly when a label derived from that skeleton's length drops
+    something: an acetyl group read as its two carbons, a benzyl group as one.
+    A fragment its skeleton already covers keeps the derived label, because the
+    recorded name of such a fragment can be a bare stem rather than a prefix.
+    """
+
+    name = str(child.get("name") or "").strip()
+    while name.startswith("(") and name.endswith(")"):
+        name = name[1:-1].strip()
+    if not name or not name.isalpha() or not name.islower():
+        return ""
+    parent = child.get("parent") if isinstance(child.get("parent"), dict) else {}
+    skeleton = {int(atom) for atom in parent.get("atoms") or ()}
+    if skeleton and {int(atom) for atom in child.get("atoms") or ()} <= skeleton:
+        return ""
+    return name
 
 
 def _parent_substituent_label(parent: dict[str, Any]) -> str:

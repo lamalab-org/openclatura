@@ -317,7 +317,7 @@ class NamingEngine:
                         analysis=analysis,
                         rules_hit=rules,
                         rule_hints=hints,
-                        **_fusion_result_metadata(analysis.decisions),
+                        **_fusion_result_metadata(analysis.decisions, analysis.substituent_tree),
                     )
                 else:
                     result = NamingResult(
@@ -517,25 +517,71 @@ class NamingEngine:
 DEFAULT_NAMING_ENGINE = NamingEngine()
 
 
-def _fusion_result_metadata(decisions) -> dict[str, str | None]:
-    """Project a traced systematic-fusion decision onto the public result."""
+_FUSION_NOMENCLATURES = frozenset({"systematic_fusion", "skeletal_replacement_fusion", "bridged_fusion"})
 
-    step = next(
-        (
-            item
-            for item in decisions
-            if item.phase == TracePhase.PARENT_SELECTION and item.data.get("parent_nomenclature")
-        ),
-        None,
-    )
-    if step is None:
-        return {}
-    return {
-        "parent_nomenclature": step.data.get("parent_nomenclature"),
-        "pin_status": step.data.get("pin_status"),
-        "fusion_support_tier": step.data.get("fusion_support_tier"),
-        "proof_source": step.data.get("proof_source"),
-    }
+
+def _iter_decision_data(decisions):
+    """Yield every decision's data, including those proving nested fragments.
+
+    A ring system named as a substituent proves itself in its own trace, which
+    the assembled item carries as nested decisions. Reading only the top level
+    would report no fusion evidence for a name whose fused component was in
+    fact proven, so the walk descends wherever a nested trace was recorded.
+    """
+
+    pending = list(decisions or ())
+    seen: set[int] = set()
+    while pending:
+        item = pending.pop(0)
+        if id(item) in seen:
+            continue
+        seen.add(id(item))
+        if isinstance(item, (list, tuple)):
+            pending.extend(item)
+            continue
+        if isinstance(item, dict):
+            phase, data = item.get("phase"), item.get("data") or {}
+            branches = item
+        else:
+            phase, data = getattr(item, "phase", None), getattr(item, "data", None) or {}
+            branches = {}
+        yield phase, data
+        # A nested proof is recorded on the assembled item, not inside the
+        # parent step's data, so both levels are followed.
+        for source in (branches, data):
+            if not isinstance(source, dict):
+                continue
+            for key in ("nested_decisions", "decisions", "substituents", "trace_segments", "spiro"):
+                nested = source.get(key)
+                if isinstance(nested, (list, tuple, dict)):
+                    pending.append(nested)
+
+
+def _fusion_result_metadata(decisions, *extra_sources) -> dict[str, str | None]:
+    """Project a traced fusion decision onto the public result.
+
+    A parent proven by the fusion engine is reported in preference to a
+    ``legacy`` parent that merely carries a proven component, so the fields
+    keep describing the strongest proof the name rests on rather than whichever
+    fragment happened to be traced first.
+    """
+
+    fallback = None
+    for phase, data in _iter_decision_data([*(decisions or ()), *extra_sources]):
+        nomenclature = data.get("parent_nomenclature")
+        if not nomenclature:
+            continue
+        projected = {
+            "parent_nomenclature": nomenclature,
+            "pin_status": data.get("pin_status"),
+            "fusion_support_tier": data.get("fusion_support_tier"),
+            "proof_source": data.get("proof_source"),
+        }
+        if nomenclature in _FUSION_NOMENCLATURES:
+            return projected
+        if fallback is None and phase == TracePhase.PARENT_SELECTION:
+            fallback = projected
+    return fallback or {}
 
 
 # --- multiprocessing helpers ---------------------------------------------
