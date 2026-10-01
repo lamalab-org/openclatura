@@ -1374,6 +1374,26 @@ def _fallback_monospiro_or_bicyclo_system(
 _MAX_VON_BAEYER_CANDIDATES = 256
 
 
+def _leading_von_baeyer_candidate(
+    ordered_atoms: list[int],
+    edges: set[tuple[int, int]],
+    fallback_path: list[int],
+) -> tuple[str | None, list[list[int]]]:
+    """The first descriptor the main-ring enumeration offers, unaudited.
+
+    It is what the Si-marked spiro projection names by, and what decides
+    whether an audited descriptor can also offer the enumeration's numbering.
+    """
+
+    canonical_ids = {atom: position for position, atom in enumerate(ordered_atoms)}
+    canonical_edges = {tuple(sorted((canonical_ids[u], canonical_ids[v]))) for u, v in edges}
+    for descriptor, candidate_paths in get_von_baeyer_descriptor_candidates(
+        set(canonical_ids.values()), canonical_edges
+    ):
+        return descriptor, [[ordered_atoms[position] for position in path] for path in candidate_paths]
+    return None, [list(fallback_path)]
+
+
 def _polyspiro_or_von_baeyer_candidate(
     mol: Molecule,
     atoms: set[int],
@@ -1393,8 +1413,48 @@ def _polyspiro_or_von_baeyer_candidate(
     # the first ordering and never reaches the second.
     ranks = canonical_ranks(mol)
     orderings = (sorted(atoms, key=ranks.__getitem__), sorted(atoms))
-    legacy_descriptor = None
-    legacy_paths = [sorted(atoms)]
+    legacy_descriptor, legacy_paths = _leading_von_baeyer_candidate(orderings[0], edges, sorted(atoms))
+    # Spiro side-component discovery temporarily marks the shared atom as Si so
+    # the locant can be recovered from the generated side name.  That marker is
+    # not a real replacement heteroatom and must not participate in the new
+    # von Baeyer numbering tie-breakers.
+    if any(mol.atoms[atom].symbol == "Si" for atom in atoms):
+        descriptor, paths = legacy_descriptor, legacy_paths
+        if not descriptor or not is_von_baeyer_descriptor(descriptor):
+            return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
+        numberings = tuple(_audited_von_baeyer_numberings(mol, descriptor, paths, frozenset(edges)))
+        return PolycycleDescriptorCandidate(
+            descriptor=descriptor,
+            paths=_dedupe_numbering_paths([list(numbering.path) for numbering in numberings]),
+            is_von_baeyer=True,
+            numberings=numberings,
+        )
+    # P-23.2.6.2 settles the decomposition by main-ring symmetry, then the cited
+    # independent bridge lengths, then the dependent bridge count, and only then
+    # by the superscript locants -- as a sorted set first and as cited second.
+    # The enumeration below ranks main rings without that comparison, so taking
+    # the first of its candidates that reconstructs can keep a decomposition
+    # whose superscripts are not the lowest available: basketane came out as
+    # pentacyclo[4.4.0.0{3,10}.0{4,7}.0{2,5}]decane where 0{3,8} was on offer.
+    # find_von_baeyer_candidates applies the criteria in order and audits each
+    # reconstruction itself, so where it reaches a decision it owns this choice;
+    # it abstains outside its ring and bridgehead bounds, and the enumeration
+    # below remains the fallback for everything it does not reach.
+    audited_candidates = find_von_baeyer_candidates(mol, atoms, edges)
+    if audited_candidates:
+        descriptor = audited_candidates[0].descriptor
+        same_descriptor = tuple(candidate for candidate in audited_candidates if candidate.descriptor == descriptor)
+        numberings = []
+        if legacy_descriptor == descriptor:
+            numberings.extend(_audited_von_baeyer_numberings(mol, descriptor, legacy_paths, frozenset(edges)))
+        numberings.extend(candidate.numbering for candidate in same_descriptor)
+        numberings = _dedupe_ring_numberings(numberings)
+        return PolycycleDescriptorCandidate(
+            descriptor=descriptor,
+            paths=_dedupe_numbering_paths([list(numbering.path) for numbering in numberings]),
+            is_von_baeyer=True,
+            numberings=tuple(numberings),
+        )
     for ordering_index, ordered_atoms in enumerate(orderings):
         accepted_descriptor = None
         accepted_numberings: list = []
@@ -1409,9 +1469,6 @@ def _polyspiro_or_von_baeyer_candidate(
         for index, (descriptor, candidate_paths) in enumerate(
             get_von_baeyer_descriptor_candidates(set(canonical_ids.values()), canonical_edges)
         ):
-            if index == 0 and ordering_index == 0:
-                legacy_descriptor = descriptor
-                legacy_paths = [[ordered_atoms[position] for position in path] for path in candidate_paths]
             if index >= _MAX_VON_BAEYER_CANDIDATES:
                 break
             if not descriptor or not is_von_baeyer_descriptor(descriptor):
@@ -1437,36 +1494,6 @@ def _polyspiro_or_von_baeyer_candidate(
                 is_von_baeyer=True,
                 numberings=tuple(numberings),
             )
-    # Spiro side-component discovery temporarily marks the shared atom as Si so
-    # the locant can be recovered from the generated side name.  That marker is
-    # not a real replacement heteroatom and must not participate in the new
-    # von Baeyer numbering tie-breakers.
-    if any(mol.atoms[atom].symbol == "Si" for atom in atoms):
-        descriptor, paths = legacy_descriptor, legacy_paths
-        if not descriptor or not is_von_baeyer_descriptor(descriptor):
-            return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
-        numberings = tuple(_audited_von_baeyer_numberings(mol, descriptor, paths, frozenset(edges)))
-        return PolycycleDescriptorCandidate(
-            descriptor=descriptor,
-            paths=_dedupe_numbering_paths([list(numbering.path) for numbering in numberings]),
-            is_von_baeyer=True,
-            numberings=numberings,
-        )
-    audited_candidates = find_von_baeyer_candidates(mol, atoms, edges)
-    if audited_candidates:
-        descriptor = audited_candidates[0].descriptor
-        same_descriptor = tuple(candidate for candidate in audited_candidates if candidate.descriptor == descriptor)
-        numberings = []
-        if legacy_descriptor == descriptor:
-            numberings.extend(_audited_von_baeyer_numberings(mol, descriptor, legacy_paths, frozenset(edges)))
-        numberings.extend(candidate.numbering for candidate in same_descriptor)
-        numberings = _dedupe_ring_numberings(numberings)
-        return PolycycleDescriptorCandidate(
-            descriptor=descriptor,
-            paths=_dedupe_numbering_paths([list(numbering.path) for numbering in numberings]),
-            is_von_baeyer=True,
-            numberings=tuple(numberings),
-        )
     descriptor, paths = legacy_descriptor, legacy_paths
     if not descriptor:
         return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)

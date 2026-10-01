@@ -5203,14 +5203,18 @@ def test_anionic_ketone_parent_names_keep_parent_descriptor_intact():
 
 
 def test_von_baeyer_polycycle_keeps_descriptor_source_numbering():
+    # The descriptors here are unchanged, so P-23.2.6.2 has already settled the
+    # decomposition and the heteroatoms are choosing among numberings it ranks
+    # equally. Either main bridgehead may be locant 1 and, where the main ring's
+    # branches are the same length, either may be numbered first; enumerating
+    # all of those rather than one picked by atom id is what puts the oxygens
+    # at 6 and 8 instead of 7 and 9. Oxygen still outranks nitrogen for the low
+    # locant (hw_priority 5 against 9), and the heteroatoms outrank the ene,
+    # which is why the third case moves to non-3-ene to reach 6 and 8.
     cases = {
-        "C1C2C1C13COC21CO3": "7,9-dioxatetracyclo[3.2.2.0^{1,5}.0^{2,4}]nonane",
-        "C1NC23COC12C=CC3": "7-oxa-9-azatricyclo[3.2.2.0^{1,5}]non-2-ene",
-        # Oxygen outranks nitrogen for low locants (hw_priority 5 against 9),
-        # so the oxygens take 3 and 7 rather than 3 and 9. Every numbering of
-        # the accepted descriptor now reaches that criterion, where only the
-        # first to reconstruct used to.
-        "C1NC23COC12COC3": "3,7-dioxa-9-azatricyclo[3.2.2.0^{1,5}]nonane",
+        "C1C2C1C13COC21CO3": "6,8-dioxatetracyclo[3.2.2.0^{1,5}.0^{2,4}]nonane",
+        "C1NC23COC12C=CC3": "6-oxa-8-azatricyclo[3.2.2.0^{1,5}]non-3-ene",
+        "C1NC23COC12COC3": "3,6-dioxa-8-azatricyclo[3.2.2.0^{1,5}]nonane",
     }
 
     for smiles, expected in cases.items():
@@ -5240,8 +5244,15 @@ def test_von_baeyer_candidate_search_builds_graph_ranked_descriptor():
     assert candidates
     assert candidates[0].descriptor == "tricyclo[2.2.1.0^{2,6}]"
     assert candidates[0].numbering.audit_ok
-    assert candidates[0].numbering.atom_to_locant[2] == 2
-    assert candidates[0].numbering.atom_to_locant[6] == 6
+    # This skeleton is all carbon and symmetric, so several numberings carry the
+    # descriptor and nothing in the rules separates them: which input atom ends
+    # up on which locant is an automorphism, not a nomenclature decision. What
+    # has to hold is that the locants reproduce the descriptor's own graph.
+    locants = candidates[0].numbering.atom_to_locant
+    assert sorted(locants.values()) == list(range(1, 8))
+    assert {frozenset((locants[first], locants[second])) for first, second in edges} == {
+        frozenset(pair) for pair in ((1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 1), (1, 7), (7, 4), (2, 6))
+    }
 
 
 def test_von_baeyer_audit_accepts_high_cycle_count_prefixes():

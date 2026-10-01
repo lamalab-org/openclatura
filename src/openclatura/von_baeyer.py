@@ -7,9 +7,10 @@ the current implementation cannot classify every bridge without guessing.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from itertools import combinations
 
+from .canonical_ranks import canonical_ranks
 from .molecule import Molecule
 from .polycycle_topology import (
     RingNumbering,
@@ -37,7 +38,7 @@ class VonBaeyerBridge:
 
 @dataclass(frozen=True)
 class VonBaeyerCandidate:
-    """One fully rendered and audited von Baeyer candidate."""
+    """One rendered von Baeyer candidate; ``numbering`` is its audit, once run."""
 
     descriptor: str
     path: tuple[int, ...]
@@ -45,7 +46,7 @@ class VonBaeyerCandidate:
     secondary_bridges: tuple[VonBaeyerBridge, ...]
     main_bridgeheads: tuple[int, int]
     rank: tuple
-    numbering: RingNumbering
+    numbering: RingNumbering | None
 
 
 def find_von_baeyer_candidates(
@@ -62,13 +63,20 @@ def find_von_baeyer_candidates(
 
     adjacency = adjacency_from_edges(atom_set, edge_set)
     ring_count = len(edge_set) - len(atom_set) + 1
-    bridgeheads = tuple(sorted(atom for atom in atom_set if len(adjacency[atom]) >= 3))
+    # Which decompositions get enumerated at all must not depend on the atom
+    # numbering the caller happened to arrive with: the path search is bounded,
+    # so a different walk order truncates a different subset, and a skeleton
+    # can lose the decomposition P-23.2.6.2 would have preferred. Walking in
+    # canonical rank order makes the bound fall in the same place whatever the
+    # input numbering.
+    ranks = canonical_ranks(mol, atom_set)
+    bridgeheads = tuple(sorted((atom for atom in atom_set if len(adjacency[atom]) >= 3), key=ranks.__getitem__))
     if ring_count > MAX_AUDITED_VON_BAEYER_RINGS or len(bridgeheads) > MAX_AUDITED_BRIDGEHEADS:
         return ()
     candidates: list[VonBaeyerCandidate] = []
 
     for first, second in combinations(bridgeheads, 2):
-        paths = _simple_paths_between(first, second, adjacency, max_paths=MAX_PATHS_PER_BRIDGEHEAD_PAIR)
+        paths = _simple_paths_between(first, second, adjacency, ranks, max_paths=MAX_PATHS_PER_BRIDGEHEAD_PAIR)
         if len(paths) >= MAX_PATHS_PER_BRIDGEHEAD_PAIR:
             continue
         for primary_paths in combinations(paths, 3):
@@ -88,7 +96,25 @@ def find_von_baeyer_candidates(
                     candidates.append(candidate)
 
     deduped = _dedupe_candidates(candidates)
-    return tuple(sorted(deduped, key=lambda candidate: candidate.rank))
+    # P-23.2.6.2 is applied in order until a decision is made, and a symmetric
+    # skeleton can exhaust it with several decompositions still tied. Those are
+    # genuinely equivalent, so the same canonical order settles them.
+    ordered = sorted(deduped, key=lambda candidate: (candidate.rank, tuple(ranks[atom] for atom in candidate.path)))
+    # Reconstructing a descriptor and comparing it to the graph is the expensive
+    # part, and a skeleton can offer a hundred decompositions the criteria have
+    # already rejected. Audit in preference order and stop at the first that
+    # proves itself; a descriptor fixes the primary lengths and the secondary
+    # locants, so everything that shares it shares its rank and is adjacent.
+    accepted: list[VonBaeyerCandidate] = []
+    for candidate in ordered:
+        if accepted and candidate.descriptor != accepted[0].descriptor:
+            if candidate.rank > accepted[0].rank:
+                break
+            continue
+        numbering = build_von_baeyer_numbering(candidate.descriptor, candidate.path, edge_set, mol)
+        if numbering.audit_ok:
+            accepted.append(replace(candidate, numbering=numbering))
+    return tuple(accepted)
 
 
 def _is_von_baeyer_scope(mol: Molecule, atoms: frozenset[int], edges: frozenset[tuple[int, int]]) -> bool:
@@ -122,66 +148,110 @@ def _build_candidates_for_decomposition(
     main_bridgeheads: tuple[int, int],
     ring_count: int,
 ) -> tuple[VonBaeyerCandidate, ...]:
-    first_ring, second_ring, main_bridge = primary_paths
-    first_ring, second_ring = _order_main_ring_branches(first_ring, second_ring)
-    if first_ring[0] != main_bridgeheads[0]:
-        first_ring = tuple(reversed(first_ring))
-    if second_ring[0] != main_bridgeheads[0]:
-        second_ring = tuple(reversed(second_ring))
-    if main_bridge[0] != main_bridgeheads[0]:
-        main_bridge = tuple(reversed(main_bridge))
-
-    primary_edges = _path_edges(first_ring) | _path_edges(second_ring) | _path_edges(main_bridge)
-    primary_atoms = set(first_ring) | set(second_ring) | set(main_bridge)
-    remaining_edges = edge_set - primary_edges
+    first_path, second_path, main_path = primary_paths
+    primary_edges = _path_edges(first_path) | _path_edges(second_path) | _path_edges(main_path)
+    primary_atoms = set(first_path) | set(second_path) | set(main_path)
     secondary = _classify_secondary_bridges(
         atom_set=atom_set,
         edge_set=edge_set,
         primary_atoms=primary_atoms,
-        remaining_edges=remaining_edges,
+        remaining_edges=edge_set - primary_edges,
     )
     if secondary is None:
         return ()
     if len(secondary) + 2 != ring_count:
         return ()
+    candidates = []
+    for head, branches in _main_ring_orientations(first_path, second_path, main_path, main_bridgeheads):
+        candidate = _candidate_for_orientation(
+            mol=mol,
+            edge_set=edge_set,
+            branches=branches,
+            secondary=secondary,
+            main_bridgeheads=(head, main_bridgeheads[1] if head == main_bridgeheads[0] else main_bridgeheads[0]),
+        )
+        if candidate is not None:
+            candidates.append(candidate)
+    return tuple(candidates)
 
+
+def _main_ring_orientations(
+    first: tuple[int, ...],
+    second: tuple[int, ...],
+    main_bridge: tuple[int, ...],
+    main_bridgeheads: tuple[int, int],
+):
+    """Every numbering the main ring and its bridge admit.
+
+    Locant 1 is a main bridgehead and the longer branch of the main ring is
+    numbered first, but either bridgehead may take locant 1, and when the two
+    branches are the same length either of them may go first. Settling that by
+    atom id hides numberings P-23.2.6.2 might prefer -- basketane's
+    0{2,5}.0{3,8}.0{4,7} was never enumerated -- and makes the choice depend on
+    how the caller happened to number the molecule.
+    """
+
+    for head in main_bridgeheads:
+        oriented = tuple(path if path[0] == head else tuple(reversed(path)) for path in (first, second, main_bridge))
+        branch_one, branch_two, bridge = oriented
+        if len(branch_one) >= len(branch_two):
+            yield head, (branch_one, branch_two, bridge)
+        if len(branch_two) >= len(branch_one):
+            yield head, (branch_two, branch_one, bridge)
+
+
+def _candidate_for_orientation(
+    *,
+    mol: Molecule,
+    edge_set: frozenset[tuple[int, int]],
+    branches: tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]],
+    secondary: tuple[VonBaeyerBridge, ...],
+    main_bridgeheads: tuple[int, int],
+) -> VonBaeyerCandidate | None:
+    first_ring, second_ring, main_bridge = branches
     base_path = _numbering_path(first_ring, second_ring, main_bridge)
     locants = {atom: idx for idx, atom in enumerate(base_path, start=1)}
-    secondary = tuple(sorted(secondary, key=_secondary_citation_key))
     path = list(base_path)
+    remaining = list(secondary)
     ordered_secondary: list[VonBaeyerBridge] = []
-    for bridge in secondary:
-        if bridge.attachments[0] not in locants or bridge.attachments[1] not in locants:
-            return ()
+    # One bridge at a time, against the locants that exist when its turn comes:
+    # a dependent bridge hangs off an earlier one and is only placeable after
+    # it, so sorting the whole set up front against the main bicycle is not the
+    # same thing.
+    while remaining:
+        ready = [
+            (index, bridge)
+            for index, bridge in enumerate(remaining)
+            if all(atom in locants for atom in bridge.attachments)
+        ]
+        if not ready:
+            return None
+        index, bridge = min(ready, key=lambda item: _secondary_citation_key(item[1], locants))
+        remaining.pop(index)
         bridge = _secondary_with_locants(bridge, locants)
         ordered_secondary.append(bridge)
         path.extend(_orient_bridge_atoms_for_descriptor(bridge, locants))
         locants = {atom: idx for idx, atom in enumerate(path, start=1)}
-    secondary = tuple(ordered_secondary)
+    cited = tuple(ordered_secondary)
 
     primary_lengths = (len(first_ring) - 2, len(second_ring) - 2, len(main_bridge) - 2)
-    descriptor_body = _descriptor_body(primary_lengths, secondary, locants)
-    descriptor = render_von_baeyer_descriptor(len(secondary) + 1, descriptor_body)
-    numbering = build_von_baeyer_numbering(descriptor, path, edge_set, mol)
-    if not numbering.audit_ok:
-        return ()
+    descriptor_body = _descriptor_body(primary_lengths, cited, locants)
+    descriptor = render_von_baeyer_descriptor(len(cited) + 1, descriptor_body)
     rank = _ranking_tuple(
         primary_lengths=primary_lengths,
-        secondary=secondary,
+        secondary=cited,
         locants=locants,
         main_ring_atom_count=len(set(first_ring) | set(second_ring)),
         main_bridge_non_ring_atom_count=len(set(main_bridge[1:-1]) - (set(first_ring) | set(second_ring))),
     )
-    return (
-        VonBaeyerCandidate(
-            descriptor=descriptor,
-            path=tuple(path),
-            primary_lengths=primary_lengths,
-            secondary_bridges=secondary,
-            main_bridgeheads=main_bridgeheads,
-            rank=rank,
-            numbering=numbering,
-        ),
+    return VonBaeyerCandidate(
+        descriptor=descriptor,
+        path=tuple(path),
+        primary_lengths=primary_lengths,
+        secondary_bridges=cited,
+        main_bridgeheads=main_bridgeheads,
+        rank=rank,
+        numbering=None,
     )
 
 
@@ -269,10 +339,29 @@ def _secondary_with_locants(bridge: VonBaeyerBridge, locants: dict[int, int]) ->
     )
 
 
-def _secondary_citation_key(bridge: VonBaeyerBridge) -> tuple:
-    # Independent before dependent; longer bridges first.  Locants break ties
-    # after the graph-derived numbering is known.
-    return (1 if bridge.dependent else 0, -bridge.length, bridge.attachments)
+def _secondary_citation_key(bridge: VonBaeyerBridge, locants: dict[int, int]) -> tuple:
+    """Order one secondary bridge against the others.
+
+    P-23.2.6.1.3 cites independent bridges before dependent ones and the bridge
+    lengths in decreasing order; P-23.2.6.2.5 settles what is left by the
+    superscript locants taken in citation order, which for equal-length bridges
+    puts the lower bridgehead pair first. Keying that on the bridgeheads rather
+    than on the attachment atoms is also what makes the descriptor independent
+    of the order the caller happened to number the molecule in.
+
+    Interiors are currently numbered in this same order, which P-23.2.6.3 does
+    not ask for -- it numbers from the bridge at the highest-numbered bridgehead
+    -- but the descriptor audit reconstructs them in citation order, so the two
+    have to agree until it learns that rule. Only systems with two or more
+    bridges that have interiors can tell the difference.
+    """
+
+    return (
+        1 if bridge.dependent else 0,
+        -bridge.length,
+        tuple(sorted(locants[atom] for atom in bridge.attachments)),
+        bridge.attachments,
+    )
 
 
 def _orient_bridge_atoms_for_descriptor(bridge: VonBaeyerBridge, locants: dict[int, int]) -> tuple[int, ...]:
@@ -335,23 +424,11 @@ def _numbering_path(
     return first_ring + tuple(reversed(second_ring[1:-1])) + main_bridge[1:-1]
 
 
-def _order_main_ring_branches(
-    first: tuple[int, ...],
-    second: tuple[int, ...],
-) -> tuple[tuple[int, ...], tuple[int, ...]]:
-    first_len = len(first) - 2
-    second_len = len(second) - 2
-    if first_len > second_len:
-        return first, second
-    if second_len > first_len:
-        return second, first
-    return min((first, second), (tuple(reversed(first)), tuple(reversed(second))))
-
-
 def _simple_paths_between(
     start: int,
     end: int,
     adjacency: dict[int, set[int]],
+    ranks: dict[int, int],
     *,
     max_paths: int,
 ) -> tuple[tuple[int, ...], ...]:
@@ -359,12 +436,12 @@ def _simple_paths_between(
     stack = [(start, (start,))]
     while stack and len(paths) < max_paths:
         current, path = stack.pop()
-        for neighbor in sorted(adjacency[current], reverse=True):
+        for neighbor in sorted(adjacency[current], key=ranks.__getitem__, reverse=True):
             if neighbor == end:
                 paths.append(path + (neighbor,))
             elif neighbor not in path:
                 stack.append((neighbor, path + (neighbor,)))
-    return tuple(sorted(paths, key=lambda path: (-len(path), path)))
+    return tuple(sorted(paths, key=lambda path: (-len(path), tuple(ranks[atom] for atom in path))))
 
 
 def _paths_are_internally_disjoint(paths: tuple[tuple[int, ...], ...]) -> bool:
