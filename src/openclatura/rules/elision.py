@@ -26,8 +26,8 @@ def elide_terminal_a(prefix: str, following: str) -> str:
     But:
         "oxa" + "thiane" -> "oxathiane"  (consonant follows, no elision)
 
-    Also used in replacement (skeletal) nomenclature:
-        "oxa" + "ane" -> "ox" + "ane" -> ...  (rare; handled per-case)
+    Do not use for skeletal replacement prefixes before parent names:
+    their terminal vowels are retained (P-16.7.2(b)).
     """
     if not prefix or not following:
         return prefix + following

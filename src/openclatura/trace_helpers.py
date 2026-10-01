@@ -19,6 +19,7 @@ from .rules import bonds, multipliers, stems
 
 
 class NamingTreeMetadata(TypedDict, total=False):
+    front_modifiers: list[dict]
     """Optional, non-invariant fields supported by naming-tree nodes."""
 
     name_atom_bindings: list[dict]
@@ -197,6 +198,9 @@ def multiplied_name_terms(name: str, count: int) -> list[str]:
 def assembly_parent_terms(parts: AssemblyParts) -> list[str]:
     """Return parent-name terms from the actual assembly configuration."""
 
+    if parts.parent_hydride is not None and parts.parent_hydride.uses_fusion_plan:
+        parent_name = parts.parent_hydride.base_name or ""
+        return [parent_name, parts.parent_hydride.derivative_stem or parent_name]
     if parts.retained_name:
         return [
             parts.retained_name,
@@ -222,9 +226,9 @@ def assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
     """Convert populated AssemblyParts metadata into visualizer annotations."""
 
     segments = []
-    if parts.substituents:
+    if parts.substituents or parts.front_modifier_items:
         grouped: dict[str, SubstituentItem] = {}
-        for item in parts.substituents:
+        for item in (*parts.substituents, *parts.front_modifier_items):
             target = grouped.setdefault(
                 item.name,
                 SubstituentItem(name=item.name, locants=[], atom_ids=set(), bond_ids=set()),
@@ -459,6 +463,7 @@ def assembly_substituent_tree(
     parts: AssemblyParts,
     *,
     name: str,
+    mol=None,
     atom_ids=None,
     bond_ids=None,
     decisions=None,
@@ -475,7 +480,7 @@ def assembly_substituent_tree(
         name=name,
         atom_ids=component_atoms,
         bond_ids=component_bonds,
-        parent=_parent_tree_node(parts),
+        parent=_parent_tree_node(parts, mol=mol),
         principal_group=_principal_group_tree_node(parts),
         substituents=_substituent_tree_nodes(parts.substituents),
         replacement_prefixes=_simple_item_tree_nodes(parts.a_prefixes, "replacement_prefix"),
@@ -492,6 +497,7 @@ def assembly_substituent_tree(
         trace_segments=trace_segments,
         nested_decisions=decisions,
         metadata={
+            "front_modifiers": _substituent_tree_nodes(parts.front_modifier_items),
             "stereo_features": [
                 {"descriptor": descriptor, "locant": locant} for descriptor, locant in parts.stereo_features
             ],
@@ -502,6 +508,7 @@ def assembly_substituent_tree(
                     "reason": operation.reason,
                     "locants": list(operation.locants),
                     "atom_ids": sorted(operation.atom_ids),
+                    "bond_ids": sorted(operation.bond_ids),
                     "operation_kind": operation.operation_kind,
                 }
                 for operation in parts.hydro_operations
@@ -539,10 +546,15 @@ def _merge_substituent_tree_instances(existing: dict | None, new: dict, name: st
     }
 
 
-def _parent_tree_node(parts: AssemblyParts) -> dict:
+def _parent_tree_node(parts: AssemblyParts, *, mol=None) -> dict:
     node = {
         "kind": "parent",
         "retained_name": parts.retained_name,
+        "parent_nomenclature": (
+            parts.parent_hydride.parent_nomenclature if parts.parent_hydride is not None else "legacy"
+        ),
+        "parent_hydride_name": (parts.parent_hydride.base_name if parts.parent_hydride is not None else None),
+        "parent_hydride_proof_source": (parts.parent_hydride.proof_source if parts.parent_hydride is not None else ""),
         "parent_length": parts.parent_length,
         "is_ring": parts.is_ring,
         "is_bicycle": parts.is_bicycle,
@@ -557,6 +569,69 @@ def _parent_tree_node(parts: AssemblyParts) -> dict:
         "atom_symbols_by_locant": dict(parts.parent_atom_symbols_by_locant),
         "atom_charges_by_locant": dict(parts.parent_atom_charges_by_locant),
     }
+    hydride = parts.parent_hydride
+    fusion_parent = hydride is not None and hydride.is_fusion_parent
+    if fusion_parent:
+        plan = hydride.fusion_plan
+        if plan is None and hydride.fusion_wrapper_plan is not None:
+            plan = hydride.fusion_wrapper_plan.parent.fusion_plan
+        if plan is not None:
+            node["selected_fusion"] = {
+                "proof_source": "selected_fusion_plan",
+                "faces": [
+                    {"id": face.id, "atoms": list(face.atom_cycle), "bonds": list(face.edge_cycle)}
+                    for face in plan.numbering.selected_face_model.faces
+                ],
+                "components": [
+                    {
+                        "occurrence_id": match.occurrence_id,
+                        "name": match.template_name,
+                        "spec_key": match.spec_key,
+                        "is_parent": match.occurrence_id in plan.ast.parent_occurrences,
+                        "atom_ids_by_locant": dict(match.local_to_input_atom),
+                        "face_ids": sorted(match.covered_face_ids),
+                    }
+                    for match in plan.ast.component_occurrences
+                ],
+                "joins": [
+                    {
+                        "attached_occurrence": join.attached_occurrence,
+                        "host_occurrence": join.host_occurrence,
+                        "kind": join.kind.value,
+                        "order": join.order,
+                        "attached_locants": [str(locant) for locant in join.attached_locants],
+                        "host_locants": [str(locant) for locant in join.host_locants],
+                        "host_sides": [str(side) for side in join.host_sides],
+                        "atoms": sorted(join.shared_input_atoms),
+                        "bonds": sorted(join.shared_input_bonds),
+                    }
+                    for join in plan.ast.joins
+                ],
+            }
+    # Retained/fusion parents use their selected nomenclature, not a second
+    # description-only topology proof with independent numbering.
+    if (
+        mol is not None
+        and (parts.is_bicycle or parts.is_polycycle)
+        and not parts.is_spiro
+        and not parts.retained_name
+        and not fusion_parent
+    ):
+        from .descriptive_topology import von_baeyer_topology_view
+
+        selected_locants = {atom: locant for locant, atom in parts.parent_atom_ids_by_locant.items()}
+        topology_view = von_baeyer_topology_view(
+            mol,
+            parts.parent_atom_ids,
+            preferred_atom_to_locant=selected_locants,
+        )
+        if topology_view is not None:
+            node["von_baeyer_topology"] = {
+                "descriptor": topology_view.descriptor,
+                "cycle_count": topology_view.cycle_count,
+                "atom_ids_by_locant": {locant: atom for atom, locant in topology_view.atom_to_locant},
+                "proof_source": topology_view.proof_source,
+            }
     suffix_data = _substituent_suffix_tree_node(parts)
     if suffix_data:
         node["substituent_suffix"] = suffix_data
