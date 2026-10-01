@@ -180,6 +180,23 @@ def _polycyclic_side_core(mol: Molecule, side_atoms: set[int], junction: int) ->
     return cores[0] if len(cores) == 1 else None
 
 
+def _has_retained_fused_parent(mol: Molecule, core: set[int]) -> bool:
+    """Whether the ring system carries a retained parent of its own.
+
+    A retained fused parent outranks a name assembled from fusion components,
+    so a side that has one is named by the ordinary component pipeline rather
+    than from a fusion proof. Only a template whose own name carries no fusion
+    descriptor counts: the registry also holds constructed parents such as
+    5H-cyclopenta[b]pyridine, which this proof is precisely what names.
+    """
+
+    from .retained_fused_templates import match_retained_graph_templates
+
+    return any(
+        "[" not in match.template.name for match in match_retained_graph_templates(mol, core, allow_nonaromatic=True)
+    )
+
+
 def plan_substituted_fusion_spiro_side(
     mol: Molecule, side_atoms: set[int], junction: int, *, mode: FusionMode | str
 ) -> SpiroAssembly | None:
@@ -188,6 +205,8 @@ def plan_substituted_fusion_spiro_side(
         return None
     core = _polycyclic_side_core(mol, side_atoms, junction)
     if core is None:
+        return None
+    if _has_retained_fused_parent(mol, core):
         return None
     token = set_fusion_mode(mode)
     try:

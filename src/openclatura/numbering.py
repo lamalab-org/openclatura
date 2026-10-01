@@ -261,6 +261,19 @@ def number_parent(
     return best
 
 
+def _substituent_citation_name(item) -> str:
+    """Return a prefix's alphanumerical sort key, per P-14.5.2.
+
+    Alphanumerical order compares the complete prefix letter by letter and
+    ignores enclosing marks and locants. Comparing the rendered prefix instead
+    would sort "((5-ethylthiophen-2-yl)methyl)" ahead of "bromo", because its
+    bracket precedes every letter.
+    """
+
+    name = str(getattr(item, "name", item) or "")
+    return "".join(char for char in name.lower() if char.isalpha())
+
+
 def choose_parent_numbering(
     mol: Molecule,
     candidate_paths: list[list[int]],
@@ -317,7 +330,27 @@ def choose_parent_numbering(
                 indicated, hydro = proven_hydrogen_locants[frozenset(lmap.items())]
                 indicated_h_eval = sorted(parse_locant(locant) for locant in indicated)
                 hydro_eval = sorted(parse_locant(locant) for locant in hydro)
-            return heteroatom_eval + (tuple(indicated_h_eval), principal_eval, hydro_eval, substituent_eval)
+            # P-14.3.5. A symmetric retained parent offers maps that tie on every
+            # criterion above - fluorene's two benzo rings put the same locant
+            # set on either - and the lowest locant then goes to the substituent
+            # cited first in alphanumerical order. Without this the tie fell
+            # through to the order the maps were built in, which follows the
+            # input atom order and made the name depend on it.
+            citation_eval = tuple(
+                sorted(
+                    (_substituent_citation_name(item), get_val(idx))
+                    for idx, items in substituent_mapping.items()
+                    if idx in lmap
+                    for item in items
+                )
+            )
+            return heteroatom_eval + (
+                tuple(indicated_h_eval),
+                principal_eval,
+                hydro_eval,
+                substituent_eval,
+                citation_eval,
+            )
 
         locant_map = min(locant_maps, key=evaluate_map)
         return list(locant_map.keys()), locant_map

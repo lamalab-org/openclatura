@@ -88,10 +88,17 @@ def test_reported_spiro_families_exact_default_and_atom_bond_permutations(index,
         assert result.error is None, result
         assert "spiro[" in result.name
         assert "3H-1H-" not in result.name
+        # A spiro side cites its retained parent rather than the name its
+        # fusion components would assemble: indene, not cyclopentabenzene.
         if index in {33408, 72633, 83075}:
-            assert "cyclopentabenzene" in result.name
+            assert "indene" in result.name
+            assert "cyclopentabenzene" not in result.name
         if index == 84640:
-            assert "benzobenzene" in result.name and "cyclopentabenzene" in result.name
+            # The other component here is selected by the ordinary parent
+            # pipeline, whose retained-parent guards decline this substitution
+            # pattern, so it is still cited from fusion components.
+            assert "indene" in result.name
+            assert "cyclopentabenzene" not in result.name
         check = verify_with_opsin(result.name, canonical, standardize_smiles=False)
         assert check.status == "matched", check.to_dict()
         assert check.canonical_original == check.canonical_roundtrip == canonical

@@ -12,9 +12,13 @@ from openclatura.graph_io import read_rdkit_mol
 from openclatura.spiro_subgraph import _project_spiro_side_molecule, plan_graph_spiro_side
 
 REPORT_SMILES = "O=C(OC(=O)C(F)(F)F)C(Cc1cscn1)CN1C2CCC1CC1(C2)OCc2ccc(F)cc21"
+# The spiro side is cited as 2-benzofuran, the retained parent, not as the
+# benzo[c]furan its fusion components would assemble. The retained parent
+# numbers the ring differently, which moves the fluorine and the junction
+# locant with it; both readings denote this structure and round-trip.
 REPORT_NAME = (
-    "2,2,2-trifluoroacetyl 2-((5'-fluorospiro[8-azabicyclo[3.2.1]octane-3,3'-"
-    "(1,3-dihydrobenzo[c]furan)]-8-yl)methyl)-3-(1,3-thiazol-4-yl)propanoate"
+    "2,2,2-trifluoroacetyl 2-((6'-fluorospiro[8-azabicyclo[3.2.1]octane-3,1'-"
+    "(1,3-dihydro-2-benzofuran)]-8-yl)methyl)-3-(1,3-thiazol-4-yl)propanoate"
 )
 
 
@@ -155,7 +159,7 @@ def test_report1219_exact_opsin_and_atom_permutations():
     for order in _orders(graph):
         result = name_mol(Chem.RenumberAtoms(graph, order), verify_opsin=False)
         assert result, result
-        assert "1,3-dihydrobenzo[c]furan" in result.name
+        assert "1,3-dihydro-2-benzofuran" in result.name
         assert "tetrahydro" not in result.name
         check = verify_with_opsin(result.name, REPORT_SMILES, standardize_smiles=False)
         assert check.ok, check.to_dict()
