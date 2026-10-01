@@ -191,6 +191,7 @@ class ParentSelection:
     fixed_start_required: bool = False
     seniority_profile: ParentSeniorityProfile | None = None
     score_tuple: tuple = ()
+    free_valence_atom: int | None = None
 
     @property
     def primary_path(self) -> list[int]:
@@ -222,6 +223,7 @@ class ParentSelection:
             xyz=self.xyz,
             polycycle_descriptor=self.polycycle_descriptor,
             ring_parent=self.ring_parent,
+            free_valence_atom=getattr(self, "free_valence_atom", None),
             fixed_start_required=fixed_start_required,
             seniority_profile=self.seniority_profile,
             score_tuple=self.score_tuple,
@@ -293,6 +295,7 @@ def select_principal_parent(
             xyz=best.xyz,
             polycycle_descriptor=descriptor,
             ring_parent=winning_rs.ring_parent,
+            free_valence_atom=getattr(winning_rs, "free_valence_atom", None),
             seniority_profile=best.seniority_profile,
             score_tuple=best.score_tuple,
         )

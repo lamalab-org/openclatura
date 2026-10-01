@@ -185,6 +185,28 @@ def _nitrogen_composition_parent_model(
     return constrained
 
 
+def free_valence_hydrogen_site(mol: Molecule, atoms: frozenset[int], atom: int | None) -> bool:
+    """Whether the parent hydride carried its indicated hydrogen at this atom.
+
+    A compound substituent attaches through a ring position and spends the
+    hydrogen the parent hydride held there, so nothing in the graph marks the
+    site. It is a neutral ring heteroatom whose ring bonds are single and whose
+    remaining valence went outside the ring.
+    """
+
+    if atom is None or atom not in atoms:
+        return False
+    value = mol.atoms[atom]
+    if value.symbol == "C" or value.charge or value.total_h_count:
+        return False
+    neighbors = mol.get_neighbors(atom)
+    if not any(other not in atoms for other in neighbors):
+        return False
+    return all(
+        (bond := mol.get_bond(atom, other)) is not None and bond.order == 1 for other in neighbors if other in atoms
+    )
+
+
 def saturated_nitrogen_hydrogen_sites(
     mol: Molecule,
     atoms: frozenset[int],

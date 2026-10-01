@@ -31,7 +31,7 @@ def test_large_polycycle_uses_confirmed_fusion_before_descriptor_search(monkeypa
 
     monkeypatch.setattr(
         "openclatura.chains._confirmed_fusion_numbering_paths",
-        lambda _mol, atoms: [sorted(atoms)],
+        lambda _mol, atoms, _exclude=None: [sorted(atoms)],
     )
 
     def fail_descriptor_search(*_args, **_kwargs):

@@ -36,6 +36,7 @@ from .layout import (
     preferred_intrinsic_layouts,
 )
 from .mancude import (
+    free_valence_hydrogen_site,
     has_complete_saturated_hydrogenation,
     indicated_hydrogen_parent_bond_model,
     parent_derivative_state,
@@ -218,27 +219,6 @@ def _plan_uncached(
     return FusionUnsupported("no supported audited fusion-component decomposition")
 
 
-def _is_free_valence_hydrogen_site(mol: Molecule, atoms: frozenset[int], atom: int) -> bool:
-    """Whether the parent hydride would carry its indicated hydrogen here.
-
-    The site is a neutral ring heteroatom whose ring bonds are all single and
-    which spends its remaining valence on the attachment, so the parent hydride
-    it came from held a hydrogen there.
-    """
-
-    if atom not in atoms:
-        return False
-    value = mol.atoms[atom]
-    if value.symbol == "C" or value.charge or value.total_h_count:
-        return False
-    neighbors = mol.get_neighbors(atom)
-    if not any(other not in atoms for other in neighbors):
-        return False
-    return all(
-        (bond := mol.get_bond(atom, other)) is not None and bond.order == 1 for other in neighbors if other in atoms
-    )
-
-
 def _plan_numbered_candidate(
     mol: Molecule,
     atoms: frozenset[int],
@@ -417,12 +397,20 @@ def _complete_fusion_plan(
             and not mol.atoms[atom].charge
             and mol.atoms[atom].total_h_count == 1
         )
+        # A free valence claims the parent's indicated hydrogen before any ring
+        # carbon can, so those carbons are not intrinsic-H sites here: their
+        # saturation is residual and belongs to a hydro prefix.
+        carbon_candidates = (
+            frozenset()
+            if free_valence_atom is not None and free_valence_hydrogen_site(mol, atoms, free_valence_atom)
+            else intrinsic_carbon_candidate_atoms(ast, specs, mol)
+        )
         bond_model, intrinsic_carbon_h = intrinsic_carbon_parent_model(
             mol,
             graph,
             bond_model,
             dict(numbering.input_locant_maps[0]),
-            intrinsic_carbon_candidate_atoms(ast, specs, mol),
+            carbon_candidates,
             intrinsic_hydrogen_atom_ids=intrinsic_n_h,
             cited_nitrogen_hydrogen_atom_ids=cited_n_h,
         )
@@ -443,7 +431,7 @@ def _complete_fusion_plan(
     # would mark the site in the graph, so only the citing caller knows, and
     # without it the citation lands on ring carbons instead and the saturation
     # those carbons stand for goes unsaid.
-    if free_valence_atom is not None and _is_free_valence_hydrogen_site(mol, atoms, free_valence_atom):
+    if free_valence_atom is not None and free_valence_hydrogen_site(mol, atoms, free_valence_atom):
         indicated_h = (input_locants[free_valence_atom],)
         indicated_h_atoms = {free_valence_atom}
     try:
