@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-01
+
+### Added
+
+- Added an audited, graph-backed systematic fusion pipeline covering higher-order
+  fused systems, Hantzsch-Widman components, skeletal replacement, retained
+  bridges, and fused derivatives with hydrogenation, charge, and oxo states.
+- Added structural descriptions for retained, fused, spiro, and bridged parents,
+  including atom-linked ring bases, shared bonds, and von Baeyer topology.
+- Expanded deterministic PR regression coverage to one million PubChem and one
+  million ZINC22 structures, alongside the complete QM9 evaluation.
+- Added a reproducible 100,000-molecule OPSIN-verified PubChem performance
+  corpus and corpus-generation manifests.
+
+### Changed
+
+- Routed eligible polycycles through bounded, graph-proven candidate generation,
+  numbering, composition, and reconstruction audits.
+- Made large evaluation regressions reuse stored names and OPSIN outcomes,
+  invoking OPSIN only when a generated name changes.
+- Made performance and evaluation jobs run only after the fast, lint, and RDKit
+  compatibility suites pass, with isolated downloadable reports and summaries.
+- Refreshed the documented naming examples and measured OPSIN round-trip
+  coverage for the current implementation.
+
+### Fixed
+
+- Corrected fusion numbering, indicated-hydrogen placement, pi-bond composition,
+  skeletal-replacement state, and derivative ownership across fused and spiro
+  parent families.
+- Corrected parent selection and naming for polyoxide chains, dispiro systems,
+  charged ligands, phosphinic acids, and retained indane and indoline derivatives.
+- Preserved required ligand and substituent parentheses after locant elision and
+  retained recursive trace evidence for ester and sulfonate modifiers.
+
 ## [0.3.3] - 2026-09-11
 
 ### Fixed
@@ -208,7 +243,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Renamed the package to OpenClatura and adopted a `src` layout.
+- Renamed the package to openclatura and adopted a `src` layout.
 - Made OPSIN integration tolerate unavailable Java installations.
 
 ## [0.1.0] - 2026-05-08
@@ -217,7 +252,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial deterministic IUPAC name generation from molecular structures.
 
-[Unreleased]: https://github.com/lamalab-org/openclatura/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/lamalab-org/openclatura/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/lamalab-org/openclatura/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/lamalab-org/openclatura/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/lamalab-org/openclatura/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/lamalab-org/openclatura/compare/v0.3.0...v0.3.1

@@ -132,7 +132,7 @@ def _closes_ring_back_to(mol: Molecule, carbon: int, hetero: int, double_o: int,
 
 
 CATIONIC_SUFFIX_GROUP_KEYS = frozenset({"aminium", "iminium", "diazonio"})
-ANIONIC_SUFFIX_GROUP_KEYS = frozenset({"olate", "thiolate", "carboxylate", "ring_carboxylate", "sulfonate"})
+ANIONIC_SUFFIX_GROUP_KEYS = frozenset({"olate", "thiolate", "aminide", "carboxylate", "ring_carboxylate", "sulfonate"})
 
 
 def _connected_component(mol: Molecule, idx: int) -> set[int]:
@@ -654,6 +654,16 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             double_c = next((c for c in c_neighbors if mol.get_bond(atom.idx, c).order == 2), None)
 
             if double_c is not None:
+                # N-nitro/nitroso is a ligand of an imine, not a hydrazone
+                # tail. Preserve C=N before the multiple-bond tail guard.
+                if any(
+                    mol.get_bond(atom.idx, n).order == 1 and _is_nitroso_or_nitro_nitrogen(mol, n, atom.idx)
+                    for n in n_neighbors
+                ):
+                    key = "iminium" if atom.charge > 0 else "imine"
+                    groups.append(PerceivedGroup(key, True, double_c, {atom.idx}))
+                    consumed.add(atom.idx)
+                    continue
                 if len(n_neighbors) > 0:
                     n2 = n_neighbors[0]
                     if mol.get_bond(atom.idx, n2).order == 1:
@@ -779,7 +789,9 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
         if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
             adj_atoms = mol.get_neighbors(atom.idx)
             if len(adj_atoms) > 0:
-                key = "aminium" if atom.charge > 0 else "amine"
+                # aminide is the mono-anion suffix; a doubly charged nitrogen
+                # would be an azanediide, which nothing here can spell.
+                key = "aminium" if atom.charge > 0 else "aminide" if atom.charge == -1 else "amine"
 
                 principal = key != "aminium" or all(mol.get_bond(atom.idx, n).order == 1 for n in adj_atoms)
                 for c in adj_atoms:

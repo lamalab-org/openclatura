@@ -1,0 +1,12 @@
+{
+  "dataset": "pubchem",
+  "repo_id": "jablonkagroup/pubchem-smiles-molecular-formula",
+  "revision": "cd46fb8a3110cc12d6a669ad0d8e260b3acf6d0b",
+  "seed": 211,
+  "sampling": "deterministic seeded sampling without replacement; paper regression rows excluded",
+  "rows": 100000,
+  "sources": [
+    "train"
+  ],
+  "sha256": "aa70a374b86b131126d6d99a5c9346b62f41be394f63a615425e2993f4981ef9"
+}

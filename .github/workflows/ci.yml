@@ -99,9 +99,9 @@ jobs:
 
   single-thread-performance:
     if: github.event_name == 'pull_request' && github.base_ref == 'tests'
-    needs: [lint, test]
+    needs: [lint, test, rdkit-compat]
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 300
     steps:
       - name: Check out PR revision
         uses: actions/checkout@v4
@@ -128,23 +128,36 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e head
 
-      - name: Compare PR single-thread performance with target
+      - name: Compare PR performance on the original corpus
         run: |
           python head/benchmarks/single_thread_benchmark.py \
             --base-src base/src \
             --head-src head/src \
             --corpus head/benchmarks/data/opsin_verified_5000.csv \
+            --label "Original verified corpus" \
             --repetitions 3 \
             --threshold-percent 15 \
             --minimum-absolute-seconds 1 \
-            --report performance-report.json
+            --report performance-report-original.json
+
+      - name: Compare PR performance on the PubChem HF corpus
+        run: |
+          python head/benchmarks/single_thread_benchmark.py \
+            --base-src base/src \
+            --head-src head/src \
+            --corpus head/benchmarks/data/pubchem_hf_seed20260929_opsin_verified_100000.csv \
+            --label "PubChem HF seed 20260929" \
+            --repetitions 3 \
+            --threshold-percent 15 \
+            --minimum-absolute-seconds 1 \
+            --report performance-report-pubchem-hf-20260929.json
 
       - name: Upload performance report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: single-thread-performance
-          path: performance-report.json
+          path: performance-report-*.json
           if-no-files-found: warn
 
   docker:
@@ -170,11 +183,21 @@ jobs:
           - pubchem/pubchem_seed42_100000
           - pubchem/pubchem_seed63_100000
           - pubchem/pubchem_seed87_100000
+          - pubchem/pubchem_hf_seed101_100000
+          - pubchem/pubchem_hf_seed211_100000
+          - pubchem/pubchem_hf_seed307_100000
+          - pubchem/pubchem_hf_seed401_100000
+          - pubchem/pubchem_hf_seed503_100000
           - zinc22/zinc22_seed5_100000
           - zinc22/zinc22_seed17_100000
           - zinc22/zinc22_seed42_100000
           - zinc22/zinc22_seed63_100000
           - zinc22/zinc22_seed87_100000
+          - zinc22/zinc22_hf_seed101_100000
+          - zinc22/zinc22_hf_seed211_100000
+          - zinc22/zinc22_hf_seed307_100000
+          - zinc22/zinc22_hf_seed401_100000
+          - zinc22/zinc22_hf_seed503_100000
 
     steps:
       - uses: actions/checkout@v4
@@ -190,7 +213,7 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Install OpenClatura and regression dependencies
+      - name: Install openclatura and regression dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"

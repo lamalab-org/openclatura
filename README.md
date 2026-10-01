@@ -2,7 +2,8 @@
 
 # openclatura
 
-**SMILES in, IUPAC name out — deterministically, and with the reasoning attached.**
+**Deterministic structure-to-IUPAC naming, with structural auditing
+and atom-level explanations.**
 
 [![PyPI](https://img.shields.io/pypi/v/openclatura.svg)](https://pypi.org/project/openclatura/)
 [![Python](https://img.shields.io/pypi/pyversions/openclatura.svg)](https://pypi.org/project/openclatura/)
@@ -13,13 +14,18 @@
 
 </div>
 
-`openclatura` names molecules the way the IUPAC Blue Book (2013) says to. It
-walks the RDKit molecular graph, perceives functional groups and ring systems,
-picks the principal parent, numbers it, and assembles the substitutive name.
+Openclatura is an open-source, rule-based structure-to-IUPAC naming
+framework for SMILES and RDKit molecules. It combines IUPAC 2013
+nomenclature, atom-linked decision traces, built-in reconstruction
+auditing, and optional independent verification through OPSIN.
 
-There is no model and no lookup table: the same structure always yields the same
-name, and every choice along the way is recorded in a decision trace, so the
-*why* of a name is recoverable and not just the *what*.
+Names are constructed from the molecular graph using nomenclature
+rules and retained-name vocabulary—not predicted by a neural model.
+Naming and built-in auditing run locally with Python and RDKit.
+Java is required only for the optional OPSIN cross-check.
+
+It supports deterministic SMILES-to-IUPAC conversion (`smiles2iupac`) for
+individual structures and molecular datasets.
 
 **What that buys you**
 
@@ -37,9 +43,9 @@ name, and every choice along the way is recorded in a decision trace, so the
 Round-trip accuracy against public datasets (details and rerun instructions in
 [`evaluations/`](https://github.com/lamalab-org/openclatura/tree/main/evaluations)):
 
-| dataset  | QM9   | PubChem | ZINC22 |
-| -------- | ----- | ------- | ------ |
-| coverage | 100 % | 99.3 %  | 97.4 % |
+| dataset  | QM9     | PubChem | ZINC22 |
+| -------- | ------- | ------- | ------ |
+| coverage | 100.00% | 99.76%  | 97.70% |
 
 The package is in **beta**. Naming is solid across common organic chemistry;
 exotic corners of the Blue Book — and stereodescriptor edge cases — are still
@@ -99,8 +105,9 @@ result = name("CC(=O)Nc1ccccc1", include_trace=True, verify_opsin=True)
 result.name           # 'N-phenylacetamide'
 result.smiles         # 'CC(=O)Nc1ccccc1'
 result.ok             # True
-result.rules_hit      # ('P-44', 'P-45', 'P-41', 'P-61', 'P-67', ...)
-result.rule_hints     # ('Parent hydride / parent structure: Blue Book P-44 ...',)
+result.rules_hit      # ('P-44', 'P-45', 'P-41', 'P-61', 'P-67')
+result.rule_hints     # ('Parent hydride / parent structure: Blue Book P-44 and P-45.',
+                      #  'Principal characteristic groups: Blue Book P-41, P-44, and P-61-P-67.')
 result.opsin_check.status   # 'matched' | 'mismatched' | 'skipped_no_java' | ...
 result.verified       # True when opsin_check is matched
 ```
@@ -123,7 +130,7 @@ results = name_many(
     processes="auto",       # or an integer, or 1 for in-process
     verify_opsin=False,
 )
-[r.name for r in results if r.ok]
+[r.name for r in results if r.ok]  # ['ethanol', 'benzene']
 ```
 
 ### Naming an existing RDKit molecule
@@ -205,6 +212,34 @@ d.rules_hit         # ('P-44', 'P-45', 'P-41', 'P-61', 'P-67')
 d.components[0]     # DescribedComponent(phase='parse', text='RDKit parsed ...')
 ```
 
+```text
+The molecule CC(=O)Nc1ccccc1 is named **N-phenylacetamide**.
+
+Processed SMILES: CC(=O)Nc1ccccc1
+Atom ids in that SMILES: C{0}C{1}(=O{2})N{3}c{4}1c{5}c{6}c{7}c{8}c{9}1
+
+RDKit parsed the SMILES into a molecular graph with 10 atoms and 10 bonds.
+The structure is a single connected component, named in one piece.
+Perception identified 1 functional group (amide); principal candidate: amide.
+The amide group is selected as the principal group by the registered seniority order.
+The parent skeleton is a 2-atom acyclic chain (atoms [0, 1]).
+Parent numbering was selected from the final atom-to-locant map (atom 1->1, atom 0->2).
+
+Component and substituent structure:
+- Component 1: N-phenylacetamide covers 10 atoms and 10 bonds.
+  Parent: chain parent with 2 atoms retained as acetamide; locants 1->1, 2->0.
+  Principal group: amide at 1 (atoms 1,2,3).
+  - Substituent at N: phenyl covers 6 atoms and 6 bonds.
+    Parent: ring parent with 6 atoms retained as benzene; locants 1->4, 2->5, 3->6, 4->7, 5->8, 6->9.
+
+Name pieces contributed by the trace:
+- parent skeleton: contributes "acetamide" (atoms 0,1; bonds 1).
+- amide: contributes "amide" (atoms 1,2,3; bonds 2,3).
+  - substituent parent skeleton: contributes "benzene" (atoms 4,5,6,7,8,9; bonds 5,6,7,8,9,10).
+
+IUPAC Blue Book rules applied: P-44, P-45, P-41, P-61, P-67.
+```
+
 ### `describe_human` — how a chemist would say it
 
 The same information, phrased the way a person would explain the structure at a
@@ -222,9 +257,11 @@ Input SMILES: CN1C=NC2=C1C(=O)N(C(=O)N2C)C
 Processed SMILES: Cn1cnc2c1c(=O)n(C)c(=O)n2C
 Atom ids in that SMILES: C{0}n{1}1c{2}n{3}c{4}2c{5}1c{6}(=O{7})n{8}(C{13})c{9}(=O{10})n{11}2C{12}
 
-The molecule is named 1,3,7-trimethylpurine-2,6-dione.
+The molecule is named 1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione.
 
-The molecule is built around the retained purine parent, 9-membered bicyclic [4.3.0] heteroskeleton.
+The molecule is built around the retained purine parent, 9-atom polycyclic heteroskeleton.
+The parent ring basis comprises a 5-membered ring of aromatic atoms containing position 4 (atom id 4), position 5 (atom id 5), position 7 (atom id 1), position 8 (atom id 2), and position 9 (atom id 3) and a 6-membered ring of aromatic atoms containing position 1 (atom id 8), position 2 (atom id 9), position 3 (atom id 11), position 4 (atom id 4), position 5 (atom id 5), and position 6 (atom id 6).
+These rings share parent bonds between position 4 (atom id 4) and position 5 (atom id 5).
 Within that parent framework, there is nitrogen at positions 1 (atom id 8), 3 (atom id 11), 7 (atom id 1), and 9 (atom id 3).
 The principal characteristic feature is oxo groups at positions 2 (atom id 9) and 6 (atom id 6).
 Attached to this framework are methyl groups at positions 1 (atom id 8), 3 (atom id 11), and 7 (atom id 1).
