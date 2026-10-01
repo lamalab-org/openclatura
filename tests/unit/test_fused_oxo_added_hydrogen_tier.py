@@ -1,4 +1,4 @@
-"""A fused parent cited as a substituent misallocates its hydrogen.
+"""How a fused parent cited as a substituent allocates its hydrogen.
 
 Parent indicated hydrogen, suffix-generated added hydrogen and genuine
 hydrogenation are three separate citation mechanisms (P-58.2.3.1.3, .1.4) and
@@ -7,12 +7,12 @@ the governing suffix (P-59.1.9), so the parent's indicated hydrogen is spent on
 that valence first (P-58.2.3.1.1) and the rest of the saturation - the two oxo
 positions and the residual ring carbons - is detachable hydro.
 
-The free valence now claims that hydrogen and the name reads, but the carbons
-it vacated are still cited as added hydrogen rather than as the hydro prefix a
-compound substituent calls for, so the preferred spelling is not reached yet.
+The free valence claims that hydrogen, and the carbons it vacates are spelled
+as hydro rather than as added hydrogen: added hydrogen is cited in parentheses
+behind a suffix locant (P-14.7), and a substituent prefix has none to offer.
 
-The controls below reach the same shape and are named correctly, because the
-assembler supplies a hydro prefix for them; they are here so a change aimed at
+The controls below reach the same shape and were already named correctly,
+because the assembler supplies a hydro prefix for them; they are here so a change aimed at
 the gap cannot quietly take them with it. Their derivative states are
 indistinguishable from the broken one at plan level - same empty
 hydrogenated_edges, hydro, intrinsic and added-H operations - so a guard that
@@ -27,8 +27,8 @@ from openclatura.chains import find_ring_systems
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.graph_io import read_smiles
 
-# Needs four saturated ring carbons: 4a and 8 as indicated hydrogen, 4b and 7a
-# as added hydrogen consumed by the 5,7-dioxo.
+# Needs four saturated ring carbons: 4a and 8 clear of the carbonyls, 4b and 7a
+# next to the 5,7-dioxo that took their pi bonds.
 UNAUDITED = "CC(=O)Oc1ccc(N2C(=O)[C@H]3[C@@H](C2=O)C2C=CC=NN2[C@H]3C(=O)c2ccccc2)cc1"
 
 # Same shape, named correctly today: the assembler spells the saturation as a
@@ -123,7 +123,6 @@ def test_the_substituted_parent_round_trips():
     assert verify_with_opsin(name_smiles(UNAUDITED), UNAUDITED).status == "matched"
 
 
-@pytest.mark.xfail(strict=True, reason="the vacated carbons are cited as added hydrogen, not as a hydro prefix")
 def test_the_substituted_parent_uses_the_preferred_prefix():
     """Round-tripping is not enough: the citation mechanisms must be right.
 
