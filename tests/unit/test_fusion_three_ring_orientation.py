@@ -45,15 +45,9 @@ AGREEING = (
 # Our locants, which the orientation above selects. OPSIN numbers these from
 # the pentagon and so reaches 2a,3a,5a,5b,9a,11a,11b instead of 1a,3a,3b,...
 DIVERGENT = {
-    "phenanthro[1',2':1,2]cyclopenta[2,3-b]oxirene": (
-        "1 1a 2 3 3a 3b 4 5 5a 6 7 8 9 9a 9b 10 11 11a"
-    ),
-    "phenanthro[1',2':1,2]cyclopenta[2,3-b]thiirene": (
-        "1 1a 2 3 3a 3b 4 5 5a 6 7 8 9 9a 9b 10 11 11a"
-    ),
-    "phenanthro[9',10':4,5]indeno[3,3a-b]oxirene": (
-        "1 2 2a 3 4 4a 4b 5 6 7 8 8a 8b 9 10 11 12 12a 12b 12c 13 13a"
-    ),
+    "phenanthro[1',2':1,2]cyclopenta[2,3-b]oxirene": "1 1a 2 3 3a 3b 4 5 5a 6 7 8 9 9a 9b 10 11 11a",
+    "phenanthro[1',2':1,2]cyclopenta[2,3-b]thiirene": "1 1a 2 3 3a 3b 4 5 5a 6 7 8 9 9a 9b 10 11 11a",
+    "phenanthro[9',10':4,5]indeno[3,3a-b]oxirene": "1 2 2a 3 4 4a 4b 5 6 7 8 8a 8b 9 10 11 12 12a 12b 12c 13 13a",
 }
 
 
@@ -75,7 +69,9 @@ def _opsin_labelled_graph(base, tmp_path):
         }
         if not labels:
             continue
-        elements = {labels[atom.attrib["id"]]: atom.attrib["elementType"] for atom in atoms if atom.attrib["id"] in labels}
+        elements = {
+            labels[atom.attrib["id"]]: atom.attrib["elementType"] for atom in atoms if atom.attrib["id"] in labels
+        }
         edges = {
             frozenset(labels[atom] for atom in bond.attrib["atomRefs2"].split())
             for bond in root.findall(".//c:bond", _CML)
