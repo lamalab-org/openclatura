@@ -24,6 +24,9 @@ rules and retained-name vocabulary—not predicted by a neural model.
 Naming and built-in auditing run locally with Python and RDKit.
 Java is required only for the optional OPSIN cross-check.
 
+It supports deterministic SMILES-to-IUPAC conversion (`smiles2iupac`) for
+individual structures and molecular datasets.
+
 **What that buys you**
 
 - **Auditable.** Each name carries the Blue Book rules it hit (`P-44`, `P-61`, …)
@@ -37,17 +40,12 @@ Java is required only for the optional OPSIN cross-check.
 
 ### Coverage
 
-OPSIN round-trip naming coverage measured by the
-[PR evaluation run](https://github.com/lamalab-org/openclatura/actions/runs/36862746222)
-(details and rerun instructions in
+Round-trip accuracy against public datasets (details and rerun instructions in
 [`evaluations/`](https://github.com/lamalab-org/openclatura/tree/main/evaluations)):
 
-| dataset | molecules | successful round trips | coverage |
-| ------- | --------: | ---------------------: | -------: |
-| QM9     |   133,885 |                133,885 | 100.0000% |
-| PubChem | 1,000,000 |                997,632 | 99.7632% |
-| ZINC22  | 1,000,000 |                976,973 | 97.6973% |
-| **Overall** | **2,133,885** | **2,108,490** | **98.8099%** |
+| dataset  | QM9       | PubChem  | ZINC22   |
+| -------- | --------- | -------- | -------- |
+| coverage | 100.0000% | 99.7632% | 97.6973% |
 
 The package is in **beta**. Naming is solid across common organic chemistry;
 exotic corners of the Blue Book — and stereodescriptor edge cases — are still
@@ -144,10 +142,12 @@ or an earlier step in a pipeline — skip the SMILES round-trip:
 from rdkit import Chem
 from openclatura import name_rdkit_mol, name_mol, name_many
 
-mol = Chem.MolFromSmiles("O=C(O)c1ccccc1")
-name_rdkit_mol(mol)                          # 'benzoic acid'
-name_mol(mol).name                           # 'benzoic acid'
-[r.name for r in name_many([mol, "CCO"])]   # ['benzoic acid', 'ethanol']
+for mol in Chem.SDMolSupplier("compounds.sdf"):
+    if mol is not None:
+        print(name_rdkit_mol(mol))          # -> 'benzoic acid'
+
+name_mol(mol)                                # typed NamingResult, as `name`
+name_many([mol, "CCO"])                      # batches take either form
 ```
 
 The input molecule is never modified, explicit hydrogens (as SD files usually
