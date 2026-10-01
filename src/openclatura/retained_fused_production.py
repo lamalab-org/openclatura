@@ -1,4 +1,3 @@
-import re
 from dataclasses import dataclass, replace
 
 from .assembly_parts import RetainedParentMetadata, SubstituentItem
@@ -260,27 +259,16 @@ def _allowed_substituents(substituent_mapping: dict[int, list[SubstituentItem]])
     """Whether the substituents on a retained parent are ones we can render.
 
     A substituent is named by its own recursive call, so what it *is* cannot
-    affect whether the parent's locants are right. A spiro junction is composed
-    by the spiro assembler, which names each side through this same pipeline,
-    so it no longer disqualifies the parent either.
+    affect whether the parent's locants are right; only a spiro junction, which
+    the retained renderer cannot compose, disqualifies the parent here.
     """
 
-    return True
-
-
-_CITABLE_LOCANT = re.compile(r"\d+[a-z]*")
+    return all(item.spiro is None for items in substituent_mapping.values() for item in items)
 
 
 def _feature_locants_are_substitutable(atom_to_locant: dict[int, str], feature_atoms: set[int]) -> bool:
-    """Whether every feature position has a locant the retained name can cite.
-
-    A ring-fusion position is cited as a numeral with a letter suffix and it
-    carries substituents like any other, so 4a-methyl is an ordinary citation.
-    Only a position the map cannot name at all disqualifies the parent.
-    """
-
     for atom in feature_atoms:
         locant = atom_to_locant.get(atom)
-        if locant is None or not _CITABLE_LOCANT.fullmatch(locant):
+        if locant is None or any(char.isalpha() for char in locant):
             return False
     return True

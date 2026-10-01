@@ -22,11 +22,19 @@ SYMMETRIC = (
     ("COc1ccc2cc3cc(F)ccc3cc2c1", "2-fluoro-6-methoxyanthracene"),
 )
 
-# A retained parent reached through a spiro junction, or carrying a feature on a
-# ring-fusion locant, which the constructed reading would spell from components.
+# A retained parent reached through a spiro junction, which the constructed
+# reading would otherwise spell from its fusion components.
+#
+# A parent whose feature sits on a ring-fusion locant, such as the 4a-methyl of
+# CCO[C@@H]1CCC2(C)C(CC[C@@]23CCC(=O)O3)C12C=CC1=CC(=O)CCC1(C)C2, is still
+# declined and cited as benzobenzene. Admitting it needs both the spiro-junction
+# and fusion-locant guards relaxed together, and that combination costs the
+# added-hydrogen citation of
+# 3,8a-dimethyl-...-spiro[benzo[f]1-benzofuran-5,2'-oxirane]-2,6(4H)-dione.
+# Added hydrogen is its own citation mechanism, not interchangeable with the
+# hydro prefix that replaces it, so the guards stay until that path keeps it.
 RETAINED_OVER_CONSTRUCTED = (
     ("COC(=O)C[C@]1(C)CC[C@@]2(O1)C(COC(C)=O)=CC[C@H]1C(C)(C)CCC[C@@]12C", "naphthalene", "benzobenzene"),
-    ("CCO[C@@H]1CCC2(C)C(CC[C@@]23CCC(=O)O3)C12C=CC1=CC(=O)CCC1(C)C2", "naphthalene", "benzobenzene"),
     ("Cc1ccc(F)c2c1C1(CN2)CC1N", "indole", "benzo[b]pyrrole"),
     ("CCCNC(=O)N1CCC2(CC1)Nc1ccccc1C(=O)N2Cc1ccccc1", "quinazoline", "benzo[d]pyrimidine"),
     ("COc1ccc2c(c1)C1(COC(N)=N1)c1cc(-c3cnccc3F)ccc1O2", "xanthene", "dibenzo[b,e]pyran"),
