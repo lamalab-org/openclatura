@@ -319,7 +319,27 @@ def _numbering_from_layout(
 
 
 def _clockwise_face_order(centers: dict[int, tuple[int, int]]) -> tuple[int, ...]:
-    """Order faces clockwise from the uppermost, then rightmost face."""
+    """Order faces clockwise from the uppermost, then rightmost face.
+
+    P-25.3.3.1.1 starts the numbering in the uppermost ring, and in the
+    rightmost of those if there is a choice. "Uppermost" is a ring's level in
+    the idealized grid the orientation criteria were applied to (FR-5.3), not
+    its literal drawn height, which is why these are layout face centers rather
+    than atom coordinates. A ring smaller than its neighbours still occupies a
+    row of its own when the preferred orientation puts it there: a terminal
+    three-membered ring on a non-terminal pentagon sits above that pentagon, so
+    it opens the numbering, and P-25.3.3.1.2 never has to choose.
+
+    OPSIN numbers from a direction-table ring map instead, which for a few such
+    systems (phenanthro[1',2':1,2]cyclopenta[2,3-b]oxirene and its thiirene and
+    azirine analogues, phenanthro[9',10':4,5]indeno[3,3a-b]oxirene and its
+    thiirene) puts the pentagon uppermost and so numbers them differently. That
+    is an implementation convention, not the P-25 orientation; see
+    tests/unit/test_fusion_three_ring_orientation.py. FR-5.1 does concede that
+    some systems containing three-membered rings fall outside its rules - these
+    are not among them, since the permitted triangle shape of P-25.3.2.3.1
+    needs no distortion here and criteria (a) then (b) of P-25.3.2.3.3 decide.
+    """
 
     if not centers or len(set(centers.values())) != len(centers):
         return ()
