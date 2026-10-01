@@ -1,9 +1,15 @@
-"""Carbon indicated hydrogen beside added hydrogen is not an audited grammar.
+"""A fused parent cited as a substituent misallocates its hydrogen.
 
-A suffix that consumes a parent double bond leaves its far endpoint saturated,
-and the parent states that as added hydrogen (P-31.1.4.2.4) while keeping its
-own indicated hydrogen. When both fall on carbon the audit declines the
-combination, so the name understates the hydrogenation instead.
+Parent indicated hydrogen, suffix-generated added hydrogen and genuine
+hydrogenation are three separate citation mechanisms (P-58.2.3.1.3, .1.4) and
+none stands in for another. A compound substituent takes its free valence as
+the governing suffix (P-59.1.9), so the parent's indicated hydrogen is spent on
+that valence first (P-58.2.3.1.1) and the rest of the saturation - the two oxo
+positions and the residual ring carbons - is detachable hydro.
+
+Here the indicated hydrogen is spent on ring carbons instead, which leaves the
+free valence without one and understates the hydrogenation by four positions,
+and the name OPSIN cannot read.
 
 The controls below reach the same shape and are named correctly, because the
 assembler supplies a hydro prefix for them; they are here so a change aimed at
@@ -95,12 +101,26 @@ def test_the_fusion_plan_leaves_two_ring_carbons_unsaid():
     assert sorted(locants[atom] for atom in saturated - stated - external) == ["4b", "7a"]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="carbon indicated hydrogen beside added hydrogen is not an audited fusion grammar",
-)
+# The rule-derived preferred prefix: -6-yl is the governing suffix, the
+# carbonyls are demoted to 5,7-dioxo, the free valence takes the parent's
+# indicated hydrogen as 6H, and the remaining saturation is detachable hydro.
+PREFERRED_PREFIX = "5,7-dioxo-4a,4b,5,7,7a,8-hexahydro-6H-pyrrolo[3',4':3,4]pyrrolo[1,2-b]pyridazin-6-yl"
+
+
+@pytest.mark.xfail(strict=True, reason="the free valence does not claim the parent's indicated hydrogen")
 @pytest.mark.skipif(not opsin_available(), reason="OPSIN round-trip needs java and py2opsin")
-def test_the_unaudited_parent_round_trips():
-    """Turns green when the combined citation is audited; update this then."""
+def test_the_substituted_parent_round_trips():
+    """Turns green when the allocation is fixed; update this then."""
 
     assert verify_with_opsin(name_smiles(UNAUDITED), UNAUDITED).status == "matched"
+
+
+@pytest.mark.xfail(strict=True, reason="the free valence does not claim the parent's indicated hydrogen")
+def test_the_substituted_parent_uses_the_preferred_prefix():
+    """Round-tripping is not enough: the citation mechanisms must be right.
+
+    An all-indicated-hydrogen spelling denotes the same structure and OPSIN
+    reads it, so a round-trip check alone cannot tell the two apart.
+    """
+
+    assert PREFERRED_PREFIX in name_smiles(UNAUDITED)
