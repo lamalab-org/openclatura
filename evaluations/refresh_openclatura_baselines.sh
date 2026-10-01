@@ -66,8 +66,10 @@ for input_path in "${inputs[@]}"; do
         pids=()
     fi
 done
-for pid in "${pids[@]}"; do
-    wait "$pid"
+for pid in "${pids[@]-}"; do
+    if [[ -n "$pid" ]]; then
+        wait "$pid"
+    fi
 done
 
 echo "Rescoring regenerated predictions with OPSIN"

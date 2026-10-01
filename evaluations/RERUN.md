@@ -8,14 +8,14 @@ same standardized structure.
 
 ## Results (standardized + tautomer-canonical OPSIN match)
 
-openclatura numbers are for **v0.3.3**; STOUT is unchanged (v2.0.5).
+openclatura numbers are for **v0.4.0**; STOUT is unchanged (v2.0.5).
 
 | dataset | molecules | **openclatura** | **STOUT** |
 |---------|-----------|-----------------|-----------|
 | QM9     | 133,885   | **100.00%**       | 92.55%          |
-| PubChem | 5×100,000 | **99.52% ± 0.02** | 97.90% ± 0.04   |
-| ZINC22  | 5×100,000 | **97.67% ± 0.06** | 92.27% ± 0.09   |
-| **Total** | **1,133,885** | **98.76%** (1,119,791) | **94.78%** (1,074,733) |
+| PubChem | 5×100,000 | **99.77% ± 0.03** | 97.90% ± 0.04   |
+| ZINC22  | 5×100,000 | **97.69% ± 0.05** | 92.27% ± 0.09   |
+| **Total** | **1,133,885** | **98.88%** (1,121,164) | **94.78%** (1,074,733) |
 
 Mean ± sample standard deviation across the five 100k seed subsets (PubChem,
 ZINC22); QM9 is a single set. openclatura wins on every dataset (largest

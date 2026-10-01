@@ -1,11 +1,11 @@
 {
   "rows": 100000,
   "original_valid": 100000,
-  "opsin_nonempty": 99626,
-  "opsin_valid": 99625,
-  "matches": 99454,
-  "failures": 546,
-  "accuracy": 99.454,
+  "opsin_nonempty": 99892,
+  "opsin_valid": 99892,
+  "matches": 99757,
+  "failures": 243,
+  "accuracy": 99.757,
   "match_method": "standardize_and_canonicalize_tautomer",
   "failures_csv": "results/pubchem/pubchem_hf_seed211_100000_openclatura_opsin_failures.csv"
 }
