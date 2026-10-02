@@ -106,9 +106,9 @@ def test_index88584_fusion_is_attempted_before_descriptor_fallback(monkeypatch):
     original_fusion = chains._confirmed_fusion_numbering_paths
     original_candidate = chains._polyspiro_or_von_baeyer_candidate
 
-    def fusion(mol, atoms, exclude_atoms=None):
+    def fusion(mol, atoms):
         attempts.append(frozenset(atoms))
-        return original_fusion(mol, atoms, exclude_atoms)
+        return original_fusion(mol, atoms)
 
     def candidate(mol, atoms, edges):
         assert frozenset(atoms) in attempts

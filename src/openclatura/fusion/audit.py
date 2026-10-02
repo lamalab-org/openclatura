@@ -33,7 +33,6 @@ from .indicated_hydrogen import (
 from .mancude import (
     ParentDerivativeState,
     compare_actual_parent_to_implied_parent,
-    free_valence_hydrogen_site,
     has_complete_saturated_hydrogenation,
     indicated_hydrogen_parent_bond_model,
     is_added_hydrogen_nitrogen,
@@ -292,14 +291,7 @@ def audit_fusion_plan(
             and not mol.atoms[atom].charge
             and mol.atoms[atom].total_h_count == 1
         )
-        # The planner withholds these when a free valence claims the citation,
-        # so the replay has to withhold them on the same terms or the models
-        # it compares were never built from the same rule.
-        carbon_candidates = (
-            frozenset()
-            if free_valence_hydrogen_site(mol, frozenset(parent_atoms), free_valence_atom)
-            else intrinsic_carbon_candidate_atoms(ast, specs, mol)
-        )
+        carbon_candidates = intrinsic_carbon_candidate_atoms(ast, specs, mol)
         intrinsic_c_h = frozenset()
         released_c_junctions = released_fusion_carbon_sites(mol, abstract_parent_graph, carbon_candidates)
         if intrinsic_n_h or carbon_candidates or released_c_junctions:
@@ -353,7 +345,7 @@ def audit_fusion_plan(
                 for atom in operation.atom_ids
             )
         _audit_indicated_hydrogens(
-            mol, numbering, bond_model, indicated_hydrogens, errors, intrinsic_c_h, hydro_owned_h, free_valence_atom
+            mol, numbering, bond_model, indicated_hydrogens, errors, intrinsic_c_h, hydro_owned_h
         )
         checks.append("indicated_hydrogens")
         _audit_lambda_descriptors(mol, parent_atoms, numbering, lambda_descriptors, errors)
@@ -1489,7 +1481,6 @@ def _audit_indicated_hydrogens(
     errors: list[str],
     intrinsic_carbon_atoms: frozenset[int] = frozenset(),
     hydro_owned_atoms: frozenset[int] = frozenset(),
-    free_valence_atom: int | None = None,
 ) -> None:
     """Audit fusion indicated-H citations against graph and bond-model state."""
 
@@ -1502,10 +1493,6 @@ def _audit_indicated_hydrogens(
         errors.append("fusion indicated-hydrogen citation is outside the completed numbering")
         return
     candidates = set(indicated_hydrogen_candidate_atoms(mol, selected_map)) | set(intrinsic_carbon_atoms)
-    # The attachment took the hydrogen that marks a free valence as a site, so
-    # the graph cannot offer it and the citing caller names it instead.
-    if free_valence_atom is not None:
-        candidates.add(free_valence_atom)
     cited_atoms = {atom_by_locant[locant] for locant in cited}
     if not cited_atoms <= candidates:
         errors.append("fusion indicated-hydrogen citation points to an ineligible graph atom")

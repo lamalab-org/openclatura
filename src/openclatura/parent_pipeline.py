@@ -22,14 +22,12 @@ from .subgraph_tools import subgraph_locant_getter
 from .trace_helpers import trace_decision
 
 
-def plan_fusion_parent(
-    mol: Molecule, parent_atoms: frozenset[int], *, mode: FusionMode, free_valence_atom: int | None = None
-):
+def plan_fusion_parent(mol: Molecule, parent_atoms: frozenset[int], *, mode: FusionMode):
     """Load the systematic fusion planner only for an enabled request."""
 
     from .fusion.planner import plan_fusion_parent as _plan_fusion_parent
 
-    return _plan_fusion_parent(mol, parent_atoms, mode=mode, free_valence_atom=free_valence_atom)
+    return _plan_fusion_parent(mol, parent_atoms, mode=mode)
 
 
 def resolve_systematic_fusion_parent(
@@ -63,9 +61,7 @@ def resolve_systematic_fusion_parent(
         )
         return None
 
-    result = plan_fusion_parent(
-        mol, selection.atom_set, mode=mode, free_valence_atom=getattr(selection, "free_valence_atom", None)
-    )
+    result = plan_fusion_parent(mol, selection.atom_set, mode=mode)
     from .fusion.model import FusionConfirmed
 
     if not isinstance(result, FusionConfirmed):

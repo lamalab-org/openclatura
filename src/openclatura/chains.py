@@ -33,10 +33,6 @@ class RingSystem:
     chord_edges: list[tuple[int, int]] = field(default_factory=list)
     polycycle_descriptor: str | None = None
     ring_parent: RingParent | None = None
-    # The ring atom a compound substituent attaches through, when this system
-    # was reached from outside. It spends the hydrogen the parent hydride held
-    # there, which no part of the graph records.
-    free_valence_atom: int | None = None
 
 
 @dataclass(frozen=True)
@@ -885,7 +881,7 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
             # _proven_monospiro_or_bicyclo_system below, which is cheap and
             # complete, so planning it here bought no routing and cost a full
             # fusion proof per fused bicycle in the molecule.
-            fusion_paths = _confirmed_fusion_numbering_paths(mol, comp_nodes, exclude_atoms)
+            fusion_paths = _confirmed_fusion_numbering_paths(mol, comp_nodes)
             if fusion_paths:
                 # The cached planner proof owns the component decomposition,
                 # completed numbering, and reconstruction. Descriptor engines
@@ -895,7 +891,6 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                         atoms=comp_nodes,
                         is_polycycle=True,
                         paths=fusion_paths,
-                        free_valence_atom=substituent_free_valence_atom(mol, comp_nodes, exclude_atoms),
                     )
                 )
                 continue
@@ -1018,34 +1013,7 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
     return merge_polyspiro_ring_systems(mol, systems)
 
 
-def substituent_free_valence_atom(mol: Molecule, atoms, exclude_atoms) -> int | None:
-    """Return the ring atom a compound substituent attaches through.
-
-    A ring system reached from an excluded atom is being cited as a prefix, and
-    the ring atom carrying that bond spends the hydrogen the parent hydride
-    held there. Nothing in the graph records that, so it is read off the
-    excluded set, which still says where the rest of the molecule attaches. A
-    system offering more than one such atom is left alone: which one the free
-    valence is would then be a choice rather than a reading.
-    """
-
-    if not exclude_atoms:
-        return None
-    from .fusion.mancude import free_valence_hydrogen_site
-
-    ring = frozenset(atoms)
-    candidates = [
-        atom
-        for atom in ring
-        if any(other in exclude_atoms for other in mol.get_neighbors(atom))
-        and free_valence_hydrogen_site(mol, ring, atom)
-    ]
-    return candidates[0] if len(candidates) == 1 else None
-
-
-def _confirmed_fusion_numbering_paths(
-    mol: Molecule, atoms: set[int], exclude_atoms: set[int] | None = None
-) -> list[list[int]]:
+def _confirmed_fusion_numbering_paths(mol: Molecule, atoms: set[int]) -> list[list[int]]:
     """Return complete paths only when the existing fusion audit confirms them.
 
     This is a routing optimization, not a second fusion implementation. The
@@ -1060,8 +1028,7 @@ def _confirmed_fusion_numbering_paths(
     mode = current_fusion_mode()
     if mode not in {FusionMode.AUDITED_PIN, FusionMode.GENERAL}:
         return []
-    free_valence = substituent_free_valence_atom(mol, atoms, exclude_atoms)
-    result = plan_fusion_parent(mol, atoms, mode=mode, free_valence_atom=free_valence)
+    result = plan_fusion_parent(mol, atoms, mode=mode)
     if not isinstance(result, FusionConfirmed):
         return []
     locant_maps = result.plan.numbering.string_input_locant_maps()
