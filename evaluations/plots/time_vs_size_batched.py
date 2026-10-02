@@ -4,8 +4,8 @@ Sample: for every heavy-atom count in ``HAC_RANGE``, up to ``PER_HAC`` molecules
 from the PubChem seed-42 subset (random, seed 0).
 
 * ``--part cpu``  (run in an env with openclatura + nispo, pinned to one core
-  with ``taskset``): names every molecule one at a time and records the
-  wall-clock time per molecule for Openclatura and NISPO.
+  with ``taskset``): names every molecule one at a time, interleaving the two
+  tools, and records the fastest of ``REPEATS`` runs per molecule.
 * ``--part gpu``  (run in the STOUT env with ``CUDA_VISIBLE_DEVICES`` set):
   decodes each heavy-atom group as ONE batch with the local batched STOUT
   (``translate_forward_batch``, batch size = group size). Each group is decoded
@@ -30,6 +30,7 @@ DATA = os.path.join(HERE, "..", "data", "pubchem", "pubchem_seed42_100000_input.
 OUT_DIR = os.path.join(HERE, "timing_batched")
 HAC_RANGE = range(5, 51)
 PER_HAC = 64
+REPEATS = 3
 
 
 def load_sample():
@@ -59,23 +60,31 @@ def run_cpu():
         "openclatura": lambda s: name_smiles(s),
         "nispo": lambda s: smiles_to_iupac_batch([s])[0],
     }
-    first = next(iter(groups.values()))[0]
-    for fn in tools.values():  # warm up imports / caches
-        fn(first)
-    out = {}
-    for tool, fn in tools.items():
-        out[tool] = {}
-        for h, smiles in groups.items():
-            times = []
-            for s in smiles:
-                t = time.perf_counter()
-                try:
-                    fn(s)
-                except Exception:
-                    pass
-                times.append(time.perf_counter() - t)
-            out[tool][h] = times
-        print(f"{tool} done")
+    # warm up lazy initialisation on molecules of every size before timing
+    warm = [g[0] for g in groups.values()] + [g[-1] for g in groups.values()]
+    for fn in tools.values():
+        for s in warm:
+            try:
+                fn(s)
+            except Exception:
+                pass
+    # Tools are interleaved molecule by molecule so both see the same background
+    # load, and each molecule is timed REPEATS times keeping the fastest run:
+    # interference on a shared machine only ever adds time.
+    out = {tool: {h: [] for h in groups} for tool in tools}
+    for h, smiles in groups.items():
+        for s in smiles:
+            for tool, fn in tools.items():
+                best = float("inf")
+                for _ in range(REPEATS):
+                    t = time.perf_counter()
+                    try:
+                        fn(s)
+                    except Exception:
+                        pass
+                    best = min(best, time.perf_counter() - t)
+                out[tool][h].append(best)
+    print("cpu timing done")
     _save("cpu", out)
 
 
@@ -112,7 +121,6 @@ def plot():
     import numpy as np
 
     import lama_aesthetics
-    from lama_aesthetics.plotutils import range_frame
 
     cpu = json.load(open(os.path.join(OUT_DIR, "cpu.json")))
     gpu = json.load(open(os.path.join(OUT_DIR, "gpu.json")))
@@ -140,9 +148,9 @@ def plot():
     ax.set_yscale("log")
     ax.set_xlabel("Heavy atom count")
     ax.set_ylabel("Time per molecule (ms)")
-    range_frame(ax, np.concatenate(xs), np.concatenate(ys))
-    ax.legend(frameon=False)
-    fig.tight_layout()
+    ax.set_ylim(0.5, 1000)
+    ax.set_xlim(min(map(min, xs)) - 1, max(map(max, xs)) + 1)
+    ax.legend(frameon=False, loc="lower left", bbox_to_anchor=(0.0, 1.0), ncol=1)
     out = os.path.join(HERE, "time_vs_size_batched")
     fig.savefig(out + ".png", dpi=300, bbox_inches="tight", pad_inches=0.1)
     fig.savefig(out + ".pdf", bbox_inches="tight", pad_inches=0.01)
