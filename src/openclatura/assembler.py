@@ -41,6 +41,65 @@ _STEM_INDICATED_H = re.compile(r"^((?:\d+[a-z]?H,)*\d+[a-z]?H)-")
 _PI_CONSUMING_PREFIXES = frozenset({"oxo", "thioxo", "sulfanylidene", "selanylidene", "imino"})
 
 
+def _parent_bond_map(parts: AssemblyParts) -> dict[str, set[str]]:
+    """Which parent locants are bonded to which, by locant."""
+
+    bonded: dict[str, set[str]] = {}
+    for left, right in parts.parent_bond_ids_by_locants:
+        bonded.setdefault(left, set()).add(right)
+        bonded.setdefault(right, set()).add(left)
+    return bonded
+
+
+def _pi_consuming_prefix_locants(parts: AssemblyParts) -> set[str]:
+    """Where a prefix -- oxo, thioxo, an ylidene -- took a parent pi bond.
+
+    Such a prefix saturates its own ring atom just as a suffix does, but it is
+    cited as a prefix and so has no locant parenthesis to carry added hydrogen.
+    """
+
+    return {
+        locant
+        for item in parts.substituents
+        if item.name in _PI_CONSUMING_PREFIXES or item.name.endswith("ylidene")
+        for locant in item.locants
+    }
+
+
+def _unspell_from_stem(parts: AssemblyParts, core_name: str, hydro: set[str], added: set[str]) -> str:
+    """Drop hydrogen now spelled elsewhere from the stem and the binding term."""
+
+    # Added hydrogen stays spelled in the stem here; the suffix mover relocates
+    # it once the suffix locants are known.
+    core_name = _respell_indicated_hydrogen(core_name, hydro) or core_name
+    parent = parts.parent_hydride
+    if (hydro or added) and parent is not None and parent.binding_term:
+        # The parent's binding term carries its own spelling of the citation, and
+        # the name/graph binding audit checks that term against the final name.
+        # Hydro locants leave the stem outright; added hydrogen leaves it too,
+        # relocated to the suffix by _move_added_hydrogen_to_suffix below.
+        respelled = _respell_indicated_hydrogen(parent.binding_term, hydro | added)
+        if respelled is not None:
+            metadata = parent.metadata
+            if metadata is not None:
+                # The hydride metadata counts the parent's own indicated
+                # hydrogen; leaving the respelled locants in it would let the
+                # hydro prefix elide its locants as though the ring were fully
+                # saturated, which reads as an ambiguous name.
+                kept_h = tuple(locant for locant in metadata.default_indicated_h if locant not in (hydro | added))
+                metadata = replace(
+                    metadata,
+                    default_indicated_h=kept_h,
+                    indicated_hydrogen_count=min(metadata.indicated_hydrogen_count, len(kept_h)),
+                )
+                parts.retained_parent_metadata = metadata
+            parts.parent_hydride = replace(parent, parent_name=respelled, hydride_metadata=metadata)
+            # Bindings were built before rendering, so the parent's term has to
+            # be rebuilt from the respelling for the final audit to match.
+            refresh_parent_binding(parts)
+    return core_name
+
+
 def _normalize_indicated_hydrogen_quota(parts: AssemblyParts, core_name: str) -> str:
     """Hold the parent's indicated-hydrogen citation to its quota (P-31.1.4.2.1).
 
@@ -84,10 +143,7 @@ def _normalize_indicated_hydrogen_quota(parts: AssemblyParts, core_name: str) ->
         return core_name
     surplus = set(cited[quota:])
 
-    bonded: dict[str, set[str]] = {}
-    for left, right in parts.parent_bond_ids_by_locants:
-        bonded.setdefault(left, set()).add(right)
-        bonded.setdefault(right, set()).add(left)
+    bonded = _parent_bond_map(parts)
     suffix_locants = {str(locant) for locant in parts.principal_group.locants} if parts.principal_group else set()
     added = {locant for locant in surplus if bonded.get(locant, set()) & suffix_locants}
     if parts.parent_charges:
@@ -107,22 +163,10 @@ def _normalize_indicated_hydrogen_quota(parts: AssemblyParts, core_name: str) ->
     if surplus & claimed:
         return core_name
 
-    # A pi-consuming prefix -- oxo, thioxo, an ylidene -- takes a parent double
-    # bond just as a suffix does, but it is cited as a prefix and so has no
-    # locant parenthesis to carry added hydrogen. Its own ring atom is saturated
-    # too, so it joins the hydro set together with the hydrogen it displaced:
+    # A pi-consuming prefix saturates its own ring atom too, so it joins the
+    # hydro set together with the hydrogen it displaced:
     # 6-oxo-1H-pyridine-3-carboxamide -> 6-oxo-1,6-dihydropyridine-3-carboxamide.
-    prefix_locants = (
-        {
-            locant
-            for item in parts.substituents
-            if item.name in _PI_CONSUMING_PREFIXES or item.name.endswith("ylidene")
-            for locant in item.locants
-        }
-        - claimed
-        if not parts.parent_charges
-        else set()
-    )
+    prefix_locants = set() if parts.parent_charges else _pi_consuming_prefix_locants(parts) - claimed
     hydro |= {locant for site in hydro for locant in bonded.get(site, set()) & prefix_locants}
     # Hydro prefixes come in pairs, so only respell what is spellable.
     existing_hydro = sum(
@@ -187,36 +231,9 @@ def _normalize_indicated_hydrogen_quota(parts: AssemblyParts, core_name: str) ->
             )
         )
     parts.indicated_hydrogens = [locant for locant in parts.indicated_hydrogens if locant not in hydro]
-    if stem_match:
-        # Added hydrogen stays spelled in the stem here; the suffix mover
-        # relocates it once the suffix locants are known.
-        core_name = _respell_indicated_hydrogen(core_name, hydro) or core_name
-    parent = parts.parent_hydride
-    if (hydro or added) and parent is not None and parent.binding_term:
-        # The parent's binding term carries its own spelling of the citation, and
-        # the name/graph binding audit checks that term against the final name.
-        # Hydro locants leave the stem outright; added hydrogen leaves it too,
-        # relocated to the suffix by _move_added_hydrogen_to_suffix below.
-        respelled = _respell_indicated_hydrogen(parent.binding_term, hydro | added)
-        if respelled is not None:
-            metadata = parent.metadata
-            if metadata is not None:
-                # The hydride metadata counts the parent's own indicated
-                # hydrogen; leaving the respelled locants in it would let the
-                # hydro prefix elide its locants as though the ring were fully
-                # saturated, which reads as an ambiguous name.
-                kept_h = tuple(locant for locant in metadata.default_indicated_h if locant not in (hydro | added))
-                metadata = replace(
-                    metadata,
-                    default_indicated_h=kept_h,
-                    indicated_hydrogen_count=min(metadata.indicated_hydrogen_count, len(kept_h)),
-                )
-                parts.retained_parent_metadata = metadata
-            parts.parent_hydride = replace(parent, parent_name=respelled, hydride_metadata=metadata)
-            # Bindings were built before rendering, so the parent's term has to
-            # be rebuilt from the respelling for the final audit to match.
-            refresh_parent_binding(parts)
-    return core_name
+    # _unspell_from_stem is a no-op on a stem with no leading citation run,
+    # which is exactly the case stem_match already reported as absent.
+    return _unspell_from_stem(parts, core_name, hydro, added)
 
 
 def _respell_indicated_hydrogen(text: str, respelled: set[str]) -> str | None:
@@ -230,8 +247,75 @@ def _respell_indicated_hydrogen(text: str, respelled: set[str]) -> str | None:
     return f"{','.join(remaining)}-{rest}" if remaining else rest
 
 
+def _respell_unspellable_added_hydrogen(parts: AssemblyParts, core_name: str) -> str:
+    """Added hydrogen needs a suffix locant to stand behind (P-14.7, P-58.2.2).
+
+    Added hydrogen is only ever cited in parentheses after the locant of the
+    suffix whose group consumed the parent pi bond -- quinolin-4(1H)-one. A
+    parent named without a suffix has no such locant: a ring system cited as a
+    substituent carries the same groups as oxo prefixes, so there is nothing for
+    the parenthesis to follow. The saturation itself is unchanged, and it is
+    spelled instead by the one mechanism that needs no suffix, a detachable
+    hydro prefix (P-31.1.4.2.4), which takes the pi-consuming prefix positions
+    with it:  5,7-dioxo-4aH,4bH,7aH,8H-6H-...-6-yl  becomes
+    5,7-dioxo-4a,4b,5,7,7a,8-hexahydro-6H-...-6-yl.
+    """
+
+    if parts.principal_group is not None or parts.parent_charges:
+        return core_name
+    if parts.is_spiro_component or parts.is_spiro_side_projection:
+        # A spiro component has no principal group of its own by construction,
+        # which is not the same as having no suffix to cite added hydrogen
+        # against: the assembled spiro name supplies one, and respelling the
+        # component's citation here loses the structure it stood for.
+        return core_name
+    operations = [operation for operation in parts.hydro_operations if operation.key == "added_hydrogen"]
+    if not operations:
+        return core_name
+    carried = {locant for operation in operations for locant in operation.locants}
+    claimed = {
+        locant
+        for operation in parts.hydro_operations
+        if operation.operation_kind == "additive_hydrogen"
+        for locant in operation.locants
+    }
+    bonded = _parent_bond_map(parts)
+    prefix_locants = _pi_consuming_prefix_locants(parts) - claimed - carried
+    displaced = {locant for site in carried for locant in bonded.get(site, set()) & prefix_locants}
+    # Hydro prefixes come in pairs, so only respell what is spellable.
+    if (len(claimed) + len(carried) + len(displaced)) % 2:
+        return core_name
+
+    for operation in operations:
+        parts.hydro_operations[parts.hydro_operations.index(operation)] = replace(
+            operation,
+            key="additive_hydrogen",
+            reason="Added hydrogen has no suffix locant to follow here, so the saturation is a hydro prefix.",
+            operation_kind="additive_hydrogen",
+        )
+    if displaced:
+        pending = sorted(displaced, key=parse_locant)
+        parts.hydro_operations.append(
+            HydroOperation(
+                key="additive_hydrogen",
+                reason="A pi-consuming prefix saturates its own position alongside the hydrogen it displaced.",
+                locants=tuple(pending),
+                atom_ids=tuple(
+                    parts.parent_atom_ids_by_locant[locant]
+                    for locant in pending
+                    if locant in parts.parent_atom_ids_by_locant
+                ),
+                operation_kind="additive_hydrogen",
+            )
+        )
+    saturated = carried | displaced
+    parts.indicated_hydrogens = [locant for locant in parts.indicated_hydrogens if locant not in saturated]
+    return _unspell_from_stem(parts, core_name, saturated, set())
+
+
 def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str, *, allow_locant_elision: bool = True) -> str:
     core_name = _normalize_indicated_hydrogen_quota(parts, core_name)
+    core_name = _respell_unspellable_added_hydrogen(parts, core_name)
     additive_hydrogens = [
         locant
         for operation in parts.hydro_operations
