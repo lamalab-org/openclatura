@@ -61,7 +61,7 @@
   },
   {
     "smiles": "CC=C",
-    "name": "prop-1-ene",
+    "name": "propene",
     "category": "alkene"
   },
   {
@@ -76,7 +76,7 @@
   },
   {
     "smiles": "CC#C",
-    "name": "prop-1-yne",
+    "name": "propyne",
     "category": "alkyne"
   },
   {
@@ -501,7 +501,7 @@
   },
   {
     "smiles": "CC(C)=C",
-    "name": "2-methylprop-1-ene",
+    "name": "2-methylpropene",
     "category": "alkene"
   },
   {

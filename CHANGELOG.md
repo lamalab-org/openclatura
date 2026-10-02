@@ -7,6 +7,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-01
+
+### Added
+
+- Added an audited, graph-backed systematic fusion pipeline covering higher-order
+  fused systems, Hantzsch-Widman components, skeletal replacement, retained
+  bridges, and fused derivatives with hydrogenation, charge, and oxo states.
+- Added structural descriptions for retained, fused, spiro, and bridged parents,
+  including atom-linked ring bases, shared bonds, and von Baeyer topology.
+- Expanded deterministic PR regression coverage to one million PubChem and one
+  million ZINC22 structures, alongside the complete QM9 evaluation.
+- Added a reproducible 100,000-molecule OPSIN-verified PubChem performance
+  corpus and corpus-generation manifests.
+
+### Changed
+
+- Routed eligible polycycles through bounded, graph-proven candidate generation,
+  numbering, composition, and reconstruction audits.
+- Made large evaluation regressions reuse stored names and OPSIN outcomes,
+  invoking OPSIN only when a generated name changes.
+- Made performance and evaluation jobs run only after the fast, lint, and RDKit
+  compatibility suites pass, with isolated downloadable reports and summaries.
+- Refreshed the documented naming examples and measured OPSIN round-trip
+  coverage for the current implementation.
+
+### Fixed
+
+- Corrected fusion numbering, indicated-hydrogen placement, pi-bond composition,
+  skeletal-replacement state, and derivative ownership across fused and spiro
+  parent families.
+- Corrected parent selection and naming for polyoxide chains, dispiro systems,
+  charged ligands, phosphinic acids, and retained indane and indoline derivatives.
+- Preserved required ligand and substituent parentheses after locant elision and
+  retained recursive trace evidence for ester and sulfonate modifiers.
+
+## [0.3.3] - 2026-09-11
+
+### Fixed
+
+- Resolve the public and executable version from the active checkout or its
+  installed package metadata so release bumps are not duplicated in code and
+  unrelated installations cannot supply a stale version.
+
+## [0.3.2] - 2026-09-03
+
+### Added
+
+- Added graph-backed retained-parent coverage for fused hydrocarbons, including
+  the acene and polyaphene series and irregular polycyclic aromatic
+  hydrocarbons such as fluoranthene, pyrene, chrysene, benzo-fused PAHs, and
+  related derivatives.
+- Added graph-backed retained macrocycle support for the porphyrin/porphine and
+  corrin families, with conventional locant maps selected before generic
+  polycycle descriptor construction where required.
+- Added a data-backed retained-name policy that separates preferred output
+  names from accepted aliases and records hydrogenated-parent spellings such
+  as `2,3-dihydro-1H-indene` and `2,3-dihydro-1H-indole`.
+- Added optional graph-proven omission of redundant constitutional locants.
+  The public `name`, `name_mol`, and `name_many` APIs expose this through
+  `omit_redundant_locants`, enabled by default.
+- Added a reproducible 5,000-molecule, OPSIN-verified single-thread benchmark,
+  corpus-generation tooling, and a pull-request performance gate that compares
+  paired measurements against the target revision.
+- Added retained-parent derivative, atom-order invariance, graph-isomorphism,
+  OPSIN round-trip, locant-elision, and benchmark regression tests.
+
+### Changed
+
+- Unified fused parents and macrocycles behind one lazy, topology-indexed
+  retained-graph registry with shared matching, numbering, metadata, and cache
+  invalidation behavior.
+- Generated regular acene and polyaphene templates from compact series data
+  while retaining explicit graph templates for irregular parent systems.
+- Moved morphology, functional-role, charge, suffix, and connection-boundary
+  handling out of broad legacy literal post-processing and into structured
+  assembly and data-backed naming rules.
+- Made redundant-locant decisions conservative graph proofs based on labelled
+  parent automorphisms and the complete set of suffix, unsaturation, and
+  substituent features. Searches use strict work limits and retain explicit
+  locants whenever uniqueness cannot be proven cheaply.
+- Added graph mutation APIs that invalidate retained-parent and other derived
+  caches, preventing stale template matches after atom or bond updates.
+
+### Fixed
+
+- Corrected additive-hydrogen accounting for retained parents that already
+  contain inherent saturated positions, and prevented indicated-hydrogen
+  relocation from consuming newly hydrogenated sites.
+- Preserved exact retained-template proofs while keeping an audited von Baeyer
+  fallback for relaxed fused-PAH topology matches that fail later retained-name
+  chemistry checks.
+- Corrected retained-parent metadata lookup for exact template names and
+  unambiguous preferred output spellings while leaving tautomer-ambiguous
+  aliases to graph-derived metadata.
+- Prevented redundant-locant omission when parent symmetry, attachment
+  capacity, supplied locant maps, or bounded-search limits leave more than one
+  constitutional arrangement possible.
+
 ## [0.3.1] - 2026-08-14
 
 ### Changed
@@ -145,7 +243,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Renamed the package to OpenClatura and adopted a `src` layout.
+- Renamed the package to openclatura and adopted a `src` layout.
 - Made OPSIN integration tolerate unavailable Java installations.
 
 ## [0.1.0] - 2026-05-08
@@ -154,7 +252,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial deterministic IUPAC name generation from molecular structures.
 
-[Unreleased]: https://github.com/lamalab-org/openclatura/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/lamalab-org/openclatura/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/lamalab-org/openclatura/compare/v0.3.3...v0.4.0
+[0.3.3]: https://github.com/lamalab-org/openclatura/compare/v0.3.2...v0.3.3
+[0.3.2]: https://github.com/lamalab-org/openclatura/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/lamalab-org/openclatura/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/lamalab-org/openclatura/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/lamalab-org/openclatura/compare/db7d1d4...7ed75cb

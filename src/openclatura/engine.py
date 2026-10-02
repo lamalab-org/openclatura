@@ -14,6 +14,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from .fusion.context import current_fusion_mode, reset_fusion_mode, set_fusion_mode
+from .fusion.model import FusionMode
 from .graph_io import get_connected_components, read_rdkit_mol, read_smiles
 from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
 from .name_assembly import set_token_span_building
@@ -63,6 +65,11 @@ class NamingRequest:
     SMILES to the input.  Verification is graceful when py2opsin or Java
     are missing (see :class:`openclatura.opsin_verify.OpsinCheck`).
 
+    ``omit_redundant_locants`` controls an experimental symmetry proof for
+    constitutional locants on simple chain and monocyclic parents. It defaults
+    to true because a provably unique locant configuration gives the better
+    name, while callers can explicitly disable it for compatibility.
+
     Structures arrive either as ``smiles`` or as an already-parsed
     ``rdkit_mol`` (``rdkit.Chem.rdchem.Mol``); when a molecule is given, a
     SMILES is only generated if something downstream actually needs one, so
@@ -74,6 +81,8 @@ class NamingRequest:
     verify_opsin: bool = False
     verify_self: bool = False
     token_debug: bool = False
+    omit_redundant_locants: bool = True
+    fusion_mode: FusionMode = FusionMode.AUDITED_PIN
     rdkit_mol: Any | None = None
 
 
@@ -99,6 +108,10 @@ class NamingResult:
     rule_hints: tuple[str, ...] = ()
     opsin_check: OpsinCheck | None = None
     self_audit: Any | None = None
+    parent_nomenclature: str | None = None
+    pin_status: str | None = None
+    fusion_support_tier: str | None = None
+    proof_source: str | None = None
 
     @property
     def ok(self) -> bool:
@@ -138,6 +151,15 @@ class NamingResult:
             "rules_hit": list(self.rules_hit),
             "rule_hints": list(self.rule_hints),
         }
+        if self.parent_nomenclature is not None:
+            payload.update(
+                {
+                    "parent_nomenclature": self.parent_nomenclature,
+                    "pin_status": self.pin_status,
+                    "fusion_support_tier": self.fusion_support_tier,
+                    "proof_source": self.proof_source,
+                }
+            )
         if include_trace:
             payload["trace_segments"] = self.trace_segments
             payload["substituent_tree"] = self.substituent_tree
@@ -157,58 +179,96 @@ class NamingEngine:
     public callers.
     """
 
-    def name(self, smiles: str) -> str:
+    def name(self, smiles: str, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN) -> str:
         """Return the generated name for ``smiles``."""
 
-        return self.run(NamingRequest(smiles=smiles)).name
+        return self.run(NamingRequest(smiles=smiles, fusion_mode=FusionMode(fusion_mode))).name
 
-    def name_smiles(self, smiles: str) -> str:
+    def name_smiles(self, smiles: str, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN) -> str:
         """Compatibility alias for the legacy public API name."""
 
-        return self.name(smiles)
+        return self.name(smiles, fusion_mode=fusion_mode)
 
-    def name_rdkit_mol(self, rdkit_mol: Any) -> str:
+    def name_rdkit_mol(self, rdkit_mol: Any, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN) -> str:
         """Return the generated name for an existing ``rdkit.Chem.rdchem.Mol``."""
 
-        return self.run(NamingRequest(rdkit_mol=rdkit_mol)).name
+        return self.run(NamingRequest(rdkit_mol=rdkit_mol, fusion_mode=FusionMode(fusion_mode))).name
 
-    def name_rdkit_mol_with_trace(self, rdkit_mol: Any) -> tuple[str, list[dict]]:
+    def name_rdkit_mol_with_trace(
+        self, rdkit_mol: Any, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN
+    ) -> tuple[str, list[dict]]:
         """Return the generated name and assembly trace for an RDKit molecule."""
 
-        result = self.run(NamingRequest(rdkit_mol=rdkit_mol, include_trace=True))
+        result = self.run(NamingRequest(rdkit_mol=rdkit_mol, include_trace=True, fusion_mode=FusionMode(fusion_mode)))
         return result.name, result.trace_segments
 
-    def analyze_rdkit_mol(self, rdkit_mol: Any, *, token_debug: bool = False) -> NameAnalysis:
+    def analyze_rdkit_mol(
+        self,
+        rdkit_mol: Any,
+        *,
+        token_debug: bool = False,
+        fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
+    ) -> NameAnalysis:
         """Return the full explainable naming analysis for an RDKit molecule."""
 
-        result = self.run(NamingRequest(rdkit_mol=rdkit_mol, include_trace=True, token_debug=token_debug))
+        result = self.run(
+            NamingRequest(
+                rdkit_mol=rdkit_mol,
+                include_trace=True,
+                token_debug=token_debug,
+                fusion_mode=FusionMode(fusion_mode),
+            )
+        )
         if result.analysis is None:
             return NameAnalysis(result.name, result.trace_segments, result.decisions, result.substituent_tree)
         return result.analysis
 
-    def name_with_trace(self, smiles: str) -> tuple[str, list[dict]]:
+    def name_with_trace(
+        self, smiles: str, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN
+    ) -> tuple[str, list[dict]]:
         """Return the generated name and assembly trace segments."""
 
-        result = self.run(NamingRequest(smiles=smiles, include_trace=True))
+        result = self.run(NamingRequest(smiles=smiles, include_trace=True, fusion_mode=FusionMode(fusion_mode)))
         return result.name, result.trace_segments
 
-    def name_smiles_with_trace(self, smiles: str) -> tuple[str, list[dict]]:
+    def name_smiles_with_trace(
+        self, smiles: str, *, fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN
+    ) -> tuple[str, list[dict]]:
         """Compatibility alias for the legacy public API name."""
 
-        return self.name_with_trace(smiles)
+        return self.name_with_trace(smiles, fusion_mode=fusion_mode)
 
-    def analyze(self, smiles: str, *, token_debug: bool = False) -> NameAnalysis:
+    def analyze(
+        self,
+        smiles: str,
+        *,
+        token_debug: bool = False,
+        fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
+    ) -> NameAnalysis:
         """Return the full explainable naming analysis for ``smiles``."""
 
-        result = self.run(NamingRequest(smiles=smiles, include_trace=True, token_debug=token_debug))
+        result = self.run(
+            NamingRequest(
+                smiles=smiles,
+                include_trace=True,
+                token_debug=token_debug,
+                fusion_mode=FusionMode(fusion_mode),
+            )
+        )
         if result.analysis is None:
             return NameAnalysis(result.name, result.trace_segments, result.decisions, result.substituent_tree)
         return result.analysis
 
-    def analyze_smiles(self, smiles: str, *, token_debug: bool = False) -> NameAnalysis:
+    def analyze_smiles(
+        self,
+        smiles: str,
+        *,
+        token_debug: bool = False,
+        fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
+    ) -> NameAnalysis:
         """Compatibility alias for the legacy public API name."""
 
-        return self.analyze(smiles, token_debug=token_debug)
+        return self.analyze(smiles, token_debug=token_debug, fusion_mode=fusion_mode)
 
     def run(self, request: NamingRequest) -> NamingResult:
         """Execute a naming request, never raising for naming failures.
@@ -222,6 +282,9 @@ class NamingEngine:
         # pure-name path so the common API does not pay for diagnostics it discards.
         need_analysis = request.include_trace or request.verify_opsin
         previous_span_building = set_token_span_building(need_analysis)
+        fusion_mode_token = (
+            None if request.fusion_mode is current_fusion_mode() else set_fusion_mode(request.fusion_mode)
+        )
 
         # The OPSIN-free self-audit rebuilds each component from its name while it
         # is being generated, so its capture hook must wrap the naming call.
@@ -238,7 +301,12 @@ class NamingEngine:
             with audit_cm as component_audits:
                 mol, smiles = self._prepare_input(request)
                 if need_analysis:
-                    analysis = self._analyze(mol, smiles=smiles, token_debug=request.token_debug)
+                    analysis = self._analyze(
+                        mol,
+                        smiles=smiles,
+                        token_debug=request.token_debug,
+                        omit_redundant_locants=request.omit_redundant_locants,
+                    )
                     rules, hints = _extract_rules_hit(analysis.trace_segments)
                     result = NamingResult(
                         name=analysis.name,
@@ -249,12 +317,18 @@ class NamingEngine:
                         analysis=analysis,
                         rules_hit=rules,
                         rule_hints=hints,
+                        **_fusion_result_metadata(analysis.decisions, analysis.substituent_tree),
                     )
                 else:
-                    result = NamingResult(name=self._name(mol), smiles=smiles)
+                    result = NamingResult(
+                        name=self._name(mol, omit_redundant_locants=request.omit_redundant_locants),
+                        smiles=smiles,
+                    )
         except Exception as exc:  # noqa: BLE001 - intentionally permissive boundary
             return NamingResult(name="", smiles=request.smiles, error=f"{type(exc).__name__}: {exc}")
         finally:
+            if fusion_mode_token is not None:
+                reset_fusion_mode(fusion_mode_token)
             set_token_span_building(previous_span_building)
 
         if request.verify_opsin:
@@ -276,6 +350,8 @@ class NamingEngine:
         verify_opsin: bool = False,
         verify_self: bool = False,
         token_debug: bool = False,
+        omit_redundant_locants: bool = True,
+        fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
         processes: int | None | str = 1,
         chunksize: int = 64,
     ) -> list[NamingResult]:
@@ -300,6 +376,8 @@ class NamingEngine:
                         verify_opsin=verify_opsin,
                         verify_self=verify_self,
                         token_debug=token_debug,
+                        omit_redundant_locants=omit_redundant_locants,
+                        fusion_mode=fusion_mode,
                     )
                 )
                 for item in smiles_list
@@ -312,6 +390,8 @@ class NamingEngine:
             verify_opsin=verify_opsin,
             verify_self=verify_self,
             token_debug=token_debug,
+            omit_redundant_locants=omit_redundant_locants,
+            fusion_mode=fusion_mode,
             processes=worker_count,
             chunksize=chunksize,
         )
@@ -334,19 +414,30 @@ class NamingEngine:
             smiles = Chem.MolToSmiles(request.rdkit_mol)
         return read_rdkit_mol(request.rdkit_mol), smiles
 
-    def _name(self, mol: Molecule) -> str:
+    def _name(self, mol: Molecule, *, omit_redundant_locants: bool = True) -> str:
         if not mol.atoms:
             return ""
 
         names = []
         for component in get_connected_components(mol):
-            component_name = self._name_component(mol, component)
+            component_name = self._name_component(
+                mol,
+                component,
+                omit_redundant_locants=omit_redundant_locants,
+            )
             if component_name:
                 names.append((component_name, _component_charge(mol, component)))
         names.sort(key=lambda item: self._component_sort_key(*item))
         return " ".join(_multiply_identical_ions(names))
 
-    def _analyze(self, mol: Molecule, *, smiles: str = "", token_debug: bool = False) -> NameAnalysis:
+    def _analyze(
+        self,
+        mol: Molecule,
+        *,
+        smiles: str = "",
+        token_debug: bool = False,
+        omit_redundant_locants: bool = True,
+    ) -> NameAnalysis:
         decisions = DecisionTrace()
         trace_decision(
             decisions,
@@ -379,6 +470,7 @@ class NamingEngine:
                 return_tree=True,
                 decision_trace=decisions,
                 token_debug=token_debug,
+                omit_redundant_locants=omit_redundant_locants,
             )
             if component_name:
                 named_components.append((component_name, trace, tree, _component_charge(mol, component)))
@@ -425,6 +517,73 @@ class NamingEngine:
 DEFAULT_NAMING_ENGINE = NamingEngine()
 
 
+_FUSION_NOMENCLATURES = frozenset({"systematic_fusion", "skeletal_replacement_fusion", "bridged_fusion"})
+
+
+def _iter_decision_data(decisions):
+    """Yield every decision's data, including those proving nested fragments.
+
+    A ring system named as a substituent proves itself in its own trace, which
+    the assembled item carries as nested decisions. Reading only the top level
+    would report no fusion evidence for a name whose fused component was in
+    fact proven, so the walk descends wherever a nested trace was recorded.
+    """
+
+    pending = list(decisions or ())
+    seen: set[int] = set()
+    while pending:
+        item = pending.pop(0)
+        if id(item) in seen:
+            continue
+        seen.add(id(item))
+        if isinstance(item, (list, tuple)):
+            pending.extend(item)
+            continue
+        if isinstance(item, dict):
+            phase, data = item.get("phase"), item.get("data") or {}
+            branches = item
+        else:
+            phase, data = getattr(item, "phase", None), getattr(item, "data", None) or {}
+            branches = {}
+        yield phase, data
+        # A nested proof is recorded on the assembled item, not inside the
+        # parent step's data, so both levels are followed.
+        for source in (branches, data):
+            if not isinstance(source, dict):
+                continue
+            for key in ("nested_decisions", "decisions", "substituents", "trace_segments", "spiro"):
+                nested = source.get(key)
+                if isinstance(nested, (list, tuple, dict)):
+                    pending.append(nested)
+
+
+def _fusion_result_metadata(decisions, *extra_sources) -> dict[str, str | None]:
+    """Project a traced fusion decision onto the public result.
+
+    A parent proven by the fusion engine is reported in preference to a
+    ``legacy`` parent that merely carries a proven component, so the fields
+    keep describing the strongest proof the name rests on rather than whichever
+    fragment happened to be traced first.
+    """
+
+    fallback = None
+    for phase, data in _iter_decision_data([*(decisions or ()), *extra_sources]):
+        nomenclature = data.get("parent_nomenclature")
+        if not nomenclature:
+            continue
+        projected = {
+            "parent_nomenclature": nomenclature,
+            "pin_status": data.get("pin_status"),
+            "fusion_support_tier": data.get("fusion_support_tier"),
+            "proof_source": data.get("proof_source"),
+        }
+        if nomenclature in _FUSION_NOMENCLATURES:
+            return projected
+        if fallback is None and phase == TracePhase.PARENT_SELECTION:
+            fallback = projected
+    return fallback or {}
+
+
 # --- multiprocessing helpers ---------------------------------------------
 
 
@@ -435,6 +594,8 @@ def _request_for(
     verify_opsin: bool,
     verify_self: bool = False,
     token_debug: bool,
+    omit_redundant_locants: bool = True,
+    fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
 ) -> NamingRequest:
     """Build a request from a batch item, which may be a SMILES or an RDKit molecule."""
 
@@ -444,12 +605,14 @@ def _request_for(
         verify_opsin=verify_opsin,
         verify_self=verify_self,
         token_debug=token_debug,
+        omit_redundant_locants=omit_redundant_locants,
+        fusion_mode=FusionMode(fusion_mode),
         **kwargs,
     )
 
 
-def _name_one_for_worker(args: tuple[str | Any, bool, bool, bool, bool]) -> NamingResult:
-    item, include_trace, verify_opsin, verify_self, token_debug = args
+def _name_one_for_worker(args: tuple[str | Any, bool, bool, bool, bool, bool, str]) -> NamingResult:
+    item, include_trace, verify_opsin, verify_self, token_debug, omit_redundant_locants, fusion_mode = args
     return DEFAULT_NAMING_ENGINE.run(
         _request_for(
             item,
@@ -457,6 +620,8 @@ def _name_one_for_worker(args: tuple[str | Any, bool, bool, bool, bool]) -> Nami
             verify_opsin=verify_opsin,
             verify_self=verify_self,
             token_debug=token_debug,
+            omit_redundant_locants=omit_redundant_locants,
+            fusion_mode=fusion_mode,
         )
     )
 
@@ -468,13 +633,18 @@ def _run_parallel(
     verify_opsin: bool,
     verify_self: bool = False,
     token_debug: bool,
+    omit_redundant_locants: bool = True,
+    fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
     processes: int,
     chunksize: int,
 ) -> list[NamingResult]:
     # Imported lazily so the simple `import openclatura` path stays light.
     from concurrent.futures import ProcessPoolExecutor
 
-    payload = [(s, include_trace, verify_opsin, verify_self, token_debug) for s in smiles_list]
+    mode = FusionMode(fusion_mode).value
+    payload = [
+        (s, include_trace, verify_opsin, verify_self, token_debug, omit_redundant_locants, mode) for s in smiles_list
+    ]
     with ProcessPoolExecutor(max_workers=processes) as ex:
         return list(ex.map(_name_one_for_worker, payload, chunksize=chunksize))
 

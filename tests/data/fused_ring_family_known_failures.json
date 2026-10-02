@@ -1,0 +1,4 @@
+{
+ "comment": "Ortho-fused bicycles at every hydrogenation level, no oxo, whose generated name does not round-trip through OPSIN. Enumerated by tests/roundtrip/test_fused_ring_family.py, not drawn from any dataset. Shrinking this list is progress; growing it is a regression.",
+ "known_failures": []
+}

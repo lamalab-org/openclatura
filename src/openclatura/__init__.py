@@ -3,9 +3,11 @@
 from collections.abc import Iterable
 from typing import Any
 
+from ._version import __version__
 from .describer import DescribedComponent, Description, DescriptionTokenSummary, describe
 from .engine import DEFAULT_NAMING_ENGINE, NamingEngine, NamingRequest, NamingResult
 from .functional_groups import register_group_detector
+from .fusion.model import FusionMode
 from .human_descriptor import HumanDescription, describe_human
 from .molecule import (
     AtomBinding,
@@ -38,6 +40,8 @@ def name(
     verify_opsin: bool = False,
     verify_self: bool = False,
     token_debug: bool = False,
+    omit_redundant_locants: bool = True,
+    fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
 ) -> NamingResult:
     """One-shot naming with the default engine. Returns a typed ``NamingResult``.
 
@@ -46,7 +50,9 @@ def name(
     returns a structured result with rules-hit information and optional
     verification metadata.  ``verify_opsin`` round-trips the name through OPSIN
     (needs Java); ``verify_self`` runs the dependency-free reconstruction audit
-    (see ``result.self_audit`` / ``result.self_verified``).
+    (see ``result.self_audit`` / ``result.self_verified``). Systematic fusion
+    naming defaults to the audited PIN policy; pass an explicit ``FusionMode``
+    to select general fusion nomenclature or legacy behavior.
     """
 
     return DEFAULT_NAMING_ENGINE.run(
@@ -56,6 +62,8 @@ def name(
             verify_opsin=verify_opsin,
             verify_self=verify_self,
             token_debug=token_debug,
+            omit_redundant_locants=omit_redundant_locants,
+            fusion_mode=FusionMode(fusion_mode),
         )
     )
 
@@ -67,6 +75,8 @@ def name_mol(
     verify_opsin: bool = False,
     verify_self: bool = False,
     token_debug: bool = False,
+    omit_redundant_locants: bool = True,
+    fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
 ) -> NamingResult:
     """One-shot naming of an existing RDKit molecule. Returns a ``NamingResult``.
 
@@ -83,6 +93,8 @@ def name_mol(
             verify_opsin=verify_opsin,
             verify_self=verify_self,
             token_debug=token_debug,
+            omit_redundant_locants=omit_redundant_locants,
+            fusion_mode=FusionMode(fusion_mode),
         )
     )
 
@@ -94,6 +106,8 @@ def name_many(
     verify_opsin: bool = False,
     verify_self: bool = False,
     token_debug: bool = False,
+    omit_redundant_locants: bool = True,
+    fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
     processes: int | None | str = 1,
     chunksize: int = 64,
 ) -> list[NamingResult]:
@@ -111,12 +125,12 @@ def name_many(
         verify_opsin=verify_opsin,
         verify_self=verify_self,
         token_debug=token_debug,
+        omit_redundant_locants=omit_redundant_locants,
+        fusion_mode=FusionMode(fusion_mode),
         processes=processes,
         chunksize=chunksize,
     )
 
-
-__version__ = "0.3.1"
 
 __all__ = [
     "AtomBinding",
@@ -126,6 +140,7 @@ __all__ = [
     "Description",
     "DescriptionTokenSummary",
     "FunctionalGroupMetadata",
+    "FusionMode",
     "HumanDescription",
     "NameAnalysis",
     "NamingEngine",
