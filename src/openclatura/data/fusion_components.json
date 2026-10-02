@@ -79,6 +79,7 @@
     {"key": "phenanthrene", "attached_prefix": "phenanthro", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "quinoline", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "carbazole", "horizontal_ring_count": 3, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
+    {"key": "acridine", "horizontal_ring_count": 3, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.3.2.1.3"},
     {"key": "1-benzofuran", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "1-benzothiophene", "horizontal_ring_count": 2, "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},
     {"key": "pyridine", "attached_prefix": "pyrido", "allow_as_parent": true, "allow_as_attached": true, "rule": "P-25.2"},

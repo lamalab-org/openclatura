@@ -374,6 +374,23 @@
       "usable_as_peri_parent": false
     },
     {
+      "accepted_general_prefixes": [],
+      "parent_name": "acridine",
+      "parser_visible_forms": [
+        "acridino"
+      ],
+      "preferred_fusion_prefix": "acridino",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.3.2.1.3",
+      "template_names": [
+        "acridine"
+      ],
+      "usable_as_peri_parent": false
+    },
+    {
       "accepted_general_prefixes": [
         "anthraceno"
       ],
@@ -955,7 +972,7 @@
   "runtime_dependency": false,
   "schema_version": 1,
   "source_sha256": {
-    "src/openclatura/data/fusion_components.json": "d1defd5758f5d1b5a0b8e406cbda5a5e3007029ab178ca24eb73e3f2eab9500e",
+    "src/openclatura/data/fusion_components.json": "2a0bf386d8ff70f938e6110e9578eea96988e24b19ae150c2909bf52977e071d",
     "src/openclatura/data/retained_fused_graph_templates.json": "ef1b6363ac355c18cb6eb13579fc4109b1622db59da045b2e8241ed72037b36d",
     "src/openclatura/data/retained_parent_name_policy.json": "8f3c1d572abccc55e6c7b25f8a774048898c35f220fe9100edb1c9228d3cdfec",
     "src/openclatura/hantzsch_widman.py": "8d28a90442764eab283fa867e4efbf44f143eb3bc70d175552a59d087dd325bc",
