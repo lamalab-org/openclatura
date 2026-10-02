@@ -12,6 +12,8 @@ Models
                     (identical output to single-item CPU translate_forward).
                     Set CUDA_VISIBLE_DEVICES to pick the GPU.
 * ``openclatura`` - our deterministic namer, multiprocessed across CPU cores.
+* ``nispo``       - the NISPO rule-based namer (``pip install nispo``),
+                    multiprocessed across CPU cores like openclatura.
 
 Examples
 --------
@@ -33,7 +35,7 @@ import sys
 import time
 from pathlib import Path
 
-NAME_KEY = {"stout": "stout_iupac", "openclatura": "openclatura_iupac"}
+NAME_KEY = {"stout": "stout_iupac", "openclatura": "openclatura_iupac", "nispo": "nispo_iupac"}
 
 
 def _read_rows(path: Path, limit: int) -> list[dict]:
@@ -83,6 +85,15 @@ def _oc_init():
     _OC_NAME = name_smiles
 
 
+def _nispo_init():
+    global _OC_NAME
+    from nispo import smiles_to_iupac_batch
+    from rdkit import RDLogger
+
+    RDLogger.DisableLog("rdApp.*")
+    _OC_NAME = lambda smi: smiles_to_iupac_batch([smi])[0]  # noqa: E731
+
+
 def _oc_chunk(chunk: list[str]) -> list[str]:
     out = []
     for smi in chunk:
@@ -96,16 +107,16 @@ def _oc_chunk(chunk: list[str]) -> list[str]:
     return out
 
 
-def _run_openclatura(smiles: list[str], workers: int, chunk: int) -> list[str]:
+def _run_openclatura(smiles: list[str], workers: int, chunk: int, init=_oc_init) -> list[str]:
     if workers <= 1:
-        _oc_init()
+        init()
         return _oc_chunk(smiles)
 
     from concurrent.futures import ProcessPoolExecutor
 
     chunks = [smiles[i : i + chunk] for i in range(0, len(smiles), chunk)]
     results: list[str] = []
-    with ProcessPoolExecutor(max_workers=workers, initializer=_oc_init) as ex:
+    with ProcessPoolExecutor(max_workers=workers, initializer=init) as ex:
         for part in ex.map(_oc_chunk, chunks):
             results.extend(part)
     return results
@@ -113,7 +124,7 @@ def _run_openclatura(smiles: list[str], workers: int, chunk: int) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--model", choices=("stout", "openclatura"), required=True)
+    parser.add_argument("--model", choices=("stout", "openclatura", "nispo"), required=True)
     parser.add_argument("--input", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--limit", type=int, default=0, help="0 = all rows")
@@ -131,6 +142,8 @@ def main(argv: list[str] | None = None) -> int:
     start = time.perf_counter()
     if args.model == "stout":
         names = _run_stout(smiles, args.batch_size)
+    elif args.model == "nispo":
+        names = _run_openclatura(smiles, args.workers, args.chunk, init=_nispo_init)
     else:
         names = _run_openclatura(smiles, args.workers, args.chunk)
     elapsed = time.perf_counter() - start

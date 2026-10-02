@@ -1,0 +1,11 @@
+{
+  "rows": 133885,
+  "original_valid": 133885,
+  "opsin_nonempty": 133477,
+  "opsin_valid": 133477,
+  "matches": 132683,
+  "failures": 1202,
+  "accuracy": 99.102,
+  "match_method": "standardize_and_canonicalize_tautomer",
+  "failures_csv": "results/paper_v040/qm9/qm9_all_nispo_opsin_failures.csv"
+}
