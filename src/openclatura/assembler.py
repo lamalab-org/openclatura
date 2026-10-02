@@ -263,6 +263,12 @@ def _respell_unspellable_added_hydrogen(parts: AssemblyParts, core_name: str) ->
 
     if parts.principal_group is not None or parts.parent_charges:
         return core_name
+    if parts.is_spiro_component or parts.is_spiro_side_projection:
+        # A spiro component has no principal group of its own by construction,
+        # which is not the same as having no suffix to cite added hydrogen
+        # against: the assembled spiro name supplies one, and respelling the
+        # component's citation here loses the structure it stood for.
+        return core_name
     operations = [operation for operation in parts.hydro_operations if operation.key == "added_hydrogen"]
     if not operations:
         return core_name

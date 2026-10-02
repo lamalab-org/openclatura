@@ -132,3 +132,41 @@ def test_the_substituted_parent_uses_the_preferred_prefix():
     """
 
     assert PREFERRED_PREFIX in name_smiles(UNAUDITED)
+
+
+# A spiro component is assembled with no principal group of its own, which is
+# not the same as having no suffix to cite added hydrogen against: the spiro
+# name supplies one. Respelling the component's citation as hydro keeps the
+# hydrogen count but loses the structure, and the 100k shards caught all three.
+SPIRO_COMPONENTS = (
+    (
+        "COc1cc(OC)c2c(c1Cl)O[C@]1(C2=O)C(=O)C2C(C[C@H]1C)NN(C)C2[C@H]1CCOC1",
+        "tetrahydro-1H,3H,3aH-benzo[c]pyrazole",
+        "hexahydro-1H-benzo[c]pyrazole",
+    ),
+    (
+        "CCN1C(=O)[C@@H]2CC3(CCN(C(=O)Nc4ccc(C)c(C)c4)CC3)CN2C1=O",
+        "dihydro-5H,7aH-pyrrolo[1,2-c]imidazole",
+        "tetrahydropyrrolo[1,2-c]imidazole",
+    ),
+    (
+        "CC(=O)Nc1ccc(CN2CC3(C2)C(=O)N(Cc2cccc(Cl)c2)C(=O)[C@@H]2C[C@@H](O)CN23)cc1",
+        "tetrahydro-2H,4H-pyrrolo[1,2-a]pyrazine",
+        "hexahydropyrrolo[1,2-a]pyrazine",
+    ),
+)
+
+
+@pytest.mark.parametrize(("smiles", "expected", "respelled"), SPIRO_COMPONENTS)
+def test_a_spiro_component_keeps_its_own_hydrogen_citation(smiles, expected, respelled):
+    """The respelling is for a parent cited as a substituent, not for these."""
+
+    name = name_smiles(smiles)
+    assert expected in name
+    assert respelled not in name
+
+
+@pytest.mark.parametrize(("smiles", "expected", "respelled"), SPIRO_COMPONENTS)
+@pytest.mark.skipif(not opsin_available(), reason="OPSIN round-trip needs java and py2opsin")
+def test_the_spiro_components_round_trip(smiles, expected, respelled):
+    assert verify_with_opsin(name_smiles(smiles), smiles).status == "matched"
