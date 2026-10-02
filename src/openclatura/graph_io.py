@@ -4,7 +4,6 @@ from rdkit import Chem
 
 from .molecule import Molecule
 
-
 _AUDIT_CIP_ENABLED = False
 
 
