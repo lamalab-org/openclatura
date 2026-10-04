@@ -11,6 +11,7 @@ from .chalcogen_roles import (
     FunctionalGroupDescriptor,
     classify_chalcogen_ligand,
     chalcogen_for_symbol,
+    require_validated_chalcogens,
 )
 from .chalcogen_vocabulary import (
     resolve_acyl_rule,
@@ -198,6 +199,7 @@ def _demote_zwitterion_cations(mol: Molecule, groups: list[PerceivedGroup]) -> l
 
 
 def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
+    require_validated_chalcogens(mol)
     groups = []
     consumed = set()
     cyclic_atoms = get_cyclic_atoms(mol)
@@ -278,6 +280,14 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             )
             consumed.update([double_ligand.atom, *hydrazide_nitrogens])
             break
+
+    # Central-atom hydrazides must likewise claim their N-N unit before the
+    # generic hydrazine parent recognizer runs.
+    for atom in mol:
+        central_group = _central_chalcogen_derivative(mol, atom.idx, consumed, cyclic_atoms)
+        if central_group is not None:
+            groups.append(central_group)
+            consumed.update(central_group.atoms_involved - {central_group.attachment_carbon})
 
     for role in nitrogen_chain_roles(mol, cyclic_atoms, consumed):
         groups.append(
@@ -395,12 +405,6 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                         if not is_cyclic:
                             groups.append(PerceivedGroup("anhydride", True, c1, {atom.idx, o1, o2}))
                             consumed.update([atom.idx, o1, o2])
-
-    for atom in mol:
-        central_group = _central_chalcogen_derivative(mol, atom.idx, consumed, cyclic_atoms)
-        if central_group is not None:
-            groups.append(central_group)
-            consumed.update(central_group.atoms_involved - {central_group.attachment_carbon})
 
     for atom in mol:
         if atom.symbol == "S" and atom.idx not in consumed:
@@ -1426,9 +1430,10 @@ def _central_chalcogen_derivative(
             and mol.get_bond(center, neighbor).order == 1
         ]
         if len(nitrogens) == 1:
-            derivative = DerivativeKind.AMIDE
+            hydrazide_nitrogens = _hydrazide_nitrogens(mol, center, nitrogens[0], cyclic_atoms)
+            derivative = DerivativeKind.HYDRAZIDE if hydrazide_nitrogens is not None else DerivativeKind.AMIDE
             descriptor_ligands = tuple(double_ligands)
-            group_atoms.add(nitrogens[0])
+            group_atoms.update(hydrazide_nitrogens or (nitrogens[0],))
         elif len(halogens) == 1:
             derivative = DerivativeKind.ACID_HALIDE
             descriptor_ligands = tuple(double_ligands)

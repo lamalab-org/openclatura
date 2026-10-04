@@ -2,7 +2,11 @@
 
 import pytest
 
-from openclatura.chalcogen_roles import ChalcogenLigandRole, classify_chalcogen_ligand
+from openclatura.chalcogen_roles import (
+    ChalcogenLigandRole,
+    UnsupportedChalcogenNomenclatureError,
+    classify_chalcogen_ligand,
+)
 from openclatura.charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
 from openclatura.graph_io import read_smiles
 from openclatura.perception import _builtin_perceive_groups
@@ -205,6 +209,11 @@ def test_anhydride_bridges_and_acyl_sites_are_independent(smiles: str, expected:
         ("C[Se](=S)(=O)O", "methaneselenonothioic O-acid"),
         ("CS(=O)(=O)OC", "methyl methanesulfonate"),
         ("CS(=O)(=O)N", "methanesulfonamide"),
+        ("CS(=O)(=O)NN", "methanesulfonohydrazide"),
+        ("CS(=O)(=O)N(N)C", "N-methylmethanesulfonohydrazide"),
+        ("CS(=S)(=O)NN", "methanesulfonothiohydrazide"),
+        ("C[Se](=O)(=O)NN", "methaneselenonohydrazide"),
+        ("C[Te](=O)NN", "methanetellurinohydrazide"),
         ("CS(=O)(=O)Cl", "methanesulfonyl chloride"),
     ],
 )
@@ -285,3 +294,11 @@ def test_peroxide_linkages_preserve_both_chalcogen_sites(smiles: str, expected: 
     import openclatura as oc
 
     assert oc.name(smiles).name == expected
+
+
+def test_polonium_is_parseable_but_has_an_explicit_unvalidated_boundary():
+    mol = read_smiles("C[PoH]")
+
+    assert mol.atoms[1].symbol == "Po"
+    with pytest.raises(UnsupportedChalcogenNomenclatureError, match="not validated for: Po"):
+        _builtin_perceive_groups(mol)

@@ -580,6 +580,11 @@ def resolve_central_acid_rule(
         seniority = (66, origin_rank, *(_ELEMENT_RANK[ligand.element] for ligand in double_ligands))
         prefix = f"{origin_stem}amoyl"
         families += ("amide_like",)
+    elif descriptor.derivative is DerivativeKind.HYDRAZIDE:
+        suffix = f"{suffix_stem}hydrazide" if infix else f"{origin_stem}ohydrazide"
+        seniority = (68, origin_rank, *(_ELEMENT_RANK[ligand.element] for ligand in double_ligands))
+        prefix = f"hydrazine{origin_stem}yl"
+        families += ("amide_like", "hydrazide")
     elif descriptor.derivative is DerivativeKind.ACID_HALIDE and leaving_symbol is not None:
         suffix = f"{suffix_stem}yl {_HALIDE_WORD[leaving_symbol]}"
         seniority = (55, origin_rank, _HALIDE_RANK[leaving_symbol])

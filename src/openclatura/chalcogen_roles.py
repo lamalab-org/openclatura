@@ -20,6 +20,29 @@ class Chalcogen(StrEnum):
 
 
 CHALCOGENS = frozenset(Chalcogen)
+VALIDATED_NOMENCLATURE_CHALCOGENS = frozenset(
+    {Chalcogen.OXYGEN, Chalcogen.SULFUR, Chalcogen.SELENIUM, Chalcogen.TELLURIUM}
+)
+
+
+class UnsupportedChalcogenNomenclatureError(ValueError):
+    """The graph contains a chalcogen whose organic vocabulary is not validated."""
+
+
+def require_validated_chalcogens(mol: Molecule) -> None:
+    """Reject unvalidated chalcogens explicitly instead of silently omitting them."""
+
+    unsupported = {
+        element
+        for atom in mol
+        if (element := chalcogen_for_symbol(atom.symbol)) is not None
+        and element not in VALIDATED_NOMENCLATURE_CHALCOGENS
+    }
+    if unsupported:
+        symbols = ", ".join(sorted(element.value for element in unsupported))
+        raise UnsupportedChalcogenNomenclatureError(
+            f"Organic functional-group nomenclature is not validated for: {symbols}"
+        )
 
 
 class ChalcogenLigandRole(StrEnum):
