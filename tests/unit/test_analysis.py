@@ -90,7 +90,7 @@ from openclatura.naming_data import namer_rules
 from openclatura.nitrogen_roles import (
     azine_roles,
     nitrogen_chain_roles,
-    terminal_n3_substituent_role,
+    terminal_nitrogen_substituent_role,
 )
 from openclatura.numbering import NUMBERING_CRITERIA, NumberingPreference
 from openclatura.oxoacid_roles import OxoLigandRole, central_oxo_roles, central_oxo_substituent_role
@@ -2725,7 +2725,7 @@ def test_cyclic_hydrazines_render_as_hydrazinyl_prefixes():
     assert generated == "4-hydrazinyl-1H-pyrazole"
 
 
-def test_terminal_n3_substituent_role_preserves_charge_and_bond_pattern():
+def test_terminal_nitrogen_substituent_role_preserves_charge_and_bond_pattern():
     mol = Molecule()
     mol.add_atom("C", 0)
     mol.add_atom("N", 1)
@@ -2735,13 +2735,28 @@ def test_terminal_n3_substituent_role_preserves_charge_and_bond_pattern():
     mol.add_bond(1, 2, order=2)
     mol.add_bond(2, 3, order=2)
 
-    role = terminal_n3_substituent_role(mol, 1, {0}, 0)
+    role = terminal_nitrogen_substituent_role(mol, 1, {0}, 0)
 
     assert role is not None
     assert role.key == "azido"
     assert role.ordered_atoms == (0, 1, 2, 3)
     assert role.charge_pattern == (0, 0, 1, -1)
     assert role.bond_orders == (1, 2, 2)
+
+
+def test_terminal_nitrogen_substituent_role_supports_longer_registered_templates():
+    mol = Molecule()
+    for idx, symbol in enumerate(("C", "N", "N", "N", "N")):
+        mol.add_atom(symbol, idx)
+    for begin, end, order in ((0, 1, 1), (1, 2, 1), (2, 3, 2), (3, 4, 1)):
+        mol.add_bond(begin, end, order=order)
+
+    role = terminal_nitrogen_substituent_role(mol, 1, {0}, 0)
+
+    assert role is not None
+    assert role.key == "hydrazonohydrazinyl"
+    assert role.ordered_atoms == (0, 1, 2, 3, 4)
+    assert role.bond_orders == (1, 1, 2, 1)
 
 
 def test_substituted_cyclic_hydrazines_keep_n_ligands_in_prefix():

@@ -100,7 +100,7 @@ CARBON_BOUND_N2_TEMPLATES: tuple[NitrogenChainTemplate, ...] = (
     NitrogenChainTemplate("diazo", (2, frozenset({2, 3})), (None, None, None), "carbon_bound_diazo"),
 )
 
-TERMINAL_N3_TEMPLATES: tuple[NitrogenChainTemplate, ...] = (
+TERMINAL_NITROGEN_TEMPLATES: tuple[NitrogenChainTemplate, ...] = (
     NitrogenChainTemplate("azido", (1, 2, 2), (None, 0, 0, 0), "terminal_cumulene_azide"),
     NitrogenChainTemplate("azido", (1, 2, 2), (None, 0, 1, -1), "terminal_charge_separated_azide"),
     NitrogenChainTemplate("azido", (2, 2, 2), (None, 0, 1, -1), "terminal_charge_separated_azide"),
@@ -109,9 +109,6 @@ TERMINAL_N3_TEMPLATES: tuple[NitrogenChainTemplate, ...] = (
     NitrogenChainTemplate("diazenylamino", (1, 1, 2), (None, 0, 0, 0), "neutral_diazenylamino"),
     NitrogenChainTemplate("aminodiazenyl", (1, 2, 1), (None, 0, 0, 0), "neutral_aminodiazenyl"),
     NitrogenChainTemplate("hydrazinylamino", (1, 1, 1), (None, 0, 0, 0), "neutral_hydrazinylamino"),
-)
-
-TERMINAL_N4_TEMPLATES: tuple[NitrogenChainTemplate, ...] = (
     NitrogenChainTemplate(
         "hydrazonohydrazinyl",
         (1, 1, 2, 1),
@@ -306,7 +303,7 @@ def _azido_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -> li
         if first_bond is None or second_bond is None:
             continue
         template = _match_template(
-            TERMINAL_N3_TEMPLATES,
+            tuple(template for template in TERMINAL_NITROGEN_TEMPLATES if len(template.bond_orders) == 3),
             (ext_bond_order, first_bond.order, second_bond.order),
             (
                 mol.atoms[ext_atom].charge,
@@ -519,79 +516,27 @@ def _hydrazine_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -
     return roles
 
 
-def terminal_n3_substituent_role(
+def terminal_nitrogen_substituent_role(
     mol: Molecule,
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
 ) -> NitrogenChainRole | None:
-    """Return an ordered role for a terminal N3 substituent fragment."""
-
-    if upstream_atom is None or mol.atoms[start_idx].symbol != "N":
-        return None
-    first_bond = mol.get_bond(start_idx, upstream_atom)
-    if first_bond is None:
-        return None
-    n2_candidates = [
-        n
-        for n in mol.get_neighbors(start_idx)
-        if n != upstream_atom and n not in exclude_atoms and mol.atoms[n].symbol == "N"
-    ]
-    if len(n2_candidates) != 1:
-        return None
-    n2 = n2_candidates[0]
-    n3_candidates = [
-        n for n in mol.get_neighbors(n2) if n != start_idx and n not in exclude_atoms and mol.atoms[n].symbol == "N"
-    ]
-    if len(n3_candidates) != 1:
-        return None
-    n3 = n3_candidates[0]
-    if _other_non_h_neighbors(mol, n3, {n2}):
-        return None
-    n1_n2 = mol.get_bond(start_idx, n2)
-    n2_n3 = mol.get_bond(n2, n3)
-    if n1_n2 is None or n2_n3 is None:
-        return None
-    charges = (mol.atoms[start_idx].charge, mol.atoms[n2].charge, mol.atoms[n3].charge)
-    orders = (first_bond.order, n1_n2.order, n2_n3.order)
-    template = _match_template(
-        tuple(template for template in TERMINAL_N3_TEMPLATES if template.key == "azido"),
-        orders,
-        (mol.atoms[upstream_atom].charge, *charges),
-    )
-    if template is None:
-        return None
-    return _make_role(
-        mol,
-        key=template.key,
-        is_principal_candidate=False,
-        attachment_atom=upstream_atom,
-        atom_ids=frozenset({start_idx, n2, n3}),
-        variant=template.variant,
-        reason=f"Matched terminal charge-separated N3 substituent at atom {upstream_atom}.",
-        ordered_atoms=(upstream_atom, start_idx, n2, n3),
-    )
-
-
-def terminal_n4_substituent_role(
-    mol: Molecule,
-    start_idx: int,
-    exclude_atoms: set[int],
-    upstream_atom: int | None,
-) -> NitrogenChainRole | None:
-    """Return an ordered role for a linear terminal N4 substituent fragment."""
+    """Return an ordered role for a linear terminal nitrogen substituent."""
 
     if upstream_atom is None or mol.atoms[start_idx].symbol != "N":
         return None
     ordered = [upstream_atom, start_idx]
     previous = upstream_atom
     current = start_idx
-    while len(ordered) < 5:
+    while True:
         candidates = [
             neighbor
             for neighbor in mol.get_neighbors(current)
             if neighbor != previous and neighbor not in exclude_atoms and mol.atoms[neighbor].symbol == "N"
         ]
+        if not candidates:
+            break
         if len(candidates) != 1:
             return None
         next_atom = candidates[0]
@@ -603,7 +548,7 @@ def terminal_n4_substituent_role(
         return None
     ordered_atoms = tuple(ordered)
     template = _match_template(
-        TERMINAL_N4_TEMPLATES,
+        TERMINAL_NITROGEN_TEMPLATES,
         _chain_bond_orders(mol, ordered_atoms),
         tuple(mol.atoms[atom].charge for atom in ordered_atoms),
     )
@@ -616,7 +561,7 @@ def terminal_n4_substituent_role(
         attachment_atom=upstream_atom,
         atom_ids=frozenset(ordered_atoms[1:]),
         variant=template.variant,
-        reason=f"Matched terminal N4 {template.key} fragment at atom {upstream_atom}.",
+        reason=f"Matched terminal {len(ordered_atoms) - 1}-nitrogen {template.key} fragment at atom {upstream_atom}.",
         ordered_atoms=ordered_atoms,
     )
 

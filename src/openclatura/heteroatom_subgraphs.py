@@ -28,7 +28,7 @@ from .namer_config import (
     SIMPLE_SULFANYL_PREFIXES,
 )
 from .naming_protocols import RecursiveSubgraphNamer
-from .nitrogen_roles import terminal_n3_substituent_role, terminal_n4_substituent_role
+from .nitrogen_roles import terminal_nitrogen_substituent_role
 from .nomenclature import RULES
 from .oxoacid_roles import OxoLigandRole, central_oxo_substituent_role
 from .rules import elision, multipliers
@@ -573,9 +573,7 @@ def terminal_nitrogen_chain_prefix(
 ) -> str:
     """Render supported linear terminal nitrogen chains from ordered graph roles."""
 
-    role = terminal_n4_substituent_role(mol, start_idx, exclude_atoms, upstream_atom)
-    if role is None:
-        role = terminal_n3_substituent_role(mol, start_idx, exclude_atoms, upstream_atom)
+    role = terminal_nitrogen_substituent_role(mol, start_idx, exclude_atoms, upstream_atom)
     return role.key if role is not None else ""
 
 
