@@ -72,14 +72,18 @@ def test_simple_chalcogen_analogues_are_named_from_graph_roles(smiles: str, expe
 
 
 @pytest.mark.parametrize(
-    ("smiles", "expected_key"),
-    [("COC", "ether"), ("CSC", "thioether"), ("C[Se]C", "selenoether"), ("C[Te]C", "telluroether")],
+    ("smiles", "expected"),
+    [
+        ("COC", "methoxymethane"),
+        ("CSC", "dimethylsulfane"),
+        ("C[Se]C", "dimethylselane"),
+        ("C[Te]C", "dimethyltellane"),
+    ],
 )
-def test_ether_analogues_share_one_structural_detector(smiles: str, expected_key: str):
-    groups = _builtin_perceive_groups(read_smiles(smiles))
+def test_ether_analogues_reuse_generic_heteroatom_subgraph_naming(smiles: str, expected: str):
+    import openclatura as oc
 
-    assert [group.key for group in groups].count(expected_key) == 2
-    assert all(group.descriptor is not None for group in groups if group.key == expected_key)
+    assert oc.name(smiles).name == expected
 
 
 @pytest.mark.parametrize(
@@ -276,11 +280,11 @@ def test_nitrile_chalcogenides_use_zwitterion_priority_and_class_names(smiles: s
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [
-        ("COOC", "dimethyl peroxide"),
-        ("CCOOC", "ethyl methyl peroxide"),
-        ("CSSC", "dimethyl disulfide"),
-        ("C[Se][Se]C", "dimethyl diselenide"),
-        ("C[Te][Te]C", "dimethyl ditelluride"),
+        ("COOC", "1,2-dimethyldioxidane"),
+        ("CCOOC", "1-ethyl-2-methyldioxidane"),
+        ("CSSC", "1,2-dimethyldisulfane"),
+        ("C[Se][Se]C", "1,2-dimethyldiselane"),
+        ("C[Te][Te]C", "1,2-dimethylditellane"),
         ("CSOC", "dimethyl thioperoxide"),
         ("CCOSC", "O-ethyl S-methyl thioperoxide"),
         ("CO[Se]C", "dimethyl selenoperoxide"),

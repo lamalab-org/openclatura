@@ -10,6 +10,7 @@ from .assembly_parts import (
     UnsaturationItem,
     split_rendered_substituent_name,
 )
+from .chalcogen_roles import FunctionalFamily
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
 from .component_group_rules import (
     exclude_nonparent_group_atoms,
@@ -338,12 +339,20 @@ def name_component(
         )
 
     early_groups = component_groups(mol, component_atoms)
-    has_peroxol_suffix = any(
-        group.is_principal_candidate
-        and group.resolved_rule is not None
-        and "peroxol" in group.resolved_rule.families
+    peroxol_atoms = {
+        atom_idx
         for group in early_groups
+        if group.descriptor is not None and group.descriptor.family is FunctionalFamily.PEROXOL
+        for atom_idx in group.atoms_involved
+    }
+    has_competing_heteroatom_chain = any(
+        atom_idx not in peroxol_atoms
+        and not mol.atoms[atom_idx].is_carbon
+        and mol.atoms[atom_idx].symbol != "H"
+        and mol.degree(atom_idx) > 1
+        for atom_idx in component_atoms
     )
+    has_peroxol_suffix = bool(peroxol_atoms) and not has_competing_heteroatom_chain
     structural_parent_result = (
         None if has_peroxol_suffix else structural_replacement_parent_result(mol, component_atoms, name_subgraph)
     )

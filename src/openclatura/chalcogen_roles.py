@@ -196,6 +196,18 @@ def classify_peroxide_linkage(
             or not mol.atoms[right_sides[0]].is_carbon
         ):
             continue
+        blocked = {bond.u, bond.v}
+        seen = {left_sides[0]}
+        stack = [left_sides[0]]
+        while stack:
+            current = stack.pop()
+            for neighbor in mol.get_neighbors(current):
+                if neighbor in blocked or neighbor in seen:
+                    continue
+                seen.add(neighbor)
+                stack.append(neighbor)
+        if right_sides[0] in seen:
+            continue
         if any(
             candidate != linker
             and (ligand := classify_chalcogen_ligand(mol, attachment, candidate)) is not None

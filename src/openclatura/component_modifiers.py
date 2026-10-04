@@ -138,9 +138,10 @@ def add_component_n_substituents(
     n_idx_global = 0
     for group_index, group in enumerate(principal_groups):
         c_idx = group.attachment_carbon
+        group_rule = group.resolved_rule or RULES.functional_groups.get(group.key)
         nitrogens = [n for n in group.atoms_involved if mol.atoms[n].symbol == "N"]
         nitrogens.sort(key=lambda n: mol.get_bond(n, c_idx) is not None, reverse=True)
-        if group.resolved_rule is not None and "urea" in group.resolved_rule.families:
+        if "urea" in group_rule.families:
             # The two urea nitrogens are equivalent: P-31.1.4 gives the unprimed locant to
             # the substituent cited first, and an unsubstituted nitrogen takes no locant.
             nitrogens.sort(key=lambda n: _nitrogen_alphabetical_rank(mol, n, c_idx, sub_exclude, branch_namer))
@@ -157,7 +158,7 @@ def add_component_n_substituents(
         if principal_key in {"amidine", "ring_amidine"}:
             # P-66.4.1.1.1.3: the amine nitrogen is N, the imino nitrogen N'.
             nitrogens.sort(key=lambda n: mol.get_bond(n, core_c).order)
-        elif group.resolved_rule is not None and "hydrazide" in group.resolved_rule.families:
+        elif "hydrazide" in group_rule.families:
             # P-66.3.1.2: the acyl-bound nitrogen is N, the terminal one N'.
             nitrogens.sort(key=lambda n: mol.get_bond(n, core_c) is None)
         elif principal_key == "guanidine":

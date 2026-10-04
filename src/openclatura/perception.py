@@ -289,7 +289,8 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             groups.append(central_group)
             consumed.update(central_group.atoms_involved - {central_group.attachment_carbon})
 
-    for role in nitrogen_chain_roles(mol, cyclic_atoms, consumed):
+    nitrogen_chains = nitrogen_chain_roles(mol, cyclic_atoms, consumed)
+    for role in nitrogen_chains:
         groups.append(
             PerceivedGroup(
                 role.key,
@@ -844,6 +845,8 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                             consumed.update([atom.idx])
 
     for terminal_atom in mol:
+        if nitrogen_chains:
+            break
         if (
             terminal_atom.idx in consumed
             or terminal_atom.idx in cyclic_atoms
@@ -909,14 +912,10 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
         if ligand.role is ChalcogenLigandRole.DOUBLE_BONDED:
             if not mol.atoms[center].is_carbon:
                 continue
-            # Acid derivatives have another singly bound heteroatom and are
-            # classified as a complete acyl group in the earlier acyl pass.
-            other_hetero = [
-                neighbor
+            if ligand.element is not Chalcogen.OXYGEN and any(
+                neighbor != atom.idx and not mol.atoms[neighbor].is_carbon
                 for neighbor in mol.get_neighbors(center)
-                if neighbor != atom.idx and not mol.atoms[neighbor].is_carbon
-            ]
-            if other_hetero:
+            ):
                 continue
             ring_neighbors = [neighbor for neighbor in mol.get_neighbors(center) if neighbor in cyclic_atoms]
             external = (
@@ -976,33 +975,6 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                 for c in adj_atoms:
                     groups.append(PerceivedGroup(key, principal, c, {atom.idx}))
                 consumed.add(atom.idx)
-
-    for atom in mol:
-        element = chalcogen_for_symbol(atom.symbol)
-        if element is None or atom.idx in consumed or atom.idx in cyclic_atoms or mol.degree(atom.idx) != 2:
-            continue
-        adj_atoms = mol.get_neighbors(atom.idx)
-        if any(not mol.atoms[neighbor].is_carbon for neighbor in adj_atoms):
-            continue
-        if any(mol.get_bond(atom.idx, neighbor).order != 1 for neighbor in adj_atoms):
-            continue
-        key = simple_group_key(FunctionalFamily.CHALCOGEN_ETHER, DerivativeKind.NEUTRAL_LINK, element)
-        if key is None:
-            continue
-        for center in adj_atoms:
-            ligand = classify_chalcogen_ligand(mol, center, atom.idx)
-            if ligand is None:
-                continue
-            descriptor = FunctionalGroupDescriptor(
-                family=FunctionalFamily.CHALCOGEN_ETHER,
-                derivative=DerivativeKind.NEUTRAL_LINK,
-                centers=(center,),
-                ligands=(ligand,),
-                linker_paths=((center, atom.idx, ligand.attachment_atom),),
-                attachment_atom=center,
-            )
-            groups.append(PerceivedGroup(key, False, center, {atom.idx}, descriptor=descriptor))
-        consumed.add(atom.idx)
 
     halogen_map = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
     for atom in mol:
@@ -1345,6 +1317,13 @@ def _central_chalcogen_derivative(
         central_element not in {Chalcogen.SULFUR, Chalcogen.SELENIUM, Chalcogen.TELLURIUM}
         or center in consumed
         or center in cyclic_atoms
+        or mol.atoms[center].charge != 0
+    ):
+        return None
+    if any(
+        chalcogen_for_symbol(mol.atoms[neighbor].symbol) is None
+        and mol.get_bond(center, neighbor).order > 1
+        for neighbor in mol.get_neighbors(center)
     ):
         return None
     carbon_anchors = [
@@ -1422,6 +1401,15 @@ def _central_chalcogen_derivative(
         ]
         if len(nitrogens) == 1:
             hydrazide_nitrogens = _hydrazide_nitrogens(mol, center, nitrogens[0], cyclic_atoms)
+            if hydrazide_nitrogens is None and any(
+                neighbor != center
+                and (
+                    mol.atoms[neighbor].symbol not in {"C", "H"}
+                    or mol.get_bond(nitrogens[0], neighbor).order != 1
+                )
+                for neighbor in mol.get_neighbors(nitrogens[0])
+            ):
+                return None
             derivative = DerivativeKind.HYDRAZIDE if hydrazide_nitrogens is not None else DerivativeKind.AMIDE
             descriptor_ligands = tuple(double_ligands)
             group_atoms.update(hydrazide_nitrogens or (nitrogens[0],))
@@ -1455,9 +1443,10 @@ def _enrich_groups(mol: Molecule, groups: list[PerceivedGroup]) -> list[Perceive
     """Attach metadata and graph bindings to perceived groups."""
 
     for group in groups:
-        if group.resolved_rule is None:
+        resolved_rule = group.resolved_rule
+        group.metadata = _metadata_for_group(group.key, resolved_rule)
+        if resolved_rule is None:
             group.resolved_rule = RULES.functional_groups.by_key.get(group.key)
-        group.metadata = _metadata_for_group(group.key, group.resolved_rule)
         group.atom_bindings = _atom_bindings_for_group(group)
         group.bond_bindings = _bond_bindings_for_group(mol, group)
         if not group.decision_reasons:
@@ -1691,6 +1680,7 @@ def _hydrazide_nitrogens(mol: Molecule, carbon: int, single_n: int, cyclic_atoms
     if terminal_n in cyclic_atoms or mol.atoms[terminal_n].charge:
         return None
     for x in mol.get_neighbors(terminal_n):
-        if x != single_n and mol.atoms[x].symbol not in {"C", "H"}:
-            return None
+        if x != single_n:
+            if mol.atoms[x].symbol not in {"C", "H"} or mol.get_bond(terminal_n, x).order != 1:
+                return None
     return single_n, terminal_n

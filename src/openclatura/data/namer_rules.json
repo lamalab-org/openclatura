@@ -1141,7 +1141,8 @@
         },
         "seniority": 60,
         "suffix_with_locant": false,
-        "needs_locant": true
+        "needs_locant": true,
+        "families": ["amide_like", "urea"]
       },
       "thiourea": {
         "role": "principal",
@@ -1154,7 +1155,8 @@
         },
         "seniority": 60,
         "suffix_with_locant": false,
-        "needs_locant": true
+        "needs_locant": true,
+        "families": ["amide_like", "urea"]
       },
       "selenourea": {
         "role": "principal",

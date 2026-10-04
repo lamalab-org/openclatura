@@ -362,6 +362,8 @@ def peroxide_linkage_result(
     if left_element is None or right_element is None:
         return None
     elements = (left_element, right_element)
+    if elements[0] is elements[1]:
+        return None
     names = []
     for attachment, linker in ((left_attachment, left), (right_attachment, right)):
         rendered = branch_namer(
