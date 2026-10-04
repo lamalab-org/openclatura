@@ -35,11 +35,11 @@ _UNSAT_STEMS: dict[str, tuple[int, Chem.BondType]] = {
 }
 _UNSAT_ALTERNATION = "|".join(sorted(_UNSAT_STEMS, key=len, reverse=True))
 
-_CYCLE_PREFIX_ALTERNATION = "|".join(
-    ("bi", *(mult.basic for count, mult in sorted(_multipliers.MULTIPLIERS.items()) if count >= 3))
-)
-_VONBAEYER_RE = re.compile(rf"(?P<prefix>{_CYCLE_PREFIX_ALTERNATION})cyclo\[(?P<body>[0-9.,^{{}}]+)\]")
-_SECONDARY_RE = re.compile(r"(\d+)\^?\{?(\d+),(\d+)\}?")
+_CYCLE_PREFIX_COUNTS = {
+    "bi": 2,
+    **{mult.basic: count for count, mult in _multipliers.MULTIPLIERS.items() if count >= 3},
+}
+_CYCLE_PREFIXES = tuple(sorted(_CYCLE_PREFIX_COUNTS, key=len, reverse=True))
 _LAMBDA = r"(?:lambda\^?\{?\d+\}?)?"
 _BASIC_ALTERNATION = "|".join(sorted((mult.basic for mult in _multipliers.MULTIPLIERS.values()), key=len, reverse=True))
 _REPL_RE = re.compile(
@@ -55,6 +55,29 @@ _REPL_RE = re.compile(
 Descriptor = tuple[int, int, int, list[tuple[int, str, str]]]
 
 
+def _parse_secondary_bridge(token: str) -> tuple[int, str, str] | None:
+    """Parse ``length^{first,second}`` without pattern matching."""
+
+    length_end = 0
+    while length_end < len(token) and token[length_end].isdigit():
+        length_end += 1
+    if length_end == 0:
+        return None
+    citation = token[length_end:]
+    if citation.startswith("^"):
+        citation = citation[1:]
+    if citation.startswith("{"):
+        if not citation.endswith("}"):
+            return None
+        citation = citation[1:-1]
+    elif citation.endswith("}"):
+        return None
+    locants = citation.split(",")
+    if len(locants) != 2 or not all(locant.isdigit() for locant in locants):
+        return None
+    return int(token[:length_end]), locants[0], locants[1]
+
+
 def _parse_descriptor(inner: str) -> Descriptor | None:
     tokens = inner.split(".")
     if len(tokens) < 3:
@@ -65,36 +88,47 @@ def _parse_descriptor(inner: str) -> Descriptor | None:
         return None
     secondary: list[tuple[int, str, str]] = []
     for tok in tokens[3:]:
-        m = _SECONDARY_RE.fullmatch(tok)
-        if m is None:
+        bridge = _parse_secondary_bridge(tok)
+        if bridge is None:
             return None
-        secondary.append((int(m.group(1)), m.group(2), m.group(3)))
+        secondary.append(bridge)
     return a, b, c, secondary
 
 
-def _parse_von_baeyer_match(match: re.Match[str]) -> Descriptor | None:
-    descriptor = _parse_descriptor(match.group("body"))
-    if descriptor is None:
-        return None
-    prefix = match.group("prefix")
-    cycle_count = 2 if prefix == "bi" else _multipliers.count_for(prefix)
-    if cycle_count != len(descriptor[3]) + 2:
-        return None
-    return descriptor
+def _find_von_baeyer_descriptor(text: str) -> tuple[int, int, Descriptor] | None:
+    """Return the span and parsed descriptor for the first valid cycle token."""
+
+    marker = "cyclo["
+    search_from = 0
+    while (marker_start := text.find(marker, search_from)) >= 0:
+        body_start = marker_start + len(marker)
+        body_end = text.find("]", body_start)
+        if body_end < 0:
+            return None
+        for prefix in _CYCLE_PREFIXES:
+            token_start = marker_start - len(prefix)
+            if token_start < 0 or text[token_start:marker_start] != prefix:
+                continue
+            descriptor = _parse_descriptor(text[body_start:body_end])
+            if descriptor is None:
+                return None
+            if _CYCLE_PREFIX_COUNTS[prefix] != len(descriptor[3]) + 2:
+                return None
+            return token_start, body_end + 1, descriptor
+        search_from = body_start
+    return None
 
 
 def parse_von_baeyer(name: str) -> Numbered | None:
     """Parse a full ``[replacement](bi|tri…)cyclo[…]stem[unsat]-<n>-yl``
     substituent (or the ``…-<n>-ylidene`` / bare parent form)."""
 
-    m = _VONBAEYER_RE.search(name)
-    if m is None:
+    parsed = _find_von_baeyer_descriptor(name)
+    if parsed is None:
         return None
-    descriptor = _parse_von_baeyer_match(m)
-    if descriptor is None:
-        return None
+    start, end, descriptor = parsed
     a, b, c, secondary = descriptor
-    pre, post = name[: m.start()], name[m.end() :]
+    pre, post = name[:start], name[end:]
 
     total = a + b + c + 2 + sum(length for length, _, _ in secondary)
     rw, locants = _build_skeleton(a, b, c, secondary)
@@ -119,13 +153,10 @@ def build_skeleton(a: int, b: int, c: int) -> tuple[Chem.RWMol | None, dict[str,
 def build_skeleton_from_descriptor(descriptor: str) -> tuple[Chem.RWMol | None, dict[str, int]]:
     """Public: build a saturated skeleton from a full ``…cyclo[…]`` descriptor
     string (mono-, bi-, or polycyclic), for parent reconstruction."""
-    m = _VONBAEYER_RE.search(descriptor)
-    if m is None:
-        return None, {}
-    parsed = _parse_von_baeyer_match(m)
+    parsed = _find_von_baeyer_descriptor(descriptor)
     if parsed is None:
         return None, {}
-    a, b, c, secondary = parsed
+    _start, _end, (a, b, c, secondary) = parsed
     return _build_skeleton(a, b, c, secondary)
 
 
