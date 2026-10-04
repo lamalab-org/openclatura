@@ -77,3 +77,47 @@ def test_ether_analogues_share_one_structural_detector(smiles: str, expected_key
 
     assert [group.key for group in groups].count(expected_key) == 2
     assert all(group.descriptor is not None for group in groups if group.key == expected_key)
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("CC(=S)O", "ethanethioic O-acid"),
+        ("CC(=O)[SH]", "ethanethioic S-acid"),
+        ("CC(=S)[SH]", "ethanedithioic acid"),
+        ("CC(=[Se])O", "ethaneselenoic O-acid"),
+        ("CC(=O)[SeH]", "ethaneselenoic Se-acid"),
+        ("CC(=[Se])[SeH]", "ethanediselenoic acid"),
+        ("CC(=[Te])O", "ethanetelluroic O-acid"),
+        ("CC(=O)[TeH]", "ethanetelluroic Te-acid"),
+        ("CC(=[Te])[TeH]", "ethaneditelluroic acid"),
+        ("CC(=S)[SeH]", "ethaneselenothioic Se-acid"),
+        ("CC(=[Se])[SH]", "ethaneselenothioic S-acid"),
+        ("CC(=[Te])[SeH]", "ethaneselenotelluroic Se-acid"),
+    ],
+)
+def test_mixed_chalcogen_acids_preserve_both_sites(smiles: str, expected: str):
+    import openclatura as oc
+
+    assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("CC(=O)SC", "S-methyl ethanethioate"),
+        ("CC(=S)OC", "O-methyl ethanethioate"),
+        ("CC(=S)SC", "S-methyl ethanedithioate"),
+        ("CC(=[Se])OC", "O-methyl ethaneselenoate"),
+        ("CC(=O)[Se]C", "Se-methyl ethaneselenoate"),
+        ("CC(=[Te])N", "ethanetelluroamide"),
+        ("CC(=[Se])NN", "ethaneselenohydrazide"),
+        ("NC(=[Se])N", "selenourea"),
+        ("NC(=[Te])N", "tellurourea"),
+        ("CC(=[Se])Cl", "ethaneselenoyl chloride"),
+    ],
+)
+def test_acyl_derivatives_reuse_the_role_aware_center(smiles: str, expected: str):
+    import openclatura as oc
+
+    assert oc.name(smiles).name == expected

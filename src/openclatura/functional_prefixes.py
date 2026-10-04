@@ -64,7 +64,7 @@ def amide_prefix_from_group(
     if single_n is None:
         return ""
     n_subs = [n for n in mol.get_neighbors(single_n) if n not in group.atoms_involved and mol.atoms[n].symbol != "H"]
-    base = RULES.functional_groups.prefix_for(group.key) or ""
+    base = group.prefix or ""
     if not base:
         return ""
     if not n_subs:
@@ -286,6 +286,8 @@ def static_prefix_handler(name: str) -> PrefixHandler:
 
 
 def acid_halide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    if group.resolved_rule is not None and "acid_halide" in group.resolved_rule.families:
+        return f"({group.prefix})" if group.prefix else ""
     return RULES.functional_groups.cited_prefix_for(group.key) or ""
 
 
@@ -296,7 +298,7 @@ def direct_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
 def fallback_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     if group.attachment_carbon not in context.parent_path:
         return ""
-    return RULES.functional_groups.prefix_for(group.key) or ""
+    return group.prefix or ""
 
 
 PREFIX_HANDLERS: dict[str, PrefixHandler] = {}
@@ -329,7 +331,16 @@ PREFIX_HANDLERS["hydrazine"] = hydrazine_prefix_handler
 
 
 def prefix_from_group(context: PrefixContext, group: PerceivedGroup) -> str:
-    handler = PREFIX_HANDLERS.get(group.key, fallback_prefix_handler)
+    handler = PREFIX_HANDLERS.get(group.key)
+    if handler is None and group.resolved_rule is not None:
+        if "ester_like" in group.resolved_rule.families:
+            handler = ester_prefix_handler
+        elif "amide_like" in group.resolved_rule.families:
+            handler = amide_prefix_handler
+        elif "acid_halide" in group.resolved_rule.families:
+            handler = acid_halide_prefix_handler
+    if handler is None:
+        handler = fallback_prefix_handler
     return handler(context, group)
 
 

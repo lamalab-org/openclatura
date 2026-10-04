@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+from .chalcogen_roles import DerivativeKind, FunctionalFamily
 from .group_atom_roles import (
     amide_nitrogen,
     bridge_oxygen,
@@ -46,9 +47,8 @@ def retarget_external_carbonyl_groups(
     """Move exocyclic carbonyl group attachment onto the parent chain atom."""
 
     for group in perceived_groups:
-        if group.key == principal_key or group.key not in RULES.functional_groups.keys_with_family(
-            "chain_external_carbonyl"
-        ):
+        families = group.resolved_rule.families if group.resolved_rule is not None else ()
+        if group.key == principal_key or "chain_external_carbonyl" not in families:
             continue
         group_c = group.attachment_carbon
         if group_c in cyclic_atoms_all:
@@ -68,6 +68,21 @@ def exclude_nonparent_group_atoms(
     for group in perceived_groups:
         selector = NONPARENT_ATOM_SELECTORS.get(group.key)
         atom_idx = selector(mol, group) if selector else None
+        if (
+            atom_idx is None
+            and group.descriptor is not None
+            and group.descriptor.family is FunctionalFamily.ACYL
+            and group.descriptor.derivative is DerivativeKind.ESTER
+        ):
+            atom_idx = ester_single_oxygen(mol, group)
+        if (
+            atom_idx is None
+            and group.descriptor is not None
+            and group.descriptor.family is FunctionalFamily.ACYL
+            and group.descriptor.derivative
+            in {DerivativeKind.AMIDE, DerivativeKind.HYDRAZIDE, DerivativeKind.UREA}
+        ):
+            atom_idx = amide_nitrogen(mol, group)
         if atom_idx is not None and atom_idx not in cyclic_atoms_all:
             exclude_atoms.add(atom_idx)
 

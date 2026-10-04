@@ -341,7 +341,7 @@ def assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
         )
 
     if parts.principal_group:
-        group = RULES.functional_groups.get(parts.principal_group.key)
+        group = parts.principal_group.resolved_rule or RULES.functional_groups.get(parts.principal_group.key)
         terms = list(principal_suffix_terms(group, (1, 2, 3)))
         if group.prefix:
             terms.append(group.prefix)

@@ -1155,6 +1155,26 @@
         "suffix_with_locant": false,
         "needs_locant": true
       },
+      "selenourea": {
+        "role": "principal",
+        "prefix": "carbamoselenoylamino",
+        "suffix": "selenourea",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 62,
+        "suffix_with_locant": false,
+        "needs_locant": true,
+        "families": ["amide_like", "urea"]
+      },
+      "tellurourea": {
+        "role": "principal",
+        "prefix": "carbamotelluroylamino",
+        "suffix": "tellurourea",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 63,
+        "suffix_with_locant": false,
+        "needs_locant": true,
+        "families": ["amide_like", "urea"]
+      },
       "ring_amide": {
         "role": "principal",
         "prefix": "carbamoyl",

@@ -2408,7 +2408,7 @@ def test_terminal_thioformyl_subgraph_is_graph_derived():
 def test_thioester_is_not_perceived_as_ring_thioaldehyde():
     generated = name_smiles("CCSC(=S)C1=CCC=CN1")
 
-    assert generated == "2-((ethylsulfanyl)(thioxo)methyl)-1,4-dihydropyridine"
+    assert generated == "S-ethyl 1,4-dihydropyridine-2-carbodithioate"
 
 
 def test_cyclic_thioamide_is_not_perceived_as_thioaldehyde():

@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 
 from .chalcogen_roles import (
+    ChalcogenLigand,
     ChalcogenLigandRole,
     DerivativeKind,
     FunctionalFamily,
@@ -10,7 +11,7 @@ from .chalcogen_roles import (
     classify_chalcogen_ligand,
     chalcogen_for_symbol,
 )
-from .chalcogen_vocabulary import simple_group_key
+from .chalcogen_vocabulary import resolve_acyl_rule, simple_group_key
 from .chains import get_cyclic_atoms
 from .functional_groups import PERCEPTION_DETECTORS, PERCEPTION_SPECS, PerceptionDetectorSpec, metadata_for_group
 from .molecule import (
@@ -225,10 +226,16 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
     for atom in mol:
         if not atom.is_carbon or atom.idx in consumed or atom.idx in cyclic_atoms:
             continue
-        oxygens = [o for o in mol.get_neighbors(atom.idx) if mol.atoms[o].symbol == "O" and o not in consumed]
-        double_o = next((o for o in oxygens if mol.get_bond(atom.idx, o).order == 2 and mol.degree(o) == 1), None)
-        if double_o is None or len(oxygens) != 1:
+        double_ligands = [
+            ligand
+            for neighbor in mol.get_neighbors(atom.idx)
+            if neighbor not in consumed
+            and (ligand := classify_chalcogen_ligand(mol, atom.idx, neighbor)) is not None
+            and ligand.role is ChalcogenLigandRole.DOUBLE_BONDED
+        ]
+        if len(double_ligands) != 1:
             continue
+        double_ligand = double_ligands[0]
         for single_n in [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "N" and n not in consumed]:
             if mol.get_bond(atom.idx, single_n).order != 1:
                 continue
@@ -236,11 +243,31 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             if hydrazide_nitrogens is None:
                 continue
             ring_neighbors = [n for n in mol.get_neighbors(atom.idx) if n in cyclic_atoms]
-            target, key = atom.idx, "hydrazide"
+            target = atom.idx
+            external = False
             if len(ring_neighbors) == 1 and mol.get_bond(atom.idx, ring_neighbors[0]).order == 1:
-                target, key = ring_neighbors[0], "ring_hydrazide"
-            groups.append(PerceivedGroup(key, True, target, {atom.idx, double_o, *hydrazide_nitrogens}))
-            consumed.update([double_o, *hydrazide_nitrogens])
+                target = ring_neighbors[0]
+                external = True
+            descriptor = FunctionalGroupDescriptor(
+                family=FunctionalFamily.ACYL,
+                derivative=DerivativeKind.HYDRAZIDE,
+                centers=(atom.idx,),
+                ligands=(double_ligand,),
+                attachment_atom=target,
+                is_external=external,
+            )
+            key, rule = resolve_acyl_rule(descriptor)
+            groups.append(
+                PerceivedGroup(
+                    key,
+                    True,
+                    target,
+                    {atom.idx, double_ligand.atom, *hydrazide_nitrogens},
+                    descriptor=descriptor,
+                    resolved_rule=rule,
+                )
+            )
+            consumed.update([double_ligand.atom, *hydrazide_nitrogens])
             break
 
     for role in nitrogen_chain_roles(mol, cyclic_atoms, consumed):
@@ -493,6 +520,11 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
 
     for atom in mol:
         if atom.is_carbon:
+            acyl_group = _acyl_chalcogen_group(mol, atom.idx, consumed, cyclic_atoms)
+            if acyl_group is not None:
+                groups.append(acyl_group)
+                consumed.update(acyl_group.atoms_involved - {acyl_group.attachment_carbon})
+                continue
             oxygens = [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "O" and n not in consumed]
             nitrogens = [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "N" and n not in consumed]
             sulfurs = [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "S" and n not in consumed]
@@ -881,6 +913,189 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                     consumed.add(atom.idx)
 
     return groups
+
+
+def _acyl_chalcogen_group(
+    mol: Molecule,
+    carbon: int,
+    consumed: set[int],
+    cyclic_atoms: set[int],
+) -> PerceivedGroup | None:
+    """Classify one complete C(=E) derivative before simpler fragments."""
+
+    ligands = [
+        ligand
+        for neighbor in mol.get_neighbors(carbon)
+        if neighbor not in consumed
+        and (ligand := classify_chalcogen_ligand(mol, carbon, neighbor)) is not None
+    ]
+    double_ligands = [ligand for ligand in ligands if ligand.role is ChalcogenLigandRole.DOUBLE_BONDED]
+    if len(double_ligands) != 1:
+        return None
+    double_ligand = double_ligands[0]
+    ring_neighbors = [neighbor for neighbor in mol.get_neighbors(carbon) if neighbor in cyclic_atoms]
+    external = (
+        carbon not in cyclic_atoms
+        and len(ring_neighbors) == 1
+        and mol.get_bond(carbon, ring_neighbors[0]).order == 1
+    )
+    attachment = ring_neighbors[0] if external else carbon
+
+    single_ligands = [
+        ligand
+        for ligand in ligands
+        if ligand.role
+        in {
+            ChalcogenLigandRole.HYDROGEN_BEARING,
+            ChalcogenLigandRole.ANIONIC,
+            ChalcogenLigandRole.ORGANIC_LINK,
+            ChalcogenLigandRole.CHALCOGEN_LINK,
+        }
+    ]
+    if len(single_ligands) == 1:
+        single_ligand = single_ligands[0]
+        if single_ligand.role is ChalcogenLigandRole.CHALCOGEN_LINK:
+            return None
+        if (
+            single_ligand.role is ChalcogenLigandRole.ORGANIC_LINK
+            and carbon in cyclic_atoms
+            and single_ligand.atom in cyclic_atoms
+            and _closes_ring_back_to(mol, carbon, single_ligand.atom, double_ligand.atom, cyclic_atoms)
+        ):
+            return _carbonyl_chalcogen_group(mol, carbon, attachment, double_ligand, DerivativeKind.KETONE)
+        derivative_by_role = {
+            ChalcogenLigandRole.HYDROGEN_BEARING: DerivativeKind.ACID,
+            ChalcogenLigandRole.ANIONIC: DerivativeKind.ANION,
+            ChalcogenLigandRole.ORGANIC_LINK: DerivativeKind.ESTER,
+        }
+        derivative = derivative_by_role[single_ligand.role]
+        descriptor = FunctionalGroupDescriptor(
+            family=FunctionalFamily.ACYL,
+            derivative=derivative,
+            centers=(carbon,),
+            ligands=(double_ligand, single_ligand),
+            linker_paths=((carbon, single_ligand.atom, single_ligand.attachment_atom),)
+            if single_ligand.attachment_atom is not None
+            else (),
+            attachment_atom=attachment,
+            is_external=external,
+        )
+        key, rule = resolve_acyl_rule(descriptor)
+        return PerceivedGroup(
+            key,
+            True,
+            attachment,
+            {carbon, double_ligand.atom, single_ligand.atom},
+            descriptor=descriptor,
+            resolved_rule=rule,
+        )
+
+    halogens = [
+        neighbor
+        for neighbor in mol.get_neighbors(carbon)
+        if neighbor not in consumed
+        and mol.atoms[neighbor].symbol in {"F", "Cl", "Br", "I"}
+        and mol.get_bond(carbon, neighbor).order == 1
+    ]
+    if len(halogens) == 1:
+        leaving = halogens[0]
+        descriptor = FunctionalGroupDescriptor(
+            family=FunctionalFamily.ACYL,
+            derivative=DerivativeKind.ACID_HALIDE,
+            centers=(carbon,),
+            ligands=(double_ligand,),
+            attachment_atom=attachment,
+            is_external=external,
+        )
+        key, rule = resolve_acyl_rule(descriptor, leaving_symbol=mol.atoms[leaving].symbol)
+        return PerceivedGroup(
+            key,
+            True,
+            attachment,
+            {carbon, double_ligand.atom, leaving},
+            descriptor=descriptor,
+            resolved_rule=rule,
+        )
+
+    nitrogens = [
+        neighbor
+        for neighbor in mol.get_neighbors(carbon)
+        if neighbor not in consumed
+        and mol.atoms[neighbor].symbol == "N"
+        and mol.get_bond(carbon, neighbor).order == 1
+    ]
+    if not nitrogens:
+        return None
+    nitrogens.sort(
+        key=lambda nitrogen: (
+            nitrogen not in cyclic_atoms,
+            any(neighbor != carbon and mol.atoms[neighbor].symbol != "H" for neighbor in mol.get_neighbors(nitrogen)),
+        ),
+        reverse=True,
+    )
+    nitrogen = nitrogens[0]
+    is_lactam = (
+        carbon in cyclic_atoms
+        and nitrogen in cyclic_atoms
+        and _closes_ring_back_to(mol, carbon, nitrogen, double_ligand.atom, cyclic_atoms)
+    )
+    if is_lactam:
+        return _carbonyl_chalcogen_group(mol, carbon, attachment, double_ligand, DerivativeKind.KETONE)
+    hydrazide_nitrogens = _hydrazide_nitrogens(mol, carbon, nitrogen, cyclic_atoms)
+    if hydrazide_nitrogens is not None:
+        derivative = DerivativeKind.HYDRAZIDE
+        group_nitrogens = hydrazide_nitrogens
+    else:
+        urea_nitrogens = _urea_nitrogens(mol, carbon, nitrogens, cyclic_atoms)
+        if urea_nitrogens is not None:
+            derivative = DerivativeKind.UREA
+            group_nitrogens = urea_nitrogens
+            attachment = carbon
+            external = False
+        elif nitrogen not in cyclic_atoms:
+            derivative = DerivativeKind.AMIDE
+            group_nitrogens = (nitrogen,)
+        else:
+            return None
+    descriptor = FunctionalGroupDescriptor(
+        family=FunctionalFamily.ACYL,
+        derivative=derivative,
+        centers=(carbon,),
+        ligands=(double_ligand,),
+        attachment_atom=attachment,
+        is_external=external,
+    )
+    key, rule = resolve_acyl_rule(descriptor)
+    return PerceivedGroup(
+        key,
+        True,
+        attachment,
+        {carbon, double_ligand.atom, *group_nitrogens},
+        descriptor=descriptor,
+        resolved_rule=rule,
+    )
+
+
+def _carbonyl_chalcogen_group(
+    mol: Molecule,
+    carbon: int,
+    attachment: int,
+    ligand: ChalcogenLigand,
+    derivative: DerivativeKind,
+) -> PerceivedGroup | None:
+    external = attachment != carbon
+    key = simple_group_key(FunctionalFamily.CARBONYL, derivative, ligand.element, external=external)
+    if key is None:
+        return None
+    descriptor = FunctionalGroupDescriptor(
+        family=FunctionalFamily.CARBONYL,
+        derivative=derivative,
+        centers=(carbon,),
+        ligands=(ligand,),
+        attachment_atom=attachment,
+        is_external=external,
+    )
+    return PerceivedGroup(key, True, attachment, {carbon, ligand.atom}, descriptor=descriptor)
 
 
 def _enrich_groups(mol: Molecule, groups: list[PerceivedGroup]) -> list[PerceivedGroup]:

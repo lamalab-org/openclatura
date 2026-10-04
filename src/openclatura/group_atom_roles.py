@@ -1,5 +1,6 @@
 """Reusable atom-role selectors for perceived functional groups."""
 
+from .chalcogen_roles import ChalcogenLigandRole
 from .molecule import Molecule
 from .nomenclature import RULES
 from .perception import PerceivedGroup
@@ -10,6 +11,10 @@ def bridge_oxygen(mol: Molecule, group: PerceivedGroup) -> int | None:
 
 
 def ester_single_oxygen(mol: Molecule, group: PerceivedGroup) -> int | None:
+    if group.descriptor is not None:
+        linkers = group.descriptor.ligands_with_role(ChalcogenLigandRole.ORGANIC_LINK)
+        if linkers:
+            return linkers[0].atom
     return next(
         (
             o
