@@ -1,0 +1,317 @@
+{
+  "dataset": "Orthonym PubChem 1M scaffold-representative corpus",
+  "selection": "all rows non-exact for deposited Openclatura 0.3.2 run (87,817 abstained + 2 other-layer matches)",
+  "openclatura_version": "0.4.0",
+  "openclatura_branch": "internal-verification (working tree state used for prior development)",
+  "scoring": "OPSIN 2.9.0 with allow_radicals=True; raw input and OPSIN-output full InChIKeys, matching the Orthonym paper scorer",
+  "selected_rows": 87819,
+  "exact_matches_recovered": 49169,
+  "remaining_failures": 38650,
+  "failure_counts": {
+    "naming_error": 21348,
+    "opsin_unparseable": 4177,
+    "constitutional_match": 6042,
+    "graph_mismatch": 7043,
+    "opsin_structure_invalid": 39,
+    "comparison_error": 1
+  },
+  "naming_error_types": {
+    "UnnamedAtomError": 5339,
+    "ValueError": 15737,
+    "KeyError": 81,
+    "TimeoutError": 186,
+    "FinalAssemblyAuditError": 5
+  },
+  "unknown_element_counts": {
+    "Ir": 2752,
+    "Pt": 2192,
+    "Y": 939,
+    "Fe": 696,
+    "Zr": 682,
+    "Pd": 612,
+    "Cu": 516,
+    "Ru": 448,
+    "Zn": 421,
+    "Ti": 355,
+    "V": 315,
+    "W": 303,
+    "U": 280,
+    "Ni": 274,
+    "Co": 236,
+    "Mn": 165,
+    "Au": 161,
+    "Cr": 132,
+    "Os": 131,
+    "Cs": 129,
+    "Rh": 124,
+    "Hf": 112,
+    "Mo": 97,
+    "Ac": 84,
+    "Ag": 82,
+    "Rb": 80,
+    "Re": 69,
+    "Gd": 63,
+    "Hg": 60,
+    "Eu": 51,
+    "Be": 42,
+    "Pr": 29,
+    "Tc": 28,
+    "Rf": 27,
+    "Lu": 25,
+    "Ar": 24,
+    "Cd": 23,
+    "Ba": 19,
+    "Sc": 17,
+    "Nb": 16,
+    "La": 15,
+    "Sm": 15,
+    "Fm": 14,
+    "Ce": 13,
+    "Yb": 12,
+    "Dy": 11,
+    "Lr": 11,
+    "Sr": 11,
+    "Tb": 10,
+    "Po": 9,
+    "Cm": 9,
+    "Nd": 8,
+    "Er": 7,
+    "Ho": 7,
+    "Th": 6,
+    "Ta": 5,
+    "At": 5,
+    "Es": 5,
+    "No": 4,
+    "Bk": 4,
+    "Cf": 3,
+    "Bh": 2,
+    "Pu": 2,
+    "Np": 2,
+    "Xe": 2,
+    "Ne": 2,
+    "He": 2,
+    "Am": 1,
+    "Pm": 1,
+    "Tm": 1,
+    "Hs": 1,
+    "Md": 1,
+    "Pa": 1
+  },
+  "top_naming_errors": [
+    {
+      "count": 2752,
+      "error": "ValueError: Unknown element symbol: Ir"
+    },
+    {
+      "count": 2441,
+      "error": "ValueError: polycyclic parent has no audited descriptor"
+    },
+    {
+      "count": 2286,
+      "error": "UnnamedAtomError: No supported parent skeleton for component atoms: 0:H"
+    },
+    {
+      "count": 2192,
+      "error": "ValueError: Unknown element symbol: Pt"
+    },
+    {
+      "count": 939,
+      "error": "ValueError: Unknown element symbol: Y"
+    },
+    {
+      "count": 696,
+      "error": "ValueError: Unknown element symbol: Fe"
+    },
+    {
+      "count": 682,
+      "error": "ValueError: Unknown element symbol: Zr"
+    },
+    {
+      "count": 612,
+      "error": "ValueError: Unknown element symbol: Pd"
+    },
+    {
+      "count": 516,
+      "error": "ValueError: Unknown element symbol: Cu"
+    },
+    {
+      "count": 448,
+      "error": "ValueError: Unknown element symbol: Ru"
+    },
+    {
+      "count": 421,
+      "error": "ValueError: Unknown element symbol: Zn"
+    },
+    {
+      "count": 355,
+      "error": "ValueError: Unknown element symbol: Ti"
+    },
+    {
+      "count": 315,
+      "error": "ValueError: Unknown element symbol: V"
+    },
+    {
+      "count": 303,
+      "error": "ValueError: Unknown element symbol: W"
+    },
+    {
+      "count": 280,
+      "error": "ValueError: Unknown element symbol: U"
+    },
+    {
+      "count": 274,
+      "error": "ValueError: Unknown element symbol: Ni"
+    },
+    {
+      "count": 236,
+      "error": "ValueError: Unknown element symbol: Co"
+    },
+    {
+      "count": 225,
+      "error": "ValueError: Retained parent locant maps must be complete bijections."
+    },
+    {
+      "count": 186,
+      "error": "TimeoutError: "
+    },
+    {
+      "count": 186,
+      "error": "UnnamedAtomError: No supported parent skeleton for component atoms: 0:B"
+    },
+    {
+      "count": 165,
+      "error": "ValueError: Unknown element symbol: Mn"
+    },
+    {
+      "count": 161,
+      "error": "ValueError: Unknown element symbol: Au"
+    },
+    {
+      "count": 146,
+      "error": "UnnamedAtomError: No supported parent skeleton for component atoms: 0:B, 1:F, 2:F, 3:F, 4:F"
+    },
+    {
+      "count": 132,
+      "error": "ValueError: Unknown element symbol: Cr"
+    },
+    {
+      "count": 131,
+      "error": "ValueError: Unknown element symbol: Os"
+    },
+    {
+      "count": 129,
+      "error": "ValueError: Unknown element symbol: Cs"
+    },
+    {
+      "count": 124,
+      "error": "ValueError: Unknown element symbol: Rh"
+    },
+    {
+      "count": 112,
+      "error": "ValueError: Unknown element symbol: Hf"
+    },
+    {
+      "count": 108,
+      "error": "UnnamedAtomError: No supported parent skeleton for component atoms: 1:B"
+    },
+    {
+      "count": 97,
+      "error": "ValueError: Unknown element symbol: Mo"
+    },
+    {
+      "count": 84,
+      "error": "ValueError: Unknown element symbol: Ac"
+    },
+    {
+      "count": 82,
+      "error": "ValueError: Unknown element symbol: Ag"
+    },
+    {
+      "count": 80,
+      "error": "ValueError: Unknown element symbol: Rb"
+    },
+    {
+      "count": 69,
+      "error": "ValueError: Unknown element symbol: Re"
+    },
+    {
+      "count": 63,
+      "error": "ValueError: Unknown element symbol: Gd"
+    },
+    {
+      "count": 62,
+      "error": "UnnamedAtomError: No supported parent skeleton for component atoms: 0:B, 1:N, 2:S"
+    },
+    {
+      "count": 60,
+      "error": "ValueError: Unknown element symbol: Hg"
+    },
+    {
+      "count": 54,
+      "error": "UnnamedAtomError: No supported parent skeleton for component atoms: 0:H, 1:H"
+    },
+    {
+      "count": 51,
+      "error": "ValueError: Unknown element symbol: Eu"
+    },
+    {
+      "count": 42,
+      "error": "ValueError: Unknown element symbol: Be"
+    },
+    {
+      "count": 32,
+      "error": "UnnamedAtomError: Generated name '<component>' left unnamed atoms: 0:C, 1:C, 2:C, 3:C, 4:Sn, 5:C, 6:C, 7:C, 8:C, 9:C, 10:C, 11:C, 12:C"
+    },
+    {
+      "count": 31,
+      "error": "ValueError: spiro side component has no complete graph-numbered parent containing its junction"
+    },
+    {
+      "count": 29,
+      "error": "ValueError: Unknown element symbol: Pr"
+    },
+    {
+      "count": 28,
+      "error": "ValueError: Unknown element symbol: Tc"
+    },
+    {
+      "count": 27,
+      "error": "ValueError: spiro assembly requires a graph-numbered path of at most three components"
+    },
+    {
+      "count": 27,
+      "error": "ValueError: Unknown element symbol: Rf"
+    },
+    {
+      "count": 25,
+      "error": "ValueError: Unknown element symbol: Lu"
+    },
+    {
+      "count": 25,
+      "error": "UnnamedAtomError: No supported parent skeleton for component atoms: 2:B"
+    },
+    {
+      "count": 24,
+      "error": "ValueError: Unknown element symbol: Ar"
+    },
+    {
+      "count": 23,
+      "error": "ValueError: Unknown element symbol: Cd"
+    }
+  ],
+  "columns": [
+    "index",
+    "smiles",
+    "name",
+    "naming_status",
+    "naming_error",
+    "opsin_smiles",
+    "outcome",
+    "comparison_error"
+  ],
+  "notes": [
+    "The Zenodo deposit discarded Openclatura 0.3.2 names for rejected rows, so this file contains regenerated 0.4.0 names only.",
+    "constitutional_match means the first InChIKey block matches but another layer differs; it is retained as a failure because the paper headline uses the full InChIKey.",
+    "Rows are sorted by the original one-based PubChem scaffold corpus row ID."
+  ]
+}

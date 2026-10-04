@@ -3,9 +3,9 @@
   "original_valid": 100000,
   "opsin_nonempty": 97769,
   "opsin_valid": 97769,
-  "matches": 97700,
-  "failures": 2300,
-  "accuracy": 97.7,
-  "match_method": "standardize_and_canonicalize_tautomer",
+  "matches": 97701,
+  "failures": 2299,
+  "accuracy": 97.701,
+  "match_method": "standardize_tautomer_and_bounded_resonance",
   "failures_csv": "results/zinc22/zinc22_hf_seed211_100000_openclatura_opsin_failures.csv"
 }

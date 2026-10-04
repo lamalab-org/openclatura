@@ -1,11 +1,11 @@
 {
   "rows": 100000,
   "original_valid": 100000,
-  "opsin_nonempty": 97672,
-  "opsin_valid": 97672,
-  "matches": 97608,
-  "failures": 2392,
-  "accuracy": 97.608,
-  "match_method": "standardize_and_canonicalize_tautomer",
+  "opsin_nonempty": 97673,
+  "opsin_valid": 97673,
+  "matches": 97610,
+  "failures": 2390,
+  "accuracy": 97.61,
+  "match_method": "standardize_tautomer_and_bounded_resonance",
   "failures_csv": "results/zinc22/zinc22_seed5_100000_openclatura_opsin_failures.csv"
 }

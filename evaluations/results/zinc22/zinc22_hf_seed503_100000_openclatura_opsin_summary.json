@@ -6,6 +6,6 @@
   "matches": 97736,
   "failures": 2264,
   "accuracy": 97.736,
-  "match_method": "standardize_and_canonicalize_tautomer",
+  "match_method": "standardize_tautomer_and_bounded_resonance",
   "failures_csv": "results/zinc22/zinc22_hf_seed503_100000_openclatura_opsin_failures.csv"
 }

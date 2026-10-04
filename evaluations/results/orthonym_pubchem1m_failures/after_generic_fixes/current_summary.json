@@ -1,0 +1,19 @@
+{
+  "source": "evaluations/results/orthonym_pubchem1m_failures/openclatura_040_failures.csv",
+  "rows": 38650,
+  "counts": {
+    "constitutional_match": 1710,
+    "exact_match": 14803,
+    "graph_mismatch": 8621,
+    "naming_error": 7052,
+    "opsin_structure_invalid": 42,
+    "opsin_unparseable": 6422
+  },
+  "exact_recovered_from_previous_failures": 14803,
+  "remaining_failures": 23847,
+  "elapsed_seconds": 906.006,
+  "metric": "OPSIN 2.9.0 allow_radicals=True; full InChIKey exact match",
+  "all_rows_csv": "evaluations/results/orthonym_pubchem1m_failures/after_generic_fixes/current_all.csv",
+  "failures_csv": "evaluations/results/orthonym_pubchem1m_failures/after_generic_fixes/current_failures.csv",
+  "targeted_refresh_rows": 37
+}
