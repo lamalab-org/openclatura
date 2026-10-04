@@ -108,6 +108,18 @@ def ester_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     return ester_prefix_from_group(context.mol, group, context.sub_exclude, "carbonyl", context.branch_namer)
 
 
+def central_ester_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    """Render an ester prefix from its resolved central-acid vocabulary."""
+
+    return ester_prefix_from_group(
+        context.mol,
+        group,
+        context.sub_exclude,
+        group.prefix or "",
+        context.branch_namer,
+    )
+
+
 def amide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     return amide_prefix_from_group(context.mol, group, context.sub_exclude, context.branch_namer)
 
@@ -333,7 +345,9 @@ PREFIX_HANDLERS["hydrazine"] = hydrazine_prefix_handler
 def prefix_from_group(context: PrefixContext, group: PerceivedGroup) -> str:
     handler = PREFIX_HANDLERS.get(group.key)
     if handler is None and group.resolved_rule is not None:
-        if "ester_like" in group.resolved_rule.families:
+        if "central_acid" in group.resolved_rule.families and "ester_like" in group.resolved_rule.families:
+            handler = central_ester_prefix_handler
+        elif "ester_like" in group.resolved_rule.families:
             handler = ester_prefix_handler
         elif "amide_like" in group.resolved_rule.families:
             handler = amide_prefix_handler

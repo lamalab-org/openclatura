@@ -65,7 +65,9 @@ def add_component_front_modifiers(
                     ligand.element is not Chalcogen.OXYGEN for ligand in group.descriptor.ligands
                 ):
                     ordered_linkers = tuple(
-                        ligand for ligand in group.descriptor.ligands if ligand is not double_ligands[0]
+                        ligand
+                        for ligand in group.descriptor.ligands
+                        if ligand.role is not ChalcogenLigandRole.DOUBLE_BONDED
                     )
                     element_locant = "".join(ligand.element.value for ligand in ordered_linkers)
                     modifier = f"{element_locant}-{modifier}"

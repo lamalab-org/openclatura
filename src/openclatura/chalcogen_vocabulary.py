@@ -399,3 +399,134 @@ def resolve_anhydride_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, 
         needs_locant=True,
         families=("anhydride",),
     )
+
+
+_CENTRAL_ACID_ORIGINS = {
+    (Chalcogen.SULFUR, 2): ("sulfon", 25, "sulfonic_acid", "sulfonate", "sulfonamide"),
+    (Chalcogen.SULFUR, 1): ("sulfin", 27, None, None, None),
+    (Chalcogen.SELENIUM, 2): ("selenon", 28, None, None, None),
+    (Chalcogen.SELENIUM, 1): ("selenin", 29, None, None, None),
+    (Chalcogen.TELLURIUM, 2): ("telluron", 29, None, None, None),
+    (Chalcogen.TELLURIUM, 1): ("tellurin", 29, None, None, None),
+}
+
+
+def resolve_central_acid_rule(
+    descriptor: FunctionalGroupDescriptor,
+    *,
+    leaving_symbol: str | None = None,
+) -> tuple[str, FunctionalGroupRule | None]:
+    """Resolve R-Q(=E)n-E-X for Q = S, Se, or Te."""
+
+    double_ligands = descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED)
+    terminal_ligands = tuple(ligand for ligand in descriptor.ligands if ligand not in double_ligands)
+    central_element = descriptor.central_element
+    if central_element is None:
+        raise ValueError("A central-acid descriptor requires its central element")
+    origin_stem, origin_rank, acid_key, ester_key, amide_key = _CENTRAL_ACID_ORIGINS[
+        (central_element, len(double_ligands))
+    ]
+    if len(terminal_ligands) == 2:
+        first_linker, terminal = terminal_ligands
+        double_infix = _replacement_infix(tuple(ligand.element for ligand in double_ligands))
+        linker_infix = _peroxo_infix(first_linker.element, terminal.element)
+        origin_prefix = f"{origin_stem}{'o' if double_infix else ''}{double_infix}"
+        ordinary_peroxo = (
+            first_linker.element is Chalcogen.OXYGEN and terminal.element is Chalcogen.OXYGEN
+        )
+        if ordinary_peroxo:
+            acid_suffix = f"{origin_prefix}operoxoic acid"
+            ester_suffix = f"{origin_prefix}operoxoate"
+        else:
+            site = f" {first_linker.element.value}{terminal.element.value}-acid"
+            acid_suffix = f"{origin_prefix}o({linker_infix}ic){site}"
+            ester_suffix = f"{origin_prefix}o({linker_infix}ate)"
+        sites = "_".join(ligand.element.value for ligand in descriptor.ligands)
+        key = f"central_{central_element.value}_{descriptor.derivative.value}_{sites}"
+        if descriptor.derivative is DerivativeKind.ACID:
+            suffix = acid_suffix
+            seniority = (
+                origin_rank,
+                *(_ELEMENT_RANK[ligand.element] for ligand in descriptor.ligands),
+            )
+            families = ("central_acid", "peroxy_acid")
+        elif descriptor.derivative is DerivativeKind.ANION:
+            suffix = ester_suffix
+            seniority = (26, origin_rank)
+            families = ("central_acid", "peroxy_ester")
+        elif descriptor.derivative is DerivativeKind.ESTER:
+            suffix = ester_suffix
+            seniority = (45, origin_rank)
+            families = ("central_acid", "ester_like", "peroxy_ester", "front_modifier")
+        else:
+            raise ValueError(f"Unsupported central peroxy derivative: {descriptor.derivative.value}")
+        return key, FunctionalGroupRule(
+            key=key,
+            role="principal",
+            prefix=f"{origin_prefix}operoxyl",
+            suffix=suffix,
+            multi_suffix=None,
+            suffix_multiplier_positions=(0,),
+            seniority=seniority,
+            suffix_with_locant=True,
+            needs_locant=True,
+            families=families,
+        )
+    terminal = terminal_ligands[0] if terminal_ligands else None
+    all_oxygen = all(ligand.element is Chalcogen.OXYGEN for ligand in descriptor.ligands)
+    standard_key = {
+        DerivativeKind.ACID: acid_key,
+        DerivativeKind.ANION: ester_key,
+        DerivativeKind.ESTER: ester_key,
+        DerivativeKind.AMIDE: amide_key,
+    }.get(descriptor.derivative)
+    if all_oxygen and standard_key is not None:
+        return standard_key, None
+
+    expected_oxygen_count = len(descriptor.ligands)
+    replacements = tuple(
+        ligand.element for ligand in descriptor.ligands if ligand.element is not Chalcogen.OXYGEN
+    )
+    infix = _replacement_infix(tuple(Chalcogen.OXYGEN for _ in range(expected_oxygen_count - len(replacements))) + replacements)
+    key_sites = "_".join(ligand.element.value for ligand in descriptor.ligands)
+    key = f"central_{central_element.value}_{descriptor.derivative.value}_{key_sites}"
+    suffix_stem = f"{origin_stem}{'o' if infix else ''}{infix}"
+    families = ("central_acid",)
+    if descriptor.derivative is DerivativeKind.ACID:
+        site = f" {terminal.element.value}-acid" if terminal is not None and replacements else " acid"
+        suffix = f"{suffix_stem}ic{site}"
+        seniority = (origin_rank, *(_ELEMENT_RANK[ligand.element] for ligand in descriptor.ligands))
+        prefix = f"{origin_stem}o{infix}o"
+    elif descriptor.derivative is DerivativeKind.ANION:
+        suffix = f"{suffix_stem}ate"
+        seniority = (26, origin_rank, *(_ELEMENT_RANK[ligand.element] for ligand in descriptor.ligands))
+        prefix = f"{origin_stem}ato"
+    elif descriptor.derivative is DerivativeKind.ESTER:
+        suffix = f"{suffix_stem}ate"
+        seniority = (40, origin_rank, *(_ELEMENT_RANK[ligand.element] for ligand in descriptor.ligands))
+        prefix = f"{origin_stem}yl"
+        families += ("ester_like", "front_modifier")
+    elif descriptor.derivative is DerivativeKind.AMIDE:
+        suffix = f"{suffix_stem}amide"
+        seniority = (66, origin_rank, *(_ELEMENT_RANK[ligand.element] for ligand in double_ligands))
+        prefix = f"{origin_stem}amoyl"
+        families += ("amide_like",)
+    elif descriptor.derivative is DerivativeKind.ACID_HALIDE and leaving_symbol is not None:
+        suffix = f"{suffix_stem}yl {_HALIDE_WORD[leaving_symbol]}"
+        seniority = (55, origin_rank, _HALIDE_RANK[leaving_symbol])
+        prefix = f"{_HALIDE_PREFIX[leaving_symbol]}{origin_stem}yl"
+        families += ("acid_halide",)
+    else:
+        raise ValueError(f"Unsupported central-acid derivative: {descriptor.derivative.value}")
+    return key, FunctionalGroupRule(
+        key=key,
+        role="principal",
+        prefix=prefix,
+        suffix=suffix,
+        multi_suffix=MultiSuffixTemplate((0,)),
+        suffix_multiplier_positions=(0,),
+        seniority=seniority,
+        suffix_with_locant=True,
+        needs_locant=True,
+        families=families,
+    )

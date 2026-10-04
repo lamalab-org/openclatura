@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 
-from .chalcogen_roles import DerivativeKind, FunctionalFamily
+from .chalcogen_roles import ChalcogenLigandRole, DerivativeKind, FunctionalFamily
 from .group_atom_roles import (
     amide_nitrogen,
     bridge_oxygen,
@@ -67,24 +67,35 @@ def exclude_nonparent_group_atoms(
 
     for group in perceived_groups:
         selector = NONPARENT_ATOM_SELECTORS.get(group.key)
-        atom_idx = selector(mol, group) if selector else None
+        atom_indices = {atom_idx} if selector and (atom_idx := selector(mol, group)) is not None else set()
         if (
-            atom_idx is None
+            not atom_indices
             and group.descriptor is not None
             and group.descriptor.family is FunctionalFamily.ACYL
             and group.descriptor.derivative is DerivativeKind.ESTER
         ):
-            atom_idx = ester_single_oxygen(mol, group)
+            atom_indices.update(
+                ligand.atom
+                for ligand in group.descriptor.ligands
+                if ligand.role is ChalcogenLigandRole.ORGANIC_LINK
+            )
         if (
-            atom_idx is None
+            not atom_indices
             and group.descriptor is not None
             and group.descriptor.family is FunctionalFamily.ACYL
             and group.descriptor.derivative
             in {DerivativeKind.AMIDE, DerivativeKind.HYDRAZIDE, DerivativeKind.UREA}
         ):
-            atom_idx = amide_nitrogen(mol, group)
-        if atom_idx is not None and atom_idx not in cyclic_atoms_all:
-            exclude_atoms.add(atom_idx)
+            if (atom_idx := amide_nitrogen(mol, group)) is not None:
+                atom_indices.add(atom_idx)
+        if group.descriptor is not None and group.descriptor.family is FunctionalFamily.CENTRAL_ACID:
+            atom_indices.update(group.descriptor.centers)
+            atom_indices.update(
+                ligand.atom
+                for ligand in group.descriptor.ligands
+                if ligand.role is ChalcogenLigandRole.ORGANIC_LINK
+            )
+        exclude_atoms.update(atom_idx for atom_idx in atom_indices if atom_idx not in cyclic_atoms_all)
 
 
 def principal_involved_atoms(

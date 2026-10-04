@@ -188,3 +188,42 @@ def test_anhydride_bridges_and_acyl_sites_are_independent(smiles: str, expected:
     import openclatura as oc
 
     assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("CS(=O)(=O)O", "methanesulfonic acid"),
+        ("CS(=O)O", "methanesulfinic acid"),
+        ("C[Se](=O)(=O)O", "methaneselenonic acid"),
+        ("C[Se](=O)O", "methaneseleninic acid"),
+        ("C[Te](=O)(=O)O", "methanetelluronic acid"),
+        ("C[Te](=O)O", "methanetellurinic acid"),
+        ("CS(=S)(=O)O", "methanesulfonothioic O-acid"),
+        ("CS(=O)(=O)S", "methanesulfonothioic S-acid"),
+        ("C[Se](=S)(=O)O", "methaneselenonothioic O-acid"),
+        ("CS(=O)(=O)OC", "methyl methanesulfonate"),
+        ("CS(=O)(=O)N", "methanesulfonamide"),
+        ("CS(=O)(=O)Cl", "methanesulfonyl chloride"),
+    ],
+)
+def test_central_chalcogen_acids_and_derivatives_share_one_topology(smiles: str, expected: str):
+    import openclatura as oc
+
+    assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("CS(=O)(=O)OO", "methanesulfonoperoxoic acid"),
+        ("CS(=O)(=O)SO", "methanesulfono(thioperoxoic) SO-acid"),
+        ("CS(=O)(=O)O[SH]", "methanesulfono(thioperoxoic) OS-acid"),
+        ("CS(=O)(=O)OOC", "methyl methanesulfonoperoxoate"),
+        ("CS(=O)(=O)SOC", "SO-methyl methanesulfono(thioperoxoate)"),
+    ],
+)
+def test_central_chalcogen_peroxy_paths_preserve_orientation(smiles: str, expected: str):
+    import openclatura as oc
+
+    assert oc.name(smiles).name == expected

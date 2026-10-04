@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 
 from .chalcogen_roles import (
+    Chalcogen,
     ChalcogenLigand,
     ChalcogenLigandRole,
     DerivativeKind,
@@ -14,6 +15,7 @@ from .chalcogen_roles import (
 from .chalcogen_vocabulary import (
     resolve_acyl_rule,
     resolve_anhydride_rule,
+    resolve_central_acid_rule,
     resolve_peroxol_rule,
     resolve_peroxy_acyl_rule,
     simple_group_key,
@@ -392,6 +394,12 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                         if not is_cyclic:
                             groups.append(PerceivedGroup("anhydride", True, c1, {atom.idx, o1, o2}))
                             consumed.update([atom.idx, o1, o2])
+
+    for atom in mol:
+        central_group = _central_chalcogen_derivative(mol, atom.idx, consumed, cyclic_atoms)
+        if central_group is not None:
+            groups.append(central_group)
+            consumed.update(central_group.atoms_involved - {central_group.attachment_carbon})
 
     for atom in mol:
         if atom.symbol == "S" and atom.idx not in consumed:
@@ -1304,6 +1312,122 @@ def _connected_without_bridge(mol: Molecule, start: int, target: int, bridge_ato
                 visited.add(neighbor)
                 queue.append(neighbor)
     return False
+
+
+def _central_chalcogen_derivative(
+    mol: Molecule,
+    center: int,
+    consumed: set[int],
+    cyclic_atoms: set[int],
+) -> PerceivedGroup | None:
+    central_element = chalcogen_for_symbol(mol.atoms[center].symbol)
+    if (
+        central_element not in {Chalcogen.SULFUR, Chalcogen.SELENIUM, Chalcogen.TELLURIUM}
+        or center in consumed
+        or center in cyclic_atoms
+    ):
+        return None
+    carbon_anchors = [
+        neighbor
+        for neighbor in mol.get_neighbors(center)
+        if mol.atoms[neighbor].is_carbon and mol.get_bond(center, neighbor).order == 1
+    ]
+    if len(carbon_anchors) != 1:
+        return None
+    anchor = carbon_anchors[0]
+    ligands = [
+        ligand
+        for neighbor in mol.get_neighbors(center)
+        if neighbor != anchor
+        and neighbor not in consumed
+        and (ligand := classify_chalcogen_ligand(mol, center, neighbor)) is not None
+    ]
+    double_ligands = [ligand for ligand in ligands if ligand.role is ChalcogenLigandRole.DOUBLE_BONDED]
+    if len(double_ligands) not in {1, 2}:
+        return None
+    terminal_ligands = [
+        ligand
+        for ligand in ligands
+        if ligand.role
+        in {
+            ChalcogenLigandRole.HYDROGEN_BEARING,
+            ChalcogenLigandRole.ANIONIC,
+            ChalcogenLigandRole.ORGANIC_LINK,
+            ChalcogenLigandRole.CHALCOGEN_LINK,
+        }
+    ]
+    derivative = None
+    group_atoms = {center, *(ligand.atom for ligand in double_ligands)}
+    leaving_symbol = None
+    if len(terminal_ligands) == 1:
+        terminal = terminal_ligands[0]
+        if terminal.role is ChalcogenLigandRole.CHALCOGEN_LINK:
+            terminal_atom = terminal.attachment_atom
+            if terminal_atom is None:
+                return None
+            terminal_end = classify_chalcogen_ligand(mol, terminal.atom, terminal_atom)
+            if terminal_end is None:
+                return None
+            derivative = {
+                ChalcogenLigandRole.HYDROGEN_BEARING: DerivativeKind.ACID,
+                ChalcogenLigandRole.ANIONIC: DerivativeKind.ANION,
+                ChalcogenLigandRole.ORGANIC_LINK: DerivativeKind.ESTER,
+            }.get(terminal_end.role)
+            if derivative is None:
+                return None
+            descriptor_ligands = (*double_ligands, terminal, terminal_end)
+            group_atoms.update({terminal.atom, terminal_end.atom})
+        else:
+            derivative = {
+                ChalcogenLigandRole.HYDROGEN_BEARING: DerivativeKind.ACID,
+                ChalcogenLigandRole.ANIONIC: DerivativeKind.ANION,
+                ChalcogenLigandRole.ORGANIC_LINK: DerivativeKind.ESTER,
+            }[terminal.role]
+            descriptor_ligands = (*double_ligands, terminal)
+            group_atoms.add(terminal.atom)
+    else:
+        nitrogens = [
+            neighbor
+            for neighbor in mol.get_neighbors(center)
+            if neighbor not in consumed
+            and mol.atoms[neighbor].symbol == "N"
+            and mol.get_bond(center, neighbor).order == 1
+        ]
+        halogens = [
+            neighbor
+            for neighbor in mol.get_neighbors(center)
+            if neighbor not in consumed
+            and mol.atoms[neighbor].symbol in {"F", "Cl", "Br", "I"}
+            and mol.get_bond(center, neighbor).order == 1
+        ]
+        if len(nitrogens) == 1:
+            derivative = DerivativeKind.AMIDE
+            descriptor_ligands = tuple(double_ligands)
+            group_atoms.add(nitrogens[0])
+        elif len(halogens) == 1:
+            derivative = DerivativeKind.ACID_HALIDE
+            descriptor_ligands = tuple(double_ligands)
+            leaving_symbol = mol.atoms[halogens[0]].symbol
+            group_atoms.add(halogens[0])
+        else:
+            return None
+    descriptor = FunctionalGroupDescriptor(
+        family=FunctionalFamily.CENTRAL_ACID,
+        derivative=derivative,
+        centers=(center,),
+        ligands=tuple(descriptor_ligands),
+        attachment_atom=anchor,
+        central_element=central_element,
+    )
+    key, rule = resolve_central_acid_rule(descriptor, leaving_symbol=leaving_symbol)
+    return PerceivedGroup(
+        key,
+        True,
+        anchor,
+        group_atoms,
+        descriptor=descriptor,
+        resolved_rule=rule,
+    )
 
 
 def _enrich_groups(mol: Molecule, groups: list[PerceivedGroup]) -> list[PerceivedGroup]:

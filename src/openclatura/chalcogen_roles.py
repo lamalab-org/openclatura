@@ -81,6 +81,7 @@ class FunctionalGroupDescriptor:
     linker_paths: tuple[tuple[int, ...], ...] = ()
     attachment_atom: int | None = None
     is_external: bool = False
+    central_element: Chalcogen | None = None
 
     @property
     def atom_ids(self) -> frozenset[int]:
