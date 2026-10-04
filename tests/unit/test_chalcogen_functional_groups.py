@@ -2,9 +2,10 @@
 
 import pytest
 
+from openclatura.chalcogen_roles import ChalcogenLigandRole, classify_chalcogen_ligand
+from openclatura.charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
 from openclatura.graph_io import read_smiles
 from openclatura.perception import _builtin_perceive_groups
-from openclatura.chalcogen_roles import ChalcogenLigandRole, classify_chalcogen_ligand
 
 
 @pytest.mark.parametrize("smiles", ["CC(=O)OC(C)=O", "O=C(C)OC(C)=O"])
@@ -224,6 +225,42 @@ def test_central_chalcogen_acids_and_derivatives_share_one_topology(smiles: str,
     ],
 )
 def test_central_chalcogen_peroxy_paths_preserve_orientation(smiles: str, expected: str):
+    import openclatura as oc
+
+    assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "kind", "expected"),
+    [
+        ("C[N+](C)(C)[O-]", NitrogenChalcogenideKind.AMINE, "(trimethyl)amine oxide"),
+        ("C[N+](C)(C)[S-]", NitrogenChalcogenideKind.AMINE, "(trimethyl)amine sulfide"),
+        ("C[N+](C)(C)[Se-]", NitrogenChalcogenideKind.AMINE, "(trimethyl)amine selenide"),
+        ("C[N+](C)(C)[Te-]", NitrogenChalcogenideKind.AMINE, "(trimethyl)amine telluride"),
+        ("CC=[N+](C)[O-]", NitrogenChalcogenideKind.IMINE, "N-methylethanimine N-oxide"),
+        ("CC=[N+](C)[S-]", NitrogenChalcogenideKind.IMINE, "N-methylethanimine N-sulfide"),
+    ],
+)
+def test_nitrogen_chalcogenides_are_classified_before_rendering(smiles: str, kind, expected: str):
+    import openclatura as oc
+
+    role = next(role for role in charge_pair_roles(read_smiles(smiles)) if role.nitrogen_kind is not None)
+
+    assert role.nitrogen_kind is kind
+    assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("CC#[N+][O-]", "ethanenitrile oxide"),
+        ("CC#[N+][S-]", "ethanenitrile sulfide"),
+        ("CC#[N+][Se-]", "ethanenitrile selenide"),
+        ("CC#[N+][Te-]", "ethanenitrile telluride"),
+        ("c1ccccc1C#[N+][S-]", "benzenecarbonitrile sulfide"),
+    ],
+)
+def test_nitrile_chalcogenides_use_zwitterion_priority_and_class_names(smiles: str, expected: str):
     import openclatura as oc
 
     assert oc.name(smiles).name == expected

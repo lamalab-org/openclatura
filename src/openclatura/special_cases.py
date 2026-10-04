@@ -4,11 +4,11 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
-from .assembly_parts import NameAtomBinding, NameTokenBinding
+from .assembly_parts import NameAtomBinding, NameTokenBinding, rendered_substituent_text
 from .assembly_prefixes import substituent_sort_key
 from .chains import get_cyclic_atoms
-from .charge_pair_roles import charge_pair_roles
-from .chalcogen_vocabulary import anhydride_class_name
+from .charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
+from .chalcogen_vocabulary import anhydride_class_name, chalcogenide_class_name
 from .formatting import (
     count_names,
     format_center_ligands,
@@ -263,6 +263,10 @@ def structural_replacement_parent_result(
         ("simple_azine_parent", lambda: simple_azine_parent_name(mol, component_atoms, branch_namer)),
         ("phosphane_borane_zwitterion", lambda: phosphane_borane_zwitterion_result(mol, component_atoms, branch_namer)),
         ("sulfonium_ylide", lambda: sulfonium_ylide_result(mol, component_atoms, branch_namer)),
+        (
+            "nitrogen_chalcogenide",
+            lambda: nitrogen_chalcogenide_result(mol, component_atoms, branch_namer),
+        ),
         ("hydroxyurea_parent", lambda: hydroxyurea_parent_result(mol, component_atoms, branch_namer)),
         ("sulfamic_acid", lambda: sulfamic_acid_result(mol, component_atoms, branch_namer)),
         ("azinic_acid", lambda: azinic_acid_result(mol, component_atoms, branch_namer)),
@@ -285,6 +289,59 @@ def structural_replacement_parent_result(
         if rendered:
             return _component_name_result(mol, component_atoms, rendered, role)
     return None
+
+
+def nitrogen_chalcogenide_result(
+    mol: Molecule,
+    component_atoms: set[int],
+    branch_namer: RecursiveSubgraphNamer | None = None,
+) -> SpecialComponentName | None:
+    """Name one amine/imine N+-E- pair by P-62.5 functional-class nomenclature."""
+
+    matches = [
+        role
+        for role in charge_pair_roles(mol, component_atoms)
+        if role.nitrogen_kind in {NitrogenChalcogenideKind.AMINE, NitrogenChalcogenideKind.IMINE}
+        and role.chalcogen is not None
+    ]
+    if len(matches) != 1:
+        return None
+    role = matches[0]
+    nitrogen = role.positive_atom
+    chalcogen = role.negative_atom
+    class_name = chalcogenide_class_name(role.chalcogen)
+    if role.nitrogen_kind is NitrogenChalcogenideKind.AMINE:
+        if branch_namer is None:
+            return None
+        ligand_names = []
+        for ligand in mol.get_neighbors(nitrogen):
+            if ligand == chalcogen or mol.atoms[ligand].symbol == "H":
+                continue
+            rendered = branch_namer(
+                mol,
+                ligand,
+                (set(mol.atoms) - component_atoms) | {nitrogen, chalcogen},
+                upstream_atom=nitrogen,
+            )
+            rendered = strip_outer_parentheses(rendered_substituent_text(rendered))
+            if not rendered:
+                return None
+            ligand_names.append(rendered)
+        if not ligand_names:
+            return None
+        amine_name = format_center_ligands(ligand_names, sort_key=substituent_sort_key)
+        name = f"({amine_name})amine {class_name}"
+    else:
+        reduced_atoms = component_atoms - {chalcogen}
+        reduced = mol.subgraph(reduced_atoms)
+        reduced.set_atom_charge(nitrogen, 0)
+        from .namer import name_component
+
+        parent_name = name_component(reduced, reduced_atoms)
+        if not parent_name:
+            return None
+        name = f"{parent_name} N-{class_name}"
+    return _component_name_result(mol, component_atoms, name, "nitrogen_chalcogenide")
 
 
 def biphenyl_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:

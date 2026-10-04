@@ -63,6 +63,56 @@ _ELEMENT_RANK = {
     Chalcogen.TELLURIUM: 3,
 }
 
+_CHALCOGENIDE_CLASS_NAMES = {
+    Chalcogen.OXYGEN: "oxide",
+    Chalcogen.SULFUR: "sulfide",
+    Chalcogen.SELENIUM: "selenide",
+    Chalcogen.TELLURIUM: "telluride",
+}
+
+_CHALCOGENIDE_PREFIXES = {
+    Chalcogen.OXYGEN: "oxido",
+    Chalcogen.SULFUR: "sulfido",
+    Chalcogen.SELENIUM: "selenido",
+    Chalcogen.TELLURIUM: "tellurido",
+}
+
+
+def chalcogenide_class_name(element: Chalcogen) -> str:
+    """Return the validated functional-class name for an anionic chalcogen ligand."""
+
+    return _CHALCOGENIDE_CLASS_NAMES[element]
+
+
+def chalcogenide_prefix(element: Chalcogen) -> str:
+    """Return the additive prefix for an anionic chalcogen ligand."""
+
+    return _CHALCOGENIDE_PREFIXES[element]
+
+
+def resolve_nitrile_chalcogenide_rule(
+    descriptor: FunctionalGroupDescriptor,
+) -> tuple[str, FunctionalGroupRule]:
+    """Resolve R-C#N+-E- while retaining the terminal chalcogen identity."""
+
+    ligand = descriptor.ligands_with_role(ChalcogenLigandRole.ANIONIC)[0]
+    class_name = chalcogenide_class_name(ligand.element)
+    external = descriptor.is_external
+    key = f"{'ring_' if external else ''}nitrile_{ligand.element.value}"
+    carbon_text = "carbo" if external else ""
+    return key, FunctionalGroupRule(
+        key=key,
+        role="principal",
+        prefix=f"cyano{chalcogenide_prefix(ligand.element)}",
+        suffix=f"{carbon_text}nitrile {class_name}",
+        multi_suffix=MultiSuffixTemplate((0,)),
+        suffix_multiplier_positions=(0,),
+        seniority=(5, _ELEMENT_RANK[ligand.element]),
+        suffix_with_locant=external,
+        needs_locant=True,
+        families=("nitrile_chalcogenide",),
+    )
+
 _REPLACEMENT_INFIX = {
     Chalcogen.SULFUR: "thio",
     Chalcogen.SELENIUM: "seleno",

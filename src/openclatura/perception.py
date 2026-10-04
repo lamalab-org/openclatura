@@ -16,6 +16,7 @@ from .chalcogen_vocabulary import (
     resolve_acyl_rule,
     resolve_anhydride_rule,
     resolve_central_acid_rule,
+    resolve_nitrile_chalcogenide_rule,
     resolve_peroxol_rule,
     resolve_peroxy_acyl_rule,
     simple_group_key,
@@ -498,15 +499,19 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             nitrogens = [n for n in mol.get_neighbors(atom.idx) if mol.atoms[n].symbol == "N" and n not in consumed]
             triple_n = next((n for n in nitrogens if mol.get_bond(atom.idx, n).order == 3), None)
             if triple_n is not None:
-                n_oxide = next(
+                terminal_chalcogenide = next(
                     (
                         x
                         for x in mol.get_neighbors(triple_n)
-                        if x != atom.idx and mol.atoms[x].symbol == "O" and mol.get_bond(triple_n, x).order == 1
+                        if x != atom.idx
+                        and chalcogen_for_symbol(mol.atoms[x].symbol) is not None
+                        and mol.atoms[x].charge == -1
+                        and mol.degree(x) == 1
+                        and mol.get_bond(triple_n, x).order == 1
                     ),
                     None,
                 )
-                if n_oxide is not None:
+                if terminal_chalcogenide is not None and mol.atoms[triple_n].charge == 1:
                     ring_neighbors = [n for n in mol.get_neighbors(atom.idx) if n in cyclic_atoms]
                     is_exocyclic = False
                     attached_ring_atom = None
@@ -515,9 +520,29 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                         if mol.get_bond(atom.idx, attached_ring_atom).order == 1:
                             is_exocyclic = True
                     target_carbon = attached_ring_atom if is_exocyclic else atom.idx
-                    key = "ring_nitrile_oxide" if is_exocyclic else "nitrile_oxide"
-                    groups.append(PerceivedGroup(key, True, target_carbon, {atom.idx, triple_n, n_oxide}))
-                    consumed.update([triple_n, n_oxide])
+                    ligand = classify_chalcogen_ligand(mol, triple_n, terminal_chalcogenide)
+                    if ligand is None:
+                        continue
+                    descriptor = FunctionalGroupDescriptor(
+                        family=FunctionalFamily.NITRILE_CHALCOGENIDE,
+                        derivative=DerivativeKind.ZWITTERION,
+                        centers=(atom.idx, triple_n),
+                        ligands=(ligand,),
+                        attachment_atom=target_carbon,
+                        is_external=is_exocyclic,
+                    )
+                    key, rule = resolve_nitrile_chalcogenide_rule(descriptor)
+                    groups.append(
+                        PerceivedGroup(
+                            key,
+                            True,
+                            target_carbon,
+                            {atom.idx, triple_n, terminal_chalcogenide},
+                            descriptor=descriptor,
+                            resolved_rule=rule,
+                        )
+                    )
+                    consumed.update([triple_n, terminal_chalcogenide])
                     continue
                 n_neighbors = [x for x in mol.get_neighbors(triple_n) if x != atom.idx]
                 if len(n_neighbors) > 0:
@@ -919,7 +944,7 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             continue
         if ligand.role not in {ChalcogenLigandRole.HYDROGEN_BEARING, ChalcogenLigandRole.ANIONIC}:
             continue
-        if ligand.role is ChalcogenLigandRole.HYDROGEN_BEARING and not mol.atoms[center].is_carbon:
+        if not mol.atoms[center].is_carbon:
             continue
         derivative = DerivativeKind.ANION if atom.charge < 0 else DerivativeKind.ALCOHOL
         key = simple_group_key(FunctionalFamily.HYDROXY, derivative, ligand.element)
