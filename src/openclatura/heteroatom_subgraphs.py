@@ -9,7 +9,6 @@ from .formatting import (
     format_element_substituent,
     format_multiplier,
     is_complex_prefix,
-    is_fully_enclosed,
     oxy_prefix_from_branch,
     strip_outer_parentheses,
 )
@@ -110,6 +109,18 @@ def _has_at_most_one_further_ligand(mol: Molecule, center_idx: int, excluded: se
     """Whether ``center_idx`` keeps at most one ligand once ``excluded`` is spent."""
 
     return len([n for n in mol.get_neighbors(center_idx) if n not in excluded]) <= 1
+
+
+def _rooted_ligand_needs_compositional_enclosure(mol: Molecule, ligand_idx: int, center_idx: int) -> bool:
+    """Whether a heteroatom-rooted ligand carries its own heavy-atom ligands.
+
+    Such a ligand is a complete substituent on the central atom rather than a
+    carbon group that can be concatenated directly with the center's suffix.
+    """
+
+    return not mol.atoms[ligand_idx].is_carbon and any(
+        neighbor != center_idx and mol.atoms[neighbor].symbol != "H" for neighbor in mol.get_neighbors(ligand_idx)
+    )
 
 
 def stereo_prefix(atom) -> str:
@@ -623,7 +634,7 @@ def _sulfur_imide_branch_name(
     branch_idx = first_substituent_neighbor(mol, sulfur, {nitrogen, *s_oxygens})
     branch = name_branch_or_none(mol, branch_idx, local_exclude, sulfur, branch_namer)
     if branch:
-        if is_complex_prefix(branch) and not is_fully_enclosed(branch):
+        if _rooted_ligand_needs_compositional_enclosure(mol, branch_idx, sulfur):
             branch = f"({branch})"
         return f"{stereo_prefix_text}{sulfonyl_group_name(branch, sulfur_oxo_suffix(len(s_oxygens)))}"
     return "sulfo"
@@ -761,7 +772,7 @@ def name_sulfur_subgraph(
                 # or ``dimethylsulfamoyl`` reads as two methyls on the nitrogen.
                 bare = any(contracted == name for _, _, name in RULES.heteroatoms.sulfonyl_ligand_contractions)
                 return f"{stereo_prefix_text}{contracted}" if bare else f"({stereo_prefix_text}{contracted})"
-            if is_complex_prefix(branch) and not is_fully_enclosed(branch):
+            if _rooted_ligand_needs_compositional_enclosure(mol, next_atoms[0], start_idx):
                 branch = f"({branch})"
             return f"({stereo_prefix_text}{branch}{suffix})"
         branches = [
