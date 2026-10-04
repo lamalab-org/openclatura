@@ -6,6 +6,7 @@ from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem, Re
 from .charge_pair_roles import charge_pair_roles
 from .fusion.context import current_fusion_mode
 from .fusion.model import FusionMode, PinDecision, PinStatus
+from .fusion.wrappers import WrapperParentKind
 from .heteroatom_subgraphs import upstream_bond_order
 from .locant_sources import LocantMapSource
 from .locants import canonical_locant_pair
@@ -458,7 +459,7 @@ def resolve_parent_hydride_plan(
         bridged_retained_parent = (
             bridged_parent is not None
             and bridged_parent.fusion_wrapper_plan is not None
-            and bridged_parent.fusion_wrapper_plan.parent.kind is ParentHydrideKind.RETAINED
+            and bridged_parent.fusion_wrapper_plan.parent.kind is WrapperParentKind.RETAINED
         )
         if bridged_parent is not None and (not spiro_polycycle_precedence or bridged_retained_parent):
             return bridged_parent
