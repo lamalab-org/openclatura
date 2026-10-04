@@ -549,7 +549,8 @@
       "isobutyl": "isobutoxy",
       "sec-butyl": "sec-butoxy",
       "tert-butyl": "tert-butoxy",
-      "phenyl": "phenoxy"
+      "phenyl": "phenoxy",
+      "amino": "aminoxy"
     }
   },
   "simple_sulfanyl_prefixes": {
@@ -1943,6 +1944,36 @@
       "amidin",
       "acid"
     ]
+  },
+  "isotope_prefixes": {
+    "bluebook_rule": "P-82.2; isotopically modified hydrogen atoms cited as substituent prefixes",
+    "values": {
+      "2": "deuterio",
+      "3": "tritio"
+    }
+  },
+  "compound_nitrogen_prefix_units": {
+    "bluebook_rule": "P-68; nitrogen-chain substituent units that require compound-prefix boundaries",
+    "values": ["amino", "diazenyl", "hydrazinyl", "hydrazono"]
+  },
+  "heteroatom_substituent_suffixes": {
+    "bluebook_rule": "P-29 and P-68; heteroatom substituent endings that retain a ligand boundary",
+    "values": [
+      "amino",
+      "imino",
+      "phosphanyl",
+      "phosphanylidene",
+      "selanyl",
+      "selanylidene",
+      "sulfanyl",
+      "sulfanylidene",
+      "tellanyl",
+      "tellanylidene"
+    ]
+  },
+  "heteroatom_ligand_prefixes": {
+    "bluebook_rule": "P-29 and P-68; heteroatom ligand prefixes that form compound substituent names",
+    "values": ["amino", "imino", "oxo", "seleno", "sulfanyl", "thioxo", "telluro"]
   },
   "replacement_prefix_order": {
     "bluebook_rule": "P-51; skeletal replacement prefix citation order",

@@ -121,7 +121,7 @@ def format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:
         attachments_per_group = 2 if ("diyl" in name and "ylidene" not in name) else 1
         count_raw = len(locs) if locs else len(items)
         count = max(1, count_raw // attachments_per_group)
-        is_isotope_prefix = name in {"deuterio", "tritio"}
+        is_isotope_prefix = name in RULES.assembly.isotope_prefixes.values()
         is_complex = not is_isotope_prefix and (
             is_complex_prefix(name) or (count > 1 and needs_complex_multiplier(name))
         )

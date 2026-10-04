@@ -25,6 +25,7 @@ from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
 from .naming_context import ComponentNamingState, NamingIntent
 from .naming_protocols import RecursiveSubgraphNamer
+from .nomenclature import RULES
 from .parent_pipeline import (
     build_parent_assembly_plan,
     resolve_parent_hydride_plan,
@@ -121,7 +122,10 @@ def collect_component_branch_substituents(
             if n_idx not in main_set
             and n_idx not in principal_involved_atom_ids
             and n_idx not in handled_prefix_atoms
-            and (n_idx not in base_exclude or (mol.atoms[n_idx].symbol == "H" and mol.atoms[n_idx].isotope in {2, 3}))
+            and (
+                n_idx not in base_exclude
+                or (mol.atoms[n_idx].symbol == "H" and mol.atoms[n_idx].isotope in RULES.assembly.isotope_prefixes)
+            )
         ]
 
         spiro_pair = find_spiro_side_pair(mol, c_idx, n_subs, main_set, base_exclude)
@@ -144,7 +148,7 @@ def collect_component_branch_substituents(
             if n_idx not in main_set and n_idx not in principal_involved_atom_ids and n_idx not in handled_prefix_atoms:
                 isotope_hydrogen = mol.atoms[n_idx]
                 if isotope_hydrogen.symbol == "H":
-                    isotope_prefix = {2: "deuterio", 3: "tritio"}.get(isotope_hydrogen.isotope)
+                    isotope_prefix = RULES.assembly.isotope_prefixes.get(isotope_hydrogen.isotope)
                     if isotope_prefix:
                         bond = mol.get_bond(c_idx, n_idx)
                         subst_mapping.setdefault(c_idx, []).append(

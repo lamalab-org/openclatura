@@ -106,6 +106,10 @@ class AssemblyRules:
     substituent_attachment_suffixes: dict[str, str]
     ambiguous_connection_substituent_stems: set[str]
     suffix_nitrogen_markers: tuple[str, ...]
+    isotope_prefixes: dict[int, str]
+    compound_nitrogen_prefix_units: tuple[str, ...]
+    heteroatom_substituent_suffixes: tuple[str, ...]
+    heteroatom_ligand_prefixes: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -486,6 +490,12 @@ def registry() -> NomenclatureRegistry:
                 assembly_grammar.values("ambiguous_connection_substituent_stems")
             ),
             suffix_nitrogen_markers=tuple(assembly_grammar.values("suffix_nitrogen_markers")),
+            isotope_prefixes={
+                int(mass): prefix for mass, prefix in assembly_grammar.mapping("isotope_prefixes").items()
+            },
+            compound_nitrogen_prefix_units=tuple(assembly_grammar.values("compound_nitrogen_prefix_units")),
+            heteroatom_substituent_suffixes=tuple(assembly_grammar.values("heteroatom_substituent_suffixes")),
+            heteroatom_ligand_prefixes=tuple(assembly_grammar.values("heteroatom_ligand_prefixes")),
         ),
         functional_groups=_functional_group_rules(),
         postprocess=_postprocess_rules(),

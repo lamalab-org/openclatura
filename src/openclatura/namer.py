@@ -877,7 +877,10 @@ def _collect_subgraph_substituents(
             for n_idx in mol.get_neighbors(c_idx)
             if n_idx not in main_set
             and n_idx not in sub_handled_atoms
-            and (n_idx not in sub_exclude or (mol.atoms[n_idx].symbol == "H" and mol.atoms[n_idx].isotope in {2, 3}))
+            and (
+                n_idx not in sub_exclude
+                or (mol.atoms[n_idx].symbol == "H" and mol.atoms[n_idx].isotope in RULES.assembly.isotope_prefixes)
+            )
         ]
 
         spiro_pair = _find_spiro_side_pair(mol, c_idx, n_subs, main_set, sub_exclude)
@@ -900,7 +903,7 @@ def _collect_subgraph_substituents(
             if n_idx not in main_set and n_idx not in sub_handled_atoms:
                 isotope_hydrogen = mol.atoms[n_idx]
                 if isotope_hydrogen.symbol == "H":
-                    isotope_prefix = {2: "deuterio", 3: "tritio"}.get(isotope_hydrogen.isotope)
+                    isotope_prefix = RULES.assembly.isotope_prefixes.get(isotope_hydrogen.isotope)
                     if isotope_prefix:
                         bond = mol.get_bond(c_idx, n_idx)
                         subst_mapping.setdefault(c_idx, []).append(
