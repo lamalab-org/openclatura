@@ -37,6 +37,8 @@ def _init_worker():
     from rdkit import Chem, RDLogger
     from rdkit.Chem.MolStandardize import rdMolStandardize
 
+    from openclatura.resonance_compare import equivalent_smiles
+
     RDLogger.DisableLog("rdApp.*")
     _W.update(
         py2opsin=py2opsin,
@@ -46,6 +48,7 @@ def _init_worker():
         reionizer=rdMolStandardize.Reionizer(),
         uncharger=rdMolStandardize.Uncharger(),
         tautomer=rdMolStandardize.TautomerEnumerator(),
+        equivalent_smiles=equivalent_smiles,
     )
 
 
@@ -60,6 +63,7 @@ def standardize_and_canonicalize_tautomer(smi):
         mol = _W["reionizer"].reionize(mol)
         mol = _W["uncharger"].uncharge(mol)
         mol = _W["tautomer"].Canonicalize(mol)
+        mol = Chem.RemoveHs(mol)
         return Chem.MolToSmiles(mol, canonical=True)
     except Exception:
         return None
@@ -91,7 +95,9 @@ def _process_chunk(payload):
             counts["opsin_nonempty"] += 1
         if std_opsin is not None:
             counts["opsin_valid"] += 1
-        if std_orig is not None and std_opsin is not None and std_orig == std_opsin:
+        if std_orig is not None and std_opsin is not None and (
+            std_orig == std_opsin or _W["equivalent_smiles"](std_orig, std_opsin)
+        ):
             counts["matches"] += 1
         else:
             counts["failures"] += 1
@@ -130,7 +136,7 @@ def _score_file(path: Path, name_key: str, smiles_key: str, chunk: int, pool: Pr
     summary = {
         **counts,
         "accuracy": round(accuracy, 3),
-        "match_method": "standardize_and_canonicalize_tautomer",
+        "match_method": "standardize_tautomer_and_bounded_resonance",
         "failures_csv": str(failures_csv),
     }
     (path.with_name(f"{path.stem}_opsin_summary.json")).write_text(

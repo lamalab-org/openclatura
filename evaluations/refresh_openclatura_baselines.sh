@@ -10,6 +10,10 @@ WORKERS_PER_SHARD="${WORKERS_PER_SHARD:-4}"
 OPSIN_WORKERS="${OPSIN_WORKERS:-12}"
 STATUS_FILE="${STATUS_FILE:-/private/tmp/openclatura-paper-evaluation-refresh.status}"
 
+if [[ "$PYTHON_BIN" == */* && "$PYTHON_BIN" != /* ]]; then
+    PYTHON_BIN="$REPO_ROOT/$PYTHON_BIN"
+fi
+
 cd "$REPO_ROOT"
 
 if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
