@@ -77,6 +77,19 @@ _CHALCOGENIDE_PREFIXES = {
     Chalcogen.TELLURIUM: "tellurido",
 }
 
+_PEROXIDE_CLASS_NAMES = {
+    frozenset((Chalcogen.OXYGEN,)): "peroxide",
+    frozenset((Chalcogen.SULFUR,)): "disulfide",
+    frozenset((Chalcogen.SELENIUM,)): "diselenide",
+    frozenset((Chalcogen.TELLURIUM,)): "ditelluride",
+    frozenset((Chalcogen.OXYGEN, Chalcogen.SULFUR)): "thioperoxide",
+    frozenset((Chalcogen.OXYGEN, Chalcogen.SELENIUM)): "selenoperoxide",
+    frozenset((Chalcogen.OXYGEN, Chalcogen.TELLURIUM)): "telluroperoxide",
+    frozenset((Chalcogen.SULFUR, Chalcogen.SELENIUM)): "selenothioperoxide",
+    frozenset((Chalcogen.SULFUR, Chalcogen.TELLURIUM)): "tellurothioperoxide",
+    frozenset((Chalcogen.SELENIUM, Chalcogen.TELLURIUM)): "selenotelluroperoxide",
+}
+
 
 def chalcogenide_class_name(element: Chalcogen) -> str:
     """Return the validated functional-class name for an anionic chalcogen ligand."""
@@ -88,6 +101,12 @@ def chalcogenide_prefix(element: Chalcogen) -> str:
     """Return the additive prefix for an anionic chalcogen ligand."""
 
     return _CHALCOGENIDE_PREFIXES[element]
+
+
+def peroxide_class_name(elements: tuple[Chalcogen, Chalcogen]) -> str:
+    """Return the P-63.3 functional-class term for an E-E linkage."""
+
+    return _PEROXIDE_CLASS_NAMES[frozenset(elements)]
 
 
 def resolve_nitrile_chalcogenide_rule(

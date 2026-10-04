@@ -148,3 +148,48 @@ def classify_chalcogen_ligand(
         bond_id=bond.idx,
         attachment_atom=attachment,
     )
+
+
+def classify_peroxide_linkage(
+    mol: Molecule,
+    component_atoms: set[int],
+) -> FunctionalGroupDescriptor | None:
+    """Return the unique acyclic R-E-E-R' linkage spanning a component."""
+
+    candidates = []
+    for bond in mol.bonds.values():
+        if bond.u not in component_atoms or bond.v not in component_atoms or bond.order != 1:
+            continue
+        if chalcogen_for_symbol(mol.atoms[bond.u].symbol) is None:
+            continue
+        if chalcogen_for_symbol(mol.atoms[bond.v].symbol) is None:
+            continue
+        left_sides = [neighbor for neighbor in mol.get_neighbors(bond.u) if neighbor != bond.v]
+        right_sides = [neighbor for neighbor in mol.get_neighbors(bond.v) if neighbor != bond.u]
+        if (
+            len(left_sides) != 1
+            or len(right_sides) != 1
+            or not mol.atoms[left_sides[0]].is_carbon
+            or not mol.atoms[right_sides[0]].is_carbon
+        ):
+            continue
+        if any(
+            candidate != linker
+            and (ligand := classify_chalcogen_ligand(mol, attachment, candidate)) is not None
+            and ligand.role is ChalcogenLigandRole.DOUBLE_BONDED
+            for attachment, linker in ((left_sides[0], bond.u), (right_sides[0], bond.v))
+            for candidate in mol.get_neighbors(attachment)
+        ):
+            continue
+        candidates.append((bond.u, bond.v, left_sides[0], right_sides[0]))
+    if len(candidates) != 1:
+        return None
+    left, right, left_attachment, right_attachment = candidates[0]
+    return FunctionalGroupDescriptor(
+        family=FunctionalFamily.PEROXIDE,
+        derivative=DerivativeKind.NEUTRAL_LINK,
+        centers=(left, right),
+        ligands=(),
+        linker_paths=((left_attachment, left, right, right_attachment),),
+        attachment_atom=left_attachment,
+    )

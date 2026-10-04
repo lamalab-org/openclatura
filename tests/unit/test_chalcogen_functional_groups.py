@@ -264,3 +264,24 @@ def test_nitrile_chalcogenides_use_zwitterion_priority_and_class_names(smiles: s
     import openclatura as oc
 
     assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("COOC", "dimethyl peroxide"),
+        ("CCOOC", "ethyl methyl peroxide"),
+        ("CSSC", "dimethyl disulfide"),
+        ("C[Se][Se]C", "dimethyl diselenide"),
+        ("C[Te][Te]C", "dimethyl ditelluride"),
+        ("CSOC", "dimethyl thioperoxide"),
+        ("CCOSC", "O-ethyl S-methyl thioperoxide"),
+        ("CO[Se]C", "dimethyl selenoperoxide"),
+        ("CS[Se]C", "dimethyl selenothioperoxide"),
+        ("C[Se][Te]C", "dimethyl selenotelluroperoxide"),
+    ],
+)
+def test_peroxide_linkages_preserve_both_chalcogen_sites(smiles: str, expected: str):
+    import openclatura as oc
+
+    assert oc.name(smiles).name == expected

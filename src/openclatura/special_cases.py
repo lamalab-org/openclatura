@@ -8,7 +8,8 @@ from .assembly_parts import NameAtomBinding, NameTokenBinding, rendered_substitu
 from .assembly_prefixes import substituent_sort_key
 from .chains import get_cyclic_atoms
 from .charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
-from .chalcogen_vocabulary import anhydride_class_name, chalcogenide_class_name
+from .chalcogen_roles import chalcogen_for_symbol, classify_peroxide_linkage
+from .chalcogen_vocabulary import anhydride_class_name, chalcogenide_class_name, peroxide_class_name
 from .formatting import (
     count_names,
     format_center_ligands,
@@ -267,6 +268,7 @@ def structural_replacement_parent_result(
             "nitrogen_chalcogenide",
             lambda: nitrogen_chalcogenide_result(mol, component_atoms, branch_namer),
         ),
+        ("peroxide_linkage", lambda: peroxide_linkage_result(mol, component_atoms, branch_namer)),
         ("hydroxyurea_parent", lambda: hydroxyurea_parent_result(mol, component_atoms, branch_namer)),
         ("sulfamic_acid", lambda: sulfamic_acid_result(mol, component_atoms, branch_namer)),
         ("azinic_acid", lambda: azinic_acid_result(mol, component_atoms, branch_namer)),
@@ -342,6 +344,58 @@ def nitrogen_chalcogenide_result(
             return None
         name = f"{parent_name} N-{class_name}"
     return _component_name_result(mol, component_atoms, name, "nitrogen_chalcogenide")
+
+
+def peroxide_linkage_result(
+    mol: Molecule,
+    component_atoms: set[int],
+    branch_namer: RecursiveSubgraphNamer | None = None,
+) -> SpecialComponentName | None:
+    """Name one R-E-E-R' component without collapsing either linkage site."""
+
+    descriptor = classify_peroxide_linkage(mol, component_atoms)
+    if descriptor is None or branch_namer is None:
+        return None
+    left_attachment, left, right, right_attachment = descriptor.linker_paths[0]
+    left_element = chalcogen_for_symbol(mol.atoms[left].symbol)
+    right_element = chalcogen_for_symbol(mol.atoms[right].symbol)
+    if left_element is None or right_element is None:
+        return None
+    elements = (left_element, right_element)
+    names = []
+    for attachment, linker in ((left_attachment, left), (right_attachment, right)):
+        rendered = branch_namer(
+            mol,
+            attachment,
+            (set(mol.atoms) - component_atoms) | {left, right},
+            upstream_atom=linker,
+        )
+        rendered = strip_outer_parentheses(rendered_substituent_text(rendered))
+        if not rendered:
+            return None
+        names.append(rendered)
+    class_name = peroxide_class_name(elements)
+    if elements[0] is elements[1] or names[0] == names[1]:
+        counts = count_names(names)
+        ligand_text = " ".join(
+            format_multiplier(name, counts[name])
+            for name in sorted(counts, key=substituent_sort_key)
+        )
+    else:
+        located = sorted(
+            (
+                f"{element.value}-{name}"
+                for element, name in zip(elements, names, strict=True)
+            ),
+            key=substituent_sort_key,
+        )
+        ligand_text = " ".join(located)
+    return _component_name_result(
+        mol,
+        component_atoms,
+        f"{ligand_text} {class_name}",
+        "peroxide_linkage",
+    )
 
 
 def biphenyl_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
