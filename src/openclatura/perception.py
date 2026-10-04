@@ -322,7 +322,7 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                         ),
                         None,
                     )
-                    if o1 and o2:
+                    if o1 is not None and o2 is not None:
                         visited = {atom.idx, c1}
                         q = [c1]
                         is_cyclic = False
