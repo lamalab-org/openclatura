@@ -19,8 +19,22 @@ def component_principal_key(perceived_groups: list[PerceivedGroup], is_substitue
 
     if is_substituent:
         return None
-    candidates = [group.key for group in perceived_groups if group.is_principal_candidate]
-    return RULES.functional_groups.most_senior(candidates).key if candidates else None
+    candidates = [
+        group
+        for group in perceived_groups
+        if group.is_principal_candidate and group.resolved_rule is not None and group.resolved_rule.seniority is not None
+    ]
+    if not candidates:
+        return None
+    best = min(
+        candidates,
+        key=lambda group: (
+            (group.resolved_rule.seniority,)
+            if isinstance(group.resolved_rule.seniority, int)
+            else group.resolved_rule.seniority
+        ),
+    )
+    return best.key
 
 
 def partition_principal_and_prefix_groups(
@@ -64,8 +78,10 @@ def add_component_principal_group(
         return
     locants = sorted([get_loc(c) for c in principal_carbons if c in numbered_path], key=parse_locant)
     atom_ids = set()
+    resolved_rule = None
     for group in perceived_groups:
         if group.key == principal_key and group.attachment_carbon in numbered_path:
+            resolved_rule = group.resolved_rule
             atom_ids.add(group.attachment_carbon)
             atom_ids.update(group.atoms_involved)
             if group.key in RULES.functional_groups.keys_with_family("hydrazone"):
@@ -98,6 +114,7 @@ def add_component_principal_group(
         atom_ids=atom_ids,
         bond_ids=bond_ids_within(mol, atom_ids),
         charge_atom_ids={atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0},
+        resolved_rule=resolved_rule,
     )
 
 

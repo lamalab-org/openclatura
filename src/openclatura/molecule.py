@@ -67,7 +67,7 @@ class FunctionalGroupMetadata:
     suffix: str | None = None
     multi_suffix: object | None = None
     suffix_multiplier_positions: tuple[int, ...] = (0,)
-    seniority: int | None = None
+    seniority: int | tuple[int, ...] | None = None
     suffix_with_locant: bool = False
     source: str = "perception"
 

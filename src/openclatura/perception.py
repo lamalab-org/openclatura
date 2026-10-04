@@ -22,6 +22,7 @@ from .molecule import (
     has_non_h_multiple_bond_neighbor,
 )
 from .nitrogen_roles import amidinohydrazone_tail_atoms, nitrogen_chain_roles
+from .nomenclature import RULES, FunctionalGroupRule
 
 
 @dataclass
@@ -41,6 +42,7 @@ class PerceivedGroup:
     variant: str | None = None
     role: str | None = None
     descriptor: FunctionalGroupDescriptor | None = None
+    resolved_rule: FunctionalGroupRule | None = None
 
     @property
     def atom_ids(self) -> set[int]:
@@ -82,6 +84,7 @@ def _copy_perceived_group(group: PerceivedGroup) -> PerceivedGroup:
         group.variant,
         group.role,
         group.descriptor,
+        group.resolved_rule,
     )
 
 
@@ -884,7 +887,9 @@ def _enrich_groups(mol: Molecule, groups: list[PerceivedGroup]) -> list[Perceive
     """Attach metadata and graph bindings to perceived groups."""
 
     for group in groups:
-        group.metadata = _metadata_for_group(group.key)
+        if group.resolved_rule is None:
+            group.resolved_rule = RULES.functional_groups.by_key.get(group.key)
+        group.metadata = _metadata_for_group(group.key, group.resolved_rule)
         group.atom_bindings = _atom_bindings_for_group(group)
         group.bond_bindings = _bond_bindings_for_group(mol, group)
         if not group.decision_reasons:
@@ -894,10 +899,20 @@ def _enrich_groups(mol: Molecule, groups: list[PerceivedGroup]) -> list[Perceive
     return groups
 
 
-def _metadata_for_group(key: str) -> FunctionalGroupMetadata:
+def _metadata_for_group(key: str, resolved_rule: FunctionalGroupRule | None = None) -> FunctionalGroupMetadata:
     """Return naming metadata for a perceived group from rule tables."""
 
-    return metadata_for_group(key)
+    if resolved_rule is None:
+        return metadata_for_group(key)
+    return FunctionalGroupMetadata(
+        prefix=resolved_rule.prefix,
+        suffix=resolved_rule.suffix,
+        multi_suffix=resolved_rule.multi_suffix,
+        suffix_multiplier_positions=resolved_rule.suffix_multiplier_positions,
+        seniority=resolved_rule.seniority,
+        suffix_with_locant=resolved_rule.suffix_with_locant,
+        source="nomenclature.resolved_functional_group",
+    )
 
 
 def _atom_bindings_for_group(group: PerceivedGroup) -> tuple[AtomBinding, ...]:

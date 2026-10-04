@@ -118,7 +118,7 @@ class FunctionalGroupRule:
     suffix: str | None = None
     multi_suffix: MultiSuffixTemplate | None = None
     suffix_multiplier_positions: tuple[int, ...] = (0,)
-    seniority: int | None = None
+    seniority: int | tuple[int, ...] | None = None
     suffix_with_locant: bool = False
     needs_locant: bool = True
     families: tuple[str, ...] = ()
@@ -162,6 +162,14 @@ class FunctionalGroupRules:
         if not principal_rules:
             raise KeyError(f"No seniority metadata for functional-group keys: {keys!r}")
         return min(principal_rules, key=lambda rule: rule.seniority)
+
+    def most_senior_rule(self, rules: list[FunctionalGroupRule]) -> FunctionalGroupRule:
+        """Return the senior resolved rule, including instance-specific rules."""
+
+        candidates = [rule for rule in rules if rule.seniority is not None]
+        if not candidates:
+            raise KeyError("No seniority metadata for resolved functional groups")
+        return min(candidates, key=lambda rule: (rule.seniority,) if isinstance(rule.seniority, int) else rule.seniority)
 
     def keys_with_family(self, family: str) -> set[str]:
         return {key for key, rule in self.by_key.items() if family in rule.families}

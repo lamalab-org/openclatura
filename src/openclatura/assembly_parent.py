@@ -650,7 +650,7 @@ def _sole_group_locant_is_redundant(parts: AssemblyParts) -> bool:
 def format_principal_suffix(parts: AssemblyParts, terminal_e: str, spiro_subs) -> tuple[str, str]:
     if not parts.principal_group:
         return terminal_e, ""
-    group = RULES.functional_groups.get(parts.principal_group.key)
+    group = parts.principal_group.resolved_rule or RULES.functional_groups.get(parts.principal_group.key)
     locs = sorted(parts.principal_group.locants, key=parse_locant)
     has_spiro_subs = bool(spiro_subs)
     omit_locant = parts.parent_length == 1

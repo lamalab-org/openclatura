@@ -13,6 +13,7 @@ from .stereo_descriptors import AbsoluteStereoCitation
 
 if TYPE_CHECKING:
     from .fusion.mancude import ParentBondDelta
+    from .nomenclature import FunctionalGroupRule
     from .ring_parent import RingParent
 
 
@@ -95,6 +96,7 @@ class PrincipalGroupItem:
     atom_ids: set[int] = field(default_factory=set)
     bond_ids: set[int] = field(default_factory=set)
     charge_atom_ids: set[int] = field(default_factory=set)
+    resolved_rule: FunctionalGroupRule | None = None
 
 
 @dataclass(frozen=True)
