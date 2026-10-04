@@ -8,12 +8,10 @@ Bug 1 -- single_atom_component_name ignored charge sign entirely (FIXED):
 Cl, Br, I) were matched by ELEMENT SYMBOL ALONE, with no check that the
 atom's actual charge matched the cation/anion role being named. A neutral
 atom of one of these elements, or one with the wrong charge sign (e.g. a
-stray "[Cl+]"), was still confidently named "sodium"/"chloride" etc. Two
-positively-charged components with no anion at all (a chemically invalid,
-charge-imbalanced input) could even both be silently named as if they
-formed a valid neutral salt together. Fixed by requiring ``charge > 0``/
-``charge < 0`` respectively; a mismatched-charge input now honestly fails
-to find a supported parent skeleton instead of naming the wrong thing.
+stray "[Cl+]"), was still confidently named "sodium"/"chloride" etc. Fixed
+by requiring ``charge > 0``/``charge < 0`` respectively. Generic atomic
+components now retain their actual charge explicitly (including zero), so
+OPSIN reconstructs these unusual inputs without silently changing them.
 
 Bug 2 -- the same function's mononuclear-hydride fallback lacked a charge
 guard (FIXED): the branch just above it (retained names "ammonia"/"water")
@@ -25,13 +23,10 @@ charge: [Al+3] paired with three chlorides came out as "alumane
 trichloride" (confirmed by OPSIN reparsing back to neutral covalent AlCl3,
 not the ionic input). Fixed by requiring ``atom.charge == 0`` before using
 the hydride-name fallback, matching the sibling branch right above it.
-Naively extending the cation table to cover these metals was tried and
-rejected: round-tripping candidate names ("aluminum trichloride", "tin
-dichloride", "bismuth trichloride", "lead dichloride") through OPSIN shows
-most reparse as the wrong (neutral covalent) structure regardless -- these
-elements need oxidation-state-aware (Stock/Roman-numeral) naming
-machinery this codebase doesn't have yet, so an honest failure is the
-correct trade until that exists, not a differently-wrong name.
+Generic monatomic charge notation now names the charged atom itself without
+pretending it is a neutral hydride. OPSIN still chooses neutral covalent
+graphs for the complete metal-halide names; those remain explicit verifier
+mismatches rather than naming failures or silently dropped charges.
 
 Bug 3 -- azinic_acid_result was completely broken (FIXED): every single
 invocation via name_one(verify_opsin=True) failed a "final assembly audit"
@@ -76,13 +71,11 @@ for all four hydrogen halides.
 Bug 6 -- neither the retained-hydride-name branch nor the general
 mononuclear-hydride fallback checked that the atom actually carries its
 full complement of hydrogens (FIXED, found while fixing bug 5): a bare,
-disconnected, zero-hydrogen atom like "[N]" or "[Si]" -- not a real,
-complete molecule, and not something any of these functions should ever
-successfully name -- matched purely on element symbol and charge==0,
-producing "ammonia" for "[N]" and "silane" for "[Si]" even though neither
-carries the hydrogens those names imply. Fixed by additionally requiring
-``atom.total_h_count == atom.element.standard_valence`` in both branches,
-so only an atom with its full, real hydrogen complement matches.
+disconnected, zero-hydrogen atom like "[N]" or "[Si]" matched purely on
+element symbol and charge==0, producing "ammonia" for "[N]" and "silane"
+for "[Si]" even though neither carries those hydrogens. Fixed by requiring
+the full hydrogen complement in both hydride branches. Bare atoms are now
+named by the generic charge-aware atomic path instead.
 
 Also investigated, found to be dead code rather than a live bug: three
 ``ParentChargeRule`` entries in ionic_naming.py (PARENT_CHARGE_RULES) have
@@ -137,29 +130,26 @@ def test_single_atom_cations_and_anions_still_name_correctly():
 
 
 @pytest.mark.parametrize(
-    "smiles",
+    ("smiles", "expected_name"),
     [
-        "[Na].[Cl-]",  # neutral sodium, not a cation
-        "[Na].[Cl]",  # both neutral -- no ions at all
-        "[Cl+].[Na+]",  # two cations, no anion -- charge-imbalanced nonsense
+        ("[Na].[Cl-]", "sodium(0) chloride"),
+        ("[Na].[Cl]", "chlorine(0) sodium(0)"),
+        ("[Cl+].[Na+]", "sodium chlorine(1+)"),
     ],
 )
-def test_wrong_charge_single_atoms_fail_honestly_instead_of_mislabeling(smiles):
-    result = name_one(smiles, verify_opsin=True)
-    assert result.error is not None, (smiles, result.name)
-    assert "sodium" not in result.name
-    assert "chloride" not in result.name
+def test_wrong_charge_single_atoms_preserve_their_actual_charge(smiles, expected_name):
+    _assert_matched(smiles, expected_name)
 
 
 def test_single_atom_component_name_checks_charge_sign_directly():
     from openclatura.graph_io import read_smiles
-    from openclatura.special_cases import single_atom_component_name
+    from openclatura.simple_components import single_atom_component_name
 
     mol = read_smiles("[Na].[Cl]")
     na_idx = next(idx for idx, atom in mol.atoms.items() if atom.symbol == "Na")
     cl_idx = next(idx for idx, atom in mol.atoms.items() if atom.symbol == "Cl")
-    assert single_atom_component_name(mol, {na_idx}) == ""
-    assert single_atom_component_name(mol, {cl_idx}) == ""
+    assert single_atom_component_name(mol, {na_idx}) == "sodium(0)"
+    assert single_atom_component_name(mol, {cl_idx}) == "chlorine(0)"
 
 
 # ---------------------------------------------------------------------------
@@ -168,18 +158,20 @@ def test_single_atom_component_name_checks_charge_sign_directly():
 
 
 @pytest.mark.parametrize(
-    "smiles",
+    ("smiles", "expected_name"),
     [
-        "[Al+3].[Cl-].[Cl-].[Cl-]",
-        "[Sn+2].[Cl-].[Cl-]",
-        "[Bi+3].[Cl-].[Cl-].[Cl-]",
-        "[Pb+2].[Cl-].[Cl-]",
+        ("[Al+3].[Cl-].[Cl-].[Cl-]", "aluminium(3+) trichloride"),
+        ("[Sn+2].[Cl-].[Cl-]", "tin(2+) dichloride"),
+        ("[Bi+3].[Cl-].[Cl-].[Cl-]", "bismuth(3+) trichloride"),
+        ("[Pb+2].[Cl-].[Cl-]", "lead(2+) dichloride"),
     ],
 )
-def test_charged_metal_atoms_are_not_named_as_neutral_hydrides(smiles):
+def test_charged_metal_atoms_are_not_named_as_neutral_hydrides(smiles, expected_name):
     result = name_one(smiles, verify_opsin=True)
-    assert result.error is not None, (smiles, result.name)
-    assert "ane" not in result.name or result.name == ""
+    assert result.error is None, (smiles, result.error)
+    assert result.name == expected_name
+    assert result.opsin_check is not None
+    assert result.opsin_check.status == "mismatched"
 
 
 def test_neutral_group13_hydrides_are_unaffected_by_the_charge_guard():
@@ -213,10 +205,18 @@ def test_hydrogen_halides_have_retained_names(smiles, expected_name):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("smiles", ["[N]", "[O]", "[Cl]", "[Si]", "[P]"])
-def test_bare_hydrogen_less_atoms_are_not_named_as_their_hydride(smiles):
-    result = name_one(smiles, verify_opsin=True)
-    assert result.error is not None, (smiles, result.name)
+@pytest.mark.parametrize(
+    ("smiles", "expected_name"),
+    [
+        ("[N]", "nitrogen(0)"),
+        ("[O]", "oxygen(0)"),
+        ("[Cl]", "chlorine(0)"),
+        ("[Si]", "silicon(0)"),
+        ("[P]", "phosphorus(0)"),
+    ],
+)
+def test_bare_hydrogen_less_atoms_are_not_named_as_their_hydride(smiles, expected_name):
+    _assert_matched(smiles, expected_name)
 
 
 # ---------------------------------------------------------------------------

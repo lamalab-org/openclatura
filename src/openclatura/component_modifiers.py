@@ -194,7 +194,7 @@ def add_component_n_substituents(
                         parts.principal_suffix_modifiers.append(
                             SubstituentItem(
                                 branch_text,
-                                [],
+                                [loc_prefix],
                                 outer_parentheses_optional=outer_parentheses_optional,
                                 atom_ids=branch_atoms,
                                 bond_ids=bond_ids_within(mol, branch_atoms | {single_n}),

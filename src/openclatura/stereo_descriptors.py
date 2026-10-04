@@ -19,7 +19,14 @@ class AbsoluteStereoCitation:
     convention: str = "modern_cip"
 
 
-def parent_absolute_stereo_citation(mol: "Molecule", atom_id: int, *, is_ring: bool) -> AbsoluteStereoCitation:
+def parent_absolute_stereo_citation(
+    mol: "Molecule",
+    atom_id: int,
+    *,
+    is_ring: bool,
+    is_substituent: bool = False,
+    retained_name: str | None = None,
+) -> AbsoluteStereoCitation:
     atom = mol.atoms[atom_id]
     modern = atom.stereo
     if modern not in ABSOLUTE_STEREO_DESCRIPTORS:
@@ -29,6 +36,7 @@ def parent_absolute_stereo_citation(mol: "Molecule", atom_id: int, *, is_ring: b
     # and phosphanyl handling. Keep the accurate graph label unchanged.
     if (
         is_ring
+        and (is_substituent or retained_name is None)
         and atom.symbol == "P"
         and atom.charge == 0
         and atom.total_h_count == 0

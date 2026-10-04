@@ -49,6 +49,7 @@ from .model import (
     FusionComponentSpec,
     FusionConfirmed,
     FusionGraph,
+    FusionJoinKind,
     FusionMode,
     FusionNameAst,
     FusionNotApplicable,
@@ -173,6 +174,8 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
                     )
                 )
                 break
+            if mode is FusionMode.AUDITED_PIN and not _audited_multiplicative_interfaces_supported(ast, registry):
+                return FusionUnsupported("multiplicative fusion interfaces lack independent locant support")
             result = _plan_numbered_candidate(
                 mol, atoms, mode, ast, registry, bounded, face_model, layouts, numbering_cache=numbering_cache
             )
@@ -196,6 +199,42 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
             return FusionAuditFailed("ranked fusion candidates failed reconstruction", details)
         return FusionUnsupported("ranked fusion candidates have no supported chemical plan", details)
     return FusionUnsupported("no supported audited fusion-component decomposition")
+
+
+def _audited_multiplicative_interfaces_supported(
+    ast: FusionNameAst,
+    registry: FusionComponentRegistry,
+) -> bool:
+    """Require explicit interfaces on independently numbered multiplicative hosts."""
+
+    # Planner tests and extension hooks may supply opaque candidate sentinels;
+    # only a concrete fusion AST can assert multiplicative-interface facts.
+    if not isinstance(ast, FusionNameAst):
+        return True
+    if not ast.multiplicative_groups:
+        return True
+    matches = {match.occurrence_id: match for match in ast.component_occurrences}
+    grouped = {occurrence for group in ast.multiplicative_groups for occurrence in group.occurrence_ids}
+    group_sizes = {
+        occurrence: len(group.occurrence_ids)
+        for group in ast.multiplicative_groups
+        for occurrence in group.occurrence_ids
+    }
+    for join in ast.joins:
+        if join.attached_occurrence not in grouped:
+            continue
+        attached = registry.get(matches[join.attached_occurrence].spec_key)
+        host = registry.get(matches[join.host_occurrence].spec_key)
+        if attached is None or host is None:
+            return False
+        locants_omitted = (join.kind is FusionJoinKind.ORTHO and attached.omit_attached_locants) or (
+            join.kind is FusionJoinKind.ORTHO_PERI and attached.omit_ortho_peri_attached_locants
+        )
+        if locants_omitted and group_sizes[join.attached_occurrence] > 2:
+            return False
+        if join.kind is FusionJoinKind.HIGHER_ORDER and host.spec.template.numbering_policy != "retained_template":
+            return False
+    return True
 
 
 def _plan_numbered_candidate(

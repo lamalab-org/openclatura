@@ -20,8 +20,11 @@ from .polycycle_topology import (
 )
 from .ring_renderer import render_von_baeyer_descriptor
 
-MAX_AUDITED_VON_BAEYER_RINGS = 8
-MAX_AUDITED_BRIDGEHEADS = 12
+# These are execution bounds, not nomenclature scope. The audited search is
+# graph-reconstructive at every rank; the previous 8-ring/12-bridgehead tier
+# excluded ordinary larger polycycles before doing any proof work.
+MAX_AUDITED_VON_BAEYER_RINGS = 32
+MAX_AUDITED_BRIDGEHEADS = 64
 MAX_PATHS_PER_BRIDGEHEAD_PAIR = 96
 
 
@@ -70,8 +73,11 @@ def find_von_baeyer_candidates(
     for first, second in combinations(bridgeheads, 2):
         paths = _simple_paths_between(first, second, adjacency, max_paths=MAX_PATHS_PER_BRIDGEHEAD_PAIR)
         if len(paths) >= MAX_PATHS_PER_BRIDGEHEAD_PAIR:
-            continue
-        for primary_paths in combinations(paths, 3):
+            theta = _three_internally_disjoint_paths(first, second, adjacency)
+            primary_path_sets = (theta,) if theta is not None else ()
+        else:
+            primary_path_sets = combinations(paths, 3)
+        for primary_paths in primary_path_sets:
             if not _paths_are_internally_disjoint(primary_paths):
                 continue
             for main_bridge_index in range(3):
@@ -93,8 +99,6 @@ def find_von_baeyer_candidates(
 
 def _is_von_baeyer_scope(mol: Molecule, atoms: frozenset[int], edges: frozenset[tuple[int, int]]) -> bool:
     if len(edges) - len(atoms) + 1 < 3:
-        return False
-    if any(mol.atoms[atom].is_aromatic for atom in atoms):
         return False
     adjacency = adjacency_from_edges(atoms, edges)
     # Free spiro centers are routed through the spiro/dispiro engine.  A
@@ -147,17 +151,32 @@ def _build_candidates_for_decomposition(
 
     base_path = _numbering_path(first_ring, second_ring, main_bridge)
     locants = {atom: idx for idx, atom in enumerate(base_path, start=1)}
-    secondary = tuple(sorted(secondary, key=_secondary_citation_key))
     path = list(base_path)
-    ordered_secondary: list[VonBaeyerBridge] = []
-    for bridge in secondary:
-        if bridge.attachments[0] not in locants or bridge.attachments[1] not in locants:
+    pending = [bridge for bridge in secondary if bridge.length > 0]
+    normalized_secondary: list[VonBaeyerBridge] = []
+    # Citation order follows bridge length, but numbering follows bridgehead
+    # seniority. Dependent ears become eligible as their attachment atoms are
+    # numbered, which is the general open-ear form of a bridged polycycle.
+    while pending:
+        available = [
+            bridge for bridge in pending if bridge.attachments[0] in locants and bridge.attachments[1] in locants
+        ]
+        if not available:
             return ()
-        bridge = _secondary_with_locants(bridge, locants)
-        ordered_secondary.append(bridge)
+        source = min(
+            available,
+            key=lambda item: (item.dependent, *_secondary_numbering_key(item, locants)),
+        )
+        bridge = _secondary_with_locants(source, locants)
+        normalized_secondary.append(bridge)
         path.extend(_orient_bridge_atoms_for_descriptor(bridge, locants))
         locants = {atom: idx for idx, atom in enumerate(path, start=1)}
-    secondary = tuple(ordered_secondary)
+        pending.remove(source)
+    for bridge in (item for item in secondary if item.length == 0):
+        if bridge.attachments[0] not in locants or bridge.attachments[1] not in locants:
+            return ()
+        normalized_secondary.append(_secondary_with_locants(bridge, locants))
+    secondary = tuple(sorted(normalized_secondary, key=lambda item: _secondary_citation_key(item, locants)))
 
     primary_lengths = (len(first_ring) - 2, len(second_ring) - 2, len(main_bridge) - 2)
     descriptor_body = _descriptor_body(primary_lengths, secondary, locants)
@@ -192,87 +211,171 @@ def _classify_secondary_bridges(
     primary_atoms: set[int],
     remaining_edges: frozenset[tuple[int, int]],
 ) -> tuple[VonBaeyerBridge, ...] | None:
-    bridges: list[VonBaeyerBridge] = []
-    direct_edges = [edge for edge in remaining_edges if edge[0] in primary_atoms and edge[1] in primary_atoms]
-    for first, second in direct_edges:
-        bridges.append(VonBaeyerBridge(length=0, attachments=tuple(sorted((first, second)))))
+    """Decompose the remainder into open ears plus zero-length chords.
 
-    outside_atoms = atom_set - primary_atoms
+    Every positive-length ear introduces previously unnumbered atoms between
+    two numbered atoms. This handles branched fused remainders generically;
+    the final descriptor reconstruction remains the proof that the chosen ears
+    cover exactly the source graph.
+    """
+
+    simple = _classify_single_path_components(
+        atom_set=atom_set,
+        edge_set=edge_set,
+        primary_atoms=primary_atoms,
+        remaining_edges=remaining_edges,
+    )
+    if simple is not None:
+        return simple
+    return _classify_open_ears(
+        atom_set=atom_set,
+        primary_atoms=primary_atoms,
+        remaining_edges=remaining_edges,
+    )
+
+
+def _classify_single_path_components(
+    *,
+    atom_set: frozenset[int],
+    edge_set: frozenset[tuple[int, int]],
+    primary_atoms: set[int],
+    remaining_edges: frozenset[tuple[int, int]],
+) -> tuple[VonBaeyerBridge, ...] | None:
+    """Keep the preferred decomposition when each outside component is one ear."""
+
+    direct_edges = {edge for edge in remaining_edges if edge[0] in primary_atoms and edge[1] in primary_atoms}
+    covered_edges = set(direct_edges)
+    bridges = [VonBaeyerBridge(length=0, attachments=tuple(sorted(edge))) for edge in direct_edges]
+    outside_atoms = set(atom_set) - primary_atoms
     outside_edges = frozenset(edge for edge in edge_set if edge[0] in outside_atoms and edge[1] in outside_atoms)
-    outside_components = _connected_components(outside_atoms, outside_edges)
-    used_outside: set[int] = set()
-    for component in outside_components:
+    for component in _connected_components(outside_atoms, outside_edges):
         connections = sorted(
             (atom, node)
             for atom in primary_atoms
             for node in component
             if tuple(sorted((atom, node))) in remaining_edges
         )
-        attachments = sorted({atom for atom, _node in connections})
-        if len(attachments) < 2:
+        candidates = []
+        for first, second in combinations(connections, 2):
+            if first[0] == second[0]:
+                continue
+            internal_path = _component_path(component, first[0], second[0], edge_set)
+            if set(internal_path) == component:
+                candidates.append((first, second, internal_path))
+        if not candidates:
             return None
-        independent = _choose_independent_secondary_bridge(component, connections, edge_set)
-        if independent is None:
-            return None
-        first_attachment, second_attachment, internal_path = independent
-        if not internal_path or set(internal_path) != component:
-            return None
-        used_outside.update(component)
+        first, second, internal_path = min(candidates, key=lambda item: (-len(item[2]), item[0], item[1]))
         bridges.append(
             VonBaeyerBridge(
                 length=len(component),
-                attachments=(first_attachment[0], second_attachment[0]),
+                attachments=(first[0], second[0]),
                 atoms=tuple(internal_path),
             )
         )
-        for attachment_atom, component_atom in connections:
-            if (attachment_atom, component_atom) in {first_attachment, second_attachment}:
-                continue
-            bridges.append(
-                VonBaeyerBridge(
-                    length=0,
-                    attachments=tuple(sorted((attachment_atom, component_atom))),
-                    dependent=True,
+        covered_edges.update(_path_edges((first[0], *internal_path, second[0])))
+        consumed = {first, second}
+        for attachment, component_atom in connections:
+            if (attachment, component_atom) not in consumed:
+                covered_edges.add(tuple(sorted((attachment, component_atom))))
+                bridges.append(
+                    VonBaeyerBridge(
+                        length=0,
+                        attachments=tuple(sorted((attachment, component_atom))),
+                        dependent=True,
+                    )
                 )
-            )
-    if used_outside != outside_atoms:
+    if covered_edges != set(remaining_edges):
         return None
     return tuple(bridges)
 
 
-def _choose_independent_secondary_bridge(
-    component: set[int],
-    connections: list[tuple[int, int]],
-    edge_set: frozenset[tuple[int, int]],
-) -> tuple[tuple[int, int], tuple[int, int], tuple[int, ...]] | None:
-    candidates = []
-    for first, second in combinations(connections, 2):
-        if first[0] == second[0] or first[1] == second[1]:
-            continue
-        internal_path = _component_path(component, first[0], second[0], edge_set)
-        if set(internal_path) != component:
-            continue
-        candidates.append((first, second, internal_path))
-    if not candidates:
+def _classify_open_ears(
+    *,
+    atom_set: frozenset[int],
+    primary_atoms: set[int],
+    remaining_edges: frozenset[tuple[int, int]],
+) -> tuple[VonBaeyerBridge, ...] | None:
+    bridges: list[VonBaeyerBridge] = []
+    known = set(primary_atoms)
+    unused = set(remaining_edges)
+    while known != atom_set:
+        unknown = set(atom_set) - known
+        unknown_edges = frozenset(edge for edge in unused if edge[0] in unknown and edge[1] in unknown)
+        candidates = []
+        for component in _connected_components(unknown, unknown_edges):
+            connections = sorted(
+                (numbered, node)
+                for numbered in known
+                for node in component
+                if tuple(sorted((numbered, node))) in unused
+            )
+            for first, second in combinations(connections, 2):
+                if first[0] == second[0]:
+                    continue
+                internal_path = _component_path(component, first[0], second[0], frozenset(unused))
+                if not internal_path:
+                    continue
+                ear_edges = {
+                    tuple(sorted((first[0], internal_path[0]))),
+                    tuple(sorted((internal_path[-1], second[0]))),
+                } | set(_path_edges(tuple(internal_path)))
+                if not ear_edges <= unused:
+                    continue
+                candidates.append((first[0], second[0], tuple(internal_path), frozenset(ear_edges)))
+        if not candidates:
+            return None
+        first, second, internal_path, ear_edges = min(
+            candidates,
+            key=lambda item: (-len(item[2]), tuple(sorted((item[0], item[1]))), item[2]),
+        )
+        bridges.append(
+            VonBaeyerBridge(
+                length=len(internal_path),
+                attachments=(first, second),
+                atoms=internal_path,
+                dependent=first not in primary_atoms or second not in primary_atoms,
+            )
+        )
+        known.update(internal_path)
+        unused.difference_update(ear_edges)
+
+    if any(first not in known or second not in known for first, second in unused):
         return None
-    return sorted(candidates, key=lambda item: (-len(item[2]), item[0], item[1]))[0]
+    for first, second in sorted(unused):
+        bridges.append(
+            VonBaeyerBridge(
+                length=0,
+                attachments=(first, second),
+                dependent=first not in primary_atoms or second not in primary_atoms,
+            )
+        )
+    return tuple(bridges)
 
 
 def _secondary_with_locants(bridge: VonBaeyerBridge, locants: dict[int, int]) -> VonBaeyerBridge:
     if bridge.attachments[0] not in locants or bridge.attachments[1] not in locants:
         return bridge
+    first, second = bridge.attachments
+    atoms = bridge.atoms
+    if locants[first] > locants[second]:
+        first, second = second, first
+        atoms = tuple(reversed(atoms))
     return VonBaeyerBridge(
         length=bridge.length,
-        attachments=tuple(sorted(bridge.attachments, key=lambda atom: locants[atom])),
-        atoms=bridge.atoms,
+        attachments=(first, second),
+        atoms=atoms,
         dependent=bridge.dependent,
     )
 
 
-def _secondary_citation_key(bridge: VonBaeyerBridge) -> tuple:
-    # Independent before dependent; longer bridges first.  Locants break ties
-    # after the graph-derived numbering is known.
-    return (1 if bridge.dependent else 0, -bridge.length, bridge.attachments)
+def _secondary_citation_key(bridge: VonBaeyerBridge, locants: dict[int, int]) -> tuple:
+    cited = tuple(sorted(locants[atom] for atom in bridge.attachments))
+    return (-bridge.length, bridge.dependent, cited)
+
+
+def _secondary_numbering_key(bridge: VonBaeyerBridge, locants: dict[int, int]) -> tuple:
+    lower, higher = sorted(locants[atom] for atom in bridge.attachments)
+    return (-higher, -lower)
 
 
 def _orient_bridge_atoms_for_descriptor(bridge: VonBaeyerBridge, locants: dict[int, int]) -> tuple[int, ...]:
@@ -284,11 +387,13 @@ def _orient_bridge_atoms_for_descriptor(bridge: VonBaeyerBridge, locants: dict[i
         return ()
     first_locant = locants[first]
     second_locant = locants[second]
-    # The descriptor parser stores attachment locants in ascending order, so
-    # internal bridge atoms must be listed from lower locant to higher locant.
+    # P-23 numbering continues from the higher-numbered bridgehead toward the
+    # lower one. ``_secondary_with_locants`` keeps ``atoms`` directed from the
+    # lower attachment to the higher attachment, so descriptor order is the
+    # reverse of that path.
     if first_locant <= second_locant:
-        return atoms
-    return tuple(reversed(atoms))
+        return tuple(reversed(atoms))
+    return atoms
 
 
 def _descriptor_body(
@@ -318,7 +423,8 @@ def _ranking_tuple(
     return (
         -main_ring_atom_count,
         -main_bridge_non_ring_atom_count,
-        abs(primary_lengths[0] - primary_lengths[1]),
+        -primary_lengths[0],
+        -primary_lengths[1],
         independent_lengths,
         dependent_count,
         secondary_locants_sorted,
@@ -365,6 +471,85 @@ def _simple_paths_between(
             elif neighbor not in path:
                 stack.append((neighbor, path + (neighbor,)))
     return tuple(sorted(paths, key=lambda path: (-len(path), path)))
+
+
+def _three_internally_disjoint_paths(
+    start: int,
+    end: int,
+    adjacency: dict[int, set[int]],
+) -> tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]] | None:
+    """Find a theta core with a vertex-capacitated three-unit flow.
+
+    Undirected edges use capacity-one gadgets, avoiding ambiguous residual
+    flow on antiparallel arcs. Internal atom capacity is one; the two selected
+    bridgeheads have capacity three. The returned paths are independently
+    checked before candidate construction and later by descriptor audit.
+    """
+
+    capacities: dict[tuple, dict[tuple, int]] = {}
+
+    def add_arc(source: tuple, target: tuple, capacity: int) -> None:
+        capacities.setdefault(source, {})[target] = capacity
+        capacities.setdefault(target, {})
+
+    for atom in adjacency:
+        add_arc(("in", atom), ("out", atom), 3 if atom in {start, end} else 1)
+    graph_edges = sorted((first, second) for first in adjacency for second in adjacency[first] if first < second)
+    for edge_index, (first, second) in enumerate(graph_edges):
+        edge_in = ("edge_in", edge_index)
+        edge_out = ("edge_out", edge_index)
+        add_arc(("out", first), edge_in, 1)
+        add_arc(("out", second), edge_in, 1)
+        add_arc(edge_in, edge_out, 1)
+        add_arc(edge_out, ("in", first), 1)
+        add_arc(edge_out, ("in", second), 1)
+
+    residual = {node: dict(targets) for node, targets in capacities.items()}
+    for source, targets in capacities.items():
+        for target in targets:
+            residual.setdefault(target, {}).setdefault(source, 0)
+    source = ("out", start)
+    sink = ("in", end)
+    for _ in range(3):
+        queue = [source]
+        previous = {source: None}
+        while queue and sink not in previous:
+            current = queue.pop(0)
+            for neighbor in sorted(residual[current], key=str):
+                if residual[current][neighbor] > 0 and neighbor not in previous:
+                    previous[neighbor] = current
+                    queue.append(neighbor)
+        if sink not in previous:
+            return None
+        current = sink
+        while previous[current] is not None:
+            parent = previous[current]
+            residual[parent][current] -= 1
+            residual[current][parent] += 1
+            current = parent
+
+    directed_edges: dict[int, list[int]] = {}
+    for edge_index, (first, second) in enumerate(graph_edges):
+        edge_in = ("edge_in", edge_index)
+        edge_out = ("edge_out", edge_index)
+        entered = [atom for atom in (first, second) if residual[("out", atom)][edge_in] == 0]
+        exited = [atom for atom in (first, second) if residual[edge_out][("in", atom)] == 0]
+        if len(entered) == 1 and len(exited) == 1 and entered[0] != exited[0]:
+            directed_edges.setdefault(entered[0], []).append(exited[0])
+
+    paths = []
+    for first_step in sorted(directed_edges.get(start, ())):
+        path = [start, first_step]
+        while path[-1] != end:
+            choices = [atom for atom in directed_edges.get(path[-1], ()) if atom not in path]
+            if len(choices) != 1:
+                return None
+            path.append(choices[0])
+        paths.append(tuple(path))
+    result = tuple(paths)
+    if len(result) != 3 or not _paths_are_internally_disjoint(result):
+        return None
+    return result
 
 
 def _paths_are_internally_disjoint(paths: tuple[tuple[int, ...], ...]) -> bool:

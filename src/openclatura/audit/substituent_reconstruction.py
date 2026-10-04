@@ -40,6 +40,7 @@ _LEAF_SMILES: dict[str, str] = {
     "aminodiazenyl": "N=NN",
     "triaz-2-en-1-yl": "NN=N",
     "triazan-1-yl": "NNN",
+    "triazan-2-yl": "N(N)N",
     "triazanyl": "NNN",
     "silyl": "[SiH3]",
     "methoxy": "OC",
@@ -83,6 +84,7 @@ _LEAF_SMILES: dict[str, str] = {
     "methylamino": "NC",
     "hydrazinyl": "NN",
     "hydrazino": "NN",
+    "hydrazonohydrazinyl": "NN=NN",
     "hydroxyimino": "=NO",
     "methylimino": "=NC",
     "methoxyimino": "=NOC",
@@ -285,6 +287,7 @@ _RING_ALIASES: dict[str, str] = {
 _LOCANT_YL_RE = re.compile(r"^(?P<stem>[a-zH0-9,\[\]-]+?)-(?P<loc>\d+[a-z]?)-yl$")
 
 _INDICATED_H_RE = re.compile(r"^(\d+)H-")
+_MAX_FRAGMENT_PAREN_DEPTH = 16
 
 
 _LEAVES_LONGEST_FIRST: tuple[str, ...] = tuple(sorted(_LEAF_SMILES, key=len, reverse=True))
@@ -332,6 +335,17 @@ def _saturated_ring_centre_is_sole(rw: Chem.RWMol, destination: Chem.Atom) -> bo
 def resolve_fragment_mol(name: str) -> Chem.Mol | None:
     """Return an RDKit mol with exactly one dummy ``*`` at the attachment point,
     or ``None`` if the name is not fully modeled."""
+    depth = maximum = 0
+    for char in name:
+        if char == "(":
+            depth += 1
+            maximum = max(maximum, depth)
+        elif char == ")":
+            depth -= 1
+        if depth < 0 or maximum > _MAX_FRAGMENT_PAREN_DEPTH:
+            return None
+    if depth:
+        return None
     stereo_map, relative = _leading_stereo_map(name)
     mol = _resolve_fragment(name, stereo_map)
     if mol is not None and relative is not None:
@@ -627,22 +641,22 @@ def _acyl_ring_variants(stem: str):
 
 def _resolve_amino(rest: str) -> Chem.Mol | None:
     """Build an ``...amino`` nitrogen bearing its organyl groups: ``ethylamino``, ``diethylamino``,
-    and two different groups as consecutive clauses (``(methyl)(phenyl)amino``)."""
+    and different groups as consecutive clauses (``butyl(benzyl)amino``)."""
     rest = rest.strip().strip("-")
     if not rest:
         return None
 
-    groups = _top_level_groups(rest)
-    if len(groups) >= 2 and all(g.startswith("(") for g in groups):
-        frags = [resolve_fragment_mol(g) for g in groups]
-        if all(f is not None for f in frags):
-            return _amino_from_ligands(frags)
+    # Prefer a complete substituent reading.  Parentheses can belong inside one
+    # ligand (``(2,2,2-trifluoroethyl)sulfamoyl``), not necessarily delimit a
+    # list of ligands on this nitrogen.
+    inner = resolve_fragment_mol(rest)
+    if inner is not None:
+        return _amino_from_ligands([inner])
 
-    count, base = _multiplied_ligand(rest)
-    inner = resolve_fragment_mol(base)
-    if inner is None:
+    frags = _hub_ligands(rest)
+    if frags is None:
         return None
-    return _amino_from_ligands([inner] * count)
+    return _amino_from_ligands(frags)
 
 
 def _multiplied_ligand(rest: str) -> tuple[int, str]:

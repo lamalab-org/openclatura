@@ -366,6 +366,7 @@ class FusionComponentMatch:
     local_to_skeleton_atom: tuple[tuple[str, int], ...]
     topology_key: tuple
     template_name: str = ""
+    has_exocyclic_heteroatom_ligand: bool = False
 
     def __post_init__(self) -> None:
         _require_nonnegative(self.occurrence_id, "occurrence_id")

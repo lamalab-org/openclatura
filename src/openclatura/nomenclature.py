@@ -8,9 +8,24 @@ from .naming_data import grouped_namer_rules
 
 
 @dataclass(frozen=True)
+class RetainedChainParentRule:
+    name: str
+    substituted_name: str | None = None
+    allows_carbon_substitution: bool = True
+
+
+@dataclass(frozen=True)
 class RetainedNameRules:
     ring_elements: set[str]
     substituent_stems: dict[str, tuple[str, str]]
+    functional_parents: dict[tuple[str, str], str]
+    chain_substituent_stems: dict[tuple[int, str], tuple[str, str]]
+    chain_parents: dict[tuple[int, str, int], RetainedChainParentRule]
+    aldehyde_chain_words: dict[int, str]
+    substituted_chain_parents: dict[tuple[int, str, int, str, str], str]
+    chain_branch_endings: dict[tuple[int, str, int, str, str], str]
+    acyl_branch_endings: dict[tuple[str, str], str]
+    substituents: dict[tuple[int, str, str, str, str], str]
     monocycle_specs: tuple[dict, ...]
     fused_polycycle_specs: tuple[dict, ...]
 
@@ -43,7 +58,9 @@ class PrefixRules:
 class ComponentRules:
     salt_metal_names: set[str]
     mononuclear_parent_hydrides: dict[str, str]
+    retained_mononuclear_hydride_names: dict[str, str]
     retained_homonuclear_chain_names: dict[str, str]
+    retained_component_graph_names: dict[tuple[tuple[tuple[str, int], ...], tuple[tuple[str, str, int], ...]], str]
     replacement_parent_oxoacid_specs: tuple[dict, ...]
 
 
@@ -51,6 +68,7 @@ class ComponentRules:
 class IonRules:
     single_atom_cations: set[str]
     single_atom_anions: dict[str, str]
+    mononuclear_hydride_ions: dict[tuple[str, int, int], str]
 
 
 @dataclass(frozen=True)
@@ -116,6 +134,9 @@ class FunctionalGroupRule:
     role: str
     prefix: str | None = None
     suffix: str | None = None
+    positive_nitrogen_suffix: str | None = None
+    retained_suffix: str | None = None
+    positive_nitrogen_retained_suffix: str | None = None
     multi_suffix: MultiSuffixTemplate | None = None
     suffix_multiplier_positions: tuple[int, ...] = (0,)
     seniority: int | None = None
@@ -197,6 +218,9 @@ def _functional_group_rules() -> FunctionalGroupRules:
             role=item["role"],
             prefix=item.get("prefix"),
             suffix=suffix,
+            positive_nitrogen_suffix=item.get("positive_nitrogen_suffix"),
+            retained_suffix=item.get("retained_suffix"),
+            positive_nitrogen_retained_suffix=item.get("positive_nitrogen_retained_suffix"),
             multi_suffix=_multi_suffix_template(suffix, multi_suffix),
             suffix_multiplier_positions=_suffix_multiplier_positions(suffix, multi_suffix),
             seniority=item.get("seniority"),
@@ -328,6 +352,58 @@ def registry() -> NomenclatureRegistry:
         retained=RetainedNameRules(
             ring_elements=set(retained.values("retained_ring_elements")),
             substituent_stems=_group_tuple_mapping("retained_parents", "retained_substituent_stems"),
+            functional_parents={
+                (row["parent"], row["group"]): row["name"] for row in retained.values("retained_functional_parents")
+            },
+            chain_substituent_stems={
+                (int(row["length"]), row["attachment"]): (row["stem"], row["ending"])
+                for row in retained.values("retained_chain_substituent_stems")
+            },
+            chain_parents={
+                (int(row["length"]), row["group"], int(row["count"])): RetainedChainParentRule(
+                    name=row["name"],
+                    substituted_name=row.get("substituted_name"),
+                    allows_carbon_substitution=bool(row.get("allows_carbon_substitution", True)),
+                )
+                for row in retained.values("retained_chain_parents")
+            },
+            aldehyde_chain_words={
+                int(length): name for length, name in retained.mapping("retained_aldehyde_chain_words").items()
+            },
+            substituted_chain_parents={
+                (
+                    int(row["length"]),
+                    row["group"],
+                    int(row["count"]),
+                    row["branch"],
+                    str(row["locant"]),
+                ): row["name"]
+                for row in retained.values("retained_substituted_chain_parents")
+            },
+            chain_branch_endings={
+                (
+                    int(row["length"]),
+                    row["group"],
+                    int(row["count"]),
+                    row["ending"],
+                    str(row["locant"]),
+                ): row["name"]
+                for row in retained.values("retained_chain_branch_endings")
+            },
+            acyl_branch_endings={
+                (row["ending"], row["attachment"]): row["name"]
+                for row in retained.values("retained_acyl_branch_endings")
+            },
+            substituents={
+                (
+                    int(row["length"]),
+                    str(row["attachment_locant"]),
+                    row["branch"],
+                    str(row["branch_locant"]),
+                    row["attachment"],
+                ): row["name"]
+                for row in retained.values("retained_substituents")
+            },
             monocycle_specs=tuple(retained.values("retained_monocycle_specs")),
             fused_polycycle_specs=tuple(retained.values("retained_fused_polycycle_specs")),
         ),
@@ -364,12 +440,36 @@ def registry() -> NomenclatureRegistry:
         components=ComponentRules(
             salt_metal_names=set(simple_components.values("salt_metal_names")),
             mononuclear_parent_hydrides=simple_components.mapping("mononuclear_parent_hydrides"),
+            retained_mononuclear_hydride_names=simple_components.mapping("retained_mononuclear_hydride_names"),
             retained_homonuclear_chain_names=simple_components.mapping("retained_homonuclear_chain_names"),
+            retained_component_graph_names={
+                (
+                    tuple(
+                        sorted(
+                            (str(symbol), int(charge))
+                            for symbol, charge, count in row["atoms"]
+                            for _ in range(int(count))
+                        )
+                    ),
+                    tuple(
+                        sorted(
+                            (min(str(left), str(right)), max(str(left), str(right)), int(order))
+                            for left, right, order, count in row["bonds"]
+                            for _ in range(int(count))
+                        )
+                    ),
+                ): row["name"]
+                for row in simple_components.values("retained_component_graph_names")
+            },
             replacement_parent_oxoacid_specs=tuple(simple_components.values("replacement_parent_oxoacid_specs")),
         ),
         ions=IonRules(
             single_atom_cations=set(simple_components.values("single_atom_cations")),
             single_atom_anions=simple_components.mapping("single_atom_anions"),
+            mononuclear_hydride_ions={
+                (row["element"], int(row["charge"]), int(row["hydrogens"])): row["name"]
+                for row in simple_components.values("mononuclear_hydride_ions")
+            },
         ),
         charges=_charge_rules(),
         assembly=AssemblyRules(

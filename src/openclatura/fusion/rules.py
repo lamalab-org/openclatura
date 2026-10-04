@@ -211,11 +211,14 @@ def component_parent_eligible(
     spec: FusionComponentSpec,
     components: Sequence[FusionComponentMatch],
 ) -> bool:
-    """Include a benzoheterocycle when a peri attachment spans its rings.
+    """Include a benzoheterocycle when the added fusion requires it as parent.
 
     The attached-only P-25.3.5 family policy applies to ordinary benzo
     attachments. A component fused across the shared ring junction cannot
     be described as attached to either constituent ring alone (P-25.5).
+    A further heterocycle fused to the benzenoid constituent likewise uses the
+    complete benzoheterocycle; an added benzene or an attachment to the
+    heterocyclic constituent retains the ordinary attached-component policy.
     Its parent role is contextual; the registry policy is not mutated.
     """
 
@@ -223,12 +226,26 @@ def component_parent_eligible(
         return True
     if not spec.usable_as_peri_parent or not spec.usable_as_attached or len(spec.rings) < 2:
         return False
+    symbols = {atom.locant: atom.symbol for atom in spec.template.atoms}
+    all_face_ids = frozenset().union(*(other.covered_face_ids for other in components))
     for other in components:
         if not component.covered_face_ids.isdisjoint(other.covered_face_ids):
             continue
         other_atoms = {atom for _, atom in other.local_to_input_atom}
         shared = {locant for locant, atom in component.local_to_input_atom if atom in other_atoms}
         if len(shared) >= 3 and not any(shared <= set(ring) for ring in spec.rings):
+            return True
+        other_has_heteroatom = any(symbol != "C" for symbol, _count in other.topology_key[1])
+        attached_to_benzenoid_ring = any(
+            len(shared) >= 2 and shared <= set(ring) and all(symbols[locant] == "C" for locant in ring)
+            for ring in spec.rings
+        )
+        if (
+            other_has_heteroatom
+            and attached_to_benzenoid_ring
+            and len(all_face_ids - component.covered_face_ids) == 1
+            and other.has_exocyclic_heteroatom_ligand
+        ):
             return True
     return False
 

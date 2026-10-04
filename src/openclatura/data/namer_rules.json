@@ -4,6 +4,7 @@
     "values": [
       "contains_principal_group",
       "principal_group_count",
+      "parent_charge_count",
       "senior_element_vector",
       "ring_parent",
       "ring_seniority",
@@ -20,6 +21,7 @@
     "values": [
       "contains_principal_group",
       "principal_group_count",
+      "parent_charge_count",
       "senior_element_vector",
       "ring_parent",
       "ring_count",
@@ -43,8 +45,8 @@
     "bluebook_rule": "Brief Guide section 7; active parent-numbering criteria by parent class.",
     "values": {
       "chain": [
-        "principal",
-        "hydro",
+      "principal",
+      "hydro",
         "hetero_by_priority",
         "indicated_hydrogen",
         "unsaturation",
@@ -55,8 +57,8 @@
       "ring": [
         "hetero_by_priority",
         "indicated_hydrogen",
-        "principal",
-        "hydro",
+      "principal",
+      "hydro",
         "unsaturation",
         "substituent_and_unsaturation",
         "substituent_citation",
@@ -83,6 +85,22 @@
       "I": "iodide"
     }
   },
+  "mononuclear_hydride_ions": {
+    "bluebook_rule": "P-72/P-73; retained and substitutive names for mononuclear hydride ions",
+    "values": [
+      {"element": "N", "charge": 1, "hydrogens": 4, "name": "ammonium"},
+      {"element": "N", "charge": -1, "hydrogens": 2, "name": "azanide"},
+      {"element": "O", "charge": -1, "hydrogens": 1, "name": "hydroxide"},
+      {"element": "O", "charge": -2, "hydrogens": 0, "name": "oxide"},
+      {"element": "O", "charge": 1, "hydrogens": 3, "name": "oxonium"},
+      {"element": "S", "charge": -1, "hydrogens": 1, "name": "sulfanide"},
+      {"element": "S", "charge": -2, "hydrogens": 0, "name": "sulfide"},
+      {"element": "P", "charge": 1, "hydrogens": 4, "name": "phosphanium"},
+      {"element": "H", "charge": 1, "hydrogens": 0, "name": "hydron"},
+      {"element": "H", "charge": -1, "hydrogens": 0, "name": "hydride"},
+      {"element": "Se", "charge": -2, "hydrogens": 0, "name": "selenide"}
+    ]
+  },
   "mononuclear_parent_hydrides": {
     "bluebook_rule": "P-13 replacement nomenclature; mononuclear non-carbon parent hydrides",
     "values": {
@@ -104,11 +122,64 @@
       "Bi": "bismuthane"
     }
   },
+  "retained_mononuclear_hydride_names": {
+    "bluebook_rule": "P-21.1.1.1; retained names of unsubstituted mononuclear hydrides",
+    "values": {
+      "H": "dihydrogen",
+      "N": "ammonia",
+      "O": "water",
+      "F": "hydrogen fluoride",
+      "Cl": "hydrogen chloride",
+      "Br": "hydrogen bromide",
+      "I": "hydrogen iodide"
+    }
+  },
   "retained_homonuclear_chain_names": {
     "bluebook_rule": "P-21.1.1 retained names for homonuclear chain parent hydrides",
     "values": {
       "N2": "hydrazine"
     }
+  },
+  "retained_component_graph_names": {
+    "bluebook_rule": "P-21.2, P-65.2, P-67.1.1.1 and P-68.3.1.1.1; retained names matched against a complete charged component graph",
+    "values": [
+      {"name": "dihydrogen", "atoms": [["H", 0, 2]], "bonds": [["H", "H", 1, 1]]},
+      {"name": "dinitrogen", "atoms": [["N", 0, 2]], "bonds": [["N", "N", 3, 1]]},
+      {"name": "dioxygen", "atoms": [["O", 0, 2]], "bonds": [["O", "O", 2, 1]]},
+      {"name": "difluorine", "atoms": [["F", 0, 2]], "bonds": [["F", "F", 1, 1]]},
+      {"name": "dichlorine", "atoms": [["Cl", 0, 2]], "bonds": [["Cl", "Cl", 1, 1]]},
+      {"name": "dibromine", "atoms": [["Br", 0, 2]], "bonds": [["Br", "Br", 1, 1]]},
+      {"name": "diiodine", "atoms": [["I", 0, 2]], "bonds": [["I", "I", 1, 1]]},
+      {"name": "tetrafluoroborate", "atoms": [["B", -1, 1], ["F", 0, 4]], "bonds": [["B", "F", 1, 4]]},
+      {"name": "hexafluorophosphate", "atoms": [["P", -1, 1], ["F", 0, 6]], "bonds": [["F", "P", 1, 6]]},
+      {"name": "sulfur dioxide", "atoms": [["S", 0, 1], ["O", 0, 2]], "bonds": [["O", "S", 2, 2]]},
+      {"name": "sulfur trioxide", "atoms": [["S", 0, 1], ["O", 0, 3]], "bonds": [["O", "S", 2, 3]]},
+      {"name": "hydroxylamine", "atoms": [["N", 0, 1], ["O", 0, 1]], "bonds": [["N", "O", 1, 1]]},
+      {"name": "hydrogen peroxide", "atoms": [["O", 0, 2]], "bonds": [["O", "O", 1, 1]]},
+      {"name": "phosphonic acid", "atoms": [["O", 0, 3], ["P", 0, 1]], "bonds": [["O", "P", 1, 2], ["O", "P", 2, 1]]},
+      {"name": "phosphinic acid", "atoms": [["O", 0, 2], ["P", 0, 1]], "bonds": [["O", "P", 1, 1], ["O", "P", 2, 1]]},
+      {"name": "sulfuric diamide", "atoms": [["N", 0, 2], ["O", 0, 2], ["S", 0, 1]], "bonds": [["N", "S", 1, 2], ["O", "S", 2, 2]]},
+      {"name": "diphosphoric acid", "atoms": [["O", 0, 7], ["P", 0, 2]], "bonds": [["O", "P", 1, 6], ["O", "P", 2, 2]]},
+      {"name": "carbon dioxide", "atoms": [["C", 0, 1], ["O", 0, 2]], "bonds": [["C", "O", 2, 2]]},
+      {"name": "carbon disulfide", "atoms": [["C", 0, 1], ["S", 0, 2]], "bonds": [["C", "S", 2, 2]]},
+      {"name": "carbonyl sulfide", "atoms": [["C", 0, 1], ["O", 0, 1], ["S", 0, 1]], "bonds": [["C", "O", 2, 1], ["C", "S", 2, 1]]},
+      {"name": "carbon monoxide", "atoms": [["C", -1, 1], ["O", 1, 1]], "bonds": [["C", "O", 3, 1]]},
+      {"name": "carbonyl dichloride", "atoms": [["C", 0, 1], ["O", 0, 1], ["Cl", 0, 2]], "bonds": [["C", "O", 2, 1], ["C", "Cl", 1, 2]]},
+      {"name": "carbonyl difluoride", "atoms": [["C", 0, 1], ["O", 0, 1], ["F", 0, 2]], "bonds": [["C", "O", 2, 1], ["C", "F", 1, 2]]},
+      {"name": "carbonyl dibromide", "atoms": [["C", 0, 1], ["O", 0, 1], ["Br", 0, 2]], "bonds": [["C", "O", 2, 1], ["Br", "C", 1, 2]]},
+      {"name": "thiocyanic acid", "atoms": [["C", 0, 1], ["N", 0, 1], ["S", 0, 1]], "bonds": [["C", "N", 3, 1], ["C", "S", 1, 1]]},
+      {"name": "isocyanic acid", "atoms": [["C", 0, 1], ["N", 0, 1], ["O", 0, 1]], "bonds": [["C", "N", 2, 1], ["C", "O", 2, 1]]},
+      {"name": "isothiocyanic acid", "atoms": [["C", 0, 1], ["N", 0, 1], ["S", 0, 1]], "bonds": [["C", "N", 2, 1], ["C", "S", 2, 1]]},
+      {"name": "cyanate", "atoms": [["C", 0, 1], ["N", 0, 1], ["O", -1, 1]], "bonds": [["C", "N", 3, 1], ["C", "O", 1, 1]]},
+      {"name": "cyanate", "atoms": [["C", 0, 1], ["N", -1, 1], ["O", 0, 1]], "bonds": [["C", "N", 2, 1], ["C", "O", 2, 1]]},
+      {"name": "thiocyanate", "atoms": [["C", 0, 1], ["N", 0, 1], ["S", -1, 1]], "bonds": [["C", "N", 3, 1], ["C", "S", 1, 1]]},
+      {"name": "thiocyanate", "atoms": [["C", 0, 1], ["N", -1, 1], ["S", 0, 1]], "bonds": [["C", "N", 2, 1], ["C", "S", 2, 1]]},
+      {"name": "cyanide", "atoms": [["C", -1, 1], ["N", 0, 1]], "bonds": [["C", "N", 3, 1]]},
+      {"name": "azide", "atoms": [["N", -1, 2], ["N", 1, 1]], "bonds": [["N", "N", 2, 2]]},
+      {"name": "nitrate", "atoms": [["N", 1, 1], ["O", 0, 1], ["O", -1, 2]], "bonds": [["N", "O", 2, 1], ["N", "O", 1, 2]]},
+      {"name": "nitrite", "atoms": [["N", 0, 1], ["O", 0, 1], ["O", -1, 1]], "bonds": [["N", "O", 2, 1], ["N", "O", 1, 1]]},
+      {"name": "peroxide", "atoms": [["O", -1, 2]], "bonds": [["O", "O", 1, 1]]}
+    ]
   },
   "replacement_parent_oxoacid_specs": {
     "bluebook_rule": "P-13 replacement nomenclature; functional parent hydrides described by central atom and ligand counts",
@@ -330,6 +401,10 @@
       "S:+": {
         "suffix": "ium",
         "reason": "Monocationic parent sulfur is rendered as a parent ium suffix operation."
+      },
+      "C:+": {
+        "suffix": "ylium",
+        "reason": "A positive parent carbon is rendered as a parent ylium suffix operation."
       },
       "*:-": {
         "suffix": "ide",
@@ -1118,6 +1193,9 @@
         "role": "principal",
         "prefix": "carbamoyl",
         "suffix": "amide",
+        "positive_nitrogen_suffix": "amidium",
+        "retained_suffix": "amide",
+        "positive_nitrogen_retained_suffix": "amidium",
         "multi_suffix": {
           "multiplier_positions": [
             0
@@ -1157,6 +1235,9 @@
         "role": "principal",
         "prefix": "carbamoyl",
         "suffix": "carboxamide",
+        "positive_nitrogen_suffix": "carboxamidium",
+        "retained_suffix": "amide",
+        "positive_nitrogen_retained_suffix": "amidium",
         "multi_suffix": {
           "multiplier_positions": [
             0
@@ -1737,6 +1818,101 @@
         ""
       ]
     }
+  },
+  "retained_functional_parents": {
+    "bluebook_rule": "P-22.3, P-65 and P-66; retained functional parent names derived from retained hydrides",
+    "values": [
+      {"parent": "benzene", "group": "alcohol", "name": "phenol"},
+      {"parent": "benzene", "group": "amine", "name": "aniline"},
+      {"parent": "benzene", "group": "ring_aldehyde", "name": "benzaldehyde"},
+      {"parent": "benzene", "group": "ring_carboxylic_acid", "name": "benzoic acid"},
+      {"parent": "benzene", "group": "ring_amide", "name": "benzamide"},
+      {"parent": "benzene", "group": "ring_hydrazide", "name": "benzohydrazide"},
+      {"parent": "benzene", "group": "ring_nitrile", "name": "benzonitrile"},
+      {"parent": "benzene", "group": "ring_carboxylate", "name": "benzoate"},
+      {"parent": "benzene", "group": "acyl", "name": "benzoyl"}
+    ]
+  },
+  "retained_chain_substituent_stems": {
+    "bluebook_rule": "P-65.1.1; retained acid stems used for acyl substituents",
+    "values": [
+      {"length": 1, "attachment": "acyl", "stem": "form", "ending": "yl"},
+      {"length": 2, "attachment": "acyl", "stem": "acet", "ending": "yl"}
+    ]
+  },
+  "retained_chain_parents": {
+    "bluebook_rule": "P-12, P-65 and P-66; retained acyclic functional parent names and substitution policy",
+    "values": [
+      {"length": 1, "group": "carboxylic_acid", "count": 1, "name": "formic acid"},
+      {"length": 2, "group": "carboxylic_acid", "count": 1, "name": "acetic acid"},
+      {"length": 1, "group": "amide", "count": 1, "name": "formamide"},
+      {"length": 1, "group": "hydrazide", "count": 1, "name": "formohydrazide"},
+      {"length": 2, "group": "hydrazide", "count": 1, "name": "acetohydrazide"},
+      {"length": 1, "group": "urea", "count": 1, "name": "urea"},
+      {"length": 1, "group": "guanidine", "count": 1, "name": "guanidine"},
+      {"length": 1, "group": "thiourea", "count": 1, "name": "thiourea"},
+      {"length": 2, "group": "amide", "count": 1, "name": "acetamide"},
+      {"length": 1, "group": "nitrile", "count": 1, "name": "hydrogen cyanide", "allows_carbon_substitution": false, "substituted_name": "formonitrile"},
+      {"length": 2, "group": "nitrile", "count": 1, "name": "acetonitrile"},
+      {"length": 3, "group": "nitrile", "count": 1, "name": "propionitrile"},
+      {"length": 4, "group": "nitrile", "count": 1, "name": "butyronitrile"},
+      {"length": 1, "group": "ester", "count": 1, "name": "formate"},
+      {"length": 2, "group": "ester", "count": 1, "name": "acetate"},
+      {"length": 1, "group": "carboxylate", "count": 1, "name": "formate"},
+      {"length": 2, "group": "carboxylate", "count": 1, "name": "acetate"},
+      {"length": 2, "group": "carboxylic_acid", "count": 2, "name": "oxalic acid", "allows_carbon_substitution": false},
+      {"length": 3, "group": "carboxylic_acid", "count": 2, "name": "malonic acid", "allows_carbon_substitution": false},
+      {"length": 4, "group": "carboxylic_acid", "count": 2, "name": "succinic acid", "allows_carbon_substitution": false},
+      {"length": 5, "group": "carboxylic_acid", "count": 2, "name": "glutaric acid", "allows_carbon_substitution": false},
+      {"length": 6, "group": "carboxylic_acid", "count": 2, "name": "adipic acid", "allows_carbon_substitution": false}
+    ]
+  },
+  "retained_aldehyde_chain_words": {
+    "bluebook_rule": "P-66.4; retained aldehyde words used by carbonyl derivatives",
+    "values": {"1": "formaldehyde", "2": "acetaldehyde"}
+  },
+  "retained_substituted_chain_parents": {
+    "bluebook_rule": "P-65 and P-66; retained chain parents that absorb one complete branch",
+    "values": [
+      {"length": 1, "group": "nitrile", "count": 1, "branch": "hydroxy", "locant": "1", "name": "cyanic acid"},
+      {"length": 1, "group": "carboxylic_acid", "count": 1, "branch": "amino", "locant": "1", "name": "carbamic acid"},
+      {"length": 1, "group": "amide", "count": 1, "branch": "hydrazinyl", "locant": "1", "name": "hydrazinecarboxamide"},
+      {"length": 1, "group": "thioamide", "count": 1, "branch": "hydrazinyl", "locant": "1", "name": "hydrazinecarbothioamide"},
+      {"length": 1, "group": "ester", "count": 1, "branch": "hydrazinyl", "locant": "1", "name": "hydrazinecarboxylate"},
+      {"length": 1, "group": "carboxylic_acid", "count": 1, "branch": "hydrazinyl", "locant": "1", "name": "hydrazinecarboxylic acid"},
+      {"length": 1, "group": "ester", "count": 1, "branch": "amino", "locant": "1", "name": "carbamate"},
+      {"length": 1, "group": "carboxylate", "count": 1, "branch": "amino", "locant": "1", "name": "carbamate"},
+      {"length": 1, "group": "acid_chloride", "count": 1, "branch": "amino", "locant": "1", "name": "carbamic chloride"},
+      {"length": 1, "group": "acid_fluoride", "count": 1, "branch": "amino", "locant": "1", "name": "carbamic fluoride"},
+      {"length": 1, "group": "acid_bromide", "count": 1, "branch": "amino", "locant": "1", "name": "carbamic bromide"}
+    ]
+  },
+  "retained_chain_branch_endings": {
+    "bluebook_rule": "P-65 and P-66; branch endings contracted into retained chain parent words",
+    "values": [
+      {"length": 1, "group": "nitrile", "count": 1, "ending": "amino", "locant": "1", "name": "cyanamide"},
+      {"length": 1, "group": "carboxylic_acid", "count": 1, "ending": "amino", "locant": "1", "name": "carbamic acid"},
+      {"length": 1, "group": "ester", "count": 1, "ending": "amino", "locant": "1", "name": "carbamate"},
+      {"length": 1, "group": "carboxylate", "count": 1, "ending": "amino", "locant": "1", "name": "carbamate"},
+      {"length": 1, "group": "acid_chloride", "count": 1, "ending": "amino", "locant": "1", "name": "carbamic chloride"},
+      {"length": 1, "group": "acid_fluoride", "count": 1, "ending": "amino", "locant": "1", "name": "carbamic fluoride"},
+      {"length": 1, "group": "acid_bromide", "count": 1, "ending": "amino", "locant": "1", "name": "carbamic bromide"}
+    ]
+  },
+  "retained_acyl_branch_endings": {
+    "bluebook_rule": "P-65 and P-66; branch endings contracted into retained acyl substituent words",
+    "values": [
+      {"ending": "amino", "attachment": "acyl", "name": "carbamoyl"},
+      {"ending": "sulfonamido", "attachment": "acyl", "name": "sulfonylcarbamoyl"}
+    ]
+  },
+  "retained_substituents": {
+    "bluebook_rule": "P-29 and P-65; retained substituent names selected by parent and attachment topology",
+    "values": [
+      {"length": 1, "attachment_locant": "1", "branch": "phenyl", "branch_locant": "1", "attachment": "single", "name": "benzyl"},
+      {"length": 3, "attachment_locant": "2", "branch": "methyl", "branch_locant": "2", "attachment": "single", "name": "tert-butyl"},
+      {"length": 1, "attachment_locant": "1", "branch": "phenyl", "branch_locant": "1", "attachment": "acyl", "name": "benzoyl"}
+    ]
   },
   "ambiguous_connection_substituent_stems": {
     "bluebook_rule": "P-13.6; explicit attachment locants avoid ambiguous retained-ring radical placement",

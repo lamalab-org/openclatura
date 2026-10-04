@@ -7,6 +7,21 @@ from .assembly_utils import is_fully_enclosed as is_fully_enclosed
 from .namer_config import ALKYL_OXY_PREFIXES
 from .rules import multipliers, stems
 
+NITROGEN_CHAIN_PREFIX_UNITS = ("amino", "diazenyl", "hydrazinyl", "hydrazono")
+HETEROATOM_SUBSTITUENT_SUFFIXES = (
+    "amino",
+    "imino",
+    "phosphanyl",
+    "phosphanylidene",
+    "selanyl",
+    "selanylidene",
+    "sulfanyl",
+    "sulfanylidene",
+    "tellanyl",
+    "tellanylidene",
+)
+HETEROATOM_LIGAND_PREFIXES = ("amino", "imino", "oxo", "seleno", "sulfanyl", "thioxo", "telluro")
+
 
 def strip_outer_parentheses(name: str | RenderedSubstituentName) -> str:
     """Remove one balanced outer parenthesis pair from a fragment."""
@@ -20,7 +35,28 @@ def strip_outer_parentheses(name: str | RenderedSubstituentName) -> str:
 def is_complex_prefix(name: str) -> bool:
     """Return true when a substituent prefix needs protective parentheses."""
 
-    return "(" in name or name[0].isdigit() or "-" in name or " " in name or _starts_with_multiplier(name)
+    return (
+        _is_compound_nitrogen_chain_prefix(name)
+        or _is_modified_heteroatom_prefix(name)
+        or "(" in name
+        or name[0].isdigit()
+        or "-" in name
+        or " " in name
+        or _starts_with_multiplier(name)
+    )
+
+
+def _is_compound_nitrogen_chain_prefix(name: str) -> bool:
+    """Protect a prefix composed from two or more nitrogen-chain units."""
+
+    return sum(name.count(unit) for unit in NITROGEN_CHAIN_PREFIX_UNITS) >= 2
+
+
+def _is_modified_heteroatom_prefix(name: str) -> bool:
+    """Keep a recursively named heteroatom ligand attached to its own center."""
+
+    has_modifier = any(name.startswith(prefix) and len(name) > len(prefix) for prefix in HETEROATOM_LIGAND_PREFIXES)
+    return has_modifier and name.endswith(HETEROATOM_SUBSTITUENT_SUFFIXES)
 
 
 def is_composite_prefix(name: str) -> bool:
@@ -110,7 +146,8 @@ def format_center_ligands(names: list[str], *, sort_key: Callable[[str], str] | 
         merges_with_multiplied_ligand = count == 1 and any(
             counts[later_name] > 1 and name.endswith(later_name) for later_name in ordered_names[index + 1 :]
         )
-        if merges_with_multiplied_ligand and not is_fully_enclosed(ligand):
+        ambiguous_first_ligand = count == 1 and len(ordered_names) > 1 and index == 0 and is_complex_prefix(name)
+        if (merges_with_multiplied_ligand or ambiguous_first_ligand) and not is_fully_enclosed(ligand):
             ligand = f"({ligand})"
         if index and count == 1 and not is_fully_enclosed(ligand):
             ligand = f"({ligand})"
@@ -144,10 +181,16 @@ def oxy_prefix_from_branch(branch: str) -> str:
     retained = ALKYL_OXY_PREFIXES.get(branch)
     if retained:
         return retained
+    # P-29.2.2: elide the terminal ``o`` of amino before ``oxy``.
+    if branch == "amino":
+        return "aminoxy"
     substituted_alkoxy = substituted_alkoxy_prefix(branch)
     if substituted_alkoxy:
         return substituted_alkoxy
-    if is_complex_prefix(branch):
+    # Preserve the attachment boundary of N-acyl prefixes. Without it,
+    # ``acetamido`` + ``oxy`` is read as a contracted ``acetamidooxy`` and
+    # loses the O-N bond instead of denoting acetylamino-O-.
+    if branch.endswith("amido") or is_complex_prefix(branch):
         return f"(({branch})oxy)"
     return f"({branch}oxy)"
 

@@ -64,6 +64,7 @@ def add_component_principal_group(
         return
     locants = sorted([get_loc(c) for c in principal_carbons if c in numbered_path], key=parse_locant)
     atom_ids = set()
+    positive_nitrogen_suffix_atom_ids = set()
     for group in perceived_groups:
         if group.key == principal_key and group.attachment_carbon in numbered_path:
             atom_ids.add(group.attachment_carbon)
@@ -92,13 +93,53 @@ def add_component_principal_group(
                         bond = mol.get_bond(amidine_carbon, nitrogen)
                         if bond is not None and bond.order == 2 and bond.stereo in {"E", "Z"}:
                             parts.stereo_features.append(("", bond.stereo))
+            if group.key in {"amide", "ring_amide"}:
+                positive_nitrogen_suffix_atom_ids.update(
+                    _positive_amide_nitrogens(
+                        mol,
+                        set(group.atoms_involved) | {group.attachment_carbon},
+                        attachment_atom=group.attachment_carbon,
+                    )
+                )
     parts.principal_group = PrincipalGroupItem(
         key=principal_key,
         locants=locants,
         atom_ids=atom_ids,
         bond_ids=bond_ids_within(mol, atom_ids),
         charge_atom_ids={atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0},
+        positive_nitrogen_suffix_atom_ids=positive_nitrogen_suffix_atom_ids,
     )
+
+
+def _positive_amide_nitrogens(
+    mol: Molecule,
+    group_atoms: set[int],
+    *,
+    attachment_atom: int,
+) -> set[int]:
+    """Return charged nitrogens directly attached to this group's carbonyl carbon."""
+
+    carbonyl_carbons = {
+        atom_idx
+        for atom_idx in group_atoms
+        if mol.atoms[atom_idx].symbol == "C"
+        and any(
+            neighbor in group_atoms
+            and mol.atoms[neighbor].symbol == "O"
+            and mol.get_bond(atom_idx, neighbor).order == 2
+            for neighbor in mol.get_neighbors(atom_idx)
+        )
+    }
+    return {
+        neighbor
+        for carbon in carbonyl_carbons
+        for neighbor in mol.get_neighbors(carbon)
+        if neighbor in group_atoms
+        and neighbor != attachment_atom
+        and mol.atoms[neighbor].symbol == "N"
+        and mol.atoms[neighbor].charge > 0
+        and mol.get_bond(carbon, neighbor).order == 1
+    }
 
 
 def _hydrazone_allows_unlocanted_stereo(mol: Molecule, group: PerceivedGroup, carbon: int) -> bool:

@@ -32,6 +32,7 @@ class ParentSeniorityProfile:
     multiple_bond_count: int
     double_bond_count: int
     path_tiebreak: tuple[int, ...]
+    parent_charge_count: int = 0
     attached_prefix_count: int = 0
     split_acyl_count: int = 0
 
@@ -42,6 +43,8 @@ class ParentSeniorityProfile:
             return -self.principal_group_count
         if criterion == "contains_principal_group":
             return -int(self.contains_principal_group)
+        if criterion == "parent_charge_count":
+            return -self.parent_charge_count
         if criterion == "senior_element_vector":
             return self.senior_element_vector
         if criterion == "polycycle_parent":
@@ -142,6 +145,7 @@ class ParentCandidate:
         profile = ParentSeniorityProfile(
             principal_group_count=principal_groups_count,
             contains_principal_group=principal_groups_count > 0,
+            parent_charge_count=_parent_charge_count(mol, path, is_ring=is_ring),
             senior_element_vector=_senior_element_vector(mol, path, include_carbon=True),
             polycycle_parent=is_polycycle,
             bicycle_parent=is_bicycle,
@@ -322,6 +326,29 @@ def _attached_prefix_count(mol: Molecule | None, path: list[int]) -> int:
         return 0
     in_path = set(path)
     return sum(1 for idx in path for nb in mol.get_neighbors(idx) if nb not in in_path)
+
+
+def _parent_charge_count(mol: Molecule | None, path: list[int], *, is_ring: bool) -> int:
+    """Count formal-charge sites that can be expressed as parent suffixes.
+
+    A charged skeleton must outrank an otherwise comparable uncharged one;
+    putting that skeleton in a branch creates unsupported ``ideyl``/``iumyl``
+    forms and can omit the component charge from the parseable parent name.
+    Principal characteristic groups remain senior because this criterion is
+    evaluated only after their coverage criteria.
+    """
+
+    if mol is None or len(path) == 1:
+        return 0
+    charged = [mol.atoms[atom_idx].charge for atom_idx in path if mol.atoms[atom_idx].charge]
+    if not is_ring:
+        return len(charged)
+    path_atoms = set(path)
+    outside = [atom.charge for atom in mol if atom.idx not in path_atoms and atom.charge]
+    negative_sites = sum(charge < 0 for charge in charged) if not any(charge > 0 for charge in outside) else 0
+    positive_sites = sum(charge > 0 for charge in charged)
+    balanced_positive_sites = positive_sites if positive_sites and any(charge < 0 for charge in outside) else 0
+    return negative_sites + balanced_positive_sites
 
 
 def _split_acyl_count(mol: Molecule | None, path: list[int]) -> int:

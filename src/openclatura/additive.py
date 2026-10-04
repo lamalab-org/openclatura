@@ -804,6 +804,35 @@ def _add_monocycle_hydro(parts: AssemblyParts, plan: tuple[int, list[int]], get_
 def add_replacement_prefixes(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     """Add replacement prefixes and lambda annotations for parent atoms."""
 
+    represented_fusion_charge_atoms = {
+        operation.atom_id
+        for operation in (
+            parts.parent_hydride.fusion_plan.charge_operations
+            if parts.parent_hydride is not None and parts.parent_hydride.fusion_plan is not None
+            else ()
+        )
+    }
+    for atom_idx in numbered_path:
+        atom = mol.atoms[atom_idx]
+        if atom.radical_electrons and atom_idx not in represented_fusion_charge_atoms:
+            raise ValueError(f"radical parent atom {atom.symbol} is outside the supported hydride tier")
+    if parts.retained_name:
+        parent_atoms = set(numbered_path)
+        for atom_idx in numbered_path:
+            atom = mol.atoms[atom_idx]
+            if atom.is_carbon or atom.charge:
+                continue
+            has_external_pi_ligand = any(
+                neighbor not in parent_atoms and mol.get_bond(atom_idx, neighbor).order > 1
+                for neighbor in mol.get_neighbors(atom_idx)
+            )
+            if has_external_pi_ligand:
+                continue
+            bonding_number = atom.total_h_count + sum(
+                mol.get_bond(atom_idx, neighbor).order for neighbor in mol.get_neighbors(atom_idx)
+            )
+            if bonding_number > atom.element.standard_valence:
+                parts.parent_lambda_conventions[str(get_loc(atom_idx))] = bonding_number
     if parts.retained_name or (parts.parent_hydride is not None and parts.parent_hydride.absorbs_skeletal_replacement):
         return
     for atom_idx in numbered_path:
@@ -812,14 +841,13 @@ def add_replacement_prefixes(mol: Molecule, parts: AssemblyParts, numbered_path:
             continue
         hw_stem = atom.element.hw_stem
         if not hw_stem:
-            continue
+            raise ValueError(f"no skeletal-replacement prefix for parent atom {atom.symbol}")
         valence = sum(mol.get_bond(atom_idx, n).order for n in mol.get_neighbors(atom_idx))
-        charged_prefix = RULES.charges.replacement_charge_states.get(
-            (atom.symbol, atom.charge, valence + atom.total_h_count)
-        )
+        bonding_number = valence + atom.total_h_count
+        charged_prefix = RULES.charges.replacement_charge_states.get((atom.symbol, atom.charge, bonding_number))
         loc = get_loc(atom_idx)
-        if atom.charge == 0 and valence > atom.element.standard_valence:
-            loc = f"{loc}lambda^{valence}"
+        if atom.charge == 0 and bonding_number > atom.element.standard_valence:
+            loc = f"{loc}lambda^{bonding_number}"
         parts.a_prefixes.append(
             SubstituentItem(
                 name=charged_prefix or hw_stem,

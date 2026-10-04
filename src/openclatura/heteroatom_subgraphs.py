@@ -28,7 +28,7 @@ from .namer_config import (
     SIMPLE_SULFANYL_PREFIXES,
 )
 from .naming_protocols import RecursiveSubgraphNamer
-from .nitrogen_roles import terminal_n3_substituent_role
+from .nitrogen_roles import terminal_n3_substituent_role, terminal_n4_substituent_role
 from .nomenclature import RULES
 from .oxoacid_roles import OxoLigandRole, central_oxo_substituent_role
 from .rules import elision, multipliers
@@ -445,9 +445,9 @@ def name_nitrogen_subgraph(
             ]
             if all(branches):
                 return f"({format_counted_prefixes(branches)}{prefix})" if branches else prefix
-    terminal_n3 = terminal_n3_prefix(mol, start_idx, exclude_atoms, upstream_atom)
-    if terminal_n3:
-        return terminal_n3
+    terminal_chain = terminal_nitrogen_chain_prefix(mol, start_idx, exclude_atoms, upstream_atom)
+    if terminal_chain:
+        return terminal_chain
     heterocumulene = nitrogen_heterocumulene_role(mol, start_idx, exclude_atoms, upstream_atom)
     if heterocumulene is not None:
         return heterocumulene.prefix
@@ -509,6 +509,22 @@ def name_nitrogen_subgraph(
     if guanidino:
         return guanidino
 
+    if (
+        upstream_order == 1
+        and upstream_atom is not None
+        and len(next_atoms) == 2
+        and all(
+            mol.atoms[nxt].symbol == "N"
+            and not mol.atoms[nxt].charge
+            and mol.degree(nxt) == 1
+            and mol.get_bond(start_idx, nxt).order == 1
+            for nxt in next_atoms
+        )
+    ):
+        # R-N(NH2)2 is triazan-2-yl.  Treating the two N-N edges as two
+        # hydrazinyl ligands adds an extra nitrogen on reconstruction.
+        return "triazan-2-yl"
+
     branches = []
     for nxt in next_atoms:
         c_oxygens = double_bonded_neighbors(mol, nxt, "O")
@@ -549,15 +565,17 @@ def name_nitrogen_subgraph(
     return format_amino_from_branches(branches, is_double, is_cation, is_anion)
 
 
-def terminal_n3_prefix(
+def terminal_nitrogen_chain_prefix(
     mol: Molecule,
     start_idx: int,
     exclude_atoms: set[int],
     upstream_atom: int | None,
 ) -> str:
-    """Render terminal N-N-N charge-separated chains from ordered graph roles."""
+    """Render supported linear terminal nitrogen chains from ordered graph roles."""
 
-    role = terminal_n3_substituent_role(mol, start_idx, exclude_atoms, upstream_atom)
+    role = terminal_n4_substituent_role(mol, start_idx, exclude_atoms, upstream_atom)
+    if role is None:
+        role = terminal_n3_substituent_role(mol, start_idx, exclude_atoms, upstream_atom)
     return role.key if role is not None else ""
 
 
@@ -615,6 +633,8 @@ def _sulfur_imide_branch_name(
     branch_idx = first_substituent_neighbor(mol, sulfur, {nitrogen, *s_oxygens})
     branch = name_branch_or_none(mol, branch_idx, local_exclude, sulfur, branch_namer)
     if branch:
+        if "(" in branch and not branch.startswith("("):
+            branch = f"({branch})"
         return f"{stereo_prefix_text}{sulfonyl_group_name(branch, sulfur_oxo_suffix(len(s_oxygens)))}"
     return "sulfo"
 
@@ -751,6 +771,8 @@ def name_sulfur_subgraph(
                 # or ``dimethylsulfamoyl`` reads as two methyls on the nitrogen.
                 bare = any(contracted == name for _, _, name in RULES.heteroatoms.sulfonyl_ligand_contractions)
                 return f"{stereo_prefix_text}{contracted}" if bare else f"({stereo_prefix_text}{contracted})"
+            if "(" in branch:
+                branch = f"({branch})"
             return f"({stereo_prefix_text}{branch}{suffix})"
         branches = [
             br
@@ -911,6 +933,15 @@ def name_pnictogen_subgraph(
         or unsubstituted_prefix(symbol, len(p_oxygens))
         or unsubstituted_prefix(symbol, 1 if p_oxygens else 0)
     ) + multiple_bond_suffix
+    atom = mol.atoms[start_idx]
+    charge_separated_chalcogenyl = any(
+        mol.atoms[neighbor].symbol in {"S", "Se", "Te"}
+        and mol.atoms[neighbor].charge < 0
+        and mol.get_bond(start_idx, neighbor).order == 1
+        for neighbor in mol.get_neighbors(start_idx)
+    )
+    if atom.charge > 0 and not charge_separated_chalcogenyl and upstream_order == 1 and suffix.endswith("yl"):
+        suffix = suffix[:-2] + "iumyl"
     if not next_atoms:
         return f"{stereo_prefix_text}{suffix}"
     branches = [
@@ -918,8 +949,6 @@ def name_pnictogen_subgraph(
         for nxt in next_atoms
         if (br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx} | set(p_oxygens), start_idx))
     ]
-    atom = mol.atoms[start_idx]
-
     all_single = all(mol.get_bond(start_idx, n).order == 1 for n in mol.get_neighbors(start_idx))
     if (
         all_single

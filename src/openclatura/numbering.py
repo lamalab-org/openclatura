@@ -24,6 +24,7 @@ class NumberingPreference:
     """
 
     principal: tuple[int, ...]
+    charge: tuple[int, ...]
     hetero_by_priority: tuple[tuple[int, ...], ...]
     indicated_hydrogen: tuple[int, ...]
     hydro: tuple[int, ...]
@@ -35,6 +36,8 @@ class NumberingPreference:
     def criterion_value(self, criterion: str) -> tuple:
         if criterion == "principal":
             return self.principal
+        if criterion == "charge":
+            return self.charge
         if criterion == "hetero_by_priority":
             return self.hetero_by_priority
         if criterion == "indicated_hydrogen":
@@ -144,6 +147,9 @@ class _DeferredNumberingPreference:
     def _derive(self, criterion: str) -> tuple:
         if criterion == "principal":
             return tuple(get_atom_locants(self._oriented_path, self._principal_carbons))
+        if criterion == "charge":
+            charged_atoms = {idx for idx in self._oriented_path if self._mol.atoms[idx].charge != 0}
+            return tuple(get_atom_locants(self._oriented_path, charged_atoms))
         if criterion == "hetero_by_priority":
             return _heteroatom_locants_by_priority(
                 self._mol,
@@ -183,7 +189,13 @@ class _DeferredNumberingPreference:
         return self.ordered_key(NUMBERING_CRITERIA["chain"])
 
     def ring_key(self) -> "_DeferredNumberingKey":
-        return self.ordered_key(NUMBERING_CRITERIA["ring"])
+        criteria = list(NUMBERING_CRITERIA["ring"])
+        if any(
+            self._mol.atoms[atom_idx].symbol == "C" and self._mol.atoms[atom_idx].charge < 0
+            for atom_idx in self._oriented_path
+        ):
+            criteria.insert(criteria.index("unsaturation"), "charge")
+        return self.ordered_key(criteria)
 
 
 def number_parent(
@@ -312,10 +324,11 @@ def choose_parent_numbering(
                 for priority in sorted(het_by_priority.keys())
             )
             substituent_eval = sorted([get_val(idx) for idx in set(substituent_mapping.keys()) if idx in lmap])
-            # Low locants to hydro prefixes, P-31.1.4.2.4.
-            hydro_eval = sorted(
-                get_val(idx) for idx in lmap if idx in mol.atoms and _is_saturated_ring_site(mol, idx, list(lmap))
-            )
+            # Only positions emitted by an actual mancude hydro plan are hydro
+            # locants. Saturated sites of a von Baeyer alkane parent are part
+            # of that parent, not implicit ``hydro`` prefixes.
+            hydro_split = _mancude_hydro_split(mol, list(lmap), retained_name)
+            hydro_eval = sorted(get_val(idx) for idx in (() if hydro_split is None else hydro_split[1]))
             indicated_h_eval = sorted(
                 get_val(idx)
                 for idx in _indicated_hydrogen_like_atoms(
@@ -384,6 +397,8 @@ def _numbering_preference(
     retained_name: str | None,
 ) -> NumberingPreference:
     principal = tuple(get_atom_locants(oriented_path, principal_carbons))
+    charged_atoms = {idx for idx in oriented_path if mol.atoms[idx].charge != 0}
+    charge = tuple(get_atom_locants(oriented_path, charged_atoms))
     hetero_by_priority = _heteroatom_locants_by_priority(
         mol,
         oriented_path,
@@ -402,6 +417,7 @@ def _numbering_preference(
     substituent_and_unsaturation = tuple(sorted(substituent_locants + list(unsaturation)))
     return NumberingPreference(
         principal=principal,
+        charge=charge,
         hetero_by_priority=hetero_by_priority,
         indicated_hydrogen=indicated_hydrogen,
         hydro=hydro,

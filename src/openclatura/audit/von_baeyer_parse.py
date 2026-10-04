@@ -7,11 +7,11 @@ after the substituent grammar, so this module parses the descriptor, stem,
 skeletal replacement (``oxa``/``aza``/…) and unsaturation locants back into a
 numbered ring skeleton — entirely from the name, never the input graph.
 
-The two-ring ``bicyclo`` case and monospiro ``spiro[a.b]`` are modelled (both
-with skeletal replacement and unsaturation), as are monocycles that state their
-own heteroatoms — the ``1-azacyclohexane`` replacement form and the contracted
-Hantzsch-Widman one (``1,4-dioxane``, ``azepane``).  Polyspiro (``dispiro``…),
-bridges carrying their own atoms, and anything that does not parse cleanly
+The two-ring ``bicyclo`` case, general audited polycycles, and monospiro
+``spiro[a.b]`` are modelled (with skeletal replacement and unsaturation), as
+are monocycles that state their own heteroatoms — the ``1-azacyclohexane``
+replacement form and the contracted Hantzsch-Widman one (``1,4-dioxane``,
+``azepane``). Polyspiro (``dispiro``…) and anything that does not parse cleanly
 return ``None`` so the caller abstains.
 """
 
@@ -35,7 +35,10 @@ _UNSAT_STEMS: dict[str, tuple[int, Chem.BondType]] = {
 }
 _UNSAT_ALTERNATION = "|".join(sorted(_UNSAT_STEMS, key=len, reverse=True))
 
-_VONBAEYER_RE = re.compile(r"(?:bi|tri|tetra|penta)cyclo\[([0-9.,^{}]+)\]")
+_CYCLE_PREFIX_ALTERNATION = "|".join(
+    ("bi", *(mult.basic for count, mult in sorted(_multipliers.MULTIPLIERS.items()) if count >= 3))
+)
+_VONBAEYER_RE = re.compile(rf"(?P<prefix>{_CYCLE_PREFIX_ALTERNATION})cyclo\[(?P<body>[0-9.,^{{}}]+)\]")
 _SECONDARY_RE = re.compile(r"(\d+)\^?\{?(\d+),(\d+)\}?")
 _LAMBDA = r"(?:lambda\^?\{?\d+\}?)?"
 _BASIC_ALTERNATION = "|".join(sorted((mult.basic for mult in _multipliers.MULTIPLIERS.values()), key=len, reverse=True))
@@ -69,6 +72,17 @@ def _parse_descriptor(inner: str) -> Descriptor | None:
     return a, b, c, secondary
 
 
+def _parse_von_baeyer_match(match: re.Match[str]) -> Descriptor | None:
+    descriptor = _parse_descriptor(match.group("body"))
+    if descriptor is None:
+        return None
+    prefix = match.group("prefix")
+    cycle_count = 2 if prefix == "bi" else _multipliers.count_for(prefix)
+    if cycle_count != len(descriptor[3]) + 2:
+        return None
+    return descriptor
+
+
 def parse_von_baeyer(name: str) -> Numbered | None:
     """Parse a full ``[replacement](bi|tri…)cyclo[…]stem[unsat]-<n>-yl``
     substituent (or the ``…-<n>-ylidene`` / bare parent form)."""
@@ -76,7 +90,7 @@ def parse_von_baeyer(name: str) -> Numbered | None:
     m = _VONBAEYER_RE.search(name)
     if m is None:
         return None
-    descriptor = _parse_descriptor(m.group(1))
+    descriptor = _parse_von_baeyer_match(m)
     if descriptor is None:
         return None
     a, b, c, secondary = descriptor
@@ -108,7 +122,7 @@ def build_skeleton_from_descriptor(descriptor: str) -> tuple[Chem.RWMol | None, 
     m = _VONBAEYER_RE.search(descriptor)
     if m is None:
         return None, {}
-    parsed = _parse_descriptor(m.group(1))
+    parsed = _parse_von_baeyer_match(m)
     if parsed is None:
         return None, {}
     a, b, c, secondary = parsed
@@ -144,7 +158,29 @@ def _build_skeleton(
             prev = i
         bond(prev, bh2)
     next_locant = n + 1
-    for length, f, g in secondary:
+    pending = [item for item in secondary if item[0] > 0]
+    numbered_secondary = []
+    while pending:
+        available = [item for item in pending if item[1] in idx and item[2] in idx]
+        if not available:
+            return None, {}
+        item = min(
+            available,
+            key=lambda bridge: (
+                max(int(bridge[1]), int(bridge[2])) > n,
+                -max(int(bridge[1]), int(bridge[2])),
+                -min(int(bridge[1]), int(bridge[2])),
+            ),
+        )
+        numbered_secondary.append(item)
+        pending.remove(item)
+        # Reserve these locants before choosing a bridge that may cite them.
+        for locant in range(next_locant, next_locant + item[0]):
+            idx[str(locant)] = -1
+        next_locant += item[0]
+    numbered_secondary.extend(item for item in secondary if item[0] == 0)
+    next_locant = n + 1
+    for length, f, g in numbered_secondary:
         if f not in idx or g not in idx:
             return None, {}
         if length == 0:

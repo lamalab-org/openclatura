@@ -148,6 +148,12 @@ def verify_with_opsin(name: str, smiles: str, standardize_smiles: bool = True) -
 
     if standardize_smiles:
         canonical_original = standardize_mol(smiles)
+        if canonical_original is None:
+            # Hypervalent but RDKit-valid inorganic ions (for example PF6-)
+            # can fall outside the standardizer's cleanup model.  Preserve a
+            # usable exact graph comparison instead of converting that into a
+            # verifier error.
+            canonical_original = _canonicalize(smiles)
     else:
         canonical_original = _canonicalize(smiles)
 

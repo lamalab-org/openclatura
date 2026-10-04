@@ -111,6 +111,15 @@ TERMINAL_N3_TEMPLATES: tuple[NitrogenChainTemplate, ...] = (
     NitrogenChainTemplate("hydrazinylamino", (1, 1, 1), (None, 0, 0, 0), "neutral_hydrazinylamino"),
 )
 
+TERMINAL_N4_TEMPLATES: tuple[NitrogenChainTemplate, ...] = (
+    NitrogenChainTemplate(
+        "hydrazonohydrazinyl",
+        (1, 1, 2, 1),
+        (None, 0, 0, 0, 0),
+        "neutral_hydrazonohydrazinyl",
+    ),
+)
+
 
 def _template_value_matches(expected, actual: int) -> bool:
     if expected is None:
@@ -561,6 +570,54 @@ def terminal_n3_substituent_role(
         variant=template.variant,
         reason=f"Matched terminal charge-separated N3 substituent at atom {upstream_atom}.",
         ordered_atoms=(upstream_atom, start_idx, n2, n3),
+    )
+
+
+def terminal_n4_substituent_role(
+    mol: Molecule,
+    start_idx: int,
+    exclude_atoms: set[int],
+    upstream_atom: int | None,
+) -> NitrogenChainRole | None:
+    """Return an ordered role for a linear terminal N4 substituent fragment."""
+
+    if upstream_atom is None or mol.atoms[start_idx].symbol != "N":
+        return None
+    ordered = [upstream_atom, start_idx]
+    previous = upstream_atom
+    current = start_idx
+    while len(ordered) < 5:
+        candidates = [
+            neighbor
+            for neighbor in mol.get_neighbors(current)
+            if neighbor != previous and neighbor not in exclude_atoms and mol.atoms[neighbor].symbol == "N"
+        ]
+        if len(candidates) != 1:
+            return None
+        next_atom = candidates[0]
+        if _other_non_h_neighbors(mol, current, {previous, next_atom}):
+            return None
+        ordered.append(next_atom)
+        previous, current = current, next_atom
+    if _other_non_h_neighbors(mol, current, {previous}):
+        return None
+    ordered_atoms = tuple(ordered)
+    template = _match_template(
+        TERMINAL_N4_TEMPLATES,
+        _chain_bond_orders(mol, ordered_atoms),
+        tuple(mol.atoms[atom].charge for atom in ordered_atoms),
+    )
+    if template is None:
+        return None
+    return _make_role(
+        mol,
+        key=template.key,
+        is_principal_candidate=False,
+        attachment_atom=upstream_atom,
+        atom_ids=frozenset(ordered_atoms[1:]),
+        variant=template.variant,
+        reason=f"Matched terminal N4 {template.key} fragment at atom {upstream_atom}.",
+        ordered_atoms=ordered_atoms,
     )
 
 

@@ -9,6 +9,7 @@ from math import prod
 
 from .assembly_parts import AssemblyParts
 from .assembly_utils import parse_locant
+from .formatting import is_complex_prefix
 from .locant_sources import LocantMapSource
 
 MAX_CANDIDATE_PLACEMENTS = 10_000
@@ -78,6 +79,7 @@ def substituent_locant_set_is_unique(parts: AssemblyParts, locs: list[str], grou
         or parts.principal_group
         or parts.unsaturations
         or parts.a_prefixes
+        or parts.indicated_hydrogens
     ):
         return False
     selected = tuple(str(locant) for locant in locs)
@@ -306,6 +308,8 @@ def _feature_groups(parts: AssemblyParts) -> list[_FeatureGroup]:
     for item in parts.substituents:
         by_name.setdefault(item.name, []).extend(str(locant) for locant in item.locants)
     for name, locants in sorted(by_name.items()):
+        if len(locants) > 1 and is_complex_prefix(name):
+            continue
         if locants and all(locant in parts.parent_atom_symbols_by_locant for locant in locants):
             groups.append(_FeatureGroup("substituent", name, tuple(sorted(locants, key=parse_locant))))
 

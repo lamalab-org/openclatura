@@ -87,6 +87,7 @@ def apply_parent_charge_names(
     retained_name: str | None = None,
     allow_retained_stem_inference: bool = False,
     charge_signs: set[int] | None = None,
+    owned_locants: set[str] | None = None,
 ) -> str:
     """Apply graph-backed charge spelling rules to the selected parent."""
 
@@ -95,6 +96,8 @@ def apply_parent_charge_names(
         allow_retained_stem_inference=allow_retained_stem_inference,
     )
     for site in parent_charge_sites(mol, numbered_path, get_loc):
+        if owned_locants is not None and site.locant in owned_locants:
+            continue
         if charge_signs is not None and charge_sign(site.charge) not in charge_signs:
             continue
         for rule in PARENT_CHARGE_RULES:
@@ -113,11 +116,20 @@ def apply_anionic_parent_names(
     numbered_path: list[int],
     get_loc,
     retained_name: str | None = None,
+    owned_locants: set[str] | None = None,
 ) -> str:
     """Compatibility wrapper for parent charge spelling."""
 
     name = apply_ring_parent_nitrogen_zwitterion_stack(name, mol, numbered_path, get_loc)
-    return apply_parent_charge_names(name, mol, numbered_path, get_loc, retained_name, charge_signs={-1})
+    return apply_parent_charge_names(
+        name,
+        mol,
+        numbered_path,
+        get_loc,
+        retained_name,
+        charge_signs={-1},
+        owned_locants=owned_locants,
+    )
 
 
 def parent_charge_sites(mol: Molecule, numbered_path: list[int], get_loc) -> list[ParentChargeSite]:

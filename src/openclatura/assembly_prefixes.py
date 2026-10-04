@@ -101,7 +101,10 @@ def substituent_locant_string(parts: AssemblyParts, name: str, locs: list[str], 
         and not spiro_subs
         and not must_print_retained_locant
     )
-    if simple_one_locant or substituent_locant_set_is_unique(parts, locs, grouped_count, spiro_subs):
+    complex_multiplied_prefix = len(locs) > 1 and is_complex_prefix(name)
+    if simple_one_locant or (
+        not complex_multiplied_prefix and substituent_locant_set_is_unique(parts, locs, grouped_count, spiro_subs)
+    ):
         return ""
     return ",".join(map(str, locs))
 
@@ -118,7 +121,10 @@ def format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:
         attachments_per_group = 2 if ("diyl" in name and "ylidene" not in name) else 1
         count_raw = len(locs) if locs else len(items)
         count = max(1, count_raw // attachments_per_group)
-        is_complex = is_complex_prefix(name) or (count > 1 and needs_complex_multiplier(name))
+        is_isotope_prefix = name in {"deuterio", "tritio"}
+        is_complex = not is_isotope_prefix and (
+            is_complex_prefix(name) or (count > 1 and needs_complex_multiplier(name))
+        )
         mult = (multipliers.complex_(count) if is_complex else multipliers.basic(count)) if count > 1 else ""
         loc_str = substituent_locant_string(parts, name, locs, len(grouped), spiro_subs)
 
@@ -131,7 +137,7 @@ def format_substituent_prefixes(parts: AssemblyParts, spiro_subs) -> str:
             outer_parentheses_optional=outer_parentheses_optional,
         )
         if is_complex and not is_fully_enclosed(name_to_use):
-            if count > 1 or loc_str:
+            if count > 1 or loc_str or len(grouped) > 1:
                 name_to_use = f"({name_to_use})"
         elif not loc_str and len(grouped) > 1 and not is_fully_enclosed(name_to_use):
             if name not in ["fluoro", "chloro", "bromo", "iodo"]:
