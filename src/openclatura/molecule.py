@@ -17,6 +17,7 @@ class Atom:
     is_aromatic: bool = False
     explicit_h_count: int = 0
     total_h_count: int = 0
+    radical_electrons: int = 0
 
     def __post_init__(self):
         if not elements.is_known(self.symbol):
@@ -197,6 +198,7 @@ class Molecule:
         is_aromatic: bool = False,
         explicit_h_count: int = 0,
         total_h_count: int = 0,
+        radical_electrons: int = 0,
     ) -> Atom:
         if idx is None:
             idx = max(self.atoms.keys(), default=0) + 1
@@ -213,6 +215,7 @@ class Molecule:
             is_aromatic=is_aromatic,
             explicit_h_count=explicit_h_count,
             total_h_count=total_h_count,
+            radical_electrons=radical_electrons,
         )
         self.atoms[idx] = atom
         self._adj[idx] = []

@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 
+from .chalcogen_roles import FunctionalGroupDescriptor
 from .chains import get_cyclic_atoms
 from .functional_groups import PERCEPTION_DETECTORS, PERCEPTION_SPECS, PerceptionDetectorSpec, metadata_for_group
 from .molecule import (
@@ -31,6 +32,7 @@ class PerceivedGroup:
     decision_reasons: tuple[str, ...] = ()
     variant: str | None = None
     role: str | None = None
+    descriptor: FunctionalGroupDescriptor | None = None
 
     @property
     def atom_ids(self) -> set[int]:
@@ -71,6 +73,7 @@ def _copy_perceived_group(group: PerceivedGroup) -> PerceivedGroup:
         group.decision_reasons,
         group.variant,
         group.role,
+        group.descriptor,
     )
 
 
@@ -851,11 +854,18 @@ def _atom_bindings_for_group(group: PerceivedGroup) -> tuple[AtomBinding, ...]:
 
     characteristic_atoms = tuple(sorted(group.atoms_involved))
     attachment_atoms = (group.attachment_carbon,)
-    return (
+    bindings = [
         AtomBinding("attachment", attachment_atoms),
         AtomBinding("characteristic_group", characteristic_atoms),
         AtomBinding("full_group", tuple(sorted(group.atom_ids))),
-    )
+    ]
+    if group.descriptor is not None:
+        bindings.append(AtomBinding("characteristic_centers", group.descriptor.centers))
+        for ligand in group.descriptor.ligands:
+            bindings.append(AtomBinding(ligand.role.value, (ligand.atom,)))
+        for path in group.descriptor.linker_paths:
+            bindings.append(AtomBinding("ordered_linker_path", path))
+    return tuple(bindings)
 
 
 def _bond_bindings_for_group(mol: Molecule, group: PerceivedGroup) -> tuple[BondBinding, ...]:
