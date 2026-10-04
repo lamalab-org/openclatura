@@ -94,6 +94,7 @@ class ChargeRules:
     replacement_charge_prefixes: dict[str, str]
     replacement_charge_states: dict[tuple[str, int, int], str]
     heteroatom_charge_prefixes: dict[str, str]
+    heteroatom_prefix_states: dict[str, tuple[str, int, int]]
     anion_suffix_placements: tuple[AnionSuffixPlacementRule, ...]
 
 
@@ -310,6 +311,8 @@ def _postprocess_rules() -> PostprocessRules:
 
 def _charge_rules() -> ChargeRules:
     group = grouped_namer_rules()["charges"]
+    heteroatom_charge_prefixes = group.mapping("heteroatom_charge_prefixes")
+    bond_orders = {"single": 1, "double": 2, "triple": 3}
     return ChargeRules(
         retained_ionic_n_parents=group.mapping("retained_ionic_n_parents"),
         saturated_n_ring_ionic_parents={
@@ -327,7 +330,15 @@ def _charge_rules() -> ChargeRules:
             (row["symbol"], row["charge"], row["valence"]): row["prefix"]
             for row in group.values("replacement_charge_states")
         },
-        heteroatom_charge_prefixes=group.mapping("heteroatom_charge_prefixes"),
+        heteroatom_charge_prefixes=heteroatom_charge_prefixes,
+        heteroatom_prefix_states={
+            prefix: (
+                state.split(":")[0],
+                1 if state.split(":")[1] == "+" else -1,
+                bond_orders[state.split(":")[2]],
+            )
+            for state, prefix in heteroatom_charge_prefixes.items()
+        },
         anion_suffix_placements=tuple(
             AnionSuffixPlacementRule(
                 key=item["key"],

@@ -38,6 +38,7 @@ from ..formatting import strip_outer_parentheses
 from ..hantzsch_widman import hw_parent_template
 from ..locants import parse_system_locant, system_locant_sort_key
 from ..molecule import Molecule
+from ..nomenclature import RULES
 from ..rules import elements as _elements
 from ..rules import multipliers as _multipliers
 from .naming import (
@@ -260,49 +261,56 @@ def _lookup_parent_template(retained_name: str) -> tuple[str, list[str]] | None:
     return hw_parent_template(retained_name)
 
 
-_DIRECT_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int], ...]] = {
-    "alcohol": (("O", 1),),
-    "thiol": (("S", 1),),
-    "amine": (("N", 1),),
-    "ketone": (("O", 2),),
-    "aldehyde": (("O", 2),),
-    "thioaldehyde": (("S", 2),),
-    "imine": (("N", 2),),
-    "carboxylic_acid": (("O", 2), ("O", 1)),
-    "amide": (("O", 2), ("N", 1)),
-    "urea": (("O", 2), ("N", 1), ("N", 1)),
+_DIRECT_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int, int], ...]] = {
+    "alcohol": (("O", 1, 0),),
+    "thiol": (("S", 1, 0),),
+    "amine": (("N", 1, 0),),
+    "ketone": (("O", 2, 0),),
+    "aldehyde": (("O", 2, 0),),
+    "thioaldehyde": (("S", 2, 0),),
+    "imine": (("N", 2, 0),),
+    "carboxylic_acid": (("O", 2, 0), ("O", 1, 0)),
+    "carboxylate": (("O", 2, 0), ("O", 1, -1)),
+    "amide": (("O", 2, 0), ("N", 1, 0)),
+    "urea": (("O", 2, 0), ("N", 1, 0), ("N", 1, 0)),
     # The amine nitrogen is N and the imino nitrogen N' (P-66.4.1.1.1.3); decorate in that order.
-    "amidine": (("N", 1), ("N", 2)),
-    "guanidine": (("N", 1), ("N", 2), ("N", 1)),
-    "thioamide": (("S", 2), ("N", 1)),
-    "thiourea": (("S", 2), ("N", 1), ("N", 1)),
-    "nitrile": (("N", 3),),
-    "acid_chloride": (("O", 2), ("Cl", 1)),
-    "acid_fluoride": (("O", 2), ("F", 1)),
-    "acid_bromide": (("O", 2), ("Br", 1)),
-    "acid_iodide": (("O", 2), ("I", 1)),
+    "amidine": (("N", 1, 0), ("N", 2, 0)),
+    "guanidine": (("N", 1, 0), ("N", 2, 0), ("N", 1, 0)),
+    "thioamide": (("S", 2, 0), ("N", 1, 0)),
+    "thiourea": (("S", 2, 0), ("N", 1, 0), ("N", 1, 0)),
+    "nitrile": (("N", 3, 0),),
+    "acid_chloride": (("O", 2, 0), ("Cl", 1, 0)),
+    "acid_fluoride": (("O", 2, 0), ("F", 1, 0)),
+    "acid_bromide": (("O", 2, 0), ("Br", 1, 0)),
+    "acid_iodide": (("O", 2, 0), ("I", 1, 0)),
+    "aminium": (("N", 1, 1),),
+    "iminium": (("N", 2, 1),),
+    "aminide": (("N", 1, -1),),
+    "olate": (("O", 1, -1),),
+    "thiolate": (("S", 1, -1),),
 }
-_EXOCYCLIC_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int], ...]] = {
-    "ring_aldehyde": (("O", 2),),
-    "ring_carboxylic_acid": (("O", 2), ("O", 1)),
-    "ring_amide": (("O", 2), ("N", 1)),
-    "ring_amidine": (("N", 1), ("N", 2)),
-    "ring_thioamide": (("S", 2), ("N", 1)),
-    "ring_nitrile": (("N", 3),),
-    "ring_acid_chloride": (("O", 2), ("Cl", 1)),
-    "ring_acid_fluoride": (("O", 2), ("F", 1)),
-    "ring_acid_bromide": (("O", 2), ("Br", 1)),
-    "ring_acid_iodide": (("O", 2), ("I", 1)),
+_EXOCYCLIC_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int, int], ...]] = {
+    "ring_aldehyde": (("O", 2, 0),),
+    "ring_carboxylic_acid": (("O", 2, 0), ("O", 1, 0)),
+    "ring_carboxylate": (("O", 2, 0), ("O", 1, -1)),
+    "ring_amide": (("O", 2, 0), ("N", 1, 0)),
+    "ring_amidine": (("N", 1, 0), ("N", 2, 0)),
+    "ring_thioamide": (("S", 2, 0), ("N", 1, 0)),
+    "ring_nitrile": (("N", 3, 0),),
+    "ring_acid_chloride": (("O", 2, 0), ("Cl", 1, 0)),
+    "ring_acid_fluoride": (("O", 2, 0), ("F", 1, 0)),
+    "ring_acid_bromide": (("O", 2, 0), ("Br", 1, 0)),
+    "ring_acid_iodide": (("O", 2, 0), ("I", 1, 0)),
 }
-_HUB_ACID_GROUPS: dict[str, tuple[str, tuple[tuple[str, int], ...]]] = {
-    "sulfonic_acid": ("S", (("O", 2), ("O", 2), ("O", 1))),
-    "sulfonamide": ("S", (("O", 2), ("O", 2), ("N", 1))),
-    "sulfonyl_fluoride": ("S", (("O", 2), ("O", 2), ("F", 1))),
-    "sulfonyl_chloride": ("S", (("O", 2), ("O", 2), ("Cl", 1))),
-    "sulfonyl_bromide": ("S", (("O", 2), ("O", 2), ("Br", 1))),
-    "sulfonyl_iodide": ("S", (("O", 2), ("O", 2), ("I", 1))),
-    "sulfinic_acid": ("S", (("O", 2), ("O", 1))),
-    "phosphonic_acid": ("P", (("O", 2), ("O", 1), ("O", 1))),
+_HUB_ACID_GROUPS: dict[str, tuple[str, tuple[tuple[str, int, int], ...]]] = {
+    "sulfonic_acid": ("S", (("O", 2, 0), ("O", 2, 0), ("O", 1, 0))),
+    "sulfonamide": ("S", (("O", 2, 0), ("O", 2, 0), ("N", 1, 0))),
+    "sulfonyl_fluoride": ("S", (("O", 2, 0), ("O", 2, 0), ("F", 1, 0))),
+    "sulfonyl_chloride": ("S", (("O", 2, 0), ("O", 2, 0), ("Cl", 1, 0))),
+    "sulfonyl_bromide": ("S", (("O", 2, 0), ("O", 2, 0), ("Br", 1, 0))),
+    "sulfonyl_iodide": ("S", (("O", 2, 0), ("O", 2, 0), ("I", 1, 0))),
+    "sulfinic_acid": ("S", (("O", 2, 0), ("O", 1, 0))),
+    "phosphonic_acid": ("P", (("O", 2, 0), ("O", 1, 0), ("O", 1, 0))),
 }
 
 _FRAGMENT_SUFFIX_GROUPS: dict[str, str] = {
@@ -311,14 +319,6 @@ _FRAGMENT_SUFFIX_GROUPS: dict[str, str] = {
     "ring_hydrazide": "C(=O)NN",
     "aldehyde_hydrazone": "=NN",
     "ring_aldehyde_hydrazone": "C=NN",
-}
-
-_CHARGED_DIRECT_SUFFIX_GROUPS: dict[str, tuple[str, int, int]] = {
-    "aminium": ("N", 1, 1),
-    "iminium": ("N", 2, 1),
-    "aminide": ("N", 1, -1),
-    "olate": ("O", 1, -1),
-    "thiolate": ("S", 1, -1),
 }
 
 _BOND_TYPES: dict[int, Chem.BondType] = {
@@ -1104,7 +1104,6 @@ _ESTER_DIRECT = {"ester", "carboxylate", "peroxy_ester"}
 _ESTER_EXOCYCLIC = {"ring_carboxylate"}
 _ESTER_SULFONATE = {"sulfonate"}
 _ESTER_KEYS = _ESTER_DIRECT | _ESTER_EXOCYCLIC | _ESTER_SULFONATE
-_ANIONIC_CARBOXYLATES = {"carboxylate", "ring_carboxylate"}
 _PEROXY_ACIDS = {"peroxy_acid", "ring_peroxy_acid"}
 
 
@@ -1119,13 +1118,11 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts, *, au
         if parts.front_modifiers:
             raise _Abstain("front modifiers without a principal group")
         return
-    if pg.key in _ANIONIC_CARBOXYLATES and not parts.front_modifiers:
-        _apply_anionic_carboxylate(rw, locants, pg)
-        return
     if pg.key in _PEROXY_ACIDS:
         _apply_peroxy_acid(rw, locants, pg)
         return
-    if pg.key in _ESTER_KEYS:
+    suffix_group = pg.key in _DIRECT_SUFFIX_GROUPS or pg.key in _EXOCYCLIC_SUFFIX_GROUPS
+    if pg.key in _ESTER_KEYS and (parts.front_modifiers or not suffix_group):
         _apply_ester(rw, locants, parts, audit_depth=audit_depth)
         return
     if pg.key in _HUB_ACID_GROUPS:
@@ -1164,22 +1161,6 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts, *, au
                 terminal_nitrogens += [idx for idx in new_nitrogens if rw.GetAtomWithIdx(idx).GetDegree() == 1]
         _expose_n_locants(locants, terminal_nitrogens)
         return
-    charged_direct = _CHARGED_DIRECT_SUFFIX_GROUPS.get(pg.key)
-    if charged_direct is not None:
-        symbol, order, charge = charged_direct
-        nitrogens: list[int] = []
-        for locant in pg.locants:
-            base_idx = locants.get(str(locant))
-            if base_idx is None:
-                raise _Abstain(f"principal-group locant {locant} outside parent")
-            atom = Chem.Atom(symbol)
-            atom.SetFormalCharge(charge)
-            added = rw.AddAtom(atom)
-            rw.AddBond(base_idx, added, _BOND_TYPES[order])
-            if symbol == "N":
-                nitrogens.append(added)
-        _expose_n_locants(locants, nitrogens)
-        return
     direct = _DIRECT_SUFFIX_GROUPS.get(pg.key)
     exocyclic = _EXOCYCLIC_SUFFIX_GROUPS.get(pg.key)
     if direct is None and exocyclic is None:
@@ -1201,23 +1182,6 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts, *, au
             locants[locant] = nitrogen
         return
     _expose_n_locants(locants, nitrogens)
-
-
-def _apply_anionic_carboxylate(rw: Chem.RWMol, locants: dict[str, int], pg) -> None:
-    for locant in pg.locants:
-        acid_c = locants.get(str(locant))
-        if acid_c is None:
-            raise _Abstain(f"principal-group locant {locant} outside parent")
-        if pg.key == "ring_carboxylate":
-            parent_idx = acid_c
-            acid_c = rw.AddAtom(Chem.Atom(6))
-            rw.AddBond(parent_idx, acid_c, Chem.BondType.SINGLE)
-        oxo = rw.AddAtom(Chem.Atom(8))
-        rw.AddBond(acid_c, oxo, Chem.BondType.DOUBLE)
-        anion = Chem.Atom(8)
-        anion.SetFormalCharge(-1)
-        anion_idx = rw.AddAtom(anion)
-        rw.AddBond(acid_c, anion_idx, Chem.BondType.SINGLE)
 
 
 def _apply_peroxy_acid(rw: Chem.RWMol, locants: dict[str, int], pg) -> None:
@@ -1315,11 +1279,13 @@ def _build_ester_group(rw: Chem.RWMol, base_idx: int, key: str, r_frag: Chem.Mol
     _graft(rw, ester_o, r_frag)
 
 
-def _decorate(rw: Chem.RWMol, base_idx: int, atoms: tuple[tuple[str, int], ...]) -> list[int]:
+def _decorate(rw: Chem.RWMol, base_idx: int, atoms: tuple[tuple[str, int, int], ...]) -> list[int]:
     """Add ``atoms`` onto ``base_idx``; return the indices of any added nitrogens."""
     nitrogens: list[int] = []
-    for element, order in atoms:
-        new = rw.AddAtom(Chem.Atom(element))
+    for element, order, charge in atoms:
+        atom = Chem.Atom(element)
+        atom.SetFormalCharge(charge)
+        new = rw.AddAtom(atom)
         rw.AddBond(base_idx, new, _BOND_TYPES[order])
         if element == "N":
             nitrogens.append(new)
@@ -1405,17 +1371,19 @@ def _apply_substituents(rw: Chem.RWMol, locants: dict[str, int], parts, *, audit
         if item.spiro is not None:
             _apply_spiro_substituent(rw, locants, item)
             continue
-        if item.name == "oxido":
+        charged_prefix = RULES.charges.heteroatom_prefix_states.get(item.name)
+        if charged_prefix is not None:
             bases = [locants.get(str(locant)) for locant in item.locants]
             if any(base_idx is None for base_idx in bases):
                 missing = next(locant for locant, base_idx in zip(item.locants, bases) if base_idx is None)
                 raise _Abstain(f"substituent locant {missing} outside parent")
-            if all(rw.GetAtomWithIdx(base_idx).GetFormalCharge() > 0 for base_idx in bases):
+            symbol, charge, order = charged_prefix
+            if all(rw.GetAtomWithIdx(base_idx).GetFormalCharge() * charge < 0 for base_idx in bases):
                 for base_idx in bases:
-                    oxygen = Chem.Atom(8)
-                    oxygen.SetFormalCharge(-1)
-                    oxygen_idx = rw.AddAtom(oxygen)
-                    rw.AddBond(base_idx, oxygen_idx, Chem.BondType.SINGLE)
+                    atom = Chem.Atom(symbol)
+                    atom.SetFormalCharge(charge)
+                    atom_idx = rw.AddAtom(atom)
+                    rw.AddBond(base_idx, atom_idx, _BOND_TYPES[order])
                 continue
         frag = _resolve_item_fragment(item, audit_depth=audit_depth + 1)
         if frag is None:
