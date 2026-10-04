@@ -5486,7 +5486,7 @@ def test_terminal_s_minus_uses_thiolate_role():
 
 
 def test_terminal_selenium_anion_substituent_preserves_charge():
-    assert name_smiles("[Se-]C1=CC2(C=CN1)CC[NH2+]CC2") == "2-selenido-3,9-diazaspiro[5.5]undeca-1,4-dien-9-ium"
+    assert name_smiles("[Se-]C1=CC2(C=CN1)CC[NH2+]CC2") == "3,9-diazaspiro[5.5]undeca-1,4-dien-9-ium-2-selenolate"
 
 
 def test_charge_separated_terminal_n3_renders_as_azido_role():

@@ -951,15 +951,9 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             continue
         if not mol.atoms[center].is_carbon and not (
             ligand.role is ChalcogenLigandRole.ANIONIC
+            and ligand.element is not Chalcogen.OXYGEN
             and mol.atoms[center].symbol == "N"
             and mol.atoms[center].charge > 0
-        ):
-            continue
-        if (
-            ligand.role is ChalcogenLigandRole.ANIONIC
-            and ligand.element is not Chalcogen.OXYGEN
-            and mol.atoms[center].charge <= 0
-            and any(candidate.charge > 0 for candidate in mol)
         ):
             continue
         derivative = DerivativeKind.ANION if atom.charge < 0 else DerivativeKind.ALCOHOL
