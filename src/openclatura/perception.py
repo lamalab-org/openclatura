@@ -2,7 +2,15 @@
 
 from dataclasses import dataclass, field
 
-from .chalcogen_roles import FunctionalGroupDescriptor
+from .chalcogen_roles import (
+    ChalcogenLigandRole,
+    DerivativeKind,
+    FunctionalFamily,
+    FunctionalGroupDescriptor,
+    classify_chalcogen_ligand,
+    chalcogen_for_symbol,
+)
+from .chalcogen_vocabulary import simple_group_key
 from .chains import get_cyclic_atoms
 from .functional_groups import PERCEPTION_DETECTORS, PERCEPTION_SPECS, PerceptionDetectorSpec, metadata_for_group
 from .molecule import (
@@ -754,39 +762,71 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                             consumed.update([atom.idx])
 
     for atom in mol:
-        if atom.idx not in consumed:
-            if atom.symbol == "O" and mol.degree(atom.idx) == 1:
-                adj_atoms = mol.get_neighbors(atom.idx)
-                if len(adj_atoms) == 1:
-                    c_idx = adj_atoms[0]
-                    bond = mol.get_bond(atom.idx, c_idx)
-                    if bond.order == 2:
-                        if mol.atoms[c_idx].is_carbon:
-                            if c_idx in cyclic_atoms or len(mol.get_neighbors(c_idx)) >= 3:
-                                groups.append(PerceivedGroup("ketone", True, c_idx, {atom.idx}))
-                            else:
-                                ring_neighbors = [n for n in mol.get_neighbors(c_idx) if n in cyclic_atoms]
-                                if len(ring_neighbors) == 1 and mol.get_bond(c_idx, ring_neighbors[0]).order == 1:
-                                    groups.append(
-                                        PerceivedGroup("ring_aldehyde", True, ring_neighbors[0], {c_idx, atom.idx})
-                                    )
-                                else:
-                                    groups.append(PerceivedGroup("aldehyde", True, c_idx, {c_idx, atom.idx}))
-                    elif bond.order == 1:
-                        if mol.atoms[c_idx].is_carbon:
-                            key = "olate" if atom.charge < 0 else "alcohol"
-                            groups.append(PerceivedGroup(key, True, c_idx, {atom.idx}))
-                    consumed.add(atom.idx)
-            elif atom.symbol == "S" and mol.degree(atom.idx) == 1 and atom.idx not in cyclic_atoms:
-                adj_atoms = mol.get_neighbors(atom.idx)
-                if len(adj_atoms) == 1:
-                    c_idx = adj_atoms[0]
-                    bond = mol.get_bond(atom.idx, c_idx)
-                    if bond.order == 1:
-                        if mol.atoms[c_idx].symbol != "H":
-                            key = "thiolate" if atom.charge < 0 else "thiol"
-                            groups.append(PerceivedGroup(key, True, c_idx, {atom.idx}))
-                            consumed.add(atom.idx)
+        if atom.idx in consumed or atom.idx in cyclic_atoms or chalcogen_for_symbol(atom.symbol) is None:
+            continue
+        if mol.degree(atom.idx) != 1:
+            continue
+        center = mol.get_neighbors(atom.idx)[0]
+        ligand = classify_chalcogen_ligand(mol, center, atom.idx)
+        if ligand is None:
+            continue
+        if ligand.role is ChalcogenLigandRole.DOUBLE_BONDED:
+            if not mol.atoms[center].is_carbon:
+                continue
+            # Acid derivatives have another singly bound heteroatom and are
+            # classified as a complete acyl group in the earlier acyl pass.
+            other_hetero = [
+                neighbor
+                for neighbor in mol.get_neighbors(center)
+                if neighbor != atom.idx and not mol.atoms[neighbor].is_carbon
+            ]
+            if other_hetero:
+                continue
+            ring_neighbors = [neighbor for neighbor in mol.get_neighbors(center) if neighbor in cyclic_atoms]
+            external = (
+                center not in cyclic_atoms
+                and mol.atoms[center].total_h_count > 0
+                and len(ring_neighbors) == 1
+                and mol.get_bond(center, ring_neighbors[0]).order == 1
+            )
+            derivative = (
+                DerivativeKind.ALDEHYDE
+                if mol.atoms[center].total_h_count > 0 and center not in cyclic_atoms
+                else DerivativeKind.KETONE
+            )
+            key = simple_group_key(FunctionalFamily.CARBONYL, derivative, ligand.element, external=external)
+            if key is None:
+                continue
+            attachment = ring_neighbors[0] if external else center
+            descriptor = FunctionalGroupDescriptor(
+                family=FunctionalFamily.CARBONYL,
+                derivative=derivative,
+                centers=(center,),
+                ligands=(ligand,),
+                attachment_atom=attachment,
+                is_external=external,
+            )
+            involved = {center, atom.idx} if derivative is DerivativeKind.ALDEHYDE else {atom.idx}
+            groups.append(PerceivedGroup(key, True, attachment, involved, descriptor=descriptor))
+            consumed.add(atom.idx)
+            continue
+        if ligand.role not in {ChalcogenLigandRole.HYDROGEN_BEARING, ChalcogenLigandRole.ANIONIC}:
+            continue
+        if ligand.role is ChalcogenLigandRole.HYDROGEN_BEARING and not mol.atoms[center].is_carbon:
+            continue
+        derivative = DerivativeKind.ANION if atom.charge < 0 else DerivativeKind.ALCOHOL
+        key = simple_group_key(FunctionalFamily.HYDROXY, derivative, ligand.element)
+        if key is None:
+            continue
+        descriptor = FunctionalGroupDescriptor(
+            family=FunctionalFamily.HYDROXY,
+            derivative=derivative,
+            centers=(center,),
+            ligands=(ligand,),
+            attachment_atom=center,
+        )
+        groups.append(PerceivedGroup(key, True, center, {atom.idx}, descriptor=descriptor))
+        consumed.add(atom.idx)
 
     for atom in mol:
         if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
@@ -802,20 +842,31 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                 consumed.add(atom.idx)
 
     for atom in mol:
-        if atom.symbol == "O" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
-            adj_atoms = mol.get_neighbors(atom.idx)
-            if len(adj_atoms) == 2:
-                for c in adj_atoms:
-                    groups.append(PerceivedGroup("ether", False, c, {atom.idx}))
-                consumed.add(atom.idx)
-
-    for atom in mol:
-        if atom.symbol == "S" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
-            adj_atoms = mol.get_neighbors(atom.idx)
-            if len(adj_atoms) == 2:
-                for c in adj_atoms:
-                    groups.append(PerceivedGroup("thioether", False, c, {atom.idx}))
-                consumed.add(atom.idx)
+        element = chalcogen_for_symbol(atom.symbol)
+        if element is None or atom.idx in consumed or atom.idx in cyclic_atoms or mol.degree(atom.idx) != 2:
+            continue
+        adj_atoms = mol.get_neighbors(atom.idx)
+        if any(not mol.atoms[neighbor].is_carbon for neighbor in adj_atoms):
+            continue
+        if any(mol.get_bond(atom.idx, neighbor).order != 1 for neighbor in adj_atoms):
+            continue
+        key = simple_group_key(FunctionalFamily.CHALCOGEN_ETHER, DerivativeKind.NEUTRAL_LINK, element)
+        if key is None:
+            continue
+        for center in adj_atoms:
+            ligand = classify_chalcogen_ligand(mol, center, atom.idx)
+            if ligand is None:
+                continue
+            descriptor = FunctionalGroupDescriptor(
+                family=FunctionalFamily.CHALCOGEN_ETHER,
+                derivative=DerivativeKind.NEUTRAL_LINK,
+                centers=(center,),
+                ligands=(ligand,),
+                linker_paths=((center, atom.idx, ligand.attachment_atom),),
+                attachment_atom=center,
+            )
+            groups.append(PerceivedGroup(key, False, center, {atom.idx}, descriptor=descriptor))
+        consumed.add(atom.idx)
 
     halogen_map = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
     for atom in mol:

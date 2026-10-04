@@ -38,3 +38,42 @@ def test_neutral_chalcogen_radical_is_not_hydrogen_bearing():
 
     assert mol.atoms[1].radical_electrons == 1
     assert classify_chalcogen_ligand(mol, 0, 1) is None
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected_key", "expected_name"),
+    [
+        ("C[SeH]", "selenol", "methaneselenol"),
+        ("C[TeH]", "tellurol", "methanetellurol"),
+        ("C[Se-]", "selenolate", "methaneselenolate"),
+        ("C[Te-]", "tellurolate", "methanetellurolate"),
+        ("CC(=S)C", "thioketone", "propane-2-thione"),
+        ("CC(=[Se])C", "selenoketone", "propane-2-selone"),
+        ("CC(=[Te])C", "telluroketone", "propane-2-tellone"),
+        ("CC(=[Se])", "selenoaldehyde", "ethaneselenal"),
+        ("CC(=[Te])", "telluroaldehyde", "ethanetellanal"),
+    ],
+)
+def test_simple_chalcogen_analogues_are_named_from_graph_roles(
+    smiles: str, expected_key: str, expected_name: str
+):
+    import openclatura as oc
+
+    mol = read_smiles(smiles)
+    groups = _builtin_perceive_groups(mol)
+    matching = [group for group in groups if group.key == expected_key]
+
+    assert len(matching) == 1
+    assert matching[0].descriptor is not None
+    assert oc.name(smiles).name == expected_name
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected_key"),
+    [("COC", "ether"), ("CSC", "thioether"), ("C[Se]C", "selenoether"), ("C[Te]C", "telluroether")],
+)
+def test_ether_analogues_share_one_structural_detector(smiles: str, expected_key: str):
+    groups = _builtin_perceive_groups(read_smiles(smiles))
+
+    assert [group.key for group in groups].count(expected_key) == 2
+    assert all(group.descriptor is not None for group in groups if group.key == expected_key)

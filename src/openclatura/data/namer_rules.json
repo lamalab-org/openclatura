@@ -631,6 +631,8 @@
     "values": [
       "ether",
       "thioether",
+      "selenoether",
+      "telluroether",
       "amine",
       "aminium",
       "aminide",
@@ -1357,7 +1359,43 @@
             0
           ]
         },
-        "seniority": 80,
+        "seniority": 81,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "selenoaldehyde": {
+        "role": "principal",
+        "prefix": "selenoxo",
+        "suffix": "selenal",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 82,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_selenoaldehyde": {
+        "role": "principal",
+        "prefix": "selenoformyl",
+        "suffix": "carboselenaldehyde",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 82,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "telluroaldehyde": {
+        "role": "principal",
+        "prefix": "telluroxo",
+        "suffix": "tellanal",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 83,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_telluroaldehyde": {
+        "role": "principal",
+        "prefix": "telluroformyl",
+        "suffix": "carbotelluraldehyde",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 83,
         "suffix_with_locant": true,
         "needs_locant": true
       },
@@ -1371,6 +1409,33 @@
           ]
         },
         "seniority": 90,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "thioketone": {
+        "role": "principal",
+        "prefix": "thioxo",
+        "suffix": "thione",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 91,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "selenoketone": {
+        "role": "principal",
+        "prefix": "selenoxo",
+        "suffix": "selone",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 92,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "telluroketone": {
+        "role": "principal",
+        "prefix": "telluroxo",
+        "suffix": "tellone",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 93,
         "suffix_with_locant": true,
         "needs_locant": true
       },
@@ -1475,7 +1540,43 @@
             0
           ]
         },
-        "seniority": 105,
+        "seniority": 101,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "selenol": {
+        "role": "principal",
+        "prefix": "selanyl",
+        "suffix": "selenol",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 102,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "tellurol": {
+        "role": "principal",
+        "prefix": "tellanyl",
+        "suffix": "tellurol",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 103,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "selenolate": {
+        "role": "principal",
+        "prefix": "selenido",
+        "suffix": "selenolate",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 16,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "tellurolate": {
+        "role": "principal",
+        "prefix": "tellurido",
+        "suffix": "tellurolate",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 16,
         "suffix_with_locant": true,
         "needs_locant": true
       },
@@ -1563,6 +1664,24 @@
         "suffix": "ether",
         "multi_suffix": null,
         "seniority": 200,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "selenoether": {
+        "role": "prefix",
+        "prefix": "selanyl",
+        "suffix": null,
+        "multi_suffix": null,
+        "seniority": null,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "telluroether": {
+        "role": "prefix",
+        "prefix": "tellanyl",
+        "suffix": null,
+        "multi_suffix": null,
+        "seniority": null,
         "suffix_with_locant": false,
         "needs_locant": true
       },
