@@ -163,38 +163,38 @@ def resolve_acyl_rule(
     if descriptor.derivative is DerivativeKind.ACID:
         site = f" {single_element.value}-acid" if single_element is not double_ligand.element else " acid"
         suffix = f"{carbo}{infix}ic{site}"
-        seniority = (7, *(_ELEMENT_RANK[element] for element in elements))
+        seniority = (20, *(_ELEMENT_RANK[element] for element in elements))
         prefix = f"{infix}carboxy"
         families = ("carboxy_prefix", "chain_external_carbonyl")
     elif descriptor.derivative is DerivativeKind.ANION:
         suffix = f"{carbo}{infix}ate"
-        seniority = (4, *(_ELEMENT_RANK[element] for element in elements))
+        seniority = (21, *(_ELEMENT_RANK[element] for element in elements))
         prefix = f"{infix}carboxylato"
         families = ("carboxy_prefix", "chain_external_carbonyl")
     elif descriptor.derivative is DerivativeKind.ESTER:
         suffix = f"{carbo}{infix}ate"
-        seniority = (9, *(_ELEMENT_RANK[element] for element in elements))
+        seniority = (40, *(_ELEMENT_RANK[element] for element in elements))
         prefix = f"{infix}oxycarbonyl"
         families = ("ester_like", "front_modifier", "chain_external_carbonyl")
         multi_suffix = None
     elif descriptor.derivative is DerivativeKind.AMIDE:
         suffix = f"{carbo}{infix}amide"
-        seniority = (11, _ELEMENT_RANK[double_ligand.element])
+        seniority = (60 + _ELEMENT_RANK[double_ligand.element],)
         prefix = f"carbamo{infix}yl"
         families = ("amide_like", "chain_external_carbonyl")
     elif descriptor.derivative is DerivativeKind.HYDRAZIDE:
         suffix = f"{carbo}{infix}hydrazide"
-        seniority = (12, _ELEMENT_RANK[double_ligand.element])
+        seniority = (68, _ELEMENT_RANK[double_ligand.element])
         prefix = f"hydrazinecarb{infix}oyl"
         families = ("amide_like", "hydrazide", "chain_external_carbonyl")
     elif descriptor.derivative is DerivativeKind.UREA:
         suffix = f"{infix}urea"
-        seniority = (11, _ELEMENT_RANK[double_ligand.element])
+        seniority = (60, _ELEMENT_RANK[double_ligand.element])
         prefix = f"carbamo{infix}ylamino"
         families = ("amide_like", "urea")
     elif descriptor.derivative is DerivativeKind.ACID_HALIDE and leaving_symbol is not None:
         suffix = f"{carbo}{infix}yl {_HALIDE_WORD[leaving_symbol]}"
-        seniority = (10, _ELEMENT_RANK[double_ligand.element], _HALIDE_RANK[leaving_symbol])
+        seniority = (50, _ELEMENT_RANK[double_ligand.element], _HALIDE_RANK[leaving_symbol])
         prefix = f"{_HALIDE_PREFIX[leaving_symbol]}{infix}carbonyl"
         families = ("acid_halide", "chain_external_carbonyl")
     else:
@@ -209,6 +209,54 @@ def resolve_acyl_rule(
         suffix_multiplier_positions=(0,),
         seniority=seniority,
         suffix_with_locant=suffix_with_locant,
+        needs_locant=True,
+        families=families,
+    )
+
+
+_PEROXOL_SUFFIXES = {
+    (Chalcogen.OXYGEN, Chalcogen.OXYGEN): "peroxol",
+    (Chalcogen.SULFUR, Chalcogen.OXYGEN): "SO-thioperoxol",
+    (Chalcogen.SELENIUM, Chalcogen.OXYGEN): "SeO-selenoperoxol",
+    (Chalcogen.TELLURIUM, Chalcogen.OXYGEN): "TeO-telluroperoxol",
+    (Chalcogen.OXYGEN, Chalcogen.SULFUR): "OS-thioperoxol",
+    (Chalcogen.OXYGEN, Chalcogen.SELENIUM): "OSe-selenoperoxol",
+    (Chalcogen.OXYGEN, Chalcogen.TELLURIUM): "OTe-telluroperoxol",
+    (Chalcogen.SULFUR, Chalcogen.SULFUR): "dithioperoxol",
+    (Chalcogen.SELENIUM, Chalcogen.SULFUR): "SeS-selenothioperoxol",
+    (Chalcogen.TELLURIUM, Chalcogen.SULFUR): "TeS-tellurothioperoxol",
+    (Chalcogen.SULFUR, Chalcogen.SELENIUM): "SSe-selenothioperoxol",
+    (Chalcogen.SULFUR, Chalcogen.TELLURIUM): "STe-tellurothioperoxol",
+    (Chalcogen.SELENIUM, Chalcogen.SELENIUM): "diselenoperoxol",
+    (Chalcogen.TELLURIUM, Chalcogen.SELENIUM): "TeSe-selenotelluroperoxol",
+    (Chalcogen.SELENIUM, Chalcogen.TELLURIUM): "SeTe-selenotelluroperoxol",
+    (Chalcogen.TELLURIUM, Chalcogen.TELLURIUM): "ditelluroperoxol",
+}
+
+_PEROXOL_PRIORITY = {pair: rank for rank, pair in enumerate(_PEROXOL_SUFFIXES)}
+
+
+def resolve_peroxol_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, FunctionalGroupRule]:
+    """Resolve the ordered R-E1-E2-H path using Blue Book Table 6.1."""
+
+    first, terminal = descriptor.ligands
+    pair = (first.element, terminal.element)
+    suffix = _PEROXOL_SUFFIXES[pair]
+    key = f"peroxol_{first.element.value}_{terminal.element.value}"
+    element_locanted = first.element is not terminal.element or terminal.element is Chalcogen.OXYGEN
+    families = ("peroxol", "element_locanted_suffix") if element_locanted and pair != (
+        Chalcogen.OXYGEN,
+        Chalcogen.OXYGEN,
+    ) else ("peroxol",)
+    return key, FunctionalGroupRule(
+        key=key,
+        role="principal",
+        prefix=None,
+        suffix=suffix,
+        multi_suffix=MultiSuffixTemplate((0,)),
+        suffix_multiplier_positions=(0,),
+        seniority=(105, _PEROXOL_PRIORITY[pair]),
+        suffix_with_locant=True,
         needs_locant=True,
         families=families,
     )

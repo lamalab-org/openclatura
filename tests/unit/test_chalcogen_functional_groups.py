@@ -121,3 +121,30 @@ def test_acyl_derivatives_reuse_the_role_aware_center(smiles: str, expected: str
     import openclatura as oc
 
     assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("COO", "methaneperoxol"),
+        ("CSO", "methane-SO-thioperoxol"),
+        ("C[Se]O", "methane-SeO-selenoperoxol"),
+        ("C[Te]O", "methane-TeO-telluroperoxol"),
+        ("CO[SH]", "methane-OS-thioperoxol"),
+        ("CO[SeH]", "methane-OSe-selenoperoxol"),
+        ("CO[TeH]", "methane-OTe-telluroperoxol"),
+        ("CS[SH]", "methanedithioperoxol"),
+        ("C[Se][SH]", "methane-SeS-selenothioperoxol"),
+        ("C[Te][SH]", "methane-TeS-tellurothioperoxol"),
+        ("CS[SeH]", "methane-SSe-selenothioperoxol"),
+        ("CS[TeH]", "methane-STe-tellurothioperoxol"),
+        ("C[Se][SeH]", "methanediselenoperoxol"),
+        ("C[Te][SeH]", "methane-TeSe-selenotelluroperoxol"),
+        ("C[Se][TeH]", "methane-SeTe-selenotelluroperoxol"),
+        ("C[Te][TeH]", "methaneditelluroperoxol"),
+    ],
+)
+def test_peroxol_table_is_order_sensitive(smiles: str, expected: str):
+    import openclatura as oc
+
+    assert oc.name(smiles).name == expected

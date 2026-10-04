@@ -337,7 +337,16 @@ def name_component(
             omit_redundant_locants=omit_redundant_locants,
         )
 
-    structural_parent_result = structural_replacement_parent_result(mol, component_atoms, name_subgraph)
+    early_groups = component_groups(mol, component_atoms)
+    has_peroxol_suffix = any(
+        group.is_principal_candidate
+        and group.resolved_rule is not None
+        and "peroxol" in group.resolved_rule.families
+        for group in early_groups
+    )
+    structural_parent_result = (
+        None if has_peroxol_suffix else structural_replacement_parent_result(mol, component_atoms, name_subgraph)
+    )
     if structural_parent_result is not None:
         name, bindings, token_spans, rewrite_history = _shortcut_component_result(
             mol,
@@ -372,7 +381,7 @@ def name_component(
         return name
 
     state = ComponentNamingState(component_atoms=set(component_atoms), is_substituent=is_substituent)
-    state.perceived_groups = component_groups(mol, state.component_atoms)
+    state.perceived_groups = early_groups
     trace_decision(
         decision_trace,
         TracePhase.PERCEPTION,

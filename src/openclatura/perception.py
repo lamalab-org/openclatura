@@ -11,7 +11,7 @@ from .chalcogen_roles import (
     classify_chalcogen_ligand,
     chalcogen_for_symbol,
 )
-from .chalcogen_vocabulary import resolve_acyl_rule, simple_group_key
+from .chalcogen_vocabulary import resolve_acyl_rule, resolve_peroxol_rule, simple_group_key
 from .chains import get_cyclic_atoms
 from .functional_groups import PERCEPTION_DETECTORS, PERCEPTION_SPECS, PerceptionDetectorSpec, metadata_for_group
 from .molecule import (
@@ -795,6 +795,60 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                         else:
                             groups.append(PerceivedGroup("amine", True, c_att, {atom.idx}))
                             consumed.update([atom.idx])
+
+    for terminal_atom in mol:
+        if (
+            terminal_atom.idx in consumed
+            or terminal_atom.idx in cyclic_atoms
+            or chalcogen_for_symbol(terminal_atom.symbol) is None
+            or mol.degree(terminal_atom.idx) != 1
+            or terminal_atom.total_h_count == 0
+            or terminal_atom.radical_electrons
+        ):
+            continue
+        first_atom = mol.get_neighbors(terminal_atom.idx)[0]
+        if chalcogen_for_symbol(mol.atoms[first_atom].symbol) is None or first_atom in consumed:
+            continue
+        anchors = [neighbor for neighbor in mol.get_neighbors(first_atom) if neighbor != terminal_atom.idx]
+        if len(anchors) != 1 or not mol.atoms[anchors[0]].is_carbon:
+            continue
+        anchor = anchors[0]
+        if any(
+            neighbor != first_atom
+            and (candidate := classify_chalcogen_ligand(mol, anchor, neighbor)) is not None
+            and candidate.role is ChalcogenLigandRole.DOUBLE_BONDED
+            for neighbor in mol.get_neighbors(anchor)
+        ):
+            continue
+        first_ligand = classify_chalcogen_ligand(mol, anchor, first_atom)
+        terminal_ligand = classify_chalcogen_ligand(mol, first_atom, terminal_atom.idx)
+        if (
+            first_ligand is None
+            or first_ligand.role is not ChalcogenLigandRole.CHALCOGEN_LINK
+            or terminal_ligand is None
+            or terminal_ligand.role is not ChalcogenLigandRole.HYDROGEN_BEARING
+        ):
+            continue
+        descriptor = FunctionalGroupDescriptor(
+            family=FunctionalFamily.PEROXOL,
+            derivative=DerivativeKind.ALCOHOL,
+            centers=(anchor,),
+            ligands=(first_ligand, terminal_ligand),
+            linker_paths=((anchor, first_atom, terminal_atom.idx),),
+            attachment_atom=anchor,
+        )
+        key, rule = resolve_peroxol_rule(descriptor)
+        groups.append(
+            PerceivedGroup(
+                key,
+                True,
+                anchor,
+                {first_atom, terminal_atom.idx},
+                descriptor=descriptor,
+                resolved_rule=rule,
+            )
+        )
+        consumed.update({first_atom, terminal_atom.idx})
 
     for atom in mol:
         if atom.idx in consumed or atom.idx in cyclic_atoms or chalcogen_for_symbol(atom.symbol) is None:
