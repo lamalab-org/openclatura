@@ -159,7 +159,7 @@ def _is_substituted_alkyl_ligand(name: str) -> bool:
     return name not in {simple_name, f"cyclo{simple_name}"}
 
 
-def oxy_prefix_from_branch(branch: str) -> str:
+def oxy_prefix_from_branch(branch: str, *, enclose_ligand: bool = False) -> str:
     """Return an oxy prefix for a named branch."""
 
     retained = ALKYL_OXY_PREFIXES.get(branch)
@@ -172,10 +172,9 @@ def oxy_prefix_from_branch(branch: str) -> str:
     substituted_alkoxy = substituted_alkoxy_prefix(branch)
     if substituted_alkoxy:
         return substituted_alkoxy
-    # Preserve the attachment boundary of N-acyl prefixes. Without it,
-    # ``acetamido`` + ``oxy`` is read as a contracted ``acetamidooxy`` and
-    # loses the O-N bond instead of denoting acetylamino-O-.
-    if branch.endswith("amido") or is_complex_prefix(branch):
+    # A heteroatom ligand is a complete named branch. Preserve that graph
+    # boundary instead of inferring its attachment atom from the rendered word.
+    if enclose_ligand or is_complex_prefix(branch):
         return f"(({branch})oxy)"
     return f"({branch}oxy)"
 

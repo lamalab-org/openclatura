@@ -33,6 +33,7 @@ class ChargePairRole:
     atom_ids: frozenset[int]
     bond_ids: frozenset[int] = frozenset()
     template_supported: bool = False
+    neutralizes_parent_charge: bool = False
     reason: str = ""
 
     @property
@@ -125,6 +126,7 @@ def _classify_charge_pair(
             {bond.idx},
             "Matched S+/C- charge pair on a non-single bond; no safe OPSIN template is registered.",
             supported=False,
+            neutralizes_parent_charge=True,
         )
 
     if pos_atom.symbol == "N" and neg_atom.symbol == "O" and bond is not None and bond.order == 1:
@@ -231,6 +233,7 @@ def _role(
     reason: str,
     *,
     supported: bool | None = None,
+    neutralizes_parent_charge: bool = False,
 ) -> ChargePairRole:
     return ChargePairRole(
         key=key,
@@ -239,6 +242,7 @@ def _role(
         atom_ids=frozenset(atom_ids),
         bond_ids=frozenset(bond_ids),
         template_supported=key in SUPPORTED_TEMPLATE_ROLES if supported is None else supported,
+        neutralizes_parent_charge=neutralizes_parent_charge,
         reason=reason,
     )
 

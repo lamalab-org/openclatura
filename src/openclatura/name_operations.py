@@ -6,6 +6,7 @@ and suffix ordering from data-backed rules.
 """
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import ClassVar
 
 
@@ -27,6 +28,14 @@ class ParentSuffixOperation(NameOperation):
     atom_symbols: tuple[str, ...] = ()
 
 
+class HydroOperationKind(StrEnum):
+    """Structural hydrogen operation represented by a parent name."""
+
+    INDICATED = "indicated_hydrogen"
+    ADDITIVE = "additive_hydrogen"
+    ADDED = "added_hydrogen"
+
+
 @dataclass(frozen=True)
 class HydroOperation(NameOperation):
     """An additive hydrogen operation tied to parent locants."""
@@ -34,7 +43,15 @@ class HydroOperation(NameOperation):
     locants: tuple[str, ...] = ()
     atom_ids: tuple[int, ...] = ()
     bond_ids: tuple[int, ...] = ()
-    operation_kind: str = "indicated_hydrogen"
+    operation_kind: HydroOperationKind = HydroOperationKind.INDICATED
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.operation_kind, HydroOperationKind):
+            object.__setattr__(self, "operation_kind", HydroOperationKind(self.operation_kind))
+
+    @property
+    def saturates_parent(self) -> bool:
+        return self.operation_kind in {HydroOperationKind.INDICATED, HydroOperationKind.ADDITIVE}
 
 
 @dataclass(frozen=True)

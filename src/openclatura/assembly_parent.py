@@ -11,6 +11,7 @@ from .assembly_parts import AssemblyParts, SubstituentItem
 from .assembly_prefixes import substituent_sort_key
 from .assembly_utils import parse_locant
 from .formatting import is_complex_prefix, strip_outer_parentheses
+from .locant_elision import retained_parent_attachment_is_ambiguous
 from .nomenclature import RULES, RetainedChainParentRule
 from .principal_suffixes import render_principal_suffix
 from .retained_specs import retained_parent_spec
@@ -194,11 +195,7 @@ def promote_retained_functional_parent(parts: AssemblyParts) -> None:
             return
         retained, absorbed = chain_parent
     if group.has_positive_nitrogen and len(group.locants) == 1:
-        rule = RULES.functional_groups.get(group.key)
-        neutral_suffix = rule.retained_suffix or rule.suffix
-        charged_suffix = rule.positive_nitrogen_retained_suffix or rule.positive_nitrogen_suffix
-        if neutral_suffix and charged_suffix and retained.endswith(neutral_suffix):
-            retained = retained[: -len(neutral_suffix)] + charged_suffix
+        retained = RULES.retained.positive_nitrogen_parent_names.get((retained, group.key), retained)
     parts.retained_name = retained
     parts.retained_absorbs_principal_group = True
     if retained == "guanidine":
@@ -498,9 +495,13 @@ def always_print_substituent_locant(parts: AssemblyParts) -> bool:
         return False
     if parts.is_bicycle or parts.is_spiro or parts.is_polycycle:
         return True
-    if parts.is_ring and (parts.a_prefixes or (parts.retained_name and parts.retained_name != "benzene")):
+    if parts.is_ring and parts.a_prefixes:
         return True
     retained_spec = retained_parent_spec(parts.retained_name)
+    if parts.is_ring and retained_spec:
+        if retained_spec.equivalent_attachment_locants:
+            return False
+        return retained_parent_attachment_is_ambiguous(parts, [str(parts.attachment_locant)])
     if retained_spec and retained_spec.attachment_policy.print_substituent_locant:
         return True
     stem_str, _ = parent_stem_and_terminal(parts)
@@ -544,10 +545,10 @@ def format_substituent_tail(
         # A charge suffix and an attachment suffix are separate operations:
         # ``benzen-2-ide-1-yl``, not the unparseable ``phen-2-ideyl``.
         terminal_e = f"-{parts.attachment_locant}-{suffix_yl}"
-    elif parts.retained_name == "benzene":
-        terminal_e = "yl"
     elif (
-        str(parts.attachment_locant) != "1" or parts.unsaturations or always_print_locant
+        (str(parts.attachment_locant) != "1" and not (parts.retained_name and parts.is_ring))
+        or parts.unsaturations
+        or always_print_locant
     ) and parts.parent_length > 1:
         terminal_e = f"-{parts.attachment_locant}-{suffix_yl}"
     else:
@@ -629,7 +630,7 @@ def format_principal_suffix(parts: AssemblyParts, terminal_e: str, spiro_subs) -
 
     if elision.is_vowel_start(suffix_text):
         terminal_e = ""
-    if positive_carbon_charge and group.key == "carboxylate" and locs:
+    if positive_carbon_charge and locs:
         return terminal_e, f"-{','.join(map(str, locs))}-{suffix_text}"
     if parts.elide_principal_group_locants:
         omit_locant = True

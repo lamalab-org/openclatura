@@ -26,6 +26,7 @@
       "ligand_join_mode": "drop_yl"
     },
     "P": {
+      "cationic_single_prefix": "phosphaniumyl",
       "unsubstituted_prefixes": {
         "0": "phosphanyl",
         "1": "phosphoryl"
@@ -83,6 +84,7 @@
       }
     },
     "As": {
+      "cationic_single_prefix": "arsaniumyl",
       "unsubstituted_prefixes": {
         "0": "arsanyl",
         "1": "arsoryl"
@@ -96,6 +98,7 @@
       }
     },
     "Sb": {
+      "cationic_single_prefix": "stibaniumyl",
       "unsubstituted_prefixes": {
         "0": "stibanyl",
         "1": "stiboryl"
@@ -324,7 +327,8 @@
       "hydroxy": 0,
       "alkoxy": 0,
       "peroxy": 0,
-      "prefix": "oxido(oxo)phosphanyl"
+      "prefix": "oxido(oxo)phosphanyl",
+      "cationic_single_prefix": "oxido(oxo)phosphaniumyl"
     },
     {
       "symbol": "As",
@@ -333,7 +337,8 @@
       "hydroxy": 0,
       "alkoxy": 0,
       "peroxy": 0,
-      "prefix": "oxido(oxo)arsanyl"
+      "prefix": "oxido(oxo)arsanyl",
+      "cationic_single_prefix": "oxido(oxo)arsaniumyl"
     },
     {
       "symbol": "Sb",
@@ -342,7 +347,8 @@
       "hydroxy": 0,
       "alkoxy": 0,
       "peroxy": 0,
-      "prefix": "oxido(oxo)stibanyl"
+      "prefix": "oxido(oxo)stibanyl",
+      "cationic_single_prefix": "oxido(oxo)stibaniumyl"
     }
   ]
 }

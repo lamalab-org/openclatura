@@ -104,7 +104,7 @@ def parent_charge_name_operations(parts: AssemblyParts) -> list[ParentSuffixOper
             early_positive_stack = positive_charge and (not parts.retained_name or retained_charge_pair)
             if (
                 parts.principal_group is not None
-                and parts.principal_group.key == "ring_aldehyde"
+                and RULES.functional_groups.get(parts.principal_group.key).suffix_with_locant
                 and len(parts.principal_group.locants) > 1
             ):
                 early_positive_stack = False
@@ -263,12 +263,12 @@ def append_charge_suffixes_to_terminal(parts: AssemblyParts, terminal_e: str) ->
     if (
         parts.is_substituent
         and parts.parent_length == 1
-        and terminal_e in {"yl", "-1-yl"}
         and len(operations) == 1
         and operations[0].locants == ("1",)
-        and operations[0].suffix == "ylium"
+        and operations[0].charge > 0
+        and operations[0].atom_symbols == ("C",)
     ):
-        return "yliumyl"
+        return f"{suffix_operation_spelling(operations[0])}{RULES.assembly.substituent_attachment_suffixes['single']}"
     return (
         "".join(f"-{','.join(operation.locants)}-{suffix_operation_spelling(operation)}" for operation in operations)
         + terminal_e

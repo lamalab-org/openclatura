@@ -14,6 +14,7 @@ class HeteroatomSubstituentSpec:
     unsubstituted_prefixes: dict[int, str]
     ligand_prefixes: dict[int, str]
     ligand_deficient_prefixes: dict[int, str] | None = None
+    cationic_single_prefix: str | None = None
     ligand_join_mode: str = "concat"
 
 
@@ -28,6 +29,7 @@ class CentralOxoSubstituentClass:
     hydroxy: int = 0
     alkoxy: int = 0
     peroxy: int = 0
+    cationic_single_prefix: str | None = None
 
     def matches(self, role: CentralOxoRole) -> bool:
         return (
@@ -52,6 +54,7 @@ def heteroatom_substituent_specs() -> dict[str, HeteroatomSubstituentSpec]:
                 int(count): prefix for count, prefix in spec.get("ligand_deficient_prefixes", {}).items()
             }
             or None,
+            cationic_single_prefix=spec.get("cationic_single_prefix"),
             ligand_join_mode=spec.get("ligand_join_mode", "concat"),
         )
         for symbol, spec in data.items()
@@ -71,17 +74,18 @@ def central_oxo_substituent_classes() -> tuple[CentralOxoSubstituentClass, ...]:
             hydroxy=int(item.get("hydroxy", 0)),
             alkoxy=int(item.get("alkoxy", 0)),
             peroxy=int(item.get("peroxy", 0)),
+            cationic_single_prefix=item.get("cationic_single_prefix"),
         )
         for item in data
     )
 
 
-def central_oxo_substituent_prefix(role: CentralOxoRole) -> str | None:
+def central_oxo_substituent_prefix(role: CentralOxoRole, *, cationic_single: bool = False) -> str | None:
     """Return configured prefix for an exact central-oxo role signature."""
 
     for item in central_oxo_substituent_classes():
         if item.matches(role):
-            return item.prefix
+            return item.cationic_single_prefix if cationic_single and item.cationic_single_prefix else item.prefix
     return None
 
 
@@ -107,6 +111,13 @@ def ligand_deficient_prefix(symbol: str, oxo_count: int) -> str | None:
     if spec is None or spec.ligand_deficient_prefixes is None:
         return None
     return spec.ligand_deficient_prefixes.get(oxo_count)
+
+
+def cationic_single_prefix(symbol: str) -> str | None:
+    """Return the configured single-bond cationic substituent prefix."""
+
+    spec = spec_for_symbol(symbol)
+    return None if spec is None else spec.cationic_single_prefix
 
 
 def _apply_join_mode(name: str, join_mode: str) -> str:

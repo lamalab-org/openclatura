@@ -18,7 +18,9 @@ class RetainedChainParentRule:
 class RetainedNameRules:
     ring_elements: set[str]
     substituent_stems: dict[str, tuple[str, str]]
+    equivalent_substituent_attachment_parents: frozenset[str]
     functional_parents: dict[tuple[str, str], str]
+    positive_nitrogen_parent_names: dict[tuple[str, str], str]
     chain_substituent_stems: dict[tuple[int, str], tuple[str, str]]
     chain_parents: dict[tuple[int, str, int], RetainedChainParentRule]
     aldehyde_chain_words: dict[int, str]
@@ -140,14 +142,16 @@ class FunctionalGroupRule:
     prefix: str | None = None
     suffix: str | None = None
     positive_nitrogen_suffix: str | None = None
-    retained_suffix: str | None = None
-    positive_nitrogen_retained_suffix: str | None = None
     multi_suffix: MultiSuffixTemplate | None = None
     suffix_multiplier_positions: tuple[int, ...] = (0,)
     seniority: int | None = None
     suffix_with_locant: bool = False
     needs_locant: bool = True
     families: tuple[str, ...] = ()
+    uses_front_modifier: bool = False
+    is_peroxy_acid: bool = False
+    is_peroxy_ester: bool = False
+    suffix_carbon_is_exocyclic: bool = False
 
 
 @dataclass(frozen=True)
@@ -213,8 +217,9 @@ def _group_tuple_mapping(group_key: str, section: str) -> dict[str, tuple[str, s
 
 def _functional_group_rules() -> FunctionalGroupRules:
     groups = {}
+    functional_group_data = grouped_namer_rules()["functional_groups"]
 
-    for key, item in grouped_namer_rules()["functional_groups"].mapping("functional_groups").items():
+    for key, item in functional_group_data.mapping("functional_groups").items():
         families = tuple(item.get("families", _derived_functional_group_families(key)))
         suffix = item.get("suffix")
         multi_suffix = item.get("multi_suffix")
@@ -224,14 +229,16 @@ def _functional_group_rules() -> FunctionalGroupRules:
             prefix=item.get("prefix"),
             suffix=suffix,
             positive_nitrogen_suffix=item.get("positive_nitrogen_suffix"),
-            retained_suffix=item.get("retained_suffix"),
-            positive_nitrogen_retained_suffix=item.get("positive_nitrogen_retained_suffix"),
             multi_suffix=_multi_suffix_template(suffix, multi_suffix),
             suffix_multiplier_positions=_suffix_multiplier_positions(suffix, multi_suffix),
             seniority=item.get("seniority"),
             suffix_with_locant=bool(item.get("suffix_with_locant", False)),
             needs_locant=bool(item.get("needs_locant", True)),
             families=families,
+            uses_front_modifier=key in functional_group_data.values("front_modifier_principal_groups"),
+            is_peroxy_acid=key in functional_group_data.values("peroxy_acid_prefix_groups"),
+            is_peroxy_ester=key in functional_group_data.values("peroxy_ester_groups"),
+            suffix_carbon_is_exocyclic=bool(item.get("suffix_carbon_is_exocyclic", False)),
         )
     return FunctionalGroupRules(by_key=groups)
 
@@ -363,12 +370,26 @@ def registry() -> NomenclatureRegistry:
     functional_group_rules = groups["functional_groups"]
     ring_descriptors = groups["ring_descriptors"]
     assembly_grammar = groups["assembly_grammar"]
+    retained_substituent_stems = retained.mapping("retained_substituent_stems")
     return NomenclatureRegistry(
         retained=RetainedNameRules(
             ring_elements=set(retained.values("retained_ring_elements")),
-            substituent_stems=_group_tuple_mapping("retained_parents", "retained_substituent_stems"),
+            substituent_stems={
+                name: (item["stem"], item["terminal"]) for name, item in retained_substituent_stems.items()
+            },
+            equivalent_substituent_attachment_parents=frozenset(
+                name
+                for name, item in retained_substituent_stems.items()
+                if item.get("equivalent_attachment_locants", False)
+            ),
             functional_parents={
                 (row["parent"], row["group"]): row["name"] for row in retained.values("retained_functional_parents")
+            },
+            positive_nitrogen_parent_names={
+                (row["name"], row["group"]): row["positive_nitrogen_name"]
+                for section in ("retained_functional_parents", "retained_chain_parents")
+                for row in retained.values(section)
+                if row.get("positive_nitrogen_name")
             },
             chain_substituent_stems={
                 (int(row["length"]), row["attachment"]): (row["stem"], row["ending"])

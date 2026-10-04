@@ -923,7 +923,8 @@
         },
         "seniority": 21,
         "suffix_with_locant": true,
-        "needs_locant": true
+        "needs_locant": true,
+        "suffix_carbon_is_exocyclic": true
       },
       "peroxy_acid": {
         "role": "principal",
@@ -949,7 +950,8 @@
         },
         "seniority": 22,
         "suffix_with_locant": true,
-        "needs_locant": true
+        "needs_locant": true,
+        "suffix_carbon_is_exocyclic": true
       },
       "peroxy_ester": {
         "role": "principal",
@@ -967,7 +969,8 @@
         "multi_suffix": null,
         "seniority": 45,
         "suffix_with_locant": true,
-        "needs_locant": true
+        "needs_locant": true,
+        "suffix_carbon_is_exocyclic": true
       },
       "sulfonic_acid": {
         "role": "principal",
@@ -1195,8 +1198,6 @@
         "prefix": "carbamoyl",
         "suffix": "amide",
         "positive_nitrogen_suffix": "amidium",
-        "retained_suffix": "amide",
-        "positive_nitrogen_retained_suffix": "amidium",
         "multi_suffix": {
           "multiplier_positions": [
             0
@@ -1237,8 +1238,6 @@
         "prefix": "carbamoyl",
         "suffix": "carboxamide",
         "positive_nitrogen_suffix": "carboxamidium",
-        "retained_suffix": "amide",
-        "positive_nitrogen_retained_suffix": "amidium",
         "multi_suffix": {
           "multiplier_positions": [
             0
@@ -1806,18 +1805,19 @@
   "retained_substituent_stems": {
     "bluebook_rule": "P-13.6 and retained parent substituent forms",
     "values": {
-      "benzene": [
-        "phen",
-        ""
-      ],
-      "pyridine": [
-        "pyridin",
-        ""
-      ],
-      "naphthalene": [
-        "naphthalen",
-        ""
-      ]
+      "benzene": {
+        "stem": "phen",
+        "terminal": "",
+        "equivalent_attachment_locants": true
+      },
+      "pyridine": {
+        "stem": "pyridin",
+        "terminal": ""
+      },
+      "naphthalene": {
+        "stem": "naphthalen",
+        "terminal": ""
+      }
     }
   },
   "retained_functional_parents": {
@@ -1827,7 +1827,7 @@
       {"parent": "benzene", "group": "amine", "name": "aniline"},
       {"parent": "benzene", "group": "ring_aldehyde", "name": "benzaldehyde"},
       {"parent": "benzene", "group": "ring_carboxylic_acid", "name": "benzoic acid"},
-      {"parent": "benzene", "group": "ring_amide", "name": "benzamide"},
+      {"parent": "benzene", "group": "ring_amide", "name": "benzamide", "positive_nitrogen_name": "benzamidium"},
       {"parent": "benzene", "group": "ring_hydrazide", "name": "benzohydrazide"},
       {"parent": "benzene", "group": "ring_nitrile", "name": "benzonitrile"},
       {"parent": "benzene", "group": "ring_carboxylate", "name": "benzoate"},
@@ -1846,13 +1846,13 @@
     "values": [
       {"length": 1, "group": "carboxylic_acid", "count": 1, "name": "formic acid"},
       {"length": 2, "group": "carboxylic_acid", "count": 1, "name": "acetic acid"},
-      {"length": 1, "group": "amide", "count": 1, "name": "formamide"},
+      {"length": 1, "group": "amide", "count": 1, "name": "formamide", "positive_nitrogen_name": "formamidium"},
       {"length": 1, "group": "hydrazide", "count": 1, "name": "formohydrazide"},
       {"length": 2, "group": "hydrazide", "count": 1, "name": "acetohydrazide"},
       {"length": 1, "group": "urea", "count": 1, "name": "urea"},
       {"length": 1, "group": "guanidine", "count": 1, "name": "guanidine"},
       {"length": 1, "group": "thiourea", "count": 1, "name": "thiourea"},
-      {"length": 2, "group": "amide", "count": 1, "name": "acetamide"},
+      {"length": 2, "group": "amide", "count": 1, "name": "acetamide", "positive_nitrogen_name": "acetamidium"},
       {"length": 1, "group": "nitrile", "count": 1, "name": "hydrogen cyanide", "allows_carbon_substitution": false, "substituted_name": "formonitrile"},
       {"length": 2, "group": "nitrile", "count": 1, "name": "acetonitrile"},
       {"length": 3, "group": "nitrile", "count": 1, "name": "propionitrile"},

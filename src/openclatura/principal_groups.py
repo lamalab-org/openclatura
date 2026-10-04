@@ -93,7 +93,7 @@ def add_component_principal_group(
                         bond = mol.get_bond(amidine_carbon, nitrogen)
                         if bond is not None and bond.order == 2 and bond.stereo in {"E", "Z"}:
                             parts.stereo_features.append(("", bond.stereo))
-            if group.key in {"amide", "ring_amide"}:
+            if RULES.functional_groups.get(group.key).positive_nitrogen_suffix:
                 positive_nitrogen_suffix_atom_ids.update(
                     _positive_amide_nitrogens(
                         mol,

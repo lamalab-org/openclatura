@@ -9,10 +9,12 @@ from .formatting import (
     format_element_substituent,
     format_multiplier,
     is_complex_prefix,
+    is_fully_enclosed,
     oxy_prefix_from_branch,
     strip_outer_parentheses,
 )
 from .heteroatom_substituent_specs import (
+    cationic_single_prefix,
     central_oxo_substituent_prefix,
     ligand_deficient_prefix,
     unsubstituted_prefix,
@@ -206,13 +208,19 @@ def central_oxo_substituent_excluded_ligand_atoms(mol: Molecule, atom_idx: int, 
     return role.oxygen_atoms
 
 
-def central_oxo_substituent_prefix_for_center(mol: Molecule, atom_idx: int, exclude_atoms: set[int]) -> str | None:
+def central_oxo_substituent_prefix_for_center(
+    mol: Molecule,
+    atom_idx: int,
+    exclude_atoms: set[int],
+    *,
+    cationic_single: bool = False,
+) -> str | None:
     """Return a data-backed oxo-substituent class prefix for a center."""
 
     role = central_oxo_substituent_role_for_center(mol, atom_idx, exclude_atoms)
     if role is None:
         return None
-    return central_oxo_substituent_prefix(role)
+    return central_oxo_substituent_prefix(role, cationic_single=cationic_single)
 
 
 def name_branch_or_none(
@@ -416,7 +424,7 @@ def name_oxygen_subgraph(
 
     branch = _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx)
     if branch:
-        return oxy_prefix_from_branch(branch)
+        return oxy_prefix_from_branch(branch, enclose_ligand=not mol.atoms[nxt].is_carbon)
     return "hydroxy"
 
 
@@ -508,22 +516,6 @@ def name_nitrogen_subgraph(
     guanidino = _guanidino_prefix(mol, start_idx, next_atoms, exclude_atoms, branch_namer)
     if guanidino:
         return guanidino
-
-    if (
-        upstream_order == 1
-        and upstream_atom is not None
-        and len(next_atoms) == 2
-        and all(
-            mol.atoms[nxt].symbol == "N"
-            and not mol.atoms[nxt].charge
-            and mol.degree(nxt) == 1
-            and mol.get_bond(start_idx, nxt).order == 1
-            for nxt in next_atoms
-        )
-    ):
-        # R-N(NH2)2 is triazan-2-yl.  Treating the two N-N edges as two
-        # hydrazinyl ligands adds an extra nitrogen on reconstruction.
-        return "triazan-2-yl"
 
     branches = []
     for nxt in next_atoms:
@@ -631,7 +623,7 @@ def _sulfur_imide_branch_name(
     branch_idx = first_substituent_neighbor(mol, sulfur, {nitrogen, *s_oxygens})
     branch = name_branch_or_none(mol, branch_idx, local_exclude, sulfur, branch_namer)
     if branch:
-        if "(" in branch and not branch.startswith("("):
+        if is_complex_prefix(branch) and not is_fully_enclosed(branch):
             branch = f"({branch})"
         return f"{stereo_prefix_text}{sulfonyl_group_name(branch, sulfur_oxo_suffix(len(s_oxygens)))}"
     return "sulfo"
@@ -769,7 +761,7 @@ def name_sulfur_subgraph(
                 # or ``dimethylsulfamoyl`` reads as two methyls on the nitrogen.
                 bare = any(contracted == name for _, _, name in RULES.heteroatoms.sulfonyl_ligand_contractions)
                 return f"{stereo_prefix_text}{contracted}" if bare else f"({stereo_prefix_text}{contracted})"
-            if "(" in branch:
+            if is_complex_prefix(branch) and not is_fully_enclosed(branch):
                 branch = f"({branch})"
             return f"({stereo_prefix_text}{branch}{suffix})"
         branches = [
@@ -918,7 +910,20 @@ def name_pnictogen_subgraph(
     p_oxygens = central_oxo_substituent_excluded_ligand_atoms(mol, start_idx, exclude_atoms)
     next_atoms = subgraph_neighbors(mol, start_idx, exclude_atoms, upstream_atom, p_oxygens)
     stereo_prefix_text = stereo_prefix(mol.atoms[start_idx])
-    named_class = central_oxo_substituent_prefix_for_center(mol, start_idx, exclude_atoms)
+    atom = mol.atoms[start_idx]
+    charge_separated_chalcogenyl = any(
+        mol.atoms[neighbor].symbol in {"S", "Se", "Te"}
+        and mol.atoms[neighbor].charge < 0
+        and mol.get_bond(start_idx, neighbor).order == 1
+        for neighbor in mol.get_neighbors(start_idx)
+    )
+    use_cationic_prefix = atom.charge > 0 and not charge_separated_chalcogenyl and upstream_order == 1
+    named_class = central_oxo_substituent_prefix_for_center(
+        mol,
+        start_idx,
+        exclude_atoms,
+        cationic_single=use_cationic_prefix,
+    )
 
     deficient = None if named_class else ligand_deficient_prefix(symbol, len(p_oxygens) or 0)
     if deficient is None and not named_class and p_oxygens:
@@ -931,15 +936,8 @@ def name_pnictogen_subgraph(
         or unsubstituted_prefix(symbol, len(p_oxygens))
         or unsubstituted_prefix(symbol, 1 if p_oxygens else 0)
     ) + multiple_bond_suffix
-    atom = mol.atoms[start_idx]
-    charge_separated_chalcogenyl = any(
-        mol.atoms[neighbor].symbol in {"S", "Se", "Te"}
-        and mol.atoms[neighbor].charge < 0
-        and mol.get_bond(start_idx, neighbor).order == 1
-        for neighbor in mol.get_neighbors(start_idx)
-    )
-    if atom.charge > 0 and not charge_separated_chalcogenyl and upstream_order == 1 and suffix.endswith("yl"):
-        suffix = suffix[:-2] + "iumyl"
+    if use_cationic_prefix and named_class is None:
+        suffix = cationic_single_prefix(symbol) or suffix
     if not next_atoms:
         return f"{stereo_prefix_text}{suffix}"
     branches = [

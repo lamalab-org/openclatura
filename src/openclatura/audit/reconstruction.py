@@ -38,7 +38,7 @@ from ..formatting import strip_outer_parentheses
 from ..hantzsch_widman import hw_parent_template
 from ..locants import parse_system_locant, system_locant_sort_key
 from ..molecule import Molecule
-from ..nomenclature import RULES
+from ..nomenclature import RULES, FunctionalGroupRule
 from ..rules import elements as _elements
 from ..rules import multipliers as _multipliers
 from .naming import (
@@ -719,10 +719,7 @@ def _saturated_locants(parts) -> tuple[str, ...]:
 
     locants = [str(loc) for loc in parts.indicated_hydrogens]
     added = [
-        str(loc)
-        for operation in parts.hydro_operations
-        if operation.operation_kind in {"additive_hydrogen", "indicated_hydrogen"}
-        for loc in operation.locants
+        str(loc) for operation in parts.hydro_operations if operation.saturates_parent for loc in operation.locants
     ]
     if added and not locants:
         locants = _stem_indicated_hydrogen_locants(parts.retained_name)
@@ -1100,16 +1097,12 @@ def _next_locant_idx(locants: dict[str, int], locant: str, is_ring: bool) -> int
     return None
 
 
-_ESTER_DIRECT = {"ester", "carboxylate", "peroxy_ester"}
-_ESTER_EXOCYCLIC = {"ring_carboxylate"}
 _ESTER_SULFONATE = {"sulfonate"}
-_ESTER_KEYS = _ESTER_DIRECT | _ESTER_EXOCYCLIC | _ESTER_SULFONATE
-_PEROXY_ACIDS = {"peroxy_acid", "ring_peroxy_acid"}
 
 
 def _is_ester_component(parts) -> bool:
     pg = parts.principal_group
-    return pg is not None and pg.key in _ESTER_KEYS
+    return pg is not None and RULES.functional_groups.get(pg.key).uses_front_modifier
 
 
 def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts, *, audit_depth: int = 0) -> None:
@@ -1118,11 +1111,12 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts, *, au
         if parts.front_modifiers:
             raise _Abstain("front modifiers without a principal group")
         return
-    if pg.key in _PEROXY_ACIDS:
-        _apply_peroxy_acid(rw, locants, pg)
+    group_rule = RULES.functional_groups.get(pg.key)
+    if group_rule.is_peroxy_acid:
+        _apply_peroxy_acid(rw, locants, pg, group_rule)
         return
     suffix_group = pg.key in _DIRECT_SUFFIX_GROUPS or pg.key in _EXOCYCLIC_SUFFIX_GROUPS
-    if pg.key in _ESTER_KEYS and (parts.front_modifiers or not suffix_group):
+    if group_rule.uses_front_modifier and (parts.front_modifiers or not suffix_group):
         _apply_ester(rw, locants, parts, audit_depth=audit_depth)
         return
     if pg.key in _HUB_ACID_GROUPS:
@@ -1184,12 +1178,17 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts, *, au
     _expose_n_locants(locants, nitrogens)
 
 
-def _apply_peroxy_acid(rw: Chem.RWMol, locants: dict[str, int], pg) -> None:
+def _apply_peroxy_acid(
+    rw: Chem.RWMol,
+    locants: dict[str, int],
+    pg,
+    group_rule: FunctionalGroupRule,
+) -> None:
     for locant in pg.locants:
         acid_c = locants.get(str(locant))
         if acid_c is None:
             raise _Abstain(f"principal-group locant {locant} outside parent")
-        if pg.key == "ring_peroxy_acid":
+        if group_rule.suffix_carbon_is_exocyclic:
             parent_idx = acid_c
             acid_c = rw.AddAtom(Chem.Atom(6))
             rw.AddBond(parent_idx, acid_c, Chem.BondType.SINGLE)
@@ -1241,7 +1240,7 @@ def _apply_ester(rw: Chem.RWMol, locants: dict[str, int], parts, *, audit_depth:
     modifier_items = parts.front_modifier_items
     for index, (name, loc) in enumerate(zip(mods, mod_locs)):
         item = modifier_items[index] if index < len(modifier_items) else None
-        if item is not None and strip_outer_parentheses(item.name) == strip_outer_parentheses(name):
+        if item is not None:
             r_frag = _resolve_item_fragment(item, audit_depth=audit_depth + 1)
         else:
             r_frag = resolve_fragment_mol(name) if name else None
@@ -1250,10 +1249,16 @@ def _apply_ester(rw: Chem.RWMol, locants: dict[str, int], parts, *, audit_depth:
         base_idx = locants.get(loc)
         if base_idx is None:
             raise _Abstain(f"ester locant {loc} outside parent")
-        _build_ester_group(rw, base_idx, pg.key, r_frag)
+        _build_ester_group(rw, base_idx, pg.key, RULES.functional_groups.get(pg.key), r_frag)
 
 
-def _build_ester_group(rw: Chem.RWMol, base_idx: int, key: str, r_frag: Chem.Mol) -> None:
+def _build_ester_group(
+    rw: Chem.RWMol,
+    base_idx: int,
+    key: str,
+    group_rule: FunctionalGroupRule,
+    r_frag: Chem.Mol,
+) -> None:
     if key in _ESTER_SULFONATE:
         sulfur = rw.AddAtom(Chem.Atom(16))
         rw.AddBond(base_idx, sulfur, Chem.BondType.SINGLE)
@@ -1265,14 +1270,14 @@ def _build_ester_group(rw: Chem.RWMol, base_idx: int, key: str, r_frag: Chem.Mol
         _graft(rw, ester_o, r_frag)
         return
     acid_c = base_idx
-    if key in _ESTER_EXOCYCLIC:
+    if group_rule.suffix_carbon_is_exocyclic:
         acid_c = rw.AddAtom(Chem.Atom(6))
         rw.AddBond(base_idx, acid_c, Chem.BondType.SINGLE)
     oxo = rw.AddAtom(Chem.Atom(8))
     rw.AddBond(acid_c, oxo, Chem.BondType.DOUBLE)
     ester_o = rw.AddAtom(Chem.Atom(8))
     rw.AddBond(acid_c, ester_o, Chem.BondType.SINGLE)
-    if key == "peroxy_ester":
+    if group_rule.is_peroxy_ester:
         peroxide_o = rw.AddAtom(Chem.Atom(8))
         rw.AddBond(ester_o, peroxide_o, Chem.BondType.SINGLE)
         ester_o = peroxide_o

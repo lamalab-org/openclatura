@@ -17,6 +17,7 @@ class RetainedParentSpec:
     name: str
     substituent_stem: str | None = None
     substituent_terminal: str | None = None
+    equivalent_attachment_locants: bool = False
     attachment_policy: AttachmentLocantPolicy = AttachmentLocantPolicy()
 
 
@@ -34,6 +35,7 @@ def retained_parent_spec(name: str | None) -> RetainedParentSpec | None:
         name=name,
         substituent_stem=stem,
         substituent_terminal=terminal,
+        equivalent_attachment_locants=name in RULES.retained.equivalent_substituent_attachment_parents,
         attachment_policy=AttachmentLocantPolicy(
             print_substituent_locant=needs_locant,
             use_parent_attachment_equivalence=True,

@@ -458,7 +458,7 @@ def resolve_parent_hydride_plan(
         bridged_retained_parent = (
             bridged_parent is not None
             and bridged_parent.fusion_wrapper_plan is not None
-            and bridged_parent.fusion_wrapper_plan.parent.kind.value == "retained"
+            and bridged_parent.fusion_wrapper_plan.parent.kind is ParentHydrideKind.RETAINED
         )
         if bridged_parent is not None and (not spiro_polycycle_precedence or bridged_retained_parent):
             return bridged_parent
@@ -664,7 +664,7 @@ def build_parent_parts(
         **assembly_overrides,
     )
     resonance_neutralized_charge_atoms = {
-        role.negative_atom for role in charge_pair_roles(mol) if role.key == "sulfur_carbanion_resonance_charge_pair"
+        role.negative_atom for role in charge_pair_roles(mol) if role.neutralizes_parent_charge
     }
     for atom_idx in numbered_path:
         locant = str(get_loc(atom_idx))
