@@ -148,3 +148,43 @@ def test_peroxol_table_is_order_sensitive(smiles: str, expected: str):
     import openclatura as oc
 
     assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("CC(=O)OO", "ethaneperoxoic acid"),
+        ("CC(=S)OO", "ethaneperoxothioic acid"),
+        ("CC(=O)SO", "ethane(thioperoxoic) SO-acid"),
+        ("CC(=O)O[SH]", "ethane(thioperoxoic) OS-acid"),
+        ("CC(=[Se])S[TeH]", "ethaneseleno(tellurothioperoxoic) STe-acid"),
+        ("CC(=O)OOC", "methyl ethaneperoxoate"),
+        ("CC(=S)OOC", "OO-methyl ethaneperoxothioate"),
+        ("CC(=O)SOC", "SO-methyl ethane(thioperoxoate)"),
+        ("CC(=O)OSC", "OS-methyl ethane(thioperoxoate)"),
+    ],
+)
+def test_peroxy_acyl_paths_preserve_orientation(smiles: str, expected: str):
+    import openclatura as oc
+
+    assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("CC(=S)OC(C)=O", "acetic ethanethioic anhydride"),
+        ("CC(=S)OC(C)=S", "ethanethioic anhydride"),
+        ("CC(=O)SC(C)=O", "acetic thioanhydride"),
+        ("CC(=O)[Se]C(C)=O", "acetic selenoanhydride"),
+        ("CC(=O)OOC(C)=O", "acetic peroxyanhydride"),
+        ("CC(=O)SOC(C)=O", "acetic thioperoxyanhydride"),
+        ("CC(=O)OSC(C)=O", "acetic thioperoxyanhydride"),
+        ("CC(=O)SSC(C)=O", "acetic dithioperoxyanhydride"),
+        ("CCC(=O)SOC(C)=O", "O-acetic S-propanoic thioperoxyanhydride"),
+    ],
+)
+def test_anhydride_bridges_and_acyl_sites_are_independent(smiles: str, expected: str):
+    import openclatura as oc
+
+    assert oc.name(smiles).name == expected

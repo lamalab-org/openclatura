@@ -260,3 +260,142 @@ def resolve_peroxol_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, Fu
         needs_locant=True,
         families=families,
     )
+
+
+def _peroxo_infix(first: Chalcogen, second: Chalcogen) -> str:
+    if first is Chalcogen.OXYGEN and second is Chalcogen.OXYGEN:
+        return "peroxo"
+    replacements = tuple(element for element in (first, second) if element is not Chalcogen.OXYGEN)
+    if len(replacements) == 2 and replacements[0] is replacements[1]:
+        return f"di{_REPLACEMENT_INFIX[replacements[0]]}peroxo"
+    replacement = "".join(sorted(_REPLACEMENT_INFIX[element] for element in replacements))
+    return f"{replacement}peroxo"
+
+
+def resolve_peroxy_acyl_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, FunctionalGroupRule | None]:
+    """Resolve C(=E1)-E2-E3-X while retaining the ordered E2-E3 path."""
+
+    double_ligand, first_linker, terminal = descriptor.ligands
+    standard_path = (
+        double_ligand.element,
+        first_linker.element,
+        terminal.element,
+    ) == (Chalcogen.OXYGEN, Chalcogen.OXYGEN, Chalcogen.OXYGEN)
+    if standard_path:
+        standard = {
+            (DerivativeKind.ACID, False): "peroxy_acid",
+            (DerivativeKind.ACID, True): "ring_peroxy_acid",
+            (DerivativeKind.ESTER, False): "peroxy_ester",
+            (DerivativeKind.ESTER, True): "ring_peroxy_ester",
+        }.get((descriptor.derivative, descriptor.is_external))
+        if standard is not None:
+            return standard, None
+
+    key = _variant_key(
+        descriptor.derivative,
+        double_ligand.element,
+        first_linker.element,
+        descriptor.is_external,
+        terminal.element.value,
+    )
+    carbo = "carbo" if descriptor.is_external else ""
+    acid_infix = _replacement_infix((double_ligand.element,))
+    linker_infix = _peroxo_infix(first_linker.element, terminal.element)
+    ordinary_peroxo = first_linker.element is Chalcogen.OXYGEN and terminal.element is Chalcogen.OXYGEN
+    if ordinary_peroxo:
+        acid_suffix = f"{carbo}{linker_infix}{acid_infix}ic"
+        ester_suffix = f"{carbo}{linker_infix}{acid_infix}ate"
+    else:
+        acid_suffix = f"{carbo}{acid_infix}({linker_infix}ic)"
+        ester_suffix = f"{carbo}{acid_infix}({linker_infix}ate)"
+    site = (
+        f" {first_linker.element.value}{terminal.element.value}-acid"
+        if first_linker.element is not terminal.element
+        else " acid"
+    )
+    if descriptor.derivative is DerivativeKind.ACID:
+        suffix = f"{acid_suffix}{site}"
+        seniority = (
+            22,
+            _ELEMENT_RANK[double_ligand.element],
+            _ELEMENT_RANK[first_linker.element],
+            _ELEMENT_RANK[terminal.element],
+        )
+        families = ("peroxy_acid", "chain_external_carbonyl")
+    elif descriptor.derivative is DerivativeKind.ANION:
+        suffix = ester_suffix
+        seniority = (
+            21,
+            _ELEMENT_RANK[double_ligand.element],
+            _ELEMENT_RANK[first_linker.element],
+            _ELEMENT_RANK[terminal.element],
+        )
+        families = ("peroxy_ester", "chain_external_carbonyl")
+    elif descriptor.derivative is DerivativeKind.ESTER:
+        suffix = ester_suffix
+        seniority = (
+            45,
+            _ELEMENT_RANK[double_ligand.element],
+            _ELEMENT_RANK[first_linker.element],
+            _ELEMENT_RANK[terminal.element],
+        )
+        families = ("ester_like", "peroxy_ester", "front_modifier", "chain_external_carbonyl")
+    else:
+        raise ValueError(f"Unsupported peroxy acyl derivative: {descriptor.derivative.value}")
+    return key, FunctionalGroupRule(
+        key=key,
+        role="principal",
+        prefix=f"{acid_infix}{linker_infix}carbonyl",
+        suffix=suffix,
+        multi_suffix=None,
+        suffix_multiplier_positions=(0,),
+        seniority=seniority,
+        suffix_with_locant=descriptor.is_external,
+        needs_locant=True,
+        families=families,
+    )
+
+
+def anhydride_class_name(descriptor: FunctionalGroupDescriptor) -> str:
+    """Return the functional-class term for an ordered anhydride bridge."""
+
+    bridge_elements = tuple(ligand.element for ligand in descriptor.ligands[2:])
+    if bridge_elements == (Chalcogen.OXYGEN,):
+        return "anhydride"
+    if len(bridge_elements) == 1:
+        return f"{_REPLACEMENT_INFIX[bridge_elements[0]]}anhydride"
+    if bridge_elements == (Chalcogen.OXYGEN, Chalcogen.OXYGEN):
+        return "peroxyanhydride"
+    replacements = tuple(element for element in bridge_elements if element is not Chalcogen.OXYGEN)
+    if len(replacements) == 1:
+        return f"{_REPLACEMENT_INFIX[replacements[0]]}peroxyanhydride"
+    if replacements[0] is replacements[1]:
+        return f"di{_REPLACEMENT_INFIX[replacements[0]]}peroxyanhydride"
+    replacement = "".join(sorted(_REPLACEMENT_INFIX[element] for element in replacements))
+    return f"{replacement}peroxyanhydride"
+
+
+def resolve_anhydride_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, FunctionalGroupRule | None]:
+    """Resolve one- and two-chalcogen bridges between two acyl centers."""
+
+    bridge_elements = tuple(ligand.element for ligand in descriptor.ligands[2:])
+    if (
+        descriptor.ligands[0].element is Chalcogen.OXYGEN
+        and descriptor.ligands[-1].element is Chalcogen.OXYGEN
+        and bridge_elements == (Chalcogen.OXYGEN,)
+    ):
+        return "anhydride", None
+    sites = "_".join(ligand.element.value for ligand in descriptor.ligands)
+    key = f"anhydride_{sites}"
+    return key, FunctionalGroupRule(
+        key=key,
+        role="principal",
+        prefix=None,
+        suffix=anhydride_class_name(descriptor),
+        multi_suffix=None,
+        suffix_multiplier_positions=(0,),
+        seniority=(30, *(_ELEMENT_RANK[element] for element in bridge_elements)),
+        suffix_with_locant=False,
+        needs_locant=True,
+        families=("anhydride",),
+    )

@@ -8,6 +8,7 @@ from .assembly_parts import NameAtomBinding, NameTokenBinding
 from .assembly_prefixes import substituent_sort_key
 from .chains import get_cyclic_atoms
 from .charge_pair_roles import charge_pair_roles
+from .chalcogen_vocabulary import anhydride_class_name
 from .formatting import (
     count_names,
     format_center_ligands,
@@ -3017,14 +3018,14 @@ def _lambda_text(mol: Molecule, atom_idx: int) -> str:
     return f"lambda{bonding_number}-"
 
 
-def _anhydride_half_atoms(mol: Molecule, start_c: int, bridge_o: int) -> set[int]:
+def _anhydride_half_atoms(mol: Molecule, start_c: int, bridge_atoms: set[int] | int) -> set[int]:
     """
     Return original atoms belonging to one acid half of an anhydride.
     """
 
     half_atoms = set()
     queue = [start_c]
-    visited = {bridge_o}
+    visited = {bridge_atoms} if isinstance(bridge_atoms, int) else set(bridge_atoms)
     while queue:
         curr = queue.pop(0)
         if curr not in half_atoms:
@@ -3034,18 +3035,24 @@ def _anhydride_half_atoms(mol: Molecule, start_c: int, bridge_o: int) -> set[int
     return half_atoms
 
 
-def anhydride_half_name(mol: Molecule, start_c: int, bridge_o: int, component_namer: ComponentNamer) -> str:
+def anhydride_half_name(
+    mol: Molecule, start_c: int, bridge_atoms: set[int] | int, component_namer: ComponentNamer
+) -> str:
     """Name one acid half of an anhydride component."""
 
-    original_half_atoms = _anhydride_half_atoms(mol, start_c, bridge_o)
+    original_half_atoms = _anhydride_half_atoms(mol, start_c, bridge_atoms)
     half_atoms = set(original_half_atoms)
     sub_mol = mol.subgraph(half_atoms)
     oh_idx = max(mol.atoms.keys()) + 100
-    sub_mol.add_atom(symbol="O", idx=oh_idx)
+    sub_mol.add_atom(symbol="O", idx=oh_idx, total_h_count=1)
     sub_mol.add_bond(u=start_c, v=oh_idx, order=1)
     half_atoms.add(oh_idx)
 
-    return component_namer(sub_mol, half_atoms).replace(" acid", "")
+    name = component_namer(sub_mol, half_atoms)
+    for ending in (" O-acid", " S-acid", " Se-acid", " Te-acid", " acid"):
+        if name.endswith(ending):
+            return name[: -len(ending)]
+    return name
 
 
 def _bond_ids_between(mol: Molecule, atom_pairs: set[tuple[int, int]]) -> set[int]:
@@ -3090,31 +3097,32 @@ def try_name_anhydride_component_result(
 ) -> AnhydrideComponentName | None:
     """Return a graph-bound anhydride component name when supported."""
 
-    if principal_key != "anhydride":
-        return None
     for group in perceived_groups:
-        if group.key != "anhydride":
+        if group.key != principal_key or group.resolved_rule is None or "anhydride" not in group.resolved_rule.families:
             continue
-        bridge_o = next((o for o in group.atoms_involved if mol.degree(o) == 2 and mol.atoms[o].symbol == "O"), None)
-        if bridge_o is None:
+        descriptor = group.descriptor
+        if descriptor is None or len(descriptor.centers) != 2 or not descriptor.linker_paths:
             continue
-        c_neighbors = [n for n in mol.get_neighbors(bridge_o) if mol.atoms[n].is_carbon]
-        if len(c_neighbors) != 2:
+        c_neighbors = list(descriptor.centers)
+        bridge_path = descriptor.linker_paths[0]
+        bridge_atoms = set(bridge_path[1:-1])
+        if not bridge_atoms:
             continue
 
         halves = []
         for carbon in c_neighbors:
-            half_atoms = _anhydride_half_atoms(mol, carbon, bridge_o)
+            half_atoms = _anhydride_half_atoms(mol, carbon, bridge_atoms)
             halves.append(
                 {
-                    "name": anhydride_half_name(mol, carbon, bridge_o, component_namer),
+                    "name": anhydride_half_name(mol, carbon, bridge_atoms, component_namer),
                     "atoms": half_atoms,
                     "bonds": bond_ids_within(mol, half_atoms),
                 }
             )
 
+        class_name = anhydride_class_name(descriptor)
         if halves[0]["name"] == halves[1]["name"]:
-            name = f"{halves[0]['name']} anhydride"
+            name = f"{halves[0]['name']} {class_name}"
             half_bindings = (
                 NameAtomBinding(
                     stage="shortcut",
@@ -3125,8 +3133,11 @@ def try_name_anhydride_component_result(
                 ),
             )
         else:
+            if len(bridge_path) == 4:
+                halves[0]["name"] = f"{mol.atoms[bridge_path[1]].symbol}-{halves[0]['name']}"
+                halves[1]["name"] = f"{mol.atoms[bridge_path[2]].symbol}-{halves[1]['name']}"
             ordered_halves = sorted(halves, key=lambda half: str(half["name"]))
-            name = f"{ordered_halves[0]['name']} {ordered_halves[1]['name']} anhydride"
+            name = f"{ordered_halves[0]['name']} {ordered_halves[1]['name']} {class_name}"
             half_bindings = tuple(
                 NameAtomBinding(
                     stage="shortcut",
@@ -3138,12 +3149,12 @@ def try_name_anhydride_component_result(
                 for half in ordered_halves
             )
 
-        core_atoms = _anhydride_core_atoms(mol, bridge_o, c_neighbors)
-        core_bonds = _anhydride_core_bond_ids(mol, bridge_o, c_neighbors, core_atoms)
+        core_atoms = set(descriptor.atom_ids)
+        core_bonds = bond_ids_within(mol, core_atoms)
         core_binding = NameAtomBinding(
             stage="shortcut",
             role="anhydride_core",
-            term="anhydride",
+            term=class_name,
             atom_ids=core_atoms,
             bond_ids=core_bonds,
         )

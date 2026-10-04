@@ -993,7 +993,8 @@
         "multi_suffix": null,
         "seniority": 30,
         "suffix_with_locant": false,
-        "needs_locant": true
+        "needs_locant": true,
+        "families": ["anhydride", "prefix_skip"]
       },
       "ester": {
         "role": "principal",

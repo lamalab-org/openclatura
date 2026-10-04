@@ -62,9 +62,13 @@ def add_component_front_modifiers(
                 linkers = group.descriptor.ligands_with_role(ChalcogenLigandRole.ORGANIC_LINK)
                 double_ligands = group.descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED)
                 if linkers and double_ligands and any(
-                    ligand.element is not Chalcogen.OXYGEN for ligand in (*linkers, *double_ligands)
+                    ligand.element is not Chalcogen.OXYGEN for ligand in group.descriptor.ligands
                 ):
-                    modifier = f"{linkers[0].element.value}-{modifier}"
+                    ordered_linkers = tuple(
+                        ligand for ligand in group.descriptor.ligands if ligand is not double_ligands[0]
+                    )
+                    element_locant = "".join(ligand.element.value for ligand in ordered_linkers)
+                    modifier = f"{element_locant}-{modifier}"
             parts.front_modifiers.append(modifier)
             locant = str(get_loc(group.attachment_carbon)) if get_loc is not None else None
             parts.front_modifier_locants.append(locant)

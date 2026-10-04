@@ -11,7 +11,13 @@ from .chalcogen_roles import (
     classify_chalcogen_ligand,
     chalcogen_for_symbol,
 )
-from .chalcogen_vocabulary import resolve_acyl_rule, resolve_peroxol_rule, simple_group_key
+from .chalcogen_vocabulary import (
+    resolve_acyl_rule,
+    resolve_anhydride_rule,
+    resolve_peroxol_rule,
+    resolve_peroxy_acyl_rule,
+    simple_group_key,
+)
 from .chains import get_cyclic_atoms
 from .functional_groups import PERCEPTION_DETECTORS, PERCEPTION_SPECS, PerceptionDetectorSpec, metadata_for_group
 from .molecule import (
@@ -340,6 +346,10 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                     if mol.degree(n3) == 1:
                         groups.append(PerceivedGroup("azido", False, adj_atoms[0], {atom.idx, n2, n3}))
                         consumed.update([atom.idx, n2, n3])
+
+    for group in _chalcogen_anhydride_groups(mol, consumed):
+        groups.append(group)
+        consumed.update(group.atoms_involved)
 
     for atom in mol:
         if atom.symbol == "O" and mol.degree(atom.idx) == 2 and atom.idx not in consumed:
@@ -1009,7 +1019,47 @@ def _acyl_chalcogen_group(
     if len(single_ligands) == 1:
         single_ligand = single_ligands[0]
         if single_ligand.role is ChalcogenLigandRole.CHALCOGEN_LINK:
-            return None
+            terminal_atom = single_ligand.attachment_atom
+            if terminal_atom is None:
+                return None
+            if (
+                carbon in cyclic_atoms
+                and single_ligand.atom in cyclic_atoms
+                and terminal_atom in cyclic_atoms
+                and _closes_ring_back_to(mol, carbon, single_ligand.atom, double_ligand.atom, cyclic_atoms)
+            ):
+                return _carbonyl_chalcogen_group(
+                    mol, carbon, attachment, double_ligand, DerivativeKind.KETONE
+                )
+            terminal_ligand = classify_chalcogen_ligand(mol, single_ligand.atom, terminal_atom)
+            if terminal_ligand is None:
+                return None
+            derivative_by_role = {
+                ChalcogenLigandRole.HYDROGEN_BEARING: DerivativeKind.ACID,
+                ChalcogenLigandRole.ANIONIC: DerivativeKind.ANION,
+                ChalcogenLigandRole.ORGANIC_LINK: DerivativeKind.ESTER,
+            }
+            derivative = derivative_by_role.get(terminal_ligand.role)
+            if derivative is None:
+                return None
+            descriptor = FunctionalGroupDescriptor(
+                family=FunctionalFamily.ACYL,
+                derivative=derivative,
+                centers=(carbon,),
+                ligands=(double_ligand, single_ligand, terminal_ligand),
+                linker_paths=((carbon, single_ligand.atom, terminal_ligand.atom),),
+                attachment_atom=attachment,
+                is_external=external,
+            )
+            key, rule = resolve_peroxy_acyl_rule(descriptor)
+            return PerceivedGroup(
+                key,
+                True,
+                attachment,
+                {carbon, double_ligand.atom, single_ligand.atom, terminal_ligand.atom},
+                descriptor=descriptor,
+                resolved_rule=rule,
+            )
         if (
             single_ligand.role is ChalcogenLigandRole.ORGANIC_LINK
             and carbon in cyclic_atoms
@@ -1150,6 +1200,110 @@ def _carbonyl_chalcogen_group(
         is_external=external,
     )
     return PerceivedGroup(key, True, attachment, {carbon, ligand.atom}, descriptor=descriptor)
+
+
+def _chalcogen_anhydride_groups(mol: Molecule, consumed: set[int]) -> list[PerceivedGroup]:
+    """Return acyclic C(=E)-E[-E]-C(=E) groups with ordered bridges."""
+
+    groups = []
+    seen: set[tuple[frozenset[int], tuple[int, ...]]] = set()
+    for first_center in mol:
+        if not first_center.is_carbon or first_center.idx in consumed:
+            continue
+        first_double = _terminal_double_chalcogen(mol, first_center.idx, consumed)
+        if first_double is None:
+            continue
+        for first_bridge_atom in mol.get_neighbors(first_center.idx):
+            if first_bridge_atom in consumed or first_bridge_atom == first_double.atom:
+                continue
+            first_bridge = classify_chalcogen_ligand(mol, first_center.idx, first_bridge_atom)
+            if first_bridge is None or first_bridge.role not in {
+                ChalcogenLigandRole.ORGANIC_LINK,
+                ChalcogenLigandRole.CHALCOGEN_LINK,
+            }:
+                continue
+            if first_bridge.role is ChalcogenLigandRole.ORGANIC_LINK:
+                second_center = first_bridge.attachment_atom
+                bridge_atoms = (first_bridge_atom,)
+                bridge_ligands = (first_bridge,)
+            else:
+                second_bridge_atom = first_bridge.attachment_atom
+                if second_bridge_atom is None:
+                    continue
+                second_bridge = classify_chalcogen_ligand(mol, first_bridge_atom, second_bridge_atom)
+                if second_bridge is None or second_bridge.role is not ChalcogenLigandRole.ORGANIC_LINK:
+                    continue
+                second_center = second_bridge.attachment_atom
+                bridge_atoms = (first_bridge_atom, second_bridge_atom)
+                bridge_ligands = (first_bridge, second_bridge)
+            if second_center is None or second_center == first_center.idx or not mol.atoms[second_center].is_carbon:
+                continue
+            second_double = _terminal_double_chalcogen(mol, second_center, consumed)
+            if second_double is None or _connected_without_bridge(
+                mol, first_center.idx, second_center, set(bridge_atoms)
+            ):
+                continue
+            identity = (frozenset({first_center.idx, second_center}), tuple(sorted(bridge_atoms)))
+            if identity in seen:
+                continue
+            seen.add(identity)
+            if first_center.idx <= second_center:
+                centers = (first_center.idx, second_center)
+                doubles = (first_double, second_double)
+                ordered_bridge_atoms = bridge_atoms
+                ordered_bridge_ligands = bridge_ligands
+            else:
+                centers = (second_center, first_center.idx)
+                doubles = (second_double, first_double)
+                ordered_bridge_atoms = tuple(reversed(bridge_atoms))
+                ordered_bridge_ligands = tuple(reversed(bridge_ligands))
+            descriptor = FunctionalGroupDescriptor(
+                family=FunctionalFamily.ACYL,
+                derivative=DerivativeKind.ANHYDRIDE,
+                centers=centers,
+                ligands=(*doubles, *ordered_bridge_ligands),
+                linker_paths=((centers[0], *ordered_bridge_atoms, centers[1]),),
+                attachment_atom=centers[0],
+            )
+            key, rule = resolve_anhydride_rule(descriptor)
+            groups.append(
+                PerceivedGroup(
+                    key,
+                    True,
+                    centers[0],
+                    {first_double.atom, second_double.atom, *bridge_atoms},
+                    descriptor=descriptor,
+                    resolved_rule=rule,
+                )
+            )
+    return groups
+
+
+def _terminal_double_chalcogen(
+    mol: Molecule, center: int, consumed: set[int]
+) -> ChalcogenLigand | None:
+    ligands = [
+        ligand
+        for neighbor in mol.get_neighbors(center)
+        if neighbor not in consumed
+        and (ligand := classify_chalcogen_ligand(mol, center, neighbor)) is not None
+        and ligand.role is ChalcogenLigandRole.DOUBLE_BONDED
+    ]
+    return ligands[0] if len(ligands) == 1 else None
+
+
+def _connected_without_bridge(mol: Molecule, start: int, target: int, bridge_atoms: set[int]) -> bool:
+    visited = set(bridge_atoms) | {start}
+    queue = [start]
+    while queue:
+        current = queue.pop(0)
+        for neighbor in mol.get_neighbors(current):
+            if neighbor == target:
+                return True
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append(neighbor)
+    return False
 
 
 def _enrich_groups(mol: Molecule, groups: list[PerceivedGroup]) -> list[PerceivedGroup]:
