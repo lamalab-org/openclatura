@@ -61,8 +61,10 @@ def add_component_front_modifiers(
             if group.descriptor is not None:
                 linkers = group.descriptor.ligands_with_role(ChalcogenLigandRole.ORGANIC_LINK)
                 double_ligands = group.descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED)
-                if linkers and double_ligands and any(
-                    ligand.element is not Chalcogen.OXYGEN for ligand in group.descriptor.ligands
+                if (
+                    linkers
+                    and double_ligands
+                    and any(ligand.element is not Chalcogen.OXYGEN for ligand in group.descriptor.ligands)
                 ):
                     ordered_linkers = tuple(
                         ligand

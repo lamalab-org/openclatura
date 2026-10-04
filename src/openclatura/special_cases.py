@@ -7,9 +7,9 @@ from dataclasses import dataclass, replace
 from .assembly_parts import NameAtomBinding, NameTokenBinding, rendered_substituent_text
 from .assembly_prefixes import substituent_sort_key
 from .chains import get_cyclic_atoms
-from .charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
 from .chalcogen_roles import chalcogen_for_symbol, classify_peroxide_linkage
 from .chalcogen_vocabulary import anhydride_class_name, chalcogenide_class_name, peroxide_class_name
+from .charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
 from .formatting import (
     count_names,
     format_center_ligands,
@@ -378,15 +378,11 @@ def peroxide_linkage_result(
     if elements[0] is elements[1] or names[0] == names[1]:
         counts = count_names(names)
         ligand_text = " ".join(
-            format_multiplier(name, counts[name])
-            for name in sorted(counts, key=substituent_sort_key)
+            format_multiplier(name, counts[name]) for name in sorted(counts, key=substituent_sort_key)
         )
     else:
         located = sorted(
-            (
-                f"{element.value}-{name}"
-                for element, name in zip(elements, names, strict=True)
-            ),
+            (f"{element.value}-{name}" for element, name in zip(elements, names, strict=True)),
             key=substituent_sort_key,
         )
         ligand_text = " ".join(located)

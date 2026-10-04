@@ -165,18 +165,20 @@ def _classify_charge_pair(
         and mol.degree(negative) == 1
     ):
         other_orders = tuple(
-            mol.get_bond(positive, neighbor).order
-            for neighbor in mol.get_neighbors(positive)
-            if neighbor != negative
+            mol.get_bond(positive, neighbor).order for neighbor in mol.get_neighbors(positive) if neighbor != negative
         )
         organic_neighbors = tuple(
-            neighbor for neighbor in mol.get_neighbors(positive) if neighbor != negative and mol.atoms[neighbor].is_carbon
+            neighbor
+            for neighbor in mol.get_neighbors(positive)
+            if neighbor != negative and mol.atoms[neighbor].is_carbon
         )
         all_neighbors_are_organic = len(organic_neighbors) == len(other_orders)
         if all_neighbors_are_organic and other_orders.count(3) == 1 and all(order == 3 for order in other_orders):
             nitrogen_kind = NitrogenChalcogenideKind.NITRILE
             key = "nitrile_chalcogenide"
-        elif all_neighbors_are_organic and other_orders.count(2) == 1 and all(order in {1, 2} for order in other_orders):
+        elif (
+            all_neighbors_are_organic and other_orders.count(2) == 1 and all(order in {1, 2} for order in other_orders)
+        ):
             nitrogen_kind = NitrogenChalcogenideKind.IMINE
             key = "n_oxide" if negative_chalcogen is Chalcogen.OXYGEN else "nitrogen_chalcogenide"
         elif all_neighbors_are_organic and other_orders and all(order == 1 for order in other_orders):

@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 
+from .chains import get_cyclic_atoms
 from .chalcogen_roles import (
     Chalcogen,
     ChalcogenLigand,
@@ -9,8 +10,8 @@ from .chalcogen_roles import (
     DerivativeKind,
     FunctionalFamily,
     FunctionalGroupDescriptor,
-    classify_chalcogen_ligand,
     chalcogen_for_symbol,
+    classify_chalcogen_ligand,
     require_validated_chalcogens,
 )
 from .chalcogen_vocabulary import (
@@ -22,7 +23,6 @@ from .chalcogen_vocabulary import (
     resolve_peroxy_acyl_rule,
     simple_group_key,
 )
-from .chains import get_cyclic_atoms
 from .functional_groups import PERCEPTION_DETECTORS, PERCEPTION_SPECS, PerceptionDetectorSpec, metadata_for_group
 from .molecule import (
     AtomBinding,
@@ -1027,8 +1027,7 @@ def _acyl_chalcogen_group(
     ligands = [
         ligand
         for neighbor in mol.get_neighbors(carbon)
-        if neighbor not in consumed
-        and (ligand := classify_chalcogen_ligand(mol, carbon, neighbor)) is not None
+        if neighbor not in consumed and (ligand := classify_chalcogen_ligand(mol, carbon, neighbor)) is not None
     ]
     double_ligands = [ligand for ligand in ligands if ligand.role is ChalcogenLigandRole.DOUBLE_BONDED]
     if len(double_ligands) != 1:
@@ -1036,9 +1035,7 @@ def _acyl_chalcogen_group(
     double_ligand = double_ligands[0]
     ring_neighbors = [neighbor for neighbor in mol.get_neighbors(carbon) if neighbor in cyclic_atoms]
     external = (
-        carbon not in cyclic_atoms
-        and len(ring_neighbors) == 1
-        and mol.get_bond(carbon, ring_neighbors[0]).order == 1
+        carbon not in cyclic_atoms and len(ring_neighbors) == 1 and mol.get_bond(carbon, ring_neighbors[0]).order == 1
     )
     attachment = ring_neighbors[0] if external else carbon
 
@@ -1065,9 +1062,7 @@ def _acyl_chalcogen_group(
                 and terminal_atom in cyclic_atoms
                 and _closes_ring_back_to(mol, carbon, single_ligand.atom, double_ligand.atom, cyclic_atoms)
             ):
-                return _carbonyl_chalcogen_group(
-                    mol, carbon, attachment, double_ligand, DerivativeKind.KETONE
-                )
+                return _carbonyl_chalcogen_group(mol, carbon, attachment, double_ligand, DerivativeKind.KETONE)
             terminal_ligand = classify_chalcogen_ligand(mol, single_ligand.atom, terminal_atom)
             if terminal_ligand is None:
                 return None
@@ -1161,9 +1156,7 @@ def _acyl_chalcogen_group(
     nitrogens = [
         neighbor
         for neighbor in mol.get_neighbors(carbon)
-        if neighbor not in consumed
-        and mol.atoms[neighbor].symbol == "N"
-        and mol.get_bond(carbon, neighbor).order == 1
+        if neighbor not in consumed and mol.atoms[neighbor].symbol == "N" and mol.get_bond(carbon, neighbor).order == 1
     ]
     if not nitrogens:
         return None
@@ -1316,9 +1309,7 @@ def _chalcogen_anhydride_groups(mol: Molecule, consumed: set[int]) -> list[Perce
     return groups
 
 
-def _terminal_double_chalcogen(
-    mol: Molecule, center: int, consumed: set[int]
-) -> ChalcogenLigand | None:
+def _terminal_double_chalcogen(mol: Molecule, center: int, consumed: set[int]) -> ChalcogenLigand | None:
     ligands = [
         ligand
         for neighbor in mol.get_neighbors(center)

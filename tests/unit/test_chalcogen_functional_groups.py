@@ -59,9 +59,7 @@ def test_neutral_chalcogen_radical_is_not_hydrogen_bearing():
         ("CC(=[Te])", "telluroaldehyde", "ethanetellanal"),
     ],
 )
-def test_simple_chalcogen_analogues_are_named_from_graph_roles(
-    smiles: str, expected_key: str, expected_name: str
-):
+def test_simple_chalcogen_analogues_are_named_from_graph_roles(smiles: str, expected_key: str, expected_name: str):
     import openclatura as oc
 
     mol = read_smiles(smiles)

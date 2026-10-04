@@ -15,7 +15,6 @@ from .chalcogen_roles import (
 )
 from .nomenclature import FunctionalGroupRule, MultiSuffixTemplate
 
-
 _SIMPLE_KEYS: dict[tuple[FunctionalFamily, DerivativeKind, Chalcogen, bool], str] = {
     (FunctionalFamily.HYDROXY, DerivativeKind.ALCOHOL, Chalcogen.OXYGEN, False): "alcohol",
     (FunctionalFamily.HYDROXY, DerivativeKind.ALCOHOL, Chalcogen.SULFUR, False): "thiol",
@@ -132,6 +131,7 @@ def resolve_nitrile_chalcogenide_rule(
         families=("nitrile_chalcogenide",),
     )
 
+
 _REPLACEMENT_INFIX = {
     Chalcogen.SULFUR: "thio",
     Chalcogen.SELENIUM: "seleno",
@@ -178,7 +178,7 @@ def _replacement_infix(elements: tuple[Chalcogen, ...]) -> str:
         return ""
     if len(replacements) == 2 and replacements[0] is replacements[1]:
         return f"di{_REPLACEMENT_INFIX[replacements[0]]}"
-    return "".join(sorted((_REPLACEMENT_INFIX[element] for element in replacements)))
+    return "".join(sorted(_REPLACEMENT_INFIX[element] for element in replacements))
 
 
 def _variant_key(
@@ -313,10 +313,16 @@ def resolve_peroxol_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, Fu
     suffix = _PEROXOL_SUFFIXES[pair]
     key = f"peroxol_{first.element.value}_{terminal.element.value}"
     element_locanted = first.element is not terminal.element or terminal.element is Chalcogen.OXYGEN
-    families = ("peroxol", "element_locanted_suffix") if element_locanted and pair != (
-        Chalcogen.OXYGEN,
-        Chalcogen.OXYGEN,
-    ) else ("peroxol",)
+    families = (
+        ("peroxol", "element_locanted_suffix")
+        if element_locanted
+        and pair
+        != (
+            Chalcogen.OXYGEN,
+            Chalcogen.OXYGEN,
+        )
+        else ("peroxol",)
+    )
     return key, FunctionalGroupRule(
         key=key,
         role="principal",
@@ -500,9 +506,7 @@ def resolve_central_acid_rule(
         double_infix = _replacement_infix(tuple(ligand.element for ligand in double_ligands))
         linker_infix = _peroxo_infix(first_linker.element, terminal.element)
         origin_prefix = f"{origin_stem}{'o' if double_infix else ''}{double_infix}"
-        ordinary_peroxo = (
-            first_linker.element is Chalcogen.OXYGEN and terminal.element is Chalcogen.OXYGEN
-        )
+        ordinary_peroxo = first_linker.element is Chalcogen.OXYGEN and terminal.element is Chalcogen.OXYGEN
         if ordinary_peroxo:
             acid_suffix = f"{origin_prefix}operoxoic acid"
             ester_suffix = f"{origin_prefix}operoxoate"
@@ -553,10 +557,10 @@ def resolve_central_acid_rule(
         return standard_key, None
 
     expected_oxygen_count = len(descriptor.ligands)
-    replacements = tuple(
-        ligand.element for ligand in descriptor.ligands if ligand.element is not Chalcogen.OXYGEN
+    replacements = tuple(ligand.element for ligand in descriptor.ligands if ligand.element is not Chalcogen.OXYGEN)
+    infix = _replacement_infix(
+        tuple(Chalcogen.OXYGEN for _ in range(expected_oxygen_count - len(replacements))) + replacements
     )
-    infix = _replacement_infix(tuple(Chalcogen.OXYGEN for _ in range(expected_oxygen_count - len(replacements))) + replacements)
     key_sites = "_".join(ligand.element.value for ligand in descriptor.ligands)
     key = f"central_{central_element.value}_{descriptor.derivative.value}_{key_sites}"
     suffix_stem = f"{origin_stem}{'o' if infix else ''}{infix}"
