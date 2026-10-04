@@ -912,6 +912,8 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
         if ligand.role is ChalcogenLigandRole.DOUBLE_BONDED:
             if not mol.atoms[center].is_carbon:
                 continue
+            if ligand.element is not Chalcogen.OXYGEN and any(candidate.charge for candidate in mol):
+                continue
             if ligand.element is not Chalcogen.OXYGEN and any(
                 neighbor != atom.idx and not mol.atoms[neighbor].is_carbon
                 for neighbor in mol.get_neighbors(center)
@@ -947,7 +949,18 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             continue
         if ligand.role not in {ChalcogenLigandRole.HYDROGEN_BEARING, ChalcogenLigandRole.ANIONIC}:
             continue
-        if not mol.atoms[center].is_carbon:
+        if not mol.atoms[center].is_carbon and not (
+            ligand.role is ChalcogenLigandRole.ANIONIC
+            and mol.atoms[center].symbol == "N"
+            and mol.atoms[center].charge > 0
+        ):
+            continue
+        if (
+            ligand.role is ChalcogenLigandRole.ANIONIC
+            and ligand.element is not Chalcogen.OXYGEN
+            and mol.atoms[center].charge <= 0
+            and any(candidate.charge > 0 for candidate in mol)
+        ):
             continue
         derivative = DerivativeKind.ANION if atom.charge < 0 else DerivativeKind.ALCOHOL
         key = simple_group_key(FunctionalFamily.HYDROXY, derivative, ligand.element)
@@ -1318,6 +1331,8 @@ def _central_chalcogen_derivative(
         or center in consumed
         or center in cyclic_atoms
         or mol.atoms[center].charge != 0
+        or mol.atoms[center].stereo is not None
+        or mol.atoms[center].raw_stereo is not None
     ):
         return None
     if any(
@@ -1400,7 +1415,23 @@ def _central_chalcogen_derivative(
             and mol.get_bond(center, neighbor).order == 1
         ]
         if len(nitrogens) == 1:
+            if nitrogens[0] in cyclic_atoms:
+                return None
             hydrazide_nitrogens = _hydrazide_nitrogens(mol, center, nitrogens[0], cyclic_atoms)
+            if hydrazide_nitrogens is not None:
+                terminal_nitrogen = hydrazide_nitrogens[1]
+                if any(
+                    neighbor != nitrogens[0]
+                    and mol.atoms[neighbor].is_carbon
+                    and any(
+                        adjacent != terminal_nitrogen
+                        and chalcogen_for_symbol(mol.atoms[adjacent].symbol) is not None
+                        and mol.get_bond(neighbor, adjacent).order > 1
+                        for adjacent in mol.get_neighbors(neighbor)
+                    )
+                    for neighbor in mol.get_neighbors(terminal_nitrogen)
+                ):
+                    return None
             if hydrazide_nitrogens is None and any(
                 neighbor != center
                 and (

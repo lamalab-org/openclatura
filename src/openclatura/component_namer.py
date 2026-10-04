@@ -10,8 +10,8 @@ from .assembly_parts import (
     UnsaturationItem,
     split_rendered_substituent_name,
 )
-from .chalcogen_roles import FunctionalFamily
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
+from .chalcogen_roles import FunctionalFamily
 from .component_group_rules import (
     exclude_nonparent_group_atoms,
     principal_involved_atoms,
