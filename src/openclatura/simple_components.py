@@ -59,9 +59,10 @@ def unsupported_generic_atomic_salt_components(
 ) -> tuple[set[int], ...]:
     """Return fallback atomic ions paired with an opposite-charge component.
 
-    Atomic charge notation is unambiguous for an isolated ion. In a salt name,
-    OPSIN treats an unregistered element-plus-counterion phrase as a covalent
-    composition instead, so the current grammar cannot safely represent it.
+    Atomic charge notation is unambiguous for an isolated ion or beside a
+    structured ion. With an atomic counterion, OPSIN treats an unregistered
+    element-plus-counterion phrase as a covalent composition instead, so the
+    current grammar cannot safely represent it.
     """
 
     charges = [sum(mol.atoms[idx].charge for idx in component) for component in components]
@@ -69,7 +70,10 @@ def unsupported_generic_atomic_salt_components(
         component
         for component, charge in zip(components, charges, strict=True)
         if is_generic_atomic_charge_component(mol, component)
-        and any(charge * other_charge < 0 for other_charge in charges)
+        and any(
+            charge * other_charge < 0 and len(other_component) == 1
+            for other_component, other_charge in zip(components, charges, strict=True)
+        )
     )
 
 
