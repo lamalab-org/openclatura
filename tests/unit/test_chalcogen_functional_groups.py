@@ -1,20 +1,58 @@
 """Regression and feature tests for role-aware chalcogen functional groups."""
 
-import pytest
+from itertools import product
 
+import pytest
+from rdkit import Chem
+
+import openclatura as oc
 from openclatura.chalcogen_roles import (
+    Chalcogen,
     ChalcogenLigandRole,
+    DerivativeKind,
+    FunctionalFamily,
     UnsupportedChalcogenNomenclatureError,
     classify_chalcogen_ligand,
 )
 from openclatura.charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
 from openclatura.graph_io import read_smiles
-from openclatura.perception import _builtin_perceive_groups
+from openclatura.perception import perceive_groups
+
+VALIDATED_CHALCOGENS = (
+    Chalcogen.OXYGEN,
+    Chalcogen.SULFUR,
+    Chalcogen.SELENIUM,
+    Chalcogen.TELLURIUM,
+)
+SMILES_ATOM = {
+    Chalcogen.OXYGEN: "O",
+    Chalcogen.SULFUR: "S",
+    Chalcogen.SELENIUM: "[Se]",
+    Chalcogen.TELLURIUM: "[Te]",
+}
+SMILES_HYDROGENATED_ATOM = {
+    Chalcogen.OXYGEN: "O",
+    Chalcogen.SULFUR: "[SH]",
+    Chalcogen.SELENIUM: "[SeH]",
+    Chalcogen.TELLURIUM: "[TeH]",
+}
+
+
+def _descriptor(smiles: str, family: FunctionalFamily, derivative: DerivativeKind):
+    matches = [
+        group.descriptor
+        for group in perceive_groups(read_smiles(smiles))
+        if group.descriptor is not None
+        and group.descriptor.family is family
+        and group.descriptor.derivative is derivative
+    ]
+    assert len(matches) == 1
+    return matches[0]
 
 
 @pytest.mark.parametrize("smiles", ["CC(=O)OC(C)=O", "O=C(C)OC(C)=O"])
 def test_anhydride_perception_is_invariant_to_atom_zero(smiles: str):
-    groups = _builtin_perceive_groups(read_smiles(smiles))
+    groups = perceive_groups(read_smiles(smiles))
 
     assert [group.key for group in groups].count("anhydride") == 1
 
@@ -64,7 +102,7 @@ def test_simple_chalcogen_analogues_are_named_from_graph_roles(smiles: str, expe
     import openclatura as oc
 
     mol = read_smiles(smiles)
-    groups = _builtin_perceive_groups(mol)
+    groups = perceive_groups(mol)
     matching = [group for group in groups if group.key == expected_key]
 
     assert len(matching) == 1
@@ -294,8 +332,116 @@ def test_nitrile_chalcogenides_use_zwitterion_priority_and_class_names(smiles: s
     ],
 )
 def test_peroxide_linkages_preserve_both_chalcogen_sites(smiles: str, expected: str):
-    import openclatura as oc
+    assert oc.name(smiles).name == expected
 
+
+@pytest.mark.parametrize(("double_element", "single_element"), product(VALIDATED_CHALCOGENS, repeat=2))
+def test_all_acid_site_combinations_have_typed_graph_descriptors(double_element, single_element):
+    smiles = f"CC(={SMILES_ATOM[double_element]}){SMILES_HYDROGENATED_ATOM[single_element]}"
+
+    descriptor = _descriptor(smiles, FunctionalFamily.ACYL, DerivativeKind.ACID)
+
+    assert tuple(ligand.element for ligand in descriptor.ligands) == (double_element, single_element)
+    assert tuple(ligand.role for ligand in descriptor.ligands) == (
+        ChalcogenLigandRole.DOUBLE_BONDED,
+        ChalcogenLigandRole.HYDROGEN_BEARING,
+    )
+    assert oc.name(smiles).name
+
+
+@pytest.mark.parametrize(("double_element", "single_element"), product(VALIDATED_CHALCOGENS, repeat=2))
+def test_all_ester_site_combinations_have_typed_graph_descriptors(double_element, single_element):
+    smiles = f"CC(={SMILES_ATOM[double_element]}){SMILES_ATOM[single_element]}C"
+
+    descriptor = _descriptor(smiles, FunctionalFamily.ACYL, DerivativeKind.ESTER)
+
+    assert tuple(ligand.element for ligand in descriptor.ligands) == (double_element, single_element)
+    assert tuple(ligand.role for ligand in descriptor.ligands) == (
+        ChalcogenLigandRole.DOUBLE_BONDED,
+        ChalcogenLigandRole.CARBON_LINK,
+    )
+    assert oc.name(smiles).name
+
+
+@pytest.mark.parametrize("derivative", (DerivativeKind.ACID, DerivativeKind.ESTER))
+@pytest.mark.parametrize(
+    ("double_element", "first_linker", "terminal_element"),
+    product(VALIDATED_CHALCOGENS, repeat=3),
+)
+def test_all_peroxy_acyl_site_combinations_have_typed_graph_descriptors(
+    derivative,
+    double_element,
+    first_linker,
+    terminal_element,
+):
+    terminal = (
+        SMILES_HYDROGENATED_ATOM[terminal_element]
+        if derivative is DerivativeKind.ACID
+        else f"{SMILES_ATOM[terminal_element]}C"
+    )
+    smiles = f"CC(={SMILES_ATOM[double_element]}){SMILES_ATOM[first_linker]}{terminal}"
+
+    descriptor = _descriptor(smiles, FunctionalFamily.ACYL, derivative)
+
+    assert tuple(ligand.element for ligand in descriptor.ligands) == (
+        double_element,
+        first_linker,
+        terminal_element,
+    )
+    assert tuple(ligand.role for ligand in descriptor.ligands) == (
+        ChalcogenLigandRole.DOUBLE_BONDED,
+        ChalcogenLigandRole.CHALCOGEN_LINK,
+        ChalcogenLigandRole.HYDROGEN_BEARING if derivative is DerivativeKind.ACID else ChalcogenLigandRole.CARBON_LINK,
+    )
+    assert oc.name(smiles).name
+
+
+@pytest.mark.parametrize("bridge_length", (1, 2))
+def test_all_anhydride_site_combinations_have_typed_graph_descriptors(bridge_length):
+    for double_left, double_right, *bridge in product(VALIDATED_CHALCOGENS, repeat=bridge_length + 2):
+        bridge_smiles = "".join(SMILES_ATOM[element] for element in bridge)
+        smiles = f"CC(={SMILES_ATOM[double_left]}){bridge_smiles}C(C)={SMILES_ATOM[double_right]}"
+
+        descriptor = _descriptor(smiles, FunctionalFamily.ACYL, DerivativeKind.ANHYDRIDE)
+        actual_elements = tuple(ligand.element for ligand in descriptor.ligands)
+        assert actual_elements == (double_left, double_right, *bridge), (smiles, actual_elements)
+        assert oc.name(smiles).name
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    (
+        "CC(=S)[SeH]",
+        "CC(=[Te])[Se]C",
+        "CC(=[Se])S[TeH]",
+        "CC(=[Te])O[Se]C",
+        "CC(=S)[Se][Te]C(C)=O",
+    ),
+)
+def test_mixed_chalcogen_names_are_invariant_to_atom_renumbering(smiles):
+    mol = Chem.MolFromSmiles(smiles)
+    assert mol is not None
+    baseline = oc.name_mol(mol).name
+    atom_count = mol.GetNumAtoms()
+
+    for order in (list(reversed(range(atom_count))), list(range(1, atom_count)) + [0]):
+        assert oc.name_mol(Chem.RenumberAtoms(mol, order)).name == baseline
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    (
+        ("CC(=[Se])CC(=O)O", "3-selenoxobutanoic acid"),
+        ("CC([TeH])CC(=O)O", "3-tellanylbutanoic acid"),
+        ("CC(=[Te])CC(=[Se])C", "4-telluroxopentane-2-selone"),
+        ("CC(=[Se])CC(=[Se])C", "pentane-2,4-diselone"),
+        ("c1ccccc1C(=[Se])O", "benzenecarboselenoic O-acid"),
+        ("CC(=[Se])N(C)C", "N,N-dimethylethaneselenoamide"),
+        ("CC(=[Te])N(C)NC", "N,N'-dimethylethanetellurohydrazide"),
+        ("[Na+].CC(=[Se])[S-]", "sodium ethaneselenothioate"),
+    ),
+)
+def test_dynamic_chalcogen_rules_compose_with_existing_parent_and_modifier_paths(smiles, expected):
     assert oc.name(smiles).name == expected
 
 
@@ -303,5 +449,6 @@ def test_polonium_is_parseable_but_has_an_explicit_unvalidated_boundary():
     mol = read_smiles("C[PoH]")
 
     assert mol.atoms[1].symbol == "Po"
-    with pytest.raises(UnsupportedChalcogenNomenclatureError, match="not validated for: Po"):
-        _builtin_perceive_groups(mol)
+    with pytest.raises(UnsupportedChalcogenNomenclatureError) as exc_info:
+        perceive_groups(mol)
+    assert str(exc_info.value) == "Organic functional-group nomenclature is not validated for: Po"

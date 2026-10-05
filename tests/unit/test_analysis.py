@@ -2928,11 +2928,14 @@ def test_functional_groups_carry_metadata_and_graph_bindings():
     assert acid.seniority == 20
     assert acid.atom_ids == {1, 2, 3}
     assert acid.bond_ids == {2, 3}
-    assert {
+    assert {binding.role for binding in acid.atom_bindings} == {
         "attachment",
         "characteristic_group",
         "full_group",
-    }.issubset({binding.role for binding in acid.atom_bindings})
+        "characteristic_centers",
+        "double_bonded",
+        "hydrogen_bearing",
+    }
 
 
 def test_charge_pair_roles_classify_supported_and_unsupported_templates():
