@@ -360,6 +360,29 @@ def test_peroxide_linkages_preserve_both_chalcogen_sites(smiles: str, expected: 
     assert oc.name(smiles).name == expected
 
 
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        (
+            "CC(C)(O)C(C)(C)OSc1ccc(CCCO)cc1",
+            "3-(((4-(3-hydroxypropyl)phenyl)sulfanyl)oxy)-2,3-dimethylbutan-2-ol",
+        ),
+        (
+            "C=CC(=O)Oc1ccc(-c2ccc(CCCOSC)cc2)cc1",
+            "4-(4-(3-(methylsulfanyloxy)propyl)phenyl)phenyl prop-2-enoate",
+        ),
+    ],
+)
+def test_peroxide_linkage_does_not_bypass_a_principal_group(smiles: str, expected: str):
+    result = oc.name(smiles, verify_self=True)
+
+    assert result.name == expected
+    assert result.self_audit.verdict == "confirmed", result.self_audit.reason
+    if oc.opsin_available():
+        check = oc.verify_with_opsin(expected, smiles, standardize_smiles=False)
+        assert check.status == "matched", check.to_dict()
+
+
 @pytest.mark.parametrize(("double_element", "single_element"), product(VALIDATED_CHALCOGENS, repeat=2))
 def test_all_acid_site_combinations_have_typed_graph_descriptors(double_element, single_element):
     smiles = f"CC(={SMILES_ATOM[double_element]}){SMILES_HYDROGENATED_ATOM[single_element]}"

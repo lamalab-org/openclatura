@@ -11,6 +11,7 @@ from .assembly_parts import (
     split_rendered_substituent_name,
 )
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
+from .chalcogen_roles import FunctionalFamily
 from .component_group_rules import (
     exclude_nonparent_group_atoms,
     principal_involved_atoms,
@@ -77,6 +78,26 @@ ParentAssembler = Callable[..., str]
 # the OPSIN-free reconstruction self-audit installs one via
 # ``openclatura.audit.capture_component_audits``.
 COMPONENT_AUDIT_HOOK: Callable[[Molecule, set[int], object], None] | None = None
+
+
+def _functional_class_linkage_defers_to_principal_group(
+    groups: list[PerceivedGroup], principal_key: str | None
+) -> bool:
+    """Keep composable linkage classes below a renderable principal group.
+
+    Mixed-chalcogen peroxide names are useful whole-component fallbacks, but
+    the perceived linkage remains non-principal.  Its functional-class shortcut
+    must therefore not bypass the ordinary principal-group pipeline.
+    """
+
+    if principal_key is None:
+        return False
+    return any(
+        not group.is_principal_candidate
+        and group.descriptor is not None
+        and group.descriptor.family is FunctionalFamily.PEROXIDE
+        for group in groups
+    )
 
 
 def _blocking_suffix_defers_to_chain_parent(
@@ -382,7 +403,11 @@ def name_component(
         and group.resolved_rule.has_capability(FunctionalGroupCapability.BLOCKS_STRUCTURAL_PARENT)
         for group in principal_groups
     )
-    structural_parent_result = structural_replacement_parent_result(mol, component_atoms, name_subgraph)
+    structural_parent_result = (
+        None
+        if _functional_class_linkage_defers_to_principal_group(early_groups, early_principal_key)
+        else structural_replacement_parent_result(mol, component_atoms, name_subgraph)
+    )
     if blocks_structural_parent and not _blocking_suffix_defers_to_chain_parent(
         mol,
         component_atoms,
