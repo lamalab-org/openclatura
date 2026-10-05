@@ -13,7 +13,7 @@ from .group_atom_roles import (
     sulfonyl_sulfur,
 )
 from .molecule import Molecule
-from .nomenclature import RULES
+from .nomenclature import RULES, FunctionalGroupCapability
 from .perception import PerceivedGroup
 
 AtomSelector = Callable[[Molecule, PerceivedGroup], int | None]
@@ -47,8 +47,9 @@ def retarget_external_carbonyl_groups(
     """Move exocyclic carbonyl group attachment onto the parent chain atom."""
 
     for group in perceived_groups:
-        families = group.resolved_rule.families if group.resolved_rule is not None else ()
-        if group.key == principal_key or "chain_external_carbonyl" not in families:
+        if group.key == principal_key or group.resolved_rule is None or not group.resolved_rule.has_capability(
+            FunctionalGroupCapability.CHAIN_EXTERNAL_CARBONYL
+        ):
             continue
         group_c = group.attachment_carbon
         if group_c in cyclic_atoms_all:
