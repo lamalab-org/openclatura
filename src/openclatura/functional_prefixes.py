@@ -3,10 +3,12 @@
 import re
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .assembly_parts import NameTokenBinding, SubstituentItem, rendered_substituent_text
 from .assembly_prefixes import substituent_sort_key
+from .chalcogen_roles import DerivativeKind, FunctionalFamily
+from .chalcogen_vocabulary import resolve_central_acid_rule
 from .formatting import (
     format_center_ligands,
     format_multiplier,
@@ -189,6 +191,46 @@ def hydrazide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> s
     return f"({'-'.join(prefixes)}hydrazine-1-carbonyl)"
 
 
+def central_hydrazide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    """Render a central hydrazide as a substituted central amide prefix."""
+
+    descriptor = group.descriptor
+    if descriptor is None or descriptor.family is not FunctionalFamily.CENTRAL_ACID:
+        return group.prefix or ""
+    center = descriptor.centers[0]
+    nitrogens = [
+        atom
+        for atom in group.atoms_involved
+        if context.mol.atoms[atom].symbol == "N" and context.mol.get_bond(center, atom) is not None
+    ]
+    if len(nitrogens) != 1:
+        return group.prefix or ""
+    nitrogen = nitrogens[0]
+    substituents = [
+        atom
+        for atom in context.mol.get_neighbors(nitrogen)
+        if atom != center and context.mol.atoms[atom].symbol != "H"
+    ]
+    amide_key, amide_rule = resolve_central_acid_rule(replace(descriptor, derivative=DerivativeKind.AMIDE))
+    base = amide_rule.prefix if amide_rule is not None else RULES.functional_groups.cited_prefix_for(amide_key)
+    if not base:
+        return ""
+    if not substituents:
+        return base
+    names = [
+        rendered_substituent_text(
+            context.branch_namer(
+                context.mol,
+                atom,
+                context.sub_exclude | {nitrogen},
+                upstream_atom=nitrogen,
+            )
+        )
+        for atom in substituents
+    ]
+    return f"({format_center_ligands(names, sort_key=substituent_sort_key)}{base})"
+
+
 def iminium_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     nitrogens = [n for n in group.atoms_involved if context.mol.atoms[n].symbol == "N"]
     if not nitrogens:
@@ -350,7 +392,11 @@ PREFIX_HANDLERS["hydrazine"] = hydrazine_prefix_handler
 def prefix_from_group(context: PrefixContext, group: PerceivedGroup) -> str:
     handler = PREFIX_HANDLERS.get(group.key)
     if handler is None and group.resolved_rule is not None:
-        if group.resolved_rule.has_capability(
+        if group.resolved_rule.has_capability(FunctionalGroupCapability.CENTRAL_ACID) and group.resolved_rule.has_capability(
+            FunctionalGroupCapability.HYDRAZIDE
+        ):
+            handler = central_hydrazide_prefix_handler
+        elif group.resolved_rule.has_capability(
             FunctionalGroupCapability.CENTRAL_ACID
         ) and group.resolved_rule.has_capability(FunctionalGroupCapability.ESTER_LIKE):
             handler = central_ester_prefix_handler

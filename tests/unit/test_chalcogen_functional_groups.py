@@ -565,6 +565,13 @@ def test_standard_sulfinic_acid_uses_its_data_defined_subordinate_prefix():
     assert oc.name("O=C(O)CS(=O)O").name == "2-hydroxysulfinylacetic acid"
 
 
+def test_subordinate_central_hydrazide_preserves_the_distal_nitrogen_branch():
+    smiles = "COC(=O)c1ccc(S(=O)(=O)NNc2ncc(C(F)(F)F)cc2Cl)cc1"
+    assert oc.name(smiles).name == (
+        "methyl 4-(((3-chloro-5-(trifluoromethyl)pyridin-2-yl)amino)sulfamoyl)benzoate"
+    )
+
+
 def test_polonium_is_parseable_but_has_an_explicit_unvalidated_boundary():
     mol = read_smiles("C[PoH]")
 
