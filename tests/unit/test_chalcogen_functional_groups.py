@@ -289,6 +289,8 @@ def test_central_chalcogen_peroxy_paths_preserve_orientation(smiles: str, expect
         ("C[N+](C)(C)[Te-]", NitrogenChalcogenideKind.AMINE, "(trimethyl)amine telluride"),
         ("CC=[N+](C)[O-]", NitrogenChalcogenideKind.IMINE, "N-methylethanimine N-oxide"),
         ("CC=[N+](C)[S-]", NitrogenChalcogenideKind.IMINE, "N-methylethanimine N-sulfide"),
+        ("CC=[N+](C)[Se-]", NitrogenChalcogenideKind.IMINE, "N-methylethanimine N-selenide"),
+        ("CC=[N+](C)[Te-]", NitrogenChalcogenideKind.IMINE, "N-methylethanimine N-telluride"),
     ],
 )
 def test_nitrogen_chalcogenides_are_classified_before_rendering(smiles: str, kind, expected: str):
@@ -327,7 +329,9 @@ def test_nitrile_chalcogenides_use_zwitterion_priority_and_class_names(smiles: s
         ("CSOC", "dimethyl thioperoxide"),
         ("CCOSC", "O-ethyl S-methyl thioperoxide"),
         ("CO[Se]C", "dimethyl selenoperoxide"),
+        ("CO[Te]C", "dimethyl telluroperoxide"),
         ("CS[Se]C", "dimethyl selenothioperoxide"),
+        ("CS[Te]C", "dimethyl tellurothioperoxide"),
         ("C[Se][Te]C", "dimethyl selenotelluroperoxide"),
     ],
 )
@@ -360,6 +364,36 @@ def test_all_ester_site_combinations_have_typed_graph_descriptors(double_element
         ChalcogenLigandRole.DOUBLE_BONDED,
         ChalcogenLigandRole.CARBON_LINK,
     )
+    assert oc.name(smiles).name
+
+
+@pytest.mark.parametrize("double_element", VALIDATED_CHALCOGENS)
+@pytest.mark.parametrize(
+    ("tail", "derivative"),
+    (
+        ("N", DerivativeKind.AMIDE),
+        ("NN", DerivativeKind.HYDRAZIDE),
+        ("Cl", DerivativeKind.ACID_HALIDE),
+    ),
+)
+def test_all_acyl_derivative_elements_share_the_typed_center(double_element, tail, derivative):
+    smiles = f"CC(={SMILES_ATOM[double_element]}){tail}"
+
+    descriptor = _descriptor(smiles, FunctionalFamily.ACYL, derivative)
+
+    assert descriptor.ligands[0].element is double_element
+    assert descriptor.ligands[0].role is ChalcogenLigandRole.DOUBLE_BONDED
+    assert oc.name(smiles).name
+
+
+@pytest.mark.parametrize("double_element", VALIDATED_CHALCOGENS)
+def test_all_urea_chalcogen_elements_share_the_typed_center(double_element):
+    smiles = f"NC(={SMILES_ATOM[double_element]})N"
+
+    descriptor = _descriptor(smiles, FunctionalFamily.ACYL, DerivativeKind.UREA)
+
+    assert descriptor.ligands[0].element is double_element
+    assert descriptor.ligands[0].role is ChalcogenLigandRole.DOUBLE_BONDED
     assert oc.name(smiles).name
 
 
