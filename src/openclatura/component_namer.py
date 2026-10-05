@@ -32,6 +32,7 @@ from .parent_pipeline import (
     resolve_retained_parent,
 )
 from .parent_selection import select_principal_parent
+from .perception import PerceivedGroup
 from .principal_groups import (
     add_component_principal_group,
     component_groups,
@@ -43,6 +44,7 @@ from .retained_fused_production import production_retained_fused_parent
 from .retained_name_policy import retained_parent_output_name
 from .rules import elements as _elements
 from .special_cases import (
+    SpecialComponentName,
     single_atom_component_name,
     structural_replacement_parent_result,
     try_name_anhydride_component_result,
@@ -75,6 +77,32 @@ ParentAssembler = Callable[..., str]
 # the OPSIN-free reconstruction self-audit installs one via
 # ``openclatura.audit.capture_component_audits``.
 COMPONENT_AUDIT_HOOK: Callable[[Molecule, set[int], object], None] | None = None
+
+
+def _blocking_suffix_defers_to_chain_parent(
+    mol: Molecule,
+    component_atoms: set[int],
+    principal_groups: list[PerceivedGroup],
+    structural_parent_result: SpecialComponentName | None,
+) -> bool:
+    """Keep a senior heteroatom-chain parent when the suffix is only one part of the skeleton."""
+
+    if structural_parent_result is None or structural_parent_result.audit_chain is None:
+        return False
+    characteristic_atoms = {
+        atom_idx
+        for group in principal_groups
+        if group.resolved_rule is not None
+        and group.resolved_rule.has_capability(FunctionalGroupCapability.BLOCKS_STRUCTURAL_PARENT)
+        for atom_idx in (group.descriptor.atom_ids if group.descriptor is not None else group.atom_ids)
+    }
+    return any(
+        atom_idx not in characteristic_atoms
+        and not mol.atoms[atom_idx].is_carbon
+        and mol.atoms[atom_idx].symbol != "H"
+        and mol.degree(atom_idx) > 1
+        for atom_idx in component_atoms
+    )
 
 
 def select_component_parent(mol: Molecule, exclude_atoms: set[int], principal_carbons: list[int]):
@@ -349,14 +377,19 @@ def name_component(
     early_groups = component_groups(mol, component_atoms)
     early_principal_key = component_principal_key(early_groups, is_substituent)
     principal_groups = [group for group in early_groups if group.key == early_principal_key]
-    has_peroxol_suffix = any(
+    blocks_structural_parent = any(
         group.resolved_rule is not None
         and group.resolved_rule.has_capability(FunctionalGroupCapability.BLOCKS_STRUCTURAL_PARENT)
         for group in principal_groups
     )
-    structural_parent_result = (
-        None if has_peroxol_suffix else structural_replacement_parent_result(mol, component_atoms, name_subgraph)
-    )
+    structural_parent_result = structural_replacement_parent_result(mol, component_atoms, name_subgraph)
+    if blocks_structural_parent and not _blocking_suffix_defers_to_chain_parent(
+        mol,
+        component_atoms,
+        principal_groups,
+        structural_parent_result,
+    ):
+        structural_parent_result = None
     if structural_parent_result is not None:
         name, bindings, token_spans, rewrite_history = _shortcut_component_result(
             mol,
