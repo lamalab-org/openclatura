@@ -14,7 +14,13 @@ from .chalcogen_roles import (
     FunctionalFamily,
     FunctionalGroupDescriptor,
 )
-from .nomenclature import RULES, FunctionalGroupCapability, FunctionalGroupRule, MultiSuffixTemplate
+from .nomenclature import (
+    RULES,
+    FunctionalGroupCapability,
+    FunctionalGroupRule,
+    MultiSuffixTemplate,
+    PrincipalCitationMode,
+)
 
 
 def simple_group_key(
@@ -130,7 +136,8 @@ def resolve_acyl_rule(
     if leaving_group is None and leaving_symbol is not None:
         leaving_group = AcylLeavingGroup(leaving_symbol)
     leaving_data = RULES.chalcogens.acyl_leaving_groups.get(leaving_group.value) if leaving_group is not None else None
-    if descriptor.derivative is DerivativeKind.ACID_HALIDE and double_ligand.element is Chalcogen.OXYGEN:
+    acyl_leaving_derivatives = {DerivativeKind.ACID_HALIDE, DerivativeKind.ACYL_PSEUDOHALIDE}
+    if descriptor.derivative in acyl_leaving_derivatives and double_ligand.element is Chalcogen.OXYGEN:
         standard_key_field = "external_key" if descriptor.is_external else "chain_key"
         if leaving_data is not None and standard_key_field in leaving_data:
             return leaving_data[standard_key_field], None
@@ -163,7 +170,6 @@ def resolve_acyl_rule(
         site = RULES.chalcogens.templates[site_template].format(element=single_element.value)
     else:
         site = ""
-    acyl_leaving_derivatives = {DerivativeKind.ACID_HALIDE, DerivativeKind.ACYL_PSEUDOHALIDE}
     if descriptor.derivative in acyl_leaving_derivatives and leaving_data is None:
         raise ValueError("An acyl leaving-group descriptor requires typed leaving-group data")
     format_values = {
@@ -198,6 +204,14 @@ def resolve_acyl_rule(
         needs_locant=True,
         families=families,
         capabilities=_capabilities(policy),
+        citation_suffixes=(
+            (
+                PrincipalCitationMode.ANHYDRIDE_HALF,
+                policy["citation_suffix"].format(**format_values),
+            ),
+        )
+        if "citation_suffix" in policy
+        else (),
     )
 
 
@@ -207,6 +221,7 @@ def resolve_peroxol_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, Fu
     first, terminal = descriptor.ligands
     pair = (first.element, terminal.element)
     policy = RULES.chalcogens.peroxol_rules[(first.element.value, terminal.element.value)]
+    family_policy = RULES.chalcogens.policies["peroxol"]
     key = f"peroxol_{first.element.value}_{terminal.element.value}"
     return key, FunctionalGroupRule(
         key=key,
@@ -215,10 +230,10 @@ def resolve_peroxol_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, Fu
         suffix=policy["suffix"],
         multi_suffix=MultiSuffixTemplate((0,)),
         suffix_multiplier_positions=(0,),
-        seniority=(105, int(policy["rank"])),
+        seniority=(int(family_policy["seniority"]), int(policy["rank"])),
         suffix_with_locant=True,
         needs_locant=True,
-        families=("peroxol",),
+        families=tuple(family_policy["families"]),
         capabilities=_capabilities(policy),
     )
 
@@ -245,12 +260,9 @@ def resolve_peroxy_acyl_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str
         terminal.element,
     ) == (Chalcogen.OXYGEN, Chalcogen.OXYGEN, Chalcogen.OXYGEN)
     if standard_path:
-        standard = {
-            (DerivativeKind.ACID, False): "peroxy_acid",
-            (DerivativeKind.ACID, True): "ring_peroxy_acid",
-            (DerivativeKind.ESTER, False): "peroxy_ester",
-            (DerivativeKind.ESTER, True): "ring_peroxy_ester",
-        }.get((descriptor.derivative, descriptor.is_external))
+        standard = RULES.chalcogens.standard_peroxy_acyl_keys.get(
+            (descriptor.derivative.value, descriptor.is_external)
+        )
         if standard is not None:
             return standard, None
 
@@ -348,7 +360,7 @@ def resolve_anhydride_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, 
         and descriptor.ligands[-1].element is Chalcogen.OXYGEN
         and bridge_elements == (Chalcogen.OXYGEN,)
     ):
-        return "anhydride", None
+        return RULES.chalcogens.policies["anhydride"]["standard_key"], None
     sites = "_".join(ligand.element.value for ligand in descriptor.ligands)
     key = f"anhydride_{sites}"
     return key, FunctionalGroupRule(

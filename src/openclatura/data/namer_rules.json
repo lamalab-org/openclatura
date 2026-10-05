@@ -856,6 +856,15 @@
       {"derivative": "urea", "double_element": "Te", "key": "tellurourea"}
     ]
   },
+  "chalcogen_standard_peroxy_acyl_keys": {
+    "bluebook_rule": "P-65.6; ordinary oxygen peroxy-acid and ester registry rows",
+    "values": [
+      {"derivative": "acid", "key": "peroxy_acid"},
+      {"derivative": "acid", "external": true, "key": "ring_peroxy_acid"},
+      {"derivative": "ester", "key": "peroxy_ester"},
+      {"derivative": "ester", "external": true, "key": "ring_peroxy_ester"}
+    ]
+  },
   "chalcogen_acyl_leaving_groups": {
     "bluebook_rule": "P-65.5 and P-65.6; acyl halide and pseudohalide words, prefixes, and priority order",
     "values": {
@@ -863,13 +872,13 @@
       "Cl": {"word": "chloride", "prefix": "chloro", "rank": 1, "chain_key": "acid_chloride", "external_key": "ring_acid_chloride"},
       "Br": {"word": "bromide", "prefix": "bromo", "rank": 2, "chain_key": "acid_bromide", "external_key": "ring_acid_bromide"},
       "I": {"word": "iodide", "prefix": "iodo", "rank": 3, "chain_key": "acid_iodide", "external_key": "ring_acid_iodide"},
-      "N3": {"word": "azide", "prefix": "azido", "rank": 4},
-      "CN": {"word": "cyanide", "prefix": "cyano", "rank": 5},
-      "NC": {"word": "isocyanide", "prefix": "isocyano", "rank": 6},
-      "NCO": {"word": "isocyanate", "prefix": "isocyanato", "rank": 7},
-      "NCS": {"word": "isothiocyanate", "prefix": "isothiocyanato", "rank": 8},
-      "NCSe": {"word": "isoselenocyanate", "prefix": "isoselenocyanato", "rank": 9},
-      "NCTe": {"word": "isotellurocyanate", "prefix": "isotellurocyanato", "rank": 10}
+      "N3": {"word": "azide", "prefix": "azido", "rank": 4, "chain_key": "acid_azide", "external_key": "ring_acid_azide"},
+      "CN": {"word": "cyanide", "prefix": "cyano", "rank": 5, "chain_key": "acid_cyanide", "external_key": "ring_acid_cyanide"},
+      "NC": {"word": "isocyanide", "prefix": "isocyano", "rank": 6, "chain_key": "acid_isocyanide", "external_key": "ring_acid_isocyanide"},
+      "NCO": {"word": "isocyanate", "prefix": "isocyanato", "rank": 7, "chain_key": "acid_isocyanate", "external_key": "ring_acid_isocyanate"},
+      "NCS": {"word": "isothiocyanate", "prefix": "isothiocyanato", "rank": 8, "chain_key": "acid_isothiocyanate", "external_key": "ring_acid_isothiocyanate"},
+      "NCSe": {"word": "isoselenocyanate", "prefix": "isoselenocyanato", "rank": 9, "chain_key": "acid_isoselenocyanate", "external_key": "ring_acid_isoselenocyanate"},
+      "NCTe": {"word": "isotellurocyanate", "prefix": "isotellurocyanato", "rank": 10, "chain_key": "acid_isotellurocyanate", "external_key": "ring_acid_isotellurocyanate"}
     }
   },
   "chalcogen_central_acid_origins": {
@@ -887,22 +896,23 @@
     "bluebook_rule": "P-62.5 and P-63 through P-66; descriptor-driven dynamic functional-group rules",
     "values": {
       "nitrile_chalcogenide": {"prefix": "cyano{additive_prefix}", "suffix": "{carbo}nitrile {class_name}", "seniority": 5, "families": ["nitrile_chalcogenide"]},
+      "peroxol": {"seniority": 105, "families": ["peroxol"]},
       "acyl": {
-        "acid": {"suffix": "{carbo}{infix}ic{site}", "prefix": "{infix}carboxy", "seniority": 20, "families": ["carboxy_prefix", "chain_external_carbonyl"], "capabilities": ["chain_external_carbonyl"]},
+        "acid": {"suffix": "{carbo}{infix}ic{site}", "citation_suffix": "{carbo}{infix}ic", "prefix": "{infix}carboxy", "seniority": 20, "families": ["carboxy_prefix", "chain_external_carbonyl"], "capabilities": ["chain_external_carbonyl"]},
         "anion": {"suffix": "{carbo}{infix}ate", "prefix": "{infix}carboxylato", "seniority": 21, "families": ["carboxy_prefix", "chain_external_carbonyl"], "capabilities": ["chain_external_carbonyl"]},
         "ester": {"suffix": "{carbo}{infix}ate", "prefix": "{infix}oxycarbonyl", "seniority": 40, "families": ["ester_like", "front_modifier", "chain_external_carbonyl"], "capabilities": ["ester_like", "front_modifier", "chain_external_carbonyl"], "multi_suffix": false},
         "amide": {"suffix": "{carbo}{infix}amide", "prefix": "carbamo{infix}yl", "seniority": 60, "ranked_seniority": true, "families": ["amide_like", "chain_external_carbonyl"], "capabilities": ["amide_like", "chain_external_carbonyl"]},
         "hydrazide": {"suffix": "{carbo}{infix}hydrazide", "prefix": "hydrazinecarb{infix}oyl", "seniority": 68, "families": ["amide_like", "hydrazide", "chain_external_carbonyl"], "capabilities": ["amide_like", "hydrazide", "chain_external_carbonyl"]},
         "urea": {"suffix": "{infix}urea", "prefix": "carbamo{infix}ylamino", "seniority": 60, "families": ["amide_like", "urea"], "capabilities": ["amide_like", "urea"]},
-        "acid_halide": {"suffix": "{carbo}{infix}yl {halide_word}", "prefix": "{halide_prefix}{infix}carbonyl", "seniority": 50, "families": ["acid_halide", "chain_external_carbonyl"], "capabilities": ["acid_halide", "chain_external_carbonyl"]},
-        "acyl_pseudohalide": {"suffix": "{carbo}{infix}yl {halide_word}", "prefix": "{halide_prefix}{infix}carbonyl", "seniority": 50, "families": ["acid_halide", "chain_external_carbonyl"], "capabilities": ["acid_halide", "chain_external_carbonyl"]}
+        "acid_halide": {"suffix": "{carbo}{infix}yl {halide_word}", "prefix": "{halide_prefix}{infix}carbonyl", "seniority": 50, "families": ["acid_halide", "chain_external_carbonyl"], "capabilities": ["acid_halide", "acyl_leaving_group", "chain_external_carbonyl"]},
+        "acyl_pseudohalide": {"suffix": "{carbo}{infix}yl {halide_word}", "prefix": "{halide_prefix}{infix}carbonyl", "seniority": 50, "families": ["acid_halide", "chain_external_carbonyl"], "capabilities": ["acid_halide", "acyl_leaving_group", "chain_external_carbonyl"]}
       },
       "peroxy_acyl": {
         "acid": {"seniority": 22, "families": ["peroxy_acid", "chain_external_carbonyl"], "capabilities": ["chain_external_carbonyl"]},
         "anion": {"seniority": 21, "families": ["peroxy_ester", "chain_external_carbonyl"], "capabilities": ["chain_external_carbonyl"]},
         "ester": {"seniority": 45, "families": ["ester_like", "peroxy_ester", "front_modifier", "chain_external_carbonyl"], "capabilities": ["ester_like", "front_modifier", "chain_external_carbonyl"]}
       },
-      "anhydride": {"seniority": 30, "families": ["anhydride"], "capabilities": ["anhydride"]},
+      "anhydride": {"standard_key": "anhydride", "seniority": 30, "families": ["anhydride"], "capabilities": ["anhydride"]},
       "imide_route": {"key": "chalcogen_imide_route", "seniority": 13, "families": ["imide_route"], "capabilities": ["promotes_member_groups"]},
       "central_peroxy": {
         "acid": {"seniority": 22, "families": ["central_acid", "peroxy_acid"], "capabilities": ["central_acid"]},
@@ -915,7 +925,7 @@
         "ester": {"seniority": 40, "families": ["central_acid", "ester_like", "front_modifier"], "capabilities": ["central_acid", "ester_like", "front_modifier"]},
         "amide": {"seniority": 66, "families": ["central_acid", "amide_like"], "capabilities": ["central_acid", "amide_like"]},
         "hydrazide": {"seniority": 68, "families": ["central_acid", "amide_like", "hydrazide"], "capabilities": ["central_acid", "amide_like", "hydrazide"]},
-        "acid_halide": {"seniority": 55, "families": ["central_acid", "acid_halide"], "capabilities": ["central_acid", "acid_halide"]}
+        "acid_halide": {"seniority": 55, "families": ["central_acid", "acid_halide"], "capabilities": ["central_acid", "acid_halide", "acyl_leaving_group"]}
       }
     }
   },
@@ -958,7 +968,10 @@
       "central_ester_prefix": "{stem}yl",
       "central_amide_prefix": "{stem}amoyl",
       "central_hydrazide_prefix": "hydrazine{stem}yl",
-      "central_acid_halide_prefix": "{halide_prefix}{stem}yl"
+      "central_acid_halide_prefix": "{halide_prefix}{stem}yl",
+      "ordinary_acyl_leaving_prefix": "{prefix}carbonyl",
+      "ordinary_acyl_leaving_chain_suffix": "oyl {word}",
+      "ordinary_acyl_leaving_external_suffix": "carbonyl {word}"
     }
   },
   "functional_groups": {
@@ -1014,7 +1027,8 @@
         },
         "seniority": 20,
         "suffix_with_locant": false,
-        "needs_locant": true
+        "needs_locant": true,
+        "citation_suffixes": {"anhydride_half": "oic"}
       },
       "carboxylate": {
         "role": "principal",
@@ -1040,7 +1054,8 @@
         },
         "seniority": 20,
         "suffix_with_locant": true,
-        "needs_locant": true
+        "needs_locant": true,
+        "citation_suffixes": {"anhydride_half": "carboxylic"}
       },
       "ring_carboxylate": {
         "role": "principal",
@@ -2200,6 +2215,14 @@
     "values": [
       {"length": 1, "group": "selenourea", "count": 1, "name": "selenourea"},
       {"length": 1, "group": "tellurourea", "count": 1, "name": "tellurourea"}
+    ]
+  },
+  "retained_principal_citations": {
+    "bluebook_rule": "P-65.7; retained acid citations used as anhydride component names",
+    "values": [
+      {"mode": "anhydride_half", "name": "formic acid", "citation": "formic"},
+      {"mode": "anhydride_half", "name": "acetic acid", "citation": "acetic"},
+      {"mode": "anhydride_half", "name": "benzoic acid", "citation": "benzoic"}
     ]
   },
   "retained_monocycle_specs": {

@@ -1,6 +1,8 @@
 """Central data registry for nomenclature lookup tables.
 Prefer ``RULES.<group>.<field>`` over importing individual module constants."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import StrEnum
 from functools import lru_cache
@@ -13,8 +15,12 @@ class RetainedNameRules:
     ring_elements: set[str]
     substituent_stems: dict[str, tuple[str, str]]
     chain_functional_parents: dict[tuple[int, str, int], str]
+    principal_citations: dict[tuple[str, str], str]
     monocycle_specs: tuple[dict, ...]
     fused_polycycle_specs: tuple[dict, ...]
+
+    def citation_for(self, name: str, mode: PrincipalCitationMode) -> str:
+        return self.principal_citations.get((mode.value, name), name)
 
 
 @dataclass(frozen=True)
@@ -112,10 +118,17 @@ class MultiSuffixTemplate:
     multiplier_positions: tuple[int, ...] = (0,)
 
 
+class PrincipalCitationMode(StrEnum):
+    """A structured context that selects an alternate principal citation."""
+
+    ANHYDRIDE_HALF = "anhydride_half"
+
+
 class FunctionalGroupCapability(StrEnum):
     """Typed assembly behaviors declared by functional-group rule data."""
 
     ACID_HALIDE = "acid_halide"
+    ACYL_LEAVING_GROUP = "acyl_leaving_group"
     AMIDE_LIKE = "amide_like"
     ANHYDRIDE = "anhydride"
     BLOCKS_STRUCTURAL_PARENT = "blocks_structural_parent"
@@ -145,9 +158,15 @@ class FunctionalGroupRule:
     needs_locant: bool = True
     families: tuple[str, ...] = ()
     capabilities: frozenset[FunctionalGroupCapability] = frozenset()
+    citation_suffixes: tuple[tuple[PrincipalCitationMode, str], ...] = ()
 
     def has_capability(self, capability: FunctionalGroupCapability) -> bool:
         return capability in self.capabilities
+
+    def suffix_for_citation(self, mode: PrincipalCitationMode | None) -> str | None:
+        if mode is None:
+            return self.suffix
+        return dict(self.citation_suffixes).get(mode, self.suffix)
 
 
 @dataclass(frozen=True)
@@ -160,6 +179,7 @@ class ChalcogenNomenclatureRules:
     peroxide_class_names: dict[frozenset[str], str]
     peroxol_rules: dict[tuple[str, str], dict]
     standard_acyl_keys: dict[tuple[str, str, str | None, bool], str]
+    standard_peroxy_acyl_keys: dict[tuple[str, bool], str]
     acyl_leaving_groups: dict[str, dict]
     central_acid_origins: dict[tuple[str, int], dict]
     policies: dict[str, dict]
@@ -182,7 +202,7 @@ class FunctionalGroupRules:
         if prefix is None:
             return None
         rule = self.by_key[key]
-        if rule.has_capability(FunctionalGroupCapability.ACID_HALIDE):
+        if rule.has_capability(FunctionalGroupCapability.ACYL_LEAVING_GROUP):
             return f"({prefix})"
         return prefix
 
@@ -262,7 +282,40 @@ def _functional_group_rules() -> FunctionalGroupRules:
                     *(FunctionalGroupCapability(capability) for capability in item.get("capabilities", ())),
                 }
             ),
+            citation_suffixes=tuple(
+                (PrincipalCitationMode(mode), suffix)
+                for mode, suffix in item.get("citation_suffixes", {}).items()
+            ),
         )
+    chalcogen_group = grouped_namer_rules()["chalcogen_nomenclature"]
+    templates = chalcogen_group.mapping("chalcogen_templates")
+    leaving_capabilities = frozenset(
+        {
+            FunctionalGroupCapability.ACID_HALIDE,
+            FunctionalGroupCapability.ACYL_LEAVING_GROUP,
+            FunctionalGroupCapability.CHAIN_EXTERNAL_CARBONYL,
+        }
+    )
+    for item in chalcogen_group.mapping("chalcogen_acyl_leaving_groups").values():
+        prefix = templates["ordinary_acyl_leaving_prefix"].format(prefix=item["prefix"])
+        for external, key_field, suffix_template in (
+            (False, "chain_key", "ordinary_acyl_leaving_chain_suffix"),
+            (True, "external_key", "ordinary_acyl_leaving_external_suffix"),
+        ):
+            key = item[key_field]
+            groups[key] = FunctionalGroupRule(
+                key=key,
+                role="principal",
+                prefix=prefix,
+                suffix=templates[suffix_template].format(word=item["word"]),
+                multi_suffix=MultiSuffixTemplate((0, 1)),
+                suffix_multiplier_positions=(0, 1),
+                seniority=(50, int(item["rank"])),
+                suffix_with_locant=external,
+                needs_locant=True,
+                families=("acid_halide", "chain_external_carbonyl"),
+                capabilities=leaving_capabilities,
+            )
     return FunctionalGroupRules(by_key=groups)
 
 
@@ -363,6 +416,10 @@ def _chalcogen_rules() -> ChalcogenNomenclatureRules:
             ): row["key"]
             for row in group.values("chalcogen_standard_acyl_keys")
         },
+        standard_peroxy_acyl_keys={
+            (row["derivative"], bool(row.get("external", False))): row["key"]
+            for row in group.values("chalcogen_standard_peroxy_acyl_keys")
+        },
         acyl_leaving_groups=group.mapping("chalcogen_acyl_leaving_groups"),
         central_acid_origins={
             (row["element"], int(row["double_bond_count"])): row
@@ -425,6 +482,10 @@ def registry() -> NomenclatureRegistry:
                 (int(row["length"]), row["group"], int(row["count"])): row["name"]
                 for row in retained.values("retained_chain_functional_parents")
             },
+            principal_citations={
+                (row["mode"], row["name"]): row["citation"]
+                for row in retained.values("retained_principal_citations")
+            },
             monocycle_specs=tuple(retained.values("retained_monocycle_specs")),
             fused_polycycle_specs=tuple(retained.values("retained_fused_polycycle_specs")),
         ),
@@ -476,7 +537,14 @@ def registry() -> NomenclatureRegistry:
             unsaturation_order={
                 key: int(value) for key, value in assembly_grammar.mapping("unsaturation_order").items()
             },
-            acid_halide_suffix_keys=set(assembly_grammar.values("acid_halide_suffix_keys")),
+            acid_halide_suffix_keys={
+                *assembly_grammar.values("acid_halide_suffix_keys"),
+                *(
+                    item[key_field]
+                    for item in groups["chalcogen_nomenclature"].mapping("chalcogen_acyl_leaving_groups").values()
+                    for key_field in ("chain_key", "external_key")
+                ),
+            },
             substituent_sort_prefix_pattern=assembly_grammar.mapping("substituent_sort")["prefix_pattern"],
             substituent_attachment_suffixes=assembly_grammar.mapping("substituent_attachment_suffixes"),
             ambiguous_connection_substituent_stems=set(
