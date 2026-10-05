@@ -13,6 +13,7 @@ from .chalcogen_vocabulary import (
     chalcogenide_class_name,
     nitrogen_chalcogenide_citation,
     peroxide_class_name,
+    uses_existing_chalcogen_citation,
 )
 from .charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
 from .formatting import (
@@ -30,7 +31,7 @@ from .molecule import (
 )
 from .naming_protocols import RecursiveSubgraphNamer
 from .nitrogen_roles import azine_roles
-from .nomenclature import RULES, FunctionalGroupCapability, PrincipalCitationMode
+from .nomenclature import RULES, ChalcogenCitationContext, FunctionalGroupCapability, PrincipalCitationMode
 from .oxoacid_roles import CentralOxoRole, OxoLigandRole, central_oxo_roles
 from .oxoacid_templates import OxoacidTemplateKind, oxoacid_role_template
 from .perception import PerceivedGroup, perceive_groups
@@ -351,6 +352,12 @@ def peroxide_linkage_result(
     if left_element is None or right_element is None:
         return None
     elements = (left_element, right_element)
+    if uses_existing_chalcogen_citation(
+        ChalcogenCitationContext.PEROXIDE,
+        elements,
+        bridge_atom_count=2,
+    ):
+        return None
     if elements[0] is elements[1]:
         return None
     names = []

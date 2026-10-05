@@ -142,6 +142,63 @@ class FunctionalGroupCapability(StrEnum):
     UREA = "urea"
 
 
+class ChalcogenCitationContext(StrEnum):
+    """Structural contexts which can select an established citation route."""
+
+    PEROXOL = "peroxol"
+    PEROXIDE = "peroxide"
+    ANHYDRIDE = "anhydride"
+
+
+class ChalcogenCitationRoute(StrEnum):
+    """How a recognized chalcogen topology enters the existing namer."""
+
+    GENERIC = "generic"
+    EXISTING = "existing"
+
+
+class ChalcogenCitationProjection(StrEnum):
+    """Structural projection used to enter an established citation path."""
+
+    DEFER = "defer"
+    PEROXY_ESTER = "peroxy_ester"
+    ESTER_OR_CARBONYL = "ester_or_carbonyl"
+
+
+@dataclass(frozen=True)
+class ChalcogenCitationRule:
+    context: ChalcogenCitationContext
+    route: ChalcogenCitationRoute
+    allowed_elements: frozenset[str]
+    required_elements: frozenset[str]
+    bridge_atom_count: int | None = None
+    projection: ChalcogenCitationProjection = ChalcogenCitationProjection.DEFER
+    allowed_site_elements: frozenset[str] = frozenset()
+    required_site_elements: frozenset[str] = frozenset()
+    allowed_bridge_elements: frozenset[str] = frozenset()
+    required_bridge_elements: frozenset[str] = frozenset()
+
+    def matches(
+        self,
+        elements: tuple[str, ...],
+        bridge_atom_count: int,
+        site_elements: tuple[str, ...] = (),
+        bridge_elements: tuple[str, ...] = (),
+    ) -> bool:
+        present = frozenset(elements)
+        sites = frozenset(site_elements)
+        bridge = frozenset(bridge_elements)
+        return (
+            present <= self.allowed_elements
+            and self.required_elements <= present
+            and (not self.allowed_site_elements or sites <= self.allowed_site_elements)
+            and self.required_site_elements <= sites
+            and (not self.allowed_bridge_elements or bridge <= self.allowed_bridge_elements)
+            and self.required_bridge_elements <= bridge
+            and (self.bridge_atom_count is None or self.bridge_atom_count == bridge_atom_count)
+        )
+
+
 _FAMILY_CAPABILITIES = {capability.value: capability for capability in FunctionalGroupCapability}
 
 
@@ -178,6 +235,7 @@ class ChalcogenNomenclatureRules:
     chalcogenide_class_names: dict[str, str]
     peroxide_class_names: dict[frozenset[str], str]
     peroxol_rules: dict[tuple[str, str], dict]
+    citation_routes: tuple[ChalcogenCitationRule, ...]
     standard_acyl_keys: dict[tuple[str, str, str | None, bool], str]
     standard_peroxy_acyl_keys: dict[tuple[str, bool], str]
     acyl_leaving_groups: dict[str, dict]
@@ -397,6 +455,21 @@ def _chalcogen_rules() -> ChalcogenNomenclatureRules:
             frozenset(row["elements"]): row["name"] for row in group.values("chalcogen_peroxide_class_names")
         },
         peroxol_rules={(row["first"], row["terminal"]): row for row in group.values("chalcogen_peroxol_rules")},
+        citation_routes=tuple(
+            ChalcogenCitationRule(
+                context=ChalcogenCitationContext(row["context"]),
+                route=ChalcogenCitationRoute(row["route"]),
+                allowed_elements=frozenset(row["allowed_elements"]),
+                required_elements=frozenset(row.get("required_elements", ())),
+                bridge_atom_count=row.get("bridge_atom_count"),
+                projection=ChalcogenCitationProjection(row.get("projection", "defer")),
+                allowed_site_elements=frozenset(row.get("allowed_site_elements", ())),
+                required_site_elements=frozenset(row.get("required_site_elements", ())),
+                allowed_bridge_elements=frozenset(row.get("allowed_bridge_elements", ())),
+                required_bridge_elements=frozenset(row.get("required_bridge_elements", ())),
+            )
+            for row in group.values("chalcogen_citation_routes")
+        ),
         standard_acyl_keys={
             (
                 row["derivative"],

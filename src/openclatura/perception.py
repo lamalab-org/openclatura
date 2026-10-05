@@ -18,6 +18,7 @@ from .chalcogen_roles import (
     require_validated_chalcogens,
 )
 from .chalcogen_vocabulary import (
+    chalcogen_citation_rule,
     resolve_acyl_rule,
     resolve_anhydride_rule,
     resolve_central_acid_rule,
@@ -26,6 +27,7 @@ from .chalcogen_vocabulary import (
     resolve_peroxol_rule,
     resolve_peroxy_acyl_rule,
     simple_group_key,
+    uses_existing_chalcogen_citation,
 )
 from .charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
 from .functional_groups import PERCEPTION_DETECTORS, PERCEPTION_SPECS, PerceptionDetectorSpec, metadata_for_group
@@ -38,7 +40,12 @@ from .molecule import (
     has_non_h_multiple_bond_neighbor,
 )
 from .nitrogen_roles import amidinohydrazone_tail_atoms, nitrogen_chain_roles
-from .nomenclature import RULES, FunctionalGroupRule
+from .nomenclature import (
+    RULES,
+    ChalcogenCitationContext,
+    ChalcogenCitationProjection,
+    FunctionalGroupRule,
+)
 
 
 @dataclass
@@ -388,7 +395,8 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
 
     for group in _chalcogen_anhydride_groups(mol, consumed):
         groups.append(group)
-        consumed.update(group.atoms_involved)
+        if group.is_principal_candidate:
+            consumed.update(group.atoms_involved - {group.attachment_carbon})
 
     for atom in mol:
         if atom.symbol == "S" and atom.idx not in consumed:
@@ -703,6 +711,21 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             linker_paths=((anchor, first_atom, terminal_atom.idx),),
             attachment_atom=anchor,
         )
+        if uses_existing_chalcogen_citation(
+            ChalcogenCitationContext.PEROXOL,
+            (first_ligand.element, terminal_ligand.element),
+            bridge_atom_count=2,
+        ):
+            groups.append(
+                PerceivedGroup(
+                    FunctionalFamily.PEROXOL.value,
+                    False,
+                    anchor,
+                    {first_atom, terminal_atom.idx},
+                    descriptor=descriptor,
+                )
+            )
+            continue
         key, rule = resolve_peroxol_rule(descriptor)
         groups.append(
             PerceivedGroup(
@@ -1313,6 +1336,25 @@ def _chalcogen_anhydride_groups(mol: Molecule, consumed: set[int]) -> list[Perce
                 linker_paths=((centers[0], *ordered_bridge_atoms, centers[1]),),
                 attachment_atom=centers[0],
             )
+            citation_rule = chalcogen_citation_rule(
+                ChalcogenCitationContext.ANHYDRIDE,
+                tuple(ligand.element for ligand in descriptor.ligands),
+                bridge_atom_count=len(bridge_atoms),
+                site_elements=tuple(ligand.element for ligand in doubles),
+                bridge_elements=tuple(ligand.element for ligand in ordered_bridge_ligands),
+            )
+            if citation_rule is not None:
+                groups.append(
+                    PerceivedGroup(
+                        FunctionalFamily.ACYL.value,
+                        False,
+                        centers[0],
+                        set(descriptor.atom_ids),
+                        descriptor=descriptor,
+                    )
+                )
+                groups.extend(_established_anhydride_projection(mol, descriptor, citation_rule.projection))
+                continue
             key, rule = resolve_anhydride_rule(descriptor)
             groups.append(
                 PerceivedGroup(
@@ -1325,6 +1367,70 @@ def _chalcogen_anhydride_groups(mol: Molecule, consumed: set[int]) -> list[Perce
                 )
             )
     return groups
+
+
+def _established_anhydride_projection(
+    mol: Molecule,
+    descriptor: FunctionalGroupDescriptor,
+    projection: ChalcogenCitationProjection,
+) -> list[PerceivedGroup]:
+    """Project a recognized bridge onto an established ester/carbonyl route."""
+
+    centers = descriptor.centers
+    doubles = descriptor.ligands[:2]
+    bridge = descriptor.ligands[2:]
+    if projection is ChalcogenCitationProjection.PEROXY_ESTER:
+        key = RULES.chalcogens.standard_peroxy_acyl_keys[(DerivativeKind.ESTER.value, False)]
+        ester_descriptor = FunctionalGroupDescriptor(
+            family=FunctionalFamily.ACYL,
+            derivative=DerivativeKind.ESTER,
+            centers=(centers[0],),
+            ligands=(doubles[0], *bridge),
+            linker_paths=(descriptor.linker_paths[0],),
+            attachment_atom=centers[0],
+        )
+        return [
+            PerceivedGroup(
+                key,
+                True,
+                centers[0],
+                {centers[0], doubles[0].atom, *(ligand.atom for ligand in bridge)},
+                descriptor=ester_descriptor,
+            )
+        ]
+
+    if projection is ChalcogenCitationProjection.ESTER_OR_CARBONYL:
+        for index, (center, double) in enumerate(zip(centers, doubles, strict=True)):
+            adjacent_bridge = bridge[0] if index == 0 else bridge[-1]
+            if double.element is not Chalcogen.OXYGEN or adjacent_bridge.element is not Chalcogen.OXYGEN:
+                continue
+            key = RULES.chalcogens.standard_acyl_keys[
+                (DerivativeKind.ESTER.value, Chalcogen.OXYGEN.value, Chalcogen.OXYGEN.value, False)
+            ]
+            return [PerceivedGroup(key, True, center, {center, double.atom, adjacent_bridge.atom})]
+
+        projected = []
+        for center, double in zip(centers, doubles, strict=True):
+            key = simple_group_key(FunctionalFamily.CARBONYL, DerivativeKind.KETONE, double.element)
+            if key is not None:
+                carbonyl_descriptor = FunctionalGroupDescriptor(
+                    family=FunctionalFamily.CARBONYL,
+                    derivative=DerivativeKind.KETONE,
+                    centers=(center,),
+                    ligands=(double,),
+                    attachment_atom=center,
+                )
+                projected.append(
+                    PerceivedGroup(
+                        key,
+                        True,
+                        center,
+                        {center, double.atom},
+                        descriptor=carbonyl_descriptor,
+                    )
+                )
+        return projected
+    return []
 
 
 def _terminal_double_chalcogen(mol: Molecule, center: int, consumed: set[int]) -> ChalcogenLigand | None:

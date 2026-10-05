@@ -13,6 +13,7 @@ from openclatura.chalcogen_roles import (
     FunctionalFamily,
     UnsupportedChalcogenNomenclatureError,
     classify_chalcogen_ligand,
+    classify_peroxide_linkages,
 )
 from openclatura.charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
 from openclatura.graph_io import read_smiles
@@ -173,10 +174,10 @@ def test_acyl_derivatives_reuse_the_role_aware_center(smiles: str, expected: str
     ("smiles", "expected"),
     [
         ("COO", "methaneperoxol"),
-        ("CSO", "methane-SO-thioperoxol"),
+        ("CSO", "(hydroxysulfanyl)methane"),
         ("C[Se]O", "methane-SeO-selenoperoxol"),
         ("C[Te]O", "methane-TeO-telluroperoxol"),
-        ("CO[SH]", "methane-OS-thioperoxol"),
+        ("CO[SH]", "(sulfanyloxy)methane"),
         ("CO[SeH]", "methane-OSe-selenoperoxol"),
         ("CO[TeH]", "methane-OTe-telluroperoxol"),
         ("CS[SH]", "methanedithioperoxol"),
@@ -221,13 +222,13 @@ def test_peroxy_acyl_paths_preserve_orientation(smiles: str, expected: str):
     [
         ("CC(=S)OC(C)=O", "acetic ethanethioic anhydride"),
         ("CC(=S)OC(C)=S", "ethanethioic anhydride"),
-        ("CC(=O)SC(C)=O", "acetic thioanhydride"),
+        ("CC(=O)SC(C)=O", "1-(acetylsulfanyl)ethan-1-one"),
         ("CC(=O)[Se]C(C)=O", "acetic selenoanhydride"),
-        ("CC(=O)OOC(C)=O", "acetic peroxyanhydride"),
-        ("CC(=O)SOC(C)=O", "acetic thioperoxyanhydride"),
-        ("CC(=O)OSC(C)=O", "acetic thioperoxyanhydride"),
-        ("CC(=O)SSC(C)=O", "acetic dithioperoxyanhydride"),
-        ("CCC(=O)SOC(C)=O", "O-acetic S-propanoic thioperoxyanhydride"),
+        ("CC(=O)OOC(C)=O", "acetyl ethaneperoxoate"),
+        ("CC(=O)SOC(C)=O", "acetylsulfanyl acetate"),
+        ("CC(=O)OSC(C)=O", "acetylsulfanyl acetate"),
+        ("CC(=O)SSC(C)=O", "1-(acetylsulfanylsulfanyl)ethan-1-one"),
+        ("CCC(=O)SOC(C)=O", "propanoylsulfanyl acetate"),
     ],
 )
 def test_anhydride_bridges_and_acyl_sites_are_independent(smiles: str, expected: str):
@@ -378,8 +379,8 @@ def test_nitrile_chalcogenides_use_zwitterion_priority_and_class_names(smiles: s
         ("CSSC", "1,2-dimethyldisulfane"),
         ("C[Se][Se]C", "1,2-dimethyldiselane"),
         ("C[Te][Te]C", "1,2-dimethylditellane"),
-        ("CSOC", "dimethyl thioperoxide"),
-        ("CCOSC", "O-ethyl S-methyl thioperoxide"),
+        ("CSOC", "methoxy(methyl)sulfane"),
+        ("CCOSC", "ethoxy(methyl)sulfane"),
         ("CO[Se]C", "dimethyl selenoperoxide"),
         ("CO[Te]C", "dimethyl telluroperoxide"),
         ("CS[Se]C", "dimethyl selenothioperoxide"),
@@ -389,6 +390,12 @@ def test_nitrile_chalcogenides_use_zwitterion_priority_and_class_names(smiles: s
 )
 def test_peroxide_linkages_preserve_both_chalcogen_sites(smiles: str, expected: str):
     assert oc.name(smiles).name == expected
+
+
+def test_charged_chalcogen_linkage_is_not_a_neutral_peroxide():
+    mol = read_smiles("C[O-][S+]C")
+
+    assert classify_peroxide_linkages(mol, set(mol.atoms)) == ()
 
 
 @pytest.mark.parametrize(

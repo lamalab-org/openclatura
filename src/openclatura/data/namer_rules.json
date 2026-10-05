@@ -835,6 +835,15 @@
       {"first": "Te", "terminal": "Te", "suffix": "ditelluroperoxol", "rank": 15, "capabilities": ["blocks_structural_parent"]}
     ]
   },
+  "chalcogen_citation_routes": {
+    "bluebook_rule": "P-63 and P-65; established substitutive and ester citations retained for supported O/S topologies",
+    "values": [
+      {"context": "peroxol", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "route": "existing"},
+      {"context": "peroxide", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "route": "existing"},
+      {"context": "anhydride", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O"], "required_site_elements": ["O"], "allowed_bridge_elements": ["O", "S"], "required_bridge_elements": ["S"], "route": "existing", "projection": "ester_or_carbonyl"},
+      {"context": "anhydride", "allowed_elements": ["O"], "required_elements": ["O"], "allowed_site_elements": ["O"], "required_site_elements": ["O"], "allowed_bridge_elements": ["O"], "required_bridge_elements": ["O"], "bridge_atom_count": 2, "route": "existing", "projection": "peroxy_ester"}
+    ]
+  },
   "chalcogen_standard_acyl_keys": {
     "bluebook_rule": "P-65 and P-66; existing registry rows reused by ordinary and retained acyl derivatives",
     "values": [

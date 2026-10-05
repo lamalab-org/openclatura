@@ -16,11 +16,48 @@ from .chalcogen_roles import (
 )
 from .nomenclature import (
     RULES,
+    ChalcogenCitationContext,
+    ChalcogenCitationRoute,
     FunctionalGroupCapability,
     FunctionalGroupRule,
     MultiSuffixTemplate,
     PrincipalCitationMode,
 )
+
+
+def chalcogen_citation_rule(
+    context: ChalcogenCitationContext,
+    elements: tuple[Chalcogen, ...],
+    *,
+    bridge_atom_count: int,
+    site_elements: tuple[Chalcogen, ...] = (),
+    bridge_elements: tuple[Chalcogen, ...] = (),
+):
+    """Return the first data rule matching typed structural citation axes."""
+
+    values = tuple(element.value for element in elements)
+    site_values = tuple(element.value for element in site_elements)
+    bridge_values = tuple(element.value for element in bridge_elements)
+    return next(
+        (
+            rule
+            for rule in RULES.chalcogens.citation_routes
+            if rule.context is context and rule.matches(values, bridge_atom_count, site_values, bridge_values)
+        ),
+        None,
+    )
+
+
+def uses_existing_chalcogen_citation(
+    context: ChalcogenCitationContext,
+    elements: tuple[Chalcogen, ...],
+    *,
+    bridge_atom_count: int,
+) -> bool:
+    """Whether this topology should reuse the established naming pipeline."""
+
+    rule = chalcogen_citation_rule(context, elements, bridge_atom_count=bridge_atom_count)
+    return rule is not None and rule.route is ChalcogenCitationRoute.EXISTING
 
 
 def simple_group_key(

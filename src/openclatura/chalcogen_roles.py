@@ -228,6 +228,8 @@ def classify_peroxide_linkages(
             continue
         if chalcogen_for_symbol(mol.atoms[bond.v].symbol) is None:
             continue
+        if any(mol.atoms[idx].charge or mol.atoms[idx].radical_electrons for idx in (bond.u, bond.v)):
+            continue
         left_sides = [neighbor for neighbor in mol.get_neighbors(bond.u) if neighbor != bond.v]
         right_sides = [neighbor for neighbor in mol.get_neighbors(bond.v) if neighbor != bond.u]
         if (

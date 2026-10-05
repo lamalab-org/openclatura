@@ -122,6 +122,7 @@ RULE_GROUPS: tuple[RuleGroupSpec, ...] = (
             "chalcogenide_class_names",
             "chalcogen_peroxide_class_names",
             "chalcogen_peroxol_rules",
+            "chalcogen_citation_routes",
             "chalcogen_standard_acyl_keys",
             "chalcogen_standard_peroxy_acyl_keys",
             "chalcogen_acyl_leaving_groups",
