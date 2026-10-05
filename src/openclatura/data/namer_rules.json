@@ -898,7 +898,7 @@
     "bluebook_rule": "P-65; stems and seniority for sulfur, selenium, and tellurium acids",
     "values": [
       {"element": "S", "double_bond_count": 2, "stem": "sulfon", "rank": 25, "acid_key": "sulfonic_acid", "ester_key": "sulfonate", "amide_key": "sulfonamide"},
-      {"element": "S", "double_bond_count": 1, "stem": "sulfin", "rank": 27},
+      {"element": "S", "double_bond_count": 1, "stem": "sulfin", "rank": 27, "acid_prefix": "hydroxysulfinyl"},
       {"element": "Se", "double_bond_count": 2, "stem": "selenon", "rank": 28},
       {"element": "Se", "double_bond_count": 1, "stem": "selenin", "rank": 29},
       {"element": "Te", "double_bond_count": 2, "stem": "telluron", "rank": 29},

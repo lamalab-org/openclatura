@@ -530,7 +530,11 @@ def resolve_central_acid_rule(descriptor: FunctionalGroupDescriptor) -> tuple[st
         site = RULES.chalcogens.templates[site_template].format(element=terminal.element.value if terminal else "")
         suffix = RULES.chalcogens.templates["central_acid_suffix"].format(stem=suffix_stem, site=site)
         seniority = (origin_rank, *(_element_rank(ligand.element) for ligand in descriptor.ligands))
-        prefix = RULES.chalcogens.templates["central_acid_prefix"].format(stem=origin_stem, infix=infix)
+        standard_prefix = origin.get("acid_prefix") if all_oxygen else None
+        prefix = standard_prefix or RULES.chalcogens.templates["central_acid_prefix"].format(
+            stem=origin_stem,
+            infix=infix,
+        )
     elif descriptor.derivative is DerivativeKind.ANION:
         suffix = RULES.chalcogens.templates["central_anion_suffix"].format(stem=suffix_stem)
         seniority = (
