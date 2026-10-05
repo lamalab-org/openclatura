@@ -339,20 +339,12 @@ def name_component(
         )
 
     early_groups = component_groups(mol, component_atoms)
-    peroxol_atoms = {
-        atom_idx
-        for group in early_groups
-        if group.descriptor is not None and group.descriptor.family is FunctionalFamily.PEROXOL
-        for atom_idx in group.atoms_involved
-    }
-    has_competing_heteroatom_chain = any(
-        atom_idx not in peroxol_atoms
-        and not mol.atoms[atom_idx].is_carbon
-        and mol.atoms[atom_idx].symbol != "H"
-        and mol.degree(atom_idx) > 1
-        for atom_idx in component_atoms
+    early_principal_key = component_principal_key(early_groups, is_substituent)
+    principal_groups = [group for group in early_groups if group.key == early_principal_key]
+    has_peroxol_suffix = any(
+        group.descriptor is not None and group.descriptor.family is FunctionalFamily.PEROXOL
+        for group in principal_groups
     )
-    has_peroxol_suffix = bool(peroxol_atoms) and not has_competing_heteroatom_chain
     structural_parent_result = (
         None if has_peroxol_suffix else structural_replacement_parent_result(mol, component_atoms, name_subgraph)
     )
