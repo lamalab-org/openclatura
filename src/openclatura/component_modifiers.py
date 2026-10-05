@@ -7,7 +7,7 @@ from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
 from .molecule import DecisionTrace, Molecule, bond_ids_within, charged_atoms
 from .naming_protocols import RecursiveSubgraphNamer
-from .nomenclature import RULES
+from .nomenclature import RULES, FunctionalGroupCapability
 from .perception import PerceivedGroup
 from .subgraph_tools import subgraph_component
 from .substituent_tokens import graph_bound_substituent_tokens
@@ -30,7 +30,7 @@ def add_component_front_modifiers(
     principal_group = next((group for group in perceived_groups if group.key == principal_key), None)
     if principal_group is None or principal_group.resolved_rule is None:
         return
-    if "front_modifier" not in principal_group.resolved_rule.families:
+    if not principal_group.resolved_rule.has_capability(FunctionalGroupCapability.FRONT_MODIFIER):
         return
     for group in perceived_groups:
         if group.key != principal_key:
@@ -141,7 +141,7 @@ def add_component_n_substituents(
         group_rule = group.resolved_rule or RULES.functional_groups.get(group.key)
         nitrogens = [n for n in group.atoms_involved if mol.atoms[n].symbol == "N"]
         nitrogens.sort(key=lambda n: mol.get_bond(n, c_idx) is not None, reverse=True)
-        if "urea" in group_rule.families:
+        if group_rule.has_capability(FunctionalGroupCapability.UREA):
             # The two urea nitrogens are equivalent: P-31.1.4 gives the unprimed locant to
             # the substituent cited first, and an unsubstituted nitrogen takes no locant.
             nitrogens.sort(key=lambda n: _nitrogen_alphabetical_rank(mol, n, c_idx, sub_exclude, branch_namer))
@@ -158,7 +158,7 @@ def add_component_n_substituents(
         if principal_key in {"amidine", "ring_amidine"}:
             # P-66.4.1.1.1.3: the amine nitrogen is N, the imino nitrogen N'.
             nitrogens.sort(key=lambda n: mol.get_bond(n, core_c).order)
-        elif "hydrazide" in group_rule.families:
+        elif group_rule.has_capability(FunctionalGroupCapability.HYDRAZIDE):
             # P-66.3.1.2: the acyl-bound nitrogen is N, the terminal one N'.
             nitrogens.sort(key=lambda n: mol.get_bond(n, core_c) is None)
         elif principal_key == "guanidine":

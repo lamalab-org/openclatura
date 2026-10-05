@@ -25,7 +25,7 @@ from .molecule import (
 )
 from .naming_protocols import RecursiveSubgraphNamer
 from .nitrogen_roles import azine_roles
-from .nomenclature import RULES
+from .nomenclature import RULES, FunctionalGroupCapability
 from .oxoacid_roles import CentralOxoRole, OxoLigandRole, central_oxo_roles
 from .oxoacid_templates import OxoacidTemplateKind, oxoacid_role_template
 from .perception import PerceivedGroup, perceive_groups
@@ -3207,7 +3207,11 @@ def try_name_anhydride_component_result(
     """Return a graph-bound anhydride component name when supported."""
 
     for group in perceived_groups:
-        if group.key != principal_key or group.resolved_rule is None or "anhydride" not in group.resolved_rule.families:
+        if (
+            group.key != principal_key
+            or group.resolved_rule is None
+            or not group.resolved_rule.has_capability(FunctionalGroupCapability.ANHYDRIDE)
+        ):
             continue
         descriptor = group.descriptor
         if descriptor is None or len(descriptor.centers) != 2 or not descriptor.linker_paths:

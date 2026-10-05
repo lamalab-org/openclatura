@@ -17,7 +17,7 @@ from .formatting import (
 from .group_atom_roles import amide_nitrogen, ester_or_peroxy_single_oxygen
 from .molecule import Molecule, bond_ids_within
 from .naming_protocols import RecursiveSubgraphNamer
-from .nomenclature import RULES
+from .nomenclature import RULES, FunctionalGroupCapability
 from .perception import PerceivedGroup
 from .rules import multipliers
 from .subgraph_tools import subgraph_component
@@ -298,7 +298,9 @@ def static_prefix_handler(name: str) -> PrefixHandler:
 
 
 def acid_halide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
-    if group.resolved_rule is not None and "acid_halide" in group.resolved_rule.families:
+    if group.resolved_rule is not None and group.resolved_rule.has_capability(
+        FunctionalGroupCapability.ACID_HALIDE
+    ):
         return f"({group.prefix})" if group.prefix else ""
     return RULES.functional_groups.cited_prefix_for(group.key) or ""
 
@@ -345,13 +347,15 @@ PREFIX_HANDLERS["hydrazine"] = hydrazine_prefix_handler
 def prefix_from_group(context: PrefixContext, group: PerceivedGroup) -> str:
     handler = PREFIX_HANDLERS.get(group.key)
     if handler is None and group.resolved_rule is not None:
-        if "central_acid" in group.resolved_rule.families and "ester_like" in group.resolved_rule.families:
+        if group.resolved_rule.has_capability(
+            FunctionalGroupCapability.CENTRAL_ACID
+        ) and group.resolved_rule.has_capability(FunctionalGroupCapability.ESTER_LIKE):
             handler = central_ester_prefix_handler
-        elif "ester_like" in group.resolved_rule.families:
+        elif group.resolved_rule.has_capability(FunctionalGroupCapability.ESTER_LIKE):
             handler = ester_prefix_handler
-        elif "amide_like" in group.resolved_rule.families:
+        elif group.resolved_rule.has_capability(FunctionalGroupCapability.AMIDE_LIKE):
             handler = amide_prefix_handler
-        elif "acid_halide" in group.resolved_rule.families:
+        elif group.resolved_rule.has_capability(FunctionalGroupCapability.ACID_HALIDE):
             handler = acid_halide_prefix_handler
     if handler is None:
         handler = fallback_prefix_handler

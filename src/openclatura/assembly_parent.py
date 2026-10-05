@@ -11,7 +11,7 @@ from .assembly_parts import AssemblyParts, SubstituentItem
 from .assembly_prefixes import substituent_sort_key
 from .assembly_utils import parse_locant
 from .formatting import is_complex_prefix, strip_outer_parentheses
-from .nomenclature import RULES
+from .nomenclature import RULES, FunctionalGroupCapability
 from .principal_suffixes import render_principal_suffix
 from .retained_specs import retained_parent_spec
 from .ring_parent import ParentHydrideKind
@@ -672,7 +672,7 @@ def format_principal_suffix(parts: AssemblyParts, terminal_e: str, spiro_subs) -
             omit_locant = True
 
     suffix_text = render_principal_suffix(group, len(locs))
-    if "element_locanted_suffix" in group.families and omit_locant:
+    if group.has_capability(FunctionalGroupCapability.ELEMENT_LOCANTED_SUFFIX) and omit_locant:
         suffix_text = f"-{suffix_text}"
     if parts.principal_suffix_modifiers and group.key in RULES.functional_groups.keys_with_family("hydrazone"):
         modifier_text = _format_principal_suffix_modifiers(parts)
