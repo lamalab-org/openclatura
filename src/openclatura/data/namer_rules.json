@@ -845,6 +845,8 @@
       {"context": "acyl", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["S"], "required_site_elements": ["S"], "allowed_bridge_elements": ["O", "S"], "required_bridge_elements": ["O"], "bridge_prefix": ["O"], "route": "existing", "projection": "carbonyl"},
       {"context": "anhydride", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O"], "required_site_elements": ["O"], "allowed_bridge_elements": ["O", "S"], "required_bridge_elements": ["S"], "route": "existing", "projection": "ester_or_carbonyl"},
       {"context": "anhydride", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O", "S"], "required_site_elements": ["S"], "allowed_bridge_elements": ["O"], "required_bridge_elements": ["O"], "route": "existing", "projection": "ester_or_carbonyl"},
+      {"context": "anhydride", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O", "S"], "required_site_elements": ["O", "S"], "allowed_bridge_elements": ["O", "S"], "required_bridge_elements": ["O", "S"], "bridge_atom_count": 2, "route": "existing", "projection": "ester_or_carbonyl"},
+      {"context": "anhydride", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O", "S"], "required_site_elements": ["O", "S"], "allowed_bridge_elements": ["S"], "required_bridge_elements": ["S"], "bridge_atom_count": 1, "route": "existing", "projection": "ester_or_carbonyl"},
       {"context": "anhydride", "allowed_elements": ["O"], "required_elements": ["O"], "allowed_site_elements": ["O"], "required_site_elements": ["O"], "allowed_bridge_elements": ["O"], "required_bridge_elements": ["O"], "bridge_atom_count": 2, "route": "existing", "projection": "peroxy_ester"}
     ]
   },
@@ -926,7 +928,7 @@
         "ester": {"seniority": 45, "families": ["ester_like", "peroxy_ester", "front_modifier", "chain_external_carbonyl"], "capabilities": ["ester_like", "front_modifier", "chain_external_carbonyl"]}
       },
       "anhydride": {"standard_key": "anhydride", "seniority": 30, "families": ["anhydride"], "capabilities": ["anhydride"]},
-      "imide_route": {"key": "chalcogen_imide_route", "seniority": 13, "families": ["imide_route"], "capabilities": ["promotes_member_groups"]},
+      "imide_route": {"key": "chalcogen_imide_route", "seniority": 65, "families": ["imide_route"], "capabilities": ["promotes_member_groups"]},
       "central_peroxy": {
         "acid": {"seniority": 22, "families": ["central_acid", "peroxy_acid"], "capabilities": ["central_acid"]},
         "anion": {"seniority": 26, "families": ["central_acid", "peroxy_ester"], "capabilities": ["central_acid"]},

@@ -108,6 +108,14 @@ def test_cyclic_imide_route_outranks_nitrile_without_replacing_member_suffixes(s
     assert oc.name(smiles).name == expected
 
 
+def test_cyclic_imide_route_remains_below_a_carboxylic_ester():
+    smiles = "CCOC(=O)C12CC(C1)[S@](=O)(=NC(=O)CN1C(=O)NC(C)(C)C1=O)C2"
+    assert oc.name(smiles).name == (
+        "ethyl (2S)-2-((2-(4,4-dimethyl-2,5-dioxoimidazolidin-1-yl)acetyl)imino)-2-oxo-"
+        "2lambda^6-thiabicyclo[2.1.1]hexane-4-carboxylate"
+    )
+
+
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [

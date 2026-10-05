@@ -38,3 +38,20 @@ def test_established_oxygen_sulfur_acyl_citations(smiles: str, expected: str):
 )
 def test_novel_heavier_chalcogen_acyl_citations_remain_generic(smiles: str, expected: str):
     assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    (
+        (
+            "CCCCCCC(C)(C)C(=O)OSC(=S)n1nc(C)cc1C",
+            "((3,5-dimethyl-1H-pyrazol-1-yl)(thioxo)methyl)sulfanyl 2,2-dimethyloctanoate",
+        ),
+        (
+            "Cc1ccc(C(=O)SC(=S)SCC#N)cc1",
+            "2-(((((4-methylphenyl)carbonyl)sulfanyl)(thioxo)methyl)sulfanyl)acetonitrile",
+        ),
+    ),
+)
+def test_mixed_site_anhydrides_reuse_structural_citation(smiles: str, expected: str):
+    assert oc.name(smiles).name == expected
