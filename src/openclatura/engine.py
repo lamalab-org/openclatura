@@ -512,9 +512,7 @@ class NamingEngine:
             return
         atoms = [mol.atoms[next(iter(component))] for component in unsupported]
         details = ", ".join(f"{atom.symbol}{atom.charge:+d}" for atom in atoms)
-        raise UnnamedAtomError(
-            "Salt composition is not supported for generic atomic charge components: " + details
-        )
+        raise UnnamedAtomError("Salt composition is not supported for generic atomic charge components: " + details)
 
     @staticmethod
     def _component_sort_key(name: str, charge: int = 0) -> tuple[int, int, str]:

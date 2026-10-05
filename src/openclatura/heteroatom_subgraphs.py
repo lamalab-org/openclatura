@@ -628,8 +628,7 @@ def terminal_nitrogen_chain_prefix(
     # A single-bond junction inside an N chain composes independently named
     # nitrogen units; preserve that graph boundary at the parent attachment.
     is_linear = all(
-        segment.start_atom == role.ordered_atoms[index]
-        and segment.end_atom == role.ordered_atoms[index + 1]
+        segment.start_atom == role.ordered_atoms[index] and segment.end_atom == role.ordered_atoms[index + 1]
         for index, segment in enumerate(role.segments)
     )
     if is_linear and any(segment.bond_order == 1 for segment in role.segments[1:]):

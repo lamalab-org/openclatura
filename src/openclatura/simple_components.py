@@ -54,9 +54,7 @@ def is_generic_atomic_charge_component(mol: Molecule, component_atoms: set[int])
     return (atom.symbol, atom.charge, atom.total_h_count) not in RULES.ions.mononuclear_hydride_ions
 
 
-def unsupported_generic_atomic_salt_components(
-    mol: Molecule, components: list[set[int]]
-) -> tuple[set[int], ...]:
+def unsupported_generic_atomic_salt_components(mol: Molecule, components: list[set[int]]) -> tuple[set[int], ...]:
     """Return fallback atomic ions paired with an opposite-charge component.
 
     Atomic charge notation is unambiguous for an isolated ion or beside a
