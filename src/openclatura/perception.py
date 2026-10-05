@@ -7,9 +7,11 @@ from .chalcogen_roles import (
     Chalcogen,
     ChalcogenLigand,
     ChalcogenLigandRole,
+    AcylLeavingGroup,
     DerivativeKind,
     FunctionalFamily,
     FunctionalGroupDescriptor,
+    LeavingGroupDescriptor,
     chalcogen_for_symbol,
     classify_chalcogen_ligand,
     classify_peroxide_linkages,
@@ -290,6 +292,14 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
         if central_group is not None:
             groups.append(central_group)
             consumed.update(central_group.atoms_involved - {central_group.attachment_carbon})
+
+    for atom in mol:
+        if not atom.is_carbon or atom.idx in consumed:
+            continue
+        pseudohalide_group = _acyl_pseudohalide_group(mol, atom.idx, consumed, cyclic_atoms)
+        if pseudohalide_group is not None:
+            groups.append(pseudohalide_group)
+            consumed.update(pseudohalide_group.atoms_involved - {pseudohalide_group.attachment_carbon})
 
     nitrogen_chains = nitrogen_chain_roles(mol, cyclic_atoms, consumed)
     for role in nitrogen_chains:
@@ -1045,6 +1055,113 @@ def _carbonyl_chalcogen_group(
         is_external=external,
     )
     return PerceivedGroup(key, True, attachment, {carbon, ligand.atom}, descriptor=descriptor)
+
+
+def _pseudohalide_leaving_group(
+    mol: Molecule,
+    center: int,
+    double_ligand: int,
+    consumed: set[int],
+) -> LeavingGroupDescriptor | None:
+    """Classify a complete pseudohalide attached directly to an acyl center."""
+
+    for first in mol.get_neighbors(center):
+        if first == double_ligand or first in consumed or mol.get_bond(center, first).order != 1:
+            continue
+        second_neighbors = [neighbor for neighbor in mol.get_neighbors(first) if neighbor != center]
+        if len(second_neighbors) != 1:
+            continue
+        second = second_neighbors[0]
+        first_symbol = mol.atoms[first].symbol
+        second_symbol = mol.atoms[second].symbol
+        first_bond = mol.get_bond(first, second)
+        if first_symbol == "C" and second_symbol == "N" and first_bond.order == 3 and mol.degree(second) == 1:
+            return _leaving_group_descriptor(mol, AcylLeavingGroup.CYANIDE, center, (first, second))
+        if first_symbol != "N":
+            continue
+        if second_symbol == "C" and first_bond.order == 3 and mol.degree(second) == 1:
+            return _leaving_group_descriptor(mol, AcylLeavingGroup.ISOCYANIDE, center, (first, second))
+        third_neighbors = [neighbor for neighbor in mol.get_neighbors(second) if neighbor != first]
+        if len(third_neighbors) != 1:
+            continue
+        third = third_neighbors[0]
+        second_bond = mol.get_bond(second, third)
+        if (
+            second_symbol == "N"
+            and mol.atoms[third].symbol == "N"
+            and mol.atoms[second].charge > 0
+            and mol.atoms[third].charge < 0
+        ):
+            return _leaving_group_descriptor(mol, AcylLeavingGroup.AZIDE, center, (first, second, third))
+        terminal_element = chalcogen_for_symbol(mol.atoms[third].symbol)
+        if second_symbol != "C" or first_bond.order != 2 or second_bond.order != 2 or terminal_element is None:
+            continue
+        if terminal_element is Chalcogen.OXYGEN:
+            kind = AcylLeavingGroup.ISOCYANATE
+        elif terminal_element is Chalcogen.SULFUR:
+            kind = AcylLeavingGroup.ISOTHIOCYANATE
+        elif terminal_element is Chalcogen.SELENIUM:
+            kind = AcylLeavingGroup.ISOSELENOCYANATE
+        elif terminal_element is Chalcogen.TELLURIUM:
+            kind = AcylLeavingGroup.ISOTELLUROCYANATE
+        else:
+            continue
+        return _leaving_group_descriptor(mol, kind, center, (first, second, third))
+    return None
+
+
+def _acyl_pseudohalide_group(
+    mol: Molecule,
+    carbon: int,
+    consumed: set[int],
+    cyclic_atoms: set[int],
+) -> PerceivedGroup | None:
+    """Bind an acyl center and its complete pseudohalide before simpler detectors."""
+
+    double_ligand = _terminal_double_chalcogen(mol, carbon, consumed)
+    if double_ligand is None:
+        return None
+    leaving_group = _pseudohalide_leaving_group(mol, carbon, double_ligand.atom, consumed)
+    if leaving_group is None:
+        return None
+    ring_neighbors = [neighbor for neighbor in mol.get_neighbors(carbon) if neighbor in cyclic_atoms]
+    external = (
+        carbon not in cyclic_atoms and len(ring_neighbors) == 1 and mol.get_bond(carbon, ring_neighbors[0]).order == 1
+    )
+    attachment = ring_neighbors[0] if external else carbon
+    descriptor = FunctionalGroupDescriptor(
+        family=FunctionalFamily.ACYL,
+        derivative=DerivativeKind.ACYL_PSEUDOHALIDE,
+        centers=(carbon,),
+        ligands=(double_ligand,),
+        linker_paths=((carbon, *leaving_group.atom_ids),),
+        attachment_atom=attachment,
+        is_external=external,
+        leaving_group=leaving_group,
+    )
+    return PerceivedGroup(
+        descriptor.derivative.value,
+        False,
+        attachment,
+        {carbon, double_ligand.atom, *leaving_group.atom_ids},
+        descriptor=descriptor,
+    )
+
+
+def _leaving_group_descriptor(
+    mol: Molecule,
+    kind: AcylLeavingGroup,
+    center: int,
+    atoms: tuple[int, ...],
+) -> LeavingGroupDescriptor:
+    path = (center, *atoms)
+    bonds = tuple(mol.get_bond(left, right).idx for left, right in zip(path, path[1:]))
+    return LeavingGroupDescriptor(
+        kind=kind,
+        attachment_atom=atoms[0],
+        atom_ids=atoms,
+        bond_ids=bonds,
+    )
 
 
 def _chalcogen_anhydride_groups(mol: Molecule, consumed: set[int]) -> list[PerceivedGroup]:

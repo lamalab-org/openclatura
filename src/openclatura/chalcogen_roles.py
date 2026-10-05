@@ -78,8 +78,33 @@ class DerivativeKind(StrEnum):
     UREA = "urea"
     ANHYDRIDE = "anhydride"
     ACID_HALIDE = "acid_halide"
+    ACYL_PSEUDOHALIDE = "acyl_pseudohalide"
     NEUTRAL_LINK = "neutral_link"
     ZWITTERION = "zwitterion"
+
+
+class AcylLeavingGroup(StrEnum):
+    FLUORIDE = "F"
+    CHLORIDE = "Cl"
+    BROMIDE = "Br"
+    IODIDE = "I"
+    AZIDE = "N3"
+    CYANIDE = "CN"
+    ISOCYANIDE = "NC"
+    ISOCYANATE = "NCO"
+    ISOTHIOCYANATE = "NCS"
+    ISOSELENOCYANATE = "NCSe"
+    ISOTELLUROCYANATE = "NCTe"
+
+
+@dataclass(frozen=True)
+class LeavingGroupDescriptor:
+    """One complete leaving-group unit attached to a functional center."""
+
+    kind: AcylLeavingGroup
+    attachment_atom: int
+    atom_ids: tuple[int, ...]
+    bond_ids: tuple[int, ...]
 
 
 @dataclass(frozen=True)
@@ -106,6 +131,7 @@ class FunctionalGroupDescriptor:
     attachment_atom: int | None = None
     is_external: bool = False
     central_element: Chalcogen | None = None
+    leaving_group: LeavingGroupDescriptor | None = None
 
     @property
     def atom_ids(self) -> frozenset[int]:
@@ -116,6 +142,8 @@ class FunctionalGroupDescriptor:
                 atoms.add(ligand.attachment_atom)
         for path in self.linker_paths:
             atoms.update(path)
+        if self.leaving_group is not None:
+            atoms.update(self.leaving_group.atom_ids)
         return frozenset(atoms)
 
     def ligands_with_role(self, role: ChalcogenLigandRole) -> tuple[ChalcogenLigand, ...]:
