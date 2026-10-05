@@ -5,7 +5,6 @@ from collections.abc import Callable
 from .assembly_parts import RenderedSubstituentName, rendered_substituent_text
 from .assembly_utils import is_fully_enclosed as is_fully_enclosed
 from .namer_config import ALKYL_OXY_PREFIXES
-from .nomenclature import RULES
 from .rules import multipliers, stems
 
 
@@ -21,30 +20,7 @@ def strip_outer_parentheses(name: str | RenderedSubstituentName) -> str:
 def is_complex_prefix(name: str) -> bool:
     """Return true when a substituent prefix needs protective parentheses."""
 
-    return (
-        _is_compound_nitrogen_chain_prefix(name)
-        or _is_modified_heteroatom_prefix(name)
-        or "(" in name
-        or name[0].isdigit()
-        or "-" in name
-        or " " in name
-        or _starts_with_multiplier(name)
-    )
-
-
-def _is_compound_nitrogen_chain_prefix(name: str) -> bool:
-    """Protect a prefix composed from two or more nitrogen-chain units."""
-
-    return sum(name.count(unit) for unit in RULES.assembly.compound_nitrogen_prefix_units) >= 2
-
-
-def _is_modified_heteroatom_prefix(name: str) -> bool:
-    """Keep a recursively named heteroatom ligand attached to its own center."""
-
-    has_modifier = any(
-        name.startswith(prefix) and len(name) > len(prefix) for prefix in RULES.assembly.heteroatom_ligand_prefixes
-    )
-    return has_modifier and name.endswith(RULES.assembly.heteroatom_substituent_suffixes)
+    return "(" in name or name[0].isdigit() or "-" in name or " " in name or _starts_with_multiplier(name)
 
 
 def is_composite_prefix(name: str) -> bool:
@@ -193,11 +169,18 @@ def substituted_alkoxy_prefix(branch: str) -> str | None:
     return f"({prefix}{replacement})" if prefix else replacement
 
 
-def format_element_substituent(stereo_prefix: str, branch: str, suffix: str, is_double: bool = False) -> str:
+def format_element_substituent(
+    stereo_prefix: str,
+    branch: str,
+    suffix: str,
+    is_double: bool = False,
+    *,
+    enclose_ligand: bool = False,
+) -> str:
     """Attach a named branch to an element substituent suffix."""
 
     branch = strip_outer_parentheses(branch)
     suffix_text = suffix + ("idene" if is_double else "")
-    if is_complex_prefix(branch):
+    if enclose_ligand or is_complex_prefix(branch):
         return f"({stereo_prefix}({branch}){suffix_text})"
     return f"({stereo_prefix}{branch}{suffix_text})"

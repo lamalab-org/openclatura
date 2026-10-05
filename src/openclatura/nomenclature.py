@@ -110,9 +110,6 @@ class AssemblyRules:
     ambiguous_connection_substituent_stems: set[str]
     suffix_nitrogen_markers: tuple[str, ...]
     isotope_prefixes: dict[int, str]
-    compound_nitrogen_prefix_units: tuple[str, ...]
-    heteroatom_substituent_suffixes: tuple[str, ...]
-    heteroatom_ligand_prefixes: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -152,6 +149,7 @@ class FunctionalGroupRule:
     is_peroxy_acid: bool = False
     is_peroxy_ester: bool = False
     suffix_carbon_is_exocyclic: bool = False
+    prefix_requires_parentheses: bool = False
 
 
 @dataclass(frozen=True)
@@ -239,6 +237,7 @@ def _functional_group_rules() -> FunctionalGroupRules:
             is_peroxy_acid=key in functional_group_data.values("peroxy_acid_prefix_groups"),
             is_peroxy_ester=key in functional_group_data.values("peroxy_ester_groups"),
             suffix_carbon_is_exocyclic=bool(item.get("suffix_carbon_is_exocyclic", False)),
+            prefix_requires_parentheses=bool(item.get("prefix_requires_parentheses", False)),
         )
     return FunctionalGroupRules(by_key=groups)
 
@@ -525,9 +524,6 @@ def registry() -> NomenclatureRegistry:
             isotope_prefixes={
                 int(mass): prefix for mass, prefix in assembly_grammar.mapping("isotope_prefixes").items()
             },
-            compound_nitrogen_prefix_units=tuple(assembly_grammar.values("compound_nitrogen_prefix_units")),
-            heteroatom_substituent_suffixes=tuple(assembly_grammar.values("heteroatom_substituent_suffixes")),
-            heteroatom_ligand_prefixes=tuple(assembly_grammar.values("heteroatom_ligand_prefixes")),
         ),
         functional_groups=_functional_group_rules(),
         postprocess=_postprocess_rules(),

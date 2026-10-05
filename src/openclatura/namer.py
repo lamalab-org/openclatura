@@ -859,6 +859,8 @@ def _collect_subgraph_substituents(
             # `(methylimino)` rather than `imino` -- needs its handler.
             if name:
                 name = _substituted_prefix_name(mol, group, sub_exclude) or name
+                if rule.prefix_requires_parentheses:
+                    name = f"({name})"
             if name:
                 subst_mapping.setdefault(group.attachment_carbon, []).append(
                     SubstituentItem(

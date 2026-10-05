@@ -2,6 +2,7 @@
 
 from .assembly_parts import split_rendered_substituent_name
 from .assembly_prefixes import substituent_sort_key
+from .assembly_utils import is_fully_enclosed
 from .formatting import (
     count_names,
     format_center_ligands,
@@ -121,6 +122,36 @@ def _rooted_ligand_needs_compositional_enclosure(mol: Molecule, ligand_idx: int,
     return not mol.atoms[ligand_idx].is_carbon and any(
         neighbor != center_idx and mol.atoms[neighbor].symbol != "H" for neighbor in mol.get_neighbors(ligand_idx)
     )
+
+
+def _graph_bound_ligand_name(mol: Molecule, ligand_idx: int, center_idx: int, name: str) -> str:
+    """Preserve a nested heteroatom ligand as one graph-owned citation unit."""
+
+    if not _rooted_ligand_needs_compositional_enclosure(mol, ligand_idx, center_idx):
+        return name
+    return f"({_without_outer_boundaries(name)})"
+
+
+def _without_outer_boundaries(name: str) -> str:
+    """Remove construction boundaries while preserving internal grouping."""
+
+    while is_fully_enclosed(name):
+        name = strip_outer_parentheses(name)
+    return name
+
+
+def _linear_heteroatom_ligand_needs_enclosure(mol: Molecule, ligand_idx: int, center_idx: int) -> bool:
+    """Return whether a ligand continues through exactly one non-oxygen heteroatom."""
+
+    atom = mol.atoms[ligand_idx]
+    if atom.is_carbon or atom.symbol == "O":
+        return False
+    heavy_continuations = [
+        neighbor
+        for neighbor in mol.get_neighbors(ligand_idx)
+        if neighbor != center_idx and mol.atoms[neighbor].symbol != "H"
+    ]
+    return len(heavy_continuations) == 1
 
 
 def stereo_prefix(atom) -> str:
@@ -273,20 +304,25 @@ def name_carbonyl_like_fragment(
 
 
 def format_amino_from_branches(
-    branches: list[str], is_double: bool, is_cation: bool = False, is_anion: bool = False
+    branches: list[str],
+    is_double: bool,
+    is_cation: bool = False,
+    is_anion: bool = False,
+    *,
+    enclose_single_ligand: bool = False,
 ) -> str:
     if is_double:
         if is_cation:
             if len(branches) == 1:
                 branch = strip_outer_parentheses(branches[0])
                 iminio = charged_heteroatom_prefix("N", 1, "double") or "iminio"
-                if is_complex_prefix(branch):
+                if enclose_single_ligand or is_complex_prefix(branch):
                     return f"(({branch}){iminio})"
                 return f"({branch}{iminio})"
             return charged_heteroatom_prefix("N", 1, "double") or "iminio"
         if len(branches) == 1:
             branch = strip_outer_parentheses(branches[0])
-            if is_complex_prefix(branch):
+            if enclose_single_ligand or is_complex_prefix(branch):
                 return f"(({branch})imino)"
             return f"({branch}imino)"
         return "imino"
@@ -308,7 +344,7 @@ def format_amino_from_branches(
         branch = strip_outer_parentheses(branches[0])
         if branch.endswith(("carbonyl", "sulfonyl", "sulfinyl", "carbonothioyl")) and not branch.startswith("("):
             return f"{branch}amino"
-        if is_complex_prefix(branch):
+        if enclose_single_ligand or is_complex_prefix(branch):
             return f"(({branch})amino)"
         return f"({branch}amino)"
 
@@ -529,6 +565,7 @@ def name_nitrogen_subgraph(
         return guanidino
 
     branches = []
+    enclose_single_ligand = False
     for nxt in next_atoms:
         c_oxygens = double_bonded_neighbors(mol, nxt, "O")
         c_sulfurs = double_bonded_neighbors(mol, nxt, "S")
@@ -563,9 +600,18 @@ def name_nitrogen_subgraph(
             else:
                 branch = _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx}, start_idx)
                 if branch:
+                    if _linear_heteroatom_ligand_needs_enclosure(mol, nxt, start_idx):
+                        branch = _without_outer_boundaries(branch)
+                        enclose_single_ligand = True
                     branches.append(branch)
 
-    return format_amino_from_branches(branches, is_double, is_cation, is_anion)
+    return format_amino_from_branches(
+        branches,
+        is_double,
+        is_cation,
+        is_anion,
+        enclose_single_ligand=enclose_single_ligand and len(branches) == 1,
+    )
 
 
 def terminal_nitrogen_chain_prefix(
@@ -577,7 +623,18 @@ def terminal_nitrogen_chain_prefix(
     """Render supported linear terminal nitrogen chains from ordered graph roles."""
 
     role = terminal_nitrogen_substituent_role(mol, start_idx, exclude_atoms, upstream_atom)
-    return role.key if role is not None else ""
+    if role is None:
+        return ""
+    # A single-bond junction inside an N chain composes independently named
+    # nitrogen units; preserve that graph boundary at the parent attachment.
+    is_linear = all(
+        segment.start_atom == role.ordered_atoms[index]
+        and segment.end_atom == role.ordered_atoms[index + 1]
+        for index, segment in enumerate(role.segments)
+    )
+    if is_linear and any(segment.bond_order == 1 for segment in role.segments[1:]):
+        return f"({role.key})"
+    return role.key
 
 
 def _has_oxido_ligand(mol: Molecule, atom_idx: int) -> bool:
@@ -776,7 +833,7 @@ def name_sulfur_subgraph(
                 branch = f"({branch})"
             return f"({stereo_prefix_text}{branch}{suffix})"
         branches = [
-            br
+            _graph_bound_ligand_name(mol, nxt, start_idx, br)
             for nxt in next_atoms
             if (
                 br := _branch_name_text(branch_namer, mol, nxt, exclude_atoms | {start_idx} | set(s_oxygens), start_idx)
@@ -825,7 +882,16 @@ def name_sulfur_subgraph(
         if branch in SIMPLE_SULFANYL_PREFIXES:
             return f"({stereo_prefix_text}{branch}sulfanyl)"
         if branch:
-            return format_element_substituent(stereo_prefix_text, branch, "sulfanyl", is_double=is_double)
+            return format_element_substituent(
+                stereo_prefix_text,
+                branch,
+                "sulfanyl",
+                is_double=is_double,
+                enclose_ligand=(
+                    mol.get_bond(start_idx, next_atoms[0]).order == 1
+                    and _rooted_ligand_needs_compositional_enclosure(mol, next_atoms[0], start_idx)
+                ),
+            )
         return f"{stereo_prefix_text}{'sulfanylidene' if is_double else 'sulfanyl'}"
 
     branches = [
