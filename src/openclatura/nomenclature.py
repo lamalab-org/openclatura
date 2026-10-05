@@ -238,6 +238,11 @@ class FunctionalGroupRules:
     def keys_with_family(self, family: str) -> set[str]:
         return {key for key, rule in self.by_key.items() if family in rule.families}
 
+    def keys_with_capability(self, capability: FunctionalGroupCapability) -> set[str]:
+        """Return registry keys declaring one typed assembly behavior."""
+
+        return {key for key, rule in self.by_key.items() if rule.has_capability(capability)}
+
 
 @dataclass(frozen=True)
 class NomenclatureRegistry:

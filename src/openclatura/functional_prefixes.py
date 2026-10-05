@@ -297,9 +297,9 @@ def static_prefix_handler(name: str) -> PrefixHandler:
     return lambda _context, _group: name
 
 
-def acid_halide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+def acyl_leaving_group_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     if group.resolved_rule is not None and group.resolved_rule.has_capability(
-        FunctionalGroupCapability.ACID_HALIDE
+        FunctionalGroupCapability.ACYL_LEAVING_GROUP
     ):
         return f"({group.prefix})" if group.prefix else ""
     return RULES.functional_groups.cited_prefix_for(group.key) or ""
@@ -325,7 +325,10 @@ PREFIX_HANDLERS.update(
     {key: static_prefix_handler("cyano") for key in RULES.functional_groups.keys_with_family("cyano_prefix")}
 )
 PREFIX_HANDLERS.update(
-    dict.fromkeys(RULES.functional_groups.keys_with_family("acid_halide"), acid_halide_prefix_handler)
+    dict.fromkeys(
+        RULES.functional_groups.keys_with_capability(FunctionalGroupCapability.ACYL_LEAVING_GROUP),
+        acyl_leaving_group_prefix_handler,
+    )
 )
 PREFIX_HANDLERS.update(
     {
@@ -355,8 +358,8 @@ def prefix_from_group(context: PrefixContext, group: PerceivedGroup) -> str:
             handler = ester_prefix_handler
         elif group.resolved_rule.has_capability(FunctionalGroupCapability.AMIDE_LIKE):
             handler = amide_prefix_handler
-        elif group.resolved_rule.has_capability(FunctionalGroupCapability.ACID_HALIDE):
-            handler = acid_halide_prefix_handler
+        elif group.resolved_rule.has_capability(FunctionalGroupCapability.ACYL_LEAVING_GROUP):
+            handler = acyl_leaving_group_prefix_handler
     if handler is None:
         handler = fallback_prefix_handler
     return handler(context, group)
