@@ -877,6 +877,19 @@ def _acyl_chalcogen_group(
     )
     attachment = ring_neighbors[0] if external else carbon
 
+    nitrogens = [
+        neighbor
+        for neighbor in mol.get_neighbors(carbon)
+        if neighbor not in consumed and mol.atoms[neighbor].symbol == "N" and mol.get_bond(carbon, neighbor).order == 1
+    ]
+    halogens = [
+        neighbor
+        for neighbor in mol.get_neighbors(carbon)
+        if neighbor not in consumed
+        and mol.atoms[neighbor].symbol in {"F", "Cl", "Br", "I"}
+        and mol.get_bond(carbon, neighbor).order == 1
+    ]
+
     single_ligands = [
         ligand
         for ligand in ligands
@@ -888,7 +901,10 @@ def _acyl_chalcogen_group(
             ChalcogenLigandRole.CHALCOGEN_LINK,
         }
     ]
-    if len(single_ligands) == 1:
+    # A centre carrying a nitrogen or a typed leaving group is not a plain
+    # ester merely because it also has a single-bonded chalcogen.  Defer those
+    # competing ligands to their complete derivative routes below.
+    if len(single_ligands) == 1 and not nitrogens and not halogens:
         single_ligand = single_ligands[0]
         if single_ligand.role is ChalcogenLigandRole.CHALCOGEN_LINK:
             terminal_atom = single_ligand.attachment_atom
@@ -964,14 +980,7 @@ def _acyl_chalcogen_group(
             resolved_rule=rule,
         )
 
-    halogens = [
-        neighbor
-        for neighbor in mol.get_neighbors(carbon)
-        if neighbor not in consumed
-        and mol.atoms[neighbor].symbol in {"F", "Cl", "Br", "I"}
-        and mol.get_bond(carbon, neighbor).order == 1
-    ]
-    if len(halogens) == 1:
+    if len(halogens) == 1 and not nitrogens:
         leaving = halogens[0]
         leaving_group = _leaving_group_descriptor(
             mol,
@@ -998,11 +1007,6 @@ def _acyl_chalcogen_group(
             resolved_rule=rule,
         )
 
-    nitrogens = [
-        neighbor
-        for neighbor in mol.get_neighbors(carbon)
-        if neighbor not in consumed and mol.atoms[neighbor].symbol == "N" and mol.get_bond(carbon, neighbor).order == 1
-    ]
     if not nitrogens:
         return None
     nitrogens.sort(
@@ -1143,6 +1147,11 @@ def _acyl_pseudohalide_group(
         return None
     leaving_group = _pseudohalide_leaving_group(mol, carbon, double_ligand.atom, consumed)
     if leaving_group is None:
+        return None
+    owned_neighbors = {double_ligand.atom, leaving_group.attachment_atom}
+    if any(
+        neighbor not in owned_neighbors and not mol.atoms[neighbor].is_carbon for neighbor in mol.get_neighbors(carbon)
+    ):
         return None
     ring_neighbors = [neighbor for neighbor in mol.get_neighbors(carbon) if neighbor in cyclic_atoms]
     external = (
@@ -1393,10 +1402,25 @@ def _central_chalcogen_derivative(
             ChalcogenLigandRole.CHALCOGEN_LINK,
         }
     ]
+    nitrogens = [
+        neighbor
+        for neighbor in mol.get_neighbors(center)
+        if neighbor not in consumed
+        and mol.atoms[neighbor].symbol == "N"
+        and mol.atoms[neighbor].charge == 0
+        and mol.get_bond(center, neighbor).order == 1
+    ]
+    halogens = [
+        neighbor
+        for neighbor in mol.get_neighbors(center)
+        if neighbor not in consumed
+        and mol.atoms[neighbor].symbol in {"F", "Cl", "Br", "I"}
+        and mol.get_bond(center, neighbor).order == 1
+    ]
     derivative = None
     group_atoms = {center, *(ligand.atom for ligand in double_ligands)}
     leaving_group = None
-    if len(terminal_ligands) == 1:
+    if len(terminal_ligands) == 1 and not nitrogens and not halogens:
         terminal = terminal_ligands[0]
         if terminal.role is ChalcogenLigandRole.CHALCOGEN_LINK:
             terminal_atom = terminal.attachment_atom
@@ -1423,20 +1447,6 @@ def _central_chalcogen_derivative(
             descriptor_ligands = (*double_ligands, terminal)
             group_atoms.add(terminal.atom)
     else:
-        nitrogens = [
-            neighbor
-            for neighbor in mol.get_neighbors(center)
-            if neighbor not in consumed
-            and mol.atoms[neighbor].symbol == "N"
-            and mol.get_bond(center, neighbor).order == 1
-        ]
-        halogens = [
-            neighbor
-            for neighbor in mol.get_neighbors(center)
-            if neighbor not in consumed
-            and mol.atoms[neighbor].symbol in {"F", "Cl", "Br", "I"}
-            and mol.get_bond(center, neighbor).order == 1
-        ]
         if len(nitrogens) == 1:
             if nitrogens[0] in cyclic_atoms:
                 return None
@@ -1477,6 +1487,9 @@ def _central_chalcogen_derivative(
             group_atoms.add(leaving)
         else:
             return None
+    owned_neighbors = {anchor} | (group_atoms & set(mol.get_neighbors(center)))
+    if owned_neighbors != set(mol.get_neighbors(center)):
+        return None
     descriptor = FunctionalGroupDescriptor(
         family=FunctionalFamily.CENTRAL_ACID,
         derivative=derivative,
