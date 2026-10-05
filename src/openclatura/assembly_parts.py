@@ -13,7 +13,7 @@ from .stereo_descriptors import AbsoluteStereoCitation
 
 if TYPE_CHECKING:
     from .fusion.mancude import ParentBondDelta
-    from .nomenclature import FunctionalGroupRule
+    from .nomenclature import FunctionalGroupRule, PrincipalCitationMode
     from .ring_parent import RingParent
 
 
@@ -142,6 +142,7 @@ class AssemblyParts:
     is_double_attach: bool = False
     is_triple_attach: bool = False
     is_acyl_substituent: bool = False
+    principal_citation_mode: PrincipalCitationMode | None = None
     attachment_locant: int | str = 1
     retained_name: str | None = None
     retained_absorbs_principal_group: bool = False

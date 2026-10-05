@@ -1,5 +1,7 @@
 """Parent stem, unsaturation, substituent-tail, and suffix formatting."""
 
+from dataclasses import replace
+
 from .assembly_charge import (
     append_charge_suffixes_to_terminal,
     has_ionic_retained_parent,
@@ -282,6 +284,8 @@ def promote_retained_functional_parent(parts: AssemblyParts) -> None:
         if chain_parent is None:
             return
         retained, absorbed = chain_parent
+    if parts.principal_citation_mode is not None:
+        retained = RULES.retained.citation_for(retained, parts.principal_citation_mode)
     parts.retained_name = retained
     parts.retained_absorbs_principal_group = True
     if retained == "guanidine":
@@ -652,6 +656,9 @@ def format_principal_suffix(parts: AssemblyParts, terminal_e: str, spiro_subs) -
     if not parts.principal_group:
         return terminal_e, ""
     group = parts.principal_group.resolved_rule or RULES.functional_groups.get(parts.principal_group.key)
+    citation_suffix = group.suffix_for_citation(parts.principal_citation_mode)
+    if citation_suffix != group.suffix:
+        group = replace(group, suffix=citation_suffix)
     locs = sorted(parts.principal_group.locants, key=parse_locant)
     has_spiro_subs = bool(spiro_subs)
     omit_locant = parts.parent_length == 1

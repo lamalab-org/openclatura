@@ -25,7 +25,7 @@ from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
 from .naming_context import ComponentNamingState, NamingIntent
 from .naming_protocols import RecursiveSubgraphNamer
-from .nomenclature import FunctionalGroupCapability
+from .nomenclature import FunctionalGroupCapability, PrincipalCitationMode
 from .parent_pipeline import (
     build_parent_assembly_plan,
     resolve_parent_hydride_plan,
@@ -289,6 +289,7 @@ def name_component(
     omit_redundant_locants: bool = True,
     parent_plan_builder: Callable | None = None,
     parent_selector: Callable | None = None,
+    principal_citation_mode: PrincipalCitationMode | None = None,
 ):
     """Name one connected component or recursive component of a molecule."""
 
@@ -326,7 +327,13 @@ def name_component(
             return name, _component_shortcut_tree(name, component_atoms, bindings, token_spans)
         return name
 
-    def name_component_again(next_mol: Molecule, next_atoms: set[int], is_substituent: bool = False):
+    def name_component_again(
+        next_mol: Molecule,
+        next_atoms: set[int],
+        is_substituent: bool = False,
+        *,
+        principal_citation_mode: PrincipalCitationMode | None = None,
+    ):
         return name_component(
             next_mol,
             next_atoms,
@@ -336,6 +343,7 @@ def name_component(
             assemble_parent_name=assemble_parent_name,
             token_debug=token_debug,
             omit_redundant_locants=omit_redundant_locants,
+            principal_citation_mode=principal_citation_mode,
         )
 
     early_groups = component_groups(mol, component_atoms)
@@ -603,6 +611,7 @@ def name_component(
         },
     )
     parts = parent_plan.parts
+    parts.principal_citation_mode = principal_citation_mode
     emit_bond_stereo(mol, parts, numbered_path, get_loc, state.base_exclude)
     add_component_front_modifiers(
         mol,

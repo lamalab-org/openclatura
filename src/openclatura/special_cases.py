@@ -25,7 +25,7 @@ from .molecule import (
 )
 from .naming_protocols import RecursiveSubgraphNamer
 from .nitrogen_roles import azine_roles
-from .nomenclature import RULES, FunctionalGroupCapability
+from .nomenclature import RULES, FunctionalGroupCapability, PrincipalCitationMode
 from .oxoacid_roles import CentralOxoRole, OxoLigandRole, central_oxo_roles
 from .oxoacid_templates import OxoacidTemplateKind, oxoacid_role_template
 from .perception import PerceivedGroup, perceive_groups
@@ -3157,11 +3157,11 @@ def anhydride_half_name(
     sub_mol.add_bond(u=start_c, v=oh_idx, order=1)
     half_atoms.add(oh_idx)
 
-    name = component_namer(sub_mol, half_atoms)
-    for ending in (" O-acid", " S-acid", " Se-acid", " Te-acid", " acid"):
-        if name.endswith(ending):
-            return name[: -len(ending)]
-    return name
+    return component_namer(
+        sub_mol,
+        half_atoms,
+        principal_citation_mode=PrincipalCitationMode.ANHYDRIDE_HALF,
+    )
 
 
 def _bond_ids_between(mol: Molecule, atom_pairs: set[tuple[int, int]]) -> set[int]:
