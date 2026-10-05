@@ -915,8 +915,7 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             if ligand.element is not Chalcogen.OXYGEN and any(candidate.charge for candidate in mol):
                 continue
             if ligand.element is not Chalcogen.OXYGEN and any(
-                neighbor != atom.idx and not mol.atoms[neighbor].is_carbon
-                for neighbor in mol.get_neighbors(center)
+                neighbor != atom.idx and not mol.atoms[neighbor].is_carbon for neighbor in mol.get_neighbors(center)
             ):
                 continue
             ring_neighbors = [neighbor for neighbor in mol.get_neighbors(center) if neighbor in cyclic_atoms]
@@ -1330,8 +1329,7 @@ def _central_chalcogen_derivative(
     ):
         return None
     if any(
-        chalcogen_for_symbol(mol.atoms[neighbor].symbol) is None
-        and mol.get_bond(center, neighbor).order > 1
+        chalcogen_for_symbol(mol.atoms[neighbor].symbol) is None and mol.get_bond(center, neighbor).order > 1
         for neighbor in mol.get_neighbors(center)
     ):
         return None
@@ -1428,10 +1426,7 @@ def _central_chalcogen_derivative(
                     return None
             if hydrazide_nitrogens is None and any(
                 neighbor != center
-                and (
-                    mol.atoms[neighbor].symbol not in {"C", "H"}
-                    or mol.get_bond(nitrogens[0], neighbor).order != 1
-                )
+                and (mol.atoms[neighbor].symbol not in {"C", "H"} or mol.get_bond(nitrogens[0], neighbor).order != 1)
                 for neighbor in mol.get_neighbors(nitrogens[0])
             ):
                 return None

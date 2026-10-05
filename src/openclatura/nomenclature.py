@@ -169,7 +169,9 @@ class FunctionalGroupRules:
         candidates = [rule for rule in rules if rule.seniority is not None]
         if not candidates:
             raise KeyError("No seniority metadata for resolved functional groups")
-        return min(candidates, key=lambda rule: (rule.seniority,) if isinstance(rule.seniority, int) else rule.seniority)
+        return min(
+            candidates, key=lambda rule: (rule.seniority,) if isinstance(rule.seniority, int) else rule.seniority
+        )
 
     def keys_with_family(self, family: str) -> set[str]:
         return {key for key, rule in self.by_key.items() if family in rule.families}

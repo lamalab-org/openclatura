@@ -22,7 +22,9 @@ def component_principal_key(perceived_groups: list[PerceivedGroup], is_substitue
     candidates = [
         group
         for group in perceived_groups
-        if group.is_principal_candidate and group.resolved_rule is not None and group.resolved_rule.seniority is not None
+        if group.is_principal_candidate
+        and group.resolved_rule is not None
+        and group.resolved_rule.seniority is not None
     ]
     if not candidates:
         return None
