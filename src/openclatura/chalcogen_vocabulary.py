@@ -133,7 +133,12 @@ def resolve_acyl_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, Funct
         if leaving_data is not None and standard_key_field in leaving_data:
             return leaving_data[standard_key_field], None
     standard = RULES.chalcogens.standard_acyl_keys.get(
-        (descriptor.derivative.value, double_ligand.element.value, single_element.value if single_element else None, descriptor.is_external)
+        (
+            descriptor.derivative.value,
+            double_ligand.element.value,
+            single_element.value if single_element else None,
+            descriptor.is_external,
+        )
     )
     if standard is not None:
         return standard, None
@@ -250,9 +255,7 @@ def resolve_peroxy_acyl_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str
         terminal.element,
     ) == (Chalcogen.OXYGEN, Chalcogen.OXYGEN, Chalcogen.OXYGEN)
     if standard_path:
-        standard = RULES.chalcogens.standard_peroxy_acyl_keys.get(
-            (descriptor.derivative.value, descriptor.is_external)
-        )
+        standard = RULES.chalcogens.standard_peroxy_acyl_keys.get((descriptor.derivative.value, descriptor.is_external))
         if standard is not None:
             return standard, None
 
@@ -302,9 +305,7 @@ def resolve_peroxy_acyl_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str
     return key, FunctionalGroupRule(
         key=key,
         role="principal",
-        prefix=RULES.chalcogens.templates["peroxy_prefix"].format(
-            acid_infix=acid_infix, linker=linker_infix
-        ),
+        prefix=RULES.chalcogens.templates["peroxy_prefix"].format(acid_infix=acid_infix, linker=linker_infix),
         suffix=suffix,
         multi_suffix=None,
         suffix_multiplier_positions=(0,),
@@ -360,7 +361,10 @@ def resolve_anhydride_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, 
         suffix=anhydride_class_name(descriptor),
         multi_suffix=None,
         suffix_multiplier_positions=(0,),
-        seniority=(int(RULES.chalcogens.policies["anhydride"]["seniority"]), *(_element_rank(element) for element in bridge_elements)),
+        seniority=(
+            int(RULES.chalcogens.policies["anhydride"]["seniority"]),
+            *(_element_rank(element) for element in bridge_elements),
+        ),
         suffix_with_locant=False,
         needs_locant=True,
         families=tuple(RULES.chalcogens.policies["anhydride"]["families"]),
@@ -404,9 +408,11 @@ def resolve_central_acid_rule(descriptor: FunctionalGroupDescriptor) -> tuple[st
         first_linker, terminal = terminal_ligands
         double_infix = _replacement_infix(tuple(ligand.element for ligand in double_ligands))
         linker_infix = _peroxo_infix(first_linker.element, terminal.element)
-        origin_prefix = RULES.chalcogens.templates["central_origin_with_infix"].format(
-            stem=origin_stem, infix=double_infix
-        ) if double_infix else origin_stem
+        origin_prefix = (
+            RULES.chalcogens.templates["central_origin_with_infix"].format(stem=origin_stem, infix=double_infix)
+            if double_infix
+            else origin_stem
+        )
         ordinary_peroxo = first_linker.element is Chalcogen.OXYGEN and terminal.element is Chalcogen.OXYGEN
         if ordinary_peroxo:
             acid_suffix = RULES.chalcogens.templates["central_peroxy_acid"].format(origin=origin_prefix)
@@ -483,20 +489,36 @@ def resolve_central_acid_rule(descriptor: FunctionalGroupDescriptor) -> tuple[st
         prefix = RULES.chalcogens.templates["central_acid_prefix"].format(stem=origin_stem, infix=infix)
     elif descriptor.derivative is DerivativeKind.ANION:
         suffix = RULES.chalcogens.templates["central_anion_suffix"].format(stem=suffix_stem)
-        seniority = (int(policy["seniority"]), origin_rank, *(_element_rank(ligand.element) for ligand in descriptor.ligands))
+        seniority = (
+            int(policy["seniority"]),
+            origin_rank,
+            *(_element_rank(ligand.element) for ligand in descriptor.ligands),
+        )
         prefix = RULES.chalcogens.templates["central_anion_prefix"].format(stem=origin_stem)
     elif descriptor.derivative is DerivativeKind.ESTER:
         suffix = RULES.chalcogens.templates["central_ester_suffix"].format(stem=suffix_stem)
-        seniority = (int(policy["seniority"]), origin_rank, *(_element_rank(ligand.element) for ligand in descriptor.ligands))
+        seniority = (
+            int(policy["seniority"]),
+            origin_rank,
+            *(_element_rank(ligand.element) for ligand in descriptor.ligands),
+        )
         prefix = RULES.chalcogens.templates["central_ester_prefix"].format(stem=origin_stem)
     elif descriptor.derivative is DerivativeKind.AMIDE:
         suffix = RULES.chalcogens.templates["central_amide_suffix"].format(stem=suffix_stem)
-        seniority = (int(policy["seniority"]), origin_rank, *(_element_rank(ligand.element) for ligand in double_ligands))
+        seniority = (
+            int(policy["seniority"]),
+            origin_rank,
+            *(_element_rank(ligand.element) for ligand in double_ligands),
+        )
         prefix = RULES.chalcogens.templates["central_amide_prefix"].format(stem=origin_stem)
     elif descriptor.derivative is DerivativeKind.HYDRAZIDE:
         template = "central_hydrazide_suffix" if infix else "central_plain_hydrazide_suffix"
         suffix = RULES.chalcogens.templates[template].format(stem=suffix_stem if infix else origin_stem)
-        seniority = (int(policy["seniority"]), origin_rank, *(_element_rank(ligand.element) for ligand in double_ligands))
+        seniority = (
+            int(policy["seniority"]),
+            origin_rank,
+            *(_element_rank(ligand.element) for ligand in double_ligands),
+        )
         prefix = RULES.chalcogens.templates["central_hydrazide_prefix"].format(stem=origin_stem)
     elif descriptor.derivative is DerivativeKind.ACID_HALIDE and leaving_data is not None:
         suffix = RULES.chalcogens.templates["central_acid_halide_suffix"].format(

@@ -47,8 +47,10 @@ def retarget_external_carbonyl_groups(
     """Move exocyclic carbonyl group attachment onto the parent chain atom."""
 
     for group in perceived_groups:
-        if group.key == principal_key or group.resolved_rule is None or not group.resolved_rule.has_capability(
-            FunctionalGroupCapability.CHAIN_EXTERNAL_CARBONYL
+        if (
+            group.key == principal_key
+            or group.resolved_rule is None
+            or not group.resolved_rule.has_capability(FunctionalGroupCapability.CHAIN_EXTERNAL_CARBONYL)
         ):
             continue
         group_c = group.attachment_carbon

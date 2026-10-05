@@ -49,8 +49,7 @@ def test_acyl_pseudohalide_owns_complete_leaving_unit(smiles: str, kind: AcylLea
     matches = [
         group
         for group in perceive_groups(read_smiles(smiles))
-        if group.descriptor is not None
-        and group.descriptor.derivative is DerivativeKind.ACYL_PSEUDOHALIDE
+        if group.descriptor is not None and group.descriptor.derivative is DerivativeKind.ACYL_PSEUDOHALIDE
     ]
 
     assert len(matches) == 1

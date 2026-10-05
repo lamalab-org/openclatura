@@ -278,8 +278,7 @@ def _functional_group_rules() -> FunctionalGroupRules:
                 }
             ),
             citation_suffixes=tuple(
-                (PrincipalCitationMode(mode), suffix)
-                for mode, suffix in item.get("citation_suffixes", {}).items()
+                (PrincipalCitationMode(mode), suffix) for mode, suffix in item.get("citation_suffixes", {}).items()
             ),
         )
     chalcogen_group = grouped_namer_rules()["chalcogen_nomenclature"]
@@ -397,9 +396,7 @@ def _chalcogen_rules() -> ChalcogenNomenclatureRules:
         peroxide_class_names={
             frozenset(row["elements"]): row["name"] for row in group.values("chalcogen_peroxide_class_names")
         },
-        peroxol_rules={
-            (row["first"], row["terminal"]): row for row in group.values("chalcogen_peroxol_rules")
-        },
+        peroxol_rules={(row["first"], row["terminal"]): row for row in group.values("chalcogen_peroxol_rules")},
         standard_acyl_keys={
             (
                 row["derivative"],
@@ -476,8 +473,7 @@ def registry() -> NomenclatureRegistry:
                 for row in retained.values("retained_chain_functional_parents")
             },
             principal_citations={
-                (row["mode"], row["name"]): row["citation"]
-                for row in retained.values("retained_principal_citations")
+                (row["mode"], row["name"]): row["citation"] for row in retained.values("retained_principal_citations")
             },
             monocycle_specs=tuple(retained.values("retained_monocycle_specs")),
             fused_polycycle_specs=tuple(retained.values("retained_fused_polycycle_specs")),
