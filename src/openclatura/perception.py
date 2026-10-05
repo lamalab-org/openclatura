@@ -244,6 +244,12 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             groups.append(imide_group)
 
     # P-66.3.1: acyl hydrazides outrank the hydrazine chain roles that would otherwise consume the N-N.
+    # Discover every acyl end before claiming atoms: a diacylhydrazine has two
+    # equally real C(=E)-N-N units, and choosing whichever carbon happens to
+    # have the lower input index makes both perception and naming depend on
+    # SMILES atom order.
+    hydrazide_groups: list[PerceivedGroup] = []
+    hydrazide_claimed_atoms: set[int] = set()
     for atom in mol:
         if not atom.is_carbon or atom.idx in consumed or atom.idx in cyclic_atoms:
             continue
@@ -278,18 +284,19 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                 is_external=external,
             )
             key, rule = resolve_acyl_rule(descriptor)
-            groups.append(
-                PerceivedGroup(
-                    key,
-                    True,
-                    target,
-                    {atom.idx, double_ligand.atom, *hydrazide_nitrogens},
-                    descriptor=descriptor,
-                    resolved_rule=rule,
-                )
+            group = PerceivedGroup(
+                key,
+                True,
+                target,
+                {atom.idx, double_ligand.atom, *hydrazide_nitrogens},
+                descriptor=descriptor,
+                resolved_rule=rule,
             )
-            consumed.update([double_ligand.atom, *hydrazide_nitrogens])
+            hydrazide_groups.append(group)
+            hydrazide_claimed_atoms.update([double_ligand.atom, *hydrazide_nitrogens])
             break
+    groups.extend(hydrazide_groups)
+    consumed.update(hydrazide_claimed_atoms)
 
     # Central-atom hydrazides must likewise claim their N-N unit before the
     # generic hydrazine parent recognizer runs.
