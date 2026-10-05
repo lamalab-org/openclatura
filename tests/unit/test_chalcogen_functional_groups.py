@@ -264,6 +264,37 @@ def test_central_chalcogen_acids_and_derivatives_share_one_topology(smiles: str,
     assert oc.name(smiles).name == expected
 
 
+def test_central_hydrazide_locants_follow_the_functional_center_after_atom_renumbering():
+    smiles = "CS(=O)(=O)N(C)NCC"
+    expected = "N'-ethyl-N-methylmethanesulfonohydrazide"
+    mol = Chem.MolFromSmiles(smiles)
+    orders = (
+        list(range(mol.GetNumAtoms())),
+        list(reversed(range(mol.GetNumAtoms()))),
+        list(range(1, mol.GetNumAtoms())) + [0],
+    )
+
+    assert {oc.name_mol(Chem.RenumberAtoms(mol, order)).name for order in orders} == {expected}
+    if oc.opsin_available():
+        check = oc.verify_with_opsin(expected, smiles, standardize_smiles=False)
+        assert check.status == "matched", check.to_dict()
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("CC(=O)Sc1ccc(Cl)c(Cl)c1", "S-(3,4-dichlorophenyl) ethanethioate"),
+        ("CC(=O)[Se]c1ccc(Cl)c(Cl)c1", "Se-(3,4-dichlorophenyl) ethaneselenoate"),
+        ("CC(=O)[Te]c1ccc(Cl)c(Cl)c1", "Te-(3,4-dichlorophenyl) ethanetelluroate"),
+    ],
+)
+def test_complex_chalcogen_front_modifiers_are_structurally_enclosed(smiles: str, expected: str):
+    assert oc.name(smiles).name == expected
+    if oc.opsin_available():
+        check = oc.verify_with_opsin(expected, smiles, standardize_smiles=False)
+        assert check.status == "matched", check.to_dict()
+
+
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [

@@ -2,7 +2,7 @@
 
 from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem, split_rendered_substituent_name
 from .chalcogen_roles import Chalcogen, ChalcogenLigandRole
-from .formatting import strip_outer_parentheses
+from .formatting import format_multiplier, is_complex_prefix, strip_outer_parentheses
 from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
 from .molecule import DecisionTrace, Molecule, bond_ids_within, charged_atoms
@@ -72,6 +72,8 @@ def add_component_front_modifiers(
                         if ligand.role is not ChalcogenLigandRole.DOUBLE_BONDED
                     )
                     element_locant = "".join(ligand.element.value for ligand in ordered_linkers)
+                    if is_complex_prefix(modifier):
+                        modifier = format_multiplier(modifier, 1)
                     modifier = f"{element_locant}-{modifier}"
             parts.front_modifiers.append(modifier)
             locant = str(get_loc(group.attachment_carbon)) if get_loc is not None else None
@@ -160,7 +162,8 @@ def add_component_n_substituents(
             nitrogens.sort(key=lambda n: mol.get_bond(n, core_c).order)
         elif group_rule.has_capability(FunctionalGroupCapability.HYDRAZIDE):
             # P-66.3.1.2: the acyl-bound nitrogen is N, the terminal one N'.
-            nitrogens.sort(key=lambda n: mol.get_bond(n, core_c) is None)
+            functional_centers = group.descriptor.centers if group.descriptor is not None else (core_c,)
+            nitrogens.sort(key=lambda n: not any(mol.get_bond(n, center) is not None for center in functional_centers))
         elif principal_key == "guanidine":
             # P-66.4.1.2.1.3: guanidine is numbered 1,2,3 with the imino nitrogen at 2; the amine
             # nitrogen whose substituent is cited first takes 1.
