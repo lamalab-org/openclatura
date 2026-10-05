@@ -2030,6 +2030,12 @@ def test_a_charge_separated_chalcogenido_is_not_a_hydride():
     assert name_smiles("C[N+](C)(C)CC[S-]") == "2-(trimethylammonio)ethane-1-thiolate"
 
 
+def test_a_skeletal_phosphonium_chalcogenide_keeps_its_anionic_suffix():
+    assert name_smiles("C=C1C[P+](C)([S-])C=C1C") == (
+        "1,4-dimethyl-3-methylidene-1H,2H-phosphol-1-ium-1-thiolate"
+    )
+
+
 def test_tetraazene_parent_takes_an_ylidene_ligand():
     # A doubly bonded carbon on the chain is an ylidene; rejecting it dropped
     # the C=N bond and named a carbon skeleton instead.

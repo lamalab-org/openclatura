@@ -111,6 +111,24 @@ def _copy_perceived_group(group: PerceivedGroup) -> PerceivedGroup:
     )
 
 
+def _is_charge_separated_chalcogen_bond(
+    mol: Molecule,
+    center: int,
+    ligand: ChalcogenLigand,
+) -> bool:
+    """Whether an anionic ligand is the charge-separated form of a double bond."""
+
+    if mol.atoms[center].charge <= 0:
+        return False
+    return any(
+        sibling.atom != ligand.atom
+        and sibling.element is ligand.element
+        and sibling.role is ChalcogenLigandRole.DOUBLE_BONDED
+        for neighbor in mol.get_neighbors(center)
+        if (sibling := classify_chalcogen_ligand(mol, center, neighbor)) is not None
+    )
+
+
 def _perceive_groups_uncached(mol: Molecule) -> list[PerceivedGroup]:
     groups = []
     for detector in PERCEPTION_DETECTORS:
@@ -791,12 +809,12 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             continue
         if ligand.role not in {ChalcogenLigandRole.HYDROGEN_BEARING, ChalcogenLigandRole.ANIONIC}:
             continue
-        if not mol.atoms[center].is_carbon and not (
+        noncarbon_anion = (
             ligand.role is ChalcogenLigandRole.ANIONIC
             and ligand.element is not Chalcogen.OXYGEN
-            and mol.atoms[center].symbol == "N"
-            and mol.atoms[center].charge > 0
-        ):
+            and not _is_charge_separated_chalcogen_bond(mol, center, ligand)
+        )
+        if not mol.atoms[center].is_carbon and not noncarbon_anion:
             continue
         derivative = DerivativeKind.ANION if atom.charge < 0 else DerivativeKind.ALCOHOL
         key = simple_group_key(FunctionalFamily.HYDROXY, derivative, ligand.element)
