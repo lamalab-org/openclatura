@@ -2222,7 +2222,12 @@
     "values": [
       {"mode": "anhydride_half", "name": "formic acid", "citation": "formic"},
       {"mode": "anhydride_half", "name": "acetic acid", "citation": "acetic"},
-      {"mode": "anhydride_half", "name": "benzoic acid", "citation": "benzoic"}
+      {"mode": "anhydride_half", "name": "benzoic acid", "citation": "benzoic"},
+      {"mode": "anhydride_half", "name": "oxalic acid", "citation": "oxalic"},
+      {"mode": "anhydride_half", "name": "malonic acid", "citation": "malonic"},
+      {"mode": "anhydride_half", "name": "succinic acid", "citation": "succinic"},
+      {"mode": "anhydride_half", "name": "glutaric acid", "citation": "glutaric"},
+      {"mode": "anhydride_half", "name": "adipic acid", "citation": "adipic"}
     ]
   },
   "retained_monocycle_specs": {
