@@ -86,6 +86,12 @@ def exclude_nonparent_group_atoms(
         ):
             if (atom_idx := amide_nitrogen(mol, group)) is not None:
                 atom_indices.add(atom_idx)
+        if (
+            group.descriptor is not None
+            and group.descriptor.derivative is DerivativeKind.ACYL_PSEUDOHALIDE
+            and group.descriptor.leaving_group is not None
+        ):
+            atom_indices.update(group.descriptor.leaving_group.atom_ids)
         if group.descriptor is not None and group.descriptor.family is FunctionalFamily.CENTRAL_ACID:
             atom_indices.update(group.descriptor.centers)
             atom_indices.update(

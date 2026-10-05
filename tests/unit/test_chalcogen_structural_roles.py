@@ -107,3 +107,25 @@ def test_acyclic_shared_nitrogen_is_not_promoted_to_retained_imide():
 )
 def test_cyclic_imide_route_outranks_nitrile_without_replacing_member_suffixes(smiles: str, expected: str):
     assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("CC(=O)N=[N+]=[N-]", "acetyl azide"),
+        ("CCCC(=O)C#N", "butanoyl cyanide"),
+        ("CC(=O)[N+]#[C-]", "acetyl isocyanide"),
+        ("CC(=O)N=C=O", "acetyl isocyanate"),
+        ("CC(=O)N=C=S", "acetyl isothiocyanate"),
+        ("CC(=O)N=C=[Se]", "acetyl isoselenocyanate"),
+        ("CC(=O)N=C=[Te]", "acetyl isotellurocyanate"),
+        ("CC(=S)N=C=O", "ethanethioyl isocyanate"),
+        ("CC(=[Se])N=C=S", "ethaneselenoyl isothiocyanate"),
+    ],
+)
+def test_acyl_pseudohalides_use_the_complete_leaving_group_route(smiles: str, expected: str):
+    assert oc.name(smiles).name == expected
+
+
+def test_acyl_pseudohalide_priority_composes_with_an_amide():
+    assert oc.name("NC(=O)CCC(=O)N=C=O").name == "3-carbamoylpropanoyl isocyanate"
