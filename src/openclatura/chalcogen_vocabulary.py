@@ -98,6 +98,22 @@ def chalcogenide_prefix(element: Chalcogen) -> str:
     return _element_data(element)["additive_prefix"]
 
 
+def chalcogen_substituent_suffix(element: Chalcogen) -> str:
+    """Return the data-defined suffix for an organic ligand on a chalcogen."""
+
+    return _element_data(element)["substituent_suffix"]
+
+
+def central_linkage_prefix(descriptor: FunctionalGroupDescriptor) -> str | None:
+    """Return the substitutive prefix for a central-acid linkage descriptor."""
+
+    if descriptor.central_element is None:
+        return None
+    double_count = len(descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED))
+    origin = RULES.chalcogens.central_acid_origins[(descriptor.central_element.value, double_count)]
+    return origin.get("linkage_prefix")
+
+
 def peroxide_class_name(elements: tuple[Chalcogen, Chalcogen]) -> str:
     """Return the P-63.3 functional-class term for an E-E linkage."""
 

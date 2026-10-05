@@ -760,10 +760,10 @@
   "chalcogen_elements": {
     "bluebook_rule": "P-62.5, P-63 through P-66; element vocabulary and order for validated chalcogen analogues",
     "values": {
-      "O": {"rank": 0, "class_name": "oxide", "additive_prefix": "oxido", "replacement_infix": "", "nitrogen_chalcogenide_citation": "substitutive"},
-      "S": {"rank": 1, "class_name": "sulfide", "additive_prefix": "sulfido", "replacement_infix": "thio", "nitrogen_chalcogenide_citation": "functional_class"},
-      "Se": {"rank": 2, "class_name": "selenide", "additive_prefix": "selenido", "replacement_infix": "seleno", "nitrogen_chalcogenide_citation": "functional_class"},
-      "Te": {"rank": 3, "class_name": "telluride", "additive_prefix": "tellurido", "replacement_infix": "telluro", "nitrogen_chalcogenide_citation": "functional_class"}
+      "O": {"rank": 0, "class_name": "oxide", "additive_prefix": "oxido", "substituent_suffix": "oxy", "replacement_infix": "", "nitrogen_chalcogenide_citation": "substitutive"},
+      "S": {"rank": 1, "class_name": "sulfide", "additive_prefix": "sulfido", "substituent_suffix": "sulfanyl", "replacement_infix": "thio", "nitrogen_chalcogenide_citation": "functional_class"},
+      "Se": {"rank": 2, "class_name": "selenide", "additive_prefix": "selenido", "substituent_suffix": "selanyl", "replacement_infix": "seleno", "nitrogen_chalcogenide_citation": "functional_class"},
+      "Te": {"rank": 3, "class_name": "telluride", "additive_prefix": "tellurido", "substituent_suffix": "tellanyl", "replacement_infix": "telluro", "nitrogen_chalcogenide_citation": "functional_class"}
     }
   },
   "chalcogen_simple_group_keys": {
@@ -897,12 +897,12 @@
   "chalcogen_central_acid_origins": {
     "bluebook_rule": "P-65; stems and seniority for sulfur, selenium, and tellurium acids",
     "values": [
-      {"element": "S", "double_bond_count": 2, "stem": "sulfon", "rank": 25, "acid_key": "sulfonic_acid", "ester_key": "sulfonate", "amide_key": "sulfonamide"},
-      {"element": "S", "double_bond_count": 1, "stem": "sulfin", "rank": 27, "acid_prefix": "hydroxysulfinyl"},
-      {"element": "Se", "double_bond_count": 2, "stem": "selenon", "rank": 28},
-      {"element": "Se", "double_bond_count": 1, "stem": "selenin", "rank": 29},
-      {"element": "Te", "double_bond_count": 2, "stem": "telluron", "rank": 29},
-      {"element": "Te", "double_bond_count": 1, "stem": "tellurin", "rank": 29}
+      {"element": "S", "double_bond_count": 2, "stem": "sulfon", "rank": 25, "linkage_prefix": "sulfonyl", "acid_key": "sulfonic_acid", "ester_key": "sulfonate", "amide_key": "sulfonamide"},
+      {"element": "S", "double_bond_count": 1, "stem": "sulfin", "rank": 27, "linkage_prefix": "sulfinyl", "acid_prefix": "hydroxysulfinyl"},
+      {"element": "Se", "double_bond_count": 2, "stem": "selenon", "rank": 28, "linkage_prefix": "selenonyl"},
+      {"element": "Se", "double_bond_count": 1, "stem": "selenin", "rank": 29, "linkage_prefix": "seleninyl"},
+      {"element": "Te", "double_bond_count": 2, "stem": "telluron", "rank": 29, "linkage_prefix": "telluronyl"},
+      {"element": "Te", "double_bond_count": 1, "stem": "tellurin", "rank": 29, "linkage_prefix": "tellurinyl"}
     ]
   },
   "chalcogen_rule_policies": {

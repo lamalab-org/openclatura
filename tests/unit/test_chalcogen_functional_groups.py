@@ -594,6 +594,23 @@ def test_acyl_heteroatom_links_reuse_the_established_ester_route(smiles, expecte
     assert oc.name(smiles).name == expected
 
 
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    (
+        (
+            "CC(S(=O)(=O)O)S(=O)(=O)OO",
+            "1-((hydroxyoxy)sulfonyl)ethane-1-sulfonic acid",
+        ),
+        (
+            "COOS(=O)(=O)c1ccccc1C(=O)O",
+            "2-((methoxyoxy)sulfonyl)benzoic acid",
+        ),
+    ),
+)
+def test_subordinate_central_linkages_use_data_defined_substitutive_prefixes(smiles, expected):
+    assert oc.name(smiles).name == expected
+
+
 def test_polonium_is_parseable_but_has_an_explicit_unvalidated_boundary():
     mol = read_smiles("C[PoH]")
 

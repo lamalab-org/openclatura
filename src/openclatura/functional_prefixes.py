@@ -7,10 +7,16 @@ from dataclasses import dataclass, replace
 
 from .assembly_parts import NameTokenBinding, SubstituentItem, rendered_substituent_text
 from .assembly_prefixes import substituent_sort_key
-from .chalcogen_roles import DerivativeKind, FunctionalFamily
-from .chalcogen_vocabulary import resolve_central_acid_rule
+from .chalcogen_roles import ChalcogenLigandRole, DerivativeKind, FunctionalFamily
+from .chalcogen_vocabulary import (
+    central_linkage_prefix,
+    chalcogen_substituent_suffix,
+    resolve_central_acid_rule,
+    simple_group_key,
+)
 from .formatting import (
     format_center_ligands,
+    format_element_substituent,
     format_multiplier,
     is_complex_prefix,
     oxy_prefix_from_branch,
@@ -120,6 +126,48 @@ def central_ester_prefix_handler(context: PrefixContext, group: PerceivedGroup) 
         group.prefix or "",
         context.branch_namer,
     )
+
+
+def central_chalcogen_linkage_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    """Render a two-chalcogen central linkage as a substitutive prefix."""
+
+    descriptor = group.descriptor
+    if descriptor is None:
+        return group.prefix or ""
+    double_ligands = descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED)
+    bridge = tuple(ligand for ligand in descriptor.ligands if ligand not in double_ligands)
+    base = central_linkage_prefix(descriptor)
+    if len(bridge) != 2 or not base:
+        return group.prefix or ""
+    first, terminal = bridge
+    terminal_text = ""
+    if terminal.role is ChalcogenLigandRole.HYDROGEN_BEARING:
+        key = simple_group_key(FunctionalFamily.HYDROXY, DerivativeKind.ALCOHOL, terminal.element)
+        terminal_text = RULES.functional_groups.cited_prefix_for(key) if key is not None else ""
+    elif terminal.role in {ChalcogenLigandRole.CARBON_LINK, ChalcogenLigandRole.HETEROATOM_LINK}:
+        attachment = terminal.attachment_atom
+        if attachment is not None:
+            branch = rendered_substituent_text(
+                context.branch_namer(
+                    context.mol,
+                    attachment,
+                    context.sub_exclude | {terminal.atom},
+                    upstream_atom=terminal.atom,
+                )
+            )
+            terminal_text = format_element_substituent(
+                "",
+                branch,
+                chalcogen_substituent_suffix(terminal.element),
+            )
+    if not terminal_text:
+        return group.prefix or ""
+    linked = format_element_substituent(
+        "",
+        terminal_text,
+        chalcogen_substituent_suffix(first.element),
+    )
+    return f"({linked}{base})"
 
 
 def amide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
@@ -392,7 +440,17 @@ PREFIX_HANDLERS["hydrazine"] = hydrazine_prefix_handler
 def prefix_from_group(context: PrefixContext, group: PerceivedGroup) -> str:
     handler = PREFIX_HANDLERS.get(group.key)
     if handler is None and group.resolved_rule is not None:
-        if group.resolved_rule.has_capability(FunctionalGroupCapability.CENTRAL_ACID) and group.resolved_rule.has_capability(
+        central_linkage = (
+            group.descriptor is not None
+            and group.descriptor.family is FunctionalFamily.CENTRAL_ACID
+            and len(group.descriptor.ligands) - len(
+                group.descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED)
+            )
+            == 2
+        )
+        if central_linkage:
+            handler = central_chalcogen_linkage_prefix_handler
+        elif group.resolved_rule.has_capability(FunctionalGroupCapability.CENTRAL_ACID) and group.resolved_rule.has_capability(
             FunctionalGroupCapability.HYDRAZIDE
         ):
             handler = central_hydrazide_prefix_handler
