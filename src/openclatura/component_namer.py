@@ -11,7 +11,6 @@ from .assembly_parts import (
     split_rendered_substituent_name,
 )
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
-from .chalcogen_roles import FunctionalFamily
 from .component_group_rules import (
     exclude_nonparent_group_atoms,
     principal_involved_atoms,
@@ -26,6 +25,7 @@ from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
 from .naming_context import ComponentNamingState, NamingIntent
 from .naming_protocols import RecursiveSubgraphNamer
+from .nomenclature import FunctionalGroupCapability
 from .parent_pipeline import (
     build_parent_assembly_plan,
     resolve_parent_hydride_plan,
@@ -342,7 +342,8 @@ def name_component(
     early_principal_key = component_principal_key(early_groups, is_substituent)
     principal_groups = [group for group in early_groups if group.key == early_principal_key]
     has_peroxol_suffix = any(
-        group.descriptor is not None and group.descriptor.family is FunctionalFamily.PEROXOL
+        group.resolved_rule is not None
+        and group.resolved_rule.has_capability(FunctionalGroupCapability.BLOCKS_STRUCTURAL_PARENT)
         for group in principal_groups
     )
     structural_parent_result = (
