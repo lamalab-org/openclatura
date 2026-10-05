@@ -4,10 +4,10 @@ from dataclasses import dataclass, field
 
 from .chains import get_cyclic_atoms
 from .chalcogen_roles import (
+    AcylLeavingGroup,
     Chalcogen,
     ChalcogenLigand,
     ChalcogenLigandRole,
-    AcylLeavingGroup,
     DerivativeKind,
     FunctionalFamily,
     FunctionalGroupDescriptor,
