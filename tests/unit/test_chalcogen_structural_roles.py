@@ -2,6 +2,7 @@
 
 import pytest
 
+import openclatura as oc
 from openclatura.chalcogen_roles import AcylLeavingGroup, Chalcogen, DerivativeKind, FunctionalFamily
 from openclatura.graph_io import read_smiles
 from openclatura.perception import perceive_groups
@@ -95,3 +96,14 @@ def test_acyclic_shared_nitrogen_is_not_promoted_to_retained_imide():
     ]
 
     assert matches == []
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("N#CC1CC(=O)NC1=O", "3-cyanopyrrolidine-2,5-dione"),
+        ("N#CC1CC(=[Se])NC1=[Te]", "4-cyano-5-telluroxopyrrolidine-2-selone"),
+    ],
+)
+def test_cyclic_imide_route_outranks_nitrile_without_replacing_member_suffixes(smiles: str, expected: str):
+    assert oc.name(smiles).name == expected

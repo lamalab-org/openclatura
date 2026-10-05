@@ -17,16 +17,17 @@ from .chalcogen_roles import (
     classify_peroxide_linkages,
     require_validated_chalcogens,
 )
-from .charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
 from .chalcogen_vocabulary import (
     resolve_acyl_rule,
     resolve_anhydride_rule,
     resolve_central_acid_rule,
+    resolve_imide_route_rule,
     resolve_nitrile_chalcogenide_rule,
     resolve_peroxol_rule,
     resolve_peroxy_acyl_rule,
     simple_group_key,
 )
+from .charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
 from .functional_groups import PERCEPTION_DETECTORS, PERCEPTION_SPECS, PerceptionDetectorSpec, metadata_for_group
 from .molecule import (
     AtomBinding,
@@ -1198,13 +1199,15 @@ def _cyclic_imide_group(
         attachment_atom=centers[0],
         shared_atoms=(nitrogen,),
     )
+    key, rule = resolve_imide_route_rule(descriptor)
     involved = {nitrogen, *centers, *(ligand.atom for ligand in double_ligands)}
     return PerceivedGroup(
-        descriptor.derivative.value,
+        key,
         True,
         centers[0],
         involved,
         descriptor=descriptor,
+        resolved_rule=rule,
     )
 
 

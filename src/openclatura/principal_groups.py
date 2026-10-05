@@ -4,7 +4,7 @@ from .assembly_parts import AssemblyParts, PrincipalGroupItem
 from .group_atom_roles import hydrazone_characteristic_carbon
 from .locants import parse_locant
 from .molecule import Molecule, bond_ids_within
-from .nomenclature import RULES
+from .nomenclature import RULES, FunctionalGroupCapability
 from .perception import PerceivedGroup, perceive_groups
 
 
@@ -28,15 +28,38 @@ def component_principal_key(perceived_groups: list[PerceivedGroup], is_substitue
     ]
     if not candidates:
         return None
+    route_markers = [
+        group
+        for group in candidates
+        if group.resolved_rule.has_capability(FunctionalGroupCapability.PROMOTES_MEMBER_GROUPS)
+    ]
+    renderable_candidates = [group for group in candidates if group not in route_markers]
+    if not renderable_candidates:
+        return None
     best = min(
-        candidates,
-        key=lambda group: (
-            (group.resolved_rule.seniority,)
-            if isinstance(group.resolved_rule.seniority, int)
-            else group.resolved_rule.seniority
-        ),
+        renderable_candidates,
+        key=lambda group: (_effective_seniority(group, route_markers), _seniority_tuple(group)),
     )
     return best.key
+
+
+def _seniority_tuple(group: PerceivedGroup) -> tuple[int, ...]:
+    seniority = group.resolved_rule.seniority
+    return (seniority,) if isinstance(seniority, int) else seniority
+
+
+def _effective_seniority(group: PerceivedGroup, route_markers: list[PerceivedGroup]) -> tuple[int, ...]:
+    priorities = [_seniority_tuple(group)]
+    if group.descriptor is None:
+        return priorities[0]
+    member_centers = set(group.descriptor.centers)
+    for marker in route_markers:
+        if marker.descriptor is None:
+            continue
+        route_centers = set(marker.descriptor.centers)
+        if member_centers and member_centers <= route_centers:
+            priorities.append(_seniority_tuple(marker))
+    return min(priorities)
 
 
 def partition_principal_and_prefix_groups(
