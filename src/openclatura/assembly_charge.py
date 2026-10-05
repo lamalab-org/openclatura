@@ -20,6 +20,12 @@ def positive_parent_n_charges(parts: AssemblyParts) -> list[ParentChargeItem]:
     return [charge for charge in parts.parent_charges if charge.symbol == "N" and charge.charge > 0]
 
 
+def has_sole_positive_parent_n_charge(parts: AssemblyParts) -> bool:
+    """Whether the parent carries exactly one charge, on a positive nitrogen."""
+
+    return len(parts.parent_charges) == 1 and len(positive_parent_n_charges(parts)) == 1
+
+
 _IUM_SUFFIX_ELEMENTS = frozenset({"N", "O", "S", "Se", "Te", "P", "As", "Sb", "Bi"})
 
 
@@ -30,7 +36,9 @@ def positive_parent_ium_charges(parts: AssemblyParts) -> list[ParentChargeItem]:
 
 
 def has_ionic_retained_parent(parts: AssemblyParts) -> bool:
-    return bool(parts.retained_name in RULES.charges.retained_ionic_n_parents and positive_parent_n_charges(parts))
+    return bool(
+        parts.retained_name in RULES.charges.retained_ionic_n_parents and has_sole_positive_parent_n_charge(parts)
+    )
 
 
 def has_retained_like_parent(parts: AssemblyParts) -> bool:
@@ -44,7 +52,7 @@ def has_retained_like_parent(parts: AssemblyParts) -> bool:
 def inferred_ionic_retained_parent(parts: AssemblyParts) -> str | None:
     if parts.retained_name or not parts.is_ring or parts.is_bicycle or parts.is_spiro or parts.is_polycycle:
         return None
-    if parts.unsaturations or len(positive_parent_n_charges(parts)) != 1:
+    if parts.unsaturations or not has_sole_positive_parent_n_charge(parts):
         return None
     aza_locs = [str(loc) for item in parts.a_prefixes if item.name == "aza" for loc in item.locants]
     if len(aza_locs) != 1:

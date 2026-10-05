@@ -4566,6 +4566,20 @@ def test_pyopsin_regression_names_preserve_positive_nitrogen_charge():
         assert name_smiles(smiles) == expected
 
 
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("O=C[C-]1[NH2+]CCC1=O", "3-oxopyrrolidin-1-ium-2-ide-2-carbaldehyde"),
+        ("CC(=O)[C-]1[NH2+]CCC1=O", "2-acetyl-3-oxopyrrolidin-1-ium-2-ide"),
+        ("CC1CC(=O)[C-]([NH2+]1)C=O", "5-methyl-3-oxopyrrolidin-1-ium-2-ide-2-carbaldehyde"),
+        ("CC1C[NH2+][C-](C=O)C1=O", "4-methyl-3-oxopyrrolidin-1-ium-2-ide-2-carbaldehyde"),
+        ("OC1C[NH2+][C-](C=O)C1=O", "4-hydroxy-3-oxopyrrolidin-1-ium-2-ide-2-carbaldehyde"),
+    ],
+)
+def test_retained_ionic_parent_contraction_requires_a_sole_parent_charge(smiles, expected):
+    assert name_smiles(smiles) == expected
+
+
 def test_parent_charge_layer_uses_structured_sites_and_charge_filters():
     mol = read_smiles("[O-]C(=O)C[NH+]1CCC1")
     numbering = {3: "1", 4: "2", 5: "3", 6: "4"}
