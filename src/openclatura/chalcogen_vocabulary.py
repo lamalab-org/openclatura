@@ -155,7 +155,7 @@ def resolve_acyl_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, Funct
     try:
         policy = _derivative_policy("acyl", descriptor.derivative)
     except KeyError:
-        raise ValueError(f"Unsupported acyl derivative descriptor: {descriptor.derivative.value}")
+        raise ValueError(f"Unsupported acyl derivative descriptor: {descriptor.derivative.value}") from None
     if descriptor.derivative is DerivativeKind.ACID:
         site_template = "acid_site_element" if single_element is not double_ligand.element else "acid_site_same"
         site = RULES.chalcogens.templates[site_template].format(element=single_element.value)
@@ -210,7 +210,6 @@ def resolve_peroxol_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, Fu
     """Resolve the ordered R-E1-E2-H path using Blue Book Table 6.1."""
 
     first, terminal = descriptor.ligands
-    pair = (first.element, terminal.element)
     policy = RULES.chalcogens.peroxol_rules[(first.element.value, terminal.element.value)]
     family_policy = RULES.chalcogens.policies["peroxol"]
     key = f"peroxol_{first.element.value}_{terminal.element.value}"
@@ -289,7 +288,7 @@ def resolve_peroxy_acyl_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str
     try:
         policy = _derivative_policy("peroxy_acyl", descriptor.derivative)
     except KeyError:
-        raise ValueError(f"Unsupported peroxy acyl derivative: {descriptor.derivative.value}")
+        raise ValueError(f"Unsupported peroxy acyl derivative: {descriptor.derivative.value}") from None
     if descriptor.derivative is DerivativeKind.ACID:
         suffix = f"{acid_suffix}{site}"
     else:
@@ -427,7 +426,7 @@ def resolve_central_acid_rule(descriptor: FunctionalGroupDescriptor) -> tuple[st
         try:
             policy = _derivative_policy("central_peroxy", descriptor.derivative)
         except KeyError:
-            raise ValueError(f"Unsupported central peroxy derivative: {descriptor.derivative.value}")
+            raise ValueError(f"Unsupported central peroxy derivative: {descriptor.derivative.value}") from None
         if descriptor.derivative is DerivativeKind.ACID:
             suffix = acid_suffix
             seniority = (

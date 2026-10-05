@@ -225,16 +225,6 @@ class FunctionalGroupRules:
             raise KeyError(f"No seniority metadata for functional-group keys: {keys!r}")
         return min(principal_rules, key=lambda rule: rule.seniority)
 
-    def most_senior_rule(self, rules: list[FunctionalGroupRule]) -> FunctionalGroupRule:
-        """Return the senior resolved rule, including instance-specific rules."""
-
-        candidates = [rule for rule in rules if rule.seniority is not None]
-        if not candidates:
-            raise KeyError("No seniority metadata for resolved functional groups")
-        return min(
-            candidates, key=lambda rule: (rule.seniority,) if isinstance(rule.seniority, int) else rule.seniority
-        )
-
     def keys_with_family(self, family: str) -> set[str]:
         return {key for key, rule in self.by_key.items() if family in rule.families}
 
@@ -294,13 +284,11 @@ def _functional_group_rules() -> FunctionalGroupRules:
         )
     chalcogen_group = grouped_namer_rules()["chalcogen_nomenclature"]
     templates = chalcogen_group.mapping("chalcogen_templates")
+    leaving_policy = chalcogen_group.mapping("chalcogen_rule_policies")["acyl"]["acid_halide"]
     leaving_capabilities = frozenset(
-        {
-            FunctionalGroupCapability.ACID_HALIDE,
-            FunctionalGroupCapability.ACYL_LEAVING_GROUP,
-            FunctionalGroupCapability.CHAIN_EXTERNAL_CARBONYL,
-        }
+        FunctionalGroupCapability(capability) for capability in leaving_policy["capabilities"]
     )
+    leaving_families = tuple(leaving_policy["families"])
     for item in chalcogen_group.mapping("chalcogen_acyl_leaving_groups").values():
         prefix = templates["ordinary_acyl_leaving_prefix"].format(prefix=item["prefix"])
         for external, key_field, suffix_template in (
@@ -315,10 +303,10 @@ def _functional_group_rules() -> FunctionalGroupRules:
                 suffix=templates[suffix_template].format(word=item["word"]),
                 multi_suffix=MultiSuffixTemplate((0, 1)),
                 suffix_multiplier_positions=(0, 1),
-                seniority=(50, int(item["rank"])),
+                seniority=(int(leaving_policy["seniority"]), int(item["rank"])),
                 suffix_with_locant=external,
                 needs_locant=True,
-                families=("acid_halide", "chain_external_carbonyl"),
+                families=leaving_families,
                 capabilities=leaving_capabilities,
             )
     return FunctionalGroupRules(by_key=groups)

@@ -377,7 +377,7 @@ def peroxide_linkage_result(
             return None
         names.append(rendered)
     class_name = peroxide_class_name(elements)
-    if elements[0] is elements[1] or names[0] == names[1]:
+    if names[0] == names[1]:
         counts = count_names(names)
         ligand_text = " ".join(
             format_multiplier(name, counts[name]) for name in sorted(counts, key=substituent_sort_key)
