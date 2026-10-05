@@ -33,12 +33,24 @@ def component_principal_key(perceived_groups: list[PerceivedGroup], is_substitue
         for group in candidates
         if group.resolved_rule.has_capability(FunctionalGroupCapability.PROMOTES_MEMBER_GROUPS)
     ]
+    promotion_markers = [
+        marker
+        for marker in route_markers
+        if not any(
+            candidate is not marker
+            and candidate.resolved_rule.has_capability(FunctionalGroupCapability.ESTER_LIKE)
+            and marker.descriptor is not None
+            and candidate.descriptor is not None
+            and set(marker.descriptor.centers).isdisjoint(candidate.descriptor.centers)
+            for candidate in candidates
+        )
+    ]
     renderable_candidates = [group for group in candidates if group not in route_markers]
     if not renderable_candidates:
         return None
     best = min(
         renderable_candidates,
-        key=lambda group: (_effective_seniority(group, route_markers), _seniority_tuple(group)),
+        key=lambda group: (_effective_seniority(group, promotion_markers), _seniority_tuple(group)),
     )
     return best.key
 
