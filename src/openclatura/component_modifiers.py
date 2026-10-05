@@ -59,7 +59,7 @@ def add_component_front_modifiers(
             modifier_atoms = subgraph_component(mol, r_group_c, sub_exclude | {single_o})
             modifier = strip_outer_parentheses(branch_name)
             if group.descriptor is not None:
-                linkers = group.descriptor.ligands_with_role(ChalcogenLigandRole.ORGANIC_LINK)
+                linkers = group.descriptor.ligands_with_role(ChalcogenLigandRole.CARBON_LINK)
                 double_ligands = group.descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED)
                 if (
                     linkers

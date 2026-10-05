@@ -1024,7 +1024,7 @@ def _acyl_chalcogen_group(
         in {
             ChalcogenLigandRole.HYDROGEN_BEARING,
             ChalcogenLigandRole.ANIONIC,
-            ChalcogenLigandRole.ORGANIC_LINK,
+            ChalcogenLigandRole.CARBON_LINK,
             ChalcogenLigandRole.CHALCOGEN_LINK,
         }
     ]
@@ -1047,7 +1047,7 @@ def _acyl_chalcogen_group(
             derivative_by_role = {
                 ChalcogenLigandRole.HYDROGEN_BEARING: DerivativeKind.ACID,
                 ChalcogenLigandRole.ANIONIC: DerivativeKind.ANION,
-                ChalcogenLigandRole.ORGANIC_LINK: DerivativeKind.ESTER,
+                ChalcogenLigandRole.CARBON_LINK: DerivativeKind.ESTER,
             }
             derivative = derivative_by_role.get(terminal_ligand.role)
             if derivative is None:
@@ -1071,7 +1071,7 @@ def _acyl_chalcogen_group(
                 resolved_rule=rule,
             )
         if (
-            single_ligand.role is ChalcogenLigandRole.ORGANIC_LINK
+            single_ligand.role is ChalcogenLigandRole.CARBON_LINK
             and carbon in cyclic_atoms
             and single_ligand.atom in cyclic_atoms
             and _closes_ring_back_to(mol, carbon, single_ligand.atom, double_ligand.atom, cyclic_atoms)
@@ -1080,7 +1080,7 @@ def _acyl_chalcogen_group(
         derivative_by_role = {
             ChalcogenLigandRole.HYDROGEN_BEARING: DerivativeKind.ACID,
             ChalcogenLigandRole.ANIONIC: DerivativeKind.ANION,
-            ChalcogenLigandRole.ORGANIC_LINK: DerivativeKind.ESTER,
+            ChalcogenLigandRole.CARBON_LINK: DerivativeKind.ESTER,
         }
         derivative = derivative_by_role[single_ligand.role]
         descriptor = FunctionalGroupDescriptor(
@@ -1226,11 +1226,11 @@ def _chalcogen_anhydride_groups(mol: Molecule, consumed: set[int]) -> list[Perce
                 continue
             first_bridge = classify_chalcogen_ligand(mol, first_center.idx, first_bridge_atom)
             if first_bridge is None or first_bridge.role not in {
-                ChalcogenLigandRole.ORGANIC_LINK,
+                ChalcogenLigandRole.CARBON_LINK,
                 ChalcogenLigandRole.CHALCOGEN_LINK,
             }:
                 continue
-            if first_bridge.role is ChalcogenLigandRole.ORGANIC_LINK:
+            if first_bridge.role is ChalcogenLigandRole.CARBON_LINK:
                 second_center = first_bridge.attachment_atom
                 bridge_atoms = (first_bridge_atom,)
                 bridge_ligands = (first_bridge,)
@@ -1239,7 +1239,7 @@ def _chalcogen_anhydride_groups(mol: Molecule, consumed: set[int]) -> list[Perce
                 if second_bridge_atom is None:
                     continue
                 second_bridge = classify_chalcogen_ligand(mol, first_bridge_atom, second_bridge_atom)
-                if second_bridge is None or second_bridge.role is not ChalcogenLigandRole.ORGANIC_LINK:
+                if second_bridge is None or second_bridge.role is not ChalcogenLigandRole.CARBON_LINK:
                     continue
                 second_center = second_bridge.attachment_atom
                 bridge_atoms = (first_bridge_atom, second_bridge_atom)
@@ -1358,7 +1358,7 @@ def _central_chalcogen_derivative(
         in {
             ChalcogenLigandRole.HYDROGEN_BEARING,
             ChalcogenLigandRole.ANIONIC,
-            ChalcogenLigandRole.ORGANIC_LINK,
+            ChalcogenLigandRole.CARBON_LINK,
             ChalcogenLigandRole.CHALCOGEN_LINK,
         }
     ]
@@ -1377,7 +1377,7 @@ def _central_chalcogen_derivative(
             derivative = {
                 ChalcogenLigandRole.HYDROGEN_BEARING: DerivativeKind.ACID,
                 ChalcogenLigandRole.ANIONIC: DerivativeKind.ANION,
-                ChalcogenLigandRole.ORGANIC_LINK: DerivativeKind.ESTER,
+                ChalcogenLigandRole.CARBON_LINK: DerivativeKind.ESTER,
             }.get(terminal_end.role)
             if derivative is None:
                 return None
@@ -1387,7 +1387,7 @@ def _central_chalcogen_derivative(
             derivative = {
                 ChalcogenLigandRole.HYDROGEN_BEARING: DerivativeKind.ACID,
                 ChalcogenLigandRole.ANIONIC: DerivativeKind.ANION,
-                ChalcogenLigandRole.ORGANIC_LINK: DerivativeKind.ESTER,
+                ChalcogenLigandRole.CARBON_LINK: DerivativeKind.ESTER,
             }[terminal.role]
             descriptor_ligands = (*double_ligands, terminal)
             group_atoms.add(terminal.atom)

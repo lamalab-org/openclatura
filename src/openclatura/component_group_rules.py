@@ -75,7 +75,7 @@ def exclude_nonparent_group_atoms(
             and group.descriptor.derivative is DerivativeKind.ESTER
         ):
             atom_indices.update(
-                ligand.atom for ligand in group.descriptor.ligands if ligand.role is ChalcogenLigandRole.ORGANIC_LINK
+                ligand.atom for ligand in group.descriptor.ligands if ligand.role is ChalcogenLigandRole.CARBON_LINK
             )
         if (
             not atom_indices
@@ -88,7 +88,7 @@ def exclude_nonparent_group_atoms(
         if group.descriptor is not None and group.descriptor.family is FunctionalFamily.CENTRAL_ACID:
             atom_indices.update(group.descriptor.centers)
             atom_indices.update(
-                ligand.atom for ligand in group.descriptor.ligands if ligand.role is ChalcogenLigandRole.ORGANIC_LINK
+                ligand.atom for ligand in group.descriptor.ligands if ligand.role is ChalcogenLigandRole.CARBON_LINK
             )
         exclude_atoms.update(atom_idx for atom_idx in atom_indices if atom_idx not in cyclic_atoms_all)
 

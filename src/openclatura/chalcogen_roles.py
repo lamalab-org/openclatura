@@ -49,7 +49,8 @@ class ChalcogenLigandRole(StrEnum):
     DOUBLE_BONDED = "double_bonded"
     HYDROGEN_BEARING = "hydrogen_bearing"
     ANIONIC = "anionic"
-    ORGANIC_LINK = "organic_link"
+    CARBON_LINK = "carbon_link"
+    HETEROATOM_LINK = "heteroatom_link"
     CHALCOGEN_LINK = "chalcogen_link"
 
 
@@ -155,12 +156,14 @@ def classify_chalcogen_ligand(
         elif atom.total_h_count > 0 and not side and atom.radical_electrons == 0:
             role = ChalcogenLigandRole.HYDROGEN_BEARING
             attachment = None
-        elif len(side) == 1 and chalcogen_for_symbol(mol.atoms[side[0]].symbol) is not None:
-            role = ChalcogenLigandRole.CHALCOGEN_LINK
-            attachment = side[0]
         elif len(side) == 1:
-            role = ChalcogenLigandRole.ORGANIC_LINK
             attachment = side[0]
+            if chalcogen_for_symbol(mol.atoms[attachment].symbol) is not None:
+                role = ChalcogenLigandRole.CHALCOGEN_LINK
+            elif mol.atoms[attachment].is_carbon:
+                role = ChalcogenLigandRole.CARBON_LINK
+            else:
+                role = ChalcogenLigandRole.HETEROATOM_LINK
         else:
             return None
     return ChalcogenLigand(
@@ -173,11 +176,11 @@ def classify_chalcogen_ligand(
     )
 
 
-def classify_peroxide_linkage(
+def classify_peroxide_linkages(
     mol: Molecule,
     component_atoms: set[int],
-) -> FunctionalGroupDescriptor | None:
-    """Return the unique acyclic R-E-E-R' linkage spanning a component."""
+) -> tuple[FunctionalGroupDescriptor, ...]:
+    """Return every acyclic carbon-E-E-carbon linkage in a component."""
 
     candidates = []
     for bond in mol.bonds.values():
@@ -217,14 +220,24 @@ def classify_peroxide_linkage(
         ):
             continue
         candidates.append((bond.u, bond.v, left_sides[0], right_sides[0]))
-    if len(candidates) != 1:
-        return None
-    left, right, left_attachment, right_attachment = candidates[0]
-    return FunctionalGroupDescriptor(
-        family=FunctionalFamily.PEROXIDE,
-        derivative=DerivativeKind.NEUTRAL_LINK,
-        centers=(left, right),
-        ligands=(),
-        linker_paths=((left_attachment, left, right, right_attachment),),
-        attachment_atom=left_attachment,
+    return tuple(
+        FunctionalGroupDescriptor(
+            family=FunctionalFamily.PEROXIDE,
+            derivative=DerivativeKind.NEUTRAL_LINK,
+            centers=(left, right),
+            ligands=(),
+            linker_paths=((left_attachment, left, right, right_attachment),),
+            attachment_atom=left_attachment,
+        )
+        for left, right, left_attachment, right_attachment in candidates
     )
+
+
+def classify_peroxide_linkage(
+    mol: Molecule,
+    component_atoms: set[int],
+) -> FunctionalGroupDescriptor | None:
+    """Return a linkage only when the component has one unambiguous instance."""
+
+    linkages = classify_peroxide_linkages(mol, component_atoms)
+    return linkages[0] if len(linkages) == 1 else None

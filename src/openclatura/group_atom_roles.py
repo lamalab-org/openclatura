@@ -12,7 +12,7 @@ def bridge_oxygen(mol: Molecule, group: PerceivedGroup) -> int | None:
 
 def ester_single_oxygen(mol: Molecule, group: PerceivedGroup) -> int | None:
     if group.descriptor is not None:
-        linkers = group.descriptor.ligands_with_role(ChalcogenLigandRole.ORGANIC_LINK)
+        linkers = group.descriptor.ligands_with_role(ChalcogenLigandRole.CARBON_LINK)
         if linkers:
             return linkers[0].atom
     return next(
