@@ -119,6 +119,28 @@ def ester_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
 def central_ester_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     """Render an ester prefix from its resolved central-acid vocabulary."""
 
+    descriptor = group.descriptor
+    if descriptor is not None:
+        linkers = descriptor.ligands_with_role(ChalcogenLigandRole.CARBON_LINK)
+        base = central_linkage_prefix(descriptor)
+        if len(linkers) == 1 and base:
+            linker = linkers[0]
+            attachment = linker.attachment_atom
+            if attachment is not None:
+                branch = rendered_substituent_text(
+                    context.branch_namer(
+                        context.mol,
+                        attachment,
+                        context.sub_exclude | {linker.atom},
+                        upstream_atom=linker.atom,
+                    )
+                )
+                ligand = format_element_substituent(
+                    "",
+                    branch,
+                    chalcogen_substituent_suffix(linker.element),
+                )
+                return f"({strip_outer_parentheses(ligand)}{base})"
     return ester_prefix_from_group(
         context.mol,
         group,

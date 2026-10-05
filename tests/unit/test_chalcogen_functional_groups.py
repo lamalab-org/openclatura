@@ -611,6 +611,12 @@ def test_subordinate_central_linkages_use_data_defined_substitutive_prefixes(smi
     assert oc.name(smiles).name == expected
 
 
+def test_subordinate_central_ester_preserves_its_linker_element():
+    assert oc.name("CSS(=O)C[C@H](N)C(=O)O").name == (
+        "(2R)-2-amino-3-(methylsulfanylsulfinyl)propanoic acid"
+    )
+
+
 def test_polonium_is_parseable_but_has_an_explicit_unvalidated_boundary():
     mol = read_smiles("C[PoH]")
 
