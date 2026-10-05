@@ -237,6 +237,12 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                     groups.append(PerceivedGroup("nitroso", False, adj_atoms[0], {atom.idx, oxygens[0]}))
                     consumed.update([atom.idx, oxygens[0]])
 
+    for atom in mol:
+        imide_group = _cyclic_imide_group(mol, atom.idx, consumed, cyclic_atoms)
+        if imide_group is not None:
+            groups.append(imide_group)
+            consumed.update(imide_group.atoms_involved)
+
     # P-66.3.1: acyl hydrazides outrank the hydrazine chain roles that would otherwise consume the N-N.
     for atom in mol:
         if not atom.is_carbon or atom.idx in consumed or atom.idx in cyclic_atoms:
@@ -1144,6 +1150,59 @@ def _acyl_pseudohalide_group(
         False,
         attachment,
         {carbon, double_ligand.atom, *leaving_group.atom_ids},
+        descriptor=descriptor,
+    )
+
+
+def _cyclic_imide_group(
+    mol: Molecule,
+    nitrogen: int,
+    consumed: set[int],
+    cyclic_atoms: set[int],
+) -> PerceivedGroup | None:
+    """Return an eligible cyclic imide with two acyl centers sharing nitrogen."""
+
+    atom = mol.atoms[nitrogen]
+    if atom.symbol != "N" or atom.charge or nitrogen in consumed or nitrogen not in cyclic_atoms:
+        return None
+    centers = tuple(
+        sorted(
+            neighbor
+            for neighbor in mol.get_neighbors(nitrogen)
+            if neighbor in cyclic_atoms
+            and mol.atoms[neighbor].is_carbon
+            and mol.get_bond(nitrogen, neighbor).order == 1
+        )
+    )
+    if len(centers) != 2:
+        return None
+    if any(
+        neighbor not in centers and mol.get_bond(nitrogen, neighbor).order != 1
+        for neighbor in mol.get_neighbors(nitrogen)
+    ):
+        return None
+    ligands = tuple(_terminal_double_chalcogen(mol, center, consumed) for center in centers)
+    if any(ligand is None for ligand in ligands):
+        return None
+    double_ligands = tuple(ligand for ligand in ligands if ligand is not None)
+    blocked = {nitrogen, *(ligand.atom for ligand in double_ligands)}
+    if not _connected_without_bridge(mol, centers[0], centers[1], blocked):
+        return None
+    descriptor = FunctionalGroupDescriptor(
+        family=FunctionalFamily.ACYL,
+        derivative=DerivativeKind.IMIDE,
+        centers=centers,
+        ligands=double_ligands,
+        linker_paths=((centers[0], nitrogen, centers[1]),),
+        attachment_atom=centers[0],
+        shared_atoms=(nitrogen,),
+    )
+    involved = {nitrogen, *centers, *(ligand.atom for ligand in double_ligands)}
+    return PerceivedGroup(
+        descriptor.derivative.value,
+        True,
+        centers[0],
+        involved,
         descriptor=descriptor,
     )
 

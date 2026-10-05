@@ -2,7 +2,7 @@
 
 import pytest
 
-from openclatura.chalcogen_roles import AcylLeavingGroup, DerivativeKind, FunctionalFamily
+from openclatura.chalcogen_roles import AcylLeavingGroup, Chalcogen, DerivativeKind, FunctionalFamily
 from openclatura.graph_io import read_smiles
 from openclatura.perception import perceive_groups
 
@@ -60,3 +60,38 @@ def test_acyl_pseudohalide_owns_complete_leaving_unit(smiles: str, kind: AcylLea
     assert len(descriptor.leaving_group.bond_ids) == unit_size
     assert set(descriptor.leaving_group.atom_ids) <= matches[0].atoms_involved
     assert set(descriptor.leaving_group.bond_ids) <= matches[0].bond_ids
+
+
+@pytest.mark.parametrize(
+    ("smiles", "elements"),
+    [
+        ("N#CC1CC(=O)NC1=O", {Chalcogen.OXYGEN}),
+        ("N#CC1CC(=[Se])NC1=[Te]", {Chalcogen.SELENIUM, Chalcogen.TELLURIUM}),
+    ],
+)
+def test_eligible_cyclic_imide_owns_both_acyl_centers(smiles: str, elements: set[Chalcogen]):
+    matches = [
+        group
+        for group in perceive_groups(read_smiles(smiles))
+        if group.descriptor is not None and group.descriptor.derivative is DerivativeKind.IMIDE
+    ]
+
+    assert len(matches) == 1
+    group = matches[0]
+    descriptor = group.descriptor
+    assert len(descriptor.centers) == 2
+    assert len(descriptor.shared_atoms) == 1
+    assert descriptor.linker_paths == ((descriptor.centers[0], descriptor.shared_atoms[0], descriptor.centers[1]),)
+    assert {ligand.element for ligand in descriptor.ligands} == elements
+    assert descriptor.atom_ids <= group.atom_ids
+    assert {ligand.bond_id for ligand in descriptor.ligands} <= group.bond_ids
+
+
+def test_acyclic_shared_nitrogen_is_not_promoted_to_retained_imide():
+    matches = [
+        group
+        for group in perceive_groups(read_smiles("CC(=O)NC(C)=O"))
+        if group.descriptor is not None and group.descriptor.derivative is DerivativeKind.IMIDE
+    ]
+
+    assert matches == []

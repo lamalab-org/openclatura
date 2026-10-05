@@ -76,6 +76,7 @@ class DerivativeKind(StrEnum):
     AMIDE = "amide"
     HYDRAZIDE = "hydrazide"
     UREA = "urea"
+    IMIDE = "imide"
     ANHYDRIDE = "anhydride"
     ACID_HALIDE = "acid_halide"
     ACYL_PSEUDOHALIDE = "acyl_pseudohalide"
@@ -132,6 +133,7 @@ class FunctionalGroupDescriptor:
     is_external: bool = False
     central_element: Chalcogen | None = None
     leaving_group: LeavingGroupDescriptor | None = None
+    shared_atoms: tuple[int, ...] = ()
 
     @property
     def atom_ids(self) -> frozenset[int]:
@@ -144,6 +146,7 @@ class FunctionalGroupDescriptor:
             atoms.update(path)
         if self.leaving_group is not None:
             atoms.update(self.leaving_group.atom_ids)
+        atoms.update(self.shared_atoms)
         return frozenset(atoms)
 
     def ligands_with_role(self, role: ChalcogenLigandRole) -> tuple[ChalcogenLigand, ...]:
