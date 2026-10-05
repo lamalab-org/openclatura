@@ -85,9 +85,9 @@ def _functional_class_linkage_defers_to_principal_group(
 ) -> bool:
     """Keep composable linkage classes below a renderable principal group.
 
-    Mixed-chalcogen peroxide names are useful whole-component fallbacks, but
-    the perceived linkage remains non-principal.  Its functional-class shortcut
-    must therefore not bypass the ordinary principal-group pipeline.
+    Whole-component functional-class names are useful fallbacks, but a
+    non-principal descriptor must not bypass the ordinary principal-group
+    pipeline.
     """
 
     if principal_key is None:
@@ -95,7 +95,11 @@ def _functional_class_linkage_defers_to_principal_group(
     return any(
         not group.is_principal_candidate
         and group.descriptor is not None
-        and group.descriptor.family is FunctionalFamily.PEROXIDE
+        and group.descriptor.family
+        in {
+            FunctionalFamily.PEROXIDE,
+            FunctionalFamily.NITROGEN_CHALCOGENIDE,
+        }
         for group in groups
     )
 
