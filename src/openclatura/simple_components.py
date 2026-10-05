@@ -39,6 +39,40 @@ def single_atom_component_name(mol: Molecule, component_atoms: set[int]) -> str:
     return ""
 
 
+def is_generic_atomic_charge_component(mol: Molecule, component_atoms: set[int]) -> bool:
+    """Return whether a charged atom is named only by fallback charge notation."""
+
+    if len(component_atoms) != 1:
+        return False
+    atom = mol.atoms[next(iter(component_atoms))]
+    if atom.charge == 0 or atom.isotope is not None or atom.total_h_count != 0:
+        return False
+    if atom.charge > 0 and atom.symbol in RULES.ions.single_atom_cations:
+        return False
+    if atom.charge < 0 and atom.symbol in RULES.ions.single_atom_anions:
+        return False
+    return (atom.symbol, atom.charge, atom.total_h_count) not in RULES.ions.mononuclear_hydride_ions
+
+
+def unsupported_generic_atomic_salt_components(
+    mol: Molecule, components: list[set[int]]
+) -> tuple[set[int], ...]:
+    """Return fallback atomic ions paired with an opposite-charge component.
+
+    Atomic charge notation is unambiguous for an isolated ion. In a salt name,
+    OPSIN treats an unregistered element-plus-counterion phrase as a covalent
+    composition instead, so the current grammar cannot safely represent it.
+    """
+
+    charges = [sum(mol.atoms[idx].charge for idx in component) for component in components]
+    return tuple(
+        component
+        for component, charge in zip(components, charges, strict=True)
+        if is_generic_atomic_charge_component(mol, component)
+        and any(charge * other_charge < 0 for other_charge in charges)
+    )
+
+
 def component_graph_signature(
     mol: Molecule, component_atoms: set[int]
 ) -> tuple[tuple[tuple[str, int], ...], tuple[tuple[str, str, int], ...]]:

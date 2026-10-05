@@ -30,6 +30,27 @@ def test_existing_simple_ion_names_are_preserved():
     assert name_smiles("[Mg+2].[Cl-].[Cl-]") == "magnesium dichloride"
 
 
+@pytest.mark.parametrize(
+    "smiles",
+    [
+        "[Al+3].[Cl-].[Cl-].[Cl-]",
+        "[Sn+2].[Cl-].[Cl-]",
+        "[Bi+3].[Cl-].[Cl-].[Cl-]",
+        "[Pb+2].[Cl-].[Cl-]",
+    ],
+)
+def test_unregistered_atomic_salt_compositions_abstain(smiles):
+    result = name(smiles)
+
+    assert result.name == ""
+    assert "Salt composition is not supported for generic atomic charge components" in result.error
+
+
+def test_generic_atomic_charge_notation_remains_available_without_a_counterion():
+    assert name_smiles("[Fe+2]") == "iron(2+)"
+    assert name_smiles("[Cl+].[Na+]") == "sodium chlorine(1+)"
+
+
 def test_neutral_atomic_hydrogen_uses_element_name():
     assert name_smiles("[H]") == "hydrogen"
 

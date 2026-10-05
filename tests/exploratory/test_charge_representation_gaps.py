@@ -23,10 +23,10 @@ charge: [Al+3] paired with three chlorides came out as "alumane
 trichloride" (confirmed by OPSIN reparsing back to neutral covalent AlCl3,
 not the ionic input). Fixed by requiring ``atom.charge == 0`` before using
 the hydride-name fallback, matching the sibling branch right above it.
-Generic monatomic charge notation now names the charged atom itself without
-pretending it is a neutral hydride. OPSIN still chooses neutral covalent
-graphs for the complete metal-halide names; those remain explicit verifier
-mismatches rather than naming failures or silently dropped charges.
+Generic monatomic charge notation now names an isolated charged atom itself
+without pretending it is a neutral hydride. Complete metal-halide names are
+rejected when the metal is not in the supported salt-ion registry, because
+OPSIN reads that phrase as a different, covalent graph.
 
 Bug 3 -- azinic_acid_result was completely broken (FIXED): every single
 invocation via name_one(verify_opsin=True) failed a "final assembly audit"
@@ -158,20 +158,18 @@ def test_single_atom_component_name_checks_charge_sign_directly():
 
 
 @pytest.mark.parametrize(
-    ("smiles", "expected_name"),
+    "smiles",
     [
-        ("[Al+3].[Cl-].[Cl-].[Cl-]", "aluminium(3+) trichloride"),
-        ("[Sn+2].[Cl-].[Cl-]", "tin(2+) dichloride"),
-        ("[Bi+3].[Cl-].[Cl-].[Cl-]", "bismuth(3+) trichloride"),
-        ("[Pb+2].[Cl-].[Cl-]", "lead(2+) dichloride"),
+        "[Al+3].[Cl-].[Cl-].[Cl-]",
+        "[Sn+2].[Cl-].[Cl-]",
+        "[Bi+3].[Cl-].[Cl-].[Cl-]",
+        "[Pb+2].[Cl-].[Cl-]",
     ],
 )
-def test_charged_metal_atoms_are_not_named_as_neutral_hydrides(smiles, expected_name):
+def test_charged_metal_salts_abstain_instead_of_naming_a_different_graph(smiles):
     result = name_one(smiles, verify_opsin=True)
-    assert result.error is None, (smiles, result.error)
-    assert result.name == expected_name
-    assert result.opsin_check is not None
-    assert result.opsin_check.status == "mismatched"
+    assert result.name == ""
+    assert "Salt composition is not supported for generic atomic charge components" in result.error
 
 
 def test_neutral_group13_hydrides_are_unaffected_by_the_charge_guard():

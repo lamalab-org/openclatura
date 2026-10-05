@@ -20,8 +20,10 @@ from .graph_io import get_connected_components, read_rdkit_mol, read_smiles
 from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
 from .name_assembly import set_token_span_building
 from .namer_config import SALT_METAL_NAMES
+from .naming_audit import UnnamedAtomError
 from .operations import infer_operations
 from .opsin_verify import OpsinCheck, verify_with_opsin
+from .simple_components import unsupported_generic_atomic_salt_components
 from .trace_helpers import attach_main_parent_decisions, trace_decision
 
 # Blue-Book-style rule identifiers (P-12, P-23.2.5, P-66.1.2.4 etc.).
@@ -418,8 +420,10 @@ class NamingEngine:
         if not mol.atoms:
             return ""
 
+        components = get_connected_components(mol)
+        self._validate_component_composition(mol, components)
         names = []
-        for component in get_connected_components(mol):
+        for component in components:
             component_name = self._name_component(
                 mol,
                 component,
@@ -452,6 +456,7 @@ class NamingEngine:
             return NameAnalysis(name="", trace_segments=[], decisions=decisions.steps)
 
         components = get_connected_components(mol)
+        self._validate_component_composition(mol, components)
         trace_decision(
             decisions,
             TracePhase.COMPONENT,
@@ -498,6 +503,17 @@ class NamingEngine:
             decisions=decisions.steps,
             substituent_tree=substituent_tree,
             operations=infer_operations(decisions.steps, trace_segments),
+        )
+
+    @staticmethod
+    def _validate_component_composition(mol: Molecule, components: list[set[int]]) -> None:
+        unsupported = unsupported_generic_atomic_salt_components(mol, components)
+        if not unsupported:
+            return
+        atoms = [mol.atoms[next(iter(component))] for component in unsupported]
+        details = ", ".join(f"{atom.symbol}{atom.charge:+d}" for atom in atoms)
+        raise UnnamedAtomError(
+            "Salt composition is not supported for generic atomic charge components: " + details
         )
 
     @staticmethod
