@@ -241,7 +241,6 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
         imide_group = _cyclic_imide_group(mol, atom.idx, consumed, cyclic_atoms)
         if imide_group is not None:
             groups.append(imide_group)
-            consumed.update(imide_group.atoms_involved)
 
     # P-66.3.1: acyl hydrazides outrank the hydrazine chain roles that would otherwise consume the N-N.
     for atom in mol:
@@ -1145,12 +1144,14 @@ def _acyl_pseudohalide_group(
         is_external=external,
         leaving_group=leaving_group,
     )
+    key, rule = resolve_acyl_rule(descriptor, leaving_group=leaving_group.kind)
     return PerceivedGroup(
-        descriptor.derivative.value,
-        False,
+        key,
+        True,
         attachment,
         {carbon, double_ligand.atom, *leaving_group.atom_ids},
         descriptor=descriptor,
+        resolved_rule=rule,
     )
 
 
