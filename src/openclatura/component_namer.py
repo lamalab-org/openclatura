@@ -92,15 +92,22 @@ def _functional_class_linkage_defers_to_principal_group(
 
     if principal_key is None:
         return False
-    return any(
-        not group.is_principal_candidate
+    principal_groups = [group for group in groups if group.is_principal_candidate]
+    functional_classes = [
+        group
+        for group in groups
+        if not group.is_principal_candidate
         and group.descriptor is not None
         and group.descriptor.family
         in {
             FunctionalFamily.PEROXIDE,
             FunctionalFamily.NITROGEN_CHALCOGENIDE,
         }
-        for group in groups
+    ]
+    return any(
+        principal.atom_ids.isdisjoint(functional_class.atom_ids)
+        for principal in principal_groups
+        for functional_class in functional_classes
     )
 
 
