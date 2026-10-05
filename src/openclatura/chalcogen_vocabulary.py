@@ -366,6 +366,22 @@ def resolve_anhydride_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, 
     )
 
 
+def resolve_imide_route_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, FunctionalGroupRule]:
+    """Return the data-defined priority marker for an imide's member groups."""
+
+    if descriptor.derivative is not DerivativeKind.IMIDE:
+        raise ValueError(f"Expected an imide descriptor, got: {descriptor.derivative.value}")
+    policy = RULES.chalcogens.policies["imide_route"]
+    key = policy["key"]
+    return key, FunctionalGroupRule(
+        key=key,
+        role="principal",
+        seniority=int(policy["seniority"]),
+        families=tuple(policy["families"]),
+        capabilities=_capabilities(policy),
+    )
+
+
 def resolve_central_acid_rule(
     descriptor: FunctionalGroupDescriptor,
     *,
@@ -392,15 +408,23 @@ def resolve_central_acid_rule(
         first_linker, terminal = terminal_ligands
         double_infix = _replacement_infix(tuple(ligand.element for ligand in double_ligands))
         linker_infix = _peroxo_infix(first_linker.element, terminal.element)
-        origin_prefix = f"{origin_stem}{'o' if double_infix else ''}{double_infix}"
+        origin_prefix = RULES.chalcogens.templates["central_origin_with_infix"].format(
+            stem=origin_stem, infix=double_infix
+        ) if double_infix else origin_stem
         ordinary_peroxo = first_linker.element is Chalcogen.OXYGEN and terminal.element is Chalcogen.OXYGEN
         if ordinary_peroxo:
-            acid_suffix = f"{origin_prefix}operoxoic acid"
-            ester_suffix = f"{origin_prefix}operoxoate"
+            acid_suffix = RULES.chalcogens.templates["central_peroxy_acid"].format(origin=origin_prefix)
+            ester_suffix = RULES.chalcogens.templates["central_peroxy_ester"].format(origin=origin_prefix)
         else:
-            site = f" {first_linker.element.value}{terminal.element.value}-acid"
-            acid_suffix = f"{origin_prefix}o({linker_infix}ic){site}"
-            ester_suffix = f"{origin_prefix}o({linker_infix}ate)"
+            site = RULES.chalcogens.templates["acid_site_pair"].format(
+                first=first_linker.element.value, second=terminal.element.value
+            )
+            acid_suffix = RULES.chalcogens.templates["central_mixed_peroxy_acid"].format(
+                origin=origin_prefix, linker=linker_infix, site=site
+            )
+            ester_suffix = RULES.chalcogens.templates["central_mixed_peroxy_ester"].format(
+                origin=origin_prefix, linker=linker_infix
+            )
         sites = "_".join(ligand.element.value for ligand in descriptor.ligands)
         key = f"central_{central_element.value}_{descriptor.derivative.value}_{sites}"
         try:
@@ -415,14 +439,14 @@ def resolve_central_acid_rule(
             )
         elif descriptor.derivative is DerivativeKind.ANION:
             suffix = ester_suffix
-            seniority = (26, origin_rank)
+            seniority = (int(policy["seniority"]), origin_rank)
         elif descriptor.derivative is DerivativeKind.ESTER:
             suffix = ester_suffix
-            seniority = (45, origin_rank)
+            seniority = (int(policy["seniority"]), origin_rank)
         return key, FunctionalGroupRule(
             key=key,
             role="principal",
-            prefix=f"{origin_prefix}operoxyl",
+            prefix=RULES.chalcogens.templates["central_peroxy_prefix"].format(origin=origin_prefix),
             suffix=suffix,
             multi_suffix=None,
             suffix_multiplier_positions=(0,),
@@ -450,35 +474,39 @@ def resolve_central_acid_rule(
     )
     key_sites = "_".join(ligand.element.value for ligand in descriptor.ligands)
     key = f"central_{central_element.value}_{descriptor.derivative.value}_{key_sites}"
-    suffix_stem = f"{origin_stem}{'o' if infix else ''}{infix}"
+    suffix_stem = RULES.chalcogens.templates["central_suffix_stem"].format(
+        stem=origin_stem, connector="o" if infix else "", infix=infix
+    )
     policy = _derivative_policy("central", descriptor.derivative)
     families = tuple(policy["families"])
     if descriptor.derivative is DerivativeKind.ACID:
-        site = f" {terminal.element.value}-acid" if terminal is not None and replacements else " acid"
-        suffix = f"{suffix_stem}ic{site}"
+        site_template = "acid_site_element" if terminal is not None and replacements else "acid_site_same"
+        site = RULES.chalcogens.templates[site_template].format(element=terminal.element.value if terminal else "")
+        suffix = RULES.chalcogens.templates["central_acid_suffix"].format(stem=suffix_stem, site=site)
         seniority = (origin_rank, *(_element_rank(ligand.element) for ligand in descriptor.ligands))
-        prefix = f"{origin_stem}o{infix}o"
+        prefix = RULES.chalcogens.templates["central_acid_prefix"].format(stem=origin_stem, infix=infix)
     elif descriptor.derivative is DerivativeKind.ANION:
-        suffix = f"{suffix_stem}ate"
-        seniority = (26, origin_rank, *(_element_rank(ligand.element) for ligand in descriptor.ligands))
-        prefix = f"{origin_stem}ato"
+        suffix = RULES.chalcogens.templates["central_anion_suffix"].format(stem=suffix_stem)
+        seniority = (int(policy["seniority"]), origin_rank, *(_element_rank(ligand.element) for ligand in descriptor.ligands))
+        prefix = RULES.chalcogens.templates["central_anion_prefix"].format(stem=origin_stem)
     elif descriptor.derivative is DerivativeKind.ESTER:
-        suffix = f"{suffix_stem}ate"
-        seniority = (40, origin_rank, *(_element_rank(ligand.element) for ligand in descriptor.ligands))
-        prefix = f"{origin_stem}yl"
+        suffix = RULES.chalcogens.templates["central_ester_suffix"].format(stem=suffix_stem)
+        seniority = (int(policy["seniority"]), origin_rank, *(_element_rank(ligand.element) for ligand in descriptor.ligands))
+        prefix = RULES.chalcogens.templates["central_ester_prefix"].format(stem=origin_stem)
     elif descriptor.derivative is DerivativeKind.AMIDE:
-        suffix = f"{suffix_stem}amide"
-        seniority = (66, origin_rank, *(_element_rank(ligand.element) for ligand in double_ligands))
-        prefix = f"{origin_stem}amoyl"
+        suffix = RULES.chalcogens.templates["central_amide_suffix"].format(stem=suffix_stem)
+        seniority = (int(policy["seniority"]), origin_rank, *(_element_rank(ligand.element) for ligand in double_ligands))
+        prefix = RULES.chalcogens.templates["central_amide_prefix"].format(stem=origin_stem)
     elif descriptor.derivative is DerivativeKind.HYDRAZIDE:
-        suffix = f"{suffix_stem}hydrazide" if infix else f"{origin_stem}ohydrazide"
-        seniority = (68, origin_rank, *(_element_rank(ligand.element) for ligand in double_ligands))
-        prefix = f"hydrazine{origin_stem}yl"
+        template = "central_hydrazide_suffix" if infix else "central_plain_hydrazide_suffix"
+        suffix = RULES.chalcogens.templates[template].format(stem=suffix_stem if infix else origin_stem)
+        seniority = (int(policy["seniority"]), origin_rank, *(_element_rank(ligand.element) for ligand in double_ligands))
+        prefix = RULES.chalcogens.templates["central_hydrazide_prefix"].format(stem=origin_stem)
     elif descriptor.derivative is DerivativeKind.ACID_HALIDE and leaving_data is not None:
         suffix = RULES.chalcogens.templates["central_acid_halide_suffix"].format(
             stem=suffix_stem, halide_word=leaving_data["word"]
         )
-        seniority = (55, origin_rank, int(leaving_data["rank"]))
+        seniority = (int(policy["seniority"]), origin_rank, int(leaving_data["rank"]))
         prefix = RULES.chalcogens.templates["central_acid_halide_prefix"].format(
             halide_prefix=leaving_data["prefix"], stem=origin_stem
         )

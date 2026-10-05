@@ -903,6 +903,7 @@
         "ester": {"seniority": 45, "families": ["ester_like", "peroxy_ester", "front_modifier", "chain_external_carbonyl"], "capabilities": ["ester_like", "front_modifier", "chain_external_carbonyl"]}
       },
       "anhydride": {"seniority": 30, "families": ["anhydride"], "capabilities": ["anhydride"]},
+      "imide_route": {"key": "chalcogen_imide_route", "seniority": 13, "families": ["imide_route"], "capabilities": ["promotes_member_groups"]},
       "central_peroxy": {
         "acid": {"seniority": 22, "families": ["central_acid", "peroxy_acid"], "capabilities": ["central_acid"]},
         "anion": {"seniority": 26, "families": ["central_acid", "peroxy_ester"], "capabilities": ["central_acid"]},

@@ -125,6 +125,7 @@ class FunctionalGroupCapability(StrEnum):
     ESTER_LIKE = "ester_like"
     FRONT_MODIFIER = "front_modifier"
     HYDRAZIDE = "hydrazide"
+    PROMOTES_MEMBER_GROUPS = "promotes_member_groups"
     UREA = "urea"
 
 
