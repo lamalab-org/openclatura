@@ -7,7 +7,6 @@ another group's name.
 """
 
 from .chalcogen_roles import (
-    AcylLeavingGroup,
     Chalcogen,
     ChalcogenLigandRole,
     DerivativeKind,
@@ -120,21 +119,13 @@ def _variant_key(
     return f"acyl_{derivative.value}_{sites}_{scope}"
 
 
-def resolve_acyl_rule(
-    descriptor: FunctionalGroupDescriptor,
-    *,
-    leaving_group: AcylLeavingGroup | None = None,
-    leaving_symbol: str | None = None,
-) -> tuple[str, FunctionalGroupRule | None]:
+def resolve_acyl_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, FunctionalGroupRule | None]:
     """Resolve an acyl descriptor without deriving chemistry from a group name."""
 
     double_ligand = descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED)[0]
     single_ligands = tuple(ligand for ligand in descriptor.ligands if ligand is not double_ligand)
     single_element = single_ligands[0].element if single_ligands else None
-    if leaving_group is None and descriptor.leaving_group is not None:
-        leaving_group = descriptor.leaving_group.kind
-    if leaving_group is None and leaving_symbol is not None:
-        leaving_group = AcylLeavingGroup(leaving_symbol)
+    leaving_group = descriptor.leaving_group.kind if descriptor.leaving_group is not None else None
     leaving_data = RULES.chalcogens.acyl_leaving_groups.get(leaving_group.value) if leaving_group is not None else None
     acyl_leaving_derivatives = {DerivativeKind.ACID_HALIDE, DerivativeKind.ACYL_PSEUDOHALIDE}
     if descriptor.derivative in acyl_leaving_derivatives and double_ligand.element is Chalcogen.OXYGEN:
@@ -394,12 +385,7 @@ def resolve_imide_route_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str
     )
 
 
-def resolve_central_acid_rule(
-    descriptor: FunctionalGroupDescriptor,
-    *,
-    leaving_group: AcylLeavingGroup | None = None,
-    leaving_symbol: str | None = None,
-) -> tuple[str, FunctionalGroupRule | None]:
+def resolve_central_acid_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, FunctionalGroupRule | None]:
     """Resolve R-Q(=E)n-E-X for Q = S, Se, or Te."""
 
     double_ligands = descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED)
@@ -407,8 +393,7 @@ def resolve_central_acid_rule(
     central_element = descriptor.central_element
     if central_element is None:
         raise ValueError("A central-acid descriptor requires its central element")
-    if leaving_group is None and leaving_symbol is not None:
-        leaving_group = AcylLeavingGroup(leaving_symbol)
+    leaving_group = descriptor.leaving_group.kind if descriptor.leaving_group is not None else None
     leaving_data = RULES.chalcogens.acyl_leaving_groups.get(leaving_group.value) if leaving_group is not None else None
     origin = RULES.chalcogens.central_acid_origins[(central_element.value, len(double_ligands))]
     origin_stem = origin["stem"]

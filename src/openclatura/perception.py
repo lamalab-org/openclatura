@@ -966,6 +966,12 @@ def _acyl_chalcogen_group(
     ]
     if len(halogens) == 1:
         leaving = halogens[0]
+        leaving_group = _leaving_group_descriptor(
+            mol,
+            AcylLeavingGroup(mol.atoms[leaving].symbol),
+            carbon,
+            (leaving,),
+        )
         descriptor = FunctionalGroupDescriptor(
             family=FunctionalFamily.ACYL,
             derivative=DerivativeKind.ACID_HALIDE,
@@ -973,8 +979,9 @@ def _acyl_chalcogen_group(
             ligands=(double_ligand,),
             attachment_atom=attachment,
             is_external=external,
+            leaving_group=leaving_group,
         )
-        key, rule = resolve_acyl_rule(descriptor, leaving_symbol=mol.atoms[leaving].symbol)
+        key, rule = resolve_acyl_rule(descriptor)
         return PerceivedGroup(
             key,
             True,
@@ -1145,7 +1152,7 @@ def _acyl_pseudohalide_group(
         is_external=external,
         leaving_group=leaving_group,
     )
-    key, rule = resolve_acyl_rule(descriptor, leaving_group=leaving_group.kind)
+    key, rule = resolve_acyl_rule(descriptor)
     return PerceivedGroup(
         key,
         True,
@@ -1381,7 +1388,7 @@ def _central_chalcogen_derivative(
     ]
     derivative = None
     group_atoms = {center, *(ligand.atom for ligand in double_ligands)}
-    leaving_symbol = None
+    leaving_group = None
     if len(terminal_ligands) == 1:
         terminal = terminal_ligands[0]
         if terminal.role is ChalcogenLigandRole.CHALCOGEN_LINK:
@@ -1453,8 +1460,14 @@ def _central_chalcogen_derivative(
         elif len(halogens) == 1:
             derivative = DerivativeKind.ACID_HALIDE
             descriptor_ligands = tuple(double_ligands)
-            leaving_symbol = mol.atoms[halogens[0]].symbol
-            group_atoms.add(halogens[0])
+            leaving = halogens[0]
+            leaving_group = _leaving_group_descriptor(
+                mol,
+                AcylLeavingGroup(mol.atoms[leaving].symbol),
+                center,
+                (leaving,),
+            )
+            group_atoms.add(leaving)
         else:
             return None
     descriptor = FunctionalGroupDescriptor(
@@ -1464,8 +1477,9 @@ def _central_chalcogen_derivative(
         ligands=tuple(descriptor_ligands),
         attachment_atom=anchor,
         central_element=central_element,
+        leaving_group=leaving_group,
     )
-    key, rule = resolve_central_acid_rule(descriptor, leaving_symbol=leaving_symbol)
+    key, rule = resolve_central_acid_rule(descriptor)
     return PerceivedGroup(
         key,
         True,
