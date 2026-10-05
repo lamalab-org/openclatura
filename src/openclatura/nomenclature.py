@@ -2,6 +2,7 @@
 Prefer ``RULES.<group>.<field>`` over importing individual module constants."""
 
 from dataclasses import dataclass
+from enum import StrEnum
 from functools import lru_cache
 
 from .naming_data import grouped_namer_rules
@@ -11,6 +12,7 @@ from .naming_data import grouped_namer_rules
 class RetainedNameRules:
     ring_elements: set[str]
     substituent_stems: dict[str, tuple[str, str]]
+    chain_functional_parents: dict[tuple[int, str, int], str]
     monocycle_specs: tuple[dict, ...]
     fused_polycycle_specs: tuple[dict, ...]
 
@@ -110,6 +112,22 @@ class MultiSuffixTemplate:
     multiplier_positions: tuple[int, ...] = (0,)
 
 
+class FunctionalGroupCapability(StrEnum):
+    """Typed assembly behaviors declared by functional-group rule data."""
+
+    ACID_HALIDE = "acid_halide"
+    AMIDE_LIKE = "amide_like"
+    ANHYDRIDE = "anhydride"
+    BLOCKS_STRUCTURAL_PARENT = "blocks_structural_parent"
+    CENTRAL_ACID = "central_acid"
+    CHAIN_EXTERNAL_CARBONYL = "chain_external_carbonyl"
+    ELEMENT_LOCANTED_SUFFIX = "element_locanted_suffix"
+    ESTER_LIKE = "ester_like"
+    FRONT_MODIFIER = "front_modifier"
+    HYDRAZIDE = "hydrazide"
+    UREA = "urea"
+
+
 @dataclass(frozen=True)
 class FunctionalGroupRule:
     key: str
@@ -122,6 +140,26 @@ class FunctionalGroupRule:
     suffix_with_locant: bool = False
     needs_locant: bool = True
     families: tuple[str, ...] = ()
+    capabilities: frozenset[FunctionalGroupCapability] = frozenset()
+
+    def has_capability(self, capability: FunctionalGroupCapability) -> bool:
+        return capability in self.capabilities
+
+
+@dataclass(frozen=True)
+class ChalcogenNomenclatureRules:
+    """Data-backed vocabulary and policies keyed by structural descriptor axes."""
+
+    elements: dict[str, dict]
+    simple_group_keys: dict[tuple[str, str, str, bool], str]
+    chalcogenide_class_names: dict[str, str]
+    peroxide_class_names: dict[frozenset[str], str]
+    peroxol_rules: dict[tuple[str, str], dict]
+    standard_acyl_keys: dict[tuple[str, str, str | None, bool], str]
+    acid_halides: dict[str, dict]
+    central_acid_origins: dict[tuple[str, int], dict]
+    policies: dict[str, dict]
+    templates: dict[str, str]
 
 
 @dataclass(frozen=True)
@@ -188,6 +226,7 @@ class NomenclatureRegistry:
     charges: ChargeRules
     assembly: AssemblyRules
     functional_groups: FunctionalGroupRules
+    chalcogens: ChalcogenNomenclatureRules
     postprocess: PostprocessRules
 
 
@@ -213,6 +252,9 @@ def _functional_group_rules() -> FunctionalGroupRules:
             suffix_with_locant=bool(item.get("suffix_with_locant", False)),
             needs_locant=bool(item.get("needs_locant", True)),
             families=families,
+            capabilities=frozenset(
+                FunctionalGroupCapability(capability) for capability in item.get("capabilities", ())
+            ),
         )
     return FunctionalGroupRules(by_key=groups)
 
@@ -290,6 +332,40 @@ def _postprocess_rules() -> PostprocessRules:
     )
 
 
+def _chalcogen_rules() -> ChalcogenNomenclatureRules:
+    group = grouped_namer_rules()["chalcogen_nomenclature"]
+    return ChalcogenNomenclatureRules(
+        elements=group.mapping("chalcogen_elements"),
+        simple_group_keys={
+            (row["family"], row["derivative"], row["element"], bool(row.get("external", False))): row["key"]
+            for row in group.values("chalcogen_simple_group_keys")
+        },
+        chalcogenide_class_names=group.mapping("chalcogenide_class_names"),
+        peroxide_class_names={
+            frozenset(row["elements"]): row["name"] for row in group.values("chalcogen_peroxide_class_names")
+        },
+        peroxol_rules={
+            (row["first"], row["terminal"]): row for row in group.values("chalcogen_peroxol_rules")
+        },
+        standard_acyl_keys={
+            (
+                row["derivative"],
+                row["double_element"],
+                row.get("single_element"),
+                bool(row.get("external", False)),
+            ): row["key"]
+            for row in group.values("chalcogen_standard_acyl_keys")
+        },
+        acid_halides=group.mapping("chalcogen_acid_halides"),
+        central_acid_origins={
+            (row["element"], int(row["double_bond_count"])): row
+            for row in group.values("chalcogen_central_acid_origins")
+        },
+        policies=group.mapping("chalcogen_rule_policies"),
+        templates=group.mapping("chalcogen_templates"),
+    )
+
+
 def _charge_rules() -> ChargeRules:
     group = grouped_namer_rules()["charges"]
     return ChargeRules(
@@ -338,6 +414,10 @@ def registry() -> NomenclatureRegistry:
         retained=RetainedNameRules(
             ring_elements=set(retained.values("retained_ring_elements")),
             substituent_stems=_group_tuple_mapping("retained_parents", "retained_substituent_stems"),
+            chain_functional_parents={
+                (int(row["length"]), row["group"], int(row["count"])): row["name"]
+                for row in retained.values("retained_chain_functional_parents")
+            },
             monocycle_specs=tuple(retained.values("retained_monocycle_specs")),
             fused_polycycle_specs=tuple(retained.values("retained_fused_polycycle_specs")),
         ),
@@ -398,6 +478,7 @@ def registry() -> NomenclatureRegistry:
             suffix_nitrogen_markers=tuple(assembly_grammar.values("suffix_nitrogen_markers")),
         ),
         functional_groups=_functional_group_rules(),
+        chalcogens=_chalcogen_rules(),
         postprocess=_postprocess_rules(),
     )
 

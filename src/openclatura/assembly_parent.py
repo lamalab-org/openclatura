@@ -52,8 +52,6 @@ RETAINED_CHAIN_PARENTS: dict[tuple[int, str, int], str] = {
     (1, "urea", 1): "urea",
     (1, "guanidine", 1): "guanidine",
     (1, "thiourea", 1): "thiourea",
-    (1, "selenourea", 1): "selenourea",
-    (1, "tellurourea", 1): "tellurourea",
     (2, "amide", 1): "acetamide",
     (1, "nitrile", 1): "hydrogen cyanide",
     (2, "nitrile", 1): "acetonitrile",
@@ -70,6 +68,7 @@ RETAINED_CHAIN_PARENTS: dict[tuple[int, str, int], str] = {
     (5, "carboxylic_acid", 2): "glutaric acid",
     (6, "carboxylic_acid", 2): "adipic acid",
 }
+RETAINED_CHAIN_PARENTS.update(RULES.retained.chain_functional_parents)
 
 
 def _halide_word(key: str) -> str | None:
