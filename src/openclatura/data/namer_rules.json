@@ -1421,7 +1421,8 @@
         },
         "seniority": 68,
         "suffix_with_locant": false,
-        "needs_locant": true
+        "needs_locant": true,
+        "families": ["amide_like", "hydrazide", "chain_external_carbonyl"]
       },
       "ring_hydrazide": {
         "role": "principal",
@@ -1434,7 +1435,8 @@
         },
         "seniority": 68,
         "suffix_with_locant": true,
-        "needs_locant": true
+        "needs_locant": true,
+        "families": ["amide_like", "hydrazide", "chain_external_carbonyl"]
       },
       "amidine": {
         "role": "principal",
