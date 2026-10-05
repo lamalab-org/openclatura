@@ -12,8 +12,10 @@ from .chalcogen_roles import (
     FunctionalGroupDescriptor,
     chalcogen_for_symbol,
     classify_chalcogen_ligand,
+    classify_peroxide_linkages,
     require_validated_chalcogens,
 )
+from .charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
 from .chalcogen_vocabulary import (
     resolve_acyl_rule,
     resolve_anhydride_rule,
@@ -200,7 +202,7 @@ def _demote_zwitterion_cations(mol: Molecule, groups: list[PerceivedGroup]) -> l
 
 def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
     require_validated_chalcogens(mol)
-    groups = []
+    groups = _composable_chalcogen_linkage_groups(mol)
     consumed = set()
     cyclic_atoms = get_cyclic_atoms(mol)
 
@@ -782,6 +784,50 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                     groups.append(PerceivedGroup(halogen_map[atom.symbol], False, adj_atoms[0], {atom.idx}))
                     consumed.add(atom.idx)
 
+    return groups
+
+
+def _composable_chalcogen_linkage_groups(mol: Molecule) -> list[PerceivedGroup]:
+    """Describe nonprincipal E-E and nitrogen-E linkages without assuming uniqueness."""
+
+    groups = [
+        PerceivedGroup(
+            FunctionalFamily.PEROXIDE.value,
+            False,
+            descriptor.attachment_atom if descriptor.attachment_atom is not None else descriptor.centers[0],
+            set(descriptor.centers),
+            descriptor=descriptor,
+        )
+        for descriptor in classify_peroxide_linkages(mol, set(mol.atoms))
+    ]
+    for role in charge_pair_roles(mol):
+        if role.nitrogen_kind not in {NitrogenChalcogenideKind.AMINE, NitrogenChalcogenideKind.IMINE}:
+            continue
+        ligand = classify_chalcogen_ligand(mol, role.positive_atom, role.negative_atom)
+        if ligand is None:
+            continue
+        organic_neighbors = tuple(
+            neighbor
+            for neighbor in mol.get_neighbors(role.positive_atom)
+            if neighbor != role.negative_atom and mol.atoms[neighbor].is_carbon
+        )
+        attachment = organic_neighbors[0] if organic_neighbors else role.positive_atom
+        descriptor = FunctionalGroupDescriptor(
+            family=FunctionalFamily.NITROGEN_CHALCOGENIDE,
+            derivative=DerivativeKind.ZWITTERION,
+            centers=(role.positive_atom,),
+            ligands=(ligand,),
+            attachment_atom=attachment,
+        )
+        groups.append(
+            PerceivedGroup(
+                FunctionalFamily.NITROGEN_CHALCOGENIDE.value,
+                False,
+                attachment,
+                set(role.atom_ids),
+                descriptor=descriptor,
+            )
+        )
     return groups
 
 
