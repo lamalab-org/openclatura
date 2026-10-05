@@ -128,6 +128,9 @@ class FunctionalGroupCapability(StrEnum):
     UREA = "urea"
 
 
+_FAMILY_CAPABILITIES = {capability.value: capability for capability in FunctionalGroupCapability}
+
+
 @dataclass(frozen=True)
 class FunctionalGroupRule:
     key: str
@@ -156,7 +159,7 @@ class ChalcogenNomenclatureRules:
     peroxide_class_names: dict[frozenset[str], str]
     peroxol_rules: dict[tuple[str, str], dict]
     standard_acyl_keys: dict[tuple[str, str, str | None, bool], str]
-    acid_halides: dict[str, dict]
+    acyl_leaving_groups: dict[str, dict]
     central_acid_origins: dict[tuple[str, int], dict]
     policies: dict[str, dict]
     templates: dict[str, str]
@@ -178,7 +181,7 @@ class FunctionalGroupRules:
         if prefix is None:
             return None
         rule = self.by_key[key]
-        if "acid_halide" in rule.families:
+        if rule.has_capability(FunctionalGroupCapability.ACID_HALIDE):
             return f"({prefix})"
         return prefix
 
@@ -253,7 +256,10 @@ def _functional_group_rules() -> FunctionalGroupRules:
             needs_locant=bool(item.get("needs_locant", True)),
             families=families,
             capabilities=frozenset(
-                FunctionalGroupCapability(capability) for capability in item.get("capabilities", ())
+                {
+                    *(_FAMILY_CAPABILITIES[family] for family in families if family in _FAMILY_CAPABILITIES),
+                    *(FunctionalGroupCapability(capability) for capability in item.get("capabilities", ())),
+                }
             ),
         )
     return FunctionalGroupRules(by_key=groups)
@@ -356,7 +362,7 @@ def _chalcogen_rules() -> ChalcogenNomenclatureRules:
             ): row["key"]
             for row in group.values("chalcogen_standard_acyl_keys")
         },
-        acid_halides=group.mapping("chalcogen_acid_halides"),
+        acyl_leaving_groups=group.mapping("chalcogen_acyl_leaving_groups"),
         central_acid_origins={
             (row["element"], int(row["double_bond_count"])): row
             for row in group.values("chalcogen_central_acid_origins")

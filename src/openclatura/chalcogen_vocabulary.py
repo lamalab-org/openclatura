@@ -1,4 +1,4 @@
-"""Rule identifiers for graph-classified chalcogen functional groups.
+"""Resolve graph-classified chalcogen descriptors through the rule registry.
 
 This module is the narrow boundary between structural descriptors and the
 existing functional-group rule registry.  Chemistry code selects with typed
@@ -7,40 +7,14 @@ another group's name.
 """
 
 from .chalcogen_roles import (
+    AcylLeavingGroup,
     Chalcogen,
     ChalcogenLigandRole,
     DerivativeKind,
     FunctionalFamily,
     FunctionalGroupDescriptor,
 )
-from .nomenclature import FunctionalGroupRule, MultiSuffixTemplate
-
-_SIMPLE_KEYS: dict[tuple[FunctionalFamily, DerivativeKind, Chalcogen, bool], str] = {
-    (FunctionalFamily.HYDROXY, DerivativeKind.ALCOHOL, Chalcogen.OXYGEN, False): "alcohol",
-    (FunctionalFamily.HYDROXY, DerivativeKind.ALCOHOL, Chalcogen.SULFUR, False): "thiol",
-    (FunctionalFamily.HYDROXY, DerivativeKind.ALCOHOL, Chalcogen.SELENIUM, False): "selenol",
-    (FunctionalFamily.HYDROXY, DerivativeKind.ALCOHOL, Chalcogen.TELLURIUM, False): "tellurol",
-    (FunctionalFamily.HYDROXY, DerivativeKind.ANION, Chalcogen.OXYGEN, False): "olate",
-    (FunctionalFamily.HYDROXY, DerivativeKind.ANION, Chalcogen.SULFUR, False): "thiolate",
-    (FunctionalFamily.HYDROXY, DerivativeKind.ANION, Chalcogen.SELENIUM, False): "selenolate",
-    (FunctionalFamily.HYDROXY, DerivativeKind.ANION, Chalcogen.TELLURIUM, False): "tellurolate",
-    (FunctionalFamily.CARBONYL, DerivativeKind.ALDEHYDE, Chalcogen.OXYGEN, False): "aldehyde",
-    (FunctionalFamily.CARBONYL, DerivativeKind.ALDEHYDE, Chalcogen.SULFUR, False): "thioaldehyde",
-    (FunctionalFamily.CARBONYL, DerivativeKind.ALDEHYDE, Chalcogen.SELENIUM, False): "selenoaldehyde",
-    (FunctionalFamily.CARBONYL, DerivativeKind.ALDEHYDE, Chalcogen.TELLURIUM, False): "telluroaldehyde",
-    (FunctionalFamily.CARBONYL, DerivativeKind.ALDEHYDE, Chalcogen.OXYGEN, True): "ring_aldehyde",
-    (FunctionalFamily.CARBONYL, DerivativeKind.ALDEHYDE, Chalcogen.SULFUR, True): "ring_thioaldehyde",
-    (FunctionalFamily.CARBONYL, DerivativeKind.ALDEHYDE, Chalcogen.SELENIUM, True): "ring_selenoaldehyde",
-    (FunctionalFamily.CARBONYL, DerivativeKind.ALDEHYDE, Chalcogen.TELLURIUM, True): "ring_telluroaldehyde",
-    (FunctionalFamily.CARBONYL, DerivativeKind.KETONE, Chalcogen.OXYGEN, False): "ketone",
-    (FunctionalFamily.CARBONYL, DerivativeKind.KETONE, Chalcogen.SULFUR, False): "thioketone",
-    (FunctionalFamily.CARBONYL, DerivativeKind.KETONE, Chalcogen.SELENIUM, False): "selenoketone",
-    (FunctionalFamily.CARBONYL, DerivativeKind.KETONE, Chalcogen.TELLURIUM, False): "telluroketone",
-    (FunctionalFamily.CHALCOGEN_ETHER, DerivativeKind.NEUTRAL_LINK, Chalcogen.OXYGEN, False): "ether",
-    (FunctionalFamily.CHALCOGEN_ETHER, DerivativeKind.NEUTRAL_LINK, Chalcogen.SULFUR, False): "thioether",
-    (FunctionalFamily.CHALCOGEN_ETHER, DerivativeKind.NEUTRAL_LINK, Chalcogen.SELENIUM, False): "selenoether",
-    (FunctionalFamily.CHALCOGEN_ETHER, DerivativeKind.NEUTRAL_LINK, Chalcogen.TELLURIUM, False): "telluroether",
-}
+from .nomenclature import RULES, FunctionalGroupCapability, FunctionalGroupRule, MultiSuffixTemplate
 
 
 def simple_group_key(
@@ -52,60 +26,41 @@ def simple_group_key(
 ) -> str | None:
     """Resolve a validated simple-family descriptor to a registry key."""
 
-    return _SIMPLE_KEYS.get((family, derivative, element, external))
+    return RULES.chalcogens.simple_group_keys.get((family.value, derivative.value, element.value, external))
 
 
-_ELEMENT_RANK = {
-    Chalcogen.OXYGEN: 0,
-    Chalcogen.SULFUR: 1,
-    Chalcogen.SELENIUM: 2,
-    Chalcogen.TELLURIUM: 3,
-}
+def _element_data(element: Chalcogen) -> dict:
+    return RULES.chalcogens.elements[element.value]
 
-_CHALCOGENIDE_CLASS_NAMES = {
-    Chalcogen.OXYGEN: "oxide",
-    Chalcogen.SULFUR: "sulfide",
-    Chalcogen.SELENIUM: "selenide",
-    Chalcogen.TELLURIUM: "telluride",
-}
 
-_CHALCOGENIDE_PREFIXES = {
-    Chalcogen.OXYGEN: "oxido",
-    Chalcogen.SULFUR: "sulfido",
-    Chalcogen.SELENIUM: "selenido",
-    Chalcogen.TELLURIUM: "tellurido",
-}
-
-_PEROXIDE_CLASS_NAMES = {
-    frozenset((Chalcogen.OXYGEN,)): "peroxide",
-    frozenset((Chalcogen.SULFUR,)): "disulfide",
-    frozenset((Chalcogen.SELENIUM,)): "diselenide",
-    frozenset((Chalcogen.TELLURIUM,)): "ditelluride",
-    frozenset((Chalcogen.OXYGEN, Chalcogen.SULFUR)): "thioperoxide",
-    frozenset((Chalcogen.OXYGEN, Chalcogen.SELENIUM)): "selenoperoxide",
-    frozenset((Chalcogen.OXYGEN, Chalcogen.TELLURIUM)): "telluroperoxide",
-    frozenset((Chalcogen.SULFUR, Chalcogen.SELENIUM)): "selenothioperoxide",
-    frozenset((Chalcogen.SULFUR, Chalcogen.TELLURIUM)): "tellurothioperoxide",
-    frozenset((Chalcogen.SELENIUM, Chalcogen.TELLURIUM)): "selenotelluroperoxide",
-}
+def _element_rank(element: Chalcogen) -> int:
+    return int(_element_data(element)["rank"])
 
 
 def chalcogenide_class_name(element: Chalcogen) -> str:
     """Return the validated functional-class name for an anionic chalcogen ligand."""
 
-    return _CHALCOGENIDE_CLASS_NAMES[element]
+    return RULES.chalcogens.chalcogenide_class_names[element.value]
 
 
 def chalcogenide_prefix(element: Chalcogen) -> str:
     """Return the additive prefix for an anionic chalcogen ligand."""
 
-    return _CHALCOGENIDE_PREFIXES[element]
+    return _element_data(element)["additive_prefix"]
 
 
 def peroxide_class_name(elements: tuple[Chalcogen, Chalcogen]) -> str:
     """Return the P-63.3 functional-class term for an E-E linkage."""
 
-    return _PEROXIDE_CLASS_NAMES[frozenset(elements)]
+    return RULES.chalcogens.peroxide_class_names[frozenset(element.value for element in elements)]
+
+
+def _capabilities(policy: dict) -> frozenset[FunctionalGroupCapability]:
+    return frozenset(FunctionalGroupCapability(value) for value in policy.get("capabilities", ()))
+
+
+def _derivative_policy(section: str, derivative: DerivativeKind) -> dict:
+    return RULES.chalcogens.policies[section][derivative.value]
 
 
 def resolve_nitrile_chalcogenide_rule(
@@ -115,61 +70,23 @@ def resolve_nitrile_chalcogenide_rule(
 
     ligand = descriptor.ligands_with_role(ChalcogenLigandRole.ANIONIC)[0]
     class_name = chalcogenide_class_name(ligand.element)
+    policy = RULES.chalcogens.policies["nitrile_chalcogenide"]
     external = descriptor.is_external
     key = f"{'ring_' if external else ''}nitrile_{ligand.element.value}"
     carbon_text = "carbo" if external else ""
     return key, FunctionalGroupRule(
         key=key,
         role="principal",
-        prefix=f"cyano{chalcogenide_prefix(ligand.element)}",
-        suffix=f"{carbon_text}nitrile {class_name}",
+        prefix=policy["prefix"].format(additive_prefix=chalcogenide_prefix(ligand.element)),
+        suffix=policy["suffix"].format(carbo=carbon_text, class_name=class_name),
         multi_suffix=MultiSuffixTemplate((0,)),
         suffix_multiplier_positions=(0,),
-        seniority=(5, _ELEMENT_RANK[ligand.element]),
+        seniority=(int(policy["seniority"]), _element_rank(ligand.element)),
         suffix_with_locant=external,
         needs_locant=True,
-        families=("nitrile_chalcogenide",),
+        families=tuple(policy["families"]),
+        capabilities=_capabilities(policy),
     )
-
-
-_REPLACEMENT_INFIX = {
-    Chalcogen.SULFUR: "thio",
-    Chalcogen.SELENIUM: "seleno",
-    Chalcogen.TELLURIUM: "telluro",
-}
-
-_STANDARD_ACYL_KEYS = {
-    (DerivativeKind.ACID, Chalcogen.OXYGEN, Chalcogen.OXYGEN, False): "carboxylic_acid",
-    (DerivativeKind.ACID, Chalcogen.OXYGEN, Chalcogen.OXYGEN, True): "ring_carboxylic_acid",
-    (DerivativeKind.ANION, Chalcogen.OXYGEN, Chalcogen.OXYGEN, False): "carboxylate",
-    (DerivativeKind.ANION, Chalcogen.OXYGEN, Chalcogen.OXYGEN, True): "ring_carboxylate",
-    (DerivativeKind.ESTER, Chalcogen.OXYGEN, Chalcogen.OXYGEN, False): "ester",
-    (DerivativeKind.ESTER, Chalcogen.OXYGEN, Chalcogen.OXYGEN, True): "ring_carboxylate",
-    (DerivativeKind.AMIDE, Chalcogen.OXYGEN, None, False): "amide",
-    (DerivativeKind.AMIDE, Chalcogen.OXYGEN, None, True): "ring_amide",
-    (DerivativeKind.AMIDE, Chalcogen.SULFUR, None, False): "thioamide",
-    (DerivativeKind.AMIDE, Chalcogen.SULFUR, None, True): "ring_thioamide",
-    (DerivativeKind.HYDRAZIDE, Chalcogen.OXYGEN, None, False): "hydrazide",
-    (DerivativeKind.HYDRAZIDE, Chalcogen.OXYGEN, None, True): "ring_hydrazide",
-    (DerivativeKind.UREA, Chalcogen.OXYGEN, None, False): "urea",
-    (DerivativeKind.UREA, Chalcogen.SULFUR, None, False): "thiourea",
-    (DerivativeKind.UREA, Chalcogen.SELENIUM, None, False): "selenourea",
-    (DerivativeKind.UREA, Chalcogen.TELLURIUM, None, False): "tellurourea",
-}
-
-_HALIDE_WORD = {"F": "fluoride", "Cl": "chloride", "Br": "bromide", "I": "iodide"}
-_HALIDE_PREFIX = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
-_HALIDE_RANK = {symbol: rank for rank, symbol in enumerate(_HALIDE_WORD)}
-_STANDARD_ACID_HALIDE_KEYS = {
-    ("F", False): "acid_fluoride",
-    ("Cl", False): "acid_chloride",
-    ("Br", False): "acid_bromide",
-    ("I", False): "acid_iodide",
-    ("F", True): "ring_acid_fluoride",
-    ("Cl", True): "ring_acid_chloride",
-    ("Br", True): "ring_acid_bromide",
-    ("I", True): "ring_acid_iodide",
-}
 
 
 def _replacement_infix(elements: tuple[Chalcogen, ...]) -> str:
@@ -177,8 +94,8 @@ def _replacement_infix(elements: tuple[Chalcogen, ...]) -> str:
     if not replacements:
         return ""
     if len(replacements) == 2 and replacements[0] is replacements[1]:
-        return f"di{_REPLACEMENT_INFIX[replacements[0]]}"
-    return "".join(sorted(_REPLACEMENT_INFIX[element] for element in replacements))
+        return f"di{_element_data(replacements[0])['replacement_infix']}"
+    return "".join(sorted(_element_data(element)["replacement_infix"] for element in replacements))
 
 
 def _variant_key(
@@ -186,13 +103,13 @@ def _variant_key(
     double_element: Chalcogen,
     single_element: Chalcogen | None,
     external: bool,
-    leaving_symbol: str | None,
+    qualifier: str | None,
 ) -> str:
     sites = double_element.value
     if single_element is not None:
         sites = f"{sites}_{single_element.value}"
-    if leaving_symbol is not None:
-        sites = f"{sites}_{leaving_symbol}"
+    if qualifier is not None:
+        sites = f"{sites}_{qualifier}"
     scope = "external" if external else "chain"
     return f"acyl_{derivative.value}_{sites}_{scope}"
 
@@ -200,6 +117,7 @@ def _variant_key(
 def resolve_acyl_rule(
     descriptor: FunctionalGroupDescriptor,
     *,
+    leaving_group: AcylLeavingGroup | None = None,
     leaving_symbol: str | None = None,
 ) -> tuple[str, FunctionalGroupRule | None]:
     """Resolve an acyl descriptor without deriving chemistry from a group name."""
@@ -207,10 +125,17 @@ def resolve_acyl_rule(
     double_ligand = descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED)[0]
     single_ligands = tuple(ligand for ligand in descriptor.ligands if ligand is not double_ligand)
     single_element = single_ligands[0].element if single_ligands else None
+    if leaving_group is None and descriptor.leaving_group is not None:
+        leaving_group = descriptor.leaving_group.kind
+    if leaving_group is None and leaving_symbol is not None:
+        leaving_group = AcylLeavingGroup(leaving_symbol)
+    leaving_data = RULES.chalcogens.acyl_leaving_groups.get(leaving_group.value) if leaving_group is not None else None
     if descriptor.derivative is DerivativeKind.ACID_HALIDE and double_ligand.element is Chalcogen.OXYGEN:
-        return _STANDARD_ACID_HALIDE_KEYS[(leaving_symbol, descriptor.is_external)], None
-    standard = _STANDARD_ACYL_KEYS.get(
-        (descriptor.derivative, double_ligand.element, single_element, descriptor.is_external)
+        standard_key_field = "external_key" if descriptor.is_external else "chain_key"
+        if leaving_data is not None and standard_key_field in leaving_data:
+            return leaving_data[standard_key_field], None
+    standard = RULES.chalcogens.standard_acyl_keys.get(
+        (descriptor.derivative.value, double_ligand.element.value, single_element.value if single_element else None, descriptor.is_external)
     )
     if standard is not None:
         return standard, None
@@ -220,7 +145,7 @@ def resolve_acyl_rule(
         double_ligand.element,
         single_element,
         descriptor.is_external,
-        leaving_symbol,
+        leaving_group.value if leaving_group is not None else None,
     )
     elements = (double_ligand.element,) if single_element is None else (double_ligand.element, single_element)
     infix = _replacement_infix(elements)
@@ -229,45 +154,37 @@ def resolve_acyl_rule(
     multi_suffix = MultiSuffixTemplate((0,))
     families: tuple[str, ...]
 
-    if descriptor.derivative is DerivativeKind.ACID:
-        site = f" {single_element.value}-acid" if single_element is not double_ligand.element else " acid"
-        suffix = f"{carbo}{infix}ic{site}"
-        seniority = (20, *(_ELEMENT_RANK[element] for element in elements))
-        prefix = f"{infix}carboxy"
-        families = ("carboxy_prefix", "chain_external_carbonyl")
-    elif descriptor.derivative is DerivativeKind.ANION:
-        suffix = f"{carbo}{infix}ate"
-        seniority = (21, *(_ELEMENT_RANK[element] for element in elements))
-        prefix = f"{infix}carboxylato"
-        families = ("carboxy_prefix", "chain_external_carbonyl")
-    elif descriptor.derivative is DerivativeKind.ESTER:
-        suffix = f"{carbo}{infix}ate"
-        seniority = (40, *(_ELEMENT_RANK[element] for element in elements))
-        prefix = f"{infix}oxycarbonyl"
-        families = ("ester_like", "front_modifier", "chain_external_carbonyl")
-        multi_suffix = None
-    elif descriptor.derivative is DerivativeKind.AMIDE:
-        suffix = f"{carbo}{infix}amide"
-        seniority = (60 + _ELEMENT_RANK[double_ligand.element],)
-        prefix = f"carbamo{infix}yl"
-        families = ("amide_like", "chain_external_carbonyl")
-    elif descriptor.derivative is DerivativeKind.HYDRAZIDE:
-        suffix = f"{carbo}{infix}hydrazide"
-        seniority = (68, _ELEMENT_RANK[double_ligand.element])
-        prefix = f"hydrazinecarb{infix}oyl"
-        families = ("amide_like", "hydrazide", "chain_external_carbonyl")
-    elif descriptor.derivative is DerivativeKind.UREA:
-        suffix = f"{infix}urea"
-        seniority = (60, _ELEMENT_RANK[double_ligand.element])
-        prefix = f"carbamo{infix}ylamino"
-        families = ("amide_like", "urea")
-    elif descriptor.derivative is DerivativeKind.ACID_HALIDE and leaving_symbol is not None:
-        suffix = f"{carbo}{infix}yl {_HALIDE_WORD[leaving_symbol]}"
-        seniority = (50, _ELEMENT_RANK[double_ligand.element], _HALIDE_RANK[leaving_symbol])
-        prefix = f"{_HALIDE_PREFIX[leaving_symbol]}{infix}carbonyl"
-        families = ("acid_halide", "chain_external_carbonyl")
-    else:
+    try:
+        policy = _derivative_policy("acyl", descriptor.derivative)
+    except KeyError:
         raise ValueError(f"Unsupported acyl derivative descriptor: {descriptor.derivative.value}")
+    if descriptor.derivative is DerivativeKind.ACID:
+        site_template = "acid_site_element" if single_element is not double_ligand.element else "acid_site_same"
+        site = RULES.chalcogens.templates[site_template].format(element=single_element.value)
+    else:
+        site = ""
+    acyl_leaving_derivatives = {DerivativeKind.ACID_HALIDE, DerivativeKind.ACYL_PSEUDOHALIDE}
+    if descriptor.derivative in acyl_leaving_derivatives and leaving_data is None:
+        raise ValueError("An acyl leaving-group descriptor requires typed leaving-group data")
+    format_values = {
+        "carbo": carbo,
+        "infix": infix,
+        "site": site,
+        "halide_word": leaving_data["word"] if leaving_data else "",
+        "halide_prefix": leaving_data["prefix"] if leaving_data else "",
+    }
+    suffix = policy["suffix"].format(**format_values)
+    prefix = policy["prefix"].format(**format_values)
+    rank = int(policy["seniority"])
+    if policy.get("ranked_seniority"):
+        seniority = (rank + _element_rank(double_ligand.element),)
+    elif descriptor.derivative in acyl_leaving_derivatives:
+        seniority = (rank, _element_rank(double_ligand.element), int(leaving_data["rank"]))
+    else:
+        seniority = (rank, *(_element_rank(element) for element in elements))
+    families = tuple(policy["families"])
+    if policy.get("multi_suffix") is False:
+        multi_suffix = None
 
     return key, FunctionalGroupRule(
         key=key,
@@ -280,29 +197,8 @@ def resolve_acyl_rule(
         suffix_with_locant=suffix_with_locant,
         needs_locant=True,
         families=families,
+        capabilities=_capabilities(policy),
     )
-
-
-_PEROXOL_SUFFIXES = {
-    (Chalcogen.OXYGEN, Chalcogen.OXYGEN): "peroxol",
-    (Chalcogen.SULFUR, Chalcogen.OXYGEN): "SO-thioperoxol",
-    (Chalcogen.SELENIUM, Chalcogen.OXYGEN): "SeO-selenoperoxol",
-    (Chalcogen.TELLURIUM, Chalcogen.OXYGEN): "TeO-telluroperoxol",
-    (Chalcogen.OXYGEN, Chalcogen.SULFUR): "OS-thioperoxol",
-    (Chalcogen.OXYGEN, Chalcogen.SELENIUM): "OSe-selenoperoxol",
-    (Chalcogen.OXYGEN, Chalcogen.TELLURIUM): "OTe-telluroperoxol",
-    (Chalcogen.SULFUR, Chalcogen.SULFUR): "dithioperoxol",
-    (Chalcogen.SELENIUM, Chalcogen.SULFUR): "SeS-selenothioperoxol",
-    (Chalcogen.TELLURIUM, Chalcogen.SULFUR): "TeS-tellurothioperoxol",
-    (Chalcogen.SULFUR, Chalcogen.SELENIUM): "SSe-selenothioperoxol",
-    (Chalcogen.SULFUR, Chalcogen.TELLURIUM): "STe-tellurothioperoxol",
-    (Chalcogen.SELENIUM, Chalcogen.SELENIUM): "diselenoperoxol",
-    (Chalcogen.TELLURIUM, Chalcogen.SELENIUM): "TeSe-selenotelluroperoxol",
-    (Chalcogen.SELENIUM, Chalcogen.TELLURIUM): "SeTe-selenotelluroperoxol",
-    (Chalcogen.TELLURIUM, Chalcogen.TELLURIUM): "ditelluroperoxol",
-}
-
-_PEROXOL_PRIORITY = {pair: rank for rank, pair in enumerate(_PEROXOL_SUFFIXES)}
 
 
 def resolve_peroxol_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, FunctionalGroupRule]:
@@ -310,41 +206,33 @@ def resolve_peroxol_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, Fu
 
     first, terminal = descriptor.ligands
     pair = (first.element, terminal.element)
-    suffix = _PEROXOL_SUFFIXES[pair]
+    policy = RULES.chalcogens.peroxol_rules[(first.element.value, terminal.element.value)]
     key = f"peroxol_{first.element.value}_{terminal.element.value}"
-    element_locanted = first.element is not terminal.element or terminal.element is Chalcogen.OXYGEN
-    families = (
-        ("peroxol", "element_locanted_suffix")
-        if element_locanted
-        and pair
-        != (
-            Chalcogen.OXYGEN,
-            Chalcogen.OXYGEN,
-        )
-        else ("peroxol",)
-    )
     return key, FunctionalGroupRule(
         key=key,
         role="principal",
         prefix=None,
-        suffix=suffix,
+        suffix=policy["suffix"],
         multi_suffix=MultiSuffixTemplate((0,)),
         suffix_multiplier_positions=(0,),
-        seniority=(105, _PEROXOL_PRIORITY[pair]),
+        seniority=(105, int(policy["rank"])),
         suffix_with_locant=True,
         needs_locant=True,
-        families=families,
+        families=("peroxol",),
+        capabilities=_capabilities(policy),
     )
 
 
 def _peroxo_infix(first: Chalcogen, second: Chalcogen) -> str:
     if first is Chalcogen.OXYGEN and second is Chalcogen.OXYGEN:
-        return "peroxo"
+        return RULES.chalcogens.templates["peroxo"]
     replacements = tuple(element for element in (first, second) if element is not Chalcogen.OXYGEN)
     if len(replacements) == 2 and replacements[0] is replacements[1]:
-        return f"di{_REPLACEMENT_INFIX[replacements[0]]}peroxo"
-    replacement = "".join(sorted(_REPLACEMENT_INFIX[element] for element in replacements))
-    return f"{replacement}peroxo"
+        return RULES.chalcogens.templates["doubly_replaced_peroxo"].format(
+            replacement=_element_data(replacements[0])["replacement_infix"]
+        )
+    replacement = "".join(sorted(_element_data(element)["replacement_infix"] for element in replacements))
+    return RULES.chalcogens.templates["replaced_peroxo"].format(replacement=replacement)
 
 
 def resolve_peroxy_acyl_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, FunctionalGroupRule | None]:
@@ -378,56 +266,51 @@ def resolve_peroxy_acyl_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str
     linker_infix = _peroxo_infix(first_linker.element, terminal.element)
     ordinary_peroxo = first_linker.element is Chalcogen.OXYGEN and terminal.element is Chalcogen.OXYGEN
     if ordinary_peroxo:
-        acid_suffix = f"{carbo}{linker_infix}{acid_infix}ic"
-        ester_suffix = f"{carbo}{linker_infix}{acid_infix}ate"
+        acid_suffix = RULES.chalcogens.templates["ordinary_peroxy_acid"].format(
+            carbo=carbo, linker=linker_infix, acid_infix=acid_infix
+        )
+        ester_suffix = RULES.chalcogens.templates["ordinary_peroxy_ester"].format(
+            carbo=carbo, linker=linker_infix, acid_infix=acid_infix
+        )
     else:
-        acid_suffix = f"{carbo}{acid_infix}({linker_infix}ic)"
-        ester_suffix = f"{carbo}{acid_infix}({linker_infix}ate)"
-    site = (
-        f" {first_linker.element.value}{terminal.element.value}-acid"
-        if first_linker.element is not terminal.element
-        else " acid"
+        acid_suffix = RULES.chalcogens.templates["mixed_peroxy_acid"].format(
+            carbo=carbo, linker=linker_infix, acid_infix=acid_infix
+        )
+        ester_suffix = RULES.chalcogens.templates["mixed_peroxy_ester"].format(
+            carbo=carbo, linker=linker_infix, acid_infix=acid_infix
+        )
+    site_template = "acid_site_pair" if first_linker.element is not terminal.element else "acid_site_same"
+    site = RULES.chalcogens.templates[site_template].format(
+        first=first_linker.element.value, second=terminal.element.value
     )
+    try:
+        policy = _derivative_policy("peroxy_acyl", descriptor.derivative)
+    except KeyError:
+        raise ValueError(f"Unsupported peroxy acyl derivative: {descriptor.derivative.value}")
     if descriptor.derivative is DerivativeKind.ACID:
         suffix = f"{acid_suffix}{site}"
-        seniority = (
-            22,
-            _ELEMENT_RANK[double_ligand.element],
-            _ELEMENT_RANK[first_linker.element],
-            _ELEMENT_RANK[terminal.element],
-        )
-        families = ("peroxy_acid", "chain_external_carbonyl")
-    elif descriptor.derivative is DerivativeKind.ANION:
-        suffix = ester_suffix
-        seniority = (
-            21,
-            _ELEMENT_RANK[double_ligand.element],
-            _ELEMENT_RANK[first_linker.element],
-            _ELEMENT_RANK[terminal.element],
-        )
-        families = ("peroxy_ester", "chain_external_carbonyl")
-    elif descriptor.derivative is DerivativeKind.ESTER:
-        suffix = ester_suffix
-        seniority = (
-            45,
-            _ELEMENT_RANK[double_ligand.element],
-            _ELEMENT_RANK[first_linker.element],
-            _ELEMENT_RANK[terminal.element],
-        )
-        families = ("ester_like", "peroxy_ester", "front_modifier", "chain_external_carbonyl")
     else:
-        raise ValueError(f"Unsupported peroxy acyl derivative: {descriptor.derivative.value}")
+        suffix = ester_suffix
+    seniority = (
+        int(policy["seniority"]),
+        _element_rank(double_ligand.element),
+        _element_rank(first_linker.element),
+        _element_rank(terminal.element),
+    )
     return key, FunctionalGroupRule(
         key=key,
         role="principal",
-        prefix=f"{acid_infix}{linker_infix}carbonyl",
+        prefix=RULES.chalcogens.templates["peroxy_prefix"].format(
+            acid_infix=acid_infix, linker=linker_infix
+        ),
         suffix=suffix,
         multi_suffix=None,
         suffix_multiplier_positions=(0,),
         seniority=seniority,
         suffix_with_locant=descriptor.is_external,
         needs_locant=True,
-        families=families,
+        families=tuple(policy["families"]),
+        capabilities=_capabilities(policy),
     )
 
 
@@ -436,18 +319,24 @@ def anhydride_class_name(descriptor: FunctionalGroupDescriptor) -> str:
 
     bridge_elements = tuple(ligand.element for ligand in descriptor.ligands[2:])
     if bridge_elements == (Chalcogen.OXYGEN,):
-        return "anhydride"
+        return RULES.chalcogens.templates["anhydride"]
     if len(bridge_elements) == 1:
-        return f"{_REPLACEMENT_INFIX[bridge_elements[0]]}anhydride"
+        return RULES.chalcogens.templates["single_replacement_anhydride"].format(
+            replacement=_element_data(bridge_elements[0])["replacement_infix"]
+        )
     if bridge_elements == (Chalcogen.OXYGEN, Chalcogen.OXYGEN):
-        return "peroxyanhydride"
+        return RULES.chalcogens.templates["peroxyanhydride"]
     replacements = tuple(element for element in bridge_elements if element is not Chalcogen.OXYGEN)
     if len(replacements) == 1:
-        return f"{_REPLACEMENT_INFIX[replacements[0]]}peroxyanhydride"
+        return RULES.chalcogens.templates["single_replacement_peroxyanhydride"].format(
+            replacement=_element_data(replacements[0])["replacement_infix"]
+        )
     if replacements[0] is replacements[1]:
-        return f"di{_REPLACEMENT_INFIX[replacements[0]]}peroxyanhydride"
-    replacement = "".join(sorted(_REPLACEMENT_INFIX[element] for element in replacements))
-    return f"{replacement}peroxyanhydride"
+        return RULES.chalcogens.templates["double_replacement_peroxyanhydride"].format(
+            replacement=_element_data(replacements[0])["replacement_infix"]
+        )
+    replacement = "".join(sorted(_element_data(element)["replacement_infix"] for element in replacements))
+    return RULES.chalcogens.templates["mixed_replacement_peroxyanhydride"].format(replacement=replacement)
 
 
 def resolve_anhydride_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, FunctionalGroupRule | None]:
@@ -469,26 +358,18 @@ def resolve_anhydride_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, 
         suffix=anhydride_class_name(descriptor),
         multi_suffix=None,
         suffix_multiplier_positions=(0,),
-        seniority=(30, *(_ELEMENT_RANK[element] for element in bridge_elements)),
+        seniority=(int(RULES.chalcogens.policies["anhydride"]["seniority"]), *(_element_rank(element) for element in bridge_elements)),
         suffix_with_locant=False,
         needs_locant=True,
-        families=("anhydride",),
+        families=tuple(RULES.chalcogens.policies["anhydride"]["families"]),
+        capabilities=_capabilities(RULES.chalcogens.policies["anhydride"]),
     )
-
-
-_CENTRAL_ACID_ORIGINS = {
-    (Chalcogen.SULFUR, 2): ("sulfon", 25, "sulfonic_acid", "sulfonate", "sulfonamide"),
-    (Chalcogen.SULFUR, 1): ("sulfin", 27, None, None, None),
-    (Chalcogen.SELENIUM, 2): ("selenon", 28, None, None, None),
-    (Chalcogen.SELENIUM, 1): ("selenin", 29, None, None, None),
-    (Chalcogen.TELLURIUM, 2): ("telluron", 29, None, None, None),
-    (Chalcogen.TELLURIUM, 1): ("tellurin", 29, None, None, None),
-}
 
 
 def resolve_central_acid_rule(
     descriptor: FunctionalGroupDescriptor,
     *,
+    leaving_group: AcylLeavingGroup | None = None,
     leaving_symbol: str | None = None,
 ) -> tuple[str, FunctionalGroupRule | None]:
     """Resolve R-Q(=E)n-E-X for Q = S, Se, or Te."""
@@ -498,9 +379,15 @@ def resolve_central_acid_rule(
     central_element = descriptor.central_element
     if central_element is None:
         raise ValueError("A central-acid descriptor requires its central element")
-    origin_stem, origin_rank, acid_key, ester_key, amide_key = _CENTRAL_ACID_ORIGINS[
-        (central_element, len(double_ligands))
-    ]
+    if leaving_group is None and leaving_symbol is not None:
+        leaving_group = AcylLeavingGroup(leaving_symbol)
+    leaving_data = RULES.chalcogens.acyl_leaving_groups.get(leaving_group.value) if leaving_group is not None else None
+    origin = RULES.chalcogens.central_acid_origins[(central_element.value, len(double_ligands))]
+    origin_stem = origin["stem"]
+    origin_rank = int(origin["rank"])
+    acid_key = origin.get("acid_key")
+    ester_key = origin.get("ester_key")
+    amide_key = origin.get("amide_key")
     if len(terminal_ligands) == 2:
         first_linker, terminal = terminal_ligands
         double_infix = _replacement_infix(tuple(ligand.element for ligand in double_ligands))
@@ -516,23 +403,22 @@ def resolve_central_acid_rule(
             ester_suffix = f"{origin_prefix}o({linker_infix}ate)"
         sites = "_".join(ligand.element.value for ligand in descriptor.ligands)
         key = f"central_{central_element.value}_{descriptor.derivative.value}_{sites}"
+        try:
+            policy = _derivative_policy("central_peroxy", descriptor.derivative)
+        except KeyError:
+            raise ValueError(f"Unsupported central peroxy derivative: {descriptor.derivative.value}")
         if descriptor.derivative is DerivativeKind.ACID:
             suffix = acid_suffix
             seniority = (
                 origin_rank,
-                *(_ELEMENT_RANK[ligand.element] for ligand in descriptor.ligands),
+                *(_element_rank(ligand.element) for ligand in descriptor.ligands),
             )
-            families = ("central_acid", "peroxy_acid")
         elif descriptor.derivative is DerivativeKind.ANION:
             suffix = ester_suffix
             seniority = (26, origin_rank)
-            families = ("central_acid", "peroxy_ester")
         elif descriptor.derivative is DerivativeKind.ESTER:
             suffix = ester_suffix
             seniority = (45, origin_rank)
-            families = ("central_acid", "ester_like", "peroxy_ester", "front_modifier")
-        else:
-            raise ValueError(f"Unsupported central peroxy derivative: {descriptor.derivative.value}")
         return key, FunctionalGroupRule(
             key=key,
             role="principal",
@@ -543,7 +429,8 @@ def resolve_central_acid_rule(
             seniority=seniority,
             suffix_with_locant=True,
             needs_locant=True,
-            families=families,
+            families=tuple(policy["families"]),
+            capabilities=_capabilities(policy),
         )
     terminal = terminal_ligands[0] if terminal_ligands else None
     all_oxygen = all(ligand.element is Chalcogen.OXYGEN for ligand in descriptor.ligands)
@@ -564,36 +451,37 @@ def resolve_central_acid_rule(
     key_sites = "_".join(ligand.element.value for ligand in descriptor.ligands)
     key = f"central_{central_element.value}_{descriptor.derivative.value}_{key_sites}"
     suffix_stem = f"{origin_stem}{'o' if infix else ''}{infix}"
-    families = ("central_acid",)
+    policy = _derivative_policy("central", descriptor.derivative)
+    families = tuple(policy["families"])
     if descriptor.derivative is DerivativeKind.ACID:
         site = f" {terminal.element.value}-acid" if terminal is not None and replacements else " acid"
         suffix = f"{suffix_stem}ic{site}"
-        seniority = (origin_rank, *(_ELEMENT_RANK[ligand.element] for ligand in descriptor.ligands))
+        seniority = (origin_rank, *(_element_rank(ligand.element) for ligand in descriptor.ligands))
         prefix = f"{origin_stem}o{infix}o"
     elif descriptor.derivative is DerivativeKind.ANION:
         suffix = f"{suffix_stem}ate"
-        seniority = (26, origin_rank, *(_ELEMENT_RANK[ligand.element] for ligand in descriptor.ligands))
+        seniority = (26, origin_rank, *(_element_rank(ligand.element) for ligand in descriptor.ligands))
         prefix = f"{origin_stem}ato"
     elif descriptor.derivative is DerivativeKind.ESTER:
         suffix = f"{suffix_stem}ate"
-        seniority = (40, origin_rank, *(_ELEMENT_RANK[ligand.element] for ligand in descriptor.ligands))
+        seniority = (40, origin_rank, *(_element_rank(ligand.element) for ligand in descriptor.ligands))
         prefix = f"{origin_stem}yl"
-        families += ("ester_like", "front_modifier")
     elif descriptor.derivative is DerivativeKind.AMIDE:
         suffix = f"{suffix_stem}amide"
-        seniority = (66, origin_rank, *(_ELEMENT_RANK[ligand.element] for ligand in double_ligands))
+        seniority = (66, origin_rank, *(_element_rank(ligand.element) for ligand in double_ligands))
         prefix = f"{origin_stem}amoyl"
-        families += ("amide_like",)
     elif descriptor.derivative is DerivativeKind.HYDRAZIDE:
         suffix = f"{suffix_stem}hydrazide" if infix else f"{origin_stem}ohydrazide"
-        seniority = (68, origin_rank, *(_ELEMENT_RANK[ligand.element] for ligand in double_ligands))
+        seniority = (68, origin_rank, *(_element_rank(ligand.element) for ligand in double_ligands))
         prefix = f"hydrazine{origin_stem}yl"
-        families += ("amide_like", "hydrazide")
-    elif descriptor.derivative is DerivativeKind.ACID_HALIDE and leaving_symbol is not None:
-        suffix = f"{suffix_stem}yl {_HALIDE_WORD[leaving_symbol]}"
-        seniority = (55, origin_rank, _HALIDE_RANK[leaving_symbol])
-        prefix = f"{_HALIDE_PREFIX[leaving_symbol]}{origin_stem}yl"
-        families += ("acid_halide",)
+    elif descriptor.derivative is DerivativeKind.ACID_HALIDE and leaving_data is not None:
+        suffix = RULES.chalcogens.templates["central_acid_halide_suffix"].format(
+            stem=suffix_stem, halide_word=leaving_data["word"]
+        )
+        seniority = (55, origin_rank, int(leaving_data["rank"]))
+        prefix = RULES.chalcogens.templates["central_acid_halide_prefix"].format(
+            halide_prefix=leaving_data["prefix"], stem=origin_stem
+        )
     else:
         raise ValueError(f"Unsupported central-acid derivative: {descriptor.derivative.value}")
     return key, FunctionalGroupRule(
@@ -607,4 +495,5 @@ def resolve_central_acid_rule(
         suffix_with_locant=True,
         needs_locant=True,
         families=families,
+        capabilities=_capabilities(policy),
     )

@@ -817,7 +817,7 @@
   "chalcogen_peroxol_rules": {
     "bluebook_rule": "P-63.3, Table 6.1; ordered suffixes for R-E1-E2-H",
     "values": [
-      {"first": "O", "terminal": "O", "suffix": "peroxol", "rank": 0},
+      {"first": "O", "terminal": "O", "suffix": "peroxol", "rank": 0, "capabilities": ["blocks_structural_parent"]},
       {"first": "S", "terminal": "O", "suffix": "SO-thioperoxol", "rank": 1, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
       {"first": "Se", "terminal": "O", "suffix": "SeO-selenoperoxol", "rank": 2, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
       {"first": "Te", "terminal": "O", "suffix": "TeO-telluroperoxol", "rank": 3, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
@@ -856,13 +856,20 @@
       {"derivative": "urea", "double_element": "Te", "key": "tellurourea"}
     ]
   },
-  "chalcogen_acid_halides": {
-    "bluebook_rule": "P-65.5; acyl halide words, prefixes, and priority order",
+  "chalcogen_acyl_leaving_groups": {
+    "bluebook_rule": "P-65.5 and P-65.6; acyl halide and pseudohalide words, prefixes, and priority order",
     "values": {
       "F": {"word": "fluoride", "prefix": "fluoro", "rank": 0, "chain_key": "acid_fluoride", "external_key": "ring_acid_fluoride"},
       "Cl": {"word": "chloride", "prefix": "chloro", "rank": 1, "chain_key": "acid_chloride", "external_key": "ring_acid_chloride"},
       "Br": {"word": "bromide", "prefix": "bromo", "rank": 2, "chain_key": "acid_bromide", "external_key": "ring_acid_bromide"},
-      "I": {"word": "iodide", "prefix": "iodo", "rank": 3, "chain_key": "acid_iodide", "external_key": "ring_acid_iodide"}
+      "I": {"word": "iodide", "prefix": "iodo", "rank": 3, "chain_key": "acid_iodide", "external_key": "ring_acid_iodide"},
+      "N3": {"word": "azide", "prefix": "azido", "rank": 4},
+      "CN": {"word": "cyanide", "prefix": "cyano", "rank": 5},
+      "NC": {"word": "isocyanide", "prefix": "isocyano", "rank": 6},
+      "NCO": {"word": "isocyanate", "prefix": "isocyanato", "rank": 7},
+      "NCS": {"word": "isothiocyanate", "prefix": "isothiocyanato", "rank": 8},
+      "NCSe": {"word": "isoselenocyanate", "prefix": "isoselenocyanato", "rank": 9},
+      "NCTe": {"word": "isotellurocyanate", "prefix": "isotellurocyanato", "rank": 10}
     }
   },
   "chalcogen_central_acid_origins": {
@@ -887,7 +894,8 @@
         "amide": {"suffix": "{carbo}{infix}amide", "prefix": "carbamo{infix}yl", "seniority": 60, "ranked_seniority": true, "families": ["amide_like", "chain_external_carbonyl"], "capabilities": ["amide_like", "chain_external_carbonyl"]},
         "hydrazide": {"suffix": "{carbo}{infix}hydrazide", "prefix": "hydrazinecarb{infix}oyl", "seniority": 68, "families": ["amide_like", "hydrazide", "chain_external_carbonyl"], "capabilities": ["amide_like", "hydrazide", "chain_external_carbonyl"]},
         "urea": {"suffix": "{infix}urea", "prefix": "carbamo{infix}ylamino", "seniority": 60, "families": ["amide_like", "urea"], "capabilities": ["amide_like", "urea"]},
-        "acid_halide": {"suffix": "{carbo}{infix}yl {halide_word}", "prefix": "{halide_prefix}{infix}carbonyl", "seniority": 50, "families": ["acid_halide", "chain_external_carbonyl"], "capabilities": ["acid_halide", "chain_external_carbonyl"]}
+        "acid_halide": {"suffix": "{carbo}{infix}yl {halide_word}", "prefix": "{halide_prefix}{infix}carbonyl", "seniority": 50, "families": ["acid_halide", "chain_external_carbonyl"], "capabilities": ["acid_halide", "chain_external_carbonyl"]},
+        "acyl_pseudohalide": {"suffix": "{carbo}{infix}yl {halide_word}", "prefix": "{halide_prefix}{infix}carbonyl", "seniority": 50, "families": ["acid_halide", "chain_external_carbonyl"], "capabilities": ["acid_halide", "chain_external_carbonyl"]}
       },
       "peroxy_acyl": {
         "acid": {"seniority": 22, "families": ["peroxy_acid", "chain_external_carbonyl"], "capabilities": ["chain_external_carbonyl"]},
