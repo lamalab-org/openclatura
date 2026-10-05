@@ -559,10 +559,14 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
 
     for atom in mol:
         if atom.is_carbon:
-            acyl_group = _acyl_chalcogen_group(mol, atom.idx, consumed, cyclic_atoms)
-            if acyl_group is not None:
+            matched_acyl = _acyl_chalcogen_group(mol, atom.idx, consumed, cyclic_atoms)
+            acyl_groups = matched_acyl if isinstance(matched_acyl, tuple) else (matched_acyl,)
+            for acyl_group in acyl_groups:
+                if acyl_group is None:
+                    continue
                 groups.append(acyl_group)
-                consumed.update(acyl_group.atoms_involved - {acyl_group.attachment_carbon})
+                if acyl_group.is_principal_candidate:
+                    consumed.update(acyl_group.atoms_involved - {acyl_group.attachment_carbon})
 
     for atom in mol:
         if atom.symbol == "N" and atom.idx not in consumed and atom.idx not in cyclic_atoms:
@@ -882,7 +886,7 @@ def _acyl_chalcogen_group(
     carbon: int,
     consumed: set[int],
     cyclic_atoms: set[int],
-) -> PerceivedGroup | None:
+) -> PerceivedGroup | tuple[PerceivedGroup, ...] | None:
     """Classify one complete C(=E) derivative before simpler fragments."""
 
     ligands = [
@@ -960,6 +964,9 @@ def _acyl_chalcogen_group(
                 attachment_atom=attachment,
                 is_external=external,
             )
+            projected = _established_acyl_projection(descriptor)
+            if projected is not None:
+                return projected
             key, rule = resolve_peroxy_acyl_rule(descriptor)
             return PerceivedGroup(
                 key,
@@ -993,6 +1000,9 @@ def _acyl_chalcogen_group(
             attachment_atom=attachment,
             is_external=external,
         )
+        projected = _established_acyl_projection(descriptor)
+        if projected is not None:
+            return projected
         key, rule = resolve_acyl_rule(descriptor)
         return PerceivedGroup(
             key,
@@ -1080,6 +1090,60 @@ def _acyl_chalcogen_group(
         descriptor=descriptor,
         resolved_rule=rule,
     )
+
+
+def _established_acyl_projection(
+    descriptor: FunctionalGroupDescriptor,
+) -> PerceivedGroup | tuple[PerceivedGroup, ...] | None:
+    """Project supported O/S acyl paths onto established structural detectors."""
+
+    double = descriptor.ligands[0]
+    bridge = descriptor.ligands[1:]
+    citation_rule = chalcogen_citation_rule(
+        ChalcogenCitationContext.ACYL,
+        tuple(ligand.element for ligand in descriptor.ligands),
+        bridge_atom_count=len(bridge),
+        site_elements=(double.element,),
+        bridge_elements=tuple(ligand.element for ligand in bridge),
+    )
+    if citation_rule is None:
+        return None
+    center = descriptor.centers[0]
+    if citation_rule.projection is ChalcogenCitationProjection.CARBONYL:
+        return PerceivedGroup(
+            FunctionalFamily.ACYL.value,
+            False,
+            descriptor.attachment_atom if descriptor.attachment_atom is not None else center,
+            set(descriptor.atom_ids),
+            descriptor=descriptor,
+        )
+    if citation_rule.projection is ChalcogenCitationProjection.ESTER:
+        key = RULES.chalcogens.standard_acyl_keys[
+            (
+                DerivativeKind.ESTER.value,
+                Chalcogen.OXYGEN.value,
+                Chalcogen.OXYGEN.value,
+                descriptor.is_external,
+            )
+        ]
+        first_linker = bridge[0]
+        attachment = descriptor.attachment_atom if descriptor.attachment_atom is not None else center
+        return (
+            PerceivedGroup(
+                FunctionalFamily.ACYL.value,
+                False,
+                attachment,
+                set(descriptor.atom_ids),
+                descriptor=descriptor,
+            ),
+            PerceivedGroup(
+                key,
+                True,
+                attachment,
+                {center, double.atom, first_linker.atom},
+            ),
+        )
+    return None
 
 
 def _carbonyl_chalcogen_group(

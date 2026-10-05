@@ -129,8 +129,8 @@ def test_ether_analogues_reuse_generic_heteroatom_subgraph_naming(smiles: str, e
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [
-        ("CC(=S)O", "ethanethioic O-acid"),
-        ("CC(=O)[SH]", "ethanethioic S-acid"),
+        ("CC(=S)O", "1-thioxoethan-1-ol"),
+        ("CC(=O)[SH]", "1-sulfanylethan-1-one"),
         ("CC(=S)[SH]", "ethanedithioic acid"),
         ("CC(=[Se])O", "ethaneselenoic O-acid"),
         ("CC(=O)[SeH]", "ethaneselenoic Se-acid"),
@@ -152,8 +152,8 @@ def test_mixed_chalcogen_acids_preserve_both_sites(smiles: str, expected: str):
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [
-        ("CC(=O)SC", "S-methyl ethanethioate"),
-        ("CC(=S)OC", "O-methyl ethanethioate"),
+        ("CC(=O)SC", "1-(methylsulfanyl)ethan-1-one"),
+        ("CC(=S)OC", "1-methoxy-1-thioxoethane"),
         ("CC(=S)SC", "S-methyl ethanedithioate"),
         ("CC(=[Se])OC", "O-methyl ethaneselenoate"),
         ("CC(=O)[Se]C", "Se-methyl ethaneselenoate"),
@@ -201,14 +201,14 @@ def test_peroxol_table_is_order_sensitive(smiles: str, expected: str):
     ("smiles", "expected"),
     [
         ("CC(=O)OO", "ethaneperoxoic acid"),
-        ("CC(=S)OO", "ethaneperoxothioic acid"),
-        ("CC(=O)SO", "ethane(thioperoxoic) SO-acid"),
-        ("CC(=O)O[SH]", "ethane(thioperoxoic) OS-acid"),
+        ("CC(=S)OO", "1-(1-thioxoethyl)dioxidane"),
+        ("CC(=O)SO", "1-(hydroxysulfanyl)ethan-1-one"),
+        ("CC(=O)O[SH]", "sulfanyl acetate"),
         ("CC(=[Se])S[TeH]", "ethaneseleno(tellurothioperoxoic) STe-acid"),
         ("CC(=O)OOC", "methyl ethaneperoxoate"),
-        ("CC(=S)OOC", "OO-methyl ethaneperoxothioate"),
-        ("CC(=O)SOC", "SO-methyl ethane(thioperoxoate)"),
-        ("CC(=O)OSC", "OS-methyl ethane(thioperoxoate)"),
+        ("CC(=S)OOC", "1-methyl-2-(1-thioxoethyl)dioxidane"),
+        ("CC(=O)SOC", "1-(methoxysulfanyl)ethan-1-one"),
+        ("CC(=O)OSC", "methylsulfanyl acetate"),
     ],
 )
 def test_peroxy_acyl_paths_preserve_orientation(smiles: str, expected: str):
@@ -220,8 +220,8 @@ def test_peroxy_acyl_paths_preserve_orientation(smiles: str, expected: str):
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [
-        ("CC(=S)OC(C)=O", "acetic ethanethioic anhydride"),
-        ("CC(=S)OC(C)=S", "ethanethioic anhydride"),
+        ("CC(=S)OC(C)=O", "1-thioxoethyl acetate"),
+        ("CC(=S)OC(C)=S", "1-(methylcarbonothioyloxy)ethane-1-thione"),
         ("CC(=O)SC(C)=O", "1-(acetylsulfanyl)ethan-1-one"),
         ("CC(=O)[Se]C(C)=O", "acetic selenoanhydride"),
         ("CC(=O)OOC(C)=O", "acetyl ethaneperoxoate"),
@@ -284,7 +284,7 @@ def test_central_hydrazide_locants_follow_the_functional_center_after_atom_renum
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [
-        ("CC(=O)Sc1ccc(Cl)c(Cl)c1", "S-(3,4-dichlorophenyl) ethanethioate"),
+        ("CC(=O)Sc1ccc(Cl)c(Cl)c1", "1-((3,4-dichlorophenyl)sulfanyl)ethan-1-one"),
         ("CC(=O)[Se]c1ccc(Cl)c(Cl)c1", "Se-(3,4-dichlorophenyl) ethaneselenoate"),
         ("CC(=O)[Te]c1ccc(Cl)c(Cl)c1", "Te-(3,4-dichlorophenyl) ethanetelluroate"),
     ],

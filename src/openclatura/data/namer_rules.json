@@ -840,7 +840,11 @@
     "values": [
       {"context": "peroxol", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "route": "existing"},
       {"context": "peroxide", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "route": "existing"},
+      {"context": "acyl", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O"], "required_site_elements": ["O"], "allowed_bridge_elements": ["O", "S"], "required_bridge_elements": ["S"], "bridge_prefix": ["O", "S"], "route": "existing", "projection": "ester"},
+      {"context": "acyl", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O"], "required_site_elements": ["O"], "allowed_bridge_elements": ["O", "S"], "required_bridge_elements": ["S"], "bridge_prefix": ["S"], "route": "existing", "projection": "carbonyl"},
+      {"context": "acyl", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["S"], "required_site_elements": ["S"], "allowed_bridge_elements": ["O", "S"], "required_bridge_elements": ["O"], "bridge_prefix": ["O"], "route": "existing", "projection": "carbonyl"},
       {"context": "anhydride", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O"], "required_site_elements": ["O"], "allowed_bridge_elements": ["O", "S"], "required_bridge_elements": ["S"], "route": "existing", "projection": "ester_or_carbonyl"},
+      {"context": "anhydride", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O", "S"], "required_site_elements": ["S"], "allowed_bridge_elements": ["O"], "required_bridge_elements": ["O"], "route": "existing", "projection": "ester_or_carbonyl"},
       {"context": "anhydride", "allowed_elements": ["O"], "required_elements": ["O"], "allowed_site_elements": ["O"], "required_site_elements": ["O"], "allowed_bridge_elements": ["O"], "required_bridge_elements": ["O"], "bridge_atom_count": 2, "route": "existing", "projection": "peroxy_ester"}
     ]
   },

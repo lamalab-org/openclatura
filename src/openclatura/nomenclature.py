@@ -148,6 +148,7 @@ class ChalcogenCitationContext(StrEnum):
     PEROXOL = "peroxol"
     PEROXIDE = "peroxide"
     ANHYDRIDE = "anhydride"
+    ACYL = "acyl"
 
 
 class ChalcogenCitationRoute(StrEnum):
@@ -163,6 +164,8 @@ class ChalcogenCitationProjection(StrEnum):
     DEFER = "defer"
     PEROXY_ESTER = "peroxy_ester"
     ESTER_OR_CARBONYL = "ester_or_carbonyl"
+    CARBONYL = "carbonyl"
+    ESTER = "ester"
 
 
 @dataclass(frozen=True)
@@ -177,6 +180,7 @@ class ChalcogenCitationRule:
     required_site_elements: frozenset[str] = frozenset()
     allowed_bridge_elements: frozenset[str] = frozenset()
     required_bridge_elements: frozenset[str] = frozenset()
+    bridge_prefix: tuple[str, ...] = ()
 
     def matches(
         self,
@@ -195,6 +199,7 @@ class ChalcogenCitationRule:
             and self.required_site_elements <= sites
             and (not self.allowed_bridge_elements or bridge <= self.allowed_bridge_elements)
             and self.required_bridge_elements <= bridge
+            and (not self.bridge_prefix or bridge_elements[: len(self.bridge_prefix)] == self.bridge_prefix)
             and (self.bridge_atom_count is None or self.bridge_atom_count == bridge_atom_count)
         )
 
@@ -467,6 +472,7 @@ def _chalcogen_rules() -> ChalcogenNomenclatureRules:
                 required_site_elements=frozenset(row.get("required_site_elements", ())),
                 allowed_bridge_elements=frozenset(row.get("allowed_bridge_elements", ())),
                 required_bridge_elements=frozenset(row.get("required_bridge_elements", ())),
+                bridge_prefix=tuple(row.get("bridge_prefix", ())),
             )
             for row in group.values("chalcogen_citation_routes")
         ),
