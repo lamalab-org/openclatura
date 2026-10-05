@@ -580,6 +580,20 @@ def test_nitrogen_chalcogenide_functional_class_defers_to_a_principal_acid():
     )
 
 
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    (
+        ("CN(C)C(=O)ONC(=O)c1ccccc1", "benzamido dimethylcarbamate"),
+        (
+            "CCOC(=O)C(CC)(Cc1cccc2cccnc12)C(=O)ONC(=O)CC",
+            "1-ethyl 3-propanamido 2-ethyl-2-((quinolin-8-yl)methyl)propanedioate",
+        ),
+    ),
+)
+def test_acyl_heteroatom_links_reuse_the_established_ester_route(smiles, expected):
+    assert oc.name(smiles).name == expected
+
+
 def test_polonium_is_parseable_but_has_an_explicit_unvalidated_boundary():
     mol = read_smiles("C[PoH]")
 

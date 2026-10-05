@@ -943,13 +943,18 @@ def _acyl_chalcogen_group(
             ChalcogenLigandRole.HYDROGEN_BEARING,
             ChalcogenLigandRole.ANIONIC,
             ChalcogenLigandRole.CARBON_LINK,
+            ChalcogenLigandRole.HETEROATOM_LINK,
             ChalcogenLigandRole.CHALCOGEN_LINK,
         }
     ]
     # A centre carrying a nitrogen or a typed leaving group is not a plain
     # ester merely because it also has a single-bonded chalcogen.  Defer those
     # competing ligands to their complete derivative routes below.
-    if len(single_ligands) == 1 and not nitrogens and not halogens:
+    if (
+        len(single_ligands) == 1
+        and not halogens
+        and (not nitrogens or single_ligands[0].role is ChalcogenLigandRole.HETEROATOM_LINK)
+    ):
         single_ligand = single_ligands[0]
         if single_ligand.role is ChalcogenLigandRole.CHALCOGEN_LINK:
             terminal_atom = single_ligand.attachment_atom
@@ -1005,6 +1010,7 @@ def _acyl_chalcogen_group(
             ChalcogenLigandRole.HYDROGEN_BEARING: DerivativeKind.ACID,
             ChalcogenLigandRole.ANIONIC: DerivativeKind.ANION,
             ChalcogenLigandRole.CARBON_LINK: DerivativeKind.ESTER,
+            ChalcogenLigandRole.HETEROATOM_LINK: DerivativeKind.ESTER,
         }
         derivative = derivative_by_role[single_ligand.role]
         descriptor = FunctionalGroupDescriptor(
