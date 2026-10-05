@@ -760,10 +760,10 @@
   "chalcogen_elements": {
     "bluebook_rule": "P-62.5, P-63 through P-66; element vocabulary and order for validated chalcogen analogues",
     "values": {
-      "O": {"rank": 0, "class_name": "oxide", "additive_prefix": "oxido", "replacement_infix": ""},
-      "S": {"rank": 1, "class_name": "sulfide", "additive_prefix": "sulfido", "replacement_infix": "thio"},
-      "Se": {"rank": 2, "class_name": "selenide", "additive_prefix": "selenido", "replacement_infix": "seleno"},
-      "Te": {"rank": 3, "class_name": "telluride", "additive_prefix": "tellurido", "replacement_infix": "telluro"}
+      "O": {"rank": 0, "class_name": "oxide", "additive_prefix": "oxido", "replacement_infix": "", "nitrogen_chalcogenide_citation": "substitutive"},
+      "S": {"rank": 1, "class_name": "sulfide", "additive_prefix": "sulfido", "replacement_infix": "thio", "nitrogen_chalcogenide_citation": "functional_class"},
+      "Se": {"rank": 2, "class_name": "selenide", "additive_prefix": "selenido", "replacement_infix": "seleno", "nitrogen_chalcogenide_citation": "functional_class"},
+      "Te": {"rank": 3, "class_name": "telluride", "additive_prefix": "tellurido", "replacement_infix": "telluro", "nitrogen_chalcogenide_citation": "functional_class"}
     }
   },
   "chalcogen_simple_group_keys": {
@@ -949,6 +949,8 @@
       "single_replacement_peroxyanhydride": "{replacement}peroxyanhydride",
       "double_replacement_peroxyanhydride": "di{replacement}peroxyanhydride",
       "mixed_replacement_peroxyanhydride": "{replacement}peroxyanhydride",
+      "amine_chalcogenide_parent": "{parent} {class_name}",
+      "imine_chalcogenide_parent": "{parent} N-{class_name}",
       "central_origin_with_infix": "{stem}o{infix}",
       "central_peroxy_acid": "{origin}operoxoic acid",
       "central_peroxy_ester": "{origin}operoxoate",

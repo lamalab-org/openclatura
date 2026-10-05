@@ -12,6 +12,7 @@ from .chalcogen_roles import (
     DerivativeKind,
     FunctionalFamily,
     FunctionalGroupDescriptor,
+    NitrogenChalcogenideCitation,
 )
 from .nomenclature import (
     RULES,
@@ -46,6 +47,12 @@ def chalcogenide_class_name(element: Chalcogen) -> str:
     """Return the validated functional-class name for an anionic chalcogen ligand."""
 
     return RULES.chalcogens.chalcogenide_class_names[element.value]
+
+
+def nitrogen_chalcogenide_citation(element: Chalcogen) -> NitrogenChalcogenideCitation:
+    """Return the data-selected citation route for an N+-E- group."""
+
+    return NitrogenChalcogenideCitation(_element_data(element)["nitrogen_chalcogenide_citation"])
 
 
 def chalcogenide_prefix(element: Chalcogen) -> str:

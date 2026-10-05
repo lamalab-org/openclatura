@@ -7,8 +7,13 @@ from dataclasses import dataclass, replace
 from .assembly_parts import NameAtomBinding, NameTokenBinding, rendered_substituent_text
 from .assembly_prefixes import substituent_sort_key
 from .chains import get_cyclic_atoms
-from .chalcogen_roles import chalcogen_for_symbol, classify_peroxide_linkage
-from .chalcogen_vocabulary import anhydride_class_name, chalcogenide_class_name, peroxide_class_name
+from .chalcogen_roles import NitrogenChalcogenideCitation, chalcogen_for_symbol, classify_peroxide_linkage
+from .chalcogen_vocabulary import (
+    anhydride_class_name,
+    chalcogenide_class_name,
+    nitrogen_chalcogenide_citation,
+    peroxide_class_name,
+)
 from .charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
 from .formatting import (
     count_names,
@@ -305,6 +310,7 @@ def nitrogen_chalcogenide_result(
         for role in charge_pair_roles(mol, component_atoms)
         if role.nitrogen_kind in {NitrogenChalcogenideKind.AMINE, NitrogenChalcogenideKind.IMINE}
         and role.chalcogen is not None
+        and nitrogen_chalcogenide_citation(role.chalcogen) is NitrogenChalcogenideCitation.FUNCTIONAL_CLASS
     ]
     if len(matches) != 1:
         return None
@@ -312,37 +318,20 @@ def nitrogen_chalcogenide_result(
     nitrogen = role.positive_atom
     chalcogen = role.negative_atom
     class_name = chalcogenide_class_name(role.chalcogen)
-    if role.nitrogen_kind is NitrogenChalcogenideKind.AMINE:
-        if branch_namer is None:
-            return None
-        ligand_names = []
-        for ligand in mol.get_neighbors(nitrogen):
-            if ligand == chalcogen or mol.atoms[ligand].symbol == "H":
-                continue
-            rendered = branch_namer(
-                mol,
-                ligand,
-                (set(mol.atoms) - component_atoms) | {nitrogen, chalcogen},
-                upstream_atom=nitrogen,
-            )
-            rendered = strip_outer_parentheses(rendered_substituent_text(rendered))
-            if not rendered:
-                return None
-            ligand_names.append(rendered)
-        if not ligand_names:
-            return None
-        amine_name = format_center_ligands(ligand_names, sort_key=substituent_sort_key)
-        name = f"({amine_name})amine {class_name}"
-    else:
-        reduced_atoms = component_atoms - {chalcogen}
-        reduced = mol.subgraph(reduced_atoms)
-        reduced.set_atom_charge(nitrogen, 0)
-        from .namer import name_component
+    reduced_atoms = component_atoms - {chalcogen}
+    reduced = mol.subgraph(reduced_atoms)
+    reduced.set_atom_charge(nitrogen, 0)
+    from .namer import name_component
 
-        parent_name = name_component(reduced, reduced_atoms)
-        if not parent_name:
-            return None
-        name = f"{parent_name} N-{class_name}"
+    parent_name = name_component(reduced, reduced_atoms)
+    if not parent_name:
+        return None
+    template = (
+        "amine_chalcogenide_parent"
+        if role.nitrogen_kind is NitrogenChalcogenideKind.AMINE
+        else "imine_chalcogenide_parent"
+    )
+    name = RULES.chalcogens.templates[template].format(parent=parent_name, class_name=class_name)
     return _component_name_result(mol, component_atoms, name, "nitrogen_chalcogenide")
 
 

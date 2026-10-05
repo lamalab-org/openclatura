@@ -19,6 +19,13 @@ class Chalcogen(StrEnum):
     POLONIUM = "Po"
 
 
+class NitrogenChalcogenideCitation(StrEnum):
+    """Preferred citation route for an N+-E- functional group."""
+
+    SUBSTITUTIVE = "substitutive"
+    FUNCTIONAL_CLASS = "functional_class"
+
+
 CHALCOGENS = frozenset(Chalcogen)
 VALIDATED_NOMENCLATURE_CHALCOGENS = frozenset(
     {Chalcogen.OXYGEN, Chalcogen.SULFUR, Chalcogen.SELENIUM, Chalcogen.TELLURIUM}

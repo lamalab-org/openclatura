@@ -283,11 +283,11 @@ def test_central_chalcogen_peroxy_paths_preserve_orientation(smiles: str, expect
 @pytest.mark.parametrize(
     ("smiles", "kind", "expected"),
     [
-        ("C[N+](C)(C)[O-]", NitrogenChalcogenideKind.AMINE, "(trimethyl)amine oxide"),
-        ("C[N+](C)(C)[S-]", NitrogenChalcogenideKind.AMINE, "(trimethyl)amine sulfide"),
-        ("C[N+](C)(C)[Se-]", NitrogenChalcogenideKind.AMINE, "(trimethyl)amine selenide"),
-        ("C[N+](C)(C)[Te-]", NitrogenChalcogenideKind.AMINE, "(trimethyl)amine telluride"),
-        ("CC=[N+](C)[O-]", NitrogenChalcogenideKind.IMINE, "N-methylethanimine N-oxide"),
+        ("C[N+](C)(C)[O-]", NitrogenChalcogenideKind.AMINE, "N,N-dimethyl-N-oxidomethanaminium"),
+        ("C[N+](C)(C)[S-]", NitrogenChalcogenideKind.AMINE, "trimethylazane sulfide"),
+        ("C[N+](C)(C)[Se-]", NitrogenChalcogenideKind.AMINE, "trimethylazane selenide"),
+        ("C[N+](C)(C)[Te-]", NitrogenChalcogenideKind.AMINE, "trimethylazane telluride"),
+        ("CC=[N+](C)[O-]", NitrogenChalcogenideKind.IMINE, "N-methyl-N-oxidoethaniminium"),
         ("CC=[N+](C)[S-]", NitrogenChalcogenideKind.IMINE, "N-methylethanimine N-sulfide"),
         ("CC=[N+](C)[Se-]", NitrogenChalcogenideKind.IMINE, "N-methylethanimine N-selenide"),
         ("CC=[N+](C)[Te-]", NitrogenChalcogenideKind.IMINE, "N-methylethanimine N-telluride"),
@@ -300,6 +300,27 @@ def test_nitrogen_chalcogenides_are_classified_before_rendering(smiles: str, kin
 
     assert role.nitrogen_kind is kind
     assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("C#CC[N+](C)([O-])C(C)Cc1ccc(C)cc1", "N-methyl-N-(1-(4-methylphenyl)propan-2-yl)-N-oxidoprop-2-yn-1-aminium"),
+        ("C=CC1CC[NH+]([O-])C1", "3-ethenyl-1-oxidopyrrolidinium"),
+        ("CC[N+](C)(C)[S-]", "N,N-dimethylethanamine sulfide"),
+        ("CC[N+](C)(C)[Se-]", "N,N-dimethylethanamine selenide"),
+        ("CC[N+](C)(C)[Te-]", "N,N-dimethylethanamine telluride"),
+    ],
+)
+def test_nitrogen_chalcogenide_citation_route_preserves_whole_parent(smiles: str, expected: str):
+    import openclatura as oc
+
+    result = oc.name(smiles, verify_opsin=oc.opsin_available())
+
+    assert result.name == expected
+    if oc.opsin_available():
+        assert result.opsin_check is not None
+        assert result.opsin_check.status == "matched"
 
 
 @pytest.mark.parametrize(
