@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
+
 from .molecule import Molecule
 from .nomenclature import RULES
 
@@ -89,6 +91,73 @@ def component_graph_signature(
     return atoms, tuple(sorted(bonds))
 
 
+@lru_cache(maxsize=1)
+def _retained_component_templates() -> tuple[tuple[str, Molecule], ...]:
+    """Parse the data-owned retained graphs once, outside registry construction."""
+
+    from .graph_io import read_smiles
+
+    return tuple((name, read_smiles(smiles)) for name, smiles in RULES.components.retained_component_graph_names)
+
+
+def _component_graph_isomorphic(
+    mol: Molecule,
+    component_atoms: set[int],
+    template: Molecule,
+) -> bool:
+    """Return whether two complete components are exactly label-isomorphic."""
+
+    template_atoms = set(template.atoms)
+    if len(component_atoms) != len(template_atoms):
+        return False
+    if component_graph_signature(mol, component_atoms) != component_graph_signature(template, template_atoms):
+        return False
+
+    def atom_label(graph: Molecule, atom_id: int) -> tuple[str, int, int | None]:
+        atom = graph.atoms[atom_id]
+        return atom.symbol, atom.charge, atom.isotope
+
+    candidates = {
+        atom_id: tuple(
+            template_id
+            for template_id in template_atoms
+            if atom_label(mol, atom_id) == atom_label(template, template_id)
+            and mol.degree(atom_id) == template.degree(template_id)
+        )
+        for atom_id in component_atoms
+    }
+    if any(not matches for matches in candidates.values()):
+        return False
+    ordered = tuple(sorted(component_atoms, key=lambda atom_id: (len(candidates[atom_id]), -mol.degree(atom_id))))
+
+    def compatible(atom_id: int, template_id: int, mapping: dict[int, int]) -> bool:
+        for mapped_atom, mapped_template in mapping.items():
+            bond = mol.get_bond(atom_id, mapped_atom)
+            template_bond = template.get_bond(template_id, mapped_template)
+            if (bond is None) != (template_bond is None):
+                return False
+            if bond is not None and bond.order != template_bond.order:
+                return False
+        return True
+
+    def extend(position: int, mapping: dict[int, int], used: set[int]) -> bool:
+        if position == len(ordered):
+            return True
+        atom_id = ordered[position]
+        for template_id in candidates[atom_id]:
+            if template_id in used or not compatible(atom_id, template_id, mapping):
+                continue
+            mapping[atom_id] = template_id
+            used.add(template_id)
+            if extend(position + 1, mapping, used):
+                return True
+            used.remove(template_id)
+            del mapping[atom_id]
+        return False
+
+    return extend(0, {}, set())
+
+
 def retained_component_graph_name(mol: Molecule, component_atoms: set[int]) -> str:
     """Return a retained name when the complete charged graph has a registered name."""
 
@@ -98,4 +167,11 @@ def retained_component_graph_name(mol: Molecule, component_atoms: set[int]) -> s
     # hydrogens distinguish substituted organic molecules from these entries.
     if any(mol.atoms[idx].total_h_count for idx in component_atoms if mol.atoms[idx].symbol == "C"):
         return ""
-    return RULES.components.retained_component_graph_names.get(component_graph_signature(mol, component_atoms), "")
+    return next(
+        (
+            name
+            for name, template in _retained_component_templates()
+            if _component_graph_isomorphic(mol, component_atoms, template)
+        ),
+        "",
+    )

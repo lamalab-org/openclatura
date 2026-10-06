@@ -1,7 +1,9 @@
 import pytest
 
 from openclatura import name, name_smiles
+from openclatura.graph_io import read_smiles
 from openclatura.rules import elements
+from openclatura.simple_components import _component_graph_isomorphic
 
 
 def test_graph_registry_carries_the_complete_periodic_table():
@@ -105,3 +107,10 @@ def test_derived_organic_names_do_not_use_retained_component_graph_shortcut(smil
 
     assert result.name == expected
     assert all(step.decision != "matched retained component graph" for step in result.decisions)
+
+
+def test_retained_component_match_requires_topology_not_only_atom_and_bond_multisets():
+    cycle = read_smiles("C1CCC1")
+    branched = read_smiles("CC1CC1")
+
+    assert not _component_graph_isomorphic(cycle, set(cycle.atoms), branched)

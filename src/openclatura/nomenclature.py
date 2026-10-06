@@ -62,7 +62,7 @@ class ComponentRules:
     mononuclear_parent_hydrides: dict[str, str]
     retained_mononuclear_hydride_names: dict[str, str]
     retained_homonuclear_chain_names: dict[str, str]
-    retained_component_graph_names: dict[tuple[tuple[tuple[str, int], ...], tuple[tuple[str, str, int], ...]], str]
+    retained_component_graph_names: tuple[tuple[str, str], ...]
     replacement_parent_oxoacid_specs: tuple[dict, ...]
 
 
@@ -477,25 +477,9 @@ def registry() -> NomenclatureRegistry:
             mononuclear_parent_hydrides=simple_components.mapping("mononuclear_parent_hydrides"),
             retained_mononuclear_hydride_names=simple_components.mapping("retained_mononuclear_hydride_names"),
             retained_homonuclear_chain_names=simple_components.mapping("retained_homonuclear_chain_names"),
-            retained_component_graph_names={
-                (
-                    tuple(
-                        sorted(
-                            (str(symbol), int(charge))
-                            for symbol, charge, count in row["atoms"]
-                            for _ in range(int(count))
-                        )
-                    ),
-                    tuple(
-                        sorted(
-                            (min(str(left), str(right)), max(str(left), str(right)), int(order))
-                            for left, right, order, count in row["bonds"]
-                            for _ in range(int(count))
-                        )
-                    ),
-                ): row["name"]
-                for row in simple_components.values("retained_component_graph_names")
-            },
+            retained_component_graph_names=tuple(
+                (row["name"], row["smiles"]) for row in simple_components.values("retained_component_graph_names")
+            ),
             replacement_parent_oxoacid_specs=tuple(simple_components.values("replacement_parent_oxoacid_specs")),
         ),
         ions=IonRules(
