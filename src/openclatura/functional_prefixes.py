@@ -121,6 +121,9 @@ def amidine_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str
         return "carbamimidoyl"
     nitrogens = [n for n in group.atoms_involved if mol.atoms[n].symbol == "N"]
     nitrogens.sort(key=lambda n: mol.get_bond(n, carbon).order)  # amine N first, imino N' second
+    # The C=N is the group's own bond, cited as an unlocanted (E)/(Z) in front of the word.
+    imine_bond = mol.get_bond(nitrogens[-1], carbon) if nitrogens else None
+    stereo = f"({imine_bond.stereo})-" if imine_bond and imine_bond.order == 2 and imine_bond.stereo else ""
     locants_by_name: dict[str, list[str]] = {}
     for nitrogen, locant in zip(nitrogens, ("N", "N'"), strict=False):
         for x in mol.get_neighbors(nitrogen):
@@ -131,14 +134,14 @@ def amidine_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str
             )
             locants_by_name.setdefault(name, []).append(locant)
     if not locants_by_name:
-        return "carbamimidoyl"
+        return f"({stereo}carbamimidoyl)" if stereo else "carbamimidoyl"
     prefixes = []
     for name in sorted(locants_by_name, key=substituent_sort_key):
         locants = locants_by_name[name]
         prefixes.append(
             f"{','.join(locants)}-{format_multiplier(name, len(locants), safe_enclose=is_complex_prefix(name))}"
         )
-    return f"({'-'.join(prefixes)}carbamimidoyl)"
+    return f"({stereo}{'-'.join(prefixes)}carbamimidoyl)"
 
 
 def hydrazide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
