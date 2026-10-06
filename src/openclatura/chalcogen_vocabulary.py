@@ -86,10 +86,16 @@ def chalcogenide_class_name(element: Chalcogen) -> str:
     return RULES.chalcogens.chalcogenide_class_names[element.value]
 
 
-def nitrogen_chalcogenide_citation(element: Chalcogen) -> NitrogenChalcogenideCitation:
+def nitrogen_chalcogenide_citation(
+    element: Chalcogen,
+    *,
+    cyclic_imine: bool = False,
+) -> NitrogenChalcogenideCitation:
     """Return the data-selected citation route for an N+-E- group."""
 
-    return NitrogenChalcogenideCitation(_element_data(element)["nitrogen_chalcogenide_citation"])
+    element_data = _element_data(element)
+    key = "cyclic_imine_chalcogenide_citation" if cyclic_imine else "nitrogen_chalcogenide_citation"
+    return NitrogenChalcogenideCitation(element_data.get(key, element_data["nitrogen_chalcogenide_citation"]))
 
 
 def chalcogenide_prefix(element: Chalcogen) -> str:

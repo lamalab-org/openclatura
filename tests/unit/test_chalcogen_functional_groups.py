@@ -355,6 +355,10 @@ def test_nitrogen_chalcogenide_citation_route_preserves_whole_parent(smiles: str
         assert result.opsin_check.status == "matched"
 
 
+def test_cyclic_imine_oxide_uses_the_data_selected_functional_class_route():
+    assert oc.name("O=C1C=c2ccccc2=[N+]1[O-]").name == "2H-indol-2-one N-oxide"
+
+
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [
