@@ -94,3 +94,66 @@ def test_the_hydrogenated_parent_is_named_from_its_own_reference():
 
     assert named == expected
     assert verify_with_opsin(named, INDOLOQUINOLIZINE).status == "matched"
+
+
+# P-14.7.1 and P-14.7.2 keep three hydrogen roles apart, and a name may carry
+# all three at once. Ordinary indicated hydrogen selects a realization of the
+# unmodified mancude parent; added indicated hydrogen is justified by a named
+# operation on that parent and need not preserve its maximum; hydro states the
+# remaining hydrogenation. The engine already renders all four of these
+# correctly, so they are the guard for any future gate on the ordinary role:
+# an added-H site must never be fed to a reference-feasibility test, and an
+# ordinary role must survive a suffix replacing the hydrogen it stands for -
+# 1H-inden-1-one keeps its 1H although the carbonyl carbon ends with no
+# hydrogen at all.
+ROLE_CONTROLS = (
+    pytest.param("1H-inden-1-one", id="ordinary-only-surviving-a-suffix"),
+    pytest.param("quinolin-2(1H)-one", id="added-only-owned-by-the-ketone"),
+    pytest.param("pyrazine-2,3-dione", id="paired-groups-need-no-citation"),
+    pytest.param("3,3a-dihydro-1H-indene-1,4(2H)-dione", id="all-three-roles-in-one-name"),
+)
+
+
+@pytest.mark.skipif(not opsin_available(), reason="the reference structures come from OPSIN")
+@pytest.mark.parametrize("target", ROLE_CONTROLS)
+def test_the_three_hydrogen_roles_stay_apart(target):
+    from py2opsin import py2opsin
+
+    smiles = py2opsin(target)
+    assert smiles, f"OPSIN could not build {target}"
+    assert name_smiles(smiles) == target
+
+
+def test_the_derivative_ledger_owes_six_hydrogens(monkeypatch):
+    """The ledger itself, without OPSIN and without going through the name.
+
+    q_hydro is 2*(D0 - D_target) = 2*(8 - 5) = 6, so six parent atoms must
+    carry a hydro increment. The proof returns four and reports the state
+    compatible, which is the defect the name-level xfail above stands on; this
+    asserts the arithmetic directly so a repair is visible before rendering.
+    """
+
+    mol = read_rdkit_mol(Chem.MolFromSmiles(INDOLOQUINOLIZINE))
+    core = max(find_ring_systems(mol), key=lambda system: len(system.atoms))
+    plan = plan_fusion_parent(mol, core.atoms, mode=FusionMode.GENERAL).plan
+    locants = {atom: str(locant) for atom, locant in plan.numbering.input_locant_maps[0]}
+    hydro = sorted(
+        {locants[atom] for operation in plan.derivative_state.hydro_operations for atom in operation.atom_ids}
+    )
+
+    assert plan.bond_model.maximum_non_cumulative_double_bonds == 8
+    assert len(hydro) == 4, "guard: this records today's under-count, not the correct ledger"
+    assert plan.derivative_state.bond_delta.compatible, "the under-counted state is reported compatible"
+
+
+@pytest.mark.xfail(strict=True, reason="derivative proof under-counts hydro where the reference needs redistribution")
+def test_the_derivative_ledger_reconstructs_the_target():
+    mol = read_rdkit_mol(Chem.MolFromSmiles(INDOLOQUINOLIZINE))
+    core = max(find_ring_systems(mol), key=lambda system: len(system.atoms))
+    plan = plan_fusion_parent(mol, core.atoms, mode=FusionMode.GENERAL).plan
+    locants = {atom: str(locant) for atom, locant in plan.numbering.input_locant_maps[0]}
+    hydro = sorted(
+        {locants[atom] for operation in plan.derivative_state.hydro_operations for atom in operation.atom_ids}
+    )
+
+    assert hydro == ["12", "12a", "12b", "6", "7", "7a"]
