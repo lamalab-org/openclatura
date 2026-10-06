@@ -28,6 +28,7 @@ def _permuted_names(smiles: str, *, seed: int, count: int = 6) -> set[str]:
             "c1ccc([C+]2C[C-](c3ccccc3)C3CCCC23)cc1",
             "2,4-diphenylbicyclo[3.3.0]octan-4-ylium-2-ide",
         ),
+        ("C1=CC=C([C-]=C1)C2=CC=CC=N2", "2-(pyridin-2-yl)benzen-1-ide"),
     ],
 )
 def test_charged_parent_numbering_is_atom_order_invariant(smiles, expected):

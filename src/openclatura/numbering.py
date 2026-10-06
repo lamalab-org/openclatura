@@ -427,11 +427,12 @@ def _numbering_preference(
 
 
 def _charge_locant_key(mol: Molecule, oriented_path: list[int]) -> tuple[tuple[int, ...], ...]:
-    """Break zwitterion ties by all, anionic, then cationic charge locants."""
+    """Rank charge locants when they do not displace heterocycle numbering."""
 
     negative = {idx for idx in oriented_path if mol.atoms[idx].charge < 0}
     positive = {idx for idx in oriented_path if mol.atoms[idx].charge > 0}
-    if not negative or not positive:
+    is_heteroatom_parent = any(mol.atoms[idx].symbol != "C" for idx in oriented_path)
+    if is_heteroatom_parent and (not negative or not positive):
         return ()
     by_sign = (negative | positive, negative, positive)
     return tuple(tuple(get_atom_locants(oriented_path, atoms)) for atoms in by_sign)
