@@ -632,8 +632,8 @@ def terminal_nitrogen_chain_prefix(
         for index, segment in enumerate(role.segments)
     )
     if is_linear and any(segment.bond_order == 1 for segment in role.segments[1:]):
-        return f"({role.key})"
-    return role.key
+        return f"({role.name})"
+    return role.name
 
 
 def _has_oxido_ligand(mol: Molecule, atom_idx: int) -> bool:

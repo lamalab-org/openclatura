@@ -13,6 +13,7 @@ from .molecule import (
     double_bonded_carbon,
     has_non_h_multiple_bond_neighbor,
 )
+from .nomenclature import RULES, BranchedNitrogenRule, NitrogenChainRule
 
 
 @dataclass(frozen=True)
@@ -68,91 +69,12 @@ class NitrogenChainRole:
     atom_ids: frozenset[int]
     variant: str
     reason: str
+    name: str = ""
     ordered_atoms: tuple[int, ...] = ()
     segments: tuple[NitrogenChainSegment, ...] = ()
     charge_pattern: tuple[int, ...] = ()
     bond_orders: tuple[int, ...] = ()
     hydrazone_side: HydrazoneSideMetadata | None = None
-
-
-@dataclass(frozen=True)
-class NitrogenChainTemplate:
-    """Declarative graph template for an ordered nitrogen-chain role."""
-
-    key: str
-    bond_orders: tuple[int | frozenset[int], ...]
-    charges: tuple[int | frozenset[int] | None, ...]
-    variant: str
-
-    def matches(self, bond_orders: tuple[int, ...], charges: tuple[int, ...]) -> bool:
-        if len(bond_orders) != len(self.bond_orders) or len(charges) != len(self.charges):
-            return False
-        return all(
-            _template_value_matches(expected, actual) for expected, actual in zip(self.bond_orders, bond_orders)
-        ) and all(_template_value_matches(expected, actual) for expected, actual in zip(self.charges, charges))
-
-
-@dataclass(frozen=True)
-class BranchedNitrogenTemplate:
-    """Declarative template for a symmetric terminal nitrogen branch."""
-
-    key: str
-    upstream_bond_order: int
-    branch_bond_orders: tuple[int, ...]
-    center_charge: int
-    branch_charges: tuple[int, ...]
-    variant: str
-
-    def matches(
-        self,
-        upstream_bond_order: int,
-        branch_bond_orders: tuple[int, ...],
-        center_charge: int,
-        branch_charges: tuple[int, ...],
-    ) -> bool:
-        return (
-            upstream_bond_order == self.upstream_bond_order
-            and tuple(sorted(branch_bond_orders)) == tuple(sorted(self.branch_bond_orders))
-            and center_charge == self.center_charge
-            and tuple(sorted(branch_charges)) == tuple(sorted(self.branch_charges))
-        )
-
-
-CARBON_BOUND_N2_TEMPLATES: tuple[NitrogenChainTemplate, ...] = (
-    NitrogenChainTemplate("diazenyl", (1, 2), (0, 0, 0), "carbon_bound_neutral_diazene"),
-    NitrogenChainTemplate(
-        "diazonio", (1, frozenset({2, 3})), (0, frozenset({0, 1}), frozenset({0, 1})), "carbon_bound_diazonium"
-    ),
-    NitrogenChainTemplate("diazo", (2, frozenset({2, 3})), (None, None, None), "carbon_bound_diazo"),
-)
-
-TERMINAL_NITROGEN_TEMPLATES: tuple[NitrogenChainTemplate, ...] = (
-    NitrogenChainTemplate("azido", (1, 2, 2), (None, 0, 0, 0), "terminal_cumulene_azide"),
-    NitrogenChainTemplate("azido", (1, 2, 2), (None, 0, 1, -1), "terminal_charge_separated_azide"),
-    NitrogenChainTemplate("azido", (2, 2, 2), (None, 0, 1, -1), "terminal_charge_separated_azide"),
-    NitrogenChainTemplate("azido", (1, 2, 2), (None, -1, 1, 0), "terminal_charge_separated_azide"),
-    NitrogenChainTemplate("azido", (2, 2, 2), (None, -1, 1, 0), "terminal_charge_separated_azide"),
-    NitrogenChainTemplate("diazenylamino", (1, 1, 2), (None, 0, 0, 0), "neutral_diazenylamino"),
-    NitrogenChainTemplate("aminodiazenyl", (1, 2, 1), (None, 0, 0, 0), "neutral_aminodiazenyl"),
-    NitrogenChainTemplate("hydrazinylamino", (1, 1, 1), (None, 0, 0, 0), "neutral_hydrazinylamino"),
-    NitrogenChainTemplate(
-        "hydrazonohydrazinyl",
-        (1, 1, 2, 1),
-        (None, 0, 0, 0, 0),
-        "neutral_hydrazonohydrazinyl",
-    ),
-)
-
-BRANCHED_TERMINAL_NITROGEN_TEMPLATES: tuple[BranchedNitrogenTemplate, ...] = (
-    BranchedNitrogenTemplate(
-        "triazan-2-yl",
-        upstream_bond_order=1,
-        branch_bond_orders=(1, 1),
-        center_charge=0,
-        branch_charges=(0, 0),
-        variant="symmetric_neutral_triazan_2_yl",
-    ),
-)
 
 
 def _template_value_matches(expected, actual: int) -> bool:
@@ -164,11 +86,42 @@ def _template_value_matches(expected, actual: int) -> bool:
 
 
 def _match_template(
-    templates: tuple[NitrogenChainTemplate, ...],
+    templates: tuple[NitrogenChainRule, ...],
     bond_orders: tuple[int, ...],
     charges: tuple[int, ...],
-) -> NitrogenChainTemplate | None:
-    return next((template for template in templates if template.matches(bond_orders, charges)), None)
+) -> NitrogenChainRule | None:
+    return next(
+        (
+            template
+            for template in templates
+            if len(bond_orders) == len(template.bond_orders)
+            and len(charges) == len(template.charges)
+            and all(
+                _template_value_matches(expected, actual) for expected, actual in zip(template.bond_orders, bond_orders)
+            )
+            and all(_template_value_matches(expected, actual) for expected, actual in zip(template.charges, charges))
+        ),
+        None,
+    )
+
+
+def _chain_templates(scope: str) -> tuple[NitrogenChainRule, ...]:
+    return tuple(template for template in RULES.nitrogen.chain_templates if template.scope == scope)
+
+
+def _branched_template_matches(
+    template: BranchedNitrogenRule,
+    upstream_bond_order: int,
+    branch_bond_orders: tuple[int, ...],
+    center_charge: int,
+    branch_charges: tuple[int, ...],
+) -> bool:
+    return (
+        upstream_bond_order == template.upstream_bond_order
+        and tuple(sorted(branch_bond_orders)) == tuple(sorted(template.branch_bond_orders))
+        and center_charge == template.center_charge
+        and tuple(sorted(branch_charges)) == tuple(sorted(template.branch_charges))
+    )
 
 
 def nitrogen_chain_roles(
@@ -193,6 +146,7 @@ def _make_role(
     mol: Molecule,
     *,
     key: str,
+    name: str | None = None,
     is_principal_candidate: bool,
     attachment_atom: int,
     atom_ids: frozenset[int],
@@ -208,6 +162,7 @@ def _make_role(
         atom_ids=atom_ids,
         variant=variant,
         reason=reason,
+        name=name or key,
         ordered_atoms=ordered_atoms,
         segments=_chain_segments(mol, ordered_atoms),
         charge_pattern=tuple(mol.atoms[idx].charge for idx in ordered_atoms),
@@ -278,7 +233,7 @@ def _diazo_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -> li
             if n_n_bond is None or n_n_bond.order < 2:
                 continue
             template = _match_template(
-                CARBON_BOUND_N2_TEMPLATES,
+                _chain_templates("carbon_bound"),
                 (c_n_bond.order, n_n_bond.order),
                 (mol.atoms[carbon.idx].charge, mol.atoms[n1].charge, mol.atoms[n2].charge),
             )
@@ -287,12 +242,13 @@ def _diazo_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -> li
             roles.append(
                 _make_role(
                     mol,
-                    key=template.key,
-                    is_principal_candidate=template.key == "diazonio",
+                    key=template.group_key,
+                    name=template.name,
+                    is_principal_candidate=template.principal_candidate,
                     attachment_atom=carbon.idx,
                     atom_ids=frozenset({n1, n2}),
                     variant=template.variant,
-                    reason=f"Matched carbon-bound {template.key} N-N fragment at atom {carbon.idx}.",
+                    reason=f"Matched carbon-bound {template.group_key} N-N fragment at atom {carbon.idx}.",
                     ordered_atoms=(carbon.idx, n1, n2),
                 )
             )
@@ -328,11 +284,8 @@ def _azido_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -> li
         n3 = n3_candidates[0]
         if _other_non_h_neighbors(mol, n3, {n2}):
             continue
-        # The contracted N3 prefixes (``hydrazinylamino`` etc.) describe a bare
-        # ``-NH-NH-NH2`` backbone with no way to spell a substituent on the middle
-        # nitrogen.  If n2 carries one, emitting the prefix would silently drop it
-        # (naming a different molecule), so decline the role and let a fuller
-        # naming path express the whole chain.
+        # Contracted N3 prefixes describe a bare backbone and cannot express a
+        # substituent on the middle nitrogen. Decline rather than lose that branch.
         if _other_non_h_neighbors(mol, n2, {n_attach.idx, n3}):
             continue
         first_bond = mol.get_bond(n_attach.idx, n2)
@@ -340,7 +293,7 @@ def _azido_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -> li
         if first_bond is None or second_bond is None:
             continue
         template = _match_template(
-            tuple(template for template in TERMINAL_NITROGEN_TEMPLATES if len(template.bond_orders) == 3),
+            tuple(template for template in _chain_templates("terminal") if len(template.bond_orders) == 3),
             (ext_bond_order, first_bond.order, second_bond.order),
             (
                 mol.atoms[ext_atom].charge,
@@ -354,12 +307,13 @@ def _azido_roles(mol: Molecule, cyclic_atoms: set[int], blocked: set[int]) -> li
         roles.append(
             _make_role(
                 mol,
-                key=template.key,
+                key=template.group_key,
+                name=template.name,
                 is_principal_candidate=False,
                 attachment_atom=ext_atom,
                 atom_ids=frozenset({n_attach.idx, n2, n3}),
                 variant=template.variant,
-                reason=f"Matched singly attached terminal N3 {template.key} fragment at atom {ext_atom}.",
+                reason=f"Matched singly attached terminal N3 {template.group_key} fragment at atom {ext_atom}.",
                 ordered_atoms=(ext_atom, n_attach.idx, n2, n3),
             )
         )
@@ -588,7 +542,7 @@ def terminal_nitrogen_substituent_role(
         return None
     ordered_atoms = tuple(ordered)
     template = _match_template(
-        TERMINAL_NITROGEN_TEMPLATES,
+        _chain_templates("terminal"),
         _chain_bond_orders(mol, ordered_atoms),
         tuple(mol.atoms[atom].charge for atom in ordered_atoms),
     )
@@ -596,12 +550,15 @@ def terminal_nitrogen_substituent_role(
         return None
     return _make_role(
         mol,
-        key=template.key,
+        key=template.group_key,
+        name=template.name,
         is_principal_candidate=False,
         attachment_atom=upstream_atom,
         atom_ids=frozenset(ordered_atoms[1:]),
         variant=template.variant,
-        reason=f"Matched terminal {len(ordered_atoms) - 1}-nitrogen {template.key} fragment at atom {upstream_atom}.",
+        reason=(
+            f"Matched terminal {len(ordered_atoms) - 1}-nitrogen {template.group_key} fragment at atom {upstream_atom}."
+        ),
         ordered_atoms=ordered_atoms,
     )
 
@@ -634,8 +591,10 @@ def _terminal_branched_nitrogen_role(
     template = next(
         (
             item
-            for item in BRANCHED_TERMINAL_NITROGEN_TEMPLATES
-            if item.matches(upstream_bond.order, branch_orders, mol.atoms[start_idx].charge, branch_charges)
+            for item in RULES.nitrogen.branched_templates
+            if _branched_template_matches(
+                item, upstream_bond.order, branch_orders, mol.atoms[start_idx].charge, branch_charges
+            )
         ),
         None,
     )
@@ -662,7 +621,8 @@ def _terminal_branched_nitrogen_role(
         ),
     )
     return NitrogenChainRole(
-        key=template.key,
+        key=template.group_key,
+        name=template.name,
         is_principal_candidate=False,
         attachment_atom=upstream_atom,
         atom_ids=frozenset((start_idx, *branches)),

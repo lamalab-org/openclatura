@@ -98,6 +98,8 @@ RULE_GROUPS: tuple[RuleGroupSpec, ...] = (
             "retained_sulfonyl_ligand_contractions",
             "halogen_prefixes",
             "halogen_lambda_suffixes",
+            "nitrogen_chain_templates",
+            "branched_nitrogen_templates",
             "direct_group_prefixes",
             "direct_prefix_groups",
             "acid_halide_prefixes",

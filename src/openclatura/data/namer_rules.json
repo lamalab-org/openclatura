@@ -614,6 +614,29 @@
       "I": "iodanyl"
     }
   },
+  "nitrogen_chain_templates": {
+    "bluebook_rule": "P-61.3 and P-68.3; graph patterns and prefix vocabulary for ordered nitrogen chains",
+    "values": [
+      {"scope": "carbon_bound", "group_key": "diazenyl", "name": "diazenyl", "bond_orders": [1, 2], "charges": [0, 0, 0], "variant": "carbon_bound_neutral_diazene", "audit_smiles": "N=N"},
+      {"scope": "carbon_bound", "group_key": "diazonio", "name": "diazonio", "bond_orders": [1, [2, 3]], "charges": [0, [0, 1], [0, 1]], "variant": "carbon_bound_diazonium", "principal_candidate": true},
+      {"scope": "carbon_bound", "group_key": "diazo", "name": "diazo", "bond_orders": [2, [2, 3]], "charges": [null, null, null], "variant": "carbon_bound_diazo", "audit_smiles": "=[N+]=[N-]"},
+      {"scope": "terminal", "group_key": "azido", "name": "azido", "bond_orders": [1, 2, 2], "charges": [null, 0, 0, 0], "variant": "terminal_cumulene_azide", "audit_smiles": "N=[N+]=[N-]"},
+      {"scope": "terminal", "group_key": "azido", "name": "azido", "bond_orders": [1, 2, 2], "charges": [null, 0, 1, -1], "variant": "terminal_charge_separated_azide", "audit_smiles": "N=[N+]=[N-]"},
+      {"scope": "terminal", "group_key": "azido", "name": "azido", "bond_orders": [2, 2, 2], "charges": [null, 0, 1, -1], "variant": "terminal_charge_separated_azide", "audit_smiles": "N=[N+]=[N-]"},
+      {"scope": "terminal", "group_key": "azido", "name": "azido", "bond_orders": [1, 2, 2], "charges": [null, -1, 1, 0], "variant": "terminal_charge_separated_azide", "audit_smiles": "N=[N+]=[N-]"},
+      {"scope": "terminal", "group_key": "azido", "name": "azido", "bond_orders": [2, 2, 2], "charges": [null, -1, 1, 0], "variant": "terminal_charge_separated_azide", "audit_smiles": "N=[N+]=[N-]"},
+      {"scope": "terminal", "group_key": "diazenylamino", "name": "diazenylamino", "bond_orders": [1, 1, 2], "charges": [null, 0, 0, 0], "variant": "neutral_diazenylamino", "audit_smiles": "NN=N"},
+      {"scope": "terminal", "group_key": "aminodiazenyl", "name": "aminodiazenyl", "bond_orders": [1, 2, 1], "charges": [null, 0, 0, 0], "variant": "neutral_aminodiazenyl", "audit_smiles": "N=NN"},
+      {"scope": "terminal", "group_key": "hydrazinylamino", "name": "hydrazinylamino", "bond_orders": [1, 1, 1], "charges": [null, 0, 0, 0], "variant": "neutral_hydrazinylamino", "audit_smiles": "NNN"},
+      {"scope": "terminal", "group_key": "hydrazonohydrazinyl", "name": "hydrazonohydrazinyl", "bond_orders": [1, 1, 2, 1], "charges": [null, 0, 0, 0, 0], "variant": "neutral_hydrazonohydrazinyl", "audit_smiles": "NN=NN"}
+    ]
+  },
+  "branched_nitrogen_templates": {
+    "bluebook_rule": "P-21.1 and P-29.2; graph patterns and prefix vocabulary for branched nitrogen parent hydrides",
+    "values": [
+      {"group_key": "triazanyl", "name": "triazan-2-yl", "upstream_bond_order": 1, "branch_bond_orders": [1, 1], "center_charge": 0, "branch_charges": [0, 0], "variant": "symmetric_neutral_triazan_2_yl", "audit_smiles": "N(N)N"}
+    ]
+  },
   "retained_ring_elements": {
     "bluebook_rule": "P-22 and P-25; retained heterocycle names supported by this implementation",
     "values": [

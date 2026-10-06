@@ -44,6 +44,39 @@ class HeteroatomRules:
     halogen_lambda_suffixes: dict[str, str]
 
 
+NitrogenConstraint = int | frozenset[int] | None
+
+
+@dataclass(frozen=True)
+class NitrogenChainRule:
+    scope: str
+    group_key: str
+    name: str
+    bond_orders: tuple[NitrogenConstraint, ...]
+    charges: tuple[NitrogenConstraint, ...]
+    variant: str
+    principal_candidate: bool = False
+    audit_smiles: str | None = None
+
+
+@dataclass(frozen=True)
+class BranchedNitrogenRule:
+    group_key: str
+    name: str
+    upstream_bond_order: int
+    branch_bond_orders: tuple[int, ...]
+    center_charge: int
+    branch_charges: tuple[int, ...]
+    variant: str
+    audit_smiles: str | None = None
+
+
+@dataclass(frozen=True)
+class NitrogenRules:
+    chain_templates: tuple[NitrogenChainRule, ...]
+    branched_templates: tuple[BranchedNitrogenRule, ...]
+
+
 @dataclass(frozen=True)
 class RingRules:
     descriptor_templates: dict[str, str]
@@ -199,6 +232,7 @@ class FunctionalGroupRules:
 class NomenclatureRegistry:
     retained: RetainedNameRules
     heteroatoms: HeteroatomRules
+    nitrogen: NitrogenRules
     rings: RingRules
     prefixes: PrefixRules
     components: ComponentRules
@@ -211,6 +245,12 @@ class NomenclatureRegistry:
 
 def _group_tuple_mapping(group_key: str, section: str) -> dict[str, tuple[str, str]]:
     return {key: tuple(value) for key, value in grouped_namer_rules()[group_key].mapping(section).items()}
+
+
+def _nitrogen_constraint(value) -> NitrogenConstraint:
+    if value is None or isinstance(value, int):
+        return value
+    return frozenset(int(item) for item in value)
 
 
 def _functional_group_rules() -> FunctionalGroupRules:
@@ -461,6 +501,34 @@ def registry() -> NomenclatureRegistry:
             ),
             halogen_prefixes=substituent_vocabulary.mapping("halogen_prefixes"),
             halogen_lambda_suffixes=substituent_vocabulary.mapping("halogen_lambda_suffixes"),
+        ),
+        nitrogen=NitrogenRules(
+            chain_templates=tuple(
+                NitrogenChainRule(
+                    scope=row["scope"],
+                    group_key=row["group_key"],
+                    name=row["name"],
+                    bond_orders=tuple(_nitrogen_constraint(value) for value in row["bond_orders"]),
+                    charges=tuple(_nitrogen_constraint(value) for value in row["charges"]),
+                    variant=row["variant"],
+                    principal_candidate=bool(row.get("principal_candidate", False)),
+                    audit_smiles=row.get("audit_smiles"),
+                )
+                for row in substituent_vocabulary.values("nitrogen_chain_templates")
+            ),
+            branched_templates=tuple(
+                BranchedNitrogenRule(
+                    group_key=row["group_key"],
+                    name=row["name"],
+                    upstream_bond_order=int(row["upstream_bond_order"]),
+                    branch_bond_orders=tuple(int(value) for value in row["branch_bond_orders"]),
+                    center_charge=int(row["center_charge"]),
+                    branch_charges=tuple(int(value) for value in row["branch_charges"]),
+                    variant=row["variant"],
+                    audit_smiles=row.get("audit_smiles"),
+                )
+                for row in substituent_vocabulary.values("branched_nitrogen_templates")
+            ),
         ),
         rings=RingRules(
             descriptor_templates=ring_descriptors.mapping("ring_descriptor_templates"),

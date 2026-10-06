@@ -2755,8 +2755,17 @@ def test_terminal_nitrogen_substituent_role_supports_longer_registered_templates
 
     assert role is not None
     assert role.key == "hydrazonohydrazinyl"
+    assert role.name == "hydrazonohydrazinyl"
     assert role.ordered_atoms == (0, 1, 2, 3, 4)
     assert role.bond_orders == (1, 1, 2, 1)
+
+
+def test_nitrogen_chain_rule_identity_is_separate_from_rendered_name():
+    (template,) = RULES.nitrogen.branched_templates
+
+    assert template.group_key == "triazanyl"
+    assert template.name == "triazan-2-yl"
+    assert template.audit_smiles == "N(N)N"
 
 
 def test_substituted_cyclic_hydrazines_keep_n_ligands_in_prefix():

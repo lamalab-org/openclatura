@@ -3,6 +3,7 @@ import re
 from rdkit import Chem
 
 from ..hantzsch_widman import hw_generated_names, hw_parent_template
+from ..nomenclature import RULES
 from ..rules import multipliers as _multipliers
 from ..rules import stems as _stems
 from .von_baeyer_parse import parse_hantzsch_widman as _parse_hantzsch_widman
@@ -33,14 +34,10 @@ _LEAF_SMILES: dict[str, str] = {
     "isothiocyanato": "N=C=S",
     "cyanato": "OC#N",
     "thiocyanato": "SC#N",
-    "azido": "N=[N+]=[N-]",
     "hydroperoxy": "OO",
-    "diazenyl": "N=N",
     "triaz-1-en-1-yl": "N=NN",
-    "aminodiazenyl": "N=NN",
     "triaz-2-en-1-yl": "NN=N",
     "triazan-1-yl": "NNN",
-    "triazan-2-yl": "N(N)N",
     "triazanyl": "NNN",
     "silyl": "[SiH3]",
     "methoxy": "OC",
@@ -84,7 +81,6 @@ _LEAF_SMILES: dict[str, str] = {
     "methylamino": "NC",
     "hydrazinyl": "NN",
     "hydrazino": "NN",
-    "hydrazonohydrazinyl": "NN=NN",
     "hydroxyimino": "=NO",
     "methylimino": "=NC",
     "methoxyimino": "=NOC",
@@ -105,7 +101,6 @@ _LEAF_SMILES: dict[str, str] = {
     "phosphanyl": "P",
     "dihydroxyboryl": "B(O)O",
     "carbamothioyl": "C(=S)N",
-    "diazo": "=[N+]=[N-]",
     "methyl": "C",
     "ethyl": "CC",
     "propyl": "CCC",
@@ -132,6 +127,13 @@ _LEAF_SMILES: dict[str, str] = {
     "methylidene": "=C",
     "ethylidene": "=CC",
 }
+_LEAF_SMILES.update(
+    {
+        template.name: template.audit_smiles
+        for template in (*RULES.nitrogen.chain_templates, *RULES.nitrogen.branched_templates)
+        if template.audit_smiles is not None
+    }
+)
 
 _RING_STEMS: dict[str, tuple[str, list[str]]] = {
     "phenyl": ("c1ccccc1", ["1", "2", "3", "4", "5", "6"]),
