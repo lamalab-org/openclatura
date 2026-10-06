@@ -12,7 +12,6 @@ from .chalcogen_roles import (
     FunctionalFamily,
     FunctionalGroupDescriptor,
     LeavingGroupDescriptor,
-    NitrogenChalcogenideCitation,
     chalcogen_for_symbol,
     classify_chalcogen_ligand,
     classify_peroxide_linkages,
@@ -20,7 +19,6 @@ from .chalcogen_roles import (
 )
 from .chalcogen_vocabulary import (
     chalcogen_citation_rule,
-    nitrogen_chalcogenide_citation,
     resolve_acyl_rule,
     resolve_anhydride_rule,
     resolve_central_acid_rule,
@@ -870,19 +868,11 @@ def _composable_chalcogen_linkage_groups(mol: Molecule) -> list[PerceivedGroup]:
         )
         for descriptor in classify_peroxide_linkages(mol, set(mol.atoms))
     ]
-    cyclic_atoms = get_cyclic_atoms(mol)
     for role in charge_pair_roles(mol):
         if role.nitrogen_kind not in {NitrogenChalcogenideKind.AMINE, NitrogenChalcogenideKind.IMINE}:
             continue
         ligand = classify_chalcogen_ligand(mol, role.positive_atom, role.negative_atom)
         if ligand is None:
-            continue
-        cyclic_imine = role.nitrogen_kind is NitrogenChalcogenideKind.IMINE and role.positive_atom in cyclic_atoms
-        if (
-            cyclic_imine
-            and nitrogen_chalcogenide_citation(ligand.element, cyclic_imine=True)
-            is NitrogenChalcogenideCitation.FUNCTIONAL_CLASS
-        ):
             continue
         organic_neighbors = tuple(
             neighbor

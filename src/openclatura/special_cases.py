@@ -311,13 +311,7 @@ def nitrogen_chalcogenide_result(
         for role in charge_pair_roles(mol, component_atoms)
         if role.nitrogen_kind in {NitrogenChalcogenideKind.AMINE, NitrogenChalcogenideKind.IMINE}
         and role.chalcogen is not None
-        and nitrogen_chalcogenide_citation(
-            role.chalcogen,
-            cyclic_imine=(
-                role.nitrogen_kind is NitrogenChalcogenideKind.IMINE and role.positive_atom in get_cyclic_atoms(mol)
-            ),
-        )
-        is NitrogenChalcogenideCitation.FUNCTIONAL_CLASS
+        and nitrogen_chalcogenide_citation(role.chalcogen) is NitrogenChalcogenideCitation.FUNCTIONAL_CLASS
     ]
     if len(matches) != 1:
         return None

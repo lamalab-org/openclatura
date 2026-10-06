@@ -760,7 +760,7 @@
   "chalcogen_elements": {
     "bluebook_rule": "P-62.5, P-63 through P-66; element vocabulary and order for validated chalcogen analogues",
     "values": {
-      "O": {"rank": 0, "class_name": "oxide", "additive_prefix": "oxido", "substituent_suffix": "oxy", "replacement_infix": "", "nitrogen_chalcogenide_citation": "substitutive", "cyclic_imine_chalcogenide_citation": "functional_class"},
+      "O": {"rank": 0, "class_name": "oxide", "additive_prefix": "oxido", "substituent_suffix": "oxy", "replacement_infix": "", "nitrogen_chalcogenide_citation": "substitutive"},
       "S": {"rank": 1, "class_name": "sulfide", "additive_prefix": "sulfido", "substituent_suffix": "sulfanyl", "replacement_infix": "thio", "nitrogen_chalcogenide_citation": "functional_class"},
       "Se": {"rank": 2, "class_name": "selenide", "additive_prefix": "selenido", "substituent_suffix": "selanyl", "replacement_infix": "seleno", "nitrogen_chalcogenide_citation": "functional_class"},
       "Te": {"rank": 3, "class_name": "telluride", "additive_prefix": "tellurido", "substituent_suffix": "tellanyl", "replacement_infix": "telluro", "nitrogen_chalcogenide_citation": "functional_class"}
