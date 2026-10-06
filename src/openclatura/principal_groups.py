@@ -1,6 +1,7 @@
 """Principal characteristic-group selection and suffix assembly."""
 
 from .assembly_parts import AssemblyParts, PrincipalGroupItem
+from .chalcogen_roles import ChalcogenLigandRole
 from .group_atom_roles import hydrazone_characteristic_carbon
 from .locants import parse_locant
 from .molecule import Molecule, bond_ids_within
@@ -41,6 +42,7 @@ def component_principal_key(perceived_groups: list[PerceivedGroup], is_substitue
             and candidate.resolved_rule.has_capability(FunctionalGroupCapability.ESTER_LIKE)
             and marker.descriptor is not None
             and candidate.descriptor is not None
+            and candidate.descriptor.ligands_with_role(ChalcogenLigandRole.CARBON_LINK)
             and set(marker.descriptor.centers).isdisjoint(candidate.descriptor.centers)
             for candidate in candidates
         )
