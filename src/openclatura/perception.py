@@ -935,6 +935,34 @@ def _acyl_chalcogen_group(
         and mol.get_bond(carbon, neighbor).order == 1
     ]
 
+    def shares_attachment_with_acyl_derivative() -> bool:
+        """Whether this center can participate in a multi-acyl parent skeleton."""
+
+        derivative_roles = {
+            ChalcogenLigandRole.HYDROGEN_BEARING,
+            ChalcogenLigandRole.ANIONIC,
+            ChalcogenLigandRole.CARBON_LINK,
+            ChalcogenLigandRole.HETEROATOM_LINK,
+            ChalcogenLigandRole.CHALCOGEN_LINK,
+        }
+        scaffold_atoms = tuple(neighbor for neighbor in mol.get_neighbors(carbon) if mol.atoms[neighbor].is_carbon)
+        for scaffold_atom in scaffold_atoms:
+            for candidate in mol.get_neighbors(scaffold_atom):
+                if candidate == carbon or not mol.atoms[candidate].is_carbon:
+                    continue
+                candidate_ligands = tuple(
+                    ligand
+                    for neighbor in mol.get_neighbors(candidate)
+                    if (ligand := classify_chalcogen_ligand(mol, candidate, neighbor)) is not None
+                )
+                if any(ligand.role is ChalcogenLigandRole.DOUBLE_BONDED for ligand in candidate_ligands) and any(
+                    ligand.role in derivative_roles for ligand in candidate_ligands
+                ):
+                    return True
+        return False
+
+    participates_in_multi_acyl_parent = shares_attachment_with_acyl_derivative()
+
     single_ligands = [
         ligand
         for ligand in ligands
@@ -946,7 +974,7 @@ def _acyl_chalcogen_group(
             ChalcogenLigandRole.HETEROATOM_LINK,
             ChalcogenLigandRole.CHALCOGEN_LINK,
         }
-        and (ligand.role is not ChalcogenLigandRole.HETEROATOM_LINK or nitrogens)
+        and (ligand.role is not ChalcogenLigandRole.HETEROATOM_LINK or nitrogens or participates_in_multi_acyl_parent)
     ]
     # A centre carrying a nitrogen or a typed leaving group is not a plain
     # ester merely because it also has a single-bonded chalcogen.  Defer those
@@ -1009,9 +1037,14 @@ def _acyl_chalcogen_group(
                 resolved_rule=rule,
             )
         if (
-            single_ligand.role is ChalcogenLigandRole.CARBON_LINK
+            single_ligand.role
+            in {
+                ChalcogenLigandRole.CARBON_LINK,
+                ChalcogenLigandRole.HETEROATOM_LINK,
+            }
             and carbon in cyclic_atoms
             and single_ligand.atom in cyclic_atoms
+            and single_ligand.attachment_atom in cyclic_atoms
             and _closes_ring_back_to(mol, carbon, single_ligand.atom, double_ligand.atom, cyclic_atoms)
         ):
             return _carbonyl_chalcogen_group(mol, carbon, attachment, double_ligand, DerivativeKind.KETONE)

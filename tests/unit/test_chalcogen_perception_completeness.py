@@ -40,6 +40,14 @@ def test_heteroatom_link_is_an_ester_only_when_the_center_is_a_carbamate():
     assert oc.name("CN(C)C(=O)ONC(=O)c1ccccc1").name == "benzamido dimethylcarbamate"
 
 
+def test_cyclic_heteroatom_link_keeps_the_carbonyl_or_thiocarbonyl_in_the_ring():
+    assert oc.name("Cc1ccc(-c2nc(=S)o[nH]2)cc1").name == "3-(4-methylphenyl)-2H-1,2,4-oxadiazole-5-thione"
+    assert (
+        oc.name("NC(CCn1oc(=O)[nH]c1=O)C(=O)O").name
+        == "2-(3-amino-4-hydroxy-4-oxobutyl)-1,2,4-oxadiazolidine-3,5-dione"
+    )
+
+
 def test_central_acid_requires_a_neutral_amide_nitrogen():
     descriptors = _descriptors("CS(=O)(=O)[NH3+]")
 
