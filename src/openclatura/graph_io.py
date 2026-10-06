@@ -51,10 +51,14 @@ def read_smiles(smiles: str) -> Molecule:
     rdmol = Chem.MolFromSmiles(smiles)
     atom_metadata = None
     if rdmol is None:
+        # Sanitization failed (an unusual valence, for example); read the
+        # graph as written.
         rdmol = Chem.MolFromSmiles(smiles, sanitize=False)
         if rdmol:
             rdmol.UpdatePropertyCache(strict=False)
             Chem.FastFindRings(rdmol)
+            atom_metadata = _atom_metadata(rdmol)
+            _kekulize(rdmol)
     else:
         atom_metadata = _atom_metadata(rdmol)
         try:
@@ -94,12 +98,23 @@ def read_rdkit_mol(rdmol: Chem.Mol | None, *, copy: bool = True) -> Molecule:
             pass
 
     atom_metadata = _atom_metadata(rdmol)
-    try:
-        Chem.Kekulize(rdmol, clearAromaticFlags=True)
-    except Exception:
-        pass
+    _kekulize(rdmol)
 
     return _build_molecule(rdmol, atom_metadata)
+
+
+def _kekulize(rdmol: Chem.Mol) -> None:
+    """Kekulize in place, refusing aromatic rings that have no Kekule structure.
+
+    An aromatic bond left in the graph is read as a single bond, so naming such
+    a ring would silently name its saturated analogue (``c1ccnc1`` as
+    pyrrolidine).
+    """
+
+    try:
+        Chem.Kekulize(rdmol, clearAromaticFlags=True)
+    except Chem.KekulizeException as exc:
+        raise ValueError(f"aromatic system has no Kekule structure ({exc})") from exc
 
 
 def _ensure_perception(rdmol: Chem.Mol) -> None:
