@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "openclatura"
-version = "0.3.3"
+version = "0.4.0"
 description = "Deterministic SMILES-to-IUPAC name generator based on the IUPAC Blue Book"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -69,12 +69,13 @@ openclatura = "openclatura.cli:main"
 
 [tool.hatch.build]
 exclude = [
-    "/examples",
-    "/evaluations",
-    "/eval_failures",
-    "/tests",
+    "/examples/**",
+    "/evaluations/**",
+    "/eval_failures/**",
+    "/tests/**",
     "/uv.lock",
-    "/website",
+    "/website/**",
+    "/benchmarks/**",
 ]
 
 [tool.hatch.build.targets.wheel]
