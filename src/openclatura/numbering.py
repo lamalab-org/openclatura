@@ -427,13 +427,13 @@ def _numbering_preference(
 
 
 def _charge_locant_key(mol: Molecule, oriented_path: list[int]) -> tuple[tuple[int, ...], ...]:
-    """Rank all charge sites, then anionic and cationic sites within a tie."""
+    """Break zwitterion ties by all, anionic, then cationic charge locants."""
 
-    by_sign = (
-        {idx for idx in oriented_path if mol.atoms[idx].charge != 0},
-        {idx for idx in oriented_path if mol.atoms[idx].charge < 0},
-        {idx for idx in oriented_path if mol.atoms[idx].charge > 0},
-    )
+    negative = {idx for idx in oriented_path if mol.atoms[idx].charge < 0}
+    positive = {idx for idx in oriented_path if mol.atoms[idx].charge > 0}
+    if not negative or not positive:
+        return ()
+    by_sign = (negative | positive, negative, positive)
     return tuple(tuple(get_atom_locants(oriented_path, atoms)) for atoms in by_sign)
 
 
