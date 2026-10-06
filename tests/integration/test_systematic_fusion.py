@@ -76,7 +76,7 @@ def test_high_rank_cyclic_multiparent_fusion_is_audited_and_atom_order_invariant
     first = name_mol(mol, include_trace=True)
     second = name_mol(reversed_mol)
 
-    assert first.name == second.name == "anthra[2,3-b]phenanthro[2,3-i]anthracene"
+    assert first.name == second.name == "anthra[2,3-b]benzo[l]pentacene"
     assert first.parent_nomenclature == "systematic_fusion"
     assert first.pin_status == "confirmed"
 
@@ -85,25 +85,28 @@ def test_high_rank_cyclic_multiparent_fusion_is_audited_and_atom_order_invariant
 def test_high_rank_fusion_cover_round_trips_through_opsin():
     result = name(HIGH_RANK_MULTIPARENT_SMILES, verify_opsin=True)
 
-    assert result.name == "anthra[2,3-b]phenanthro[2,3-i]anthracene"
+    assert result.name == "anthra[2,3-b]benzo[l]pentacene"
     assert result.opsin_check is not None and result.opsin_check.status == "matched"
 
 
 def test_high_rank_cover_search_prunes_lower_preference_tiers(monkeypatch):
     import openclatura.fusion.descriptor as descriptor
 
-    calls = 0
+    searched_tiers = []
     build_candidates = descriptor._candidates_for_component_selection
 
     def counted_candidates(*args, **kwargs):
-        nonlocal calls
-        calls += 1
+        searched_tiers.append(kwargs["required_parent_seniority"])
         return build_candidates(*args, **kwargs)
 
     monkeypatch.setattr(descriptor, "_candidates_for_component_selection", counted_candidates)
 
-    assert name(HIGH_RANK_MULTIPARENT_SMILES).name == "anthra[2,3-b]phenanthro[2,3-i]anthracene"
-    assert calls == 1
+    assert name(HIGH_RANK_MULTIPARENT_SMILES).name == "anthra[2,3-b]benzo[l]pentacene"
+    # Several exact covers reach the senior parent (pentacene) - benzene +
+    # phenanthrene, two naphthalenes, anthracene + benzene - so the top tier
+    # holds more than one prepared selection. What the pruning claim is about
+    # is that no tier below it is ever searched.
+    assert searched_tiers and len(set(searched_tiers)) == 1
 
 
 @pytest.mark.parametrize(

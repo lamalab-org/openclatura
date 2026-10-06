@@ -12,13 +12,19 @@ from openclatura.molecule import Molecule
 THIRD_COMPONENT_PARENT = "N1=C2C3=C(N=NC3=N1)N=N2"
 
 
-def _cactus_third_component_graph() -> Molecule:
-    """Return five pentagons whose component graph has two cyclic blocks."""
+def _cactus_third_component_graph(nitrogens=frozenset({2, 3})) -> Molecule:
+    """Return five pentagons whose component graph has two cyclic blocks.
+
+    The nitrogens sit so that no retained bicycle spans a fused pentagon
+    pair: every pair carries either two nitrogens or one away from its
+    ring junction, which rules out both pentalene and 1H-pyrrolizine. The
+    cover therefore stays at five monocyclic components and rank two.
+    """
 
     mol = Molecule()
     for atom_id in range(15):
         mol.add_atom(
-            "N" if atom_id in {2, 4} else "C",
+            "N" if atom_id in nitrogens else "C",
             idx=atom_id,
             is_aromatic=True,
         )
@@ -125,6 +131,26 @@ def test_cactus_component_cover_uses_the_same_replacement_parent_route():
     assert plan.parent.is_skeletal_replacement_fusion
     assert plan.parent.audit_ok
     assert len(plan.prohibited_citation.citation_plan.cycle_closing_join_indices) == 2
+
+
+def test_a_retained_bicycle_collapses_a_cactus_cover_to_a_unicyclic_one():
+    # The same five pentagons with the nitrogens at 2 and 4: 1H-pyrrolizine
+    # covers the last two faces as one component, so the cover graph loses a
+    # cycle and the parent is reached through the unicyclic route instead.
+    mol = _cactus_third_component_graph(nitrogens=frozenset({2, 4}))
+
+    plan = plan_third_component_fusion_parent(
+        mol,
+        mol.atoms,
+        mode=FusionMode.GENERAL,
+    )
+
+    assert plan is not None
+    assert plan.cover_topology == "unicyclic"
+    assert plan.ring_sizes == (5, 5, 5, 5, 5)
+    assert plan.parent.is_skeletal_replacement_fusion
+    assert plan.parent.audit_ok
+    assert len(plan.prohibited_citation.citation_plan.cycle_closing_join_indices) == 1
 
 
 def test_cactus_cover_with_a_pendant_component_uses_the_same_proof_route():

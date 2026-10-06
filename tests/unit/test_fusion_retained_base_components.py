@@ -114,3 +114,58 @@ def test_the_completed_target_is_order_invariant():
     count = mol.GetNumAtoms()
     orders = (list(range(count)), list(reversed(range(count))), sorted(range(count), key=lambda i: (i * 7) % count))
     assert len({name_mol(Chem.RenumberAtoms(mol, order)).name for order in orders}) == 1
+
+
+# FR-4.1.2 encloses a component's own locants in square brackets when the
+# component is cited inside a fusion name. The standalone parent hydride keeps
+# the hyphenated form (1,10-phenanthroline), so only the two fusion roles are
+# pinned here: the attached prefix and the base component.
+ENCLOSED_COMPONENT_LOCANTS = {
+    "1,5-naphthyridine": ("[1,5]naphthyridine", "[1,5]naphthyridino"),
+    "1,6-naphthyridine": ("[1,6]naphthyridine", "[1,6]naphthyridino"),
+    "1,7-naphthyridine": ("[1,7]naphthyridine", "[1,7]naphthyridino"),
+    "1,8-naphthyridine": ("[1,8]naphthyridine", "[1,8]naphthyridino"),
+    "2,6-naphthyridine": ("[2,6]naphthyridine", "[2,6]naphthyridino"),
+    "2,7-naphthyridine": ("[2,7]naphthyridine", "[2,7]naphthyridino"),
+    "1,7-phenanthroline": ("[1,7]phenanthroline", "[1,7]phenanthrolino"),
+    "1,8-phenanthroline": ("[1,8]phenanthroline", "[1,8]phenanthrolino"),
+    "1,9-phenanthroline": ("[1,9]phenanthroline", "[1,9]phenanthrolino"),
+    "1,10-phenanthroline": ("[1,10]phenanthroline", "[1,10]phenanthrolino"),
+    "2,7-phenanthroline": ("[2,7]phenanthroline", "[2,7]phenanthrolino"),
+    "2,8-phenanthroline": ("[2,8]phenanthroline", "[2,8]phenanthrolino"),
+}
+
+
+@pytest.mark.parametrize("key", sorted(ENCLOSED_COMPONENT_LOCANTS))
+def test_component_locants_are_enclosed_in_both_fusion_roles(key):
+    parent_name, attached_prefix = ENCLOSED_COMPONENT_LOCANTS[key]
+    component = fusion_component_registry().get(key)
+
+    assert component is not None, f"{key} is not offered as a fusion component"
+    assert component.spec.parent_name == parent_name
+    assert component.spec.attached_prefix == attached_prefix
+    # The template's own output name is what a standalone parent hydride uses
+    # and keeps its hyphen; only the fusion forms take enclosing marks.
+    assert component.spec.template.output_name == key
+
+
+# The structure is built from the first name and has to come back as the
+# second: the literature spelling of the phenanthroline case drops the
+# indicated hydrogen that the preferred name states.
+ENCLOSED_BASE_TARGETS = (
+    ("dibenzo[b,g][1,8]naphthyridine", "dibenzo[b,g][1,8]naphthyridine"),
+    ("benzo[b][1,8]naphthyridine", "benzo[b][1,8]naphthyridine"),
+    ("imidazo[4,5-f][1,10]phenanthroline", "1H-imidazo[4,5-f][1,10]phenanthroline"),
+)
+
+
+@pytest.mark.skipif(not opsin_available(), reason="the reference structures come from OPSIN")
+@pytest.mark.parametrize("source,expected", ENCLOSED_BASE_TARGETS)
+def test_a_locanted_base_component_renders_enclosed(source, expected):
+    from py2opsin import py2opsin
+
+    smiles = py2opsin(source)
+    assert smiles, f"OPSIN could not build {source}"
+    named = name_smiles(smiles)
+    assert named == expected
+    assert verify_with_opsin(named, smiles).status == "matched"

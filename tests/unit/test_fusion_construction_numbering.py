@@ -38,17 +38,17 @@ CASES = (
     (
         32572,
         "C[C@@]12C(O)C=CC1C1=CC3CCC=C4C=CC5=CCC2C1C5C43",
-        "pentaleno[1,2,3-jk]benzo[1,2,3,4-def]phenanthrene",
+        "pentaleno[1,2,3-cd]pyrene",
     ),
     (
         76220,
         "CN=c1c2c(N3CCO[C@@H](COC)C3)c(F)cc3c(=O)c(C(=O)O)c4scc1n4c32",
-        "pentaleno[1,6a,6,5-cde]naphthalene",
+        "thiazolo[4,3,2-cd]benzo[1,2,3-hi]indolizine",
     ),
     (
         79496,
         "O=c1nc2c3ccccc3nc3sc4cccc1c4n32",
-        "benzo[a]cyclopenta[def]phenanthrene",
+        "cyclopenta[def]chrysene",
     ),
     (
         4582,
@@ -87,16 +87,16 @@ CASES = (
         "CN1c2cc(C#N)ccc2N2CC[C@@H](NC(=O)C(F)(F)F)C[C@@H]2c2c(C#N)cccc21",
         "pyrido[1,2-d]dibenzo[b,f][1,4]diazepine",
     ),
-    (28506, "O=C1C=C[C@@H]2[C@H]3c4cccc5cccc(c45)[C@H]3[C@H]1N2c1ccccc1", "naphtho[1,8a,8-ab]azulene"),
+    (28506, "O=C1C=C[C@@H]2[C@H]3c4cccc5cccc(c45)[C@H]3[C@H]1N2c1ccccc1", "cyclohepta[a]acenaphthylene"),
     (
         31042,
         "COc1ccc(CN2c3ccccc3[C@@]34CCN5C=C[C@@H]6OCC[C@]6(CC[C@H]23)[C@H]54)cc1",
-        "indolo[2,3-h]pyrrolo[3,2,1-ij]furo[2,3-d]quinoline",
+        "furo[2',3':7,8]indolizino[8,8a,1-cd]carbazole",
     ),
     (45607, "CC1=C[C@H]2C[C@H](C)[C@H]3CC[C@H](C)C4=C3[C@@H](OC4=O)[C@@]2(C)C1", "azuleno[4,5,6-cd]2-benzofuran"),
     (52973, "O=C1C=CC(=O)C2=C3C1=CC=CC3N1C=CCN21", "pyrazolo[1,2-a]cyclohepta[cd]indazole"),
-    (53931, "N#CC(C#N)=C1c2cc(F)ccc2-c2cc3c(cc21)C(=C(C#N)C#N)C1C=C(F)C=CC31", "indeno[1,2-f]benzo[b]indene"),
-    (59172, "CCO[C@@H]1C=C2[C@H](O)CN3CCCc4cc(OC)c(OC)cc4[C@]23C[C@H]1OC", "indolo[1,7a-a]benzo[c]azepine"),
+    (53931, "N#CC(C#N)=C1c2cc(F)ccc2-c2cc3c(cc21)C(=C(C#N)C#N)C1C=C(F)C=CC31", "indeno[2,1-b]fluorene"),
+    (59172, "CCO[C@@H]1C=C2[C@H](O)CN3CCCc4cc(OC)c(OC)cc4[C@]23C[C@H]1OC", "benzo[1',2':3,4]azepino[2,1-i]indole"),
     (
         59728,
         "CC(C)C1=C2[C@H]3CC=C4[C@@H]5[C@@H](O[C@@H]6OC[C@@](O)(C(=O)[C@@]65O)[C@@H]4O)[C@]3(C)CC[C@]2(C)CC1",
@@ -105,7 +105,7 @@ CASES = (
     (
         64746,
         "COc1ccc2c(c1)C13CCNC1C1c4[nH]c5ccc(OC)cc5c4CCN1C3N2",
-        "benzo[1',2':2,3]pyrrolo[4,5-d]indolo[2',3':2,3]pyrrolo[3',2':3,4]pyrrolo[5,1-f]pyridine",
+        "indolo[3',2':2,3]pyrrolo[2',3':1,2]indolizino[8,7-b]indole",
     ),
     (67508, "CNCCC(=O)N1c2ccccc2N2CCc3cccc(c32)C1C", "[1,5]benzodiazepino[3,2,1-hi]indole"),
     (75694, "O=C(O)N1CCc2c(n3c4c(cccc24)CCC3)CC1", "azepino[4',5':2,3]pyrrolo[4,5,1-ij]quinoline"),
@@ -126,7 +126,7 @@ CASES = (
     (
         98468,
         "Fc1ccc(-c2ccc3[nH]c4c(c3c2)-c2cccc3cccc-4c23)cc1",
-        "benzo[b]naphtho[1',8a',8':1,2,3]cyclopenta[4,5-d]pyrrole",
+        "acenaphthyleno[1,2-b]indole",
     ),
     (
         30704,
