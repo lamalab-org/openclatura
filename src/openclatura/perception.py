@@ -969,6 +969,14 @@ def _acyl_chalcogen_group(
             owned_neighbors.add(ligand.attachment_atom)
         return set(mol.get_neighbors(ligand.atom)) <= owned_neighbors
 
+    def has_registered_acyl_route(ligand: ChalcogenLigand, derivative: DerivativeKind) -> bool:
+        return (
+            derivative.value,
+            double_ligand.element.value,
+            ligand.element.value,
+            external,
+        ) in RULES.chalcogens.standard_acyl_keys
+
     single_ligands = [
         ligand
         for ligand in ligands
@@ -981,18 +989,15 @@ def _acyl_chalcogen_group(
             ChalcogenLigandRole.CHALCOGEN_LINK,
         }
         and is_complete_linker(ligand)
-        and (ligand.role is not ChalcogenLigandRole.HETEROATOM_LINK or nitrogens or participates_in_multi_acyl_parent)
+        and (
+            ligand.role is not ChalcogenLigandRole.HETEROATOM_LINK
+            or participates_in_multi_acyl_parent
+            or (nitrogens and has_registered_acyl_route(ligand, DerivativeKind.ESTER))
+        )
     ]
     single_ligand = single_ligands[0] if len(single_ligands) == 1 else None
-    has_standard_acyl_route = (
-        single_ligand is not None
-        and (
-            DerivativeKind.ESTER.value,
-            double_ligand.element.value,
-            single_ligand.element.value,
-            external,
-        )
-        in RULES.chalcogens.standard_acyl_keys
+    has_standard_acyl_route = single_ligand is not None and has_registered_acyl_route(
+        single_ligand, DerivativeKind.ESTER
     )
     # A centre carrying a nitrogen or a typed leaving group is not a plain
     # ester merely because it also has a single-bonded chalcogen.  Defer those

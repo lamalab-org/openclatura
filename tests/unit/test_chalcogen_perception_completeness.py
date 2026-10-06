@@ -21,6 +21,13 @@ def test_acyl_ester_does_not_steal_a_colocated_amide_nitrogen():
     assert oc.name("NC(=O)SC").name == "1-(methylsulfanyl)formamide"
 
 
+def test_unregistered_heteroatom_acyl_link_does_not_claim_an_ester_route():
+    descriptors = _descriptors("NSC(=S)N1CCCCC1")
+
+    assert not any(descriptor.derivative is DerivativeKind.ESTER for descriptor in descriptors)
+    assert oc.name("NSC(=S)N1CCCCC1").name == "1-((aminosulfanyl)(thioxo)methyl)piperidine"
+
+
 def test_acyl_halide_does_not_steal_a_colocated_amide_nitrogen():
     descriptors = _descriptors("NC(=O)Cl")
 
