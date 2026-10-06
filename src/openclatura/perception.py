@@ -963,6 +963,12 @@ def _acyl_chalcogen_group(
 
     participates_in_multi_acyl_parent = shares_attachment_with_acyl_derivative()
 
+    def is_complete_linker(ligand: ChalcogenLigand) -> bool:
+        owned_neighbors = {carbon}
+        if ligand.attachment_atom is not None:
+            owned_neighbors.add(ligand.attachment_atom)
+        return set(mol.get_neighbors(ligand.atom)) <= owned_neighbors
+
     single_ligands = [
         ligand
         for ligand in ligands
@@ -974,8 +980,20 @@ def _acyl_chalcogen_group(
             ChalcogenLigandRole.HETEROATOM_LINK,
             ChalcogenLigandRole.CHALCOGEN_LINK,
         }
+        and is_complete_linker(ligand)
         and (ligand.role is not ChalcogenLigandRole.HETEROATOM_LINK or nitrogens or participates_in_multi_acyl_parent)
     ]
+    single_ligand = single_ligands[0] if len(single_ligands) == 1 else None
+    has_standard_acyl_route = (
+        single_ligand is not None
+        and (
+            DerivativeKind.ESTER.value,
+            double_ligand.element.value,
+            single_ligand.element.value,
+            external,
+        )
+        in RULES.chalcogens.standard_acyl_keys
+    )
     # A centre carrying a nitrogen or a typed leaving group is not a plain
     # ester merely because it also has a single-bonded chalcogen.  Defer those
     # competing ligands to their complete derivative routes below.
@@ -990,9 +1008,10 @@ def _acyl_chalcogen_group(
                 ChalcogenLigandRole.ANIONIC,
                 ChalcogenLigandRole.HETEROATOM_LINK,
             }
+            or has_standard_acyl_route
         )
     ):
-        single_ligand = single_ligands[0]
+        assert single_ligand is not None
         if single_ligand.role is ChalcogenLigandRole.CHALCOGEN_LINK:
             terminal_atom = single_ligand.attachment_atom
             if terminal_atom is None:
@@ -1024,7 +1043,7 @@ def _acyl_chalcogen_group(
                 attachment_atom=attachment,
                 is_external=external,
             )
-            projected = None if nitrogens else _established_acyl_projection(descriptor)
+            projected = None if nitrogens else _established_acyl_projection(mol, descriptor)
             if projected is not None:
                 return projected
             key, rule = resolve_peroxy_acyl_rule(descriptor)
@@ -1066,7 +1085,7 @@ def _acyl_chalcogen_group(
             attachment_atom=attachment,
             is_external=external,
         )
-        projected = None if nitrogens else _established_acyl_projection(descriptor)
+        projected = None if nitrogens else _established_acyl_projection(mol, descriptor)
         if projected is not None:
             return projected
         key, rule = resolve_acyl_rule(descriptor)
@@ -1159,6 +1178,7 @@ def _acyl_chalcogen_group(
 
 
 def _established_acyl_projection(
+    mol: Molecule,
     descriptor: FunctionalGroupDescriptor,
 ) -> PerceivedGroup | tuple[PerceivedGroup, ...] | None:
     """Project supported O/S acyl paths onto established structural detectors."""
@@ -1176,6 +1196,11 @@ def _established_acyl_projection(
         return None
     center = descriptor.centers[0]
     if citation_rule.projection is ChalcogenCitationProjection.CARBONYL:
+        has_carbon_or_hydrogen_attachment = mol.atoms[center].total_h_count > 0 or any(
+            mol.atoms[neighbor].is_carbon for neighbor in mol.get_neighbors(center)
+        )
+        if not has_carbon_or_hydrogen_attachment:
+            return None
         return PerceivedGroup(
             FunctionalFamily.ACYL.value,
             False,
