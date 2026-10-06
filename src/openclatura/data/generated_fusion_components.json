@@ -2,64 +2,6 @@
   "components": [
     {
       "accepted_general_prefixes": [],
-      "parent_name": "1,4-benzodioxine",
-      "parser_visible_forms": [],
-      "preferred_fusion_prefix": "benzodioxino",
-      "roles": [
-        "attached"
-      ],
-      "rule": "P-25.3.5",
-      "template_names": [
-        "1,4-benzodioxine"
-      ],
-      "usable_as_peri_parent": true
-    },
-    {
-      "accepted_general_prefixes": [],
-      "parent_name": "1,5-benzodiazepine",
-      "parser_visible_forms": [],
-      "preferred_fusion_prefix": "[1,5]benzodiazepino",
-      "roles": [
-        "attached"
-      ],
-      "rule": "P-25.3.5",
-      "template_names": [
-        "1H-1,5-benzodiazepine"
-      ],
-      "usable_as_peri_parent": true
-    },
-    {
-      "accepted_general_prefixes": [],
-      "parent_name": "1-benzofuran",
-      "parser_visible_forms": [],
-      "preferred_fusion_prefix": "benzofuro",
-      "roles": [
-        "parent",
-        "attached"
-      ],
-      "rule": "P-25.2",
-      "template_names": [
-        "1-benzofuran"
-      ],
-      "usable_as_peri_parent": false
-    },
-    {
-      "accepted_general_prefixes": [],
-      "parent_name": "1-benzothiophene",
-      "parser_visible_forms": [],
-      "preferred_fusion_prefix": "benzothieno",
-      "roles": [
-        "parent",
-        "attached"
-      ],
-      "rule": "P-25.2",
-      "template_names": [
-        "1-benzothiophene"
-      ],
-      "usable_as_peri_parent": false
-    },
-    {
-      "accepted_general_prefixes": [],
       "parent_name": "1H-indene",
       "parser_visible_forms": [
         "indeno"
@@ -74,64 +16,6 @@
         "1H-indene"
       ],
       "usable_as_peri_parent": false
-    },
-    {
-      "accepted_general_prefixes": [],
-      "parent_name": "2,1,3-benzothiadiazole",
-      "parser_visible_forms": [],
-      "preferred_fusion_prefix": "[2,1,3]benzothiadiazolo",
-      "roles": [
-        "attached"
-      ],
-      "rule": "P-25.3.5",
-      "template_names": [
-        "2,1,3-benzothiadiazole"
-      ],
-      "usable_as_peri_parent": true
-    },
-    {
-      "accepted_general_prefixes": [],
-      "parent_name": "2,1,3-benzoxadiazole",
-      "parser_visible_forms": [],
-      "preferred_fusion_prefix": "[2,1,3]benzoxadiazolo",
-      "roles": [
-        "attached"
-      ],
-      "rule": "P-25.3.5",
-      "template_names": [
-        "2,1,3-benzoxadiazole"
-      ],
-      "usable_as_peri_parent": true
-    },
-    {
-      "accepted_general_prefixes": [],
-      "parent_name": "2-benzofuran",
-      "parser_visible_forms": [
-        "isobenzofurano"
-      ],
-      "preferred_fusion_prefix": "isobenzofurano",
-      "roles": [
-        "attached"
-      ],
-      "rule": "P-25.3.5",
-      "template_names": [
-        "2-benzofuran"
-      ],
-      "usable_as_peri_parent": true
-    },
-    {
-      "accepted_general_prefixes": [],
-      "parent_name": "2-benzothiophene",
-      "parser_visible_forms": [],
-      "preferred_fusion_prefix": "[2]benzothieno",
-      "roles": [
-        "attached"
-      ],
-      "rule": "P-25.3.5",
-      "template_names": [
-        "2-benzothiophene"
-      ],
-      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -177,6 +61,34 @@
         "1,3-thiazole"
       ],
       "usable_as_peri_parent": false
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[1,4]benzodioxine",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "benzodioxino",
+      "roles": [
+        "attached"
+      ],
+      "rule": "P-25.3.5",
+      "template_names": [
+        "1,4-benzodioxine"
+      ],
+      "usable_as_peri_parent": true
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[1,5]benzodiazepine",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "[1,5]benzodiazepino",
+      "roles": [
+        "attached"
+      ],
+      "rule": "P-25.3.5",
+      "template_names": [
+        "1H-1,5-benzodiazepine"
+      ],
+      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -435,6 +347,64 @@
     },
     {
       "accepted_general_prefixes": [],
+      "parent_name": "[1]benzofuran",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "benzofuro",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "1-benzofuran"
+      ],
+      "usable_as_peri_parent": false
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[1]benzothiophene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "benzothieno",
+      "roles": [
+        "parent",
+        "attached"
+      ],
+      "rule": "P-25.2",
+      "template_names": [
+        "1-benzothiophene"
+      ],
+      "usable_as_peri_parent": false
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[2,1,3]benzothiadiazole",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "[2,1,3]benzothiadiazolo",
+      "roles": [
+        "attached"
+      ],
+      "rule": "P-25.3.5",
+      "template_names": [
+        "2,1,3-benzothiadiazole"
+      ],
+      "usable_as_peri_parent": true
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[2,1,3]benzoxadiazole",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "[2,1,3]benzoxadiazolo",
+      "roles": [
+        "attached"
+      ],
+      "rule": "P-25.3.5",
+      "template_names": [
+        "2,1,3-benzoxadiazole"
+      ],
+      "usable_as_peri_parent": true
+    },
+    {
+      "accepted_general_prefixes": [],
       "parent_name": "[2,6]naphthyridine",
       "parser_visible_forms": [],
       "preferred_fusion_prefix": "[2,6]naphthyridino",
@@ -507,6 +477,36 @@
         "[20]annulene"
       ],
       "usable_as_peri_parent": false
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[2]benzofuran",
+      "parser_visible_forms": [
+        "isobenzofurano"
+      ],
+      "preferred_fusion_prefix": "isobenzofurano",
+      "roles": [
+        "attached"
+      ],
+      "rule": "P-25.3.5",
+      "template_names": [
+        "2-benzofuran"
+      ],
+      "usable_as_peri_parent": true
+    },
+    {
+      "accepted_general_prefixes": [],
+      "parent_name": "[2]benzothiophene",
+      "parser_visible_forms": [],
+      "preferred_fusion_prefix": "[2]benzothieno",
+      "roles": [
+        "attached"
+      ],
+      "rule": "P-25.3.5",
+      "template_names": [
+        "2-benzothiophene"
+      ],
+      "usable_as_peri_parent": true
     },
     {
       "accepted_general_prefixes": [],
@@ -1660,7 +1660,7 @@
   "runtime_dependency": false,
   "schema_version": 1,
   "source_sha256": {
-    "src/openclatura/data/fusion_components.json": "6be73bfdf3d73fa5c575ea71cc83317551019e58401d5745b1eee2924fe6f3c2",
+    "src/openclatura/data/fusion_components.json": "bdd2a72f210b79250eb73e3f10dc137e55a941c1f53321291a7ba628e85eecba",
     "src/openclatura/data/retained_fused_graph_templates.json": "befef11cf69a9c604c89d0dcc0fa32cb3b4155b4272298d53f8f8bfb0cd8f6dc",
     "src/openclatura/data/retained_parent_name_policy.json": "8f3c1d572abccc55e6c7b25f8a774048898c35f220fe9100edb1c9228d3cdfec",
     "src/openclatura/hantzsch_widman.py": "8d28a90442764eab283fa867e4efbf44f143eb3bc70d175552a59d087dd325bc",

@@ -116,10 +116,11 @@ def test_the_completed_target_is_order_invariant():
     assert len({name_mol(Chem.RenumberAtoms(mol, order)).name for order in orders}) == 1
 
 
-# FR-4.1.2 encloses a component's own locants in square brackets when the
-# component is cited inside a fusion name. The standalone parent hydride keeps
-# the hyphenated form (1,10-phenanthroline), so only the two fusion roles are
-# pinned here: the attached prefix and the base component.
+# FR-4.8 encloses the locants cited as part of a component's name in square
+# brackets; P-16.5.2.2 is the Blue Book counterpart. The transformation belongs
+# to the fusion citation, not to the standalone parent hydride, which keeps its
+# hyphen - so both fusion roles are pinned here against the template's own
+# output name.
 ENCLOSED_COMPONENT_LOCANTS = {
     "1,5-naphthyridine": ("[1,5]naphthyridine", "[1,5]naphthyridino"),
     "1,6-naphthyridine": ("[1,6]naphthyridine", "[1,6]naphthyridino"),

@@ -258,7 +258,7 @@ def test_partly_hydrogenated_hw_component_uses_fusion_nomenclature():
         ),
         (
             "CC1=C2CC3C(C)(C=CC(=O)C34CO4)CC2OC1=O",
-            "3,8a-dimethyl-4a,8a,9,9a-tetrahydrospiro[benzo[f]1-benzofuran-5,2'-oxirane]-2,6(4H)-dione",
+            "3,8a-dimethyl-4a,8a,9,9a-tetrahydrospiro[benzo[f][1]benzofuran-5,2'-oxirane]-2,6(4H)-dione",
         ),
     ],
 )

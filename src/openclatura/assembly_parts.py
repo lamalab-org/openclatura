@@ -16,6 +16,32 @@ if TYPE_CHECKING:
     from .ring_parent import RingParent
 
 
+# Both ring renderers tag the indicated-hydrogen run they emit and the
+# separator that closes it. P-25.7.1.3.2 cites that run in front of the ring
+# system's name, replacement terms included, so assembly has to be able to
+# take it off the front again - by reading the tokens, not by matching an H in
+# a finished string.
+INDICATED_HYDROGEN_ROLES = frozenset(
+    {
+        "fusion_indicated_hydrogen",
+        "fusion_indicated_hydrogen_separator",
+        "replacement_indicated_hydrogen",
+        "replacement_indicated_hydrogen_separator",
+    }
+)
+
+
+def leading_indicated_hydrogen_citation(parts) -> str:
+    """Return the leading indicated-hydrogen run, its separator included."""
+
+    taken = 0
+    for part in parts:
+        if part.grammar_role not in INDICATED_HYDROGEN_ROLES:
+            break
+        taken += 1
+    return "".join(part.text for part in parts[:taken])
+
+
 @dataclass(frozen=True)
 class NameTokenBinding:
     """Renderer-emitted token metadata before final string positioning."""

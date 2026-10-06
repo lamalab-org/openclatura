@@ -63,12 +63,12 @@ CASES = (
     (
         44983,
         "COC1=CC2SC3=C(C(=O)C4CCC=CC34)C2C=C1",
-        "indeno[1,2-b]1-benzothiophene",
+        "indeno[1,2-b][1]benzothiophene",
     ),
     (
         48496,
         "OC1=CC2SC3=C(C2C=C1)C(O)(c1ccc(OCCN2CCCCC2)cc1)c1ccccc13",
-        "indeno[1,2-b]1-benzothiophene",
+        "indeno[1,2-b][1]benzothiophene",
     ),
     (
         11029,
@@ -93,14 +93,14 @@ CASES = (
         "COc1ccc(CN2c3ccccc3[C@@]34CCN5C=C[C@@H]6OCC[C@]6(CC[C@H]23)[C@H]54)cc1",
         "furo[2',3':7,8]indolizino[8,8a,1-cd]carbazole",
     ),
-    (45607, "CC1=C[C@H]2C[C@H](C)[C@H]3CC[C@H](C)C4=C3[C@@H](OC4=O)[C@@]2(C)C1", "azuleno[4,5,6-cd]2-benzofuran"),
+    (45607, "CC1=C[C@H]2C[C@H](C)[C@H]3CC[C@H](C)C4=C3[C@@H](OC4=O)[C@@]2(C)C1", "azuleno[4,5,6-cd][2]benzofuran"),
     (52973, "O=C1C=CC(=O)C2=C3C1=CC=CC3N1C=CCN21", "pyrazolo[1,2-a]cyclohepta[cd]indazole"),
     (53931, "N#CC(C#N)=C1c2cc(F)ccc2-c2cc3c(cc21)C(=C(C#N)C#N)C1C=C(F)C=CC31", "indeno[2,1-b]fluorene"),
     (59172, "CCO[C@@H]1C=C2[C@H](O)CN3CCCc4cc(OC)c(OC)cc4[C@]23C[C@H]1OC", "benzo[1',2':3,4]azepino[2,1-i]indole"),
     (
         59728,
         "CC(C)C1=C2[C@H]3CC=C4[C@@H]5[C@@H](O[C@@H]6OC[C@@](O)(C(=O)[C@@]65O)[C@@H]4O)[C@]3(C)CC[C@]2(C)CC1",
-        "cyclopenta[1'',2'':1',2']benzo[3',4':1,2]cyclohepta[3,4,5-cd]2-benzofuran",
+        "cyclopenta[1'',2'':1',2']benzo[3',4':1,2]cyclohepta[3,4,5-cd][2]benzofuran",
     ),
     (
         64746,
@@ -121,7 +121,7 @@ CASES = (
         "pyrrolo[1,2-a][1,3]dioxolo[4',5':1,2]benzo[4,5-d]cyclopenta[b]azepine",
     ),
     (88969, "COc1ccc2c3c1OC1C[C@@H](OC(=O)c4ccc(C(C)(C)C)cc4)C=C[C@@]31CCN2C", "benzofuro[3a,3,2-de]quinoline"),
-    (89309, "CN1CCN(C2=Nc3cc(Cl)cc4ccn(c34)-c3ccccc32)CC1", "pyrrolo[1,2,3-ef]benzo[c]1,5-benzodiazepine"),
+    (89309, "CN1CCN(C2=Nc3cc(Cl)cc4ccn(c34)-c3ccccc32)CC1", "pyrrolo[1,2,3-ef]benzo[c][1,5]benzodiazepine"),
     (90198, "COc1ccc2c3c1OC1C[C@@H](OC(=O)c4ccc(Cl)cc4Cl)C=C[C@@]31CCN2C", "benzofuro[3a,3,2-de]quinoline"),
     (
         98468,
