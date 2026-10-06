@@ -1275,6 +1275,8 @@ def _acylamino_amido_prefix(
 
     try:
         acid_name = name_component(acid_mol, acid_atoms | {hydroxyl_idx}, is_substituent=False)
+    except RecursionError:
+        raise
     except Exception:
         return None
     amido = _retained_sulfonyl_amino(str(acid_name)) or _acid_name_to_amido(str(acid_name))
