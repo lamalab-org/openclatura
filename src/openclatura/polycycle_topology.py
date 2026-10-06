@@ -11,7 +11,10 @@ from .graph_kernel import (
     adjacency_from_edges as adjacency_from_edges,
 )
 from .graph_kernel import (
-    canonical_cycle,
+    biconnected_edge_components,
+)
+from .graph_kernel import (
+    canonical_cycle as canonical_cycle,
 )
 from .graph_kernel import (
     connected_components as connected_components,
@@ -722,31 +725,19 @@ def internal_degrees(atoms: frozenset[int], edges: frozenset[tuple[int, int]]) -
 
 
 def fused_bonds(mol: Molecule, atoms: frozenset[int]) -> tuple[tuple[int, int], ...]:
-    cycles = simple_cycles_from_edges(atoms, edges_within_atoms(mol, set(atoms)))
-    edge_counts: dict[tuple[int, int], int] = {}
-    for cycle in cycles:
-        for idx, atom in enumerate(cycle):
-            edge = tuple(sorted((atom, cycle[(idx + 1) % len(cycle)])))
-            edge_counts[edge] = edge_counts.get(edge, 0) + 1
-    return tuple(sorted(edge for edge, count in edge_counts.items() if count > 1))
+    """Return the bonds that lie on more than one simple cycle.
 
+    Every bond of a biconnected block lies on a cycle, and on a second one
+    unless the block is a single ring, so these are exactly the bonds of the
+    blocks with more bonds than atoms. This avoids enumerating simple cycles,
+    whose number grows exponentially with the ring count (fullerenes, cages).
+    """
 
-def simple_cycles_from_edges(atoms: frozenset[int], edges: set[tuple[int, int]]) -> list[tuple[int, ...]]:
-    adjacency = {atom: set() for atom in atoms}
-    for first, second in edges:
-        adjacency[first].add(second)
-        adjacency[second].add(first)
-    cycles = set()
-    for start in atoms:
-        stack = [(start, [start])]
-        while stack:
-            current, path = stack.pop()
-            for neighbor in adjacency[current]:
-                if neighbor == start and len(path) >= 3:
-                    cycles.add(_canonical_cycle(path))
-                elif neighbor not in path and neighbor >= start:
-                    stack.append((neighbor, path + [neighbor]))
-    return [tuple(cycle) for cycle in sorted(cycles)]
+    fused: list[tuple[int, int]] = []
+    for block in biconnected_edge_components(atoms, edges_within_atoms(mol, set(atoms))):
+        if len(block) > len({atom for edge in block for atom in edge}):
+            fused.extend(block)
+    return tuple(sorted(fused))
 
 
 def _component_path_between_attachment_atoms(
@@ -823,7 +814,3 @@ def adjacent_atoms(atom: int, edges: frozenset[tuple[int, int]]) -> set[int]:
         elif second == atom:
             adjacent.add(first)
     return adjacent
-
-
-def _canonical_cycle(path: list[int]) -> tuple[int, ...]:
-    return canonical_cycle(path)
