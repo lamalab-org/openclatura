@@ -24,7 +24,7 @@ class NumberingPreference:
     """
 
     principal: tuple[int, ...]
-    charge: tuple[int, ...]
+    charge: tuple[tuple[int, ...], ...]
     hetero_by_priority: tuple[tuple[int, ...], ...]
     indicated_hydrogen: tuple[int, ...]
     hydro: tuple[int, ...]
@@ -148,8 +148,7 @@ class _DeferredNumberingPreference:
         if criterion == "principal":
             return tuple(get_atom_locants(self._oriented_path, self._principal_carbons))
         if criterion == "charge":
-            charged_atoms = {idx for idx in self._oriented_path if self._mol.atoms[idx].charge != 0}
-            return tuple(get_atom_locants(self._oriented_path, charged_atoms))
+            return _charge_locant_key(self._mol, self._oriented_path)
         if criterion == "hetero_by_priority":
             return _heteroatom_locants_by_priority(
                 self._mol,
@@ -397,8 +396,7 @@ def _numbering_preference(
     retained_name: str | None,
 ) -> NumberingPreference:
     principal = tuple(get_atom_locants(oriented_path, principal_carbons))
-    charged_atoms = {idx for idx in oriented_path if mol.atoms[idx].charge != 0}
-    charge = tuple(get_atom_locants(oriented_path, charged_atoms))
+    charge = _charge_locant_key(mol, oriented_path)
     hetero_by_priority = _heteroatom_locants_by_priority(
         mol,
         oriented_path,
@@ -426,6 +424,17 @@ def _numbering_preference(
         substituent_citation=_substituent_citation_locants(oriented_path, substituent_mapping),
         stereochemistry=_stereochemistry_sequence(mol, oriented_path),
     )
+
+
+def _charge_locant_key(mol: Molecule, oriented_path: list[int]) -> tuple[tuple[int, ...], ...]:
+    """Rank all charge sites, then anionic and cationic sites within a tie."""
+
+    by_sign = (
+        {idx for idx in oriented_path if mol.atoms[idx].charge != 0},
+        {idx for idx in oriented_path if mol.atoms[idx].charge < 0},
+        {idx for idx in oriented_path if mol.atoms[idx].charge > 0},
+    )
+    return tuple(tuple(get_atom_locants(oriented_path, atoms)) for atoms in by_sign)
 
 
 def _hydro_locants(mol: Molecule, oriented_path: list[int], retained_name: str | None) -> tuple[int, ...]:

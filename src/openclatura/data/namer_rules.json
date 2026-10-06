@@ -45,11 +45,12 @@
     "bluebook_rule": "Brief Guide section 7; active parent-numbering criteria by parent class.",
     "values": {
       "chain": [
-      "principal",
-      "hydro",
+        "principal",
+        "hydro",
         "hetero_by_priority",
         "indicated_hydrogen",
         "unsaturation",
+        "charge",
         "substituent_and_unsaturation",
         "substituent_citation",
         "stereochemistry"
@@ -57,9 +58,10 @@
       "ring": [
         "hetero_by_priority",
         "indicated_hydrogen",
-      "principal",
-      "hydro",
+        "principal",
+        "hydro",
         "unsaturation",
+        "charge",
         "substituent_and_unsaturation",
         "substituent_citation",
         "stereochemistry"
