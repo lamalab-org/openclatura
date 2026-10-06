@@ -5,34 +5,14 @@ from rdkit import Chem
 
 from openclatura import name, name_mol, opsin_available, parent_pipeline
 
+# A saturated tricyclic that no retained component covers, so the parent is
+# reached by replacing the carbon skeleton's ring atoms: octahydro-1,7-dioxa-
+# 7a-azacyclopenta[cd]indene.
+_REPLACEMENT_SKELETON = "C1ON2OCCC3CCC1C32"
+
 
 def _replacement_parent(branch_length):
-    graph = Chem.RWMol()
-    for symbol in ("C", "C", "N", "C", "C", "C", "C", "N", "C", "N", "C", "C", "N", "O", "C", "N"):
-        graph.AddAtom(Chem.Atom(symbol))
-    edges = (
-        (0, 1),
-        (1, 2),
-        (2, 3),
-        (3, 4),
-        (4, 5),
-        (5, 6),
-        (6, 7),
-        (7, 8),
-        (8, 9),
-        (9, 10),
-        (10, 11),
-        (11, 6),
-        (10, 12),
-        (12, 0),
-        (11, 2),
-        (1, 13),
-        (12, 14),
-        (8, 15),
-    )
-    double = {(6, 7), (8, 9), (10, 11), (1, 13)}
-    for edge in edges:
-        graph.AddBond(*edge, Chem.BondType.DOUBLE if edge in double else Chem.BondType.SINGLE)
+    graph = Chem.RWMol(Chem.MolFromSmiles(_REPLACEMENT_SKELETON))
     last = 0
     for _ in range(branch_length):
         atom = graph.AddAtom(Chem.Atom("C"))
@@ -78,11 +58,26 @@ def test_replacement_derivatives_roundtrip(branch_length):
 
 
 @pytest.mark.skipif(not opsin_available(), reason="OPSIN and Java are required")
-def test_reported_replacement_parent_with_stereochemical_sidechain_roundtrips():
+def test_replacement_parent_with_stereochemical_sidechain_roundtrips():
+    result = name(
+        "COC(=O)[C@@H]1ON2OC(/C=N/C)CC3CC[C@@H]1[C@H]32",
+        verify_opsin=True,
+    )
+    assert result.error is None
+    assert result.parent_nomenclature == "skeletal_replacement_fusion"
+    assert result.opsin_check.status == "matched", result.opsin_check.to_dict()
+
+
+@pytest.mark.skipif(not opsin_available(), reason="OPSIN and Java are required")
+def test_reported_pteridine_parent_with_stereochemical_sidechain_roundtrips():
+    # Reported as a replacement parent before pteridine was admitted as a
+    # retained base component (P-25.3.2.1.3). Ordinary fusion now covers the
+    # ring system as pyrido[3,2,1-de]pteridine, which is the senior answer;
+    # the molecule stays here as the roundtrip guard it was reported for.
     result = name(
         "CCC1C(=O)N2CCCc3nc(NC/C(C=NCc4ccc(C(F)(F)F)nc4)=C/N)nc(c32)N1C",
         verify_opsin=True,
     )
     assert result.error is None
-    assert result.parent_nomenclature == "skeletal_replacement_fusion"
+    assert result.parent_nomenclature == "systematic_fusion"
     assert result.opsin_check.status == "matched", result.opsin_check.to_dict()

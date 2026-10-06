@@ -73,12 +73,14 @@ def _unspell_from_stem(parts: AssemblyParts, core_name: str, hydro: set[str], ad
     # it once the suffix locants are known.
     core_name = _respell_indicated_hydrogen(core_name, hydro) or core_name
     parent = parts.parent_hydride
-    if (hydro or added) and parent is not None and parent.binding_term:
-        # The parent's binding term carries its own spelling of the citation, and
-        # the name/graph binding audit checks that term against the final name.
-        # Hydro locants leave the stem outright; added hydrogen leaves it too,
-        # relocated to the suffix by _move_added_hydrogen_to_suffix below.
-        respelled = _respell_indicated_hydrogen(parent.binding_term, hydro | added)
+    if (hydro or added) and parent is not None and parent.base_name:
+        # Respelling works on the parent's own name, indicated-hydrogen run and
+        # all, because that run is exactly what the hydro locants take over.
+        # The binding term is the contiguous ring word and no longer carries
+        # the run, so it cannot stand in for the name here. Hydro locants leave
+        # the stem outright; added hydrogen leaves it too, relocated to the
+        # suffix by _move_added_hydrogen_to_suffix below.
+        respelled = _respell_indicated_hydrogen(parent.base_name, hydro | added)
         if respelled is not None:
             metadata = parent.metadata
             if metadata is not None:
@@ -508,6 +510,13 @@ def post_process_rewrite_rules():
     return (("post_process_name", _post_process_name),)
 
 
+def _replacement_indicated_hydrogen(parts: AssemblyParts) -> str:
+    """Return the parent's own indicated-hydrogen run, as its proof recorded it."""
+
+    parent = parts.parent_hydride
+    return parent.indicated_hydrogen_citation if parent is not None else ""
+
+
 def assemble_name_raw(parts: AssemblyParts) -> str:
     if prepare_fusion_charge_assembly(parts):
         refresh_name_atom_bindings(parts)
@@ -536,7 +545,9 @@ def assemble_name_raw(parts: AssemblyParts) -> str:
         spiro_parent_terminal = (
             terminal_e if parts.parent_hydride is not None and parts.parent_hydride.uses_fusion_plan else "e"
         )
-        stem_str = apply_replacement_prefix(stem_str, a_prefix_str)
+        stem_str = apply_replacement_prefix(
+            stem_str, a_prefix_str, indicated_hydrogen=_replacement_indicated_hydrogen(parts)
+        )
         if parts.is_substituent:
             stem_str, unsat_str, terminal_e, suffix_str = format_substituent_tail(
                 parts, stem_str, terminal_e, spiro_subs

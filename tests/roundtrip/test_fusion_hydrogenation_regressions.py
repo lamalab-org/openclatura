@@ -10,17 +10,17 @@ from openclatura import FusionMode, name_mol
 CASES = [
     (
         "O=C(COc1ccc2nc3n(c(=O)c2c1)CCC3)Nc1ccc(F)cc1",
-        "N-(4-fluorophenyl)-2-((9-oxo-2,3-dihydro-1H-pyrrolo[1,2-a]benzo[d]pyrimidin-7-yl)oxy)acetamide",
+        "N-(4-fluorophenyl)-2-((9-oxo-2,3-dihydro-1H-pyrrolo[2,1-b]quinazolin-7-yl)oxy)acetamide",
     ),
     (
         "O=C(NCc1ccccc1)Nc1ccc(C2=CSC3=NCCN23)cc1",
         "N-benzyl-N'-(4-(5,6-dihydroimidazo[2,1-b][1,3]thiazol-3-yl)phenyl)urea",
     ),
-    ("O=c1c2ccccc2nc2n1CCC2", "2,3-dihydropyrrolo[1,2-a]benzo[d]pyrimidin-9(1H)-one"),
+    ("O=c1c2ccccc2nc2n1CCC2", "2,3-dihydropyrrolo[2,1-b]quinazolin-9(1H)-one"),
     ("C1=CSC2=NCCN12", "5,6-dihydroimidazo[2,1-b][1,3]thiazole"),
-    ("O=c1c2ccccc2nc2n1CC(C)C2", "2-methyl-2,3-dihydropyrrolo[1,2-a]benzo[d]pyrimidin-9(1H)-one"),
+    ("O=c1c2ccccc2nc2n1CC(C)C2", "2-methyl-2,3-dihydropyrrolo[2,1-b]quinazolin-9(1H)-one"),
     ("CC1CN2C(=NC1)SC=C2", "6-methyl-6,7-dihydro-5H-thiazolo[3,2-a]pyrimidine"),
-    ("O=c1c2ccccc2nc2n1CC=C2", "pyrrolo[1,2-a]benzo[d]pyrimidin-9(1H)-one"),
+    ("O=c1c2ccccc2nc2n1CC=C2", "pyrrolo[2,1-b]quinazolin-9(1H)-one"),
 ]
 
 
