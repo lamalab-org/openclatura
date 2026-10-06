@@ -946,6 +946,7 @@ def _acyl_chalcogen_group(
             ChalcogenLigandRole.HETEROATOM_LINK,
             ChalcogenLigandRole.CHALCOGEN_LINK,
         }
+        and (ligand.role is not ChalcogenLigandRole.HETEROATOM_LINK or nitrogens)
     ]
     # A centre carrying a nitrogen or a typed leaving group is not a plain
     # ester merely because it also has a single-bonded chalcogen.  Defer those
@@ -953,7 +954,15 @@ def _acyl_chalcogen_group(
     if (
         len(single_ligands) == 1
         and not halogens
-        and (not nitrogens or single_ligands[0].role is ChalcogenLigandRole.HETEROATOM_LINK)
+        and (
+            not nitrogens
+            or single_ligands[0].role
+            in {
+                ChalcogenLigandRole.HYDROGEN_BEARING,
+                ChalcogenLigandRole.ANIONIC,
+                ChalcogenLigandRole.HETEROATOM_LINK,
+            }
+        )
     ):
         single_ligand = single_ligands[0]
         if single_ligand.role is ChalcogenLigandRole.CHALCOGEN_LINK:
@@ -987,7 +996,7 @@ def _acyl_chalcogen_group(
                 attachment_atom=attachment,
                 is_external=external,
             )
-            projected = _established_acyl_projection(descriptor)
+            projected = None if nitrogens else _established_acyl_projection(descriptor)
             if projected is not None:
                 return projected
             key, rule = resolve_peroxy_acyl_rule(descriptor)
@@ -1024,7 +1033,7 @@ def _acyl_chalcogen_group(
             attachment_atom=attachment,
             is_external=external,
         )
-        projected = _established_acyl_projection(descriptor)
+        projected = None if nitrogens else _established_acyl_projection(descriptor)
         if projected is not None:
             return projected
         key, rule = resolve_acyl_rule(descriptor)

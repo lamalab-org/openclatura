@@ -28,6 +28,18 @@ def test_acyl_halide_does_not_steal_a_colocated_amide_nitrogen():
     assert not any(descriptor.derivative is DerivativeKind.ACID_HALIDE for descriptor in descriptors)
 
 
+def test_hydrogen_bearing_acyl_ligand_keeps_acid_priority_over_nitrogen():
+    descriptors = _descriptors("NC(=O)O")
+
+    assert any(descriptor.derivative is DerivativeKind.ACID for descriptor in descriptors)
+    assert oc.name("NC(=O)O").name == "carbamic acid"
+
+
+def test_heteroatom_link_is_an_ester_only_when_the_center_is_a_carbamate():
+    assert oc.name("C#CCC(=O)ON(C)C(=O)CCC").name == "N-((but-3-ynoyl)oxy)-N-methylbutanamide"
+    assert oc.name("CN(C)C(=O)ONC(=O)c1ccccc1").name == "benzamido dimethylcarbamate"
+
+
 def test_central_acid_requires_a_neutral_amide_nitrogen():
     descriptors = _descriptors("CS(=O)(=O)[NH3+]")
 
