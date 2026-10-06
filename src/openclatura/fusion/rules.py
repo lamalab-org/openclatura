@@ -10,7 +10,15 @@ from typing import Protocol
 from ..locants import retained_locant_sort_key
 from ..rules import elements
 from .config import fusion_nomenclature_config
-from .model import FusionComponentMatch, FusionComponentSpec, FusionJoin, FusionMode, FusionRuleDecision
+from .model import (
+    FusionComponentMatch,
+    FusionComponentSpec,
+    FusionJoin,
+    FusionMode,
+    FusionRuleDecision,
+    ParentEligibilityEvidence,
+    ParentEligibilityKind,
+)
 
 # P-25.3.2.4 gives these two criteria independent semantic identities and
 # distinct element orders. Keep them separate so data changes to one rule
@@ -211,6 +219,16 @@ def component_parent_eligible(
     spec: FusionComponentSpec,
     components: Sequence[FusionComponentMatch],
 ) -> bool:
+    """Return whether registry or graph-bound evidence permits parent use."""
+
+    return component_parent_eligibility_evidence(component, spec, components) is not None
+
+
+def component_parent_eligibility_evidence(
+    component: FusionComponentMatch,
+    spec: FusionComponentSpec,
+    components: Sequence[FusionComponentMatch],
+) -> ParentEligibilityEvidence | None:
     """Include a benzoheterocycle when the added fusion requires it as parent.
 
     The attached-only P-25.3.5 family policy applies to ordinary benzo
@@ -223,9 +241,12 @@ def component_parent_eligible(
     """
 
     if spec.usable_as_parent:
-        return True
+        return ParentEligibilityEvidence(
+            kind=ParentEligibilityKind.REGISTRY_PARENT,
+            component_occurrence_id=component.occurrence_id,
+        )
     if not spec.usable_as_peri_parent or not spec.usable_as_attached or len(spec.rings) < 2:
-        return False
+        return None
     symbols = {atom.locant: atom.symbol for atom in spec.template.atoms}
     all_face_ids = frozenset().union(*(other.covered_face_ids for other in components))
     for other in components:
@@ -234,7 +255,13 @@ def component_parent_eligible(
         other_atoms = {atom for _, atom in other.local_to_input_atom}
         shared = {locant for locant, atom in component.local_to_input_atom if atom in other_atoms}
         if len(shared) >= 3 and not any(shared <= set(ring) for ring in spec.rings):
-            return True
+            return ParentEligibilityEvidence(
+                kind=ParentEligibilityKind.CROSS_CONSTITUENT_INTERFACE,
+                component_occurrence_id=component.occurrence_id,
+                related_occurrence_id=other.occurrence_id,
+                shared_locants=tuple(sorted(shared, key=retained_locant_sort_key)),
+                added_face_ids=all_face_ids - component.covered_face_ids,
+            )
         other_has_heteroatom = any(symbol != "C" for symbol, _count in other.topology_key[1])
         attached_to_benzenoid_ring = any(
             len(shared) >= 2 and shared <= set(ring) and all(symbols[locant] == "C" for locant in ring)
@@ -246,8 +273,14 @@ def component_parent_eligible(
             and len(all_face_ids - component.covered_face_ids) == 1
             and other.has_exocyclic_heteroatom_ligand
         ):
-            return True
-    return False
+            return ParentEligibilityEvidence(
+                kind=ParentEligibilityKind.BENZENOID_HETERO_EXTENSION,
+                component_occurrence_id=component.occurrence_id,
+                related_occurrence_id=other.occurrence_id,
+                shared_locants=tuple(sorted(shared, key=retained_locant_sort_key)),
+                added_face_ids=all_face_ids - component.covered_face_ids,
+            )
+    return None
 
 
 def component_spec_seniority_key(spec: FusionComponentSpec) -> ChemicalComponentSeniorityKey:

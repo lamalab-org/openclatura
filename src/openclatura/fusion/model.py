@@ -58,6 +58,30 @@ class PinStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
+class ParentEligibilityKind(StrEnum):
+    """Structural reason why a fusion component may act as the parent."""
+
+    REGISTRY_PARENT = "registry_parent"
+    CROSS_CONSTITUENT_INTERFACE = "cross_constituent_interface"
+    BENZENOID_HETERO_EXTENSION = "benzenoid_hetero_extension"
+
+
+@dataclass(frozen=True, slots=True)
+class ParentEligibilityEvidence:
+    """Graph-bound evidence for contextual fusion-parent eligibility."""
+
+    kind: ParentEligibilityKind
+    component_occurrence_id: int
+    related_occurrence_id: int | None = None
+    shared_locants: tuple[str, ...] = ()
+    added_face_ids: frozenset[int] = frozenset()
+
+    def __post_init__(self) -> None:
+        _require_nonnegative(self.component_occurrence_id, "component occurrence id")
+        if self.related_occurrence_id is not None:
+            _require_nonnegative(self.related_occurrence_id, "related occurrence id")
+
+
 @dataclass(frozen=True, slots=True)
 class PinDecision:
     """Evidence-backed preferred-name conclusion made by parent resolution."""
