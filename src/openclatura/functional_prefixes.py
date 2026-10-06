@@ -277,9 +277,7 @@ def central_hydrazide_prefix_handler(context: PrefixContext, group: PerceivedGro
         return group.prefix or ""
     nitrogen = nitrogens[0]
     substituents = [
-        atom
-        for atom in context.mol.get_neighbors(nitrogen)
-        if atom != center and context.mol.atoms[atom].symbol != "H"
+        atom for atom in context.mol.get_neighbors(nitrogen) if atom != center and context.mol.atoms[atom].symbol != "H"
     ]
     amide_key, amide_rule = resolve_central_acid_rule(replace(descriptor, derivative=DerivativeKind.AMIDE))
     base = amide_rule.prefix if amide_rule is not None else RULES.functional_groups.cited_prefix_for(amide_key)
@@ -465,16 +463,15 @@ def prefix_from_group(context: PrefixContext, group: PerceivedGroup) -> str:
         central_linkage = (
             group.descriptor is not None
             and group.descriptor.family is FunctionalFamily.CENTRAL_ACID
-            and len(group.descriptor.ligands) - len(
-                group.descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED)
-            )
+            and len(group.descriptor.ligands)
+            - len(group.descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED))
             == 2
         )
         if central_linkage:
             handler = central_chalcogen_linkage_prefix_handler
-        elif group.resolved_rule.has_capability(FunctionalGroupCapability.CENTRAL_ACID) and group.resolved_rule.has_capability(
-            FunctionalGroupCapability.HYDRAZIDE
-        ):
+        elif group.resolved_rule.has_capability(
+            FunctionalGroupCapability.CENTRAL_ACID
+        ) and group.resolved_rule.has_capability(FunctionalGroupCapability.HYDRAZIDE):
             handler = central_hydrazide_prefix_handler
         elif group.resolved_rule.has_capability(
             FunctionalGroupCapability.CENTRAL_ACID

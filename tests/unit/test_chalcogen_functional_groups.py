@@ -567,16 +567,13 @@ def test_standard_sulfinic_acid_uses_its_data_defined_subordinate_prefix():
 
 def test_subordinate_central_hydrazide_preserves_the_distal_nitrogen_branch():
     smiles = "COC(=O)c1ccc(S(=O)(=O)NNc2ncc(C(F)(F)F)cc2Cl)cc1"
-    assert oc.name(smiles).name == (
-        "methyl 4-(((3-chloro-5-(trifluoromethyl)pyridin-2-yl)amino)sulfamoyl)benzoate"
-    )
+    assert oc.name(smiles).name == ("methyl 4-(((3-chloro-5-(trifluoromethyl)pyridin-2-yl)amino)sulfamoyl)benzoate")
 
 
 def test_nitrogen_chalcogenide_functional_class_defers_to_a_principal_acid():
     smiles = "O=C(O)c1ccc2c(C3CCCCC3)c(-c3ccoc3)n(CC[N+]3([S-])CCOCC3)c2c1"
     assert oc.name(smiles).name == (
-        "4-(2-(6-carboxy-3-cyclohexyl-2-(furan-3-yl)-1H-indol-1-yl)ethyl)"
-        "morpholin-4-ium-4-thiolate"
+        "4-(2-(6-carboxy-3-cyclohexyl-2-(furan-3-yl)-1H-indol-1-yl)ethyl)morpholin-4-ium-4-thiolate"
     )
 
 
@@ -612,9 +609,7 @@ def test_subordinate_central_linkages_use_data_defined_substitutive_prefixes(smi
 
 
 def test_subordinate_central_ester_preserves_its_linker_element():
-    assert oc.name("CSS(=O)C[C@H](N)C(=O)O").name == (
-        "(2R)-2-amino-3-(methylsulfanylsulfinyl)propanoic acid"
-    )
+    assert oc.name("CSS(=O)C[C@H](N)C(=O)O").name == ("(2R)-2-amino-3-(methylsulfanylsulfinyl)propanoic acid")
 
 
 def test_polonium_is_parseable_but_has_an_explicit_unvalidated_boundary():
