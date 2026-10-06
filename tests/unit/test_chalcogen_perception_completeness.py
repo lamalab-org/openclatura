@@ -28,6 +28,22 @@ def test_unregistered_heteroatom_acyl_link_does_not_claim_an_ester_route():
     assert oc.name("NSC(=S)N1CCCCC1").name == "1-((aminosulfanyl)(thioxo)methyl)piperidine"
 
 
+def test_chalcogen_chain_does_not_override_a_colocated_carbamate():
+    for smiles in ("CSOC(=O)NCCCc1ccccc1", "CCN(C(=O)OS)C"):
+        groups = perceive_groups(read_smiles(smiles))
+        assert not any(
+            group.is_principal_candidate
+            and group.descriptor is not None
+            and group.descriptor.derivative in {DerivativeKind.ACID, DerivativeKind.ESTER}
+            and group.descriptor.linker_paths
+            and len(group.descriptor.linker_paths[0]) == 3
+            for group in groups
+        )
+
+    assert oc.name("CSOC(=O)NCCCc1ccccc1").name == "methylsulfanyl (3-phenylpropyl)carbamate"
+    assert oc.name("CCN(C(=O)OS)C").name == "sulfanyl ethyl(methyl)carbamate"
+
+
 def test_acyl_halide_does_not_steal_a_colocated_amide_nitrogen():
     descriptors = _descriptors("NC(=O)Cl")
 

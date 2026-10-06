@@ -1048,7 +1048,7 @@ def _acyl_chalcogen_group(
                 attachment_atom=attachment,
                 is_external=external,
             )
-            projected = None if nitrogens else _established_acyl_projection(mol, descriptor)
+            projected = _established_acyl_projection(mol, descriptor)
             if projected is not None:
                 return projected
             key, rule = resolve_peroxy_acyl_rule(descriptor)
@@ -1090,7 +1090,7 @@ def _acyl_chalcogen_group(
             attachment_atom=attachment,
             is_external=external,
         )
-        projected = None if nitrogens else _established_acyl_projection(mol, descriptor)
+        projected = _established_acyl_projection(mol, descriptor)
         if projected is not None:
             return projected
         key, rule = resolve_acyl_rule(descriptor)
