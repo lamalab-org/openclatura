@@ -6,7 +6,21 @@ import json
 import subprocess
 import sys
 
+import pytest
+
 from openclatura import DescribedComponent, Description, describe
+
+
+@pytest.mark.parametrize(
+    ("smiles", "reason"),
+    [
+        ("[Fe+2]", "one-atom ionic component"),
+        ("O=S=O", "retained name in the component registry"),
+        ("[BH3-][P+](C)(C)C", "graph-derived replacement-parent hydride class"),
+    ],
+)
+def test_describer_renders_direct_component_decisions(smiles, reason):
+    assert reason in str(describe(smiles))
 
 
 def test_describe_returns_structured_description():

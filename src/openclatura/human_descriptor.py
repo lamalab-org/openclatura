@@ -18,9 +18,10 @@ from .assembly_utils import parse_locant
 from .engine import DEFAULT_NAMING_ENGINE, NamingRequest, NamingResult
 from .graph_io import read_smiles
 from .graph_kernel import biconnected_edge_components, cycle_edges
-from .molecule import Molecule
+from .molecule import Molecule, TracePhase
 from .retained_fused_templates import _smallest_ring_basis
 from .rules import stems
+from .trace_helpers import decision_trace_data
 
 
 @dataclass(frozen=True)
@@ -39,12 +40,20 @@ class HumanDescription:
     def __str__(self) -> str:
         return self.text
 
+    @property
+    def decision_tree(self) -> tuple[dict[str, Any], ...]:
+        """Return the complete, JSON-safe naming decision trace."""
+
+        return tuple(decision_trace_data(self.result.decisions))
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "smiles": self.smiles,
             "name": self.name,
             "paragraphs": list(self.paragraphs),
             "text": self.text,
+            "decision_tree": list(self.decision_tree),
+            "substituent_tree": list(self.result.substituent_tree),
         }
 
 
@@ -71,12 +80,34 @@ def describe_human(smiles: str, verify_opsin: bool = False) -> HumanDescription:
     else:
         paragraphs.append(f"The molecule is named {result.name}.")
 
-    for node in result.substituent_tree:
-        description = _describe_node(node, mol, subject="The molecule", depth=0)
+    nodes = result.substituent_tree
+    for index, node in enumerate(nodes, start=1):
+        subject = "The molecule" if len(nodes) == 1 else f"Component {index}"
+        description = _describe_node(node, mol, subject=subject, depth=0)
+        if not description:
+            description = _describe_direct_component_decision(node, result.decisions, subject)
         if description:
             paragraphs.append(description)
 
     return HumanDescription(smiles=smiles, name=result.name, paragraphs=tuple(paragraphs), result=result)
+
+
+def _describe_direct_component_decision(node: dict[str, Any], decisions, subject: str) -> str:
+    """Describe a complete-component shortcut from its recorded rationale."""
+
+    node_atoms = {int(atom) for atom in node.get("atoms") or ()}
+    node_name = node.get("name")
+    if not node_atoms or not node_name:
+        return ""
+    for step in decisions:
+        if step.phase != TracePhase.COMPONENT:
+            continue
+        if set(step.atoms) != node_atoms or step.data.get("name") != node_name:
+            continue
+        if not step.reason:
+            continue
+        return f"{subject} uses a direct complete-component naming rule. {step.reason}"
+    return ""
 
 
 def _processed_smiles_sentence(smiles: str) -> str:

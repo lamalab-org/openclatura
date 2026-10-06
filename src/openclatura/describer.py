@@ -194,12 +194,16 @@ def _render_parse(step: TraceStep) -> str | None:
 
 def _render_component(step: TraceStep) -> str | None:
     components = step.data.get("components") or []
-    if not components:
-        return None
-    if len(components) == 1:
-        return "The structure is a single connected component, named in one piece."
-    sizes = ", ".join(str(len(component)) for component in components)
-    return f"The structure splits into {len(components)} connected components with atom counts {sizes}."
+    if components:
+        if len(components) == 1:
+            return "The structure is a single connected component, named in one piece."
+        sizes = ", ".join(str(len(component)) for component in components)
+        return f"The structure splits into {len(components)} connected components with atom counts {sizes}."
+
+    name = step.data.get("name")
+    if name and step.reason:
+        return f"{step.reason} The resulting component name is **{name}**."
+    return None
 
 
 def _render_perception(step: TraceStep) -> str | None:
