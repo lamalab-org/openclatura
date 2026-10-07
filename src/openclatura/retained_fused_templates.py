@@ -674,7 +674,16 @@ def _relocated_indicated_h(
         movable = list(saturated)
     if len(movable) < needed or (strict and len(movable) != needed):
         return None
-    return tuple(sorted(movable, key=retained_locant_sort_key)[:needed])
+    # P-58.2.1.2 gives indicated hydrogen the lowest nonfusion position that can
+    # hold it, and that preference comes before the locant's own value. This is
+    # where the realization is chosen, not merely spelled: 4H-indene with hydro
+    # at 3a,5 and 3aH-indene with hydro at 4,5 describe the same molecule from
+    # different references, and the preferred name is 3a,5-dihydro-4H-indene
+    # although 3a is the lower locant. A fusion site is not inadmissible - it
+    # simply follows - so an unsubstituted 3aH-indene, whose only saturated
+    # site is 3a, still keeps its citation there.
+    fusion = set(template.fusion_atoms)
+    return tuple(sorted(movable, key=lambda locant: (locant in fusion, retained_locant_sort_key(locant)))[:needed])
 
 
 def _template_match_from_assignment(
