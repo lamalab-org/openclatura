@@ -83,7 +83,7 @@ def add_component_front_modifiers(
             if include_trace:
                 parts.front_modifier_items.append(
                     SubstituentItem(
-                        name=strip_outer_parentheses(branch_name),
+                        name=modifier,
                         locants=[locant] if locant is not None else [],
                         atom_ids=modifier_atoms,
                         bond_ids=bond_ids_within(mol, modifier_atoms),
