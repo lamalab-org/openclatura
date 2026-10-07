@@ -138,13 +138,45 @@ def test_unknown_fixed_valence_charge_fails_closed(compatibility):
         parent_bond_model(_molecule(graph) if compatibility else graph, range(3) if compatibility else None)
 
 
-@pytest.mark.parametrize("charge", (-1, 0, 1))
+@pytest.mark.parametrize("charge,expected", ((1, 1), (0, 0)))
 @pytest.mark.parametrize("compatibility", (False, True))
-def test_nitrogen_retains_separate_donor_and_charge_handling(charge, compatibility):
+def test_ordinary_nitrogen_capacity_follows_its_charge(charge, expected, compatibility):
+    """P-25.7.1.1 keeps the double bonds consistent with the bonding numbers.
+
+    Ordinary octet nitrogen budgets are N(-1) 2, N 3, N(+1) 4. Three skeletal
+    bonds spend a neutral nitrogen's budget outright, so the bridgehead of a
+    quinolizine takes no pi increment; the same three bonds leave a cationic
+    nitrogen one, which is the double bond quinolizin-5-ium visibly has. The
+    charge policy still states no mancude limit for nitrogen - that absence is
+    not permission to carry any load.
+    """
+
     graph = _star("N", degree=3, charge=charge)
     model = parent_bond_model(_molecule(graph) if compatibility else graph, range(4) if compatibility else None)
-    assert model.maximum_non_cumulative_double_bonds == 1
+    assert model.maximum_non_cumulative_double_bonds == expected
     assert elements.get("N").mancude_limit_for_charge(charge) is None
+
+
+@pytest.mark.parametrize("compatibility", (False, True))
+def test_overloaded_anionic_nitrogen_is_not_a_valid_baseline(compatibility):
+    """Three skeletal bonds already exceed an anionic nitrogen's budget of two."""
+
+    graph = _star("N", degree=3, charge=-1)
+    with pytest.raises(ValueError, match="above fixed-valence limit"):
+        parent_bond_model(_molecule(graph) if compatibility else graph, range(4) if compatibility else None)
+
+
+@pytest.mark.parametrize("compatibility", (False, True))
+def test_anionic_nitrogen_within_its_budget_stays_valid(compatibility):
+    """Two skeletal bonds spend the budget exactly: valid, with no increment.
+
+    This separates "no remaining capacity" from "invalid baseline", so a blanket
+    rejection of anionic nitrogen cannot satisfy the case above.
+    """
+
+    graph = _star("N", degree=2, charge=-1)
+    model = parent_bond_model(_molecule(graph) if compatibility else graph, range(3) if compatibility else None)
+    assert model.maximum_non_cumulative_double_bonds == 0
 
 
 @pytest.mark.parametrize(
@@ -156,7 +188,16 @@ def test_explicit_nitrogen_donor_constraints_are_preserved(site_changes):
     assert parent_bond_model(graph).maximum_non_cumulative_double_bonds == 0
 
 
-@pytest.mark.parametrize("symbol, degree", (("N", 3), ("P", 4), ("S", 5), ("Se", 5)))
+def test_a_required_double_is_not_a_declaration_of_nonstandard_valence():
+    """A neutral nitrogen holding three neighbours and a required double carries
+    load four against a budget of three, so it is rejected. A lambda parent has
+    to say so; the required bond does not say it for them."""
+
+    with pytest.raises(ValueError, match="above fixed-valence limit"):
+        parent_bond_model(_star("N", degree=3, required_double=True))
+
+
+@pytest.mark.parametrize("symbol, degree", (("P", 4), ("S", 5), ("Se", 5)))
 def test_required_bond_load_does_not_replace_lambda_or_nitrogen_proofs(symbol, degree):
     graph = _star(symbol, degree=degree, required_double=True)
     model = parent_bond_model(graph)

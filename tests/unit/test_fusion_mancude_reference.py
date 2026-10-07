@@ -86,7 +86,6 @@ def test_the_reference_fixes_both_counts(smiles, expected_maximum, expected_site
 # wrong name looked self-consistent: indole's N-1 carries hydrogen in
 # isolation, and carried onto N-12 it names a seven-double-bond parent this
 # molecule does not have.
-@pytest.mark.xfail(strict=True, reason="derivative proof under-counts hydro where the reference needs redistribution")
 @pytest.mark.skipif(not opsin_available(), reason="OPSIN and Java are required")
 def test_the_hydrogenated_parent_is_named_from_its_own_reference():
     expected = "6,7,7a,12,12a,12b-hexahydroindolo[2,3-a]quinolizine"
@@ -124,29 +123,29 @@ def test_the_three_hydrogen_roles_stay_apart(target):
     assert name_smiles(smiles) == target
 
 
-def test_the_derivative_ledger_owes_six_hydrogens(monkeypatch):
-    """The ledger itself, without OPSIN and without going through the name.
+def test_the_reference_is_still_reached_by_citing_two_hydrogens(monkeypatch):
+    """The total is right; the decomposition is not, and that is the next defect.
 
-    q_hydro is 2*(D0 - D_target) = 2*(8 - 5) = 6, so six parent atoms must
-    carry a hydro increment. The proof returns four and reports the state
-    compatible, which is the defect the name-level xfail above stands on; this
-    asserts the arithmetic directly so a repair is visible before rendering.
+    P-25.7.1.1 wants the maximum the completed system admits, which here is
+    eight with no citation available, so all six hydrogens are hydro. The plan
+    instead cites 6H and 12H, which costs the reference its eighth bond, and
+    the renderer then folds both citations back into the hydro prefix. Six
+    hydrogens are reported either way, so the name above is right - but it is
+    right by arriving at the correct total, not by naming the parent the
+    molecule has.
     """
 
     mol = read_rdkit_mol(Chem.MolFromSmiles(INDOLOQUINOLIZINE))
     core = max(find_ring_systems(mol), key=lambda system: len(system.atoms))
     plan = plan_fusion_parent(mol, core.atoms, mode=FusionMode.GENERAL).plan
-    locants = {atom: str(locant) for atom, locant in plan.numbering.input_locant_maps[0]}
-    hydro = sorted(
-        {locants[atom] for operation in plan.derivative_state.hydro_operations for atom in operation.atom_ids}
-    )
+    unconstrained = parent_bond_model(plan.abstract_parent_graph)
 
-    assert plan.bond_model.maximum_non_cumulative_double_bonds == 8
-    assert len(hydro) == 4, "guard: this records today's under-count, not the correct ledger"
-    assert plan.derivative_state.bond_delta.compatible, "the under-counted state is reported compatible"
+    assert unconstrained.maximum_non_cumulative_double_bonds == 8
+    assert plan.bond_model.maximum_non_cumulative_double_bonds == 7, "guard: records the citation's cost"
+    assert [str(locant) for locant in plan.indicated_hydrogens] == ["6", "12"]
 
 
-@pytest.mark.xfail(strict=True, reason="derivative proof under-counts hydro where the reference needs redistribution")
+@pytest.mark.xfail(strict=True, reason="the parent is still reached by citing hydrogen the reference can pair")
 def test_the_derivative_ledger_reconstructs_the_target():
     mol = read_rdkit_mol(Chem.MolFromSmiles(INDOLOQUINOLIZINE))
     core = max(find_ring_systems(mol), key=lambda system: len(system.atoms))
