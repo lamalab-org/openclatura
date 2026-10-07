@@ -3811,6 +3811,46 @@ def test_analyze_smiles_exposes_decision_trace():
     assert TracePhase.ASSEMBLY in phases
 
 
+@pytest.mark.parametrize(
+    ("smiles", "family", "derivative", "elements", "center_elements"),
+    [
+        ("C[N+]([Se-])(C)C", "nitrogen_chalcogenide", "zwitterion", ["Se"], ["N"]),
+        ("CC[Se]SC", "peroxide", "neutral_link", [], ["Se", "S"]),
+    ],
+)
+def test_whole_component_chalcogen_routes_expose_typed_decisions(smiles, family, derivative, elements, center_elements):
+    analysis = analyze_smiles(smiles)
+    perception = next(step for step in analysis.decisions if step.decision == "identified shortcut functional group")
+    priority = next(step for step in analysis.decisions if step.decision == "selected whole-component citation route")
+    descriptor = perception.data["descriptor"]
+
+    assert descriptor["family"] == family
+    assert descriptor["derivative"] == derivative
+    assert [ligand["element"] for ligand in descriptor["ligands"]] == elements
+    assert descriptor["center_elements"] == center_elements
+    assert priority.data["descriptor"] == descriptor
+    assert analysis.substituent_tree[0]["shortcut"]["descriptor"] == descriptor
+
+
+def test_dynamic_and_projected_chalcogen_groups_expose_structural_descriptors():
+    dynamic = analyze_smiles("CC(=[Se])S[TeH]")
+    dynamic_groups = next(step for step in dynamic.decisions if step.phase is TracePhase.PERCEPTION).data["groups"]
+    descriptor = next(group["descriptor"] for group in dynamic_groups if group["principal_candidate"])
+    assert descriptor["family"] == "acyl"
+    assert descriptor["derivative"] == "acid"
+    assert [ligand["role"] for ligand in descriptor["ligands"]] == [
+        "double_bonded",
+        "chalcogen_link",
+        "hydrogen_bearing",
+    ]
+
+    projected = analyze_smiles("CSOC(=O)NCCCc1ccccc1")
+    projected_groups = next(step for step in projected.decisions if step.phase is TracePhase.PERCEPTION).data["groups"]
+    ester = next(group for group in projected_groups if group["key"] == "ester")
+    assert ester["descriptor"]["linker_paths"] == [[3, 2, 1]]
+    assert any("registered chalcogen citation route" in reason for reason in ester["reasons"])
+
+
 def test_recursive_substituent_trace_segments_include_nested_decisions():
     analysis = analyze_smiles("CCCCC(c1ccccc1)C(=O)O")
 

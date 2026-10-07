@@ -66,6 +66,7 @@ from .trace_helpers import (
     assembly_trace_segments,
     build_shortcut_tree_node,
     decision_trace_data,
+    functional_group_descriptor_data,
     functional_group_trace_data,
     trace_decision,
 )
@@ -380,11 +381,17 @@ def name_component(
             },
         )
         if return_trace and return_tree:
-            return name, [], _component_shortcut_tree(name, component_atoms, bindings, token_spans)
+            return (
+                name,
+                [],
+                _component_shortcut_tree(name, component_atoms, bindings, token_spans, role="single_atom_component"),
+            )
         if return_trace:
             return name, []
         if return_tree:
-            return name, _component_shortcut_tree(name, component_atoms, bindings, token_spans)
+            return name, _component_shortcut_tree(
+                name, component_atoms, bindings, token_spans, role="single_atom_component"
+            )
         return name
 
     def name_component_again(
@@ -427,6 +434,24 @@ def name_component(
     ):
         structural_parent_result = None
     if structural_parent_result is not None:
+        descriptor_data = functional_group_descriptor_data(structural_parent_result.descriptor, mol)
+        if descriptor_data is not None:
+            trace_decision(
+                decision_trace,
+                TracePhase.PERCEPTION,
+                "identified shortcut functional group",
+                "A typed graph descriptor covers the functional group used by the whole-component citation.",
+                atoms=set(structural_parent_result.descriptor.atom_ids),
+                data={"descriptor": descriptor_data},
+            )
+            trace_decision(
+                decision_trace,
+                TracePhase.PRIORITY,
+                "selected whole-component citation route",
+                "The typed functional group has a complete graph-backed functional-class renderer.",
+                atoms=component_atoms,
+                data={"shortcut_role": structural_parent_result.role, "descriptor": descriptor_data},
+            )
         name, bindings, token_spans, rewrite_history = _shortcut_component_result(
             mol,
             component_atoms,
@@ -449,14 +474,34 @@ def name_component(
                 "name_atom_bindings": bindings,
                 "name_token_spans": token_spans,
                 "name_rewrite_history": rewrite_history,
+                "shortcut_role": structural_parent_result.role,
+                "descriptor": descriptor_data,
             },
         )
         if return_trace and return_tree:
-            return name, [], _component_shortcut_tree(name, component_atoms, bindings, token_spans)
+            return (
+                name,
+                [],
+                _component_shortcut_tree(
+                    name,
+                    component_atoms,
+                    bindings,
+                    token_spans,
+                    role=structural_parent_result.role,
+                    descriptor=descriptor_data,
+                ),
+            )
         if return_trace:
             return name, []
         if return_tree:
-            return name, _component_shortcut_tree(name, component_atoms, bindings, token_spans)
+            return name, _component_shortcut_tree(
+                name,
+                component_atoms,
+                bindings,
+                token_spans,
+                role=structural_parent_result.role,
+                descriptor=descriptor_data,
+            )
         return name
 
     state = ComponentNamingState(component_atoms=set(component_atoms), is_substituent=is_substituent)
@@ -467,7 +512,7 @@ def name_component(
         "identified functional groups",
         "Functional-group perception binds matched subgroups to graph atoms before priority selection.",
         atoms=state.component_atoms,
-        data={"groups": functional_group_trace_data(state.perceived_groups)},
+        data={"groups": functional_group_trace_data(state.perceived_groups, mol)},
     )
     state.principal_key = component_principal_key(state.perceived_groups, state.is_substituent)
     trace_decision(
@@ -507,11 +552,19 @@ def name_component(
             },
         )
         if return_trace and return_tree:
-            return name, [], _component_shortcut_tree(name, state.component_atoms, bindings, token_spans)
+            return (
+                name,
+                [],
+                _component_shortcut_tree(
+                    name, state.component_atoms, bindings, token_spans, role="anhydride_component"
+                ),
+            )
         if return_trace:
             return name, []
         if return_tree:
-            return name, _component_shortcut_tree(name, state.component_atoms, bindings, token_spans)
+            return name, _component_shortcut_tree(
+                name, state.component_atoms, bindings, token_spans, role="anhydride_component"
+            )
         return name
 
     state.exclude_atoms = set(mol.atoms.keys()) - state.component_atoms
@@ -789,7 +842,13 @@ def name_component(
 
 
 def _component_shortcut_tree(
-    name: str, component_atoms: set[int], bindings: list[dict], token_spans: list[dict]
+    name: str,
+    component_atoms: set[int],
+    bindings: list[dict],
+    token_spans: list[dict],
+    *,
+    role: str,
+    descriptor: dict | None = None,
 ) -> dict:
     """Return a minimal component tree for shortcut component names."""
 
@@ -799,4 +858,5 @@ def _component_shortcut_tree(
         atom_ids=component_atoms,
         name_atom_bindings=bindings,
         name_token_spans=token_spans,
+        shortcut={"role": role, "descriptor": descriptor},
     )

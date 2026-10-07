@@ -118,9 +118,13 @@ def add_component_principal_group(
     locants = sorted([get_loc(c) for c in principal_carbons if c in numbered_path], key=parse_locant)
     atom_ids = set()
     resolved_rule = None
+    descriptors = []
     for group in perceived_groups:
         if group.key == principal_key and group.attachment_carbon in numbered_path:
             resolved_rule = group.resolved_rule
+            explanation_descriptor = group.trace_descriptor or group.descriptor
+            if explanation_descriptor is not None:
+                descriptors.append(explanation_descriptor)
             atom_ids.add(group.attachment_carbon)
             atom_ids.update(group.atoms_involved)
             if group.key in RULES.functional_groups.keys_with_family("hydrazone"):
@@ -154,6 +158,7 @@ def add_component_principal_group(
         bond_ids=bond_ids_within(mol, atom_ids),
         charge_atom_ids={atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0},
         resolved_rule=resolved_rule,
+        descriptors=tuple(descriptors),
     )
 
 

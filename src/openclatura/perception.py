@@ -66,6 +66,7 @@ class PerceivedGroup:
     role: str | None = None
     descriptor: FunctionalGroupDescriptor | None = None
     resolved_rule: FunctionalGroupRule | None = None
+    trace_descriptor: FunctionalGroupDescriptor | None = None
 
     @property
     def atom_ids(self) -> set[int]:
@@ -108,6 +109,7 @@ def _copy_perceived_group(group: PerceivedGroup) -> PerceivedGroup:
         group.role,
         group.descriptor,
         group.resolved_rule,
+        group.trace_descriptor,
     )
 
 
@@ -1237,6 +1239,10 @@ def _established_acyl_projection(
                 True,
                 attachment,
                 {center, double.atom, first_linker.atom},
+                trace_descriptor=descriptor,
+                decision_reasons=(
+                    "A registered chalcogen citation route projects this descriptor onto the established ester path.",
+                ),
             ),
         )
     return None
@@ -1555,7 +1561,10 @@ def _established_anhydride_projection(
                 True,
                 centers[0],
                 {centers[0], doubles[0].atom, *(ligand.atom for ligand in bridge)},
-                descriptor=ester_descriptor,
+                trace_descriptor=ester_descriptor,
+                decision_reasons=(
+                    "A registered chalcogen citation route projects this descriptor onto the established peroxy-ester path.",
+                ),
             )
         ]
 
@@ -1567,7 +1576,25 @@ def _established_anhydride_projection(
             key = RULES.chalcogens.standard_acyl_keys[
                 (DerivativeKind.ESTER.value, Chalcogen.OXYGEN.value, Chalcogen.OXYGEN.value, False)
             ]
-            return [PerceivedGroup(key, True, center, {center, double.atom, adjacent_bridge.atom})]
+            projected_descriptor = FunctionalGroupDescriptor(
+                family=FunctionalFamily.ACYL,
+                derivative=DerivativeKind.ESTER,
+                centers=(center,),
+                ligands=(double, adjacent_bridge),
+                attachment_atom=center,
+            )
+            return [
+                PerceivedGroup(
+                    key,
+                    True,
+                    center,
+                    {center, double.atom, adjacent_bridge.atom},
+                    trace_descriptor=projected_descriptor,
+                    decision_reasons=(
+                        "A registered chalcogen citation route projects this descriptor onto the established ester path.",
+                    ),
+                )
+            ]
 
         projected = []
         for center, double in zip(centers, doubles, strict=True):

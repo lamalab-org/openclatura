@@ -7,7 +7,15 @@ from dataclasses import dataclass, replace
 from .assembly_parts import NameAtomBinding, NameTokenBinding, rendered_substituent_text
 from .assembly_prefixes import substituent_sort_key
 from .chains import get_cyclic_atoms
-from .chalcogen_roles import NitrogenChalcogenideCitation, chalcogen_for_symbol, classify_peroxide_linkage
+from .chalcogen_roles import (
+    DerivativeKind,
+    FunctionalFamily,
+    FunctionalGroupDescriptor,
+    NitrogenChalcogenideCitation,
+    chalcogen_for_symbol,
+    classify_chalcogen_ligand,
+    classify_peroxide_linkage,
+)
 from .chalcogen_vocabulary import (
     anhydride_class_name,
     chalcogenide_class_name,
@@ -71,6 +79,7 @@ class SpecialComponentName:
     # backbone as a chain of ``element``, each ligand grafted at its locant.
     # Without it a shortcut name is unauditable and can only abstain.
     audit_chain: ChainAuditPlan | None = None
+    descriptor: FunctionalGroupDescriptor | None = None
 
 
 def _component_name_result(
@@ -80,6 +89,7 @@ def _component_name_result(
     role: str,
     *,
     bindings: tuple[NameAtomBinding, ...] = (),
+    descriptor: FunctionalGroupDescriptor | None = None,
 ) -> SpecialComponentName:
     """Build a typed special-name result, using full-component binding as the fallback."""
 
@@ -94,7 +104,7 @@ def _component_name_result(
                 charge_atom_ids=charged_atoms(mol, component_atoms),
             ),
         )
-    return SpecialComponentName(name=name, role=role, bindings=bindings)
+    return SpecialComponentName(name=name, role=role, bindings=bindings, descriptor=descriptor)
 
 
 def _center_stereo_bindings(mol: Molecule, center: int) -> tuple[NameAtomBinding, ...]:
@@ -333,7 +343,26 @@ def nitrogen_chalcogenide_result(
         else "imine_chalcogenide_parent"
     )
     name = RULES.chalcogens.templates[template].format(parent=parent_name, class_name=class_name)
-    return _component_name_result(mol, component_atoms, name, "nitrogen_chalcogenide")
+    ligand = classify_chalcogen_ligand(mol, nitrogen, chalcogen)
+    if ligand is None:
+        return None
+    organic_neighbors = tuple(
+        neighbor for neighbor in mol.get_neighbors(nitrogen) if neighbor != chalcogen and mol.atoms[neighbor].is_carbon
+    )
+    descriptor = FunctionalGroupDescriptor(
+        family=FunctionalFamily.NITROGEN_CHALCOGENIDE,
+        derivative=DerivativeKind.ZWITTERION,
+        centers=(nitrogen,),
+        ligands=(ligand,),
+        attachment_atom=organic_neighbors[0] if organic_neighbors else nitrogen,
+    )
+    return _component_name_result(
+        mol,
+        component_atoms,
+        name,
+        "nitrogen_chalcogenide",
+        descriptor=descriptor,
+    )
 
 
 def peroxide_linkage_result(
@@ -389,6 +418,7 @@ def peroxide_linkage_result(
         component_atoms,
         f"{ligand_text} {class_name}",
         "peroxide_linkage",
+        descriptor=descriptor,
     )
 
 
