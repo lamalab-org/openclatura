@@ -136,8 +136,6 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
                 stereo = accurate
             elif atom.GetSymbol() == "S" and atom.GetTotalDegree() == 3:
                 stereo = "R" if stereo == "S" else "S"
-        elif _raw_tetrahedral_stereo(atom) and atom.GetIdx() in modern_cip:
-            stereo = modern_cip[atom.GetIdx()]
         raw_stereo = _raw_tetrahedral_stereo(atom) if not stereo else None
         mol.add_atom(
             symbol=atom.GetSymbol(),
