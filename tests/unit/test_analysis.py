@@ -2887,7 +2887,7 @@ def test_naming_engine_matches_plain_public_api():
 
 
 def test_graph_parser_preserves_aromatic_and_hydrogen_metadata_after_kekulization():
-    mol = read_smiles("Cn1cc[nH]n1")
+    mol = read_smiles("Cc1cc[nH]n1")
     aromatic_n_with_h = [atom.idx for atom in mol if atom.symbol == "N" and atom.is_aromatic and atom.total_h_count > 0]
 
     assert aromatic_n_with_h
