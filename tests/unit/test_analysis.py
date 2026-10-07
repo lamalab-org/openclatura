@@ -5832,9 +5832,20 @@ def test_azine_aryl_side_uses_the_retained_benzene_name():
     # bare homocyclic ring is symmetric, so the attachment is position 1.
     assert name_smiles("c1ccccc1C=NN=Cc1ccccc1") == "benzaldehyde benzylidenehydrazone"
     assert name_smiles("CSC(N)=NN=Cc1ccccc1") == "benzaldehyde (amino)(methylsulfanyl)methylidenehydrazone"
-    # A heteroatom breaks that symmetry and genuinely needs numbering, so the
-    # shortcut must still decline rather than guess position 1.
-    assert "benzaldehyde 5-azacyclohexa" in name_smiles("c1ccncc1C=NN=Cc1ccccc1")
+    # A heteroatom breaks that symmetry and genuinely needs numbering; the
+    # locant comes from the ring's own substituent name (``pyridin-3-yl``).
+    assert name_smiles("c1ccncc1C=NN=Cc1ccccc1") == "pyridine-3-carbaldehyde benzylidenehydrazone"
+
+
+def test_azine_heterocycle_side_uses_the_retained_ring_name():
+    # A retained heterocycle has no locant map either, and the fallback spelt
+    # it with replacement prefixes numbered from the attachment atom
+    # (``4-oxa1-azacyclohexan-1-carbaldehyde``), unlike the aldehyde alone.
+    assert name_smiles("CC(C)=NN=CN1CCOCC1") == "morpholine-4-carbaldehyde propan-2-ylidenehydrazone"
+    assert name_smiles("CC(C)=NN=Cc1ccco1") == "furan-2-carbaldehyde propan-2-ylidenehydrazone"
+    assert name_smiles("C(=NN=Cc1ccccn1)c1ccccn1") == "pyridine-2-carbaldehyde pyridin-2-ylmethylidenehydrazone"
+    assert name_smiles("CC(C)=NN=CC1CCSCC1") == "thiane-4-carbaldehyde propan-2-ylidenehydrazone"
+    assert name_smiles("CC(C)=NN=CC1CCOC1") == "oxolane-3-carbaldehyde propan-2-ylidenehydrazone"
 
 
 def test_organometallic_skeletal_replacement():
