@@ -91,12 +91,29 @@ def _opsin_roundtrip(names: list[str]) -> list[str]:
     return [value or "" for value in decoded]
 
 
+def _reviewed_parser_gaps() -> dict[tuple[str, str], dict]:
+    """Return the reviewed parser gaps, keyed by structure and expected name.
+
+    A gap waives one expectation only: that the reference parser accepts a name
+    this engine emits as preferred. It never makes a rejection count as a round
+    trip, and it is bound to the exact name - a different name, including the
+    less senior one a gap replaced, still fails.
+    """
+
+    path = Path(__file__).with_name("reviewed_parser_gaps.json")
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text())
+    return {(gap["smiles"], gap["expected_name"]): gap for gap in data.get("gaps", ())}
+
+
 def verify_changed_rows(changed: list[dict[str, Any]], opsin_chunk_size: int) -> None:
     """Mutate discrepancy records with their current OPSIN result."""
 
     from openclatura.resonance_compare import equivalent_smiles
     from openclatura.utils import standardize_mol
 
+    gaps = _reviewed_parser_gaps()
     nonempty = [row for row in changed if row["current_name"]]
     for start in range(0, len(nonempty), opsin_chunk_size):
         chunk = nonempty[start : start + opsin_chunk_size]
@@ -116,8 +133,25 @@ def verify_changed_rows(changed: list[dict[str, Any]], opsin_chunk_size: int) ->
             matched = original is not None and roundtrip is not None and original == roundtrip
             if not matched and opsin_smiles and row.get("smiles"):
                 matched = equivalent_smiles(row["smiles"], opsin_smiles)
+            gap = gaps.get((row.get("smiles"), row["current_name"]))
+            reviewed_gap = False
+            if gap is not None:
+                if not opsin_smiles:
+                    # The recorded rejection reproduced. The name stays preferred
+                    # and this stays a rejection in the interoperability metric;
+                    # only the release gate treats it as reviewed.
+                    reviewed_gap = True
+                elif matched:
+                    # The parser now reads it, so the gap is stale and has to be
+                    # retired rather than carried forward.
+                    row["parser_gap"] = "stale"
+                else:
+                    # An expected rejection never licenses a different structure.
+                    row["parser_gap"] = "structure_changed"
             row.update(
-                current_status="matched" if matched else "failed",
+                current_status=("matched" if matched else ("reviewed_parser_gap" if reviewed_gap else "failed")),
+            )
+            row.update(
                 opsin_smiles=opsin_smiles,
                 standardized_original=original,
                 standardized_roundtrip=roundtrip,
@@ -179,10 +213,16 @@ def check_regression(
         verify_changed_rows(changed, opsin_chunk_size)
 
     current_changed_matches = sum(row["current_status"] == "matched" for row in changed)
+    reviewed_gaps = sum(row["current_status"] == "reviewed_parser_gap" for row in changed)
+    stale_gaps = [row for row in changed if row.get("parser_gap") in {"stale", "structure_changed"}]
     current_matches = unchanged_matches + current_changed_matches
     selected_failure_ids = {_row_id(row) for row in rows} & baseline_failure_ids
     baseline_matches = len(rows) - len(selected_failure_ids)
-    passed = current_matches >= baseline_matches
+    # The metric still counts a reviewed gap as a parser rejection; the gate asks
+    # the narrower question of whether anything regressed that has not been
+    # reviewed. A stale gap, or one whose parser now returns a different
+    # structure, fails outright - that is the signal that it needs attention.
+    passed = current_matches + reviewed_gaps >= baseline_matches and not stale_gaps
 
     return {
         "baseline_file": str(baseline_path),
@@ -197,6 +237,8 @@ def check_regression(
         "changed_names": len(changed),
         "changed_baseline_matches": sum(row["baseline_status"] == "matched" for row in changed),
         "changed_current_matches": current_changed_matches,
+        "reviewed_parser_gaps": reviewed_gaps,
+        "stale_parser_gaps": [row["current_name"] for row in stale_gaps],
         "passed": passed,
         "elapsed_seconds": round(time.perf_counter() - started, 3),
         "stored_summary": stored_summary,

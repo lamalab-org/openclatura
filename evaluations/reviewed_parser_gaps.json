@@ -1,0 +1,43 @@
+{
+  "_comment": [
+    "Names this engine emits as preferred that the pinned reference parser cannot read.",
+    "A gap waives ONE expectation: that the reference parser accepts the string. The exact",
+    "expected name and the independent structural reconstruction stay mandatory, the parser is",
+    "still invoked, and the rejection is still counted as a rejection in the interoperability",
+    "metric - it is never reported as a round trip.",
+    "A gap applies only to the recorded parser artifact. If that parser later accepts the name",
+    "the gap is stale and must be retired; if it returns a different structure the case fails,",
+    "because an expected rejection never licenses a mismatch."
+  ],
+  "parser": {
+    "py2opsin": "1.2.0",
+    "jar": "opsin-cli-2.9.0-jar-with-dependencies.jar",
+    "jar_sha256_prefix": "c2e29326c281f87b"
+  },
+  "gaps": [
+    {
+      "smiles": "C1=NCCc2ccc3c(c21)Sc1c(ccc2c1C=NCC2)O3",
+      "expected_name": "3,4,10,11-tetrahydro[1,4]oxathiino[2,3-h:6,5-h']diisoquinoline",
+      "expected_outcome": "name_unparseable",
+      "preference_evidence": "rule_derived",
+      "rules": ["FR-6", "FR-6.1", "P-25.3.7"],
+      "rationale": [
+        "Two nonoverlapping isoquinoline parents fused to one 1,4-oxathiine interparent",
+        "component is a multiparent system, so the parent is multiplied and the second",
+        "parent's fusion letters are primed. The baseline it replaced has pyridine as its",
+        "parent with isoquinolino as a higher-order attached component, which is less senior.",
+        "Independent reconstruction: 22 skeletal atoms, 26 edges, D0 = 10, u = 0, four hydro",
+        "increments at 3, 4, 10 and 11, reconstructing the target without copying its",
+        "double-bond positions."
+      ],
+      "parser_note": [
+        "Every ingredient parses alone - [1,4]oxathiino[2,3-h]isoquinoline,",
+        "benzo[1,2-h:6,5-h']diisoquinoline - and [1,4]dioxino[2,3-h:6,5-h']diisoquinoline",
+        "parses with one heteroatom swapped. Only this combination is refused. That locates",
+        "the behaviour reproducibly; it does not identify the cause inside the parser."
+      ],
+      "review_trigger": "any change to the parser artifact above",
+      "retire_when": "the recorded parser returns the target structure for the expected name"
+    }
+  ]
+}
