@@ -41,6 +41,23 @@ from .model import FusionComponentConstructionOrder, FusionComponentMatch, Fusio
 SUPPORTED_SCHEMA_VERSION = 1
 
 
+def _has_exocyclic_heteroatom_ligand(
+    mol: Molecule,
+    local_to_input: tuple[tuple[str, int], ...],
+) -> bool:
+    """Return whether a ring heteroatom bears a heteroatom ligand outside the component."""
+
+    component_atoms = {atom for _locant, atom in local_to_input}
+    return any(
+        mol.atoms[center].symbol != "C"
+        and any(
+            neighbor not in component_atoms and mol.atoms[neighbor].symbol not in {"C", "H"}
+            for neighbor in mol.get_neighbors(center)
+        )
+        for center in component_atoms
+    )
+
+
 class FusionComponentRole(StrEnum):
     """A nomenclatural role for which a fusion component may be eligible."""
 
@@ -363,6 +380,7 @@ class FusionComponentRegistry:
                             local_to_skeleton_atom=local_to_skeleton,
                             topology_key=topology_key,
                             template_name=template.name,
+                            has_exocyclic_heteroatom_ligand=_has_exocyclic_heteroatom_ligand(mol, local_to_input),
                         )
                     )
                     occurrence_id += 1
@@ -399,6 +417,7 @@ class FusionComponentRegistry:
                             ),
                             topology_key=topology_key,
                             template_name=generated.template.name,
+                            has_exocyclic_heteroatom_ligand=_has_exocyclic_heteroatom_ligand(mol, local_to_input),
                         )
                     )
                     occurrence_id += 1

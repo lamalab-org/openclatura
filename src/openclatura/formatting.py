@@ -110,7 +110,8 @@ def format_center_ligands(names: list[str], *, sort_key: Callable[[str], str] | 
         merges_with_multiplied_ligand = count == 1 and any(
             counts[later_name] > 1 and name.endswith(later_name) for later_name in ordered_names[index + 1 :]
         )
-        if merges_with_multiplied_ligand and not is_fully_enclosed(ligand):
+        ambiguous_first_ligand = count == 1 and len(ordered_names) > 1 and index == 0 and is_complex_prefix(name)
+        if (merges_with_multiplied_ligand or ambiguous_first_ligand) and not is_fully_enclosed(ligand):
             ligand = f"({ligand})"
         if index and count == 1 and not is_fully_enclosed(ligand):
             ligand = f"({ligand})"
@@ -134,7 +135,7 @@ def _is_substituted_alkyl_ligand(name: str) -> bool:
     return name not in {simple_name, f"cyclo{simple_name}"}
 
 
-def oxy_prefix_from_branch(branch: str) -> str:
+def oxy_prefix_from_branch(branch: str, *, enclose_ligand: bool = False) -> str:
     """Return an oxy prefix for a named branch."""
 
     retained = ALKYL_OXY_PREFIXES.get(branch)
@@ -147,7 +148,9 @@ def oxy_prefix_from_branch(branch: str) -> str:
     substituted_alkoxy = substituted_alkoxy_prefix(branch)
     if substituted_alkoxy:
         return substituted_alkoxy
-    if is_complex_prefix(branch):
+    # A heteroatom ligand is a complete named branch. Preserve that graph
+    # boundary instead of inferring its attachment atom from the rendered word.
+    if enclose_ligand or is_complex_prefix(branch):
         return f"(({branch})oxy)"
     return f"({branch}oxy)"
 
@@ -166,11 +169,18 @@ def substituted_alkoxy_prefix(branch: str) -> str | None:
     return f"({prefix}{replacement})" if prefix else replacement
 
 
-def format_element_substituent(stereo_prefix: str, branch: str, suffix: str, is_double: bool = False) -> str:
+def format_element_substituent(
+    stereo_prefix: str,
+    branch: str,
+    suffix: str,
+    is_double: bool = False,
+    *,
+    enclose_ligand: bool = False,
+) -> str:
     """Attach a named branch to an element substituent suffix."""
 
     branch = strip_outer_parentheses(branch)
     suffix_text = suffix + ("idene" if is_double else "")
-    if is_complex_prefix(branch):
+    if enclose_ligand or is_complex_prefix(branch):
         return f"({stereo_prefix}({branch}){suffix_text})"
     return f"({stereo_prefix}{branch}{suffix_text})"

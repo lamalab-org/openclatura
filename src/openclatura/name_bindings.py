@@ -941,7 +941,11 @@ def _principal_suffix_emitted_tokens(group) -> tuple[NameTokenBinding, ...]:
 
     rule = RULES.functional_groups.get(group.key)
     locants = tuple(str(locant) for locant in group.locants)
-    rendered_suffix = render_principal_suffix(rule, len(locants) or 1)
+    rendered_suffix = render_principal_suffix(
+        rule,
+        len(locants) or 1,
+        positive_nitrogen=group.has_positive_nitrogen,
+    )
     return _rendered_term_tokens(
         rendered_suffix,
         token_kind="suffix",

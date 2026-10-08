@@ -20,6 +20,12 @@ def positive_parent_n_charges(parts: AssemblyParts) -> list[ParentChargeItem]:
     return [charge for charge in parts.parent_charges if charge.symbol == "N" and charge.charge > 0]
 
 
+def has_sole_positive_parent_n_charge(parts: AssemblyParts) -> bool:
+    """Whether the parent carries exactly one charge, on a positive nitrogen."""
+
+    return len(parts.parent_charges) == 1 and len(positive_parent_n_charges(parts)) == 1
+
+
 _IUM_SUFFIX_ELEMENTS = frozenset({"N", "O", "S", "Se", "Te", "P", "As", "Sb", "Bi"})
 
 
@@ -30,7 +36,9 @@ def positive_parent_ium_charges(parts: AssemblyParts) -> list[ParentChargeItem]:
 
 
 def has_ionic_retained_parent(parts: AssemblyParts) -> bool:
-    return bool(parts.retained_name in RULES.charges.retained_ionic_n_parents and positive_parent_n_charges(parts))
+    return bool(
+        parts.retained_name in RULES.charges.retained_ionic_n_parents and has_sole_positive_parent_n_charge(parts)
+    )
 
 
 def has_retained_like_parent(parts: AssemblyParts) -> bool:
@@ -44,7 +52,7 @@ def has_retained_like_parent(parts: AssemblyParts) -> bool:
 def inferred_ionic_retained_parent(parts: AssemblyParts) -> str | None:
     if parts.retained_name or not parts.is_ring or parts.is_bicycle or parts.is_spiro or parts.is_polycycle:
         return None
-    if parts.unsaturations or len(positive_parent_n_charges(parts)) != 1:
+    if parts.unsaturations or not has_sole_positive_parent_n_charge(parts):
         return None
     aza_locs = [str(loc) for item in parts.a_prefixes if item.name == "aza" for loc in item.locants]
     if len(aza_locs) != 1:
@@ -78,24 +86,89 @@ def parent_charge_name_operations(parts: AssemblyParts) -> list[ParentSuffixOper
     fusion_operations = fusion_parent_charge_name_operations(parts)
     if fusion_operations is not None:
         return fusion_operations
-    suffix_locs = tuple(parent_charge_suffix_locs(parts))
-    if not suffix_locs:
-        return []
-    rule = RULES.charges.parent_charge_suffixes["N:+"]
-    symbols = tuple(sorted({charge.symbol for charge in positive_parent_ium_charges(parts)}))
-    reasons = tuple(
-        dict.fromkeys(RULES.charges.parent_charge_suffixes.get(f"{symbol}:+", rule).reason for symbol in symbols)
-    )
-    return [
-        ParentSuffixOperation(
-            key="parent-n-cation-suffix",
-            locants=suffix_locs,
-            suffix=rule.suffix,
-            reason=" ".join(reasons),
-            charge=1,
-            atom_symbols=symbols,
+    represented_as_azonia = single_charged_replacement_locants(parts)
+    retained_positive_charge = has_ionic_retained_parent(parts) or bool(inferred_ionic_retained_parent(parts))
+    retained_parent_positive = bool(parts.retained_name and positive_parent_ium_charges(parts))
+    positive_carbon = any(charge.symbol == "C" and charge.charge > 0 for charge in parts.parent_charges)
+    positive_charge = any(charge.charge > 0 for charge in parts.parent_charges)
+    positive_locants = {str(charge.locant) for charge in parts.parent_charges if charge.charge > 0}
+    negative_locants = {str(charge.locant) for charge in parts.parent_charges if charge.charge < 0}
+    multiple_negative_sites = len(negative_locants) > 1
+    retained_charge_pair = bool(
+        parts.retained_name
+        and any(
+            set(edge) & positive_locants and set(edge) & negative_locants
+            for edge in parts.parent_bond_orders_by_locants
         )
-    ]
+    )
+    rendered: list[ParentSuffixOperation] = []
+    grouped_sites: dict[tuple[int, str], list[ParentChargeItem]] = {}
+    for charge in parts.parent_charges:
+        if str(charge.locant) in represented_as_azonia:
+            continue
+        if charge.charge > 0 and retained_positive_charge:
+            continue
+        if charge.charge < 0:
+            early_positive_stack = positive_charge and (not parts.retained_name or retained_charge_pair)
+            if (
+                parts.principal_group is not None
+                and RULES.functional_groups.get(parts.principal_group.key).suffix_with_locant
+                and len(parts.principal_group.locants) > 1
+            ):
+                early_positive_stack = False
+            if (
+                not early_positive_stack
+                and not (
+                    parts.is_substituent
+                    and not parts.retained_name
+                    and (parts.parent_length > 1 or not parts.is_double_attach)
+                )
+                and not (multiple_negative_sites and not parts.retained_name)
+            ):
+                continue
+            rule_key = "*:-"
+        elif charge.symbol == "C":
+            rule_key = "C:+"
+        elif charge.symbol in _IUM_SUFFIX_ELEMENTS:
+            rule_key = f"{charge.symbol}:+"
+            if rule_key not in RULES.charges.parent_charge_suffixes:
+                rule_key = "N:+"
+        else:
+            continue
+        grouped_sites.setdefault((charge.charge, rule_key), []).append(charge)
+
+    sign_order = (
+        (1, -1)
+        if positive_carbon or retained_positive_charge or (retained_parent_positive and retained_charge_pair)
+        else (-1, 1)
+        if positive_charge or parts.is_substituent
+        else (-1,)
+        if any(group_sign < 0 for group_sign, _rule_key in grouped_sites)
+        else (1,)
+    )
+    for sign in sign_order:
+        for (group_sign, rule_key), sites in grouped_sites.items():
+            if group_sign != sign:
+                continue
+            rule = RULES.charges.parent_charge_suffixes[rule_key]
+            symbols = tuple(sorted({charge.symbol for charge in sites}))
+            reasons = tuple(
+                dict.fromkeys(
+                    RULES.charges.parent_charge_suffixes.get(f"{symbol}:{'+' if sign > 0 else '-'}", rule).reason
+                    for symbol in symbols
+                )
+            )
+            rendered.append(
+                ParentSuffixOperation(
+                    key="parent-anion-suffix" if sign < 0 else "parent-cation-suffix",
+                    locants=tuple(sorted((str(charge.locant) for charge in sites), key=parse_locant)),
+                    suffix=rule.suffix,
+                    reason=" ".join(reasons),
+                    charge=sign,
+                    atom_symbols=symbols,
+                )
+            )
+    return rendered
 
 
 def fusion_parent_charge_name_operations(parts: AssemblyParts) -> list[ParentSuffixOperation] | None:
@@ -159,10 +232,12 @@ def fusion_parent_charge_name_operations(parts: AssemblyParts) -> list[ParentSuf
 
 
 def prepare_fusion_charge_assembly(parts: AssemblyParts) -> bool:
-    """Resolve charged parent operations before suffixes or branches render."""
+    """Resolve early charged-parent operations before suffixes or branches render."""
 
     operations = fusion_parent_charge_name_operations(parts)
     if operations is None:
+        operations = parent_charge_name_operations(parts)
+    if not any(operation.charge < 0 for operation in operations):
         return False
     negative_c = {charge.atom_id for charge in parts.parent_charges if charge.symbol == "C" and charge.charge == -1}
     consumed = [
@@ -193,6 +268,15 @@ def append_charge_suffixes_to_terminal(parts: AssemblyParts, terminal_e: str) ->
     operations = parent_charge_name_operations(parts)
     if not operations:
         return terminal_e
+    if (
+        parts.is_substituent
+        and parts.parent_length == 1
+        and len(operations) == 1
+        and operations[0].locants == ("1",)
+        and operations[0].charge > 0
+        and operations[0].atom_symbols == ("C",)
+    ):
+        return f"{suffix_operation_spelling(operations[0])}{RULES.assembly.substituent_attachment_suffixes['single']}"
     return (
         "".join(f"-{','.join(operation.locants)}-{suffix_operation_spelling(operation)}" for operation in operations)
         + terminal_e

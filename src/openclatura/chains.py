@@ -829,9 +829,11 @@ def find_ring_systems(mol: Molecule, exclude_atoms: set[int] = None) -> list[Rin
                 shared = b1["nodes"].intersection(b2["nodes"])
                 merged_nodes = b1["nodes"] | b2["nodes"]
                 merged_edges = b1["edges"] | b2["edges"]
-                should_merge = (len(shared) == 1 and b1["is_monocycle"] and b2["is_monocycle"]) or (
-                    shared and _has_multiple_spiro_centers(merged_nodes, merged_edges)
-                )
+                # A single spiro parent can be formed directly from two
+                # monocyclic blocks. Larger overlapping groups stay split
+                # here: merge_polyspiro_ring_systems joins them later only
+                # after proving and auditing a linear-dispiro descriptor.
+                should_merge = len(shared) == 1 and b1["is_monocycle"] and b2["is_monocycle"]
                 if should_merge:
                     blocks[i] = {"nodes": merged_nodes, "edges": merged_edges, "is_monocycle": False}
                     merged = True
@@ -1437,21 +1439,6 @@ def _polyspiro_or_von_baeyer_candidate(
                 is_von_baeyer=True,
                 numberings=tuple(numberings),
             )
-    # Spiro side-component discovery temporarily marks the shared atom as Si so
-    # the locant can be recovered from the generated side name.  That marker is
-    # not a real replacement heteroatom and must not participate in the new
-    # von Baeyer numbering tie-breakers.
-    if any(mol.atoms[atom].symbol == "Si" for atom in atoms):
-        descriptor, paths = legacy_descriptor, legacy_paths
-        if not descriptor or not is_von_baeyer_descriptor(descriptor):
-            return PolycycleDescriptorCandidate(descriptor=descriptor, paths=paths)
-        numberings = tuple(_audited_von_baeyer_numberings(mol, descriptor, paths, frozenset(edges)))
-        return PolycycleDescriptorCandidate(
-            descriptor=descriptor,
-            paths=_dedupe_numbering_paths([list(numbering.path) for numbering in numberings]),
-            is_von_baeyer=True,
-            numberings=numberings,
-        )
     audited_candidates = find_von_baeyer_candidates(mol, atoms, edges)
     if audited_candidates:
         descriptor = audited_candidates[0].descriptor

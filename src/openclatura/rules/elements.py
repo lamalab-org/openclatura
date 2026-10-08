@@ -19,6 +19,7 @@ class Element:
     fusion_supported: bool = False
     mancude_bonding_limit: int | None = None
     mancude_charged_bonding_limits: tuple[tuple[int, int], ...] = ()
+    nomenclature_supported: bool = True
 
     def mancude_limit_for_charge(self, charge: int) -> int | None:
         """Resolve an explicit fixed-valence limit, leaving donor/lambda sites alone."""
@@ -56,6 +57,28 @@ def _load_elements() -> dict[str, Element]:
         if element.symbol in result:
             raise ValueError(f"duplicate element symbol {element.symbol!r}")
         result[element.symbol] = element
+
+    # Keep the graph layer complete even when bonded-element nomenclature is
+    # unavailable. This allows generic naming of disconnected atomic ions
+    # without admitting unsupported coordination chemistry into the namer.
+    from rdkit import Chem
+
+    periodic_table = Chem.GetPeriodicTable()
+    for atomic_number in range(1, 119):
+        symbol = periodic_table.GetElementSymbol(atomic_number)
+        if symbol in result:
+            continue
+        default_valence = periodic_table.GetDefaultValence(atomic_number)
+        result[symbol] = Element(
+            symbol=symbol,
+            name=periodic_table.GetElementName(atomic_number).lower(),
+            atomic_number=atomic_number,
+            standard_valence=max(0, default_valence),
+            hw_stem=None,
+            hw_priority=None,
+            substituent_prefix=None,
+            nomenclature_supported=False,
+        )
     return result
 
 

@@ -7,10 +7,14 @@ from rdkit import Chem
 
 from openclatura import name_mol, opsin_available, verify_with_opsin
 from openclatura.chains import find_ring_systems
-from openclatura.fusion.model import FusionConfirmed, FusionMode
+from openclatura.fusion.model import FusionConfirmed, FusionMode, ParentEligibilityKind
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.fusion.registry import fusion_component_registry
-from openclatura.fusion.rules import component_parent_eligible, component_spec_seniority_key
+from openclatura.fusion.rules import (
+    component_parent_eligibility_evidence,
+    component_parent_eligible,
+    component_spec_seniority_key,
+)
 from openclatura.graph_io import read_rdkit_mol
 
 REPORTED_SMILES = "C=CC(O)N1CCN(c2nc(=O)n3c4c(c(-c5ccc(F)cc5)c(Cl)cc24)SC[C@@H](OC)C3)CC1"
@@ -89,6 +93,15 @@ def test_inherited_bicycle_wins_parent_seniority_without_changing_peripheral_num
     assert not parent_spec.usable_as_parent
     assert parent_spec.usable_as_peri_parent
     assert component_parent_eligible(parent, parent_spec, plan.ast.component_occurrences)
+    evidence = component_parent_eligibility_evidence(parent, parent_spec, plan.ast.component_occurrences)
+    assert evidence is not None
+    assert evidence.kind in {
+        ParentEligibilityKind.CROSS_CONSTITUENT_INTERFACE,
+        ParentEligibilityKind.BENZENOID_HETERO_EXTENSION,
+    }
+    assert evidence.component_occurrence_id == parent.occurrence_id
+    assert evidence.related_occurrence_id == attached.occurrence_id
+    assert evidence.shared_locants
     assert component_parent_eligible(
         parent, replace(parent_spec, rule_reference="independent bibliography"), plan.ast.component_occurrences
     )

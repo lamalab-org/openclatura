@@ -25,6 +25,7 @@ from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
 from .naming_context import ComponentNamingState, NamingIntent
 from .naming_protocols import RecursiveSubgraphNamer
+from .nomenclature import RULES
 from .parent_pipeline import (
     build_parent_assembly_plan,
     resolve_parent_hydride_plan,
@@ -41,8 +42,8 @@ from .principal_groups import (
 from .retained_fused_production import production_retained_fused_parent
 from .retained_name_policy import retained_parent_output_name
 from .rules import elements as _elements
+from .simple_components import retained_component_graph_name, single_atom_component_name
 from .special_cases import (
-    single_atom_component_name,
     structural_replacement_parent_result,
     try_name_anhydride_component_result,
 )
@@ -88,7 +89,13 @@ def select_component_parent(mol: Molecule, exclude_atoms: set[int], principal_ca
 
 def build_component_parent_plan(mol, selection, intent, substituents, **parent_options):
     """Resolve and number the parent before perceiving its assembly features."""
-    parent = resolve_parent_hydride_plan(mol, selection, **parent_options)
+    has_spiro_substituent = any(item.spiro is not None for items in substituents.values() for item in items)
+    parent = resolve_parent_hydride_plan(
+        mol,
+        selection,
+        has_spiro_substituent=has_spiro_substituent,
+        **parent_options,
+    )
     return build_parent_assembly_plan(mol, selection, intent, substituents, parent_hydride=parent)
 
 
@@ -115,7 +122,10 @@ def collect_component_branch_substituents(
             if n_idx not in main_set
             and n_idx not in principal_involved_atom_ids
             and n_idx not in handled_prefix_atoms
-            and n_idx not in base_exclude
+            and (
+                n_idx not in base_exclude
+                or (mol.atoms[n_idx].symbol == "H" and mol.atoms[n_idx].isotope in RULES.assembly.isotope_prefixes)
+            )
         ]
 
         spiro_pair = find_spiro_side_pair(mol, c_idx, n_subs, main_set, base_exclude)
@@ -136,6 +146,21 @@ def collect_component_branch_substituents(
 
         for n_idx in n_subs:
             if n_idx not in main_set and n_idx not in principal_involved_atom_ids and n_idx not in handled_prefix_atoms:
+                isotope_hydrogen = mol.atoms[n_idx]
+                if isotope_hydrogen.symbol == "H":
+                    isotope_prefix = RULES.assembly.isotope_prefixes.get(isotope_hydrogen.isotope)
+                    if isotope_prefix:
+                        bond = mol.get_bond(c_idx, n_idx)
+                        subst_mapping.setdefault(c_idx, []).append(
+                            SubstituentItem(
+                                name=isotope_prefix,
+                                locants=[],
+                                atom_ids={n_idx},
+                                bond_ids={bond.idx} if bond is not None else set(),
+                            )
+                        )
+                    handled_prefix_atoms.add(n_idx)
+                    continue
                 branch_decisions = DecisionTrace() if emit_metadata else None
                 if emit_metadata:
                     branch_name, branch_trace, branch_tree = name_subgraph(
@@ -291,7 +316,9 @@ def name_component(
 ):
     """Name one connected component or recursive component of a molecule."""
 
-    emit_metadata = return_trace or return_tree or decision_trace is not None
+    # The reconstruction hook needs recursive substituent assembly plans even
+    # when the caller did not request the public explanation tree.
+    emit_metadata = return_trace or return_tree or decision_trace is not None or COMPONENT_AUDIT_HOOK is not None
 
     single_atom_name = single_atom_component_name(mol, component_atoms)
     if single_atom_name:
@@ -324,6 +351,50 @@ def name_component(
         if return_tree:
             return name, _component_shortcut_tree(name, component_atoms, bindings, token_spans)
         return name
+
+    retained_graph_name = retained_component_graph_name(mol, component_atoms)
+    if retained_graph_name:
+        name, bindings, token_spans, rewrite_history = _shortcut_component_result(
+            mol,
+            component_atoms,
+            retained_graph_name,
+            stage="retained_component",
+            role="retained_component_graph",
+            emit_metadata=emit_metadata,
+            token_debug=token_debug,
+        )
+        trace_decision(
+            decision_trace,
+            TracePhase.COMPONENT,
+            "matched retained component graph",
+            "The complete charged component graph has a retained name in the component registry.",
+            atoms=component_atoms,
+            data={
+                "name": name,
+                "name_atom_bindings": bindings,
+                "name_token_spans": token_spans,
+                "name_rewrite_history": rewrite_history,
+            },
+        )
+        if return_trace and return_tree:
+            return name, [], _component_shortcut_tree(name, component_atoms, bindings, token_spans)
+        if return_trace:
+            return name, []
+        if return_tree:
+            return name, _component_shortcut_tree(name, component_atoms, bindings, token_spans)
+        return name
+
+    if len(component_atoms) == 1:
+        atom = mol.atoms[next(iter(component_atoms))]
+        if atom.isotope is not None:
+            raise UnnamedAtomError(f"Isotopic atomic component naming is not supported: {atom.isotope}{atom.symbol}")
+
+    unsupported = sorted(
+        {mol.atoms[idx].symbol for idx in component_atoms if not mol.atoms[idx].element.nomenclature_supported}
+    )
+    if unsupported:
+        joined = ", ".join(unsupported)
+        raise UnnamedAtomError(f"Bonded-element nomenclature is not supported for: {joined}")
 
     def name_component_again(next_mol: Molecule, next_atoms: set[int], is_substituent: bool = False):
         return name_component(

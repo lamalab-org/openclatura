@@ -71,6 +71,11 @@ def _kekule_resonance_equivalent(left: str, right: str) -> bool:
         return False
     target = Chem.MolToSmiles(second)
     for candidate in Chem.ResonanceMolSupplier(first, Chem.KEKULE_ALL, maxStructs=64):
+        # RDKit can yield a null resonance entry for graphs it accepted but
+        # could not materialize.  That means "no match", not a comparison
+        # failure for the entire evaluation row.
+        if candidate is None:
+            continue
         if tuple(atom_state(atom) for atom in candidate.GetAtoms()) != states:
             continue
         # Re-sanitize each drawing so aromaticity and canonical atom ranking

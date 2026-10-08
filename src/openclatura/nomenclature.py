@@ -8,9 +8,26 @@ from .naming_data import grouped_namer_rules
 
 
 @dataclass(frozen=True)
+class RetainedChainParentRule:
+    name: str
+    substituted_name: str | None = None
+    allows_carbon_substitution: bool = True
+
+
+@dataclass(frozen=True)
 class RetainedNameRules:
     ring_elements: set[str]
     substituent_stems: dict[str, tuple[str, str]]
+    equivalent_substituent_attachment_parents: frozenset[str]
+    functional_parents: dict[tuple[str, str], str]
+    positive_nitrogen_parent_names: dict[tuple[str, str], str]
+    chain_substituent_stems: dict[tuple[int, str], tuple[str, str]]
+    chain_parents: dict[tuple[int, str, int], RetainedChainParentRule]
+    aldehyde_chain_words: dict[int, str]
+    substituted_chain_parents: dict[tuple[int, str, int, str, str], str]
+    chain_branch_endings: dict[tuple[int, str, int, str, str], str]
+    acyl_branch_endings: dict[tuple[str, str], str]
+    substituents: dict[tuple[int, str, str, str, str], str]
     monocycle_specs: tuple[dict, ...]
     fused_polycycle_specs: tuple[dict, ...]
 
@@ -25,6 +42,39 @@ class HeteroatomRules:
     sulfonyl_ligand_contractions: tuple[tuple[str, str, str], ...]
     halogen_prefixes: dict[str, str]
     halogen_lambda_suffixes: dict[str, str]
+
+
+NitrogenConstraint = int | frozenset[int] | None
+
+
+@dataclass(frozen=True)
+class NitrogenChainRule:
+    scope: str
+    group_key: str
+    name: str
+    bond_orders: tuple[NitrogenConstraint, ...]
+    charges: tuple[NitrogenConstraint, ...]
+    variant: str
+    principal_candidate: bool = False
+    audit_smiles: str | None = None
+
+
+@dataclass(frozen=True)
+class BranchedNitrogenRule:
+    group_key: str
+    name: str
+    upstream_bond_order: int
+    branch_bond_orders: tuple[int, ...]
+    center_charge: int
+    branch_charges: tuple[int, ...]
+    variant: str
+    audit_smiles: str | None = None
+
+
+@dataclass(frozen=True)
+class NitrogenRules:
+    chain_templates: tuple[NitrogenChainRule, ...]
+    branched_templates: tuple[BranchedNitrogenRule, ...]
 
 
 @dataclass(frozen=True)
@@ -43,7 +93,9 @@ class PrefixRules:
 class ComponentRules:
     salt_metal_names: set[str]
     mononuclear_parent_hydrides: dict[str, str]
+    retained_mononuclear_hydride_names: dict[str, str]
     retained_homonuclear_chain_names: dict[str, str]
+    retained_component_graph_names: tuple[tuple[str, str], ...]
     replacement_parent_oxoacid_specs: tuple[dict, ...]
 
 
@@ -51,6 +103,7 @@ class ComponentRules:
 class IonRules:
     single_atom_cations: set[str]
     single_atom_anions: dict[str, str]
+    mononuclear_hydride_ions: dict[tuple[str, int, int], str]
 
 
 @dataclass(frozen=True)
@@ -76,6 +129,7 @@ class ChargeRules:
     replacement_charge_prefixes: dict[str, str]
     replacement_charge_states: dict[tuple[str, int, int], str]
     heteroatom_charge_prefixes: dict[str, str]
+    heteroatom_prefix_states: dict[str, tuple[str, int, int]]
     anion_suffix_placements: tuple[AnionSuffixPlacementRule, ...]
 
 
@@ -88,6 +142,7 @@ class AssemblyRules:
     substituent_attachment_suffixes: dict[str, str]
     ambiguous_connection_substituent_stems: set[str]
     suffix_nitrogen_markers: tuple[str, ...]
+    isotope_prefixes: dict[int, str]
 
 
 @dataclass(frozen=True)
@@ -116,12 +171,18 @@ class FunctionalGroupRule:
     role: str
     prefix: str | None = None
     suffix: str | None = None
+    positive_nitrogen_suffix: str | None = None
     multi_suffix: MultiSuffixTemplate | None = None
     suffix_multiplier_positions: tuple[int, ...] = (0,)
     seniority: int | None = None
     suffix_with_locant: bool = False
     needs_locant: bool = True
     families: tuple[str, ...] = ()
+    uses_front_modifier: bool = False
+    is_peroxy_acid: bool = False
+    is_peroxy_ester: bool = False
+    suffix_carbon_is_exocyclic: bool = False
+    prefix_requires_parentheses: bool = False
 
 
 @dataclass(frozen=True)
@@ -171,6 +232,7 @@ class FunctionalGroupRules:
 class NomenclatureRegistry:
     retained: RetainedNameRules
     heteroatoms: HeteroatomRules
+    nitrogen: NitrogenRules
     rings: RingRules
     prefixes: PrefixRules
     components: ComponentRules
@@ -185,10 +247,17 @@ def _group_tuple_mapping(group_key: str, section: str) -> dict[str, tuple[str, s
     return {key: tuple(value) for key, value in grouped_namer_rules()[group_key].mapping(section).items()}
 
 
+def _nitrogen_constraint(value) -> NitrogenConstraint:
+    if value is None or isinstance(value, int):
+        return value
+    return frozenset(int(item) for item in value)
+
+
 def _functional_group_rules() -> FunctionalGroupRules:
     groups = {}
+    functional_group_data = grouped_namer_rules()["functional_groups"]
 
-    for key, item in grouped_namer_rules()["functional_groups"].mapping("functional_groups").items():
+    for key, item in functional_group_data.mapping("functional_groups").items():
         families = tuple(item.get("families", _derived_functional_group_families(key)))
         suffix = item.get("suffix")
         multi_suffix = item.get("multi_suffix")
@@ -197,12 +266,18 @@ def _functional_group_rules() -> FunctionalGroupRules:
             role=item["role"],
             prefix=item.get("prefix"),
             suffix=suffix,
+            positive_nitrogen_suffix=item.get("positive_nitrogen_suffix"),
             multi_suffix=_multi_suffix_template(suffix, multi_suffix),
             suffix_multiplier_positions=_suffix_multiplier_positions(suffix, multi_suffix),
             seniority=item.get("seniority"),
             suffix_with_locant=bool(item.get("suffix_with_locant", False)),
             needs_locant=bool(item.get("needs_locant", True)),
             families=families,
+            uses_front_modifier=key in functional_group_data.values("front_modifier_principal_groups"),
+            is_peroxy_acid=key in functional_group_data.values("peroxy_acid_prefix_groups"),
+            is_peroxy_ester=key in functional_group_data.values("peroxy_ester_groups"),
+            suffix_carbon_is_exocyclic=bool(item.get("suffix_carbon_is_exocyclic", False)),
+            prefix_requires_parentheses=bool(item.get("prefix_requires_parentheses", False)),
         )
     return FunctionalGroupRules(by_key=groups)
 
@@ -282,6 +357,8 @@ def _postprocess_rules() -> PostprocessRules:
 
 def _charge_rules() -> ChargeRules:
     group = grouped_namer_rules()["charges"]
+    heteroatom_charge_prefixes = group.mapping("heteroatom_charge_prefixes")
+    bond_orders = {"single": 1, "double": 2, "triple": 3}
     return ChargeRules(
         retained_ionic_n_parents=group.mapping("retained_ionic_n_parents"),
         saturated_n_ring_ionic_parents={
@@ -299,7 +376,15 @@ def _charge_rules() -> ChargeRules:
             (row["symbol"], row["charge"], row["valence"]): row["prefix"]
             for row in group.values("replacement_charge_states")
         },
-        heteroatom_charge_prefixes=group.mapping("heteroatom_charge_prefixes"),
+        heteroatom_charge_prefixes=heteroatom_charge_prefixes,
+        heteroatom_prefix_states={
+            prefix: (
+                state.split(":")[0],
+                1 if state.split(":")[1] == "+" else -1,
+                bond_orders[state.split(":")[2]],
+            )
+            for state, prefix in heteroatom_charge_prefixes.items()
+        },
         anion_suffix_placements=tuple(
             AnionSuffixPlacementRule(
                 key=item["key"],
@@ -324,10 +409,76 @@ def registry() -> NomenclatureRegistry:
     functional_group_rules = groups["functional_groups"]
     ring_descriptors = groups["ring_descriptors"]
     assembly_grammar = groups["assembly_grammar"]
+    retained_substituent_stems = retained.mapping("retained_substituent_stems")
     return NomenclatureRegistry(
         retained=RetainedNameRules(
             ring_elements=set(retained.values("retained_ring_elements")),
-            substituent_stems=_group_tuple_mapping("retained_parents", "retained_substituent_stems"),
+            substituent_stems={
+                name: (item["stem"], item["terminal"]) for name, item in retained_substituent_stems.items()
+            },
+            equivalent_substituent_attachment_parents=frozenset(
+                name
+                for name, item in retained_substituent_stems.items()
+                if item.get("equivalent_attachment_locants", False)
+            ),
+            functional_parents={
+                (row["parent"], row["group"]): row["name"] for row in retained.values("retained_functional_parents")
+            },
+            positive_nitrogen_parent_names={
+                (row["name"], row["group"]): row["positive_nitrogen_name"]
+                for section in ("retained_functional_parents", "retained_chain_parents")
+                for row in retained.values(section)
+                if row.get("positive_nitrogen_name")
+            },
+            chain_substituent_stems={
+                (int(row["length"]), row["attachment"]): (row["stem"], row["ending"])
+                for row in retained.values("retained_chain_substituent_stems")
+            },
+            chain_parents={
+                (int(row["length"]), row["group"], int(row["count"])): RetainedChainParentRule(
+                    name=row["name"],
+                    substituted_name=row.get("substituted_name"),
+                    allows_carbon_substitution=bool(row.get("allows_carbon_substitution", True)),
+                )
+                for row in retained.values("retained_chain_parents")
+            },
+            aldehyde_chain_words={
+                int(length): name for length, name in retained.mapping("retained_aldehyde_chain_words").items()
+            },
+            substituted_chain_parents={
+                (
+                    int(row["length"]),
+                    row["group"],
+                    int(row["count"]),
+                    row["branch"],
+                    str(row["locant"]),
+                ): row["name"]
+                for row in retained.values("retained_substituted_chain_parents")
+            },
+            chain_branch_endings={
+                (
+                    int(row["length"]),
+                    row["group"],
+                    int(row["count"]),
+                    row["ending"],
+                    str(row["locant"]),
+                ): row["name"]
+                for row in retained.values("retained_chain_branch_endings")
+            },
+            acyl_branch_endings={
+                (row["ending"], row["attachment"]): row["name"]
+                for row in retained.values("retained_acyl_branch_endings")
+            },
+            substituents={
+                (
+                    int(row["length"]),
+                    str(row["attachment_locant"]),
+                    row["branch"],
+                    str(row["branch_locant"]),
+                    row["attachment"],
+                ): row["name"]
+                for row in retained.values("retained_substituents")
+            },
             monocycle_specs=tuple(retained.values("retained_monocycle_specs")),
             fused_polycycle_specs=tuple(retained.values("retained_fused_polycycle_specs")),
         ),
@@ -351,6 +502,34 @@ def registry() -> NomenclatureRegistry:
             halogen_prefixes=substituent_vocabulary.mapping("halogen_prefixes"),
             halogen_lambda_suffixes=substituent_vocabulary.mapping("halogen_lambda_suffixes"),
         ),
+        nitrogen=NitrogenRules(
+            chain_templates=tuple(
+                NitrogenChainRule(
+                    scope=row["scope"],
+                    group_key=row["group_key"],
+                    name=row["name"],
+                    bond_orders=tuple(_nitrogen_constraint(value) for value in row["bond_orders"]),
+                    charges=tuple(_nitrogen_constraint(value) for value in row["charges"]),
+                    variant=row["variant"],
+                    principal_candidate=bool(row.get("principal_candidate", False)),
+                    audit_smiles=row.get("audit_smiles"),
+                )
+                for row in substituent_vocabulary.values("nitrogen_chain_templates")
+            ),
+            branched_templates=tuple(
+                BranchedNitrogenRule(
+                    group_key=row["group_key"],
+                    name=row["name"],
+                    upstream_bond_order=int(row["upstream_bond_order"]),
+                    branch_bond_orders=tuple(int(value) for value in row["branch_bond_orders"]),
+                    center_charge=int(row["center_charge"]),
+                    branch_charges=tuple(int(value) for value in row["branch_charges"]),
+                    variant=row["variant"],
+                    audit_smiles=row.get("audit_smiles"),
+                )
+                for row in substituent_vocabulary.values("branched_nitrogen_templates")
+            ),
+        ),
         rings=RingRules(
             descriptor_templates=ring_descriptors.mapping("ring_descriptor_templates"),
             polycycle_prefixes={
@@ -364,12 +543,20 @@ def registry() -> NomenclatureRegistry:
         components=ComponentRules(
             salt_metal_names=set(simple_components.values("salt_metal_names")),
             mononuclear_parent_hydrides=simple_components.mapping("mononuclear_parent_hydrides"),
+            retained_mononuclear_hydride_names=simple_components.mapping("retained_mononuclear_hydride_names"),
             retained_homonuclear_chain_names=simple_components.mapping("retained_homonuclear_chain_names"),
+            retained_component_graph_names=tuple(
+                (row["name"], row["smiles"]) for row in simple_components.values("retained_component_graph_names")
+            ),
             replacement_parent_oxoacid_specs=tuple(simple_components.values("replacement_parent_oxoacid_specs")),
         ),
         ions=IonRules(
             single_atom_cations=set(simple_components.values("single_atom_cations")),
             single_atom_anions=simple_components.mapping("single_atom_anions"),
+            mononuclear_hydride_ions={
+                (row["element"], int(row["charge"]), int(row["hydrogens"])): row["name"]
+                for row in simple_components.values("mononuclear_hydride_ions")
+            },
         ),
         charges=_charge_rules(),
         assembly=AssemblyRules(
@@ -386,6 +573,9 @@ def registry() -> NomenclatureRegistry:
                 assembly_grammar.values("ambiguous_connection_substituent_stems")
             ),
             suffix_nitrogen_markers=tuple(assembly_grammar.values("suffix_nitrogen_markers")),
+            isotope_prefixes={
+                int(mass): prefix for mass, prefix in assembly_grammar.mapping("isotope_prefixes").items()
+            },
         ),
         functional_groups=_functional_group_rules(),
         postprocess=_postprocess_rules(),

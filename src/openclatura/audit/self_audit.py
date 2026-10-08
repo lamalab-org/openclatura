@@ -114,7 +114,15 @@ def self_audit(smiles: str) -> ReconstructionAudit:
 
     import openclatura as oc
 
+    from ..graph_io import read_smiles
+
     try:
+        input_mol = read_smiles(smiles)
+        if any(atom.isotope is not None for atom in input_mol):
+            return ReconstructionAudit(
+                verdict="abstained",
+                reason="isotopically-labelled species not modelled",
+            )
         with capture_component_audits() as collected:
             result = oc.name(smiles)
     except Exception as exc:  # pragma: no cover - naming boundary

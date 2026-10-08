@@ -7,6 +7,7 @@ from functools import partial
 
 from .additive import add_indicated_hydrogens as _add_indicated_hydrogens
 from .assembler import assemble_name_raw, post_process_rewrite_rules
+from .assembly_charge import parent_charge_name_operations
 from .assembly_parts import (
     AssemblyParts,
     RenderedSubstituentName,
@@ -858,6 +859,8 @@ def _collect_subgraph_substituents(
             # `(methylimino)` rather than `imino` -- needs its handler.
             if name:
                 name = _substituted_prefix_name(mol, group, sub_exclude) or name
+                if rule.prefix_requires_parentheses:
+                    name = f"({name})"
             if name:
                 subst_mapping.setdefault(group.attachment_carbon, []).append(
                     SubstituentItem(
@@ -874,7 +877,12 @@ def _collect_subgraph_substituents(
         n_subs = [
             n_idx
             for n_idx in mol.get_neighbors(c_idx)
-            if n_idx not in main_set and n_idx not in sub_handled_atoms and n_idx not in sub_exclude
+            if n_idx not in main_set
+            and n_idx not in sub_handled_atoms
+            and (
+                n_idx not in sub_exclude
+                or (mol.atoms[n_idx].symbol == "H" and mol.atoms[n_idx].isotope in RULES.assembly.isotope_prefixes)
+            )
         ]
 
         spiro_pair = _find_spiro_side_pair(mol, c_idx, n_subs, main_set, sub_exclude)
@@ -894,7 +902,24 @@ def _collect_subgraph_substituents(
             n_subs = [n for n in n_subs if n not in sub_comp]
 
         for n_idx in n_subs:
-            if n_idx not in main_set and n_idx not in sub_handled_atoms and n_idx not in sub_exclude:
+            if n_idx not in main_set and n_idx not in sub_handled_atoms:
+                isotope_hydrogen = mol.atoms[n_idx]
+                if isotope_hydrogen.symbol == "H":
+                    isotope_prefix = RULES.assembly.isotope_prefixes.get(isotope_hydrogen.isotope)
+                    if isotope_prefix:
+                        bond = mol.get_bond(c_idx, n_idx)
+                        subst_mapping.setdefault(c_idx, []).append(
+                            SubstituentItem(
+                                name=isotope_prefix,
+                                locants=[],
+                                atom_ids={n_idx},
+                                bond_ids={bond.idx} if bond is not None else set(),
+                            )
+                        )
+                    sub_handled_atoms.add(n_idx)
+                    continue
+                if n_idx in sub_exclude:
+                    continue
                 branch_decisions = DecisionTrace() if emit_metadata else None
                 branch_exclude = sub_exclude | main_set
                 if emit_metadata:
@@ -1025,6 +1050,12 @@ def _assemble_parent_name(
     """Assemble a parent name and apply shared post-assembly charge rules."""
 
     name = assemble_name_raw(parts)
+    owned_anion_locants = {
+        str(locant)
+        for operation in parent_charge_name_operations(parts)
+        if operation.charge < 0
+        for locant in operation.locants
+    }
     rewrites = []
     if finalize_subgraph:
         rewrites.append(
@@ -1038,7 +1069,14 @@ def _assemble_parent_name(
         (
             (
                 "apply_anionic_parent_names",
-                lambda text: apply_anionic_parent_names(text, mol, numbered_path, get_loc, parts.retained_name),
+                lambda text: apply_anionic_parent_names(
+                    text,
+                    mol,
+                    numbered_path,
+                    get_loc,
+                    parts.retained_name,
+                    owned_locants=owned_anion_locants,
+                ),
             ),
             (
                 "apply_cationic_imino_parent_prefixes",

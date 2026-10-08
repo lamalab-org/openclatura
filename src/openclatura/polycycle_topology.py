@@ -351,7 +351,7 @@ def audit_von_baeyer_descriptor(
     path: tuple[int, ...] | list[int],
     edge_set: frozenset[tuple[int, int]] | set[tuple[int, int]],
 ) -> VonBaeyerAudit:
-    """Reconstruct a tricyclo/tetracyclo descriptor and compare it to graph edges."""
+    """Reconstruct a von Baeyer polycycle descriptor and compare it to graph edges."""
 
     numbered_path = tuple(path)
     normalized_edges = frozenset(normalize_edges(edge_set))
@@ -426,7 +426,30 @@ def _von_baeyer_edges_from_numbering(
         return frozenset()
     edges = set(_bicyclo_edges_from_numbering(base_numbers, locant_to_atom))
     next_bridge_locant = base_count + 1
-    for length, (first_locant, second_locant) in extra_bridges:
+    positive_bridges = [bridge for bridge in extra_bridges if bridge[0] > 0]
+    numbered_bridges = []
+    highest_numbered_locant = base_count
+    while positive_bridges:
+        available = [
+            bridge
+            for bridge in positive_bridges
+            if bridge[1][0] <= highest_numbered_locant and bridge[1][1] <= highest_numbered_locant
+        ]
+        if not available:
+            return frozenset()
+        bridge = min(
+            available,
+            key=lambda item: (
+                item[1][1] > base_count,
+                -item[1][1],
+                -item[1][0],
+            ),
+        )
+        numbered_bridges.append(bridge)
+        positive_bridges.remove(bridge)
+        highest_numbered_locant += bridge[0]
+    numbered_bridges.extend(bridge for bridge in extra_bridges if bridge[0] == 0)
+    for length, (first_locant, second_locant) in numbered_bridges:
         if first_locant not in locant_to_atom or second_locant not in locant_to_atom:
             return frozenset()
         if length == 0:
@@ -437,7 +460,11 @@ def _von_baeyer_edges_from_numbering(
             return frozenset()
         if first_locant in bridge_locants or second_locant in bridge_locants:
             return frozenset()
-        locant_chain = (first_locant, *bridge_locants, second_locant)
+        # Secondary-bridge atoms continue from the higher-numbered
+        # bridgehead toward the lower-numbered one (P-23.2.5). Keep this
+        # independent reconstruction aligned with the grammar consumed by
+        # OPSIN and audit.von_baeyer_parse.
+        locant_chain = (second_locant, *bridge_locants, first_locant)
         for left, right in zip(locant_chain, locant_chain[1:]):
             edges.add(tuple(sorted((locant_to_atom[left], locant_to_atom[right]))))
         next_bridge_locant += length

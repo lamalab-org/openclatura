@@ -13,6 +13,48 @@ from openclatura.human_descriptor import _describe_node, _retained_fusion_framew
 from openclatura.retained_fused_templates import _smallest_ring_basis
 
 
+@pytest.mark.parametrize(
+    ("smiles", "decision", "reason"),
+    [
+        ("[Fe+2]", "named single-atom component", "one-atom ionic component"),
+        ("O=S=O", "matched retained component graph", "retained name in the component registry"),
+        (
+            "[BH3-][P+](C)(C)C",
+            "named structural replacement parent",
+            "graph-derived replacement-parent hydride class",
+        ),
+    ],
+)
+def test_human_descriptor_exposes_direct_component_reason_and_decision_tree(smiles, decision, reason):
+    d = describe_human(smiles)
+
+    assert reason in d.text
+    assert any(step["decision"] == decision for step in d.decision_tree)
+    payload = d.to_dict()
+    assert payload["decision_tree"] == list(d.decision_tree)
+    assert payload["substituent_tree"] == list(d.result.substituent_tree)
+    assert json.loads(json.dumps(payload)) == payload
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected_text"),
+    [
+        ("N#CON", "aminoxy group"),
+        ("OCCNN=NN", "hydrazonohydrazinyl group"),
+        ("CC([O-])[C+]=C=O", "positive carbon center"),
+        ("[2H]C([2H])([2H])c1ccccc1", "trideuteriomethyl group"),
+        ("C1CC2CCC1C2", "bicyclic [2.2.1] carbon skeleton"),
+        ("O1C=CC2=NC3=C(C=C21)SC=C3", "selected fusion components"),
+    ],
+)
+def test_human_descriptor_covers_new_structural_nomenclature(smiles, expected_text):
+    d = describe_human(smiles)
+
+    assert d.name
+    assert expected_text in d.text
+    assert d.decision_tree
+
+
 def test_human_descriptor_uses_parent_metadata_without_token_spans():
     d = describe_human("CN1C=NC2=C1C(=O)N(C(=O)N2C)C")
 

@@ -273,6 +273,13 @@ def _canonical(mol) -> str | None:
         # ``oxido`` is the charge-separated spelling of an oxo, so it must agree
         # with an input written either way
         ("(oxido)", "*=O"),
+        # A heteroatom hub may mix a bare first ligand with parenthesised later
+        # ligands.  This is the same generic ligand-list grammar used by silyl,
+        # boryl, and phosphoryl hubs.
+        (
+            "(butyl((1H-pyrrol-3-yl)methyl)amino)",
+            "*N(CCCC)Cc1cc[nH]c1",
+        ),
     ],
 )
 def test_resolve_fragment_grammar(name, expected):
@@ -303,6 +310,11 @@ def test_resolve_fragment_grammar(name, expected):
 )
 def test_unresolvable_substituent_returns_none(name):
     # A construct outside the modelled grammar must abstain (None), never guess.
+    assert resolve_fragment_mol(name) is None
+
+
+def test_pathologically_nested_substituent_abstains_without_recursive_expansion():
+    name = "(" * 17 + "methyl" + ")" * 17
     assert resolve_fragment_mol(name) is None
 
 
@@ -731,7 +743,6 @@ def test_corrupted_exocyclic_ez_is_not_confirmed(smiles):
 @pytest.mark.parametrize(
     "smiles",
     [
-        "COC(=O)N1N=CN=N1",  # 2H-tetrazole: indicated-hydrogen position not modelled
         "[Na+].[Cl-]",  # ionic: no auditable component
         # The name drops the isotopic label, so confirming it would certify a name
         # that does not denote the input.
@@ -743,6 +754,64 @@ def test_self_audit_abstains_on_unmodelled(smiles):
     result = self_audit(smiles)
     assert result.verdict == "abstained", f"{smiles}: {result.verdict}"
     assert not result.ok
+
+
+def test_self_audit_rebuilds_single_indicated_hydrogen_with_mancude_matching():
+    result = oc.name("COC(=O)N1N=CN=N1", verify_self=True)
+    assert result.name == "methyl 2H-tetrazole-2-carboxylate"
+    assert result.self_audit is not None
+    assert result.self_audit.verdict == "confirmed"
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    [
+        "N#CSCSc1c(Cl)nc(Cl)c[n+]1[O-]",  # locanted parent ium plus oxido
+        "C[C@@H](C#C[NH2+][O-])O[Si](C)(C)C(C)(C)C",  # aminium
+        "C=[N+]([O-])C1=CC1C",  # iminium
+        "CC(C)(C)[N+]1(C(=O)[O-])CCC(Oc2ccc(C=O)cc2)CC1",  # zwitterionic carboxylate
+        "COc1ccccc1N(C)N=CC1=Nc2ccc(Cl)cc2C1(C)C",  # substituted hydrazone suffix
+        "CC(=O)OOC(C)(C)C",  # peroxy ester
+        "O=C(NC(O)C(O)CO)OO",  # peroxy acid
+    ],
+)
+def test_self_audit_rebuilds_generic_charged_and_suffix_operations(smiles):
+    result = self_audit(smiles)
+    assert result.verdict == "confirmed", result.reason
+
+
+def test_recursive_assembly_plans_rebuild_unparsed_nested_substituents():
+    from openclatura.assembly_parts import AssemblyParts, SubstituentItem
+    from openclatura.audit.reconstruction import _canonical_constitution, _reconstruct_from_parts
+    from openclatura.trace_helpers import assembly_substituent_tree
+
+    leaf = AssemblyParts(parent_length=1, is_substituent=True, attachment_locant=1)
+    leaf_tree = assembly_substituent_tree(leaf, name="unparsed-leaf")
+    branch = AssemblyParts(
+        parent_length=1,
+        is_substituent=True,
+        attachment_locant=1,
+        substituents=[SubstituentItem("unparsed-leaf", ["1"], substituent_tree=leaf_tree)],
+    )
+    branch_tree = assembly_substituent_tree(branch, name="unparsed-branch")
+    parent = AssemblyParts(
+        parent_length=1,
+        substituents=[SubstituentItem("unparsed-branch", ["1"], substituent_tree=branch_tree)],
+    )
+
+    assert "audit_parts" not in leaf_tree
+    assert dict(leaf_tree) == leaf_tree
+    assert _canonical_constitution(_reconstruct_from_parts(parent)) == "CCC"
+
+
+def test_systematic_fusion_mancude_difference_remains_an_abstention():
+    # The text-driven closure confirms an exact match, but its reduced mancude
+    # model is not complete enough to reject a differently placed fused-system
+    # tautomer.
+    smiles = "C[C@@H]1CCN(C(=O)c2ccc(Cl)s2)C[C@@H]1n1c(=O)[nH]c2cnc3[nH]ccc3c21"
+    result = self_audit(smiles)
+    assert result.verdict == "abstained"
+    assert "mancude reconstruction" in result.reason
 
 
 # --------------------------------------------------------------------------- #
@@ -768,6 +837,12 @@ def test_self_audit_abstains_on_unmodelled(smiles):
         (
             "Cn1c(=O)n(C2CCCN(C(=O)c3cccs3)C2)c2ncncc21",
             "7-methyl-9-(1-((thiophen-2-yl)carbonyl)piperidin-3-yl)-7,9-dihydro-8H-purin-8-one",
+        ),
+        # A substituted pyrrole-like nitrogen already has three sigma bonds and
+        # is not a vertex in the remaining mancude pi matching.
+        (
+            "CN1CCc2c(c3cc(Cl)ccc3n2[C@H]2CC[C@@H]2c2ccc(F)cc2)C1",
+            "8-chloro-5-((1S,2R)-2-(4-fluorophenyl)cyclobutyl)-2-methyl-1,2,3,4-tetrahydroindolo[3,2-c]pyridine",
         ),
     ],
 )
@@ -1044,6 +1119,72 @@ def test_ring_unsaturation_stem_builds_its_own_bond_order(smiles: str, stem: str
         for word, (_count, order) in _UNSAT_STEMS.items()
     )
     assert self_audit(smiles).verdict == "confirmed"
+
+
+def test_large_von_baeyer_prefix_and_secondary_bridge_orientation_reconstruct():
+    smiles = "C12=C3C(C=C4C=NC=C5C(C=C(C6=CC=C7C=NC=C(C7=C61)C=C2)C4=C53)=O)=O"
+
+    result = oc.name(smiles, verify_self=True, verify_opsin=True)
+
+    assert "heptacyclo[" in result.name
+    assert result.self_audit.verdict == "confirmed"
+    assert result.opsin_check.status == "matched"
+
+
+def test_secondary_bridge_interiors_use_numbering_order_not_citation_order():
+    from openclatura.audit.von_baeyer_parse import build_skeleton_from_descriptor
+
+    descriptor = (
+        "undecacyclo[14.14.14.2^{7,10}.2^{22,25}.2^{36,39}.0^{4,6}.0^{11,13}.0^{19,21}.0^{26,28}.0^{33,35}.0^{40,42}]"
+    )
+    rw, locants = build_skeleton_from_descriptor(descriptor)
+    edges = {
+        tuple(sorted((first, second), key=int))
+        for first, first_atom in locants.items()
+        for second, second_atom in locants.items()
+        if int(first) < int(second) and rw.GetBondBetweenAtoms(first_atom, second_atom) is not None
+    }
+
+    assert {
+        ("7", "50"),
+        ("10", "49"),
+        ("22", "48"),
+        ("25", "47"),
+        ("36", "46"),
+        ("39", "45"),
+    } <= edges
+
+
+def test_secondary_bridges_are_numbered_by_bridgehead_seniority_not_length():
+    from openclatura.audit.von_baeyer_parse import build_skeleton_from_descriptor
+
+    descriptor = "nonacyclo[21.3.3.3^{10,14}.1^{2,22}.1^{4,7}.1^{9,15}.1^{17,20}.0^{1,23}.0^{10,14}]"
+    rw, locants = build_skeleton_from_descriptor(descriptor)
+    edges = {
+        tuple(sorted((int(first), int(second))))
+        for first, first_atom in locants.items()
+        for second, second_atom in locants.items()
+        if int(first) < int(second) and rw.GetBondBetweenAtoms(first_atom, second_atom) is not None
+    }
+
+    assert {(2, 30), (22, 30), (17, 31), (20, 31), (9, 32), (15, 32)} <= edges
+    assert {(14, 33), (33, 34), (34, 35), (10, 35), (4, 36), (7, 36)} <= edges
+
+
+def test_dependent_secondary_bridge_is_numbered_after_independent_bridges():
+    from openclatura.audit.von_baeyer_parse import build_skeleton_from_descriptor
+
+    descriptor = "decacyclo[21.9.5.4^{12,27}.3^{7,9}.3^{11,13}.3^{15,17}.3^{34,36}.1^{29,42}.0^{5,32}.0^{19,24}]"
+    rw, locants = build_skeleton_from_descriptor(descriptor)
+    edges = {
+        tuple(sorted((int(first), int(second))))
+        for first, first_atom in locants.items()
+        for second, second_atom in locants.items()
+        if int(first) < int(second) and rw.GetBondBetweenAtoms(first_atom, second_atom) is not None
+    }
+
+    assert {(29, 54), (42, 54)} <= edges
+    assert (29, 45) not in edges
 
 
 # --------------------------------------------------------------------------- #

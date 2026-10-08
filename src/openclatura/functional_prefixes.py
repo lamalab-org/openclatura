@@ -359,6 +359,8 @@ def collect_component_prefix_substituents(
 
         name = prefix_from_group(context, group)
         if name:
+            if RULES.functional_groups.get(group.key).prefix_requires_parentheses:
+                name = f"({name})"
             trace_atoms = set(group.atoms_involved)
             for atom_idx in group.atoms_involved:
                 for neighbor in mol.get_neighbors(atom_idx):

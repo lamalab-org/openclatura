@@ -429,7 +429,12 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                         continue
                 elif single_o is not None:
                     o_neighbors = [x for x in mol.get_neighbors(single_o) if x != atom.idx]
-                    if len(o_neighbors) > 0:
+                    # A cyanate attached through oxygen to a nitrogen still
+                    # contains a principal-group candidate. Leave both ends
+                    # available so normal seniority can select the nitrile and
+                    # render the N-O branch, instead of prematurely consuming
+                    # the whole graph as a nonprincipal cyanato prefix.
+                    if len(o_neighbors) > 0 and all(mol.atoms[x].symbol != "N" for x in o_neighbors):
                         groups.append(PerceivedGroup("cyanato", False, o_neighbors[0], {atom.idx, triple_n, single_o}))
                         consumed.update([atom.idx, triple_n, single_o])
                         continue

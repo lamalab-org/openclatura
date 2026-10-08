@@ -197,6 +197,21 @@ def _has_retained_fused_parent(mol: Molecule, core: set[int]) -> bool:
     )
 
 
+def _has_audited_polycycle_parent(mol: Molecule, side_atoms: set[int], core: set[int]) -> bool:
+    """Whether the side core already has a complete von Baeyer parent proof."""
+
+    from .chains import find_ring_systems
+
+    excluded = set(mol.atoms) - side_atoms
+    return any(
+        system.atoms == core
+        and system.polycycle_descriptor is not None
+        and system.ring_parent is not None
+        and system.ring_parent.audit_ok
+        for system in find_ring_systems(mol, excluded)
+    )
+
+
 def plan_substituted_fusion_spiro_side(
     mol: Molecule, side_atoms: set[int], junction: int, *, mode: FusionMode | str
 ) -> SpiroAssembly | None:
@@ -206,7 +221,7 @@ def plan_substituted_fusion_spiro_side(
     core = _polycyclic_side_core(mol, side_atoms, junction)
     if core is None:
         return None
-    if _has_retained_fused_parent(mol, core):
+    if _has_retained_fused_parent(mol, core) or _has_audited_polycycle_parent(mol, side_atoms, core):
         return None
     token = set_fusion_mode(mode)
     try:

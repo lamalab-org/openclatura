@@ -113,130 +113,6 @@ def _center_stereo_bindings(mol: Molecule, center: int) -> tuple[NameAtomBinding
     )
 
 
-def single_atom_component_name(mol: Molecule, component_atoms: set[int]) -> str:
-    """Return the name for a one-atom ionic component, when supported."""
-
-    if len(component_atoms) != 1:
-        return ""
-    atom = mol.atoms[list(component_atoms)[0]]
-    if atom.symbol in RULES.ions.single_atom_cations and atom.charge > 0:
-        return atom.element.name
-    if atom.symbol in RULES.ions.single_atom_anions and atom.charge < 0:
-        return RULES.ions.single_atom_anions[atom.symbol]
-    ion_name = SINGLE_ATOM_HYDRIDE_IONS.get((atom.symbol, atom.charge, atom.total_h_count))
-    if ion_name:
-        return ion_name
-    if (
-        atom.charge == 0
-        and atom.symbol in RETAINED_MONONUCLEAR_HYDRIDE_NAMES
-        and atom.total_h_count == atom.element.standard_valence
-    ):
-        # P-21.1.1.1: ammonia, water and the hydrogen halides are the
-        # retained names of the unsubstituted hydrides -- only when the atom
-        # actually carries its full complement of hydrogens (a bare, H-less
-        # "[N]"/"[Cl]" is not a real, complete molecule and must not match).
-        return RETAINED_MONONUCLEAR_HYDRIDE_NAMES[atom.symbol]
-    if atom.charge == 0 and atom.total_h_count == atom.element.standard_valence:
-        # Same reasoning as the retained-name branch above: a bare, H-less
-        # atom (e.g. "[Si]") is not a real silane and must not match.
-        hydride_name = RULES.components.mononuclear_parent_hydrides.get(atom.symbol)
-        if hydride_name:
-            return hydride_name
-    return ""
-
-
-RETAINED_MONONUCLEAR_HYDRIDE_NAMES = {
-    "N": "ammonia",
-    "O": "water",
-    "F": "hydrogen fluoride",
-    "Cl": "hydrogen chloride",
-    "Br": "hydrogen bromide",
-    "I": "hydrogen iodide",
-}
-
-# P-72/P-73: mononuclear hydride ions, keyed by (element, charge, hydrogen count).
-SINGLE_ATOM_HYDRIDE_IONS = {
-    ("N", 1, 4): "ammonium",
-    ("N", -1, 2): "azanide",
-    ("O", -1, 1): "hydroxide",
-    ("O", -2, 0): "oxide",
-    ("O", 1, 3): "oxonium",
-    ("S", -1, 1): "sulfanide",
-    ("S", -2, 0): "sulfide",
-    ("P", 1, 4): "phosphanium",
-    ("H", 1, 0): "hydron",
-    ("H", -1, 0): "hydride",
-    ("Se", -2, 0): "selenide",
-}
-
-# P-21.1.1.1, P-67.1.1.1, P-68.3.1.1.1: small inorganic parents with retained names, matched as whole
-# graphs -- (sorted atom symbols, sorted bonds as (symbol, symbol, order)).
-RETAINED_SMALL_INORGANIC_PARENTS: dict[tuple[tuple[tuple[str, int], ...], tuple[tuple[str, str, int], ...]], str] = {}
-
-
-def _register_small_parent(name: str, atoms: list[tuple[str, int]], bonds: list[tuple[str, str, int]]) -> None:
-    key = (tuple(sorted(atoms)), tuple(sorted((min(a, b), max(a, b), order) for a, b, order in bonds)))
-    RETAINED_SMALL_INORGANIC_PARENTS[key] = name
-
-
-for _name, _atoms, _bonds in (
-    ("hydroxylamine", [("N", 0), ("O", 0)], [("N", "O", 1)]),
-    ("hydrogen peroxide", [("O", 0), ("O", 0)], [("O", "O", 1)]),
-    ("phosphonic acid", [("O", 0)] * 3 + [("P", 0)], [("O", "P", 1), ("O", "P", 1), ("O", "P", 2)]),
-    ("phosphinic acid", [("O", 0)] * 2 + [("P", 0)], [("O", "P", 1), ("O", "P", 2)]),
-    ("sulfuric diamide", [("N", 0)] * 2 + [("O", 0)] * 2 + [("S", 0)], [("N", "S", 1)] * 2 + [("O", "S", 2)] * 2),
-    ("diphosphoric acid", [("O", 0)] * 7 + [("P", 0)] * 2, [("O", "P", 1)] * 6 + [("O", "P", 2)] * 2),
-    # P-65.2.1.3 / P-65.2.2: carbonic acid halides and the carbon oxides and sulfides.
-    ("carbon dioxide", [("C", 0), ("O", 0), ("O", 0)], [("C", "O", 2)] * 2),
-    ("carbon disulfide", [("C", 0), ("S", 0), ("S", 0)], [("C", "S", 2)] * 2),
-    ("carbonyl sulfide", [("C", 0), ("O", 0), ("S", 0)], [("C", "O", 2), ("C", "S", 2)]),
-    ("carbon monoxide", [("C", -1), ("O", 1)], [("C", "O", 3)]),
-    (
-        "carbonyl dichloride",
-        [("C", 0), ("O", 0), ("Cl", 0), ("Cl", 0)],
-        [("C", "O", 2), ("C", "Cl", 1), ("C", "Cl", 1)],
-    ),
-    ("carbonyl difluoride", [("C", 0), ("O", 0), ("F", 0), ("F", 0)], [("C", "O", 2), ("C", "F", 1), ("C", "F", 1)]),
-    ("carbonyl dibromide", [("C", 0), ("O", 0), ("Br", 0), ("Br", 0)], [("C", "O", 2), ("C", "Br", 1), ("C", "Br", 1)]),
-    ("thiocyanic acid", [("C", 0), ("N", 0), ("S", 0)], [("C", "N", 3), ("C", "S", 1)]),
-    ("isocyanic acid", [("C", 0), ("N", 0), ("O", 0)], [("C", "N", 2), ("C", "O", 2)]),
-    ("isothiocyanic acid", [("C", 0), ("N", 0), ("S", 0)], [("C", "N", 2), ("C", "S", 2)]),
-    ("cyanate", [("C", 0), ("N", 0), ("O", -1)], [("C", "N", 3), ("C", "O", 1)]),
-    ("cyanate", [("C", 0), ("N", -1), ("O", 0)], [("C", "N", 2), ("C", "O", 2)]),
-    ("thiocyanate", [("C", 0), ("N", 0), ("S", -1)], [("C", "N", 3), ("C", "S", 1)]),
-    ("thiocyanate", [("C", 0), ("N", -1), ("S", 0)], [("C", "N", 2), ("C", "S", 2)]),
-    ("cyanide", [("C", -1), ("N", 0)], [("C", "N", 3)]),
-    ("azide", [("N", -1), ("N", 1), ("N", -1)], [("N", "N", 2), ("N", "N", 2)]),
-    ("nitrate", [("N", 1), ("O", 0), ("O", -1), ("O", -1)], [("N", "O", 2), ("N", "O", 1), ("N", "O", 1)]),
-    ("nitrite", [("N", 0), ("O", 0), ("O", -1)], [("N", "O", 2), ("N", "O", 1)]),
-    ("peroxide", [("O", -1), ("O", -1)], [("O", "O", 1)]),
-):
-    _register_small_parent(_name, _atoms, _bonds)
-
-
-def _small_inorganic_signature(mol: Molecule, component_atoms: set[int]):
-    atoms = tuple(sorted((mol.atoms[idx].symbol, int(mol.atoms[idx].charge)) for idx in component_atoms))
-    bonds = []
-    for bond in mol.bonds.values():
-        if bond.u in component_atoms and bond.v in component_atoms:
-            a, b = sorted((mol.atoms[bond.u].symbol, mol.atoms[bond.v].symbol))
-            bonds.append((a, b, int(bond.order)))
-    return atoms, tuple(sorted(bonds))
-
-
-def small_inorganic_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
-    """Whole-graph retained names for the small inorganic parents (hydroxylamine, hydrogen peroxide, ...)."""
-
-    if len(component_atoms) < 2 or len(component_atoms) > 9:
-        return None
-    if any(mol.atoms[idx].total_h_count for idx in component_atoms if mol.atoms[idx].symbol == "C"):
-        return None
-    name = RETAINED_SMALL_INORGANIC_PARENTS.get(_small_inorganic_signature(mol, component_atoms))
-    if name is None:
-        return None
-    return _component_name_result(mol, component_atoms, name, "small_inorganic_parent")
-
-
 def structural_replacement_parent_name(
     mol: Molecule,
     component_atoms: set[int],
@@ -256,7 +132,6 @@ def structural_replacement_parent_result(
     """Return a graph-bound replacement-parent hydride name result."""
 
     renderers = (
-        ("small_inorganic_parent", lambda: small_inorganic_parent_result(mol, component_atoms)),
         ("biphenyl_parent", lambda: biphenyl_parent_result(mol, component_atoms)),
         ("diazo_lambda_heteroring_parent", lambda: diazo_lambda_heteroring_parent_name(mol, component_atoms)),
         ("simple_azine_parent", lambda: simple_azine_parent_name(mol, component_atoms, branch_namer)),

@@ -51,6 +51,19 @@ class RenderedSubstituentName:
 RenderedSubstituentText = str | RenderedSubstituentName
 
 
+class AuditableSubstituentTree(dict):
+    """Public naming-tree data with a private recursive reconstruction plan.
+
+    The object deliberately remains a plain ``dict`` to serializers and callers.
+    The assembly plan is an in-process audit detail and is therefore kept out of
+    the mapping itself.
+    """
+
+    def __init__(self, *args, audit_parts: AssemblyParts, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.audit_parts = audit_parts
+
+
 def split_rendered_substituent_name(name: RenderedSubstituentText) -> tuple[str, bool]:
     """Return plain text and explicit boundary metadata for a rendered name."""
 
@@ -79,6 +92,11 @@ class SubstituentItem:
     spiro: SpiroAssembly | None = None
     outer_parentheses_optional: bool = False
 
+    def __post_init__(self) -> None:
+        # Keep this outside the dataclass fields: dataclasses.asdict() is used by
+        # metadata consumers and must not expose or recursively copy audit plans.
+        self._audit_parts = getattr(self.substituent_tree, "audit_parts", None)
+
 
 @dataclass
 class UnsaturationItem:
@@ -95,6 +113,11 @@ class PrincipalGroupItem:
     atom_ids: set[int] = field(default_factory=set)
     bond_ids: set[int] = field(default_factory=set)
     charge_atom_ids: set[int] = field(default_factory=set)
+    positive_nitrogen_suffix_atom_ids: set[int] = field(default_factory=set)
+
+    @property
+    def has_positive_nitrogen(self) -> bool:
+        return bool(self.positive_nitrogen_suffix_atom_ids)
 
 
 @dataclass(frozen=True)
@@ -163,6 +186,7 @@ class AssemblyParts:
     indicated_hydrogens: list[str] = field(default_factory=list)
     hydro_operations: list[HydroOperation] = field(default_factory=list)
     parent_charges: list[ParentChargeItem] = field(default_factory=list)
+    parent_lambda_conventions: dict[str, int] = field(default_factory=dict)
     parent_atom_ids: set[int] = field(default_factory=set)
     parent_bond_ids: set[int] = field(default_factory=set)
     parent_atom_ids_by_locant: dict[str, int] = field(default_factory=dict)

@@ -3,7 +3,7 @@
 import pytest
 from rdkit import Chem
 
-from openclatura.resonance_compare import equivalent_smiles
+from openclatura.resonance_compare import _kekule_resonance_equivalent, equivalent_smiles
 
 
 def _bridged_conjugated_graph(ligand_length):
@@ -74,3 +74,8 @@ def test_bridged_conjugated_kekule_drawings_are_equivalent(ligand_length):
 )
 def test_resonance_does_not_hide_other_graph_changes(left, right):
     assert equivalent_smiles(left, right) == (Chem.CanonSmiles(left) == Chem.CanonSmiles(right))
+
+
+def test_null_resonance_candidate_is_ignored(monkeypatch):
+    monkeypatch.setattr(Chem, "ResonanceMolSupplier", lambda *_args, **_kwargs: [None])
+    assert not _kekule_resonance_equivalent("C1=CC=CC=C1", "c1ccccc1")

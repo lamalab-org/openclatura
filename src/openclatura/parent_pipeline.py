@@ -3,6 +3,7 @@
 from dataclasses import asdict
 
 from .assembly_parts import AssemblyParts, NameAtomBinding, ParentChargeItem, RetainedParentMetadata
+from .charge_pair_roles import charge_pair_roles
 from .fusion.context import current_fusion_mode
 from .fusion.model import FusionMode, PinDecision, PinStatus
 from .heteroatom_subgraphs import upstream_bond_order
@@ -18,6 +19,7 @@ from .ring_parent import ParentHydrideKind, RingParent
 from .ring_renderer import is_von_baeyer_descriptor
 from .rules import retained
 from .small_ring_stereo import scoped_small_ring_stereo_features
+from .stereo_descriptors import parent_absolute_stereo_citation
 from .subgraph_tools import subgraph_locant_getter
 from .trace_helpers import trace_decision
 
@@ -388,6 +390,7 @@ def resolve_parent_hydride_plan(
     retained_parent_metadata: RetainedParentMetadata | None = None,
     decision_trace: DecisionTrace | None = None,
     retained_proof_source: str = "retained_template",
+    has_spiro_substituent: bool = False,
 ) -> RingParent | None:
     """Resolve one ring parent-hydride handoff without changing selection rules.
 
@@ -405,11 +408,24 @@ def resolve_parent_hydride_plan(
                 descriptor=selection.polycycle_descriptor,
                 paths=selection.paths,
             )
-        return parent.with_retained_identity(
-            name=retained_name,
-            locant_maps=locant_maps,
-            metadata=retained_parent_metadata,
-            proof_source=retained_proof_source,
+        maps_cover_parent = not locant_maps or all(
+            set(locant_map) == set(parent.atoms) and len(set(locant_map.values())) == len(parent.atoms)
+            for locant_map in locant_maps
+        )
+        if maps_cover_parent:
+            return parent.with_retained_identity(
+                name=retained_name,
+                locant_maps=locant_maps,
+                metadata=retained_parent_metadata,
+                proof_source=retained_proof_source,
+            )
+        trace_decision(
+            decision_trace,
+            TracePhase.PARENT_SELECTION,
+            "rejected partial retained-parent proof",
+            "Retained locant maps must be complete bijections over the selected parent before its name can be used.",
+            atoms=set(parent.atoms),
+            data={"retained_name": retained_name, "locant_map_count": len(locant_maps)},
         )
 
     if selection.is_bicycle or selection.is_polycycle:
@@ -433,8 +449,29 @@ def resolve_parent_hydride_plan(
             selection,
             decision_trace=decision_trace,
         )
-        if bridged_parent is not None:
+        spiro_polycycle_precedence = (
+            has_spiro_substituent
+            and parent is not None
+            and parent.audit_ok
+            and is_von_baeyer_descriptor(parent.descriptor)
+        )
+        bridged_retained_parent = (
+            bridged_parent is not None
+            and bridged_parent.fusion_wrapper_plan is not None
+            and bridged_parent.fusion_wrapper_plan.parent.hydride.hydride_kind is ParentHydrideKind.RETAINED
+        )
+        if bridged_parent is not None and (not spiro_polycycle_precedence or bridged_retained_parent):
             return bridged_parent
+        if spiro_polycycle_precedence:
+            trace_decision(
+                decision_trace,
+                TracePhase.PARENT_SELECTION,
+                "kept audited polycycle for spiro assembly",
+                "The complete von Baeyer parent remains intact before joining the independently numbered spiro side.",
+                atoms=selection.atom_set,
+                data={"reason": "spiro_component_parent_precedence"},
+            )
+            return parent
     return parent
 
 
@@ -457,12 +494,20 @@ def build_parent_assembly_plan(
         and retained_name is not None
         and parent_hydride.hydride_kind is not ParentHydrideKind.RETAINED
     ):
-        retained_parent_metadata = retained_parent_metadata or retained.parent_metadata(retained_name)
-        parent_hydride = parent_hydride.with_retained_identity(
-            name=retained_name,
-            locant_maps=locant_maps,
-            metadata=retained_parent_metadata,
+        maps_cover_parent = not locant_maps or all(
+            set(locant_map) == set(parent_hydride.atoms) and len(set(locant_map.values())) == len(parent_hydride.atoms)
+            for locant_map in locant_maps
         )
+        if maps_cover_parent:
+            retained_parent_metadata = retained_parent_metadata or retained.parent_metadata(retained_name)
+            parent_hydride = parent_hydride.with_retained_identity(
+                name=retained_name,
+                locant_maps=locant_maps,
+                metadata=retained_parent_metadata,
+            )
+        else:
+            retained_name = None
+            retained_parent_metadata = None
     if parent_hydride is not None:
         retained_name = parent_hydride.retained_name or retained_name
         retained_parent_metadata = parent_hydride.metadata or retained_parent_metadata
@@ -618,6 +663,9 @@ def build_parent_parts(
         parent_bond_ids=bond_ids_within(mol, set(numbered_path)),
         **assembly_overrides,
     )
+    resonance_neutralized_charge_atoms = {
+        role.negative_atom for role in charge_pair_roles(mol) if role.neutralizes_parent_charge
+    }
     for atom_idx in numbered_path:
         locant = str(get_loc(atom_idx))
         parts.parent_atom_ids_by_locant[locant] = atom_idx
@@ -625,8 +673,16 @@ def build_parent_parts(
         parts.parent_atom_charges_by_locant[locant] = mol.atoms[atom_idx].charge
         parts.parent_atom_isotopes_by_locant[locant] = mol.atoms[atom_idx].isotope
         if mol.atoms[atom_idx].stereo:
-            parts.stereo_features.append((get_loc(atom_idx), mol.atoms[atom_idx].stereo))
-        if mol.atoms[atom_idx].charge:
+            citation = parent_absolute_stereo_citation(
+                mol,
+                atom_idx,
+                is_ring=selection.is_ring,
+                is_substituent=intent.is_substituent,
+                retained_name=retained_name,
+            )
+            parts.absolute_stereo_citations[atom_idx] = citation
+            parts.stereo_features.append((get_loc(atom_idx), citation.descriptor))
+        if mol.atoms[atom_idx].charge and atom_idx not in resonance_neutralized_charge_atoms:
             parts.parent_charges.append(
                 ParentChargeItem(
                     locant=locant,

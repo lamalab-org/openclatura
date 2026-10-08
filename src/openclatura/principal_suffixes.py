@@ -4,7 +4,7 @@ from .nomenclature import FunctionalGroupRule
 from .rules import multipliers
 
 
-def render_principal_suffix(rule: FunctionalGroupRule, count: int) -> str:
+def render_principal_suffix(rule: FunctionalGroupRule, count: int, *, positive_nitrogen: bool = False) -> str:
     """Render a principal-group suffix for one or more equivalent groups.
 
     ``FunctionalGroupRule.suffix_multiplier_positions`` stores the suffix
@@ -13,11 +13,16 @@ def render_principal_suffix(rule: FunctionalGroupRule, count: int) -> str:
     for every group and count.
     """
 
-    if not rule.suffix:
+    suffix = (
+        rule.positive_nitrogen_suffix
+        if positive_nitrogen and count == 1 and rule.positive_nitrogen_suffix
+        else rule.suffix
+    )
+    if not suffix:
         return ""
     if count <= 1:
-        return rule.suffix
-    words = rule.suffix.split()
+        return suffix
+    words = suffix.split()
     positions = set(rule.suffix_multiplier_positions or (0,))
     multiplier = multipliers.basic(count)
     rendered = [f"{multiplier}{word}" if idx in positions else word for idx, word in enumerate(words)]

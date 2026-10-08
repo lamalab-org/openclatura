@@ -5,6 +5,7 @@ from typing import TypedDict
 
 from .assembly_parts import (
     AssemblyParts,
+    AuditableSubstituentTree,
     NameTokenBinding,
     RenderedSubstituentName,
     SubstituentItem,
@@ -164,6 +165,8 @@ def add_substituent_trace(
                 substituent_tree,
                 existing.name,
             )
+            if getattr(existing, "_audit_parts", None) is None:
+                existing._audit_parts = getattr(substituent_tree, "audit_parts", None)
         existing.emitted_tokens = existing.emitted_tokens + tuple(emitted_tokens)
     else:
         parts.substituents.append(
@@ -475,7 +478,7 @@ def assembly_substituent_tree(
         trace_segments = assembly_trace_segments(parts)
     component_atoms = set(atom_ids or parts.parent_atom_ids)
     component_bonds = set(bond_ids or parts.parent_bond_ids)
-    return build_naming_tree_node(
+    node = build_naming_tree_node(
         kind="fragment",
         name=name,
         atom_ids=component_atoms,
@@ -524,6 +527,7 @@ def assembly_substituent_tree(
             ],
         },
     )
+    return AuditableSubstituentTree(node, audit_parts=parts)
 
 
 def _merge_substituent_tree_instances(existing: dict | None, new: dict, name: str) -> dict:

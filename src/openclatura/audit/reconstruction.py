@@ -34,9 +34,11 @@ from typing import Literal
 
 from rdkit import Chem
 
+from ..formatting import strip_outer_parentheses
 from ..hantzsch_widman import hw_parent_template
 from ..locants import parse_system_locant, system_locant_sort_key
 from ..molecule import Molecule
+from ..nomenclature import RULES, FunctionalGroupRule
 from ..rules import elements as _elements
 from ..rules import multipliers as _multipliers
 from .naming import (
@@ -216,9 +218,9 @@ def _is_retained_chain_parent(retained_name: str) -> bool:
     namer's table so the two directions cannot drift.
     """
 
-    from ..assembly_parent import RETAINED_CHAIN_PARENTS
+    from ..assembly_parent import RETAINED_CHAIN_PARENT_RULES
 
-    return retained_name in set(RETAINED_CHAIN_PARENTS.values())
+    return retained_name in {rule.name for rule in RETAINED_CHAIN_PARENT_RULES.values()}
 
 
 @lru_cache(maxsize=1)
@@ -259,49 +261,56 @@ def _lookup_parent_template(retained_name: str) -> tuple[str, list[str]] | None:
     return hw_parent_template(retained_name)
 
 
-_DIRECT_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int], ...]] = {
-    "alcohol": (("O", 1),),
-    "thiol": (("S", 1),),
-    "amine": (("N", 1),),
-    "ketone": (("O", 2),),
-    "aldehyde": (("O", 2),),
-    "thioaldehyde": (("S", 2),),
-    "imine": (("N", 2),),
-    "carboxylic_acid": (("O", 2), ("O", 1)),
-    "amide": (("O", 2), ("N", 1)),
-    "urea": (("O", 2), ("N", 1), ("N", 1)),
+_DIRECT_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int, int], ...]] = {
+    "alcohol": (("O", 1, 0),),
+    "thiol": (("S", 1, 0),),
+    "amine": (("N", 1, 0),),
+    "ketone": (("O", 2, 0),),
+    "aldehyde": (("O", 2, 0),),
+    "thioaldehyde": (("S", 2, 0),),
+    "imine": (("N", 2, 0),),
+    "carboxylic_acid": (("O", 2, 0), ("O", 1, 0)),
+    "carboxylate": (("O", 2, 0), ("O", 1, -1)),
+    "amide": (("O", 2, 0), ("N", 1, 0)),
+    "urea": (("O", 2, 0), ("N", 1, 0), ("N", 1, 0)),
     # The amine nitrogen is N and the imino nitrogen N' (P-66.4.1.1.1.3); decorate in that order.
-    "amidine": (("N", 1), ("N", 2)),
-    "guanidine": (("N", 1), ("N", 2), ("N", 1)),
-    "thioamide": (("S", 2), ("N", 1)),
-    "thiourea": (("S", 2), ("N", 1), ("N", 1)),
-    "nitrile": (("N", 3),),
-    "acid_chloride": (("O", 2), ("Cl", 1)),
-    "acid_fluoride": (("O", 2), ("F", 1)),
-    "acid_bromide": (("O", 2), ("Br", 1)),
-    "acid_iodide": (("O", 2), ("I", 1)),
+    "amidine": (("N", 1, 0), ("N", 2, 0)),
+    "guanidine": (("N", 1, 0), ("N", 2, 0), ("N", 1, 0)),
+    "thioamide": (("S", 2, 0), ("N", 1, 0)),
+    "thiourea": (("S", 2, 0), ("N", 1, 0), ("N", 1, 0)),
+    "nitrile": (("N", 3, 0),),
+    "acid_chloride": (("O", 2, 0), ("Cl", 1, 0)),
+    "acid_fluoride": (("O", 2, 0), ("F", 1, 0)),
+    "acid_bromide": (("O", 2, 0), ("Br", 1, 0)),
+    "acid_iodide": (("O", 2, 0), ("I", 1, 0)),
+    "aminium": (("N", 1, 1),),
+    "iminium": (("N", 2, 1),),
+    "aminide": (("N", 1, -1),),
+    "olate": (("O", 1, -1),),
+    "thiolate": (("S", 1, -1),),
 }
-_EXOCYCLIC_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int], ...]] = {
-    "ring_aldehyde": (("O", 2),),
-    "ring_carboxylic_acid": (("O", 2), ("O", 1)),
-    "ring_amide": (("O", 2), ("N", 1)),
-    "ring_amidine": (("N", 1), ("N", 2)),
-    "ring_thioamide": (("S", 2), ("N", 1)),
-    "ring_nitrile": (("N", 3),),
-    "ring_acid_chloride": (("O", 2), ("Cl", 1)),
-    "ring_acid_fluoride": (("O", 2), ("F", 1)),
-    "ring_acid_bromide": (("O", 2), ("Br", 1)),
-    "ring_acid_iodide": (("O", 2), ("I", 1)),
+_EXOCYCLIC_SUFFIX_GROUPS: dict[str, tuple[tuple[str, int, int], ...]] = {
+    "ring_aldehyde": (("O", 2, 0),),
+    "ring_carboxylic_acid": (("O", 2, 0), ("O", 1, 0)),
+    "ring_carboxylate": (("O", 2, 0), ("O", 1, -1)),
+    "ring_amide": (("O", 2, 0), ("N", 1, 0)),
+    "ring_amidine": (("N", 1, 0), ("N", 2, 0)),
+    "ring_thioamide": (("S", 2, 0), ("N", 1, 0)),
+    "ring_nitrile": (("N", 3, 0),),
+    "ring_acid_chloride": (("O", 2, 0), ("Cl", 1, 0)),
+    "ring_acid_fluoride": (("O", 2, 0), ("F", 1, 0)),
+    "ring_acid_bromide": (("O", 2, 0), ("Br", 1, 0)),
+    "ring_acid_iodide": (("O", 2, 0), ("I", 1, 0)),
 }
-_HUB_ACID_GROUPS: dict[str, tuple[str, tuple[tuple[str, int], ...]]] = {
-    "sulfonic_acid": ("S", (("O", 2), ("O", 2), ("O", 1))),
-    "sulfonamide": ("S", (("O", 2), ("O", 2), ("N", 1))),
-    "sulfonyl_fluoride": ("S", (("O", 2), ("O", 2), ("F", 1))),
-    "sulfonyl_chloride": ("S", (("O", 2), ("O", 2), ("Cl", 1))),
-    "sulfonyl_bromide": ("S", (("O", 2), ("O", 2), ("Br", 1))),
-    "sulfonyl_iodide": ("S", (("O", 2), ("O", 2), ("I", 1))),
-    "sulfinic_acid": ("S", (("O", 2), ("O", 1))),
-    "phosphonic_acid": ("P", (("O", 2), ("O", 1), ("O", 1))),
+_HUB_ACID_GROUPS: dict[str, tuple[str, tuple[tuple[str, int, int], ...]]] = {
+    "sulfonic_acid": ("S", (("O", 2, 0), ("O", 2, 0), ("O", 1, 0))),
+    "sulfonamide": ("S", (("O", 2, 0), ("O", 2, 0), ("N", 1, 0))),
+    "sulfonyl_fluoride": ("S", (("O", 2, 0), ("O", 2, 0), ("F", 1, 0))),
+    "sulfonyl_chloride": ("S", (("O", 2, 0), ("O", 2, 0), ("Cl", 1, 0))),
+    "sulfonyl_bromide": ("S", (("O", 2, 0), ("O", 2, 0), ("Br", 1, 0))),
+    "sulfonyl_iodide": ("S", (("O", 2, 0), ("O", 2, 0), ("I", 1, 0))),
+    "sulfinic_acid": ("S", (("O", 2, 0), ("O", 1, 0))),
+    "phosphonic_acid": ("P", (("O", 2, 0), ("O", 1, 0), ("O", 1, 0))),
 }
 
 _FRAGMENT_SUFFIX_GROUPS: dict[str, str] = {
@@ -403,6 +412,13 @@ def _structural_verdict(mol, atoms, parts, reference) -> tuple[str, str, str | N
         return "abstained", "reconstructed graph failed sanitisation", None, None
     if reconstructed == reference:
         return "confirmed", "", reconstructed, rebuilt
+    if _has_systematic_fusion_parent(parts) and _saturated_locants(parts):
+        return (
+            "abstained",
+            "systematic-fusion mancude reconstruction is not unique enough to reject the name",
+            reconstructed,
+            rebuilt,
+        )
     return "mismatch", f"reconstructed {reconstructed!r} != input {reference!r}", reconstructed, rebuilt
 
 
@@ -627,15 +643,25 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
     """Rebuild the component skeleton from ``parts``; raise ``_Abstain`` if any
     construct is not modelled."""
 
+    rw, _locants = _reconstruct_numbered_from_parts(parts)
+    return rw
+
+
+def _reconstruct_numbered_from_parts(
+    parts, *, allow_substituent: bool = False, audit_depth: int = 0
+) -> tuple[Chem.RWMol, dict[str, int]]:
+    """Rebuild a component and retain its locant map for recursive attachment."""
+
+    if audit_depth > 16:
+        raise _Abstain("recursive substituent reconstruction depth exceeded")
+
     has_template = (
         parts.retained_name is not None and _lookup_parent_template(parts.retained_name) is not None
     ) or _has_systematic_fusion_parent(parts)
-    if getattr(parts, "is_substituent", False):
+    if getattr(parts, "is_substituent", False) and not allow_substituent:
         raise _Abstain("substituent component (audited via recursion, not here)")
     if parts.front_modifiers and not _is_ester_component(parts):
         raise _Abstain("front modifiers not modelled")
-    if parts.parent_charges:
-        raise _Abstain("parent charges not modelled")
     saturated = _saturated_locants(parts)
     paired_external_pi = False
     if _has_systematic_fusion_parent(parts):
@@ -657,18 +683,11 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
                 )
             )
     ring_ketone = parts.principal_group is not None and parts.principal_group.key == "ketone"
-    rebuild_unsaturation = has_template and (
-        paired_external_pi
-        or len(saturated) > 1
-        or any(op.operation_kind == "additive_hydrogen" for op in parts.hydro_operations)
-    )
+    rebuild_unsaturation = has_template and bool(saturated)
     if saturated and not has_template:
         raise _Abstain("saturated ring positions without a retained template")
     if saturated and not rebuild_unsaturation and len(parts.indicated_hydrogens) != 1:
         raise _Abstain("indicated hydrogen position not modelled")
-    if parts.principal_suffix_modifiers:
-        raise _Abstain("principal-suffix modifiers not modelled")
-
     rw, locants, aromatic_ring = _build_parent(parts)
     implied = _implied_ketone_saturation(rw, locants, parts) if ring_ketone and aromatic_ring else set()
     rebuild_unsaturation = rebuild_unsaturation or bool(implied)
@@ -681,11 +700,13 @@ def _reconstruct_from_parts(parts) -> Chem.RWMol:
         raise _Abstain(f"indicated hydrogen {parts.indicated_hydrogens[0]} not placeable")
     _apply_replacements(rw, locants, parts, aromatic_ring)
     _apply_unsaturations(rw, locants, parts, aromatic_ring)
-    _apply_principal_group(rw, locants, parts)
-    _apply_substituents(rw, locants, parts)
+    _apply_parent_charges(rw, locants, parts)
+    _apply_principal_group(rw, locants, parts, audit_depth=audit_depth)
+    _apply_principal_suffix_modifiers(rw, locants, parts, audit_depth=audit_depth)
+    _apply_substituents(rw, locants, parts, audit_depth=audit_depth)
     if rebuild_unsaturation:
         _close_mancude_template(rw, template_idxs, saturated_idxs)
-    return rw
+    return rw, locants
 
 
 def _saturated_locants(parts) -> tuple[str, ...]:
@@ -698,10 +719,7 @@ def _saturated_locants(parts) -> tuple[str, ...]:
 
     locants = [str(loc) for loc in parts.indicated_hydrogens]
     added = [
-        str(loc)
-        for operation in parts.hydro_operations
-        if operation.operation_kind == "additive_hydrogen"
-        for loc in operation.locants
+        str(loc) for operation in parts.hydro_operations if operation.saturates_parent for loc in operation.locants
     ]
     if added and not locants:
         locants = _stem_indicated_hydrogen_locants(parts.retained_name)
@@ -804,6 +822,8 @@ def _close_mancude_template(rw: Chem.RWMol, template_idxs: tuple[int, ...], satu
             continue  # a suffix (=O) or an ylidene substituent already took it
         if atom.GetAtomicNum() in _MANCUDE_SINGLE_BONDED:
             continue  # a ring chalcogen is single-bonded in every mancude parent
+        if not _can_accept_ring_double_bond(atom):
+            continue  # e.g. a neutral, three-coordinate pyrrole-like nitrogen
         unsaturated.append(idx)
     if not unsaturated:
         return
@@ -815,24 +835,31 @@ def _close_mancude_template(rw: Chem.RWMol, template_idxs: tuple[int, ...], satu
         if bond.GetBeginAtomIdx() in pending and bond.GetEndAtomIdx() in pending
     ]
 
-    solutions: list[tuple[int, ...]] = []
+    memo: dict[frozenset[int], tuple[tuple[int, ...], ...]] = {}
 
-    def search(remaining: frozenset[int], chosen: tuple[int, ...]) -> None:
-        if len(solutions) > _MAX_RING_BOND_PLACEMENTS:
-            return
+    def search(remaining: frozenset[int]) -> tuple[tuple[int, ...], ...]:
         if not remaining:
-            solutions.append(chosen)
-            return
+            return ((),)
+        if remaining in memo:
+            return memo[remaining]
+        if len(memo) >= _MAX_RING_MATCHING_STATES:
+            raise _Abstain("ring double-bond placement search budget exhausted")
         pivot = min(remaining)
+        solutions: list[tuple[int, ...]] = []
         for begin, end, bond_idx in ring_bonds:
             if pivot not in (begin, end):
                 continue
             partner = end if begin == pivot else begin
             if partner not in remaining:
                 continue
-            search(remaining - {pivot, partner}, chosen + (bond_idx,))
+            solutions.extend((bond_idx, *suffix) for suffix in search(remaining - {pivot, partner}))
+            if len(solutions) > _MAX_RING_BOND_PLACEMENTS:
+                break
+        result = tuple(solutions[: _MAX_RING_BOND_PLACEMENTS + 1])
+        memo[remaining] = result
+        return result
 
-    search(pending, ())
+    solutions = list(search(pending))
     if not solutions:
         raise _Abstain("no ring double-bond placement fits the cited saturation")
     if len(solutions) > _MAX_RING_BOND_PLACEMENTS:
@@ -847,7 +874,27 @@ def _close_mancude_template(rw: Chem.RWMol, template_idxs: tuple[int, ...], satu
         rw.GetBondWithIdx(bond_idx).SetBondType(Chem.BondType.DOUBLE)
 
 
+def _can_accept_ring_double_bond(atom: Chem.Atom) -> bool:
+    """Whether one incident single bond can be promoted without exceeding valence.
+
+    Mancude templates contain atoms which are part of the ring skeleton but do
+    not participate in its pi matching.  In particular, a substituted neutral
+    pyrrole-like nitrogen already has three sigma bonds.  Treating it as a
+    matching vertex makes otherwise valid fused systems appear impossible.
+    """
+
+    valences = Chem.GetPeriodicTable().GetValenceList(atom.GetAtomicNum())
+    if not valences:
+        return True
+    current = sum(int(bond.GetBondTypeAsDouble()) for bond in atom.GetBonds()) + atom.GetNumExplicitHs()
+    charge = atom.GetFormalCharge()
+    if atom.GetAtomicNum() in (5, 7, 15, 33, 51) and charge > 0:
+        current -= charge
+    return any(valence < 0 or current < valence for valence in valences)
+
+
 _MAX_RING_BOND_PLACEMENTS = 16
+_MAX_RING_MATCHING_STATES = 4096
 
 
 def _placement_structure(rw: Chem.RWMol, solution: tuple[int, ...]) -> str | None:
@@ -1008,6 +1055,19 @@ def _apply_unsaturations(rw: Chem.RWMol, locants: dict[str, int], parts, aromati
             bond.SetBondType(_BOND_TYPES[order])
 
 
+def _apply_parent_charges(rw: Chem.RWMol, locants: dict[str, int], parts) -> None:
+    """Apply explicitly locanted ``ium``/``ide`` parent charge operations."""
+
+    for item in parts.parent_charges:
+        idx = locants.get(str(item.locant))
+        if idx is None:
+            raise _Abstain(f"parent charge locant {item.locant} outside parent")
+        atom = rw.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != item.symbol:
+            raise _Abstain(f"parent charge at {item.locant} names {item.symbol}, template has {atom.GetSymbol()}")
+        atom.SetFormalCharge(item.charge)
+
+
 def _parse_unsaturation_locant(token: str) -> tuple[str | None, str | None]:
     """Split an unsaturation locant into (start, explicit-partner). ``4`` -> the
     bond 4→5 (partner ``None``); ``3a(7a)`` cites a fusion bond."""
@@ -1037,25 +1097,27 @@ def _next_locant_idx(locants: dict[str, int], locant: str, is_ring: bool) -> int
     return None
 
 
-_ESTER_DIRECT = {"ester", "carboxylate"}
-_ESTER_EXOCYCLIC = {"ring_carboxylate"}
 _ESTER_SULFONATE = {"sulfonate"}
-_ESTER_KEYS = _ESTER_DIRECT | _ESTER_EXOCYCLIC | _ESTER_SULFONATE
 
 
 def _is_ester_component(parts) -> bool:
     pg = parts.principal_group
-    return pg is not None and pg.key in _ESTER_KEYS
+    return pg is not None and RULES.functional_groups.get(pg.key).uses_front_modifier
 
 
-def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts) -> None:
+def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts, *, audit_depth: int = 0) -> None:
     pg = parts.principal_group
     if pg is None:
         if parts.front_modifiers:
             raise _Abstain("front modifiers without a principal group")
         return
-    if pg.key in _ESTER_KEYS:
-        _apply_ester(rw, locants, parts)
+    group_rule = RULES.functional_groups.get(pg.key)
+    if group_rule.is_peroxy_acid:
+        _apply_peroxy_acid(rw, locants, pg, group_rule)
+        return
+    suffix_group = pg.key in _DIRECT_SUFFIX_GROUPS or pg.key in _EXOCYCLIC_SUFFIX_GROUPS
+    if group_rule.uses_front_modifier and (parts.front_modifiers or not suffix_group):
+        _apply_ester(rw, locants, parts, audit_depth=audit_depth)
         return
     if pg.key in _HUB_ACID_GROUPS:
         hub_element, decoration = _HUB_ACID_GROUPS[pg.key]
@@ -1116,6 +1178,43 @@ def _apply_principal_group(rw: Chem.RWMol, locants: dict[str, int], parts) -> No
     _expose_n_locants(locants, nitrogens)
 
 
+def _apply_peroxy_acid(
+    rw: Chem.RWMol,
+    locants: dict[str, int],
+    pg,
+    group_rule: FunctionalGroupRule,
+) -> None:
+    for locant in pg.locants:
+        acid_c = locants.get(str(locant))
+        if acid_c is None:
+            raise _Abstain(f"principal-group locant {locant} outside parent")
+        if group_rule.suffix_carbon_is_exocyclic:
+            parent_idx = acid_c
+            acid_c = rw.AddAtom(Chem.Atom(6))
+            rw.AddBond(parent_idx, acid_c, Chem.BondType.SINGLE)
+        oxo = rw.AddAtom(Chem.Atom(8))
+        rw.AddBond(acid_c, oxo, Chem.BondType.DOUBLE)
+        inner_o = rw.AddAtom(Chem.Atom(8))
+        outer_o = rw.AddAtom(Chem.Atom(8))
+        rw.AddBond(acid_c, inner_o, Chem.BondType.SINGLE)
+        rw.AddBond(inner_o, outer_o, Chem.BondType.SINGLE)
+
+
+def _apply_principal_suffix_modifiers(rw: Chem.RWMol, locants: dict[str, int], parts, *, audit_depth: int = 0) -> None:
+    """Attach ligands cited after a hydrazone suffix to its terminal nitrogen."""
+
+    if not parts.principal_suffix_modifiers:
+        return
+    target = locants.get("N")
+    if target is None:
+        raise _Abstain("principal-suffix modifier has no terminal nitrogen")
+    for item in parts.principal_suffix_modifiers:
+        frag = _resolve_item_fragment(item, audit_depth=audit_depth + 1)
+        if frag is None:
+            raise _Abstain(f"principal-suffix modifier {item.name!r} not modelled")
+        _graft(rw, target, frag)
+
+
 def _expose_n_locants(locants: dict[str, int], nitrogens: list[int]) -> None:
     """Register a suffix's characteristic nitrogens under the italic ``N`` locants
     so that N-substituents (N-methyl, N,N-dimethyl, N'-ethyl…) can attach.
@@ -1130,7 +1229,7 @@ def _expose_n_locants(locants: dict[str, int], nitrogens: list[int]) -> None:
             locants[key] = nitrogen
 
 
-def _apply_ester(rw: Chem.RWMol, locants: dict[str, int], parts) -> None:
+def _apply_ester(rw: Chem.RWMol, locants: dict[str, int], parts, *, audit_depth: int = 0) -> None:
     pg = parts.principal_group
     mods = list(parts.front_modifiers)
     mod_locs = [str(loc) for loc in parts.front_modifier_locants]
@@ -1138,17 +1237,28 @@ def _apply_ester(rw: Chem.RWMol, locants: dict[str, int], parts) -> None:
         mod_locs = [str(loc) for loc in pg.locants]
     if len(mods) != len(mod_locs):
         raise _Abstain("ester front-modifier/locant count mismatch")
-    for name, loc in zip(mods, mod_locs):
-        r_frag = resolve_fragment_mol(name) if name else None
+    modifier_items = parts.front_modifier_items
+    for index, (name, loc) in enumerate(zip(mods, mod_locs)):
+        item = modifier_items[index] if index < len(modifier_items) else None
+        if item is not None:
+            r_frag = _resolve_item_fragment(item, audit_depth=audit_depth + 1)
+        else:
+            r_frag = resolve_fragment_mol(name) if name else None
         if r_frag is None:
             raise _Abstain(f"ester group {name!r} not modelled")
         base_idx = locants.get(loc)
         if base_idx is None:
             raise _Abstain(f"ester locant {loc} outside parent")
-        _build_ester_group(rw, base_idx, pg.key, r_frag)
+        _build_ester_group(rw, base_idx, pg.key, RULES.functional_groups.get(pg.key), r_frag)
 
 
-def _build_ester_group(rw: Chem.RWMol, base_idx: int, key: str, r_frag: Chem.Mol) -> None:
+def _build_ester_group(
+    rw: Chem.RWMol,
+    base_idx: int,
+    key: str,
+    group_rule: FunctionalGroupRule,
+    r_frag: Chem.Mol,
+) -> None:
     if key in _ESTER_SULFONATE:
         sulfur = rw.AddAtom(Chem.Atom(16))
         rw.AddBond(base_idx, sulfur, Chem.BondType.SINGLE)
@@ -1160,21 +1270,27 @@ def _build_ester_group(rw: Chem.RWMol, base_idx: int, key: str, r_frag: Chem.Mol
         _graft(rw, ester_o, r_frag)
         return
     acid_c = base_idx
-    if key in _ESTER_EXOCYCLIC:
+    if group_rule.suffix_carbon_is_exocyclic:
         acid_c = rw.AddAtom(Chem.Atom(6))
         rw.AddBond(base_idx, acid_c, Chem.BondType.SINGLE)
     oxo = rw.AddAtom(Chem.Atom(8))
     rw.AddBond(acid_c, oxo, Chem.BondType.DOUBLE)
     ester_o = rw.AddAtom(Chem.Atom(8))
     rw.AddBond(acid_c, ester_o, Chem.BondType.SINGLE)
+    if group_rule.is_peroxy_ester:
+        peroxide_o = rw.AddAtom(Chem.Atom(8))
+        rw.AddBond(ester_o, peroxide_o, Chem.BondType.SINGLE)
+        ester_o = peroxide_o
     _graft(rw, ester_o, r_frag)
 
 
-def _decorate(rw: Chem.RWMol, base_idx: int, atoms: tuple[tuple[str, int], ...]) -> list[int]:
+def _decorate(rw: Chem.RWMol, base_idx: int, atoms: tuple[tuple[str, int, int], ...]) -> list[int]:
     """Add ``atoms`` onto ``base_idx``; return the indices of any added nitrogens."""
     nitrogens: list[int] = []
-    for element, order in atoms:
-        new = rw.AddAtom(Chem.Atom(element))
+    for element, order, charge in atoms:
+        atom = Chem.Atom(element)
+        atom.SetFormalCharge(charge)
+        new = rw.AddAtom(atom)
         rw.AddBond(base_idx, new, _BOND_TYPES[order])
         if element == "N":
             nitrogens.append(new)
@@ -1255,12 +1371,26 @@ def _apply_spiro_substituent(rw: Chem.RWMol, locants: dict[str, int], item) -> N
     _fuse_spiro(rw, base_idx, frag)
 
 
-def _apply_substituents(rw: Chem.RWMol, locants: dict[str, int], parts) -> None:
+def _apply_substituents(rw: Chem.RWMol, locants: dict[str, int], parts, *, audit_depth: int = 0) -> None:
     for item in parts.substituents:
         if item.spiro is not None:
             _apply_spiro_substituent(rw, locants, item)
             continue
-        frag = resolve_fragment_mol(item.name)
+        charged_prefix = RULES.charges.heteroatom_prefix_states.get(item.name)
+        if charged_prefix is not None:
+            bases = [locants.get(str(locant)) for locant in item.locants]
+            if any(base_idx is None for base_idx in bases):
+                missing = next(locant for locant, base_idx in zip(item.locants, bases) if base_idx is None)
+                raise _Abstain(f"substituent locant {missing} outside parent")
+            symbol, charge, order = charged_prefix
+            if all(rw.GetAtomWithIdx(base_idx).GetFormalCharge() * charge < 0 for base_idx in bases):
+                for base_idx in bases:
+                    atom = Chem.Atom(symbol)
+                    atom.SetFormalCharge(charge)
+                    atom_idx = rw.AddAtom(atom)
+                    rw.AddBond(base_idx, atom_idx, _BOND_TYPES[order])
+                continue
+        frag = _resolve_item_fragment(item, audit_depth=audit_depth + 1)
         if frag is None:
             raise _Abstain(f"substituent {item.name!r} not modelled")
         for locant in item.locants:
@@ -1268,6 +1398,54 @@ def _apply_substituents(rw: Chem.RWMol, locants: dict[str, int], parts) -> None:
             if base_idx is None:
                 raise _Abstain(f"substituent locant {locant} outside parent")
             _graft(rw, base_idx, frag)
+
+
+def _resolve_item_fragment(item, *, audit_depth: int) -> Chem.Mol | None:
+    """Resolve a named ligand textually, then from its recursive audit plan."""
+
+    frag = resolve_fragment_mol(item.name)
+    if frag is not None:
+        return frag
+    return _fragment_from_audit_parts(item, audit_depth=audit_depth)
+
+
+def _fragment_from_audit_parts(item, *, audit_depth: int) -> Chem.Mol | None:
+    """Rebuild a recursively named substituent from its typed assembly plan.
+
+    This fallback is used only when the independent text parser cannot resolve
+    the rendered prefix.  The tree name check prevents stale or mismatched
+    metadata from certifying a different fragment.
+    """
+
+    audit_parts = getattr(item, "_audit_parts", None)
+    if audit_parts is None:
+        return None
+    tree_name = (item.substituent_tree or {}).get("name")
+    if not tree_name or strip_outer_parentheses(tree_name) != strip_outer_parentheses(item.name):
+        return None
+    rw, locants = _reconstruct_numbered_from_parts(
+        audit_parts,
+        allow_substituent=True,
+        audit_depth=audit_depth,
+    )
+    attachment_idx = locants.get(str(audit_parts.attachment_locant))
+    if attachment_idx is None:
+        raise _Abstain(f"substituent attachment locant {audit_parts.attachment_locant!r} outside parent")
+    bond_type = (
+        Chem.BondType.TRIPLE
+        if audit_parts.is_triple_attach
+        else Chem.BondType.DOUBLE
+        if audit_parts.is_double_attach
+        else Chem.BondType.SINGLE
+    )
+    dummy_idx = rw.AddAtom(Chem.Atom(0))
+    rw.AddBond(dummy_idx, attachment_idx, bond_type)
+    frag = rw.GetMol()
+    try:
+        Chem.SanitizeMol(frag)
+    except Exception as exc:
+        raise _Abstain(f"recursive substituent reconstruction failed sanitisation: {exc}") from exc
+    return frag
 
 
 def _graft(rw: Chem.RWMol, base_idx: int, frag: Chem.Mol) -> None:

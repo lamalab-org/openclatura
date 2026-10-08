@@ -1,5 +1,6 @@
 import json
 import re
+from itertools import combinations
 from pathlib import Path
 
 import pytest
@@ -14,9 +15,8 @@ from openclatura import (
     graph_io,
     name_smiles,
 )
-from openclatura import (
-    analyze_smiles as _analyze_smiles,
-)
+from openclatura import analyze_smiles as _analyze_smiles
+from openclatura import name as name_result
 from openclatura.additive import add_indicated_hydrogens
 from openclatura.assembler import (
     assemble_name,
@@ -90,7 +90,7 @@ from openclatura.naming_data import namer_rules
 from openclatura.nitrogen_roles import (
     azine_roles,
     nitrogen_chain_roles,
-    terminal_n3_substituent_role,
+    terminal_nitrogen_substituent_role,
 )
 from openclatura.numbering import NUMBERING_CRITERIA, NumberingPreference
 from openclatura.oxoacid_roles import OxoLigandRole, central_oxo_roles, central_oxo_substituent_role
@@ -106,6 +106,7 @@ from openclatura.parent_selection import (
 )
 from openclatura.perception import PerceivedGroup, perceive_groups
 from openclatura.polycycle_topology import (
+    adjacency_from_edges,
     audit_von_baeyer_descriptor,
     bicyclo_proof,
     build_ring_numbering,
@@ -157,7 +158,11 @@ from openclatura.trace_helpers import (
     build_naming_tree_node,
     build_shortcut_tree_node,
 )
-from openclatura.von_baeyer import _classify_secondary_bridges, find_von_baeyer_candidates
+from openclatura.von_baeyer import (
+    _classify_secondary_bridges,
+    _three_internally_disjoint_paths,
+    find_von_baeyer_candidates,
+)
 
 # Provenance and fixture data that the package itself never loads at runtime.
 TEST_DATA_DIR = Path(__file__).resolve().parents[1] / "data"
@@ -383,6 +388,11 @@ def test_nested_stereochemical_substituent_keeps_semantic_boundary():
 def test_hydrogen_cyanide_absorbed_nitrile_name_passes_final_audit():
     assert name_smiles("C#N") == "hydrogen cyanide"
 
+    retained_rule = RULES.retained.chain_parents[(1, "nitrile", 1)]
+    assert retained_rule.name == "hydrogen cyanide"
+    assert retained_rule.substituted_name == "formonitrile"
+    assert not retained_rule.allows_carbon_substitution
+
     analysis = analyze_smiles("C#N")
     assembly_steps = [step for step in analysis.decisions if step.decision == "assembled component name"]
     tokens = assembly_steps[-1].data["name_token_spans"]
@@ -394,6 +404,15 @@ def test_hydrogen_cyanide_absorbed_nitrile_name_passes_final_audit():
     assert hydrogen["binding_indices"] == cyanide["binding_indices"]
     assert cyanide["binding_indices"]
     assert cyanide["atoms"]
+
+
+def test_retained_chain_parent_substitution_policy_is_registry_driven():
+    succinic_acid = RULES.retained.chain_parents[(4, "carboxylic_acid", 2)]
+
+    assert succinic_acid.name == "succinic acid"
+    assert not succinic_acid.allows_carbon_substitution
+    assert name_smiles("OC(=O)CCC(=O)O") == "succinic acid"
+    assert name_smiles("CC(CC(=O)O)C(=O)O") == "2-methylbutanedioic acid"
 
 
 def test_cyanamide_absorbed_nitrile_name_passes_final_audit():
@@ -411,10 +430,17 @@ def test_component_without_supported_parent_raises_instead_of_methane_fallback()
     mol = Molecule()
     mol.add_atom("H", 0)
     mol.add_atom("H", 1)
-    mol.add_bond(0, 1, order=1)
+    # H-H is the retained elemental parent dihydrogen. Use an unsupported
+    # bond order here so this remains a fail-closed parent-selection test.
+    mol.add_bond(0, 1, order=2)
 
     with pytest.raises(UnnamedAtomError):
         name_component(mol, {0, 1})
+
+
+def test_generated_parent_does_not_silently_replace_unsupported_or_radical_atoms_with_carbon():
+    assert "no skeletal-replacement prefix for parent atom In" in name_result("[InH]1CCCCC1").error
+    assert "radical parent atom B" in name_result("[B]1CCCCC1").error
 
 
 def test_component_coverage_audit_rejects_unnamed_atoms():
@@ -2699,7 +2725,7 @@ def test_cyclic_hydrazines_render_as_hydrazinyl_prefixes():
     assert generated == "4-hydrazinyl-1H-pyrazole"
 
 
-def test_terminal_n3_substituent_role_preserves_charge_and_bond_pattern():
+def test_terminal_nitrogen_substituent_role_preserves_charge_and_bond_pattern():
     mol = Molecule()
     mol.add_atom("C", 0)
     mol.add_atom("N", 1)
@@ -2709,13 +2735,37 @@ def test_terminal_n3_substituent_role_preserves_charge_and_bond_pattern():
     mol.add_bond(1, 2, order=2)
     mol.add_bond(2, 3, order=2)
 
-    role = terminal_n3_substituent_role(mol, 1, {0}, 0)
+    role = terminal_nitrogen_substituent_role(mol, 1, {0}, 0)
 
     assert role is not None
     assert role.key == "azido"
     assert role.ordered_atoms == (0, 1, 2, 3)
     assert role.charge_pattern == (0, 0, 1, -1)
     assert role.bond_orders == (1, 2, 2)
+
+
+def test_terminal_nitrogen_substituent_role_supports_longer_registered_templates():
+    mol = Molecule()
+    for idx, symbol in enumerate(("C", "N", "N", "N", "N")):
+        mol.add_atom(symbol, idx)
+    for begin, end, order in ((0, 1, 1), (1, 2, 1), (2, 3, 2), (3, 4, 1)):
+        mol.add_bond(begin, end, order=order)
+
+    role = terminal_nitrogen_substituent_role(mol, 1, {0}, 0)
+
+    assert role is not None
+    assert role.key == "hydrazonohydrazinyl"
+    assert role.name == "hydrazonohydrazinyl"
+    assert role.ordered_atoms == (0, 1, 2, 3, 4)
+    assert role.bond_orders == (1, 1, 2, 1)
+
+
+def test_nitrogen_chain_rule_identity_is_separate_from_rendered_name():
+    (template,) = RULES.nitrogen.branched_templates
+
+    assert template.group_key == "triazanyl"
+    assert template.name == "triazan-2-yl"
+    assert template.audit_smiles == "N(N)N"
 
 
 def test_substituted_cyclic_hydrazines_keep_n_ligands_in_prefix():
@@ -3841,6 +3891,7 @@ def test_parent_selection_criteria_are_data_ordered():
     profile = ParentSeniorityProfile(
         principal_group_count=1,
         contains_principal_group=True,
+        parent_charge_count=0,
         senior_element_vector=(7,),
         polycycle_parent=False,
         bicycle_parent=False,
@@ -3859,6 +3910,7 @@ def test_parent_selection_criteria_are_data_ordered():
     assert PARENT_SELECTION_CRITERIA == (
         "contains_principal_group",
         "principal_group_count",
+        "parent_charge_count",
         "senior_element_vector",
         "ring_parent",
         "ring_seniority",
@@ -3869,7 +3921,7 @@ def test_parent_selection_criteria_are_data_ordered():
         "attached_prefix_count",
         "path_tiebreak",
     )
-    assert profile.score_tuple() == (-1, -1, (7,), 0, (), (-2, 0, (0, 0, 0, 0, 0, 0)), 0, 0, 0, 0, (0, 1))
+    assert profile.score_tuple() == (-1, -1, 0, (7,), 0, (), (-2, 0, (0, 0, 0, 0, 0, 0)), 0, 0, 0, 0, (0, 1))
 
 
 def test_senior_element_vector_orders_ring_and_chain_parent_profiles():
@@ -4190,6 +4242,7 @@ def test_parent_seniority_criteria_follow_brief_guide_section_6_order():
 def test_numbering_preference_uses_data_ordered_criteria():
     preference = NumberingPreference(
         principal=(2,),
+        charge=(3,),
         hetero_by_priority=((1,),),
         indicated_hydrogen=(),
         hydro=(),
@@ -4520,6 +4573,20 @@ def test_pyopsin_regression_names_preserve_positive_nitrogen_charge():
 
     for smiles, expected in cases.items():
         assert name_smiles(smiles) == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    [
+        ("O=C[C-]1[NH2+]CCC1=O", "3-oxopyrrolidin-1-ium-2-ide-2-carbaldehyde"),
+        ("CC(=O)[C-]1[NH2+]CCC1=O", "2-acetyl-3-oxopyrrolidin-1-ium-2-ide"),
+        ("CC1CC(=O)[C-]([NH2+]1)C=O", "5-methyl-3-oxopyrrolidin-1-ium-2-ide-2-carbaldehyde"),
+        ("CC1C[NH2+][C-](C=O)C1=O", "4-methyl-3-oxopyrrolidin-1-ium-2-ide-2-carbaldehyde"),
+        ("OC1C[NH2+][C-](C=O)C1=O", "4-hydroxy-3-oxopyrrolidin-1-ium-2-ide-2-carbaldehyde"),
+    ],
+)
+def test_retained_ionic_parent_contraction_requires_a_sole_parent_charge(smiles, expected):
+    assert name_smiles(smiles) == expected
 
 
 def test_parent_charge_layer_uses_structured_sites_and_charge_filters():
@@ -4912,6 +4979,47 @@ def test_complex_spiro_fused_systems_do_not_use_linear_dispiro_renderer():
     assert generated != "dispiro[2.0.2.3]nonane"
 
 
+def test_spiro_attached_ring_does_not_erase_an_audited_polycycle_parent():
+    mol = read_smiles("C1CCC2(CC1)C(=O)C34CCCC(C3)ON4C2=O")
+
+    systems = find_ring_systems(mol)
+
+    assert [(len(system.atoms), system.polycycle_descriptor) for system in systems] == [
+        (6, None),
+        (11, "tricyclo[5.3.1.0^{1,5}]"),
+    ]
+    assert name_smiles("C1CCC2(CC1)C(=O)C34CCCC(C3)ON4C2=O") == (
+        "spiro[6-oxa-5-azatricyclo[5.3.1.0^{1,5}]undecane-3,1'-cyclohexane]-2,4-dione"
+    )
+
+
+def test_aromatic_perception_does_not_exclude_an_audited_von_baeyer_parent():
+    smiles = "C1CN1C2=C(C(=O)C3=C(C2=O)C4C5=CC=CC=C5C3C6=CC=CC=C46)Br"
+    mol = read_smiles(smiles)
+
+    ring = max(find_ring_systems(mol), key=lambda system: len(system.atoms))
+
+    assert ring.ring_parent is not None
+    assert ring.ring_parent.audit_ok
+    assert ring.polycycle_descriptor == "pentacyclo[6.6.6.0^{2,7}.0^{9,14}.0^{15,20}]"
+    assert name_smiles(smiles) == (
+        "4-(aziridin-1-yl)-5-bromopentacyclo[6.6.6.0^{2,7}.0^{9,14}.0^{15,20}]"
+        "icosa-2(7),4,9,11,13,15,17,19-octaene-3,6-dione"
+    )
+
+
+def test_real_silicon_polycycle_uses_the_audited_descriptor_search():
+    smiles = "C[Si]1(C2=CC3C(C=C2[Si](O1)(C)C)C4C5C(C3O4)C6C7=CC=CC=C7C5C8=CC=CC=C68)C"
+
+    generated = name_smiles(smiles)
+
+    assert generated == (
+        "7,7,9,9-tetramethyl-8,28-dioxa-7,9-disilaoctacyclo"
+        "[13.6.6.1^{3,13}.0^{2,14}.0^{4,12}.0^{6,10}.0^{16,21}.0^{22,27}]"
+        "octacosa-5,10,16,18,20,22,24,26-octaene"
+    )
+
+
 def test_pyopsin_regression_names_preserve_terminal_olate_charge():
     cases = {
         "[NH3+]CC1=C([O-])OC=N1": "4-(ammoniomethyl)-1,3-oxazol-5-olate",
@@ -5179,6 +5287,12 @@ def test_connection_boundary_regression_names_keep_unambiguous_attachment():
         assert name_smiles(smiles) == expected
 
 
+def test_nested_heteroatom_chain_preserves_each_attachment_boundary():
+    assert name_smiles("S=S=NSN=P(c1ccccc1)(c1ccccc1)c1ccccc1") == (
+        "(diphenyl((((thioxosulfanylidene)amino)sulfanyl)imino)phosphanyl)benzene"
+    )
+
+
 def test_one_atom_parents_drop_the_locant_their_single_position_makes_redundant():
     # A ring parent keeps its locant; a one-carbon parent has nowhere else to put the group.
     assert name_smiles("CCOC(=O)C1CCN(CC1)S(C)(=O)=O") == "ethyl 1-(methylsulfonyl)piperidine-4-carboxylate"
@@ -5293,6 +5407,15 @@ def test_von_baeyer_candidate_search_can_render_heptacyclo_candidate():
     assert candidates[0].numbering.audit_ok
 
 
+def test_von_baeyer_ranking_maximizes_the_first_main_ring_bridge():
+    smiles = "CC(C)=C1[C@H]2CC[C@H]1[C@@]13O[C@@]21[C@H]1C[C@H]3C(S(=O)(=O)c2ccccc2)=C1S(=O)(=O)c1ccccc1"
+
+    assert name_smiles(smiles) == (
+        "(1R,2R,3R,6R,7S,8R)-4,5-bis(phenylsulfonyl)-11-(propan-2-ylidene)-"
+        "12-oxapentacyclo[6.2.1.1^{2,7}.1^{3,6}.0^{2,7}]tridec-4-ene"
+    )
+
+
 def test_von_baeyer_secondary_bridge_classifier_keeps_dependent_bridges_after_independent_bridges():
     atom_set = frozenset(range(1, 10))
     edge_set = frozenset(
@@ -5332,6 +5455,48 @@ def test_von_baeyer_secondary_bridge_classifier_keeps_dependent_bridges_after_in
 
     assert bridges is not None
     assert [(bridge.length, bridge.dependent) for bridge in bridges] == [(2, False), (0, True)]
+
+
+def test_von_baeyer_secondary_bridge_classifier_decomposes_branched_remainders_into_open_ears():
+    primary_edges = {(1, 2), (2, 3), (3, 4), (4, 5), (5, 6), (6, 1), (1, 7), (7, 4)}
+    remaining_edges = {(2, 8), (8, 9), (4, 9), (8, 10), (9, 10), (6, 10)}
+    edge_set = frozenset(primary_edges | remaining_edges)
+
+    bridges = _classify_secondary_bridges(
+        atom_set=frozenset(range(1, 11)),
+        edge_set=edge_set,
+        primary_atoms={1, 2, 3, 4, 5, 6, 7},
+        remaining_edges=frozenset(remaining_edges),
+    )
+
+    assert bridges is not None
+    assert sum(bridge.length for bridge in bridges) == 3
+    assert len(bridges) == 3
+
+
+def test_dense_fused_graph_finds_a_bounded_theta_core():
+    mol = read_smiles("C1=CC2=C3C=CC4=C5C=CC6=C7C=CC8=C9C=CC%10=C1C2=C1C(=C%109)C(=C87)C(=C56)C1=C34")
+    ring = max(find_ring_systems(mol), key=lambda system: len(system.atoms))
+    edges = frozenset(
+        (first, second)
+        for first in ring.atoms
+        for second in mol.get_neighbors(first)
+        if second in ring.atoms and first < second
+    )
+    adjacency = adjacency_from_edges(ring.atoms, edges)
+    bridgeheads = sorted(atom for atom in ring.atoms if len(adjacency[atom]) >= 3)
+
+    theta = next(
+        (
+            paths
+            for first, second in combinations(bridgeheads, 2)
+            if (paths := _three_internally_disjoint_paths(first, second, adjacency)) is not None
+        ),
+        None,
+    )
+
+    assert theta is not None
+    assert len({atom for path in theta for atom in path[1:-1]}) == sum(len(path) - 2 for path in theta)
 
 
 def test_polycycle_without_descriptor_fails_closed():
@@ -5434,6 +5599,40 @@ def test_sulfur_ylide_resonance_compare_accepts_lambda_fallback_graph():
     assert equivalent_smiles("C[SH+](C)=[C-]c1ccccc1", "CS(C)=CC1=CC=CC=C1")
     assert equivalent_smiles("C[S+](C)[CH-]C", "CS(C)=CC")
     assert not equivalent_smiles("C[S+](C)[CH-]C", "CCSC")
+
+
+def test_positive_parent_carbon_charges_are_rendered_as_ylium():
+    cases = {
+        "CC([O-])[C+]=C=O": "4-oxobut-3-en-3-ylium-2-olate",
+        "[C+]#CC#CC#C[CH2-]": "hepta-1,3,5-triyn-1-ylium-7-ide",
+        "C=[C+]C(=O)[O-]": "prop-2-en-2-ylium-1-oate",
+        "c1ccc([C+]2C[C-](c3ccccc3)C3CCCC23)cc1": ("2,4-diphenylbicyclo[3.3.0]octan-4-ylium-2-ide"),
+    }
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+    assert name_smiles("[C+](=C1C=C[CH-]C=C1)c1ccccc1") == ("((cyclohexa-2,5-dien-4-ide-1-ylidene)methyliumyl)benzene")
+
+
+def test_repeated_heterocycle_prefixes_keep_structural_locants():
+    cases = {
+        "O=[N+]([O-])C1=NC([N+](=O)[O-])=NC1": "2,5-dinitro-4H-imidazole",
+        "COC1=C(OC)OCO1": "4,5-dimethoxy-2H-1,3-dioxole",
+        "Fc1cccc(Cl)c1C1=NNC(c2c(F)cccc2Cl)=NN1": ("3,6-bis(2-chloro-6-fluorophenyl)-1,4-dihydro-1,2,4,5-tetrazine"),
+    }
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_explicit_parent_hydrogen_contributes_to_lambda_bonding_number():
+    assert name_smiles("CC1(C)CO[PH]2(c3ccccc3)O[C@H](c3ccccc3)CN12") == (
+        "(3R)-6,6-dimethyl-1,3-diphenyl-2,8-dioxa-5-aza-1lambda^5-phosphabicyclo[3.3.0]octane"
+    )
+
+
+def test_branched_triazane_and_aminoxy_nitrile_keep_their_connectivity():
+    assert name_smiles("N#CON") == "aminoxyformonitrile"
+    assert "(triazan-2-ylmethyl)" in name_smiles("N[C@H]1C(O)[C@H](O)C(CN(N)N)O[C@H]1N(N)N")
 
 
 def test_charge_separated_diazo_hypervalent_ring_templates_do_not_use_imino_aminium():
@@ -5539,6 +5738,120 @@ def test_an_oxidised_pnictogen_prefix_cites_two_ligands_or_says_inoyl():
 
     for smiles, expected in cases.items():
         assert name_smiles(smiles) == expected
+
+
+def test_charged_pnictogen_prefix_and_parent_charge_stack_preserve_formal_charge():
+    cases = {
+        "O=[P+]([O-])Oc1ccccc1CO": "(2-((oxido(oxo)phosphaniumyl)oxy)phenyl)methanol",
+        "CCCCCC(CC)O[P+](=O)[O-]": "3-((oxido(oxo)phosphaniumyl)oxy)octane",
+        "C=[N+]1[CH-]N=C2c3ccccc3C3C=CC=C(C)C3N21": (
+            "17-methyl-3-methylidene-2,3,5-triazatetracyclo[11.4.0.0^{7,12}.0^{2,6}]"
+            "heptadeca-5,7,9,11,14,16-hexaen-4-ide-3-ium"
+        ),
+        "CC(C)c1ccc(C2=CC(c3ccccc3)=[O+][SiH-]O2)cc1": (
+            "4-phenyl-6-(4-(propan-2-yl)phenyl)-1,3-dioxa-2-silacyclohexa-3,5-dien-2-ide-3-ium"
+        ),
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_nested_complex_ligands_keep_their_grammatical_boundary():
+    cases = {
+        "CCN(C)S(=O)Nc1c(F)cc(Oc2ncccc2-c2ccnc(NC)n2)c(F)c1F": (
+            "4-(2-((4-(((ethyl(methyl)amino)sulfinyl)amino)-2,3,5-trifluorophenyl)oxy)pyridin-3-yl)-"
+            "N-methylpyrimidin-2-amine"
+        ),
+        "C[C@@H](c1ccccc1)N(C)C(c1c(O)ccc2ccccc12)[C@@H]1C=CC=C2C=CC=CC21": (
+            "1-(((1R)-1,8a-dihydronaphthalen-1-yl)(methyl((1S)-1-phenylethyl)amino)methyl)naphthalen-2-ol"
+        ),
+    }
+
+    for smiles, expected in cases.items():
+        assert name_smiles(smiles) == expected
+
+
+def test_distinct_hydrazone_n_ligands_keep_separate_n_locants():
+    smiles = r"CN(/N=C1\CCCc2cccnc21)c1nc2ccccc2s1"
+    assert name_smiles(smiles) == (
+        "(8E)-6,7-dihydrobenzo[b]pyridin-8(5H)-one N-(1,3-benzothiazol-2-yl)-N-methylhydrazone"
+    )
+
+
+@pytest.mark.parametrize(
+    "smiles,expected",
+    [
+        (
+            "C[C@H]1CCC[P@]1c1cccc([P@@]2CCC[C@@H]2C)c1",
+            "(1S,2S)-2-methyl-1-(3-((1R,2S)-2-methylphospholan-1-yl)phenyl)phospholane",
+        ),
+        (
+            "CC(C)c1cc(C(C)C)c(-c2cccc3c2[P@](C(C)(C)C)CO3)c(C(C)C)c1",
+            "(9R)-9-(tert-butyl)-2-(2,4,6-tris(propan-2-yl)phenyl)-7-oxa-9-phosphabicyclo[4.3.0]nona-1(6),2,4-triene",
+        ),
+    ],
+)
+def test_ring_phosphorus_uses_the_parser_compatible_cip_citation(smiles, expected):
+    assert name_smiles(smiles) == expected
+
+
+def test_bridged_carbon_keeps_its_independently_computed_cip_descriptor():
+    smiles = "CC(C)(C)CCC(=O)c1nccc([C@@]23CC[C@@H](c4cc(-c5c(F)cccc5F)nnc42)C3(C)C)n1"
+    assert name_smiles(smiles) == (
+        "1-(4-((1S,8R)-5-(2,6-difluorophenyl)-11,11-dimethyl-3,4-diazatricyclo"
+        "[6.2.1.0^{2,7}]undeca-2(7),3,5-trien-1-yl)pyrimidin-2-yl)-4,4-dimethylpentan-1-one"
+    )
+
+
+def test_retained_parent_emits_nonstandard_bonding_number():
+    assert name_smiles("CC1=CC=S(C(N)=O)N1C(=O)O") == "1-carbamoyl-3-methyl-1lambda^4-1,2-thiazole-2-carboxylic acid"
+
+
+def test_n_acylaminooxy_keeps_the_amido_attachment_boundary():
+    smiles = "CC(=O)NO[C@H]1C(OC(C)=O)O[C@H](COC(C)=O)[C@@H](OCc2ccccc2F)[C@@H]1OC(C)=O"
+    assert name_smiles(smiles) == (
+        "((2R,3R,4S,5R)-5-((acetamido)oxy)-4,6-bis(acetyloxy)-3-(((2-fluorophenyl)methyl)oxy)oxan-2-yl)methyl acetate"
+    )
+
+
+def test_compound_nitrogen_chain_prefix_keeps_its_attachment_boundary():
+    smiles = "CCCC[C@@H](C(=O)O)[C@@H](Cc1ccc(-c2ccc(S(C)(=O)=O)cc2)cc1)C(N=NN)=NC"
+    assert name_smiles(smiles) == (
+        "(2R)-2-((2R)-1-(aminodiazenyl)-1-(methylimino)-3-(4-(4-(methylsulfonyl)phenyl)phenyl)propan-2-yl)hexanoic acid"
+    )
+
+
+def test_complete_benzoheterocycle_can_be_the_contextual_fusion_parent():
+    smiles = "O=S1(=O)CCc2c1ccc1ncnc(NC3CCCC3)c21"
+    assert name_smiles(smiles) == ("N-cyclopentyl-7,7-dioxo-8,9-dihydro-7lambda^6-thieno[3,2-f]quinazolin-1-amine")
+
+
+@pytest.mark.parametrize(
+    "smiles,expected",
+    [
+        (
+            "C/C=C/c1cccc2c3c(-c4ccccc4)c4ccccc4c-3cc3ccccc3c12",
+            "22-phenyl-6-((1E)-prop-1-en-1-yl)pentacyclo[13.7.0.0^{16,21}.0^{8,13}.0^{2,7}]"
+            "docosa-1(22),2,4,6,8,10,12,14,16,18,20-undecaene",
+        ),
+        (
+            "C[Si](C)(C)c1ccc(-c2cccc3c4cccc5c4n(c23)-c2ccccc2-c2ccccc2-5)nc1",
+            "6-(5-(trimethylsilyl)pyridin-2-yl)-8-azahexacyclo[19.3.1.0^{8,25}.0^{15,20}."
+            "0^{9,14}.0^{2,7}]pentacosa-1(25),2,4,6,9,11,13,15,17,19,21,23-dodecaene",
+        ),
+    ],
+)
+def test_audited_mode_declines_unproven_multiplicative_polycomponent_locants(smiles, expected):
+    assert name_smiles(smiles) == expected
+
+
+def test_one_atom_secondary_von_baeyer_bridge_is_not_rejected():
+    smiles = "COC1(OC)[C@@]2(Cl)C(Cl)=C(Cl)[C@]1(Cl)[C@@H]1CC[C@@]34CC(=O)C=CC[C@]3(CC[C@@H]12)OC(=O)O4"
+    assert name_smiles(smiles) == (
+        "(1R,4R,5S,8R,9S,12S)-5,6,7,8-tetrachloro-21,21-dimethoxy-18,20-dioxa"
+        "pentacyclo[10.5.3.1^{5,8}.0^{1,12}.0^{4,9}]henicosa-6,14-diene-16,19-dione"
+    )
 
 
 def test_a_cation_outranks_the_neutral_characteristic_groups():
