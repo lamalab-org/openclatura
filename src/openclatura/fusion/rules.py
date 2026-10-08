@@ -139,6 +139,7 @@ def component_interface_orbit(
     )
 
 
+@lru_cache(maxsize=16384)
 def multiplicative_attachment_key(
     spec: FusionComponentSpec,
     join: FusionJoin,
@@ -192,6 +193,7 @@ def component_canonicalization_key(spec: FusionComponentSpec) -> tuple:
     )
 
 
+@lru_cache(maxsize=16384)
 def multiplicative_member_order_key(join: FusionJoin) -> tuple:
     """Canonical descriptor order within one multiplicative group."""
 

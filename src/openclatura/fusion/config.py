@@ -51,8 +51,10 @@ class FusionSearchLimits:
     maximum_component_occurrences: int
     maximum_component_selections: int
     component_selection_states: int
-    # None lifts the bound: the locant-map search is bounded by the work it
-    # actually has to do, not by a state count.
+    # None, and it stays None. A state ceiling does not only cost time: it
+    # decides which covers the search ever sees, so a molecule whose fusion
+    # cover is expensive silently falls through to von Baeyer instead. The
+    # answer to an expensive search is a smaller search, not a shorter one.
     locant_map_combinations: int | None
     mancude_states: int
     maximum_name_candidates: int

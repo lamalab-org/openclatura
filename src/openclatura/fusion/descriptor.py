@@ -13,6 +13,7 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
+from functools import lru_cache
 from itertools import combinations
 from typing import Protocol
 
@@ -1868,6 +1869,7 @@ def _join_preference_key(join: FusionJoin, side_rank: int) -> tuple:
     return (join.order, side_rank, _attached_locant_key(join))
 
 
+@lru_cache(maxsize=16384)
 def _attached_locant_key(join: FusionJoin) -> tuple:
     return tuple(retained_locant_sort_key(locant.text) for locant in join.attached_locants)
 
