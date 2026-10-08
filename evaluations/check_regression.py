@@ -94,6 +94,7 @@ def _opsin_roundtrip(names: list[str]) -> list[str]:
 def verify_changed_rows(changed: list[dict[str, Any]], opsin_chunk_size: int) -> None:
     """Mutate discrepancy records with their current OPSIN result."""
 
+    from openclatura.resonance_compare import equivalent_smiles
     from openclatura.utils import standardize_mol
 
     nonempty = [row for row in changed if row["current_name"]]
@@ -103,7 +104,18 @@ def verify_changed_rows(changed: list[dict[str, Any]], opsin_chunk_size: int) ->
         for row, opsin_smiles in zip(chunk, decoded, strict=True):
             original = row["standardized_smiles"] or None
             roundtrip = standardize_mol(opsin_smiles) if opsin_smiles else None
+            # Standardized SMILES are compared string to string, so two
+            # drawings of one molecule read as two molecules. A conjugated
+            # fused system has several Kekule forms with the same atoms,
+            # hydrogens and charges, and RDKit's aromatic perception does not
+            # normalise all of them: 1,2,3,4-tetramethylindeno[2,1-a]fluorene
+            # decodes to a drawing of the target that differs only in where
+            # its double bonds sit. The engine's own verifier already settles
+            # that with equivalent_smiles, and the gate has to ask the same
+            # question or it reports a naming regression for a redrawing.
             matched = original is not None and roundtrip is not None and original == roundtrip
+            if not matched and opsin_smiles and row.get("smiles"):
+                matched = equivalent_smiles(row["smiles"], opsin_smiles)
             row.update(
                 current_status="matched" if matched else "failed",
                 opsin_smiles=opsin_smiles,

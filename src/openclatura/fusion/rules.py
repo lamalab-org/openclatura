@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Protocol
 
 from ..locants import retained_locant_sort_key
@@ -104,11 +105,20 @@ def pin_ring_size_gate(ring_sizes: tuple[int, ...]) -> bool:
     return fusion_ring_size_gate(ring_sizes)
 
 
+@lru_cache(maxsize=8192)
 def component_interface_orbit(
     spec: FusionComponentSpec,
     directed_path: tuple[str, ...],
 ) -> tuple[str, ...]:
-    """Return the canonical typed-automorphism orbit of one local path."""
+    """Return the canonical typed-automorphism orbit of one local path.
+
+    The orbit depends on the component's template and the path alone, so the
+    answer is the same every time the locant-map search reaches that interface.
+    The search walks the cartesian product of each child's symmetric mappings,
+    which revisits the same handful of interfaces thousands of times - the
+    template automorphisms are already cached, and this caches the canonical
+    choice made from them.
+    """
 
     from ..retained_fused_templates import retained_graph_template_automorphisms
 

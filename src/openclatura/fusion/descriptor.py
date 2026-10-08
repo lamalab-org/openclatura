@@ -1003,7 +1003,7 @@ def _best_tree_mapping_candidate(
             proved = proved_joins.setdefault(child, {})
             for index, mapping in enumerate(projected[child]):
                 visited_states += 1
-                if visited_states > MAX_LOCANT_MAP_COMBINATIONS:
+                if MAX_LOCANT_MAP_COMBINATIONS is not None and visited_states > MAX_LOCANT_MAP_COMBINATIONS:
                     raise _LocantMapBudgetExceeded(
                         f"tree locant-map search exceeds bounded limit {MAX_LOCANT_MAP_COMBINATIONS} states"
                     )
@@ -1249,7 +1249,7 @@ def _compatible_mapping_assignments(
     def visit(position: int) -> None:
         nonlocal visited_states
         visited_states += 1
-        if visited_states > MAX_LOCANT_MAP_COMBINATIONS:
+        if MAX_LOCANT_MAP_COMBINATIONS is not None and visited_states > MAX_LOCANT_MAP_COMBINATIONS:
             raise _LocantMapBudgetExceeded(
                 f"compatible locant-map search exceeds bounded limit {MAX_LOCANT_MAP_COMBINATIONS}"
             )

@@ -1660,7 +1660,7 @@
   "runtime_dependency": false,
   "schema_version": 1,
   "source_sha256": {
-    "src/openclatura/data/fusion_components.json": "bdd2a72f210b79250eb73e3f10dc137e55a941c1f53321291a7ba628e85eecba",
+    "src/openclatura/data/fusion_components.json": "4e368e7d3a9d1b7c86e589ae87d1051e1eb3727a7701f9a7378f4f49d492e483",
     "src/openclatura/data/retained_fused_graph_templates.json": "befef11cf69a9c604c89d0dcc0fa32cb3b4155b4272298d53f8f8bfb0cd8f6dc",
     "src/openclatura/data/retained_parent_name_policy.json": "8f3c1d572abccc55e6c7b25f8a774048898c35f220fe9100edb1c9228d3cdfec",
     "src/openclatura/hantzsch_widman.py": "8d28a90442764eab283fa867e4efbf44f143eb3bc70d175552a59d087dd325bc",

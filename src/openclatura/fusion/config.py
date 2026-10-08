@@ -51,7 +51,9 @@ class FusionSearchLimits:
     maximum_component_occurrences: int
     maximum_component_selections: int
     component_selection_states: int
-    locant_map_combinations: int
+    # None lifts the bound: the locant-map search is bounded by the work it
+    # actually has to do, not by a state count.
+    locant_map_combinations: int | None
     mancude_states: int
     maximum_name_candidates: int
 
@@ -172,7 +174,14 @@ def fusion_nomenclature_config_from_data(data: dict) -> FusionNomenclatureConfig
     )
     limits_data = _mapping(data, "search_limits")
     search = FusionSearchLimits(
-        **{field: _positive_int(limits_data, field) for field in FusionSearchLimits.__dataclass_fields__}
+        **{
+            field: (
+                _optional_positive_int(limits_data, field)
+                if field in _UNBOUNDABLE_SEARCH_LIMITS
+                else _positive_int(limits_data, field)
+            )
+            for field in FusionSearchLimits.__dataclass_fields__
+        }
     )
     if search.minimum_ring_size > search.maximum_ring_size:
         raise ValueError("fusion minimum ring size must not exceed the maximum")
@@ -257,6 +266,18 @@ def _text_list(data: dict, key: str, *, allowed: set[str]) -> tuple[str, ...]:
     if len(result) != len(set(result)):
         raise ValueError(f"fusion nomenclature {key} must not contain duplicates")
     return result
+
+
+# A limit that may be left unset, which lifts it rather than defaulting it.
+_UNBOUNDABLE_SEARCH_LIMITS = frozenset({"locant_map_combinations"})
+
+
+def _optional_positive_int(data: dict, key: str) -> int | None:
+    """Return a positive limit, or None where the table leaves it unbounded."""
+
+    if data.get(key) is None:
+        return None
+    return _positive_int(data, key)
 
 
 def _positive_int(data: dict, key: str) -> int:
