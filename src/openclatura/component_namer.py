@@ -11,6 +11,7 @@ from .assembly_parts import (
     split_rendered_substituent_name,
 )
 from .chains import find_all_carbon_paths, find_ring_systems, get_cyclic_atoms
+from .chalcogen_roles import FunctionalFamily
 from .component_group_rules import (
     exclude_nonparent_group_atoms,
     principal_involved_atoms,
@@ -25,12 +26,14 @@ from .name_bindings import binding_trace_data, refresh_name_atom_bindings
 from .naming_audit import UnnamedAtomError, assert_component_fully_named
 from .naming_context import ComponentNamingState, NamingIntent
 from .naming_protocols import RecursiveSubgraphNamer
+from .nomenclature import FunctionalGroupCapability, PrincipalCitationMode
 from .parent_pipeline import (
     build_parent_assembly_plan,
     resolve_parent_hydride_plan,
     resolve_retained_parent,
 )
 from .parent_selection import select_principal_parent
+from .perception import PerceivedGroup
 from .principal_groups import (
     add_component_principal_group,
     component_groups,
@@ -42,6 +45,7 @@ from .retained_fused_production import production_retained_fused_parent
 from .retained_name_policy import retained_parent_output_name
 from .rules import elements as _elements
 from .special_cases import (
+    SpecialComponentName,
     single_atom_component_name,
     structural_replacement_parent_result,
     try_name_anhydride_component_result,
@@ -62,6 +66,7 @@ from .trace_helpers import (
     assembly_trace_segments,
     build_shortcut_tree_node,
     decision_trace_data,
+    functional_group_descriptor_data,
     functional_group_trace_data,
     trace_decision,
 )
@@ -74,6 +79,63 @@ ParentAssembler = Callable[..., str]
 # the OPSIN-free reconstruction self-audit installs one via
 # ``openclatura.audit.capture_component_audits``.
 COMPONENT_AUDIT_HOOK: Callable[[Molecule, set[int], object], None] | None = None
+
+
+def _functional_class_linkage_defers_to_principal_group(
+    groups: list[PerceivedGroup], principal_key: str | None
+) -> bool:
+    """Keep composable linkage classes below a renderable principal group.
+
+    Whole-component functional-class names are useful fallbacks, but a
+    non-principal descriptor must not bypass the ordinary principal-group
+    pipeline.
+    """
+
+    if principal_key is None:
+        return False
+    principal_groups = [group for group in groups if group.is_principal_candidate]
+    functional_classes = [
+        group
+        for group in groups
+        if not group.is_principal_candidate
+        and group.descriptor is not None
+        and group.descriptor.family
+        in {
+            FunctionalFamily.PEROXIDE,
+            FunctionalFamily.NITROGEN_CHALCOGENIDE,
+        }
+    ]
+    return any(
+        principal.atom_ids.isdisjoint(functional_class.atom_ids)
+        for principal in principal_groups
+        for functional_class in functional_classes
+    )
+
+
+def _blocking_suffix_defers_to_chain_parent(
+    mol: Molecule,
+    component_atoms: set[int],
+    principal_groups: list[PerceivedGroup],
+    structural_parent_result: SpecialComponentName | None,
+) -> bool:
+    """Keep a senior heteroatom-chain parent when the suffix is only one part of the skeleton."""
+
+    if structural_parent_result is None or structural_parent_result.audit_chain is None:
+        return False
+    characteristic_atoms = {
+        atom_idx
+        for group in principal_groups
+        if group.resolved_rule is not None
+        and group.resolved_rule.has_capability(FunctionalGroupCapability.BLOCKS_STRUCTURAL_PARENT)
+        for atom_idx in (group.descriptor.atom_ids if group.descriptor is not None else group.atom_ids)
+    }
+    return any(
+        atom_idx not in characteristic_atoms
+        and not mol.atoms[atom_idx].is_carbon
+        and mol.atoms[atom_idx].symbol != "H"
+        and mol.degree(atom_idx) > 1
+        for atom_idx in component_atoms
+    )
 
 
 def select_component_parent(mol: Molecule, exclude_atoms: set[int], principal_carbons: list[int]):
@@ -288,6 +350,7 @@ def name_component(
     omit_redundant_locants: bool = True,
     parent_plan_builder: Callable | None = None,
     parent_selector: Callable | None = None,
+    principal_citation_mode: PrincipalCitationMode | None = None,
 ):
     """Name one connected component or recursive component of a molecule."""
 
@@ -318,14 +381,26 @@ def name_component(
             },
         )
         if return_trace and return_tree:
-            return name, [], _component_shortcut_tree(name, component_atoms, bindings, token_spans)
+            return (
+                name,
+                [],
+                _component_shortcut_tree(name, component_atoms, bindings, token_spans, role="single_atom_component"),
+            )
         if return_trace:
             return name, []
         if return_tree:
-            return name, _component_shortcut_tree(name, component_atoms, bindings, token_spans)
+            return name, _component_shortcut_tree(
+                name, component_atoms, bindings, token_spans, role="single_atom_component"
+            )
         return name
 
-    def name_component_again(next_mol: Molecule, next_atoms: set[int], is_substituent: bool = False):
+    def name_component_again(
+        next_mol: Molecule,
+        next_atoms: set[int],
+        is_substituent: bool = False,
+        *,
+        principal_citation_mode: PrincipalCitationMode | None = None,
+    ):
         return name_component(
             next_mol,
             next_atoms,
@@ -335,10 +410,48 @@ def name_component(
             assemble_parent_name=assemble_parent_name,
             token_debug=token_debug,
             omit_redundant_locants=omit_redundant_locants,
+            principal_citation_mode=principal_citation_mode,
         )
 
-    structural_parent_result = structural_replacement_parent_result(mol, component_atoms, name_subgraph)
+    early_groups = component_groups(mol, component_atoms)
+    early_principal_key = component_principal_key(early_groups, is_substituent)
+    principal_groups = [group for group in early_groups if group.key == early_principal_key]
+    blocks_structural_parent = any(
+        group.resolved_rule is not None
+        and group.resolved_rule.has_capability(FunctionalGroupCapability.BLOCKS_STRUCTURAL_PARENT)
+        for group in principal_groups
+    )
+    structural_parent_result = (
+        None
+        if _functional_class_linkage_defers_to_principal_group(early_groups, early_principal_key)
+        else structural_replacement_parent_result(mol, component_atoms, name_subgraph)
+    )
+    if blocks_structural_parent and not _blocking_suffix_defers_to_chain_parent(
+        mol,
+        component_atoms,
+        principal_groups,
+        structural_parent_result,
+    ):
+        structural_parent_result = None
     if structural_parent_result is not None:
+        descriptor_data = functional_group_descriptor_data(structural_parent_result.descriptor, mol)
+        if descriptor_data is not None:
+            trace_decision(
+                decision_trace,
+                TracePhase.PERCEPTION,
+                "identified shortcut functional group",
+                "A typed graph descriptor covers the functional group used by the whole-component citation.",
+                atoms=set(structural_parent_result.descriptor.atom_ids),
+                data={"descriptor": descriptor_data},
+            )
+            trace_decision(
+                decision_trace,
+                TracePhase.PRIORITY,
+                "selected whole-component citation route",
+                "The typed functional group has a complete graph-backed functional-class renderer.",
+                atoms=component_atoms,
+                data={"shortcut_role": structural_parent_result.role, "descriptor": descriptor_data},
+            )
         name, bindings, token_spans, rewrite_history = _shortcut_component_result(
             mol,
             component_atoms,
@@ -361,25 +474,45 @@ def name_component(
                 "name_atom_bindings": bindings,
                 "name_token_spans": token_spans,
                 "name_rewrite_history": rewrite_history,
+                "shortcut_role": structural_parent_result.role,
+                "descriptor": descriptor_data,
             },
         )
         if return_trace and return_tree:
-            return name, [], _component_shortcut_tree(name, component_atoms, bindings, token_spans)
+            return (
+                name,
+                [],
+                _component_shortcut_tree(
+                    name,
+                    component_atoms,
+                    bindings,
+                    token_spans,
+                    role=structural_parent_result.role,
+                    descriptor=descriptor_data,
+                ),
+            )
         if return_trace:
             return name, []
         if return_tree:
-            return name, _component_shortcut_tree(name, component_atoms, bindings, token_spans)
+            return name, _component_shortcut_tree(
+                name,
+                component_atoms,
+                bindings,
+                token_spans,
+                role=structural_parent_result.role,
+                descriptor=descriptor_data,
+            )
         return name
 
     state = ComponentNamingState(component_atoms=set(component_atoms), is_substituent=is_substituent)
-    state.perceived_groups = component_groups(mol, state.component_atoms)
+    state.perceived_groups = early_groups
     trace_decision(
         decision_trace,
         TracePhase.PERCEPTION,
         "identified functional groups",
         "Functional-group perception binds matched subgroups to graph atoms before priority selection.",
         atoms=state.component_atoms,
-        data={"groups": functional_group_trace_data(state.perceived_groups)},
+        data={"groups": functional_group_trace_data(state.perceived_groups, mol)},
     )
     state.principal_key = component_principal_key(state.perceived_groups, state.is_substituent)
     trace_decision(
@@ -419,11 +552,19 @@ def name_component(
             },
         )
         if return_trace and return_tree:
-            return name, [], _component_shortcut_tree(name, state.component_atoms, bindings, token_spans)
+            return (
+                name,
+                [],
+                _component_shortcut_tree(
+                    name, state.component_atoms, bindings, token_spans, role="anhydride_component"
+                ),
+            )
         if return_trace:
             return name, []
         if return_tree:
-            return name, _component_shortcut_tree(name, state.component_atoms, bindings, token_spans)
+            return name, _component_shortcut_tree(
+                name, state.component_atoms, bindings, token_spans, role="anhydride_component"
+            )
         return name
 
     state.exclude_atoms = set(mol.atoms.keys()) - state.component_atoms
@@ -592,6 +733,7 @@ def name_component(
         },
     )
     parts = parent_plan.parts
+    parts.principal_citation_mode = principal_citation_mode
     emit_bond_stereo(mol, parts, numbered_path, get_loc, state.base_exclude)
     add_component_front_modifiers(
         mol,
@@ -700,7 +842,13 @@ def name_component(
 
 
 def _component_shortcut_tree(
-    name: str, component_atoms: set[int], bindings: list[dict], token_spans: list[dict]
+    name: str,
+    component_atoms: set[int],
+    bindings: list[dict],
+    token_spans: list[dict],
+    *,
+    role: str,
+    descriptor: dict | None = None,
 ) -> dict:
     """Return a minimal component tree for shortcut component names."""
 
@@ -710,4 +858,5 @@ def _component_shortcut_tree(
         atom_ids=component_atoms,
         name_atom_bindings=bindings,
         name_token_spans=token_spans,
+        shortcut={"role": role, "descriptor": descriptor},
     )

@@ -297,3 +297,38 @@ def test_human_descriptor_handles_nested_substituent_trees_generically():
     assert "pyrimidine-derived" in text
     assert "retained benzene parent" in text
     assert "amino group" in text
+
+
+@pytest.mark.parametrize(
+    ("smiles", "route", "family", "element"),
+    [
+        ("C[N+]([Se-])(C)C", "nitrogen chalcogenide route", "zwitterion nitrogen chalcogenide", "selenium"),
+        ("CC[Se]SC", "peroxide linkage route", "neutral link peroxide", "linker path 1-2-3-4"),
+    ],
+)
+def test_human_descriptor_explains_typed_whole_component_chalcogen_routes(smiles, route, family, element):
+    description = describe_human(smiles)
+    text = description.text
+
+    assert description.name
+    assert f"whole component is cited through the {route}" in text
+    assert family in text
+    assert element in text
+    assert description.result.substituent_tree[0]["shortcut"]["descriptor"]
+
+
+def test_human_descriptor_uses_typed_dynamic_group_labels_and_front_modifiers():
+    acid = describe_human("CC(=[Se])S[TeH]")
+    assert "an acid acyl group" in acid.text
+    assert "acyl acid Se S Te chain group" not in acid.text
+    assert "double bonded selenium ligand" in acid.text
+    assert "hydrogen bearing tellurium ligand" in acid.text
+
+    ester = describe_human("CC(=O)O[Se]C")
+    assert "an ester acyl group" in ester.text
+    assert "The front modifier is OSe-methyl" in ester.text
+
+    projected = describe_human("CSOC(=O)NCCCc1ccccc1")
+    assert projected.name == "methylsulfanyl (3-phenylpropyl)carbamate"
+    assert "The front modifier is methylsulfanyl" in projected.text
+    assert "a carbon link sulfur ligand" in projected.text

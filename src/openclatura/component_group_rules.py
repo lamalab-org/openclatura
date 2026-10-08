@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+from .chalcogen_roles import ChalcogenLigandRole, DerivativeKind, FunctionalFamily
 from .group_atom_roles import (
     amide_nitrogen,
     bridge_oxygen,
@@ -12,7 +13,7 @@ from .group_atom_roles import (
     sulfonyl_sulfur,
 )
 from .molecule import Molecule
-from .nomenclature import RULES
+from .nomenclature import RULES, FunctionalGroupCapability
 from .perception import PerceivedGroup
 
 AtomSelector = Callable[[Molecule, PerceivedGroup], int | None]
@@ -46,8 +47,10 @@ def retarget_external_carbonyl_groups(
     """Move exocyclic carbonyl group attachment onto the parent chain atom."""
 
     for group in perceived_groups:
-        if group.key == principal_key or group.key not in RULES.functional_groups.keys_with_family(
-            "chain_external_carbonyl"
+        if (
+            group.key == principal_key
+            or group.resolved_rule is None
+            or not group.resolved_rule.has_capability(FunctionalGroupCapability.CHAIN_EXTERNAL_CARBONYL)
         ):
             continue
         group_c = group.attachment_carbon
@@ -67,9 +70,36 @@ def exclude_nonparent_group_atoms(
 
     for group in perceived_groups:
         selector = NONPARENT_ATOM_SELECTORS.get(group.key)
-        atom_idx = selector(mol, group) if selector else None
-        if atom_idx is not None and atom_idx not in cyclic_atoms_all:
-            exclude_atoms.add(atom_idx)
+        atom_indices = {atom_idx} if selector and (atom_idx := selector(mol, group)) is not None else set()
+        if (
+            not atom_indices
+            and group.descriptor is not None
+            and group.descriptor.family is FunctionalFamily.ACYL
+            and group.descriptor.derivative is DerivativeKind.ESTER
+        ):
+            atom_indices.update(
+                ligand.atom for ligand in group.descriptor.ligands if ligand.role is ChalcogenLigandRole.CARBON_LINK
+            )
+        if (
+            not atom_indices
+            and group.descriptor is not None
+            and group.descriptor.family is FunctionalFamily.ACYL
+            and group.descriptor.derivative in {DerivativeKind.AMIDE, DerivativeKind.HYDRAZIDE, DerivativeKind.UREA}
+        ):
+            if (atom_idx := amide_nitrogen(mol, group)) is not None:
+                atom_indices.add(atom_idx)
+        if (
+            group.descriptor is not None
+            and group.descriptor.derivative is DerivativeKind.ACYL_PSEUDOHALIDE
+            and group.descriptor.leaving_group is not None
+        ):
+            atom_indices.update(group.descriptor.leaving_group.atom_ids)
+        if group.descriptor is not None and group.descriptor.family is FunctionalFamily.CENTRAL_ACID:
+            atom_indices.update(group.descriptor.centers)
+            atom_indices.update(
+                ligand.atom for ligand in group.descriptor.ligands if ligand.role is ChalcogenLigandRole.CARBON_LINK
+            )
+        exclude_atoms.update(atom_idx for atom_idx in atom_indices if atom_idx not in cyclic_atoms_all)
 
 
 def principal_involved_atoms(

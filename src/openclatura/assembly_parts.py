@@ -12,7 +12,9 @@ from .spiro_assembly import SpiroAssembly
 from .stereo_descriptors import AbsoluteStereoCitation
 
 if TYPE_CHECKING:
+    from .chalcogen_roles import FunctionalGroupDescriptor
     from .fusion.mancude import ParentBondDelta
+    from .nomenclature import FunctionalGroupRule, PrincipalCitationMode
     from .ring_parent import RingParent
 
 
@@ -95,6 +97,8 @@ class PrincipalGroupItem:
     atom_ids: set[int] = field(default_factory=set)
     bond_ids: set[int] = field(default_factory=set)
     charge_atom_ids: set[int] = field(default_factory=set)
+    resolved_rule: FunctionalGroupRule | None = None
+    descriptors: tuple[FunctionalGroupDescriptor, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -140,6 +144,7 @@ class AssemblyParts:
     is_double_attach: bool = False
     is_triple_attach: bool = False
     is_acyl_substituent: bool = False
+    principal_citation_mode: PrincipalCitationMode | None = None
     attachment_locant: int | str = 1
     retained_name: str | None = None
     retained_absorbs_principal_group: bool = False

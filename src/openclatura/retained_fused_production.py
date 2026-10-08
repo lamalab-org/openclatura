@@ -4,6 +4,7 @@ from .assembly_parts import RetainedParentMetadata, SubstituentItem
 from .grammar_snapshot_data import retained_fused_derivative_gate
 from .molecule import Molecule
 from .namer_config import INDICATED_H_RETAINED_NAMES
+from .nomenclature import FunctionalGroupCapability
 from .perception import PerceivedGroup
 from .retained_derivative_hydrogen import prove_retained_oxo_carbon_hydrogen
 from .retained_fused_templates import RetainedGraphTemplateMatch, match_retained_fused_templates
@@ -249,6 +250,10 @@ def _neutral_retained_parent(mol: Molecule, atoms: set[int]) -> bool:
 def _allowed_groups(parent_atoms: set[int], perceived_groups: list[PerceivedGroup]) -> bool:
     for group in perceived_groups:
         if group.attachment_carbon not in parent_atoms:
+            continue
+        if group.resolved_rule is not None and group.resolved_rule.has_capability(
+            FunctionalGroupCapability.PROMOTES_MEMBER_GROUPS
+        ):
             continue
         if group.key not in ALLOWED_GROUP_KEYS:
             return False

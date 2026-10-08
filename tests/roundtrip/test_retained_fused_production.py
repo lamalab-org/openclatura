@@ -136,6 +136,17 @@ def test_normalized_pairs_match_requires_parseable_equivalent_structures():
     assert not _normalized_pairs_match(["not-a-smiles"], ["CCO"])
 
 
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
+    (
+        ("N1=CC=CC2=CC=C3C(NC(CC3=C12)=O)=O", "8,10-dihydro-1,8-phenanthroline-7,9-dione"),
+        ("N1C(N=C2N=CN=C2C1=O)=O", "1H-purine-2,6-dione"),
+    ),
+)
+def test_imide_route_marker_preserves_retained_fused_parent(smiles: str, expected: str):
+    assert name_many([smiles], processes=1)[0].name == expected
+
+
 @pytest.fixture(scope="module")
 def parent_cml_rows() -> list[str]:
     return _opsin([name for name, _ in PARENT_CASES], output_format="CML")

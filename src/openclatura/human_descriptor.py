@@ -185,6 +185,10 @@ def _describe_node(node: dict[str, Any], mol: Molecule, *, subject: str, depth: 
     if parent_sentence:
         sentences.append(parent_sentence)
 
+    shortcut_sentence = _shortcut_sentence(node)
+    if shortcut_sentence:
+        sentences.append(shortcut_sentence)
+
     assembled_sentence = _assembled_framework_sentence(parent, mol)
     if assembled_sentence:
         sentences.append(assembled_sentence)
@@ -212,6 +216,10 @@ def _describe_node(node: dict[str, Any], mol: Molecule, *, subject: str, depth: 
     charge_sentence = _charge_sentence(node)
     if charge_sentence:
         sentences.append(charge_sentence)
+
+    front_modifier_sentence = _front_modifier_sentence(node, mol)
+    if front_modifier_sentence:
+        sentences.append(front_modifier_sentence)
 
     substituent_sentence = _substituent_summary_sentence(node, mol)
     if substituent_sentence:
@@ -447,11 +455,82 @@ def _principal_group_sentence(node: dict[str, Any]) -> str:
         return ""
     key = str(group.get("key") or "functional group")
     locants = [str(loc) for loc in group.get("locants") or ()]
-    label = _principal_group_label(key, len(locants))
+    descriptors = [descriptor for descriptor in group.get("descriptors") or () if descriptor]
+    label = (
+        _functional_group_descriptor_label(descriptors[0], len(locants))
+        if group.get("generated_rule") and descriptors
+        else _principal_group_label(key, len(locants))
+    )
     article = "" if label.endswith("s") else "an " if label[0].lower() in "aeiou" else "a "
     if locants:
-        return f"The principal characteristic feature is {article}{label} at {_positions(locants, node.get('parent') or {})}."
-    return f"The principal characteristic feature is {article}{label}."
+        sentence = (
+            f"The principal characteristic feature is {article}{label} "
+            f"at {_positions(locants, node.get('parent') or {})}."
+        )
+    else:
+        sentence = f"The principal characteristic feature is {article}{label}."
+    detail = _functional_group_descriptor_detail(descriptors)
+    return f"{sentence} {detail}" if detail else sentence
+
+
+def _shortcut_sentence(node: dict[str, Any]) -> str:
+    shortcut = node.get("shortcut") or {}
+    descriptor = shortcut.get("descriptor")
+    if not descriptor:
+        return ""
+    label = _functional_group_descriptor_label(descriptor, 1)
+    role = _readable_key(str(shortcut.get("role") or "whole-component"))
+    detail = _functional_group_descriptor_detail([descriptor])
+    sentence = f"The whole component is cited through the {role} route for a {label}."
+    return f"{sentence} {detail}" if detail else sentence
+
+
+def _functional_group_descriptor_label(descriptor: dict[str, Any], count: int) -> str:
+    derivative = _readable_key(str(descriptor.get("derivative") or "functional"))
+    family = _readable_key(str(descriptor.get("family") or "group"))
+    label = f"{derivative} {family} group"
+    return f"{label}s" if count > 1 else label
+
+
+def _functional_group_descriptor_detail(descriptors: list[dict[str, Any]]) -> str:
+    if not descriptors:
+        return ""
+    details = [_one_functional_group_descriptor_detail(descriptor) for descriptor in descriptors]
+    details = [detail for detail in details if detail]
+    if not details:
+        return ""
+    prefix = "The typed graph descriptor records" if len(details) == 1 else "The typed graph descriptors record"
+    return f"{prefix} {_join_phrases(details)}."
+
+
+def _one_functional_group_descriptor_detail(descriptor: dict[str, Any]) -> str:
+    centers = [int(atom) for atom in descriptor.get("centers") or ()]
+    center_elements = [str(element) for element in descriptor.get("center_elements") or ()]
+    ligands = descriptor.get("ligands") or ()
+    center_text = ""
+    if centers:
+        center_text = _join_phrases(
+            [
+                f"{_element_name(center_elements[index])} center atom {center}"
+                if index < len(center_elements)
+                else f"center atom {center}"
+                for index, center in enumerate(centers)
+            ]
+        )
+    ligand_phrases = []
+    for ligand in ligands:
+        element = _element_name(str(ligand.get("element") or "atom"))
+        role = _readable_key(str(ligand.get("role") or "ligand"))
+        ligand_description = f"{role} {element} ligand"
+        ligand_phrases.append(f"{_article_for(ligand_description)} {ligand_description} at atom {ligand.get('atom')}")
+    paths = ["-".join(str(atom) for atom in path) for path in descriptor.get("linker_paths") or ()]
+    phrases = []
+    if center_text:
+        phrases.append(center_text)
+    phrases.extend(ligand_phrases)
+    if paths:
+        phrases.append(("linker path " if len(paths) == 1 else "linker paths ") + ", ".join(paths))
+    return _join_phrases(phrases)
 
 
 def _principal_group_label(key: str, count: int) -> str:
@@ -485,6 +564,17 @@ def _charge_sentence(node: dict[str, Any]) -> str:
     if not phrases:
         return ""
     return "The parent carries " + _join_phrases(phrases) + "."
+
+
+def _front_modifier_sentence(node: dict[str, Any], mol: Molecule) -> str:
+    modifiers = node.get("front_modifiers") or ()
+    if not modifiers:
+        return ""
+    names = [
+        str(modifier.get("front_modifier_name") or _display_substituent_name(modifier, mol)) for modifier in modifiers
+    ]
+    subject = "The front modifier is" if len(names) == 1 else "The front modifiers are"
+    return f"{subject} {_join_phrases(names)}; these graph-bound ligand names are cited before the parent."
 
 
 def _substituent_summary_sentence(node: dict[str, Any], mol: Molecule) -> str:
@@ -711,6 +801,8 @@ def _element_name(symbol: str) -> str:
         "P": "phosphorus",
         "S": "sulfur",
         "Se": "selenium",
+        "Te": "tellurium",
+        "Po": "polonium",
         "Si": "silicon",
     }
     return names.get(symbol, symbol)
