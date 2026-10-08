@@ -1,10 +1,11 @@
 """Principal characteristic-group selection and suffix assembly."""
 
 from .assembly_parts import AssemblyParts, PrincipalGroupItem
+from .chalcogen_roles import ChalcogenLigandRole
 from .group_atom_roles import hydrazone_characteristic_carbon
 from .locants import parse_locant
 from .molecule import Molecule, bond_ids_within
-from .nomenclature import RULES
+from .nomenclature import RULES, FunctionalGroupCapability
 from .perception import PerceivedGroup, perceive_groups
 
 
@@ -19,8 +20,60 @@ def component_principal_key(perceived_groups: list[PerceivedGroup], is_substitue
 
     if is_substituent:
         return None
-    candidates = [group.key for group in perceived_groups if group.is_principal_candidate]
-    return RULES.functional_groups.most_senior(candidates).key if candidates else None
+    candidates = [
+        group
+        for group in perceived_groups
+        if group.is_principal_candidate
+        and group.resolved_rule is not None
+        and group.resolved_rule.seniority is not None
+    ]
+    if not candidates:
+        return None
+    route_markers = [
+        group
+        for group in candidates
+        if group.resolved_rule.has_capability(FunctionalGroupCapability.PROMOTES_MEMBER_GROUPS)
+    ]
+    promotion_markers = [
+        marker
+        for marker in route_markers
+        if not any(
+            candidate is not marker
+            and candidate.resolved_rule.has_capability(FunctionalGroupCapability.ESTER_LIKE)
+            and marker.descriptor is not None
+            and candidate.descriptor is not None
+            and candidate.descriptor.ligands_with_role(ChalcogenLigandRole.CARBON_LINK)
+            and set(marker.descriptor.centers).isdisjoint(candidate.descriptor.centers)
+            for candidate in candidates
+        )
+    ]
+    renderable_candidates = [group for group in candidates if group not in route_markers]
+    if not renderable_candidates:
+        return None
+    best = min(
+        renderable_candidates,
+        key=lambda group: (_effective_seniority(group, promotion_markers), _seniority_tuple(group)),
+    )
+    return best.key
+
+
+def _seniority_tuple(group: PerceivedGroup) -> tuple[int, ...]:
+    seniority = group.resolved_rule.seniority
+    return (seniority,) if isinstance(seniority, int) else seniority
+
+
+def _effective_seniority(group: PerceivedGroup, route_markers: list[PerceivedGroup]) -> tuple[int, ...]:
+    priorities = [_seniority_tuple(group)]
+    if group.descriptor is None:
+        return priorities[0]
+    member_centers = set(group.descriptor.centers)
+    for marker in route_markers:
+        if marker.descriptor is None:
+            continue
+        route_centers = set(marker.descriptor.centers)
+        if member_centers and member_centers <= route_centers:
+            priorities.append(_seniority_tuple(marker))
+    return min(priorities)
 
 
 def partition_principal_and_prefix_groups(
@@ -64,8 +117,14 @@ def add_component_principal_group(
         return
     locants = sorted([get_loc(c) for c in principal_carbons if c in numbered_path], key=parse_locant)
     atom_ids = set()
+    resolved_rule = None
+    descriptors = []
     for group in perceived_groups:
         if group.key == principal_key and group.attachment_carbon in numbered_path:
+            resolved_rule = group.resolved_rule
+            explanation_descriptor = group.trace_descriptor or group.descriptor
+            if explanation_descriptor is not None:
+                descriptors.append(explanation_descriptor)
             atom_ids.add(group.attachment_carbon)
             atom_ids.update(group.atoms_involved)
             if group.key in RULES.functional_groups.keys_with_family("hydrazone"):
@@ -98,6 +157,8 @@ def add_component_principal_group(
         atom_ids=atom_ids,
         bond_ids=bond_ids_within(mol, atom_ids),
         charge_atom_ids={atom_idx for atom_idx in atom_ids if mol.atoms[atom_idx].charge != 0},
+        resolved_rule=resolved_rule,
+        descriptors=tuple(descriptors),
     )
 
 

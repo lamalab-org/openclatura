@@ -283,3 +283,24 @@ def test_audit_models_every_retained_monocycle_the_namer_emits():
     emitted = {spec["name"] for spec in RULES.retained.monocycle_specs}
     missing = sorted(name for name in emitted if name not in _ALL_PARENT_TEMPLATES)
     assert missing == []
+
+
+def test_acyl_leaving_group_rules_expand_from_one_data_table():
+    from openclatura.nomenclature import RULES, FunctionalGroupCapability
+
+    for item in RULES.chalcogens.acyl_leaving_groups.values():
+        for key_field in ("chain_key", "external_key"):
+            rule = RULES.functional_groups.get(item[key_field])
+            assert item["word"] in rule.suffix
+            assert rule.has_capability(FunctionalGroupCapability.ACYL_LEAVING_GROUP)
+            assert item[key_field] in RULES.assembly.acid_halide_suffix_keys
+
+
+def test_anhydride_half_citations_are_structured_rule_data():
+    from openclatura.nomenclature import RULES, PrincipalCitationMode
+
+    acid = RULES.functional_groups.get("carboxylic_acid")
+    ring_acid = RULES.functional_groups.get("ring_carboxylic_acid")
+    assert acid.suffix_for_citation(PrincipalCitationMode.ANHYDRIDE_HALF) == "oic"
+    assert ring_acid.suffix_for_citation(PrincipalCitationMode.ANHYDRIDE_HALF) == "carboxylic"
+    assert RULES.retained.citation_for("acetic acid", PrincipalCitationMode.ANHYDRIDE_HALF) == "acetic"

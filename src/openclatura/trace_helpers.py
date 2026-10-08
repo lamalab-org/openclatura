@@ -10,6 +10,7 @@ from .assembly_parts import (
     SubstituentItem,
     split_rendered_substituent_name,
 )
+from .chalcogen_roles import FunctionalGroupDescriptor
 from .formatting import strip_outer_parentheses
 from .molecule import DecisionTrace, TracePhase
 from .nomenclature import RULES
@@ -28,6 +29,7 @@ class NamingTreeMetadata(TypedDict, total=False):
     indicated_hydrogens: list[str]
     hydro_operations: list[dict]
     parent_charges: list[dict]
+    shortcut: dict
 
 
 NAMING_TREE_METADATA_FIELDS = frozenset(NamingTreeMetadata.__annotations__)
@@ -72,7 +74,47 @@ def trace_decision(
     trace.add(phase, decision, reason, atoms=atoms or (), bonds=bonds or (), data=data)
 
 
-def functional_group_trace_data(groups: list[PerceivedGroup]) -> list[dict]:
+def functional_group_descriptor_data(descriptor: FunctionalGroupDescriptor | None, mol=None) -> dict | None:
+    """Return the complete JSON-safe structural description of a functional group."""
+
+    if descriptor is None:
+        return None
+    leaving_group = descriptor.leaving_group
+    return {
+        "family": descriptor.family.value,
+        "derivative": descriptor.derivative.value,
+        "centers": list(descriptor.centers),
+        "center_elements": [mol.atoms[center].symbol for center in descriptor.centers] if mol is not None else [],
+        "ligands": [
+            {
+                "atom": ligand.atom,
+                "element": ligand.element.value,
+                "role": ligand.role.value,
+                "center": ligand.center,
+                "bond": ligand.bond_id,
+                "attachment_atom": ligand.attachment_atom,
+            }
+            for ligand in descriptor.ligands
+        ],
+        "linker_paths": [list(path) for path in descriptor.linker_paths],
+        "attachment_atom": descriptor.attachment_atom,
+        "is_external": descriptor.is_external,
+        "central_element": descriptor.central_element.value if descriptor.central_element is not None else None,
+        "leaving_group": (
+            {
+                "kind": leaving_group.kind.value,
+                "attachment_atom": leaving_group.attachment_atom,
+                "atoms": list(leaving_group.atom_ids),
+                "bonds": list(leaving_group.bond_ids),
+            }
+            if leaving_group is not None
+            else None
+        ),
+        "shared_atoms": list(descriptor.shared_atoms),
+    }
+
+
+def functional_group_trace_data(groups: list[PerceivedGroup], mol=None) -> list[dict]:
     """Return compact functional-group metadata for decision traces."""
 
     return [
@@ -86,6 +128,8 @@ def functional_group_trace_data(groups: list[PerceivedGroup]) -> list[dict]:
             "suffix": group.suffix,
             "seniority": group.seniority,
             "metadata_source": group.metadata.source,
+            "descriptor": functional_group_descriptor_data(group.trace_descriptor or group.descriptor, mol),
+            "reasons": list(group.decision_reasons),
         }
         for group in groups
     ]
@@ -341,7 +385,7 @@ def assembly_trace_segments(parts: AssemblyParts) -> list[dict]:
         )
 
     if parts.principal_group:
-        group = RULES.functional_groups.get(parts.principal_group.key)
+        group = parts.principal_group.resolved_rule or RULES.functional_groups.get(parts.principal_group.key)
         terms = list(principal_suffix_terms(group, (1, 2, 3)))
         if group.prefix:
             terms.append(group.prefix)
@@ -441,6 +485,7 @@ def build_shortcut_tree_node(
     nested_decisions=None,
     name_atom_bindings: list[dict] | None = None,
     name_token_spans: list[dict] | None = None,
+    shortcut: dict | None = None,
 ) -> dict:
     """Build a schema-complete tree node for a shortcut-rendered name."""
 
@@ -449,6 +494,8 @@ def build_shortcut_tree_node(
         metadata["name_atom_bindings"] = list(name_atom_bindings)
     if name_token_spans is not None:
         metadata["name_token_spans"] = list(name_token_spans)
+    if shortcut is not None:
+        metadata["shortcut"] = dict(shortcut)
     return build_naming_tree_node(
         kind=kind,
         name=name,
@@ -481,7 +528,7 @@ def assembly_substituent_tree(
         atom_ids=component_atoms,
         bond_ids=component_bonds,
         parent=_parent_tree_node(parts, mol=mol),
-        principal_group=_principal_group_tree_node(parts),
+        principal_group=_principal_group_tree_node(parts, mol),
         substituents=_substituent_tree_nodes(parts.substituents),
         replacement_prefixes=_simple_item_tree_nodes(parts.a_prefixes, "replacement_prefix"),
         unsaturations=[
@@ -497,7 +544,7 @@ def assembly_substituent_tree(
         trace_segments=trace_segments,
         nested_decisions=decisions,
         metadata={
-            "front_modifiers": _substituent_tree_nodes(parts.front_modifier_items),
+            "front_modifiers": _front_modifier_tree_nodes(parts.front_modifier_items),
             "stereo_features": [
                 {"descriptor": descriptor, "locant": locant} for descriptor, locant in parts.stereo_features
             ],
@@ -655,9 +702,10 @@ def _substituent_suffix_tree_node(parts: AssemblyParts) -> dict | None:
     }
 
 
-def _principal_group_tree_node(parts: AssemblyParts) -> dict | None:
+def _principal_group_tree_node(parts: AssemblyParts, mol=None) -> dict | None:
     if parts.principal_group is None:
         return None
+    rule = parts.principal_group.resolved_rule
     return {
         "kind": "principal_group",
         "key": parts.principal_group.key,
@@ -665,6 +713,19 @@ def _principal_group_tree_node(parts: AssemblyParts) -> dict | None:
         "atoms": sorted(parts.principal_group.atom_ids),
         "bonds": sorted(parts.principal_group.bond_ids),
         "charge_atoms": sorted(parts.principal_group.charge_atom_ids),
+        "descriptors": [
+            functional_group_descriptor_data(descriptor, mol) for descriptor in parts.principal_group.descriptors
+        ],
+        "generated_rule": parts.principal_group.key not in RULES.functional_groups.by_key,
+        "citation": (
+            {
+                "prefix": rule.prefix,
+                "suffix": rule.suffix,
+                "families": list(rule.families),
+            }
+            if rule is not None
+            else None
+        ),
     }
 
 
@@ -715,4 +776,13 @@ def _substituent_tree_nodes(items: list[SubstituentItem]) -> list[dict]:
                 "prefixes": list(item.spiro.prefixes),
             }
         nodes.append(child)
+    return nodes
+
+
+def _front_modifier_tree_nodes(items: list[SubstituentItem]) -> list[dict]:
+    """Keep the cited modifier text alongside its recursively named ligand tree."""
+
+    nodes = _substituent_tree_nodes(items)
+    for node, item in zip(nodes, items, strict=True):
+        node["front_modifier_name"] = item.name
     return nodes

@@ -47,6 +47,8 @@ RULE_GROUPS: tuple[RuleGroupSpec, ...] = (
         sections=(
             "retained_ring_elements",
             "retained_substituent_stems",
+            "retained_chain_functional_parents",
+            "retained_principal_citations",
             "retained_monocycle_specs",
             "retained_fused_polycycle_specs",
         ),
@@ -111,6 +113,24 @@ RULE_GROUPS: tuple[RuleGroupSpec, ...] = (
             "hydrazone_principal_groups",
         ),
         reason="Functional-group rows and their derived behavior families are one extension surface.",
+    ),
+    RuleGroupSpec(
+        key="chalcogen_nomenclature",
+        sections=(
+            "chalcogen_elements",
+            "chalcogen_simple_group_keys",
+            "chalcogenide_class_names",
+            "chalcogen_peroxide_class_names",
+            "chalcogen_peroxol_rules",
+            "chalcogen_citation_routes",
+            "chalcogen_standard_acyl_keys",
+            "chalcogen_standard_peroxy_acyl_keys",
+            "chalcogen_acyl_leaving_groups",
+            "chalcogen_central_acid_origins",
+            "chalcogen_rule_policies",
+            "chalcogen_templates",
+        ),
+        reason="Chalcogen descriptor axes, vocabulary, templates, and priority policy form one data-backed rule family.",
     ),
     RuleGroupSpec(
         key="ring_descriptors",

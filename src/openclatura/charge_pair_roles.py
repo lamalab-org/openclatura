@@ -8,7 +8,9 @@ role keys instead of applying a global anion suffix.
 """
 
 from dataclasses import dataclass
+from enum import StrEnum
 
+from .chalcogen_roles import Chalcogen, chalcogen_for_symbol
 from .molecule import Molecule
 from .role_certificate import RoleCertificate, RoleCertificateAudit, RoleProjection, audit_role_certificate
 
@@ -16,11 +18,19 @@ SUPPORTED_TEMPLATE_ROLES = frozenset(
     {
         "diazonium_azanide",
         "n_oxide",
+        "nitrogen_chalcogenide",
+        "nitrile_chalcogenide",
         "phosphane_borane_zwitterion",
         "sulfonium_ylide_single_bond",
         "terminal_chalcogenide_heteroarenium",
     }
 )
+
+
+class NitrogenChalcogenideKind(StrEnum):
+    AMINE = "amine"
+    IMINE = "imine"
+    NITRILE = "nitrile"
 
 
 @dataclass(frozen=True)
@@ -34,6 +44,8 @@ class ChargePairRole:
     bond_ids: frozenset[int] = frozenset()
     template_supported: bool = False
     reason: str = ""
+    nitrogen_kind: NitrogenChalcogenideKind | None = None
+    chalcogen: Chalcogen | None = None
 
     @property
     def charge_pattern(self) -> tuple[tuple[int, int], tuple[int, int]]:
@@ -127,7 +139,14 @@ def _classify_charge_pair(
             supported=False,
         )
 
-    if pos_atom.symbol == "N" and neg_atom.symbol == "O" and bond is not None and bond.order == 1:
+    negative_chalcogen = chalcogen_for_symbol(neg_atom.symbol)
+    if (
+        pos_atom.symbol == "N"
+        and pos_atom.is_aromatic
+        and negative_chalcogen is Chalcogen.OXYGEN
+        and bond is not None
+        and bond.order == 1
+    ):
         return _role(
             mol,
             "n_oxide",
@@ -135,7 +154,49 @@ def _classify_charge_pair(
             negative,
             {positive, negative},
             {bond.idx},
-            "Matched N+-O- oxide charge pair.",
+            "Matched an aromatic N+-O- oxide charge pair.",
+        )
+    if (
+        pos_atom.symbol == "N"
+        and not pos_atom.is_aromatic
+        and negative_chalcogen is not None
+        and bond is not None
+        and bond.order == 1
+        and mol.degree(negative) == 1
+    ):
+        other_orders = tuple(
+            mol.get_bond(positive, neighbor).order for neighbor in mol.get_neighbors(positive) if neighbor != negative
+        )
+        organic_neighbors = tuple(
+            neighbor
+            for neighbor in mol.get_neighbors(positive)
+            if neighbor != negative and mol.atoms[neighbor].is_carbon
+        )
+        all_neighbors_are_organic = len(organic_neighbors) == len(other_orders)
+        if all_neighbors_are_organic and other_orders.count(3) == 1 and all(order == 3 for order in other_orders):
+            nitrogen_kind = NitrogenChalcogenideKind.NITRILE
+            key = "nitrile_chalcogenide"
+        elif (
+            all_neighbors_are_organic and other_orders.count(2) == 1 and all(order in {1, 2} for order in other_orders)
+        ):
+            nitrogen_kind = NitrogenChalcogenideKind.IMINE
+            key = "n_oxide" if negative_chalcogen is Chalcogen.OXYGEN else "nitrogen_chalcogenide"
+        elif all_neighbors_are_organic and other_orders and all(order == 1 for order in other_orders):
+            nitrogen_kind = NitrogenChalcogenideKind.AMINE
+            key = "n_oxide" if negative_chalcogen is Chalcogen.OXYGEN else "nitrogen_chalcogenide"
+        else:
+            nitrogen_kind = None
+            key = "adjacent_formal_charge_pair"
+        return _role(
+            mol,
+            key,
+            positive,
+            negative,
+            {positive, negative},
+            {bond.idx},
+            "Matched a terminal chalcogenide on a positively charged nitrogen center.",
+            nitrogen_kind=nitrogen_kind,
+            chalcogen=negative_chalcogen,
         )
 
     if pos_atom.symbol == "N" and neg_atom.symbol == "N" and bond is not None:
@@ -231,6 +292,8 @@ def _role(
     reason: str,
     *,
     supported: bool | None = None,
+    nitrogen_kind: NitrogenChalcogenideKind | None = None,
+    chalcogen: Chalcogen | None = None,
 ) -> ChargePairRole:
     return ChargePairRole(
         key=key,
@@ -240,6 +303,8 @@ def _role(
         bond_ids=frozenset(bond_ids),
         template_supported=key in SUPPORTED_TEMPLATE_ROLES if supported is None else supported,
         reason=reason,
+        nitrogen_kind=nitrogen_kind,
+        chalcogen=chalcogen,
     )
 
 
