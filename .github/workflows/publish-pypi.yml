@@ -1,9 +1,12 @@
 name: Publish to PyPI
 
 on:
+  workflow_dispatch:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
+    paths:
+      - pyproject.toml
 
 concurrency:
   group: publish-pypi-${{ github.ref }}
@@ -13,48 +16,74 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build distributions
+  release_metadata:
+    name: Inspect release metadata
     runs-on: ubuntu-latest
     outputs:
-      package-version: ${{ steps.release_metadata.outputs.version }}
+      package_version: ${{ steps.release_metadata.outputs.version }}
+      should_publish: ${{ steps.release_metadata.outputs.should_publish }}
 
     steps:
-      - name: Check out tagged revision
+      - name: Check out revision
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Require a commit from main
-        run: git merge-base --is-ancestor "${GITHUB_SHA}" origin/main
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
-      - name: Require tag to match package version
+      - name: Inspect version change
         id: release_metadata
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           python - <<'PY'
           import os
           import pathlib
+          import subprocess
           import tomllib
 
           project = tomllib.loads(pathlib.Path("pyproject.toml").read_text())
           version = project["project"]["version"]
-          expected_tag = f"v{version}"
-          actual_tag = os.environ["RELEASE_TAG"]
-          if actual_tag != expected_tag:
-              raise SystemExit(
-                  f"Release tag {actual_tag!r} does not match package version; "
-                  f"expected {expected_tag!r}"
-              )
+          if os.environ["EVENT_NAME"] == "workflow_dispatch":
+              should_publish = True
+          else:
+              previous_text = subprocess.run(
+                  ["git", "show", f"{os.environ['BEFORE_SHA']}:pyproject.toml"],
+                  check=True,
+                  capture_output=True,
+                  text=True,
+              ).stdout
+              previous_version = tomllib.loads(previous_text)["project"]["version"]
+              should_publish = version != previous_version
+              if not should_publish:
+                  print(
+                      f"pyproject.toml changed without changing project.version "
+                      f"({version}); skipping publication"
+                  )
+
           with open(os.environ["GITHUB_OUTPUT"], "a") as output:
               print(f"version={version}", file=output)
+              print(f"should_publish={str(should_publish).lower()}", file=output)
           PY
+
+  build:
+    name: Build distributions
+    needs: release_metadata
+    if: needs.release_metadata.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out revision
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Install build tools
         run: python -m pip install --upgrade build twine
@@ -74,11 +103,11 @@ jobs:
 
   publish:
     name: Publish distributions
-    needs: build
+    needs: [release_metadata, build]
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/project/openclatura/${{ needs.build.outputs.package-version }}/
+      url: https://pypi.org/project/openclatura/${{ needs.release_metadata.outputs.package_version }}/
     permissions:
       id-token: write
 
