@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>openclatura — name a polymer</title>
+<meta name="description" content="Draw the monomers a polymer is made from and get its source-based IUPAC name, with copolymer connectives, chain architecture and end groups.">
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --border: #e2e5ea;
+    --text: #1a2233;
+    --muted: #5c6675;
+    --accent: #1a56db;
+    --accent-soft: #e8effc;
+    --err: #b42318;
+    --err-soft: #fdeceb;
+    --ok: #17803d;
+    --ok-soft: #e7f6ec;
+    --warn: #9a6700;
+    --warn-soft: #fdf6e3;
+    --chip: #eef1f5;
+    --editor-bg: #ffffff; /* matches Ketcher's own themed canvas */
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1420;
+      --surface: #171e2e;
+      --border: #2a3450;
+      --text: #e8ecf4;
+      --muted: #97a1b5;
+      --accent: #6d9cff;
+      --accent-soft: #1d2a47;
+      --err: #ff8177;
+      --err-soft: #3a1d1c;
+      --ok: #56d68a;
+      --ok-soft: #16301f;
+      --warn: #e8c05a;
+      --warn-soft: #322a14;
+      --chip: #222c44;
+      --editor-bg: #1c1f2b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+  header {
+    max-width: 86rem;
+    margin: 0 auto;
+    padding: 1.6rem 1.25rem 1.1rem;
+  }
+  .header-row { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 1.45rem; letter-spacing: -.01em; }
+  header h1 span { color: var(--accent); }
+  header p { margin: .3rem 0 0; max-width: 52rem; color: var(--muted); font-size: .92rem; }
+  header p a { color: var(--accent); }
+  .version-tag {
+    font-family: var(--mono);
+    font-size: .74rem;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: .08rem .45rem;
+  }
+  .version-tag:empty { display: none; }
+  .version-tag.beta { border-color: var(--accent); color: var(--accent); }
+  main {
+    max-width: 86rem;
+    margin: 0 auto;
+    padding: 0 1.25rem 3rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(26rem, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+  }
+  @media (max-width: 70rem) { main { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1rem 1.1rem 1.1rem;
+  }
+  .card + .card { margin-top: 1.25rem; }
+  .card h2 {
+    margin: 0 0 .8rem;
+    padding-bottom: .45rem;
+    border-bottom: 1px solid var(--border);
+    font-size: .76rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: .5rem;
+  }
+  .card h2 .count { font-weight: 400; text-transform: none; letter-spacing: 0; }
+  .editor-shell {
+    position: relative;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    background: var(--editor-bg);
+    height: min(52vh, 440px);
+    min-height: 340px;
+  }
+  #ketcher-frame { width: 100%; height: 100%; border: 0; display: block; }
+  #editor-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    background: var(--editor-bg);
+    color: var(--muted);
+    font-size: .95rem;
+    z-index: 2;
+    transition: opacity .25s;
+  }
+  .spinner {
+    display: inline-block;
+    width: .8em; height: .8em;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* --- buttons --- */
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--chip);
+    color: var(--text);
+    padding: .3rem .7rem;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    padding: .45rem 1rem;
+  }
+  button.primary:hover:not(:disabled) { filter: brightness(1.08); color: #fff; }
+  .actions { display: flex; gap: .5rem; align-items: center; margin-top: .8rem; flex-wrap: wrap; }
+  .actions .note { font-size: .82rem; color: var(--muted); }
+  .examples { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .8rem; align-items: center; }
+  .examples .label { font-size: .8rem; color: var(--muted); margin-right: .15rem; }
+  .examples button { font-size: .82rem; padding: .28rem .7rem; }
+
+  /* --- monomer list --- */
+  ol.monomers { list-style: none; margin: 0; padding: 0; }
+  li.monomer {
+    display: grid;
+    grid-template-columns: auto 4.6rem minmax(0, 1fr) auto;
+    gap: .7rem;
+    align-items: center;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    padding: .5rem .6rem;
+  }
+  li.monomer + li.monomer { margin-top: .5rem; }
+  li.monomer.dragging { opacity: .4; }
+  li.monomer.drop-target { border-color: var(--accent); box-shadow: inset 0 2px 0 var(--accent); }
+  .grip {
+    cursor: grab;
+    color: var(--muted);
+    font-size: 1rem;
+    line-height: 1;
+    user-select: none;
+    padding: 0 .1rem;
+  }
+  .grip:active { cursor: grabbing; }
+  .thumb {
+    width: 4.6rem; height: 3.2rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  .thumb svg { width: 100%; height: 100%; }
+  .m-body { min-width: 0; }
+  .m-name { font-size: .92rem; font-weight: 600; word-break: break-word; }
+  .m-name.pending { color: var(--muted); font-weight: 400; font-style: italic; }
+  .m-trivial { font-size: .8rem; color: var(--muted); }
+  .m-smiles {
+    font-family: var(--mono);
+    font-size: .74rem;
+    color: var(--muted);
+    word-break: break-all;
+  }
+  .m-tools { display: flex; gap: .25rem; align-items: center; }
+  .m-tools button { padding: .12rem .4rem; font-size: .78rem; line-height: 1.4; }
+  .badge {
+    display: inline-block;
+    font-size: .68rem;
+    font-family: var(--mono);
+    padding: .02rem .3rem;
+    border: 1px solid transparent;
+    margin-left: .35rem;
+    vertical-align: .08em;
+  }
+  .badge.matched { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+  .badge.unverified { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+  .empty { color: var(--muted); font-size: .9rem; margin: .2rem 0 0; }
+
+  /* --- controls --- */
+  .controls { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem 1rem; }
+  @media (max-width: 26rem) { .controls { grid-template-columns: 1fr; } }
+  .field { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+  .field label { font-size: .78rem; color: var(--muted); }
+  .field select {
+    font: inherit;
+    font-size: .88rem;
+    padding: .3rem .4rem;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    max-width: 100%;
+  }
+  .field select:disabled { opacity: .55; }
+  .field .sub { font-size: .74rem; color: var(--muted); }
+  .mech-line { margin: .85rem 0 0; font-size: .82rem; color: var(--muted); }
+  .mech-line strong { color: var(--text); font-weight: 600; }
+
+  /* --- result --- */
+  #poly-name {
+    font-size: 1.3rem;
+    line-height: 1.35;
+    font-weight: 600;
+    word-break: break-word;
+    letter-spacing: -.01em;
+  }
+  #poly-name i { font-style: italic; font-weight: 600; }
+  #poly-name.placeholder { color: var(--muted); font-size: .95rem; font-weight: 400; }
+  .name-tools { display: flex; gap: .5rem; margin-top: .7rem; align-items: center; flex-wrap: wrap; }
+  .name-tools .copied { font-size: .8rem; color: var(--ok); }
+  .alsoknown { margin-top: .9rem; padding-top: .7rem; border-top: 1px solid var(--border); font-size: .86rem; }
+  .alsoknown dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .2rem .7rem; }
+  .alsoknown dt { color: var(--muted); font-size: .78rem; }
+  .alsoknown dd { margin: 0; }
+  .alsoknown .acr { font-family: var(--mono); }
+  .errbox {
+    margin-top: .7rem;
+    background: var(--err-soft);
+    border: 1px solid var(--err);
+    color: var(--err);
+    padding: .5rem .7rem;
+    font-size: .86rem;
+  }
+  .errbox:empty { display: none; }
+  .notebox {
+    margin-top: .7rem;
+    background: var(--warn-soft);
+    border: 1px solid var(--warn);
+    color: var(--warn);
+    padding: .5rem .7rem;
+    font-size: .84rem;
+  }
+  .notebox:empty { display: none; }
+  .card > .sub { margin: -.2rem 0 .7rem; font-size: .82rem; color: var(--muted); }
+  .paste-row { display: flex; gap: .5rem; align-items: stretch; }
+  .paste-row input {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-family: var(--mono);
+    font-size: .8rem;
+    padding: .45rem .55rem;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--bg);
+    color: inherit;
+  }
+  .importbox { margin-top: .8rem; font-size: .82rem; }
+  .importbox:empty { display: none; }
+  .importbox .line { margin: .25rem 0; }
+  .importbox .k { color: var(--muted); }
+  .importbox .mono { font-family: var(--mono); font-size: .92em; }
+  .importbox .amb {
+    margin-top: .5rem;
+    padding: .5rem .6rem;
+    border-left: 2px solid var(--accent);
+    background: var(--chip);
+  }
+  .importbox .amb select { margin-top: .35rem; font-size: .8rem; max-width: 100%; }
+  .bigsmiles {
+    margin-top: .9rem;
+    padding-top: .7rem;
+    border-top: 1px solid var(--border);
+    font-size: .82rem;
+  }
+  .bigsmiles .k {
+    display: block;
+    color: var(--muted);
+    font-size: .74rem;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    margin-bottom: .25rem;
+  }
+  .bigsmiles code {
+    font-family: var(--mono);
+    font-size: .86rem;
+    word-break: break-all;
+    display: block;
+  }
+  footer {
+    max-width: 86rem;
+    margin: 0 auto;
+    color: var(--muted);
+    font-size: .82rem;
+    padding: 0 1rem 2.5rem;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <h1><span>openclatura</span> — name a polymer</h1>
+    <span class="version-tag" id="app-version" title="openclatura package version"></span>
+  </div>
+  <p>
+    Draw the monomers a polymer is made from and add them one at a time. Each is
+    named with IUPAC Blue Book rules, then assembled into a <em>source-based</em>
+    polymer name — <code>poly</code> applied to the monomer names — with a
+    copolymer connective, chain architecture and end groups.
+    Naming a single molecule instead? <a href="/">Go to the namer</a> ·
+    <a href="/teach">see how a name is built</a>.
+  </p>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h2>Draw a monomer</h2>
+      <div class="editor-shell">
+        <div id="editor-loading"><span class="spinner"></span> Loading structure editor…</div>
+        <iframe id="ketcher-frame" src="/ketcher/index.html" title="Ketcher structure editor"></iframe>
+      </div>
+      <div class="actions">
+        <button class="primary" id="add-monomer" disabled>Add monomer</button>
+        <button id="clear-editor">Clear canvas</button>
+        <span class="note" id="add-note">Draw a structure, then add it to the list.</span>
+      </div>
+      <div class="examples" id="examples">
+        <span class="label">Quick add:</span>
+        <button data-smiles="C=Cc1ccccc1">styrene</button>
+        <button data-smiles="C=C">ethene</button>
+        <button data-smiles="C=CCl">vinyl chloride</button>
+        <button data-smiles="C=C(C)C(=O)OC">methyl methacrylate</button>
+        <button data-smiles="C=CC#N">acrylonitrile</button>
+        <button data-smiles="C1CO1">ethylene oxide</button>
+        <button data-smiles="O=C1CCCCCN1">ε-caprolactam</button>
+        <button data-smiles="C=CC=C">butadiene</button>
+        <button data-smiles="OCCO">ethylene glycol</button>
+        <button data-smiles="OC(=O)c1ccc(C(=O)O)cc1">terephthalic acid</button>
+        <button data-smiles="NCCCCCCN">hexamethylenediamine</button>
+        <button data-smiles="OC(=O)CCCCC(=O)O">adipic acid</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Paste a structure or a polymer</h2>
+      <p class="sub">
+        A SMILES adds one monomer. A <strong>BigSMILES</strong> stochastic object
+        is taken apart instead: its repeat units are disconnected back to the
+        monomers that made them, and the connective, block structure and end
+        groups are read off the bond descriptors.
+      </p>
+      <div class="paste-row">
+        <input id="import-text" type="text" spellcheck="false"
+               placeholder="{[][&lt;]OCCOC(=O)c1ccc(cc1)C(=O)[&gt;][]}  or  C=Cc1ccccc1">
+        <button class="primary" id="import-go">Import</button>
+      </div>
+      <div class="examples" id="bigsmiles-examples">
+        <span class="label">Try:</span>
+        <button data-bigsmiles="{[][&lt;]OCCOC(=O)c1ccc(cc1)C(=O)[&gt;][]}">PET</button>
+        <button data-bigsmiles="{[][&lt;]C(=O)CCCCC(=O)[&lt;],[&gt;]NCCCCCCN[&gt;];[&gt;]O,[&lt;][H][]}">nylon-6,6</button>
+        <button data-bigsmiles="{[][&lt;]OCCOC(=O)NCCCCCCNC(=O)[&gt;][]}">polyurethane</button>
+        <button data-bigsmiles="{[][&lt;]CC(c1ccccc1)[&gt;][&gt;]}{[&lt;][&lt;]CC(C)(C(=O)OC)[&gt;][]}">PS-<i>b</i>-PMMA</button>
+        <button data-bigsmiles="CC{[&gt;][&lt;]CC(C)[&gt;][&lt;]}CC(C)=C">polypropylene</button>
+      </div>
+      <div class="importbox" id="importbox" hidden></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="card">
+      <h2>The polymer name</h2>
+      <div id="poly-name" class="placeholder">Add a monomer to name a polymer.</div>
+      <div class="name-tools" id="name-tools" hidden>
+        <button id="copy-name">Copy name</button>
+        <span class="copied" id="copied" hidden>Copied</span>
+      </div>
+      <div class="alsoknown" id="alsoknown" hidden>
+        <dl id="alsoknown-dl"></dl>
+      </div>
+      <div class="bigsmiles" id="bigsmiles-box" hidden>
+        <span class="k">BigSMILES</span>
+        <code id="bigsmiles-text"></code>
+      </div>
+      <div class="notebox" id="notebox"></div>
+      <div class="errbox" id="errbox"></div>
+    </div>
+
+    <div class="card">
+      <h2>
+        <span>Monomers</span>
+        <span class="count" id="monomer-count"></span>
+      </h2>
+      <ol class="monomers" id="monomer-list"></ol>
+      <p class="empty" id="monomer-empty">
+        No monomers yet. Draw one on the left, or use a quick-add button.
+      </p>
+      <p class="mech-line" id="order-hint"></p>
+    </div>
+
+    <div class="card">
+      <h2>Architecture &amp; end groups</h2>
+      <div class="controls">
+        <div class="field">
+          <label for="connective">Monomer arrangement</label>
+          <select id="connective" disabled></select>
+          <span class="sub" id="connective-sub">Needs two or more monomers.</span>
+        </div>
+        <div class="field">
+          <label for="architecture">Chain architecture</label>
+          <select id="architecture"></select>
+          <span class="sub" id="architecture-sub">Linear is the default and is left unmarked.</span>
+        </div>
+        <div class="field">
+          <label for="tacticity">Configuration</label>
+          <select id="tacticity"></select>
+          <span class="sub" id="tacticity-sub">Stereochemistry of the chain, not of the monomer.</span>
+        </div>
+        <div class="field">
+          <label for="end-alpha">α end group</label>
+          <select id="end-alpha"></select>
+        </div>
+        <div class="field">
+          <label for="end-omega">ω end group</label>
+          <select id="end-omega"></select>
+        </div>
+      </div>
+      <p class="mech-line" id="mech-line"></p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Powered by <a href="https://github.com/lamalab-org/iupac-name-generator">openclatura</a>,
+  an open nomenclature framework ·
+  Editor: <a href="https://lifescience.opensource.epam.com/ketcher/">Ketcher</a> (EPAM, Apache-2.0) · MIT licensed
+</footer>
+
+<script>
+  var el = function (id) { return document.getElementById(id); };
+
+  var ketcher = null;
+  var monomers = [];          // [{smiles, name, opsin, svg}]
+  var requestSeq = 0;
+  var options = null;
+  var lastResult = null;
+  // Mechanism-appropriate end groups from the last response, so the α/ω menus
+  // offer the groups that actually terminate this kind of chain first.
+  var suggestedEnds = [];
+  var thumbCache = {};
+
+  var MECHANISM_LABELS = {
+    chain: "chain-growth (addition)",
+    ring: "ring-opening",
+    condensation: "step-growth (condensation)"
+  };
+
+  fetch("/api/warmup").catch(function () {});
+
+  // -----------------------------------------------------------------------
+  // Editor
+  // -----------------------------------------------------------------------
+  (function waitForKetcher() {
+    var frame = el("ketcher-frame");
+    var tries = 0;
+    var timer = setInterval(function () {
+      tries += 1;
+      var k = null;
+      try { k = frame.contentWindow && frame.contentWindow.ketcher; } catch (e) { /* not ready */ }
+      if (k) {
+        clearInterval(timer);
+        ketcher = k;
+        el("editor-loading").style.opacity = "0";
+        setTimeout(function () { el("editor-loading").style.display = "none"; }, 300);
+        ketcher.editor.subscribe("change", refreshAddButton);
+        refreshAddButton();
+      } else if (tries > 300) { // ~60 s
+        clearInterval(timer);
+        el("editor-loading").textContent = "The structure editor failed to load.";
+      }
+    }, 200);
+  })();
+
+  function editorSmiles() {
+    if (!ketcher) return Promise.resolve("");
+    return ketcher.getSmiles().then(function (s) { return (s || "").trim(); })
+      .catch(function () { return ""; });
+  }
+
+  function refreshAddButton() {
+    editorSmiles().then(function (smiles) {
+      var empty = !smiles;
+      el("add-monomer").disabled = empty;
+      el("add-note").textContent = empty
+        ? "Draw a structure, then add it to the list."
+        : "Ready to add: " + smiles;
+    });
+  }
+
+  el("add-monomer").addEventListener("click", function () {
+    editorSmiles().then(function (smiles) {
+      if (smiles) addMonomer(smiles);
+    });
+  });
+
+  el("clear-editor").addEventListener("click", function () {
+    if (ketcher) ketcher.setMolecule("").then(refreshAddButton, refreshAddButton);
+  });
+
+  el("examples").addEventListener("click", function (event) {
+    var smiles = event.target && event.target.getAttribute("data-smiles");
+    if (smiles) addMonomer(smiles);
+  });
+
+  // -----------------------------------------------------------------------
+  // Import: one field for both SMILES and BigSMILES
+  //
+  // The server decides which it is — a brace is not legal SMILES anywhere, so
+  // the test is conclusive — and a BigSMILES comes back already taken apart
+  // into the builder's own state: monomers, connective, end groups. Everything
+  // then flows through the ordinary naming path, so there is only one place a
+  // name can be built.
+  // -----------------------------------------------------------------------
+  var lastImport = null;
+
+  function runImport(text) {
+    var value = (text || "").trim();
+    if (!value) return;
+    el("import-text").value = value;
+    el("importbox").hidden = false;
+    el("importbox").textContent = "Reading…";
+
+    fetch("/api/polymer/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: value, route_choice: routeChoice })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data || !data.ok) {
+          el("importbox").textContent = (data && data.error) || "Could not read that.";
+          return;
+        }
+        lastImport = data;
+        if (data.kind === "smiles") {
+          el("importbox").hidden = true;
+          addMonomer(data.monomers[0].smiles);
+          return;
+        }
+        applyImport(data);
+      })
+      .catch(function () {
+        el("importbox").textContent = "The import service could not be reached.";
+      });
+  }
+
+  // Which disconnection the user picked, per linkage. Sent back on re-import so
+  // switching PET from terephthalic acid to dimethyl terephthalate re-derives
+  // the monomers rather than patching the name.
+  var routeChoice = {};
+
+  function applyImport(data) {
+    monomers = [];
+    (data.monomers || []).forEach(function (item) {
+      if (monomers.length < 8) {
+        monomers.push({ smiles: item.smiles, name: null, opsin: null });
+        loadThumb(item.smiles);
+      }
+    });
+    if (data.connective) el("connective").value = data.connective;
+    // Imported state replaces builder state wholesale. Without the reset, an
+    // end group picked for the previous polymer survives the import and lands
+    // in the new name.
+    el("architecture").value = data.architecture || "linear";
+    // Stereodescriptors in the pasted repeat unit are a statement about the
+    // chain, so they set the configuration rather than being dropped.
+    el("tacticity").value = data.tacticity || "";
+    el("end-alpha").value = data.end_alpha_choice || "";
+    el("end-omega").value = data.end_omega_choice || "";
+    renderMonomers();
+    nameCurrent();
+    renderImportReport(data);
+  }
+
+  function renderImportReport(data) {
+    var box = el("importbox");
+    box.hidden = false;
+    box.innerHTML = "";
+
+    function line(label, value, mono) {
+      if (!value) return;
+      var div = document.createElement("div");
+      div.className = "line";
+      var k = document.createElement("span");
+      k.className = "k";
+      k.textContent = label + ": ";
+      var v = document.createElement("span");
+      if (mono) v.className = "mono";
+      v.textContent = value;
+      div.appendChild(k);
+      div.appendChild(v);
+      box.appendChild(div);
+    }
+
+    var first = (data.blocks || [])[0] || {};
+    line("Read as", data.n_blocks > 1
+      ? data.n_blocks + " blocks, joined (" + (data.connective || "co") + ")"
+      : first.type);
+
+    if (first.route) {
+      // The route is the whole reason the monomers look the way they do, so it
+      // is stated rather than left implicit in the structures.
+      line("Route", first.route.name + (first.route.eliminated
+        ? " — eliminates " + first.route.eliminated
+        : " — no leaving group (polyaddition)"));
+    }
+
+    // The fragment is shown with the curated entry it mapped onto, since that
+    // entry -- not the fragment -- is what reaches the name. An unmapped
+    // fragment says so instead of silently disappearing.
+    function endLine(label, fragment, choice) {
+      if (!fragment) return;
+      line(label, fragment + (choice
+        ? "  → " + choice
+        : "  (no matching end-group entry; not included in the name)"), true);
+    }
+    endLine("α end group", data.end_alpha, data.end_alpha_choice);
+    endLine("ω end group", data.end_omega, data.end_omega_choice);
+    if (data.ends_assumed_order) {
+      // Only when the descriptors genuinely leave it open — identical
+      // descriptors on both fragments fix nothing. Distinct directional
+      // descriptors assign the ends by their pairing and get no note.
+      line("Note", "both end groups carry the same bond descriptor, so the " +
+        "notation does not say which chain end is which — written order was " +
+        "used; swap them in the menus if needed");
+    }
+    var ends = first.end_groups || {};
+    // Stated fragments already assigned above are not repeated here.
+    if (!data.ends_assumed_order && ends.stated && ends.stated.length) {
+      line("End groups stated in the object", ends.stated.join(", "), true);
+    }
+
+    (data.ambiguities || []).forEach(function (amb) {
+      if (amb.parameter !== "route") return;
+      var wrap = document.createElement("div");
+      wrap.className = "amb";
+      var text = document.createElement("div");
+      text.textContent = "The route cannot be recovered from the structure — " +
+        amb.reason + ". Assumed: " + amb.assumed + ".";
+      wrap.appendChild(text);
+
+      var select = document.createElement("select");
+      [amb.assumed].concat(amb.options).forEach(function (name) {
+        var opt = document.createElement("option");
+        opt.value = name;
+        opt.textContent = name;
+        select.appendChild(opt);
+      });
+      var linkage = (first.route && first.route.linkage) || "";
+      select.addEventListener("change", function () {
+        routeChoice[linkage] = select.value;
+        runImport(el("import-text").value);
+      });
+      wrap.appendChild(select);
+      box.appendChild(wrap);
+    });
+  }
+
+  el("import-go").addEventListener("click", function () {
+    routeChoice = {};
+    runImport(el("import-text").value);
+  });
+
+  el("import-text").addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      routeChoice = {};
+      runImport(el("import-text").value);
+    }
+  });
+
+  el("bigsmiles-examples").addEventListener("click", function (event) {
+    var text = event.target && event.target.getAttribute("data-bigsmiles");
+    if (text) {
+      routeChoice = {};
+      runImport(text);
+    }
+  });
+
+  // -----------------------------------------------------------------------
+  // Monomer list
+  // -----------------------------------------------------------------------
+  function addMonomer(smiles) {
+    if (monomers.length >= 8) {
+      showError("Eight monomers is the most this builder will name at once.");
+      return;
+    }
+    monomers.push({ smiles: smiles, name: null, opsin: null });
+    renderMonomers();
+    nameCurrent();
+    loadThumb(smiles);
+  }
+
+  function removeMonomer(index) {
+    monomers.splice(index, 1);
+    renderMonomers();
+    nameCurrent();
+  }
+
+  function moveMonomer(from, to) {
+    if (to < 0 || to >= monomers.length || from === to) return;
+    var moved = monomers.splice(from, 1)[0];
+    monomers.splice(to, 0, moved);
+    renderMonomers();
+    nameCurrent();
+  }
+
+  function loadThumb(smiles) {
+    if (thumbCache[smiles]) return;
+    // Marked in-flight so a repeated monomer does not fetch twice.
+    thumbCache[smiles] = "";
+    fetch("/api/depict", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ smiles: smiles, width: 150, height: 105, annotate: false })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data && data.ok && data.svg) {
+          thumbCache[smiles] = data.svg;
+          renderMonomers();
+        }
+      })
+      .catch(function () { /* a missing thumbnail is cosmetic */ });
+  }
+
+  function renderMonomers() {
+    var list = el("monomer-list");
+    list.innerHTML = "";
+    el("monomer-empty").hidden = monomers.length > 0;
+    el("monomer-count").textContent = monomers.length
+      ? monomers.length + (monomers.length === 1 ? " monomer" : " monomers")
+      : "";
+
+    monomers.forEach(function (mono, index) {
+      var li = document.createElement("li");
+      li.className = "monomer";
+      li.draggable = true;
+      li.dataset.index = String(index);
+
+      var grip = document.createElement("span");
+      grip.className = "grip";
+      grip.textContent = "⠿";
+      grip.title = "Drag to reorder";
+      li.appendChild(grip);
+
+      var thumb = document.createElement("div");
+      thumb.className = "thumb";
+      if (thumbCache[mono.smiles]) {
+        thumb.innerHTML = thumbCache[mono.smiles];
+      } else {
+        thumb.innerHTML = '<span class="spinner"></span>';
+      }
+      li.appendChild(thumb);
+
+      var body = document.createElement("div");
+      body.className = "m-body";
+      var nameDiv = document.createElement("div");
+      if (mono.name) {
+        nameDiv.className = "m-name";
+        nameDiv.textContent = mono.name;
+        if (mono.opsin) {
+          var badge = document.createElement("span");
+          var matched = mono.opsin === "matched";
+          badge.className = "badge " + (matched ? "matched" : "unverified");
+          badge.textContent = matched ? "OPSIN ✓" : mono.opsin.replace(/_/g, " ");
+          badge.title = matched
+            ? "OPSIN read this name back to the same structure."
+            : "OPSIN could not confirm this name.";
+          nameDiv.appendChild(badge);
+        }
+      } else {
+        nameDiv.className = "m-name pending";
+        nameDiv.textContent = "naming…";
+      }
+      body.appendChild(nameDiv);
+      // The name chemists would say, when it differs from the systematic one.
+      if (mono.trivialName && mono.trivialName !== mono.name) {
+        var triv = document.createElement("div");
+        triv.className = "m-trivial";
+        triv.textContent = mono.trivialName;
+        body.appendChild(triv);
+      }
+      var smi = document.createElement("div");
+      smi.className = "m-smiles";
+      smi.textContent = mono.smiles;
+      body.appendChild(smi);
+      li.appendChild(body);
+
+      var tools = document.createElement("div");
+      tools.className = "m-tools";
+      tools.appendChild(toolButton("↑", "Move up", index === 0, function () {
+        moveMonomer(index, index - 1);
+      }));
+      tools.appendChild(toolButton("↓", "Move down", index === monomers.length - 1, function () {
+        moveMonomer(index, index + 1);
+      }));
+      tools.appendChild(toolButton("✎", "Load into the editor", false, function () {
+        if (ketcher) ketcher.setMolecule(mono.smiles).then(refreshAddButton, refreshAddButton);
+      }));
+      tools.appendChild(toolButton("✕", "Remove", false, function () {
+        removeMonomer(index);
+      }));
+      li.appendChild(tools);
+
+      list.appendChild(li);
+    });
+  }
+
+  function toolButton(label, title, disabled, onClick) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.textContent = label;
+    b.title = title;
+    b.setAttribute("aria-label", title);
+    b.disabled = disabled;
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  // Drag and drop reordering. The ↑/↓ buttons above do the same job for anyone
+  // not using a pointer, so this is an enhancement rather than the only route.
+  var dragIndex = null;
+
+  el("monomer-list").addEventListener("dragstart", function (event) {
+    var li = event.target.closest("li.monomer");
+    if (!li) return;
+    dragIndex = Number(li.dataset.index);
+    li.classList.add("dragging");
+    event.dataTransfer.effectAllowed = "move";
+    // Firefox will not start a drag without payload.
+    event.dataTransfer.setData("text/plain", String(dragIndex));
+  });
+
+  el("monomer-list").addEventListener("dragover", function (event) {
+    if (dragIndex === null) return;
+    event.preventDefault();
+    var li = event.target.closest("li.monomer");
+    clearDropTargets();
+    if (li && Number(li.dataset.index) !== dragIndex) li.classList.add("drop-target");
+  });
+
+  el("monomer-list").addEventListener("drop", function (event) {
+    if (dragIndex === null) return;
+    event.preventDefault();
+    var li = event.target.closest("li.monomer");
+    clearDropTargets();
+    if (li) moveMonomer(dragIndex, Number(li.dataset.index));
+    dragIndex = null;
+  });
+
+  el("monomer-list").addEventListener("dragend", function () {
+    clearDropTargets();
+    var dragging = document.querySelector("li.monomer.dragging");
+    if (dragging) dragging.classList.remove("dragging");
+    dragIndex = null;
+  });
+
+  function clearDropTargets() {
+    var marked = el("monomer-list").querySelectorAll(".drop-target");
+    Array.prototype.forEach.call(marked, function (node) {
+      node.classList.remove("drop-target");
+    });
+  }
+
+  // -----------------------------------------------------------------------
+  // Controls
+  // -----------------------------------------------------------------------
+  function fillSelect(select, values, labeller) {
+    select.innerHTML = "";
+    values.forEach(function (value) {
+      var opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = labeller ? labeller(value) : value;
+      select.appendChild(opt);
+    });
+  }
+
+  fetch("/api/polymer/options")
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data || !data.ok) return;
+      options = data;
+
+      var conn = el("connective");
+      conn.innerHTML = "";
+      data.connectives.forEach(function (c) {
+        var opt = document.createElement("option");
+        opt.value = c.value;
+        opt.textContent = "-" + c.value + "-  " + c.meaning;
+        conn.appendChild(opt);
+      });
+
+      var arch = el("architecture");
+      arch.innerHTML = "";
+      data.architectures.forEach(function (a) {
+        var opt = document.createElement("option");
+        opt.value = a.value;
+        opt.textContent = a.value + (a.prefix ? "  (" + a.prefix + "-)" : "  (unmarked)");
+        arch.appendChild(opt);
+      });
+
+      var tact = el("tacticity");
+      tact.innerHTML = "";
+      var none = document.createElement("option");
+      none.value = "";
+      none.textContent = "— unspecified —";
+      tact.appendChild(none);
+      (data.tacticities || []).forEach(function (t) {
+        var opt = document.createElement("option");
+        opt.value = t.value;
+        opt.textContent = t.value + "-  " + t.meaning;
+        tact.appendChild(opt);
+      });
+
+      renderEndGroupMenus();
+    })
+    .catch(function () { /* controls stay as-is; naming still works */ });
+
+  // The α/ω menus are rebuilt after each naming call so the groups that suit the
+  // detected mechanism sit at the top, under a label saying so. Each option
+  // carries where the end group comes from, since that is what makes it
+  // plausible on this polymer at all.
+  function endGroupOption(entry) {
+    var opt = document.createElement("option");
+    opt.value = entry.value;
+    opt.textContent = entry.value + (entry.origin ? " — " + entry.origin : "");
+    // The IUPAC prefix is what actually lands in the name, and for the trivial
+    // labels (TEMPO, maleimido) it is not guessable from the label.
+    opt.title = entry.prefix !== entry.value
+      ? "Appears in the name as: " + entry.prefix
+      : entry.origin || "";
+    return opt;
+  }
+
+  function renderEndGroupMenus() {
+    if (!options) return;
+    var byName = {};
+    options.end_groups.forEach(function (entry) { byName[entry.value] = entry; });
+
+    ["end-alpha", "end-omega"].forEach(function (id) {
+      var select = el(id);
+      var previous = select.value;
+      select.innerHTML = "";
+
+      var none = document.createElement("option");
+      none.value = "";
+      none.textContent = "— none —";
+      select.appendChild(none);
+
+      var rest = options.end_groups.slice();
+      if (suggestedEnds.length) {
+        var group = document.createElement("optgroup");
+        group.label = "Typical for this polymer";
+        suggestedEnds.forEach(function (name) {
+          if (byName[name]) group.appendChild(endGroupOption(byName[name]));
+        });
+        select.appendChild(group);
+        rest = rest.filter(function (entry) { return suggestedEnds.indexOf(entry.value) === -1; });
+      }
+      var other = document.createElement("optgroup");
+      other.label = suggestedEnds.length ? "Other end groups" : "End groups";
+      rest.forEach(function (entry) { other.appendChild(endGroupOption(entry)); });
+      select.appendChild(other);
+
+      // Keep whatever the user had chosen, if it still exists.
+      select.value = previous;
+      if (select.value !== previous) select.value = "";
+    });
+  }
+
+  ["connective", "architecture", "tacticity", "end-alpha", "end-omega"].forEach(function (id) {
+    el(id).addEventListener("change", nameCurrent);
+  });
+
+  // -----------------------------------------------------------------------
+  // Naming
+  // -----------------------------------------------------------------------
+  function showError(message) {
+    el("errbox").textContent = message || "";
+  }
+
+  function nameCurrent() {
+    var multi = monomers.length > 1;
+    el("connective").disabled = !multi;
+    el("connective-sub").textContent = multi
+      ? "How the monomers are arranged along the chain."
+      : "Needs two or more monomers.";
+
+    if (!monomers.length) {
+      lastResult = null;
+      suggestedEnds = [];
+      renderEndGroupMenus();
+      var nameEl = el("poly-name");
+      nameEl.className = "placeholder";
+      nameEl.textContent = "Add a monomer to name a polymer.";
+      el("name-tools").hidden = true;
+      el("alsoknown").hidden = true;
+      el("bigsmiles-box").hidden = true;
+      el("notebox").textContent = "";
+      el("order-hint").textContent = "";
+      el("mech-line").textContent = "";
+      showError("");
+      return;
+    }
+
+    var seq = ++requestSeq;
+    fetch("/api/polymer", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        monomers: monomers.map(function (m) { return { smiles: m.smiles }; }),
+        connective: el("connective").value || "co",
+        architecture: el("architecture").value || "linear",
+        tacticity: el("tacticity").value || null,
+        end_alpha: el("end-alpha").value || null,
+        end_omega: el("end-omega").value || null,
+        verify: true
+      })
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (seq !== requestSeq) return; // a newer edit already won
+        renderResult(data);
+      })
+      .catch(function () {
+        if (seq === requestSeq) showError("The naming service could not be reached.");
+      });
+  }
+
+  function renderResult(data) {
+    if (!data || !data.ok) {
+      showError((data && data.error) || "This polymer could not be named.");
+      var nameEl = el("poly-name");
+      nameEl.className = "placeholder";
+      nameEl.textContent = "No name yet.";
+      el("name-tools").hidden = true;
+      el("alsoknown").hidden = true;
+      return;
+    }
+    showError("");
+    lastResult = data;
+
+    var nameEl = el("poly-name");
+    nameEl.className = "";
+    // name_html carries the <i> marks on the italicised connectives and
+    // architecture prefixes; the server escapes the rest.
+    nameEl.innerHTML = data.name_html || data.name;
+    el("name-tools").hidden = false;
+
+    // Fold the per-monomer names and OPSIN verdicts back into the list.
+    (data.monomers || []).forEach(function (item, index) {
+      if (monomers[index]) {
+        monomers[index].name = item.name;
+        monomers[index].trivialName = item.trivial_name || null;
+        monomers[index].opsin = item.opsin || null;
+      }
+    });
+    renderMonomers();
+
+    suggestedEnds = data.suggested_end_groups || [];
+    renderEndGroupMenus();
+
+    el("order-hint").textContent = data.order_hint || "";
+
+    var mechBits = [];
+    var mechLabel = MECHANISM_LABELS[data.mechanism];
+    if (mechLabel) mechBits.push("Mechanism: " + mechLabel);
+    if (data.handles && data.handles.length) {
+      mechBits.push("reactive handles seen: " + data.handles.join(", "));
+    }
+    el("mech-line").textContent = mechBits.length
+      ? mechBits.join(" · ") + ". The α/ω menus are ordered to suit this."
+      : "";
+
+    renderAlsoKnown(data);
+    renderBigSmiles(data);
+  }
+
+  // The machine-readable counterpart of the name, built from the same monomers
+  // and connective. Shown even when it cannot be derived, with the reason: a
+  // silent gap reads as "this polymer has no BigSMILES", which is not what a
+  // missing repeat unit means.
+  function renderBigSmiles(data) {
+    var box = el("bigsmiles-box");
+    var out = el("bigsmiles-text");
+    var result = data.bigsmiles;
+    if (!result) {
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    if (result.ok) {
+      out.textContent = result.bigsmiles;
+      out.title = result.note || "";
+    } else {
+      out.textContent = "— not derivable: " + (result.reason || "unknown") + " —";
+      out.title = "";
+    }
+  }
+
+  function renderAlsoKnown(data) {
+    var box = el("alsoknown");
+    var dl = el("alsoknown-dl");
+    var note = el("notebox");
+    dl.innerHTML = "";
+    note.textContent = "";
+
+    var commodity = data.commodity;
+    if (!commodity && !data.trivial_name) {
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+
+    // The trivial-name form exists for any combination of known monomers, so a
+    // copolymer gets one even when the whole polymer is not a curated commodity.
+    // Skipped when a commodity name says the same thing more directly
+    // ("polystyrene" beats "poly(styrene)").
+    if (data.trivial_name && (!commodity || commodity.trivial_name !== data.trivial_name)) {
+      addRow(dl, "Trivial-name form", data.trivial_name);
+    }
+
+    if (!commodity) return;
+
+    if (commodity.match === "related") {
+      note.textContent =
+        "These are the monomers of " + commodity.trivial_name + " (" + commodity.acronym +
+        "), but that polymer is " +
+        (commodity.expected_connective === "alt" ? "strictly alternating" : "statistical") +
+        " — the arrangement selected here describes a different material.";
+    }
+
+    addRow(dl, commodity.match === "related" ? "Same monomers as" : "Commonly called",
+      commodity.trivial_name);
+    addRow(dl, "Acronym", commodity.acronym, "acr");
+    if (commodity.cru_name) {
+      addRow(dl, "Structure-based", commodity.cru_name, "acr");
+    }
+  }
+
+  function addRow(dl, label, value, valueClass) {
+    var dt = document.createElement("dt");
+    dt.textContent = label;
+    var dd = document.createElement("dd");
+    dd.textContent = value;
+    if (valueClass) dd.className = valueClass;
+    dl.appendChild(dt);
+    dl.appendChild(dd);
+  }
+
+  el("copy-name").addEventListener("click", function () {
+    if (!lastResult) return;
+    navigator.clipboard.writeText(lastResult.name).then(function () {
+      var flag = el("copied");
+      flag.hidden = false;
+      setTimeout(function () { flag.hidden = true; }, 1400);
+    }, function () { /* clipboard refused; nothing useful to say */ });
+  });
+
+  // -----------------------------------------------------------------------
+  // Version tag
+  // -----------------------------------------------------------------------
+  fetch("/api/healthz")
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data || !data.version) return;
+      var tag = el("app-version");
+      tag.textContent = "v" + data.version + (data.channel === "beta" ? " beta" : "");
+      if (data.channel === "beta") tag.className = "version-tag beta";
+    })
+    .catch(function () { /* the tag just stays empty */ });
+</script>
+</body>
+</html>
