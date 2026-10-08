@@ -573,10 +573,10 @@ def simple_azine_parent_name(
         c2 = role.right.carbon_atom
         side1 = set(role.left.side_atoms)
         side2 = set(role.right.side_atoms)
-        parent1 = _carbonyl_equivalent_side_name(mol, side1, c1, as_ylidene=False)
-        parent2 = _carbonyl_equivalent_side_name(mol, side2, c2, as_ylidene=False)
-        ylidene1 = _carbonyl_equivalent_side_name(mol, side1, c1, as_ylidene=True)
-        ylidene2 = _carbonyl_equivalent_side_name(mol, side2, c2, as_ylidene=True)
+        parent1 = _carbonyl_equivalent_side_name(mol, side1, c1, as_ylidene=False, branch_namer=branch_namer)
+        parent2 = _carbonyl_equivalent_side_name(mol, side2, c2, as_ylidene=False, branch_namer=branch_namer)
+        ylidene1 = _carbonyl_equivalent_side_name(mol, side1, c1, as_ylidene=True, branch_namer=branch_namer)
+        ylidene2 = _carbonyl_equivalent_side_name(mol, side2, c2, as_ylidene=True, branch_namer=branch_namer)
         if not parent1 or not parent2 or not ylidene1 or not ylidene2:
             if branch_namer is None:
                 continue
@@ -594,10 +594,6 @@ def simple_azine_parent_name(
                 if branch_ylidene1 and branch_ylidene1.endswith("ylidene"):
                     stereo = _hydrazone_stereo_prefix(mol, c2, n2, parent2)
                     return f"{stereo}{parent2} {branch_ylidene1}hydrazone"
-            # A ketone's amidinohydrazone has no suffix to be named with -- only
-            # aldehydes do -- and an amidino carbon has no carbonyl equivalent
-            # to be the parent either.  Name the hydrazine itself instead and
-            # hang both sides on it as ylidene substituents.
             amidino = [_is_amidino_carbon(mol, c1, n1), _is_amidino_carbon(mol, c2, n2)]
             aldehyde = [_is_aldehyde_side_carbon(mol, c1, n1), _is_aldehyde_side_carbon(mol, c2, n2)]
             substituted_amidino = any(
@@ -713,9 +709,12 @@ def _carbonyl_equivalent_side_name(
     carbonyl_carbon: int,
     *,
     as_ylidene: bool,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> str:
     return (
-        _retained_ring_carbaldehyde_side_name(mol, side_atoms, carbonyl_carbon, as_ylidene=as_ylidene)
+        _retained_ring_carbaldehyde_side_name(
+            mol, side_atoms, carbonyl_carbon, as_ylidene=as_ylidene, branch_namer=branch_namer
+        )
         or _simple_ring_carbaldehyde_side_name(mol, side_atoms, carbonyl_carbon, as_ylidene=as_ylidene)
         or _simple_ring_ylidene_side_name(mol, side_atoms, carbonyl_carbon, as_ylidene=as_ylidene)
         or _simple_carbonyl_side_name(mol, side_atoms, carbonyl_carbon, as_ylidene=as_ylidene)
@@ -780,6 +779,7 @@ def _retained_ring_carbaldehyde_side_name(
     carbonyl_carbon: int,
     *,
     as_ylidene: bool,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> str:
     """Name Ar-CH=N sides as retained-ring carbaldehyde/ylidene roles."""
 
@@ -795,10 +795,16 @@ def _retained_ring_carbaldehyde_side_name(
         return ""
     retained_name, locant_maps = retained_match
     locant_map = _choose_retained_map_for_attachment(locant_maps, ring_attachment)
-    if locant_map is None:
-        locant = "1" if _is_homocyclic(mol, ring_path) else ""
-    else:
+    if locant_map is not None:
         locant = locant_map.get(ring_attachment, "")
+    elif _is_homocyclic(mol, ring_path):
+        locant = "1"
+    elif branch_namer is not None:
+        yl_name = branch_namer(mol, ring_attachment, set(mol.atoms) - ring_atoms, upstream_atom=carbonyl_carbon)
+        match = re.search(r"-(\d+[a-z]?)-yl$", strip_outer_parentheses(yl_name) or "")
+        locant = match.group(1) if match else ""
+    else:
+        locant = ""
     if not locant:
         return ""
     if as_ylidene:
@@ -883,6 +889,10 @@ def _simple_ring_carbaldehyde_side_name(
     if ring is None:
         return ""
     ring_atoms, ring_start = ring
+    # A heterocycle is named by its retained or Hantzsch-Widman name, never by
+    # replacement prefixes numbered from the attachment atom.
+    if not _is_homocyclic(mol, sorted(ring_atoms)):
+        return ""
     ring_path = _ordered_simple_ring_from_start(mol, ring_atoms, ring_start)
     if not ring_path:
         return ""

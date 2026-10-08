@@ -1,0 +1,84 @@
+name: Deploy website
+
+# Releases openclatura.org automatically: whenever a push to main changes the
+# version in pyproject.toml (or anything under website/), the site is redeployed
+# to the production Vercel project pinned to that version. The deploy script
+# waits for the version to appear on PyPI and otherwise installs from the commit.
+#
+# Required repository secret: VERCEL_TOKEN (vercel.com → Account → Tokens).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - pyproject.toml
+      - website/**
+      - .github/workflows/deploy-website.yml
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "PyPI version to deploy (default: the one in pyproject.toml)"
+        required: false
+
+concurrency:
+  group: deploy-website
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.check.outputs.deploy }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - id: check
+        run: |
+          version="${{ inputs.version }}"
+          if [[ -z "$version" ]]; then
+            version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' pyproject.toml)"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          deploy=true
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            before="$(git show HEAD^:pyproject.toml 2>/dev/null | sed -n 's/^version = "\([^"]*\)"/\1/p' || true)"
+            if [[ "$before" == "$version" ]] && \
+               git diff --quiet HEAD^ HEAD -- website .github/workflows/deploy-website.yml; then
+              deploy=false   # pyproject.toml changed, but not the version or the site
+            fi
+          fi
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+          echo "version=$version deploy=$deploy"
+
+  deploy:
+    needs: changes
+    if: needs.changes.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: Production
+      url: https://openclatura.org
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: team_TuHj8iYJYb943bM2JoNd9vY9
+      VERCEL_PROJECT_ID: prj_bH51Gv6lTJSQdC31XBKZoHOy5sJC
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check secret
+        run: |
+          if [[ -z "$VERCEL_TOKEN" ]]; then
+            echo "::error::VERCEL_TOKEN secret is not set (Settings → Secrets → Actions)."
+            exit 1
+          fi
+      - name: Deploy openclatura ${{ needs.changes.outputs.version }} to production
+        env:
+          GIT_SHA: ${{ github.sha }}
+        run: ./website/scripts/deploy_stable.sh "${{ needs.changes.outputs.version }}"
