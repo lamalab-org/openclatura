@@ -482,19 +482,23 @@ def component_entry_layouts(
             if central.size != shape.ring_size or any(central.id not in (a, b) for a, b, _ in model.face_adjacency):
                 continue
             terminals = [face for face in model.faces if face.id != central.id]
-            roots = [face for face in terminals if face.size == shape.entry_component_size]
             if any(face.size < shape.entry_component_size for face in terminals):
                 continue
-            # A three-ring row needs the ring that sits off it, and the entry
-            # component's size only identifies that ring where the terminals
-            # differ in size. Three benzo rings on a seven-membered ring are all
-            # six-membered, so nothing matched, the row was never drawn, and the
-            # numbering started in a row benzene instead of the one above it -
-            # putting the central methylene at 13 rather than 9. The port check
-            # below already requires the occupied ports to be the entry port and
-            # its opposites, so offering each terminal lets that geometry name
-            # the root instead of the size doing it.
-            for root in roots or terminals:
+            # FR-5.1.1 draws the main row through the two attachments that sit
+            # as far apart as possible around the central ring, which leaves
+            # the third one off the row and uppermost, so it starts the
+            # numbering. That is a property of where the shared edges fall on
+            # the central cycle, not of how large the attached rings are: on a
+            # seven-membered ring with gaps of 2, 2 and 3 the off-row component
+            # is the one between the two short gaps whatever its size. Picking
+            # it by entry_component_size instead put a five-membered terminal
+            # above the row whenever one existed, which started the numbering
+            # in the wrong ring. The port test below is the geometric statement
+            # of the same rule - occupied ports must be the entry port and its
+            # opposites - so every terminal is offered and the geometry names
+            # the root. entry_component_size survives only as the floor on how
+            # small a terminal this shape admits.
+            for root in terminals:
                 terminal_shapes = {face.id: _symmetric_terminal_shape(face.size) for face in terminals if face != root}
                 if any(value is None for value in terminal_shapes.values()):
                     continue
@@ -1490,6 +1494,7 @@ def _materialize_layouts(
     integer = {atom: (2 * x, 2 * y) for atom, (x, y) in integer.items()}
     centers = {face: (2 * x, 2 * y) for face, (x, y) in centers.items()}
     centers = _two_port_pentagon_axes(placed_orders, centers, adjacent)
+    centers = _three_port_odd_ring_axes(placed_orders, centers, adjacent)
     pentagon_chain = _opsin_pentagon_chain(placed_orders, adjacent) if opsin_ring_map else None
     if pentagon_chain is not None:
         centers = _coupled_pentagon_axis_centers(pentagon_chain, centers)
@@ -1568,6 +1573,69 @@ def _materialize_layouts(
                 candidates.setdefault(_layout_geometry_key(layout), layout)
 
     return tuple(sorted(candidates.values(), key=_layout_sort_key))
+
+
+def _three_port_odd_ring_axes(
+    orders: dict[int, tuple[int, ...]], centers: dict[int, Point], adjacent: frozenset[frozenset[int]]
+) -> dict[int, Point]:
+    """Put a three-port odd ring on the row through its widest-apart pair.
+
+    FR-5.1.1 draws the main row through the two attachments that sit as far
+    apart as possible around the central ring, leaving the third off the row
+    and uppermost, so it starts the numbering. A seven-membered ring has no
+    pair of parallel edges, so its polygon centre sits off the line joining
+    the two row neighbours; the direction grid only keeps a neighbour on the
+    same row when the offset is exactly horizontal, so that off-axis centre
+    cost the row an entire ring. Every drawing then reported a maximum row of
+    two where three was available, the orientation criteria tied drawings that
+    start in different terminals, and the ordered locant criteria chose among
+    candidates that should never have been admitted.
+
+    This is the odd-ring counterpart of the two-port pentagon rule above: the
+    widest-apart pair names the row, and the ring is recentred onto its
+    midpoint so the row is straight. Only independent constraints on an
+    acyclic face graph are applied.
+    """
+
+    if len(adjacent) != len(orders) - 1:
+        return centers
+    neighbors: dict[int, list[int]] = defaultdict(list)
+    for left, right in adjacent:
+        neighbors[left].append(right)
+        neighbors[right].append(left)
+    edges = {face: {frozenset((a, b)) for a, b in zip(order, order[1:] + order[:1])} for face, order in orders.items()}
+    targets = {}
+    for face, order in orders.items():
+        size = len(order)
+        if size != 7 or len(neighbors[face]) != 3:
+            continue
+        ports = {}
+        for index, (a, b) in enumerate(zip(order, order[1:] + order[:1])):
+            for other in neighbors[face]:
+                if frozenset((a, b)) in edges[other]:
+                    ports[other] = index
+        if len(ports) != 3:
+            continue
+        # On a seven-membered ring the widest separation is three edges, and
+        # the reverse reading of the same pair is four.
+        widest = [
+            (left, right)
+            for left in ports
+            for right in ports
+            if left < right and (ports[left] - ports[right]) % size in (3, 4)
+        ]
+        if len(widest) != 1:
+            continue
+        targets[face] = widest[0]
+    result = dict(centers)
+    for face, (left, right) in targets.items():
+        if left in targets or right in targets:
+            continue
+        # Exact midpoint coordinates are retained by the caller's scale.
+        if any((centers[left][axis] + centers[right][axis]) % 2 for axis in (0, 1)):
+            continue
+        result[face] = tuple((centers[left][axis] + centers[right][axis]) // 2 for axis in (0, 1))
+    return result if len(set(result.values())) == len(result) else centers
 
 
 def _two_port_pentagon_axes(
