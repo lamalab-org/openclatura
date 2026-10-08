@@ -31,6 +31,7 @@ parser; each divergence is a relabelling of the same ring system.
 import pytest
 from rdkit import Chem
 
+from openclatura import name_smiles, opsin_available, verify_with_opsin
 from openclatura.chains import find_ring_systems
 from openclatura.fusion.faces import cached_bounded_face_model, typed_face_model
 from openclatura.fusion.layout import _direction_grid_centers, preferred_intrinsic_layouts
@@ -111,3 +112,41 @@ def test_low_heteroatom_locants_decide_the_surviving_tie(smiles, admissible, sel
         mol, bounded, face_model=face_model, layouts=preferred_intrinsic_layouts(face_model)
     )
     assert {_heteroatom_locants(mol, atoms, numbering) for numbering in selection.accepted} == {selected}
+
+
+# Three attachments on an eight-membered ring, 2, 2 and 4 edges apart: the
+# diametral benzo pair forms the main row and the triazole stands above it, so
+# the numbering starts in the triazole. The octagon's mirror axis runs through
+# two vertices, so even its diametral edges are not parallel and its centre
+# missed the row exactly as a seven-membered ring's does. Until the row was
+# drawn, no layout produced a map OPSIN admits.
+EIGHT_RING_NAMES = (
+    pytest.param(
+        "CCCCc1ccc2c(c1)CCc1cc(OC(C)C)ccc1-c1nnn(C(C)(C)C)c1-2",
+        "11-butyl-1-(tert-butyl)-6-isopropoxy-8,9-dihydrodibenzo[1',2':1,2;1'',2'':5,6]cycloocta[3,4-d][1,2,3]triazole",
+        id="54539-dibenzocyclooctatriazole",
+    ),
+    # Reached through the bridged path, so it has no intrinsic layout of its
+    # own; the row its unbridged framework now draws is what moves the locants.
+    pytest.param(
+        "COc1cccc2c1C=Cc1c(OC)cccc1C1=C2C2C=CC1O2",
+        "8,11-dimethoxy-1,4-dihydro-1,4-epoxytribenzo[a,c,e][8]annulene",
+        id="98874-tribenzoannulene",
+    ),
+)
+
+
+def test_eight_membered_centre_also_draws_its_row():
+    _, _, _, face_model = _model("CCCCc1ccc2c(c1)CCc1cc(OC(C)C)ccc1-c1nnn(C(C)(C)C)c1-2")
+    layouts = preferred_intrinsic_layouts(face_model)
+    assert layouts
+    # -row_count is the second component of the orientation score.
+    assert layouts[0].orientation_score[1] == -3
+
+
+@pytest.mark.skipif(not opsin_available(), reason="OPSIN is unavailable")
+@pytest.mark.parametrize("smiles,expected", EIGHT_RING_NAMES)
+def test_the_drawn_row_carries_the_eight_ring_locants(smiles, expected):
+    produced = name_smiles(smiles)
+    assert produced == expected
+    assert verify_with_opsin(produced, smiles).status == "matched"

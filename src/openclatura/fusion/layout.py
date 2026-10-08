@@ -1575,23 +1575,31 @@ def _materialize_layouts(
     return tuple(sorted(candidates.values(), key=_layout_sort_key))
 
 
+# How far apart two of three attachments can sit on a large central ring, as a
+# difference of port indices read either way round. Seven admits three edges;
+# eight admits four, the diametral pair.
+_WIDEST_THREE_PORT_SEPARATIONS = {7: (3, 4), 8: (4,)}
+
+
 def _three_port_odd_ring_axes(
     orders: dict[int, tuple[int, ...]], centers: dict[int, Point], adjacent: frozenset[frozenset[int]]
 ) -> dict[int, Point]:
-    """Put a three-port odd ring on the row through its widest-apart pair.
+    """Put a three-port large ring on the row through its widest-apart pair.
 
     FR-5.1.1 draws the main row through the two attachments that sit as far
     apart as possible around the central ring, leaving the third off the row
-    and uppermost, so it starts the numbering. A seven-membered ring has no
-    pair of parallel edges, so its polygon centre sits off the line joining
-    the two row neighbours; the direction grid only keeps a neighbour on the
-    same row when the offset is exactly horizontal, so that off-axis centre
-    cost the row an entire ring. Every drawing then reported a maximum row of
+    and uppermost, so it starts the numbering. Neither stored polygon puts its
+    widest-apart edges parallel: a seven-membered ring has no parallel edges at
+    all, and the octagon's mirror axis runs through two vertices, so its
+    diametral edges are not parallel either. The centre therefore sits off the
+    line joining the two row neighbours, and the direction grid only keeps a
+    neighbour on the same row when the offset is exactly horizontal, so that
+    off-axis centre cost the row an entire ring. Every drawing then reported a maximum row of
     two where three was available, the orientation criteria tied drawings that
     start in different terminals, and the ordered locant criteria chose among
     candidates that should never have been admitted.
 
-    This is the odd-ring counterpart of the two-port pentagon rule above: the
+    This is the large-ring counterpart of the two-port pentagon rule above: the
     widest-apart pair names the row, and the ring is recentred onto its
     midpoint so the row is straight. Only independent constraints on an
     acyclic face graph are applied.
@@ -1607,7 +1615,7 @@ def _three_port_odd_ring_axes(
     targets = {}
     for face, order in orders.items():
         size = len(order)
-        if size != 7 or len(neighbors[face]) != 3:
+        if len(neighbors[face]) != 3 or size not in _WIDEST_THREE_PORT_SEPARATIONS:
             continue
         ports = {}
         for index, (a, b) in enumerate(zip(order, order[1:] + order[:1])):
@@ -1616,13 +1624,12 @@ def _three_port_odd_ring_axes(
                     ports[other] = index
         if len(ports) != 3:
             continue
-        # On a seven-membered ring the widest separation is three edges, and
-        # the reverse reading of the same pair is four.
+        separations = _WIDEST_THREE_PORT_SEPARATIONS[size]
         widest = [
             (left, right)
             for left in ports
             for right in ports
-            if left < right and (ports[left] - ports[right]) % size in (3, 4)
+            if left < right and (ports[left] - ports[right]) % size in separations
         ]
         if len(widest) != 1:
             continue
