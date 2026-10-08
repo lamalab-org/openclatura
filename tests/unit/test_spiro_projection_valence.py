@@ -17,8 +17,8 @@ REPORT_SMILES = "O=C(OC(=O)C(F)(F)F)C(Cc1cscn1)CN1C2CCC1CC1(C2)OCc2ccc(F)cc21"
 # numbers the ring differently, which moves the fluorine and the junction
 # locant with it; both readings denote this structure and round-trip.
 REPORT_NAME = (
-    "2,2,2-trifluoroacetyl 2-((6'-fluorospiro[8-azabicyclo[3.2.1]octane-3,1'-"
-    "(1,3-dihydro-2-benzofuran)]-8-yl)methyl)-3-(1,3-thiazol-4-yl)propanoate"
+    "2,2,2-trifluoroacetic 2-((6'-fluorospiro[8-azabicyclo[3.2.1]octane-3,1'-"
+    "(1,3-dihydro-2-benzofuran)]-8-yl)methyl)-3-(1,3-thiazol-4-yl)propanoic anhydride"
 )
 
 
