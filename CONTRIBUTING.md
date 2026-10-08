@@ -52,8 +52,9 @@ We prioritize work that can be validated through **OPSIN** where possible. OPSIN
 ## Publishing a release
 
 Releases are published to PyPI by `.github/workflows/publish-pypi.yml` when a
-version tag is pushed. Before using the workflow for the first time, configure
-the `openclatura` project on PyPI with this trusted publisher:
+change to the project version in `pyproject.toml` reaches `main`. Before using
+the workflow for the first time, configure the `openclatura` project on PyPI
+with this trusted publisher:
 
 * owner: `lamalab-org`
 * repository: `openclatura`
@@ -61,8 +62,9 @@ the `openclatura` project on PyPI with this trusted publisher:
 * environment: `pypi`
 
 To publish a release, update the version in `pyproject.toml`, update the
-changelog, and merge those changes into `main`. Then tag that exact commit and
-push the tag:
+changelog, and merge those changes into `main`. The merge automatically builds,
+validates, and publishes the release. A tag can then be added to mark the
+release in Git history:
 
 ```console
 git switch main
@@ -71,10 +73,10 @@ git tag -a v0.4.1 -m "openclatura 0.4.1"
 git push origin v0.4.1
 ```
 
-The tag must be `v` followed by the exact project version, and its commit must
-be part of `main`. The workflow builds and validates the wheel and source
-distribution before publishing them. PyPI authentication uses a short-lived
-trusted-publishing credential; no PyPI token is stored in GitHub.
+Edits to other `pyproject.toml` settings and tag pushes do not publish a
+release. PyPI authentication uses a short-lived trusted-publishing credential;
+no PyPI token is stored in GitHub. Maintainers can manually start the workflow
+from GitHub Actions to retry a release that has not reached PyPI.
 
 ## Questions and discussions
 
