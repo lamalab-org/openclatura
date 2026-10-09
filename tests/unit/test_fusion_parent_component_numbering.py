@@ -86,16 +86,26 @@ def test_inherited_bicycle_wins_parent_seniority_without_changing_peripheral_num
     parent_spec = registry.spec_for_match(parent)
     attached_spec = registry.spec_for_match(attached)
     assert parent_spec.parent_name == "quinazoline"
-    assert not parent_spec.usable_as_parent
-    assert parent_spec.usable_as_peri_parent
+    # Quinazoline is an ordinary retained component of Table 2.8 and now carries
+    # an explicit registry row, so it is parent-eligible outright and
+    # component_parent_eligible short-circuits before the peri branch. That
+    # branch still exists for the contextual benzoheterocycles of P-25.3.5,
+    # which remain attached-only; it is no longer exercised by this fixture.
+    assert parent_spec.usable_as_parent
     assert component_parent_eligible(parent, parent_spec, plan.ast.component_occurrences)
     assert component_parent_eligible(
         parent, replace(parent_spec, rule_reference="independent bibliography"), plan.ast.component_occurrences
     )
+    # The peri branch itself, exercised by withholding the ordinary parent role
+    # the way the family policy does for a contextual benzoheterocycle: a
+    # peri-attached component is eligible, the same component without that flag
+    # is not, and neither is one whose attachment lies within a single ring.
+    peri_only = replace(parent_spec, usable_as_parent=False, usable_as_peri_parent=True)
+    assert component_parent_eligible(parent, peri_only, plan.ast.component_occurrences)
     assert not component_parent_eligible(
-        parent, replace(parent_spec, usable_as_peri_parent=False), plan.ast.component_occurrences
+        parent, replace(peri_only, usable_as_peri_parent=False), plan.ast.component_occurrences
     )
-    assert not component_parent_eligible(parent, parent_spec, (parent,))
+    assert not component_parent_eligible(parent, peri_only, (parent,))
     # Even a multi-edge attachment wholly within one constituent ring
     # retains the ordinary attached-only component policy.
     local_atoms = dict(parent.local_to_input_atom)
@@ -106,7 +116,7 @@ def test_inherited_bicycle_wins_parent_seniority_without_changing_peripheral_num
             for index, (locant, _) in enumerate(attached.local_to_input_atom)
         ),
     )
-    assert not component_parent_eligible(parent, parent_spec, (parent, same_ring_attachment))
+    assert not component_parent_eligible(parent, peri_only, (parent, same_ring_attachment))
     assert component_spec_seniority_key(parent_spec) < component_spec_seniority_key(attached_spec)
     (stereo_atom,) = [atom for atom, _ in Chem.FindMolChiralCenters(graph, includeUnassigned=False)]
     for locant_map in plan.numbering.string_input_locant_maps():

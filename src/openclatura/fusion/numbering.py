@@ -319,7 +319,27 @@ def _numbering_from_layout(
 
 
 def _clockwise_face_order(centers: dict[int, tuple[int, int]]) -> tuple[int, ...]:
-    """Order faces clockwise from the uppermost, then rightmost face."""
+    """Order faces clockwise from the uppermost, then rightmost face.
+
+    P-25.3.3.1.1 starts the numbering in the uppermost ring, and in the
+    rightmost of those if there is a choice. "Uppermost" is a ring's level in
+    the idealized grid the orientation criteria were applied to (FR-5.3), not
+    its literal drawn height, which is why these are layout face centers rather
+    than atom coordinates. A ring smaller than its neighbours still occupies a
+    row of its own when the preferred orientation puts it there: a terminal
+    three-membered ring on a non-terminal pentagon sits above that pentagon, so
+    it opens the numbering, and P-25.3.3.1.2 never has to choose.
+
+    OPSIN numbers from a direction-table ring map instead, which for a few such
+    systems (phenanthro[1',2':1,2]cyclopenta[2,3-b]oxirene and its thiirene and
+    azirine analogues, phenanthro[9',10':4,5]indeno[3,3a-b]oxirene and its
+    thiirene) puts the pentagon uppermost and so numbers them differently. That
+    is an implementation convention, not the P-25 orientation; see
+    tests/unit/test_fusion_three_ring_orientation.py. FR-5.1 does concede that
+    some systems containing three-membered rings fall outside its rules - these
+    are not among them, since the permitted triangle shape of P-25.3.2.3.1
+    needs no distortion here and criteria (a) then (b) of P-25.3.2.3.3 decide.
+    """
 
     if not centers or len(set(centers.values())) != len(centers):
         return ()
@@ -463,7 +483,7 @@ def validate_parent_bond_valence(
     graph = _parent_bond_graph(parent, atom_ids)
     loads = _parent_bond_loads(graph, assignment)
     for site in graph.atoms:
-        limit = elements.get(site.symbol).mancude_limit_for_charge(site.formal_charge)
+        limit = resolved_bonding_budget(site)
         if limit is not None and loads[site.id] > limit:
             raise ValueError(
                 f"parent atom {site.id} ({site.symbol}, charge {site.formal_charge:+d}) "
@@ -483,11 +503,41 @@ def parent_pi_capable_atom_ids(graph: FusionGraph) -> frozenset[int]:
         for site in graph.atoms
         if site.pi_capacity
         and not site.forced_single
-        and (
-            (limit := elements.get(site.symbol).mancude_limit_for_charge(site.formal_charge)) is None
-            or loads[site.id] < limit
-        )
+        and ((budget := resolved_bonding_budget(site)) is None or loads[site.id] < budget)
     )
+
+
+def resolved_bonding_budget(site) -> int | None:
+    """Return the bond-order budget of the state this site actually models.
+
+    P-25.7.1.1 maximises double bonds "consistent with the bonding numbers", so
+    a site whose mandatory skeletal bonds already spend its budget takes no pi
+    increment, and one whose bonds exceed it is not a valid baseline at all.
+
+    Ordinary octet nitrogen is resolved here because its charge policy states
+    no mancude limit, and a missing limit is not evidence that nitrogen may
+    carry any load: the bridgehead of a quinolizine holds three skeletal bonds
+    against a budget of three, which excludes it structurally without any
+    appeal to aromaticity, a donor flag or a template convention. The budgets
+    are N(-1) 2, N 3, N(+1) 4.
+
+    Every other missing limit is left as None. Those elements carry deliberate
+    nonstandard-state handling - an explicitly modelled lambda parent has its
+    own stated bonding number - and overwriting them with a neutral standard
+    valence would discard it. A charge this policy does not resolve is also
+    left None rather than guessed: a nitrenium nitrogen shares its charge with
+    an iminium one and does not share its bonding state.
+    """
+
+    limit = elements.get(site.symbol).mancude_limit_for_charge(site.formal_charge)
+    if limit is not None:
+        return limit
+    if site.symbol == "N":
+        return _ORDINARY_NITROGEN_BUDGET.get(site.formal_charge)
+    return None
+
+
+_ORDINARY_NITROGEN_BUDGET = {-1: 2, 0: 3, 1: 4}
 
 
 def parent_bond_model(

@@ -515,8 +515,25 @@ def parent_stem_and_terminal(parts: AssemblyParts) -> tuple[str, str]:
     return stem_str, terminal_e
 
 
-def apply_replacement_prefix(stem_str: str, a_prefix_str: str) -> str:
-    """Join skeletal replacement prefixes without vowel elision (P-16.7.2(b))."""
+def apply_replacement_prefix(stem_str: str, a_prefix_str: str, *, indicated_hydrogen: str = "") -> str:
+    """Join skeletal replacement prefixes without vowel elision (P-16.7.2(b)).
+
+    P-25.7.1.3.2 cites the indicated hydrogen of an ortho- or ortho-and-peri-
+    fused ring system at the front of that system's name, "including
+    replacement terms, if any"; FR-9.3.1 states the same order. So the run
+    moves ahead of the prefixes instead of staying against the ring body, and
+    the preferred name is 6H-1,7-dioxacyclopenta[cd]indene, not
+    1,7-dioxa-6H-cyclopenta[cd]indene. Ordering settles the punctuation too:
+    once the run leads, nothing separates the prefixes from the ring name, and
+    the hyphen P-16.2.4.1(a) puts after a locant is the one the run carries.
+
+    This orders the ring-system name alone. It does not move indicated
+    hydrogen ahead of the substituent prefixes of a complete name.
+    """
+    if not a_prefix_str:
+        return stem_str
+    if indicated_hydrogen and stem_str.startswith(indicated_hydrogen):
+        return indicated_hydrogen + a_prefix_str + stem_str[len(indicated_hydrogen) :]
     return a_prefix_str + stem_str
 
 

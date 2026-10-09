@@ -1990,7 +1990,7 @@
       "pin": true,
       "priority": 6,
       "aliases": [],
-      "attached_prefix": "1,10-phenanthrolino",
+      "attached_prefix": "[1,10]phenanthrolino",
       "derivative_stem": "1,10-phenanthrolin",
       "template": {
         "atoms": [
@@ -2220,7 +2220,7 @@
       "pin": true,
       "priority": 6,
       "aliases": [],
-      "attached_prefix": "1,4-phenanthrolino",
+      "attached_prefix": "[1,4]phenanthrolino",
       "derivative_stem": "1,4-phenanthrolin",
       "template": {
         "atoms": [
@@ -2451,7 +2451,7 @@
       "pin": true,
       "priority": 6,
       "aliases": [],
-      "attached_prefix": "1,5-phenanthrolino",
+      "attached_prefix": "[1,5]phenanthrolino",
       "derivative_stem": "1,5-phenanthrolin",
       "template": {
         "atoms": [
@@ -2682,7 +2682,7 @@
       "pin": true,
       "priority": 6,
       "aliases": [],
-      "attached_prefix": "1,6-phenanthrolino",
+      "attached_prefix": "[1,6]phenanthrolino",
       "derivative_stem": "1,6-phenanthrolin",
       "template": {
         "atoms": [
@@ -2913,7 +2913,7 @@
       "pin": true,
       "priority": 6,
       "aliases": [],
-      "attached_prefix": "1,7-phenanthrolino",
+      "attached_prefix": "[1,7]phenanthrolino",
       "derivative_stem": "1,7-phenanthrolin",
       "template": {
         "atoms": [
@@ -3144,7 +3144,7 @@
       "pin": true,
       "priority": 6,
       "aliases": [],
-      "attached_prefix": "1,8-phenanthrolino",
+      "attached_prefix": "[1,8]phenanthrolino",
       "derivative_stem": "1,8-phenanthrolin",
       "template": {
         "atoms": [
@@ -3375,7 +3375,7 @@
       "pin": true,
       "priority": 6,
       "aliases": [],
-      "attached_prefix": "1,9-phenanthrolino",
+      "attached_prefix": "[1,9]phenanthrolino",
       "derivative_stem": "1,9-phenanthrolin",
       "template": {
         "atoms": [
@@ -3606,7 +3606,7 @@
       "pin": true,
       "priority": 6,
       "aliases": [],
-      "attached_prefix": "2,7-phenanthrolino",
+      "attached_prefix": "[2,7]phenanthrolino",
       "derivative_stem": "2,7-phenanthrolin",
       "template": {
         "atoms": [
@@ -3837,7 +3837,7 @@
       "pin": true,
       "priority": 6,
       "aliases": [],
-      "attached_prefix": "2,8-phenanthrolino",
+      "attached_prefix": "[2,8]phenanthrolino",
       "derivative_stem": "2,8-phenanthrolin",
       "template": {
         "atoms": [
@@ -4068,7 +4068,7 @@
       "pin": true,
       "priority": 6,
       "aliases": [],
-      "attached_prefix": "3,5-phenanthrolino",
+      "attached_prefix": "[3,5]phenanthrolino",
       "derivative_stem": "3,5-phenanthrolin",
       "template": {
         "atoms": [
@@ -4299,7 +4299,7 @@
       "pin": true,
       "priority": 6,
       "aliases": [],
-      "attached_prefix": "3,6-phenanthrolino",
+      "attached_prefix": "[3,6]phenanthrolino",
       "derivative_stem": "3,6-phenanthrolin",
       "template": {
         "atoms": [
@@ -4530,7 +4530,7 @@
       "pin": true,
       "priority": 6,
       "aliases": [],
-      "attached_prefix": "4,5-phenanthrolino",
+      "attached_prefix": "[4,5]phenanthrolino",
       "derivative_stem": "4,5-phenanthrolin",
       "template": {
         "atoms": [
@@ -6046,7 +6046,7 @@
       "pin": true,
       "priority": 11,
       "aliases": [],
-      "attached_prefix": "1,5-naphthyridino",
+      "attached_prefix": "[1,5]naphthyridino",
       "derivative_stem": "1,5-naphthyridin",
       "template": {
         "atoms": [
@@ -6212,7 +6212,7 @@
       "pin": true,
       "priority": 11,
       "aliases": [],
-      "attached_prefix": "1,6-naphthyridino",
+      "attached_prefix": "[1,6]naphthyridino",
       "derivative_stem": "1,6-naphthyridin",
       "template": {
         "atoms": [
@@ -6378,7 +6378,7 @@
       "pin": true,
       "priority": 11,
       "aliases": [],
-      "attached_prefix": "1,7-naphthyridino",
+      "attached_prefix": "[1,7]naphthyridino",
       "derivative_stem": "1,7-naphthyridin",
       "template": {
         "atoms": [
@@ -6544,7 +6544,7 @@
       "pin": true,
       "priority": 11,
       "aliases": [],
-      "attached_prefix": "1,8-naphthyridino",
+      "attached_prefix": "[1,8]naphthyridino",
       "derivative_stem": "1,8-naphthyridin",
       "template": {
         "atoms": [
@@ -6710,7 +6710,7 @@
       "pin": true,
       "priority": 11,
       "aliases": [],
-      "attached_prefix": "2,6-naphthyridino",
+      "attached_prefix": "[2,6]naphthyridino",
       "derivative_stem": "2,6-naphthyridin",
       "template": {
         "atoms": [
@@ -6876,7 +6876,7 @@
       "pin": true,
       "priority": 11,
       "aliases": [],
-      "attached_prefix": "2,7-naphthyridino",
+      "attached_prefix": "[2,7]naphthyridino",
       "derivative_stem": "2,7-naphthyridin",
       "template": {
         "atoms": [

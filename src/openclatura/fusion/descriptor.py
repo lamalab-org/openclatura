@@ -13,6 +13,7 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from collections.abc import Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
+from functools import lru_cache
 from itertools import combinations
 from typing import Protocol
 
@@ -1003,7 +1004,7 @@ def _best_tree_mapping_candidate(
             proved = proved_joins.setdefault(child, {})
             for index, mapping in enumerate(projected[child]):
                 visited_states += 1
-                if visited_states > MAX_LOCANT_MAP_COMBINATIONS:
+                if MAX_LOCANT_MAP_COMBINATIONS is not None and visited_states > MAX_LOCANT_MAP_COMBINATIONS:
                     raise _LocantMapBudgetExceeded(
                         f"tree locant-map search exceeds bounded limit {MAX_LOCANT_MAP_COMBINATIONS} states"
                     )
@@ -1249,7 +1250,7 @@ def _compatible_mapping_assignments(
     def visit(position: int) -> None:
         nonlocal visited_states
         visited_states += 1
-        if visited_states > MAX_LOCANT_MAP_COMBINATIONS:
+        if MAX_LOCANT_MAP_COMBINATIONS is not None and visited_states > MAX_LOCANT_MAP_COMBINATIONS:
             raise _LocantMapBudgetExceeded(
                 f"compatible locant-map search exceeds bounded limit {MAX_LOCANT_MAP_COMBINATIONS}"
             )
@@ -1868,6 +1869,7 @@ def _join_preference_key(join: FusionJoin, side_rank: int) -> tuple:
     return (join.order, side_rank, _attached_locant_key(join))
 
 
+@lru_cache(maxsize=16384)
 def _attached_locant_key(join: FusionJoin) -> tuple:
     return tuple(retained_locant_sort_key(locant.text) for locant in join.attached_locants)
 

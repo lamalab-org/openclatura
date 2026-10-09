@@ -199,6 +199,25 @@ class RingParent:
         }
 
     @property
+    def indicated_hydrogen_citation(self) -> str:
+        """Return the leading indicated-hydrogen run of this parent's own name.
+
+        P-25.7.1.3.2 cites it in front of the ring system's name, replacement
+        terms included, so assembly needs the run and the ring body apart. The
+        source has to follow base_name's own dispatch: a replacement parent may
+        carry its proof's rendering or the fusion plan's, and only the renderer
+        that produced the name knows which tokens are the hydrogen.
+        """
+
+        from .assembly_parts import leading_indicated_hydrogen_citation
+
+        if self.is_skeletal_replacement_fusion and self.replacement_fusion_state is not None:
+            return leading_indicated_hydrogen_citation(self.replacement_fusion_state.rendered_parts)
+        if self.parent_name is None and self.uses_fusion_plan:
+            return leading_indicated_hydrogen_citation(self.fusion_plan.rendered_parts)
+        return ""
+
+    @property
     def base_name(self) -> str | None:
         if self.is_skeletal_replacement_fusion and self.replacement_fusion_state is not None:
             return self.replacement_fusion_state.rendered_name
@@ -219,7 +238,13 @@ class RingParent:
 
     @property
     def binding_term(self) -> str | None:
-        """Return parent text that survives suffix and unsaturation morphology."""
+        """Return parent text that survives suffix and unsaturation morphology.
+
+        The indicated-hydrogen run is not part of the contiguous ring word: it
+        is cited ahead of the replacement prefixes (P-25.7.1.3.2), which puts
+        those prefixes between it and the ring. It carries its own token bound
+        to its own atom, so the ring body is what this term has to name.
+        """
 
         if self.hydride_kind in {
             ParentHydrideKind.RETAINED,
@@ -227,7 +252,10 @@ class RingParent:
             ParentHydrideKind.SKELETAL_REPLACEMENT_FUSION,
             ParentHydrideKind.BRIDGED_FUSION,
         }:
-            return self.base_name
+            name = self.base_name
+            if name is None:
+                return None
+            return name.removeprefix(self.indicated_hydrogen_citation) or name
         return self.descriptor
 
     @property

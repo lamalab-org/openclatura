@@ -1,4 +1,4 @@
-"""A fused parent cited as a substituent misallocates its hydrogen.
+"""How a fused parent cited as a substituent allocates its hydrogen.
 
 Parent indicated hydrogen, suffix-generated added hydrogen and genuine
 hydrogenation are three separate citation mechanisms (P-58.2.3.1.3, .1.4) and
@@ -9,10 +9,18 @@ positions and the residual ring carbons - is detachable hydro.
 
 Here the indicated hydrogen is spent on ring carbons instead, which leaves the
 free valence without one and understates the hydrogenation by four positions,
-and the name OPSIN cannot read.
+in a name OPSIN cannot read.
 
-The controls below reach the same shape and are named correctly, because the
-assembler supplies a hydro prefix for them; they are here so a change aimed at
+Spending it on the free valence instead was tried in e857651 and reverted: it
+reached the preferred prefix here but regressed 52 PubChem molecules of the
+same family, because suppressing the carbon citation is what frees the
+hydrogen and nothing downstream puts it back - 3,4,5,6-tetrahydroazepino-
+[4,5,6-cd]indol-5-yl came out as 3,4-dihydro-5H-azepino[4,5,6-cd]indol-5-yl,
+four stated hydrogens becoming three. The xfails below mark what is still
+owed.
+
+The controls below reach the same shape and were already named correctly,
+because the assembler supplies a hydro prefix for them; they are here so a change aimed at
 the gap cannot quietly take them with it. Their derivative states are
 indistinguishable from the broken one at plan level - same empty
 hydrogenated_edges, hydro, intrinsic and added-H operations - so a guard that
@@ -27,8 +35,8 @@ from openclatura.chains import find_ring_systems
 from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.graph_io import read_smiles
 
-# Needs four saturated ring carbons: 4a and 8 as indicated hydrogen, 4b and 7a
-# as added hydrogen consumed by the 5,7-dioxo.
+# Needs four saturated ring carbons: 4a and 8 clear of the carbonyls, 4b and 7a
+# next to the 5,7-dioxo that took their pi bonds.
 UNAUDITED = "CC(=O)Oc1ccc(N2C(=O)[C@H]3[C@@H](C2=O)C2C=CC=NN2[C@H]3C(=O)c2ccccc2)cc1"
 
 # Same shape, named correctly today: the assembler spells the saturation as a
@@ -124,3 +132,41 @@ def test_the_substituted_parent_uses_the_preferred_prefix():
     """
 
     assert PREFERRED_PREFIX in name_smiles(UNAUDITED)
+
+
+# A spiro component is assembled with no principal group of its own, which is
+# not the same as having no suffix to cite added hydrogen against: the spiro
+# name supplies one. Respelling the component's citation as hydro keeps the
+# hydrogen count but loses the structure, and the 100k shards caught all three.
+SPIRO_COMPONENTS = (
+    (
+        "COc1cc(OC)c2c(c1Cl)O[C@]1(C2=O)C(=O)C2C(C[C@H]1C)NN(C)C2[C@H]1CCOC1",
+        "tetrahydro-1H,3H,3aH-benzo[c]pyrazole",
+        "hexahydro-1H-benzo[c]pyrazole",
+    ),
+    (
+        "CCN1C(=O)[C@@H]2CC3(CCN(C(=O)Nc4ccc(C)c(C)c4)CC3)CN2C1=O",
+        "dihydro-5H,7aH-pyrrolo[1,2-c]imidazole",
+        "tetrahydropyrrolo[1,2-c]imidazole",
+    ),
+    (
+        "CC(=O)Nc1ccc(CN2CC3(C2)C(=O)N(Cc2cccc(Cl)c2)C(=O)[C@@H]2C[C@@H](O)CN23)cc1",
+        "tetrahydro-2H,4H-pyrrolo[1,2-a]pyrazine",
+        "hexahydropyrrolo[1,2-a]pyrazine",
+    ),
+)
+
+
+@pytest.mark.parametrize(("smiles", "expected", "respelled"), SPIRO_COMPONENTS)
+def test_a_spiro_component_keeps_its_own_hydrogen_citation(smiles, expected, respelled):
+    """The respelling is for a parent cited as a substituent, not for these."""
+
+    name = name_smiles(smiles)
+    assert expected in name
+    assert respelled not in name
+
+
+@pytest.mark.parametrize(("smiles", "expected", "respelled"), SPIRO_COMPONENTS)
+@pytest.mark.skipif(not opsin_available(), reason="OPSIN round-trip needs java and py2opsin")
+def test_the_spiro_components_round_trip(smiles, expected, respelled):
+    assert verify_with_opsin(name_smiles(smiles), smiles).status == "matched"

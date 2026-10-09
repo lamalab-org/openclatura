@@ -13,7 +13,11 @@ from openclatura.graph_io import read_smiles
 def _mancude_model(mol):
     return parent_bond_model(
         FusionGraph(
-            atoms=tuple(FusionGraphAtom(atom.idx, atom.symbol) for atom in mol.atoms.values()),
+            # The parent is built for the state being modelled, charge included:
+            # a nitrogen's bond-order budget is 2, 3 or 4 as it is anionic,
+            # neutral or cationic, and dropping the charge here would model a
+            # neutral parent for a cation.
+            atoms=tuple(FusionGraphAtom(atom.idx, atom.symbol, atom.charge) for atom in mol.atoms.values()),
             bonds=tuple(FusionGraphBond(tuple(sorted((bond.u, bond.v))), "mancude") for bond in mol.bonds.values()),
         )
     )
@@ -47,7 +51,12 @@ def test_fusion_nitrogen_charge_is_not_treated_as_neutral_lone_pair():
     assert len(neutral.hydrogenated_atom_ids) == 8
     assert 0 not in neutral.hydrogenated_atom_ids
     mol.atoms[0] = replace(mol.atoms[0], charge=1)
-    charged = compare_actual_parent_to_implied_parent(mol, mol.atoms, model)
+    # The budget belongs to the state being modelled, so the charge has to be in
+    # place before the parent is built: three skeletal bonds spend a neutral
+    # nitrogen's three outright, and leave a cationic nitrogen one of its four.
+    # Reusing the neutral model here would ask composition to widen a parent it
+    # can only constrain.
+    charged = compare_actual_parent_to_implied_parent(mol, mol.atoms, _mancude_model(mol))
     assert len(charged.hydrogenated_atom_ids) == 10
     assert 0 in charged.hydrogenated_atom_ids
 

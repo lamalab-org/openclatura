@@ -91,11 +91,62 @@ def _opsin_roundtrip(names: list[str]) -> list[str]:
     return [value or "" for value in decoded]
 
 
+def _reviewed_parser_gaps() -> dict[tuple[str, str], dict]:
+    """Return the reviewed parser gaps, keyed by structure and expected name.
+
+    A gap waives one expectation only: that the reference parser accepts a name
+    this engine emits as preferred. It never makes a rejection count as a round
+    trip, and it is bound to the exact name - a different name, including the
+    less senior one a gap replaced, still fails.
+    """
+
+    path = Path(__file__).with_name("reviewed_parser_gaps.json")
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text())
+    return {(gap["smiles"], gap["expected_name"]): gap for gap in data.get("gaps", ())}
+
+
+def _reviewed_numbering_mismatches(path: Path | None = None) -> dict[tuple[str, str], dict]:
+    """Return reviewed parser numbering mismatches, keyed by structure and name.
+
+    This is a separate category from the rejection waiver above, with a higher
+    burden, because here the parser accepts the name and the disputed numbering
+    is the very thing under review. A record is honoured only when it carries an
+    independently derived numbered parent graph, the rule record that prefers it,
+    an independent reconstruction of the complete derivative, and the exact wrong
+    interpretation the pinned parser returns. It never makes a mismatch count as
+    a round trip.
+    """
+
+    path = path or Path(__file__).with_name("reviewed_parser_numbering_mismatches.json")
+    if not path.exists():
+        return {}
+    data = json.loads(path.read_text())
+    required = tuple(data.get("required_fields", ()))
+    if not required:
+        raise RuntimeError("the numbering-mismatch schema must state its required fields")
+    records = {}
+    for record in data.get("mismatches", ()):
+        missing = [field for field in required if not record.get(field)]
+        if missing:
+            raise RuntimeError(
+                f"reviewed numbering mismatch for {record.get('expected_name')!r} is missing {missing}"
+            )
+        if record["preference_evidence"] != "rule_derived":
+            raise RuntimeError("a numbering mismatch must be rule derived, not a published whole-name PIN")
+        records[record["smiles"], record["expected_name"]] = record
+    return records
+
+
 def verify_changed_rows(changed: list[dict[str, Any]], opsin_chunk_size: int) -> None:
     """Mutate discrepancy records with their current OPSIN result."""
 
+    from openclatura.resonance_compare import equivalent_smiles
     from openclatura.utils import standardize_mol
 
+    gaps = _reviewed_parser_gaps()
+    mismatches = _reviewed_numbering_mismatches()
     nonempty = [row for row in changed if row["current_name"]]
     for start in range(0, len(nonempty), opsin_chunk_size):
         chunk = nonempty[start : start + opsin_chunk_size]
@@ -103,9 +154,60 @@ def verify_changed_rows(changed: list[dict[str, Any]], opsin_chunk_size: int) ->
         for row, opsin_smiles in zip(chunk, decoded, strict=True):
             original = row["standardized_smiles"] or None
             roundtrip = standardize_mol(opsin_smiles) if opsin_smiles else None
+            # Standardized SMILES are compared string to string, so two
+            # drawings of one molecule read as two molecules. A conjugated
+            # fused system has several Kekule forms with the same atoms,
+            # hydrogens and charges, and RDKit's aromatic perception does not
+            # normalise all of them: 1,2,3,4-tetramethylindeno[2,1-a]fluorene
+            # decodes to a drawing of the target that differs only in where
+            # its double bonds sit. The engine's own verifier already settles
+            # that with equivalent_smiles, and the gate has to ask the same
+            # question or it reports a naming regression for a redrawing.
             matched = original is not None and roundtrip is not None and original == roundtrip
+            if not matched and opsin_smiles and row.get("smiles"):
+                matched = equivalent_smiles(row["smiles"], opsin_smiles)
+            gap = gaps.get((row.get("smiles"), row["current_name"]))
+            reviewed_gap = False
+            if gap is not None:
+                if not opsin_smiles:
+                    # The recorded rejection reproduced. The name stays preferred
+                    # and this stays a rejection in the interoperability metric;
+                    # only the release gate treats it as reviewed.
+                    reviewed_gap = True
+                elif matched:
+                    # The parser now reads it, so the gap is stale and has to be
+                    # retired rather than carried forward.
+                    row["parser_gap"] = "stale"
+                else:
+                    # An expected rejection never licenses a different structure.
+                    row["parser_gap"] = "structure_changed"
+            # A reviewed numbering mismatch is honoured only when the parser
+            # returns exactly the interpretation that was reviewed. Anything
+            # else - a correct reading, a different wrong reading, a rejection -
+            # is outside the record and has to surface.
+            record = mismatches.get((row.get("smiles"), row["current_name"]))
+            reviewed_mismatch = False
+            if record is not None:
+                if matched:
+                    row["numbering_mismatch"] = "stale"
+                elif not opsin_smiles:
+                    row["numbering_mismatch"] = "unexpected_rejection"
+                elif roundtrip != record["parser_returned_standardized"]:
+                    row["numbering_mismatch"] = "different_interpretation"
+                else:
+                    reviewed_mismatch = True
             row.update(
-                current_status="matched" if matched else "failed",
+                current_status=(
+                    "matched"
+                    if matched
+                    else (
+                        "reviewed_parser_gap"
+                        if reviewed_gap
+                        else ("reviewed_numbering_mismatch" if reviewed_mismatch else "failed")
+                    )
+                ),
+            )
+            row.update(
                 opsin_smiles=opsin_smiles,
                 standardized_original=original,
                 standardized_roundtrip=roundtrip,
@@ -167,10 +269,22 @@ def check_regression(
         verify_changed_rows(changed, opsin_chunk_size)
 
     current_changed_matches = sum(row["current_status"] == "matched" for row in changed)
+    reviewed_gaps = sum(row["current_status"] == "reviewed_parser_gap" for row in changed)
+    reviewed_mismatches = sum(row["current_status"] == "reviewed_numbering_mismatch" for row in changed)
+    stale_gaps = [
+        row
+        for row in changed
+        if row.get("parser_gap") in {"stale", "structure_changed"}
+        or row.get("numbering_mismatch") in {"stale", "different_interpretation", "unexpected_rejection"}
+    ]
     current_matches = unchanged_matches + current_changed_matches
     selected_failure_ids = {_row_id(row) for row in rows} & baseline_failure_ids
     baseline_matches = len(rows) - len(selected_failure_ids)
-    passed = current_matches >= baseline_matches
+    # The metric still counts a reviewed gap as a parser rejection; the gate asks
+    # the narrower question of whether anything regressed that has not been
+    # reviewed. A stale gap, or one whose parser now returns a different
+    # structure, fails outright - that is the signal that it needs attention.
+    passed = current_matches + reviewed_gaps + reviewed_mismatches >= baseline_matches and not stale_gaps
 
     return {
         "baseline_file": str(baseline_path),
@@ -185,6 +299,9 @@ def check_regression(
         "changed_names": len(changed),
         "changed_baseline_matches": sum(row["baseline_status"] == "matched" for row in changed),
         "changed_current_matches": current_changed_matches,
+        "reviewed_parser_gaps": reviewed_gaps,
+        "reviewed_numbering_mismatches": reviewed_mismatches,
+        "stale_parser_gaps": [row["current_name"] for row in stale_gaps],
         "passed": passed,
         "elapsed_seconds": round(time.perf_counter() - started, 3),
         "stored_summary": stored_summary,

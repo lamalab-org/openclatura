@@ -482,115 +482,142 @@ def component_entry_layouts(
             if central.size != shape.ring_size or any(central.id not in (a, b) for a, b, _ in model.face_adjacency):
                 continue
             terminals = [face for face in model.faces if face.id != central.id]
-            roots = [face for face in terminals if face.size == shape.entry_component_size]
-            if len(roots) != 1 or any(face.size < shape.entry_component_size for face in terminals):
+            if any(face.size < shape.entry_component_size for face in terminals):
                 continue
-            root = roots[0]
-            terminal_shapes = {face.id: _symmetric_terminal_shape(face.size) for face in terminals if face != root}
-            if any(value is None for value in terminal_shapes.values()):
-                continue
-            matches = [match for match in ast.component_occurrences if match.covered_face_ids == frozenset({root.id})]
-            if len(matches) != 1:
-                continue
-            match = matches[0]
-            local = dict(match.local_to_input_atom)
-            perimeter = specs[match.occurrence_id].template.peripheral_atoms
-            if not all(locant in local for locant in perimeter):
-                continue
-            cycle = tuple(local[locant] for locant in perimeter)
-            if len(cycle) != root.size or set(cycle) != set(root.atom_cycle):
-                continue
-            edges = {frozenset(pair) for pair in zip(root.atom_cycle, root.atom_cycle[1:] + root.atom_cycle[:1])}
-            if any(frozenset(pair) not in edges for pair in zip(cycle, cycle[1:] + cycle[:1])):
-                continue
-            shared = set(central.atom_cycle) & set(cycle)
-            # Fusion may reverse a component's standalone perimeter. The
-            # ordered interface, including multiplied occurrences, owns the
-            # direction used to enter the completed ring system.
-            interfaces = [
-                join.interface
-                for join in ast.joins
-                if join.interface.attached_occurrence == match.occurrence_id
-                and set(join.interface.ordered_input_atoms) == shared
-            ]
-            entry = interfaces[0].ordered_input_atoms if len(interfaces) == 1 else None
-            if entry is None or {cycle[-1], cycle[0]} & shared:
-                continue
-            orders = _orders_starting_with_edge(central.atom_cycle, entry)
-            if len(orders) != 1:
-                continue
-            port = shape.directed_entry_port
-            order = orders[0][-port:] + orders[0][:-port] if port else orders[0]
-            ports = {
-                index
-                for index, pair in enumerate(zip(order, order[1:] + order[:1]))
-                if any(set(pair) <= set(face.atom_cycle) for face in terminals)
-            }
-            if ports != {port, *shape.opposite_ports}:
-                continue
-            root_shapes = [
-                item
-                for item in _SHAPES_BY_SIZE[root.size]
-                if item.coordinate_system == "cartesian" and not item.distortion_rank
-            ]
-            if len(root_shapes) != 1:
-                continue
-            terminal_shapes[root.id] = root_shapes[0]
-            budget = _Budget(search_budget)
-            budget.spend()
-            dx, dy = (
-                shape.vertices[(port + 1) % shape.ring_size][axis] - shape.vertices[port][axis] for axis in (0, 1)
-            )
-            scale = lcm(*(face.size for face in model.faces))
-            positions = {
-                atom: ((-dx * x - dy * y) * scale, (dy * x - dx * y) * scale)
-                for atom, (x, y) in zip(order, shape.vertices)
-            }
-            placed = {central.id: order}
-            for face in terminals:
+            # FR-5.1.1 draws the main row through the two attachments that sit
+            # as far apart as possible around the central ring, which leaves
+            # the third one off the row and uppermost, so it starts the
+            # numbering. That is a property of where the shared edges fall on
+            # the central cycle, not of how large the attached rings are: on a
+            # seven-membered ring with gaps of 2, 2 and 3 the off-row component
+            # is the one between the two short gaps whatever its size. Picking
+            # it by entry_component_size instead put a five-membered terminal
+            # above the row whenever one existed, which started the numbering
+            # in the wrong ring. The port test below is the geometric statement
+            # of the same rule - occupied ports must be the entry port and its
+            # opposites - so every terminal is offered and the geometry names
+            # the root. entry_component_size survives only as the floor on how
+            # small a terminal this shape admits.
+            for root in terminals:
+                terminal_shapes = {face.id: _symmetric_terminal_shape(face.size) for face in terminals if face != root}
+                if any(value is None for value in terminal_shapes.values()):
+                    continue
+                matches = [
+                    match for match in ast.component_occurrences if match.covered_face_ids == frozenset({root.id})
+                ]
+                if len(matches) != 1:
+                    continue
+                match = matches[0]
+                local = dict(match.local_to_input_atom)
+                perimeter = specs[match.occurrence_id].template.peripheral_atoms
+                if not all(locant in local for locant in perimeter):
+                    continue
+                cycle = tuple(local[locant] for locant in perimeter)
+                if len(cycle) != root.size or set(cycle) != set(root.atom_cycle):
+                    continue
+                edges = {frozenset(pair) for pair in zip(root.atom_cycle, root.atom_cycle[1:] + root.atom_cycle[:1])}
+                if any(frozenset(pair) not in edges for pair in zip(cycle, cycle[1:] + cycle[:1])):
+                    continue
+                shared = set(central.atom_cycle) & set(cycle)
+                # Fusion may reverse a component's standalone perimeter. The
+                # ordered interface, including multiplied occurrences, owns the
+                # direction used to enter the completed ring system.
+                interfaces = [
+                    join.interface
+                    for join in ast.joins
+                    if join.interface.attached_occurrence == match.occurrence_id
+                    and set(join.interface.ordered_input_atoms) == shared
+                ]
+                entry = interfaces[0].ordered_input_atoms if len(interfaces) == 1 else None
+                # The shared bond must not straddle the ends of the component's
+                # perimeter, but where it does that is a property of the stored
+                # order rather than of the structure: the perimeter is a cycle,
+                # so an equivalent rotation satisfies the requirement. Three
+                # benzo rings on a seven-membered ring were rejected here for
+                # nothing else, which left the three-ring row undrawn.
+                for turn in range(len(cycle)):
+                    if not {cycle[-1], cycle[0]} & shared:
+                        break
+                    cycle = cycle[1:] + cycle[:1]
+                if entry is None or {cycle[-1], cycle[0]} & shared:
+                    continue
+                orders = _orders_starting_with_edge(central.atom_cycle, entry)
+                if len(orders) != 1:
+                    continue
+                port = shape.directed_entry_port
+                order = orders[0][-port:] + orders[0][:-port] if port else orders[0]
+                ports = {
+                    index
+                    for index, pair in enumerate(zip(order, order[1:] + order[:1]))
+                    if any(set(pair) <= set(face.atom_cycle) for face in terminals)
+                }
+                if ports != {port, *shape.opposite_ports}:
+                    continue
+                root_shapes = [
+                    item
+                    for item in _SHAPES_BY_SIZE[root.size]
+                    if item.coordinate_system == "cartesian" and not item.distortion_rank
+                ]
+                if len(root_shapes) != 1:
+                    continue
+                terminal_shapes[root.id] = root_shapes[0]
+                budget = _Budget(search_budget)
                 budget.spend()
-                edge = next(pair for pair in zip(order, order[1:] + order[:1]) if set(pair) <= set(face.atom_cycle))
-                endpoints = tuple(reversed(edge))
-                face_order = _orders_starting_with_edge(face.atom_cycle, endpoints)[0]
-                positions = {atom: (x * _SHAPE_EDGE_SCALE, y * _SHAPE_EDGE_SCALE) for atom, (x, y) in positions.items()}
-                positions.update(
-                    _place_shape(
-                        terminal_shapes[face.id],
-                        face_order,
-                        positions[endpoints[0]],
-                        positions[endpoints[1]],
-                        coordinate_system="cartesian",
-                    )
+                dx, dy = (
+                    shape.vertices[(port + 1) % shape.ring_size][axis] - shape.vertices[port][axis] for axis in (0, 1)
                 )
-                placed[face.id] = face_order
-            if not _audit_layout(model, placed, positions):
-                return ()
-            centers = {face: _ring_axis_center(cycle, positions) for face, cycle in placed.items()}
-            positions, centers = _normalize_integer_layout(positions, centers)
-            adjacent = frozenset(frozenset((a, b)) for a, b, _ in model.face_adjacency)
-            return (
-                FusedLayout(
-                    face_positions=tuple((face, *point) for face, point in sorted(centers.items())),
-                    atom_positions=tuple((atom, *point) for atom, point in sorted(positions.items())),
-                    face_shapes=tuple(
-                        sorted(
-                            (
-                                (central.id, shape.shape_id),
-                                *((face, item.shape_id) for face, item in terminal_shapes.items()),
-                            )
+                scale = lcm(*(face.size for face in model.faces))
+                positions = {
+                    atom: ((-dx * x - dy * y) * scale, (dy * x - dx * y) * scale)
+                    for atom, (x, y) in zip(order, shape.vertices)
+                }
+                placed = {central.id: order}
+                for face in terminals:
+                    budget.spend()
+                    edge = next(pair for pair in zip(order, order[1:] + order[:1]) if set(pair) <= set(face.atom_cycle))
+                    endpoints = tuple(reversed(edge))
+                    face_order = _orders_starting_with_edge(face.atom_cycle, endpoints)[0]
+                    positions = {
+                        atom: (x * _SHAPE_EDGE_SCALE, y * _SHAPE_EDGE_SCALE) for atom, (x, y) in positions.items()
+                    }
+                    positions.update(
+                        _place_shape(
+                            terminal_shapes[face.id],
+                            face_order,
+                            positions[endpoints[0]],
+                            positions[endpoints[1]],
+                            coordinate_system="cartesian",
                         )
+                    )
+                    placed[face.id] = face_order
+                if not _audit_layout(model, placed, positions):
+                    return ()
+                centers = {face: _ring_axis_center(cycle, positions) for face, cycle in placed.items()}
+                positions, centers = _normalize_integer_layout(positions, centers)
+                adjacent = frozenset(frozenset((a, b)) for a, b, _ in model.face_adjacency)
+                return (
+                    FusedLayout(
+                        face_positions=tuple((face, *point) for face, point in sorted(centers.items())),
+                        atom_positions=tuple((atom, *point) for atom, point in sorted(positions.items())),
+                        face_shapes=tuple(
+                            sorted(
+                                (
+                                    (central.id, shape.shape_id),
+                                    *((face, item.shape_id) for face, item in terminal_shapes.items()),
+                                )
+                            )
+                        ),
+                        orientation_score=_orientation_score(
+                            centers, {}, adjacent, distortion=shape.distortion_rank, orders=placed, positions=positions
+                        ),
+                        component_entry_edge=entry,
+                        audit_evidence=(
+                            "configured opposite-port direction witness",
+                            "entry follows the graph-bound ordered fusion interface",
+                            "complete original face geometry audited",
+                        ),
                     ),
-                    orientation_score=_orientation_score(
-                        centers, {}, adjacent, distortion=shape.distortion_rank, orders=placed, positions=positions
-                    ),
-                    component_entry_edge=entry,
-                    audit_evidence=(
-                        "configured opposite-port direction witness",
-                        "entry follows the graph-bound ordered fusion interface",
-                        "complete original face geometry audited",
-                    ),
-                ),
-            )
+                )
     return _entry_direction_layouts(model, ast, specs, search_budget)
 
 
@@ -1467,6 +1494,7 @@ def _materialize_layouts(
     integer = {atom: (2 * x, 2 * y) for atom, (x, y) in integer.items()}
     centers = {face: (2 * x, 2 * y) for face, (x, y) in centers.items()}
     centers = _two_port_pentagon_axes(placed_orders, centers, adjacent)
+    centers = _three_port_odd_ring_axes(placed_orders, centers, adjacent)
     pentagon_chain = _opsin_pentagon_chain(placed_orders, adjacent) if opsin_ring_map else None
     if pentagon_chain is not None:
         centers = _coupled_pentagon_axis_centers(pentagon_chain, centers)
@@ -1545,6 +1573,76 @@ def _materialize_layouts(
                 candidates.setdefault(_layout_geometry_key(layout), layout)
 
     return tuple(sorted(candidates.values(), key=_layout_sort_key))
+
+
+# How far apart two of three attachments can sit on a large central ring, as a
+# difference of port indices read either way round. Seven admits three edges;
+# eight admits four, the diametral pair.
+_WIDEST_THREE_PORT_SEPARATIONS = {7: (3, 4), 8: (4,)}
+
+
+def _three_port_odd_ring_axes(
+    orders: dict[int, tuple[int, ...]], centers: dict[int, Point], adjacent: frozenset[frozenset[int]]
+) -> dict[int, Point]:
+    """Put a three-port large ring on the row through its widest-apart pair.
+
+    FR-5.1.1 draws the main row through the two attachments that sit as far
+    apart as possible around the central ring, leaving the third off the row
+    and uppermost, so it starts the numbering. Neither stored polygon puts its
+    widest-apart edges parallel: a seven-membered ring has no parallel edges at
+    all, and the octagon's mirror axis runs through two vertices, so its
+    diametral edges are not parallel either. The centre therefore sits off the
+    line joining the two row neighbours, and the direction grid only keeps a
+    neighbour on the same row when the offset is exactly horizontal, so that
+    off-axis centre cost the row an entire ring. Every drawing then reported a maximum row of
+    two where three was available, the orientation criteria tied drawings that
+    start in different terminals, and the ordered locant criteria chose among
+    candidates that should never have been admitted.
+
+    This is the large-ring counterpart of the two-port pentagon rule above: the
+    widest-apart pair names the row, and the ring is recentred onto its
+    midpoint so the row is straight. Only independent constraints on an
+    acyclic face graph are applied.
+    """
+
+    if len(adjacent) != len(orders) - 1:
+        return centers
+    neighbors: dict[int, list[int]] = defaultdict(list)
+    for left, right in adjacent:
+        neighbors[left].append(right)
+        neighbors[right].append(left)
+    edges = {face: {frozenset((a, b)) for a, b in zip(order, order[1:] + order[:1])} for face, order in orders.items()}
+    targets = {}
+    for face, order in orders.items():
+        size = len(order)
+        if len(neighbors[face]) != 3 or size not in _WIDEST_THREE_PORT_SEPARATIONS:
+            continue
+        ports = {}
+        for index, (a, b) in enumerate(zip(order, order[1:] + order[:1])):
+            for other in neighbors[face]:
+                if frozenset((a, b)) in edges[other]:
+                    ports[other] = index
+        if len(ports) != 3:
+            continue
+        separations = _WIDEST_THREE_PORT_SEPARATIONS[size]
+        widest = [
+            (left, right)
+            for left in ports
+            for right in ports
+            if left < right and (ports[left] - ports[right]) % size in separations
+        ]
+        if len(widest) != 1:
+            continue
+        targets[face] = widest[0]
+    result = dict(centers)
+    for face, (left, right) in targets.items():
+        if left in targets or right in targets:
+            continue
+        # Exact midpoint coordinates are retained by the caller's scale.
+        if any((centers[left][axis] + centers[right][axis]) % 2 for axis in (0, 1)):
+            continue
+        result[face] = tuple((centers[left][axis] + centers[right][axis]) // 2 for axis in (0, 1))
+    return result if len(set(result.values())) == len(result) else centers
 
 
 def _two_port_pentagon_axes(

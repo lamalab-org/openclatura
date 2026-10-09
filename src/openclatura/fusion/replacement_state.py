@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
-from ..assembly_parts import NameTokenBinding
+from ..assembly_parts import NameTokenBinding, leading_indicated_hydrogen_citation
 from ..locants import system_locant_sort_key
 from .mancude import ParentDerivativeState, indicated_hydrogen_parent_bond_model, parent_derivative_state
 from .model import FusionGraph, ParentBondModel
@@ -47,6 +47,19 @@ class ReplacementFusionState:
     @property
     def rendered_name(self) -> str:
         return "".join(part.text for part in self.rendered_parts)
+
+    @property
+    def indicated_hydrogen_citation(self) -> str:
+        """Return the leading indicated-hydrogen run, its separator included.
+
+        P-25.7.1.3.2 cites the indicated hydrogen of a fused ring system in
+        front of the whole name, replacement terms included, so the assembler
+        needs the run and the ring body as separate things. The tokens already
+        carry that distinction; recovering it by matching an ``H`` in the
+        finished string would be guessing at what is recorded here.
+        """
+
+        return leading_indicated_hydrogen_citation(self.rendered_parts)
 
     @property
     def audit_ok(self) -> bool:
