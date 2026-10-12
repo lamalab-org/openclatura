@@ -144,14 +144,20 @@ SPIRO_COMPONENTS = (
         "tetrahydro-1H,3H,3aH-benzo[c]pyrazole",
         "hexahydro-1H-benzo[c]pyrazole",
     ),
+    # These two carry a cyclic imide, which the imide route names as the -dione
+    # suffix on the spiro parent: the route group is senior to the amide, and
+    # promotes its own member carbonyls. The component's hydrogen is then cited
+    # against that parent and so comes out primed. What the test still fixes is
+    # the thing it was written for - that the citation stays the component's
+    # own, and is not respelled as plain hydro.
     (
         "CCN1C(=O)[C@@H]2CC3(CCN(C(=O)Nc4ccc(C)c(C)c4)CC3)CN2C1=O",
-        "dihydro-5H,7aH-pyrrolo[1,2-c]imidazole",
+        "5'H,7'H,7a'H-spiro[piperidine-4,6'-pyrrolo[1,2-c]imidazole]",
         "tetrahydropyrrolo[1,2-c]imidazole",
     ),
     (
         "CC(=O)Nc1ccc(CN2CC3(C2)C(=O)N(Cc2cccc(Cl)c2)C(=O)[C@@H]2C[C@@H](O)CN23)cc1",
-        "tetrahydro-2H,4H-pyrrolo[1,2-a]pyrazine",
+        "6',7',8',8a'-tetrahydro-2'H-spiro[azetidine-3,4'-pyrrolo[1,2-a]pyrazine]",
         "hexahydropyrrolo[1,2-a]pyrazine",
     ),
 )
@@ -160,30 +166,33 @@ SPIRO_COMPONENTS = (
 def _principal_group_diagnosis(smiles):
     """Report what was perceived and which group won, for a failure message.
 
-    These two cases pass on macOS and fail on the Linux CI runners, and the
-    difference is not the hydrogen spelling the assertion names: it is which
-    group becomes the suffix. Locally the amide is perceived and outranks the
-    ring ketones outright, so it takes the suffix and the ring carbonyls become
-    oxo prefixes. For the dione to win instead, the amide has to be missing
-    from perception altogether - there is no seniority tie for an ordering to
-    decide. Perception is RDKit substructure matching, so the failing
-    environment is the only place the missing match can be seen; printing it
-    here is what makes that observable without a Linux machine to hand.
+    Selection reads each group's resolved rule, so that is what this reports.
+    A route marker declaring PROMOTES_MEMBER_GROUPS is itself unrenderable and
+    hands the suffix to the carbonyls it owns, which is how a cyclic imide
+    becomes a dione and takes the suffix from an amide that is nominally more
+    senior. Reporting only a registry lookup hides that: the route rule is not
+    registered under its own key, so it reads as having no seniority at all.
     """
 
     from openclatura.graph_io import read_rdkit_mol
-    from openclatura.nomenclature import RULES
     from openclatura.perception import perceive_groups
     from openclatura.principal_groups import component_principal_key
 
     molecule = read_rdkit_mol(Chem.MolFromSmiles(smiles))
     candidates = [group for group in perceive_groups(molecule) if group.is_principal_candidate]
-    perceived = ", ".join(
-        f"{group.key}@{group.attachment_carbon}"
-        f"(seniority={getattr(RULES.functional_groups.by_key.get(group.key), 'seniority', None)})"
-        for group in candidates
-    )
-    return f"principal={component_principal_key(candidates, False)!r}; candidates: {perceived or 'none'}"
+    described = []
+    for group in candidates:
+        rule = group.resolved_rule
+        capabilities = sorted(
+            getattr(capability, "value", str(capability)) for capability in getattr(rule, "capabilities", ())
+        )
+        described.append(
+            f"{group.key}@{group.attachment_carbon}"
+            f"(seniority={getattr(rule, 'seniority', 'unresolved')}"
+            + (f", {'+'.join(capabilities)}" if capabilities else "")
+            + ")"
+        )
+    return f"principal={component_principal_key(candidates, False)!r}; candidates: {', '.join(described) or 'none'}"
 
 
 @pytest.mark.parametrize(("smiles", "expected", "respelled"), SPIRO_COMPONENTS)
