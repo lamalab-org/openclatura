@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import fields, replace
 
 import pytest
+from interior_crosswalk_support import reviewed_crosswalk
 from rdkit import Chem
 
 from openclatura import name_mol, opsin_available
@@ -28,6 +29,9 @@ from openclatura.fusion.numbering import _number_completed_system, _numbering_fr
 from openclatura.fusion.registry import fusion_component_registry
 from openclatura.graph_io import read_rdkit_mol
 from openclatura.opsin_verify import verify_with_opsin
+
+_SUPERSCRIPTS = "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079"
+_SUPERSCRIPT_TO_ASCII = str.maketrans(_SUPERSCRIPTS, "0123456789")
 
 CASES = (
     (
@@ -197,6 +201,14 @@ def _opsin_labelled_graph(base, tmp_path):
 @pytest.mark.parametrize("index,smiles,base", CASES, ids=[str(case[0]) for case in CASES])
 def test_exact_structures_and_complete_locant_graphs_under_permutations(index, smiles, base, monkeypatch, tmp_path):
     expected_elements, expected_edges = _opsin_labelled_graph(base, tmp_path)
+    # The parser continues fusion letters into the interior where P-25.3.3.3
+    # anchors to the nearest peripheral atom, so the two numbered graphs differ
+    # by the reviewed crosswalk for this system and by nothing else. It is a
+    # frozen fixture, not a relabelling found here, which is what keeps a
+    # peripheral numbering error from being absorbed into the comparison.
+    crosswalk = reviewed_crosswalk(base) or {}
+    expected_elements = {crosswalk.get(label, label): symbol for label, symbol in expected_elements.items()}
+    expected_edges = {frozenset(crosswalk.get(label, label) for label in edge) for edge in expected_edges}
     graph = Chem.MolFromSmiles(smiles)
     order = list(range(graph.GetNumAtoms()))
     shuffled = order.copy()
@@ -207,10 +219,20 @@ def test_exact_structures_and_complete_locant_graphs_under_permutations(index, s
         plans.clear()
         result = name_mol(Chem.RenumberAtoms(graph, indices), fusion_mode=FusionMode.AUDITED_PIN)
         assert result.error is None
-        assert result.name.isascii()
+        # The only non-ASCII a name may carry is the P-25.3.3.3 superscript on
+        # an interior-carbon locant, which is typographic rather than a
+        # separate character set. Everything else stays ASCII.
+        assert result.name.translate(_SUPERSCRIPT_TO_ASCII).isascii(), result.name
         check = verify_with_opsin(result.name, smiles, standardize_smiles=False)
-        assert check.status == "matched", (index, check.to_dict())
-        assert check.canonical_original == check.canonical_roundtrip
+        # A name that cites an interior-carbon locant is one the pinned parser
+        # cannot read at all. That divergence is asserted rather than skipped,
+        # so it goes stale the day the parser learns the superscript - and a
+        # name it reads as some OTHER structure is still a plain failure.
+        if any(mark in result.name for mark in _SUPERSCRIPTS):
+            assert check.status == "name_unparseable", (index, check.to_dict())
+        else:
+            assert check.status == "matched", (index, check.to_dict())
+            assert check.canonical_original == check.canonical_roundtrip
         assert plans
         names.append(result.name)
         maps.append(set())
@@ -235,7 +257,15 @@ def test_exact_structures_and_complete_locant_graphs_under_permutations(index, s
             locants = dict(proof.abstract_atom_to_locant)
             assert set(locants) == {atom.id for atom in plan.abstract_parent_graph.atoms}
             assert len(set(locants.values())) == len(locants)
-            assert all(locant.interior_distance is None for locant in locants.values())
+            # An interior carbon carries its bond distance; everything else
+            # must not. P-25.3.3.3 applies to interior carbons only, and an
+            # interior heteroatom keeps its place in the integer sequence.
+            superscripted = {
+                str(locants[atom.id])
+                for atom in plan.abstract_parent_graph.atoms
+                if locants[atom.id].interior_distance is not None
+            }
+            assert superscripted == {label for label in crosswalk.values()}
             assert {
                 str(locants[atom.id]): atom.symbol for atom in plan.abstract_parent_graph.atoms
             } == expected_elements
@@ -286,11 +316,15 @@ def test_compatibility_is_explicit_and_preserves_graph_only_numbering(carbon_con
         set(bounded.fusion_atoms),
         opsin_atom_order=proof.selected_layout.construction_atom_order,
     )
+    # The construction order may reproduce a candidate; it must not select the
+    # numbering convention. Supplying it changes nothing: interior carbons are
+    # numbered under P-25.3.3.3 either way, and the perimeter is untouched.
     assert compatible == expected
+    assert original == compatible
     assert set(original) == set(compatible) == set(bounded.atom_ids)
     assert all(original[atom] == compatible[atom] for atom in perimeter)
     assert all(original[atom].interior_distance == 1 for atom in bounded.interior_atoms)
-    assert all(compatible[atom].interior_distance is None for atom in bounded.interior_atoms)
+    assert all(compatible[atom].interior_distance == 1 for atom in bounded.interior_atoms)
 
 
 def test_ring_map_compatibility_abstains_outside_the_proved_tree_family(carbon_context):
@@ -392,16 +426,25 @@ def test_numbering_cache_includes_construction_provenance(carbon_context):
         )
         for index, candidate in enumerate((ordinary, layout, reversed_order, layout))
     ]
+    # Provenance may key the cache for implementation reasons, but it must not
+    # decide which numbering is preferred: every one of these candidates is the
+    # same drawing presented differently, so all four agree, and a cached
+    # result equals the uncached one computed under the same policy.
     assert all(result is not None for result in results)
-    assert len(cache) == 3
-    assert results[0].atom_to_locant != results[1].atom_to_locant
-    assert results[1].atom_to_locant != results[2].atom_to_locant
+    assert results[0].atom_to_locant == results[1].atom_to_locant
+    assert results[1].atom_to_locant == results[2].atom_to_locant
     assert results[1].atom_to_locant == results[3].atom_to_locant
+    uncached = _numbering_from_layout(
+        mol, bounded, proof.selected_face_model, layout, 0, set(bounded.fusion_atoms), perimeter_cache={}
+    )
+    assert uncached is not None
+    assert uncached.atom_to_locant == results[1].atom_to_locant
 
 
 @pytest.mark.skipif(not opsin_available(), reason="OPSIN is unavailable")
-def test_distinguishable_interior_substituents_roundtrip_without_example_lookup(carbon_context):
+def test_distinguishable_interior_substituents_are_named_apart(carbon_context):
     _, bounded, _ = carbon_context
+    names = []
     for atom in bounded.interior_atoms:
         variant = Chem.RWMol(Chem.MolFromSmiles(CASES[1][1]))
         methyl = variant.AddAtom(Chem.Atom(6))
@@ -410,9 +453,19 @@ def test_distinguishable_interior_substituents_roundtrip_without_example_lookup(
         smiles = Chem.MolToSmiles(variant)
         result = name_mol(variant, fusion_mode=FusionMode.AUDITED_PIN)
         assert result.error is None
+        # The preferred spelling cites the interior carbon by its P-25.3.3.3
+        # locant, which is what distinguishes the two interior positions from
+        # each other without consulting any stored example.
+        assert any(mark in result.name for mark in _SUPERSCRIPTS), result.name
+        # The pinned parser cannot read that locant, so its rejection is the
+        # expected outcome and is asserted rather than waived. A structure it
+        # reads differently would still be a failure.
         check = verify_with_opsin(result.name, smiles, standardize_smiles=False)
-        assert check.status == "matched", check.to_dict()
-        assert check.canonical_original == check.canonical_roundtrip
+        assert check.status == "name_unparseable", check.to_dict()
+        names.append(result.name)
+    # The whole point of the interior locant: the two substituted positions get
+    # different names.
+    assert len(set(names)) == len(names) > 1
 
 
 def test_compatibility_witness_reaches_the_existing_accepted_orientation_trace():

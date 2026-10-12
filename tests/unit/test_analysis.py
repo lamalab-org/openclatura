@@ -2915,7 +2915,9 @@ def test_display_locants_keep_numeric_order_and_rendered_text():
     assert locant_text(numbering[10]) == "4a"
     assert locant_text(numbering[11]) == "5"
     assert sorted([numbering[11], numbering[10]]) == [numbering[10], numbering[11]]
-    assert parse_locant(numbering[10]) == (1, 4.0, "a")
+    # The fourth field is the P-25.3.3.3 interior distance, zero for a
+    # peripheral fusion locant; P-14.3.5 orders 4a before 4a-superscript-one.
+    assert parse_locant(numbering[10]) == (1, 4.0, "a", 0)
 
 
 def test_functional_groups_carry_metadata_and_graph_bindings():

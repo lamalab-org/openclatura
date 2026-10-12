@@ -1,4 +1,19 @@
-"""A unique interior vertex continues completed fusion locants without ambiguity."""
+"""A unique interior vertex follows the rule for its own element.
+
+An interior CARBON takes P-25.3.3.3: the locant of its nearest peripheral atom,
+the lowest where several are equally near, with the bond distance as a
+superscript. Uniqueness is not an exception - phenalene has one interior carbon
+and is printed 3a-superscript-one, and P-52.2.4.4.2.1 carries that locant
+through skeletal replacement in 1,3a-superscript-one,4,9-tetraazaphenalene.
+
+An interior HETEROATOM reached through heterocyclic fusion components is a
+separate procedure and continues the integer sequence. Both rules live here so
+that collapsing one into the other shows up immediately.
+
+The pinned parser continues fusion letters for interior carbons instead, so it
+cannot read a name citing the superscript. That divergence is asserted, not
+waived: a parse returning some other structure would still be a failure.
+"""
 
 import random
 
@@ -16,9 +31,9 @@ from openclatura.molecule import Molecule
 from openclatura.opsin_verify import verify_with_opsin
 
 
-@pytest.mark.parametrize("symbol,expected", (("C", "6b"), ("N", "7")))
+@pytest.mark.parametrize("symbol,expected", (("C", "2a\u00b9"), ("N", "7")))
 @pytest.mark.parametrize("reverse_ids", (False, True))
-def test_unique_interior_vertex_continues_the_peripheral_sequence(symbol, expected, reverse_ids):
+def test_unique_interior_vertex_follows_the_rule_for_its_element(symbol, expected, reverse_ids):
     index = {atom: 9 - atom if reverse_ids else atom for atom in range(10)}
     cycles = ((0, 1, 2, 3, 4), (0, 4, 5, 6, 7), (0, 7, 8, 9, 1))
     mol = Molecule()
@@ -36,7 +51,10 @@ def test_unique_interior_vertex_continues_the_peripheral_sequence(symbol, expect
     assert set(locants) == set(mol.atoms)
     assert len(set(locants.values())) == len(mol.atoms)
     assert str(locants[index[0]]) == expected
-    assert all(locant.interior_distance is None for locant in locants.values())
+    # Only the interior carbon carries a distance; the heteroatom keeps its
+    # integer, and no peripheral atom is superscripted either way.
+    carried = {atom for atom, locant in locants.items() if locant.interior_distance is not None}
+    assert carried == ({index[0]} if symbol == "C" else set())
     assert [str(locants[atom]) for atom in perimeter] == ["1", "2", "2a", "3", "4", "4a", "5", "6", "6a"]
 
 
@@ -62,7 +80,13 @@ def test_single_interior_completed_names_roundtrip_exactly(smiles, ordering):
     assert result.error is None
     assert "cyclo[" not in result.name
     check = verify_with_opsin(result.name, smiles, standardize_smiles=False)
-    assert check.status == "matched", (result.name, check)
+    if any(mark in result.name for mark in "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079"):
+        # The name cites an interior carbon, which the pinned parser cannot
+        # read. Asserting the rejection keeps the record honest and makes it
+        # go stale the day the parser learns the locant.
+        assert check.status == "name_unparseable", (result.name, check)
+    else:
+        assert check.status == "matched", (result.name, check)
 
 
 def test_skeletal_replacement_keeps_all_single_interior_maps_under_permutations():
@@ -81,6 +105,9 @@ def test_skeletal_replacement_keeps_all_single_interior_maps_under_permutations(
             for locants in result.parent.proof_locant_maps
         }
         assert len(maps) == 2
-        assert all(dict(locants)[10] == "7b" for locants in maps)
+        # P-52.2.4.4.2.1: replacement prefixes do not renumber the hydrocarbon
+        # framework, so the interior carbon keeps the locant that framework
+        # gave it - the 1,3a-superscript-one,4,9-tetraazaphenalene pattern.
+        assert all(dict(locants)[10] == "2a\u00b9" for locants in maps)
         results.append(maps)
     assert results[0] == results[1] == results[2]

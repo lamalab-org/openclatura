@@ -1069,7 +1069,13 @@ def test_ortho_peri_parent_with_interior_atoms_receives_a_complete_audited_numbe
     assert result.plan.rendered_base_name == "benzo[1,2,3,4-def]phenanthrene"
     assert any(join.kind.value == "ortho_peri" for join in result.plan.ast.joins)
     assert set(dict(result.plan.numbering.input_locant_maps[0])) == set(mol.atoms)
-    assert {str(locant) for _, locant in result.plan.numbering.input_locant_maps[0]} >= {"10b", "10c"}
+    # P-25.3.3.3 numbers an interior carbon from its nearest peripheral atom
+    # with the bond distance as a superscript, and the fusion recommendations
+    # print this very conversion: pyrene's former 10b and 10c are 3a1 and 5a1.
+    assert {str(locant) for _, locant in result.plan.numbering.input_locant_maps[0]} >= {
+        "3a\u00b9",
+        "5a\u00b9",
+    }
 
 
 def test_complex_multiparent_interior_system_still_abstains_safely():

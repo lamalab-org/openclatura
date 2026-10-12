@@ -56,6 +56,7 @@ class ChemicalComponentSeniorityKey:
     heteroatom_kind_count: int
     heteroatom_counts_by_priority: tuple[int, ...]
     horizontal_row_count: int
+    upper_right_ring_quarters: int
     all_heteroatom_locants: tuple[tuple[int, int, str, int], ...]
     per_element_locants: tuple[tuple[tuple[int, int, str, int], ...], ...]
     peripheral_fusion_carbon_locants: tuple[tuple[int, int, str, int], ...]
@@ -69,6 +70,7 @@ class ChemicalComponentSeniorityKey:
             self.heteroatom_kind_count,
             self.heteroatom_counts_by_priority,
             self.horizontal_row_count,
+            self.upper_right_ring_quarters,
             self.all_heteroatom_locants,
             self.per_element_locants,
             self.peripheral_fusion_carbon_locants,
@@ -87,6 +89,7 @@ _CRITERION_LABELS = (
     "heteroatom_kind_count",
     "heteroatom_counts_by_priority",
     "horizontal_row_count",
+    "upper_right_ring_quarters",
     "all_heteroatom_locants",
     "per_element_locants",
     "peripheral_fusion_carbon_locants",
@@ -276,6 +279,7 @@ def component_spec_seniority_key(spec: FusionComponentSpec) -> ChemicalComponent
         heteroatom_kind_count=-len(counts),
         heteroatom_counts_by_priority=tuple(-counts.get(symbol, 0) for symbol in GENERAL_HETEROATOM_COUNT_PRECEDENCE),
         horizontal_row_count=-_maximum_horizontal_row_count(spec),
+        upper_right_ring_quarters=-_upper_right_ring_quarters(spec),
         all_heteroatom_locants=all_hetero_locants,
         per_element_locants=per_element_locants,
         peripheral_fusion_carbon_locants=tuple(
@@ -284,6 +288,51 @@ def component_spec_seniority_key(spec: FusionComponentSpec) -> ChemicalComponent
     )
     object.__setattr__(spec, "_seniority_key", result)
     return result
+
+
+def _upper_right_ring_quarters(spec: FusionComponentSpec) -> int:
+    """P-25.3.2.3.3(b): rings in the upper right quadrant, in quarter rings.
+
+    Criterion (a) compares rings in the main horizontal row and (b) breaks its
+    ties by how much of the system sits above and to the right of the centre,
+    counting a bisected ring as a half. Phenanthrene and phenalene both put two
+    rings in the row and are separated only here, at one and a half rings
+    against one - which is the printed basis for phenanthrene being senior.
+
+    Omitting (b) left those two equal until an unrelated later term decided
+    them, and it decided them the wrong way round. The count is read off the
+    component's own preferred drawing rather than stored per row, so it cannot
+    drift from the geometry it describes. The layout score already measures
+    this quadrant on a quarter-ring scale, where one and a half rings reads 6
+    and one ring reads 4.
+    """
+
+    if len(spec.rings) < 2:
+        return 0
+    from ..molecule import Molecule
+    from .faces import select_bounded_face_model, typed_face_model
+    from .layout import LayoutSearchBudgetExceeded, preferred_intrinsic_layouts
+
+    # Ring shape is all this criterion looks at, so the skeleton is carbonised:
+    # a component's own heteroatoms cannot be kekulised in isolation.
+    mol = Molecule()
+    index = {atom.locant: position for position, atom in enumerate(spec.atoms)}
+    for atom in spec.atoms:
+        mol.add_atom("C", idx=index[atom.locant])
+    for edge, bond in enumerate(spec.bonds):
+        left, right = bond.locants
+        mol.add_bond(index[left], index[right], idx=edge)
+    try:
+        bounded = select_bounded_face_model(mol, frozenset(mol.atoms))
+        if bounded is None:
+            return 0
+        layouts = preferred_intrinsic_layouts(typed_face_model(mol, bounded))
+    except (LayoutSearchBudgetExceeded, ValueError):
+        return 0
+    if not layouts:
+        return 0
+    # orientation_score is (distortion, -rows, -upper_right, lower_left, -above)
+    return -layouts[0].orientation_score[2]
 
 
 def explain_component_comparison(

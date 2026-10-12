@@ -14,7 +14,6 @@ from ..molecule import Molecule
 from ..polycycle_topology import normalize_edge
 from ..retained_graph_model import RetainedGraphTemplate
 from ..rules import elements
-from .citation_numbering import numbered_parent_graphs_agree
 from .config import fusion_nomenclature_config
 from .faces import BoundedFaceModel, typed_face_model
 from .layout import OpsinConstructionLayout, OpsinEntryLayout, preferred_intrinsic_layouts
@@ -179,31 +178,19 @@ def _construction_ordered_numberings(
     layouts: tuple[FusedLayout, ...],
     candidates: tuple[CompletedNumbering, ...],
 ) -> tuple[CompletedNumbering, ...]:
-    if len(candidates) < 2:
-        return candidates
-    ranked = []
-    for candidate in candidates:
-        if candidate.layout_index is None:
-            return candidates
-        layout = layouts[candidate.layout_index]
-        if type(layout) is not OpsinConstructionLayout:
-            return candidates
-        if layout.construction_numbering_priority is not None:
-            ranked.append((layout.construction_numbering_priority, candidate))
-    if not ranked:
-        return candidates
-    if numbered_parent_graphs_agree(mol, (dict(candidate.atom_to_locant) for candidate in candidates)):
-        return candidates
-    best = min(priority for priority, _ in ranked)
-    first = [candidate for priority, candidate in ranked if priority == best]
-    if not numbered_parent_graphs_agree(mol, (dict(candidate.atom_to_locant) for candidate in first)):
-        return candidates
-    reference = dict(first[0].atom_to_locant)
-    return tuple(
-        candidate
-        for candidate in candidates
-        if numbered_parent_graphs_agree(mol, (reference, dict(candidate.atom_to_locant)))
-    )
+    """Keep every tied numbering: the citation order does not rank them.
+
+    Provider identity is not a nomenclatural criterion, and nothing in FR-5 or
+    P-25.3.3 makes "the citation builder produced this one first" a preference.
+    Construction order looked load-bearing only because the same branch carried
+    the superseded interior-numbering convention with it. Once every interior
+    carbon is numbered under P-25.3.3.3 the apparent ties dissolve instead of
+    needing a ranking: pyrene's four peripheral mappings are four different
+    atom-to-locant maps of one and the same numbered parent graph, which is no
+    ambiguity at all. Dropping the ranking changes no outcome in the suite.
+    """
+
+    return candidates
 
 
 def _graph_numbering_candidates(mol: Molecule, faces: BoundedFaceModel) -> tuple[CompletedNumbering, ...]:
@@ -719,18 +706,25 @@ def _number_completed_system(
     interior = set(faces.atom_ids) - set(perimeter)
     if not interior:
         return result
-    if opsin_atom_order is not None:
-        if len(set(opsin_atom_order)) != len(opsin_atom_order) or set(opsin_atom_order) != set(faces.atom_ids):
-            return None
-        return _number_perimeter(
-            mol, perimeter + tuple(atom for atom in opsin_atom_order if atom in interior), fusion_atoms | interior
-        )
-    if len(interior) == 1:
-        # A unique interior vertex has an unambiguous place after the
-        # perimeter in completed fusion numbering. Continue the final fusion
-        # letter (or integer for a heteroatom), not a distance superscript.
-        return _number_perimeter(mol, perimeter + tuple(interior), fusion_atoms | interior)
-
+    # P-25.3.3.3 numbers an interior carbon from the nearest peripheral atom,
+    # with the bond distance as a superscript, and the fusion recommendations
+    # print the conversion for pyrene itself: 10b and 10c become 3a1 and 5a1.
+    # Two shortcuts used to leave the older continuation labels in place.
+    #
+    # The first took the interior order from the citation builder whenever it
+    # had one, which made the provider decide the convention rather than which
+    # of two otherwise identical candidates to keep. Construction order may
+    # reproduce a candidate; it may not pick the nomenclature.
+    #
+    # The second treated a single interior vertex as unambiguous and continued
+    # the final fusion letter. Uniqueness is not an exception: phenalene has one
+    # interior carbon and is printed as 3a1, and P-52.2.4.4.2.1 carries exactly
+    # that locant through skeletal replacement in 1,3a1,4,9-tetraazaphenalene.
+    #
+    # Numbering every interior carbon the same way is also what collapses the
+    # apparent pyrene tie: its four peripheral mappings label one numbered
+    # graph under this rule, where fixed-order continuation labels fail to
+    # exchange with the perimeter and look like two.
     distance, anchors = _interior_distances_and_anchors(mol, faces.atom_ids, perimeter)
     if set(distance) != set(faces.atom_ids):
         return None
