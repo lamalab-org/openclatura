@@ -158,7 +158,11 @@ def _assert_roundtrip(source):
         graph = Chem.RenumberAtoms(source, order)
         mol, plan = _plan(graph)
         assert charged_donor_citation_pi_dead_end(mol, plan) is None
-        assert len(plan.ast.component_occurrences) == 4
+        # Phenazine is an admitted retained component, so this graph is now
+        # covered by two components rather than four. Name the cover rather
+        # than counting it, so a change of decomposition reads as one.
+        assert sorted(match.spec_key for match in plan.ast.component_occurrences) == ["imidazole", "phenazine"]
+        assert plan.rendered_base_name == "imidazo[4,5-b]phenazine"
         assert not plan.derivative_state.hydro_operations
         assert not plan.derivative_state.unsaturation_operations
         named = name_mol(graph, include_trace=True, verify_self=True)

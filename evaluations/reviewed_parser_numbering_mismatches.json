@@ -1,0 +1,52 @@
+{
+  "_comment": [
+    "Names this engine emits as preferred that the pinned reference parser ACCEPTS and then",
+    "reads as a different molecule, because it numbers the same ring system differently.",
+    "This is deliberately NOT the rejection waiver in reviewed_parser_gaps.json, and it must",
+    "not be merged into it: an expected rejection never licenses a mismatch, and a generic",
+    "'structure mismatch' label would hide whether the defect belongs to the engine or to the",
+    "parser. The label names what is actually in dispute - the numbering of the parent.",
+    "",
+    "A record waives nothing about correctness. The raw outcome stays 'mismatched': the parser",
+    "match metric and the structural verification helper never report it as a round trip. Only",
+    "the release gate may treat it as a reviewed interoperability discrepancy.",
+    "",
+    "The evidential burden is higher than for a rejection, because the disputed numbering is",
+    "the very thing under review. An engine reconstruction that consumes the same atom-to-locant",
+    "map that produced the name only shows internal consistency. Every record therefore carries",
+    "an INDEPENDENTLY derived numbered parent graph, and names the source that derived it.",
+    "",
+    "The record applies only when all of these hold at once: the expected name is unchanged, the",
+    "intended structure is unchanged, the tested parser environment matches the pinned one, and",
+    "the parser returns exactly the recorded wrong interpretation. Any other parser response -",
+    "a correct reading, a different wrong reading, a rejection, a timeout, a crash - is NOT",
+    "covered and fails loudly. A changed response makes a record stale, never successful."
+  ],
+  "parser": {
+    "py2opsin": "1.2.0",
+    "jar": "opsin-cli-2.9.0-jar-with-dependencies.jar",
+    "jar_sha256_prefix": "c2e29326c281f87b"
+  },
+  "required_fields": [
+    "smiles",
+    "expected_name",
+    "disputed_numbering",
+    "drawing_record",
+    "derivative_reconstruction",
+    "parser_returned_smiles",
+    "parser_returned_standardized",
+    "independent_source",
+    "preference_evidence",
+    "rules",
+    "review_trigger",
+    "retire_when"
+  ],
+  "field_notes": {
+    "disputed_numbering": "The complete numbered parent graph, derived independently of the engine: every locant with its element, and the ring bonds written as locant pairs. Copying the engine's own map here defeats the record.",
+    "drawing_record": "Why that numbering is the preferred one under the rules, in order: permitted ring shapes, the shared edges forming the maximum horizontal row, the orientation/quadrant comparison, the selected uppermost-rightmost starting ring, the most counterclockwise nonfusion starting atom, the clockwise perimeter, and the surviving alternatives with the criterion that separated them.",
+    "derivative_reconstruction": "Independent reconstruction of the COMPLETE derivative, not the parent alone: substitution, hydrogen state, charge and stereochemistry.",
+    "independent_source": "What derived the numbering and reconstruction, and why it is independent of the engine under review. It need not be another naming engine; a hand-checked drawing with a separate reconstruction script qualifies. Reusing the engine's selected map does not.",
+    "preference_evidence": "rule_derived - a published whole-name PIN would not be in dispute."
+  },
+  "mismatches": []
+}

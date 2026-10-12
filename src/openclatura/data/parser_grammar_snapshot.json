@@ -216,6 +216,7 @@
         "1,10-phenanthrolin"
       ],
       "fusion_stems": [
+        "[1,10]phenanthrolino",
         "1,10-phenanthrolino"
       ],
       "derivative_status": "production_safe"
@@ -270,6 +271,7 @@
         "1,4-phenanthrolin"
       ],
       "fusion_stems": [
+        "[1,4]phenanthrolino",
         "1,4-phenanthrolino"
       ],
       "derivative_status": "production_safe"
@@ -282,6 +284,7 @@
         "1,5-naphthyridin"
       ],
       "fusion_stems": [
+        "[1,5]naphthyridino",
         "1,5-naphthyridino"
       ],
       "derivative_status": "production_safe"
@@ -294,6 +297,7 @@
         "1,5-phenanthrolin"
       ],
       "fusion_stems": [
+        "[1,5]phenanthrolino",
         "1,5-phenanthrolino"
       ],
       "derivative_status": "production_safe"
@@ -306,6 +310,7 @@
         "1,6-naphthyridin"
       ],
       "fusion_stems": [
+        "[1,6]naphthyridino",
         "1,6-naphthyridino"
       ],
       "derivative_status": "production_safe"
@@ -318,6 +323,7 @@
         "1,6-phenanthrolin"
       ],
       "fusion_stems": [
+        "[1,6]phenanthrolino",
         "1,6-phenanthrolino"
       ],
       "derivative_status": "production_safe"
@@ -330,6 +336,7 @@
         "1,7-naphthyridin"
       ],
       "fusion_stems": [
+        "[1,7]naphthyridino",
         "1,7-naphthyridino"
       ],
       "derivative_status": "production_safe"
@@ -342,6 +349,7 @@
         "1,7-phenanthrolin"
       ],
       "fusion_stems": [
+        "[1,7]phenanthrolino",
         "1,7-phenanthrolino"
       ],
       "derivative_status": "production_safe"
@@ -354,6 +362,7 @@
         "1,8-naphthyridin"
       ],
       "fusion_stems": [
+        "[1,8]naphthyridino",
         "1,8-naphthyridino"
       ],
       "derivative_status": "production_safe"
@@ -366,6 +375,7 @@
         "1,8-phenanthrolin"
       ],
       "fusion_stems": [
+        "[1,8]phenanthrolino",
         "1,8-phenanthrolino"
       ],
       "derivative_status": "production_safe"
@@ -378,6 +388,7 @@
         "1,9-phenanthrolin"
       ],
       "fusion_stems": [
+        "[1,9]phenanthrolino",
         "1,9-phenanthrolino"
       ],
       "derivative_status": "production_safe"
@@ -676,6 +687,7 @@
         "2,6-naphthyridin"
       ],
       "fusion_stems": [
+        "[2,6]naphthyridino",
         "2,6-naphthyridino"
       ],
       "derivative_status": "production_safe"
@@ -688,6 +700,7 @@
         "2,7-naphthyridin"
       ],
       "fusion_stems": [
+        "[2,7]naphthyridino",
         "2,7-naphthyridino"
       ],
       "derivative_status": "production_safe"
@@ -700,6 +713,7 @@
         "2,7-phenanthrolin"
       ],
       "fusion_stems": [
+        "[2,7]phenanthrolino",
         "2,7-phenanthrolino"
       ],
       "derivative_status": "production_safe"
@@ -712,6 +726,7 @@
         "2,8-phenanthrolin"
       ],
       "fusion_stems": [
+        "[2,8]phenanthrolino",
         "2,8-phenanthrolino"
       ],
       "derivative_status": "production_safe"
@@ -831,6 +846,7 @@
         "3,5-phenanthrolin"
       ],
       "fusion_stems": [
+        "[3,5]phenanthrolino",
         "3,5-phenanthrolino"
       ],
       "derivative_status": "production_safe"
@@ -843,6 +859,7 @@
         "3,6-phenanthrolin"
       ],
       "fusion_stems": [
+        "[3,6]phenanthrolino",
         "3,6-phenanthrolino"
       ],
       "derivative_status": "production_safe"
@@ -885,6 +902,7 @@
         "4,5-phenanthrolin"
       ],
       "fusion_stems": [
+        "[4,5]phenanthrolino",
         "4,5-phenanthrolino"
       ],
       "derivative_status": "production_safe"

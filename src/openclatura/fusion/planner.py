@@ -85,21 +85,32 @@ def plan_fusion_parent(
     parent_atom_ids: Iterable[int],
     *,
     mode: FusionMode | str,
+    free_valence_atom: int | None = None,
 ) -> FusionPlanningResult:
-    """Return a proven fusion parent or a typed reason for safe fallback."""
+    """Return a proven fusion parent or a typed reason for safe fallback.
+
+    ``free_valence_atom`` names the ring atom a compound substituent is
+    attached through. That atom carries no hydrogen in the molecule, because
+    the attachment took it, so nothing in the graph marks it as the parent's
+    indicated-hydrogen site; only the caller citing the parent as a prefix
+    knows. It changes the plan, so it is part of the cache key.
+    """
 
     policy = FusionMode(mode)
     atoms = frozenset(parent_atom_ids)
-    cache_key = ("systematic_fusion", PLANNER_TIER, policy.value, tuple(sorted(atoms)))
+    valence = free_valence_atom if free_valence_atom in atoms else None
+    cache_key = ("systematic_fusion", PLANNER_TIER, policy.value, tuple(sorted(atoms)), valence)
     cached = mol._fusion_plan_cache.get(cache_key)
     if cached is not None:
         return cached
-    result = _plan_uncached(mol, atoms, policy)
+    result = _plan_uncached(mol, atoms, policy, free_valence_atom=valence)
     mol._fusion_plan_cache[cache_key] = result
     return result
 
 
-def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> FusionPlanningResult:
+def _plan_uncached(
+    mol: Molecule, atoms: frozenset[int], mode: FusionMode, *, free_valence_atom: int | None = None
+) -> FusionPlanningResult:
     if not fusion_mode_allows_planning(mode):
         return FusionNotApplicable(f"fusion mode {mode.value!r} does not enable systematic planning")
     if len(atoms) < 6:
@@ -174,7 +185,16 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
                 )
                 break
             result = _plan_numbered_candidate(
-                mol, atoms, mode, ast, registry, bounded, face_model, layouts, numbering_cache=numbering_cache
+                mol,
+                atoms,
+                mode,
+                ast,
+                registry,
+                bounded,
+                face_model,
+                layouts,
+                numbering_cache=numbering_cache,
+                free_valence_atom=free_valence_atom,
             )
             if isinstance(result, FusionConfirmed):
                 return result
@@ -198,6 +218,27 @@ def _plan_uncached(mol: Molecule, atoms: frozenset[int], mode: FusionMode) -> Fu
     return FusionUnsupported("no supported audited fusion-component decomposition")
 
 
+def _is_free_valence_hydrogen_site(mol: Molecule, atoms: frozenset[int], atom: int) -> bool:
+    """Whether the parent hydride would carry its indicated hydrogen here.
+
+    The site is a neutral ring heteroatom whose ring bonds are all single and
+    which spends its remaining valence on the attachment, so the parent hydride
+    it came from held a hydrogen there.
+    """
+
+    if atom not in atoms:
+        return False
+    value = mol.atoms[atom]
+    if value.symbol == "C" or value.charge or value.total_h_count:
+        return False
+    neighbors = mol.get_neighbors(atom)
+    if not any(other not in atoms for other in neighbors):
+        return False
+    return all(
+        (bond := mol.get_bond(atom, other)) is not None and bond.order == 1 for other in neighbors if other in atoms
+    )
+
+
 def _plan_numbered_candidate(
     mol: Molecule,
     atoms: frozenset[int],
@@ -209,6 +250,7 @@ def _plan_numbered_candidate(
     layouts: tuple[FusedLayout, ...] | Callable[[], tuple[FusedLayout, ...] | FusionUnsupported],
     *,
     numbering_cache: dict[bool, CompletedNumberingSelection] | None = None,
+    free_valence_atom: int | None = None,
 ) -> FusionPlanningResult:
     """Keep chemistry local to each numbering, sharing topology discovery."""
     specs = {match.occurrence_id: registry.spec_for_match(match) for match in ast.component_occurrences}
@@ -285,7 +327,15 @@ def _plan_numbered_candidate(
             rejected_numberings=numbering_selection.rejected,
         )
         result = _complete_fusion_plan(
-            mol, atoms, mode, ast, registry, proof, graph=graph, initial_bond_model=initial_model
+            mol,
+            atoms,
+            mode,
+            ast,
+            registry,
+            proof,
+            graph=graph,
+            initial_bond_model=initial_model,
+            free_valence_atom=free_valence_atom,
         )
         if (
             isinstance(result, FusionConfirmed)
@@ -328,6 +378,7 @@ def _complete_fusion_plan(
     *,
     graph: FusionGraph | None = None,
     initial_bond_model: ParentBondModel | None = None,
+    free_valence_atom: int | None = None,
 ) -> FusionPlanningResult:
     """Prove chemistry and rendering against one specific numbered parent."""
 
@@ -386,6 +437,15 @@ def _complete_fusion_plan(
     )
     input_atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
     indicated_h_atoms = {input_atom_by_locant[locant] for locant in indicated_h}
+    # P-58.2.3.1.1. A compound substituent's free valence is its governing
+    # suffix, and the parent's indicated hydrogen is spent on that valence
+    # before anything else can claim it. The attachment took the hydrogen that
+    # would mark the site in the graph, so only the citing caller knows, and
+    # without it the citation lands on ring carbons instead and the saturation
+    # those carbons stand for goes unsaid.
+    if free_valence_atom is not None and _is_free_valence_hydrogen_site(mol, atoms, free_valence_atom):
+        indicated_h = (input_locants[free_valence_atom],)
+        indicated_h_atoms = {free_valence_atom}
     try:
         derivative_state = parent_derivative_state(
             mol,
@@ -488,6 +548,7 @@ def _complete_fusion_plan(
         registry=registry,
         lambda_descriptors=lambda_descriptors,
         indicated_hydrogens=indicated_h,
+        free_valence_atom=free_valence_atom,
         charge_operations=charge_operations,
         derivative_state=derivative_state,
         rendered_core_name=rendered_core_name,

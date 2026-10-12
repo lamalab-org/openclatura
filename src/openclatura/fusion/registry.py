@@ -8,6 +8,7 @@ SMILES/SMARTS pattern, or drawing coordinates.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
@@ -452,6 +453,30 @@ def _component_construction_orders() -> Mapping[str, FusionComponentConstruction
     return MappingProxyType(result)
 
 
+# FR-4.8 encloses the locants cited as part of a component's name in square
+# brackets, and P-16.5.2.2 requires the same of locants describing structural
+# features of components, component heteroatoms among them. 1,8-naphthyridine
+# is the standalone parent hydride; [1,8]naphthyridine is the component cited
+# in benzo[b][1,8]naphthyridine, parent and attached role alike.
+#
+# This normalizes component-local structural locants and nothing else. The
+# leading indicated-hydrogen run is skipped because it is not one of them, and
+# it stays separate information: the enlarged system assigns and places its own
+# indicated hydrogen, so no 1H- here is propagated into the completed name.
+# Hydrogenation locants, substituent locants and assembled fusion descriptors
+# never reach this text and must not be drawn into the same transformation.
+_COMPONENT_LOCANT_PREFIX = re.compile(r"^((?:\d+[a-z]?H-)*)(\d+[a-z]?(?:,\d+[a-z]?)*)-(?=[a-z])")
+
+
+def _enclose_component_locants(name: str) -> str:
+    """Return the fusion-citation spelling of a component's own name."""
+
+    match = _COMPONENT_LOCANT_PREFIX.match(name)
+    if match is None:
+        return name
+    return f"{match.group(1)}[{match.group(2)}]{name[match.end() :]}"
+
+
 def _component_spec(
     *,
     key: str,
@@ -468,7 +493,7 @@ def _component_spec(
 ) -> FusionComponentSpec:
     return FusionComponentSpec(
         key=key,
-        parent_name=parent_name,
+        parent_name=_enclose_component_locants(parent_name),
         attached_prefix=attached_prefix,
         template=template,
         usable_as_parent=usable_as_parent,

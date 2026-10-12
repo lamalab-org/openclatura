@@ -165,6 +165,7 @@ def audit_fusion_plan(
     indicated_hydrogens: tuple[SystemLocant, ...] = (),
     charge_operations: tuple[FusionChargeOperation, ...] = (),
     derivative_state: ParentDerivativeState | None = None,
+    free_valence_atom: int | None = None,
     rendered_core_name: str | None = None,
 ) -> FusionAuditResult:
     """Independently reconstruct and audit a completed fusion candidate.
@@ -229,6 +230,7 @@ def audit_fusion_plan(
             numbering=numbering,
             indicated_hydrogens=indicated_hydrogens,
             derivative_state=derivative_state,
+            free_valence_atom=free_valence_atom,
         )
         if composition_errors:
             return FusionAuditResult(
@@ -542,6 +544,7 @@ def _audited_pin_composition_errors(
     numbering: FusionNumberingProof,
     indicated_hydrogens: tuple[SystemLocant, ...],
     derivative_state: ParentDerivativeState | None,
+    free_valence_atom: int | None = None,
 ) -> tuple[str, ...]:
     """Return composition classes not yet proved for preferred-name output.
 
@@ -552,7 +555,7 @@ def _audited_pin_composition_errors(
     """
 
     consistent = derivative_state is not None and _has_consistent_derivative_operations(
-        mol, ast, specs, numbering, indicated_hydrogens, derivative_state
+        mol, ast, specs, numbering, indicated_hydrogens, derivative_state, free_valence_atom
     )
     atom_by_locant = {locant: atom for atom, locant in numbering.input_locant_maps[0]}
     intrinsic_carbon_composition = consistent and any(
@@ -584,6 +587,7 @@ def _has_consistent_derivative_operations(
     numbering: FusionNumberingProof,
     indicated_hydrogens: tuple[SystemLocant, ...],
     state: ParentDerivativeState,
+    free_valence_atom: int | None = None,
 ) -> bool:
     """Check chemical operation scopes; independent replay proves their contents.
 
@@ -636,9 +640,11 @@ def _has_consistent_derivative_operations(
         for atom in h_atoms | added
         if mol.atoms[atom].symbol == "N"
         and not mol.atoms[atom].charge
-        and mol.atoms[atom].total_h_count == 1
-        and len(neighbors := mol.get_neighbors(atom)) == 2
-        and all(neighbor in atoms and mol.get_bond(atom, neighbor).order == 1 for neighbor in neighbors)
+        # A free valence spends the hydrogen that would witness the citation, so
+        # the attachment stands in its place: the parent hydride still held one.
+        and mol.atoms[atom].total_h_count == (0 if atom == free_valence_atom else 1)
+        and len(neighbors := mol.get_neighbors(atom)) == (3 if atom == free_valence_atom else 2)
+        and all(neighbor not in atoms or mol.get_bond(atom, neighbor).order == 1 for neighbor in neighbors)
         and all(order == 1 for edge, order in state.bond_delta.assignment.orders if atom in edge)
     }
     added_n_witnesses = {

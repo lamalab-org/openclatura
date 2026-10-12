@@ -265,6 +265,13 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         # the structure can bear.
         atom_by_locant = {str(get_loc(idx)): idx for idx in numbered_path}
         spelled = _name_indicated_hydrogen_locants(parts.retained_name)
+        # P-58.2.1.2 gives indicated hydrogen the lowest nonfusion position it
+        # can take, and that preference comes before the locant's own value:
+        # the preferred name is 3a,5-dihydro-4H-indene, not
+        # 4,5-dihydro-3aH-indene, although 3a is the lower locant. A fusion
+        # site is not inadmissible - it simply follows - so where only fusion
+        # sites can hold the citation one of them still does.
+        relocation_fusion_locants = set(metadata.fusion_locants) if metadata is not None else set()
         stranded = [
             locant
             for locant in spelled
@@ -273,7 +280,10 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         if stranded:
             free = [
                 locant
-                for locant in sorted(atom_by_locant, key=parse_locant)
+                for locant in sorted(
+                    atom_by_locant,
+                    key=lambda item: (item in relocation_fusion_locants, parse_locant(item)),
+                )
                 if locant not in spelled
                 and _is_saturated_ring_site(mol, atom_by_locant[locant], numbered_path)
                 and not _is_oxo_ring_site(mol, atom_by_locant[locant], numbered_path)

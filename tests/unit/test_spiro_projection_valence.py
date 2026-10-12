@@ -159,6 +159,16 @@ def test_report1219_exact_opsin_and_atom_permutations():
     for order in _orders(graph):
         result = name_mol(Chem.RenumberAtoms(graph, order), verify_opsin=False)
         assert result, result
+        # KNOWN DEFECT, left standing deliberately. This benzofuran is cited as
+        # a spiro component, not named standalone, so P-24.5.3 encloses its
+        # heteroatom locant the way FR-4.8/P-16.5.2.2 do in a fusion citation:
+        # the printed example is spiro[[1,2]benzodithiole-3,2'-[1,3]benzodithiole].
+        # The component-locant normalisation that fixed the fusion citations
+        # runs on fusion component specs and never reaches the spiro renderer,
+        # so this still reads 2-benzofuran. The assertion records what the
+        # engine does today; it is not evidence that the unenclosed spelling is
+        # the preferred one, and the hydro-prefix placement in this name wants
+        # its own review before anything here is pinned as correct.
         assert "1,3-dihydro-2-benzofuran" in result.name
         assert "tetrahydro" not in result.name
         check = verify_with_opsin(result.name, REPORT_SMILES, standardize_smiles=False)

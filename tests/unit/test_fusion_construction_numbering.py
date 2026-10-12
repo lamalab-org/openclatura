@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from dataclasses import fields, replace
 
 import pytest
+from interior_crosswalk_support import reviewed_crosswalk
 from rdkit import Chem
 
 from openclatura import name_mol, opsin_available
@@ -29,6 +30,9 @@ from openclatura.fusion.registry import fusion_component_registry
 from openclatura.graph_io import read_rdkit_mol
 from openclatura.opsin_verify import verify_with_opsin
 
+_SUPERSCRIPTS = "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079"
+_SUPERSCRIPT_TO_ASCII = str.maketrans(_SUPERSCRIPTS, "0123456789")
+
 CASES = (
     (
         31149,
@@ -38,17 +42,17 @@ CASES = (
     (
         32572,
         "C[C@@]12C(O)C=CC1C1=CC3CCC=C4C=CC5=CCC2C1C5C43",
-        "pentaleno[1,2,3-jk]benzo[1,2,3,4-def]phenanthrene",
+        "pentaleno[1,2,3-cd]pyrene",
     ),
     (
         76220,
         "CN=c1c2c(N3CCO[C@@H](COC)C3)c(F)cc3c(=O)c(C(=O)O)c4scc1n4c32",
-        "pentaleno[1,6a,6,5-cde]naphthalene",
+        "thiazolo[4,3,2-cd]benzo[1,2,3-hi]indolizine",
     ),
     (
         79496,
         "O=c1nc2c3ccccc3nc3sc4cccc1c4n32",
-        "benzo[a]cyclopenta[def]phenanthrene",
+        "cyclopenta[def]chrysene",
     ),
     (
         4582,
@@ -63,12 +67,12 @@ CASES = (
     (
         44983,
         "COC1=CC2SC3=C(C(=O)C4CCC=CC34)C2C=C1",
-        "indeno[1,2-b]1-benzothiophene",
+        "indeno[1,2-b][1]benzothiophene",
     ),
     (
         48496,
         "OC1=CC2SC3=C(C2C=C1)C(O)(c1ccc(OCCN2CCCCC2)cc1)c1ccccc13",
-        "indeno[1,2-b]1-benzothiophene",
+        "indeno[1,2-b][1]benzothiophene",
     ),
     (
         11029,
@@ -87,25 +91,32 @@ CASES = (
         "CN1c2cc(C#N)ccc2N2CC[C@@H](NC(=O)C(F)(F)F)C[C@@H]2c2c(C#N)cccc21",
         "pyrido[1,2-d]dibenzo[b,f][1,4]diazepine",
     ),
-    (28506, "O=C1C=C[C@@H]2[C@H]3c4cccc5cccc(c45)[C@H]3[C@H]1N2c1ccccc1", "naphtho[1,8a,8-ab]azulene"),
+    (28506, "O=C1C=C[C@@H]2[C@H]3c4cccc5cccc(c45)[C@H]3[C@H]1N2c1ccccc1", "cyclohepta[a]acenaphthylene"),
     (
         31042,
         "COc1ccc(CN2c3ccccc3[C@@]34CCN5C=C[C@@H]6OCC[C@]6(CC[C@H]23)[C@H]54)cc1",
-        "indolo[2,3-h]pyrrolo[3,2,1-ij]furo[2,3-d]quinoline",
+        "furo[2',3':7,8]indolizino[8,8a,1-cd]carbazole",
     ),
-    (45607, "CC1=C[C@H]2C[C@H](C)[C@H]3CC[C@H](C)C4=C3[C@@H](OC4=O)[C@@]2(C)C1", "azuleno[4,5,6-cd]2-benzofuran"),
+    (45607, "CC1=C[C@H]2C[C@H](C)[C@H]3CC[C@H](C)C4=C3[C@@H](OC4=O)[C@@]2(C)C1", "azuleno[4,5,6-cd][2]benzofuran"),
     (52973, "O=C1C=CC(=O)C2=C3C1=CC=CC3N1C=CCN21", "pyrazolo[1,2-a]cyclohepta[cd]indazole"),
-    (53931, "N#CC(C#N)=C1c2cc(F)ccc2-c2cc3c(cc21)C(=C(C#N)C#N)C1C=C(F)C=CC31", "indeno[1,2-f]benzo[b]indene"),
-    (59172, "CCO[C@@H]1C=C2[C@H](O)CN3CCCc4cc(OC)c(OC)cc4[C@]23C[C@H]1OC", "indolo[1,7a-a]benzo[c]azepine"),
+    (53931, "N#CC(C#N)=C1c2cc(F)ccc2-c2cc3c(cc21)C(=C(C#N)C#N)C1C=C(F)C=CC31", "indeno[2,1-b]fluorene"),
+    (59172, "CCO[C@@H]1C=C2[C@H](O)CN3CCCc4cc(OC)c(OC)cc4[C@]23C[C@H]1OC", "benzo[1',2':3,4]azepino[2,1-i]indole"),
     (
         59728,
         "CC(C)C1=C2[C@H]3CC=C4[C@@H]5[C@@H](O[C@@H]6OC[C@@](O)(C(=O)[C@@]65O)[C@@H]4O)[C@]3(C)CC[C@]2(C)CC1",
-        "cyclopenta[1'',2'':1',2']benzo[3',4':1,2]cyclohepta[3,4,5-cd]2-benzofuran",
+        # P-25.4.3.4.2(b) picks the fused system to be bridged by ring count
+        # and then by skeletal atoms. Both partitions of this 22-atom cyclic
+        # skeleton keep five rings, but a one-carbon methano bridge leaves 21
+        # atoms in the framework where an epoxymethano bridge leaves only 20,
+        # so the larger framework wins before any component seniority is
+        # consulted. [2]Benzofuran would beat pyran on component ring count,
+        # but its ring is not present in the framework that wins.
+        "cyclopenta[1''',2''':1'',2'']benzo[3'',4'':1',2']cyclohepta[3',4':2,3]furo[5,4-b]pyran",
     ),
     (
         64746,
         "COc1ccc2c(c1)C13CCNC1C1c4[nH]c5ccc(OC)cc5c4CCN1C3N2",
-        "benzo[1',2':2,3]pyrrolo[4,5-d]indolo[2',3':2,3]pyrrolo[3',2':3,4]pyrrolo[5,1-f]pyridine",
+        "indolo[3',2':2,3]pyrrolo[2',3':1,2]indolizino[8,7-b]indole",
     ),
     (67508, "CNCCC(=O)N1c2ccccc2N2CCc3cccc(c32)C1C", "[1,5]benzodiazepino[3,2,1-hi]indole"),
     (75694, "O=C(O)N1CCc2c(n3c4c(cccc24)CCC3)CC1", "azepino[4',5':2,3]pyrrolo[4,5,1-ij]quinoline"),
@@ -121,12 +132,12 @@ CASES = (
         "pyrrolo[1,2-a][1,3]dioxolo[4',5':1,2]benzo[4,5-d]cyclopenta[b]azepine",
     ),
     (88969, "COc1ccc2c3c1OC1C[C@@H](OC(=O)c4ccc(C(C)(C)C)cc4)C=C[C@@]31CCN2C", "benzofuro[3a,3,2-de]quinoline"),
-    (89309, "CN1CCN(C2=Nc3cc(Cl)cc4ccn(c34)-c3ccccc32)CC1", "pyrrolo[1,2,3-ef]benzo[c]1,5-benzodiazepine"),
+    (89309, "CN1CCN(C2=Nc3cc(Cl)cc4ccn(c34)-c3ccccc32)CC1", "pyrrolo[1,2,3-ef]benzo[c][1,5]benzodiazepine"),
     (90198, "COc1ccc2c3c1OC1C[C@@H](OC(=O)c4ccc(Cl)cc4Cl)C=C[C@@]31CCN2C", "benzofuro[3a,3,2-de]quinoline"),
     (
         98468,
         "Fc1ccc(-c2ccc3[nH]c4c(c3c2)-c2cccc3cccc-4c23)cc1",
-        "benzo[b]naphtho[1',8a',8':1,2,3]cyclopenta[4,5-d]pyrrole",
+        "acenaphthyleno[1,2-b]indole",
     ),
     (
         30704,
@@ -190,6 +201,14 @@ def _opsin_labelled_graph(base, tmp_path):
 @pytest.mark.parametrize("index,smiles,base", CASES, ids=[str(case[0]) for case in CASES])
 def test_exact_structures_and_complete_locant_graphs_under_permutations(index, smiles, base, monkeypatch, tmp_path):
     expected_elements, expected_edges = _opsin_labelled_graph(base, tmp_path)
+    # The parser continues fusion letters into the interior where P-25.3.3.3
+    # anchors to the nearest peripheral atom, so the two numbered graphs differ
+    # by the reviewed crosswalk for this system and by nothing else. It is a
+    # frozen fixture, not a relabelling found here, which is what keeps a
+    # peripheral numbering error from being absorbed into the comparison.
+    crosswalk = reviewed_crosswalk(base) or {}
+    expected_elements = {crosswalk.get(label, label): symbol for label, symbol in expected_elements.items()}
+    expected_edges = {frozenset(crosswalk.get(label, label) for label in edge) for edge in expected_edges}
     graph = Chem.MolFromSmiles(smiles)
     order = list(range(graph.GetNumAtoms()))
     shuffled = order.copy()
@@ -200,10 +219,20 @@ def test_exact_structures_and_complete_locant_graphs_under_permutations(index, s
         plans.clear()
         result = name_mol(Chem.RenumberAtoms(graph, indices), fusion_mode=FusionMode.AUDITED_PIN)
         assert result.error is None
-        assert result.name.isascii()
+        # The only non-ASCII a name may carry is the P-25.3.3.3 superscript on
+        # an interior-carbon locant, which is typographic rather than a
+        # separate character set. Everything else stays ASCII.
+        assert result.name.translate(_SUPERSCRIPT_TO_ASCII).isascii(), result.name
         check = verify_with_opsin(result.name, smiles, standardize_smiles=False)
-        assert check.status == "matched", (index, check.to_dict())
-        assert check.canonical_original == check.canonical_roundtrip
+        # A name that cites an interior-carbon locant is one the pinned parser
+        # cannot read at all. That divergence is asserted rather than skipped,
+        # so it goes stale the day the parser learns the superscript - and a
+        # name it reads as some OTHER structure is still a plain failure.
+        if any(mark in result.name for mark in _SUPERSCRIPTS):
+            assert check.status == "name_unparseable", (index, check.to_dict())
+        else:
+            assert check.status == "matched", (index, check.to_dict())
+            assert check.canonical_original == check.canonical_roundtrip
         assert plans
         names.append(result.name)
         maps.append(set())
@@ -211,8 +240,16 @@ def test_exact_structures_and_complete_locant_graphs_under_permutations(index, s
         for plan in plans:
             proof = plan.numbering
             witness = proof.selected_layout
-            assert isinstance(witness, OpsinConstructionLayout)
-            assert OPSIN_CONSTRUCTION_NUMBERING in witness.audit_evidence
+            # The construction order reproduces how the reference parser merges
+            # rings; it breaks ties the orientation rules leave open. A
+            # configured entry port settles the orientation outright - it
+            # returns one layout and one numbering variant - so a layout
+            # carrying that witness needs no construction order, and the locant
+            # graph below is still checked against OPSIN either way.
+            entry_port_witness = "configured opposite-port direction witness" in witness.audit_evidence
+            assert isinstance(witness, OpsinConstructionLayout) or entry_port_witness
+            if not entry_port_witness:
+                assert OPSIN_CONSTRUCTION_NUMBERING in witness.audit_evidence
             if index in {4582, 58492}:
                 assert OPSIN_RING_MAP_NUMBERING in witness.audit_evidence
             if index in {44983, 48496}:
@@ -220,21 +257,30 @@ def test_exact_structures_and_complete_locant_graphs_under_permutations(index, s
             locants = dict(proof.abstract_atom_to_locant)
             assert set(locants) == {atom.id for atom in plan.abstract_parent_graph.atoms}
             assert len(set(locants.values())) == len(locants)
-            assert all(locant.interior_distance is None for locant in locants.values())
+            # An interior carbon carries its bond distance; everything else
+            # must not. P-25.3.3.3 applies to interior carbons only, and an
+            # interior heteroatom keeps its place in the integer sequence.
+            superscripted = {
+                str(locants[atom.id])
+                for atom in plan.abstract_parent_graph.atoms
+                if locants[atom.id].interior_distance is not None
+            }
+            assert superscripted == {label for label in crosswalk.values()}
             assert {
                 str(locants[atom.id]): atom.symbol for atom in plan.abstract_parent_graph.atoms
             } == expected_elements
             assert {
                 frozenset(str(locants[atom]) for atom in bond.atoms) for bond in plan.abstract_parent_graph.bonds
             } == expected_edges
-            assert set(witness.construction_atom_order) == set(locants)
+            if not entry_port_witness:
+                assert set(witness.construction_atom_order) == set(locants)
             maps[-1].add(tuple(sorted((indices[atom], str(locant)) for atom, locant in locants.items())))
             # Symmetric component embeddings may reorder peripheral construction
             # atoms. Only the surviving interior order participates in numbering.
             constructions[-1].add(
                 tuple(
                     indices[atom]
-                    for atom in witness.construction_atom_order
+                    for atom in (() if entry_port_witness else witness.construction_atom_order)
                     if atom not in proof.selected_face_model.outer_boundary
                 )
             )
@@ -270,11 +316,15 @@ def test_compatibility_is_explicit_and_preserves_graph_only_numbering(carbon_con
         set(bounded.fusion_atoms),
         opsin_atom_order=proof.selected_layout.construction_atom_order,
     )
+    # The construction order may reproduce a candidate; it must not select the
+    # numbering convention. Supplying it changes nothing: interior carbons are
+    # numbered under P-25.3.3.3 either way, and the perimeter is untouched.
     assert compatible == expected
+    assert original == compatible
     assert set(original) == set(compatible) == set(bounded.atom_ids)
     assert all(original[atom] == compatible[atom] for atom in perimeter)
     assert all(original[atom].interior_distance == 1 for atom in bounded.interior_atoms)
-    assert all(compatible[atom].interior_distance is None for atom in bounded.interior_atoms)
+    assert all(compatible[atom].interior_distance == 1 for atom in bounded.interior_atoms)
 
 
 def test_ring_map_compatibility_abstains_outside_the_proved_tree_family(carbon_context):
@@ -376,16 +426,25 @@ def test_numbering_cache_includes_construction_provenance(carbon_context):
         )
         for index, candidate in enumerate((ordinary, layout, reversed_order, layout))
     ]
+    # Provenance may key the cache for implementation reasons, but it must not
+    # decide which numbering is preferred: every one of these candidates is the
+    # same drawing presented differently, so all four agree, and a cached
+    # result equals the uncached one computed under the same policy.
     assert all(result is not None for result in results)
-    assert len(cache) == 3
-    assert results[0].atom_to_locant != results[1].atom_to_locant
-    assert results[1].atom_to_locant != results[2].atom_to_locant
+    assert results[0].atom_to_locant == results[1].atom_to_locant
+    assert results[1].atom_to_locant == results[2].atom_to_locant
     assert results[1].atom_to_locant == results[3].atom_to_locant
+    uncached = _numbering_from_layout(
+        mol, bounded, proof.selected_face_model, layout, 0, set(bounded.fusion_atoms), perimeter_cache={}
+    )
+    assert uncached is not None
+    assert uncached.atom_to_locant == results[1].atom_to_locant
 
 
 @pytest.mark.skipif(not opsin_available(), reason="OPSIN is unavailable")
-def test_distinguishable_interior_substituents_roundtrip_without_example_lookup(carbon_context):
+def test_distinguishable_interior_substituents_are_named_apart(carbon_context):
     _, bounded, _ = carbon_context
+    names = []
     for atom in bounded.interior_atoms:
         variant = Chem.RWMol(Chem.MolFromSmiles(CASES[1][1]))
         methyl = variant.AddAtom(Chem.Atom(6))
@@ -394,9 +453,19 @@ def test_distinguishable_interior_substituents_roundtrip_without_example_lookup(
         smiles = Chem.MolToSmiles(variant)
         result = name_mol(variant, fusion_mode=FusionMode.AUDITED_PIN)
         assert result.error is None
+        # The preferred spelling cites the interior carbon by its P-25.3.3.3
+        # locant, which is what distinguishes the two interior positions from
+        # each other without consulting any stored example.
+        assert any(mark in result.name for mark in _SUPERSCRIPTS), result.name
+        # The pinned parser cannot read that locant, so its rejection is the
+        # expected outcome and is asserted rather than waived. A structure it
+        # reads differently would still be a failure.
         check = verify_with_opsin(result.name, smiles, standardize_smiles=False)
-        assert check.status == "matched", check.to_dict()
-        assert check.canonical_original == check.canonical_roundtrip
+        assert check.status == "name_unparseable", check.to_dict()
+        names.append(result.name)
+    # The whole point of the interior locant: the two substituted positions get
+    # different names.
+    assert len(set(names)) == len(names) > 1
 
 
 def test_compatibility_witness_reaches_the_existing_accepted_orientation_trace():

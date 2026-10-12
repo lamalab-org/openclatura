@@ -76,7 +76,7 @@ def test_high_rank_cyclic_multiparent_fusion_is_audited_and_atom_order_invariant
     first = name_mol(mol, include_trace=True)
     second = name_mol(reversed_mol)
 
-    assert first.name == second.name == "anthra[2,3-b]phenanthro[2,3-i]anthracene"
+    assert first.name == second.name == "anthra[2,3-b]benzo[l]pentacene"
     assert first.parent_nomenclature == "systematic_fusion"
     assert first.pin_status == "confirmed"
 
@@ -85,25 +85,28 @@ def test_high_rank_cyclic_multiparent_fusion_is_audited_and_atom_order_invariant
 def test_high_rank_fusion_cover_round_trips_through_opsin():
     result = name(HIGH_RANK_MULTIPARENT_SMILES, verify_opsin=True)
 
-    assert result.name == "anthra[2,3-b]phenanthro[2,3-i]anthracene"
+    assert result.name == "anthra[2,3-b]benzo[l]pentacene"
     assert result.opsin_check is not None and result.opsin_check.status == "matched"
 
 
 def test_high_rank_cover_search_prunes_lower_preference_tiers(monkeypatch):
     import openclatura.fusion.descriptor as descriptor
 
-    calls = 0
+    searched_tiers = []
     build_candidates = descriptor._candidates_for_component_selection
 
     def counted_candidates(*args, **kwargs):
-        nonlocal calls
-        calls += 1
+        searched_tiers.append(kwargs["required_parent_seniority"])
         return build_candidates(*args, **kwargs)
 
     monkeypatch.setattr(descriptor, "_candidates_for_component_selection", counted_candidates)
 
-    assert name(HIGH_RANK_MULTIPARENT_SMILES).name == "anthra[2,3-b]phenanthro[2,3-i]anthracene"
-    assert calls == 1
+    assert name(HIGH_RANK_MULTIPARENT_SMILES).name == "anthra[2,3-b]benzo[l]pentacene"
+    # Several exact covers reach the senior parent (pentacene) - benzene +
+    # phenanthrene, two naphthalenes, anthracene + benzene - so the top tier
+    # holds more than one prepared selection. What the pruning claim is about
+    # is that no tier below it is ever searched.
+    assert searched_tiers and len(set(searched_tiers)) == 1
 
 
 @pytest.mark.parametrize(
@@ -255,7 +258,7 @@ def test_partly_hydrogenated_hw_component_uses_fusion_nomenclature():
         ),
         (
             "CC1=C2CC3C(C)(C=CC(=O)C34CO4)CC2OC1=O",
-            "3,8a-dimethyl-4a,8a,9,9a-tetrahydrospiro[benzo[f]1-benzofuran-5,2'-oxirane]-2,6(4H)-dione",
+            "3,8a-dimethyl-4a,8a,9,9a-tetrahydrospiro[benzo[f][1]benzofuran-5,2'-oxirane]-2,6(4H)-dione",
         ),
     ],
 )
@@ -1066,7 +1069,13 @@ def test_ortho_peri_parent_with_interior_atoms_receives_a_complete_audited_numbe
     assert result.plan.rendered_base_name == "benzo[1,2,3,4-def]phenanthrene"
     assert any(join.kind.value == "ortho_peri" for join in result.plan.ast.joins)
     assert set(dict(result.plan.numbering.input_locant_maps[0])) == set(mol.atoms)
-    assert {str(locant) for _, locant in result.plan.numbering.input_locant_maps[0]} >= {"10b", "10c"}
+    # P-25.3.3.3 numbers an interior carbon from its nearest peripheral atom
+    # with the bond distance as a superscript, and the fusion recommendations
+    # print this very conversion: pyrene's former 10b and 10c are 3a1 and 5a1.
+    assert {str(locant) for _, locant in result.plan.numbering.input_locant_maps[0]} >= {
+        "3a\u00b9",
+        "5a\u00b9",
+    }
 
 
 def test_complex_multiparent_interior_system_still_abstains_safely():

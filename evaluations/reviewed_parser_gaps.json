@@ -1,0 +1,257 @@
+{
+  "_comment": [
+    "Names this engine emits as preferred that the pinned reference parser cannot read.",
+    "A gap waives ONE expectation: that the reference parser accepts the string. The exact",
+    "expected name and the independent structural reconstruction stay mandatory, the parser is",
+    "still invoked, and the rejection is still counted as a rejection in the interoperability",
+    "metric - it is never reported as a round trip.",
+    "A gap applies only to the recorded parser artifact. If that parser later accepts the name",
+    "the gap is stale and must be retired; if it returns a different structure the case fails,",
+    "because an expected rejection never licenses a mismatch."
+  ],
+  "parser": {
+    "py2opsin": "1.2.0",
+    "jar": "opsin-cli-2.9.0-jar-with-dependencies.jar",
+    "jar_sha256_prefix": "c2e29326c281f87b"
+  },
+  "gaps": [
+    {
+      "smiles": "C1=NCCc2ccc3c(c21)Sc1c(ccc2c1C=NCC2)O3",
+      "expected_name": "3,4,10,11-tetrahydro[1,4]oxathiino[2,3-h:6,5-h']diisoquinoline",
+      "expected_outcome": "name_unparseable",
+      "preference_evidence": "rule_derived",
+      "rules": [
+        "FR-6",
+        "FR-6.1",
+        "P-25.3.7"
+      ],
+      "rationale": [
+        "Two nonoverlapping isoquinoline parents fused to one 1,4-oxathiine interparent",
+        "component is a multiparent system, so the parent is multiplied and the second",
+        "parent's fusion letters are primed. The baseline it replaced has pyridine as its",
+        "parent with isoquinolino as a higher-order attached component, which is less senior.",
+        "Independent reconstruction: 22 skeletal atoms, 26 edges, D0 = 10, u = 0, four hydro",
+        "increments at 3, 4, 10 and 11, reconstructing the target without copying its",
+        "double-bond positions."
+      ],
+      "parser_note": [
+        "Every ingredient parses alone - [1,4]oxathiino[2,3-h]isoquinoline,",
+        "benzo[1,2-h:6,5-h']diisoquinoline - and [1,4]dioxino[2,3-h:6,5-h']diisoquinoline",
+        "parses with one heteroatom swapped. Only this combination is refused. That locates",
+        "the behaviour reproducibly; it does not identify the cause inside the parser."
+      ],
+      "review_trigger": "any change to the parser artifact above",
+      "retire_when": "the recorded parser returns the target structure for the expected name"
+    },
+    {
+      "smiles": "O=C(Nc1ccncc1)C1=C[C@@H]2Oc3c(O)ccc4c3[C@@]23CC12CN(CC1CC1)[C@H](C4)[C@]23O",
+      "expected_name": "(5aR,5a¹S,9aS,9a¹S)-6-(cyclopropylmethyl)-2,5a¹-dihydroxy-N-(pyridin-4-yl)-5a,5a¹,7,7a,9a,9a¹-hexahydro-7a,9a¹-methano-5H-benzo[1',2',3':3,3a,4]isobenzofurano[6,7,7a,1-cde]isoindole-8-carboxamide",
+      "expected_outcome": "name_unparseable",
+      "preference_evidence": "rule_derived",
+      "rules": [
+        "P-25.3.3.3.1",
+        "P-25.3.3.3.2",
+        "FR-5.5.2",
+        "P-14.3.5"
+      ],
+      "rationale": [
+        "The name cites an interior carbon by the locant of its nearest peripheral atom",
+        "with the bond distance as a superscript, which is what P-25.3.3.3 prescribes and",
+        "FR-5.5.2 prints for pyrene itself (former 10b and 10c become 3a1 and 5a1). The",
+        "anchor is certified independently of this engine in",
+        "tests/data/interior_locant_crosswalk.json: the shortest distance from the interior",
+        "carbon to the fixed perimeter, every peripheral atom at that distance, and the",
+        "lowest of them. P-14.3.5 then cites the unsuperscripted locant before its",
+        "superscripted counterpart."
+      ],
+      "parser_note": [
+        "OPSIN 2.9.0 continues the fusion letters into the interior instead, so it has no",
+        "vocabulary for a superscripted locant and rejects the name outright rather than",
+        "reading it as a different structure. The bare ring system still parses; only the",
+        "interior locant is unreadable."
+      ],
+      "review_trigger": "any change to the parser artifact above",
+      "retire_when": "the recorded parser returns the target structure for the expected name"
+    },
+    {
+      "smiles": "CC[C@@H]1CN2CC[C@@]34c5ccccc5N5C(=O)CC=C([C@H]1C[C@@H]23)[C@@H]54",
+      "expected_name": "(3aR,3a¹R,12S,13aR,14S)-14-ethyl-2,3,13,13a-tetrahydro-3a¹H,10H,12H-1,12-ethanopyrido[3,2,1-jk]pyrrolo[3,2-f]carbazol-9-one",
+      "expected_outcome": "name_unparseable",
+      "preference_evidence": "rule_derived",
+      "rules": [
+        "P-25.3.3.3.1",
+        "P-25.3.3.3.2",
+        "FR-5.5.2",
+        "P-14.3.5"
+      ],
+      "rationale": [
+        "The name cites an interior carbon by the locant of its nearest peripheral atom",
+        "with the bond distance as a superscript, which is what P-25.3.3.3 prescribes and",
+        "FR-5.5.2 prints for pyrene itself (former 10b and 10c become 3a1 and 5a1). The",
+        "anchor is certified independently of this engine in",
+        "tests/data/interior_locant_crosswalk.json: the shortest distance from the interior",
+        "carbon to the fixed perimeter, every peripheral atom at that distance, and the",
+        "lowest of them. P-14.3.5 then cites the unsuperscripted locant before its",
+        "superscripted counterpart."
+      ],
+      "parser_note": [
+        "OPSIN 2.9.0 continues the fusion letters into the interior instead, so it has no",
+        "vocabulary for a superscripted locant and rejects the name outright rather than",
+        "reading it as a different structure. The bare ring system still parses; only the",
+        "interior locant is unreadable."
+      ],
+      "review_trigger": "any change to the parser artifact above",
+      "retire_when": "the recorded parser returns the target structure for the expected name"
+    },
+    {
+      "smiles": "O=c1nc2c3ccccc3nc3sc4cccc1c4n32",
+      "expected_name": "4-thia-4a¹,5,10-triazacyclopenta[def]chrysen-11-one",
+      "expected_outcome": "name_unparseable",
+      "preference_evidence": "rule_derived",
+      "rules": [
+        "P-25.3.3.3.1",
+        "P-25.3.3.3.2",
+        "FR-5.5.2",
+        "P-14.3.5"
+      ],
+      "rationale": [
+        "The name cites an interior carbon by the locant of its nearest peripheral atom",
+        "with the bond distance as a superscript, which is what P-25.3.3.3 prescribes and",
+        "FR-5.5.2 prints for pyrene itself (former 10b and 10c become 3a1 and 5a1). The",
+        "anchor is certified independently of this engine in",
+        "tests/data/interior_locant_crosswalk.json: the shortest distance from the interior",
+        "carbon to the fixed perimeter, every peripheral atom at that distance, and the",
+        "lowest of them. P-14.3.5 then cites the unsuperscripted locant before its",
+        "superscripted counterpart."
+      ],
+      "parser_note": [
+        "OPSIN 2.9.0 continues the fusion letters into the interior instead, so it has no",
+        "vocabulary for a superscripted locant and rejects the name outright rather than",
+        "reading it as a different structure. The bare ring system still parses; only the",
+        "interior locant is unreadable."
+      ],
+      "review_trigger": "any change to the parser artifact above",
+      "retire_when": "the recorded parser returns the target structure for the expected name"
+    },
+    {
+      "smiles": "COc1ccc(CN2c3ccccc3[C@@]34CCN5C=C[C@@H]6OCC[C@]6(CC[C@H]23)[C@H]54)cc1",
+      "expected_name": "(2aS,5aR,5a¹R,7aS,12bS)-8-((4-methoxyphenyl)methyl)-4,5,7,7a,13,14-hexahydro-2aH,5a¹H,6H-furo[2',3':7,8]indolizino[8,8a,1-cd]carbazole",
+      "expected_outcome": "name_unparseable",
+      "preference_evidence": "rule_derived",
+      "rules": [
+        "P-25.3.3.3.1",
+        "P-25.3.3.3.2",
+        "FR-5.5.2",
+        "P-14.3.5"
+      ],
+      "rationale": [
+        "The name cites an interior carbon by the locant of its nearest peripheral atom",
+        "with the bond distance as a superscript, which is what P-25.3.3.3 prescribes and",
+        "FR-5.5.2 prints for pyrene itself (former 10b and 10c become 3a1 and 5a1). The",
+        "anchor is certified independently of this engine in",
+        "tests/data/interior_locant_crosswalk.json: the shortest distance from the interior",
+        "carbon to the fixed perimeter, every peripheral atom at that distance, and the",
+        "lowest of them. P-14.3.5 then cites the unsuperscripted locant before its",
+        "superscripted counterpart."
+      ],
+      "parser_note": [
+        "OPSIN 2.9.0 continues the fusion letters into the interior instead, so it has no",
+        "vocabulary for a superscripted locant and rejects the name outright rather than",
+        "reading it as a different structure. The bare ring system still parses; only the",
+        "interior locant is unreadable."
+      ],
+      "review_trigger": "any change to the parser artifact above",
+      "retire_when": "the recorded parser returns the target structure for the expected name"
+    },
+    {
+      "smiles": "Cc1nc2cccc3cnc1n32",
+      "expected_name": "2-methyl-1,2a¹,3-triazabenzo[1,2,3-cd]pentalene",
+      "expected_outcome": "name_unparseable",
+      "preference_evidence": "rule_derived",
+      "rules": [
+        "P-25.3.3.3.1",
+        "P-25.3.3.3.2",
+        "FR-5.5.2",
+        "P-14.3.5"
+      ],
+      "rationale": [
+        "The name cites an interior carbon by the locant of its nearest peripheral atom",
+        "with the bond distance as a superscript, which is what P-25.3.3.3 prescribes and",
+        "FR-5.5.2 prints for pyrene itself (former 10b and 10c become 3a1 and 5a1). The",
+        "anchor is certified independently of this engine in",
+        "tests/data/interior_locant_crosswalk.json: the shortest distance from the interior",
+        "carbon to the fixed perimeter, every peripheral atom at that distance, and the",
+        "lowest of them. P-14.3.5 then cites the unsuperscripted locant before its",
+        "superscripted counterpart."
+      ],
+      "parser_note": [
+        "OPSIN 2.9.0 continues the fusion letters into the interior instead, so it has no",
+        "vocabulary for a superscripted locant and rejects the name outright rather than",
+        "reading it as a different structure. The bare ring system still parses; only the",
+        "interior locant is unreadable."
+      ],
+      "review_trigger": "any change to the parser artifact above",
+      "retire_when": "the recorded parser returns the target structure for the expected name"
+    },
+    {
+      "smiles": "COC(=O)C1(C(=O)OC)CC2=C(C)C(=O)[C@H]3CC[C@@H]1[C@@H]23",
+      "expected_name": "dimethyl (2a¹R,4aS,6aR)-3-methyl-4-oxo-1,2a¹,4a,5,6,6a-hexahydrocyclopenta[cd]pentalene-1,1(2H)-dicarboxylate",
+      "expected_outcome": "name_unparseable",
+      "preference_evidence": "rule_derived",
+      "rules": [
+        "P-25.3.3.3.1",
+        "P-25.3.3.3.2",
+        "FR-5.5.2",
+        "P-14.3.5"
+      ],
+      "rationale": [
+        "The name cites an interior carbon by the locant of its nearest peripheral atom",
+        "with the bond distance as a superscript, which is what P-25.3.3.3 prescribes and",
+        "FR-5.5.2 prints for pyrene itself (former 10b and 10c become 3a1 and 5a1). The",
+        "anchor is certified independently of this engine in",
+        "tests/data/interior_locant_crosswalk.json: the shortest distance from the interior",
+        "carbon to the fixed perimeter, every peripheral atom at that distance, and the",
+        "lowest of them. P-14.3.5 then cites the unsuperscripted locant before its",
+        "superscripted counterpart."
+      ],
+      "parser_note": [
+        "OPSIN 2.9.0 continues the fusion letters into the interior instead, so it has no",
+        "vocabulary for a superscripted locant and rejects the name outright rather than",
+        "reading it as a different structure. The bare ring system still parses; only the",
+        "interior locant is unreadable."
+      ],
+      "review_trigger": "any change to the parser artifact above",
+      "retire_when": "the recorded parser returns the target structure for the expected name"
+    },
+    {
+      "smiles": "Cc1ccc(S(=O)(=O)O[C@H]2C[C@@H]3C=C[C@@H]4C=C[C@@H]2[C@H]43)cc1",
+      "expected_name": "(1S,2aR,2a¹S,4aR,6aR)-1,2,2a,2a¹,4a,6a-hexahydrocyclopenta[cd]pentalen-1-yl 4-methylbenzene-1-sulfonate",
+      "expected_outcome": "name_unparseable",
+      "preference_evidence": "rule_derived",
+      "rules": [
+        "P-25.3.3.3.1",
+        "P-25.3.3.3.2",
+        "FR-5.5.2",
+        "P-14.3.5"
+      ],
+      "rationale": [
+        "The name cites an interior carbon by the locant of its nearest peripheral atom",
+        "with the bond distance as a superscript, which is what P-25.3.3.3 prescribes and",
+        "FR-5.5.2 prints for pyrene itself (former 10b and 10c become 3a1 and 5a1). The",
+        "anchor is certified independently of this engine in",
+        "tests/data/interior_locant_crosswalk.json: the shortest distance from the interior",
+        "carbon to the fixed perimeter, every peripheral atom at that distance, and the",
+        "lowest of them. P-14.3.5 then cites the unsuperscripted locant before its",
+        "superscripted counterpart."
+      ],
+      "parser_note": [
+        "OPSIN 2.9.0 continues the fusion letters into the interior instead, so it has no",
+        "vocabulary for a superscripted locant and rejects the name outright rather than",
+        "reading it as a different structure. The bare ring system still parses; only the",
+        "interior locant is unreadable."
+      ],
+      "review_trigger": "any change to the parser artifact above",
+      "retire_when": "the recorded parser returns the target structure for the expected name"
+    }
+  ]
+}

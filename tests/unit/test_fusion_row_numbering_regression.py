@@ -9,7 +9,7 @@ from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.graph_io import read_smiles
 
 SMILES = "c1ccc2c(c1)ccc1c2ccc2c3c[nH]cc3ncc21"
-EXPECTED_NAME = "2H-pyrrolo[3,4-b]phenanthro[2,1-d]pyridine"
+EXPECTED_NAME = "2H-pyrrolo[3,4-c]naphtho[1,2-h]isoquinoline"
 DIONE_SMILES = "CCc1cccc2c1[nH]c1c3c(c(C(C)=O)cc12)C(=O)C=CC3=O"
 DIONE_NAME = "5-acetyl-10-ethyl-11H-benzo[a]carbazole-1,4-dione"
 

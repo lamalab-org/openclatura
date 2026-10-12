@@ -22,9 +22,9 @@ from openclatura.graph_io import read_smiles
 PLANNED = (
     ("c1cnc2[nH]cnc2c1", "3H-imidazo[4,5-b]pyridine"),
     ("Brc1cn2c(n1)OCCC2", "2-bromo-6,7-dihydro-5H-imidazo[2,1-b][1,3]oxazine"),
-    ("CSc1nc(N)c2ccc3ccccc3c2n1", "2-(methylsulfanyl)naphtho[1,2-d]pyrimidin-4-amine"),
+    ("CSc1nc(N)c2ccc3ccccc3c2n1", "2-(methylsulfanyl)benzo[h]quinazolin-4-amine"),
     ("Cc1nc2cc(O)c3ccccc3c2o1", "2-methylnaphtho[2,1-d][1,3]oxazol-5-ol"),
-    ("Cc1c2ccccc2nc2cc3ccccc3n12", "12-methylindolo[1,2-a]benzo[d]pyrimidine"),
+    ("Cc1c2ccccc2nc2cc3ccccc3n12", "12-methylindolo[2,1-b]quinazoline"),
     ("COC(=O)c1cc2c(cn1)ncn2Cc1ccc(F)cc1", "methyl 1-((4-fluorophenyl)methyl)imidazo[4,5-c]pyridine-6-carboxylate"),
 )
 
