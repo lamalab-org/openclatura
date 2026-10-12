@@ -4,10 +4,26 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
-from .assembly_parts import NameAtomBinding, NameTokenBinding
+from .assembly_parts import NameAtomBinding, NameTokenBinding, rendered_substituent_text
 from .assembly_prefixes import substituent_sort_key
 from .chains import get_cyclic_atoms
-from .charge_pair_roles import charge_pair_roles
+from .chalcogen_roles import (
+    DerivativeKind,
+    FunctionalFamily,
+    FunctionalGroupDescriptor,
+    NitrogenChalcogenideCitation,
+    chalcogen_for_symbol,
+    classify_chalcogen_ligand,
+    classify_peroxide_linkage,
+)
+from .chalcogen_vocabulary import (
+    anhydride_class_name,
+    chalcogenide_class_name,
+    nitrogen_chalcogenide_citation,
+    peroxide_class_name,
+    uses_existing_chalcogen_citation,
+)
+from .charge_pair_roles import NitrogenChalcogenideKind, charge_pair_roles
 from .formatting import (
     count_names,
     format_center_ligands,
@@ -23,7 +39,7 @@ from .molecule import (
 )
 from .naming_protocols import RecursiveSubgraphNamer
 from .nitrogen_roles import azine_roles
-from .nomenclature import RULES
+from .nomenclature import RULES, ChalcogenCitationContext, FunctionalGroupCapability, PrincipalCitationMode
 from .oxoacid_roles import CentralOxoRole, OxoLigandRole, central_oxo_roles
 from .oxoacid_templates import OxoacidTemplateKind, oxoacid_role_template
 from .perception import PerceivedGroup, perceive_groups
@@ -63,6 +79,7 @@ class SpecialComponentName:
     # backbone as a chain of ``element``, each ligand grafted at its locant.
     # Without it a shortcut name is unauditable and can only abstain.
     audit_chain: ChainAuditPlan | None = None
+    descriptor: FunctionalGroupDescriptor | None = None
 
 
 def _component_name_result(
@@ -72,6 +89,7 @@ def _component_name_result(
     role: str,
     *,
     bindings: tuple[NameAtomBinding, ...] = (),
+    descriptor: FunctionalGroupDescriptor | None = None,
 ) -> SpecialComponentName:
     """Build a typed special-name result, using full-component binding as the fallback."""
 
@@ -86,7 +104,7 @@ def _component_name_result(
                 charge_atom_ids=charged_atoms(mol, component_atoms),
             ),
         )
-    return SpecialComponentName(name=name, role=role, bindings=bindings)
+    return SpecialComponentName(name=name, role=role, bindings=bindings, descriptor=descriptor)
 
 
 def _center_stereo_bindings(mol: Molecule, center: int) -> tuple[NameAtomBinding, ...]:
@@ -262,6 +280,11 @@ def structural_replacement_parent_result(
         ("simple_azine_parent", lambda: simple_azine_parent_name(mol, component_atoms, branch_namer)),
         ("phosphane_borane_zwitterion", lambda: phosphane_borane_zwitterion_result(mol, component_atoms, branch_namer)),
         ("sulfonium_ylide", lambda: sulfonium_ylide_result(mol, component_atoms, branch_namer)),
+        (
+            "nitrogen_chalcogenide",
+            lambda: nitrogen_chalcogenide_result(mol, component_atoms, branch_namer),
+        ),
+        ("peroxide_linkage", lambda: peroxide_linkage_result(mol, component_atoms, branch_namer)),
         ("hydroxyurea_parent", lambda: hydroxyurea_parent_result(mol, component_atoms, branch_namer)),
         ("sulfamic_acid", lambda: sulfamic_acid_result(mol, component_atoms, branch_namer)),
         ("azinic_acid", lambda: azinic_acid_result(mol, component_atoms, branch_namer)),
@@ -284,6 +307,119 @@ def structural_replacement_parent_result(
         if rendered:
             return _component_name_result(mol, component_atoms, rendered, role)
     return None
+
+
+def nitrogen_chalcogenide_result(
+    mol: Molecule,
+    component_atoms: set[int],
+    branch_namer: RecursiveSubgraphNamer | None = None,
+) -> SpecialComponentName | None:
+    """Name one amine/imine N+-E- pair by P-62.5 functional-class nomenclature."""
+
+    matches = [
+        role
+        for role in charge_pair_roles(mol, component_atoms)
+        if role.nitrogen_kind in {NitrogenChalcogenideKind.AMINE, NitrogenChalcogenideKind.IMINE}
+        and role.chalcogen is not None
+        and nitrogen_chalcogenide_citation(role.chalcogen) is NitrogenChalcogenideCitation.FUNCTIONAL_CLASS
+    ]
+    if len(matches) != 1:
+        return None
+    role = matches[0]
+    nitrogen = role.positive_atom
+    chalcogen = role.negative_atom
+    class_name = chalcogenide_class_name(role.chalcogen)
+    reduced_atoms = component_atoms - {chalcogen}
+    reduced = mol.subgraph(reduced_atoms)
+    reduced.set_atom_charge(nitrogen, 0)
+    from .namer import name_component
+
+    parent_name = name_component(reduced, reduced_atoms)
+    if not parent_name:
+        return None
+    template = (
+        "amine_chalcogenide_parent"
+        if role.nitrogen_kind is NitrogenChalcogenideKind.AMINE
+        else "imine_chalcogenide_parent"
+    )
+    name = RULES.chalcogens.templates[template].format(parent=parent_name, class_name=class_name)
+    ligand = classify_chalcogen_ligand(mol, nitrogen, chalcogen)
+    if ligand is None:
+        return None
+    organic_neighbors = tuple(
+        neighbor for neighbor in mol.get_neighbors(nitrogen) if neighbor != chalcogen and mol.atoms[neighbor].is_carbon
+    )
+    descriptor = FunctionalGroupDescriptor(
+        family=FunctionalFamily.NITROGEN_CHALCOGENIDE,
+        derivative=DerivativeKind.ZWITTERION,
+        centers=(nitrogen,),
+        ligands=(ligand,),
+        attachment_atom=organic_neighbors[0] if organic_neighbors else nitrogen,
+    )
+    return _component_name_result(
+        mol,
+        component_atoms,
+        name,
+        "nitrogen_chalcogenide",
+        descriptor=descriptor,
+    )
+
+
+def peroxide_linkage_result(
+    mol: Molecule,
+    component_atoms: set[int],
+    branch_namer: RecursiveSubgraphNamer | None = None,
+) -> SpecialComponentName | None:
+    """Name one R-E-E-R' component without collapsing either linkage site."""
+
+    descriptor = classify_peroxide_linkage(mol, component_atoms)
+    if descriptor is None or branch_namer is None:
+        return None
+    left_attachment, left, right, right_attachment = descriptor.linker_paths[0]
+    left_element = chalcogen_for_symbol(mol.atoms[left].symbol)
+    right_element = chalcogen_for_symbol(mol.atoms[right].symbol)
+    if left_element is None or right_element is None:
+        return None
+    elements = (left_element, right_element)
+    if uses_existing_chalcogen_citation(
+        ChalcogenCitationContext.PEROXIDE,
+        elements,
+        bridge_atom_count=2,
+    ):
+        return None
+    if elements[0] is elements[1]:
+        return None
+    names = []
+    for attachment, linker in ((left_attachment, left), (right_attachment, right)):
+        rendered = branch_namer(
+            mol,
+            attachment,
+            (set(mol.atoms) - component_atoms) | {left, right},
+            upstream_atom=linker,
+        )
+        rendered = strip_outer_parentheses(rendered_substituent_text(rendered))
+        if not rendered:
+            return None
+        names.append(rendered)
+    class_name = peroxide_class_name(elements)
+    if names[0] == names[1]:
+        counts = count_names(names)
+        ligand_text = " ".join(
+            format_multiplier(name, counts[name]) for name in sorted(counts, key=substituent_sort_key)
+        )
+    else:
+        located = sorted(
+            (f"{element.value}-{name}" for element, name in zip(elements, names, strict=True)),
+            key=substituent_sort_key,
+        )
+        ligand_text = " ".join(located)
+    return _component_name_result(
+        mol,
+        component_atoms,
+        f"{ligand_text} {class_name}",
+        "peroxide_linkage",
+        descriptor=descriptor,
+    )
 
 
 def biphenyl_parent_result(mol: Molecule, component_atoms: set[int]) -> SpecialComponentName | None:
@@ -573,10 +709,10 @@ def simple_azine_parent_name(
         c2 = role.right.carbon_atom
         side1 = set(role.left.side_atoms)
         side2 = set(role.right.side_atoms)
-        parent1 = _carbonyl_equivalent_side_name(mol, side1, c1, as_ylidene=False)
-        parent2 = _carbonyl_equivalent_side_name(mol, side2, c2, as_ylidene=False)
-        ylidene1 = _carbonyl_equivalent_side_name(mol, side1, c1, as_ylidene=True)
-        ylidene2 = _carbonyl_equivalent_side_name(mol, side2, c2, as_ylidene=True)
+        parent1 = _carbonyl_equivalent_side_name(mol, side1, c1, as_ylidene=False, branch_namer=branch_namer)
+        parent2 = _carbonyl_equivalent_side_name(mol, side2, c2, as_ylidene=False, branch_namer=branch_namer)
+        ylidene1 = _carbonyl_equivalent_side_name(mol, side1, c1, as_ylidene=True, branch_namer=branch_namer)
+        ylidene2 = _carbonyl_equivalent_side_name(mol, side2, c2, as_ylidene=True, branch_namer=branch_namer)
         if not parent1 or not parent2 or not ylidene1 or not ylidene2:
             if branch_namer is None:
                 continue
@@ -594,10 +730,6 @@ def simple_azine_parent_name(
                 if branch_ylidene1 and branch_ylidene1.endswith("ylidene"):
                     stereo = _hydrazone_stereo_prefix(mol, c2, n2, parent2)
                     return f"{stereo}{parent2} {branch_ylidene1}hydrazone"
-            # A ketone's amidinohydrazone has no suffix to be named with -- only
-            # aldehydes do -- and an amidino carbon has no carbonyl equivalent
-            # to be the parent either.  Name the hydrazine itself instead and
-            # hang both sides on it as ylidene substituents.
             amidino = [_is_amidino_carbon(mol, c1, n1), _is_amidino_carbon(mol, c2, n2)]
             aldehyde = [_is_aldehyde_side_carbon(mol, c1, n1), _is_aldehyde_side_carbon(mol, c2, n2)]
             substituted_amidino = any(
@@ -713,9 +845,12 @@ def _carbonyl_equivalent_side_name(
     carbonyl_carbon: int,
     *,
     as_ylidene: bool,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> str:
     return (
-        _retained_ring_carbaldehyde_side_name(mol, side_atoms, carbonyl_carbon, as_ylidene=as_ylidene)
+        _retained_ring_carbaldehyde_side_name(
+            mol, side_atoms, carbonyl_carbon, as_ylidene=as_ylidene, branch_namer=branch_namer
+        )
         or _simple_ring_carbaldehyde_side_name(mol, side_atoms, carbonyl_carbon, as_ylidene=as_ylidene)
         or _simple_ring_ylidene_side_name(mol, side_atoms, carbonyl_carbon, as_ylidene=as_ylidene)
         or _simple_carbonyl_side_name(mol, side_atoms, carbonyl_carbon, as_ylidene=as_ylidene)
@@ -780,6 +915,7 @@ def _retained_ring_carbaldehyde_side_name(
     carbonyl_carbon: int,
     *,
     as_ylidene: bool,
+    branch_namer: RecursiveSubgraphNamer | None = None,
 ) -> str:
     """Name Ar-CH=N sides as retained-ring carbaldehyde/ylidene roles."""
 
@@ -795,10 +931,16 @@ def _retained_ring_carbaldehyde_side_name(
         return ""
     retained_name, locant_maps = retained_match
     locant_map = _choose_retained_map_for_attachment(locant_maps, ring_attachment)
-    if locant_map is None:
-        locant = "1" if _is_homocyclic(mol, ring_path) else ""
-    else:
+    if locant_map is not None:
         locant = locant_map.get(ring_attachment, "")
+    elif _is_homocyclic(mol, ring_path):
+        locant = "1"
+    elif branch_namer is not None:
+        yl_name = branch_namer(mol, ring_attachment, set(mol.atoms) - ring_atoms, upstream_atom=carbonyl_carbon)
+        match = re.search(r"-(\d+[a-z]?)-yl$", strip_outer_parentheses(yl_name) or "")
+        locant = match.group(1) if match else ""
+    else:
+        locant = ""
     if not locant:
         return ""
     if as_ylidene:
@@ -883,6 +1025,10 @@ def _simple_ring_carbaldehyde_side_name(
     if ring is None:
         return ""
     ring_atoms, ring_start = ring
+    # A heterocycle is named by its retained or Hantzsch-Widman name, never by
+    # replacement prefixes numbered from the attachment atom.
+    if not _is_homocyclic(mol, sorted(ring_atoms)):
+        return ""
     ring_path = _ordered_simple_ring_from_start(mol, ring_atoms, ring_start)
     if not ring_path:
         return ""
@@ -3017,14 +3163,14 @@ def _lambda_text(mol: Molecule, atom_idx: int) -> str:
     return f"lambda{bonding_number}-"
 
 
-def _anhydride_half_atoms(mol: Molecule, start_c: int, bridge_o: int) -> set[int]:
+def _anhydride_half_atoms(mol: Molecule, start_c: int, bridge_atoms: set[int] | int) -> set[int]:
     """
     Return original atoms belonging to one acid half of an anhydride.
     """
 
     half_atoms = set()
     queue = [start_c]
-    visited = {bridge_o}
+    visited = {bridge_atoms} if isinstance(bridge_atoms, int) else set(bridge_atoms)
     while queue:
         curr = queue.pop(0)
         if curr not in half_atoms:
@@ -3034,18 +3180,24 @@ def _anhydride_half_atoms(mol: Molecule, start_c: int, bridge_o: int) -> set[int
     return half_atoms
 
 
-def anhydride_half_name(mol: Molecule, start_c: int, bridge_o: int, component_namer: ComponentNamer) -> str:
+def anhydride_half_name(
+    mol: Molecule, start_c: int, bridge_atoms: set[int] | int, component_namer: ComponentNamer
+) -> str:
     """Name one acid half of an anhydride component."""
 
-    original_half_atoms = _anhydride_half_atoms(mol, start_c, bridge_o)
+    original_half_atoms = _anhydride_half_atoms(mol, start_c, bridge_atoms)
     half_atoms = set(original_half_atoms)
     sub_mol = mol.subgraph(half_atoms)
     oh_idx = max(mol.atoms.keys()) + 100
-    sub_mol.add_atom(symbol="O", idx=oh_idx)
+    sub_mol.add_atom(symbol="O", idx=oh_idx, total_h_count=1)
     sub_mol.add_bond(u=start_c, v=oh_idx, order=1)
     half_atoms.add(oh_idx)
 
-    return component_namer(sub_mol, half_atoms).replace(" acid", "")
+    return component_namer(
+        sub_mol,
+        half_atoms,
+        principal_citation_mode=PrincipalCitationMode.ANHYDRIDE_HALF,
+    )
 
 
 def _bond_ids_between(mol: Molecule, atom_pairs: set[tuple[int, int]]) -> set[int]:
@@ -3090,31 +3242,36 @@ def try_name_anhydride_component_result(
 ) -> AnhydrideComponentName | None:
     """Return a graph-bound anhydride component name when supported."""
 
-    if principal_key != "anhydride":
-        return None
     for group in perceived_groups:
-        if group.key != "anhydride":
+        if (
+            group.key != principal_key
+            or group.resolved_rule is None
+            or not group.resolved_rule.has_capability(FunctionalGroupCapability.ANHYDRIDE)
+        ):
             continue
-        bridge_o = next((o for o in group.atoms_involved if mol.degree(o) == 2 and mol.atoms[o].symbol == "O"), None)
-        if bridge_o is None:
+        descriptor = group.descriptor
+        if descriptor is None or len(descriptor.centers) != 2 or not descriptor.linker_paths:
             continue
-        c_neighbors = [n for n in mol.get_neighbors(bridge_o) if mol.atoms[n].is_carbon]
-        if len(c_neighbors) != 2:
+        c_neighbors = list(descriptor.centers)
+        bridge_path = descriptor.linker_paths[0]
+        bridge_atoms = set(bridge_path[1:-1])
+        if not bridge_atoms:
             continue
 
         halves = []
         for carbon in c_neighbors:
-            half_atoms = _anhydride_half_atoms(mol, carbon, bridge_o)
+            half_atoms = _anhydride_half_atoms(mol, carbon, bridge_atoms)
             halves.append(
                 {
-                    "name": anhydride_half_name(mol, carbon, bridge_o, component_namer),
+                    "name": anhydride_half_name(mol, carbon, bridge_atoms, component_namer),
                     "atoms": half_atoms,
                     "bonds": bond_ids_within(mol, half_atoms),
                 }
             )
 
+        class_name = anhydride_class_name(descriptor)
         if halves[0]["name"] == halves[1]["name"]:
-            name = f"{halves[0]['name']} anhydride"
+            name = f"{halves[0]['name']} {class_name}"
             half_bindings = (
                 NameAtomBinding(
                     stage="shortcut",
@@ -3125,8 +3282,11 @@ def try_name_anhydride_component_result(
                 ),
             )
         else:
+            if len(bridge_path) == 4:
+                halves[0]["name"] = f"{mol.atoms[bridge_path[1]].symbol}-{halves[0]['name']}"
+                halves[1]["name"] = f"{mol.atoms[bridge_path[2]].symbol}-{halves[1]['name']}"
             ordered_halves = sorted(halves, key=lambda half: str(half["name"]))
-            name = f"{ordered_halves[0]['name']} {ordered_halves[1]['name']} anhydride"
+            name = f"{ordered_halves[0]['name']} {ordered_halves[1]['name']} {class_name}"
             half_bindings = tuple(
                 NameAtomBinding(
                     stage="shortcut",
@@ -3138,12 +3298,12 @@ def try_name_anhydride_component_result(
                 for half in ordered_halves
             )
 
-        core_atoms = _anhydride_core_atoms(mol, bridge_o, c_neighbors)
-        core_bonds = _anhydride_core_bond_ids(mol, bridge_o, c_neighbors, core_atoms)
+        core_atoms = set(descriptor.atom_ids)
+        core_bonds = bond_ids_within(mol, core_atoms)
         core_binding = NameAtomBinding(
             stage="shortcut",
             role="anhydride_core",
-            term="anhydride",
+            term=class_name,
             atom_ids=core_atoms,
             bond_ids=core_bonds,
         )

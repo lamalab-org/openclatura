@@ -1270,7 +1270,11 @@ def _acylamino_amido_prefix(
     acid_mol = mol.subgraph(acid_atoms)
     _neutralize_charge_separated_oxo(acid_mol, acyl_c)
     hydroxyl_idx = max(mol.atoms) + 1
-    acid_mol.add_atom(symbol="O", idx=hydroxyl_idx)
+    # This synthetic cap represents E-H, not a bare terminal chalcogen.  The
+    # typed ligand classifier deliberately uses hydrogen metadata instead of
+    # inferring it from degree, so preserve that chemical fact on the atom we
+    # add just as the SMILES reader would.
+    acid_mol.add_atom(symbol="O", idx=hydroxyl_idx, total_h_count=1)
     acid_mol.add_bond(u=acyl_c, v=hydroxyl_idx, order=1)
 
     try:

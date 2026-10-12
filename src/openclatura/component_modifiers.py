@@ -1,12 +1,13 @@
 """Data-driven component modifiers attached after parent numbering."""
 
 from .assembly_parts import AssemblyParts, NameTokenBinding, SubstituentItem, split_rendered_substituent_name
-from .formatting import strip_outer_parentheses
+from .chalcogen_roles import Chalcogen, ChalcogenLigandRole
+from .formatting import format_multiplier, is_complex_prefix, strip_outer_parentheses
 from .group_atom_roles import ester_or_peroxy_single_oxygen
 from .locants import parse_locant
 from .molecule import DecisionTrace, Molecule, bond_ids_within, charged_atoms
 from .naming_protocols import RecursiveSubgraphNamer
-from .nomenclature import RULES
+from .nomenclature import RULES, FunctionalGroupCapability
 from .perception import PerceivedGroup
 from .subgraph_tools import subgraph_component
 from .substituent_tokens import graph_bound_substituent_tokens
@@ -26,7 +27,10 @@ def add_component_front_modifiers(
 ) -> None:
     """Add ester/sulfonate front modifiers such as the alcohol component name."""
 
-    if principal_key not in RULES.functional_groups.keys_with_family("front_modifier"):
+    principal_group = next((group for group in perceived_groups if group.key == principal_key), None)
+    if principal_group is None or principal_group.resolved_rule is None:
+        return
+    if not principal_group.resolved_rule.has_capability(FunctionalGroupCapability.FRONT_MODIFIER):
         return
     for group in perceived_groups:
         if group.key != principal_key:
@@ -53,7 +57,25 @@ def add_component_front_modifiers(
             branch_name = branch_namer(mol, r_group_c, branch_exclude, upstream_atom=single_o)
         if branch_name:
             modifier_atoms = subgraph_component(mol, r_group_c, sub_exclude | {single_o})
-            parts.front_modifiers.append(strip_outer_parentheses(branch_name))
+            modifier = strip_outer_parentheses(branch_name)
+            if group.descriptor is not None:
+                linkers = group.descriptor.ligands_with_role(ChalcogenLigandRole.CARBON_LINK)
+                double_ligands = group.descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED)
+                if (
+                    linkers
+                    and double_ligands
+                    and any(ligand.element is not Chalcogen.OXYGEN for ligand in group.descriptor.ligands)
+                ):
+                    ordered_linkers = tuple(
+                        ligand
+                        for ligand in group.descriptor.ligands
+                        if ligand.role is not ChalcogenLigandRole.DOUBLE_BONDED
+                    )
+                    element_locant = "".join(ligand.element.value for ligand in ordered_linkers)
+                    if is_complex_prefix(modifier):
+                        modifier = format_multiplier(modifier, 1)
+                    modifier = f"{element_locant}-{modifier}"
+            parts.front_modifiers.append(modifier)
             locant = str(get_loc(group.attachment_carbon)) if get_loc is not None else None
             parts.front_modifier_locants.append(locant)
             parts.front_modifier_atom_ids.update(modifier_atoms)
@@ -61,7 +83,7 @@ def add_component_front_modifiers(
             if include_trace:
                 parts.front_modifier_items.append(
                     SubstituentItem(
-                        name=strip_outer_parentheses(branch_name),
+                        name=modifier,
                         locants=[locant] if locant is not None else [],
                         atom_ids=modifier_atoms,
                         bond_ids=bond_ids_within(mol, modifier_atoms),
@@ -118,9 +140,10 @@ def add_component_n_substituents(
     n_idx_global = 0
     for group_index, group in enumerate(principal_groups):
         c_idx = group.attachment_carbon
+        group_rule = group.resolved_rule or RULES.functional_groups.get(group.key)
         nitrogens = [n for n in group.atoms_involved if mol.atoms[n].symbol == "N"]
         nitrogens.sort(key=lambda n: mol.get_bond(n, c_idx) is not None, reverse=True)
-        if principal_key in {"urea", "thiourea"}:
+        if group_rule.has_capability(FunctionalGroupCapability.UREA):
             # The two urea nitrogens are equivalent: P-31.1.4 gives the unprimed locant to
             # the substituent cited first, and an unsubstituted nitrogen takes no locant.
             nitrogens.sort(key=lambda n: _nitrogen_alphabetical_rank(mol, n, c_idx, sub_exclude, branch_namer))
@@ -137,9 +160,10 @@ def add_component_n_substituents(
         if principal_key in {"amidine", "ring_amidine"}:
             # P-66.4.1.1.1.3: the amine nitrogen is N, the imino nitrogen N'.
             nitrogens.sort(key=lambda n: mol.get_bond(n, core_c).order)
-        elif principal_key in {"hydrazide", "ring_hydrazide"}:
+        elif group_rule.has_capability(FunctionalGroupCapability.HYDRAZIDE):
             # P-66.3.1.2: the acyl-bound nitrogen is N, the terminal one N'.
-            nitrogens.sort(key=lambda n: mol.get_bond(n, core_c) is None)
+            functional_centers = group.descriptor.centers if group.descriptor is not None else (core_c,)
+            nitrogens.sort(key=lambda n: not any(mol.get_bond(n, center) is not None for center in functional_centers))
         elif principal_key == "guanidine":
             # P-66.4.1.2.1.3: guanidine is numbered 1,2,3 with the imino nitrogen at 2; the amine
             # nitrogen whose substituent is cited first takes 1.

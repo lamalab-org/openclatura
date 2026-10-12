@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>openclatura — learn how an IUPAC name is built</title>
+<meta name="description" content="Draw a molecule, get its IUPAC name, and see which part of the name describes which part of the structure.">
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --border: #e2e5ea;
+    --text: #1a2233;
+    --muted: #5c6675;
+    --accent: #1a56db;
+    --accent-soft: #e8effc;
+    --err: #b42318;
+    --err-soft: #fdeceb;
+    --chip: #eef1f5;
+    --editor-bg: #ffffff; /* matches Ketcher's own themed canvas */
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1420;
+      --surface: #171e2e;
+      --border: #2a3450;
+      --text: #e8ecf4;
+      --muted: #97a1b5;
+      --accent: #6d9cff;
+      --accent-soft: #1d2a47;
+      --err: #ff8177;
+      --err-soft: #3a1d1c;
+      --chip: #222c44;
+      --editor-bg: #1c1f2b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+  header {
+    max-width: 86rem;
+    margin: 0 auto;
+    padding: 1.6rem 1.25rem 1.1rem;
+  }
+  .header-row { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 1.45rem; letter-spacing: -.01em; }
+  header h1 span { color: var(--accent); }
+  header p { margin: .3rem 0 0; max-width: 46rem; color: var(--muted); font-size: .92rem; }
+  header p a { color: var(--accent); }
+  .version-tag {
+    font-family: var(--mono);
+    font-size: .74rem;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    padding: .08rem .45rem;
+  }
+  .version-tag:empty { display: none; }
+  .version-tag.beta { border-color: var(--accent); color: var(--accent); }
+  main {
+    max-width: 86rem;
+    margin: 0 auto;
+    padding: 0 1.25rem 3rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(24rem, 1fr);
+    gap: 1.25rem;
+    align-items: start;
+  }
+  @media (max-width: 66rem) { main { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1rem 1.1rem 1.1rem;
+  }
+  .card + .card { margin-top: 1.25rem; }
+  .card h2 {
+    margin: 0 0 .8rem;
+    padding-bottom: .45rem;
+    border-bottom: 1px solid var(--border);
+    font-size: .76rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--muted);
+  }
+  .editor-shell {
+    position: relative;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    background: var(--editor-bg);
+    height: min(60vh, 520px);
+    min-height: 400px;
+  }
+  #ketcher-frame { width: 100%; height: 100%; border: 0; display: block; }
+  #editor-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    background: var(--editor-bg);
+    color: var(--muted);
+    font-size: .95rem;
+    z-index: 2;
+    transition: opacity .25s;
+  }
+  .examples { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .8rem; align-items: center; }
+  .examples .label { font-size: .8rem; color: var(--muted); margin-right: .15rem; }
+  .examples button {
+    border: 1px solid var(--border);
+    background: var(--chip);
+    color: var(--text);
+    padding: .28rem .7rem;
+    font-size: .82rem;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .examples button:hover { border-color: var(--accent); color: var(--accent); }
+  .spinner {
+    display: inline-block;
+    width: .8em; height: .8em;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    vertical-align: -0.1em;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .status { font-size: .82rem; color: var(--muted); min-height: 1.2rem; }
+
+  /* ---- The name, laid out as hoverable pieces -------------------------- */
+  #name-line {
+    font-size: 1.5rem;
+    font-weight: 650;
+    letter-spacing: -.01em;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+    margin: .1rem 0 .2rem;
+  }
+  #name-line.long { font-size: 1.1rem; }
+  #name-line.placeholder { color: var(--muted); font-weight: 400; font-size: 1rem; }
+  #name-line.error { color: var(--err); font-weight: 500; font-size: 1rem; }
+  #name-line.stale { opacity: .4; transition: opacity .15s; }
+  .tok {
+    cursor: pointer;
+    border-bottom: 2px solid var(--border);
+    transition: background .12s, border-color .12s, color .12s;
+  }
+  .tok:hover, .tok.on {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .tok-kind-locant { border-bottom-style: dotted; }
+  #tok-role {
+    min-height: 2.6rem;
+    font-size: .87rem;
+    color: var(--muted);
+    border-left: 2px solid var(--border);
+    padding-left: .7rem;
+    margin: .5rem 0 0;
+  }
+  #tok-role b { color: var(--text); font-weight: 600; }
+  .hint-line { font-size: .8rem; color: var(--muted); margin: .1rem 0 0; }
+
+  /* ---- Structure ------------------------------------------------------- */
+  #depiction {
+    background: #fff; /* the drawing is light-only */
+    border: 1px solid var(--border);
+    padding: .4rem;
+    margin: 0;
+    position: relative;
+  }
+  #depiction svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  #depiction .hl-atom { fill: var(--accent); opacity: .35; pointer-events: none; }
+  #depiction .hl-bond { stroke: #1a56db; opacity: .45; stroke-linecap: round; pointer-events: none; }
+  .caption { font-size: .78rem; color: var(--muted); margin: .5rem 0 0; text-align: center; }
+
+  /* ---- Steps ----------------------------------------------------------- */
+  #steps { margin: 0; padding-left: 1.15rem; font-size: .92rem; }
+  #steps li { margin-bottom: .4rem; }
+  .errbox {
+    background: var(--err-soft);
+    color: var(--err);
+    padding: .55rem .8rem;
+    font-size: .85rem;
+    margin-top: .6rem;
+    display: none;
+    word-break: break-word;
+  }
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: .82rem;
+    padding: 0 1rem 2.5rem;
+  }
+  footer a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-row">
+    <h1><span>openclatura</span> — how the name is built</h1>
+    <span class="version-tag" id="app-version" title="openclatura package version"></span>
+  </div>
+  <p>
+    Draw a molecule. It is named with IUPAC Blue Book rules, and every piece of
+    the name is linked to the part of the structure it describes — hover a piece
+    to see it. Looking for the plain namer instead? <a href="/">Go to the namer</a>.
+  </p>
+</header>
+
+<main>
+  <section>
+    <div class="card">
+      <h2>Draw a molecule</h2>
+      <div class="editor-shell">
+        <div id="editor-loading"><span class="spinner"></span> Loading structure editor…</div>
+        <iframe id="ketcher-frame" src="/ketcher/index.html" title="Ketcher structure editor"></iframe>
+      </div>
+      <div class="examples" id="examples">
+        <span class="label">Try:</span>
+        <button data-smiles="CCO">ethanol</button>
+        <button data-smiles="CC(C)CC(=O)N">3-methylbutanamide</button>
+        <button data-smiles="CC(=O)Oc1ccccc1C(=O)O">aspirin</button>
+        <button data-smiles="CN1C=NC2=C1C(=O)N(C(=O)N2C)C">caffeine</button>
+        <button data-smiles="C1CCC2(CC1)OCCO2">a spiro ketal</button>
+        <button data-smiles="c1ccc2ncccc2c1">quinoline</button>
+      </div>
+    </div>
+
+  </section>
+
+  <section>
+    <div class="card">
+      <h2>The name</h2>
+      <div id="name-line" class="placeholder">Draw a structure to name it.</div>
+      <p class="hint-line" id="hint-line"></p>
+      <p id="tok-role"></p>
+      <div class="status" id="status"></div>
+      <div class="errbox" id="errbox"></div>
+    </div>
+
+    <div class="card">
+      <h2>The structure, numbered the IUPAC way</h2>
+      <figure id="depiction"></figure>
+      <p class="caption" id="depict-caption">
+        The small numbers are IUPAC locants — the positions the name counts from.
+      </p>
+    </div>
+
+    <div class="card">
+      <h2>Why the name says that</h2>
+      <ol id="steps"></ol>
+    </div>
+  </section>
+</main>
+
+<footer>
+  Powered by <a href="https://github.com/lamalab-org/iupac-name-generator">openclatura</a>,
+  an open nomenclature framework ·
+  Editor: <a href="https://lifescience.opensource.epam.com/ketcher/">Ketcher</a> (EPAM, Apache-2.0) · MIT licensed
+</footer>
+
+<script>
+  var ketcher = null;
+  var debounceTimer = null;
+  var currentSmiles = "";
+  var haveResult = false;
+  var requestSeq = 0;
+
+  // Same waits as the namer page: an edit needs to settle before it is named,
+  // and a structure that cannot be named is usually just unfinished, so the
+  // failure is held back until the drawing has actually stopped changing.
+  var EDIT_DEBOUNCE_MS = 900;
+  var EXAMPLE_DEBOUNCE_MS = 300;
+  var FAILURE_GRACE_MS = 2000;
+  var failureTimer = null;
+
+  var el = function (id) { return document.getElementById(id); };
+
+  fetch("/api/warmup").catch(function () {});
+
+  (function waitForKetcher() {
+    var frame = el("ketcher-frame");
+    var tries = 0;
+    var timer = setInterval(function () {
+      tries += 1;
+      var k = null;
+      try { k = frame.contentWindow && frame.contentWindow.ketcher; } catch (e) { /* not ready */ }
+      if (k) {
+        clearInterval(timer);
+        ketcher = k;
+        el("editor-loading").style.opacity = "0";
+        setTimeout(function () { el("editor-loading").style.display = "none"; }, 300);
+        ketcher.editor.subscribe("change", function () {
+          clearTimeout(debounceTimer);
+          clearTimeout(failureTimer);
+          debounceTimer = setTimeout(teachCurrent, EDIT_DEBOUNCE_MS);
+        });
+      } else if (tries > 300) { // ~60 s
+        clearInterval(timer);
+        el("editor-loading").innerHTML = "Failed to load the structure editor. Reload to retry.";
+      }
+    }, 200);
+  })();
+
+  function setStatus(html) { el("status").innerHTML = html; }
+
+  function showError(msg) {
+    var box = el("errbox");
+    box.textContent = msg;
+    box.style.display = "block";
+  }
+
+  // ---------------------------------------------------------------------
+  // Reading the drawing.
+  //
+  // While a ring template is active and the cursor sits on the canvas, Ketcher
+  // inserts its hovering preview into the live struct, so the exported
+  // structure contains a ring the user never drew. Free-standing previews flag
+  // their atoms `isPreview` and are dropped from a clone; a preview snapped
+  // onto an existing atom carries no flag, so that case just skips the update
+  // until the cursor moves off. (Same handling as the namer page.)
+  // ---------------------------------------------------------------------
+
+  var SMILES_FORMAT = "chemical/x-daylight-smiles";
+
+  function connectedPreview() {
+    var tool = ketcher.editor.tool && ketcher.editor.tool();
+    var preview = tool && tool.templatePreview;
+    return !!(preview && preview.connectedPreviewAction);
+  }
+
+  function drawnAtoms() {
+    var ids = [];
+    var previews = 0;
+    ketcher.editor.struct().atoms.forEach(function (atom, id) {
+      if (atom.isPreview) previews += 1;
+      else ids.push(id);
+    });
+    return previews ? ids : null;
+  }
+
+  function fullSmiles() {
+    return ketcher.getSmiles().then(function (s) { return { smiles: (s || "").trim() }; });
+  }
+
+  function smilesToName() {
+    if (connectedPreview()) return Promise.resolve({ skip: true });
+    var ids = null;
+    try {
+      ids = drawnAtoms();
+    } catch (e) { /* fall through to the whole structure */ }
+    if (!ids) return fullSmiles();
+    if (!ids.length) return Promise.resolve({ smiles: "" }); // preview only
+    var clone = ketcher.editor.struct().clone(new Set(ids));
+    return ketcher.indigo.convert(clone, { outputFormat: SMILES_FORMAT })
+      .then(function (res) { return { smiles: (res && res.struct || "").trim() }; })
+      .catch(fullSmiles);
+  }
+
+  function teachCurrent() {
+    if (!ketcher) return;
+    smilesToName().then(function (result) {
+      if (result.skip) return;
+      var smiles = result.smiles;
+      if (!smiles) {
+        currentSmiles = "";
+        reset("Draw a structure to name it.");
+        return;
+      }
+      if (smiles === currentSmiles && haveResult) {
+        setStatus(""); // the edit moved or selected something; nothing changed
+        return;
+      }
+      currentSmiles = smiles;
+      requestTeach(smiles);
+    }).catch(function () {
+      setStatus(""); // half-drawn structures can fail export; stay quiet
+    });
+  }
+
+  function reset(placeholder) {
+    clearTimeout(failureTimer);
+    haveResult = false;
+    el("name-line").textContent = placeholder;
+    el("name-line").className = "placeholder";
+    el("hint-line").textContent = "";
+    el("tok-role").innerHTML = "";
+    el("depiction").innerHTML = "";
+    el("steps").innerHTML = "";
+    el("errbox").style.display = "none";
+    setStatus("");
+  }
+
+  function scheduleFailure(seq, msg) {
+    clearTimeout(failureTimer);
+    failureTimer = setTimeout(function () {
+      if (seq !== requestSeq) return;
+      haveResult = false;
+      el("name-line").textContent = "This structure cannot be named yet.";
+      el("name-line").className = "error";
+      el("hint-line").textContent = "";
+      el("tok-role").innerHTML = "";
+      el("depiction").innerHTML = "";
+      el("steps").innerHTML = "";
+      showError(msg);
+    }, FAILURE_GRACE_MS);
+  }
+
+  function requestTeach(smiles) {
+    var seq = ++requestSeq;
+    clearTimeout(failureTimer);
+    el("errbox").style.display = "none";
+    if (haveResult) el("name-line").classList.add("stale");
+    setStatus('<span class="spinner"></span> naming and explaining…');
+
+    fetch("/api/teach", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ smiles: smiles })
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error("Something went wrong (HTTP " + r.status + ").");
+        return r.json();
+      })
+      .then(function (data) {
+        if (seq !== requestSeq) return; // superseded by a newer drawing
+        setStatus("");
+        if (!data.ok) {
+          scheduleFailure(seq, data.error || "This structure cannot be named yet.");
+          return;
+        }
+        haveResult = true;
+        render(data);
+      })
+      .catch(function (e) {
+        if (seq !== requestSeq) return;
+        setStatus("");
+        scheduleFailure(seq, e.message);
+      });
+  }
+
+  function render(data) {
+    renderName(data.name, data.tokens || []);
+    renderDepiction(data.depiction);
+    renderSteps(data.steps || []);
+  }
+
+  // ---- The name, cut into hoverable pieces ------------------------------
+  // The tokens are non-overlapping and in name order, but they need not cover
+  // the whole string: hyphens, brackets and the commas between locants sit in
+  // the gaps and are emitted as plain text.
+  function renderName(name, tokens) {
+    var line = el("name-line");
+    line.className = name.length > 42 ? "long" : "";
+    line.innerHTML = "";
+    var cursor = 0;
+    tokens.forEach(function (token) {
+      if (token.start > cursor) {
+        line.appendChild(document.createTextNode(name.slice(cursor, token.start)));
+      }
+      var span = document.createElement("span");
+      span.className = "tok tok-kind-" + (token.kind || "other");
+      span.textContent = name.slice(token.start, token.end);
+      span.addEventListener("mouseenter", function () { focusToken(span, token); });
+      span.addEventListener("mouseleave", clearFocus);
+      // Tap-to-inspect on touch, where there is no hover.
+      span.addEventListener("click", function () { focusToken(span, token); });
+      line.appendChild(span);
+      cursor = token.end;
+    });
+    if (cursor < name.length) line.appendChild(document.createTextNode(name.slice(cursor)));
+
+    el("hint-line").textContent = tokens.length
+      ? "Hover a highlighted piece of the name to find it in the structure."
+      : "";
+    el("tok-role").innerHTML = "";
+  }
+
+  function focusToken(span, token) {
+    clearFocus();
+    span.classList.add("on");
+    var role = el("tok-role");
+    role.innerHTML = "";
+    var strong = document.createElement("b");
+    strong.textContent = "“" + token.text + "”";
+    role.appendChild(strong);
+    var tail = " is " + token.role;
+    if (token.locants && token.locants.length) {
+      tail += ", at position " + token.locants.join(", ");
+    }
+    role.appendChild(document.createTextNode(tail + "."));
+    highlight(token.atoms || [], token.bonds || []);
+  }
+
+  function clearFocus() {
+    var on = document.querySelectorAll(".tok.on");
+    for (var i = 0; i < on.length; i++) on[i].classList.remove("on");
+    var layer = el("hl-layer");
+    if (layer) while (layer.firstChild) layer.removeChild(layer.firstChild);
+  }
+
+  // ---- Structure --------------------------------------------------------
+  // Highlights are drawn as an overlay rather than by recolouring the drawing:
+  // an unlabelled carbon has no glyph in the SVG to recolour, so the server
+  // sends the drawing coordinate of every atom and the markers go on top.
+  var atomCoords = {};
+  var bondPx = 96; // drawn bond length, which the marker sizes scale with
+  var SVG_NS = "http://www.w3.org/2000/svg";
+
+  function renderDepiction(depiction) {
+    var fig = el("depiction");
+    fig.innerHTML = "";
+    atomCoords = {};
+    if (!depiction || !depiction.ok || !depiction.svg) {
+      el("depict-caption").textContent = "The structure drawing is unavailable.";
+      return;
+    }
+    fig.innerHTML = depiction.svg;
+    atomCoords = depiction.coords || {};
+    bondPx = depiction.bond_px || 96;
+    var svg = fig.querySelector("svg");
+    if (!svg) return;
+    var layer = document.createElementNS(SVG_NS, "g");
+    layer.setAttribute("id", "hl-layer");
+    svg.appendChild(layer); // last child, so highlights sit above the drawing
+    // Only the parent skeleton is numbered. A substituent that carries its own
+    // positions ("2-((cyclopropyl)carbonyl)phenyl") counts them on its own
+    // numbering, which is not on this drawing — so the caption must not promise
+    // that every locant in the name can be found here.
+    el("depict-caption").textContent =
+      "The numbers are IUPAC locants for the parent skeleton. A substituent "
+      + "named with its own positions counts those separately.";
+  }
+
+  function highlight(atoms, bonds) {
+    var layer = el("hl-layer");
+    if (!layer) return;
+    // Bonds first, so the round atom markers cap them cleanly.
+    var svg = layer.ownerSVGElement;
+    bonds.forEach(function (bondId) {
+      // A double or triple bond is several paths sharing the same bond class.
+      var paths = svg.querySelectorAll("path.bond-" + bondId);
+      for (var i = 0; i < paths.length; i++) {
+        var line = document.createElementNS(SVG_NS, "path");
+        line.setAttribute("d", paths[i].getAttribute("d"));
+        line.setAttribute("fill", "none");
+        line.setAttribute("class", "hl-bond");
+        line.setAttribute("stroke-width", (bondPx * 0.26).toFixed(1));
+        layer.appendChild(line);
+      }
+    });
+    atoms.forEach(function (atomId) {
+      var xy = atomCoords[String(atomId)];
+      if (!xy) return;
+      var dot = document.createElementNS(SVG_NS, "circle");
+      dot.setAttribute("cx", xy[0]);
+      dot.setAttribute("cy", xy[1]);
+      dot.setAttribute("r", (bondPx * 0.22).toFixed(1));
+      dot.setAttribute("class", "hl-atom");
+      layer.appendChild(dot);
+    });
+  }
+
+  // ---- Steps ------------------------------------------------------------
+  function renderSteps(steps) {
+    var list = el("steps");
+    list.innerHTML = "";
+    if (!steps.length) {
+      // Some names (salts, for instance) are assembled without a parent
+      // skeleton to walk through, so there is no breakdown to show.
+      var empty = document.createElement("li");
+      empty.textContent = "This name has no step-by-step breakdown — hover the "
+        + "pieces of the name above to see what each one refers to.";
+      list.appendChild(empty);
+      return;
+    }
+    steps.forEach(function (text) {
+      var li = document.createElement("li");
+      li.textContent = text;
+      list.appendChild(li);
+    });
+  }
+
+  el("examples").addEventListener("click", function (ev) {
+    var smiles = ev.target && ev.target.getAttribute("data-smiles");
+    if (smiles && ketcher) {
+      ketcher.setMolecule(smiles).then(function () {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(teachCurrent, EXAMPLE_DEBOUNCE_MS);
+      });
+    }
+  });
+
+  fetch("/api/healthz")
+    .then(function (r) { return r.ok ? r.json() : null; })
+    .then(function (d) {
+      if (!d || !d.version) return;
+      // A git build reports the version of the release its branch forked from,
+      // so the number alone cannot tell beta from stable — the ref can.
+      var label = "v" + d.version;
+      if (d.channel === "beta") label += " · beta" + (d.git_ref ? " (" + d.git_ref + ")" : "");
+      var chip = el("app-version");
+      chip.textContent = label;
+      if (d.channel === "beta") chip.classList.add("beta");
+    })
+    .catch(function () { /* version tag stays hidden */ });
+</script>
+</body>
+</html>

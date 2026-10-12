@@ -3,12 +3,20 @@
 import re
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .assembly_parts import NameTokenBinding, SubstituentItem, rendered_substituent_text
 from .assembly_prefixes import substituent_sort_key
+from .chalcogen_roles import ChalcogenLigandRole, DerivativeKind, FunctionalFamily
+from .chalcogen_vocabulary import (
+    central_linkage_prefix,
+    chalcogen_substituent_suffix,
+    resolve_central_acid_rule,
+    simple_group_key,
+)
 from .formatting import (
     format_center_ligands,
+    format_element_substituent,
     format_multiplier,
     is_complex_prefix,
     oxy_prefix_from_branch,
@@ -17,7 +25,7 @@ from .formatting import (
 from .group_atom_roles import amide_nitrogen, ester_or_peroxy_single_oxygen
 from .molecule import Molecule, bond_ids_within
 from .naming_protocols import RecursiveSubgraphNamer
-from .nomenclature import RULES
+from .nomenclature import RULES, FunctionalGroupCapability
 from .perception import PerceivedGroup
 from .rules import multipliers
 from .subgraph_tools import subgraph_component
@@ -64,7 +72,7 @@ def amide_prefix_from_group(
     if single_n is None:
         return ""
     n_subs = [n for n in mol.get_neighbors(single_n) if n not in group.atoms_involved and mol.atoms[n].symbol != "H"]
-    base = RULES.functional_groups.prefix_for(group.key) or ""
+    base = group.prefix or ""
     if not base:
         return ""
     if not n_subs:
@@ -108,6 +116,82 @@ def ester_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     return ester_prefix_from_group(context.mol, group, context.sub_exclude, "carbonyl", context.branch_namer)
 
 
+def central_ester_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    """Render an ester prefix from its resolved central-acid vocabulary."""
+
+    descriptor = group.descriptor
+    if descriptor is not None:
+        linkers = descriptor.ligands_with_role(ChalcogenLigandRole.CARBON_LINK)
+        base = central_linkage_prefix(descriptor)
+        if len(linkers) == 1 and base:
+            linker = linkers[0]
+            attachment = linker.attachment_atom
+            if attachment is not None:
+                branch = rendered_substituent_text(
+                    context.branch_namer(
+                        context.mol,
+                        attachment,
+                        context.sub_exclude | {linker.atom},
+                        upstream_atom=linker.atom,
+                    )
+                )
+                ligand = format_element_substituent(
+                    "",
+                    branch,
+                    chalcogen_substituent_suffix(linker.element),
+                )
+                return f"({strip_outer_parentheses(ligand)}{base})"
+    return ester_prefix_from_group(
+        context.mol,
+        group,
+        context.sub_exclude,
+        group.prefix or "",
+        context.branch_namer,
+    )
+
+
+def central_chalcogen_linkage_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    """Render a two-chalcogen central linkage as a substitutive prefix."""
+
+    descriptor = group.descriptor
+    if descriptor is None:
+        return group.prefix or ""
+    double_ligands = descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED)
+    bridge = tuple(ligand for ligand in descriptor.ligands if ligand not in double_ligands)
+    base = central_linkage_prefix(descriptor)
+    if len(bridge) != 2 or not base:
+        return group.prefix or ""
+    first, terminal = bridge
+    terminal_text = ""
+    if terminal.role is ChalcogenLigandRole.HYDROGEN_BEARING:
+        key = simple_group_key(FunctionalFamily.HYDROXY, DerivativeKind.ALCOHOL, terminal.element)
+        terminal_text = RULES.functional_groups.cited_prefix_for(key) if key is not None else ""
+    elif terminal.role in {ChalcogenLigandRole.CARBON_LINK, ChalcogenLigandRole.HETEROATOM_LINK}:
+        attachment = terminal.attachment_atom
+        if attachment is not None:
+            branch = rendered_substituent_text(
+                context.branch_namer(
+                    context.mol,
+                    attachment,
+                    context.sub_exclude | {terminal.atom},
+                    upstream_atom=terminal.atom,
+                )
+            )
+            terminal_text = format_element_substituent(
+                "",
+                branch,
+                chalcogen_substituent_suffix(terminal.element),
+            )
+    if not terminal_text:
+        return group.prefix or ""
+    linked = format_element_substituent(
+        "",
+        terminal_text,
+        chalcogen_substituent_suffix(first.element),
+    )
+    return f"({linked}{base})"
+
+
 def amide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     return amide_prefix_from_group(context.mol, group, context.sub_exclude, context.branch_namer)
 
@@ -121,6 +205,9 @@ def amidine_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str
         return "carbamimidoyl"
     nitrogens = [n for n in group.atoms_involved if mol.atoms[n].symbol == "N"]
     nitrogens.sort(key=lambda n: mol.get_bond(n, carbon).order)  # amine N first, imino N' second
+    # The C=N is the group's own bond, cited as an unlocanted (E)/(Z) in front of the word.
+    imine_bond = mol.get_bond(nitrogens[-1], carbon) if nitrogens else None
+    stereo = f"({imine_bond.stereo})-" if imine_bond and imine_bond.order == 2 and imine_bond.stereo else ""
     locants_by_name: dict[str, list[str]] = {}
     for nitrogen, locant in zip(nitrogens, ("N", "N'"), strict=False):
         for x in mol.get_neighbors(nitrogen):
@@ -131,14 +218,14 @@ def amidine_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str
             )
             locants_by_name.setdefault(name, []).append(locant)
     if not locants_by_name:
-        return "carbamimidoyl"
+        return f"({stereo}carbamimidoyl)" if stereo else "carbamimidoyl"
     prefixes = []
     for name in sorted(locants_by_name, key=substituent_sort_key):
         locants = locants_by_name[name]
         prefixes.append(
             f"{','.join(locants)}-{format_multiplier(name, len(locants), safe_enclose=is_complex_prefix(name))}"
         )
-    return f"({'-'.join(prefixes)}carbamimidoyl)"
+    return f"({stereo}{'-'.join(prefixes)}carbamimidoyl)"
 
 
 def hydrazide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
@@ -175,6 +262,44 @@ def hydrazide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> s
             f"{','.join(locants)}-{format_multiplier(name, len(locants), safe_enclose=is_complex_prefix(name))}"
         )
     return f"({'-'.join(prefixes)}hydrazine-1-carbonyl)"
+
+
+def central_hydrazide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    """Render a central hydrazide as a substituted central amide prefix."""
+
+    descriptor = group.descriptor
+    if descriptor is None or descriptor.family is not FunctionalFamily.CENTRAL_ACID:
+        return group.prefix or ""
+    center = descriptor.centers[0]
+    nitrogens = [
+        atom
+        for atom in group.atoms_involved
+        if context.mol.atoms[atom].symbol == "N" and context.mol.get_bond(center, atom) is not None
+    ]
+    if len(nitrogens) != 1:
+        return group.prefix or ""
+    nitrogen = nitrogens[0]
+    substituents = [
+        atom for atom in context.mol.get_neighbors(nitrogen) if atom != center and context.mol.atoms[atom].symbol != "H"
+    ]
+    amide_key, amide_rule = resolve_central_acid_rule(replace(descriptor, derivative=DerivativeKind.AMIDE))
+    base = amide_rule.prefix if amide_rule is not None else RULES.functional_groups.cited_prefix_for(amide_key)
+    if not base:
+        return ""
+    if not substituents:
+        return base
+    names = [
+        rendered_substituent_text(
+            context.branch_namer(
+                context.mol,
+                atom,
+                context.sub_exclude | {nitrogen},
+                upstream_atom=nitrogen,
+            )
+        )
+        for atom in substituents
+    ]
+    return f"({format_center_ligands(names, sort_key=substituent_sort_key)}{base})"
 
 
 def iminium_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
@@ -285,7 +410,11 @@ def static_prefix_handler(name: str) -> PrefixHandler:
     return lambda _context, _group: name
 
 
-def acid_halide_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+def acyl_leaving_group_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
+    if group.resolved_rule is not None and group.resolved_rule.has_capability(
+        FunctionalGroupCapability.ACYL_LEAVING_GROUP
+    ):
+        return f"({group.prefix})" if group.prefix else ""
     return RULES.functional_groups.cited_prefix_for(group.key) or ""
 
 
@@ -296,7 +425,7 @@ def direct_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
 def fallback_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     if group.attachment_carbon not in context.parent_path:
         return ""
-    return RULES.functional_groups.prefix_for(group.key) or ""
+    return group.prefix or ""
 
 
 PREFIX_HANDLERS: dict[str, PrefixHandler] = {}
@@ -309,7 +438,10 @@ PREFIX_HANDLERS.update(
     {key: static_prefix_handler("cyano") for key in RULES.functional_groups.keys_with_family("cyano_prefix")}
 )
 PREFIX_HANDLERS.update(
-    dict.fromkeys(RULES.functional_groups.keys_with_family("acid_halide"), acid_halide_prefix_handler)
+    dict.fromkeys(
+        RULES.functional_groups.keys_with_capability(FunctionalGroupCapability.ACYL_LEAVING_GROUP),
+        acyl_leaving_group_prefix_handler,
+    )
 )
 PREFIX_HANDLERS.update(
     {
@@ -329,7 +461,33 @@ PREFIX_HANDLERS["hydrazine"] = hydrazine_prefix_handler
 
 
 def prefix_from_group(context: PrefixContext, group: PerceivedGroup) -> str:
-    handler = PREFIX_HANDLERS.get(group.key, fallback_prefix_handler)
+    handler = PREFIX_HANDLERS.get(group.key)
+    if handler is None and group.resolved_rule is not None:
+        central_linkage = (
+            group.descriptor is not None
+            and group.descriptor.family is FunctionalFamily.CENTRAL_ACID
+            and len(group.descriptor.ligands)
+            - len(group.descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED))
+            == 2
+        )
+        if central_linkage:
+            handler = central_chalcogen_linkage_prefix_handler
+        elif group.resolved_rule.has_capability(
+            FunctionalGroupCapability.CENTRAL_ACID
+        ) and group.resolved_rule.has_capability(FunctionalGroupCapability.HYDRAZIDE):
+            handler = central_hydrazide_prefix_handler
+        elif group.resolved_rule.has_capability(
+            FunctionalGroupCapability.CENTRAL_ACID
+        ) and group.resolved_rule.has_capability(FunctionalGroupCapability.ESTER_LIKE):
+            handler = central_ester_prefix_handler
+        elif group.resolved_rule.has_capability(FunctionalGroupCapability.ESTER_LIKE):
+            handler = ester_prefix_handler
+        elif group.resolved_rule.has_capability(FunctionalGroupCapability.AMIDE_LIKE):
+            handler = amide_prefix_handler
+        elif group.resolved_rule.has_capability(FunctionalGroupCapability.ACYL_LEAVING_GROUP):
+            handler = acyl_leaving_group_prefix_handler
+    if handler is None:
+        handler = fallback_prefix_handler
     return handler(context, group)
 
 

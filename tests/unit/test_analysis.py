@@ -2030,6 +2030,10 @@ def test_a_charge_separated_chalcogenido_is_not_a_hydride():
     assert name_smiles("C[N+](C)(C)CC[S-]") == "2-(trimethylammonio)ethane-1-thiolate"
 
 
+def test_a_skeletal_phosphonium_chalcogenide_keeps_its_anionic_suffix():
+    assert name_smiles("C=C1C[P+](C)([S-])C=C1C") == ("1,4-dimethyl-3-methylidene-1H,2H-phosphol-1-ium-1-thiolate")
+
+
 def test_tetraazene_parent_takes_an_ylidene_ligand():
     # A doubly bonded carbon on the chain is an ylidene; rejecting it dropped
     # the C=N bond and named a carbon skeleton instead.
@@ -2408,7 +2412,7 @@ def test_terminal_thioformyl_subgraph_is_graph_derived():
 def test_thioester_is_not_perceived_as_ring_thioaldehyde():
     generated = name_smiles("CCSC(=S)C1=CCC=CN1")
 
-    assert generated == "2-((ethylsulfanyl)(thioxo)methyl)-1,4-dihydropyridine"
+    assert generated == "S-ethyl 1,4-dihydropyridine-2-carbodithioate"
 
 
 def test_cyclic_thioamide_is_not_perceived_as_thioaldehyde():
@@ -2887,7 +2891,7 @@ def test_naming_engine_matches_plain_public_api():
 
 
 def test_graph_parser_preserves_aromatic_and_hydrogen_metadata_after_kekulization():
-    mol = read_smiles("Cn1cc[nH]n1")
+    mol = read_smiles("Cc1cc[nH]n1")
     aromatic_n_with_h = [atom.idx for atom in mol if atom.symbol == "N" and atom.is_aromatic and atom.total_h_count > 0]
 
     assert aromatic_n_with_h
@@ -2934,6 +2938,9 @@ def test_functional_groups_carry_metadata_and_graph_bindings():
         "attachment",
         "characteristic_group",
         "full_group",
+        "characteristic_centers",
+        "double_bonded",
+        "hydrogen_bearing",
     }
 
 
@@ -3804,6 +3811,46 @@ def test_analyze_smiles_exposes_decision_trace():
     assert TracePhase.PARENT_SELECTION in phases
     assert TracePhase.NUMBERING in phases
     assert TracePhase.ASSEMBLY in phases
+
+
+@pytest.mark.parametrize(
+    ("smiles", "family", "derivative", "elements", "center_elements"),
+    [
+        ("C[N+]([Se-])(C)C", "nitrogen_chalcogenide", "zwitterion", ["Se"], ["N"]),
+        ("CC[Se]SC", "peroxide", "neutral_link", [], ["Se", "S"]),
+    ],
+)
+def test_whole_component_chalcogen_routes_expose_typed_decisions(smiles, family, derivative, elements, center_elements):
+    analysis = analyze_smiles(smiles)
+    perception = next(step for step in analysis.decisions if step.decision == "identified shortcut functional group")
+    priority = next(step for step in analysis.decisions if step.decision == "selected whole-component citation route")
+    descriptor = perception.data["descriptor"]
+
+    assert descriptor["family"] == family
+    assert descriptor["derivative"] == derivative
+    assert [ligand["element"] for ligand in descriptor["ligands"]] == elements
+    assert descriptor["center_elements"] == center_elements
+    assert priority.data["descriptor"] == descriptor
+    assert analysis.substituent_tree[0]["shortcut"]["descriptor"] == descriptor
+
+
+def test_dynamic_and_projected_chalcogen_groups_expose_structural_descriptors():
+    dynamic = analyze_smiles("CC(=[Se])S[TeH]")
+    dynamic_groups = next(step for step in dynamic.decisions if step.phase is TracePhase.PERCEPTION).data["groups"]
+    descriptor = next(group["descriptor"] for group in dynamic_groups if group["principal_candidate"])
+    assert descriptor["family"] == "acyl"
+    assert descriptor["derivative"] == "acid"
+    assert [ligand["role"] for ligand in descriptor["ligands"]] == [
+        "double_bonded",
+        "chalcogen_link",
+        "hydrogen_bearing",
+    ]
+
+    projected = analyze_smiles("CSOC(=O)NCCCc1ccccc1")
+    projected_groups = next(step for step in projected.decisions if step.phase is TracePhase.PERCEPTION).data["groups"]
+    ester = next(group for group in projected_groups if group["key"] == "ester")
+    assert ester["descriptor"]["linker_paths"] == [[3, 2, 1]]
+    assert any("registered chalcogen citation route" in reason for reason in ester["reasons"])
 
 
 def test_recursive_substituent_trace_segments_include_nested_decisions():
@@ -5463,7 +5510,7 @@ def test_group_13_14_central_atoms_have_a_parent_hydride():
 def test_hypervalent_sulfur_ester_keeps_every_ligand():
     # ``sulfinyloxy``/``sulfonyloxy`` name a sulfur with one further ligand; a
     # lambda^6 sulfur has three, and used to lose two of them silently.
-    assert name_smiles("CCOS(C)=O") == "1-(methylsulfinyloxy)ethane"
+    assert name_smiles("CCOS(C)=O") == "ethyl methanesulfinate"
     assert (
         name_smiles("CCCCCCOS(=O)(CCCCCC)(CCCCCC)OCCCCCC") == "1-((dihexyl(hexyloxy)(oxo)-lambda^6-sulfanyl)oxy)hexane"
     )
@@ -5471,7 +5518,7 @@ def test_hypervalent_sulfur_ester_keeps_every_ligand():
 
 def test_sulfur_imide_substituents_preserve_double_bonded_nitrogen():
     assert name_smiles("N=S(Cl)CF") == "(chloro(imino)sulfanyl)fluoromethane"
-    assert name_smiles("CSC(=O)S(C)=N") == "(imino(methyl)sulfanyl)(methylsulfanyl)methanone"
+    assert name_smiles("CSC(=O)S(C)=N") == "S-methyl (imino(methyl)sulfanyl)methanethioate"
 
 
 def test_sulfonimidoyl_substituents_keep_imino_n_ligand():
@@ -5488,7 +5535,7 @@ def test_terminal_s_minus_uses_thiolate_role():
 
 
 def test_terminal_selenium_anion_substituent_preserves_charge():
-    assert name_smiles("[Se-]C1=CC2(C=CN1)CC[NH2+]CC2") == "2-selenido-3,9-diazaspiro[5.5]undeca-1,4-dien-9-ium"
+    assert name_smiles("[Se-]C1=CC2(C=CN1)CC[NH2+]CC2") == "3,9-diazaspiro[5.5]undeca-1,4-dien-9-ium-2-selenolate"
 
 
 def test_charge_separated_terminal_n3_renders_as_azido_role():
@@ -5834,9 +5881,20 @@ def test_azine_aryl_side_uses_the_retained_benzene_name():
     # bare homocyclic ring is symmetric, so the attachment is position 1.
     assert name_smiles("c1ccccc1C=NN=Cc1ccccc1") == "benzaldehyde benzylidenehydrazone"
     assert name_smiles("CSC(N)=NN=Cc1ccccc1") == "benzaldehyde (amino)(methylsulfanyl)methylidenehydrazone"
-    # A heteroatom breaks that symmetry and genuinely needs numbering, so the
-    # shortcut must still decline rather than guess position 1.
-    assert "benzaldehyde 5-azacyclohexa" in name_smiles("c1ccncc1C=NN=Cc1ccccc1")
+    # A heteroatom breaks that symmetry and genuinely needs numbering; the
+    # locant comes from the ring's own substituent name (``pyridin-3-yl``).
+    assert name_smiles("c1ccncc1C=NN=Cc1ccccc1") == "pyridine-3-carbaldehyde benzylidenehydrazone"
+
+
+def test_azine_heterocycle_side_uses_the_retained_ring_name():
+    # A retained heterocycle has no locant map either, and the fallback spelt
+    # it with replacement prefixes numbered from the attachment atom
+    # (``4-oxa1-azacyclohexan-1-carbaldehyde``), unlike the aldehyde alone.
+    assert name_smiles("CC(C)=NN=CN1CCOCC1") == "morpholine-4-carbaldehyde propan-2-ylidenehydrazone"
+    assert name_smiles("CC(C)=NN=Cc1ccco1") == "furan-2-carbaldehyde propan-2-ylidenehydrazone"
+    assert name_smiles("C(=NN=Cc1ccccn1)c1ccccn1") == "pyridine-2-carbaldehyde pyridin-2-ylmethylidenehydrazone"
+    assert name_smiles("CC(C)=NN=CC1CCSCC1") == "thiane-4-carbaldehyde propan-2-ylidenehydrazone"
+    assert name_smiles("CC(C)=NN=CC1CCOC1") == "oxolane-3-carbaldehyde propan-2-ylidenehydrazone"
 
 
 def test_organometallic_skeletal_replacement():

@@ -631,6 +631,8 @@
     "values": [
       "ether",
       "thioether",
+      "selenoether",
+      "telluroether",
       "amine",
       "aminium",
       "aminide",
@@ -755,6 +757,240 @@
       "ring_aldehyde_amidinohydrazone"
     ]
   },
+  "chalcogen_elements": {
+    "bluebook_rule": "P-62.5, P-63 through P-66; element vocabulary and order for validated chalcogen analogues",
+    "values": {
+      "O": {"rank": 0, "class_name": "oxide", "additive_prefix": "oxido", "substituent_suffix": "oxy", "replacement_infix": "", "nitrogen_chalcogenide_citation": "substitutive"},
+      "S": {"rank": 1, "class_name": "sulfide", "additive_prefix": "sulfido", "substituent_suffix": "sulfanyl", "replacement_infix": "thio", "nitrogen_chalcogenide_citation": "functional_class"},
+      "Se": {"rank": 2, "class_name": "selenide", "additive_prefix": "selenido", "substituent_suffix": "selanyl", "replacement_infix": "seleno", "nitrogen_chalcogenide_citation": "functional_class"},
+      "Te": {"rank": 3, "class_name": "telluride", "additive_prefix": "tellurido", "substituent_suffix": "tellanyl", "replacement_infix": "telluro", "nitrogen_chalcogenide_citation": "functional_class"}
+    }
+  },
+  "chalcogen_simple_group_keys": {
+    "bluebook_rule": "P-63 and P-64; existing functional-group registry keys selected by structural descriptor",
+    "values": [
+      {"family": "hydroxy", "derivative": "alcohol", "element": "O", "key": "alcohol"},
+      {"family": "hydroxy", "derivative": "alcohol", "element": "S", "key": "thiol"},
+      {"family": "hydroxy", "derivative": "alcohol", "element": "Se", "key": "selenol"},
+      {"family": "hydroxy", "derivative": "alcohol", "element": "Te", "key": "tellurol"},
+      {"family": "hydroxy", "derivative": "anion", "element": "O", "key": "olate"},
+      {"family": "hydroxy", "derivative": "anion", "element": "S", "key": "thiolate"},
+      {"family": "hydroxy", "derivative": "anion", "element": "Se", "key": "selenolate"},
+      {"family": "hydroxy", "derivative": "anion", "element": "Te", "key": "tellurolate"},
+      {"family": "carbonyl", "derivative": "aldehyde", "element": "O", "key": "aldehyde"},
+      {"family": "carbonyl", "derivative": "aldehyde", "element": "S", "key": "thioaldehyde"},
+      {"family": "carbonyl", "derivative": "aldehyde", "element": "Se", "key": "selenoaldehyde"},
+      {"family": "carbonyl", "derivative": "aldehyde", "element": "Te", "key": "telluroaldehyde"},
+      {"family": "carbonyl", "derivative": "aldehyde", "element": "O", "external": true, "key": "ring_aldehyde"},
+      {"family": "carbonyl", "derivative": "aldehyde", "element": "S", "external": true, "key": "ring_thioaldehyde"},
+      {"family": "carbonyl", "derivative": "aldehyde", "element": "Se", "external": true, "key": "ring_selenoaldehyde"},
+      {"family": "carbonyl", "derivative": "aldehyde", "element": "Te", "external": true, "key": "ring_telluroaldehyde"},
+      {"family": "carbonyl", "derivative": "ketone", "element": "O", "key": "ketone"},
+      {"family": "carbonyl", "derivative": "ketone", "element": "S", "key": "thioketone"},
+      {"family": "carbonyl", "derivative": "ketone", "element": "Se", "key": "selenoketone"},
+      {"family": "carbonyl", "derivative": "ketone", "element": "Te", "key": "telluroketone"},
+      {"family": "chalcogen_ether", "derivative": "neutral_link", "element": "O", "key": "ether"},
+      {"family": "chalcogen_ether", "derivative": "neutral_link", "element": "S", "key": "thioether"},
+      {"family": "chalcogen_ether", "derivative": "neutral_link", "element": "Se", "key": "selenoether"},
+      {"family": "chalcogen_ether", "derivative": "neutral_link", "element": "Te", "key": "telluroether"}
+    ]
+  },
+  "chalcogenide_class_names": {
+    "bluebook_rule": "P-62.5; functional-class names and additive prefixes for chalcogenides",
+    "values": {"O": "oxide", "S": "sulfide", "Se": "selenide", "Te": "telluride"}
+  },
+  "chalcogen_peroxide_class_names": {
+    "bluebook_rule": "P-63.3; functional-class terms for chalcogen-chalcogen linkages",
+    "values": [
+      {"elements": ["O"], "name": "peroxide"},
+      {"elements": ["S"], "name": "disulfide"},
+      {"elements": ["Se"], "name": "diselenide"},
+      {"elements": ["Te"], "name": "ditelluride"},
+      {"elements": ["O", "S"], "name": "thioperoxide"},
+      {"elements": ["O", "Se"], "name": "selenoperoxide"},
+      {"elements": ["O", "Te"], "name": "telluroperoxide"},
+      {"elements": ["S", "Se"], "name": "selenothioperoxide"},
+      {"elements": ["S", "Te"], "name": "tellurothioperoxide"},
+      {"elements": ["Se", "Te"], "name": "selenotelluroperoxide"}
+    ]
+  },
+  "chalcogen_peroxol_rules": {
+    "bluebook_rule": "P-63.3, Table 6.1; ordered suffixes for R-E1-E2-H",
+    "values": [
+      {"first": "O", "terminal": "O", "suffix": "peroxol", "rank": 0, "capabilities": ["blocks_structural_parent"]},
+      {"first": "S", "terminal": "O", "suffix": "SO-thioperoxol", "rank": 1, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
+      {"first": "Se", "terminal": "O", "suffix": "SeO-selenoperoxol", "rank": 2, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
+      {"first": "Te", "terminal": "O", "suffix": "TeO-telluroperoxol", "rank": 3, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
+      {"first": "O", "terminal": "S", "suffix": "OS-thioperoxol", "rank": 4, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
+      {"first": "O", "terminal": "Se", "suffix": "OSe-selenoperoxol", "rank": 5, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
+      {"first": "O", "terminal": "Te", "suffix": "OTe-telluroperoxol", "rank": 6, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
+      {"first": "S", "terminal": "S", "suffix": "dithioperoxol", "rank": 7, "capabilities": ["blocks_structural_parent"]},
+      {"first": "Se", "terminal": "S", "suffix": "SeS-selenothioperoxol", "rank": 8, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
+      {"first": "Te", "terminal": "S", "suffix": "TeS-tellurothioperoxol", "rank": 9, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
+      {"first": "S", "terminal": "Se", "suffix": "SSe-selenothioperoxol", "rank": 10, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
+      {"first": "S", "terminal": "Te", "suffix": "STe-tellurothioperoxol", "rank": 11, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
+      {"first": "Se", "terminal": "Se", "suffix": "diselenoperoxol", "rank": 12, "capabilities": ["blocks_structural_parent"]},
+      {"first": "Te", "terminal": "Se", "suffix": "TeSe-selenotelluroperoxol", "rank": 13, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
+      {"first": "Se", "terminal": "Te", "suffix": "SeTe-selenotelluroperoxol", "rank": 14, "capabilities": ["element_locanted_suffix", "blocks_structural_parent"]},
+      {"first": "Te", "terminal": "Te", "suffix": "ditelluroperoxol", "rank": 15, "capabilities": ["blocks_structural_parent"]}
+    ]
+  },
+  "chalcogen_citation_routes": {
+    "bluebook_rule": "P-63 and P-65; established substitutive and ester citations retained for supported O/S topologies",
+    "values": [
+      {"context": "peroxol", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "route": "existing"},
+      {"context": "peroxide", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "route": "existing"},
+      {"context": "acyl", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O"], "required_site_elements": ["O"], "allowed_bridge_elements": ["O", "S"], "required_bridge_elements": ["S"], "bridge_prefix": ["O", "S"], "route": "existing", "projection": "ester"},
+      {"context": "acyl", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O"], "required_site_elements": ["O"], "allowed_bridge_elements": ["O", "S"], "required_bridge_elements": ["S"], "bridge_prefix": ["S"], "route": "existing", "projection": "carbonyl"},
+      {"context": "acyl", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["S"], "required_site_elements": ["S"], "allowed_bridge_elements": ["O", "S"], "required_bridge_elements": ["O"], "bridge_prefix": ["O"], "route": "existing", "projection": "carbonyl"},
+      {"context": "anhydride", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O"], "required_site_elements": ["O"], "allowed_bridge_elements": ["O", "S"], "required_bridge_elements": ["S"], "route": "existing", "projection": "ester_or_carbonyl"},
+      {"context": "anhydride", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O", "S"], "required_site_elements": ["S"], "allowed_bridge_elements": ["O"], "required_bridge_elements": ["O"], "route": "existing", "projection": "ester_or_carbonyl"},
+      {"context": "anhydride", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O", "S"], "required_site_elements": ["O", "S"], "allowed_bridge_elements": ["O", "S"], "required_bridge_elements": ["O", "S"], "bridge_atom_count": 2, "route": "existing", "projection": "ester_or_carbonyl"},
+      {"context": "anhydride", "allowed_elements": ["O", "S"], "required_elements": ["O", "S"], "allowed_site_elements": ["O", "S"], "required_site_elements": ["O", "S"], "allowed_bridge_elements": ["S"], "required_bridge_elements": ["S"], "bridge_atom_count": 1, "route": "existing", "projection": "ester_or_carbonyl"},
+      {"context": "anhydride", "allowed_elements": ["O"], "required_elements": ["O"], "allowed_site_elements": ["O"], "required_site_elements": ["O"], "allowed_bridge_elements": ["O"], "required_bridge_elements": ["O"], "bridge_atom_count": 2, "route": "existing", "projection": "peroxy_ester"}
+    ]
+  },
+  "chalcogen_standard_acyl_keys": {
+    "bluebook_rule": "P-65 and P-66; existing registry rows reused by ordinary and retained acyl derivatives",
+    "values": [
+      {"derivative": "acid", "double_element": "O", "single_element": "O", "key": "carboxylic_acid"},
+      {"derivative": "acid", "double_element": "O", "single_element": "O", "external": true, "key": "ring_carboxylic_acid"},
+      {"derivative": "anion", "double_element": "O", "single_element": "O", "key": "carboxylate"},
+      {"derivative": "anion", "double_element": "O", "single_element": "O", "external": true, "key": "ring_carboxylate"},
+      {"derivative": "ester", "double_element": "O", "single_element": "O", "key": "ester"},
+      {"derivative": "ester", "double_element": "O", "single_element": "O", "external": true, "key": "ring_carboxylate"},
+      {"derivative": "amide", "double_element": "O", "key": "amide"},
+      {"derivative": "amide", "double_element": "O", "external": true, "key": "ring_amide"},
+      {"derivative": "amide", "double_element": "S", "key": "thioamide"},
+      {"derivative": "amide", "double_element": "S", "external": true, "key": "ring_thioamide"},
+      {"derivative": "hydrazide", "double_element": "O", "key": "hydrazide"},
+      {"derivative": "hydrazide", "double_element": "O", "external": true, "key": "ring_hydrazide"},
+      {"derivative": "urea", "double_element": "O", "key": "urea"},
+      {"derivative": "urea", "double_element": "S", "key": "thiourea"},
+      {"derivative": "urea", "double_element": "Se", "key": "selenourea"},
+      {"derivative": "urea", "double_element": "Te", "key": "tellurourea"}
+    ]
+  },
+  "chalcogen_standard_peroxy_acyl_keys": {
+    "bluebook_rule": "P-65.6; ordinary oxygen peroxy-acid and ester registry rows",
+    "values": [
+      {"derivative": "acid", "key": "peroxy_acid"},
+      {"derivative": "acid", "external": true, "key": "ring_peroxy_acid"},
+      {"derivative": "ester", "key": "peroxy_ester"},
+      {"derivative": "ester", "external": true, "key": "ring_peroxy_ester"}
+    ]
+  },
+  "chalcogen_acyl_leaving_groups": {
+    "bluebook_rule": "P-65.5 and P-65.6; acyl halide and pseudohalide words, prefixes, and priority order",
+    "values": {
+      "F": {"word": "fluoride", "prefix": "fluoro", "rank": 0, "chain_key": "acid_fluoride", "external_key": "ring_acid_fluoride"},
+      "Cl": {"word": "chloride", "prefix": "chloro", "rank": 1, "chain_key": "acid_chloride", "external_key": "ring_acid_chloride"},
+      "Br": {"word": "bromide", "prefix": "bromo", "rank": 2, "chain_key": "acid_bromide", "external_key": "ring_acid_bromide"},
+      "I": {"word": "iodide", "prefix": "iodo", "rank": 3, "chain_key": "acid_iodide", "external_key": "ring_acid_iodide"},
+      "N3": {"word": "azide", "prefix": "azido", "rank": 4, "chain_key": "acid_azide", "external_key": "ring_acid_azide"},
+      "CN": {"word": "cyanide", "prefix": "cyano", "rank": 5, "chain_key": "acid_cyanide", "external_key": "ring_acid_cyanide"},
+      "NC": {"word": "isocyanide", "prefix": "isocyano", "rank": 6, "chain_key": "acid_isocyanide", "external_key": "ring_acid_isocyanide"},
+      "NCO": {"word": "isocyanate", "prefix": "isocyanato", "rank": 7, "chain_key": "acid_isocyanate", "external_key": "ring_acid_isocyanate"},
+      "NCS": {"word": "isothiocyanate", "prefix": "isothiocyanato", "rank": 8, "chain_key": "acid_isothiocyanate", "external_key": "ring_acid_isothiocyanate"},
+      "NCSe": {"word": "isoselenocyanate", "prefix": "isoselenocyanato", "rank": 9, "chain_key": "acid_isoselenocyanate", "external_key": "ring_acid_isoselenocyanate"},
+      "NCTe": {"word": "isotellurocyanate", "prefix": "isotellurocyanato", "rank": 10, "chain_key": "acid_isotellurocyanate", "external_key": "ring_acid_isotellurocyanate"}
+    }
+  },
+  "chalcogen_central_acid_origins": {
+    "bluebook_rule": "P-65; stems and seniority for sulfur, selenium, and tellurium acids",
+    "values": [
+      {"element": "S", "double_bond_count": 2, "stem": "sulfon", "rank": 25, "linkage_prefix": "sulfonyl", "acid_key": "sulfonic_acid", "ester_key": "sulfonate", "amide_key": "sulfonamide"},
+      {"element": "S", "double_bond_count": 1, "stem": "sulfin", "rank": 27, "linkage_prefix": "sulfinyl", "acid_prefix": "hydroxysulfinyl"},
+      {"element": "Se", "double_bond_count": 2, "stem": "selenon", "rank": 28, "linkage_prefix": "selenonyl"},
+      {"element": "Se", "double_bond_count": 1, "stem": "selenin", "rank": 29, "linkage_prefix": "seleninyl"},
+      {"element": "Te", "double_bond_count": 2, "stem": "telluron", "rank": 29, "linkage_prefix": "telluronyl"},
+      {"element": "Te", "double_bond_count": 1, "stem": "tellurin", "rank": 29, "linkage_prefix": "tellurinyl"}
+    ]
+  },
+  "chalcogen_rule_policies": {
+    "bluebook_rule": "P-62.5 and P-63 through P-66; descriptor-driven dynamic functional-group rules",
+    "values": {
+      "nitrile_chalcogenide": {"prefix": "cyano{additive_prefix}", "suffix": "{carbo}nitrile {class_name}", "seniority": 5, "families": ["nitrile_chalcogenide"]},
+      "peroxol": {"seniority": 105, "families": ["peroxol"]},
+      "acyl": {
+        "acid": {"suffix": "{carbo}{infix}ic{site}", "citation_suffix": "{carbo}{infix}ic", "prefix": "{infix}carboxy", "seniority": 20, "families": ["carboxy_prefix", "chain_external_carbonyl"], "capabilities": ["chain_external_carbonyl"]},
+        "anion": {"suffix": "{carbo}{infix}ate", "prefix": "{infix}carboxylato", "seniority": 21, "families": ["carboxy_prefix", "chain_external_carbonyl"], "capabilities": ["chain_external_carbonyl"]},
+        "ester": {"suffix": "{carbo}{infix}ate", "prefix": "{infix}oxycarbonyl", "seniority": 40, "families": ["ester_like", "front_modifier", "chain_external_carbonyl"], "capabilities": ["ester_like", "front_modifier", "chain_external_carbonyl"], "multi_suffix": false},
+        "amide": {"suffix": "{carbo}{infix}amide", "prefix": "carbamo{infix}yl", "seniority": 60, "ranked_seniority": true, "families": ["amide_like", "chain_external_carbonyl"], "capabilities": ["amide_like", "chain_external_carbonyl"]},
+        "hydrazide": {"suffix": "{carbo}{infix}hydrazide", "prefix": "hydrazinecarb{infix}oyl", "seniority": 68, "families": ["amide_like", "hydrazide", "chain_external_carbonyl"], "capabilities": ["amide_like", "hydrazide", "chain_external_carbonyl"]},
+        "urea": {"suffix": "{infix}urea", "prefix": "carbamo{infix}ylamino", "seniority": 60, "families": ["amide_like", "urea"], "capabilities": ["amide_like", "urea"]},
+        "acid_halide": {"suffix": "{carbo}{infix}yl {halide_word}", "prefix": "{halide_prefix}{infix}carbonyl", "seniority": 50, "families": ["acid_halide", "chain_external_carbonyl"], "capabilities": ["acid_halide", "acyl_leaving_group", "chain_external_carbonyl"]},
+        "acyl_pseudohalide": {"suffix": "{carbo}{infix}yl {halide_word}", "prefix": "{halide_prefix}{infix}carbonyl", "seniority": 50, "families": ["acid_halide", "chain_external_carbonyl"], "capabilities": ["acid_halide", "acyl_leaving_group", "chain_external_carbonyl"]}
+      },
+      "peroxy_acyl": {
+        "acid": {"seniority": 22, "families": ["peroxy_acid", "chain_external_carbonyl"], "capabilities": ["chain_external_carbonyl"]},
+        "anion": {"seniority": 21, "families": ["peroxy_ester", "chain_external_carbonyl"], "capabilities": ["chain_external_carbonyl"]},
+        "ester": {"seniority": 45, "families": ["ester_like", "peroxy_ester", "front_modifier", "chain_external_carbonyl"], "capabilities": ["ester_like", "front_modifier", "chain_external_carbonyl"]}
+      },
+      "anhydride": {"standard_key": "anhydride", "seniority": 30, "families": ["anhydride"], "capabilities": ["anhydride"]},
+      "imide_route": {"key": "chalcogen_imide_route", "seniority": 13, "families": ["imide_route"], "capabilities": ["promotes_member_groups"]},
+      "central_peroxy": {
+        "acid": {"seniority": 22, "families": ["central_acid", "peroxy_acid"], "capabilities": ["central_acid"]},
+        "anion": {"seniority": 26, "families": ["central_acid", "peroxy_ester"], "capabilities": ["central_acid"]},
+        "ester": {"seniority": 45, "families": ["central_acid", "ester_like", "peroxy_ester", "front_modifier"], "capabilities": ["central_acid", "ester_like", "front_modifier"]}
+      },
+      "central": {
+        "acid": {"families": ["central_acid"], "capabilities": ["central_acid"]},
+        "anion": {"seniority": 26, "families": ["central_acid"], "capabilities": ["central_acid"]},
+        "ester": {"seniority": 40, "families": ["central_acid", "ester_like", "front_modifier"], "capabilities": ["central_acid", "ester_like", "front_modifier"]},
+        "amide": {"seniority": 66, "families": ["central_acid", "amide_like"], "capabilities": ["central_acid", "amide_like"]},
+        "hydrazide": {"seniority": 68, "families": ["central_acid", "amide_like", "hydrazide"], "capabilities": ["central_acid", "amide_like", "hydrazide"]},
+        "acid_halide": {"seniority": 55, "families": ["central_acid", "acid_halide"], "capabilities": ["central_acid", "acid_halide", "acyl_leaving_group"]}
+      }
+    }
+  },
+  "chalcogen_templates": {
+    "bluebook_rule": "P-62.5 and P-63 through P-66; compositional templates used by typed chalcogen rule resolution",
+    "values": {
+      "acid_site_same": " acid",
+      "acid_site_element": " {element}-acid",
+      "acid_site_pair": " {first}{second}-acid",
+      "peroxo": "peroxo",
+      "replaced_peroxo": "{replacement}peroxo",
+      "doubly_replaced_peroxo": "di{replacement}peroxo",
+      "ordinary_peroxy_acid": "{carbo}{linker}{acid_infix}ic",
+      "ordinary_peroxy_ester": "{carbo}{linker}{acid_infix}ate",
+      "mixed_peroxy_acid": "{carbo}{acid_infix}({linker}ic)",
+      "mixed_peroxy_ester": "{carbo}{acid_infix}({linker}ate)",
+      "peroxy_prefix": "{acid_infix}{linker}carbonyl",
+      "anhydride": "anhydride",
+      "single_replacement_anhydride": "{replacement}anhydride",
+      "peroxyanhydride": "peroxyanhydride",
+      "single_replacement_peroxyanhydride": "{replacement}peroxyanhydride",
+      "double_replacement_peroxyanhydride": "di{replacement}peroxyanhydride",
+      "mixed_replacement_peroxyanhydride": "{replacement}peroxyanhydride",
+      "amine_chalcogenide_parent": "{parent} {class_name}",
+      "imine_chalcogenide_parent": "{parent} N-{class_name}",
+      "central_origin_with_infix": "{stem}o{infix}",
+      "central_peroxy_acid": "{origin}operoxoic acid",
+      "central_peroxy_ester": "{origin}operoxoate",
+      "central_mixed_peroxy_acid": "{origin}o({linker}ic){site}",
+      "central_mixed_peroxy_ester": "{origin}o({linker}ate)",
+      "central_peroxy_prefix": "{origin}operoxyl",
+      "central_suffix_stem": "{stem}{connector}{infix}",
+      "central_acid_suffix": "{stem}ic{site}",
+      "central_anion_suffix": "{stem}ate",
+      "central_ester_suffix": "{stem}ate",
+      "central_amide_suffix": "{stem}amide",
+      "central_hydrazide_suffix": "{stem}hydrazide",
+      "central_plain_hydrazide_suffix": "{stem}ohydrazide",
+      "central_acid_halide_suffix": "{stem}yl {halide_word}",
+      "central_acid_prefix": "{stem}o{infix}o",
+      "central_anion_prefix": "{stem}ato",
+      "central_ester_prefix": "{stem}yl",
+      "central_amide_prefix": "{stem}amoyl",
+      "central_hydrazide_prefix": "hydrazine{stem}yl",
+      "central_acid_halide_prefix": "{halide_prefix}{stem}yl",
+      "ordinary_acyl_leaving_prefix": "{prefix}carbonyl",
+      "ordinary_acyl_leaving_chain_suffix": "oyl {word}",
+      "ordinary_acyl_leaving_external_suffix": "carbonyl {word}"
+    }
+  },
   "functional_groups": {
     "bluebook_rule": "Unified functional-group metadata. Add or override functional groups here with role, suffix templates, locant policy, multiplication strategy, handlers, and optional family tags.",
     "values": {
@@ -808,7 +1044,8 @@
         },
         "seniority": 20,
         "suffix_with_locant": false,
-        "needs_locant": true
+        "needs_locant": true,
+        "citation_suffixes": {"anhydride_half": "oic"}
       },
       "carboxylate": {
         "role": "principal",
@@ -834,7 +1071,8 @@
         },
         "seniority": 20,
         "suffix_with_locant": true,
-        "needs_locant": true
+        "needs_locant": true,
+        "citation_suffixes": {"anhydride_half": "carboxylic"}
       },
       "ring_carboxylate": {
         "role": "principal",
@@ -991,7 +1229,8 @@
         "multi_suffix": null,
         "seniority": 30,
         "suffix_with_locant": false,
-        "needs_locant": true
+        "needs_locant": true,
+        "families": ["anhydride", "prefix_skip"]
       },
       "ester": {
         "role": "principal",
@@ -1138,7 +1377,8 @@
         },
         "seniority": 60,
         "suffix_with_locant": false,
-        "needs_locant": true
+        "needs_locant": true,
+        "families": ["amide_like", "urea"]
       },
       "thiourea": {
         "role": "principal",
@@ -1151,7 +1391,28 @@
         },
         "seniority": 60,
         "suffix_with_locant": false,
-        "needs_locant": true
+        "needs_locant": true,
+        "families": ["amide_like", "urea"]
+      },
+      "selenourea": {
+        "role": "principal",
+        "prefix": "carbamoselenoylamino",
+        "suffix": "selenourea",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 62,
+        "suffix_with_locant": false,
+        "needs_locant": true,
+        "families": ["amide_like", "urea"]
+      },
+      "tellurourea": {
+        "role": "principal",
+        "prefix": "carbamotelluroylamino",
+        "suffix": "tellurourea",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 63,
+        "suffix_with_locant": false,
+        "needs_locant": true,
+        "families": ["amide_like", "urea"]
       },
       "ring_amide": {
         "role": "principal",
@@ -1177,7 +1438,8 @@
         },
         "seniority": 68,
         "suffix_with_locant": false,
-        "needs_locant": true
+        "needs_locant": true,
+        "families": ["amide_like", "hydrazide", "chain_external_carbonyl"]
       },
       "ring_hydrazide": {
         "role": "principal",
@@ -1190,7 +1452,8 @@
         },
         "seniority": 68,
         "suffix_with_locant": true,
-        "needs_locant": true
+        "needs_locant": true,
+        "families": ["amide_like", "hydrazide", "chain_external_carbonyl"]
       },
       "amidine": {
         "role": "principal",
@@ -1357,7 +1620,43 @@
             0
           ]
         },
-        "seniority": 80,
+        "seniority": 81,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "selenoaldehyde": {
+        "role": "principal",
+        "prefix": "selenoxo",
+        "suffix": "selenal",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 82,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_selenoaldehyde": {
+        "role": "principal",
+        "prefix": "selenoformyl",
+        "suffix": "carboselenaldehyde",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 82,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "telluroaldehyde": {
+        "role": "principal",
+        "prefix": "telluroxo",
+        "suffix": "tellanal",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 83,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "ring_telluroaldehyde": {
+        "role": "principal",
+        "prefix": "telluroformyl",
+        "suffix": "carbotelluraldehyde",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 83,
         "suffix_with_locant": true,
         "needs_locant": true
       },
@@ -1371,6 +1670,33 @@
           ]
         },
         "seniority": 90,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "thioketone": {
+        "role": "principal",
+        "prefix": "thioxo",
+        "suffix": "thione",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 91,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "selenoketone": {
+        "role": "principal",
+        "prefix": "selenoxo",
+        "suffix": "selone",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 92,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "telluroketone": {
+        "role": "principal",
+        "prefix": "telluroxo",
+        "suffix": "tellone",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 93,
         "suffix_with_locant": true,
         "needs_locant": true
       },
@@ -1475,7 +1801,43 @@
             0
           ]
         },
-        "seniority": 105,
+        "seniority": 101,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "selenol": {
+        "role": "principal",
+        "prefix": "selanyl",
+        "suffix": "selenol",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 102,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "tellurol": {
+        "role": "principal",
+        "prefix": "tellanyl",
+        "suffix": "tellurol",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 103,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "selenolate": {
+        "role": "principal",
+        "prefix": "selenido",
+        "suffix": "selenolate",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 16,
+        "suffix_with_locant": true,
+        "needs_locant": true
+      },
+      "tellurolate": {
+        "role": "principal",
+        "prefix": "tellurido",
+        "suffix": "tellurolate",
+        "multi_suffix": {"multiplier_positions": [0]},
+        "seniority": 16,
         "suffix_with_locant": true,
         "needs_locant": true
       },
@@ -1563,6 +1925,24 @@
         "suffix": "ether",
         "multi_suffix": null,
         "seniority": 200,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "selenoether": {
+        "role": "prefix",
+        "prefix": "selanyl",
+        "suffix": null,
+        "multi_suffix": null,
+        "seniority": null,
+        "suffix_with_locant": false,
+        "needs_locant": true
+      },
+      "telluroether": {
+        "role": "prefix",
+        "prefix": "tellanyl",
+        "suffix": null,
+        "multi_suffix": null,
+        "seniority": null,
         "suffix_with_locant": false,
         "needs_locant": true
       },
@@ -1847,6 +2227,26 @@
         "category": "retained_alias",
         "reason": "Use retained hydrazinyl prefix for aminoamino."
       }
+    ]
+  },
+  "retained_chain_functional_parents": {
+    "bluebook_rule": "P-66.1; retained one-carbon chalcogen analogues of urea",
+    "values": [
+      {"length": 1, "group": "selenourea", "count": 1, "name": "selenourea"},
+      {"length": 1, "group": "tellurourea", "count": 1, "name": "tellurourea"}
+    ]
+  },
+  "retained_principal_citations": {
+    "bluebook_rule": "P-65.7; retained acid citations used as anhydride component names",
+    "values": [
+      {"mode": "anhydride_half", "name": "formic acid", "citation": "formic"},
+      {"mode": "anhydride_half", "name": "acetic acid", "citation": "acetic"},
+      {"mode": "anhydride_half", "name": "benzoic acid", "citation": "benzoic"},
+      {"mode": "anhydride_half", "name": "oxalic acid", "citation": "oxalic"},
+      {"mode": "anhydride_half", "name": "malonic acid", "citation": "malonic"},
+      {"mode": "anhydride_half", "name": "succinic acid", "citation": "succinic"},
+      {"mode": "anhydride_half", "name": "glutaric acid", "citation": "glutaric"},
+      {"mode": "anhydride_half", "name": "adipic acid", "citation": "adipic"}
     ]
   },
   "retained_monocycle_specs": {
