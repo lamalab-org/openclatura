@@ -157,13 +157,42 @@ SPIRO_COMPONENTS = (
 )
 
 
+def _principal_group_diagnosis(smiles):
+    """Report what was perceived and which group won, for a failure message.
+
+    These two cases pass on macOS and fail on the Linux CI runners, and the
+    difference is not the hydrogen spelling the assertion names: it is which
+    group becomes the suffix. Locally the amide is perceived and outranks the
+    ring ketones outright, so it takes the suffix and the ring carbonyls become
+    oxo prefixes. For the dione to win instead, the amide has to be missing
+    from perception altogether - there is no seniority tie for an ordering to
+    decide. Perception is RDKit substructure matching, so the failing
+    environment is the only place the missing match can be seen; printing it
+    here is what makes that observable without a Linux machine to hand.
+    """
+
+    from openclatura.graph_io import read_rdkit_mol
+    from openclatura.nomenclature import RULES
+    from openclatura.perception import perceive_groups
+    from openclatura.principal_groups import component_principal_key
+
+    molecule = read_rdkit_mol(Chem.MolFromSmiles(smiles))
+    candidates = [group for group in perceive_groups(molecule) if group.is_principal_candidate]
+    perceived = ", ".join(
+        f"{group.key}@{group.attachment_carbon}"
+        f"(seniority={getattr(RULES.functional_groups.by_key.get(group.key), 'seniority', None)})"
+        for group in candidates
+    )
+    return f"principal={component_principal_key(candidates, False)!r}; candidates: {perceived or 'none'}"
+
+
 @pytest.mark.parametrize(("smiles", "expected", "respelled"), SPIRO_COMPONENTS)
 def test_a_spiro_component_keeps_its_own_hydrogen_citation(smiles, expected, respelled):
     """The respelling is for a parent cited as a substituent, not for these."""
 
     name = name_smiles(smiles)
-    assert expected in name
-    assert respelled not in name
+    assert expected in name, f"{name}\n{_principal_group_diagnosis(smiles)}"
+    assert respelled not in name, f"{name}\n{_principal_group_diagnosis(smiles)}"
 
 
 @pytest.mark.parametrize(("smiles", "expected", "respelled"), SPIRO_COMPONENTS)
