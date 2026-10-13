@@ -65,10 +65,7 @@ def test_heteroatom_link_is_an_ester_only_when_the_center_is_a_carbamate():
 
 def test_cyclic_heteroatom_link_keeps_the_carbonyl_or_thiocarbonyl_in_the_ring():
     assert oc.name("Cc1ccc(-c2nc(=S)o[nH]2)cc1").name == "3-(4-methylphenyl)-2H-1,2,4-oxadiazole-5-thione"
-    assert (
-        oc.name("NC(CCn1oc(=O)[nH]c1=O)C(=O)O").name
-        == "2-(3-amino-4-hydroxy-4-oxobutyl)-1,2,4-oxadiazolidine-3,5-dione"
-    )
+    assert oc.name("NC(CCn1oc(=O)[nH]c1=O)C(=O)O").name == "2-amino-4-(3,5-dioxo-1,2,4-oxadiazolidin-2-yl)butanoic acid"
 
 
 def test_central_acid_requires_a_neutral_amide_nitrogen():

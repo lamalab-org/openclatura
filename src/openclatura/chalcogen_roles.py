@@ -36,6 +36,10 @@ class UnsupportedChalcogenNomenclatureError(ValueError):
     """The graph contains a chalcogen whose organic vocabulary is not validated."""
 
 
+class AcylDescriptorValidationError(ValueError):
+    """A declared acyl descriptor is inconsistent with its molecular graph."""
+
+
 def require_validated_chalcogens(mol: Molecule) -> None:
     """Reject unvalidated chalcogens explicitly instead of silently omitting them."""
 
@@ -160,6 +164,98 @@ class FunctionalGroupDescriptor:
         return tuple(ligand for ligand in self.ligands if ligand.role is role)
 
 
+@dataclass(frozen=True)
+class AcylLinkageView:
+    """Validated, path-oriented view of a two-centre acyl linkage."""
+
+    left_center: int
+    right_center: int
+    left_double: ChalcogenLigand
+    right_double: ChalcogenLigand
+    bridge_ligands: tuple[ChalcogenLigand, ...]
+    path: tuple[int, ...]
+
+
+def double_ligand_for_center(
+    descriptor: FunctionalGroupDescriptor,
+    center: int,
+) -> ChalcogenLigand:
+    """Return the unique double-bonded ligand belonging to ``center``."""
+
+    matches = tuple(
+        ligand for ligand in descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED) if ligand.center == center
+    )
+    if len(matches) != 1:
+        raise AcylDescriptorValidationError(
+            f"Expected exactly one double ligand at acyl center {center}; found {len(matches)}"
+        )
+    return matches[0]
+
+
+def is_complete_acyl_end(
+    mol: Molecule,
+    center: int,
+    double_ligand: ChalcogenLigand,
+    linkage_atom: int,
+) -> bool:
+    """Return whether one linkage end is a complete formyl/carbyl acyl site.
+
+    The bounded carboxylic-anhydride route normally requires hydrogen or one
+    carbon substituent.  A heteroatom attachment can also anchor an established
+    parent when the component beyond it has parent-defining ring or multiple-
+    bond topology.  A simple heteroalkyl ligand instead identifies another
+    derivative family, such as a carbonate or carbamate.
+    """
+
+    atom = mol.atoms[center]
+    if (
+        not atom.is_carbon
+        or atom.charge != 0
+        or atom.radical_electrons != 0
+        or atom.is_aromatic
+        or double_ligand.center != center
+        or double_ligand.role is not ChalcogenLigandRole.DOUBLE_BONDED
+    ):
+        return False
+
+    double_bond = mol.get_bond(center, double_ligand.atom)
+    linkage_bond = mol.get_bond(center, linkage_atom)
+    if double_bond is None or double_bond.order != 2 or linkage_bond is None or linkage_bond.order != 1:
+        return False
+
+    remaining = set(mol.get_neighbors(center)) - {double_ligand.atom, linkage_atom}
+    if not remaining:
+        return atom.total_h_count == 1
+    if len(remaining) != 1 or atom.total_h_count != 0:
+        return False
+    substituent = next(iter(remaining))
+    substituent_bond = mol.get_bond(center, substituent)
+    if substituent_bond is None or substituent_bond.order != 1:
+        return False
+    if mol.atoms[substituent].is_carbon:
+        return True
+
+    component = {substituent}
+    frontier = [substituent]
+    while frontier:
+        current = frontier.pop()
+        for neighbor in mol.get_neighbors(current):
+            if neighbor == center or neighbor in component:
+                continue
+            component.add(neighbor)
+            frontier.append(neighbor)
+
+    component_edges = {
+        mol.get_bond(left, right).idx
+        for left in component
+        for right in mol.get_neighbors(left)
+        if right in component and left < right
+    }
+    has_cycle = len(component_edges) >= len(component)
+    has_multiple_bond = any(mol.bonds[bond_id].order > 1 for bond_id in component_edges)
+    return has_cycle or has_multiple_bond
+
+
 def chalcogen_for_symbol(symbol: str) -> Chalcogen | None:
     """Return the typed chalcogen for an element symbol, if supported."""
 
@@ -211,6 +307,63 @@ def classify_chalcogen_ligand(
         center=center,
         bond_id=bond.idx,
         attachment_atom=attachment,
+    )
+
+
+def acyl_linkage_view(
+    mol: Molecule,
+    descriptor: FunctionalGroupDescriptor,
+) -> AcylLinkageView:
+    """Validate and orient a one- or two-chalcogen anhydride bridge."""
+
+    if descriptor.family is not FunctionalFamily.ACYL or descriptor.derivative is not DerivativeKind.ANHYDRIDE:
+        raise AcylDescriptorValidationError("Expected an acyl anhydride descriptor")
+    if len(descriptor.centers) != 2 or descriptor.centers[0] == descriptor.centers[1]:
+        raise AcylDescriptorValidationError("An anhydride requires two distinct acyl centers")
+    if len(descriptor.linker_paths) != 1:
+        raise AcylDescriptorValidationError("An anhydride requires one ordered linker path")
+
+    path = descriptor.linker_paths[0]
+    if len(path) not in {3, 4}:
+        raise AcylDescriptorValidationError("An anhydride bridge must contain one or two chalcogen atoms")
+    if set((path[0], path[-1])) != set(descriptor.centers):
+        raise AcylDescriptorValidationError("The linker path must terminate at both acyl centers")
+
+    left_center, right_center = path[0], path[-1]
+    left_double = double_ligand_for_center(descriptor, left_center)
+    right_double = double_ligand_for_center(descriptor, right_center)
+    bridge_ligands = []
+    for position in range(1, len(path) - 1):
+        previous_atom = path[position - 1]
+        bridge_atom = path[position]
+        next_atom = path[position + 1]
+        bond = mol.get_bond(previous_atom, bridge_atom)
+        next_bond = mol.get_bond(bridge_atom, next_atom)
+        atom = mol.atoms[bridge_atom]
+        if bond is None or next_bond is None or bond.order != 1 or next_bond.order != 1:
+            raise AcylDescriptorValidationError("Every anhydride bridge bond must be single")
+        if (
+            chalcogen_for_symbol(atom.symbol) is None
+            or atom.charge != 0
+            or atom.radical_electrons != 0
+            or atom.total_h_count != 0
+            or set(mol.get_neighbors(bridge_atom)) != {previous_atom, next_atom}
+        ):
+            raise AcylDescriptorValidationError(f"Bridge atom {bridge_atom} is not a complete neutral chalcogen linker")
+        ligand = classify_chalcogen_ligand(mol, previous_atom, bridge_atom)
+        if ligand is None or ligand.attachment_atom != next_atom:
+            raise AcylDescriptorValidationError(
+                f"Bridge atom {bridge_atom} does not agree with the ordered linker path"
+            )
+        bridge_ligands.append(ligand)
+
+    return AcylLinkageView(
+        left_center=left_center,
+        right_center=right_center,
+        left_double=left_double,
+        right_double=right_double,
+        bridge_ligands=tuple(bridge_ligands),
+        path=path,
     )
 
 

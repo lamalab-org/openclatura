@@ -1,4 +1,4 @@
-"""OPSIN-compatible citation routes sampled from the CI regression corpus."""
+"""Descriptor-preserving chalcogen citations sampled from the CI corpus."""
 
 import pytest
 
@@ -10,22 +10,22 @@ import openclatura as oc
     [
         (
             "CC(=O)CC(=O)OSC(C)(C)C",
-            "(tert-butyl)sulfanyl 3-oxobutanoate",
+            "OS-(tert-butyl) 3-oxobutane(thioperoxoate)",
         ),
-        ("C=CC(=O)SS", "1-(sulfanylsulfanyl)prop-2-en-1-one"),
+        ("C=CC(=O)SS", "prop-2-ene(dithioperoxoic) acid"),
         (
             "CC(C)SC(=O)c1cc(C(=O)O)no1",
-            "5-(((propan-2-yl)sulfanyl)carbonyl)-1,2-oxazole-3-carboxylic acid",
+            "5-((propan-2-yl)sulfanylcarbonyl)-1,2-oxazole-3-carboxylic acid",
         ),
-        ("CCCCOC(=S)CCC(=O)OCC", "ethyl 4-butoxy-4-thioxobutanoate"),
-        ("CCc1cccc(C(=O)OS)c1", "sulfanyl 3-ethylbenzoate"),
+        ("CCCCOC(=S)CCC(=O)OCC", "ethyl 3-(butoxycarbonothioyl)propanoate"),
+        ("CCc1cccc(C(=O)OS)c1", "3-ethylbenzene-1-carbo(thioperoxoic) OS-acid"),
         (
             "O=C(SSC(Cl)=CCl)c1cc(Cl)c(Cl)cc1Cl",
-            "(((1,2-dichloroethenyl)sulfanyl)sulfanyl)(2,4,5-trichlorophenyl)methanone",
+            "SS-(1,2-dichloroethenyl) 2,4,5-trichlorobenzene-1-carbo(dithioperoxoate)",
         ),
     ],
 )
-def test_established_oxygen_sulfur_acyl_citations(smiles: str, expected: str):
+def test_oxygen_sulfur_acyl_citations_preserve_complete_derivatives(smiles: str, expected: str):
     assert oc.name(smiles).name == expected
 
 
@@ -45,13 +45,13 @@ def test_novel_heavier_chalcogen_acyl_citations_remain_generic(smiles: str, expe
     (
         (
             "CCCCCCC(C)(C)C(=O)OSC(=S)n1nc(C)cc1C",
-            "((3,5-dimethyl-1H-pyrazol-1-yl)(thioxo)methyl)sulfanyl 2,2-dimethyloctanoate",
+            "O-2,2-dimethyloctanoic S-3,5-dimethyl-1H-pyrazole-1-carbothioic thioperoxyanhydride",
         ),
         (
             "Cc1ccc(C(=O)SC(=S)SCC#N)cc1",
-            "2-(((((4-methylphenyl)carbonyl)sulfanyl)(thioxo)methyl)sulfanyl)acetonitrile",
+            "2-(((hydroxy)(thioxo)methyl)sulfanyl)acetonitrile 4-methylbenzoic thioanhydride",
         ),
     ),
 )
-def test_mixed_site_anhydrides_reuse_structural_citation(smiles: str, expected: str):
+def test_mixed_site_anhydrides_keep_both_acyl_ends(smiles: str, expected: str):
     assert oc.name(smiles).name == expected

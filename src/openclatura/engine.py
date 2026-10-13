@@ -14,6 +14,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from .chalcogen_roles import require_validated_chalcogens
 from .fusion.context import current_fusion_mode, reset_fusion_mode, set_fusion_mode
 from .fusion.model import FusionMode
 from .graph_io import get_connected_components, read_rdkit_mol, read_smiles
@@ -300,6 +301,7 @@ class NamingEngine:
         try:
             with audit_cm as component_audits:
                 mol, smiles = self._prepare_input(request)
+                require_validated_chalcogens(mol)
                 if need_analysis:
                     analysis = self._analyze(
                         mol,

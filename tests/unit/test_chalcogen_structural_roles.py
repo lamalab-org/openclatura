@@ -118,6 +118,23 @@ def test_cyclic_imide_route_remains_below_a_carboxylic_ester():
 
 @pytest.mark.parametrize(
     ("smiles", "expected"),
+    (
+        (
+            "O=Cc1cc(NCCOCCOCCOCCC(=O)O)ccc1C(=O)NC1CCC(=O)NC1=O",
+            "3-((2-((2-((2-((4-((2,6-dioxopiperidin-3-yl)carbamoyl)-3-formylphenyl)amino)ethyl)oxy)ethyl)oxy)ethyl)oxy)propanoic acid",
+        ),
+        (
+            "CC(=O)NOC1(C)C(=O)NC(=O)NC1=O",
+            "N-((5-methyl-2,4,6-trioxo-1,3-diazinan-5-yl)oxy)acetamide",
+        ),
+    ),
+)
+def test_cyclic_imide_route_remains_below_independent_more_senior_groups(smiles: str, expected: str):
+    assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
+    ("smiles", "expected"),
     [
         ("CC(=O)N=[N+]=[N-]", "acetyl azide"),
         ("CCCC(=O)C#N", "butanoyl cyanide"),

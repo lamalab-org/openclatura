@@ -9,6 +9,7 @@ from .assembly_parts import NameTokenBinding, SubstituentItem, rendered_substitu
 from .assembly_prefixes import substituent_sort_key
 from .chalcogen_roles import ChalcogenLigandRole, DerivativeKind, FunctionalFamily
 from .chalcogen_vocabulary import (
+    acyl_center_prefix,
     central_linkage_prefix,
     chalcogen_substituent_suffix,
     resolve_central_acid_rule,
@@ -113,6 +114,36 @@ def peroxy_ester_prefix_from_group(
 def ester_prefix_handler(context: PrefixContext, group: PerceivedGroup) -> str:
     if group.key in RULES.prefixes.peroxy_ester_groups:
         return peroxy_ester_prefix_from_group(context.mol, group, context.sub_exclude, context.branch_namer)
+    descriptor = group.descriptor
+    if descriptor is not None:
+        doubles = descriptor.ligands_with_role(ChalcogenLigandRole.DOUBLE_BONDED)
+        ordered_linkers = tuple(
+            ligand for ligand in descriptor.ligands if ligand.role is not ChalcogenLigandRole.DOUBLE_BONDED
+        )
+        if len(doubles) == 1 and ordered_linkers:
+            terminal = ordered_linkers[-1]
+            attachment = terminal.attachment_atom
+            if attachment is not None:
+                branch = rendered_substituent_text(
+                    context.branch_namer(
+                        context.mol,
+                        attachment,
+                        context.sub_exclude | {terminal.atom},
+                        upstream_atom=terminal.atom,
+                    )
+                )
+                ligand = format_element_substituent(
+                    "",
+                    branch,
+                    chalcogen_substituent_suffix(terminal.element),
+                )
+                for linker in reversed(ordered_linkers[:-1]):
+                    ligand = format_element_substituent(
+                        "",
+                        ligand,
+                        chalcogen_substituent_suffix(linker.element),
+                    )
+                return f"({strip_outer_parentheses(ligand)}{acyl_center_prefix(doubles[0].element)})"
     return ester_prefix_from_group(context.mol, group, context.sub_exclude, "carbonyl", context.branch_namer)
 
 

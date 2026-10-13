@@ -94,6 +94,7 @@ def _opsin_roundtrip(names: list[str]) -> list[str]:
 def verify_changed_rows(changed: list[dict[str, Any]], opsin_chunk_size: int) -> None:
     """Mutate discrepancy records with their current OPSIN result."""
 
+    from openclatura.resonance_compare import equivalent_smiles
     from openclatura.utils import standardize_mol
 
     nonempty = [row for row in changed if row["current_name"]]
@@ -103,7 +104,9 @@ def verify_changed_rows(changed: list[dict[str, Any]], opsin_chunk_size: int) ->
         for row, opsin_smiles in zip(chunk, decoded, strict=True):
             original = row["standardized_smiles"] or None
             roundtrip = standardize_mol(opsin_smiles) if opsin_smiles else None
-            matched = original is not None and roundtrip is not None and original == roundtrip
+            matched = original is not None and roundtrip is not None and (
+                original == roundtrip or equivalent_smiles(row["smiles"], opsin_smiles)
+            )
             row.update(
                 current_status="matched" if matched else "failed",
                 opsin_smiles=opsin_smiles,
@@ -175,7 +178,7 @@ def check_regression(
     return {
         "baseline_file": str(baseline_path),
         "generation_input": "standardized_smiles" if normalize_generation_input else "stored_smiles",
-        "comparison_method": "standardize_mol(original) == standardize_mol(OPSIN(name))",
+        "comparison_method": "standardized equality or bounded resonance equivalence of original and OPSIN(name)",
         "rows": len(rows),
         "baseline_matches": baseline_matches,
         "current_matches": current_matches,

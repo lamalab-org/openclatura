@@ -11,7 +11,6 @@ from openclatura.chalcogen_roles import (
     ChalcogenLigandRole,
     DerivativeKind,
     FunctionalFamily,
-    UnsupportedChalcogenNomenclatureError,
     classify_chalcogen_ligand,
     classify_peroxide_linkages,
 )
@@ -129,8 +128,8 @@ def test_ether_analogues_reuse_generic_heteroatom_subgraph_naming(smiles: str, e
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [
-        ("CC(=S)O", "1-thioxoethan-1-ol"),
-        ("CC(=O)[SH]", "1-sulfanylethan-1-one"),
+        ("CC(=S)O", "ethanethioic O-acid"),
+        ("CC(=O)[SH]", "ethanethioic S-acid"),
         ("CC(=S)[SH]", "ethanedithioic acid"),
         ("CC(=[Se])O", "ethaneselenoic O-acid"),
         ("CC(=O)[SeH]", "ethaneselenoic Se-acid"),
@@ -152,8 +151,8 @@ def test_mixed_chalcogen_acids_preserve_both_sites(smiles: str, expected: str):
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [
-        ("CC(=O)SC", "1-(methylsulfanyl)ethan-1-one"),
-        ("CC(=S)OC", "1-methoxy-1-thioxoethane"),
+        ("CC(=O)SC", "S-methyl ethanethioate"),
+        ("CC(=S)OC", "O-methyl ethanethioate"),
         ("CC(=S)SC", "S-methyl ethanedithioate"),
         ("CC(=[Se])OC", "O-methyl ethaneselenoate"),
         ("CC(=O)[Se]C", "Se-methyl ethaneselenoate"),
@@ -201,14 +200,14 @@ def test_peroxol_table_is_order_sensitive(smiles: str, expected: str):
     ("smiles", "expected"),
     [
         ("CC(=O)OO", "ethaneperoxoic acid"),
-        ("CC(=S)OO", "1-(1-thioxoethyl)dioxidane"),
-        ("CC(=O)SO", "1-(hydroxysulfanyl)ethan-1-one"),
-        ("CC(=O)O[SH]", "sulfanyl acetate"),
+        ("CC(=S)OO", "ethaneperoxothioic acid"),
+        ("CC(=O)SO", "ethane(thioperoxoic) SO-acid"),
+        ("CC(=O)O[SH]", "ethane(thioperoxoic) OS-acid"),
         ("CC(=[Se])S[TeH]", "ethaneseleno(tellurothioperoxoic) STe-acid"),
         ("CC(=O)OOC", "methyl ethaneperoxoate"),
-        ("CC(=S)OOC", "1-methyl-2-(1-thioxoethyl)dioxidane"),
-        ("CC(=O)SOC", "1-(methoxysulfanyl)ethan-1-one"),
-        ("CC(=O)OSC", "methylsulfanyl acetate"),
+        ("CC(=S)OOC", "OO-methyl ethaneperoxothioate"),
+        ("CC(=O)SOC", "SO-methyl ethane(thioperoxoate)"),
+        ("CC(=O)OSC", "OS-methyl ethane(thioperoxoate)"),
     ],
 )
 def test_peroxy_acyl_paths_preserve_orientation(smiles: str, expected: str):
@@ -217,24 +216,47 @@ def test_peroxy_acyl_paths_preserve_orientation(smiles: str, expected: str):
     assert oc.name(smiles).name == expected
 
 
+def test_subordinate_peroxy_acyl_prefix_preserves_every_ordered_linker():
+    import openclatura as oc
+
+    assert oc.name("CCOC(=O)CC(=O)OSc1ccccc1").name == "ethyl 2-(phenylsulfanyloxycarbonyl)acetate"
+
+
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [
-        ("CC(=S)OC(C)=O", "1-thioxoethyl acetate"),
-        ("CC(=S)OC(C)=S", "1-(methylcarbonothioyloxy)ethane-1-thione"),
-        ("CC(=O)SC(C)=O", "1-(acetylsulfanyl)ethan-1-one"),
+        ("CC(=S)OC(C)=O", "acetic ethanethioic anhydride"),
+        ("CC(=S)OC(C)=S", "ethanethioic anhydride"),
+        ("CC(=O)SC(C)=O", "acetic thioanhydride"),
         ("CC(=O)[Se]C(C)=O", "acetic selenoanhydride"),
-        ("CC(=O)OOC(C)=O", "acetyl ethaneperoxoate"),
-        ("CC(=O)SOC(C)=O", "acetylsulfanyl acetate"),
-        ("CC(=O)OSC(C)=O", "acetylsulfanyl acetate"),
-        ("CC(=O)SSC(C)=O", "1-(acetylsulfanylsulfanyl)ethan-1-one"),
-        ("CCC(=O)SOC(C)=O", "propanoylsulfanyl acetate"),
+        ("CC(=O)OOC(C)=O", "acetic peroxyanhydride"),
+        ("CC(=O)SOC(C)=O", "acetic thioperoxyanhydride"),
+        ("CC(=O)OSC(C)=O", "acetic thioperoxyanhydride"),
+        ("CC(=O)SSC(C)=O", "acetic dithioperoxyanhydride"),
+        ("CCC(=O)SOC(C)=O", "O-acetic S-propanoic thioperoxyanhydride"),
     ],
 )
 def test_anhydride_bridges_and_acyl_sites_are_independent(smiles: str, expected: str):
     import openclatura as oc
 
     assert oc.name(smiles).name == expected
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    (
+        "COC(=O)OC(C)=O",
+        "CNC(=O)OC(C)=O",
+        "CSC(=S)SC(C)=S",
+        "COC(=[Se])S[Te]C(C)=O",
+    ),
+)
+def test_anhydride_requires_complete_formyl_or_carbyl_acyl_ends(smiles: str):
+    groups = perceive_groups(read_smiles(smiles))
+
+    assert not any(
+        group.descriptor is not None and group.descriptor.derivative is DerivativeKind.ANHYDRIDE for group in groups
+    )
 
 
 @pytest.mark.parametrize(
@@ -284,7 +306,7 @@ def test_central_hydrazide_locants_follow_the_functional_center_after_atom_renum
 @pytest.mark.parametrize(
     ("smiles", "expected"),
     [
-        ("CC(=O)Sc1ccc(Cl)c(Cl)c1", "1-((3,4-dichlorophenyl)sulfanyl)ethan-1-one"),
+        ("CC(=O)Sc1ccc(Cl)c(Cl)c1", "S-(3,4-dichlorophenyl) ethanethioate"),
         ("CC(=O)[Se]c1ccc(Cl)c(Cl)c1", "Se-(3,4-dichlorophenyl) ethaneselenoate"),
         ("CC(=O)[Te]c1ccc(Cl)c(Cl)c1", "Te-(3,4-dichlorophenyl) ethanetelluroate"),
     ],
@@ -613,9 +635,18 @@ def test_subordinate_central_ester_preserves_its_linker_element():
 
 
 def test_polonium_is_parseable_but_has_an_explicit_unvalidated_boundary():
-    mol = read_smiles("C[PoH]")
+    mol = read_smiles("CC(=[Po])[OH]")
 
-    assert mol.atoms[1].symbol == "Po"
-    with pytest.raises(UnsupportedChalcogenNomenclatureError) as exc_info:
-        perceive_groups(mol)
-    assert str(exc_info.value) == "Organic functional-group nomenclature is not validated for: Po"
+    groups = perceive_groups(mol)
+    assert any(
+        group.is_principal_candidate
+        and group.descriptor is not None
+        and group.descriptor.family is FunctionalFamily.ACYL
+        and group.descriptor.derivative is DerivativeKind.ACID
+        for group in groups
+    )
+    result = oc.name("CC(=[Po])[OH]")
+    assert not result.ok
+    assert result.error == (
+        "UnsupportedChalcogenNomenclatureError: Organic functional-group nomenclature is not validated for: Po"
+    )

@@ -686,6 +686,10 @@ def test_anhydride_shortcut_binds_acid_halves_and_core_separately():
 
     assert steps
     data = steps[-1].data
+    descriptor = data["descriptor"]
+    assert descriptor["family"] == "acyl"
+    assert descriptor["derivative"] == "anhydride"
+    assert descriptor["linker_paths"] == [[1, 3, 4]]
     bindings = data["name_atom_bindings"]
     assert {binding["role"] for binding in bindings} == {"anhydride_half", "anhydride_core"}
     assert not any(binding["role"] == "anhydride_component" for binding in bindings)
@@ -2034,6 +2038,10 @@ def test_a_skeletal_phosphonium_chalcogenide_keeps_its_anionic_suffix():
     assert name_smiles("C=C1C[P+](C)([S-])C=C1C") == ("1,4-dimethyl-3-methylidene-1H,2H-phosphol-1-ium-1-thiolate")
 
 
+def test_a_phosphonium_substituent_keeps_its_positive_charge():
+    assert name_smiles("C[P+](C)(C)C(=S)[S-]") == "(trimethylphosphaniumyl)methanedithioate"
+
+
 def test_tetraazene_parent_takes_an_ylidene_ligand():
     # A doubly bonded carbon on the chain is an ylidene; rejecting it dropped
     # the C=N bond and named a carbon skeleton instead.
@@ -2048,6 +2056,18 @@ def test_a_short_or_charged_nitrogen_chain_leaves_its_own_group_alone():
     assert name_smiles("COc1ccc(N=[N+]([O-])c2ccccc2)cc1") == "2-(4-methoxyphenyl)-1-phenyldiazene 1-oxide"
     # A principal group outside the chain keeps its own parent and suffix.
     assert name_smiles("OCCNN=NN") == "2-(hydrazonohydrazinyl)ethan-1-ol"
+
+
+def test_a_charged_imino_prefix_keeps_all_of_its_ligands():
+    assert name_smiles("CCCC/C=C\\N(NC(C)=O)C(=O)[C@H](CO)N=[N+]([O-])CCCCCC") == (
+        "(2S)-N'-acetyl-N-((1Z)-hex-1-en-1-yl)-2-((hexyl(oxido)iminio)amino)-3-hydroxypropanehydrazide"
+    )
+
+
+def test_a_diazenyl_prefix_keeps_stereo_beside_an_imino_nitrogen():
+    assert name_smiles(r"N/N=N/N=C\ONc1ccc(-n2c(=S)[nH][nH]c2=S)cc1") == (
+        "4-(4-((((1Z)-(((E)-aminodiazenyl)imino)methyl)oxy)amino)phenyl)-1,2,4-triazolidine-3,5-dithione"
+    )
 
 
 def test_substituted_imino_on_a_ring_centre_keeps_its_double_bond():
@@ -3848,7 +3868,7 @@ def test_dynamic_and_projected_chalcogen_groups_expose_structural_descriptors():
     projected_groups = next(step for step in projected.decisions if step.phase is TracePhase.PERCEPTION).data["groups"]
     ester = next(group for group in projected_groups if group["key"] == "ester")
     assert ester["descriptor"]["linker_paths"] == [[3, 2, 1]]
-    assert any("registered chalcogen citation route" in reason for reason in ester["reasons"])
+    assert any("competing nitrogen derivative" in reason for reason in ester["reasons"])
 
 
 def test_recursive_substituent_trace_segments_include_nested_decisions():
@@ -5517,6 +5537,9 @@ def test_hypervalent_sulfur_ester_keeps_every_ligand():
 def test_sulfur_imide_substituents_preserve_double_bonded_nitrogen():
     assert name_smiles("N=S(Cl)CF") == "(chloro(imino)sulfanyl)fluoromethane"
     assert name_smiles("CSC(=O)S(C)=N") == "S-methyl (imino(methyl)sulfanyl)methanethioate"
+    assert name_smiles("Cc1cc(Cl)ccc1N=S(Cc1ccccc1)C(=S)OCc1ccccc1") == (
+        "O-benzyl (benzyl((4-chloro-2-methylphenyl)imino)sulfanyl)methanethioate"
+    )
 
 
 def test_sulfonimidoyl_substituents_keep_imino_n_ligand():
@@ -5877,7 +5900,7 @@ def test_azine_aryl_side_uses_the_retained_benzene_name():
     # has none, and requiring one rejected plain benzene -- so the aldehyde side
     # of an azine fell through to ``cyclohexa-1,3,5-trien-1-carbaldehyde``.  A
     # bare homocyclic ring is symmetric, so the attachment is position 1.
-    assert name_smiles("c1ccccc1C=NN=Cc1ccccc1") == "benzaldehyde benzylidenehydrazone"
+    assert name_smiles("c1ccccc1C=NN=Cc1ccccc1") == "1,2-bis(benzylidene)hydrazine"
     assert name_smiles("CSC(N)=NN=Cc1ccccc1") == "benzaldehyde (amino)(methylsulfanyl)methylidenehydrazone"
     # A heteroatom breaks that symmetry and genuinely needs numbering; the
     # locant comes from the ring's own substituent name (``pyridin-3-yl``).
@@ -5890,7 +5913,8 @@ def test_azine_heterocycle_side_uses_the_retained_ring_name():
     # (``4-oxa1-azacyclohexan-1-carbaldehyde``), unlike the aldehyde alone.
     assert name_smiles("CC(C)=NN=CN1CCOCC1") == "morpholine-4-carbaldehyde propan-2-ylidenehydrazone"
     assert name_smiles("CC(C)=NN=Cc1ccco1") == "furan-2-carbaldehyde propan-2-ylidenehydrazone"
-    assert name_smiles("C(=NN=Cc1ccccn1)c1ccccn1") == "pyridine-2-carbaldehyde pyridin-2-ylmethylidenehydrazone"
+    assert name_smiles("C(=NN=Cc1ccccn1)c1ccccn1") == "1,2-bis(pyridin-2-ylmethylidene)hydrazine"
+    assert name_smiles(r"C(=N\N=C/c1ccc[nH]1)\c1ccc[nH]1") == ("1,2-bis[(Z)-pyrrol-2-ylmethylidene]hydrazine")
     assert name_smiles("CC(C)=NN=CC1CCSCC1") == "thiane-4-carbaldehyde propan-2-ylidenehydrazone"
     assert name_smiles("CC(C)=NN=CC1CCOC1") == "oxolane-3-carbaldehyde propan-2-ylidenehydrazone"
 

@@ -328,6 +328,17 @@ def test_human_descriptor_uses_typed_dynamic_group_labels_and_front_modifiers():
     assert "an ester acyl group" in ester.text
     assert "The front modifier is OSe-methyl" in ester.text
 
+
+def test_human_descriptor_explains_typed_chalcogen_anhydride_shortcut():
+    description = describe_human("CC(=O)SOC(=O)CC")
+
+    assert description.name == "S-acetic O-propanoic thioperoxyanhydride"
+    assert "an anhydride acyl group" in description.text
+    assert description.text.count("a double bonded oxygen ligand") == 2
+    assert "linker path" in description.text
+    descriptor = description.result.substituent_tree[0]["shortcut"]["descriptor"]
+    assert descriptor["derivative"] == "anhydride"
+
     projected = describe_human("CSOC(=O)NCCCc1ccccc1")
     assert projected.name == "methylsulfanyl (3-phenylpropyl)carbamate"
     assert "The front modifier is methylsulfanyl" in projected.text

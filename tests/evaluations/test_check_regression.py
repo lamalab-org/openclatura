@@ -77,3 +77,20 @@ def test_only_changed_names_are_sent_to_opsin(tmp_path, monkeypatch):
     assert seen == [1]
     assert report["changed_names"] == 1
     assert report["current_matches"] == 2
+
+
+def test_changed_names_use_the_public_verifiers_resonance_equivalence(monkeypatch):
+    rows = [
+        {
+            "index": 0,
+            "smiles": "CO[P+]([O-])(OC)C",
+            "standardized_smiles": "CO[P+]([O-])(OC)C",
+            "current_name": "dimethyl methylphosphonate",
+            "current_status": "pending_opsin",
+        }
+    ]
+    monkeypatch.setattr(CHECKER, "_opsin_roundtrip", lambda _names: ["COP(=O)(OC)C"])
+
+    CHECKER.verify_changed_rows(rows, opsin_chunk_size=10)
+
+    assert rows[0]["current_status"] == "matched"

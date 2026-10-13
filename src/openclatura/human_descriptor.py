@@ -481,7 +481,7 @@ def _shortcut_sentence(node: dict[str, Any]) -> str:
     label = _functional_group_descriptor_label(descriptor, 1)
     role = _readable_key(str(shortcut.get("role") or "whole-component"))
     detail = _functional_group_descriptor_detail([descriptor])
-    sentence = f"The whole component is cited through the {role} route for a {label}."
+    sentence = f"The whole component is cited through the {role} route for {_article_for(label)} {label}."
     return f"{sentence} {detail}" if detail else sentence
 
 

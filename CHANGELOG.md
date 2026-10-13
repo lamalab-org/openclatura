@@ -5,7 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.3] - 2026-10-13
+
+### Added
+
+- Added validated, path-oriented acyl-linkage views for one- and two-chalcogen
+  bridges, preserving both acyl ends and the ordered bridge composition.
+- Added comprehensive regression coverage for independently varied oxygen,
+  sulfur, selenium, and tellurium sites in acids, esters, peroxy derivatives,
+  anhydrides, and related nitrogen-containing groups.
+- Added typed chalcogen linkage details to decision traces and human-readable
+  molecular descriptions.
+
+### Changed
+
+- Made functional-group perception, principal-group selection, and prefix and
+  suffix rendering consume the same structural descriptors and data-backed
+  nomenclature rules.
+- Made corpus round-trip verification accept bounded resonance-equivalent
+  structures in addition to identical standardized SMILES.
+
+### Fixed
+
+- Corrected mixed-chalcogen carboxylic acids, peroxyacids, esters, anhydrides,
+  and peroxyanhydrides while keeping double-bonded sites and bridge sites
+  independent.
+- Preserved complete ordered linker sequences, charged and substituted imino
+  ligands, phosphonium charge, azine symmetry, and characteristic-group
+  priority in composite names.
+- Prevented carbonates, carbamates, and related derivatives from being
+  misclassified as carboxylic anhydrides while retaining parent-bearing acyl
+  ends on rings and functionalized substituents.
+- Kept retained-parent and fused-ring nomenclature stable with the generic
+  chalcogen routes enabled.
 
 ## [0.4.2] - 2026-10-08
 
@@ -298,7 +330,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial deterministic IUPAC name generation from molecular structures.
 
-[Unreleased]: https://github.com/lamalab-org/openclatura/compare/v0.4.2...HEAD
+[0.4.3]: https://github.com/lamalab-org/openclatura/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/lamalab-org/openclatura/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/lamalab-org/openclatura/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/lamalab-org/openclatura/compare/v0.3.3...v0.4.0

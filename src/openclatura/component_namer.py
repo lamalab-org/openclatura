@@ -528,6 +528,7 @@ def name_component(
         mol, state.perceived_groups, state.principal_key, name_component_again
     )
     if anhydride_result is not None:
+        descriptor_data = functional_group_descriptor_data(anhydride_result.descriptor, mol)
         name, bindings, token_spans, rewrite_history = _shortcut_component_result(
             mol,
             state.component_atoms,
@@ -549,6 +550,7 @@ def name_component(
                 "name_atom_bindings": bindings,
                 "name_token_spans": token_spans,
                 "name_rewrite_history": rewrite_history,
+                "descriptor": descriptor_data,
             },
         )
         if return_trace and return_tree:
@@ -556,14 +558,24 @@ def name_component(
                 name,
                 [],
                 _component_shortcut_tree(
-                    name, state.component_atoms, bindings, token_spans, role="anhydride_component"
+                    name,
+                    state.component_atoms,
+                    bindings,
+                    token_spans,
+                    role="anhydride_component",
+                    descriptor=descriptor_data,
                 ),
             )
         if return_trace:
             return name, []
         if return_tree:
             return name, _component_shortcut_tree(
-                name, state.component_atoms, bindings, token_spans, role="anhydride_component"
+                name,
+                state.component_atoms,
+                bindings,
+                token_spans,
+                role="anhydride_component",
+                descriptor=descriptor_data,
             )
         return name
 

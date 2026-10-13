@@ -6,6 +6,7 @@ from dataclasses import dataclass, replace
 
 from .assembly_parts import NameAtomBinding, NameTokenBinding, rendered_substituent_text
 from .assembly_prefixes import substituent_sort_key
+from .canonical_ranks import canonical_ranks
 from .chains import get_cyclic_atoms
 from .chalcogen_roles import (
     DerivativeKind,
@@ -56,6 +57,7 @@ class AnhydrideComponentName:
 
     name: str
     bindings: tuple[NameAtomBinding, ...]
+    descriptor: FunctionalGroupDescriptor
 
 
 @dataclass(frozen=True)
@@ -756,6 +758,19 @@ def simple_azine_parent_name(
                     first, second = sorted(ylidenes, key=substituent_sort_key)
                     return f"1-({first})-2-({second})hydrazine"
             continue
+        ranks = canonical_ranks(mol)
+        left_bond = mol.get_bond(c1, n1)
+        right_bond = mol.get_bond(c2, n2)
+        if (
+            ranks[c1] == ranks[c2]
+            and ranks[n1] == ranks[n2]
+            and left_bond is not None
+            and right_bond is not None
+            and left_bond.stereo == right_bond.stereo
+        ):
+            stereo = f"({left_bond.stereo})-" if left_bond.stereo in {"E", "Z"} else ""
+            cited_side = f"{stereo}{ylidene1}"
+            return f"1,2-bis[{cited_side}]hydrazine" if stereo else f"1,2-bis({cited_side})hydrazine"
         # Prefer the longer carbonyl parent; this follows parent-size
         # preference and keeps the shorter side as the ylidene hydrazone
         # modifier.
@@ -3282,10 +3297,12 @@ def try_name_anhydride_component_result(
                 ),
             )
         else:
-            if len(bridge_path) == 4:
+            half_order = tuple(str(half["name"]) for half in halves)
+            bridge_symbols = tuple(mol.atoms[atom].symbol for atom in bridge_path[1:-1])
+            if len(bridge_symbols) == 2 and bridge_symbols[0] != bridge_symbols[1]:
                 halves[0]["name"] = f"{mol.atoms[bridge_path[1]].symbol}-{halves[0]['name']}"
                 halves[1]["name"] = f"{mol.atoms[bridge_path[2]].symbol}-{halves[1]['name']}"
-            ordered_halves = sorted(halves, key=lambda half: str(half["name"]))
+            ordered_halves = [half for _name, half in sorted(zip(half_order, halves, strict=True))]
             name = f"{ordered_halves[0]['name']} {ordered_halves[1]['name']} {class_name}"
             half_bindings = tuple(
                 NameAtomBinding(
@@ -3307,5 +3324,9 @@ def try_name_anhydride_component_result(
             atom_ids=core_atoms,
             bond_ids=core_bonds,
         )
-        return AnhydrideComponentName(name=name, bindings=half_bindings + (core_binding,))
+        return AnhydrideComponentName(
+            name=name,
+            bindings=half_bindings + (core_binding,),
+            descriptor=descriptor,
+        )
     return None

@@ -12,13 +12,13 @@ from .chalcogen_roles import (
     FunctionalFamily,
     FunctionalGroupDescriptor,
     LeavingGroupDescriptor,
+    acyl_linkage_view,
     chalcogen_for_symbol,
     classify_chalcogen_ligand,
     classify_peroxide_linkages,
-    require_validated_chalcogens,
+    is_complete_acyl_end,
 )
 from .chalcogen_vocabulary import (
-    chalcogen_citation_rule,
     resolve_acyl_rule,
     resolve_anhydride_rule,
     resolve_central_acid_rule,
@@ -43,7 +43,6 @@ from .nitrogen_roles import amidinohydrazone_tail_atoms, nitrogen_chain_roles
 from .nomenclature import (
     RULES,
     ChalcogenCitationContext,
-    ChalcogenCitationProjection,
     FunctionalGroupRule,
 )
 
@@ -231,7 +230,6 @@ def _demote_zwitterion_cations(mol: Molecule, groups: list[PerceivedGroup]) -> l
 
 
 def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
-    require_validated_chalcogens(mol)
     groups = _composable_chalcogen_linkage_groups(mol)
     consumed = set()
     cyclic_atoms = get_cyclic_atoms(mol)
@@ -998,9 +996,57 @@ def _acyl_chalcogen_group(
         )
     ]
     single_ligand = single_ligands[0] if len(single_ligands) == 1 else None
-    has_standard_acyl_route = single_ligand is not None and has_registered_acyl_route(
-        single_ligand, DerivativeKind.ESTER
-    )
+    if (
+        single_ligand is not None
+        and nitrogens
+        and not halogens
+        and single_ligand.role is ChalcogenLigandRole.CHALCOGEN_LINK
+        and has_registered_acyl_route(single_ligand, DerivativeKind.ESTER)
+    ):
+        terminal_atom = single_ligand.attachment_atom
+        terminal_ligand = (
+            classify_chalcogen_ligand(mol, single_ligand.atom, terminal_atom) if terminal_atom is not None else None
+        )
+        terminal_roles = {
+            ChalcogenLigandRole.HYDROGEN_BEARING,
+            ChalcogenLigandRole.ANIONIC,
+            ChalcogenLigandRole.CARBON_LINK,
+        }
+        if terminal_ligand is not None and terminal_ligand.role in terminal_roles:
+            descriptor = FunctionalGroupDescriptor(
+                family=FunctionalFamily.ACYL,
+                derivative=DerivativeKind.ESTER,
+                centers=(carbon,),
+                ligands=(double_ligand, single_ligand, terminal_ligand),
+                linker_paths=((carbon, single_ligand.atom, terminal_ligand.atom),),
+                attachment_atom=attachment,
+                is_external=external,
+            )
+            key = RULES.chalcogens.standard_acyl_keys[
+                (
+                    DerivativeKind.ESTER.value,
+                    double_ligand.element.value,
+                    single_ligand.element.value,
+                    external,
+                )
+            ]
+            return (
+                PerceivedGroup(
+                    FunctionalFamily.ACYL.value,
+                    False,
+                    attachment,
+                    set(descriptor.atom_ids),
+                    descriptor=descriptor,
+                ),
+                PerceivedGroup(
+                    key,
+                    True,
+                    attachment,
+                    {carbon, double_ligand.atom, single_ligand.atom},
+                    trace_descriptor=descriptor,
+                    decision_reasons=("A competing nitrogen derivative retains the registered carbamate route.",),
+                ),
+            )
     # A centre carrying a nitrogen or a typed leaving group is not a plain
     # ester merely because it also has a single-bonded chalcogen.  Defer those
     # competing ligands to their complete derivative routes below.
@@ -1015,7 +1061,10 @@ def _acyl_chalcogen_group(
                 ChalcogenLigandRole.ANIONIC,
                 ChalcogenLigandRole.HETEROATOM_LINK,
             }
-            or has_standard_acyl_route
+            or (
+                single_ligands[0].role is ChalcogenLigandRole.CARBON_LINK
+                and has_registered_acyl_route(single_ligands[0], DerivativeKind.ESTER)
+            )
         )
     ):
         assert single_ligand is not None
@@ -1050,9 +1099,6 @@ def _acyl_chalcogen_group(
                 attachment_atom=attachment,
                 is_external=external,
             )
-            projected = _established_acyl_projection(mol, descriptor)
-            if projected is not None:
-                return projected
             key, rule = resolve_peroxy_acyl_rule(descriptor)
             return PerceivedGroup(
                 key,
@@ -1092,9 +1138,6 @@ def _acyl_chalcogen_group(
             attachment_atom=attachment,
             is_external=external,
         )
-        projected = _established_acyl_projection(mol, descriptor)
-        if projected is not None:
-            return projected
         key, rule = resolve_acyl_rule(descriptor)
         return PerceivedGroup(
             key,
@@ -1182,70 +1225,6 @@ def _acyl_chalcogen_group(
         descriptor=descriptor,
         resolved_rule=rule,
     )
-
-
-def _established_acyl_projection(
-    mol: Molecule,
-    descriptor: FunctionalGroupDescriptor,
-) -> PerceivedGroup | tuple[PerceivedGroup, ...] | None:
-    """Project supported O/S acyl paths onto established structural detectors."""
-
-    double = descriptor.ligands[0]
-    bridge = descriptor.ligands[1:]
-    citation_rule = chalcogen_citation_rule(
-        ChalcogenCitationContext.ACYL,
-        tuple(ligand.element for ligand in descriptor.ligands),
-        bridge_atom_count=len(bridge),
-        site_elements=(double.element,),
-        bridge_elements=tuple(ligand.element for ligand in bridge),
-    )
-    if citation_rule is None:
-        return None
-    center = descriptor.centers[0]
-    if citation_rule.projection is ChalcogenCitationProjection.CARBONYL:
-        has_carbon_or_hydrogen_attachment = mol.atoms[center].total_h_count > 0 or any(
-            mol.atoms[neighbor].is_carbon for neighbor in mol.get_neighbors(center)
-        )
-        if not has_carbon_or_hydrogen_attachment:
-            return None
-        return PerceivedGroup(
-            FunctionalFamily.ACYL.value,
-            False,
-            descriptor.attachment_atom if descriptor.attachment_atom is not None else center,
-            set(descriptor.atom_ids),
-            descriptor=descriptor,
-        )
-    if citation_rule.projection is ChalcogenCitationProjection.ESTER:
-        key = RULES.chalcogens.standard_acyl_keys[
-            (
-                DerivativeKind.ESTER.value,
-                Chalcogen.OXYGEN.value,
-                Chalcogen.OXYGEN.value,
-                descriptor.is_external,
-            )
-        ]
-        first_linker = bridge[0]
-        attachment = descriptor.attachment_atom if descriptor.attachment_atom is not None else center
-        return (
-            PerceivedGroup(
-                FunctionalFamily.ACYL.value,
-                False,
-                attachment,
-                set(descriptor.atom_ids),
-                descriptor=descriptor,
-            ),
-            PerceivedGroup(
-                key,
-                True,
-                attachment,
-                {center, double.atom, first_linker.atom},
-                trace_descriptor=descriptor,
-                decision_reasons=(
-                    "A registered chalcogen citation route projects this descriptor onto the established ester path.",
-                ),
-            ),
-        )
-    return None
 
 
 def _carbonyl_chalcogen_group(
@@ -1462,7 +1441,6 @@ def _chalcogen_anhydride_groups(mol: Molecule, consumed: set[int]) -> list[Perce
             if first_bridge.role is ChalcogenLigandRole.CARBON_LINK:
                 second_center = first_bridge.attachment_atom
                 bridge_atoms = (first_bridge_atom,)
-                bridge_ligands = (first_bridge,)
             else:
                 second_bridge_atom = first_bridge.attachment_atom
                 if second_bridge_atom is None:
@@ -1472,12 +1450,14 @@ def _chalcogen_anhydride_groups(mol: Molecule, consumed: set[int]) -> list[Perce
                     continue
                 second_center = second_bridge.attachment_atom
                 bridge_atoms = (first_bridge_atom, second_bridge_atom)
-                bridge_ligands = (first_bridge, second_bridge)
             if second_center is None or second_center == first_center.idx or not mol.atoms[second_center].is_carbon:
                 continue
             second_double = _terminal_double_chalcogen(mol, second_center, consumed)
-            if second_double is None or _connected_without_bridge(
-                mol, first_center.idx, second_center, set(bridge_atoms)
+            if (
+                second_double is None
+                or not is_complete_acyl_end(mol, first_center.idx, first_double, first_bridge_atom)
+                or not is_complete_acyl_end(mol, second_center, second_double, bridge_atoms[-1])
+                or _connected_without_bridge(mol, first_center.idx, second_center, set(bridge_atoms))
             ):
                 continue
             identity = (frozenset({first_center.idx, second_center}), tuple(sorted(bridge_atoms)))
@@ -1488,39 +1468,27 @@ def _chalcogen_anhydride_groups(mol: Molecule, consumed: set[int]) -> list[Perce
                 centers = (first_center.idx, second_center)
                 doubles = (first_double, second_double)
                 ordered_bridge_atoms = bridge_atoms
-                ordered_bridge_ligands = bridge_ligands
             else:
                 centers = (second_center, first_center.idx)
                 doubles = (second_double, first_double)
                 ordered_bridge_atoms = tuple(reversed(bridge_atoms))
-                ordered_bridge_ligands = tuple(reversed(bridge_ligands))
             descriptor = FunctionalGroupDescriptor(
                 family=FunctionalFamily.ACYL,
                 derivative=DerivativeKind.ANHYDRIDE,
                 centers=centers,
-                ligands=(*doubles, *ordered_bridge_ligands),
+                ligands=doubles,
                 linker_paths=((centers[0], *ordered_bridge_atoms, centers[1]),),
                 attachment_atom=centers[0],
             )
-            citation_rule = chalcogen_citation_rule(
-                ChalcogenCitationContext.ANHYDRIDE,
-                tuple(ligand.element for ligand in descriptor.ligands),
-                bridge_atom_count=len(bridge_atoms),
-                site_elements=tuple(ligand.element for ligand in doubles),
-                bridge_elements=tuple(ligand.element for ligand in ordered_bridge_ligands),
+            view = acyl_linkage_view(mol, descriptor)
+            descriptor = FunctionalGroupDescriptor(
+                family=descriptor.family,
+                derivative=descriptor.derivative,
+                centers=(view.left_center, view.right_center),
+                ligands=(view.left_double, view.right_double, *view.bridge_ligands),
+                linker_paths=(view.path,),
+                attachment_atom=view.left_center,
             )
-            if citation_rule is not None:
-                groups.append(
-                    PerceivedGroup(
-                        FunctionalFamily.ACYL.value,
-                        False,
-                        centers[0],
-                        set(descriptor.atom_ids),
-                        descriptor=descriptor,
-                    )
-                )
-                groups.extend(_established_anhydride_projection(mol, descriptor, citation_rule.projection))
-                continue
             key, rule = resolve_anhydride_rule(descriptor)
             groups.append(
                 PerceivedGroup(
@@ -1533,91 +1501,6 @@ def _chalcogen_anhydride_groups(mol: Molecule, consumed: set[int]) -> list[Perce
                 )
             )
     return groups
-
-
-def _established_anhydride_projection(
-    mol: Molecule,
-    descriptor: FunctionalGroupDescriptor,
-    projection: ChalcogenCitationProjection,
-) -> list[PerceivedGroup]:
-    """Project a recognized bridge onto an established ester/carbonyl route."""
-
-    centers = descriptor.centers
-    doubles = descriptor.ligands[:2]
-    bridge = descriptor.ligands[2:]
-    if projection is ChalcogenCitationProjection.PEROXY_ESTER:
-        key = RULES.chalcogens.standard_peroxy_acyl_keys[(DerivativeKind.ESTER.value, False)]
-        ester_descriptor = FunctionalGroupDescriptor(
-            family=FunctionalFamily.ACYL,
-            derivative=DerivativeKind.ESTER,
-            centers=(centers[0],),
-            ligands=(doubles[0], *bridge),
-            linker_paths=(descriptor.linker_paths[0],),
-            attachment_atom=centers[0],
-        )
-        return [
-            PerceivedGroup(
-                key,
-                True,
-                centers[0],
-                {centers[0], doubles[0].atom, *(ligand.atom for ligand in bridge)},
-                trace_descriptor=ester_descriptor,
-                decision_reasons=(
-                    "A registered chalcogen citation route projects this descriptor onto the established peroxy-ester path.",
-                ),
-            )
-        ]
-
-    if projection is ChalcogenCitationProjection.ESTER_OR_CARBONYL:
-        for index, (center, double) in enumerate(zip(centers, doubles, strict=True)):
-            adjacent_bridge = bridge[0] if index == 0 else bridge[-1]
-            if double.element is not Chalcogen.OXYGEN or adjacent_bridge.element is not Chalcogen.OXYGEN:
-                continue
-            key = RULES.chalcogens.standard_acyl_keys[
-                (DerivativeKind.ESTER.value, Chalcogen.OXYGEN.value, Chalcogen.OXYGEN.value, False)
-            ]
-            projected_descriptor = FunctionalGroupDescriptor(
-                family=FunctionalFamily.ACYL,
-                derivative=DerivativeKind.ESTER,
-                centers=(center,),
-                ligands=(double, adjacent_bridge),
-                attachment_atom=center,
-            )
-            return [
-                PerceivedGroup(
-                    key,
-                    True,
-                    center,
-                    {center, double.atom, adjacent_bridge.atom},
-                    trace_descriptor=projected_descriptor,
-                    decision_reasons=(
-                        "A registered chalcogen citation route projects this descriptor onto the established ester path.",
-                    ),
-                )
-            ]
-
-        projected = []
-        for center, double in zip(centers, doubles, strict=True):
-            key = simple_group_key(FunctionalFamily.CARBONYL, DerivativeKind.KETONE, double.element)
-            if key is not None:
-                carbonyl_descriptor = FunctionalGroupDescriptor(
-                    family=FunctionalFamily.CARBONYL,
-                    derivative=DerivativeKind.KETONE,
-                    centers=(center,),
-                    ligands=(double,),
-                    attachment_atom=center,
-                )
-                projected.append(
-                    PerceivedGroup(
-                        key,
-                        True,
-                        center,
-                        {center, double.atom},
-                        descriptor=carbonyl_descriptor,
-                    )
-                )
-        return projected
-    return []
 
 
 def _terminal_double_chalcogen(mol: Molecule, center: int, consumed: set[int]) -> ChalcogenLigand | None:

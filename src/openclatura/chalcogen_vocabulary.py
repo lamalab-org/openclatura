@@ -7,12 +7,15 @@ another group's name.
 """
 
 from .chalcogen_roles import (
+    AcylDescriptorValidationError,
     Chalcogen,
+    ChalcogenLigand,
     ChalcogenLigandRole,
     DerivativeKind,
     FunctionalFamily,
     FunctionalGroupDescriptor,
     NitrogenChalcogenideCitation,
+    double_ligand_for_center,
 )
 from .nomenclature import (
     RULES,
@@ -80,6 +83,28 @@ def _element_rank(element: Chalcogen) -> int:
     return int(_element_data(element)["rank"])
 
 
+def _has_functional_replacement_vocabulary(elements: tuple[Chalcogen, ...]) -> bool:
+    """Whether every site has source-backed functional-replacement vocabulary."""
+
+    return all("replacement_infix" in _element_data(element) for element in elements)
+
+
+def _structural_acyl_rule(
+    key: str,
+    policy: dict,
+    elements: tuple[Chalcogen, ...],
+) -> FunctionalGroupRule:
+    """Keep a recognized acyl topology eligible until public naming validation."""
+
+    return FunctionalGroupRule(
+        key=key,
+        role="principal",
+        seniority=(int(policy["seniority"]), *(_element_rank(element) for element in elements)),
+        families=tuple(policy["families"]),
+        capabilities=_capabilities(policy),
+    )
+
+
 def chalcogenide_class_name(element: Chalcogen) -> str:
     """Return the validated functional-class name for an anionic chalcogen ligand."""
 
@@ -102,6 +127,12 @@ def chalcogen_substituent_suffix(element: Chalcogen) -> str:
     """Return the data-defined suffix for an organic ligand on a chalcogen."""
 
     return _element_data(element)["substituent_suffix"]
+
+
+def acyl_center_prefix(element: Chalcogen) -> str:
+    """Return the prefix stem for a carbon doubly bonded to ``element``."""
+
+    return _element_data(element)["acyl_center_prefix"]
 
 
 def central_linkage_prefix(descriptor: FunctionalGroupDescriptor) -> str | None:
@@ -211,6 +242,9 @@ def resolve_acyl_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, Funct
         leaving_group.value if leaving_group is not None else None,
     )
     elements = (double_ligand.element,) if single_element is None else (double_ligand.element, single_element)
+    if not _has_functional_replacement_vocabulary(elements):
+        policy = _derivative_policy("acyl", descriptor.derivative)
+        return key, _structural_acyl_rule(key, policy, elements)
     infix = _replacement_infix(elements)
     carbo = "carbo" if descriptor.is_external else ""
     suffix_with_locant = descriptor.is_external
@@ -326,6 +360,10 @@ def resolve_peroxy_acyl_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str
         descriptor.is_external,
         terminal.element.value,
     )
+    elements = (double_ligand.element, first_linker.element, terminal.element)
+    if not _has_functional_replacement_vocabulary(elements):
+        policy = _derivative_policy("peroxy_acyl", descriptor.derivative)
+        return key, _structural_acyl_rule(key, policy, elements)
     carbo = "carbo" if descriptor.is_external else ""
     acid_infix = _replacement_infix((double_ligand.element,))
     linker_infix = _peroxo_infix(first_linker.element, terminal.element)
@@ -377,10 +415,40 @@ def resolve_peroxy_acyl_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str
     )
 
 
+def _ordered_anhydride_sites(
+    descriptor: FunctionalGroupDescriptor,
+) -> tuple[ChalcogenLigand, tuple[ChalcogenLigand, ...], ChalcogenLigand]:
+    """Return both double sites and bridge ligands in linker-path order."""
+
+    if len(descriptor.linker_paths) != 1:
+        raise AcylDescriptorValidationError("An anhydride requires one ordered linker path")
+    path = descriptor.linker_paths[0]
+    if len(path) not in {3, 4} or set((path[0], path[-1])) != set(descriptor.centers):
+        raise AcylDescriptorValidationError("Invalid ordered anhydride linker path")
+    bridge = []
+    for atom in path[1:-1]:
+        matches = tuple(
+            ligand
+            for ligand in descriptor.ligands
+            if ligand.atom == atom and ligand.role is not ChalcogenLigandRole.DOUBLE_BONDED
+        )
+        if len(matches) != 1:
+            raise AcylDescriptorValidationError(
+                f"Expected exactly one bridge ligand for linker atom {atom}; found {len(matches)}"
+            )
+        bridge.append(matches[0])
+    return (
+        double_ligand_for_center(descriptor, path[0]),
+        tuple(bridge),
+        double_ligand_for_center(descriptor, path[-1]),
+    )
+
+
 def anhydride_class_name(descriptor: FunctionalGroupDescriptor) -> str:
     """Return the functional-class term for an ordered anhydride bridge."""
 
-    bridge_elements = tuple(ligand.element for ligand in descriptor.ligands[2:])
+    _left, bridge, _right = _ordered_anhydride_sites(descriptor)
+    bridge_elements = tuple(ligand.element for ligand in bridge)
     if bridge_elements == (Chalcogen.OXYGEN,):
         return RULES.chalcogens.templates["anhydride"]
     if len(bridge_elements) == 1:
@@ -405,15 +473,20 @@ def anhydride_class_name(descriptor: FunctionalGroupDescriptor) -> str:
 def resolve_anhydride_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, FunctionalGroupRule | None]:
     """Resolve one- and two-chalcogen bridges between two acyl centers."""
 
-    bridge_elements = tuple(ligand.element for ligand in descriptor.ligands[2:])
+    left_double, bridge, right_double = _ordered_anhydride_sites(descriptor)
+    bridge_elements = tuple(ligand.element for ligand in bridge)
     if (
-        descriptor.ligands[0].element is Chalcogen.OXYGEN
-        and descriptor.ligands[-1].element is Chalcogen.OXYGEN
+        left_double.element is Chalcogen.OXYGEN
+        and right_double.element is Chalcogen.OXYGEN
         and bridge_elements == (Chalcogen.OXYGEN,)
     ):
         return RULES.chalcogens.policies["anhydride"]["standard_key"], None
-    sites = "_".join(ligand.element.value for ligand in descriptor.ligands)
+    sites = "_".join(element.value for element in (left_double.element, *bridge_elements, right_double.element))
     key = f"anhydride_{sites}"
+    elements = (left_double.element, *bridge_elements, right_double.element)
+    policy = RULES.chalcogens.policies["anhydride"]
+    if not _has_functional_replacement_vocabulary(elements):
+        return key, _structural_acyl_rule(key, policy, elements)
     return key, FunctionalGroupRule(
         key=key,
         role="principal",
@@ -422,13 +495,13 @@ def resolve_anhydride_rule(descriptor: FunctionalGroupDescriptor) -> tuple[str, 
         multi_suffix=None,
         suffix_multiplier_positions=(0,),
         seniority=(
-            int(RULES.chalcogens.policies["anhydride"]["seniority"]),
+            int(policy["seniority"]),
             *(_element_rank(element) for element in bridge_elements),
         ),
         suffix_with_locant=False,
         needs_locant=True,
-        families=tuple(RULES.chalcogens.policies["anhydride"]["families"]),
-        capabilities=_capabilities(RULES.chalcogens.policies["anhydride"]),
+        families=tuple(policy["families"]),
+        capabilities=_capabilities(policy),
     )
 
 
