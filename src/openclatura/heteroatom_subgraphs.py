@@ -35,6 +35,10 @@ from .oxoacid_roles import OxoLigandRole, central_oxo_substituent_role
 from .rules import elision, multipliers
 
 
+class _UnnamedBranch(Exception):
+    """A ligand branch of the heteroatom has no name, so the heteroatom substituent has none either."""
+
+
 def _branch_name_text(
     branch_namer: RecursiveSubgraphNamer,
     mol: Molecule,
@@ -51,6 +55,11 @@ def _branch_name_text(
         upstream_atom=upstream_atom,
     )
     name, _ = split_rendered_substituent_name(rendered)
+    # The renderers below read an empty name as "no ligand here" (``hydroxy``
+    # for an ``oxy`` with nothing to name), which would drop the branch's atoms.
+    # An explicit hydrogen (deuterium, say) is the one ligand that has no name.
+    if not name and mol.atoms[start_idx].symbol != "H":
+        raise _UnnamedBranch
     return name
 
 
@@ -1039,8 +1048,22 @@ def name_heteroatom_subgraph(
     upstream_atom: int | None,
     branch_namer: RecursiveSubgraphNamer,
 ) -> str | None:
-    """Name supported heteroatom-starting recursive fragments."""
+    """Name supported heteroatom-starting recursive fragments.
+    Return None for an unsupported heteroatom and "" when a ligand branch cannot be named."""
 
+    try:
+        return _name_supported_heteroatom_subgraph(mol, start_idx, exclude_atoms, upstream_atom, branch_namer)
+    except _UnnamedBranch:
+        return ""
+
+
+def _name_supported_heteroatom_subgraph(
+    mol: Molecule,
+    start_idx: int,
+    exclude_atoms: set[int],
+    upstream_atom: int | None,
+    branch_namer: RecursiveSubgraphNamer,
+) -> str | None:
     symbol = mol.atoms[start_idx].symbol
     if symbol in HALOGEN_PREFIXES:
         return name_halogen_subgraph(mol, start_idx, exclude_atoms, upstream_atom, branch_namer)
@@ -1060,7 +1083,7 @@ def name_heteroatom_subgraph(
         )
     if symbol in {"P", "As", "Sb"}:
         return name_pnictogen_subgraph(mol, start_idx, exclude_atoms, upstream_atom, branch_namer, symbol)
-    if symbol in {"Si", "B"}:
+    if symbol in {"Si", "Ge", "Sn", "Pb", "B"}:
         return name_group_13_14_subgraph(mol, start_idx, exclude_atoms, upstream_atom, branch_namer)
     return None
 
