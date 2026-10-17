@@ -248,9 +248,15 @@ def _add_indicated_hydrogen_prefix(parts: AssemblyParts, core_name: str, *, allo
     if not indicated_hydrogens and not additive_hydrogens:
         return core_name
     if positive_parent_n_charges(parts):
-        # The ium suffix states the hydrogen on its own nitrogen, but a second,
-        # neutral ring NH still has to be cited: 4-imino-1H-pyrimidin-3-ium.
-        cationic_locants = {charge.locant for charge in positive_parent_n_charges(parts)}
+        # The ium suffix states the hydrogen on its own nitrogen when that
+        # nitrogen keeps a ring double bond, as in pyridin-1-ium. A second,
+        # neutral ring NH still has to be cited (4-imino-1H-pyrimidin-3-ium), and
+        # so does a saturated ium nitrogen (1H-pyridin-1-ium-4-one).
+        cationic_locants = {
+            charge.locant
+            for charge in positive_parent_n_charges(parts)
+            if any(order > 1 for edge, order in parts.parent_bond_orders_by_locants.items() if charge.locant in edge)
+        }
         indicated_hydrogens = [locant for locant in indicated_hydrogens if locant not in cationic_locants]
         if not additive_hydrogens and not indicated_hydrogens:
             return core_name

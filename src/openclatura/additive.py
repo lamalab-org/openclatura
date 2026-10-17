@@ -1,6 +1,7 @@
 import re
 from dataclasses import replace
 
+from .assembly_charge import positive_parent_ium_charges
 from .assembly_parts import AssemblyParts, SubstituentItem
 from .fusion.mancude import compare_actual_parent_to_implied_parent
 from .locants import parse_locant
@@ -152,6 +153,11 @@ def _relocate_preferred_hydrogenation(mol: Molecule, parts: AssemblyParts, numbe
 def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     """Add indicated hydrogen locants for retained ring names."""
 
+    _add_parent_indicated_hydrogens(mol, parts, numbered_path, get_loc)
+    _cite_saturated_ium_hydrogen(mol, parts, numbered_path, get_loc)
+
+
+def _add_parent_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
     _relocate_preferred_hydrogenation(mol, parts, numbered_path, get_loc)
     if _apply_retained_oxo_carbon_hydrogen(mol, parts, numbered_path, get_loc):
         return
@@ -549,6 +555,80 @@ def add_indicated_hydrogens(mol: Molecule, parts: AssemblyParts, numbered_path: 
         )
     if oxo_derivative and not added_h_needed:
         _recast_ring_ketone_hydrogens(mol, parts, numbered_path, get_loc)
+
+
+def _cite_saturated_ium_hydrogen(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> None:
+    """Cite hydrogen at an -ium ring atom that has no ring double bond.
+
+    The ium suffix states the hydrogen of an atom that keeps a ring double bond,
+    as in pyridin-1-ium. A saturated one needs its own citation: OPSIN reads a
+    ring -ium as one more bond to the atom and puts a ring double bond there
+    otherwise, so pyridin-1-ium-4-one reads as the 3H tautomer and
+    4H-pyran-1-ium-4-one does not parse. It is indicated hydrogen in front of the
+    parent, 1H-pyridin-1-ium-4-one, because added hydrogen cited against the ium
+    locant would read as 1(1H)-ium.
+    """
+
+    metadata = parts.retained_parent_metadata
+    if metadata is None or not metadata.mancude_double_bonds:
+        return
+    atom_by_locant = {str(get_loc(idx)): idx for idx in numbered_path}
+    for charge in positive_parent_ium_charges(parts):
+        locant = charge.locant
+        atom_idx = atom_by_locant.get(locant)
+        if atom_idx is None or charge.charge != 1 or not _is_saturated_ring_site(mol, atom_idx, numbered_path):
+            continue
+        cited = [operation for operation in parts.hydro_operations if locant in operation.locants]
+        if cited:
+            # A ring ketone's NH is added hydrogen in the neutral parent,
+            # pyridin-4(1H)-one; here it stays in front of the parent.
+            for operation in cited:
+                if operation.key == "added_hydrogen" and operation.locants == (locant,):
+                    parts.hydro_operations[parts.hydro_operations.index(operation)] = replace(
+                        operation,
+                        key="indicated_hydrogen",
+                        reason="A saturated ium ring atom cites its own indicated hydrogen.",
+                    )
+            continue
+        atom = mol.atoms[atom_idx]
+        if atom.symbol not in {"O", "S", "Se", "Te"} or not (atom.total_h_count or atom.explicit_h_count):
+            continue
+        # A divalent chalcogen cannot hold the neutral parent's indicated
+        # hydrogen, so 4H-pyran-4-one puts it on the ketone carbon. Protonated,
+        # the chalcogen is the parent's one saturated position and takes the
+        # citation itself; the oxo carbon needs none. Any other saturated
+        # position would still need its own, so leave those alone.
+        if metadata.indicated_hydrogen_count != 1:
+            continue
+        oxo_locants = set()
+        for other_locant, other_idx in atom_by_locant.items():
+            if other_idx == atom_idx:
+                continue
+            if _is_oxo_ring_site(mol, other_idx, numbered_path):
+                oxo_locants.add(other_locant)
+            elif _is_saturated_ring_site(mol, other_idx, numbered_path):
+                break
+        else:
+            parts.hydro_operations = [
+                operation
+                for operation in parts.hydro_operations
+                if not (operation.operation_kind == "indicated_hydrogen" and set(operation.locants) <= oxo_locants)
+            ]
+            parts.indicated_hydrogens = [loc for loc in parts.indicated_hydrogens if loc not in oxo_locants]
+            if _name_indicated_hydrogen_locants(parts.retained_name) & oxo_locants:
+                # 4H-1-benzopyran spells the citation in its own stem.
+                parts.retained_name = _respell_indicated_hydrogen(parts.retained_name, {locant})
+                continue
+            parts.indicated_hydrogens.append(locant)
+            parts.hydro_operations.append(
+                HydroOperation(
+                    key="indicated_hydrogen",
+                    reason="A saturated ium ring atom cites its own indicated hydrogen.",
+                    locants=(locant,),
+                    atom_ids=(atom_idx,),
+                    operation_kind="indicated_hydrogen",
+                )
+            )
 
 
 def _apply_retained_oxo_carbon_hydrogen(mol: Molecule, parts: AssemblyParts, numbered_path: list[int], get_loc) -> bool:
