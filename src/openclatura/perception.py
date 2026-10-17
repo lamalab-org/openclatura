@@ -465,7 +465,7 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             if double_n is not None:
                 if double_s is not None:
                     n_neighbors = [x for x in mol.get_neighbors(double_n) if x != atom.idx]
-                    if len(n_neighbors) > 0:
+                    if len(n_neighbors) == 1:
                         groups.append(
                             PerceivedGroup("isothiocyanato", False, n_neighbors[0], {atom.idx, double_n, double_s})
                         )
@@ -473,7 +473,7 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                         continue
                 elif double_o is not None:
                     n_neighbors = [x for x in mol.get_neighbors(double_n) if x != atom.idx]
-                    if len(n_neighbors) > 0:
+                    if len(n_neighbors) == 1:
                         groups.append(
                             PerceivedGroup("isocyanato", False, n_neighbors[0], {atom.idx, double_n, double_o})
                         )
@@ -495,7 +495,7 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
             if triple_n is not None:
                 if single_s is not None:
                     s_neighbors = [x for x in mol.get_neighbors(single_s) if x != atom.idx]
-                    if len(s_neighbors) > 0:
+                    if len(s_neighbors) == 1:
                         groups.append(
                             PerceivedGroup("thiocyanato", False, s_neighbors[0], {atom.idx, triple_n, single_s})
                         )
@@ -503,7 +503,7 @@ def _builtin_perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
                         continue
                 elif single_o is not None:
                     o_neighbors = [x for x in mol.get_neighbors(single_o) if x != atom.idx]
-                    if len(o_neighbors) > 0:
+                    if len(o_neighbors) == 1:
                         groups.append(PerceivedGroup("cyanato", False, o_neighbors[0], {atom.idx, triple_n, single_o}))
                         consumed.update([atom.idx, triple_n, single_o])
                         continue
