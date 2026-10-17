@@ -273,7 +273,11 @@ def name_carbonyl_like_fragment(
 
 
 def format_amino_from_branches(
-    branches: list[str], is_double: bool, is_cation: bool = False, is_anion: bool = False
+    branches: list[str],
+    is_double: bool,
+    is_cation: bool = False,
+    is_anion: bool = False,
+    stereo_prefix_text: str = "",
 ) -> str:
     if is_double:
         if is_cation:
@@ -297,7 +301,7 @@ def format_amino_from_branches(
     if is_cation:
         prefix = charged_heteroatom_prefix("N", 1, "single") or "ammonio"
         if prefix == "ammonio":
-            return ammonio_prefix([strip_outer_parentheses(branch) for branch in branches])
+            return ammonio_prefix([strip_outer_parentheses(branch) for branch in branches], stereo_prefix_text)
         return prefix
     if is_anion:
         if not branches:
@@ -571,7 +575,10 @@ def name_nitrogen_subgraph(
                 if branch:
                     branches.append(branch)
 
-    return format_amino_from_branches(branches, is_double, is_cation, is_anion)
+    # A quaternary ammonio nitrogen cites its R/S inside the prefix, as a sulfaniumyl does.
+    nitrogen = mol.atoms[start_idx]
+    stereo_prefix_text = stereo_prefix(nitrogen) if is_cation and nitrogen.total_h_count == 0 else ""
+    return format_amino_from_branches(branches, is_double, is_cation, is_anion, stereo_prefix_text)
 
 
 def terminal_n3_prefix(

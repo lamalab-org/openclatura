@@ -69,14 +69,14 @@ class AnionicSuffixOperation:
     reason: str
 
 
-def ammonio_prefix(branches: list[str]) -> str:
+def ammonio_prefix(branches: list[str], stereo_prefix_text: str = "") -> str:
     """Return an ammonio-style prefix for a protonated nitrogen substituent."""
 
     if not branches:
         return "ammonio"
     if any(re.match(r"^[A-Z][a-z]?-", branch) for branch in branches):
-        return f"({''.join(branches)}ammonio)"
-    return f"({format_center_ligands(branches, sort_key=substituent_sort_key)}ammonio)"
+        return f"({stereo_prefix_text}{''.join(branches)}ammonio)"
+    return f"({stereo_prefix_text}{format_center_ligands(branches, sort_key=substituent_sort_key)}ammonio)"
 
 
 def apply_parent_charge_names(

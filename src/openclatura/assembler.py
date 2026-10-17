@@ -362,6 +362,9 @@ def _add_stereo_prefix(parts: AssemblyParts, final_word: str) -> str:
             feature for feature in unique_stereo if not (feature[0] == "1" and feature[1] in unlocanted_descriptors)
         ]
     sorted_stereo = sorted(unique_stereo, key=lambda f: parse_locant(f[0]) if f[0] else (0, ""))
+    if len(sorted_stereo) == 1 and sorted_stereo[0][0] == "N":
+        # A lone -aminium nitrogen descriptor needs no locant: (S)-N-ethyl-N-methyl-N-propylbenzenaminium.
+        sorted_stereo = [("", sorted_stereo[0][1])]
     stereo_str = "(" + ",".join(f"{loc}{st}" if loc else st for loc, st in sorted_stereo) + ")-"
     return stereo_str + final_word
 
