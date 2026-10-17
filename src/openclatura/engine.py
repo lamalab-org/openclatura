@@ -521,9 +521,14 @@ class NamingEngine:
 
     @staticmethod
     def _component_sort_key(name: str, charge: int = 0) -> tuple[int, int, str]:
-        """P-72.3: cations are cited before anions; metals first among cations, then alphabetical."""
+        """P-72.3: cations are cited before anions; metals first among cations, then alphabetical.
 
-        charge_rank = 0 if charge > 0 else (1 if charge == 0 else 2)
+        Neutral components follow the salt, so that the anion directly follows the
+        cations: between them, a neutral alcohol or amine name would be read with the
+        anion as one functional class name (``propan-2-ol methanesulfonate``).
+        """
+
+        charge_rank = 0 if charge > 0 else (1 if charge < 0 else 2)
         return (charge_rank, 0 if name in SALT_METAL_NAMES else 1, name)
 
     @staticmethod
