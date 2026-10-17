@@ -773,11 +773,17 @@ def simple_azine_parent_name(
             return f"1,2-bis[{cited_side}]hydrazine" if stereo else f"1,2-bis({cited_side})hydrazine"
         # Prefer the longer carbonyl parent; this follows parent-size
         # preference and keeps the shorter side as the ylidene hydrazone
-        # modifier.
-        if (len(side2), parent2) > (len(side1), parent1):
-            parent_name, modifier, parent_carbon, parent_n = parent2, ylidene1, c2, n2
+        # modifier.  Between two sides of the same name, the parent is the
+        # one whose C=N is Z, then E, so the name does not follow atom order.
+        stereo_rank = {"E": 1, "Z": 2}
+        left_rank = stereo_rank.get(left_bond.stereo if left_bond is not None else None, 0)
+        right_rank = stereo_rank.get(right_bond.stereo if right_bond is not None else None, 0)
+        if (len(side2), parent2, right_rank) > (len(side1), parent1, left_rank):
+            parent_name, parent_carbon, parent_n = parent2, c2, n2
+            modifier = _ylidene_with_stereo(mol, c1, n1, ylidene1)
         else:
-            parent_name, modifier, parent_carbon, parent_n = parent1, ylidene2, c1, n1
+            parent_name, parent_carbon, parent_n = parent1, c1, n1
+            modifier = _ylidene_with_stereo(mol, c2, n2, ylidene2)
         stereo = _hydrazone_stereo_prefix(mol, parent_carbon, parent_n, parent_name)
         return f"{stereo}{parent_name} {modifier}hydrazone"
     return ""
@@ -1198,9 +1204,26 @@ def _hydrazone_stereo_prefix(mol: Molecule, carbon: int, nitrogen: int, parent_n
     bond = mol.get_bond(carbon, nitrogen)
     if bond is None or bond.stereo not in {"E", "Z"}:
         return ""
-    match = re.search(r"an-(\d+)-one$", parent_name)
-    loc = match.group(1) if match else "1"
+    # Only a ketone or chain-aldehyde parent numbers the C=N carbon;
+    # benzaldehyde and ...carbaldehyde have no locant for it, and OPSIN
+    # rejects one, so their descriptor is unlocanted.
+    match = re.search(r"-(\d+)-one$", parent_name)
+    if match:
+        loc = match.group(1)
+    elif parent_name.endswith("al"):
+        loc = "1"
+    else:
+        loc = ""
     return f"({loc}{bond.stereo})-"
+
+
+def _ylidene_with_stereo(mol: Molecule, carbon: int, nitrogen: int, ylidene: str) -> str:
+    """Cite the ylidene side's own C=N descriptor, as ``[(E)-benzylidene]``."""
+
+    bond = mol.get_bond(carbon, nitrogen)
+    if bond is None or bond.stereo not in {"E", "Z"}:
+        return ylidene
+    return f"[({bond.stereo})-{ylidene}]"
 
 
 def sulfonium_ylide_name(
