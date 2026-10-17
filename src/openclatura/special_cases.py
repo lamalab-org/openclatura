@@ -2782,23 +2782,52 @@ def _locanted_ligand_prefix(items: list[tuple[int, str]]) -> str:
 # derivatives are named on the heteroatom: triphenylphosphane, trimethyl(phenyl)silane.
 _SENIOR_HYDRIDE_CENTRES = frozenset({"P", "As", "Sb", "Bi", "Si", "Ge", "Sn", "Pb", "B", "Al", "Ga", "In", "Tl"})
 
+# P-41, P-70.2: cations are senior to acids and to every neutral class, so an onium
+# centre stays in the parent even when the rest of the molecule has a suffix:
+# (4-hydroxyphenyl)dimethylsulfanium, not 4-(dimethylsulfaniumyl)phenol. Nitrogen
+# gets this from its -aminium suffix; these centres have none and are named on the
+# cationic parent hydride (P-73.1.1.2), with their standard bonding number.
+_ONIUM_CENTRE_BONDING = {"P": 4, "As": 4, "Sb": 4, "Bi": 4, "O": 3, "S": 3, "Se": 3, "Te": 3}
+
+
+def _sole_onium_centre(mol: Molecule, component_atoms: set[int]) -> int | None:
+    """The component's only charged atom, when it is an onium centre bonded only to carbon."""
+
+    charged = [idx for idx in component_atoms if mol.atoms[idx].charge]
+    if len(charged) != 1:
+        return None
+    atom = mol.atoms[charged[0]]
+    neighbors = mol.get_neighbors(atom.idx)
+    if (
+        atom.charge != 1
+        or _ONIUM_CENTRE_BONDING.get(atom.symbol) != len(neighbors) + atom.total_h_count
+        or not all(mol.atoms[n].is_carbon for n in neighbors)
+    ):
+        return None
+    return atom.idx
+
 
 def simple_central_parent_hydride_result(
     mol: Molecule, component_atoms: set[int], branch_namer: RecursiveSubgraphNamer | None = None
 ) -> SpecialComponentName | None:
     """Name simple mononuclear parent hydrides with halogen/alkoxy/hydrocarbyl ligands."""
 
-    central_candidates = [
-        idx
-        for idx in component_atoms
-        if mol.atoms[idx].symbol in RULES.components.mononuclear_parent_hydrides
-        and mol.atoms[idx].symbol not in {"O", "F", "Cl", "Br", "I"}
-        and mol.degree(idx) >= 2
-    ]
+    onium_centre = _sole_onium_centre(mol, component_atoms)
+    central_candidates = (
+        [onium_centre]
+        if onium_centre is not None
+        else [
+            idx
+            for idx in component_atoms
+            if mol.atoms[idx].symbol in RULES.components.mononuclear_parent_hydrides
+            and mol.atoms[idx].symbol not in {"O", "F", "Cl", "Br", "I"}
+            and mol.degree(idx) >= 2
+        ]
+    )
     if len(central_candidates) != 1:
         return None
     central = central_candidates[0]
-    if mol.atoms[central].stereo or mol.atoms[central].raw_stereo:
+    if central != onium_centre and (mol.atoms[central].stereo or mol.atoms[central].raw_stereo):
         # A configured centre (e.g. a chiral phosphine oxide) needs a
         # stereo-descriptor this "phosphane oxide"-style spelling has no
         # machinery to carry -- organophosphonic_acid_result refuses to fire
@@ -2835,7 +2864,7 @@ def simple_central_parent_hydride_result(
             for n in mol.get_neighbors(central)
         )
     )
-    onium = (
+    onium = central == onium_centre or (
         mol.atoms[central].charge == 1
         and central_symbol in _SENIOR_HYDRIDE_CENTRES
         and not charge_separated_oxide
@@ -2845,10 +2874,9 @@ def simple_central_parent_hydride_result(
     if mol.atoms[central].charge and not charge_separated_oxide and not onium:
         # A charged nitrogen centre is an -ium/-ide parent named on its carbon (methanaminium).
         return None
-    hydrocarbyl_allowed = (
-        branch_namer is not None
-        and central_symbol in _SENIOR_HYDRIDE_CENTRES
-        and not _has_principal_group(mol, component_atoms)
+    hydrocarbyl_allowed = branch_namer is not None and (
+        central == onium_centre
+        or (central_symbol in _SENIOR_HYDRIDE_CENTRES and not _has_principal_group(mol, component_atoms))
     )
     ligand_names = []
     ligand_bindings = []
