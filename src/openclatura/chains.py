@@ -678,35 +678,46 @@ def _shortest_component_path(start: int, end: int, component: set[int], adj: dic
 
 
 def _cyclic_atoms_within(mol: Molecule, valid_nodes: set[int]) -> set[int]:
-    """Atoms lying on a cycle of the subgraph induced by ``valid_nodes``."""
+    """Atoms lying on a cycle of the subgraph induced by ``valid_nodes``.
 
-    cyclic = set()
-    for n in valid_nodes:
-        in_cycle = False
-        for nxt in mol.get_neighbors(n):
-            if nxt not in valid_nodes:
-                continue
-            visited = {n, nxt}
-            q = [nxt]
-            found = False
-            while q:
-                curr = q.pop(0)
-                for nn in mol.get_neighbors(curr):
-                    if nn in valid_nodes:
-                        if nn == n and curr != nxt:
-                            found = True
-                            break
-                        elif nn not in visited:
-                            visited.add(nn)
-                            q.append(nn)
-                if found:
-                    break
-            if found:
-                in_cycle = True
+    An atom is on a cycle exactly when one of its bonds is not a bridge, so one
+    depth-first search (Tarjan's low-link) finds them all in linear time.  A
+    search per atom made this quadratic, and each residue of a peptide names
+    the rest of the chain as a new molecule, which made peptides cubic (#136).
+    The search keeps an explicit stack, so long chains cannot exhaust Python's
+    recursion limit.
+    """
+
+    order: dict[int, int] = {}
+    low: dict[int, int] = {}
+    on_cycle: set[int] = set()
+    for root in valid_nodes:
+        if root in order:
+            continue
+        order[root] = low[root] = len(order)
+        # Each frame is (atom, the atom it was reached from, its unvisited neighbours).
+        stack = [(root, None, iter(mol.get_neighbors(root)))]
+        while stack:
+            atom, parent, neighbors = stack[-1]
+            for nxt in neighbors:
+                if nxt not in valid_nodes or nxt == parent:
+                    continue
+                if nxt in order:
+                    low[atom] = min(low[atom], order[nxt])
+                    continue
+                order[nxt] = low[nxt] = len(order)
+                stack.append((nxt, atom, iter(mol.get_neighbors(nxt))))
                 break
-        if in_cycle:
-            cyclic.add(n)
-    return cyclic
+            else:
+                stack.pop()
+                if parent is not None:
+                    low[parent] = min(low[parent], low[atom])
+                    # The bond parent-atom is a bridge only when nothing below
+                    # ``atom`` reaches back to ``parent`` or above it.
+                    if low[atom] <= order[parent]:
+                        on_cycle.update((atom, parent))
+    # Keep the iteration order of ``valid_nodes`` that the per-atom search had.
+    return {n for n in valid_nodes if n in on_cycle}
 
 
 def get_cyclic_atoms(mol: Molecule, exclude_atoms: set[int] = None) -> set[int]:
