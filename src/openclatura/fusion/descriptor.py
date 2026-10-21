@@ -291,8 +291,16 @@ def _selection_preference_tiers(
         if component_parent_eligible(match, spec, prepared.matches):
             roots_by_seniority[component_spec_seniority_key(spec).as_tuple()].append(match.occurrence_id)
 
+    # The independent audit requires every declared parent to have the best
+    # intrinsic seniority among all eligible components in this exact cover.
+    # Lower tiers can therefore never produce a valid plan; do not construct
+    # their local-map combinations and ASTs only to reject them after complete
+    # numbering, bond-model, and reconstruction work.
+    preferred_seniority = min(roots_by_seniority, default=None)
     result = []
     for seniority, roots in roots_by_seniority.items():
+        if seniority != preferred_seniority:
+            continue
         root_sets = [(root,) for root in roots]
         if allow_multiparent_parents:
             roots_by_variant: dict[tuple, list[int]] = defaultdict(list)

@@ -92,7 +92,7 @@ def test_unresolved_interior_maps_still_hit_the_existing_guard(monkeypatch):
     monkeypatch.setattr(numbering, "_construction_ordered_numberings", lambda mol, layouts, candidates: candidates)
     _, _, result = _plan(Chem.MolFromSmiles(SMILES))
     assert isinstance(result, FusionUnsupported)
-    assert "tied fusion numberings identify different locant-labelled parent graphs" in result.details
+    assert "tied fusion numberings identify different locant-labelled parent graphs" in (result.reason, *result.details)
 
 
 def test_construction_provenance_is_required_to_resolve_the_tie(monkeypatch):
