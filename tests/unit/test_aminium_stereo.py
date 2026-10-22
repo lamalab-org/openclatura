@@ -41,8 +41,8 @@ CASES = {
 # Stereo that was already cited, and nitrogens that are not stereocentres.
 GUARDS = {
     "C[N@+]1(Cc2ccccc2)CCC[C@H]1C": "(1R,2R)-1-benzyl-1,2-dimethylpyrrolidinium",
-    "C[S@+](CC)c1ccccc1": "((R)-ethyl(methyl)sulfaniumyl)benzene",
-    "C[P@+](CC)(CCC)c1ccccc1": "((S)-ethyl(methyl)(propyl)phosphaniumyl)benzene",
+    "C[S@+](CC)c1ccccc1": "(R)-ethyl(methyl)(phenyl)sulfanium",
+    "C[P@+](CC)(CCC)c1ccccc1": "(S)-ethyl(methyl)(phenyl)(propyl)phosphanium",
     "C[N@+](C)(CC)c1ccccc1": "N-ethyl-N,N-dimethylbenzenaminium",
     "C[N+](C)(C)c1ccccc1": "N,N,N-trimethylbenzenaminium",
     "C[C@@H](CC)[N+](C)(C)C": "(2S)-N,N,N-trimethylbutan-2-aminium",

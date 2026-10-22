@@ -36,7 +36,7 @@ GUARDS = {
     "C[P@](=O)(CC)c1ccccc1": "((S)-ethyl(methyl)oxophosphanyl)benzene",
     "C[P@](=O)(OC)c1ccccc1": "((S)-methoxy(methyl)phosphoryl)benzene",
     "C[P@](=O)(S)c1ccccc1": "((S)-methyl(sulfanyl)oxophosphanyl)benzene",
-    "C[P@+](CC)(CCC)c1ccccc1": "((S)-ethyl(methyl)(propyl)phosphaniumyl)benzene",
+    "C[P@+](CC)(CCC)c1ccccc1": "(S)-ethyl(methyl)(phenyl)(propyl)phosphanium",
     "CC[N@+]1([O-])CCC[C@H]1C": "(1S,2R)-1-ethyl-2-methyl-1-oxidopyrrolidinium",
 }
 
