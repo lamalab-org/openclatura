@@ -53,7 +53,15 @@ class FusionSearchLimits:
     component_selection_states: int
     locant_map_combinations: int
     mancude_states: int
+    interior_numbering_states: int
     maximum_name_candidates: int
+
+
+@dataclass(frozen=True, slots=True)
+class FusionNumberingConfig:
+    interior_carbon_profile: str
+    rule_reference: str
+    opsin_compatibility_version: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,6 +120,7 @@ class RingShapeSpec:
 class FusionNomenclatureConfig:
     registry_version: str
     graph_source: str
+    numbering: FusionNumberingConfig
     rules: FusionRuleConfig
     search: FusionSearchLimits
     ring_shapes: tuple[RingShapeSpec, ...]
@@ -146,6 +155,18 @@ def fusion_nomenclature_config_from_data(data: dict) -> FusionNomenclatureConfig
     graph_source = _text(data, "graph_source")
     if graph_source != "retained_graph_templates":
         raise ValueError("fusion components must use the shared retained graph-template registry")
+    numbering_data = _mapping(data, "numbering")
+    numbering = FusionNumberingConfig(
+        interior_carbon_profile=_text(numbering_data, "interior_carbon_profile"),
+        rule_reference=_text(numbering_data, "rule_reference"),
+        opsin_compatibility_version=_text(numbering_data, "opsin_compatibility_version"),
+    )
+    if numbering.interior_carbon_profile != "legacy_cas_letter_continuation":
+        raise ValueError("unsupported fusion interior-carbon numbering profile")
+    if numbering.rule_reference != "FR-5.5.2":
+        raise ValueError("legacy interior-carbon numbering must cite FR-5.5.2")
+    if numbering.opsin_compatibility_version != "2.9.0":
+        raise ValueError("unsupported OPSIN fusion-numbering compatibility version")
     rules_data = _mapping(data, "rules")
     eligibility_gate = _mapping(rules_data, "eligibility_gate")
     support_data = _mapping(rules_data, "support")
@@ -185,6 +206,7 @@ def fusion_nomenclature_config_from_data(data: dict) -> FusionNomenclatureConfig
     return FusionNomenclatureConfig(
         registry_version=_text(data, "registry_version"),
         graph_source=graph_source,
+        numbering=numbering,
         rules=rules,
         search=search,
         ring_shapes=shapes,

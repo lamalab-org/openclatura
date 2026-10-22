@@ -45,6 +45,10 @@ class RetainedParentBondCapacityError(ValueError):
     """A proposed retained hydrogen state cannot preserve parent pi capacity."""
 
 
+class _InteriorNumberingBudgetExceeded(RuntimeError):
+    """Internal signal that the bounded FR-5.5.2 path search was exhausted."""
+
+
 _CONFIG = fusion_nomenclature_config()
 
 
@@ -58,6 +62,7 @@ class CompletedNumbering:
     layout_index: int | None = None
     start_face_id: int | None = None
     start_atom: int | None = None
+    opsin_compatible: bool | None = None
 
     @property
     def string_map(self) -> dict[int, str]:
@@ -287,16 +292,11 @@ def _numbering_from_layout(
             or start_atom in fusion_atoms
         ):
             return None
-    construction_order = layout.construction_atom_order if isinstance(layout, OpsinConstructionLayout) else None
-    cache_key = perimeter, construction_order
+    cache_key = perimeter, None
     if perimeter_cache is not None and cache_key in perimeter_cache:
         numbered = perimeter_cache[cache_key]
     else:
-        locant_map = (
-            _number_completed_system(mol, faces, perimeter, fusion_atoms, opsin_atom_order=construction_order)
-            if construction_order is not None
-            else _number_completed_system(mol, faces, perimeter, fusion_atoms)
-        )
+        locant_map = _number_completed_system(mol, faces, perimeter, fusion_atoms)
         numbered = (
             CompletedNumbering(
                 perimeter=perimeter,
@@ -310,11 +310,22 @@ def _numbering_from_layout(
             perimeter_cache[cache_key] = numbered
     if numbered is None:
         return None
+    opsin_compatible = None
+    if isinstance(layout, OpsinConstructionLayout):
+        opsin_map = _opsin_29_completed_system_numbering(
+            mol,
+            faces,
+            perimeter,
+            fusion_atoms,
+            layout.construction_atom_order,
+        )
+        opsin_compatible = opsin_map == dict(numbered.atom_to_locant)
     return replace(
         numbered,
         layout_index=layout_index,
         start_face_id=start_face_id,
         start_atom=start_atom,
+        opsin_compatible=opsin_compatible,
     )
 
 
@@ -658,10 +669,8 @@ def _number_completed_system(
     faces: BoundedFaceModel,
     perimeter: tuple[int, ...],
     fusion_atoms: set[int],
-    *,
-    opsin_atom_order: tuple[int, ...] | None = None,
 ) -> dict[int, SystemLocant] | None:
-    """Number the perimeter, then extend the map to interior atoms."""
+    """Number the perimeter, then apply the configured interior profile."""
 
     result = _number_perimeter(mol, perimeter, fusion_atoms)
     if result is None:
@@ -669,18 +678,6 @@ def _number_completed_system(
     interior = set(faces.atom_ids) - set(perimeter)
     if not interior:
         return result
-    if opsin_atom_order is not None:
-        if len(set(opsin_atom_order)) != len(opsin_atom_order) or set(opsin_atom_order) != set(faces.atom_ids):
-            return None
-        return _number_perimeter(
-            mol, perimeter + tuple(atom for atom in opsin_atom_order if atom in interior), fusion_atoms | interior
-        )
-    if len(interior) == 1:
-        # A unique interior vertex has an unambiguous place after the
-        # perimeter in completed fusion numbering. Continue the final fusion
-        # letter (or integer for a heteroatom), not a distance superscript.
-        return _number_perimeter(mol, perimeter + tuple(interior), fusion_atoms | interior)
-
     distance, anchors = _interior_distances_and_anchors(mol, faces.atom_ids, perimeter)
     if set(distance) != set(faces.atom_ids):
         return None
@@ -699,16 +696,228 @@ def _number_completed_system(
         next_integer += 1
         result[atom] = SystemLocant(next_integer)
 
-    for atom in sorted(interior - set(interior_hetero), key=lambda value: (distance[value], ranks[value])):
-        anchor = min(anchors[atom], key=lambda value: system_locant_sort_key(result[value]))
-        anchor_locant = result[anchor]
-        result[atom] = SystemLocant(
-            anchor_locant.base,
-            fusion_suffix=anchor_locant.fusion_suffix,
-            interior_distance=distance[atom],
-        )
-    if len(set(result.values())) != len(result):
+    interior_carbons = interior - set(interior_hetero)
+    if _CONFIG.numbering.interior_carbon_profile != "legacy_cas_letter_continuation":
         return None
+    try:
+        return _legacy_interior_carbon_numbering(
+            mol,
+            faces.atom_ids,
+            perimeter,
+            result,
+            interior_carbons,
+            search_budget=_CONFIG.search.interior_numbering_states,
+        )
+    except _InteriorNumberingBudgetExceeded:
+        return None
+
+
+def _opsin_29_completed_system_numbering(
+    mol: Molecule,
+    faces: BoundedFaceModel,
+    perimeter: tuple[int, ...],
+    fusion_atoms: set[int],
+    construction_atom_order: tuple[int, ...],
+) -> dict[int, SystemLocant] | None:
+    """Model OPSIN 2.9.0's fragment-order interior labels for compatibility.
+
+    This witness is compared with, and never used to define, the rule-based
+    FR-5.5.2 numbering returned by :func:`_number_completed_system`.
+    """
+
+    if len(set(construction_atom_order)) != len(construction_atom_order) or set(construction_atom_order) != set(
+        faces.atom_ids
+    ):
+        return None
+    interior = set(faces.atom_ids) - set(perimeter)
+    return _number_perimeter(
+        mol,
+        perimeter + tuple(atom for atom in construction_atom_order if atom in interior),
+        fusion_atoms | interior,
+    )
+
+
+def _legacy_interior_carbon_numbering(
+    mol: Molecule,
+    atom_ids: frozenset[int],
+    perimeter: tuple[int, ...],
+    numbered: dict[int, SystemLocant],
+    interior_carbons: set[int],
+    *,
+    search_budget: int,
+) -> dict[int, SystemLocant] | None:
+    """Apply the CAS elaboration of A-22.2 recorded in FR-5.5.2(a)-(d)."""
+
+    remaining = set(interior_carbons)
+    if not remaining:
+        return numbered
+    if search_budget < 1:
+        raise ValueError("interior numbering search budget must be positive")
+    _, peripheral_anchors = _interior_distances_and_anchors(mol, atom_ids, perimeter)
+    states = [0]
+
+    # Items (a) and (d): inspect already numbered peripheral atoms and
+    # interior heteroatoms from the highest locant downward. A carbon path must
+    # start at the numbered atom whose locant it continues.
+    initial_anchors = tuple(sorted(numbered, key=lambda atom: system_locant_sort_key(numbered[atom]), reverse=True))
+    for anchor in initial_anchors:
+        path = _preferred_interior_path(
+            mol,
+            atom_ids,
+            anchor,
+            remaining,
+            peripheral_anchors,
+            numbered,
+            states,
+            search_budget,
+        )
+        if path == ():
+            continue
+        if path is None:
+            return None
+        if not _assign_legacy_continuation(numbered, numbered[anchor], path):
+            return None
+        remaining.difference_update(path)
+
+    # Item (c): cover any isolated atoms or chains left by (a)-(b), taking the
+    # longest remaining chain and continuing the highest alphanumeric locant.
+    while remaining:
+        paths = []
+        for start in remaining:
+            paths.extend(
+                _maximal_simple_paths(
+                    mol,
+                    atom_ids,
+                    (start,),
+                    remaining - {start},
+                    states,
+                    search_budget,
+                )
+            )
+        path = _select_legacy_path(paths, peripheral_anchors, numbered)
+        if path is None:
+            return None
+        highest = max(numbered.values(), key=system_locant_sort_key)
+        if not _assign_legacy_continuation(numbered, highest, path):
+            return None
+        remaining.difference_update(path)
+
+    return numbered if len(set(numbered.values())) == len(numbered) else None
+
+
+def _preferred_interior_path(
+    mol: Molecule,
+    atom_ids: frozenset[int],
+    anchor: int,
+    remaining: set[int],
+    peripheral_anchors: Mapping[int, frozenset[int]],
+    numbered: Mapping[int, SystemLocant],
+    states: list[int],
+    search_budget: int,
+) -> tuple[int, ...] | None:
+    paths = []
+    for neighbor in mol.get_neighbors(anchor):
+        if neighbor not in remaining:
+            continue
+        paths.extend(
+            _maximal_simple_paths(
+                mol,
+                atom_ids,
+                (neighbor,),
+                remaining - {neighbor},
+                states,
+                search_budget,
+            )
+        )
+    if not paths:
+        return ()
+    return _select_legacy_path(paths, peripheral_anchors, numbered)
+
+
+def _maximal_simple_paths(
+    mol: Molecule,
+    atom_ids: frozenset[int],
+    path: tuple[int, ...],
+    available: set[int],
+    states: list[int],
+    search_budget: int,
+) -> tuple[tuple[int, ...], ...]:
+    states[0] += 1
+    if states[0] > search_budget:
+        raise _InteriorNumberingBudgetExceeded
+    extensions = tuple(
+        neighbor for neighbor in mol.get_neighbors(path[-1]) if neighbor in atom_ids and neighbor in available
+    )
+    if not extensions:
+        return (path,)
+    paths = []
+    for neighbor in extensions:
+        paths.extend(
+            _maximal_simple_paths(
+                mol,
+                atom_ids,
+                path + (neighbor,),
+                available - {neighbor},
+                states,
+                search_budget,
+            )
+        )
+    return tuple(paths)
+
+
+def _select_legacy_path(
+    paths: Iterable[tuple[int, ...]],
+    peripheral_anchors: Mapping[int, frozenset[int]],
+    numbered: Mapping[int, SystemLocant],
+) -> tuple[int, ...] | None:
+    candidates = tuple(paths)
+    if not candidates:
+        return None
+    longest = max(map(len, candidates))
+    candidates = tuple(path for path in candidates if len(path) == longest)
+
+    def branch_key(path: tuple[int, ...]) -> tuple:
+        return tuple(
+            min(system_locant_sort_key(numbered[anchor]) for anchor in peripheral_anchors[atom]) for atom in path
+        )
+
+    best = min(branch_key(path) for path in candidates)
+    preferred = tuple(path for path in candidates if branch_key(path) == best)
+    unique = tuple(dict.fromkeys(preferred))
+    return unique[0] if len(unique) == 1 else None
+
+
+def _assign_legacy_continuation(
+    numbered: dict[int, SystemLocant],
+    anchor: SystemLocant,
+    path: tuple[int, ...],
+) -> bool:
+    suffix_index = max(
+        (_fusion_suffix_index(locant.fusion_suffix) for locant in numbered.values() if locant.base == anchor.base),
+        default=_fusion_suffix_index(anchor.fusion_suffix),
+    )
+    for offset, atom in enumerate(path, start=1):
+        locant = SystemLocant(anchor.base, _fusion_suffix(suffix_index + offset))
+        if locant in numbered.values():
+            return False
+        numbered[atom] = locant
+    return True
+
+
+def _fusion_suffix_index(suffix: str) -> int:
+    value = 0
+    for char in suffix:
+        value = value * 26 + ord(char) - ord("a") + 1
+    return value
+
+
+def _fusion_suffix(index: int) -> str:
+    if index < 1:
+        raise ValueError("fusion suffix index must be positive")
+    result = ""
+    while index:
+        index, remainder = divmod(index - 1, 26)
+        result = chr(ord("a") + remainder) + result
     return result
 
 
