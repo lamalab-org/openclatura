@@ -13,6 +13,9 @@ def test_checked_in_fusion_configuration_is_complete_and_data_backed():
     config = fusion_nomenclature_config()
 
     assert config.graph_source == "retained_graph_templates"
+    assert config.numbering.interior_carbon_profile == "legacy_cas_letter_continuation"
+    assert config.numbering.rule_reference == "FR-5.5.2"
+    assert config.numbering.opsin_compatibility_version == "2.9.0"
     assert config.rules.planner_tier == "bounded-polycomponent-v3"
     assert config.rules.support.cover_kinds == ("tree",)
     assert config.rules.support.join_kinds == ("ortho", "ortho_peri", "higher_order")

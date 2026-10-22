@@ -119,8 +119,8 @@ def test_pericondensed_numbering_assigns_interior_carbons_from_peripheral_anchor
     for numbering in selection.accepted:
         locants = dict(numbering.atom_to_locant)
         assert set(locants) == set(mol.atoms)
-        assert all(locants[atom].interior_distance == 1 for atom in (14, 15))
-        assert all(locants[atom].fusion_suffix for atom in (14, 15))
+        assert {str(locants[atom]) for atom in (14, 15)} == {"10b", "10c"}
+        assert all(locants[atom].interior_distance is None for atom in (14, 15))
 
 
 def test_interior_heteroatom_continues_the_peripheral_integer_sequence():

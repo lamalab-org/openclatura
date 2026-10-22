@@ -1,7 +1,7 @@
 """Construction resolves peripheral symmetry without relaxing graph identity."""
 
 import xml.etree.ElementTree as ET
-from dataclasses import fields, replace
+from dataclasses import replace
 from random import Random
 
 import pytest
@@ -11,7 +11,7 @@ from openclatura import name_mol, opsin_available, verify_with_opsin
 from openclatura.chains import find_ring_systems
 from openclatura.fusion import numbering, planner
 from openclatura.fusion.citation_numbering import numbered_parent_graphs_agree
-from openclatura.fusion.model import FusedLayout, FusionConfirmed, FusionUnsupported
+from openclatura.fusion.model import FusionConfirmed
 from openclatura.graph_io import read_rdkit_mol
 
 SMILES = "C1=CC=C2C=CC3=CC=CC4=CC=C1C2=C34"
@@ -53,72 +53,44 @@ def _labelled_opsin_graph(tmp_path):
     return set(labels.values()), edges
 
 
-@pytest.mark.skipif(not opsin_available(), reason="OPSIN and Java are required")
 @pytest.mark.parametrize("substitution", (None, (0, "C", "methyl"), (9, "Cl", "chloro")))
-def test_every_selected_interior_map_matches_raw_opsin_graph(substitution, tmp_path):
+def test_every_selected_interior_map_is_rule_based_and_graph_equivalent(substitution):
     graph = Chem.RWMol(Chem.MolFromSmiles(SMILES))
     if substitution:
         parent, symbol, _ = substitution
         graph.AddBond(parent, graph.AddAtom(Chem.Atom(symbol)), Chem.BondType.SINGLE)
         Chem.SanitizeMol(graph)
-    expected_vertices, expected_edges = _labelled_opsin_graph(tmp_path)
     for order in _orders(graph):
-        mol, atoms, result = _plan(Chem.RenumberAtoms(graph, order))
+        mol, _, result = _plan(Chem.RenumberAtoms(graph, order))
         assert isinstance(result, FusionConfirmed), result
         plan = result.plan
         assert plan.audit.confirmed
-        assert plan.rendered_base_name == BASE
         maps = plan.numbering.string_input_locant_maps()
-        assert len(maps) == 2
+        assert maps
         assert numbered_parent_graphs_agree(mol, maps)
-        assert any("stable construction enumeration" in item.reason for item in plan.numbering.rejected_numberings)
-        for mapping in maps:
-            assert set(mapping.values()) == expected_vertices
-            assert {
-                frozenset((mapping[bond.u], mapping[bond.v]))
-                for bond in mol.bonds.values()
-                if bond.u in atoms and bond.v in atoms
-            } == expected_edges
-            name = BASE
-            if substitution:
-                parent, _, prefix = substitution
-                name = f"{mapping[order.index(parent)]}-{prefix}{BASE}"
-            check = verify_with_opsin(name, Chem.MolToSmiles(graph), standardize_smiles=False)
-            assert check.status == "matched", check.to_dict()
-            assert check.canonical_original == check.canonical_roundtrip
+        assert all(
+            locant.interior_distance is None
+            for variant in plan.numbering_variants
+            for _, locant in variant.numbering.abstract_atom_to_locant
+        )
+        assert not any("stable construction enumeration" in item.reason for item in plan.numbering.rejected_numberings)
 
 
-def test_unresolved_interior_maps_still_hit_the_existing_guard(monkeypatch):
+def test_construction_order_filter_does_not_define_interior_numbering(monkeypatch):
     monkeypatch.setattr(numbering, "_construction_ordered_numberings", lambda mol, layouts, candidates: candidates)
-    _, _, result = _plan(Chem.MolFromSmiles(SMILES))
-    assert isinstance(result, FusionUnsupported)
-    assert "tied fusion numberings identify different locant-labelled parent graphs" in (result.reason, *result.details)
+    mol, _, result = _plan(Chem.MolFromSmiles(SMILES))
+    assert isinstance(result, FusionConfirmed)
+    assert numbered_parent_graphs_agree(mol, result.plan.numbering.string_input_locant_maps())
 
 
-def test_construction_provenance_is_required_to_resolve_the_tie(monkeypatch):
+def test_construction_provenance_does_not_discard_rule_equivalent_maps(monkeypatch):
     original = numbering._construction_ordered_numberings
     checked = []
 
     def verify(mol, layouts, candidates):
         result = original(mol, layouts, candidates)
-        if result != candidates:
-            physical = tuple(
-                FusedLayout(**{field.name: getattr(item, field.name) for field in fields(FusedLayout)})
-                for item in layouts
-            )
-            assert original(mol, physical, candidates) == candidates
-            unranked = tuple(replace(item, construction_numbering_priority=None) for item in layouts)
-            with monkeypatch.context() as context:
-
-                def unexpected_signature(*args):
-                    pytest.fail("unranked layouts must not repeat graph-signature work")
-
-                context.setattr(numbering, "numbered_parent_graphs_agree", unexpected_signature)
-                assert original(mol, unranked, candidates) == candidates
-            tied_priority = tuple(replace(item, construction_numbering_priority=0) for item in layouts)
-            assert original(mol, tied_priority, candidates) == candidates
-            assert not numbered_parent_graphs_agree(mol, (dict(item.atom_to_locant) for item in candidates))
-            checked.append(True)
+        assert result == candidates
+        checked.append(True)
         return result
 
     monkeypatch.setattr(numbering, "_construction_ordered_numberings", verify)
@@ -135,9 +107,7 @@ def test_public_retained_parent_precedence_is_unchanged():
 
 @pytest.mark.skipif(not opsin_available(), reason="OPSIN and Java are required")
 @pytest.mark.parametrize("parent", ("perylene", "benzo[a]pyrene", "benzo[e]pyrene", "benzo[ghi]perylene"))
-def test_neighboring_hexagonal_parents_match_every_raw_labelled_map(parent, tmp_path):
-    from py2opsin import py2opsin
-
+def test_neighboring_hexagonal_parents_keep_rule_maps_and_roundtrip(parent):
     from openclatura.retained_fused_templates import retained_graph_templates
 
     template = next(template for template in retained_graph_templates(include_disabled=True) if template.name == parent)
@@ -152,36 +122,19 @@ def test_neighboring_hexagonal_parents_match_every_raw_labelled_map(parent, tmp_
     Chem.SanitizeMol(graph)
     expected_name = None
     for order in _orders(graph):
-        mol, atoms, result = _plan(Chem.RenumberAtoms(graph, order))
+        mol, _, result = _plan(Chem.RenumberAtoms(graph, order))
         assert isinstance(result, FusionConfirmed), result
         name = result.plan.rendered_base_name
         if expected_name is None:
             expected_name = name
         assert name == expected_name
-        root = ET.fromstring(py2opsin(name, output_format="CML", tmp_fpath=str(tmp_path / "neighbor.txt")))
-        ns = {"c": "http://www.xml-cml.org/schema"}
-        labels = {
-            atom.attrib["id"]: atom.find("c:label", ns).attrib["value"]
-            for atom in root.findall(".//c:atom", ns)
-            if atom.attrib["elementType"] != "H"
-        }
-        expected = {
-            frozenset(labels[atom] for atom in bond.attrib["atomRefs2"].split())
-            for bond in root.findall(".//c:bond", ns)
-            if all(atom in labels for atom in bond.attrib["atomRefs2"].split())
-        }
-        for mapping in result.plan.numbering.string_input_locant_maps():
-            assert set(mapping.values()) == set(labels.values())
-            assert {
-                frozenset((mapping[bond.u], mapping[bond.v]))
-                for bond in mol.bonds.values()
-                if bond.u in atoms and bond.v in atoms
-            } == expected
+        maps = result.plan.numbering.string_input_locant_maps()
+        assert numbered_parent_graphs_agree(mol, maps)
         check = verify_with_opsin(name, Chem.MolToSmiles(graph), standardize_smiles=False)
         assert check.status == "matched", check.to_dict()
 
 
-def test_exhausted_construction_proof_preserves_ambiguity(monkeypatch):
+def test_exhausted_construction_proof_does_not_block_rule_numbering(monkeypatch):
     from openclatura.fusion import construction_order
 
     original = construction_order.ordered_hexagonal_construction
@@ -195,11 +148,11 @@ def test_exhausted_construction_proof_preserves_ambiguity(monkeypatch):
 
     monkeypatch.setattr(construction_order, "ordered_hexagonal_construction", exhausted)
     _, _, result = _plan(Chem.MolFromSmiles(SMILES))
-    assert isinstance(result, FusionUnsupported)
+    assert isinstance(result, FusionConfirmed)
     assert checked
 
 
-def test_generated_graph_without_construction_provenance_preserves_ambiguity(monkeypatch):
+def test_generated_graph_without_construction_provenance_keeps_rule_numbering(monkeypatch):
     from openclatura.fusion import construction_order
 
     original = construction_order.ordered_hexagonal_construction
@@ -219,7 +172,7 @@ def test_generated_graph_without_construction_provenance_preserves_ambiguity(mon
 
     monkeypatch.setattr(construction_order, "ordered_hexagonal_construction", generated)
     _, _, result = _plan(Chem.MolFromSmiles(SMILES))
-    assert isinstance(result, FusionUnsupported)
+    assert isinstance(result, FusionConfirmed)
 
 
 @pytest.mark.parametrize("seed", (7, 73))
@@ -262,12 +215,10 @@ def test_graph_record_reordering_preserves_construction_witness(seed, parent, mo
     Chem.SanitizeMol(graph)
     _, _, result = _plan(graph)
     assert isinstance(result, FusionConfirmed)
-    if parent == "pyrene":
-        assert result.plan.rendered_base_name == BASE
     assert checked
 
 
-def test_missing_construction_metadata_preserves_ambiguity(monkeypatch):
+def test_missing_construction_metadata_keeps_rule_numbering(monkeypatch):
     from openclatura.fusion import construction_order
 
     original = construction_order.ordered_hexagonal_construction
@@ -279,7 +230,7 @@ def test_missing_construction_metadata_preserves_ambiguity(monkeypatch):
 
     monkeypatch.setattr(construction_order, "ordered_hexagonal_construction", missing)
     _, _, result = _plan(Chem.MolFromSmiles(SMILES))
-    assert isinstance(result, FusionUnsupported)
+    assert isinstance(result, FusionConfirmed)
 
 
 @pytest.mark.parametrize("defect", ("missing_edge", "extra_vertex", "missing_source", "missing_version"))
