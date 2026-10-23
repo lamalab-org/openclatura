@@ -14,9 +14,9 @@ from openclatura.graph_io import read_rdkit_mol
 
 SMILES = "CC(C)=CCC[C@]1(C)Oc2cc(CO)c(C=O)c3c2[C@H]2[C@@H](O3)[C@@](C)(O)CC[C@H]21"
 EXPECTED_NAME = (
-    "(3S,3aR,9S,9aR,9bS)-3-hydroxy-6-(hydroxymethyl)-3,9-dimethyl-"
-    "9-(4-methylpent-3-en-1-yl)-2,3,3a,4,8,9,9a,9b-octahydro-"
-    "4,8-dioxa1H-cyclopenta[def]phenanthrene-5-carbaldehyde"
+    "(4aR,5S,7aR,8S,9cS)-5-hydroxy-2-(hydroxymethyl)-5,8-dimethyl-"
+    "8-(4-methylpent-3-en-1-yl)-4a,5,6,7,7a,8,9,9c-octahydro-"
+    "4,9-dioxa4H-cyclopenta[def]phenanthrene-3-carbaldehyde"
 )
 ASSIGNMENT_A = {
     frozenset(("3a", "9b")),
@@ -132,7 +132,7 @@ def test_complete_name_is_input_and_component_order_invariant(monkeypatch):
 
 
 @pytest.mark.skipif(not opsin_available(), reason="OPSIN and Java are required")
-def test_pinned_opsin_reconstructs_the_complete_stereochemical_structure():
+def test_parser_compatible_fallback_reconstructs_the_complete_stereochemical_structure():
     assert importlib.metadata.version("py2opsin") == "1.2.0"
     result = name_mol(Chem.MolFromSmiles(SMILES), verify_opsin=True)
     assert result.name == EXPECTED_NAME

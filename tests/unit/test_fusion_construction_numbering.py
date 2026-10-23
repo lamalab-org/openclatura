@@ -212,19 +212,12 @@ def test_exact_structures_and_complete_locant_graphs_under_permutations(index, s
         assert result.error is None
         assert result.name.isascii()
         if index in OPSIN_INCOMPATIBLE_INTERIOR_CASES:
-            # Keep the nomenclature proof independent of OPSIN's known
-            # construction-order interpretation of these interior letters.
-            assert plans
+            # The rule-correct mapping remains tested independently below;
+            # production must continue to a construction OPSIN can interpret.
+            assert base not in result.name
             check = verify_with_opsin(result.name, smiles, standardize_smiles=False)
-            assert check.status != "matched"
-            maps.append(
-                {
-                    tuple(
-                        sorted((indices[atom], str(locant)) for atom, locant in plan.numbering.abstract_atom_to_locant)
-                    )
-                    for plan in plans
-                }
-            )
+            assert check.status == "matched", (index, check.to_dict())
+            maps.append(set())
             constructions.append(set())
             names.append(result.name)
             continue
@@ -420,7 +413,7 @@ def test_rule_numbering_cache_excludes_opsin_construction_provenance(carbon_cont
 
 
 @pytest.mark.skipif(not opsin_available(), reason="OPSIN is unavailable")
-def test_distinguishable_interior_substituents_roundtrip_without_example_lookup():
+def test_distinguishable_interior_substituents_use_parser_compatible_fallbacks():
     source = Chem.MolFromSmiles(CASES[1][1])
     mol = read_rdkit_mol(source)
     atoms = max(find_ring_systems(mol), key=lambda ring: len(ring.atoms)).atoms
@@ -437,18 +430,18 @@ def test_distinguishable_interior_substituents_roundtrip_without_example_lookup(
         assert result.error is None
         names.append(result.name)
         check = verify_with_opsin(result.name, smiles, standardize_smiles=False)
-        assert check.status != "matched"
+        assert check.status == "matched", check.to_dict()
     assert len(set(names)) == len(bounded.interior_atoms)
 
 
-def test_compatibility_witness_reaches_the_existing_accepted_orientation_trace():
+def test_incompatible_construction_witness_continues_to_verified_parent_method():
     index = 32572
     smiles = next(smiles for case, smiles, _ in CASES if case == index)
     result = name_mol(Chem.MolFromSmiles(smiles), fusion_mode=FusionMode.AUDITED_PIN, include_trace=True)
     assert result.error is None
-    orientation = next(step for step in result.decisions if step.decision == "selected preferred fusion orientation")
-    assert OPSIN_CONSTRUCTION_NUMBERING in orientation.data["audit_evidence"]
-    assert any("PIN not certified" in evidence for evidence in orientation.data["audit_evidence"])
+    assert result.parent_nomenclature == "bridged_fusion"
+    assert any(step.decision == "systematic fusion fallback" for step in result.decisions)
+    assert verify_with_opsin(result.name, smiles, standardize_smiles=False).status == "matched"
 
 
 def test_entry_compatibility_witness_projects_through_existing_plan_trace(monkeypatch):

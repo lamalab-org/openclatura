@@ -727,6 +727,7 @@ class FusionNumberingProof:
     abstract_atom_to_locant: tuple[tuple[int, SystemLocant], ...]
     input_locant_maps: tuple[tuple[tuple[int, SystemLocant], ...], ...]
     rejected_numberings: tuple[RejectedNumbering, ...] = ()
+    citation_opsin_compatible: bool | None = None
 
     def __post_init__(self) -> None:
         abstract_atoms = _validate_bijective_map(self.abstract_atom_to_locant, "abstract atom-to-locant map")

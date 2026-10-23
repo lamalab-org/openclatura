@@ -312,14 +312,12 @@ def _numbering_from_layout(
         return None
     opsin_compatible = None
     if isinstance(layout, OpsinConstructionLayout):
-        opsin_map = _opsin_29_completed_system_numbering(
+        opsin_compatible = opsin_construction_compatibility(
             mol,
             faces,
-            perimeter,
-            fusion_atoms,
+            numbered,
             layout.construction_atom_order,
         )
-        opsin_compatible = opsin_map == dict(numbered.atom_to_locant)
     return replace(
         numbered,
         layout_index=layout_index,
@@ -734,6 +732,36 @@ def _opsin_29_completed_system_numbering(
         mol,
         perimeter + tuple(atom for atom in construction_atom_order if atom in interior),
         fusion_atoms | interior,
+    )
+
+
+def opsin_construction_compatibility(
+    mol: Molecule,
+    faces: BoundedFaceModel,
+    numbering: CompletedNumbering,
+    construction_atom_order: tuple[int, ...] | None,
+) -> bool | None:
+    """Compare a rule-derived numbering with a supported parser construction.
+
+    The construction order may come either from a directed layout or directly
+    from the citation AST.  Absence of a complete construction remains
+    unknown; a complete but different map is an explicit incompatibility.
+    """
+
+    if construction_atom_order is None:
+        return None
+    opsin_map = _opsin_29_completed_system_numbering(
+        mol,
+        faces,
+        numbering.perimeter,
+        set(faces.fusion_atoms),
+        construction_atom_order,
+    )
+    if opsin_map is None:
+        return None
+    return numbered_parent_graphs_agree(
+        mol,
+        (opsin_map, dict(numbering.atom_to_locant)),
     )
 
 

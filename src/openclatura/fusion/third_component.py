@@ -96,6 +96,18 @@ def _plan_uncached(
     parent = _carbon_parent(carbon, atoms, mode)
     if parent is None or not parent.audit_ok:
         return None
+    bounded = cached_bounded_face_model(carbon, atoms)
+    if (
+        bounded is not None
+        and set(replacement_atoms) & set(bounded.interior_atoms)
+        and parent.fusion_plan is not None
+        and parent.fusion_plan.numbering.citation_opsin_compatible is False
+    ):
+        # A replacement prefix makes the interior locant graph-significant.
+        # If the citation-order model proves that the supported parser assigns
+        # that graph differently, abstain and let the parent pipeline choose a
+        # parser-compatible systematic construction.
+        return None
     replacement_state = None
     from .replacement_state import replacement_state_scope
 
