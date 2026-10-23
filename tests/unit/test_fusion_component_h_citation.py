@@ -5,6 +5,7 @@ from dataclasses import replace
 import pytest
 from rdkit import Chem
 
+from openclatura import name_mol
 from openclatura.fusion.descriptor import (
     _parent_component_name,
     build_fusion_name_ast,
@@ -21,6 +22,8 @@ from openclatura.opsin_verify import verify_with_opsin
 TARGET = "C1=CC2=C3C4=C(C2C=C1)C1C=CC=CC1=C4c1ccccc13"
 BASE_NAME = "dibenzo[1',2':1,2;1'',2'':5,6]pentaleno[3,3a,4-ab]indene"
 BASE_SMILES = "c1ccc2c(c1)C1=C3C2=c2ccccc2=C3c2ccccc21"
+RELOCATED_H_SMILES = "C12=CC=CC1C1=CC=CC1C1=CC=CC21"
+RELOCATED_H_NAME = "6a,9a-dihydro-3aH-dicyclopenta[e,g]indene"
 
 
 @pytest.mark.parametrize(
@@ -76,6 +79,15 @@ def test_indene_fusion_citation_and_bindings_are_atom_order_invariant(indene_cit
     assert spec.template.default_indicated_h == ("1",)
 
 
+def test_component_indicated_h_is_reassigned_over_the_completed_pi_system():
+    graph = Chem.MolFromSmiles(RELOCATED_H_SMILES)
+    for order in (list(range(graph.GetNumAtoms())), list(reversed(range(graph.GetNumAtoms())))):
+        result = name_mol(Chem.RenumberAtoms(graph, order), include_trace=True)
+        assert result.name == RELOCATED_H_NAME
+        assert result.parent_nomenclature == "systematic_fusion"
+        assert result.pin_status == "confirmed"
+
+
 @pytest.mark.parametrize("locants", [("1",), ("1", "3")])
 def test_local_h_removal_preserves_every_rendered_token_binding(indene_citations, locants):
     mol, ast = indene_citations[0]
@@ -123,6 +135,12 @@ def test_rendered_indene_fusion_parent_has_exact_opsin_skeleton(indene_citations
         name = render_fusion_name(ast, fusion_component_registry())
         check = verify_with_opsin(name, BASE_SMILES, standardize_smiles=False)
         assert check.status == "matched", check.to_dict()
+
+
+@pytest.mark.opsin
+def test_relocated_component_indicated_h_roundtrips():
+    check = verify_with_opsin(RELOCATED_H_NAME, RELOCATED_H_SMILES, standardize_smiles=False)
+    assert check.status == "matched", check.to_dict()
 
 
 @pytest.mark.opsin

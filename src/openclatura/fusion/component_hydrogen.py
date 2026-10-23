@@ -17,9 +17,16 @@ class ComponentHydrogenConsumption:
 
 
 def component_hydrogen_consumption(
-    ast: FusionNameAst, specs: Mapping[int, FusionComponentSpec]
+    ast: FusionNameAst,
+    specs: Mapping[int, FusionComponentSpec],
+    completed_indicated_hydrogen_atoms: frozenset[int] = frozenset(),
 ) -> ComponentHydrogenConsumption | None:
-    """Prove consumption without assuming the original H locant is a junction."""
+    """Prove consumption without assuming the original H locant is retained.
+
+    An isolated component's indicated-H site can move when its pi system is
+    composed with the other fusion components.  The completed parent can
+    therefore have an unpaired carbon at a different, explicitly cited site.
+    """
     from .indicated_hydrogen import intrinsic_carbon_fusion_scope
 
     if not any(
@@ -32,12 +39,14 @@ def component_hydrogen_consumption(
         return None
     components = tuple((match, specs[match.occurrence_id]) for match in ast.component_occurrences)
     junctions = frozenset(atom for join in ast.joins for atom in join.shared_input_atoms)
-    return _component_hydrogen_consumption(components, junctions)
+    return _component_hydrogen_consumption(components, junctions, completed_indicated_hydrogen_atoms)
 
 
 @lru_cache(maxsize=512)
 def _component_hydrogen_consumption(
-    components: tuple[tuple[FusionComponentMatch, FusionComponentSpec], ...], junctions: frozenset[int]
+    components: tuple[tuple[FusionComponentMatch, FusionComponentSpec], ...],
+    junctions: frozenset[int],
+    completed_indicated_hydrogen_atoms: frozenset[int] = frozenset(),
 ) -> ComponentHydrogenConsumption | None:
     from .indicated_hydrogen import (
         _component_graph,
@@ -102,8 +111,8 @@ def _component_hydrogen_consumption(
     for assignment in model.allowed_kekule_assignments:
         doubles = frozenset(edge for edge, order in assignment.orders if order == 2)
         paired = {atom for edge in doubles for atom in edge}
-        if paired != pi_atoms:
-            return None
+        if pi_atoms - paired != pi_atoms & completed_indicated_hydrogen_atoms:
+            continue
         assignment_consumed = set()
         for occurrence, edges, assignments, local_pi, carbon_h in local_domains:
             local_doubles = doubles & edges
