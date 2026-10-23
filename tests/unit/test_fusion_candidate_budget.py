@@ -5,7 +5,7 @@ from rdkit import Chem
 
 from openclatura import name_mol, name_smiles
 from openclatura.chains import find_ring_systems
-from openclatura.fusion import planner
+from openclatura.fusion import mancude, planner
 from openclatura.fusion.descriptor import FusionDescriptorError, iter_fusion_name_asts
 from openclatura.fusion.faces import cached_bounded_face_model
 from openclatura.fusion.model import FusionConfirmed, FusionMode, FusionUnsupported
@@ -129,3 +129,12 @@ def test_deeply_ambiguous_system_prunes_incomplete_parents_before_candidate_audi
 
     assert name_smiles(smiles)
     assert attempted == 4
+
+
+def test_external_pi_candidates_are_proved_lazily_in_rank_order():
+    smiles = "CC1C(=O)OC(=O)C2C1(C)CCC1C2(C)CCC2(C)C3CC(C)(C)CCC3(C)CCC12C"
+    expected = "1,5,6,11,14,17,17,20-octamethyl-8-oxapentacyclo[12.8.0.0^{15,20}.0^{2,11}.0^{5,10}]docosane-7,9-dione"
+    mancude._single_site_parent_model.cache_clear()
+
+    assert name_smiles(smiles) == expected
+    assert mancude._single_site_parent_model.cache_info().misses <= 100
