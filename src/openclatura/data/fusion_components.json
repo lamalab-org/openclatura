@@ -35,7 +35,7 @@
     "layout_states": 25000,
     "maximum_layouts": 4096,
     "maximum_component_occurrences": 16,
-    "component_selection_states": 4096,
+    "wrapper_search_states": 4096,
     "locant_map_combinations": 4096,
     "mancude_states": 100000,
     "interior_numbering_states": 100000

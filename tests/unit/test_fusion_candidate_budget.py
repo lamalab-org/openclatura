@@ -79,12 +79,14 @@ def test_candidate_iteration_has_no_arbitrary_count_limit(monkeypatch):
 
 def test_exact_cover_results_have_no_arbitrary_count_limit():
     options = tuple(
-        _OccurrenceOption(frozenset({face}), variant, frozenset(), ()) for face in range(9) for variant in ("a", "b")
+        _OccurrenceOption(frozenset({face}), variant, frozenset(), ()) for face in range(12) for variant in ("a", "b")
     )
 
-    covers = _exact_component_covers(options, frozenset(range(9)))
+    covers = _exact_component_covers(options, frozenset(range(12)))
 
-    assert len(covers) == 512
+    # A binary tree over twelve independent selections visits 8,191 search
+    # states, proving that the former 4,096-state ceiling is gone.
+    assert len(covers) == 4096
 
 
 def test_incomplete_match_union_is_rejected_before_cover_enumeration(monkeypatch):

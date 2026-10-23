@@ -40,7 +40,7 @@ from .model import FusionConfirmed, FusionMode, FusionParentPlan, ParentBondMode
 from .numbering import RetainedParentBondCapacityError, retained_template_parent_bond_model
 from .rules import fusion_ring_size_gate
 
-_WRAPPER_SEARCH_STATES = fusion_nomenclature_config().search.component_selection_states
+_WRAPPER_SEARCH_STATES = fusion_nomenclature_config().search.wrapper_search_states
 _COMPOSITE_BRIDGES = composite_bridge_constructions()
 _LOCALIZED_CARBON_BRIDGES = localized_carbon_bridge_bond_orders()
 

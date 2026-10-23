@@ -53,7 +53,6 @@ _LIMITS = fusion_nomenclature_config().search
 _SUPPORT = fusion_nomenclature_config().rules.support
 MAX_COMPONENT_OCCURRENCES = _LIMITS.maximum_component_occurrences
 MAX_FACES = _LIMITS.maximum_faces
-MAX_COMPONENT_SELECTION_STATES = _LIMITS.component_selection_states
 MAX_LOCANT_MAP_COMBINATIONS = _LIMITS.locant_map_combinations
 
 
@@ -687,19 +686,12 @@ def _exact_component_covers(
         raise FusionDescriptorError("component matches do not cover every fusion face")
 
     covers: list[tuple[_OccurrenceOption, ...]] = []
-    visited_states = 0
 
     def visit(
         covered: frozenset[int],
         selected_atoms: frozenset[int],
         selected: tuple[_OccurrenceOption, ...],
     ) -> None:
-        nonlocal visited_states
-        visited_states += 1
-        if visited_states > MAX_COMPONENT_SELECTION_STATES:
-            raise FusionDescriptorError(
-                f"component cover search exceeds bounded limit {MAX_COMPONENT_SELECTION_STATES}"
-            )
         if covered == target_face_ids:
             if target_atom_ids is not None and selected_atoms != target_atom_ids:
                 return
