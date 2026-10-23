@@ -15,6 +15,7 @@
       "multiparent_parents": true,
       "maximum_tree_component_occurrences": 16,
       "maximum_multiparent_component_occurrences": 3,
+      "maximum_multiparent_interparent_faces": 1,
       "charged_parents": true,
       "nonstandard_valence": true,
       "interior_atoms": true,

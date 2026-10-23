@@ -29,6 +29,7 @@ class FusionSupportConfig:
     multiparent_parents: bool
     maximum_tree_component_occurrences: int
     maximum_multiparent_component_occurrences: int
+    maximum_multiparent_interparent_faces: int
     charged_parents: bool
     nonstandard_valence: bool
     interior_atoms: bool
@@ -178,6 +179,10 @@ def fusion_nomenclature_config_from_data(data: dict) -> FusionNomenclatureConfig
         maximum_multiparent_component_occurrences=_positive_int(
             support_data,
             "maximum_multiparent_component_occurrences",
+        ),
+        maximum_multiparent_interparent_faces=_positive_int(
+            support_data,
+            "maximum_multiparent_interparent_faces",
         ),
         charged_parents=_boolean(support_data, "charged_parents"),
         nonstandard_valence=_boolean(support_data, "nonstandard_valence"),

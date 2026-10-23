@@ -1357,6 +1357,11 @@ def _build_candidate(
     classified_primary: Mapping[int, tuple[FusionJoin, int]] | None = None,
 ) -> _Candidate | None:
     match_by_id = {match.occurrence_id: match for match in matches}
+    if enforce_interoperability_limits and any(
+        len(match_by_id[occurrence].covered_face_ids) > _SUPPORT.maximum_multiparent_interparent_faces
+        for occurrence in topology.interparent_occurrences
+    ):
+        return None
     primary_joins: dict[int, FusionJoin] = {}
     interparent_joins: list[FusionJoin] = []
     cycle_closing_joins: list[FusionJoin] = []

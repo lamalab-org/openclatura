@@ -22,6 +22,7 @@ def test_checked_in_fusion_configuration_is_complete_and_data_backed():
     assert config.rules.support.multiparent_parents
     assert config.rules.support.maximum_tree_component_occurrences == 16
     assert config.rules.support.maximum_multiparent_component_occurrences == 3
+    assert config.rules.support.maximum_multiparent_interparent_faces == 1
     assert config.rules.support.charged_parents
     assert config.rules.support.nonstandard_valence
     assert config.rules.support.interior_atoms
