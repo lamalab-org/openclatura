@@ -55,7 +55,6 @@ class FusionSearchLimits:
     locant_map_combinations: int
     mancude_states: int
     interior_numbering_states: int
-    maximum_name_candidates: int
 
 
 @dataclass(frozen=True, slots=True)

@@ -75,7 +75,6 @@ from .valence import fusion_lambda_descriptors
 
 PLANNER_TIER = fusion_nomenclature_config().rules.planner_tier
 SUPPORT = fusion_nomenclature_config().rules.support
-MAXIMUM_NAME_CANDIDATES = fusion_nomenclature_config().search.maximum_name_candidates
 
 # Preserve the planner-level test/extension seam while sharing face proofs
 # between ordinary and P-25.5 planning.
@@ -170,21 +169,17 @@ def _plan_uncached(
         or any(neighbor not in atoms for neighbor in mol.get_neighbors(atom))
         for atom in atoms
     )
+    parent_edges = frozenset(
+        tuple(sorted((bond.u, bond.v))) for bond in mol.bonds.values() if bond.u in atoms and bond.v in atoms
+    )
     try:
-        # Ranked candidates are emitted in nomenclatural preference order, so a
-        # supported decomposition is proven almost immediately or not at all.
-        # Past that the walk is only enumerating ways to fail, each paying for a
-        # full numbering and reconstruction audit, and the parent falls back to
-        # the same non-fusion name either way.
-        for index, ast in enumerate(iter_fusion_name_asts(mol, matches, registry)):
-            if index >= MAXIMUM_NAME_CANDIDATES:
-                rejected.append(
-                    FusionUnsupported(
-                        "ranked fusion candidates exhausted the audited candidate budget",
-                        (f"stopped after {MAXIMUM_NAME_CANDIDATES} ranked fusion-name candidates",),
-                    )
-                )
-                break
+        for ast in iter_fusion_name_asts(
+            mol,
+            matches,
+            registry,
+            required_parent_atom_ids=atoms,
+            required_parent_edges=parent_edges,
+        ):
             result = _plan_numbered_candidate(
                 mol,
                 atoms,

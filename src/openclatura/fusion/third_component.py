@@ -175,7 +175,16 @@ def _select_replacement_state(mol, carbon, atoms, mode, first_parent):
     )
     candidates = []
     ranks = canonical_ranks(mol)
-    for ast in iter_fusion_name_asts(carbon, matches, registry):
+    parent_edges = frozenset(
+        tuple(sorted((bond.u, bond.v))) for bond in carbon.bonds.values() if bond.u in atoms and bond.v in atoms
+    )
+    for ast in iter_fusion_name_asts(
+        carbon,
+        matches,
+        registry,
+        required_parent_atom_ids=atoms,
+        required_parent_edges=parent_edges,
+    ):
         # Different atom embeddings of this same preferred construction need
         # joint proofs. Do not substitute a lower-priority carbon parent.
         if "".join(part.text for part in render_fusion_name_parts(ast, registry, mol=carbon)) != first_core:

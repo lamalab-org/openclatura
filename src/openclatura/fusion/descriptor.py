@@ -160,6 +160,8 @@ def build_fusion_name_ast(
     join_kinds: Iterable[str] | None = None,
     multiparent_parents: bool | None = None,
     enforce_interoperability_limits: bool = True,
+    required_parent_atom_ids: Iterable[int] | None = None,
+    required_parent_edges: Iterable[tuple[int, int]] | None = None,
 ) -> FusionNameAst:
     """Return the preferred citation; chemical planning consumes the iterator."""
 
@@ -172,6 +174,8 @@ def build_fusion_name_ast(
             join_kinds=join_kinds,
             multiparent_parents=multiparent_parents,
             enforce_interoperability_limits=enforce_interoperability_limits,
+            required_parent_atom_ids=required_parent_atom_ids,
+            required_parent_edges=required_parent_edges,
         )
     )
 
@@ -185,6 +189,8 @@ def iter_fusion_name_asts(
     join_kinds: Iterable[str] | None = None,
     multiparent_parents: bool | None = None,
     enforce_interoperability_limits: bool = True,
+    required_parent_atom_ids: Iterable[int] | None = None,
+    required_parent_edges: Iterable[tuple[int, int]] | None = None,
 ) -> Iterator[FusionNameAst]:
     """Build the preferred bounded fusion citation from exact component maps.
 
@@ -205,14 +211,27 @@ def iter_fusion_name_asts(
     if not supported_joins <= {"ortho", "ortho_peri", "higher_order"}:
         raise ValueError("unknown fusion join kind")
 
+    if (required_parent_atom_ids is None) != (required_parent_edges is None):
+        raise ValueError("required parent atoms and edges must be supplied together")
+    target_atoms = None if required_parent_atom_ids is None else frozenset(required_parent_atom_ids)
+    target_edges = (
+        None if required_parent_edges is None else frozenset(normalize_edge(*edge) for edge in required_parent_edges)
+    )
+    if target_atoms is not None and any(not set(edge) <= target_atoms for edge in target_edges):
+        raise ValueError("required parent edges must have both endpoints in the required atom set")
+
     options = _occurrence_options(mol, component_matches, registry)
+    if target_atoms is not None:
+        available_atoms = frozenset(atom for option in options for atom in option.atom_ids)
+        if available_atoms != target_atoms:
+            raise FusionDescriptorError("fusion component matches do not cover the selected parent atom set")
     face_ids = tuple(sorted(set().union(*(option.face_ids for option in options))))
     if len(face_ids) < 2:
         raise FusionDescriptorError("a fusion citation requires at least two component faces")
     if len(face_ids) > MAX_FACES:
         raise FusionDescriptorError(f"face count {len(face_ids)} exceeds bounded limit {MAX_FACES}")
 
-    selections = _exact_component_covers(options, frozenset(face_ids))
+    selections = _exact_component_covers(options, frozenset(face_ids), target_atom_ids=target_atoms)
     parent_scopes: dict[tuple, set[frozenset[int]]] = defaultdict(set)
     for option in options:
         spec = _spec_for_match(registry, option.mappings[0])
@@ -230,6 +249,8 @@ def iter_fusion_name_asts(
             supported_covers=supported_covers,
             supported_joins=supported_joins,
             parent_scopes=parent_scopes,
+            target_atom_ids=target_atoms,
+            target_edges=target_edges,
         )
         if prepared is None:
             continue
@@ -334,6 +355,8 @@ def _prepare_component_selection(
     supported_covers: frozenset[str],
     supported_joins: frozenset[str],
     parent_scopes: Mapping[tuple, set[frozenset[int]]] | None = None,
+    target_atom_ids: frozenset[int] | None = None,
+    target_edges: frozenset[tuple[int, int]] | None = None,
 ) -> _PreparedComponentSelection | None:
     """Normalize and audit one exact component cover once."""
 
@@ -345,9 +368,13 @@ def _prepare_component_selection(
     matches = tuple(replace(option.mappings[0], occurrence_id=index) for index, option in enumerate(ordered))
     specs = {match.occurrence_id: _spec_for_match(registry, match) for match in matches}
     scopes = tuple(_scope_for_match(mol, match, specs[match.occurrence_id]) for match in matches)
-    target_atoms = frozenset(atom for scope in scopes for atom in scope.atom_ids)
-    target_edges = frozenset(edge for scope in scopes for edge in scope.edges)
-    audit = audit_component_cover(scopes, target_atom_ids=target_atoms, target_edges=target_edges)
+    reconstructed_atoms = frozenset(atom for scope in scopes for atom in scope.atom_ids)
+    reconstructed_edges = frozenset(edge for scope in scopes for edge in scope.edges)
+    audit = audit_component_cover(
+        scopes,
+        target_atom_ids=reconstructed_atoms if target_atom_ids is None else target_atom_ids,
+        target_edges=reconstructed_edges if target_edges is None else target_edges,
+    )
     if not audit.ok or audit.proof.kind not in supported_covers:
         return None
     if any(_interface_support_key(interface) not in supported_joins for interface in audit.graph.interfaces):
@@ -648,8 +675,10 @@ def _occurrence_options(
 def _exact_component_covers(
     options: Sequence[_OccurrenceOption],
     target_face_ids: frozenset[int],
+    *,
+    target_atom_ids: frozenset[int] | None = None,
 ) -> tuple[tuple[_OccurrenceOption, ...], ...]:
-    """Enumerate bounded, deterministic, disjoint covers of all target faces."""
+    """Enumerate deterministic covers of the complete target graph."""
 
     by_face: dict[int, tuple[_OccurrenceOption, ...]] = {
         face_id: tuple(option for option in options if face_id in option.face_ids)
@@ -661,7 +690,11 @@ def _exact_component_covers(
     covers: list[tuple[_OccurrenceOption, ...]] = []
     visited_states = 0
 
-    def visit(covered: frozenset[int], selected: tuple[_OccurrenceOption, ...]) -> None:
+    def visit(
+        covered: frozenset[int],
+        selected_atoms: frozenset[int],
+        selected: tuple[_OccurrenceOption, ...],
+    ) -> None:
         nonlocal visited_states
         visited_states += 1
         if visited_states > MAX_COMPONENT_SELECTION_STATES:
@@ -669,6 +702,8 @@ def _exact_component_covers(
                 f"component cover search exceeds bounded limit {MAX_COMPONENT_SELECTION_STATES}"
             )
         if covered == target_face_ids:
+            if target_atom_ids is not None and selected_atoms != target_atom_ids:
+                return
             covers.append(selected)
             if len(covers) > MAX_COMPONENT_SELECTIONS:
                 raise FusionDescriptorError(
@@ -677,14 +712,24 @@ def _exact_component_covers(
             return
         if len(selected) >= MAX_COMPONENT_OCCURRENCES:
             return
+        if target_atom_ids is not None:
+            compatible = (
+                option for option in options if not option.face_ids & covered and option.face_ids <= target_face_ids
+            )
+            possible_atoms = selected_atoms | frozenset(atom for option in compatible for atom in option.atom_ids)
+            if not target_atom_ids <= possible_atoms:
+                return
         uncovered = target_face_ids - covered
         pivot = min(uncovered, key=lambda face_id: (len(by_face[face_id]), face_id))
         for option in by_face[pivot]:
             if option.face_ids & covered or not option.face_ids <= target_face_ids:
                 continue
-            visit(covered | option.face_ids, selected + (option,))
+            next_atoms = selected_atoms | option.atom_ids
+            if target_atom_ids is not None and not next_atoms <= target_atom_ids:
+                continue
+            visit(covered | option.face_ids, next_atoms, selected + (option,))
 
-    visit(frozenset(), ())
+    visit(frozenset(), frozenset(), ())
     if not covers:
         raise FusionDescriptorError("no bounded exact component cover was found")
     return tuple(covers)

@@ -39,8 +39,7 @@
     "component_selection_states": 4096,
     "locant_map_combinations": 4096,
     "mancude_states": 100000,
-    "interior_numbering_states": 100000,
-    "maximum_name_candidates": 64
+    "interior_numbering_states": 100000
   },
   "annulene_series": {"minimum_ring_size": 7, "maximum_ring_size": 20},
   "ring_shapes": [
