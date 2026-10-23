@@ -53,7 +53,6 @@ _LIMITS = fusion_nomenclature_config().search
 _SUPPORT = fusion_nomenclature_config().rules.support
 MAX_COMPONENT_OCCURRENCES = _LIMITS.maximum_component_occurrences
 MAX_FACES = _LIMITS.maximum_faces
-MAX_COMPONENT_SELECTIONS = _LIMITS.maximum_component_selections
 MAX_COMPONENT_SELECTION_STATES = _LIMITS.component_selection_states
 MAX_LOCANT_MAP_COMBINATIONS = _LIMITS.locant_map_combinations
 
@@ -705,10 +704,6 @@ def _exact_component_covers(
             if target_atom_ids is not None and selected_atoms != target_atom_ids:
                 return
             covers.append(selected)
-            if len(covers) > MAX_COMPONENT_SELECTIONS:
-                raise FusionDescriptorError(
-                    f"component selection count exceeds bounded limit {MAX_COMPONENT_SELECTIONS}"
-                )
             return
         if len(selected) >= MAX_COMPONENT_OCCURRENCES:
             return

@@ -6,7 +6,12 @@ from rdkit import Chem
 from openclatura import name_mol, name_smiles
 from openclatura.chains import find_ring_systems
 from openclatura.fusion import mancude, planner
-from openclatura.fusion.descriptor import FusionDescriptorError, iter_fusion_name_asts
+from openclatura.fusion.descriptor import (
+    FusionDescriptorError,
+    _exact_component_covers,
+    _OccurrenceOption,
+    iter_fusion_name_asts,
+)
 from openclatura.fusion.faces import cached_bounded_face_model
 from openclatura.fusion.model import FusionConfirmed, FusionMode, FusionUnsupported
 from openclatura.fusion.planner import plan_fusion_parent
@@ -70,6 +75,16 @@ def test_candidate_iteration_has_no_arbitrary_count_limit(monkeypatch):
 
     assert planner._plan_uncached(mol, atoms, FusionMode.AUDITED_PIN) is confirmed
     assert attempted == list(candidates)
+
+
+def test_exact_cover_results_have_no_arbitrary_count_limit():
+    options = tuple(
+        _OccurrenceOption(frozenset({face}), variant, frozenset(), ()) for face in range(9) for variant in ("a", "b")
+    )
+
+    covers = _exact_component_covers(options, frozenset(range(9)))
+
+    assert len(covers) == 512
 
 
 def test_incomplete_match_union_is_rejected_before_cover_enumeration(monkeypatch):

@@ -50,7 +50,6 @@ class FusionSearchLimits:
     layout_states: int
     maximum_layouts: int
     maximum_component_occurrences: int
-    maximum_component_selections: int
     component_selection_states: int
     locant_map_combinations: int
     mancude_states: int
