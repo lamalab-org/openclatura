@@ -22,7 +22,7 @@ NESTED = "OC(=O)c1ccccc1OC(C)C(=O)NC(C)C(C)C"
         ("CCCC(C)C", "2-methylpentane", "2-methylpentane"),
         # Charged parents keep their spelling: the ium locant must not detach.
         ("[O-]C1CCC[NH2+]C1", "piperidinium-3-olate", "piperidinium-3-olate"),
-        ("OC(=O)C1CCCC[NH2+]1", "piperidinium-2-carboxylic acid", "piperidinium-2-carboxylic acid"),
+        ("OC(=O)C1CCCC[NH2+]1", "2-carboxypiperidinium", "2-carboxypiperidinium"),
         # Substituent prefixes keep before-suffix locants.
         ("CC(=O)OC(C)CC", "butan-2-yl acetate", "butan-2-yl acetate"),
         # mercapto re-sorts alphanumerically and takes a simple multiplier.

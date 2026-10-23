@@ -140,7 +140,7 @@ def _perceive_groups_uncached(mol: Molecule) -> list[PerceivedGroup]:
         specs = BUILTIN_PERCEPTION_SPECS
     for spec in specs:
         groups.extend(spec.detector(mol))
-    return _enrich_groups(mol, _demote_zwitterion_cations(mol, groups))
+    return _enrich_groups(mol, _demote_groups_on_cationic_rings(mol, _demote_zwitterion_cations(mol, groups)))
 
 
 def perceive_groups(mol: Molecule) -> list[PerceivedGroup]:
@@ -191,15 +191,15 @@ CATIONIC_SUFFIX_GROUP_KEYS = frozenset({"aminium", "iminium", "diazonio"})
 ANIONIC_SUFFIX_GROUP_KEYS = frozenset({"olate", "thiolate", "aminide", "carboxylate", "ring_carboxylate", "sulfonate"})
 
 
-def _connected_component(mol: Molecule, idx: int) -> set[int]:
-    """Return the atoms reachable from ``idx``."""
+def _connected_component(mol: Molecule, idx: int, within: set[int] | None = None) -> set[int]:
+    """Return the atoms reachable from ``idx``, optionally only through ``within``."""
 
     seen = {idx}
     stack = [idx]
     while stack:
         current = stack.pop()
         for neighbor in mol.get_neighbors(current):
-            if neighbor not in seen:
+            if neighbor not in seen and (within is None or neighbor in within):
                 seen.add(neighbor)
                 stack.append(neighbor)
     return seen
@@ -226,6 +226,50 @@ def _demote_zwitterion_cations(mol: Molecule, groups: list[PerceivedGroup]) -> l
         component = _connected_component(mol, cation.attachment_carbon)
         if anion_atoms & component:
             cation.is_principal_candidate = False
+    return groups
+
+
+def _demote_groups_on_cationic_rings(mol: Molecule, groups: list[PerceivedGroup]) -> list[PerceivedGroup]:
+    """Cite a cationic ring's neutral characteristic groups as prefixes.
+
+    A cation outranks every neutral class (P-41), so when the ring parent itself
+    carries the ium centre its ketone, acid or alcohol is a prefix:
+    2,2-dimethyl-1,3-dioxo-2,3-dihydro-1H-isoindol-2-ium (P-73.1.2.1), not
+    -ium-1,3-dione.  Only a component whose every neutral principal candidate
+    sits on that ring system changes, and only when it has no other ring:
+    parent selection does not rank cations, so without a principal group a
+    neutral ring elsewhere could take the parent.  A zwitterion keeps its anion
+    suffix, and a cationic group suffix is already senior.
+    """
+
+    if not any(atom.charge > 0 for atom in mol):
+        return groups
+    cyclic_atoms = get_cyclic_atoms(mol)
+    cationic_ring_atoms = {atom.idx for atom in mol if atom.charge > 0 and atom.idx in cyclic_atoms}
+    visited: set[int] = set()
+    for start in sorted(cationic_ring_atoms):
+        if start in visited:
+            continue
+        component = _connected_component(mol, start)
+        visited |= component
+        cations = cationic_ring_atoms & component
+        if any(mol.atoms[idx].charge < 0 for idx in component):
+            continue
+        candidates = [
+            group for group in groups if group.is_principal_candidate and group.attachment_carbon in component
+        ]
+        if not candidates or any(group.key in CATIONIC_SUFFIX_GROUP_KEYS for group in candidates):
+            continue
+        ring_atoms: set[int] = set()
+        for idx in cations:
+            if idx not in ring_atoms:
+                ring_atoms |= _connected_component(mol, idx, within=cyclic_atoms)
+        if cyclic_atoms & component <= ring_atoms and all(
+            any(atom in ring_atoms or any(n in ring_atoms for n in mol.get_neighbors(atom)) for atom in group.atom_ids)
+            for group in candidates
+        ):
+            for group in candidates:
+                group.is_principal_candidate = False
     return groups
 
 

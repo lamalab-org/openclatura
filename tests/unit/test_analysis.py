@@ -4578,7 +4578,7 @@ def test_pyopsin_regression_names_preserve_positive_nitrogen_charge():
         "OC1C[NH2+]C1C([O-])=O": "3-hydroxyazetidinium-2-carboxylate",
         "C[NH+](C)C(C#C)C([O-])=O": "2-(dimethylammonio)but-3-ynoate",
         "[O-]C(=O)C1[NH2+]CC2CC12": "3-azoniabicyclo[3.1.0]hexane-2-carboxylate",
-        "CC(C)(C)/C=C/C(=O)N1CCC[C@@H]2[C@H]1C[NH2+]C2": "(2E)-1-((4aS,7aS)-2,3,4,4a,7,7a-hexahydro-6H-pyrrolo[3,4-b]pyridin-6-ium-1-yl)-4,4-dimethylpent-2-en-1-one",
+        "CC(C)(C)/C=C/C(=O)N1CCC[C@@H]2[C@H]1C[NH2+]C2": "(4aS,7aS)-1-((2E)-4,4-dimethylpent-2-enoyl)-2,3,4,4a,7,7a-hexahydro-6H-pyrrolo[3,4-b]pyridin-6-ium",
         "C[C@H]1C[NH+](CCN1c2[nH]c3ccccc3n2)C": "2-((2S)-2,4-dimethylpiperazin-4-ium-1-yl)-1H-benzimidazole",
         "Cc1cn2c(cccc2[nH+]1)c3cccc(c3F)C[NH+]4CCCCC4": "5-(2-fluoro-3-(piperidinium-1-ylmethyl)phenyl)-2-methylimidazo[1,2-a]pyridin-1-ium",
         "Cc1cn2c(cccc2[nH+]1)c3ccc(cc3F)N4CCCCC4": "5-(2-fluoro-4-(piperidin-1-yl)phenyl)-2-methylimidazo[1,2-a]pyridin-1-ium",

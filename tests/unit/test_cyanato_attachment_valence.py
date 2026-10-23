@@ -11,10 +11,10 @@ CASES = {
     "CC(=O)NS1(CCCC1)C#N": "N-(1-cyanothiolan-1-yl)acetamide",
     "N#CS1(C)CCCC1": "1-methylthiolane-1-carbonitrile",
     "CS(C)(C)C#N": "(trimethyl-lambda^4-sulfanyl)methanenitrile",
-    "C[S+](C)C#N": "(dimethylsulfaniumyl)methanenitrile",
-    "CC[S@+](C)C#N": "((S)-ethyl(methyl)sulfaniumyl)methanenitrile",
+    "C[S+](C)C#N": "cyanodimethylsulfanium",
+    "CC[S@+](C)C#N": "(S)-cyano(ethyl)(methyl)sulfanium",
     "N#CS1=CC=CC=C1": "1lambda^4-thiacyclohexa-1,3,5-triene-1-carbonitrile",
-    "C[O+](C)C#N": "(dimethyloxidaniumyl)methanenitrile",
+    "C[O+](C)C#N": "cyanodimethyloxidanium",
     "C[N+](C)=C=S": "N,N-dimethyl-1-thioxomethaniminium",
     "C[N+](C)=C=O": "N,N-dimethyl-1-oxomethaniminium",
 }

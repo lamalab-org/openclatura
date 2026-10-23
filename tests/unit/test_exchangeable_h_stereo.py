@@ -14,7 +14,7 @@ CASES = {
     "C[P@@](=O)(O)CC": ("CP(=O)(O)CC", "ethyl(methyl)phosphinic acid"),
     "CC[N@H+]1CCC(=O)[C@@H]([C@@H]1[C@H](O)C)O": (
         "CC[NH+]1CCC(=O)[C@@H]([C@@H]1[C@H](O)C)O",
-        "(2S,3R)-1-ethyl-3-hydroxy-2-((1R)-1-hydroxyethyl)piperidinium-4-one",
+        "(2S,3R)-1-ethyl-3-hydroxy-2-((1R)-1-hydroxyethyl)-4-oxopiperidinium",
     ),
     "C[N@@H+]1CCC[C@H]1c1cccnc1": ("C[NH+]1CCC[C@H]1c1cccnc1", "3-((2S)-1-methylpyrrolidinium-2-yl)pyridine"),
     "C[N@H+]1[C@H]2CC[C@@H]1[C@H]([C@H](C2)OC(=O)c1ccccc1)C(=O)OC": (
@@ -36,7 +36,7 @@ GUARDS = {
     "C[P@](=O)(CC)c1ccccc1": "((S)-ethyl(methyl)oxophosphanyl)benzene",
     "C[P@](=O)(OC)c1ccccc1": "((S)-methoxy(methyl)phosphoryl)benzene",
     "C[P@](=O)(S)c1ccccc1": "((S)-methyl(sulfanyl)oxophosphanyl)benzene",
-    "C[P@+](CC)(CCC)c1ccccc1": "((S)-ethyl(methyl)(propyl)phosphaniumyl)benzene",
+    "C[P@+](CC)(CCC)c1ccccc1": "(S)-ethyl(methyl)(phenyl)(propyl)phosphanium",
     "CC[N@+]1([O-])CCC[C@H]1C": "(1S,2R)-1-ethyl-2-methyl-1-oxidopyrrolidinium",
 }
 
