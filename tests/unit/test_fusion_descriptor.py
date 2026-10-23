@@ -179,7 +179,7 @@ def test_planner_checks_next_descriptor_after_chemical_rejection(monkeypatch):
     first, second = object(), object()
     attempted = []
 
-    def candidates(*args):
+    def candidates(*args, **kwargs):
         yield first
         yield second
         pytest.fail("candidate generation must stop once a chemical plan is confirmed")

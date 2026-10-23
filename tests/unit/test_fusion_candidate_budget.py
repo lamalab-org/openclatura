@@ -1,10 +1,4 @@
-"""Ranked fusion-name candidates stop at the configured budget.
-
-Preference-ordered candidates prove a supported decomposition almost at once
-or never, so the walk past that point only enumerates ways to fail, each one
-paying for a full numbering and reconstruction audit. Bounding the walk must
-not cost a name that the unbounded walk would have produced.
-"""
+"""Fusion candidates are bounded by exact parent coverage, not a count cap."""
 
 import pytest
 from rdkit import Chem
@@ -12,13 +6,15 @@ from rdkit import Chem
 from openclatura import name_mol, name_smiles
 from openclatura.chains import find_ring_systems
 from openclatura.fusion import planner
-from openclatura.fusion.config import fusion_nomenclature_config
-from openclatura.fusion.model import FusionConfirmed, FusionUnsupported
+from openclatura.fusion.descriptor import FusionDescriptorError, iter_fusion_name_asts
+from openclatura.fusion.faces import cached_bounded_face_model
+from openclatura.fusion.model import FusionConfirmed, FusionMode, FusionUnsupported
 from openclatura.fusion.planner import plan_fusion_parent
+from openclatura.fusion.registry import fusion_component_registry
 from openclatura.graph_io import read_smiles
 
 # Ring systems the planner names itself, rather than ones carrying a retained
-# name, so the budget is exercised on the path it actually bounds.
+# name, so they exercise the ranked systematic-fusion path.
 PLANNED = (
     ("c1cnc2[nH]cnc2c1", "3H-imidazo[4,5-b]pyridine"),
     ("Brc1cn2c(n1)OCCC2", "2-bromo-6,7-dihydro-5H-imidazo[2,1-b][1,3]oxazine"),
@@ -34,10 +30,10 @@ def _largest_ring_system(smiles):
     return mol, max(find_ring_systems(mol), key=lambda ring: len(ring.atoms)).atoms
 
 
-def test_budget_is_configured_and_positive():
-    limit = fusion_nomenclature_config().search.maximum_name_candidates
-    assert limit >= 1
-    assert planner.MAXIMUM_NAME_CANDIDATES == limit
+def _parent_edges(mol, atoms):
+    return frozenset(
+        tuple(sorted((bond.u, bond.v))) for bond in mol.bonds.values() if bond.u in atoms and bond.v in atoms
+    )
 
 
 @pytest.mark.parametrize(("smiles", "expected"), PLANNED)
@@ -49,55 +45,87 @@ def test_the_planner_owns_these_names(smiles, expected):
 
 
 @pytest.mark.parametrize(("smiles", "expected"), PLANNED)
-def test_the_configured_budget_costs_no_proven_name(smiles, expected):
+def test_exact_parent_coverage_costs_no_proven_name(smiles, expected):
     assert name_smiles(smiles) == expected
     mol, atoms = _largest_ring_system(smiles)
     assert isinstance(plan_fusion_parent(mol, atoms, mode="audited_pin"), FusionConfirmed)
 
 
-@pytest.mark.parametrize(("smiles", "expected"), PLANNED)
-def test_one_candidate_already_proves_the_preferred_decomposition(monkeypatch, smiles, expected):
-    """Candidates are emitted in preference order, so the first one carries it."""
+def test_candidate_iteration_has_no_arbitrary_count_limit(monkeypatch):
+    mol, atoms = _largest_ring_system(PLANNED[0][0])
+    confirmed = planner._plan_uncached(mol, atoms, FusionMode.AUDITED_PIN)
+    assert isinstance(confirmed, FusionConfirmed)
+    candidates = tuple(object() for _ in range(80))
+    attempted = []
 
-    monkeypatch.setattr(planner, "MAXIMUM_NAME_CANDIDATES", 1)
-    assert name_smiles(smiles) == expected
+    def generated(*args, **kwargs):
+        yield from candidates
 
+    def complete(mol, atoms, mode, ast, *args, **kwargs):
+        attempted.append(ast)
+        return confirmed if ast is candidates[-1] else FusionUnsupported("not this construction")
 
-@pytest.mark.parametrize(("smiles", "expected"), PLANNED)
-def test_an_exhausted_budget_abstains_with_a_typed_reason(monkeypatch, smiles, expected):
-    """Refusing every candidate abstains; it never raises and never guesses."""
+    monkeypatch.setattr(planner, "iter_fusion_name_asts", generated)
+    monkeypatch.setattr(planner, "_plan_numbered_candidate", complete)
 
-    monkeypatch.setattr(planner, "MAXIMUM_NAME_CANDIDATES", 0)
-    mol, atoms = _largest_ring_system(smiles)
-    result = plan_fusion_parent(mol, atoms, mode="audited_pin")
-    assert isinstance(result, FusionUnsupported), result
-    assert "candidate budget" in result.reason
-
-
-@pytest.mark.parametrize(("smiles", "expected"), PLANNED)
-def test_an_exhausted_budget_still_yields_a_name(monkeypatch, smiles, expected):
-    """A bounded planner falls back rather than leaving the caller nameless."""
-
-    monkeypatch.setattr(planner, "MAXIMUM_NAME_CANDIDATES", 0)
-    named = name_mol(Chem.MolFromSmiles(smiles), include_trace=True)
-    assert named.name
-    assert named.parent_nomenclature != "systematic_fusion"
+    assert planner._plan_uncached(mol, atoms, FusionMode.AUDITED_PIN) is confirmed
+    assert attempted == list(candidates)
 
 
-def test_a_deeply_ambiguous_ring_system_stays_within_the_budget():
-    """The system that motivated the budget once walked 294 candidates."""
+def test_incomplete_match_union_is_rejected_before_cover_enumeration(monkeypatch):
+    mol, atoms = _largest_ring_system("c1ccc2ccccc2c1")
+    bounded = cached_bounded_face_model(mol, atoms)
+    registry = fusion_component_registry()
+    matches = registry.match_faces(mol, bounded)
+    assert matches
+    unavailable_atom = max(mol.atoms) + 1
 
-    smiles = "CC(C)=CCC[C@]1(C)Oc2cc(CO)c(C=O)c3c2[C@H]2[C@@H](O3)[C@@](C)(O)CC[C@H]21"
-    counted = {"calls": 0}
+    def must_not_enumerate(*args, **kwargs):
+        pytest.fail("an incomplete global match union must be rejected before cover enumeration")
+
+    monkeypatch.setattr("openclatura.fusion.descriptor._exact_component_covers", must_not_enumerate)
+    with pytest.raises(FusionDescriptorError, match="do not cover the selected parent atom set"):
+        next(
+            iter_fusion_name_asts(
+                mol,
+                matches,
+                registry,
+                required_parent_atom_ids=atoms | {unavailable_atom},
+                required_parent_edges=_parent_edges(mol, atoms),
+            )
+        )
+
+
+def test_component_cover_must_reconstruct_the_required_parent_edges():
+    mol, atoms = _largest_ring_system("c1ccc2ccccc2c1")
+    bounded = cached_bounded_face_model(mol, atoms)
+    registry = fusion_component_registry()
+    matches = registry.match_faces(mol, bounded)
+    edges = _parent_edges(mol, atoms)
+
+    with pytest.raises(FusionDescriptorError, match="no exact tree-cover fusion citation"):
+        next(
+            iter_fusion_name_asts(
+                mol,
+                matches,
+                registry,
+                required_parent_atom_ids=atoms,
+                required_parent_edges=frozenset(tuple(edges)[1:]),
+            )
+        )
+
+
+def test_deeply_ambiguous_system_prunes_incomplete_parents_before_candidate_audit(monkeypatch):
+    smiles = "C=C1/C=C\\C=C/N(c2ccc(C)cc2)c2c3c(c4c(c21)-c1ccccc1C4)C=CC3"
+    attempted = 0
     original = planner._plan_numbered_candidate
 
     def counting(*args, **kwargs):
-        counted["calls"] += 1
+        nonlocal attempted
+        attempted += 1
         return original(*args, **kwargs)
 
-    planner._plan_numbered_candidate = counting
-    try:
-        assert name_smiles(smiles)
-    finally:
-        planner._plan_numbered_candidate = original
-    assert 0 < counted["calls"] < planner.MAXIMUM_NAME_CANDIDATES
+    monkeypatch.setattr(planner, "_plan_numbered_candidate", counting)
+
+    assert name_smiles(smiles)
+    assert attempted == 4
