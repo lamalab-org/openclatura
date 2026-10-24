@@ -1063,7 +1063,7 @@ def test_ortho_peri_parent_with_interior_atoms_receives_a_complete_audited_numbe
     result = plan_fusion_parent(mol, mol.atoms, mode=FusionMode.GENERAL)
 
     assert isinstance(result, FusionConfirmed)
-    assert result.plan.rendered_base_name == "benzo[1,2,3,4-def]phenanthrene"
+    assert result.plan.rendered_base_name == "benzo[2,1,6,5-def]phenanthrene"
     assert any(join.kind.value == "ortho_peri" for join in result.plan.ast.joins)
     assert set(dict(result.plan.numbering.input_locant_maps[0])) == set(mol.atoms)
     assert {str(locant) for _, locant in result.plan.numbering.input_locant_maps[0]} >= {"10b", "10c"}

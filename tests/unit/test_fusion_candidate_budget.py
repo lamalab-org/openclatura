@@ -100,4 +100,4 @@ def test_a_deeply_ambiguous_ring_system_stays_within_the_budget():
         assert name_smiles(smiles)
     finally:
         planner._plan_numbered_candidate = original
-    assert 0 < counted["calls"] <= 2 * planner.MAXIMUM_NAME_CANDIDATES
+    assert 0 < counted["calls"] < planner.MAXIMUM_NAME_CANDIDATES

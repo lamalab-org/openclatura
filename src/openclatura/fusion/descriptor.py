@@ -17,12 +17,14 @@ from itertools import combinations
 from typing import Protocol
 
 from ..assembly_parts import NameTokenBinding
+from ..canonical_ranks import canonical_ranks
 from ..locants import retained_locant_sort_key
 from ..molecule import Molecule
 from ..polycycle_topology import normalize_edge
 from ..rules import multipliers
 from .config import fusion_nomenclature_config
 from .cover import ComponentScope, CoverGraph, FusionInterface, audit_component_cover, component_scope
+from .faces import cached_bounded_face_model
 from .model import (
     ComponentLocant,
     FusionCitationNode,
@@ -203,7 +205,7 @@ def iter_fusion_name_asts(
     if not supported_joins <= {"ortho", "ortho_peri", "higher_order"}:
         raise ValueError("unknown fusion join kind")
 
-    options = _occurrence_options(component_matches, registry)
+    options = _occurrence_options(mol, component_matches, registry)
     face_ids = tuple(sorted(set().union(*(option.face_ids for option in options))))
     if len(face_ids) < 2:
         raise FusionDescriptorError("a fusion citation requires at least two component faces")
@@ -291,8 +293,16 @@ def _selection_preference_tiers(
         if component_parent_eligible(match, spec, prepared.matches):
             roots_by_seniority[component_spec_seniority_key(spec).as_tuple()].append(match.occurrence_id)
 
+    # The independent audit requires every declared parent to have the best
+    # intrinsic seniority among all eligible components in this exact cover.
+    # Lower tiers can therefore never produce a valid plan; do not construct
+    # their local-map combinations and ASTs only to reject them after complete
+    # numbering, bond-model, and reconstruction work.
+    preferred_seniority = min(roots_by_seniority, default=None)
     result = []
     for seniority, roots in roots_by_seniority.items():
+        if seniority != preferred_seniority:
+            continue
         root_sets = [(root,) for root in roots]
         if allow_multiparent_parents:
             roots_by_variant: dict[tuple, list[int]] = defaultdict(list)
@@ -329,7 +339,9 @@ def _prepare_component_selection(
 
     if len(options) > MAX_COMPONENT_OCCURRENCES:
         return None
-    ordered = tuple(sorted(options, key=_occurrence_option_key))
+    target_atoms = frozenset(atom for option in options for atom in option.atom_ids)
+    ranks = _interior_component_order_ranks(mol, target_atoms)
+    ordered = tuple(sorted(options, key=lambda option: _occurrence_option_key(option, ranks)))
     matches = tuple(replace(option.mappings[0], occurrence_id=index) for index, option in enumerate(ordered))
     specs = {match.occurrence_id: _spec_for_match(registry, match) for match in matches}
     scopes = tuple(_scope_for_match(mol, match, specs[match.occurrence_id]) for match in matches)
@@ -609,6 +621,7 @@ def _parent_component_name(spec: FusionComponentSpec) -> str:
 
 
 def _occurrence_options(
+    mol: Molecule,
     matches: Sequence[FusionComponentMatch],
     registry: _Registry | Mapping[str, FusionComponentSpec],
 ) -> tuple[_OccurrenceOption, ...]:
@@ -621,13 +634,15 @@ def _occurrence_options(
     if not grouped:
         raise FusionDescriptorError("no exact component matches were supplied")
 
+    target_atoms = frozenset(atom for match in matches for _, atom in match.local_to_input_atom)
+    ranks = _interior_component_order_ranks(mol, target_atoms)
     options: list[_OccurrenceOption] = []
     for (face_ids, spec_key, _template_name, atom_ids), mappings in grouped.items():
         _spec_for_match(registry, mappings[0])
         unique = {mapping.local_to_input_atom: mapping for mapping in mappings}
-        ordered = tuple(unique[key] for key in sorted(unique, key=_local_map_key))
+        ordered = tuple(unique[key] for key in sorted(unique, key=lambda mapping: _local_map_key(mapping, ranks)))
         options.append(_OccurrenceOption(face_ids, spec_key, atom_ids, ordered))
-    return tuple(sorted(options, key=_occurrence_option_key))
+    return tuple(sorted(options, key=lambda option: _occurrence_option_key(option, ranks)))
 
 
 def _exact_component_covers(
@@ -899,6 +914,7 @@ def _best_tree_mapping_candidate(
     projected = _deduplicate_interface_equivalent_maps(
         mapping_sets,
         interface_by_pair.values(),
+        mol,
     )
     root = topology.roots[0]
     children: dict[int, tuple[int, ...]] = {
@@ -1232,6 +1248,7 @@ def _compatible_mapping_assignments(
     projected_mapping_sets = _deduplicate_interface_equivalent_maps(
         mapping_sets,
         interface_by_pair.values(),
+        mol,
     )
     occurrence_order = tuple(
         sorted(range(len(mapping_sets)), key=lambda occurrence: (order_by_occurrence[occurrence], occurrence))
@@ -1300,6 +1317,7 @@ def _compatible_mapping_assignments(
 def _deduplicate_interface_equivalent_maps(
     mapping_sets: Sequence[tuple[FusionComponentMatch, ...]],
     interfaces: Iterable[FusionInterface[int]],
+    mol: Molecule,
 ) -> tuple[tuple[FusionComponentMatch, ...], ...]:
     """Keep one full map for each distinct assignment at fusion interfaces."""
 
@@ -1308,13 +1326,19 @@ def _deduplicate_interface_equivalent_maps(
         interface_atoms[interface.left].update(interface.shared_atom_ids)
         interface_atoms[interface.right].update(interface.shared_atom_ids)
 
+    target_atoms = frozenset(
+        atom for mappings in mapping_sets for mapping in mappings for _, atom in mapping.local_to_input_atom
+    )
+    ranks = _interior_component_order_ranks(mol, target_atoms)
     result = []
     for occurrence, mappings in enumerate(mapping_sets):
         relevant_atoms = interface_atoms[occurrence]
         by_projection: dict[tuple[tuple[int, str], ...], FusionComponentMatch] = {}
         for mapping in mappings:
             locant_by_atom = {atom: locant for locant, atom in mapping.local_to_input_atom}
-            projection = tuple((atom, locant_by_atom[atom]) for atom in sorted(relevant_atoms))
+            projection = tuple(
+                sorted(((ranks[atom] if ranks is not None else atom), locant_by_atom[atom]) for atom in relevant_atoms)
+            )
             by_projection.setdefault(projection, mapping)
         result.append(tuple(by_projection[key] for key in sorted(by_projection)))
     return tuple(result)
@@ -1333,6 +1357,11 @@ def _build_candidate(
     classified_primary: Mapping[int, tuple[FusionJoin, int]] | None = None,
 ) -> _Candidate | None:
     match_by_id = {match.occurrence_id: match for match in matches}
+    if enforce_interoperability_limits and any(
+        len(match_by_id[occurrence].covered_face_ids) > _SUPPORT.maximum_multiparent_interparent_faces
+        for occurrence in topology.interparent_occurrences
+    ):
+        return None
     primary_joins: dict[int, FusionJoin] = {}
     interparent_joins: list[FusionJoin] = []
     cycle_closing_joins: list[FusionJoin] = []
@@ -1872,17 +1901,32 @@ def _attached_locant_key(join: FusionJoin) -> tuple:
     return tuple(retained_locant_sort_key(locant.text) for locant in join.attached_locants)
 
 
-def _local_map_key(mapping: tuple[tuple[str, int], ...]) -> tuple:
-    return tuple((retained_locant_sort_key(locant), atom) for locant, atom in mapping)
+def _interior_component_order_ranks(mol: Molecule, atom_ids: frozenset[int]) -> Mapping[int, int] | None:
+    """Use structural ordering only where multiple interior atoms can tie."""
+
+    bounded = cached_bounded_face_model(mol, atom_ids)
+    return canonical_ranks(mol) if bounded is not None and len(bounded.interior_atoms) > 1 else None
 
 
-def _occurrence_option_key(option: _OccurrenceOption) -> tuple:
+def _local_map_key(mapping: tuple[tuple[str, int], ...], ranks: Mapping[int, int] | None) -> tuple:
+    """Order component embeddings by molecular invariants, never atom ids."""
+
+    return tuple(
+        (retained_locant_sort_key(locant), ranks[atom] if ranks is not None else atom) for locant, atom in mapping
+    )
+
+
+def _occurrence_option_key(option: _OccurrenceOption, ranks: Mapping[int, int] | None) -> tuple:
+    atom_key = (lambda atom: ranks[atom]) if ranks is not None else (lambda atom: atom)
     return (
-        min(option.face_ids),
-        -len(option.face_ids),
-        tuple(sorted(option.face_ids)),
+        *(
+            (-len(option.face_ids),)
+            if ranks is not None
+            else (min(option.face_ids), -len(option.face_ids), tuple(sorted(option.face_ids)))
+        ),
         option.mappings[0].template_name,
-        tuple(sorted(option.atom_ids)),
+        tuple(sorted(atom_key(atom) for atom in option.atom_ids)),
+        _local_map_key(option.mappings[0].local_to_input_atom, ranks),
     )
 
 
