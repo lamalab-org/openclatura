@@ -836,8 +836,8 @@ def _collect_subgraph_substituents(
     *,
     emit_metadata: bool = True,
     omit_redundant_locants: bool = True,
-) -> dict[int, list[SubstituentItem]]:
-    """Collect prefixes attached to a recursive subgraph parent.
+) -> dict[int, list[SubstituentItem]] | None:
+    """Collect prefixes attached to a recursive subgraph parent, or None when a branch cannot be named.
     P-14.2, P-16.5, P-44, P-61 through P-67, and P-24 for the spiro side-ring substituents."""
 
     main_set = set(candidate_path)
@@ -917,6 +917,12 @@ def _collect_subgraph_substituents(
                     branch_trace = []
                     branch_tree = None
                 branch_name, outer_parentheses_optional = split_rendered_substituent_name(branch_name)
+                # A branch that cannot be named fails the whole subgraph: the
+                # caller binds all its atoms to the one name, so the component
+                # audit would not see the branch missing.  An explicit hydrogen
+                # (deuterium, say) has no prefix, and the audit skips it too.
+                if not branch_name and mol.atoms[n_idx].symbol != "H":
+                    return None
                 if branch_name:
                     branch_atoms = _subgraph_component(mol, n_idx, branch_exclude)
                     branch_with_attachment = branch_atoms | {c_idx}
@@ -1333,6 +1339,17 @@ def name_subgraph(
         name = _acylamino_amido_prefix(mol, start_idx, exclude_atoms, upstream_atom)
         if name is None:
             name = name_heteroatom_subgraph(mol, start_idx, exclude_atoms, upstream_atom, name_subgraph)
+        if name == "":
+            if decision_trace is not None:
+                trace_decision(
+                    decision_trace,
+                    TracePhase.ASSEMBLY,
+                    "failed heteroatom substituent shortcut",
+                    "A ligand branch of the terminal non-carbon atom could not be named.",
+                    atoms=component,
+                    bonds=_bond_ids_within(mol, component),
+                )
+            return _unnamed_subgraph_result(return_trace, return_tree)
         if name is not None:
             if decision_trace is not None:
                 trace_decision(
@@ -1391,13 +1408,7 @@ def name_subgraph(
                 atoms=component,
                 bonds=_bond_ids_within(mol, component),
             )
-        if return_trace and return_tree:
-            return "", [], None
-        if return_trace:
-            return "", []
-        if return_tree:
-            return "", None
-        return ""
+        return _unnamed_subgraph_result(return_trace, return_tree)
     if decision_trace is not None:
         trace_decision(
             decision_trace,
@@ -1432,6 +1443,17 @@ def name_subgraph(
         emit_metadata=emit_metadata,
         omit_redundant_locants=omit_redundant_locants,
     )
+    if subst_mapping is None:
+        if decision_trace is not None:
+            trace_decision(
+                decision_trace,
+                TracePhase.ASSEMBLY,
+                "failed substituent branch naming",
+                "A branch on the substituent parent could not be named, so neither can the substituent.",
+                atoms=component,
+                bonds=_bond_ids_within(mol, component),
+            )
+        return _unnamed_subgraph_result(return_trace, return_tree)
     # A retained ring is retained as a prefix too (``quinolin-7-yl``); a substituent
     # has no principal group, and its attachment is one more locant to cite.
     retained_parent_metadata = None
@@ -1573,6 +1595,18 @@ def name_subgraph(
     return rendered_name
 
 
+def _unnamed_subgraph_result(return_trace: bool, return_tree: bool):
+    """Return ``name_subgraph``'s empty name, the signal that the subgraph cannot be named."""
+
+    if return_trace and return_tree:
+        return "", [], None
+    if return_trace:
+        return "", []
+    if return_tree:
+        return "", None
+    return ""
+
+
 def _shortcut_substituent_tree(
     name: str,
     component: set[int],
@@ -1687,6 +1721,9 @@ def _heteroatom_center_token_in_name(symbol: str, name: str) -> str:
         "P": ("phosphoryl", "phosphono", "phosphanylidene", "phosphanylidynemethyl", "phosphanyl", "phosphino"),
         "B": ("borylidene", "boryl", "boranuide"),
         "Si": ("silylidene", "silyl"),
+        "Ge": ("germylidene", "germyl"),
+        "Sn": ("stannylidene", "stannyl"),
+        "Pb": ("plumbylidene", "plumbyl"),
         "O": ("hydroperoxy", "peroxy", "hydroxy", "oxy", "oxido"),
         "N": ("ammonio", "azanidyl", "iminio", "amino", "imino", "nitrilo"),
     }.get(symbol, ())
