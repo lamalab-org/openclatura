@@ -3,6 +3,7 @@ import itertools
 from openclatura.assembly_parts import RetainedParentMetadata
 from openclatura.hantzsch_widman import hw_spec_for_name, hw_spec_for_ring
 from openclatura.molecule import Molecule
+from openclatura.naming_style import RETAINED_OVER_HANTZSCH_WIDMAN, hantzsch_widman_requested
 from openclatura.nomenclature import RULES
 from openclatura.retained_graph_templates import match_retained_graph_templates
 from openclatura.retained_graph_templates import (
@@ -156,6 +157,13 @@ def get_retained_ring(mol: Molecule, path: list[int]) -> tuple[str, list[dict[in
                         double_bonds += 1
 
     deg3_nodes = [u for u, d in internal_degrees.items() if d == 3]
+
+    if hantzsch_widman_requested() and not deg3_nodes and any(symbol != "C" for symbol in symbols):
+        spec = hw_spec_for_ring(mol, path)
+        if spec is not None and spec["name"] not in RETAINED_OVER_HANTZSCH_WIDMAN:
+            generated = _generated_monocycle(mol, path, size, total_bonds, double_bonds)
+            if generated is not None:
+                return generated
 
     data_monocycle = _match_data_monocycle_retained(mol, path, size, total_bonds, double_bonds, symbols)
     if data_monocycle is not None:

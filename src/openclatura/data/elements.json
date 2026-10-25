@@ -29,6 +29,7 @@
     {"symbol": "In", "name": "indium", "atomic_number": 49, "standard_valence": 3, "hw_stem": null, "hw_priority": null, "substituent_prefix": null, "fusion_special_priority": 21, "fusion_general_priority": 21, "mancude_forced_single": false, "fusion_supported": true},
     {"symbol": "Tl", "name": "thallium", "atomic_number": 81, "standard_valence": 3, "hw_stem": null, "hw_priority": null, "substituent_prefix": null, "fusion_special_priority": 22, "fusion_general_priority": 22, "mancude_forced_single": false, "fusion_supported": true},
     {"symbol": "Pb", "name": "lead", "atomic_number": 82, "standard_valence": 4, "hw_stem": "plumba", "hw_priority": 17, "substituent_prefix": "plumbyl", "fusion_special_priority": 16, "fusion_general_priority": 16, "mancude_forced_single": false, "fusion_supported": true},
-    {"symbol": "Bi", "name": "bismuth", "atomic_number": 83, "standard_valence": 3, "hw_stem": "bisma", "hw_priority": 13, "substituent_prefix": "bismuthanyl", "fusion_special_priority": 12, "fusion_general_priority": 12, "mancude_forced_single": false, "fusion_supported": true}
+    {"symbol": "Bi", "name": "bismuth", "atomic_number": 83, "standard_valence": 3, "hw_stem": "bisma", "hw_priority": 13, "substituent_prefix": "bismuthanyl", "fusion_special_priority": 12, "fusion_general_priority": 12, "mancude_forced_single": false, "fusion_supported": true},
+    {"symbol": "Po", "name": "polonium", "atomic_number": 84, "standard_valence": 2, "hw_stem": null, "hw_priority": null, "substituent_prefix": null, "fusion_special_priority": null, "fusion_general_priority": null, "mancude_forced_single": true, "fusion_supported": false}
   ]
 }

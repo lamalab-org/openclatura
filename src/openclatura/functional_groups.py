@@ -40,7 +40,7 @@ def metadata_for_group(key: str) -> FunctionalGroupMetadata:
     if rule is None:
         return FunctionalGroupMetadata(source="perception")
     return FunctionalGroupMetadata(
-        prefix=rule.prefix,
+        prefix=RULES.functional_groups.prefix_for(key),
         suffix=rule.suffix,
         multi_suffix=rule.multi_suffix,
         suffix_multiplier_positions=rule.suffix_multiplier_positions,

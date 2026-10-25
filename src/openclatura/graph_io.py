@@ -51,10 +51,14 @@ def read_smiles(smiles: str) -> Molecule:
     rdmol = Chem.MolFromSmiles(smiles)
     atom_metadata = None
     if rdmol is None:
+        # Sanitization failed (an unusual valence, for example); read the
+        # graph as written.
         rdmol = Chem.MolFromSmiles(smiles, sanitize=False)
         if rdmol:
             rdmol.UpdatePropertyCache(strict=False)
             Chem.FastFindRings(rdmol)
+            atom_metadata = _atom_metadata(rdmol)
+            _kekulize(rdmol)
     else:
         atom_metadata = _atom_metadata(rdmol)
         try:
@@ -94,12 +98,23 @@ def read_rdkit_mol(rdmol: Chem.Mol | None, *, copy: bool = True) -> Molecule:
             pass
 
     atom_metadata = _atom_metadata(rdmol)
-    try:
-        Chem.Kekulize(rdmol, clearAromaticFlags=True)
-    except Exception:
-        pass
+    _kekulize(rdmol)
 
     return _build_molecule(rdmol, atom_metadata)
+
+
+def _kekulize(rdmol: Chem.Mol) -> None:
+    """Kekulize in place, refusing aromatic rings that have no Kekule structure.
+
+    An aromatic bond left in the graph is read as a single bond, so naming such
+    a ring would silently name its saturated analogue (``c1ccnc1`` as
+    pyrrolidine).
+    """
+
+    try:
+        Chem.Kekulize(rdmol, clearAromaticFlags=True)
+    except Chem.KekulizeException as exc:
+        raise ValueError(f"aromatic system has no Kekule structure ({exc})") from exc
 
 
 def _ensure_perception(rdmol: Chem.Mol) -> None:
@@ -124,6 +139,12 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
     if atom_metadata is None:
         atom_metadata = _atom_metadata(rdmol)
 
+    # A heteroatom centre whose configuration is lost to proton exchange is not a
+    # stereocentre; dropping its tag before perception keeps every downstream
+    # view of the molecule (descriptors, CIP maps, the audit's copy) in step.
+    for atom in rdmol.GetAtoms():
+        if atom.GetChiralTag() != Chem.rdchem.ChiralType.CHI_UNSPECIFIED and _achiral_by_proton_exchange(atom):
+            atom.SetChiralTag(Chem.rdchem.ChiralType.CHI_UNSPECIFIED)
     Chem.AssignStereochemistry(rdmol, force=True, cleanIt=True)
     chiral_centers = dict(Chem.FindMolChiralCenters(rdmol, includeUnassigned=False))
     mol.legacy_cip = dict(chiral_centers)
@@ -173,6 +194,7 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
             is_aromatic=atom_metadata[atom.GetIdx()]["is_aromatic"],
             explicit_h_count=atom_metadata[atom.GetIdx()]["explicit_h_count"],
             total_h_count=atom_metadata[atom.GetIdx()]["total_h_count"],
+            radical_electrons=atom.GetNumRadicalElectrons(),
         )
 
     for bond in rdmol.GetBonds():
@@ -195,6 +217,27 @@ def _build_molecule(rdmol: Chem.Mol | None, atom_metadata: dict | None) -> Molec
             cip=modern_bond_cip.get((min(u, v), max(u, v))) if _AUDIT_CIP_ENABLED else None,
         )
     return mol
+
+
+def _achiral_by_proton_exchange(atom: Chem.Atom) -> bool:
+    """Whether a N, P, As, S or Se centre loses its configuration to proton
+    exchange or resonance: it carries a hydrogen (an N-H+ inverts by
+    deprotonation), or two of its neighbours are the same chalcogen or nitrogen
+    with no other heavy neighbour, as the =O and -OH of P(=O)(OH).  This is
+    OPSIN's ``StereoAnalyser.isAchiralDueToResonanceOrTautomerism``, so the
+    namer gives no descriptor that OPSIN would refuse to place."""
+
+    if atom.GetSymbol() not in {"N", "P", "As", "S", "Se"}:
+        return False
+    if atom.GetTotalNumHs(includeNeighbors=True):
+        return True
+    terminal_elements = []
+    for neighbor in atom.GetNeighbors():
+        if neighbor.GetSymbol() in {"O", "S", "Se", "Te", "N"} and all(
+            other.GetIdx() == atom.GetIdx() or other.GetAtomicNum() == 1 for other in neighbor.GetNeighbors()
+        ):
+            terminal_elements.append(neighbor.GetSymbol())
+    return len(terminal_elements) != len(set(terminal_elements))
 
 
 def _raw_tetrahedral_stereo(atom: Chem.Atom) -> str | None:

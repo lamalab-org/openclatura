@@ -939,7 +939,7 @@ def _instance_tokens_for_locants(
 def _principal_suffix_emitted_tokens(group) -> tuple[NameTokenBinding, ...]:
     """Emit suffix tokens from the functional-group renderer, not a word list."""
 
-    rule = RULES.functional_groups.get(group.key)
+    rule = group.resolved_rule or RULES.functional_groups.get(group.key)
     locants = tuple(str(locant) for locant in group.locants)
     rendered_suffix = render_principal_suffix(rule, len(locants) or 1)
     return _rendered_term_tokens(

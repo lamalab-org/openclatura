@@ -55,6 +55,10 @@ def canonical_ranks(mol: Molecule, atom_ids=None) -> dict[int, int]:
     valence so substituent identity cannot alter intrinsic parent ranking.
     """
 
+    # Parent selection asks for the whole-graph ranks once per candidate path,
+    # so answer a cached whole-graph request before touching every atom.
+    if atom_ids is None and mol._canonical_rank_cache is not None:
+        return mol._canonical_rank_cache
     atoms = frozenset(mol.atoms if atom_ids is None else atom_ids)
     unknown = atoms - mol.atoms.keys()
     if unknown:
@@ -66,6 +70,12 @@ def canonical_ranks(mol: Molecule, atom_ids=None) -> dict[int, int]:
 
     invariants = {idx: _initial_invariant(mol, idx, atoms) for idx in atoms}
     ranks = _ranks_from_invariants(invariants)
+    # A chain needs about as many rounds as it has atoms, so look the bonds up
+    # once rather than in every round.
+    bonded = {
+        idx: [(_order(mol, idx, neighbor), neighbor) for neighbor in mol.get_neighbors(idx) if neighbor in atoms]
+        for idx in atoms
+    }
 
     # Refine until the partition stops getting finer.  Each round replaces an
     # atom's invariant with its own rank plus the multiset of its neighbours',
@@ -75,11 +85,7 @@ def canonical_ranks(mol: Molecule, atom_ids=None) -> dict[int, int]:
     for _ in range(len(atoms)):
         refined = {}
         for idx in atoms:
-            neighbour_key = sorted(
-                (_order(mol, idx, neighbor), ranks[neighbor])
-                for neighbor in mol.get_neighbors(idx)
-                if neighbor in atoms
-            )
+            neighbour_key = sorted((order, ranks[neighbor]) for order, neighbor in bonded[idx])
             refined[idx] = (ranks[idx], tuple(neighbour_key))
         ranks = _ranks_from_invariants(refined)
         classes = len(set(ranks.values()))

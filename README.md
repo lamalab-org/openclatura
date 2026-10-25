@@ -165,6 +165,36 @@ for step in analysis.decisions:
     print(step.phase, step.decision, step.reason)
 ```
 
+### Name style
+
+`style=` picks between equivalent spellings of the same name. The default
+output is unchanged; presets bundle the individual options, and any option can
+be overridden on top of a preset:
+
+```python
+from openclatura import name
+
+name("SCC=CCO").name                        # 4-sulfanylbut-2-en-1-ol
+name("SCC=CCO", style="traditional").name   # 4-mercapto-2-buten-1-ol
+name("CC=CC", locant_placement="before_parent").name  # 2-butene
+```
+
+| Option | Default | Alternative |
+|---|---|---|
+| `enclosing_marks` | `parentheses`: `2-((1-((…)amino)…)oxy)` | `nested`: `2-({1-[(…)amino]…}oxy)` (P-16.5.4); `alternating`: `2-[(1-[(…)amino]…)oxy]` |
+| `thiol_prefix` | `sulfanyl` | `mercapto` |
+| `locant_placement` | `before_suffix`: `but-2-ene`, `pentan-2-ol` | `before_parent`: `2-butene`, `2-pentanol` |
+| `heterocycle_names` | `retained`: `furan`, `pyrrolidine`, `pyrimidine` | `hantzsch_widman`: `oxole`, `azolidine`, `1,3-diazine` (pyridine and pyran stay; fused rings unaffected) |
+
+| Preset | `enclosing_marks` | `thiol_prefix` | `locant_placement` |
+|---|---|---|---|
+| `default` | parentheses | sulfanyl | before_suffix |
+| `iupac2013` | nested | sulfanyl | before_suffix |
+| `traditional` | nested | mercapto | before_parent |
+
+The CLI takes the same choices as `--style`, `--enclosing-marks`,
+`--thiol-prefix`, `--locant-placement` and `--heterocycle-names`.
+
 ## CLI
 
 ```bash
@@ -240,10 +270,7 @@ Name pieces contributed by the trace:
 IUPAC Blue Book rules applied: P-44, P-45, P-41, P-61, P-67.
 ```
 
-### `describe_human` — how a chemist would say it
-
-The same information, phrased the way a person would explain the structure at a
-whiteboard, with every position tied back to an atom index in the SMILES:
+### `describe_human` — describe the molecular graph using natural language
 
 ```python
 from openclatura import describe_human
@@ -264,6 +291,7 @@ The parent ring basis comprises a 5-membered ring of aromatic atoms containing p
 These rings share parent bonds between position 4 (atom id 4) and position 5 (atom id 5).
 Within that parent framework, there is nitrogen at positions 1 (atom id 8), 3 (atom id 11), 7 (atom id 1), and 9 (atom id 3).
 The principal characteristic feature is oxo groups at positions 2 (atom id 9) and 6 (atom id 6).
+The typed graph descriptors record carbon center atom 6 and a double bonded oxygen ligand at atom 7 and carbon center atom 9 and a double bonded oxygen ligand at atom 10.
 Attached to this framework are methyl groups at positions 1 (atom id 8), 3 (atom id 11), and 7 (atom id 1).
 ```
 

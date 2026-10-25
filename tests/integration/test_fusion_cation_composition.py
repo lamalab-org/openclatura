@@ -13,8 +13,7 @@ from openclatura import FusionMode, name, name_mol, opsin_available
     [
         (
             "CC(C)(C)/C=C/C(=O)N1CCC[C@@H]2[C@H]1C[NH2+]C2",
-            "(2E)-1-((4aS,7aS)-2,3,4,4a,7,7a-hexahydro-6H-pyrrolo[3,4-b]pyridin-6-ium-1-yl)"
-            "-4,4-dimethylpent-2-en-1-one",
+            "(4aS,7aS)-1-((2E)-4,4-dimethylpent-2-enoyl)-2,3,4,4a,7,7a-hexahydro-6H-pyrrolo[3,4-b]pyridin-6-ium",
         ),
         (
             "Cn1c(ccn1)C[NH+]2CCc3c(cc[nH]c3=O)C2",
@@ -42,10 +41,10 @@ def test_charged_hydro_fusion_roundtrips_after_atom_reordering(smiles, expected)
         ("CN1CCCC2C1C[NH2+]C2", "1-methyl-2,3,4,4a,7,7a-hexahydro-6H-pyrrolo[3,4-b]pyridin-6-ium"),
         ("CCN1CCCC2C1C[NH2+]C2", "1-ethyl-2,3,4,4a,7,7a-hexahydro-6H-pyrrolo[3,4-b]pyridin-6-ium"),
         ("CN1CCCC2C1C[NH2+]C2C", "1,5-dimethyl-2,3,4,4a,7,7a-hexahydro-6H-pyrrolo[3,4-b]pyridin-6-ium"),
-        ("[NH2+]1CCc2c(cc[nH]c2=O)C1", "2,3,4,6-tetrahydropyrido[4,3-c]pyridin-2-ium-5-one"),
-        ("C[NH+]1CCc2c(cc[nH]c2=O)C1", "2-methyl-2,3,4,6-tetrahydropyrido[4,3-c]pyridin-2-ium-5-one"),
-        ("CC[NH+]1CCc2c(cc[nH]c2=O)C1", "2-ethyl-2,3,4,6-tetrahydropyrido[4,3-c]pyridin-2-ium-5-one"),
-        ("[NH2+]1CCc2cc[nH]c(=O)c2C1", "2,3,4,7-tetrahydropyrido[3,4-c]pyridin-2-ium-8-one"),
+        ("[NH2+]1CCc2c(cc[nH]c2=O)C1", "5-oxo-2,3,4,6-tetrahydropyrido[4,3-c]pyridin-2-ium"),
+        ("C[NH+]1CCc2c(cc[nH]c2=O)C1", "2-methyl-5-oxo-2,3,4,6-tetrahydropyrido[4,3-c]pyridin-2-ium"),
+        ("CC[NH+]1CCc2c(cc[nH]c2=O)C1", "2-ethyl-5-oxo-2,3,4,6-tetrahydropyrido[4,3-c]pyridin-2-ium"),
+        ("[NH2+]1CCc2cc[nH]c(=O)c2C1", "8-oxo-2,3,4,7-tetrahydropyrido[3,4-c]pyridin-2-ium"),
     ],
 )
 def test_separate_hydro_and_nitrogen_h_variants_roundtrip(smiles, expected):

@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-10-08
+
+### Added
+
+- Added generic, graph-backed nomenclature for oxygen and its sulfur, selenium,
+  tellurium, and polonium analogues across simple chalcogenols, carbonyls,
+  acids, esters, peroxides, peroxyacids, anhydrides, and oxoacid derivatives.
+- Added composable support for nitrogen-containing chalcogen families,
+  including amine and imine chalcogenides, imides, hydrazides, and acyl
+  pseudohalides.
+- Added typed functional-group descriptors to decision traces and both public
+  description renderers, retaining center, ligand, element, bond, family, and
+  derivative metadata.
+- Added systematic regression coverage for mixed group-16 combinations,
+  structural roles, perception completeness, citation compatibility, and
+  human-readable descriptions.
+
+### Changed
+
+- Moved chalcogen capabilities, vocabulary, precedence, suffixes, prefixes,
+  and citation routes into the existing data-backed naming registry.
+- Generalized perception, parent selection, and assembly around typed graph
+  roles so functional-group behavior is selected structurally rather than by
+  molecule-specific cases.
+
+### Fixed
+
+- Preserved principal-group precedence and acyl ownership across mixed esters,
+  anhydrides, peroxy linkages, imides, hydrazides, cyclic derivatives, and
+  charged chalcogen species.
+- Preserved established oxygen and sulfur names while extending the same
+  structural routes to the heavier group-16 elements.
+- Kept retained and fused parent selection stable when chalcogen functional
+  groups are attached to ring systems.
+
+## [0.4.1] - 2026-10-08
+
+### Added
+
+- Added trusted PyPI publishing and production website deployment workflows.
+
+### Fixed
+
+- Hardened aromatic-input validation, carbamimidoyl stereochemistry, recursive
+  acylamino naming, and fused-bond discovery.
+
 ## [0.4.0] - 2026-10-01
 
 ### Added
@@ -252,7 +298,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial deterministic IUPAC name generation from molecular structures.
 
-[Unreleased]: https://github.com/lamalab-org/openclatura/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/lamalab-org/openclatura/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/lamalab-org/openclatura/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/lamalab-org/openclatura/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/lamalab-org/openclatura/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/lamalab-org/openclatura/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/lamalab-org/openclatura/compare/v0.3.1...v0.3.2

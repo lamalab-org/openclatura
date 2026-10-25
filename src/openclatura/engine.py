@@ -14,12 +14,21 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from .chalcogen_roles import require_validated_chalcogens
 from .fusion.context import current_fusion_mode, reset_fusion_mode, set_fusion_mode
 from .fusion.model import FusionMode
 from .graph_io import get_connected_components, read_rdkit_mol, read_smiles
 from .molecule import DecisionTrace, Molecule, NameAnalysis, TracePhase
 from .name_assembly import set_token_span_building
 from .namer_config import SALT_METAL_NAMES
+from .naming_style import (
+    DEFAULT_STYLE,
+    NamingStyle,
+    apply_final_style,
+    current_naming_style,
+    reset_naming_style,
+    set_naming_style,
+)
 from .operations import infer_operations
 from .opsin_verify import OpsinCheck, verify_with_opsin
 from .trace_helpers import attach_main_parent_decisions, trace_decision
@@ -84,6 +93,7 @@ class NamingRequest:
     omit_redundant_locants: bool = True
     fusion_mode: FusionMode = FusionMode.AUDITED_PIN
     rdkit_mol: Any | None = None
+    style: NamingStyle = DEFAULT_STYLE
 
 
 @dataclass(frozen=True)
@@ -285,6 +295,7 @@ class NamingEngine:
         fusion_mode_token = (
             None if request.fusion_mode is current_fusion_mode() else set_fusion_mode(request.fusion_mode)
         )
+        style_token = None if request.style is current_naming_style() else set_naming_style(request.style)
 
         # The OPSIN-free self-audit rebuilds each component from its name while it
         # is being generated, so its capture hook must wrap the naming call.
@@ -300,6 +311,7 @@ class NamingEngine:
         try:
             with audit_cm as component_audits:
                 mol, smiles = self._prepare_input(request)
+                require_validated_chalcogens(mol)
                 if need_analysis:
                     analysis = self._analyze(
                         mol,
@@ -324,11 +336,15 @@ class NamingEngine:
                         name=self._name(mol, omit_redundant_locants=request.omit_redundant_locants),
                         smiles=smiles,
                     )
+                if request.style != DEFAULT_STYLE:
+                    result = _apply_style(result, request.style)
         except Exception as exc:  # noqa: BLE001 - intentionally permissive boundary
             return NamingResult(name="", smiles=request.smiles, error=f"{type(exc).__name__}: {exc}")
         finally:
             if fusion_mode_token is not None:
                 reset_fusion_mode(fusion_mode_token)
+            if style_token is not None:
+                reset_naming_style(style_token)
             set_token_span_building(previous_span_building)
 
         if request.verify_opsin:
@@ -354,6 +370,7 @@ class NamingEngine:
         fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
         processes: int | None | str = 1,
         chunksize: int = 64,
+        style: NamingStyle = DEFAULT_STYLE,
     ) -> list[NamingResult]:
         """Name a batch of SMILES (or RDKit molecules), optionally in parallel.
 
@@ -378,6 +395,7 @@ class NamingEngine:
                         token_debug=token_debug,
                         omit_redundant_locants=omit_redundant_locants,
                         fusion_mode=fusion_mode,
+                        style=style,
                     )
                 )
                 for item in smiles_list
@@ -392,6 +410,7 @@ class NamingEngine:
             token_debug=token_debug,
             omit_redundant_locants=omit_redundant_locants,
             fusion_mode=fusion_mode,
+            style=style,
             processes=worker_count,
             chunksize=chunksize,
         )
@@ -502,9 +521,14 @@ class NamingEngine:
 
     @staticmethod
     def _component_sort_key(name: str, charge: int = 0) -> tuple[int, int, str]:
-        """P-72.3: cations are cited before anions; metals first among cations, then alphabetical."""
+        """P-72.3: cations are cited before anions; metals first among cations, then alphabetical.
 
-        charge_rank = 0 if charge > 0 else (1 if charge == 0 else 2)
+        Neutral components follow the salt, so that the anion directly follows the
+        cations: between them, a neutral alcohol or amine name would be read with the
+        anion as one functional class name (``propan-2-ol methanesulfonate``).
+        """
+
+        charge_rank = 0 if charge > 0 else (1 if charge < 0 else 2)
         return (charge_rank, 0 if name in SALT_METAL_NAMES else 1, name)
 
     @staticmethod
@@ -596,6 +620,7 @@ def _request_for(
     token_debug: bool,
     omit_redundant_locants: bool = True,
     fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
+    style: NamingStyle = DEFAULT_STYLE,
 ) -> NamingRequest:
     """Build a request from a batch item, which may be a SMILES or an RDKit molecule."""
 
@@ -607,12 +632,13 @@ def _request_for(
         token_debug=token_debug,
         omit_redundant_locants=omit_redundant_locants,
         fusion_mode=FusionMode(fusion_mode),
+        style=style,
         **kwargs,
     )
 
 
-def _name_one_for_worker(args: tuple[str | Any, bool, bool, bool, bool, bool, str]) -> NamingResult:
-    item, include_trace, verify_opsin, verify_self, token_debug, omit_redundant_locants, fusion_mode = args
+def _name_one_for_worker(args: tuple[str | Any, bool, bool, bool, bool, bool, str, NamingStyle]) -> NamingResult:
+    item, include_trace, verify_opsin, verify_self, token_debug, omit_redundant_locants, fusion_mode, style = args
     return DEFAULT_NAMING_ENGINE.run(
         _request_for(
             item,
@@ -622,6 +648,7 @@ def _name_one_for_worker(args: tuple[str | Any, bool, bool, bool, bool, bool, st
             token_debug=token_debug,
             omit_redundant_locants=omit_redundant_locants,
             fusion_mode=fusion_mode,
+            style=style,
         )
     )
 
@@ -635,6 +662,7 @@ def _run_parallel(
     token_debug: bool,
     omit_redundant_locants: bool = True,
     fusion_mode: FusionMode | str = FusionMode.AUDITED_PIN,
+    style: NamingStyle = DEFAULT_STYLE,
     processes: int,
     chunksize: int,
 ) -> list[NamingResult]:
@@ -643,10 +671,21 @@ def _run_parallel(
 
     mode = FusionMode(fusion_mode).value
     payload = [
-        (s, include_trace, verify_opsin, verify_self, token_debug, omit_redundant_locants, mode) for s in smiles_list
+        (s, include_trace, verify_opsin, verify_self, token_debug, omit_redundant_locants, mode, style)
+        for s in smiles_list
     ]
     with ProcessPoolExecutor(max_workers=processes) as ex:
         return list(ex.map(_name_one_for_worker, payload, chunksize=chunksize))
+
+
+def _apply_style(result: NamingResult, style: NamingStyle) -> NamingResult:
+    """Apply the finished-name style passes; they preserve length, so spans stay aligned."""
+
+    name = apply_final_style(result.name, style)
+    if name == result.name:
+        return result
+    analysis = result.analysis if result.analysis is None else replace(result.analysis, name=name)
+    return replace(result, name=name, analysis=analysis)
 
 
 def _component_charge(mol: Molecule, component: set[int]) -> int:
