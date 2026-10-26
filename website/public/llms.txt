@@ -1,0 +1,66 @@
+# openclatura
+
+> Turns a SMILES string into its IUPAC name with deterministic Blue Book rules (no LLM in the loop), and explains how the name is built. The drawing editor at https://openclatura.org is for people; agents should use the plain-text URLs below.
+
+## Name a molecule
+
+    GET https://openclatura.org/smiles=<SMILES>
+
+Example: https://openclatura.org/smiles=CC(=O)Nc1ccccc1
+
+    smiles: CC(=O)Nc1ccccc1
+    name: N-phenylacetamide
+    opsin: matched
+
+- `smiles:` is the SMILES the server received. Check that it is the one you sent (see Encoding).
+- `opsin:` is an independent check: OPSIN, a separate name-to-structure parser, reads the name back. `matched` means the name gives back the same molecule. Other values: `mismatched` (OPSIN read a different molecule), `name_unparseable` (OPSIN could not read the name), `error`, and `skipped_no_java` / `skipped_no_opsin` (the check could not run).
+- On failure the second line is `error: <reason>` and the status is 422.
+
+## Describe how the name is built
+
+    GET https://openclatura.org/describe=<SMILES>
+
+Example: https://openclatura.org/describe=CC(=O)Nc1ccccc1
+
+Returns a plain-text description: the principal characteristic group, the parent skeleton and its numbering, each substituent, and the IUPAC Blue Book rules applied (P-numbers). This is the output of `openclatura describe`.
+
+## Encoding
+
+Percent-encode the SMILES, e.g. `encodeURIComponent(smiles)` or `urllib.parse.quote(smiles, safe="")`. If you write the URL by hand, at least:
+
+- `#` → `%23`. An unescaped `#` ends the URL: `CC#N` is read as `CC` and named ethane.
+- `%` → `%25` (two-digit ring closures such as `C%10`).
+- `\` → `%5C`. Browsers and many HTTP clients turn an unescaped `\` in a path into `/`, which flips double-bond stereo (`F/C=C\F` becomes `F/C=C/F`).
+
+`+` can be sent as-is; it is always read as `+`, never as a space.
+
+If you cannot control encoding, put the SMILES in the query string, where `\` survives:
+
+    GET https://openclatura.org/name?smiles=<SMILES>
+    GET https://openclatura.org/describe?smiles=<SMILES>
+
+## Options
+
+Add these to the query string of any URL above, e.g. `/smiles=CCO?format=json` or `/name?smiles=CCO&verify=0`.
+
+- `format=json`: JSON instead of text. For names: `{"ok", "smiles", "name", "error", "rules_hit", "rule_hints", "opsin_check": {"status", ...}}`. For descriptions: `{"smiles", "name", "summary", "paragraphs", "rules_hit", ...}`.
+- `verify=0`: skip the OPSIN check (it is on by default, as in the command-line tool).
+- `no_cache=1`: do not store the structure in the site's result cache. The cache only makes repeat requests fast; structures are not shared or used for training.
+
+## Status codes
+
+- 200: named or described.
+- 400: no SMILES given; the body is a short usage note.
+- 422: not a valid SMILES, or not nameable by the current rules; the body says which.
+- 429: rate limit reached; wait for the number of seconds in the `Retry-After` header.
+
+## Limits
+
+At most 10 molecules per second from one IP address. Ask for one molecule per request and pace your requests.
+
+For large sets, run openclatura locally: `pip install openclatura`, then `openclatura name "<SMILES>"` or `openclatura batch smiles.txt` (one SMILES per line, JSON Lines out). The OPSIN check needs Java; add `--no-verify` without it.
+
+## More
+
+- Source, Python API and CLI: https://github.com/lamalab-org/openclatura
+- Preprint: https://chemrxiv.org/doi/abs/10.26434/chemrxiv.15006114/v1
