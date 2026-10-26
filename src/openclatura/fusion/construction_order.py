@@ -170,9 +170,10 @@ def ordered_hexagonal_construction(
 
     def enter(ring: int, entry: int, atom: int) -> tuple[list[int], tuple[int, ...]] | None:
         nonlocal remaining
-        remaining -= 1
-        if remaining < 0:
-            return None
+        if remaining is not None:
+            remaining -= 1
+            if remaining < 0:
+                return None
         visited.add(ring)
         cycle = [atom]
         edges = [entry]
