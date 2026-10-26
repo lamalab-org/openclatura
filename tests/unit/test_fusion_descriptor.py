@@ -423,6 +423,22 @@ def test_long_component_tree_uses_a_central_parent_location_and_is_atom_order_in
     assert maximum_depth(first_ast) == maximum_depth(second_ast) == 8
 
 
+def test_descriptor_search_has_no_independent_component_count_limit():
+    components = ("furan",) * 17
+    joins = tuple(
+        pair
+        for occurrence in range(16)
+        for pair in (
+            ((occurrence, "4"), (occurrence + 1, "2")),
+            ((occurrence, "5"), (occurrence + 1, "3")),
+        )
+    )
+
+    _mol, ast, _name = _build(components, joins, enforce_interoperability_limits=False)
+
+    assert len(ast.component_occurrences) == 17
+
+
 def test_long_five_membered_ring_chain_respects_configured_component_budget(monkeypatch):
     from openclatura.fusion import descriptor
 

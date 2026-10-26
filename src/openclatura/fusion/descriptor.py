@@ -51,17 +51,11 @@ from .rules import (
 
 _LIMITS = fusion_nomenclature_config().search
 _SUPPORT = fusion_nomenclature_config().rules.support
-MAX_COMPONENT_OCCURRENCES = _LIMITS.maximum_component_occurrences
 MAX_FACES = _LIMITS.maximum_faces
-MAX_LOCANT_MAP_COMBINATIONS = _LIMITS.locant_map_combinations
 
 
 class FusionDescriptorError(ValueError):
     """Raised when the bounded descriptor tier cannot prove a valid AST."""
-
-
-class _LocantMapBudgetExceeded(RuntimeError):
-    """Internal signal that one candidate cover exceeded its deterministic budget."""
 
 
 class _Registry(Protocol):
@@ -237,7 +231,6 @@ def iter_fusion_name_asts(
             parent_scopes[component_variant_identity(spec)].add(option.atom_ids)
     parent_scopes = {variant: scopes for variant, scopes in parent_scopes.items() if len(scopes) > 1}
 
-    budget_exhausted = 0
     selections_by_preference: dict[tuple, list[_PreparedComponentSelection]] = defaultdict(list)
     for selection in selections:
         prepared = _prepare_component_selection(
@@ -264,20 +257,17 @@ def iter_fusion_name_asts(
         candidates: list[_Candidate] = []
         parent_seniority, _location_prefix = preference
         for prepared in selections_by_preference[preference]:
-            try:
-                candidates.extend(
-                    _candidates_for_component_selection(
-                        mol,
-                        prepared,
-                        registry,
-                        supported_joins=supported_joins,
-                        allow_multiparent_parents=allow_multiparent_parents,
-                        enforce_interoperability_limits=enforce_interoperability_limits,
-                        required_parent_seniority=parent_seniority,
-                    )
+            candidates.extend(
+                _candidates_for_component_selection(
+                    mol,
+                    prepared,
+                    registry,
+                    supported_joins=supported_joins,
+                    allow_multiparent_parents=allow_multiparent_parents,
+                    enforce_interoperability_limits=enforce_interoperability_limits,
+                    required_parent_seniority=parent_seniority,
                 )
-            except _LocantMapBudgetExceeded:
-                budget_exhausted += 1
+            )
         # The rendered name orders candidates that every structural criterion
         # leaves tied, so it is only needed within a tie. Ranking the whole set
         # by it meant rendering thousands of citations per system when the
@@ -287,10 +277,6 @@ def iter_fusion_name_asts(
                 emitted.append(ast)
                 yield ast
     if not emitted:
-        if budget_exhausted:
-            raise FusionDescriptorError(
-                f"all viable component covers exceeded the locant-map budget of {MAX_LOCANT_MAP_COMBINATIONS} states"
-            )
         tier = "tree-cover" if supported_covers == {"tree"} else "supported-cover"
         raise FusionDescriptorError(f"no exact {tier} fusion citation was found")
 
@@ -358,8 +344,6 @@ def _prepare_component_selection(
 ) -> _PreparedComponentSelection | None:
     """Normalize and audit one exact component cover once."""
 
-    if len(options) > MAX_COMPONENT_OCCURRENCES:
-        return None
     target_atoms = frozenset(atom for option in options for atom in option.atom_ids)
     ranks = _interior_component_order_ranks(mol, target_atoms)
     ordered = tuple(sorted(options, key=lambda option: _occurrence_option_key(option, ranks)))
@@ -697,8 +681,6 @@ def _exact_component_covers(
                 return
             covers.append(selected)
             return
-        if len(selected) >= MAX_COMPONENT_OCCURRENCES:
-            return
         if target_atom_ids is not None:
             compatible = (
                 option for option in options if not option.face_ids & covered and option.face_ids <= target_face_ids
@@ -957,7 +939,6 @@ def _best_tree_mapping_candidate(
     selected_joins: dict[int, FusionJoin] = {}
     side_ranks: dict[int, int] = {}
     best: _Candidate | None = None
-    visited_states = 0
 
     def prefix_is_worse(prefix: tuple[tuple, ...]) -> bool:
         if best is None:
@@ -1030,7 +1011,6 @@ def _best_tree_mapping_candidate(
         }
 
         def select_direct_child(position: int) -> None:
-            nonlocal visited_states
             if position == len(child_ids):
                 ordered = tuple(
                     sorted(
@@ -1050,11 +1030,6 @@ def _best_tree_mapping_candidate(
             interface = interface_by_pair[frozenset((child, node))]
             proved = proved_joins.setdefault(child, {})
             for index, mapping in enumerate(projected[child]):
-                visited_states += 1
-                if visited_states > MAX_LOCANT_MAP_COMBINATIONS:
-                    raise _LocantMapBudgetExceeded(
-                        f"tree locant-map search exceeds bounded limit {MAX_LOCANT_MAP_COMBINATIONS} states"
-                    )
                 if index in proved:
                     classified = proved[index]
                 else:
@@ -1293,15 +1268,8 @@ def _compatible_mapping_assignments(
     assignments: list[tuple[tuple[FusionComponentMatch, ...], Mapping[int, tuple[FusionJoin, int]]]] = []
     selected: dict[int, FusionComponentMatch] = {}
     classified: dict[int, tuple[FusionJoin, int]] = {}
-    visited_states = 0
 
     def visit(position: int) -> None:
-        nonlocal visited_states
-        visited_states += 1
-        if visited_states > MAX_LOCANT_MAP_COMBINATIONS:
-            raise _LocantMapBudgetExceeded(
-                f"compatible locant-map search exceeds bounded limit {MAX_LOCANT_MAP_COMBINATIONS}"
-            )
         if position == len(occurrence_order):
             assignments.append(
                 (
