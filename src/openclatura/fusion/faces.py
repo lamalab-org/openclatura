@@ -130,12 +130,12 @@ def typed_face_model(mol: Molecule, bounded: BoundedFaceModel) -> FaceModel:
 @dataclass(slots=True)
 class _Budget:
     phase: str
-    limit: int
+    limit: int | None
     used: int = 0
 
     def spend(self) -> None:
         self.used += 1
-        if self.used > self.limit:
+        if self.limit is not None and self.used > self.limit:
             raise FaceSearchBudgetExceeded(self.phase, self.limit)
 
 
@@ -145,13 +145,14 @@ def enumerate_chordless_cycles(
     *,
     min_size: int = _CONFIG.search.minimum_ring_size,
     max_size: int = _CONFIG.search.maximum_ring_size,
-    search_budget: int = _CONFIG.search.cycle_states,
+    search_budget: int | None = None,
 ) -> tuple[GraphCycle, ...]:
-    """Enumerate chordless cycles deterministically within a hard budget.
+    """Enumerate chordless cycles deterministically, with an optional budget.
 
     ``min_size`` and ``max_size`` are intentionally constrained to the first
-    production range, 3 through 8.  Exhausting the budget raises instead of
-    exposing a partial cycle set that could be mistaken for a proof.
+    production range, 3 through 8.  An explicitly supplied exhausted budget
+    raises instead of exposing a partial cycle set that could be mistaken for
+    a proof.
     """
 
     if not _CONFIG.search.minimum_ring_size <= min_size <= max_size <= _CONFIG.search.maximum_ring_size:
@@ -159,7 +160,7 @@ def enumerate_chordless_cycles(
             f"cycle sizes must satisfy {_CONFIG.search.minimum_ring_size} <= min_size <= "
             f"max_size <= {_CONFIG.search.maximum_ring_size}"
         )
-    if search_budget < 1:
+    if search_budget is not None and search_budget < 1:
         raise ValueError("search_budget must be positive")
     atoms = frozenset(mol.atoms if atom_ids is None else atom_ids)
     unknown = atoms - mol.atoms.keys()
@@ -243,8 +244,8 @@ def select_bounded_face_model(
     *,
     min_ring_size: int = _CONFIG.search.minimum_ring_size,
     max_ring_size: int | None = None,
-    cycle_search_budget: int = _CONFIG.search.cycle_states,
-    model_search_budget: int = _CONFIG.search.face_model_states,
+    cycle_search_budget: int | None = None,
+    model_search_budget: int | None = None,
 ) -> BoundedFaceModel | None:
     """Return the first deterministic face model satisfying every audit.
 
@@ -257,7 +258,9 @@ def select_bounded_face_model(
     carbon-face completion of otherwise uncovered edges.
     """
 
-    if cycle_search_budget < 1 or model_search_budget < 1:
+    if (cycle_search_budget is not None and cycle_search_budget < 1) or (
+        model_search_budget is not None and model_search_budget < 1
+    ):
         raise ValueError("face search budgets must be positive")
     atoms = frozenset(atom_ids)
     graph_edges = frozenset(edges_within_atoms(mol, set(atoms)))
@@ -312,7 +315,7 @@ def _complete_large_carbon_faces(
     atoms: frozenset[int],
     edges: frozenset[Edge],
     cycles: tuple[GraphCycle, ...],
-    search_budget: int,
+    search_budget: int | None,
 ) -> tuple[GraphCycle, ...]:
     """Complete uncovered edges with bounded, edge-seeded annulene candidates.
 
@@ -400,8 +403,8 @@ def cached_bounded_face_model(
     *,
     min_ring_size: int = _CONFIG.search.minimum_ring_size,
     max_ring_size: int | None = None,
-    cycle_search_budget: int = _CONFIG.search.cycle_states,
-    model_search_budget: int = _CONFIG.search.face_model_states,
+    cycle_search_budget: int | None = None,
+    model_search_budget: int | None = None,
 ) -> BoundedFaceModel | None:
     """Reuse one immutable face proof across fusion naming alternatives."""
 

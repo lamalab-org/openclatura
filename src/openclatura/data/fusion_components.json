@@ -29,9 +29,7 @@
   "search_limits": {
     "minimum_ring_size": 3,
     "maximum_ring_size": 8,
-    "maximum_faces": 24,
-    "cycle_states": 100000,
-    "face_model_states": 50000
+    "maximum_faces": 24
   },
   "annulene_series": {"minimum_ring_size": 7, "maximum_ring_size": 20},
   "ring_shapes": [
