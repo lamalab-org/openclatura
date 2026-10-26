@@ -42,6 +42,20 @@ def test_repeated_candidate_reuses_an_immutable_model(monkeypatch):
     assert numbering._parent_graph_bond_model.cache_info().maxsize == 128
 
 
+def test_default_mancude_search_has_no_state_budget(monkeypatch):
+    budgets = []
+    original = numbering._maximum_matchings
+
+    def capture(edges, *, search_budget):
+        budgets.append(search_budget)
+        return original(edges, search_budget=search_budget)
+
+    monkeypatch.setattr(numbering, "_maximum_matchings", capture)
+    numbering.parent_bond_model(_cycle())
+
+    assert budgets == [None]
+
+
 @pytest.mark.parametrize(
     "changes",
     (

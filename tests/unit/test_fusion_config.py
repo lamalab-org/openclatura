@@ -31,6 +31,8 @@ def test_checked_in_fusion_configuration_is_complete_and_data_backed():
     assert config.rules.minimum_ring_count == 2
     assert {shape.ring_size for shape in config.ring_shapes} == set(range(3, 9))
     assert config.search.maximum_faces == 24
+    assert not hasattr(config.search, "mancude_states")
+    assert not hasattr(config.search, "interior_numbering_states")
 
 
 @pytest.mark.parametrize(

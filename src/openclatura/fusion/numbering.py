@@ -503,7 +503,7 @@ def parent_bond_model(
     parent: FusionGraph | Molecule,
     atom_ids: Iterable[int] | None = None,
     *,
-    search_budget: int = _CONFIG.search.mancude_states,
+    search_budget: int | None = None,
 ) -> ParentBondModel:
     """Build all maximum non-cumulative Kekule assignments for a parent graph."""
 
@@ -514,7 +514,7 @@ def parent_bond_model(
 
 @lru_cache(maxsize=128)
 def _parent_graph_bond_model(
-    graph: FusionGraph, search_budget: int, _element_policies: tuple[elements.Element, ...]
+    graph: FusionGraph, search_budget: int | None, _element_policies: tuple[elements.Element, ...]
 ) -> ParentBondModel:
     """Reuse immutable candidate models, including the active policy in the key."""
 
@@ -554,7 +554,7 @@ def retained_template_parent_bond_model(
     template: RetainedGraphTemplate,
     locant_to_input_atom: Mapping[str, int],
     *,
-    search_budget: int = _CONFIG.search.mancude_states,
+    search_budget: int | None = None,
     indicated_h: tuple[str, ...] | None = None,
 ) -> ParentBondModel:
     """Build the parent-hydride bond model for one retained-template mapping.
@@ -704,7 +704,7 @@ def _number_completed_system(
             perimeter,
             result,
             interior_carbons,
-            search_budget=_CONFIG.search.interior_numbering_states,
+            search_budget=None,
         )
     except _InteriorNumberingBudgetExceeded:
         return None
@@ -772,14 +772,14 @@ def _legacy_interior_carbon_numbering(
     numbered: dict[int, SystemLocant],
     interior_carbons: set[int],
     *,
-    search_budget: int,
+    search_budget: int | None,
 ) -> dict[int, SystemLocant] | None:
     """Apply the CAS elaboration of A-22.2 recorded in FR-5.5.2(a)-(d)."""
 
     remaining = set(interior_carbons)
     if not remaining:
         return numbered
-    if search_budget < 1:
+    if search_budget is not None and search_budget < 1:
         raise ValueError("interior numbering search budget must be positive")
     _, peripheral_anchors = _interior_distances_and_anchors(mol, atom_ids, perimeter)
     states = [0]
@@ -841,7 +841,7 @@ def _preferred_interior_path(
     peripheral_anchors: Mapping[int, frozenset[int]],
     numbered: Mapping[int, SystemLocant],
     states: list[int],
-    search_budget: int,
+    search_budget: int | None,
 ) -> tuple[int, ...] | None:
     paths = []
     for neighbor in mol.get_neighbors(anchor):
@@ -868,10 +868,10 @@ def _maximal_simple_paths(
     path: tuple[int, ...],
     available: set[int],
     states: list[int],
-    search_budget: int,
+    search_budget: int | None,
 ) -> tuple[tuple[int, ...], ...]:
     states[0] += 1
-    if states[0] > search_budget:
+    if search_budget is not None and states[0] > search_budget:
         raise _InteriorNumberingBudgetExceeded
     extensions = tuple(
         neighbor for neighbor in mol.get_neighbors(path[-1]) if neighbor in atom_ids and neighbor in available
@@ -1093,7 +1093,7 @@ def _locant_key(locant: SystemLocant) -> tuple[int, str, int]:
 
 
 def _maximum_matchings(
-    edges: frozenset[tuple[int, int]], *, search_budget: int
+    edges: frozenset[tuple[int, int]], *, search_budget: int | None
 ) -> tuple[frozenset[tuple[int, int]], ...]:
     """Return every maximum matching using memoized residual vertex states.
 
@@ -1118,7 +1118,7 @@ def _maximum_matchings(
         if cached is not None:
             return cached
         states += 1
-        if states > search_budget:
+        if search_budget is not None and states > search_budget:
             raise MancudeSearchBudgetExceeded(search_budget)
         if not available:
             return (frozenset(),)
