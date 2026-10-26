@@ -44,7 +44,6 @@ _IMPLEMENTED_JOIN_KINDS = ("ortho", "ortho_peri", "higher_order")
 class FusionSearchLimits:
     minimum_ring_size: int
     maximum_ring_size: int
-    maximum_faces: int
 
 
 @dataclass(frozen=True, slots=True)

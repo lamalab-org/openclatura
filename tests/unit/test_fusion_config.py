@@ -30,7 +30,7 @@ def test_checked_in_fusion_configuration_is_complete_and_data_backed():
     assert config.rules.minimum_ring_size == 5
     assert config.rules.minimum_ring_count == 2
     assert {shape.ring_size for shape in config.ring_shapes} == set(range(3, 9))
-    assert config.search.maximum_faces == 24
+    assert not hasattr(config.search, "maximum_faces")
     assert not hasattr(config.search, "cycle_states")
     assert not hasattr(config.search, "face_model_states")
     assert not hasattr(config.search, "mancude_states")
@@ -41,7 +41,6 @@ def test_checked_in_fusion_configuration_is_complete_and_data_backed():
     ("path", "value", "message"),
     [
         (("graph_source",), "independent_templates", "shared retained"),
-        (("search_limits", "maximum_faces"), 0, "must be positive"),
         (("ring_shapes",), [], "ring_shapes"),
     ],
 )
@@ -63,12 +62,3 @@ def test_configuration_cannot_enable_an_unimplemented_proof_tier(field, value):
 
     with pytest.raises(ValueError, match="unimplemented|exceed the implemented"):
         fusion_nomenclature_config_from_data(data)
-
-
-def test_face_limit_is_independent_of_component_grammar_support():
-    data = deepcopy(load_json_table("fusion_components.json"))
-    data["search_limits"]["maximum_faces"] = 19
-
-    config = fusion_nomenclature_config_from_data(data)
-
-    assert config.search.maximum_faces == 19

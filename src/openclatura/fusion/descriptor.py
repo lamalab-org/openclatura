@@ -49,9 +49,7 @@ from .rules import (
     multiplicative_member_order_key,
 )
 
-_LIMITS = fusion_nomenclature_config().search
 _SUPPORT = fusion_nomenclature_config().rules.support
-MAX_FACES = _LIMITS.maximum_faces
 
 
 class FusionDescriptorError(ValueError):
@@ -220,8 +218,6 @@ def iter_fusion_name_asts(
     face_ids = tuple(sorted(set().union(*(option.face_ids for option in options))))
     if len(face_ids) < 2:
         raise FusionDescriptorError("a fusion citation requires at least two component faces")
-    if len(face_ids) > MAX_FACES:
-        raise FusionDescriptorError(f"face count {len(face_ids)} exceeds bounded limit {MAX_FACES}")
 
     selections = _exact_component_covers(options, frozenset(face_ids), target_atom_ids=target_atoms)
     parent_scopes: dict[tuple, set[frozenset[int]]] = defaultdict(set)
