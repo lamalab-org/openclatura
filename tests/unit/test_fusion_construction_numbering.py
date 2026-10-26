@@ -106,7 +106,7 @@ CASES = (
     (
         59728,
         "CC(C)C1=C2[C@H]3CC=C4[C@@H]5[C@@H](O[C@@H]6OC[C@@](O)(C(=O)[C@@]65O)[C@@H]4O)[C@]3(C)CC[C@]2(C)CC1",
-        "cyclopenta[1'',2'':1',2']benzo[3',4':1,2]cyclohepta[3,4,5-cd]2-benzofuran",
+        "cyclopenta[1''',2''':1'',2'']benzo[3'',4'':1',2']cyclohepta[3',4':2,3]furo[5,4-b]pyran",
     ),
     (
         64746,
