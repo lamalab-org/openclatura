@@ -10,6 +10,7 @@ from openclatura.fusion.planner import plan_fusion_parent
 from openclatura.fusion.wrappers import (
     NondetachableBridgeKind,
     WrapperParentKind,
+    _bridge_removal_candidate_groups,
     plan_bridged_fusion_wrapper,
     plan_fusion_spiro_side,
 )
@@ -180,11 +181,13 @@ def test_bridged_wrapper_request_mode_does_not_claim_unaudited_pin_preference():
     assert selected.data["search_states"] > 0
 
 
-def test_bridged_fusion_wrapper_abstains_when_search_budget_is_exhausted(monkeypatch):
-    mol = read_smiles("C12=CC=C(C=3C4=CC=C(C13)C4)O2")
-    monkeypatch.setattr("openclatura.fusion.wrappers._WRAPPER_SEARCH_STATES", 1)
+def test_bridge_candidate_generation_has_no_state_cap_and_is_size_ordered():
+    segments = tuple(frozenset({atom}) for atom in range(13))
 
-    assert plan_bridged_fusion_wrapper(mol, mol.atoms, mode=FusionMode.GENERAL) is None
+    groups = tuple(_bridge_removal_candidate_groups(segments, None))
+
+    assert tuple(size for size, _ in groups) == tuple(range(1, 14))
+    assert sum(len(candidates) for _, candidates in groups) == 8191
 
 
 def test_ordinary_fused_parent_is_not_misclassified_as_a_bridge_wrapper():
