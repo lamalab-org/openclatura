@@ -37,7 +37,6 @@ def test_checked_in_fusion_configuration_is_complete_and_data_backed():
     ("path", "value", "message"),
     [
         (("graph_source",), "independent_templates", "shared retained"),
-        (("search_limits", "layout_states"), 0, "must be positive"),
         (("search_limits", "maximum_faces"), 0, "must be positive"),
         (("ring_shapes",), [], "ring_shapes"),
     ],

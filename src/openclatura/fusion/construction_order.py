@@ -28,7 +28,7 @@ def ordered_hexagonal_construction(
     specs: dict[int, FusionComponentSpec],
     model: FaceModel,
     positions: dict[int, Point],
-    search_budget: int,
+    search_budget: int | None,
 ) -> ConstructionOrder | None:
     from .layout import _center_row_orientation_score
 
@@ -133,9 +133,10 @@ def ordered_hexagonal_construction(
             # replacements in place. Sorting or snapshot iteration differs.
             change = False
             for target_index, target in enumerate(rings):
-                remaining -= 1
-                if remaining < 0:
-                    return None
+                if remaining is not None:
+                    remaining -= 1
+                    if remaining < 0:
+                        return None
                 if target is ring:
                     continue
                 reduced = difference(target, ring)

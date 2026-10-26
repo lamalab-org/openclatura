@@ -126,8 +126,8 @@ def test_straight_chain_search_has_a_linear_state_ceiling(monkeypatch, count):
         context.setattr(layout, "_Budget", CountedBudget)
         result = entry_geometry.entry_direction_geometry(model, 25000)
     assert result is not None
-    assert len(budgets) == 1
-    assert budgets[0].used <= 32 * count
+    assert len(budgets) == 2
+    assert budgets[-1].used <= 32 * count
     assert len(result[1]) >= 2
     assert all(witness.orientation_score[:2] == (0, -count) for witness in result[1])
     entry_geometry.entry_direction_geometry.cache_clear()
@@ -147,12 +147,9 @@ def test_intrinsic_cache_normalizes_defaults_and_preserves_limits(monkeypatch):
         layout._preferred_intrinsic_layouts.cache_clear()
         first = layout.preferred_intrinsic_layouts(model)
         assert first
-        assert (
-            layout.preferred_intrinsic_layouts(model, search_budget=25000, max_layouts=4096, opsin_ring_map=False)
-            is first
-        )
+        assert layout.preferred_intrinsic_layouts(model, opsin_ring_map=False) is first
         assert len(calls) == 1
-        assert layout.preferred_intrinsic_layouts(model, search_budget=25001) == first
+        assert layout.preferred_intrinsic_layouts(model, search_budget=25000, max_layouts=4096) == first
         assert len(calls) == 2
         for limits in ({"search_budget": 1}, {"max_layouts": 1}):
             with pytest.raises(layout.LayoutSearchBudgetExceeded):

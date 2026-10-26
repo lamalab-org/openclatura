@@ -47,8 +47,6 @@ class FusionSearchLimits:
     maximum_faces: int
     cycle_states: int
     face_model_states: int
-    layout_states: int
-    maximum_layouts: int
     mancude_states: int
     interior_numbering_states: int
 
